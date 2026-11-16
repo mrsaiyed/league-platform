@@ -262,6 +262,8 @@ const samePlace = (a: SettingPlace, b: SettingPlace) => JSON.stringify(a) === JS
  * screen on the stand-in yet: those parts fail by name (createLeague, setLeagueName,
  * renameShortName, setLeagueStatus, createSeason, updateSeason, setSeasonRules,
  * setSeasonRosterSettings, setCurrentSeason, getSeason, and every division command).
+ * Publishing a site design has no screen yet either: the stand-in's made-up leagues keep
+ * their designs as data (stand-in-league-sites.ts), so its two site parts fail by name.
  */
 export function worldLeaguesStores(
   s: LeagueWorld,
@@ -293,6 +295,8 @@ export function worldLeaguesStores(
     programCount: notYet('leagues.programCount'),
     updateSeason: notYet('leagues.updateSeason'),
     setCurrentSeason: notYet('leagues.setCurrentSeason'),
+    latestSiteReleaseNumber: notYet('leagues.latestSiteReleaseNumber'),
+    publishSiteRelease: notYet('leagues.publishSiteRelease'),
     isPlatformStaff: async () => false,
     settingRows: async (key, places) =>
       s.settings

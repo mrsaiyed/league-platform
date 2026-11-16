@@ -1446,6 +1446,8 @@ export const en = {
   'activity.leagues.set_name': "Changed the league's name",
   'activity.leagues.rename_short_name': "Changed the league's address to {slug}",
   'activity.leagues.set_status': "Changed the league's state to {status}",
+  'activity.leagues.publish_site_design':
+    "Published a design for the league's site (version {number})",
   'activity.leagues.create_season': 'Added a season',
   'activity.leagues.set_current_season': 'Changed the current season',
   'activity.leagues.update_season': 'Changed a season',

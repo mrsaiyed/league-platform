@@ -95,6 +95,9 @@ export type LeagueRecords = MadeLeague & {
   readyImportId: string;
   /** A fixtures import still waiting to be read, holding the uploaded text. */
   readingImportId: string;
+  /** The league's first published site release, and its site pointed at it (0020). */
+  siteReleaseId: string;
+  siteId: string;
 };
 
 export type TwoLeagues = {
@@ -539,6 +542,22 @@ async function seededLeague(
       JSON.stringify({ version: 1, upload: 'Date,Home,Away' }),
     ],
   );
+  // Its published design and its site (0020). The design is a starting design's with
+  // the league's marker in a value of its own, so a read that met the other league's
+  // release would carry its marker; each league's release is number 1.
+  const design = JSON.stringify({ version: 1, base: 'light', mark: m });
+  const siteReleaseId = await id(
+    pglite,
+    `insert into site_releases (league_id, number, starting_design, design, published_by_account_id)
+     values ($1, 1, 'crest', $2::jsonb, $3)`,
+    [leagueId, design, ownerId],
+  );
+  const siteId = await id(
+    pglite,
+    `insert into sites (league_id, starting_design, design_draft, published_release_id)
+     values ($1, 'crest', $2::jsonb, $3)`,
+    [leagueId, design, siteReleaseId],
+  );
   // A job a worker holds. It carries ids only (T-131), so no marker: its ids are the league's.
   const jobLeaseToken = randomUUID();
   const jobId = await id(
@@ -598,6 +617,8 @@ async function seededLeague(
     importId,
     readyImportId,
     readingImportId,
+    siteReleaseId,
+    siteId,
   };
 }
 

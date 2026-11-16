@@ -18,7 +18,7 @@
 // cannot be granted until those tables exist (0004). Their permissions are tested
 // in core (modules/access/policy.test.ts), and they join this matrix with the
 // clubs and teams step.
-import { defaultSeasonRules } from '@srleagues/contracts';
+import { defaultSeasonRules, startingDesign } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
@@ -130,6 +130,7 @@ import {
   setSeasonRosterSettings,
   setLeagueName,
   setLeagueStatus,
+  publishSiteDesign,
   type AccessTx,
   type CommandContext,
   type CommandRequirement,
@@ -1893,6 +1894,21 @@ const rows: readonly Row[] = [
     needs: 'platform-staff',
     prepare: async () => ({ input: { status: 'suspended', version: 1 } }),
     run: (c, i) => setLeagueStatus(c, i, leaguesDeps),
+  },
+  // The league's site (P5 §2, step 2.187): publishing its design is the Site area's
+  // `site.publish`, which the owner, admins and editors hold (P4 §4).
+  {
+    command: 'leagues.publish_site_design',
+    name: "publish a design for the league's site",
+    needs: 'site.publish',
+    prepare: async () => ({
+      input: {
+        startingDesign: 'midnight-gold',
+        design: startingDesign('midnight-gold'),
+        sinceRelease: 0,
+      },
+    }),
+    run: (c, i) => publishSiteDesign(c, i, leaguesDeps),
   },
   // Seasons are checked at their program (P4 §4): the default program's rows refuse
   // the admin of another program; the program's rows let that program's admin in.
