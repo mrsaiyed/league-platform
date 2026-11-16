@@ -5,6 +5,7 @@ import { checkLoginRole } from '../db/check-login-role.ts';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import { withTransaction } from '../db/with-transaction.ts';
+import { findLeagueAudience } from '../queries/index.ts';
 import { leaguesStore } from '../stores/index.ts';
 import { madeUpDatabase, type MadeUpDatabase } from './made-up-database.ts';
 import { seedLeagues } from './seed-data.ts';
@@ -62,5 +63,26 @@ describe('madeUpDatabase', () => {
       await binned.close();
     }
     await expect(madeUpDatabase({ inBin: ['no-such-league'] })).rejects.toThrow(/no seed league/);
+  }, 60_000);
+
+  it('tells a seed league another audience when asked, and refuses a name it does not hold', async () => {
+    const [first, second] = made.leagues;
+    if (first === undefined || second === undefined) throw new Error('two seed leagues expected');
+    const mixed = await madeUpDatabase({ audiences: { [first.slug]: 'mixed' } });
+    const mixedDb = createDatabase(mixed.source);
+    try {
+      const audienceOf = (leagueId: string) =>
+        withTransaction(mixedDb, { leagueId }, (scope) => findLeagueAudience(scope));
+      const ids = new Map(mixed.leagues.map((league) => [league.slug, league.leagueId]));
+      expect(await audienceOf(ids.get(first.slug) ?? '')).toBe('mixed');
+      const own = seedLeagues.find((league) => league.slug === second.slug)?.audience;
+      expect(await audienceOf(ids.get(second.slug) ?? '')).toBe(own);
+    } finally {
+      await mixedDb.close();
+      await mixed.close();
+    }
+    await expect(madeUpDatabase({ audiences: { 'no-such-league': 'adult' } })).rejects.toThrow(
+      /no seed league/,
+    );
   }, 60_000);
 });

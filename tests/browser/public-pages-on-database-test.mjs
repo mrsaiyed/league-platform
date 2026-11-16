@@ -89,6 +89,12 @@ const people = [
       points: 10,
     },
     homeLeaders: ['Robin Placeholder', 'Quinn S.'],
+    // The adult league's child, on their own team: by first name and last initial (R-14).
+    child: {
+      team: { slug: 'otters', name: 'Lakeside Otters' },
+      shown: 'Quinn S.',
+      lastName: 'Sample',
+    },
     // The child's surname, and the made-up private values the seed holds.
     neverShown: ['Sample', 'morgan@lakeside', 'robin@lakeside', '1990-04-12', '2012-09-03'],
   },
@@ -306,18 +312,20 @@ if (browser) {
       note(`${slug}: ${league.team.name}'s page names the team`, has(team.text, league.team.name));
       // The page's tables, cell by cell: a number is checked in its own row and column,
       // never anywhere in the page's text, where a "4" or a "10" nearly always is.
-      const tables = await page.evaluate(() =>
-        [...document.querySelectorAll('main table')].map((table) => ({
-          headers: [...table.querySelectorAll('thead th')].map((th) =>
-            th.textContent.replace(/\s+/g, ' ').trim(),
-          ),
-          rows: [...table.querySelectorAll('tbody tr')].map((tr) =>
-            [...tr.children].map((cell) => cell.textContent.replace(/\s+/g, ' ').trim()),
-          ),
-        })),
-      );
-      const rowOf = (name) =>
-        tables.flatMap((table) => {
+      const tablesOnPage = () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('main table')].map((table) => ({
+            headers: [...table.querySelectorAll('thead th')].map((th) =>
+              th.textContent.replace(/\s+/g, ' ').trim(),
+            ),
+            rows: [...table.querySelectorAll('tbody tr')].map((tr) =>
+              [...tr.children].map((cell) => cell.textContent.replace(/\s+/g, ' ').trim()),
+            ),
+          })),
+        );
+      const tables = await tablesOnPage();
+      const rowOf = (name, inTables = tables) =>
+        inTables.flatMap((table) => {
           const points = table.headers.findIndex((h) => /\bPoints\b/.test(h));
           return (
             table.rows
@@ -347,6 +355,26 @@ if (browser) {
       );
       await nothingPrivate(`${league.team.name}'s page`);
       await accessible(`/${slug}/teams/${league.team.slug} on the database`);
+
+      // A child's own team page: their roster line by first name and last initial (R-14).
+      if (league.child !== undefined) {
+        const { child } = league;
+        const theirs = await open(`/${slug}/teams/${child.team.slug}`);
+        note(`${slug}: ${child.team.name}'s page is served`, theirs.status === 200);
+        const line = rowOf(child.shown, await tablesOnPage()).find(
+          (row) => row.points === undefined,
+        );
+        note(
+          `${slug}: ${child.team.name}'s roster shows the child as ${child.shown}`,
+          line !== undefined,
+          theirs.text.slice(0, 600),
+        );
+        note(
+          `${slug}: ${child.team.name}'s page never shows the child's family name`,
+          !has(theirs.text, child.lastName),
+        );
+        await nothingPrivate(`${child.team.name}'s page`);
+      }
 
       const home = await open(`/${slug}`);
       for (const leader of league.homeLeaders) {

@@ -8,7 +8,12 @@
 // parents' confirmation, and with a player's own request to be taken off. Each time the
 // names must be the ones the rules give, read from the league's own audience and
 // settings, and no page's data may hold a full name where the policy shortens it, a
-// withheld first or last name, or any private value (a contact address, a birth date).
+// withheld first or last name, any private value (a contact address, a birth date), or
+// any person's database id. Then each way a person is shown less or leaves (an adult's
+// own request for initials, a team whose statistics are its staff's only, a player who
+// left their team, the same person moved to the bin) and a league of mixed ages. A
+// league whose audience cannot be read is read as youth by findLeagueAudience (its own
+// test); the column admits no other value, so no seed league can be made one.
 import {
   findPrivateFields,
   privateValuesOf,
@@ -16,11 +21,16 @@ import {
   readStatisticsTable,
   setNameRequest,
   setSetting,
+  markLeft,
+  removePerson,
+  setTeamStatsVisibility,
+  type Audience,
   type CommandDeps,
   type LeaguesTx,
   type NameRequest,
   type PeopleTx,
   type ShownName,
+  type TeamsTx,
 } from '@srleagues/core';
 import * as database from '@srleagues/database';
 import { createElement } from 'react';
@@ -44,9 +54,11 @@ let db: database.DatabaseHandle;
 let stats: PublicStatsPorts;
 let settingsDeps: CommandDeps<LeaguesTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
+let teamsDeps: CommandDeps<TeamsTx>;
 
-beforeAll(async () => {
-  made = await database.madeUpDatabase({ underWay: true });
+/** Opens a made-up database with the seasons under way, and the ports and commands on it. */
+async function open(options: database.MadeUpOptions = {}) {
+  made = await database.madeUpDatabase({ ...options, underWay: true });
   db = database.createDatabase(made.source);
   stats = databasePublicStats(database, db);
   const base = (scope: database.LeagueScope) => ({
@@ -73,7 +85,18 @@ beforeAll(async () => {
     log: () => {},
     now: () => performance.now(),
   };
-}, 120_000);
+  teamsDeps = {
+    transaction: database.commandTransaction(db, (scope) => ({
+      ...base(scope),
+      teams: database.teamsStore(scope),
+    })),
+    events: [],
+    log: () => {},
+    now: () => performance.now(),
+  };
+}
+
+beforeAll(() => open(), 120_000);
 
 afterAll(async () => {
   await db.close();
@@ -149,8 +172,20 @@ async function pagesOf(slug: string) {
       .flatMap((p) => p.roster.lines)
       .map((line) => (line.name.shown ? line.name.text : null)),
     leaderNames: leaders.map((l) => l.name),
+    /** Each team's page as it was read: its head, its statistics and its roster. */
+    teamPages,
   };
 }
+
+/** What a scan also expects, beyond the names setting and each person's own request. */
+type ScanCase = {
+  /** Who plays, when the league was told another audience than the seed's. */
+  readonly audience?: Audience;
+  /** First names of players on a team whose statistics are for its staff only. */
+  readonly absentFromStats?: readonly string[];
+  /** First names of players who have left their team: still in its history, marked. */
+  readonly former?: readonly string[];
+};
 
 /**
  * Every person of the league as its owner's list holds them (people not in the bin), read
@@ -226,22 +261,26 @@ async function scan(
   slug: string,
   setting: Setting,
   requests: Readonly<Record<string, NameRequest>>,
+  also: ScanCase = {},
 ) {
   const { seed } = leagueOf(slug);
+  const audience = also.audience ?? seed.audience;
   const pages = await pagesOf(slug);
   const want = seed.people.map((person, place) => {
     const request = requests[person.firstName] ?? 'none';
-    return { person, place, request, shown: expected(person, seed.audience, setting, request) };
+    return { person, place, request, shown: expected(person, audience, setting, request) };
   });
-  // The statistics page, by each player's points: the seed gave place p 10 + 4p.
-  for (const { place, shown } of want) {
+  const absent = (first: string) => also.absentFromStats?.includes(first) === true;
+  // The statistics page, by each player's points: the seed gave place p 10 + 4p. A player
+  // of a team whose statistics are its staff's only is not on it at all.
+  for (const { person, place, shown } of want) {
     const cell = pages.byPoints.get(10 + 4 * place);
     expect(cell, `${slug} ${setting} place ${place}`).toBe(
-      shown.shown ? shown.text : 'A player (name not shown)',
+      absent(person.firstName) ? undefined : shown.shown ? shown.text : 'A player (name not shown)',
     );
   }
-  // The rosters and the leaders show the same names, and none other.
-  const shownNames = want.map((w) => asText(w.shown));
+  // The rosters show every name the rules give, and none other; the leaders only those.
+  const shownNames = want.filter((w) => !absent(w.person.firstName)).map((w) => asText(w.shown));
   expect([...pages.rosterNames].sort()).toEqual(
     want
       .map((w) => w.shown)
@@ -250,6 +289,24 @@ async function scan(
   );
   for (const name of pages.leaderNames) {
     expect([...shownNames, 'A player (name not shown)']).toContain(name);
+  }
+  // A player of a staff-only team: that team's page shows its totals only, no player line.
+  for (const { person, shown } of want.filter((w) => absent(w.person.firstName))) {
+    const theirs = pages.teamPages.find((p) =>
+      p.roster.lines.some((line) => line.name.shown && line.name.text === asText(shown)),
+    );
+    expect(theirs?.teamStats?.playerLinesShown, person.firstName).toBe(false);
+    expect(theirs?.teamStats?.playerRows ?? [], person.firstName).toEqual([]);
+  }
+  // One who left their team stays on its roster, marked as having left (R-17).
+  for (const { person, shown } of want.filter((w) => also.former?.includes(w.person.firstName))) {
+    const lines = pages.teamPages.flatMap((p) => p.roster.lines);
+    const theirs = lines.filter((line) => line.name.shown && line.name.text === asText(shown));
+    if (!shown.shown) continue;
+    expect(
+      theirs.map((line) => line.former),
+      person.firstName,
+    ).toEqual([true]);
   }
   // Nothing withheld, and nothing private, anywhere in any page's data.
   const privateValues = want.flatMap(({ person, request, shown }) =>
@@ -354,5 +411,123 @@ describe('the T-81 scan through the database-backed ports', () => {
     const { seed } = leagueOf('maple-street');
     await scan('maple-street', 'fullConfirmed', { [seed.people[0]?.firstName ?? '']: 'removed' });
     await scan('lakeside', 'hidden', {});
+  });
+});
+
+/** The owner of a seed league, as a command's context. */
+const asOwner = (slug: string) => {
+  const { leagueId, ownerAccountId } = leagueOf(slug);
+  return { leagueId, accountId: ownerAccountId, requestId: 'scan' };
+};
+/** A seed person's id, by first name, from the owner's own list. */
+const personNamed = async (slug: string, firstName: string) => {
+  const id = (await peopleOf(slug)).find((p) => p.firstName === firstName)?.id;
+  if (id === undefined) throw new Error(`no ${firstName} in ${slug}`);
+  return id;
+};
+const must = <T>(what: string, result: { ok: true; value: T } | { ok: false; error: unknown }) => {
+  if (!result.ok) throw new Error(`${what}: ${JSON.stringify(result.error)}`);
+  return result.value;
+};
+
+describe('the T-81 scan on the database: each way a person is shown less or leaves', () => {
+  it("follows a person's own request for initials, a staff-only team, a former player and a person in the bin", async () => {
+    const slug = 'lakeside';
+    const as = asOwner(slug);
+    // Back to full names, not confirmed: the start (the tests before left it hidden).
+    await save(slug, 'privacy.publicNames', 'fullName');
+    await scan(slug, 'start', {});
+
+    // An adult's own request for initials, once the league lets adults ask (R-15, R-25).
+    await save(slug, 'privacy.playersMayAskForInitials', true);
+    const robin = await personNamed(slug, 'Robin');
+    const robinVersion = await peopleDeps.transaction(
+      as,
+      async (tx) => (await tx.people.find(robin, false))?.version ?? 0,
+    );
+    must(
+      'initials',
+      await setNameRequest(
+        as,
+        { personId: robin, version: robinVersion, showAs: 'initials', reason: 'personAsked' },
+        peopleDeps,
+      ),
+    );
+    await scan(slug, 'start', { Robin: 'initials' });
+
+    // The child's team keeps its players' statistics to its staff (S-22): the child is on
+    // its roster still, and on no statistics page, leaders card or player line.
+    const quinn = await personNamed(slug, 'Quinn');
+    const [season] = await stats.seasonsOf(as.leagueId);
+    const store = stats.readStoreOf(as.leagueId);
+    const playedFor = async (personId: string) => {
+      const teams = await store.playerTeams(season?.id ?? '');
+      const teamId = teams.find((row) => row.personId === personId)?.teamId;
+      if (teamId === undefined) throw new Error(`no team for ${personId}`);
+      return teamId;
+    };
+    const quinnsTeam = await playedFor(quinn);
+    const teamVersion = await teamsDeps.transaction(
+      as,
+      async (tx) => (await tx.teams.find(quinnsTeam))?.version ?? 0,
+    );
+    must(
+      'staff only',
+      await setTeamStatsVisibility(
+        as,
+        { teamId: quinnsTeam, version: teamVersion, statsVisibility: 'staff' },
+        teamsDeps,
+      ),
+    );
+    await scan(slug, 'start', { Robin: 'initials' }, { absentFromStats: ['Quinn'] });
+
+    // A player who left their team: still on its roster, marked, and still in the
+    // statistics of the games they played (R-17).
+    const morgan = await personNamed(slug, 'Morgan');
+    const morgansTeam = await playedFor(morgan);
+    const entry = await teamsDeps.transaction(as, async (tx) =>
+      (await tx.teams.listRoster(morgansTeam)).find((line) => line.personId === morgan),
+    );
+    if (entry === undefined) throw new Error('no roster entry for Morgan');
+    must(
+      'left',
+      await markLeft(
+        as,
+        {
+          rosterEntryId: entry.id,
+          version: entry.version,
+          leftOn: entry.joinedOn ?? new Date().toISOString().slice(0, 10),
+        },
+        teamsDeps,
+      ),
+    );
+    const left = { absentFromStats: ['Quinn'], former: ['Morgan'] } as const;
+    await scan(slug, 'start', { Robin: 'initials' }, left);
+
+    // The same person moved to the bin: no name on any page, though their games still
+    // count (a nameless line), and nothing of theirs anywhere, their id included.
+    must('bin', await removePerson(as, { personId: morgan }, peopleDeps));
+    const binned = await scan(slug, 'start', { Robin: 'initials', Morgan: 'removed' }, left);
+    expect(binned).toEqual(expect.arrayContaining(['Morgan', 'Example']));
+  });
+});
+
+describe('the T-81 scan on the database: a league whose players are of mixed ages', () => {
+  beforeAll(async () => {
+    await db.close();
+    await made.close();
+    peopleKept.clear();
+    versions.clear();
+    await open({ audiences: { lakeside: 'mixed' } });
+  }, 120_000);
+
+  it('shows a player whose age is not known as a child until the confirmation (R-14, R-15)', async () => {
+    // Robin's age is not known: in a mixed league that is a child, with care.
+    const start = await scan('lakeside', 'start', {}, { audience: 'mixed' });
+    expect(start).toEqual(expect.arrayContaining(['Placeholder']));
+    await save('lakeside', 'privacy.childrenInFullConfirmed', true, true);
+    await scan('lakeside', 'fullConfirmed', {}, { audience: 'mixed' });
+    await save('lakeside', 'privacy.publicNames', 'firstNameLastInitial');
+    await scan('lakeside', 'initial', {}, { audience: 'mixed' });
   });
 });
