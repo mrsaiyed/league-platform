@@ -1,4 +1,6 @@
+import type { CSSProperties } from 'react';
 import { Emblem } from '../emblem/emblem.tsx';
+import { safeColor } from '../team-color.ts';
 import { Facts, type Fact } from '../facts/facts.tsx';
 
 export type TeamCardFact = Fact;
@@ -16,7 +18,11 @@ export type TeamCardProps = {
 /** A team as a card: its emblem, its name, its record and a few facts. One link, whole. */
 export function TeamCard({ name, href, color, figure, facts }: TeamCardProps) {
   return (
-    <article className="ui-team-card">
+    <article
+      className="ui-team-card"
+      // The team's own color, for the fine line at the card's top.
+      style={safeColor(color) ? ({ '--team-color': safeColor(color) } as CSSProperties) : undefined}
+    >
       <Emblem name={name} color={color} />
       <div className="ui-team-card-text">
         {/* Level two: a teams page has its title and then its teams, with no level between. */}

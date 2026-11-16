@@ -1,4 +1,5 @@
-import { EmptyPanel, PageHead, TeamCard as TeamCardPiece } from '@srleagues/ui';
+import { leagueUrl } from '@srleagues/core';
+import { CallBand, EmptyPanel, PageHead, TeamCard as TeamCardPiece } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
@@ -73,7 +74,7 @@ export async function TeamsPage({
   if (season !== undefined && cards === undefined) return notFound();
   return (
     <main>
-      <PageHead title={t('teams.title')} eyebrow={season?.name} />
+      <PageHead title={t('teams.heading')} kicker={season?.name} sub={t('teams.lead')} />
       {season === undefined || cards === undefined ? (
         <EmptyPanel text={t('teams.noSeason')} />
       ) : (
@@ -87,7 +88,20 @@ export async function TeamsPage({
               }}
             />
           ) : (
-            <TeamCards cards={cards} />
+            <>
+              <TeamCards cards={cards} />
+              {/* The page closes as the home page does: one band, one way on. */}
+              <CallBand
+                title={t('teams.call.title')}
+                text={t('teams.call.text')}
+                action={{
+                  href: leagueUrl(addressee, 'schedule', {
+                    season: season.isCurrent ? undefined : season.slug,
+                  }),
+                  label: t('home.hero.schedule'),
+                }}
+              />
+            </>
           )}
         </>
       )}

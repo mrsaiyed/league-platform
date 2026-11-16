@@ -105,8 +105,8 @@ export const tableCss = String.raw`
     inset-inline-end: var(--step-2);
     inline-size: var(--step-2);
     block-size: var(--step-2);
-    border-block-end: 2px solid var(--color-text);
-    border-inline-end: 2px solid var(--color-text);
+    border-block-end: var(--line-heavy) solid var(--color-text);
+    border-inline-end: var(--line-heavy) solid var(--color-text);
     transform: rotate(-45deg);
   }
   [dir='rtl'] .ui-table-frame::after {
@@ -295,9 +295,15 @@ export const tableCss = String.raw`
 .ui-standings[data-emblems='true'] .ui-team-cell > [dir] {
   max-inline-size: calc(45cqi - var(--step-6) - var(--step-3));
 }
+/* And the one width the team column has in every division's table grows by what the emblem
+   is wider than the chip, so it still holds a name of about ten letters and a note's mark:
+   the numbers of two divisions stay under each other. */
+.ui-standings[data-emblems='true'] .ui-team-cell {
+  min-inline-size: calc(7.5rem + var(--step-3));
+}
 /* A table with emblems stands among scoreboards, and has their fine line at its top. */
 .ui-table-frame:has(.ui-standings[data-emblems='true']) {
-  border-block-start: 2px solid var(--color-ornament-line);
+  border-block-start: var(--line-heavy) solid var(--color-ornament-line);
 }
 /* With emblems a team's place is set in the score face, in the color the eye lands on. */
 .ui-standings[data-emblems='true'] tbody td.ui-num:first-child {
@@ -321,6 +327,25 @@ export const tableCss = String.raw`
   color: var(--color-muted);
   font-weight: 400;
   text-decoration: underline;
+}
+/* In a team's cell the mark is part of the name's own flow, after its last word. The name
+   keeps room for it at its end, and the mark hangs in that room: it takes none in the line
+   itself, so under a long name whose last line is full it still stands beside the last
+   word, never on a line of its own. (Of two marks it is the last that hangs.) */
+.ui-team-cell > [dir]:has(> .ui-note-mark) {
+  padding-inline-end: var(--step-5);
+  /* The room is added to the name's limit, not taken from its words: a name with a mark
+     wraps exactly where the same name without one does. */
+  max-inline-size: calc(45vw - var(--step-6) + var(--step-5));
+  max-inline-size: calc(45cqi - var(--step-6) + var(--step-5));
+}
+.ui-standings[data-emblems='true'] .ui-team-cell > [dir]:has(> .ui-note-mark) {
+  max-inline-size: calc(45cqi - var(--step-6) - var(--step-3) + var(--step-5));
+}
+/* The pull-back is under the same condition as the room it hangs in: a browser that does
+   not know ':has()' drops both, and the mark simply takes its own room in the line. */
+.ui-team-cell > [dir]:has(> .ui-note-mark) > .ui-note-mark:last-child a {
+  margin-inline-end: calc(-1 * var(--step-5));
 }
 /* Notes under a table stay put while it scrolls, and are never faded by the sign above. */
 .ui-footnotes,

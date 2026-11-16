@@ -51,8 +51,7 @@ html {
   transform: none;
 }
 
-/* The header. First row: the league's mark and name with a small line under it, the
-   season picker and the way in. Second row: the menu. On a phone it is one row (the mark,
+/* The header. First row: the league's mark and name, the season picker and the way in. Second row: the menu. On a phone it is one row (the mark,
    the name and the menu button), and the button opens a panel in the header itself that
    holds the menu, sign-in and the season picker. */
 .site-header {
@@ -71,9 +70,8 @@ html {
 .league-site .site-header :focus-visible {
   outline-color: var(--header-text);
 }
-/* The first row is 56 high for a name of one line. A long name takes two lines, and then
-   the row grows by what they need: the name never touches the row's edges (8 clear above
-   its words, 6 under the small line). */
+/* The first row is 56 high. A long name takes two lines, which have room in it: the name
+   never touches the row's edges (about 10 clear above and below two lines). */
 .site-header-top {
   position: relative;
   display: flex;
@@ -83,10 +81,10 @@ html {
   min-block-size: calc(var(--tap) + var(--step-3));
   padding-block: calc(var(--step-3) / 2);
 }
-/* The league's mark, its name and the small line under the name. The whole of it is the
-   way home: the name's link covers it. The mark stands over the start of the link and the
-   small line over its foot, so the link is as tall as a thumb needs while the three read
-   as one. */
+/* The league's mark and its name. The whole of it is the way home: the name's link covers
+   it, and the mark stands over the start of the link, so the link is as tall as a thumb
+   needs while the two read as one. (A line of the league's own under the name is a
+   setting for a later step; until then there is none.) */
 .site-brand {
   position: relative;
   display: grid;
@@ -113,10 +111,10 @@ html {
   grid-area: 1 / 1;
   align-items: center;
   min-inline-size: 0;
-  /* The name is the way home: as tall as anything a thumb taps, its words over the small
-     line, with a little clear above them however many lines they take. */
+  /* The name is the way home: as tall as anything a thumb taps, its words in the middle of
+     it, with a little clear above and below them however many lines they take. */
   min-block-size: var(--tap);
-  padding-block: calc(var(--step-1) / 2) var(--step-4);
+  padding-block: calc(var(--step-1) / 2);
   /* The width of the mark (a shield 32 high is 28 wide) and the gap after it. */
   padding-inline-start: calc(var(--step-6) + var(--step-1));
   color: var(--header-name);
@@ -141,21 +139,6 @@ html {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
-}
-.site-tagline {
-  grid-area: 1 / 1;
-  align-self: end;
-  block-size: var(--step-4);
-  padding-inline-start: calc(var(--step-6) + var(--step-1));
-  overflow: hidden;
-  color: var(--header-muted);
-  font-size: var(--text-12);
-  letter-spacing: 0.16em;
-  line-height: var(--step-4);
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-  pointer-events: none;
 }
 .site-header .site-sign-in,
 .site-menu > summary {
@@ -208,14 +191,30 @@ html {
   position: relative;
   inline-size: var(--step-4);
   block-size: var(--step-3);
-  border-block: 2px solid currentColor;
+  border-block: var(--line-heavy) solid currentColor;
 }
-.site-menu-icon::before {
+.site-menu-icon::before,
+.site-menu-icon::after {
   content: '';
   position: absolute;
   inset-inline: 0;
   inset-block-start: calc(50% - 1px);
-  border-block-start: 2px solid currentColor;
+  border-block-start: var(--line-heavy) solid currentColor;
+}
+/* The second middle line is there only for the cross. */
+.site-menu-icon::after {
+  opacity: 0;
+}
+/* An open menu's button is a cross: the outer lines go, the two middle ones turn. */
+.site-menu[open] .site-menu-icon {
+  border-block-color: transparent;
+}
+.site-menu[open] .site-menu-icon::before {
+  transform: rotate(45deg);
+}
+.site-menu[open] .site-menu-icon::after {
+  opacity: 1;
+  transform: rotate(-45deg);
 }
 /* An open menu never grows past the screen: the header scrolls inside itself. */
 .site-header-top:has(.site-menu[open]) {
@@ -223,9 +222,12 @@ html {
   overflow-y: auto;
 }
 .site-menu-panel {
-  /* Its line stands under the whole first row, the menu button included. */
+  /* Its line stands under the whole first row, the menu button included, and runs to the
+     edges of the screen: the panel is as wide as the header, its links in the column. */
   margin-block-start: calc(var(--step-3) / 2);
+  margin-inline: calc(-1 * var(--gutter));
   padding-block: var(--step-2) var(--step-4);
+  padding-inline: var(--gutter);
   border-block-start: 1px solid var(--header-rule);
 }
 .site-menu-panel ul,
@@ -254,7 +256,7 @@ html {
 .site-header .site-menu-panel li a {
   min-block-size: var(--step-7);
   padding-inline: var(--step-4);
-  border-inline-start: 2px solid transparent;
+  border-inline-start: var(--line-heavy) solid transparent;
 }
 .site-header .site-menu-panel li a:hover {
   color: var(--tab-hover-text);
@@ -398,7 +400,7 @@ html {
 .site-header .site-tabs a {
   min-block-size: var(--tap);
   padding-inline: var(--step-4);
-  border-block-end: 2px solid transparent;
+  border-block-end: var(--line-heavy) solid transparent;
   font-size: var(--tab-size);
   transition:
     background-color 0.15s,
@@ -440,7 +442,7 @@ html {
   }
   .site-header .site-name {
     min-block-size: calc(var(--tap) + var(--step-3));
-    padding-block: 0 var(--step-5);
+    padding-block: 0;
     /* The mark is a shield 48 high here. */
     padding-inline-start: calc(var(--step-7) + var(--step-4));
     font-size: var(--text-22);
@@ -451,10 +453,6 @@ html {
     display: block;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-  .site-tagline {
-    padding-inline-start: calc(var(--step-7) + var(--step-4));
-    letter-spacing: 0.22em;
   }
   .site-menu {
     display: none;
@@ -707,7 +705,26 @@ html {
    the full schedule", so a reader reaches the standings after a few boards, not seven. A
    game waiting for a new day is news, and is always shown. */
 @media (max-width: 47.99rem) {
-  .home-next .ui-card-grid > li:nth-child(n + 3):has(> .ui-game-card[data-status='scheduled']) {
+  /* Counted by what a card is, not by where it stands: a game still to start is put away
+     only when two such games stand before it, whatever else (a postponed game, one that
+     has just gone live) is in the list. */
+  .home-next
+    .ui-card-grid
+    > li:has(> .ui-game-card[data-status='scheduled'])
+    ~ li:has(> .ui-game-card[data-status='scheduled'])
+    ~ li:has(> .ui-game-card[data-status='scheduled']) {
+    display: none;
+  }
+  /* While a game is being played its board already heads the page: the phone then shows
+     the next game that will be played (and a postponed one besides) and the latest one,
+     so the standings are still a few boards down. */
+  .home-next[data-live='true']
+    .ui-card-grid
+    > li:has(> .ui-game-card[data-status='scheduled'])
+    ~ li:has(> .ui-game-card[data-status='scheduled']) {
+    display: none;
+  }
+  .home-pair[data-live='true'] > .ui-section:first-child .ui-card-grid > li:nth-child(n + 2) {
     display: none;
   }
 }
@@ -730,27 +747,79 @@ html {
 /* The season's leaders under a short column of standings: a small heading with the way to
    every player's numbers, then each leader as one short row. */
 .home-leaders-beside {
-  margin-block-start: var(--step-5);
+  margin-block-start: var(--space-section);
 }
 .home-leaders-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--step-1) var(--step-4);
   min-block-size: var(--tap);
+  margin-block-end: var(--step-4);
 }
-.league-site .home-leaders-head .ui-kicker {
+/* On a phone the leaders are a section of their own, under the standings: a kicker and a
+   title, as every section of the page has. */
+.home-leaders-title {
+  display: grid;
+  gap: var(--step-2);
+  min-inline-size: 0;
+}
+.league-site .home-leaders-title > * {
+  margin: 0;
+}
+.league-site .home-leaders-title h3 {
+  font-size: var(--text-22);
+}
+/* The same title as a small label (the shared kicker), for a laptop: put away on a phone. */
+.league-site .home-leaders-label {
+  display: none;
   margin: 0;
   font-family: var(--font-body);
+}
+/* On a laptop they stand under the standings as a part of that column: the title is the
+   small label, the phone's kicker and title are put away, and the cards take the rest of
+   the column's height, so the two columns end level. Only one of the two titles is ever
+   drawn, or read out. */
+@media (min-width: 64rem) {
+  .home-leaders-beside {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    margin-block-start: var(--step-5);
+  }
+  .home-leaders-head {
+    align-items: center;
+    margin-block-end: 0;
+  }
+  .home-leaders-title {
+    display: none;
+  }
+  .league-site .home-leaders-label {
+    display: flex;
+  }
+  .home-leaders-beside > .ui-spot-row {
+    flex: 1 1 auto;
+    grid-auto-rows: 1fr;
+  }
+  .home-leaders-beside .ui-spot {
+    align-content: center;
+  }
 }
 .home-tables > * {
   min-inline-size: 0;
 }
 @media (min-width: 64rem) {
+  /* The two columns are one height, and each is a column of its own parts, so what
+     stands last in the shorter one (the leaders under the standings) can take up the
+     difference. */
   .home-pair[data-tables='few'] {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
+    align-items: stretch;
+  }
+  .home-pair[data-tables='few'] > .ui-section {
+    display: flex;
+    flex-direction: column;
   }
   .home-pair[data-tables='many'] .home-tables {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -758,6 +827,47 @@ html {
   }
   .home-pair[data-tables='many'] .home-tables > :last-child:nth-child(odd) {
     grid-column: 1 / -1;
+  }
+}
+
+/* The statistics page. Each statistic is a column of its own: its number card and, right
+   under it at the same width, the rest of its list; a statistic with no card is a plain
+   list. With few statistics the players' table and the teams' table sit side by side on a
+   laptop, so a row's numbers stay near the name they belong to; with many, each table
+   takes the page's width. */
+.stats-leaders {
+  margin-block-start: var(--step-5);
+}
+.stats-leader {
+  align-content: start;
+  row-gap: var(--step-2);
+}
+/* Side by side, the cards of a row are one height and the lists start on one line; a
+   plain list starts where the cards beside it do. */
+@supports (grid-template-rows: subgrid) {
+  @media (min-width: 48rem) {
+    .stats-leader {
+      grid-row: span 2;
+      grid-template-rows: subgrid;
+    }
+    .stats-leader > .ui-leader-card:only-child {
+      grid-row: 1 / -1;
+      align-self: start;
+    }
+  }
+}
+.stats-tables {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 var(--step-5);
+}
+.stats-tables > * {
+  min-inline-size: 0;
+}
+@media (min-width: 64rem) {
+  .stats-tables[data-layout='pair'] {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
   }
 }
 

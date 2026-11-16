@@ -37,6 +37,7 @@ import {
   recordForfeitAction,
 } from './actions.ts';
 import { buildGameRows, type GameRowView } from './build-games-view.ts';
+import { earlyWhen, nowOf } from './early-when.ts';
 import { FinalScoreBoxes, type FinalScoreTexts } from './final-score-boxes.tsx';
 import { earlierEmptyText, needsResultEmptyText } from './empty-list-text.ts';
 import { dayHeadingText, earlierRoundText } from './game-day-text.ts';
@@ -149,7 +150,7 @@ function Controls({
   /** The game was just reopened to correct it: its boxes start open. */
   readonly reopened: boolean;
   readonly times: LeagueTimes;
-  /** The server's time now (ms), to say when a game's time has not come. */
+  /** The ports' clock now (ms, nowOf), to say when a game's time has not come. */
   readonly now: number;
   /** The earlier round the game is shown in, kept in its place's address. */
   readonly round: string | undefined;
@@ -163,10 +164,7 @@ function Controls({
   const permalink = `${list}#${gameAnchor(game.id)}`;
   // A refusal names the game ("Tigers at Lions: …").
   const refusal = t('admin.games.refusedAbout', { game: gameText(game), problem: '{problem}' });
-  const early =
-    game.startsAt !== null && Date.parse(game.startsAt) > now
-      ? gameWhenText(game.startsAt, times)
-      : undefined;
+  const early = earlyWhen(game.startsAt, now, times);
   return (
     <div className="admin-game-controls ui-stack">
       {game.hasPlays ? (
@@ -375,8 +373,10 @@ export async function GamesPage({
   const reopens = await readReopenViews(games, context, holder, ports.games.deps);
   const names = await ports.games.namesOf(addressee.id);
   const rowsOf = (of: readonly MyGame[]) => buildGameRows(of, names, holder, reopens);
-  const { timeZone } = await ports.publicSchedule.clockOf(addressee.id);
-  const times: LeagueTimes = { locale, timeZone };
+  // The ports' one clock (step 2.179): the made-up world's own on the stand-in, so a game's
+  // time is never measured against another clock than the one it was read on.
+  const clock = await ports.publicSchedule.clockOf(addressee.id);
+  const times: LeagueTimes = { locale, timeZone: clock.timeZone };
   // What was just saved, taken (so a reload does not say it again): said beside its game;
   // at the top when the game is not on the page (a result entered under "Needs a result"
   // takes the game to its earlier round), naming it from the game as it is now.
@@ -393,7 +393,7 @@ export async function GamesPage({
     league,
     here: addressee,
     times,
-    now: Date.now(),
+    now: nowOf(clock),
     labels: displayLabels(t).game,
     saved:
       aboutRow === undefined || saved === undefined ? undefined : { row: aboutRow, text: saved },

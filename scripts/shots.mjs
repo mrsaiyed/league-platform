@@ -702,7 +702,8 @@ try {
         context: staff,
         base: '',
       })),
-      ...(design === '' ? accountMenuPages : []).map((page) => ({
+      // Under a named design too: the account button sits in the header every design draws.
+      ...accountMenuPages.map((page) => ({
         ...page,
         name: `${leagues[0]}-${page.name}`,
         context: staff,
@@ -852,7 +853,11 @@ try {
             };
             put(document.querySelector('.site-header .site-name > span'), league);
             for (const table of document.querySelectorAll('table.ui-table')) {
-              put(table.querySelector('tbody .ui-team-cell > [dir]'), name);
+              // Only the name's own words are replaced. In the standings they have an
+              // element of their own, with a note's mark after it in the same flow, and
+              // the picture must show where the mark lands.
+              const cell = table.querySelector('tbody .ui-team-cell > [dir]');
+              put(cell?.querySelector('.ui-team-name') ?? cell, name);
             }
             put(document.querySelector('.ui-scoreboard-name > [dir]'), name);
             // The first game card gets the long name, and the next card one long word. A
