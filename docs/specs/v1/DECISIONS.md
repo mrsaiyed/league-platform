@@ -374,6 +374,7 @@ All dated November 12, 2026.
 | T-271                 | Each form answered with the answer in the address                            | Agreed (delegated): refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)           | Step 2.155: a refusal emptied a box score; "Saved" off screen; a reload said it again (H6, M2, M8) |
 | T-272                 | T-41: ids sort by creation time (0002: in order on one connection)           | Agreed (delegated): on one connection each id sorts after every id it made before (a memory of the session); none across connections (rec. 068) | Step 2.151: PGlite ticks in whole ms, so ids of one ms sorted either way; tests failed by chance   |
 | T-273                 | New                                                                          | On the database, the public schedule and standings move first; statistics refuse until part 3; local seasons under way (rec. 069)               | Step 2.93 part 2: one port serves both the standings and the statistics, and the seed had no games |
+| T-274                 | New                                                                          | Names read with the league's own settings in one snapshot; no design stored yet; a season naming no statistics keeps its rules' (rec. 070)      | Step 2.93 part 3: the statistics and team pages show children's names; nothing wrote `stat_keys`   |
 | T-275                 | New                                                                          | Page titles and other page metadata are never streamed: every page has its title in the head of its first bytes (rec. 071)                      | Step 2.175: a page could arrive with its content before its title; browser checks met it untitled  |
 
 ## The full list
@@ -651,26 +652,27 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 
 ### [T2 — Repository and code structure](technical/T2-repo-and-code-structure.md)
 
-| ID    | Decision                                                                                                                                                               | Status             | Stage 1 |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------- |
-| T-20  | Everything lives in this one repository, organized as npm workspaces with a single lockfile, as it is today                                                            | Agreed (delegated) | yes     |
-| T-21  | Dependencies point one way                                                                                                                                             | Agreed (delegated) | yes     |
-| T-22  | A module is used only through its `index.ts`                                                                                                                           | Agreed (delegated) | yes     |
-| T-23  | Every change to data is a command, and every command has the same shape                                                                                                | Agreed (delegated) | yes     |
-| T-24  | Things that happen afterwards are events                                                                                                                               | Agreed (delegated) | yes     |
-| T-25  | Pages and handlers are thin. A page asks a query for data and renders it. A form action or API handler parses the request, builds the context, calls one command, and… | Agreed (delegated) | yes     |
-| T-26  | Two ways in, one set of commands                                                                                                                                       | Agreed (delegated) | yes     |
-| T-27  | No league is ever named in code                                                                                                                                        | Agreed (delegated) | yes     |
-| T-28  | No query without a league. Every function in `packages/database` that touches league data requires a league ID argument; there is no way to call it without one. The…  | Agreed (delegated) | yes     |
-| T-29  | What goes to the browser is chosen, not leaked                                                                                                                         | Agreed (delegated) |         |
-| T-30  | Settings and secrets are read in one place at startup, checked against a schema, and the app refuses to start if one is missing                                        | Agreed (delegated) |         |
-| T-31  | Naming. Files are `kebab-case.ts`. One command or query per file, named for what it does (`end-game.ts`). Tests sit beside the code as `end-game.test.ts`. Database…   | Agreed (delegated) |         |
-| T-32  | Strict TypeScript settings, no `any`, no ignored errors without a comment saying why                                                                                   | Agreed (delegated) |         |
-| T-33  | Size is a signal. A file past about 300 lines, or a command doing three separate things, gets split                                                                    | Agreed (delegated) |         |
-| T-34  | Every address is built by one function, and the league a request is for is worked out in one place                                                                     | Agreed (delegated) | yes     |
-| T-232 | The shell works a request out once, then each page answers shown, not found, forwarded or no access (403); pages check, layouts never refuse; Next.js 16 (record 020)  | Agreed (delegated) | yes     |
-| T-271 | A form's answer never rides in the address: refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)          | Agreed (delegated) |         |
-| T-273 | On the database the public schedule and the standings move first; the statistics refuse until part 3; local seasons are under way (record 069)                         | Agreed (delegated) |         |
+| ID    | Decision                                                                                                                                                                            | Status             | Stage 1 |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------- |
+| T-20  | Everything lives in this one repository, organized as npm workspaces with a single lockfile, as it is today                                                                         | Agreed (delegated) | yes     |
+| T-21  | Dependencies point one way                                                                                                                                                          | Agreed (delegated) | yes     |
+| T-22  | A module is used only through its `index.ts`                                                                                                                                        | Agreed (delegated) | yes     |
+| T-23  | Every change to data is a command, and every command has the same shape                                                                                                             | Agreed (delegated) | yes     |
+| T-24  | Things that happen afterwards are events                                                                                                                                            | Agreed (delegated) | yes     |
+| T-25  | Pages and handlers are thin. A page asks a query for data and renders it. A form action or API handler parses the request, builds the context, calls one command, and…              | Agreed (delegated) | yes     |
+| T-26  | Two ways in, one set of commands                                                                                                                                                    | Agreed (delegated) | yes     |
+| T-27  | No league is ever named in code                                                                                                                                                     | Agreed (delegated) | yes     |
+| T-28  | No query without a league. Every function in `packages/database` that touches league data requires a league ID argument; there is no way to call it without one. The…               | Agreed (delegated) | yes     |
+| T-29  | What goes to the browser is chosen, not leaked                                                                                                                                      | Agreed (delegated) |         |
+| T-30  | Settings and secrets are read in one place at startup, checked against a schema, and the app refuses to start if one is missing                                                     | Agreed (delegated) |         |
+| T-31  | Naming. Files are `kebab-case.ts`. One command or query per file, named for what it does (`end-game.ts`). Tests sit beside the code as `end-game.test.ts`. Database…                | Agreed (delegated) |         |
+| T-32  | Strict TypeScript settings, no `any`, no ignored errors without a comment saying why                                                                                                | Agreed (delegated) |         |
+| T-33  | Size is a signal. A file past about 300 lines, or a command doing three separate things, gets split                                                                                 | Agreed (delegated) |         |
+| T-34  | Every address is built by one function, and the league a request is for is worked out in one place                                                                                  | Agreed (delegated) | yes     |
+| T-232 | The shell works a request out once, then each page answers shown, not found, forwarded or no access (403); pages check, layouts never refuse; Next.js 16 (record 020)               | Agreed (delegated) | yes     |
+| T-271 | A form's answer never rides in the address: refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)                       | Agreed (delegated) |         |
+| T-273 | On the database the public schedule and the standings move first; the statistics refuse until part 3; local seasons are under way (record 069)                                      | Agreed (delegated) |         |
+| T-274 | On the database a name is read with the league's own settings and audience in one snapshot; no design is stored yet; a season that names no statistics keeps its rules (record 070) | Agreed (delegated) |         |
 
 ### [T3 — Data model](technical/T3-data-model.md)
 

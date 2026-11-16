@@ -7,7 +7,8 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { siteOfLeague } from '../../server/league-site.ts';
+import { siteOf } from '../../server/league-site.ts';
+import { standInLeagueSites } from '../../server/stand-in-league-sites.ts';
 import { standInLeagues } from '../../server/stand-in-ports.ts';
 import { DesignStyle } from './design-style.tsx';
 import { SiteFooter } from './site-footer.tsx';
@@ -55,11 +56,13 @@ describe('league design', () => {
     expect(html).toContain(designToCssText(startingDesign('clean-court')));
   });
 
-  it('gives two made-up leagues two different designs and a neutral one to the rest', () => {
-    const one = siteOfLeague(standInLeagues.live);
-    const two = siteOfLeague(standInLeagues.other);
+  it('gives two made-up leagues two different designs and a neutral one to the rest', async () => {
+    const one = await siteOf(standInLeagues.live, standInLeagueSites);
+    const two = await siteOf(standInLeagues.other, standInLeagueSites);
     expect(one.design).not.toEqual(two.design);
-    expect(siteOfLeague({ id: 'unknown', slug: 'some-league' }).name).toBe('some-league');
+    expect((await siteOf({ id: 'unknown', slug: 'some-league' }, standInLeagueSites)).name).toBe(
+      'some-league',
+    );
   });
 });
 

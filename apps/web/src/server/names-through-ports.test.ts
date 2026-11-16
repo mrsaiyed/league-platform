@@ -122,22 +122,23 @@ function world() {
   };
   /** The youth league's Rockets roster and statistics, as the team and statistics pages read them. */
   const youthNames = async () => {
-    const settings = await w.ports.publicStats.settingsOf(youth);
     const viewer = publicViewer(youth);
     const rockets = youthTeams.find((t) => t.slug === 'rockets')?.id ?? '';
-    const roster = await w.ports.publicTeams.rosterOf(youth, rockets, {
-      viewer,
-      policy: settings.namePolicy,
-    });
-    const table = await readStatisticsTable(w.ports.publicStats.readStoreOf(youth), {
-      seasonId: standInSeasonIds.youthWinter,
-      viewing: {
-        leagueId: youth,
-        viewer,
-        audience: settings.audience,
-        policy: settings.namePolicy,
-      },
-    });
+    const roster = await w.ports.publicStats.statisticsOf(youth, ({ rosterOf }) =>
+      rosterOf(rockets, viewer),
+    );
+    // As the pages read them: the statistics with the league's settings, one snapshot.
+    const table = await w.ports.publicStats.statisticsOf(youth, ({ store, settings }) =>
+      readStatisticsTable(store, {
+        seasonId: standInSeasonIds.youthWinter,
+        viewing: {
+          leagueId: youth,
+          viewer,
+          audience: settings.audience,
+          policy: settings.namePolicy,
+        },
+      }),
+    );
     if (!table.ok) throw new Error('expected statistics');
     return {
       roster: roster.lines.map((l) => (l.name.shown ? l.name.text : null)),

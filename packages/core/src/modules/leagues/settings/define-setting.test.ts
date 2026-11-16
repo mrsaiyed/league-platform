@@ -188,6 +188,19 @@ describe('the settings stage 2 declares', () => {
     }
   });
 
+  it('rank a player among the leaders from 3 games, which the league can change (P7 section 6)', () => {
+    const setting = declaredSettings.get('statistics.minimumGamesToRank');
+    expect(setting?.default).toBe(3);
+    expect(setting?.levels).toEqual(['league']);
+    expect(setting?.permission).toBe('league.settings');
+    for (const games of [0, 1, 3, 1000]) {
+      expect(setting?.type.safeParse(games).success, String(games)).toBe(true);
+    }
+    for (const games of [-1, 1001, 2.5, '3']) {
+      expect(setting?.type.safeParse(games).success, String(games)).toBe(false);
+    }
+  });
+
   it('start a new team at everyone and let teams choose (S-22, S-23, S-24)', () => {
     const level = declaredSettings.get('teams.startingStatsLevel');
     expect(level?.default).toBe('everyone');

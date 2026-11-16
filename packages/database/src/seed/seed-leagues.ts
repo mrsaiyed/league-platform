@@ -137,7 +137,7 @@ async function loadLeague(
         slug: league.slug,
         name: league.name,
         timeZone: league.timeZone,
-        audience: 'adult',
+        audience: league.audience,
         ownerAccountId: ownerId,
         sportKey: 'basketball',
         firstSeason: { ...league.season },

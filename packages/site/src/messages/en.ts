@@ -73,6 +73,7 @@ export const en = {
   'display.player': 'Player',
   'display.total': 'Total',
   'display.sortBy': 'Sort by',
+  'display.noValue': 'Nothing recorded',
   'display.round': 'Round',
   'display.season': 'Season',
   'display.show': 'Show',
@@ -136,6 +137,13 @@ export const en = {
   'stats.col.gamesFull': 'Games played',
   'stats.col.value': 'Value',
   'stats.allPlayers': 'All players',
+  // Under "All players": the table lists everyone, the leaders above it only those with the
+  // league's minimum games, so a player the table puts first may lead no card. The second
+  // is said to screen readers after the games played of each such player.
+  'stats.listedNotRanked_one': 'Every player is listed. Fewer than {count} game: not ranked yet.',
+  'stats.listedNotRanked_other':
+    'Every player is listed. Fewer than {count} games: not ranked yet.',
+  'stats.notRankedYet': 'not ranked yet',
   'stats.teams': 'Teams',
   'stats.teamsTotalsOnly': 'Only team totals are shown for {teams}.',
   'stats.teamsJoin': ', ',
@@ -179,6 +187,9 @@ export const en = {
   'schedule.lead': 'Scores as they come in, and everything still to be played.',
   'standings.heading': 'The standings.',
   'standings.lead': 'Where every team stands after each game.',
+  // What follows the tables on the standings page: the latest decided games, as scoreboards.
+  'standings.results': 'Latest results',
+  'standings.results.kicker': 'How they got here',
   'stats.heading': 'By the numbers.',
   'stats.lead': 'The season’s leaders, then every player and every team.',
   // The number cards at the head of the statistics page's leaders: who leads a statistic,
@@ -262,6 +273,7 @@ export const en = {
   'team.rosterEmpty': 'No one is on this team yet.',
   'team.rosterFormer': 'Left the team',
   'team.jersey': 'Number',
+  'team.noNumber': 'No number',
   'team.player': 'Player',
   'team.role': 'Role',
   'team.role.player': 'Player',
@@ -295,6 +307,9 @@ export const en = {
   'game.postponed': 'This game has been postponed.',
   'game.cancelled': 'This game has been cancelled.',
   'game.forfeit': 'This game was decided by forfeit.',
+  'game.forfeitBy': '{team} forfeited this game.',
+  // Under the board of a game still to come (or put off): the two teams, each with its record.
+  'game.teams': 'The two teams',
   'game.wasSetFor': 'It was set for {when}',
   'game.region': 'The game',
   'game.live': 'The game, live',
@@ -564,6 +579,7 @@ export const en = {
   'adminSettings.area.members': 'Start page for members',
   'adminSettings.area.games': 'Scoring',
   'adminSettings.area.teams': 'Team statistics',
+  'adminSettings.area.statistics': 'Statistics',
   'adminSettings.area.privacy': 'Privacy',
   // What the Privacy part says around its settings (step 2.162, R-29, record 065): one
   // opening sentence by who plays, what is in force now, and where the parents'
@@ -1561,6 +1577,8 @@ export const en = {
   'setting.teams.startingStatsLevel.option.staff': "Only the team's staff and the league's admins",
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
+  'setting.statistics.minimumGamesToRank.label':
+    'Games a player must have played to be ranked among the leaders. 0 ranks everyone. A player with fewer still shows in the full table.',
   'setting.privacy.publicNames.label':
     "Names on public pages: how players are shown on the team pages, game pages and statistics. If a person's own request for less is recorded (initials, or their name taken off), it always wins over this setting.",
   // Each choice says what it does to adults and to children (R-29, record 065).
