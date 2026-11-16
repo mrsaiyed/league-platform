@@ -14,9 +14,16 @@
 //
 // packages/database is handed in, not imported: Node.js loads it when the app starts
 // (container.ts), so Next.js never bundles it.
-import { mayListSeason, type CommandDeps, type SchedulingTx } from '@srleagues/core';
+import {
+  mayListSeason,
+  type AccessHolder,
+  type CommandContext,
+  type CommandDeps,
+  type SchedulingTx,
+} from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
+import { randomUUID } from 'node:crypto';
 import { isDatabaseId } from './database-id.ts';
 import type { ScheduleAdminPorts, ScheduleSeason } from './schedule-admin.ts';
 
@@ -37,6 +44,8 @@ export function databaseScheduleAdmin(
   database: ScheduleAdminQueries,
   db: DatabaseHandle,
   log: CommandDeps<SchedulingTx>['log'],
+  /** What an account holds in a league, read fresh (the web ports' own accessOf). */
+  accessOf: (context: CommandContext) => Promise<AccessHolder | undefined>,
 ): ScheduleAdminPorts {
   return {
     deps: {
@@ -61,7 +70,14 @@ export function databaseScheduleAdmin(
             )
           ).teams
         : [],
-    seasonsOf: async (leagueId, holder) => {
+    seasonsOf: async (leagueId, given) => {
+      // Only the account is taken from what the caller hands in: what it holds is read
+      // again for this very league, so a holder read in another league can never open
+      // this league's seasons not public yet.
+      const holder =
+        given === undefined
+          ? undefined
+          : await accessOf({ leagueId, accountId: given.accountId, requestId: randomUUID() });
       const rows = await database.withTransaction(db, { leagueId }, (scope) =>
         database.listLeagueSeasons(scope),
       );

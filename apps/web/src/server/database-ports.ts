@@ -188,6 +188,8 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     return ok({ ...who.value, accountId: account.value });
   };
 
+  const accessOf = accessOfVia(deps);
+
   return {
     findLeague: (shortName) =>
       database.withTransaction(db, {}, (scope) => database.findLeagueByShortName(scope, shortName)),
@@ -206,7 +208,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     signIn,
     signInMail: options.signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
-    accessOf: accessOfVia(deps),
+    accessOf,
     // The one read across leagues (record 066): in a transaction set to the session's
     // account and no league, through my_leagues(), which answers for that account only.
     leaguesOfAccount: (accountId) =>
@@ -216,8 +218,9 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     games: notMovedYet('games area'),
     fixtureImport: notMovedYet('fixture import'),
     publicSchedule: databasePublicSchedule(database, db, now),
-    // Its seasonsOf lists only what mayListSeason allows the holder (part 4).
-    scheduleAdmin: databaseScheduleAdmin(database, db, options.log),
+    // Its seasonsOf lists only what mayListSeason allows the holder, read again for the
+    // league it lists (part 4).
+    scheduleAdmin: databaseScheduleAdmin(database, db, options.log, accessOf),
     publicTeams: databasePublicTeams(database, db),
     adminTeams: notMovedYet('Admin → Teams'),
     adminSettings: databaseAdminSettings(database, db, options.log),
