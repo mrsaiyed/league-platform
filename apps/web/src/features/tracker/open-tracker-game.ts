@@ -22,10 +22,12 @@ import { QueueError, type QueueStorage } from './queue-storage.ts';
 import type { CommandTransport } from './command-transport.ts';
 import {
   formatOf,
+  noLineupPicks,
   openedGameKeepMs,
   sameFormat,
   type DeviceRosters,
   type GameFormat,
+  type LineupPicks,
   type OpenedGameStorage,
 } from './opened-game-storage.ts';
 import { createStoringTrackerServer } from './storing-tracker-server.ts';
@@ -106,6 +108,10 @@ export type OpenedTrackerGame = {
   confirmedFormat(): GameFormat | null;
   /** Stores the format the scorekeeper confirmed (P7 §5.1). */
   confirmFormat(format: GameFormat): Promise<void>;
+  /** The starters being picked, as the device kept them (checklist C3). */
+  lineupPicks(): LineupPicks;
+  /** Keeps the starters being picked, so a reload mid-pick keeps the taps. */
+  keepLineupPicks(picks: LineupPicks): Promise<void>;
 };
 
 export type OpenTrackerGameResult =
@@ -128,13 +134,16 @@ export async function openTrackerGame(
   let storage: Awaited<ReturnType<OpenTrackerGameOptions['openStorage']>>;
   let deviceId: string;
   let confirmed: GameFormat | null;
+  let picks: LineupPicks;
   try {
     storage = await options.openStorage();
     const openedAt = now();
     await storage.games.forgetOthers(owner, openedAt - openedGameKeepMs);
     await storage.games.saveRosters(owner, rosters, openedAt);
     deviceId = await storage.games.deviceId(options.newDeviceId);
-    confirmed = (await storage.games.find(gameId))?.confirmedFormat ?? null;
+    const kept = await storage.games.find(gameId);
+    confirmed = kept?.confirmedFormat ?? null;
+    picks = kept?.lineupPicks ?? noLineupPicks;
   } catch (error) {
     return { ok: false, code: codeOf(error) };
   }
@@ -176,6 +185,13 @@ export async function openTrackerGame(
         } catch (error) {
           options.onStoreFailed?.(codeOf(error));
         }
+      },
+      lineupPicks: () => picks,
+      async keepLineupPicks(next) {
+        // Kept for this visit even if the device cannot store them: the lineup itself is
+        // a play, saved like any other once it is set. Picks are a convenience.
+        picks = next;
+        await games.saveLineupPicks(gameId, next).catch(() => undefined);
       },
     },
   };

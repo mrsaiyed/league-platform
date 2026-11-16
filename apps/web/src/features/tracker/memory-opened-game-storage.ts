@@ -1,7 +1,12 @@
 // The opened games kept in memory, for tests. It copies what goes in and what comes
 // out, as the browser's storage does, so a test cannot pass by changing an object the
 // storage still holds.
-import { stillKept, type OpenedGame, type OpenedGameStorage } from './opened-game-storage.ts';
+import {
+  stillKept,
+  withLineupPicks,
+  type OpenedGame,
+  type OpenedGameStorage,
+} from './opened-game-storage.ts';
 
 export function createMemoryOpenedGameStorage(): OpenedGameStorage {
   const games = new Map<string, OpenedGame>();
@@ -30,6 +35,7 @@ export function createMemoryOpenedGameStorage(): OpenedGameStorage {
           rostersSavedAt: savedAt,
           state: found?.state ?? null,
           confirmedFormat: found?.confirmedFormat ?? null,
+          ...(found?.lineupPicks === undefined ? {} : { lineupPicks: found.lineupPicks }),
         }),
       );
     },
@@ -46,6 +52,9 @@ export function createMemoryOpenedGameStorage(): OpenedGameStorage {
     },
     async confirmFormat(gameId, format) {
       change(gameId, (game) => ({ ...game, confirmedFormat: format }));
+    },
+    async saveLineupPicks(gameId, picks) {
+      change(gameId, (game) => withLineupPicks(game, picks));
     },
     async deviceId(make) {
       device ??= make();
