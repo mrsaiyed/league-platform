@@ -243,7 +243,10 @@ export function SettingForms({
                   </p>
                   {row.field.kind === 'other' ? null : (
                     <p className="staff-buttons">
-                      <button type="submit" className="ui-button" data-kind="main">
+                      {/* A page of settings has no one main action: each setting's Save
+                          is outlined, and giving a setting back its default is quieter
+                          still, so no screen is a column of filled buttons (step 2.103). */}
+                      <button type="submit" className="ui-button">
                         {say('adminSettings.save')}
                       </button>
                       {row.version === null ? null : (
@@ -252,6 +255,7 @@ export function SettingForms({
                           <button
                             type="submit"
                             className="ui-button"
+                            data-kind="quiet"
                             name="intent"
                             value={clearIntent}
                             formNoValidate

@@ -682,8 +682,9 @@
   gap: var(--step-2) var(--step-5);
 }
 /* The roster: one player under another between fine lines. Their name, then their number
-   and role with Save (filled), their leaving date with "Mark as left" (outlined), and
-   moving them up or down (quiet, with an arrow): three buttons that cannot be mistaken. */
+   and role with Save, their leaving date with "Mark as left" (both outlined, each beside
+   its own field), and moving them up or down (quiet, with an arrow). No row has a filled
+   button: the page's one filled button is "Add a player". */
 .staff .admin-roster,
 .staff .admin-left {
   display: grid;

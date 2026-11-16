@@ -146,8 +146,10 @@ export async function TeamPage({
           />
           <ColorFields color={team.color} />
           <DivisionField divisions={divisions} value={team.divisionId} />
+          {/* The page's one filled button is "Add a player", at its head and on the form
+              it leads to; every other save here is outlined (step 2.103). */}
           <p className="staff-buttons">
-            <button type="submit" className="ui-button" data-kind="main">
+            <button type="submit" className="ui-button">
               {t('adminTeams.edit.submit')}
             </button>
           </p>
@@ -164,7 +166,7 @@ export async function TeamPage({
             value={team.statsVisibility}
           />
           <p className="staff-buttons">
-            <button type="submit" className="ui-button" data-kind="main">
+            <button type="submit" className="ui-button">
               {t('adminTeams.stats.submit')}
             </button>
           </p>
@@ -216,7 +218,7 @@ export async function TeamPage({
                       />
                     </label>{' '}
                     <RoleSelect value={line.role} />{' '}
-                    <button type="submit" className="ui-button" data-kind="main">
+                    <button type="submit" className="ui-button">
                       {t('adminTeams.roster.saveEntry')}
                     </button>
                   </p>
@@ -344,7 +346,7 @@ export async function TeamPage({
           />
           <NumberAndRole />
           <p className="staff-buttons">
-            <button type="submit" className="ui-button" data-kind="main">
+            <button type="submit" className="ui-button">
               {t('adminTeams.newPerson.submit')}
             </button>
           </p>
