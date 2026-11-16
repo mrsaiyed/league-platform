@@ -11,6 +11,8 @@ import { fileURLToPath } from 'node:url';
 import {
   browserChain,
   extraArguments,
+  folderProblems,
+  HELPERS,
   isBrowserTest,
   startLine,
   stoppedLine,
@@ -20,6 +22,8 @@ import { browserFailureNotes } from '../scripts/browser-failure-rules.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const folder = path.join(root, 'tests/browser');
 const read = (name) => fs.readFileSync(path.join(folder, name), 'utf8');
+/** How a made-up test ends, as every real one does. */
+const ends = 'process.exitCode = 0;\n';
 
 test('the chain is every test file in tests/browser: the exit test first, then alphabetical', () => {
   const names = fs.readdirSync(folder);
@@ -49,12 +53,37 @@ test('only files named "<name>-test.mjs" are tests', () => {
     assert.ok(!isBrowserTest(name), name);
 });
 
+test('a file that is neither a test nor a listed helper, or a test that does not run, stops the chain', () => {
+  // The real folder: only tests and the listed helpers, every test a real run.
+  assert.deepEqual(folderProblems(fs.readdirSync(folder), read), []);
+  assert.deepEqual(HELPERS, ['tracker-driver.mjs', 'web-browser-kit.mjs']);
+  const files = {
+    'web-exit-test.mjs': ends,
+    'rounds.test.mjs': ends,
+    'notes.txt': 'notes',
+    'kit-test.mjs': `export const lent = 1;\n${ends}`,
+    'quiet-test.mjs': "// process.exit(1) only in a comment\nconsole.log('passed');\n",
+    'tracker-driver.mjs': 'export const driver = 1;\n',
+  };
+  const read2 = (n) => files[n];
+  assert.deepEqual(folderProblems(Object.keys(files), read2), [
+    'kit-test.mjs exports something, as a helper does: a test only runs.',
+    'notes.txt is neither a browser test ("<name>-test.mjs") nor a helper listed in HELPERS (scripts/web-browser-chain.mjs).',
+    'quiet-test.mjs never sets how it ended (process.exit or process.exitCode), so it could never fail.',
+    'rounds.test.mjs is neither a browser test ("<name>-test.mjs") nor a helper listed in HELPERS (scripts/web-browser-chain.mjs).',
+  ]);
+  assert.throws(
+    () => browserChain(Object.keys(files), read2),
+    /The browser tests in tests\/browser cannot run:\n {2}kit-test\.mjs exports/,
+  );
+});
+
 test("a test's own extra arguments come from its own line, after --no-build", () => {
   const files = {
-    'web-exit-test.mjs': '// the exit test\n',
-    'b-test.mjs': '// B\n// In the browser chain: --now=2026-11-16T18:00:00Z --dev\nconst x = 1;\n',
-    'a-test.mjs': '// A\n',
-    'kit.mjs': '',
+    'web-exit-test.mjs': `// the exit test\n${ends}`,
+    'b-test.mjs': `// B\n// In the browser chain: --now=2026-11-16T18:00:00Z --dev\n${ends}`,
+    'a-test.mjs': `// A\n${ends}`,
+    'web-browser-kit.mjs': 'export const kit = 1;\n',
   };
   assert.deepEqual(extraArguments(files['b-test.mjs']), ['--now=2026-11-16T18:00:00Z', '--dev']);
   assert.deepEqual(
@@ -76,7 +105,7 @@ test("a test's own extra arguments come from its own line, after --no-build", ()
 });
 
 test('the line printed before a test is the one the notes on GitHub name the test by', () => {
-  const chain = browserChain(['web-exit-test.mjs', 'made-up-test.mjs'], () => '');
+  const chain = browserChain(['web-exit-test.mjs', 'made-up-test.mjs'], () => ends);
   assert.deepEqual(chain.map(startLine), [
     '+ node tests/browser/web-exit-test.mjs',
     '+ node tests/browser/made-up-test.mjs --no-build',
@@ -157,9 +186,9 @@ function runOn(tests, ...args) {
 
 test('the runner stops at the first test that fails, with its own exit code', () => {
   const run = runOn({
-    'a-pass-test.mjs': "console.log('A made-up check passed.');\n",
+    'a-pass-test.mjs': `console.log('A made-up check passed.');\n${ends}`,
     'b-fail-test.mjs': "console.log('Made-up check failed:');\nprocess.exit(3);\n",
-    'c-never-test.mjs': "console.log('never run');\n",
+    'c-never-test.mjs': `console.log('never run');\n${ends}`,
   });
   assert.equal(run.status, 3);
   assert.ok(run.stderr.includes(`+ node .local/${run.dir}/b-fail-test.mjs --no-build`), run.stderr);
@@ -168,8 +197,8 @@ test('the runner stops at the first test that fails, with its own exit code', ()
 
 test('a test that kills itself stops the chain; where signals exist it is named "Killed", 137', () => {
   const run = runOn({
-    'a-kill-test.mjs': "console.log('stopping myself');\nprocess.kill(process.pid, 'SIGKILL');\n",
-    'b-never-test.mjs': "console.log('never run');\n",
+    'a-kill-test.mjs': `console.log('stopping myself');\n${ends}process.kill(process.pid, 'SIGKILL');\n`,
+    'b-never-test.mjs': `console.log('never run');\n${ends}`,
   });
   assert.doesNotMatch(run.stdout + run.stderr, /never run/);
   if (process.platform === 'win32') {

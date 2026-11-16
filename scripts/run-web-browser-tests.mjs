@@ -25,12 +25,18 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const relative = process.env.WEB_BROWSER_TESTS_FOLDER ?? 'tests/browser';
 const folder = path.join(root, relative);
 const asked = process.argv.slice(2);
-const chain = browserChain(
-  fs.readdirSync(folder),
-  (name) => fs.readFileSync(path.join(folder, name), 'utf8'),
-  asked.filter((a) => !a.startsWith('--')),
-  relative,
-);
+let chain;
+try {
+  chain = browserChain(
+    fs.readdirSync(folder),
+    (name) => fs.readFileSync(path.join(folder, name), 'utf8'),
+    asked.filter((a) => !a.startsWith('--')),
+    relative,
+  );
+} catch (error) {
+  console.error(String(error?.message ?? error));
+  process.exit(1);
+}
 
 if (asked.includes('--list')) {
   for (const test of chain) console.log(startLine(test).slice(2));

@@ -4,8 +4,9 @@
 // (tests/web-browser-chain.test.mjs).
 //
 // The tests are the files themselves: every `tests/browser/<name>-test.mjs` is in the
-// chain, and nothing else is (the helpers there, web-browser-kit.mjs and tracker-driver.mjs,
-// do not end in "-test.mjs"). A new browser test is only its file: no shared line or list
+// chain, and nothing else is: the helpers there are listed in HELPERS below, and any other
+// file, or a test that exports or never sets how it ended, stops the chain with a sentence
+// before anything runs. A new browser test is only its file: no shared line or list
 // to edit, so two lanes that each add one never collide (before this step the chain was
 // one line of package.json that every such step edited).
 //
@@ -27,8 +28,46 @@ import os from 'node:os';
 /** The test that runs first and builds the app; the rest are given --no-build. */
 export const FIRST = 'web-exit-test.mjs';
 
+/**
+ * The files in tests/browser that are not tests: the helpers the tests import. The one list
+ * of them. Any other file there must be a test, named `<name>-test.mjs`, or the chain
+ * refuses to run, so a test misnamed is never quietly left out.
+ */
+export const HELPERS = ['tracker-driver.mjs', 'web-browser-kit.mjs'];
+
 /** Whether a file in tests/browser is a test of the chain. */
 export const isBrowserTest = (name) => /^[a-z0-9]+(?:-[a-z0-9]+)*-test\.mjs$/.test(name);
+
+/**
+ * What is wrong with the folder, as sentences ([] when nothing is): a file that is neither
+ * a test nor a listed helper, and a test that does not run. A test runs and says how it
+ * ended: it exports nothing (a helper misnamed as a test exports what it lends) and, outside
+ * its comments, calls `process.exit` or sets `process.exitCode`, as every test does to fail;
+ * a file that never does could only ever pass.
+ */
+export function folderProblems(names, read) {
+  const problems = [];
+  for (const name of [...names].sort()) {
+    if (HELPERS.includes(name)) continue;
+    if (!isBrowserTest(name)) {
+      problems.push(
+        `${name} is neither a browser test ("<name>-test.mjs") nor a helper listed in HELPERS (scripts/web-browser-chain.mjs).`,
+      );
+      continue;
+    }
+    const code = read(name)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    if (/^\s*export\b/m.test(code)) {
+      problems.push(`${name} exports something, as a helper does: a test only runs.`);
+    } else if (!/\bprocess\.exit(?:Code)?\b/.test(code)) {
+      problems.push(
+        `${name} never sets how it ended (process.exit or process.exitCode), so it could never fail.`,
+      );
+    }
+  }
+  return problems;
+}
 
 /** A test's own extra arguments, from its line `// In the browser chain: …` ([] if none). */
 export function extraArguments(source) {
@@ -43,6 +82,10 @@ export function extraArguments(source) {
  * chain's order; the first kept builds.
  */
 export function browserChain(names, read, only = [], folder = 'tests/browser') {
+  const problems = folderProblems(names, read);
+  if (problems.length > 0) {
+    throw new Error(`The browser tests in ${folder} cannot run:\n  ${problems.join('\n  ')}`);
+  }
   const wanted = only.map((name) => (name.endsWith('.mjs') ? name : `${name}.mjs`));
   const tests = names
     .filter(isBrowserTest)
