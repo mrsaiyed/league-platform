@@ -22,6 +22,7 @@
 // area reads and writes through the product's own commands; it is made again each time
 // the server starts.
 import {
+  myLeagues,
   ok,
   systemClock,
   type AccessTx,
@@ -42,7 +43,9 @@ import { randomUUID } from 'node:crypto';
 // new area's stand-in is wired in standInPorts beside the areas like it, not at the end.
 import { accessOfVia } from './access-of.ts';
 import type { FoundLeague, LeagueById } from './context.ts';
+import { keepingSender, readKeptEmails, type KeptEmail } from './kept-emails.ts';
 import { liveListenAuthorize } from './live-listen.ts';
+import { runsOnMadeUpData } from './made-up-mode.ts';
 import { namePolicyOf, namesShownOf } from './name-policy-of.ts';
 import type { WebPorts } from './ports.ts';
 import { createPlayPublisher } from './publish-plays.ts';
@@ -202,6 +205,12 @@ export type StandInOptions = {
    * Only the world reads it; sign-in and sessions keep this computer's clock.
    */
   readonly worldStartsAt?: string;
+  /**
+   * The working folder's `.local/captured-email` (kept-emails.ts, step 2.96): once the app
+   * has started, a copy of each email to a made-up address is written there for the kept
+   * emails' page. Left out (the unit tests), nothing is written.
+   */
+  readonly keptEmailsFolder?: string | null;
 };
 
 /** A clock that reads `startsAt` now and runs on from it as this computer's does. */
@@ -222,6 +231,26 @@ export const standInMember = {
   password: 'made-up member password',
 } as const;
 
+/** The made-up people who sign in with a password, for "be this made-up person" (step 2.96). */
+function madeUpSignInChoices() {
+  return [
+    ...Object.entries(standInStaffSignIns).map(([key, made]) => ({
+      key,
+      name: made.name,
+      email: made.email,
+      password: made.password,
+      accountId: standInPeople[made.person].accountId,
+    })),
+    {
+      key: 'member',
+      name: 'Morgan Member',
+      email: standInMember.email,
+      password: standInMember.password,
+      accountId: standInMemberAccountId,
+    },
+  ];
+}
+
 export type StandInPorts = WebPorts & {
   /** Gives standInMember an account, through the sign-in service's own steps. */
   readonly signUpMadeUpMember: () => Promise<void>;
@@ -230,12 +259,23 @@ export type StandInPorts = WebPorts & {
    * accounts on the sign-in stand-in, through the same steps. The stand-in only.
    */
   readonly signUpMadeUpStaff: () => Promise<void>;
+  /** From now on emails to made-up addresses are written to the kept emails' folder. */
+  readonly startKeeping: () => void;
 };
 
 /** The sign-in stand-in and its emails, for the stand-in and for the made-up database. */
 export type StandInSignIn = Pick<StandInPorts, 'signIn' | 'signInMail' | 'signUpMadeUpMember'> & {
   /** Gives one made-up address an account with this password, through the service's steps. */
   readonly signUpMadeUp: (email: string, password: string) => Promise<void>;
+  /** The newest kept emails in the folder, newest first (the kept emails' page). */
+  readonly keptEmails: () => Promise<readonly KeptEmail[]>;
+  /**
+   * The code in the newest email captured in memory for `email`, once the email asked for
+   * just now has reached the capture ("be this made-up person" on the made-up database).
+   */
+  readonly newestCodeFor: (email: string) => Promise<string | undefined>;
+  /** From now on emails to made-up addresses are written to the folder (after startup). */
+  readonly startKeeping: () => void;
 };
 
 /**
@@ -244,7 +284,7 @@ export type StandInSignIn = Pick<StandInPorts, 'signIn' | 'signInMail' | 'signUp
  * database (record 055) signs people in with it too.
  */
 export function standInSignIn(options: StandInOptions): StandInSignIn {
-  if (options.appEnv !== 'local' && options.appEnv !== 'test') {
+  if (!runsOnMadeUpData(options.appEnv)) {
     throw new Error(
       `The web app's made-up stand-in is for local work and tests only, not "${options.appEnv}".`,
     );
@@ -257,8 +297,14 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
   }
   const now = () => new Date();
   const outbox = captureEmail({ now });
+  // A copy of each email to a made-up address in the working folder, once started (step 2.96).
+  const folder = options.keptEmailsFolder ?? null;
+  const keeping = keepingSender(outbox, folder, {
+    now,
+    onNotKept: () => options.warn?.('email not kept', { kind: 'kept-email' }),
+  });
   const signInMail = createSignInMail({
-    sender: outbox,
+    sender: keeping.sender,
     fromAddress: options.emailFrom,
     siteOrigin: options.publicBaseUrl,
     onNoticeFailed: (kind) => options.warn?.('sign-in email not sent', { kind }),
@@ -275,13 +321,17 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
     returnOrigins: [options.publicBaseUrl],
     now,
   });
+  const newestCodeFor = async (email: string) => {
+    // The code email is handed over without waiting: let it reach the capture.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const address = email.trim().toLowerCase();
+    const sent = outbox.messages().findLast((m) => m.to.toLowerCase() === address);
+    return /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
+  };
   const signUpMadeUp = async (email: string, password: string) => {
     const here = '127.0.0.1';
     const asked = await signIn.startSignUp({ email, networkAddress: here });
-    // The code email is handed over without waiting: let it reach the capture.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    const sent = outbox.messages().findLast((m) => m.to === email);
-    const code = /\b(\d{6})\b/.exec(sent?.text ?? '')?.[1];
+    const code = await newestCodeFor(email);
     if (!asked.ok || code === undefined) throw new Error('A made-up person got no code.');
     const proved = await signIn.verifyCode({ email, code, networkAddress: here });
     if (!proved.ok) throw new Error('A made-up person could not be proved.');
@@ -298,11 +348,15 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
     signInMail,
     signUpMadeUp,
     signUpMadeUpMember: () => signUpMadeUp(standInMember.email, standInMember.password),
+    keptEmails: async () => (folder === null ? [] : readKeptEmails(folder, options.publicBaseUrl)),
+    newestCodeFor,
+    startKeeping: keeping.startKeeping,
   };
 }
 
 export function standInPorts(options: StandInOptions): StandInPorts {
-  const { signIn, signInMail, signUpMadeUpMember, signUpMadeUp } = standInSignIn(options);
+  const made = standInSignIn(options);
+  const { signIn, signInMail, signUpMadeUpMember, signUpMadeUp } = made;
   const people: readonly MadeUpPerson[] = Object.values(standInPeople);
   const now = () => new Date();
   const deps: CommandDeps<AccessTx> = {
@@ -365,6 +419,23 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     }),
   });
   const tracker: TrackerPorts = { ...games.tracker, publisher: hub };
+  const leaguesOf = standInMyLeagues({
+    leagues,
+    accessOf: (leagueId) => accessTx(leagueId).access,
+    // Roster places are the world's rows: the made-up coach is the person on a team of
+    // each seeded league there (standInSeedCast.memberAccountId).
+    world,
+    // The made-up member who signs in with a password is no person in the world's rows.
+    // They play in both public leagues, and in the draft league, which they may not see
+    // before it is published (U-9).
+    placesBeyondTheWorld: {
+      [standInMemberAccountId]: [
+        standInLeagues.live.id,
+        standInLeagues.other.id,
+        standInLeagues.draft.id,
+      ],
+    },
+  });
   return {
     findLeague: async (shortName): Promise<FoundLeague | undefined> => {
       const found = leagues.find((l) => l.slug === shortName || l.formerSlugs.includes(shortName));
@@ -384,23 +455,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf,
-    leaguesOfAccount: standInMyLeagues({
-      leagues,
-      accessOf: (leagueId) => accessTx(leagueId).access,
-      // Roster places are the world's rows: the made-up coach is the person on a team of
-      // each seeded league there (standInSeedCast.memberAccountId).
-      world,
-      // The made-up member who signs in with a password is no person in the world's rows.
-      // They play in both public leagues, and in the draft league, which they may not see
-      // before it is published (U-9).
-      placesBeyondTheWorld: {
-        [standInMemberAccountId]: [
-          standInLeagues.live.id,
-          standInLeagues.other.id,
-          standInLeagues.draft.id,
-        ],
-      },
-    }),
+    leaguesOfAccount: leaguesOf,
     games,
     tracker,
     publishPlays: createPlayPublisher({
@@ -416,6 +471,34 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     answers: answersOnlyHere(options.publicBaseUrl),
     fixtureImport: standInFixtureImport(world),
     leagueSites: standInLeagueSitesIn(options.localDesign),
+    // The kept emails and "be this made-up person" (step 2.96): the made-up people who sign
+    // in with a password, each with the leagues they may see, read as the front page reads
+    // them (core's myLeagues over the same rows).
+    localTools: {
+      keptEmails: made.keptEmails,
+      newestCodeFor: made.newestCodeFor,
+      madeUpPeople: async () =>
+        Promise.all(
+          madeUpSignInChoices().map(async (choice) => ({
+            key: choice.key,
+            name: choice.name,
+            email: choice.email,
+            places: (await myLeagues(choice.accountId, () => leaguesOf(choice.accountId))).map(
+              (league) => ({
+                slug: league.slug,
+                name: league.name,
+                memberships: league.memberships,
+              }),
+            ),
+          })),
+        ),
+      madeUpSignInOf: (key) => {
+        const choice = madeUpSignInChoices().find((c) => c.key === key);
+        return choice === undefined
+          ? undefined
+          : { kind: 'password', email: choice.email, password: choice.password };
+      },
+    },
     publicStats: standInPublicStats(world, namePolicy),
     adminTeams: standInAdminTeams(world),
     adminSettings,
@@ -423,6 +506,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     scheduleAdmin: standInSchedule(world),
     publicTeams: standInPublicTeams(world),
     signUpMadeUpMember,
+    startKeeping: made.startKeeping,
     signUpMadeUpStaff: async () => {
       for (const person of Object.values(standInStaffSignIns)) {
         await signUpMadeUp(person.email, person.password);

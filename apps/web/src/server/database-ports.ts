@@ -34,6 +34,7 @@ import { databaseLeagueSites, type LeagueSitesQueries } from './database-league-
 import { databasePublicSchedule, type PublicScheduleQueries } from './database-public-schedule.ts';
 import { databasePublicStats, type PublicStatsQueries } from './database-public-stats.ts';
 import { databasePublicTeams, type PublicTeamsQueries } from './database-public-teams.ts';
+import type { LocalTools } from './local-tools.ts';
 import { notMovedYet, NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
 import type { WebPorts } from './ports.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
@@ -76,6 +77,11 @@ export type DatabasePortsOptions = {
    */
   readonly warn: (message: string, fields: { readonly signInUserId: string }) => void;
   readonly now?: () => Date;
+  /**
+   * The kept emails and "be this made-up person" (step 2.96): given only on the made-up
+   * database (startup.ts); a real database has none, so both pages answer "not found".
+   */
+  readonly localTools?: LocalTools | null;
 };
 
 /** How often one sign-in user's account problem is logged again: once an hour (T-86). */
@@ -205,6 +211,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     leaguesOfAccount: (accountId) =>
       database.withTransaction(db, { accountId }, (scope) => database.listMyLeagues(scope)),
     leagueSites: databaseLeagueSites(database, db),
+    localTools: options.localTools ?? null,
     publicStats: databasePublicStats(database, db),
     games: notMovedYet('games area'),
     fixtureImport: notMovedYet('fixture import'),

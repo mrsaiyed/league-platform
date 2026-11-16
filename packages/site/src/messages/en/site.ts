@@ -123,6 +123,21 @@ export const enSite = {
   'shell.suspendedNotice':
     'This league has been taken down. Only the people who run it can see it, to export their data.',
   'site.poweredBy': 'Powered by SR Leagues',
+  // Step 2.96: two pages of local work and tests only, never in staging or production.
+  'standIn.keptEmails.code': 'Its code',
+  'standIn.keptEmails.empty': 'No email has been kept yet.',
+  'standIn.keptEmails.intro':
+    'The emails the made-up data sent on this computer, newest first. None of them left it. Only emails to made-up addresses (ending in .test, or at example.com) are kept here.',
+  'standIn.keptEmails.keptAt': 'Kept {when}',
+  'standIn.keptEmails.title': 'Emails kept on this computer',
+  'standIn.keptEmails.to': 'To {address}',
+  'standIn.keptEmails.words': 'What it says',
+  'standIn.madeUpPeople.be': 'Be {name}',
+  'standIn.madeUpPeople.intro':
+    'Sign this browser in as one of the made-up people. They exist only in the made-up data on this computer. Where a person has no password, they are sent a code and then choose one.',
+  'standIn.madeUpPeople.none': 'In no league yet',
+  'standIn.madeUpPeople.open': 'Open {league} as {name}',
+  'standIn.madeUpPeople.title': 'Be a made-up person',
   'standIn.otherHost.body':
     'This copy of SR Leagues holds only made-up leagues. It answers only requests made on the computer it runs on, to that computer’s own address, and not requests passed on by another server.',
   'standIn.otherHost.title': 'Not here',

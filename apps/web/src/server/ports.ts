@@ -12,6 +12,7 @@ import type { ContextDeps, IdentifyError } from './context.ts';
 import type { FixtureImportPorts } from './fixture-import-ports.ts';
 import type { GamesAreaPorts } from './games-area-ports.ts';
 import type { LeagueSiteLookup } from './league-site.ts';
+import type { LocalTools } from './local-tools.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 import type { PublicTeamsPorts } from './public-teams.ts';
@@ -57,6 +58,11 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly games: GamesAreaPorts;
   /** Each league's name and design, as its pages show them (league-site.ts). */
   readonly leagueSites: LeagueSiteLookup;
+  /**
+   * The kept emails' page and "be this made-up person" (step 2.96, local-tools.ts): only on
+   * made-up data, null on a real database. The pages ask the app's mode first (local-only.ts).
+   */
+  readonly localTools: LocalTools | null;
   /** What the public home and schedule pages read (step 2.42). */
   readonly publicSchedule: PublicSchedulePorts;
   /** What the public standings and statistics pages read (step 2.43). */

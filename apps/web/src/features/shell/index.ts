@@ -15,7 +15,7 @@ export { currentMenuPage, type MenuPage } from './current-menu-page.ts';
 export { DesignStyle, displayStylesheet, displayStylesheetMark } from './design-style.tsx';
 export { headerSeason, type HeaderSeason } from './header-season.ts';
 export { LeagueNotice } from './league-notice.tsx';
-export { MyLeaguesList } from './my-leagues-list.tsx';
+export { membershipsInWords, MyLeaguesList } from './my-leagues-list.tsx';
 export { LeagueSitePage } from './league-site-page.tsx';
 export { NotBuilt } from './not-built.tsx';
 export { LeagueNotFound, PlatformNotFound } from './not-found-screens.tsx';

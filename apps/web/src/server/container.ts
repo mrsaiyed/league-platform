@@ -10,6 +10,8 @@
 // directly as the tracker does, and its migration runner finds its folder on disk.
 import { consoleSink, createLogger } from '@srleagues/observability';
 import { getConfig } from './config.ts';
+import { keptEmailsFolderFrom } from './kept-emails.ts';
+import { runsOnMadeUpData } from './made-up-mode.ts';
 import type { WebPorts } from './ports.ts';
 import { startWebApp } from './startup.ts';
 
@@ -30,5 +32,8 @@ function start(): Promise<WebPorts> {
     database: () => import(/* turbopackIgnore: true */ '@srleagues/database'),
     log: (line) => logger.info('command', line),
     warn: (message, fields) => logger.warn(message, fields),
+    // Read only on made-up data (local work and tests): where the kept emails are written,
+    // the working folder found from where the server runs (kept-emails.ts, step 2.96).
+    keptEmailsFolder: runsOnMadeUpData(config.APP_ENV) ? keptEmailsFolderFrom(process.cwd()) : null,
   });
 }
