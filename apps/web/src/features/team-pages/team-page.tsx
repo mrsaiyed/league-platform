@@ -105,18 +105,20 @@ export function RosterSections({ roster }: { readonly roster: RosterView }) {
   );
 }
 
-/** How many statistics a team's totals may have and still stand as a strip of big numbers. */
-const stripLimit = 4;
+/** How many statistics a team's totals may have and still stand beside the players' table. */
+const besideLimit = 4;
 
 /**
  * The team's statistics as its setting allows: totals always, player lines when shown.
- * A few totals are a strip of big numbers under their small label, not a table of one row
- * the width of the page; many are a table. With few columns the totals and the players'
- * table stand side by side on a laptop, so a row's numbers stay near its name.
+ * The totals are a strip of big numbers under their small label, never a table of one row
+ * the width of the page: a few in one line, many wrapping onto a second (the strip's own
+ * doing). With few statistics the totals and the players' table stand side by side on a
+ * laptop, so a row's numbers stay near its name; with many each takes the page's width.
+ * A team with nothing recorded says so in a calm panel, whoever may see its players.
  */
 export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
   const labels = displayLabels(t);
-  if (!stats.hasNumbers && stats.playerLinesShown) {
+  if (!stats.hasNumbers) {
     return <EmptyPanel text={t('team.statsNone')} />;
   }
   const totals = stats.totalsRows[0];
@@ -129,7 +131,7 @@ export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
             ? []
             : [{ key: column.key, label: column.fullName ?? column.label, value: String(value) }];
         });
-  const asStrip = numbers.length > 0 && stats.totalsColumns.length - 1 <= stripLimit;
+  const beside = numbers.length > 0 && stats.totalsColumns.length - 1 <= besideLimit;
   // The players open sorted by points, biggest first, as on the statistics page; by the
   // first statistic where the sport has no points.
   const sortColumn =
@@ -150,8 +152,8 @@ export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
       />
     ) : null;
   return (
-    <div className="team-stats" data-layout={asStrip && players !== null ? 'pair' : 'stack'}>
-      {stats.totalsRows.length === 0 ? null : asStrip ? (
+    <div className="team-stats" data-layout={beside && players !== null ? 'pair' : 'stack'}>
+      {numbers.length === 0 ? null : (
         <div className="team-totals">
           <p className="ui-eyebrow">{t('team.statsTotals')}</p>
           <StatStrip label={t('team.statsTotals')} items={numbers} />
@@ -159,20 +161,8 @@ export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
             <p className="ui-section-note">{t('team.statsTotalsOnly')}</p>
           )}
         </div>
-      ) : (
-        <SortableStatsTable
-          caption={t('team.statsTotals')}
-          columns={stats.totalsColumns}
-          rows={stats.totalsRows}
-          locale={locale}
-          labels={labels.stats}
-          emblems
-        />
       )}
       {players}
-      {stats.playerLinesShown || (asStrip && stats.totalsRows.length > 0) ? null : (
-        <p className="ui-section-note">{t('team.statsTotalsOnly')}</p>
-      )}
     </div>
   );
 }

@@ -293,7 +293,35 @@ export const layoutCss = String.raw`
     border-block-start: 1px solid var(--color-line);
   }
 }
+/* More than four numbers (a team's totals in a sport that keeps many statistics) wrap onto
+   further lines of the same strip: as many across as the piece worked out for a phone, so
+   the lines are even. Every cell has a hairline after it and under it, each pushed one
+   line's width out of its place: the lines of the last column and of the last row fall
+   outside the strip, which cuts them off, and the rest stand between the cells, however
+   many there are across. A last line that is one short keeps the lines around its empty
+   place. */
+.ui-stat-strip[data-wrap='true'] {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(var(--ui-stat-across), minmax(0, 1fr));
+  overflow: hidden;
+}
+.ui-stat-strip[data-wrap='true'] > .ui-stat {
+  margin-block-end: -1px;
+  margin-inline-end: -1px;
+  border-block-start: 0;
+  border-inline-start: 0;
+  border-block-end: 1px solid var(--color-line);
+  border-inline-end: 1px solid var(--color-line);
+}
+@media (max-width: 22.49rem) {
+  .ui-stat-strip[data-wrap='true'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (min-width: 48rem) {
+  .ui-stat-strip[data-wrap='true'] {
+    grid-template-columns: repeat(var(--ui-stat-across-wide), minmax(0, 1fr));
+  }
   .ui-stat {
     gap: var(--step-2);
     padding-block: var(--step-5);

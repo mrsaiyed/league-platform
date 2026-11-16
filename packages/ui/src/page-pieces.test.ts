@@ -24,6 +24,7 @@ import {
   appliesAtOnce,
   displayCss,
   initialOf,
+  stripAcross,
 } from '../index.ts';
 
 const arabicName = 'نسور الصحراء';
@@ -129,6 +130,61 @@ describe('strip of numbers', () => {
     expect(html).toContain('aria-label="The season in numbers"');
     expect(html).toContain('<dt>Teams</dt><dd>5</dd>');
     expect(html.match(/<dt>/g)).toHaveLength(2);
+  });
+
+  const stripOf = (count: number) =>
+    render(
+      createElement(StatStrip, {
+        label: 'Team totals',
+        items: Array.from({ length: count }, (_, n) => ({
+          key: `s${n}`,
+          label: `Stat ${n}`,
+          value: String(n),
+        })),
+      }),
+    );
+
+  it('stands up to four numbers in one line, with nothing said about wrapping', () => {
+    for (const count of [1, 2, 3, 4]) {
+      expect(stripOf(count)).toContain('<dl class="ui-stat-strip">');
+    }
+  });
+
+  it('wraps more than four onto even lines: so many across on a phone, so many from a tablet up', () => {
+    // As few lines as it takes, and the lines as even as they can be.
+    expect([5, 6, 7, 8, 9, 10, 12, 13].map((count) => stripAcross(count, 4))).toEqual([
+      3, 3, 4, 4, 3, 4, 4, 4,
+    ]);
+    expect([5, 6, 7, 8, 9, 10, 12, 13].map((count) => stripAcross(count, 6))).toEqual([
+      5, 6, 4, 4, 5, 5, 6, 5,
+    ]);
+    expect(stripAcross(0, 4)).toBe(1);
+    expect(stripOf(5)).toContain(
+      '<dl class="ui-stat-strip" data-wrap="true" style="--ui-stat-across:3;--ui-stat-across-wide:5">',
+    );
+    const seven = stripOf(7);
+    expect(seven).toContain(
+      '<dl class="ui-stat-strip" data-wrap="true" style="--ui-stat-across:4;--ui-stat-across-wide:4">',
+    );
+    // Still one named list of numbers: every one is there, and none is a table.
+    expect(seven.match(/<dt>/g)).toHaveLength(7);
+    expect(seven).not.toContain('<table');
+    const css = displayCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).toMatch(
+      /\.ui-stat-strip\[data-wrap='true'\] \{\s*grid-auto-flow: row;\s*grid-template-columns: repeat\(var\(--ui-stat-across\), minmax\(0, 1fr\)\);\s*overflow: hidden;/,
+    );
+    expect(css).toMatch(
+      /@media \(min-width: 48rem\) \{\s*\.ui-stat-strip\[data-wrap='true'\] \{\s*grid-template-columns: repeat\(var\(--ui-stat-across-wide\), minmax\(0, 1fr\)\);/,
+    );
+    // On the narrowest phones it is two across, as the short strip is.
+    expect(css).toMatch(
+      /@media \(max-width: 22\.49rem\) \{\s*\.ui-stat-strip\[data-wrap='true'\] \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+    );
+    // The hairlines between its cells, whichever cell ends a line: each cell's own, after
+    // it and under it, and none of the short strip's lines before a cell.
+    expect(css).toMatch(
+      /\.ui-stat-strip\[data-wrap='true'\] > \.ui-stat \{\s*margin-block-end: -1px;\s*margin-inline-end: -1px;\s*border-block-start: 0;\s*border-inline-start: 0;\s*border-block-end: 1px solid var\(--color-line\);\s*border-inline-end: 1px solid var\(--color-line\);/,
+    );
   });
 });
 
