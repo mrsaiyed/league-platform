@@ -77,11 +77,14 @@ export type NewRosterEntry = {
   readonly joinedOn: string | null;
 };
 
-/** What a roster change sets; a field left out stays as it is, null clears a number. */
+/**
+ * What a roster change sets; a field left out stays as it is, null clears a number, and
+ * a leaving date of null puts the entry back on the roster (marked as left by mistake).
+ */
 export type RosterEntryChange = {
   jerseyNumber?: string | null;
   role?: string;
-  leftOn?: string;
+  leftOn?: string | null;
   sort?: number;
 };
 
@@ -124,13 +127,21 @@ export type TeamsStore = {
   readonly addRosterEntry: (entry: NewRosterEntry) => Promise<string | RosterTaken>;
   /**
    * Changes an entry: the new version, why it was refused, or undefined if it is not
-   * there or, when `version` is given, has moved on (T-46).
+   * there or, when `version` is given, has moved on (T-46). Clearing the leaving date is
+   * refused as the database refuses an open entry: the person is on the team again
+   * (`already-on-team`), or their number is worn, where the season asks for unique
+   * numbers (`jersey-taken`).
    */
   readonly updateRosterEntry: (
     entryId: string,
     change: RosterEntryChange,
     version?: number,
   ) => Promise<number | RosterTaken | undefined>;
+  /**
+   * Today in the league's own time zone (yyyy-mm-dd), by the database's clock: a leaving
+   * date cannot be after it.
+   */
+  readonly leagueToday: () => Promise<string>;
   /** The program a season belongs to (where a team's permission is checked), or undefined. */
   readonly seasonProgramId: (seasonId: string) => Promise<string | undefined>;
   /** The season a division belongs to and whether it is in the bin, or undefined if not found. */

@@ -56,6 +56,8 @@ export type LeagueRecords = MadeLeague & {
   personId: string;
   /** A person who left the team (so not on a roster now): the child of the shared account. */
   formerPlayerId: string;
+  /** That person's roster entry on the team, with its leaving date. */
+  formerRosterEntryId: string;
   rosterEntryId: string;
   /** The season's regular-season stage and its first round. */
   stageId: string;
@@ -294,7 +296,8 @@ async function seededLeague(
     `insert into people (league_id, profile_id, first_name, last_name) values ($1, $2, $3, 'Child')`,
     [leagueId, sharedChildProfileId, m],
   );
-  await pglite.query(
+  const formerRosterEntryId = await id(
+    pglite,
     `insert into roster_entries (league_id, team_id, person_id, jersey_number, left_on)
      values ($1, $2, $3, '23', '2026-11-30')`,
     [leagueId, teamId, childPersonId],
@@ -571,6 +574,7 @@ async function seededLeague(
     teamId,
     personId,
     formerPlayerId: childPersonId,
+    formerRosterEntryId,
     rosterEntryId,
     stageId,
     roundId,
