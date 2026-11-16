@@ -263,8 +263,9 @@ if (browser) {
             name: 'Start the clock',
             exact: true,
           }),
+          // Named with how many each team has left: two full a half in this league.
           'the way to both teams’ timeouts': page.getByRole('button', {
-            name: 'Timeouts',
+            name: 'Timeouts: Hawks 2 left, Bears 2 left',
             exact: true,
           }),
         };

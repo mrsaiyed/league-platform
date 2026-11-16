@@ -1108,6 +1108,9 @@ export const en = {
   'tracker.clockSheet.setTo': 'Set clock to {clock}',
   // Timeouts: both teams', in the pad.
   'tracker.timeouts.title': 'Timeouts',
+  // The button's name for a screen reader: "Timeouts: Hawks 2 left, Bears none left".
+  // On the screen it reads "Timeouts 2 · 1", home first as on the scoreboard.
+  'tracker.timeouts.buttonLabel': 'Timeouts: {home} {homeLeft}, {away} {awayLeft}',
   'tracker.timeouts.of': '{team} timeouts',
   'tracker.timeouts.chip': 'Timeouts {count}',
   'tracker.timeouts.chipLabel_one': '{team}: {count} timeout left',

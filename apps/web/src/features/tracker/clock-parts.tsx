@@ -17,7 +17,7 @@
 //   those taken and taking the latest back.
 import type { Translate } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
-import type { MouseEvent } from 'react';
+import { Fragment, type MouseEvent } from 'react';
 import { periodText } from './engine-words.ts';
 import type { ClockEntry, PeriodChoice } from './game-clock.ts';
 import type { TimeoutCall } from './scoring-moves.ts';
@@ -191,16 +191,44 @@ export function ClockControls(props: {
         />
         <span className="court-go-word">{t(`tracker.clock.${state}`)}</span>
       </button>
+      {/* The one way to both teams' timeouts carries how many each has left, home first as
+          on the scoreboard ("Timeouts 2 · 1"): a coach asks, and on a phone a team's
+          heading has no room to say it. A team with none is marked, in red; a screen
+          reader is told both in full. */}
       <button
         type="button"
         className="court-timeouts-button"
         data-timeouts-open=""
         aria-expanded={props.timeoutsOpen}
         aria-controls={props.padId}
+        aria-label={t('tracker.timeouts.buttonLabel', {
+          home: view.teams.home.name,
+          homeLeft: leftText(view.teams.home.timeouts.left, t),
+          away: view.teams.away.name,
+          awayLeft: leftText(view.teams.away.timeouts.left, t),
+        })}
         disabled={final}
         onClick={on.timeouts}
       >
-        {t('tracker.timeouts.title')}
+        <span className="court-timeouts-word">{t('tracker.timeouts.title')}</span>
+        <span className="court-timeouts-left" aria-hidden="true">
+          {sides.map((side, place) => {
+            const left = view.teams[side].timeouts.left;
+            return (
+              <Fragment key={side}>
+                {/* The dot between the two numbers, drawn. */}
+                {place === 0 ? null : <span className="court-timeouts-dot" />}
+                <span
+                  className="court-timeouts-count"
+                  data-timeouts-left={side}
+                  data-none={left === 0 ? '' : undefined}
+                >
+                  {left}
+                </span>
+              </Fragment>
+            );
+          })}
+        </span>
         <span className="court-caret" aria-hidden="true" />
       </button>
     </>

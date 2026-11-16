@@ -892,6 +892,15 @@ export async function clockSteps(kit) {
             (await page.getByRole('button', { name: 'Hawks: 2 timeouts left' }).isVisible()),
           await chip('home').innerText(),
         );
+        note(
+          'the Timeouts button says how many each team has left, home first, and is named in full for a screen reader',
+          /^Timeouts\s*2\s*2$/.test((await c.timeoutsButton.innerText()).trim()) &&
+            (await page
+              .getByRole('button', { name: 'Timeouts: Hawks 2 left, Bears 2 left', exact: true })
+              .isVisible()) &&
+            (await c.timeoutsButton.locator('[data-none]').count()) === 0,
+          await c.timeoutsButton.innerText(),
+        );
         await c.startClock();
         await watchScrolling(page);
         await tapWhereItIs(page, c.timeoutsButton, 'Timeouts');
@@ -925,7 +934,8 @@ export async function clockSteps(kit) {
             !(await c.timeoutsPad.isVisible()) &&
             (await c.stopReason.innerText()).trim() === 'Stopped for a Hawks timeout.' &&
             clockBefore - seconds(await c.clockText()) <= 3 &&
-            (await chip('home').innerText()).trim() === 'Timeouts 1',
+            (await chip('home').innerText()).trim() === 'Timeouts 1' &&
+            /^Timeouts\s*1\s*2$/.test((await c.timeoutsButton.innerText()).trim()),
           await c.stopReason.innerText(),
         );
         await c.timeout('home');
@@ -1157,8 +1167,47 @@ export async function clockSteps(kit) {
             (await page
               .getByRole('button', { name: /Set the clock or change the period$/ })
               .isVisible()) &&
-            (await page.getByRole('button', { name: 'Timeouts', exact: true }).isVisible()) &&
+            (await page
+              .getByRole('button', {
+                name: 'Timeouts: Hawks none left, Bears none left',
+                exact: true,
+              })
+              .isVisible()) &&
             (await page.getByRole('button', { name: 'Hide the Start clock button' }).isVisible()),
+        );
+        // Timeouts left are one tap away on a phone, and the button itself says how many
+        // (the lead's answer on the area 4 review): both numbers, home first as on the
+        // scoreboard, whole inside the button; a team with none has its number on red.
+        const left = await c.timeoutsButton.evaluate((button) => {
+          const edge = button.getBoundingClientRect();
+          return [...button.querySelectorAll('[data-timeouts-left]')].map((number) => {
+            const r = number.getBoundingClientRect();
+            return {
+              side: number.getAttribute('data-timeouts-left'),
+              says: number.textContent,
+              none: number.hasAttribute('data-none'),
+              ground: getComputedStyle(number).backgroundColor,
+              whole:
+                r.width > 0 &&
+                r.left >= edge.left &&
+                r.right <= edge.right &&
+                r.top >= edge.top &&
+                r.bottom <= edge.bottom,
+            };
+          });
+        });
+        note(
+          `${label}: the Timeouts button carries both teams’ numbers left, home first, and a team with none has its number on red`,
+          left.length === 2 &&
+            left[0].side === 'home' &&
+            left[1].side === 'away' &&
+            left[0].says === '0' &&
+            left[1].says === '0' &&
+            left.every(
+              (number) => number.none && number.whole && !/rgba\(0, 0, 0, 0\)/.test(number.ground),
+            ) &&
+            /^Timeouts\s*0\s*0$/.test((await c.timeoutsButton.innerText()).trim()),
+          JSON.stringify(left),
         );
       });
       await accessible(page, 'the clock stopped, at a phone upright');

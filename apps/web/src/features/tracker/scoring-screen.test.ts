@@ -635,7 +635,7 @@ describe('the frame (checklist A3, A4, A6, I7, T1; DESIGN.md section 7, line 11)
     // step 2.37 adds (Undo, Redo) goes after them.
     const controls = html.slice(html.indexOf('data-slot="clock-controls"'));
     expect(controls.slice(0, controls.indexOf('</section>'))).toMatch(
-      /^data-slot="clock-controls" aria-label="Clock and undo"><button[^>]*data-clock-toggle=""[^>]*>.*<button[^>]*data-timeouts-open=""[^>]*>Timeouts<span[^>]*><\/span><\/button>$/s,
+      /^data-slot="clock-controls" aria-label="Clock and undo"><button[^>]*data-clock-toggle=""[^>]*>.*<button[^>]*data-timeouts-open=""[^>]*><span class="court-timeouts-word">Timeouts<\/span>.*<span class="court-caret" aria-hidden="true"><\/span><\/button>$/s,
     );
     // The places left: empty until the steps that own them.
     expect(html).toContain('data-slot="play-log" aria-label="Plays"></section>');

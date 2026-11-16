@@ -875,6 +875,35 @@
 .court-timeouts-button[aria-expanded='true'] {
   border-color: var(--court-gold);
 }
+/* How many timeouts each team has left, on the button itself: home first, as on the
+   scoreboard, with a dot between ("Timeouts 2 · 1"). On a phone a team's heading has no
+   room to say it, and a coach asks. A team with none left has its number on red, with an
+   edge: the "0" says it, the color only repeats it. */
+.court-timeouts-word {
+  margin-inline-end: 8px;
+}
+.court-timeouts-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 800;
+}
+.court-timeouts-count {
+  min-inline-size: 1ch;
+  text-align: center;
+}
+.court-timeouts-count[data-none] {
+  padding-inline: 5px;
+  border: 1px solid var(--court-red-line);
+  border-radius: 6px;
+  background: var(--court-red);
+}
+.court-timeouts-dot {
+  inline-size: 3px;
+  block-size: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
 .court-timeouts-button:disabled {
   opacity: 0.45;
 }

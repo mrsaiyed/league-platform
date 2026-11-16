@@ -115,10 +115,33 @@ describe('Start and Pause (T2)', () => {
     const html = controls(stopped);
     expect(tag(html, 'data-timeouts-open')).toContain('aria-controls="court-pad"');
     expect(tag(html, 'data-timeouts-open')).toContain('aria-expanded="false"');
-    expect(words(html)).toBe('Start Timeouts');
+    expect(words(html)).toBe('Start Timeouts 5 5');
     const done = controls(stopped, final());
     expect(tag(done, 'data-clock-toggle')).toMatch(/\sdisabled=""/);
     expect(tag(done, 'data-timeouts-open')).toMatch(/\sdisabled=""/);
+  });
+
+  it('the way to the timeouts carries both teams’ numbers left, home first, and marks a team with none', () => {
+    // Two full a half in this format: the home team takes one, then its second.
+    const call: basketball.Command = { type: 'timeout', side: 'home', seconds: 60 };
+    const one = controls(stopped, played([call], tippedOff(basketball.HALVES)));
+    expect(words(one)).toBe('Start Timeouts 1 2');
+    expect(one.indexOf('data-timeouts-left="home"')).toBeLessThan(
+      one.indexOf('data-timeouts-left="away"'),
+    );
+    // A screen reader is told both in full, and nothing of the short form twice.
+    expect(tag(one, 'data-timeouts-open')).toContain(
+      'aria-label="Timeouts: Hawks 1 left, Bears 2 left"',
+    );
+    expect(tag(one, 'class="court-timeouts-left"')).toContain('aria-hidden="true"');
+    expect(one).not.toContain('data-none');
+    const none = controls(stopped, played([call, call], tippedOff(basketball.HALVES)));
+    expect(words(none)).toBe('Start Timeouts 0 2');
+    expect(tag(none, 'data-timeouts-left="home"')).toContain('data-none=""');
+    expect(tag(none, 'data-timeouts-left="away"')).not.toContain('data-none');
+    expect(tag(none, 'data-timeouts-open')).toContain(
+      'aria-label="Timeouts: Hawks none left, Bears 2 left"',
+    );
   });
 });
 
