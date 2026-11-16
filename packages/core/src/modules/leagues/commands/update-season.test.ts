@@ -72,6 +72,39 @@ describe('updateSeason', () => {
     expect(await code(staffId, { seasonId: id(1), version: 1, name: 'X' })).toBe('not-allowed');
   });
 
+  it('refuses a scheduler and a scorekeeper showing a season (A-18, step 2.182)', async () => {
+    const grantOf = (accountId: string, role: 'scheduler' | 'scorekeeper', n: number) =>
+      ({
+        id: `01900000-0000-7000-8000-0000000000f${n}`,
+        accountId,
+        role,
+        scope: { type: 'league' },
+        grantedByAccountId: ownerId,
+        revokedAt: null,
+      }) as const;
+    const scheduler = '01900000-0000-7000-8000-0000000000d1';
+    const scorekeeper = '01900000-0000-7000-8000-0000000000d2';
+    const { db, deps, as } = memoryLeagues({
+      seasons: seasons.map((s) => ({ ...s, status: 'draft' as const })),
+      grants: [grantOf(scheduler, 'scheduler', 1), grantOf(scorekeeper, 'scorekeeper', 2)],
+    });
+    for (const who of [scheduler, scorekeeper]) {
+      expect(
+        await updateSeason(as(who), { seasonId: id(2), version: 1, status: 'active' }, deps),
+      ).toEqual({ ok: false, error: { code: 'not-allowed' } });
+    }
+    expect(db.state.seasons[1]?.status).toBe('draft');
+    expect(db.state.activity).toEqual([]);
+    // The owner shows it and hides it again.
+    expect(
+      await updateSeason(as(ownerId), { seasonId: id(2), version: 1, status: 'active' }, deps),
+    ).toEqual({ ok: true, value: { version: 2 } });
+    expect(
+      await updateSeason(as(ownerId), { seasonId: id(2), version: 2, status: 'draft' }, deps),
+    ).toEqual({ ok: true, value: { version: 3 } });
+    expect(db.state.seasons[1]?.status).toBe('draft');
+  });
+
   it('changes nothing and logs nothing when nothing differs', async () => {
     const { db, deps, as } = memoryLeagues({ seasons });
     expect(

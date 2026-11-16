@@ -1,0 +1,59 @@
+# Minutes played and a clock that is set: the rule for step 2.189
+
+Written by the area 6 lead ("The numbers are right", on the strongest model, read-only) on 2026-11-16, at the lead's request, so that step 2.189 can be built without its builder deciding anything. The lead accepted the rule the same day and recorded it as S-71, decided for you.
+
+## What the engine does today (`packages/sports/src/basketball/live.ts`)
+
+1. `derive` (lines 404 to 530) adds up each player's stints in `elapsedMs`, the clock's total running time, which `record` (687 to 697) stamps on every play. A period change only marks where the period began (498 to 501).
+2. `setClock` (882 to 903): time put BACK winds `elapsedMs` back by the smaller of the time put back and the time run this period, and OVERWRITES the `elapsedMs` and `clockMs` of every later play (892 to 897). It keeps no memory of what was there. Time taken OFF changes only the reading (901). So a clock set down and then up wipes the period's minutes, and a clock set up and then down loses that time for good.
+3. Undo never touches the clock: a set clock is not a play (640 to 647; audit of live scoring, I2). A set cannot reach past the start of its period (888), so earlier periods are safe.
+
+The Al-Hadi tracker behaves the same way, and keeps doing so: nothing in this step changes its results by one second.
+
+## Examples
+
+Quarters of 8:00, five on the court, 2:00 played and the clock at 6:00, unless said. "Run" means proved on the real engine.
+
+| Case                                                                                                                                 | Today                                                                                         | Right                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| a0, as found on the screen: halves, 16:55, set to 12:00, set back to 16:55                                                           | everyone 0:00; the basket made at 19:00 now reads 16:55 (run)                                 | 3:05 each; the basket reads 19:00                                      |
+| a: means 6:08, types 0:08, then sets 6:08                                                                                            | everyone 0:00 (run)                                                                           | 1:52 each                                                              |
+| b: set too high: h6 comes in for h1 at 6:30; 6:00, set to 7:30, set back to 6:00                                                     | h1 0:30, h6 0:00, the others 0:30; the substitution reads 7:30 (run)                          | h1 1:30, h6 0:30, the others 2:00; 6:30                                |
+| c: the clock ran on to 5:40 after a whistle and is set to 6:00                                                                       | 2:00 (run)                                                                                    | 2:00: that time was not played                                         |
+| d: 30 seconds were played with the clock stopped; 6:00 is set to 5:30                                                                | 2:00; with the quarter played out, 7:30 each and 37:30 for the team (run)                     | 2:30; then 8:00 each and 40:00                                         |
+| e: 6:00 set to 0:08, h6 comes in for h1, set to 6:08                                                                                 | everyone 0:00 (run)                                                                           | h1 1:52, h6 0:00, the others 1:52                                      |
+| f: the second quarter before it starts, 8:00 set to 7:00 and back; after 1:00 of it, 7:00 set to 0:07 and back; the same in overtime | 8:00 (fine); 8:00; 8:00: each period's minute is wiped, the first quarter never touched (run) | 8:00; 9:00; 10:00                                                      |
+| g: 6:00 set to 0:08, then Undo                                                                                                       | the last basket goes, the clock stays at 0:08, minutes 2:00 (run)                             | the same: Undo is not for the clock; a second set is, and is now exact |
+
+## The rule (S-71, decided for you)
+
+In words for a league's admin: minutes are counted on the game clock. In each period the time played is the time the period started with, less what the clock shows. Time put back on the clock comes off the players who were on the court (it was not played). Time taken off is added to them (it was played with the clock stopped). A clock set wrongly and set right before it is started again changes nothing. Before the clock has run in a period, setting it only says where the period starts. A correction never reaches into another period.
+
+The other rule that could be defended keeps the tracker's meaning (time taken off is never given to anyone) and only makes a mistake put right exact. Then case d stays at 2:00 and a whole quarter can read 7:30. The game clock was chosen because a coach checks minutes against the scoreboard. The step's first idea (a set never moves minutes) fails case c.
+
+## For the builder: never overwrite; keep facts and reckon from them
+
+- Facts, under the new rule only, never rewritten: `clock.ranMs` (the true running time), `ranMs` on each play's stamp, and `state.clockSets[] = { segment, ranMs, ms }`, where a segment is the stretch between two period plays, overtime included. A second set at the same `ranMs` replaces the first. A set to the time the clock would show anyway (the same whole second) removes the entry and restores the exact reading.
+- For each segment: `L` is the reading it started with (the period's length, or the set made at its first moment). `readingAt(r)` is the last entry at or before `r`: its `ms` less (`r` less its `ranMs`). `corrected(r) = min(L, max(readingAt(r), every later entry's ms))`. The game time of a moment is `base + L − corrected(r)`.
+- After each set clock, and after undo or redo of a period play, the segment's plays are stamped again (in `plays` and in `redo`): `clockMs = corrected(ranMs)` and `elapsedMs = base + L − corrected`; `clock.elapsedMs = base + L − min(L, remainingMs)`, which `clockAt` must also keep while the clock runs. `derive` stays as it is.
+- Decided edges: plays tapped during one stoppage all sit at that one moment, so the order of taps does not matter; undo of a period play drops that period's sets, and clock time run in it counts for nobody; redo stamps the period play at the present moment.
+
+## What changes, and behind what switch
+
+- One optional field on the engine's `Rules` (for example `minutesFollow: 'game-clock'`). Absent, the engine does what it does today, to the second. `setClock`, `record` and `clockAt` branch on it.
+- `engineRulesOf` (`packages/core/src/modules/games/engine-rules.ts`, line 29) sets it for every game of the new product. It is not a league's setting: there is one right answer.
+- It is left OUT of `checkRules` (`live.ts`, 823) and of the tracker's strict contract (`packages/contracts/src/live-stats.ts`, 16), so the Al-Hadi tracker cannot turn it on; and out of the transfer path (`apply-tracker-commands.ts`, 217): a game played on the tracker keeps the tracker's numbers.
+- The tracker's tests that hold its behavior, all in `tests/live-stats-engine.test.mjs`: "setting the clock back takes those seconds off whoever was on the floor" (250), "minutes credit each stint…" (233), "a period change resets the clock…" (272), "the clock runs from its anchor…" (219), "a foul stops a running clock…" (340). None of them pins the wipe. The step adds a NEW test file with today's results from the table above and a whole-state equality for a fixed script without the switch.
+- Games already recorded: their saved rules lack the switch, so they keep the old rule for life (S-1). No migration. They cannot be reckoned again from the saved state (the old rule overwrote the times), only by replaying the game's events; made-up data is seeded again instead.
+- The stored play log needs nothing new: each set clock is already an event with its time (`apply-tracker-commands.ts`, 369 to 371). The state document gains the three optional facts; its schema is loose (`tracker-protocol.ts`, 433 to 436).
+- No stale figure was found: a game's lines are saved again in the same batch (393 to 398) and settled when the game ends (`finish-tracked-game.ts`, 72); season totals read those lines (`rebuild-season.ts`, 84); the public play-by-play reads `clockMs` from the saved state (`read-game-page.ts`, 283).
+
+## The done test
+
+- Unit cases named a0, a, b, c, d, e, f (three parts) and g, each with the "Right" column: minutes AND the plays' times. And three more: "a mistake that ran on" (6:00 set to 0:08, 5 seconds run, set to 6:03: 1:57), "above the start" (6:00 set to 9:00, 10 seconds, set to 5:50: 2:10) and "half a second" (paused at 16:54.6, set to 12:00, set to 16:55: back to the millisecond).
+- Property tests over random taps (start, pause, sets up to the period's length, substitutions, period changes, undo, redo): (1) a team with five on throughout totals exactly five times `clock.elapsedMs`, and each period's share is its start less its clock, between 0 and the start; (2) every player is between 0 and the sum of the periods' starts; (3) at any stopped moment, set X and then set back gives the same `derive` and the same play stamps as neither; (4) set X and then set Y equals set Y; (5) a play's `elapsedMs` never goes down along the log; (6) without the switch the state equals the pinned one.
+- The scoring screen (built in step 2.36): its clock form works the old rule out again in `game-clock.ts` (217 to 227) and says only what comes off (`scoring-screen.tsx`, 807 to 815). The engine exports one helper for "what would a set to X do" and the form uses it. `tracker.clockSheet.putsBack` and `putsBackAll` stay true when time comes off. New sentences: "This adds {time} to the minutes of the players on the court." and, before the clock has run in the period, "The period will start at {clock}. Nobody's minutes change." After the set, `tracker.say.clockSetBack` stays and a matching "was added" sentence is new. The figure is the difference between the two times as the clock shows them (16:55 to 12:00 says 4:55).
+
+## Not checked, or not perfect
+
+No browser and no whole gate was run. If the clock RAN between a mistake and its fix and a substitution fell inside that stretch, totals are exact but the two swapped players can be a few seconds off, and plays in that stretch show the corrected time. A scorekeeper who forgot to start the clock at the very start of a period and takes time off before ever starting it gives nobody that time; the other choice would add minutes nobody played whenever a period is shortened on purpose, which is worse.

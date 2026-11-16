@@ -389,11 +389,21 @@ if (browser) {
         inStats?.points === String(league.team.points),
         JSON.stringify(inStats?.cells ?? tables),
       );
-      const totals = rowOf(league.team.name).find((row) => row.points !== undefined);
+      // The team's totals are a strip of numbers under "Team totals" since step 2.147 part
+      // 3, not a table row under the team's name: its Points number is read from the strip,
+      // label by label, never from anywhere in the page's text.
+      const totals = await page.evaluate(() =>
+        [
+          ...document.querySelectorAll('main [role="group"][aria-label="Team totals"] .ui-stat'),
+        ].map((stat) => ({
+          label: stat.querySelector('dt')?.textContent?.trim() ?? '',
+          value: stat.querySelector('dd')?.textContent?.trim() ?? '',
+        })),
+      );
       note(
         `${slug}: ${league.team.name}'s totals show its ${league.team.points} points`,
-        totals?.points === String(league.team.points),
-        JSON.stringify(totals?.cells ?? tables),
+        totals.find((stat) => /^Points$/.test(stat.label))?.value === String(league.team.points),
+        JSON.stringify(totals.length > 0 ? totals : tables),
       );
       await nothingPrivate(`${league.team.name}'s page`);
       await noPersonIds(`${league.team.name}'s page`);

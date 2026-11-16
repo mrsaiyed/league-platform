@@ -18,13 +18,11 @@ export const tableCss = String.raw`
   timeline-scope: --ui-table-scroll;
 }
 /* A table whose name is kept for screen readers only (a heading above it says the same) has
-   no line of its own for the arrow, which then sat on a column heading. It gets a short
-   band above its headings, and the arrow sits there. */
+   no line of its own for the arrow, which must not sit on a column heading. Its arrow
+   stands over the box's far corner instead (below), so the fade keeps no clear patch for
+   one inside the box. */
 .ui-table-frame:has(caption.ui-visually-hidden) {
-  --ui-table-arrow: var(--step-1);
-}
-.ui-table-frame:has(caption.ui-visually-hidden) .ui-table-wrap {
-  padding-block-start: var(--step-4);
+  --ui-table-arrow: calc(-1 * var(--step-8));
 }
 .ui-table-wrap {
   /* Words kept only for screen readers are placed out of the flow; this keeps the ones in
@@ -77,7 +75,7 @@ export const tableCss = String.raw`
   .ui-table-frame::before {
     inset-block: 0;
     inset-inline-end: 0;
-    inline-size: var(--step-5);
+    inline-size: var(--step-4);
     border-start-end-radius: inherit;
     border-end-end-radius: inherit;
     background:
@@ -97,9 +95,6 @@ export const tableCss = String.raw`
       ),
       linear-gradient(to left, transparent, var(--color-panel));
   }
-  .ui-table-frame:has(caption.ui-visually-hidden)::after {
-    inset-block-start: var(--step-1);
-  }
   .ui-table-frame::after {
     inset-block-start: var(--step-4);
     inset-inline-end: var(--step-2);
@@ -112,6 +107,23 @@ export const tableCss = String.raw`
   [dir='rtl'] .ui-table-frame::after {
     transform: rotate(45deg);
   }
+  /* Over a table with no name in view the sign is the arrow of a way on, standing above
+     the box's far corner in the gap under the section's title: no strip is kept for it
+     inside the box, and it never sits on a column heading. */
+  .ui-table-frame:has(caption.ui-visually-hidden)::after {
+    inset-block-start: calc(-1 * (var(--step-4) + var(--step-1)));
+    inset-inline-end: 0;
+    inline-size: var(--step-4);
+    block-size: var(--step-4);
+    border: 0;
+    background: var(--color-muted);
+    -webkit-mask: var(--ui-arrow) center / contain no-repeat;
+    mask: var(--ui-arrow) center / contain no-repeat;
+    transform: none;
+  }
+  [dir='rtl'] .ui-table-frame:has(caption.ui-visually-hidden)::after {
+    transform: scaleX(-1);
+  }
   /* The column that stays put has an edge while the table is scrolled under it: a hairline
      and a soft shadow on its far side. A number half under it is then plainly covered, not
      read as a different number. A table that is not scrolled shows no edge. */
@@ -120,16 +132,18 @@ export const tableCss = String.raw`
     position: absolute;
     inset-block: 0;
     inset-inline-start: 100%;
-    inline-size: var(--step-2);
+    inline-size: var(--step-3);
     border-inline-start: 1px solid var(--color-line-strong);
-    background: linear-gradient(to right, var(--scroll-shadow), transparent);
+    /* The panel's own color, thinning: a number scrolled against the column fades into it
+       over a few pixels, and never stands hard against the name. */
+    background: linear-gradient(to right, var(--color-panel), transparent);
     opacity: 0;
     pointer-events: none;
     animation: ui-table-stuck linear both;
     animation-timeline: --ui-table-scroll;
   }
   [dir='rtl'] .ui-team-cell::after {
-    background: linear-gradient(to left, var(--scroll-shadow), transparent);
+    background: linear-gradient(to left, var(--color-panel), transparent);
   }
 }
 /* A browser that cannot follow the scroll gives that column a hairline at all times. */
@@ -311,6 +325,94 @@ export const tableCss = String.raw`
   font-family: var(--font-score);
   font-size: var(--text-16);
 }
+/* The two box scores of one game are read one against the other. The column of the numbers
+   players wear has one width in both, and both give their names the same room (the page
+   counts the letters of the longest name of either: --name-room), up to the name column's
+   limit: so the number columns of the two stand under each other on a phone, and one
+   table never hides a column the other shows. A table that lists no players gives "Total"
+   the width the other's two first columns have together. */
+.ui-box-score tr > .ui-num:first-child {
+  inline-size: var(--step-7);
+}
+.ui-box-score .ui-team-cell > [dir] {
+  min-inline-size: min(calc(var(--name-room, 0) * 1ch), calc(45cqi - var(--step-6)));
+}
+.ui-box-score[data-players='hidden'] .ui-team-cell {
+  inline-size: calc(
+    var(--step-7) + 2 * var(--step-3) +
+      min(calc(var(--name-room, 0) * 1ch), calc(45cqi - var(--step-6)))
+  );
+}
+/* In a box as narrow as a phone's a box score's cells stand a step closer and the column of
+   numbers worn is a step narrower, so one more statistic is in view in both tables. */
+@container (max-width: 30rem) {
+  .ui-box-score th,
+  .ui-box-score td {
+    padding-inline: var(--step-2);
+  }
+  .ui-box-score tr > :first-child {
+    padding-inline-start: var(--step-4);
+  }
+  .ui-box-score tr > :last-child {
+    padding-inline-end: var(--step-4);
+  }
+  .ui-box-score tr > .ui-num:first-child {
+    inline-size: calc(var(--step-6) + var(--step-2));
+  }
+  .ui-box-score[data-players='hidden'] .ui-team-cell {
+    inline-size: calc(
+      var(--step-6) + var(--step-2) + 2 * var(--step-2) +
+        min(calc(var(--name-room, 0) * 1ch), calc(45cqi - var(--step-6)))
+    );
+  }
+}
+/* A cell with no number holds a quiet dash, never nothing. */
+.ui-no-value {
+  color: var(--color-muted);
+}
+/* The column a table is sorted by is picked out quietly: its numbers are heavier, and its
+   heading is in the text color with the arrow of its direction. */
+.ui-stats td[data-sorted='true'] {
+  font-weight: 700;
+}
+/* A figure a row draws quieter (the games played of a player with too few to be ranked):
+   the quiet text color, which still reads on a panel, and never heavier than plain, even
+   in the column the table is sorted by. */
+.ui-stats td[data-quiet='true'] {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+/* A table whose team column folds (the statistics page's players): in a box as narrow as a
+   phone's the team is its shield alone, before the player's name, and the team's own
+   column is gone, so the numbers come straight after the name. The team's name is still
+   said to screen readers there. In a wider box the fold's two parts are not drawn. */
+.ui-stats .ui-fold {
+  display: none;
+}
+@container (max-width: 30rem) {
+  .ui-stats[data-fold] .ui-fold {
+    display: inline;
+  }
+  .ui-stats[data-fold] [data-folded] {
+    display: none;
+  }
+  /* In a box that narrow the cells of any table of statistics stand a step closer, as a
+     standings table's do, so one more column is in view. */
+  .ui-stats th,
+  .ui-stats td {
+    padding-inline: var(--step-2);
+  }
+  .ui-stats tr > :first-child {
+    padding-inline-start: var(--step-4);
+  }
+  .ui-stats tr > :last-child {
+    padding-inline-end: var(--step-4);
+  }
+  /* The name gives up what the shield takes, as a standings table's does. */
+  .ui-stats[data-fold] .ui-team-cell > [dir] {
+    max-inline-size: calc(45cqi - var(--step-6) - var(--step-3));
+  }
+}
 /* A note's number sits beside the name without making its row taller than the others. */
 .ui-note-mark {
   font-size: var(--text-12);
@@ -378,7 +480,11 @@ export const tableCss = String.raw`
   justify-content: flex-start;
   gap: var(--step-1);
   padding-block: 0;
-  padding-inline: 0;
+  /* Room inside the button for the keyboard's ring, which is drawn inside it (below), taken
+     back outside it: the heading stands where it stood, and the ring never lies on its
+     letters. */
+  padding-inline: var(--step-2);
+  margin-inline: calc(-1 * var(--step-2));
   min-block-size: var(--tap);
   min-inline-size: var(--tap);
   border: 0;

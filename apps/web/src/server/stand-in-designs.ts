@@ -2,9 +2,10 @@
 //
 // Every shared piece takes its colors from a league's design, and that is proved, not
 // assumed (docs/build/DESIGN.md, section 4, line 28): the pages are pictured in three
-// color sets, one of them neither of the first starting design's two. That third set
-// lives here, as the design a made-up league's admin might have saved: a green league. It
-// is not a starting design and is never offered to a real league.
+// color sets, one of them neither of the first starting design's two, and in a fourth
+// whose main color is bright. Those two live here, as designs a made-up league's admin
+// might have saved: a green league and an orange one. Neither is a starting design, and
+// neither is ever offered to a real league.
 import {
   designDocumentSchema,
   startingDesign,
@@ -31,6 +32,27 @@ const madeUpDesigns = {
     corners: 'sharp',
     cards: 'outlined',
     spacing: 'roomy',
+  },
+  // A fourth set (step 2.147 part 3): a light league whose main color is a bright orange.
+  // An orange cannot be read as text on a white page, nor white words on it: so this is
+  // the set where the color the eye lands on falls back to the highlight (a burnt orange),
+  // the header's bar carries dark words, and a band is made from the text color. A navy
+  // for small labels.
+  ember: {
+    version: 1,
+    base: 'light',
+    colors: {
+      background: '#fffaf3',
+      panel: '#ffffff',
+      text: '#1f2430',
+      primary: '#f08a00',
+      accent: '#1f3a5f',
+      highlight: '#b4380f',
+    },
+    fonts: { heading: 'source-sans', body: 'inter' },
+    corners: 'soft',
+    cards: 'raised',
+    spacing: 'comfortable',
   },
 } satisfies Record<string, DesignDocument>;
 

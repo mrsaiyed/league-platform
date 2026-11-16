@@ -298,7 +298,8 @@ export const heroCss = String.raw`
   background: var(--color-band-pop-hover);
 }
 .ui-root .ui-button[data-kind='ghost'] {
-  border-color: color-mix(in srgb, var(--color-on-band) 38%, transparent);
+  /* The band's own edge: its words' color, as strongly as it takes to be seen there. */
+  border-color: var(--band-edge);
   background: transparent;
   color: var(--color-on-band);
 }

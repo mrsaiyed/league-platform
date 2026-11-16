@@ -12,23 +12,90 @@
 //
 // Every value is fixed text that names other variables; nothing a league types is in it.
 import { contrastRatio } from './contrast.ts';
+import {
+  bandSurfaces,
+  derivedColors,
+  headerSurfaces,
+  mixColors,
+  tintShares,
+} from './derived-colors.ts';
 import type { DesignDocument } from './design-document.ts';
 import { headingTraits } from './fonts.ts';
 
 /** A main color needs this much against the page to show as a hairline at low strength. */
 const lineContrast = 3;
 
+/**
+ * The edge of a control (a field, a picker, an outlined button) and every other strong
+ * line: the text color laid on at 45 percent, or as much more as it takes for the line to
+ * stand 3 to 1 from the page and from a panel (WCAG 1.4.11). On a dark page 45 is plenty;
+ * on a white one a dark text color needs about half. Worked out, so a league's own colors
+ * get an edge that can be seen.
+ */
+const edgeContrast = 3;
+
+/**
+ * How much of `ink` (the color of the words there) an edge must be laid on with to stand
+ * 3 to 1 from every one of `surfaces`: from `least` percent, in steps of five.
+ */
+export function shareForEdge(ink: string, surfaces: readonly string[], least: number): number {
+  for (let share = least; share < 100; share += 5) {
+    const reads = surfaces.every(
+      (surface) => contrastRatio(mixColors(surface, ink, share / 100), surface) >= edgeContrast,
+    );
+    if (reads) return share;
+  }
+  return 100;
+}
+
+export function edgeShare(colors: DesignDocument['colors']): number {
+  return shareForEdge(colors.text, [colors.background, colors.panel], 45);
+}
+
+/**
+ * The same edge where a control stands on a filled ground: in the header (the menu's
+ * button, the season picker, the account button) and on a band (the outlined button
+ * beside the one that matters). It is the color of the words there, laid on at 40 percent
+ * or as much more as it takes: a light design's bar or band of a mid-strength main color
+ * needs more than a dark page does.
+ */
+export function filledEdgeShares(design: DesignDocument): {
+  readonly header: number;
+  readonly band: number;
+} {
+  const colors = { ...design.colors, highlight: design.colors.highlight ?? design.colors.accent };
+  const derived = derivedColors(colors, design.base);
+  const headerText = design.base === 'dark' ? colors.text : derived.onPrimary;
+  return {
+    header: shareForEdge(headerText, headerSurfaces(colors, design.base), 40),
+    band: shareForEdge(derived.onBand, Object.values(bandSurfaces(colors, design.base)), 40),
+  };
+}
+
+/**
+ * A frame's tint as the stylesheet writes it: the main color at that frame's share
+ * (`tintShares`, the one place the numbers are), over nothing or over a panel. Written
+ * from the same numbers the texts are fitted to, so neither can change without the other.
+ */
+const tintPercent = (base: 'light' | 'dark'): string => `${Math.round(tintShares[base] * 100)}%`;
+const tintOver = (base: 'light' | 'dark', ground: 'transparent' | 'var(--color-panel)'): string =>
+  `color-mix(in srgb, var(--color-primary) ${tintPercent(base)}, ${ground})`;
+
 const bases = {
   dark: {
-    '--color-line-strong': 'color-mix(in srgb, var(--color-text) 45%, transparent)',
-    '--color-tint': 'color-mix(in srgb, var(--color-primary) 9%, transparent)',
+    '--color-tint': tintOver('dark', 'transparent'),
     '--header-background': 'var(--color-background)',
     '--header-text': 'var(--color-text)',
     '--header-name': 'var(--color-text)',
     '--header-line': 'var(--color-line)',
     // A card of a dark design has a little of the main color at one corner, never more
     // than the texts are fitted to (hoverTintShare): where the page gets its warmth.
-    '--card-wash': 'color-mix(in srgb, var(--color-primary) 9%, var(--color-panel))',
+    '--card-wash': tintOver('dark', 'var(--color-panel)'),
+    // The ground of a soft pill on a card (Postponed, Forfeit): the panel with the tint
+    // in it, as one solid color. Laid over a card as a see-through tint it stacked on the
+    // card's own wash, and under a bright main color the pill's words fell short of 4.5
+    // to 1 there (measured, step 2.147 part 3). This is a surface the texts are fitted to.
+    '--color-tint-panel': tintOver('dark', 'var(--color-panel)'),
     // How much of a team's color fills its shield: on a dark panel a third shows as a
     // deep tone of it.
     '--emblem-strength': '30%',
@@ -38,8 +105,7 @@ const bases = {
     '--scroll-shadow': 'rgba(0, 0, 0, 0.5)',
   },
   light: {
-    '--color-line-strong': 'color-mix(in srgb, var(--color-text) 45%, transparent)',
-    '--color-tint': 'color-mix(in srgb, var(--color-primary) 7%, transparent)',
+    '--color-tint': tintOver('light', 'transparent'),
     '--header-background': 'var(--color-primary)',
     '--header-text': 'var(--color-on-primary)',
     '--header-name': 'var(--color-on-primary)',
@@ -47,6 +113,8 @@ const bases = {
     // A card of a light design is its panel's color and nothing else: cards and tables
     // are one tint, and a main color laid over white would turn it dusty.
     '--card-wash': 'var(--color-panel)',
+    // A soft pill's ground: the panel with the light frame's own tint in it.
+    '--color-tint-panel': tintOver('light', 'var(--color-panel)'),
     // On a white panel a team's color needs more than half to have the strength it has on
     // a dark one.
     '--emblem-strength': '55%',
@@ -57,7 +125,7 @@ const bases = {
     // every text is fitted to) and an edge of the main color, and a shield on it is drawn
     // as on any panel.
     '--spot-ground': 'var(--color-panel)',
-    '--spot-glow': 'color-mix(in srgb, var(--color-primary) 7%, var(--color-panel))',
+    '--spot-glow': tintOver('light', 'var(--color-panel)'),
     '--spot-edge': 'color-mix(in srgb, var(--color-primary) 45%, transparent)',
     '--spot-words': 'var(--color-text)',
     '--spot-muted': 'var(--color-muted)',
@@ -122,8 +190,13 @@ export function frameVariables(design: DesignDocument): Record<string, string> {
   // Rounded links are filled with the bar's own colors, so they belong to a light design's
   // bar; a dark design always has the line.
   const tabStyle = !dark && design.corners === 'round' ? tabs.pill : tabs.line;
+  const filled = filledEdgeShares(design);
   return {
     ...bases[design.base],
+    // Whole numbers from a fixed list, never anything a league typed.
+    '--color-line-strong': `color-mix(in srgb, var(--color-text) ${edgeShare(design.colors)}%, transparent)`,
+    '--header-edge': `color-mix(in srgb, var(--header-text) ${filled.header}%, transparent)`,
+    '--band-edge': `color-mix(in srgb, var(--color-on-band) ${filled.band}%, transparent)`,
     '--color-line': mainShows
       ? 'color-mix(in srgb, var(--color-primary) 22%, transparent)'
       : 'color-mix(in srgb, var(--color-text) 14%, transparent)',

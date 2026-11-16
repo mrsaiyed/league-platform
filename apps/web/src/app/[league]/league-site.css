@@ -55,7 +55,9 @@ html {
    the name and the menu button), and the button opens a panel in the header itself that
    holds the menu, sign-in and the season picker. */
 .site-header {
-  /* A fine line inside the header, in the header's own text color. */
+  /* A fine line inside the header, in the header's own text color. The edge of a control
+     in the header (--header-edge) is the design's: the same color, as strongly as it
+     takes to stand 3 to 1 from the header's ground (packages/site, frame-look.ts). */
   --header-rule: color-mix(in srgb, var(--header-text) 14%, transparent);
   position: sticky;
   inset-block-start: 0;
@@ -149,7 +151,7 @@ html {
   gap: var(--step-2);
   min-block-size: var(--tap);
   padding-inline: var(--step-3);
-  border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+  border: 1px solid var(--header-edge);
   border-radius: var(--radius-small);
   color: var(--header-text);
   font-size: var(--text-14);
@@ -268,7 +270,7 @@ html {
   justify-content: center;
   min-block-size: var(--tap);
   margin-block-start: var(--step-3);
-  border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+  border: 1px solid var(--header-edge);
   border-radius: var(--radius-small);
   color: var(--header-text);
   font-size: var(--text-14);
@@ -309,7 +311,7 @@ html {
   min-block-size: var(--tap);
   margin-block-start: var(--step-3);
   padding-inline: var(--step-3);
-  border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+  border: 1px solid var(--header-edge);
   border-radius: var(--radius-small);
   background: transparent;
   color: var(--header-text);
@@ -364,7 +366,7 @@ html {
 }
 .site-header .site-season select,
 .site-header .site-season button {
-  border-color: color-mix(in srgb, var(--header-text) 40%, transparent);
+  border-color: var(--header-edge);
   background-color: transparent;
   color: var(--header-text);
 }
@@ -529,7 +531,7 @@ html {
     justify-content: center;
     inline-size: var(--step-6);
     block-size: var(--step-6);
-    border: 1px solid color-mix(in srgb, var(--header-text) 40%, transparent);
+    border: 1px solid var(--header-edge);
     border-radius: 50%;
     color: var(--header-text);
     font-size: var(--text-14);
@@ -871,6 +873,17 @@ html {
   }
 }
 
+/* The teams page of a league with divisions: each division's cards under its own small
+   label, as its standings are. */
+.teams-divisions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-6);
+}
+.teams-division > .ui-eyebrow {
+  margin-block-end: var(--step-3);
+}
+
 /* A team's page: the games take the width, the roster sits beside them. */
 .team-layout {
   display: grid;
@@ -884,6 +897,32 @@ html {
      first by the keyboard. */
   .team-layout {
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+/* A team's statistics: its totals as a strip of big numbers under their small label, and
+   its players' table. With few statistics the two stand side by side on a laptop, so a
+   row's numbers stay near its name; otherwise one under the other. */
+.team-stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-4) var(--step-5);
+}
+.team-stats > * {
+  min-inline-size: 0;
+}
+.team-totals {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: var(--step-3);
+}
+.team-stats .ui-section-note {
+  margin: 0;
+}
+@media (min-width: 64rem) {
+  .team-stats[data-layout='pair'] {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
     align-items: start;
   }
 }
@@ -908,7 +947,9 @@ html {
 .game-page > .ui-page-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  /* The number's label has a short rule before it, which has no line of words to stand on:
+     the two are set level by their middles. */
+  align-items: center;
   gap: var(--step-1) var(--step-3);
   margin-block-end: var(--step-3);
 }

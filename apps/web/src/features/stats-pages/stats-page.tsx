@@ -126,23 +126,34 @@ export function StatsTables({
         )}
       </Section>
       <div className="stats-tables" data-layout={sideBySide ? 'pair' : 'stack'}>
-        <Section title={t('stats.allPlayers')}>
+        <Section
+          title={t('stats.allPlayers')}
+          note={
+            // Said where the eye is: the table lists everyone and opens sorted by points, so
+            // its first row may be a player with too few games to lead a card above.
+            data.playerRows.some((row) => row.quiet !== undefined)
+              ? t.plural('stats.listedNotRanked', data.minimumGames)
+              : undefined
+          }
+        >
           <SortableStatsTable
             caption={t('stats.allPlayers')}
             captionHidden
             columns={data.playerColumns}
             rows={data.playerRows}
+            initialSort={data.openingSort}
             locale={locale}
             labels={labels.stats}
             emblems
+            foldTeam="team"
           />
         </Section>
         <Section
           title={t('stats.teams')}
           note={
-            data.totalsOnlyTeams.length > 0
+            data.totalsNoteTeams.length > 0
               ? t('stats.teamsTotalsOnly', {
-                  teams: data.totalsOnlyTeams.join(t('stats.teamsJoin')),
+                  teams: data.totalsNoteTeams.join(t('stats.teamsJoin')),
                 })
               : undefined
           }
@@ -152,6 +163,7 @@ export function StatsTables({
             captionHidden
             columns={data.teamColumns}
             rows={data.teamRows}
+            initialSort={data.openingSort}
             locale={locale}
             labels={labels.stats}
             emblems
