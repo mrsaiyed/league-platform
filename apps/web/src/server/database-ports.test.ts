@@ -379,6 +379,8 @@ describe('databasePorts (record 055)', () => {
 
   it("reads the statistics' settings, a member's teams and the league's name (part 3)", async () => {
     expect((await ports.publicStats.settingsOf(lakeside().leagueId)).audience).toBe('adult');
+    // A league that saved no minimum games for its leaders has the starting 3 (P7 §6).
+    expect((await ports.publicStats.settingsOf(lakeside().leagueId)).minimumGames).toBe(3);
     expect(
       await ports.publicTeams.teamIdsOfAccount(lakeside().leagueId, randomUUID(), randomUUID()),
     ).toEqual([]);

@@ -10,7 +10,9 @@
 // is recorded from its box score sheet, a line for every player on the two teams, so the
 // season has statistics as well as results (step 2.93 part 3). The standings and the
 // players' season totals are rebuilt by the standings module's own event handler, as for
-// any result. The same for every league: no league is named here, and the dates follow
+// any result. A season one game old has no player with the starting minimum of 3 games
+// for the leaders (P7 §6), so each seed league saves 1, as its admin may on League
+// settings. The same for every league: no league is named here, and the dates follow
 // the league's own today.
 import type { PGlite } from '@electric-sql/pglite';
 import {
@@ -19,8 +21,10 @@ import {
   dayIn,
   eventHandlers,
   getScheduleDraft,
+  minimumGamesToRank,
   publishSchedule,
   setBoxScore,
+  setSetting,
   updateSeason,
   type BoxScoreLineInput,
   type CommandContext,
@@ -225,6 +229,14 @@ export async function putSeedSeasonsUnderWay(
         await updateSeason(
           as,
           { seasonId, version: league.season_version, status: 'active', current: true },
+          deps,
+        ),
+      );
+      must(
+        'the minimum games for leaders',
+        await setSetting(
+          as,
+          { level: 'league', key: minimumGamesToRank.key, value: 1, version: null },
           deps,
         ),
       );

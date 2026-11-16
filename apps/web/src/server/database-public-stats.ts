@@ -15,7 +15,14 @@
 // The read store alone (readStoreOf) does not read people: it refuses, so no page can put
 // a name beside a setting read at another moment. The rules of who is shown and how stay
 // in core (statisticsSource, showName); these ports only fetch.
-import { fail, readNamePolicy, readStandings, type StandingsReadStore } from '@srleagues/core';
+import {
+  fail,
+  lookupSetting,
+  minimumGamesToRank,
+  readNamePolicy,
+  readStandings,
+  type StandingsReadStore,
+} from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle, LeagueScope } from '@srleagues/database';
 import { isDatabaseId as isId } from './database-id.ts';
@@ -31,13 +38,6 @@ export type PublicStatsQueries = Pick<
   | 'listSettingValues'
   | 'listPublicRoster'
 >;
-
-/**
- * The least number of games a player needs to be ranked among the leaders. No league
- * setting holds one yet, so on the database there is none (record 070: a question for
- * the founder; the made-up world's leagues carry one of their own).
- */
-const noMinimumGames = 0;
 
 export class NamesOnlyWithSettings extends Error {
   constructor() {
@@ -60,7 +60,13 @@ export function databasePublicStats(
     namePolicy: await readNamePolicy({
       settingRows: (key, places) => database.listSettingValues(scope, key, places),
     }),
-    minimumGames: noMinimumGames,
+    // The league's own minimum games for leaders, as League settings saves it (P7 §6).
+    minimumGames: lookupSetting(
+      minimumGamesToRank,
+      (await database.listSettingValues(scope, minimumGamesToRank.key, {})).filter(
+        (row) => row.level === 'league',
+      ),
+    ).value,
   });
   return {
     seasonsOf: async (leagueId) =>

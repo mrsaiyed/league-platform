@@ -9,7 +9,11 @@
 import { readStandings } from '@srleagues/core';
 import type { NamePolicyOf } from './name-policy-of.ts';
 import type { PublicStatsPorts, PublicStatsSettings } from './public-stats.ts';
-import { worldPublicRoster, worldPublicSeasons } from './stand-in-world-reads.ts';
+import {
+  worldMinimumGames,
+  worldPublicRoster,
+  worldPublicSeasons,
+} from './stand-in-world-reads.ts';
 import { worldStandingsRead } from './stand-in-world-standings.ts';
 import type { World } from './stand-in-world.ts';
 
@@ -26,7 +30,8 @@ export function standInPublicStats(
       // A league whose audience is not known counts as youth: the careful reading (R-15).
       audience: s?.audience ?? 'youth',
       namePolicy: await namePolicyOf(leagueId),
-      minimumGames: s?.minimumGames ?? 0,
+      // The league's own rule, as League settings saves it (P7 §6; 3 to start).
+      minimumGames: worldMinimumGames(s),
     };
   };
   return {

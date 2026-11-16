@@ -108,8 +108,6 @@ export type LeagueWorld = {
   readonly audience: Audience;
   /** The league's own time zone: its "today" and its game times. */
   readonly timeZone: string;
-  /** The fewest games a player needs to be among the leaders; 0 for none. */
-  readonly minimumGames: number;
   currentSeasonId: string | null;
   seasons: WorldSeason[];
   divisions: WorldDivision[];
@@ -143,7 +141,7 @@ export type LeagueWorld = {
 /** A league that holds nothing yet. */
 export function emptyLeagueWorld(
   league: { readonly id: string; readonly slug: string; readonly name: string },
-  facts: Pick<LeagueWorld, 'audience' | 'timeZone' | 'minimumGames'>,
+  facts: Pick<LeagueWorld, 'audience' | 'timeZone'>,
 ): LeagueWorld {
   return {
     leagueId: league.id,
@@ -151,7 +149,6 @@ export function emptyLeagueWorld(
     name: league.name,
     audience: facts.audience,
     timeZone: facts.timeZone,
-    minimumGames: facts.minimumGames,
     currentSeasonId: null,
     seasons: [],
     divisions: [],

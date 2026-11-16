@@ -188,7 +188,7 @@ beforeAll(async () => {
   });
   const empty = emptyLeagueWorld(
     { id: league.leagueId, slug: 'lakeside', name: 'Lakeside Hoops League' },
-    { audience: 'adult', timeZone: zone, minimumGames: 0 },
+    { audience: 'adult', timeZone: zone },
   );
   world = madeUpWorld({
     leagues: [

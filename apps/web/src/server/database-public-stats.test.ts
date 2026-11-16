@@ -4,7 +4,9 @@
 // the league's own settings, in one transaction with them (T-81, record 070).
 import {
   defaultNamePolicy,
+  minimumGamesToRank,
   publicViewer,
+  setSetting,
   readStandings,
   readStatisticsTable,
   readTeamRecords,
@@ -137,13 +139,65 @@ describe('databasePublicStats', () => {
     expect(await ports.standingsOf(league('maple-street'), season.id)).toEqual(elsewhere);
   });
 
-  it("reads each league's own audience and name settings (step 2.126, R-15)", async () => {
+  it("reads each league's own audience, name settings and minimum games (step 2.126, R-15, P7 §6)", async () => {
+    // The seed saves 1 game for the leaders, through League settings' own command.
     expect(await ports.settingsOf(league('lakeside'))).toEqual({
       audience: 'adult',
       namePolicy: defaultNamePolicy,
-      minimumGames: 0,
+      minimumGames: 1,
     });
     expect((await ports.settingsOf(league('maple-street'))).audience).toBe('youth');
+  });
+
+  it("reads the league's minimum games for leaders as its owner saves it, and ranks by it (P7 §6)", async () => {
+    const owner = made.leagues.find((l) => l.slug === 'maple-street')?.ownerAccountId ?? '';
+    const deps = {
+      transaction: database.commandTransaction(db, (scope) => ({
+        jobs: database.jobsStore(scope),
+        access: database.accessStore(scope),
+        activity: database.activityLogStore(scope),
+        leagues: database.leaguesStore(scope),
+        divisions: database.divisionsStore(scope),
+      })),
+      events: [],
+      log: () => {},
+      now: () => performance.now(),
+    };
+    const at = { leagueId: league('maple-street'), accountId: owner, requestId: 'minimum' };
+    const leadersNow = async () =>
+      homeLeadersOf(ports, {
+        leagueId: league('maple-street'),
+        seasonId: (await seasonOf('maple-street')).id,
+      });
+    expect(await leadersNow()).not.toEqual([]);
+    // Every seed player has played one game: at 2, no one is ranked.
+    const read = await deps.transaction(at, (tx) =>
+      tx.leagues.settingRows(minimumGamesToRank.key, {}),
+    );
+    const saved = await setSetting(
+      at,
+      {
+        level: 'league',
+        key: minimumGamesToRank.key,
+        value: 2,
+        version: read.find((row) => row.level === 'league')?.version ?? null,
+      },
+      deps,
+    );
+    expect(saved.ok).toBe(true);
+    expect((await ports.settingsOf(league('maple-street'))).minimumGames).toBe(2);
+    expect(await leadersNow()).toEqual([]);
+    // The other league keeps its own.
+    expect((await ports.settingsOf(league('lakeside'))).minimumGames).toBe(1);
+    // Back as the seed left it, for the tests after this one.
+    if (!saved.ok) throw new Error(saved.error.code);
+    const back = await setSetting(
+      at,
+      { level: 'league', key: minimumGamesToRank.key, value: 1, version: saved.value.version },
+      deps,
+    );
+    expect(back.ok).toBe(true);
+    expect(await leadersNow()).not.toEqual([]);
   });
 
   it('reads the statistics and the settings as one snapshot: one transaction, set to the league', async () => {

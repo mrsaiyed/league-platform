@@ -180,7 +180,7 @@ A cancelled game can be put back, with a reason, by whoever may cancel it; it is
 
 - **S-9: standings are always calculated from final games; nobody types them in.** Each division has its own table with seeds. When teams are level, the page can show why one is ahead ("head-to-head").
 - **S-10: an admin can add an adjustment** (a points deduction, a forfeit win awarded by ruling) with a reason. It shows as a footnote under the table.
-- **Statistics**: season totals and per-game averages for every stat the season keeps; leaders with a minimum-games rule the league sets; a full sortable table. Fouls and turnovers get no leaders card unless the league switches it on (**S-48**, decided for you); they stay in the tables.
+- **Statistics**: season totals and per-game averages for every stat the season keeps; leaders with a minimum-games rule the league sets (a league setting, `statistics.minimumGamesToRank`: 3 games to start, answered by the lead for the founder at step 2.93 part 3; 0 ranks everyone; a player with fewer games still shows in the full table); a full sortable table. Fouls and turnovers get no leaders card unless the league switches it on (**S-48**, decided for you); they stay in the tables.
 - **Player pages** (if the league shows them): this season, past seasons, and career totals within the league.
 - **S-11: only final games count.** A live game's numbers show on its own page but not in season totals until it ends.
 - **S-22 (new, the founder's direction, November 12): who can see players' statistics is a setting, and each team can choose for itself.**
