@@ -153,6 +153,59 @@ describe('the box score grid', () => {
     }
   });
 
+  // Step 2.103 (review): the grid's boxes are text boxes, so what was typed reaches the
+  // server as typed, where a number box sent unreadable text as an empty box. Every kind
+  // of box refuses whatever is not a whole number written in the digits 0 to 9; spaces
+  // around one are dropped; an empty box is still nothing typed.
+  it('refuses, by name, text that is not a whole number, as a text box sends it', async () => {
+    const { games, sheetOf } = setup();
+    const target = (await games()).find((g) => g.id === lionsTigers);
+    const sheet = { ...(await sheetOf(target?.id ?? '')), minutes: true };
+    const someone = sheet.players.find((p) => p.teamId === sheet.game.homeTeamId);
+    if (someone === undefined) throw new Error('the stand-in has home players');
+    const names = [
+      boxScoreField.stat(someone.personId, 'points'),
+      boxScoreField.minutes(someone.personId),
+      'awayScore',
+      'homeScore',
+    ];
+    const unreadable = ['1-2', '8o', '1.5', '+3', '1e2', '٣', '３', '7 7', '0x1', 'seven'];
+    for (const name of names) {
+      for (const bad of unreadable) {
+        expect(wrongBoxScoreFields(sheet, { [name]: bad }), `${name} = ${bad}`).toEqual([name]);
+        expect(readBoxScoreForm(sheet, { [name]: bad }), `${name} = ${bad}`).toBeUndefined();
+      }
+      for (const spaced of [' 7 ', '7 ', '\t7']) {
+        expect(wrongBoxScoreFields(sheet, { [name]: spaced }), `${name} = ${spaced}`).toEqual([]);
+      }
+      for (const empty of ['', '   ']) {
+        expect(wrongBoxScoreFields(sheet, { [name]: empty }), `${name} empty`).toEqual([]);
+      }
+    }
+    // Spaces around a number are dropped: the number is read.
+    const spaced = readBoxScoreForm(sheet, {
+      [boxScoreField.stat(someone.personId, 'points')]: ' 7 ',
+      [boxScoreField.minutes(someone.personId)]: ' 20 ',
+      awayScore: ' 3 ',
+    });
+    expect(spaced).toMatchObject({ homeScore: 7, awayScore: 3 });
+    expect(spaced?.lines).toContainEqual(
+      expect.objectContaining({
+        personId: someone.personId,
+        secondsPlayed: 1200,
+        stats: { points: 7 },
+      }),
+    );
+    // An empty box is nothing typed, exactly as before: an empty score is the points total.
+    expect(
+      readBoxScoreForm(sheet, {
+        [boxScoreField.stat(someone.personId, 'points')]: '12',
+        homeScore: '',
+        awayScore: '   ',
+      }),
+    ).toMatchObject({ homeScore: 12, awayScore: 0 });
+  });
+
   it('names the boxes a refusal is about, in screen order, and the score of a tie (2.155)', async () => {
     const { ports, ctx, games, sheetOf } = setup();
     const target = (await games()).find((g) => g.id === lionsTigers);

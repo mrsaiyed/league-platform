@@ -14,6 +14,9 @@
 // - The same for the two boxes on the games list: a tie, asked about, "Yes", refused
 //   beside the boxes, which are still open with the tie in them and marked. The same with
 //   scripts off.
+// - "8o" in a points box and "1-2" in a score of the box score grid are refused in words,
+//   naming the box, kept in the boxes, and the game is not made final. The same with
+//   scripts off.
 // - A save says "Saved", naming the game and its score, beside it, on the screen at 390
 //   without scrolling; a reload does not say it again, and nothing of it is in the address.
 // - A real double tap on a save button (the grid's, and "Yes, make it final") saves once
@@ -347,35 +350,61 @@ if (browser) {
           JSON.stringify(kept),
         );
         await accessible(page, `${label}, refused`);
-        if (scripts) {
-          // Text a number box cannot read at all is sent by a browser as an empty box:
-          // with scripts on it is caught before the send and said the same way.
-          await boxes.nth(1).fill('4');
-          await tabs.nth(1).click();
-          await boxes.nth(7).focus();
-          await page.keyboard.type('1-2');
-          await tabs.nth(0).click();
-          let posts = 0;
-          const count = (request) => {
-            if (request.method() === 'POST') posts += 1;
-          };
-          page.on('request', count);
-          await save.click();
-          await page.locator('main input[name^="stat.points."][aria-invalid="true"]').waitFor();
-          await page.waitForTimeout(500);
-          page.off('request', count);
-          const unread = ((await refusal.textContent()) ?? '').trim();
-          note(
-            `${label}: text a number box cannot read is said in words, with its team shown`,
-            unread.endsWith(': enter a whole number from 0 to 999, or leave it empty.') &&
-              (await boxes.nth(7).getAttribute('aria-invalid')) === 'true' &&
-              (await boxes.nth(1).getAttribute('aria-invalid')) === null &&
-              (await grids.nth(1).isVisible()) &&
-              !(await grids.nth(0).isVisible()),
-            unread,
-          );
-          note(`${label}: a box that cannot be read is not sent as an empty one`, posts === 0);
-        }
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  // Step 2.103 (review): the grid's boxes are text boxes. A number box sent text it could
+  // not read ("8o", "1-2") as an empty box, and with the browser's own checking off the
+  // server took that as nothing typed and made the game final with a score nobody typed.
+  // Now the text reaches the server as typed: refused in words, naming the box, kept in
+  // the boxes, and the game is not final. With scripts on and with scripts off.
+  for (const scripts of [true, false]) {
+    const label = `text that is not a number${scripts ? '' : ', with scripts off'}`;
+    await step(`${label}, in the box score, is refused by name and kept`, async () => {
+      const { context, page } = await signedInAs('local-scheduler-token', {
+        javaScriptEnabled: scripts,
+      });
+      try {
+        await openBoxScore(page, finalScoreGame, 'Box score: Tigers at Lions');
+        const stat = pointsBoxes(page).nth(0);
+        const score = page.getByLabel('Score for Lions');
+        const player = ((await stat.locator('xpath=ancestor::tr/th').textContent()) ?? '').trim();
+        await stat.fill('8o');
+        await score.fill('1-2');
+        const save = page.getByRole('button', { name: 'Save box score and make it final' });
+        await (scripts ? save.click() : Promise.all([page.waitForEvent('load'), save.click()]));
+        const refusal = page.locator('#box-score-scores').getByRole('alert');
+        await refusal.waitFor();
+        const text = ((await refusal.textContent()) ?? '').trim();
+        note(
+          `${label}: the refusal names the box in words`,
+          player !== '' &&
+            text.includes('Points') &&
+            text.includes(player) &&
+            text.endsWith(': enter a whole number from 0 to 999, or leave it empty.'),
+          `${player} | ${text}`,
+        );
+        note(
+          `${label}: both boxes are marked, and only they`,
+          (await stat.getAttribute('aria-invalid')) === 'true' &&
+            (await score.getAttribute('aria-invalid')) === 'true' &&
+            (await page.locator('main input[aria-invalid="true"]').count()) === 2,
+        );
+        const kept = [await stat.inputValue(), await score.inputValue()];
+        note(
+          `${label}: what was typed is still in the boxes`,
+          kept[0] === '8o' && kept[1] === '1-2',
+          JSON.stringify(kept),
+        );
+        await accessible(page, `${label}, refused`);
+        await openGames(page);
+        const status = await gameOn(page, finalScoreGame)
+          .locator('.ui-game-card')
+          .getAttribute('data-status');
+        note(`${label}: the game is not made final`, status === 'scheduled', status ?? '');
       } finally {
         await context.close();
       }

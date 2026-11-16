@@ -623,7 +623,8 @@
   text-align: start;
   text-overflow: ellipsis;
 }
-.staff .box-score-grid input[type='number'] {
+/* A count's box: a text box asking for number keys (box-score-sheet-form.tsx says why). */
+.staff .box-score-grid input[inputmode='numeric'] {
   inline-size: calc(var(--step-7) + var(--step-2));
   padding-inline: var(--step-2);
   font-size: var(--text-16);
