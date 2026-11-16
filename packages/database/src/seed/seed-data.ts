@@ -85,9 +85,11 @@ export const seedLeagues: readonly SeedLeague[] = [
     ],
     people: [
       {
-        firstName: 'Pat',
+        // Not "Pat": the name scans look for a withheld first name anywhere in a page, and
+        // "pat" is in every drawn shield's <path>.
+        firstName: 'Morgan',
         lastName: 'Example',
-        contactEmail: 'pat@lakeside.example.test',
+        contactEmail: 'morgan@lakeside.example.test',
         birthDate: '1990-04-12',
         isMinor: false,
       },

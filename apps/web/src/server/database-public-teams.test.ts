@@ -97,7 +97,11 @@ describe('databasePublicTeams with the seasons under way', () => {
   };
 
   it('shows an adult league in full, its child with care; a youth league with care (R-14, R-15)', async () => {
-    expect(await rosterNames('lakeside')).toEqual(['Pat Example', 'Quinn S.', 'Robin Placeholder']);
+    expect(await rosterNames('lakeside')).toEqual([
+      'Morgan Example',
+      'Quinn S.',
+      'Robin Placeholder',
+    ]);
     expect(await rosterNames('maple-street')).toEqual(['Casey F.', 'Jordan I.']);
   });
 });

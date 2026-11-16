@@ -164,7 +164,7 @@ describe('databasePublicStats', () => {
     });
     // The seed's people, by the league's starting setting: the child Quinn with care.
     expect(Object.fromEntries(names)).toEqual({
-      'Pat Example': 10,
+      'Morgan Example': 10,
       'Quinn S.': 14,
       'Robin Placeholder': 18,
     });
@@ -201,7 +201,7 @@ describe('databasePublicStats', () => {
     expect(leaders.map((l) => [l.name, l.value])).toEqual([
       ['Robin Placeholder', '18.0'],
       ['Quinn S.', '14.0'],
-      ['Pat Example', '10.0'],
+      ['Morgan Example', '10.0'],
     ]);
   });
 });
