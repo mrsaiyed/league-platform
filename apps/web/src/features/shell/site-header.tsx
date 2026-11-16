@@ -114,9 +114,9 @@ export function AccountButton({ account }: { readonly account: AccountMenu }) {
 
 /**
  * The header of every page of a league. First row: the league's mark (its first letter in
- * a shield, until it has a logo of its own) and its name (U-8) with a small line under it,
- * then the season picker on the pages that show one season, and the account button: the way
- * in for a visitor, coming back to this page; for a signed-in person, their menu.
+ * a shield, until it has a logo of its own) and its name (U-8), with nothing written under
+ * it, then the season picker on the pages that show one season, and the account button: the
+ * way in for a visitor, coming back to this page; for a signed-in person, their menu.
  * Second row: the menu.
  *
  * On a phone the first row is the mark, the name and one menu button. The button opens a
@@ -154,7 +154,6 @@ export function SiteHeader({
           <a className="site-name" href={leagueHomeStayUrl(league)} dir="auto">
             <span>{name}</span>
           </a>
-          <span className="site-tagline">{t('shell.tagline')}</span>
         </div>
         <details className="site-menu">
           <summary>

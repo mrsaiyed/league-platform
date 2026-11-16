@@ -27,9 +27,6 @@ export const en = {
   'shell.notBuilt': 'This page is not built yet.',
   'shell.backToLeague': 'Back to the league home',
   'shell.skipToContent': 'Skip to the content',
-  // The small line under a league's name in the header, the same for every league until a
-  // league can write its own.
-  'shell.tagline': 'Official league site',
   'shell.draftNotice': 'This league is not published. Only the people who run it can see it.',
   'shell.suspendedNotice':
     'This league has been taken down. Only the people who run it can see it, to export their data.',
@@ -160,6 +157,8 @@ export const en = {
   'home.number.teams': 'Teams',
   'home.number.played': 'Games played',
   'home.number.toPlay': 'Games to play',
+  // In place of "Games to play" once a season has none left.
+  'home.number.scored': 'Points scored',
   'home.number.rounds': 'Rounds',
   // The first starting design's home page (step 2.147, C-16): a hero with one sentence and
   // two ways on, a tiny label (a kicker) over each section's title, and one call to action
@@ -172,8 +171,28 @@ export const en = {
   // result is still awaited, so its label is true of both.
   'home.results.kicker': 'Latest games',
   'home.standings.kicker': 'The race for the top',
-  // The season's leaders on the home page (step 2.147 part 2): a tiny label on each card
-  // (the leader's place and what is led), and what the number is.
+  // The inner pages' heads (step 2.147 part 2, second landing): a phrased title and one
+  // sentence under the season's name, so the inner pages and the home page are one
+  // family. Each is written to read well for any league and any sport. The plain names
+  // ("Schedule", "Standings") stay for the menu and the browser's tab.
+  'schedule.heading': 'Every game, every round.',
+  'schedule.lead': 'Scores as they come in, and everything still to be played.',
+  'standings.heading': 'The standings.',
+  'standings.lead': 'Where every team stands after each game.',
+  'stats.heading': 'By the numbers.',
+  'stats.lead': 'The season’s leaders, then every player and every team.',
+  // The number cards at the head of the statistics page's leaders: who leads a statistic,
+  // and what the number is when the page shows season totals.
+  'stats.leaderOf': '{stat} leader',
+  'stats.inAll': 'this season',
+  // The band that closes the teams page, with the way to the schedule.
+  'teams.call.title': 'See them play.',
+  'teams.call.text': 'Every game of the season, round by round.',
+  'teams.heading': 'The teams.',
+  'teams.lead': 'Every team’s record, roster and games.',
+  // The season's leaders on the home page (step 2.147 part 2): the section's title, its
+  // kicker and its way on, a tiny label on each card (the leader's place and what is
+  // led), and what the number is.
   'home.leaders': 'Leading the way',
   'home.leaders.kicker': 'The players to watch',
   'home.leaders.all': 'All player stats',
@@ -593,10 +612,43 @@ export const en = {
   'admin.myGames.archived': 'This league is archived, so its games cannot be scored or changed.',
   'admin.myGames.suspended': 'This league is suspended, so its games cannot be scored or changed.',
   // The games area (step 2.55).
-  'admin.games.intro': 'The games of today and the week ahead.',
+  // Step 2.156: the games that still need a result come first, however old, then today,
+  // the week by day, and earlier games a round at a time.
+  'admin.games.intro':
+    'Games that still need a result come first, then today, this week and earlier games.',
   'admin.games.listProblem':
     'The games could not be shown. You may not have access to score or change games here.',
-  'admin.games.empty': 'There are no games this week.',
+  'admin.games.toEarlier': 'Earlier games',
+  'admin.games.needsResult.title': 'Needs a result',
+  'admin.games.needsResult.note':
+    'Games whose start has passed and that have no result yet, oldest first.',
+  'admin.games.needsResult.empty': 'Every game that has started has its result.',
+  // For someone who scores only some games (a program, or the games assigned to them).
+  'admin.games.needsResult.emptyYours': 'Every game you score that has started has its result.',
+  'admin.games.needsResult.more':
+    'Only the oldest {count} are shown. Enter their results and the next ones appear here.',
+  'admin.games.todayTitle': 'Today',
+  'admin.games.todayEmpty': 'No more games today.',
+  'admin.games.weekTitle': 'This week',
+  'admin.games.weekEmpty': 'No more games in the next six days.',
+  'admin.games.tomorrow': 'Tomorrow',
+  'admin.games.earlier.title': 'Earlier games',
+  'admin.games.earlier.note':
+    'Finished, forfeited, postponed and cancelled games from before today, one round at a time, to look back or correct a result.',
+  'admin.games.earlier.empty': 'There are no earlier games yet.',
+  'admin.games.earlier.emptyYours': 'There are no earlier games you score yet.',
+  'admin.games.earlier.filters': 'Earlier games',
+  'admin.games.earlier.round': 'Round',
+  'admin.games.earlier.choose': 'Choose a round',
+  'admin.games.earlier.show': 'Show',
+  'admin.games.earlier.pick': 'Choose a round to see its games.',
+  'admin.games.earlier.roundNumber': 'Round {number}',
+  'admin.games.earlier.noRound': 'Games outside a round',
+  'admin.games.earlier.option': '{round}, {days} ({count})',
+  'admin.games.earlier.optionSeason': '{round}, {season}, {days} ({count})',
+  'admin.games.earlier.days': '{first} to {last}',
+  'admin.games.earlier.moreRounds': 'Only the latest {count} rounds are offered.',
+  'admin.games.earlier.moreGames': 'Only the first {count} games of this round are shown.',
   'admin.games.scorekeeper': 'Scorekeeper: {names}',
   'admin.games.noScorekeeper': 'No scorekeeper yet',
   'admin.games.scoreOf': 'Score for {team}',

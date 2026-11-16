@@ -6,6 +6,12 @@ export type PageHeadProps = {
   readonly title: string;
   /** A small label above the title: the season, say. */
   readonly eyebrow?: string | undefined;
+  /**
+   * The same small label drawn as a kicker (a short rule, then the label), as over a
+   * section's title on the home page: for a page whose title is a phrase ("The
+   * standings.") with one sentence under it. Drawn in place of the eyebrow.
+   */
+  readonly kicker?: string | undefined;
   /** One quiet line under the title. */
   readonly sub?: string | undefined;
   /** A few short facts under the title, each a label and its value: a team's seed and record. */
@@ -23,6 +29,7 @@ export function PageHead({
   title,
   eyebrow,
   sub,
+  kicker,
   facts,
   size = 'page',
   lead,
@@ -39,11 +46,15 @@ export function PageHead({
     );
   }
   return (
-    <header className="ui-page-head">
+    <header className="ui-page-head" data-phrased={kicker ? 'true' : undefined}>
       <div className="ui-page-head-row">
         {lead}
         <div className="ui-page-head-text">
-          {eyebrow ? <p className="ui-eyebrow">{eyebrow}</p> : null}
+          {kicker ? (
+            <p className="ui-kicker">{kicker}</p>
+          ) : eyebrow ? (
+            <p className="ui-eyebrow">{eyebrow}</p>
+          ) : null}
           <h1 dir="auto">{title}</h1>
           {sub ? <p className="ui-page-sub">{sub}</p> : null}
           {facts && facts.length > 0 ? <Facts facts={facts} /> : null}

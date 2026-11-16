@@ -3,6 +3,7 @@ import {
   EmptyPanel,
   FilterToolbar,
   LeaderCard,
+  LeaderSpot,
   OptionPicker,
   PageHead,
   Section,
@@ -18,6 +19,9 @@ import { locale, t } from '../../server/messages.ts';
 import { loadStatsPage, parseBy, type LeaderBoard, type StatsPageData } from './build-stats.ts';
 import { chooseSeason, firstValue } from './choose-season.ts';
 import type { SearchParams } from './standings-page.tsx';
+
+/** How many statistics open with a number card: three, as many as stand across a laptop. */
+const cardLimit = 3;
 
 /** One leader board as the card draws it: each leader's place and name, team and games, and number. */
 function leaderEntries(board: LeaderBoard): readonly LeaderEntry[] {
@@ -63,6 +67,23 @@ export function StatsTables({
       />
     );
   }
+  // Each statistic is a column of its own. The first three that one player leads alone
+  // open with a number card (one very large number, the first on the league's main color),
+  // and the rest of that statistic's list stands right under its own card, going on from
+  // second place: the leader is not said twice. A statistic whose first place is shared
+  // names no one leader: it has no card, and its list shows the players level at 1. So
+  // does a statistic after the third card: a plain list from first place.
+  const alone = boards.filter((board) => board.first !== undefined && !board.first.tied);
+  const carded = new Set(alone.slice(0, cardLimit).map((board) => board.key));
+  const columns = boards.map((board) => {
+    const entries = leaderEntries(board);
+    const card = carded.has(board.key) ? board.first : undefined;
+    return { board, card, entries: card === undefined ? entries : entries.slice(1) };
+  });
+  const firstCard = columns.find((column) => column.card !== undefined)?.board.key;
+  // Few statistics: the players' table and the teams' sit side by side on a laptop, so a
+  // row's numbers stay near its name. Many: each takes the page's width.
+  const sideBySide = data.playerColumns.length <= 7;
   return (
     <>
       <Section
@@ -70,10 +91,33 @@ export function StatsTables({
         note={data.minimumGames > 0 ? t.plural('stats.minimumGames', data.minimumGames) : undefined}
       >
         {boards.length > 0 ? (
-          <ul className="ui-card-grid">
-            {boards.map((board) => (
-              <li key={board.key}>
-                <LeaderCard title={board.title} entries={leaderEntries(board)} />
+          <ul
+            className="ui-spot-row stats-leaders"
+            data-across={(['one', 'two', 'three'] as const)[Math.min(columns.length, 3) - 1]}
+          >
+            {columns.map(({ board, card, entries }) => (
+              <li key={board.key} className="stats-leader">
+                {card === undefined ? null : (
+                  <LeaderSpot
+                    label={t('stats.leaderOf', { stat: board.title })}
+                    value={card.value}
+                    unit={t(data.by === 'average' ? 'home.leaders.perGame' : 'stats.inAll')}
+                    name={card.name}
+                    detail={t('stats.leaderDetail', {
+                      team: card.teams,
+                      games: t.plural('stats.leaderGames', card.games),
+                    })}
+                    team={card.team}
+                    first={board.key === firstCard}
+                  />
+                )}
+                {entries.length === 0 ? null : (
+                  <LeaderCard
+                    title={board.title}
+                    entries={entries}
+                    afterLeader={card !== undefined}
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -81,37 +125,39 @@ export function StatsTables({
           <EmptyPanel text={t('stats.leadersNone')} />
         )}
       </Section>
-      <Section title={t('stats.allPlayers')}>
-        <SortableStatsTable
-          caption={t('stats.allPlayers')}
-          captionHidden
-          columns={data.playerColumns}
-          rows={data.playerRows}
-          locale={locale}
-          labels={labels.stats}
-          emblems
-        />
-      </Section>
-      <Section
-        title={t('stats.teams')}
-        note={
-          data.totalsOnlyTeams.length > 0
-            ? t('stats.teamsTotalsOnly', {
-                teams: data.totalsOnlyTeams.join(t('stats.teamsJoin')),
-              })
-            : undefined
-        }
-      >
-        <SortableStatsTable
-          caption={t('stats.teams')}
-          captionHidden
-          columns={data.teamColumns}
-          rows={data.teamRows}
-          locale={locale}
-          labels={labels.stats}
-          emblems
-        />
-      </Section>
+      <div className="stats-tables" data-layout={sideBySide ? 'pair' : 'stack'}>
+        <Section title={t('stats.allPlayers')}>
+          <SortableStatsTable
+            caption={t('stats.allPlayers')}
+            captionHidden
+            columns={data.playerColumns}
+            rows={data.playerRows}
+            locale={locale}
+            labels={labels.stats}
+            emblems
+          />
+        </Section>
+        <Section
+          title={t('stats.teams')}
+          note={
+            data.totalsOnlyTeams.length > 0
+              ? t('stats.teamsTotalsOnly', {
+                  teams: data.totalsOnlyTeams.join(t('stats.teamsJoin')),
+                })
+              : undefined
+          }
+        >
+          <SortableStatsTable
+            caption={t('stats.teams')}
+            captionHidden
+            columns={data.teamColumns}
+            rows={data.teamRows}
+            locale={locale}
+            labels={labels.stats}
+            emblems
+          />
+        </Section>
+      </div>
     </>
   );
 }
@@ -146,7 +192,7 @@ export async function StatsPage({
   const action = leagueUrl(addressee, 'stats');
   return (
     <main>
-      <PageHead title={t('stats.title')} eyebrow={season?.name} />
+      <PageHead title={t('stats.heading')} kicker={season?.name} sub={t('stats.lead')} />
       {season === undefined || data === undefined ? (
         <EmptyPanel text={t('stats.noSeason')} />
       ) : (

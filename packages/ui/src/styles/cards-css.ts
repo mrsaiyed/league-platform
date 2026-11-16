@@ -16,8 +16,9 @@ export const cardsCss = String.raw`
   overflow: visible;
   color: color-mix(in srgb, var(--emblem-color) 74%, var(--color-text));
 }
+/* In a row of a table: a little taller than a line of its words. */
 .ui-emblem[data-size='small'] {
-  block-size: var(--step-5);
+  block-size: calc(var(--step-5) + var(--step-1));
 }
 .ui-emblem[data-size='large'] {
   block-size: calc(var(--step-8) + var(--step-5));
@@ -74,16 +75,26 @@ export const cardsCss = String.raw`
   align-items: center;
   gap: var(--step-4);
   inline-size: 100%;
-  padding-block: var(--step-4);
-  padding-inline: var(--space);
-  background: var(--color-panel);
+  padding-block: var(--step-5);
+  padding-inline: var(--step-5);
+  /* As a game's card: the panel, warmed at one corner in a dark design. At its top a fine
+     line in the team's own color (the accent for a team with none), strong enough to be
+     told from its neighbors' and no stronger than a picked-out card's edge. */
+  background-color: var(--color-panel);
+  background-image: linear-gradient(120deg, var(--card-wash), var(--color-panel) 70%);
   border: var(--card-border-width) solid var(--color-line);
+  border-block-start: var(--line-heavy) solid
+    color-mix(in srgb, var(--team-color, var(--color-accent)) 50%, transparent);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   transition: border-color 0.15s;
 }
 .ui-team-card:hover {
-  border-color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-pop) 50%, transparent);
+}
+/* The team's shield is the largest thing on its card. */
+.ui-team-card > .ui-emblem {
+  block-size: var(--step-8);
 }
 .ui-team-card-text {
   display: grid;
@@ -153,7 +164,7 @@ export const cardsCss = String.raw`
   flex: none;
   color: var(--color-pop);
   font-family: var(--font-score);
-  font-size: var(--text-22);
+  font-size: var(--text-28);
   font-weight: var(--heading-weight);
   font-variant-numeric: lining-nums tabular-nums;
   line-height: 1;
@@ -223,6 +234,12 @@ export const cardsCss = String.raw`
 .ui-leader:first-child .ui-leader-value {
   color: var(--color-pop);
   font-size: var(--text-36);
+}
+/* A list that starts after the leader (who has a card of their own above it) picks out no
+   line: its first is second place. */
+.ui-leader-card[data-after-leader='true'] .ui-leader:first-child .ui-leader-value {
+  color: inherit;
+  font-size: var(--text-18);
 }
 
 /* One leader, picked out: a tiny label, one very large number, the player's name, a quiet
@@ -308,34 +325,53 @@ export const cardsCss = String.raw`
 /* The first of a row is a small band: the league's main color, with a band's own colors
    for its words and its number, which are fitted to it whatever the league chose. */
 .ui-spot[data-first='true'] {
-  background-color: var(--color-band);
-  background-image: linear-gradient(120deg, var(--color-band-glow), var(--color-band));
-  border-color: color-mix(in srgb, var(--color-band-pop) 28%, transparent);
-  color: var(--color-on-band);
+  background-color: var(--spot-ground, var(--color-band));
+  background-image: linear-gradient(
+    120deg,
+    var(--spot-glow, var(--color-band-glow)),
+    var(--spot-ground, var(--color-band))
+  );
+  border-color: var(--spot-edge, color-mix(in srgb, var(--color-band-pop) 28%, transparent));
+  color: var(--spot-words, var(--color-on-band));
 }
 [dir='rtl'] .ui-spot[data-first='true'] {
-  background-image: linear-gradient(240deg, var(--color-band-glow), var(--color-band));
+  background-image: linear-gradient(
+    240deg,
+    var(--spot-glow, var(--color-band-glow)),
+    var(--spot-ground, var(--color-band))
+  );
 }
+/* A design may soften the first card (the --spot values: packages/site, frame-look.ts): a
+   light design does, where a filled card of the main color would be a second band over
+   the closing one. Left unsaid, the card is a small band. */
 .ui-spot[data-first='true'] :is(.ui-spot-label, .ui-spot-unit, .ui-spot-detail) {
-  color: var(--color-band-muted);
+  color: var(--spot-muted, var(--color-band-muted));
 }
 .ui-spot[data-first='true'] .ui-spot-value {
-  color: var(--color-band-pop);
+  color: var(--spot-pop, var(--color-band-pop));
 }
 /* On the filled card a shield keeps its team's own color: it is filled with that color,
    a little deepened, not laid thinly over the card's (which turned a green team grey on a
    maroon card). Its lines and its letter are in the band's words' color, and the letter
    has a fine dark edge so it reads on a light team color too. */
 .ui-spot[data-first='true'] > .ui-emblem {
-  color: color-mix(in srgb, var(--emblem-color) 35%, var(--color-on-band));
+  color: color-mix(
+    in srgb,
+    var(--emblem-color) var(--spot-line-share, 35%),
+    var(--spot-letter, var(--color-on-band))
+  );
 }
 .ui-spot[data-first='true'] .ui-emblem-shield {
-  fill: color-mix(in srgb, var(--emblem-color) 82%, var(--color-band-deep));
+  fill: color-mix(
+    in srgb,
+    var(--emblem-color) var(--spot-shield-share, 82%),
+    var(--spot-shield-under, var(--color-band-deep))
+  );
 }
 .ui-spot[data-first='true'] .ui-emblem-letter {
-  color: var(--color-on-band);
+  color: var(--spot-letter, var(--color-on-band));
   paint-order: stroke;
-  stroke: color-mix(in srgb, var(--color-band-deep) 70%, transparent);
+  stroke: var(--spot-letter-edge, color-mix(in srgb, var(--color-band-deep) 70%, transparent));
   stroke-width: 1.5px;
 }
 /* Wide: the number in a first column of its own, the name beside it, clear of the shield. */
@@ -403,8 +439,8 @@ export const cardsCss = String.raw`
   inline-size: var(--step-2);
   block-size: var(--step-2);
   margin-inline: var(--step-1);
-  border-block-end: 2px solid var(--color-muted);
-  border-inline-end: 2px solid var(--color-muted);
+  border-block-end: var(--line-heavy) solid var(--color-muted);
+  border-inline-end: var(--line-heavy) solid var(--color-muted);
   transition: transform 0.15s;
   transform: rotate(-45deg);
 }
@@ -455,6 +491,15 @@ export const cardsCss = String.raw`
   margin-inline-start: auto;
   color: var(--color-muted);
   font-size: var(--text-14);
+}
+/* On a phone every round's count stands on a line of its own under the round's name, in
+   line with it: so a round with a note beside its mark is not the only one whose heading
+   breaks. */
+@media (max-width: 29.99rem) {
+  .ui-group-summary {
+    flex: 1 1 100%;
+    margin-inline-start: var(--step-5);
+  }
 }
 .ui-group-body {
   padding-block: var(--step-1) var(--step-5);
