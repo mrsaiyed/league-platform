@@ -3,7 +3,7 @@
 // one. Each league of the pair has one release (number 1) and its site, its design
 // carrying its marker. Imported by isolation-cases.test-helper.ts.
 import { createLeague, publishSiteDesign } from '@srleagues/core';
-import { startingDesign, startingDesignWith } from '@srleagues/contracts';
+import { startingDesignWith } from '@srleagues/contracts';
 import { sql } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import { transactionOf } from '../db/transaction-scope.ts';
@@ -55,7 +55,7 @@ registerIsolationCase({
     insertSiteRelease(scope, {
       number: 2,
       startingDesign: 'crest-light',
-      design: startingDesign('crest-light'),
+      design: { version: 1, base: 'light' },
       publishedByAccountId: scope.accountId ?? randomUUID(),
     }),
 });

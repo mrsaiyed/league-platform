@@ -1,35 +1,148 @@
-// Each league's name and design on the made-up database (step 2.93 part 3, record 070):
-// the name its owner gave it, and the neutral starting design, since the database holds
-// no design until the design editor's tables come.
+// Each league's name and design on the made-up database (step 2.93 part 3, record 070;
+// step 2.187, record 073): the name its owner gave it, and the design of its latest
+// published release, checked again before it is drawn; the neutral design for a league
+// with none, and for one whose stored design does not pass, which is reported.
 import * as database from '@srleagues/database';
-import { startingDesign } from '@srleagues/site';
+import { designToCssText, startingDesign } from '@srleagues/site';
+import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { databaseLeagueSites } from './database-league-sites.ts';
+import { databaseLeagueSites, designNotDrawn } from './database-league-sites.ts';
 import { siteOf, type LeagueSiteLookup } from './league-site.ts';
 
 let made: database.MadeUpDatabase;
 let db: database.DatabaseHandle;
+let pglite: PGlite;
 let sites: LeagueSiteLookup;
+let reports: { message: string; fields: object }[];
+let clock: number;
 
 beforeAll(async () => {
   made = await database.madeUpDatabase();
+  if (made.source.kind !== 'pglite') throw new Error('the made-up database is not PGlite');
+  pglite = made.source.pglite;
   db = database.createDatabase(made.source);
-  sites = databaseLeagueSites(database, db);
+  reports = [];
+  clock = Date.UTC(2026, 10, 16, 12);
+  sites = databaseLeagueSites(database, db, {
+    report: (message, fields) => reports.push({ message, fields }),
+    now: () => clock,
+  });
 }, 120_000);
 afterAll(async () => {
   await db.close();
   await made.close();
 });
 
+const seedLeague = (slug: string) => {
+  const league = made.leagues.find((l) => l.slug === slug);
+  if (league === undefined) throw new Error(`no ${slug}`);
+  return { id: league.leagueId, slug: league.slug, ownerAccountId: league.ownerAccountId };
+};
+
+/**
+ * Writes rows past the app's login, as a migration or a hand-made fix could: the
+ * made-up database's session was opened by the superuser, which the test takes back for
+ * this one write and then gives up again.
+ */
+async function pastTheApp(work: () => Promise<unknown>) {
+  await pglite.exec('set session authorization postgres');
+  try {
+    await work();
+  } finally {
+    await pglite.exec(`set session authorization ${database.madeUpLoginRole}`);
+  }
+}
+
+let nextNumber = 10;
+/** Stores a release of the league holding `design`, whatever it is: its number. */
+async function storeRelease(league: { id: string; ownerAccountId: string }, design: unknown) {
+  const number = nextNumber++;
+  await pastTheApp(() =>
+    pglite.query(
+      `insert into site_releases (league_id, number, starting_design, design, published_by_account_id)
+       values ($1, $2, 'crest', $3::jsonb, $4)`,
+      [league.id, number, JSON.stringify(design), league.ownerAccountId],
+    ),
+  );
+  return number;
+}
+
 describe('databaseLeagueSites', () => {
-  it('names each seed league by its own name, with the neutral design', async () => {
+  it('names each seed league by its own name, drawn in its own starting design', async () => {
+    const designs = new Set<string>();
     for (const seed of database.seedLeagues) {
-      const league = made.leagues.find((l) => l.slug === seed.slug);
-      if (league === undefined) throw new Error(`no ${seed.slug}`);
-      const site = await siteOf({ id: league.leagueId, slug: league.slug }, sites);
+      const site = await siteOf(seedLeague(seed.slug), sites);
       expect(site.name).toBe(seed.name);
-      expect(site.design).toEqual(startingDesign('clean-court'));
+      expect(site.design).toEqual(startingDesign(seed.design));
+      designs.add(site.design.colors.primary);
     }
+    // The seed's leagues look different from one another, and neither is the neutral one.
+    expect(designs.size).toBe(database.seedLeagues.length);
+    expect(designs.has(startingDesign('clean-court').colors.primary)).toBe(false);
+    expect(reports).toEqual([]);
+  });
+
+  it('draws a league with no release in the neutral design', async () => {
+    const id = '01900000-0000-7000-8000-00000000f001';
+    await pastTheApp(() =>
+      // A league and its default program are made together (0003).
+      pglite.transaction(async (tx) => {
+        await tx.query(
+          `insert into leagues (id, slug, name, time_zone, audience, listed, owner_account_id)
+           values ($1, 'no-design-yet', 'No Design Yet League', 'America/Chicago', 'adult', true, $2)`,
+          [id, made.leagues[0]?.ownerAccountId],
+        );
+        await tx.query(
+          `insert into programs (league_id, slug, name, sport_key, is_default)
+           values ($1, 'main', 'Main', 'basketball', true)`,
+          [id],
+        );
+      }),
+    );
+    const site = await siteOf({ id, slug: 'no-design-yet' }, sites);
+    expect(site).toEqual({ name: 'No Design Yet League', design: startingDesign('clean-court') });
+    expect(reports).toEqual([]);
+  });
+
+  it('never draws a stored value the schema does not allow: the neutral design, reported once an hour', async () => {
+    const league = seedLeague('maple-street');
+    const own = startingDesign(
+      database.seedLeagues.find((l) => l.slug === 'maple-street')?.design ?? 'crest',
+    );
+    const hostile: unknown[] = [
+      { ...own, colors: { ...own.colors, primary: 'red; } body { display:none' } },
+      { ...own, colors: { ...own.colors, accent: '</style><script>alert(1)</script>' } },
+      { ...own, colors: { ...own.colors, background: 'url(http://example.test/x.png)' } },
+      { ...own, colors: { ...own.colors, text: `#${'a'.repeat(5000)}` } },
+      { ...own, fonts: { ...own.fonts, heading: "x'; } body { display:none" } },
+      { ...own, corners: '0; } body { display:none' },
+      // A document of an older or another shape.
+      { version: 1, colors: { primary: '#123456' } },
+      { ...own, version: 2 },
+    ];
+    for (const design of hostile) {
+      reports = [];
+      const number = await storeRelease(league, design);
+      const site = await siteOf(league, sites);
+      expect(site.design).toEqual(startingDesign('clean-court'));
+      const css = designToCssText(site.design);
+      for (const words of ['display:none', '</style>', 'url(', 'script', 'aaaaaaaa']) {
+        expect(css).not.toContain(words);
+      }
+      expect(reports).toEqual([
+        { message: designNotDrawn, fields: { leagueId: league.id, release: String(number) } },
+      ]);
+    }
+    // Asked again within the hour: drawn the same, not reported again; after it, again.
+    reports = [];
+    await siteOf(league, sites);
+    expect(reports).toEqual([]);
+    clock += 61 * 60 * 1000;
+    await siteOf(league, sites);
+    expect(reports).toHaveLength(1);
+    // A sound design published after it is drawn again.
+    await storeRelease(league, startingDesign('crest-light'));
+    expect((await siteOf(league, sites)).design).toEqual(startingDesign('crest-light'));
   });
 
   it('knows no league for an id that is not one, asking no database', async () => {
