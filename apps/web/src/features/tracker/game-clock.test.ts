@@ -6,11 +6,12 @@ import { describe, expect, it } from 'vitest';
 import {
   clockEntry,
   clockEntryKey,
-  minutesBack,
+  minutesMoved,
   minutesNow,
   periodChoices,
   periodEnd,
   readClock,
+  setEffect,
   startOffered,
   stopKey,
   stopReason,
@@ -233,14 +234,20 @@ describe('the clock’s keys (T5)', () => {
     }
   });
 
+  // These games keep the rule they were saved with (the engine's rules without
+  // minutesFollow): the form says what that rule does. The new product's rule is below.
   it('knows when a time puts time back on the clock, which comes off the minutes', () => {
     const paused = at(at(tippedOff(), 10_000, { type: 'start' }), 100_000, { type: 'pause' });
     const reading = readClock(paused, 101_000);
     expect(reading.text).toBe('6:30');
-    expect(minutesBack(paused, reading, 7 * 60_000).ms).toBe(30_000);
-    expect(minutesBack(paused, reading, 6 * 60_000).ms).toBe(0);
-    // Before the clock has run there are no minutes to take off.
-    expect(minutesBack(tippedOff(), readClock(tippedOff(), 0), 8 * 60_000).ms).toBe(0);
+    expect(setEffect(paused, 7 * 60_000, 101_000)).toEqual({
+      kind: 'back',
+      time: '0:30',
+      wholePeriod: false,
+    });
+    expect(setEffect(paused, 6 * 60_000, 101_000)).toBeNull();
+    // Before the clock has run there are no minutes to take off: the period starts there.
+    expect(setEffect(tippedOff(), 8 * 60_000, 0)).toEqual({ kind: 'start', clock: '8:00' });
   });
 
   /** What the engine really took off the minutes when the clock was set. */
@@ -256,16 +263,24 @@ describe('the clock’s keys (T5)', () => {
     const fresh = readClock(second, 611_000);
     expect(fresh.text).toBe('8:00');
     // Typing 8:00 again changes nothing, and nothing of the first quarter is ever touched.
-    expect(minutesBack(second, fresh, 8 * 60_000)).toEqual({ ms: 0, wholePeriod: false });
+    expect(setEffect(second, 8 * 60_000, 611_000)).toEqual({ kind: 'start', clock: '8:00' });
     // A minute and a half into the second quarter, 6:30 on the clock.
     const paused = at(at(second, 620_000, { type: 'start' }), 710_000, { type: 'pause' });
     const reading = readClock(paused, 711_000);
     expect(reading.text).toBe('6:30');
     // 7:00 puts half a minute back: that comes off, and it is the engine's own figure.
-    expect(minutesBack(paused, reading, 7 * 60_000)).toEqual({ ms: 30_000, wholePeriod: false });
+    expect(setEffect(paused, 7 * 60_000, 711_000)).toEqual({
+      kind: 'back',
+      time: '0:30',
+      wholePeriod: false,
+    });
     expect(tookOff(paused, 711_000, 7 * 60_000)).toBe(30_000);
     // 8:00 puts a minute and a half back: all this quarter has run, and no more than it.
-    expect(minutesBack(paused, reading, 8 * 60_000)).toEqual({ ms: 90_000, wholePeriod: true });
+    expect(setEffect(paused, 8 * 60_000, 711_000)).toEqual({
+      kind: 'back',
+      time: '1:30',
+      wholePeriod: true,
+    });
     expect(tookOff(paused, 711_000, 8 * 60_000)).toBe(90_000);
   });
 
@@ -276,16 +291,50 @@ describe('the clock’s keys (T5)', () => {
     });
     expect(readClock(paused, 196_000).text).toBe('16:55');
     // Set to 12:00 by mistake: lower, so nothing comes off, and the form says nothing.
-    expect(minutesBack(paused, readClock(paused, 196_000), 12 * 60_000).ms).toBe(0);
+    expect(setEffect(paused, 12 * 60_000, 196_000)).toBeNull();
     const wrong = at(paused, 200_000, { type: 'set-clock', ms: 12 * 60_000 });
     // Put right: 4:55 goes back on the clock, but what comes off the minutes is the 3:05
     // the half has run, which is all of it. The form says both, and the engine does it.
-    const reading = readClock(wrong, 201_000);
-    expect(minutesBack(wrong, reading, 1_015_000)).toEqual({ ms: 185_000, wholePeriod: true });
+    expect(setEffect(wrong, 1_015_000, 201_000)).toEqual({
+      kind: 'back',
+      time: '3:05',
+      wholePeriod: true,
+    });
     expect(tookOff(wrong, 201_000, 1_015_000)).toBe(185_000);
     const right = at(wrong, 210_000, { type: 'set-clock', ms: 1_015_000 });
     expect(basketball.derive(paused).players['h3']?.ms).toBe(185_000);
     expect(basketball.derive(right).players['h3']?.ms).toBe(0);
+  });
+
+  it('on the game clock (the new product, S-71): set wrongly and put right, 3:05 stays 3:05', () => {
+    const rules: basketball.Rules = { ...basketball.HALVES, minutesFollow: 'game-clock' };
+    const paused = at(at(tippedOff(rules), 10_000, { type: 'start' }), 195_000, {
+      type: 'pause',
+    });
+    expect(readClock(paused, 196_000).text).toBe('16:55');
+    // 12:00 takes 4:55 off the clock: the form says it adds 4:55, and the engine does.
+    expect(setEffect(paused, 12 * 60_000, 196_000)).toEqual({ kind: 'added', time: '4:55' });
+    const wrong = at(paused, 200_000, { type: 'set-clock', ms: 12 * 60_000 });
+    expect(minutesMoved(readClock(paused, 200_000), wrong)).toEqual({
+      kind: 'added',
+      time: '4:55',
+    });
+    expect(basketball.derive(wrong).players['h3']?.ms).toBe(480_000);
+    // Put right: the same 4:55 comes off again, not the half.
+    expect(setEffect(wrong, 1_015_000, 201_000)).toEqual({
+      kind: 'back',
+      time: '4:55',
+      wholePeriod: false,
+    });
+    expect(tookOff(wrong, 201_000, 1_015_000)).toBe(295_000);
+    const right = at(wrong, 210_000, { type: 'set-clock', ms: 1_015_000 });
+    expect(minutesMoved(readClock(wrong, 210_000), right)).toEqual({ kind: 'back', time: '4:55' });
+    expect(basketball.formatMinutes(basketball.derive(right).players['h3']?.ms ?? -1)).toBe('3:05');
+    // The same time as the clock shows already moves nothing, and says nothing.
+    expect(setEffect(right, 1_015_000, 211_000)).toBeNull();
+    expect(minutesMoved(readClock(right, 211_000), right)).toBeNull();
+    // Before the clock has run in the period, a set only says where the period starts.
+    expect(setEffect(tippedOff(rules), 15 * 60_000, 0)).toEqual({ kind: 'start', clock: '15:00' });
   });
 
   it('refuses a time longer than the period being played, in words (L5)', () => {

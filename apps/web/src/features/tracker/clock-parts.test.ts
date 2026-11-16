@@ -16,6 +16,7 @@ import {
   TeamFouls,
   TimeoutsChip,
   TimeoutsPad,
+  clockSetSaid,
   latestTimeouts,
   teamBoardLabel,
   timeoutRuleText,
@@ -446,11 +447,11 @@ describe('timeouts (G3 to G7)', () => {
 describe('the form that sets the clock and picks the period (T5, T6)', () => {
   const sheetOf = (
     digits: string,
-    minutesBack: ClockSheet['minutesBack'] = null,
+    effect: ClockSheet['effect'] = null,
     period = 1,
   ): ClockSheet => ({
     entry: clockEntry(digits, basketball.periodMs(basketball.QUARTERS, period)),
-    minutesBack,
+    effect,
     periodLength: basketball.formatClock(basketball.periodMs(basketball.QUARTERS, period)),
     periods: periodChoices(basketball.QUARTERS, period),
   });
@@ -481,14 +482,33 @@ describe('the form that sets the clock and picks the period (T5, T6)', () => {
   });
 
   it('says what comes off the minutes before time goes back on the clock, and that setting a running clock stops it', () => {
-    expect(words(form(sheetOf('800', { back: '0:30', wholePeriod: false })))).toContain(
-      'This takes 0:30 off the minutes of the players on the court.',
-    );
+    expect(
+      words(form(sheetOf('800', { kind: 'back', time: '0:30', wholePeriod: false }))),
+    ).toContain('This takes 0:30 off the minutes of the players on the court.');
     // All the period has run comes off: the form says so (the area 4 review, M4).
-    expect(words(form(sheetOf('800', { back: '3:05', wholePeriod: true })))).toContain(
-      'This takes 3:05 off the players’ minutes: all they have played this period.',
-    );
+    expect(
+      words(form(sheetOf('800', { kind: 'back', time: '3:05', wholePeriod: true }))),
+    ).toContain('This takes 3:05 off the players’ minutes: all they have played this period.');
     expect(words(form(sheetOf(''), running))).toContain('Setting the clock stops it.');
+  });
+
+  it('says what is added when time comes off the clock, and where a period not yet run starts (S-71)', () => {
+    expect(words(form(sheetOf('500', { kind: 'added', time: '2:30' })))).toContain(
+      'This adds 2:30 to the minutes of the players on the court.',
+    );
+    expect(words(form(sheetOf('700', { kind: 'start', clock: '7:00' })))).toContain(
+      'The period will start at 7:00. Nobody’s minutes change.',
+    );
+  });
+
+  it('says once set what truly came off or was added, or only the time', () => {
+    expect(clockSetSaid(t, '12:00', { kind: 'added', time: '4:55' })).toBe(
+      'Clock set to 12:00. 4:55 was added to the minutes of the players on the court.',
+    );
+    expect(clockSetSaid(t, '16:55', { kind: 'back', time: '4:55' })).toBe(
+      'Clock set to 16:55. 4:55 came off the minutes of the players on the court.',
+    );
+    expect(clockSetSaid(t, '7:00', null)).toBe('Clock set to 7:00.');
   });
 
   it('says what is wrong with a time the clock does not take, and does not set it', () => {

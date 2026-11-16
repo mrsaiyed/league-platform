@@ -27,6 +27,9 @@ export const enTracker = {
   // Start and Pause differ in word and in shape; at 0:00 the button says why it is greyed.
   'tracker.clock.start': 'Start',
   'tracker.clock.startLabel': 'Start the clock',
+  // What a time that takes time off the clock adds to the minutes (S-71): it was played
+  // with the clock stopped. The engine's own figure, "4:55" for 16:55 set to 12:00.
+  'tracker.clockSheet.adds': 'This adds {time} to the minutes of the players on the court.',
   'tracker.clockSheet.backLabel': 'Delete the last digit',
   'tracker.clockSheet.clear': 'Clear',
   'tracker.clockSheet.clearLabel': 'Clear the time typed',
@@ -41,7 +44,8 @@ export const enTracker = {
   'tracker.clockSheet.periodNow': '{period}, the period being played',
   // What a time that puts time back on the clock takes off the minutes: the engine's own
   // figure, which is never more than the period being played has run. The second says
-  // that it is all of it (a clock set lower by mistake and then put right).
+  // that it is all of it (a time put back above where the period started; or, in a game
+  // saved before minutes followed the game clock, a clock set lower and put right).
   'tracker.clockSheet.putsBack': 'This takes {back} off the minutes of the players on the court.',
   'tracker.clockSheet.putsBackAll':
     'This takes {back} off the players’ minutes: all they have played this period.',
@@ -49,6 +53,8 @@ export const enTracker = {
   'tracker.clockSheet.seconds': 'Seconds go up to 59.',
   'tracker.clockSheet.set': 'Set clock',
   'tracker.clockSheet.setTo': 'Set clock to {clock}',
+  // Before the clock has run in a period, a set only says where the period starts.
+  'tracker.clockSheet.startsAt': 'The period will start at {clock}. Nobody’s minutes change.',
   'tracker.clockSheet.stops': 'Setting the clock stops it.',
   'tracker.clockSheet.time': 'Time left',
   // The form that sets the clock and picks the period.
@@ -223,6 +229,9 @@ export const enTracker = {
   'tracker.say.bonus.1': 'Bonus: {team}.',
   'tracker.say.bonus.2': 'Double bonus: {team}.',
   'tracker.say.clockSet': 'Clock set to {clock}.',
+  // {time} is what was added to the minutes: the time taken off the clock (S-71).
+  'tracker.say.clockSetAdded':
+    'Clock set to {clock}. {time} was added to the minutes of the players on the court.',
   // {back} is what came off the minutes, which can be less than went back on the clock.
   'tracker.say.clockSetBack':
     'Clock set to {clock}. {back} came off the minutes of the players on the court.',

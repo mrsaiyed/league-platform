@@ -19,7 +19,7 @@ import type { Translate } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
 import { Fragment, type MouseEvent } from 'react';
 import { periodText } from './engine-words.ts';
-import type { ClockEntry, PeriodChoice } from './game-clock.ts';
+import type { ClockEntry, PeriodChoice, SetEffect } from './game-clock.ts';
 import type { TimeoutCall } from './scoring-moves.ts';
 import type { ScoringView, Side, TakenTimeout, TeamPanel } from './scoring-view.ts';
 
@@ -42,11 +42,12 @@ export type ClockSheet = {
   /** What is typed on its keys so far, and what that means. */
   readonly entry: ClockEntry;
   /**
-   * What setting the time typed takes off the players' minutes ("0:30"), and whether
-   * that is all this period has run; null when it takes nothing off. The engine's own
-   * figure (game-clock.ts), so the form never says more than is then done.
+   * What setting the time typed does to the players' minutes: what comes off ("0:30") and
+   * whether that is all this period has run, what is added, or that the period will start
+   * there; null when the minutes do not move. The engine's own helper (`setEffect` of
+   * game-clock.ts), so the form never says other than what is then done.
    */
-  readonly minutesBack: { readonly back: string; readonly wholePeriod: boolean } | null;
+  readonly effect: SetEffect | null;
   /** "20:00": how long the period being played is, said when a longer time is typed. */
   readonly periodLength: string;
   readonly periods: readonly PeriodChoice[];
@@ -572,6 +573,36 @@ function TeamTimeouts(props: {
 
 const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back'] as const;
 
+/** What the form says a set will do to the minutes, before it is done. */
+function effectSaid(t: Translate, effect: SetEffect): string {
+  switch (effect.kind) {
+    case 'back':
+      return t(
+        effect.wholePeriod ? 'tracker.clockSheet.putsBackAll' : 'tracker.clockSheet.putsBack',
+        { back: effect.time },
+      );
+    case 'added':
+      return t('tracker.clockSheet.adds', { time: effect.time });
+    case 'start':
+      return t('tracker.clockSheet.startsAt', { clock: effect.clock });
+  }
+}
+
+/**
+ * The sentence said once the clock is set to `clock` ("12:00"): what truly came off or was
+ * added to the minutes (`minutesMoved` of game-clock.ts), or only the time it was set to.
+ */
+export function clockSetSaid(
+  t: Translate,
+  clock: string,
+  moved: { readonly kind: 'back' | 'added'; readonly time: string } | null,
+): string {
+  if (moved === null) return t('tracker.say.clockSet', { clock });
+  return moved.kind === 'back'
+    ? t('tracker.say.clockSetBack', { clock, back: moved.time })
+    : t('tracker.say.clockSetAdded', { clock, time: moved.time });
+}
+
 /**
  * The form that sets the clock and picks the period (T5, T6): large number keys in place
  * of the browser's own box, the time filling from the right as on a scoreboard's
@@ -598,13 +629,8 @@ export function ClockSheetView(props: {
               period: period(view, t),
               length: sheet.periodLength,
             })
-          : sheet.minutesBack !== null
-            ? t(
-                sheet.minutesBack.wholePeriod
-                  ? 'tracker.clockSheet.putsBackAll'
-                  : 'tracker.clockSheet.putsBack',
-                { back: sheet.minutesBack.back },
-              )
+          : sheet.effect !== null
+            ? effectSaid(t, sheet.effect)
             : t(clock.running ? 'tracker.clockSheet.stops' : 'tracker.clockSheet.keysHelp');
   return (
     <div className="court-sheet-wrap" data-clock-sheet="">
