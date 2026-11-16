@@ -966,7 +966,7 @@ export async function clockSteps(kit) {
         // at the same size, and only where the line truly has no room for both.
         const drawn = await glance(page);
         note(
-          `${size.width} x ${size.height}${letters}: both teams in the double bonus: each box holds its fouls and "Double bonus" whole`,
+          `${size.width} x ${size.height}${letters}: both teams in the double bonus: each box holds its count and its badge whole, the badge showing "Double bonus" where both words fit and "Double" only where they cannot`,
           boxes.length === 2 &&
             boxes.every(
               (box) =>
