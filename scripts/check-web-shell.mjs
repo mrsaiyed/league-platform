@@ -85,7 +85,7 @@ const game = (n) => `01900000-0000-7000-8000-006a${n.toString(16).padStart(8, '0
 const noAccess = 'NEXT_HTTP_ERROR_FALLBACK;403';
 const notFound = 'NEXT_HTTP_ERROR_FALLBACK;404';
 
-// A link in the admin's own navigation (features/shell/admin-nav.tsx). The area's
+// A link in the admin's own navigation (features/staff/staff-nav.tsx). The area's
 // name alone is no proof: the site's menu has "Schedule" and "Teams" too.
 const adminLink = (league, area) => `href="/${league}/admin/${area}"`;
 
@@ -937,10 +937,14 @@ async function checkStylesheets(origin) {
 /**
  * The page's own forms: those after the league's header. Since step 2.127 the header holds
  * the account button's "Sign out" form (twice: the phone menu and the laptop's button),
- * so forms are counted from the page's own content, as they were before it.
+ * so forms are counted from the page's own content, as they were before it. The admin's
+ * own frame (step 2.103) holds "Sign out" too, in its phone menu and again in its side
+ * menu, which comes after its header: so the count starts where the page's content does
+ * (`id="content"`, in the league's frame and in the admin's alike).
  */
 function pageForms(html) {
-  return html.slice(Math.max(0, html.indexOf('</header>')));
+  const content = html.indexOf('id="content"');
+  return html.slice(Math.max(0, content >= 0 ? content : html.indexOf('</header>')));
 }
 
 async function checkTeams(origin) {

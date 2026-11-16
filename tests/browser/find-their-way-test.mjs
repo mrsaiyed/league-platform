@@ -25,6 +25,7 @@ import {
   buildNext,
   freePort,
   launch,
+  openStaffMenu,
   startNext,
   waitFor,
 } from './web-browser-kit.mjs';
@@ -187,8 +188,14 @@ async function tallEnough(page, within, label) {
   );
   note(`everything tapped is at least 44 high: ${label}`, short.length === 0, short.join(', '));
 }
-/** The phone menu's button, which also holds the account button's entries (one tap). */
-const openMenu = (page) => page.locator('.site-header .site-menu > summary').click();
+/**
+ * The phone menu's button, which also holds the account button's entries (one tap): the
+ * league's own on a public page, the admin's own inside the admin (step 2.103).
+ */
+const openMenu = async (page) => {
+  if ((await page.locator('.staff-bar').count()) > 0) return openStaffMenu(page);
+  return page.locator('.site-header .site-menu > summary').click();
+};
 /**
  * The account button on the scoring page: the tracker has a frame of its own, with no
  * league header (step 2.35; DESIGN.md section 7, line 11), and the button is in its first
@@ -321,9 +328,12 @@ if (browser) {
         note('two taps from the league home to the admin', true);
         await accessible(page, 'the admin home, signed in');
         await noSidewaysScroll(page, 'the admin home');
+        // "View the site" is apart at the foot of the admin's own menu (step 2.103).
+        await openMenu(page);
+        await tallEnough(page, '.staff-bar .staff-menu-panel', "the admin's menu on a phone");
         await Promise.all([
           page.waitForURL((url) => url.pathname === '/north-valley'),
-          link(page, 'View the site').click(),
+          page.locator('.staff-bar').getByRole('link', { name: 'View the site' }).click(),
         ]);
         await openMenu(page);
         await Promise.all([

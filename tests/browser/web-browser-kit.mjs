@@ -117,6 +117,18 @@ export async function buildNext() {
 }
 
 /**
+ * The admin's own menu (step 2.103): at the side on a laptop, behind one menu button on a
+ * phone. Opens it when its button is on the screen and the menu is shut, as a person would
+ * before tapping one of the admin's areas, "View the site" or "Sign out".
+ */
+export async function openStaffMenu(page) {
+  const menu = page.locator('.staff-bar .staff-menu');
+  const button = menu.locator('> summary');
+  if (!(await button.isVisible())) return;
+  if ((await menu.getAttribute('open')) === null) await button.click();
+}
+
+/**
  * Accessibility checks on the screen the page shows (T-186). axe is not a dependency,
  * so these are the checks that can be made from the page itself: language, title, one
  * main landmark and one level-one heading, names on every link, button and field,

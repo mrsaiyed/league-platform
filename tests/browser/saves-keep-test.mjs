@@ -24,6 +24,7 @@ import {
   buildNext,
   freePort,
   launch,
+  openStaffMenu,
   startNext,
   waitFor,
   whatWentWrong,
@@ -127,6 +128,8 @@ const gameOn = (page, id) => page.locator(`li[id="game-${id}"]`);
 /** From the admin's home to the games list, by tapping the admin's own "Games". */
 async function openGames(page) {
   await page.goto(`${origin}/north-valley/admin`);
+  // On a phone the admin's areas are behind its menu button (step 2.103).
+  await openStaffMenu(page);
   await Promise.all([
     page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
     page

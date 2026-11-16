@@ -22,6 +22,7 @@ import {
   buildNext,
   freePort,
   launch,
+  openStaffMenu,
   startNext,
   waitFor,
 } from './web-browser-kit.mjs';
@@ -84,6 +85,8 @@ async function signedInAs(token) {
 /** From the admin's home to the games list, by tapping the admin's own "Games". */
 async function openGames(page, league) {
   await page.goto(`${origin}/${league}/admin`);
+  // On a phone the admin's areas are behind its menu button (step 2.103).
+  await openStaffMenu(page);
   await Promise.all([
     page.waitForURL((url) => url.pathname === `/${league}/admin/games`),
     // The admin's own navigation: the account button holds a hidden link to the same place.
@@ -247,6 +250,8 @@ if (browser) {
     try {
       await page.goto(`${origin}/old-meadow/admin`);
       const started = Date.now();
+      // On a phone the admin's areas are behind its menu button (step 2.103).
+      await openStaffMenu(page);
       await Promise.all([
         page.waitForURL((url) => url.pathname === '/old-meadow/admin/games'),
         page
