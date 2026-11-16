@@ -374,6 +374,7 @@ All dated November 12, 2026.
 | T-271                 | Each form answered with the answer in the address                            | Agreed (delegated): refused, in the post's answer with what was typed; saved, a one-time notice; a repeat post is the same (rec. 067)           | Step 2.155: a refusal emptied a box score; "Saved" off screen; a reload said it again (H6, M2, M8) |
 | T-272                 | T-41: ids sort by creation time (0002: in order on one connection)           | Agreed (delegated): on one connection each id sorts after every id it made before (a memory of the session); none across connections (rec. 068) | Step 2.151: PGlite ticks in whole ms, so ids of one ms sorted either way; tests failed by chance   |
 | T-273                 | New                                                                          | On the database, the public schedule and standings move first; statistics refuse until part 3; local seasons under way (rec. 069)               | Step 2.93 part 2: one port serves both the standings and the statistics, and the seed had no games |
+| T-275                 | New                                                                          | Page titles and other page metadata are never streamed: every page has its title in the head of its first bytes (rec. 071)                      | Step 2.175: a page could arrive with its content before its title; browser checks met it untitled  |
 
 ## The full list
 
@@ -927,6 +928,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-167 | Which paid tier of each vendor to start on (decided from prices at build time)                                                                         | Open               |         |
 | T-168 | Whether to pay for a second database region (not until an association contract requires it)                                                            | Open               |         |
 | T-270 | The first online test copy: web on Render's free instance, worker on its smallest paid one, the Supabase test project; no Cloudflare or domain yet     | Agreed (delegated) |         |
+| T-275 | Page titles and other page metadata are never streamed: `htmlLimitedBots: /.*/`; `generateMetadata` never reads slow data (record 071)                 | Agreed (delegated) |         |
 
 ### [T9 — Quality and maintainability](technical/T9-quality-and-maintainability.md)
 

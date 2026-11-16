@@ -27,7 +27,18 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - run: npm run test:varsity:browser
-      - run: npm run test:stats:browser
+      # As for the web's browser tests: the tracker's own browser check runs in bash with its
+      # trace on and its output kept, so the next step can say what failed (step 2.175).
+      - name: npm run test:stats:browser
+        id: stats-browser
+        shell: bash
+        run: |
+          set -o pipefail
+          env SHELLOPTS=xtrace npm_config_script_shell=bash npm run test:stats:browser 2>&1 | tee "$RUNNER_TEMP/stats-browser-output.txt"
+      - name: Say what failed in the tracker's browser check
+        if: failure() && steps.stats-browser.outcome == 'failure'
+        shell: bash
+        run: node scripts/browser-failure-notes.mjs "$RUNNER_TEMP/stats-browser-output.txt"
       - run: npm run test:pages:browser
       # As for verify: the output also goes to a file, so the next step can say what failed.
       # npm runs the chain in bash with its trace on, so bash prints "+ node tests/browser/…"
