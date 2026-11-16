@@ -1762,38 +1762,13 @@ export async function clockSteps(kit) {
       // size (the code review, M-c: it was measured at 390 x 664 only). The pad returns
       // to rest with each of these taps, so a second fast tap lands where the button is:
       // a floor player's options, a team's whole bench, and a bench player's options.
-      for (const { size, letters, family } of await fits(page)) {
-        await drawIn(page, family);
-        await page.setViewportSize({ width: size.width, height: size.height });
-        await twoFrames(page);
-        const label = `${size.width} x ${size.height}${letters}`;
-        await c.startButton.waitFor();
-        const [startAt, hideAt] = [await rectOf(c.startButton), await rectOf(c.hideStart)];
-        const measured = {};
-        const measure = async (what, within) => {
-          const buttons = await buttonsOf(within);
-          const close = buttons.find((b) => b.close);
-          measured[what] = {
-            buttons: buttons.length,
-            under: buttons.filter((b) => !b.close && overlap(b, startAt)).map((b) => b.name),
-            underCross: buttons.filter((b) => !b.close && overlap(b, hideAt)).map((b) => b.name),
-            crossOnCross: close !== undefined && overlap(close, hideAt),
-          };
-        };
-        const tile = floor(c, 'home');
-        await tile.click();
-        const floorOptions = c.pad.locator(
-          `[data-options="${await tile.getAttribute('data-player')}"]`,
-        );
-        await floorOptions.waitFor();
-        await measure('a floor player’s options', floorOptions);
-        // A picked player's second line is whole, to the end of the minutes (the area 4
-        // review, L6: it was cut on a tablet lying down). Where a device's letters are
-        // too wide for all of it, the line leaves words off, never letters: "On court"
-        // first, then the word after the minutes. So it is read here as a scorekeeper
-        // reads it: each part of it either shows whole on the line or is not there at
-        // all, and a part is left off only where the line truly had no room for it.
-        const facts = await floorOptions.locator('.court-who-facts').evaluate((el) => {
+      /**
+       * A picked player's second line, read as a scorekeeper reads it: each part of it
+       * whole on the line, cut, or left off (wrapped out of it), with what the line has,
+       * what it would need for each word it can leave off, and a space in its own face.
+       */
+      const lineOf = (options) =>
+        options.locator('.court-who-facts').evaluate((el) => {
           const box = el.getBoundingClientRect();
           const widthOf = (part) => part?.getBoundingClientRect().width ?? 0;
           const parts = [];
@@ -1826,8 +1801,10 @@ export async function clockSteps(kit) {
             cut: parts.filter((part) => part.shows === 'cut').map((part) => part.says),
             leftOff: parts.filter((part) => part.shows === 'left off').map((part) => part.says),
             all: el.textContent,
+            out: el.hasAttribute('data-out'),
             has: box.width,
-            // What the line needs with the word after the minutes, and with "On court" too.
+            // What the line needs with the word after the minutes, and with where the
+            // player is too ("On court", "Bench", "Fouled out").
             withPlayed: widthOf(core) + after.width,
             withWhere: widthOf(where) + widthOf(core) + after.width,
             px: Number.parseFloat(getComputedStyle(el).fontSize),
@@ -1843,27 +1820,93 @@ export async function clockSteps(kit) {
             })(),
           };
         });
+      /**
+       * A picked player's second line is whole, to the end of the minutes, for a player
+       * `where` ("On court", "Bench" or "Fouled out"). "On court" and "Bench" are left
+       * off first, then the word after the minutes; "Fouled out" is what that line is
+       * for, so it stays, and only the word after the minutes may be left off.
+       */
+      const lineFits = async (label, size, who, where, options) => {
+        const facts = await lineOf(options);
+        const out = where === 'Fouled out';
         // A space's width of doubt, as wide as a space is in this face: a word that wraps
         // away is measured without its space.
         const noRoom = (needs) => needs > facts.has - facts.space;
-        const offWhere = facts.leftOff.some((part) => /^On court/.test(part));
+        const offWhere = facts.leftOff.some((part) => part.startsWith(where));
         const offPlayed = facts.leftOff.some((part) => /played/.test(part));
+        const fouls = out ? '(\\d+ fouls? · )?' : '\\d+ fouls? · ';
+        const shown = new RegExp(
+          `^(${where} · )${out ? '' : '?'}${fouls}\\d+ pts · \\d+:\\d\\d( played)?$`,
+        );
+        const heard = new RegExp(`^${where} · \\d+ fouls? · \\d+ pts · \\d+:\\d\\d played$`);
         console.log(
-          `  ${label}: a picked player’s second line reads “${facts.shows}”: ${facts.has.toFixed(1)} wide, ${facts.withPlayed.toFixed(1)} needed with "played", ${facts.withWhere.toFixed(1)} with "On court" too, a space ${facts.space.toFixed(1)}`,
+          `  ${label}: ${who}’s second line reads “${facts.shows}”: ${facts.has.toFixed(1)} wide, ${facts.withPlayed.toFixed(1)} needed with "played", ${facts.withWhere.toFixed(1)} with "${where}" too, a space ${facts.space.toFixed(1)}`,
         );
         note(
-          `${label}: a picked player’s second line is whole, to the end of the minutes`,
-          /^(On court · )?\d+ fouls? · \d+ pts · \d+:\d\d( played)?$/.test(facts.shows) &&
+          `${label}: ${who}’s second line is whole, to the end of the minutes`,
+          shown.test(facts.shows) &&
+            facts.out === out &&
             facts.cut.length === 0 &&
             // The whole of it is still what a screen reader is given.
-            /^On court · \d+ fouls? · \d+ pts · \d+:\d\d played$/.test(facts.all) &&
-            // Words are left off only for want of room, "On court" before "played".
-            (!offWhere || noRoom(facts.withWhere)) &&
-            (!offPlayed || (noRoom(facts.withPlayed) && !/^On court/.test(facts.shows))) &&
+            heard.test(facts.all) &&
+            // Words are left off only for want of room, where the player is before "played"
+            // (and "Fouled out" never).
+            (out ? !offWhere : !offWhere || noRoom(facts.withWhere)) &&
+            (!offPlayed ||
+              (out
+                ? noRoom(facts.withWhere)
+                : noRoom(facts.withPlayed) && !facts.shows.startsWith(where))) &&
             // And never by setting it smaller than the pad's other second-rank words.
             facts.px >= (size.width >= 700 && size.height >= 521 ? 15 : 13),
           JSON.stringify(facts),
         );
+      };
+      // Who is picked from the bench, and who has fouled out, found once where the
+      // benches are drawn: a home bench player who has not fouled out, and anyone who has.
+      const people = await page.evaluate(() =>
+        [...document.querySelectorAll('.court-tile[data-player]')].map((el) => ({
+          id: el.getAttribute('data-player'),
+          side: el.getAttribute('data-side'),
+          onCourt: el.getAttribute('data-oncourt') === '1',
+          out: el.hasAttribute('data-out'),
+        })),
+      );
+      const onBench = people.find((one) => one.side === 'home' && !one.onCourt && !one.out)?.id;
+      const fouledOut = people.find((one) => one.out) ?? null;
+      for (const { size, letters, family } of await fits(page)) {
+        await drawIn(page, family);
+        await page.setViewportSize({ width: size.width, height: size.height });
+        await twoFrames(page);
+        const label = `${size.width} x ${size.height}${letters}`;
+        await c.startButton.waitFor();
+        const [startAt, hideAt] = [await rectOf(c.startButton), await rectOf(c.hideStart)];
+        const measured = {};
+        const measure = async (what, within) => {
+          const buttons = await buttonsOf(within);
+          const close = buttons.find((b) => b.close);
+          measured[what] = {
+            buttons: buttons.length,
+            under: buttons.filter((b) => !b.close && overlap(b, startAt)).map((b) => b.name),
+            underCross: buttons.filter((b) => !b.close && overlap(b, hideAt)).map((b) => b.name),
+            crossOnCross: close !== undefined && overlap(close, hideAt),
+          };
+        };
+        const tile = floor(c, 'home');
+        await tile.click();
+        const floorOptions = c.pad.locator(
+          `[data-options="${await tile.getAttribute('data-player')}"]`,
+        );
+        await floorOptions.waitFor();
+        await measure('a floor player’s options', floorOptions);
+        // A picked player's second line is whole, to the end of the minutes (the area 4
+        // review, L6: it was cut on a tablet lying down). Where a device's letters are
+        // too wide for all of it, the line leaves words off, never letters: "On court"
+        // first, then the word after the minutes. So it is read here as a scorekeeper
+        // reads it: each part of it either shows whole on the line or is not there at
+        // all, and a part is left off only where the line truly had no room for it.
+        // The same for a bench player's line ("Bench · …"), and for a player who has
+        // fouled out, whose line keeps "Fouled out" and leaves off only "played".
+        await lineFits(label, size, 'a picked player', 'On court', floorOptions);
         await floorOptions.locator('.court-close').click();
         await c.pad.locator('[data-rest]').waitFor();
         // The bench's button is drawn only where the bench is folded away; it is there
@@ -1872,12 +1915,38 @@ export async function clockSteps(kit) {
         const bench = c.pad.locator('[data-bench-list="home"]');
         await bench.waitFor();
         await measure('the whole bench', bench);
-        await bench.locator('[data-bench-pick]').first().click();
-        const benchOptions = c.pad.locator('[data-options]');
+        const pick = bench.locator(
+          onBench === undefined ? '[data-bench-pick]' : `[data-bench-pick="${onBench}"]`,
+        );
+        const picked = await pick.first().getAttribute('data-bench-pick');
+        await pick.first().click();
+        const benchOptions = c.pad.locator(`[data-options="${picked}"]`);
         await benchOptions.waitFor();
         await measure('a bench player’s options', benchOptions);
+        await lineFits(label, size, 'a picked bench player', 'Bench', benchOptions);
         await benchOptions.locator('.court-close').click();
         await c.pad.locator('[data-rest]').waitFor();
+        if (fouledOut === null) {
+          note(
+            `${label}: a picked fouled-out player’s second line is whole, to the end of the minutes`,
+            false,
+            'nobody in the game has fouled out',
+          );
+        } else {
+          const outTile = c.root.locator(`[data-floor] .court-tile[data-player="${fouledOut.id}"]`);
+          if (await outTile.isVisible()) await outTile.click();
+          else {
+            await c.benchButton(fouledOut.side).evaluate((button) => button.click());
+            await c.pad
+              .locator(`[data-bench-list="${fouledOut.side}"] [data-bench-pick="${fouledOut.id}"]`)
+              .click();
+          }
+          const outOptions = c.pad.locator(`[data-options="${fouledOut.id}"]`);
+          await outOptions.waitFor();
+          await lineFits(label, size, 'a picked fouled-out player', 'Fouled out', outOptions);
+          await outOptions.locator('.court-close').click();
+          await c.pad.locator('[data-rest]').waitFor();
+        }
         const all = Object.values(measured);
         note(
           `${label}: no option, substitute or bench player lies under the Start clock button, and only the pad’s own × lies under its ×`,
