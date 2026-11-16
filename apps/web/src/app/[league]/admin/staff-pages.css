@@ -134,6 +134,45 @@
 .admin-slots details[open] > summary {
   margin-block-end: var(--step-2);
 }
+/* A round's panel is tight: its rows carry their own room. */
+.staff .admin-round {
+  gap: var(--step-2);
+}
+/* On a laptop a round's games stand two across, so a round is half as tall. */
+@media (min-width: 64rem) {
+  .staff .admin-slots {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: var(--step-6);
+    align-items: start;
+  }
+}
+/* A game's form: its fields side by side where there is room; then, on a line of their
+   own, Save at the start and "Remove game" apart at the far end. */
+.staff .admin-slot-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--step-4);
+}
+.admin-slot-form > .staff-field {
+  flex: 1 1 13rem;
+}
+.admin-slot-form::before {
+  content: '';
+  flex-basis: 100%;
+  order: 1;
+  margin-block-start: calc(-1 * var(--step-4));
+}
+.staff .admin-slot-form > p {
+  order: 2;
+  margin: 0;
+}
+.admin-slot-form > p:has(> [data-kind='danger']) {
+  margin-inline-start: auto;
+}
+.staff .admin-move-form {
+  margin: 0;
+}
 .admin-slots details > form + form,
 .admin-publish > details {
   margin-block-start: var(--step-4);

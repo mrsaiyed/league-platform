@@ -5,7 +5,7 @@ import {
   previewSchedulePublish,
   type VenueWithCourts,
 } from '@srleagues/core';
-import { EmptyPanel, PageHead } from '@srleagues/ui';
+import { Emblem, EmptyPanel, PageHead } from '@srleagues/ui';
 import { randomUUID } from 'node:crypto';
 import { Fragment, type ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
@@ -328,9 +328,6 @@ function BasisFields({ basis }: { readonly basis: Basis }) {
   );
 }
 
-/** No style of its own any more: a field's look is the staff area's (step 2.103). */
-const wide = undefined;
-
 /** A field of the grid's forms: its label above it (the staff area's field piece). */
 function Field({ label, children }: { readonly label: string; readonly children: ReactNode }) {
   return (
@@ -349,7 +346,7 @@ function PlaceSelect({
   readonly value: string;
 }) {
   return (
-    <select name="place" defaultValue={value} style={wide}>
+    <select name="place" defaultValue={value}>
       <option value="">{t('schedule.admin.noPlaceOption')}</option>
       {venues.flatMap((v) => [
         <option key={v.id} value={`${v.id}|`}>
@@ -367,7 +364,7 @@ function PlaceSelect({
 
 function RecordingSelect({ value }: { readonly value: GridGame['recording'] }) {
   return (
-    <select name="recording" defaultValue={value ?? ''} style={wide}>
+    <select name="recording" defaultValue={value ?? ''}>
       {value === null || value === undefined ? (
         <option value="">{t('schedule.admin.recording.rules')}</option>
       ) : null}
@@ -393,7 +390,7 @@ function TeamSelect({
 }) {
   return (
     <Field label={label}>
-      <select name={name} defaultValue={value} required style={wide}>
+      <select name={name} defaultValue={value} required>
         <option value="">{t('schedule.admin.chooseTeam')}</option>
         {teams.map((team) => (
           <option key={team.id} value={team.id}>
@@ -463,13 +460,7 @@ function RoundSection({
               <BasisFields basis={basis} />
               <input type="hidden" name="roundId" value={round.id} />
               <Field label={t('schedule.admin.renameRound')}>
-                <input
-                  name="label"
-                  defaultValue={round.label}
-                  required
-                  maxLength={120}
-                  style={wide}
-                />
+                <input name="label" defaultValue={round.label} required maxLength={120} />
               </Field>
               <p className="staff-buttons">
                 <button type="submit" className="ui-button">
@@ -481,13 +472,7 @@ function RoundSection({
               <BasisFields basis={basis} />
               <input type="hidden" name="roundId" value={round.id} />
               <Field label={t('schedule.admin.changeRoundDate')}>
-                <input
-                  type="date"
-                  name="date"
-                  defaultValue={round.date ?? ''}
-                  required
-                  style={wide}
-                />
+                <input type="date" name="date" defaultValue={round.date ?? ''} required />
               </Field>
               <p className="ui-field-help">{t('schedule.admin.changeRoundDateNote')}</p>
               <p className="staff-buttons">
@@ -590,7 +575,7 @@ function GameList({
 }) {
   if (games.length === 0) return null;
   return (
-    <ol style={{ paddingInlineStart: '1.25rem' }}>
+    <ol className="admin-slots">
       {games.map((g) => (
         <GameItem
           key={g.id}
@@ -636,25 +621,29 @@ function GameItem({
   const place = game.placeLabel ?? t('schedule.admin.noPlace');
   return (
     <li id={gameAnchor(game.id)} data-game={game.id} data-clash={game.clashed ? 'yes' : 'no'}>
-      <p>
+      {/* One row a game: its two teams' marks and names, then its day, time and place. */}
+      <p className="admin-slot-line">
+        <Emblem name={game.awayName} size="small" />
+        <Emblem name={game.homeName} size="small" />
         <strong>{t('schedule.admin.gameVs', { away: game.awayName, home: game.homeName })}</strong>
-        <br />
-        {game.recording === null || game.recording === undefined
-          ? t('schedule.admin.gameDetails', { when, place })
-          : t('schedule.admin.gameDetailsRecording', {
-              when,
-              place,
-              recording: t(`schedule.admin.recording.${game.recording}`),
-            })}
+        <span>
+          {game.recording === null || game.recording === undefined
+            ? t('schedule.admin.gameDetails', { when, place })
+            : t('schedule.admin.gameDetailsRecording', {
+                when,
+                place,
+                recording: t(`schedule.admin.recording.${game.recording}`),
+              })}
+        </span>
       </p>
       {saved?.node}
       {game.clashed ? (
         <p role="status">
-          <strong>{t('schedule.admin.clashFlag')}</strong>
+          <StaffPill kind="stop">{t('schedule.admin.clashFlag')}</StaffPill>
         </p>
       ) : null}
       {!flagged || game.offRoundDate === null || round === undefined ? null : (
-        <div data-off-round-date={game.id}>
+        <div className="ui-notice" data-off-round-date={game.id}>
           <p role="status">
             <strong>
               {t('schedule.admin.offRoundDate', { round: round.label, date: game.offRoundDate })}
@@ -671,7 +660,7 @@ function GameItem({
         </div>
       )}
       {!basis.canEdit ? null : !game.editable ? (
-        <p>
+        <p className="staff-quiet">
           {game.status === 'postponed' || game.status === 'cancelled'
             ? t('schedule.admin.gameNotScheduled', { status: game.status })
             : t('schedule.admin.gameLocked')}
@@ -679,7 +668,7 @@ function GameItem({
       ) : (
         <details>
           <summary>{t('schedule.admin.edit')}</summary>
-          <form action={saveGameAction}>
+          <form action={saveGameAction} className="staff-form admin-slot-form">
             <BasisFields basis={basis} />
             <input type="hidden" name="gameId" value={game.id} />
             <input
@@ -689,7 +678,7 @@ function GameItem({
             />
             <input type="hidden" name="wasRecording" value={game.recording ?? ''} />
             <Field label={t('schedule.admin.roundField')}>
-              <select name="roundId" defaultValue={game.roundId ?? ''} style={wide}>
+              <select name="roundId" defaultValue={game.roundId ?? ''}>
                 <option value="">{t('schedule.admin.noRound')}</option>
                 {rounds.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -699,10 +688,10 @@ function GameItem({
               </select>
             </Field>
             <Field label={t('schedule.admin.date')}>
-              <input type="date" name="date" defaultValue={game.date} required style={wide} />
+              <input type="date" name="date" defaultValue={game.date} required />
             </Field>
             <Field label={t('schedule.admin.time')}>
-              <input type="time" name="time" defaultValue={game.time ?? ''} style={wide} />
+              <input type="time" name="time" defaultValue={game.time ?? ''} />
             </Field>
             <Field label={t('schedule.admin.place')}>
               <PlaceSelect venues={venues} value={game.place} />
@@ -710,17 +699,30 @@ function GameItem({
             <Field label={t('schedule.admin.recording')}>
               <RecordingSelect value={game.recording} />
             </Field>
-            <button type="submit">{t('schedule.admin.save')}</button>{' '}
-            <button type="submit" formAction={removeGameAction} formNoValidate>
-              {t('schedule.admin.remove')}
-            </button>
+            {/* Save is the main button; "Remove game" is the outlined destructive one, apart. */}
+            <p>
+              <button type="submit" className="ui-button" data-kind="main">
+                {t('schedule.admin.save')}
+              </button>
+            </p>
+            <p>
+              <button
+                type="submit"
+                formAction={removeGameAction}
+                formNoValidate
+                className="ui-button"
+                data-kind="danger"
+              >
+                {t('schedule.admin.remove')}
+              </button>
+            </p>
           </form>
           {others.length === 0 ? null : (
-            <form action={swapGamesAction}>
+            <form action={swapGamesAction} className="staff-form">
               <BasisFields basis={basis} />
               <input type="hidden" name="gameId" value={game.id} />
               <Field label={t('schedule.admin.swapWith')}>
-                <select name="otherGameId" defaultValue="" required style={wide}>
+                <select name="otherGameId" defaultValue="" required>
                   <option value="">{t('schedule.admin.swapChoose')}</option>
                   {others.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -732,8 +734,12 @@ function GameItem({
                   ))}
                 </select>
               </Field>
-              <p>{t('schedule.admin.swapNote')}</p>
-              <button type="submit">{t('schedule.admin.swapSubmit')}</button>
+              <p className="ui-field-help">{t('schedule.admin.swapNote')}</p>
+              <p className="staff-buttons">
+                <button type="submit" className="ui-button">
+                  {t('schedule.admin.swapSubmit')}
+                </button>
+              </p>
             </form>
           )}
         </details>
@@ -756,17 +762,17 @@ function AddGame({
   return (
     <details data-add-game={round?.id ?? 'none'}>
       <summary>{t('schedule.admin.addGame')}</summary>
-      <form action={addGameAction}>
+      <form action={addGameAction} className="staff-form admin-slot-form">
         <BasisFields basis={basis} />
         <input type="hidden" name="gameId" value={randomUUID()} />
         <input type="hidden" name="roundId" value={round?.id ?? ''} />
         <TeamSelect name="homeTeamId" label={t('schedule.admin.home')} teams={teams} value="" />
         <TeamSelect name="awayTeamId" label={t('schedule.admin.away')} teams={teams} value="" />
         <Field label={t('schedule.admin.date')}>
-          <input type="date" name="date" defaultValue={round?.date ?? ''} required style={wide} />
+          <input type="date" name="date" defaultValue={round?.date ?? ''} required />
         </Field>
         <Field label={t('schedule.admin.time')}>
-          <input type="time" name="time" style={wide} />
+          <input type="time" name="time" />
         </Field>
         <Field label={t('schedule.admin.place')}>
           <PlaceSelect venues={venues} value="" />
@@ -774,7 +780,11 @@ function AddGame({
         <Field label={t('schedule.admin.recording')}>
           <RecordingSelect value={null} />
         </Field>
-        <button type="submit">{t('schedule.admin.addGameSubmit')}</button>
+        <p className="staff-buttons">
+          <button type="submit" className="ui-button" data-kind="main">
+            {t('schedule.admin.addGameSubmit')}
+          </button>
+        </p>
       </form>
     </details>
   );
@@ -796,7 +806,7 @@ function MoveToRoundDate({
   readonly main?: boolean;
 }) {
   return (
-    <form action={saveGameAction}>
+    <form action={saveGameAction} className="admin-move-form">
       <BasisFields basis={basis} />
       <input type="hidden" name="gameId" value={game.id} />
       <input
@@ -855,7 +865,6 @@ function AddRoundForm({
             maxLength={120}
             aria-describedby="add-round-name-help"
             aria-invalid={problem?.field === 'label' ? true : undefined}
-            style={wide}
           />
         </Field>
         {error('label')}
@@ -872,7 +881,6 @@ function AddRoundForm({
             required
             aria-describedby="add-round-date-help"
             aria-invalid={problem?.field === 'date' ? true : undefined}
-            style={wide}
           />
         </Field>
         {error('date')}

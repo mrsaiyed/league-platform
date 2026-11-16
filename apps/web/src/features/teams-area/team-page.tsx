@@ -13,6 +13,7 @@ import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
+import { StaffTrail } from '../staff/index.ts';
 import { t, type TextKey } from '../../server/messages.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
 import {
@@ -87,10 +88,8 @@ export async function TeamPage({
   const listUrl = leagueUrl(here, 'admin-area', { area: 'teams' });
 
   return (
-    <main>
-      <p>
-        <a href={listUrl}>{t('adminTeams.allTeams')}</a>
-      </p>
+    <main className="admin-teams admin-team">
+      <StaffTrail steps={[{ href: listUrl, label: t('admin.area.teams') }]} here={team.name} />
       <h1>
         <Swatch team={team} />
         {team.name}
@@ -98,7 +97,7 @@ export async function TeamPage({
       <Notice query={query} />
 
       <Section title={t('adminTeams.edit.title')}>
-        <form action={saveTeamAction}>
+        <form action={saveTeamAction} className="staff-form">
           <LeagueField league={here.slug} />
           <input type="hidden" name="team" value={team.id} />
           <input type="hidden" name="version" value={team.version} />
@@ -118,14 +117,16 @@ export async function TeamPage({
           />
           <ColorFields color={team.color} />
           <DivisionField divisions={divisions} value={team.divisionId} />
-          <p>
-            <button type="submit">{t('adminTeams.edit.submit')}</button>
+          <p className="staff-buttons">
+            <button type="submit" className="ui-button" data-kind="main">
+              {t('adminTeams.edit.submit')}
+            </button>
           </p>
         </form>
       </Section>
 
       <Section title={t('adminTeams.stats.title')}>
-        <form action={saveTeamStatsAction}>
+        <form action={saveTeamStatsAction} className="staff-form">
           <LeagueField league={here.slug} />
           <input type="hidden" name="team" value={team.id} />
           <input type="hidden" name="version" value={team.version} />
@@ -133,8 +134,10 @@ export async function TeamPage({
             label={t('adminTeams.field.statsVisibility')}
             value={team.statsVisibility}
           />
-          <p>
-            <button type="submit">{t('adminTeams.stats.submit')}</button>
+          <p className="staff-buttons">
+            <button type="submit" className="ui-button" data-kind="main">
+              {t('adminTeams.stats.submit')}
+            </button>
           </p>
         </form>
       </Section>
@@ -145,7 +148,7 @@ export async function TeamPage({
         ) : open.length === 0 ? (
           <p>{t('adminTeams.roster.none')}</p>
         ) : (
-          <ol>
+          <ol className="admin-roster">
             {open.map((line, place) => (
               <li key={line.id}>
                 <strong>{nameOf(line)}</strong>
@@ -153,13 +156,13 @@ export async function TeamPage({
                 {line.jerseyNumber !== null && wornTwice.has(line.jerseyNumber) ? (
                   <> {t('adminTeams.roster.numberTwice', { number: line.jerseyNumber })}</>
                 ) : null}
-                <form action={changeEntryAction}>
+                <form action={changeEntryAction} className="admin-roster-form">
                   <LeagueField league={here.slug} />
                   <input type="hidden" name="team" value={team.id} />
                   <input type="hidden" name="entry" value={line.id} />
                   <input type="hidden" name="version" value={line.version} />
-                  <p>
-                    <label>
+                  <p className="admin-roster-fields">
+                    <label className="staff-field" data-size="figure">
                       {t('adminTeams.roster.number')}
                       <input
                         name="jerseyNumber"
@@ -173,10 +176,12 @@ export async function TeamPage({
                       />
                     </label>{' '}
                     <RoleSelect value={line.role} />{' '}
-                    <button type="submit">{t('adminTeams.roster.saveEntry')}</button>
+                    <button type="submit" className="ui-button" data-kind="main">
+                      {t('adminTeams.roster.saveEntry')}
+                    </button>
                   </p>
                 </form>
-                <form action={markLeftAction}>
+                <form action={markLeftAction} className="admin-roster-form">
                   <LeagueField league={here.slug} />
                   <input type="hidden" name="team" value={team.id} />
                   <input type="hidden" name="entry" value={line.id} />
@@ -204,7 +209,7 @@ export async function TeamPage({
         {left.length === 0 ? null : (
           <>
             <h3>{t('adminTeams.roster.leftTitle')}</h3>
-            <ul>
+            <ul className="admin-left">
               {left.map((line) => (
                 <li key={line.id}>
                   {t('adminTeams.roster.leftLine', {
@@ -224,11 +229,11 @@ export async function TeamPage({
         ) : available.length === 0 ? (
           <p>{t('adminTeams.add.noOne')}</p>
         ) : (
-          <form action={addToRosterAction}>
+          <form action={addToRosterAction} className="staff-form">
             <LeagueField league={here.slug} />
             <input type="hidden" name="team" value={team.id} />
             <p>
-              <label>
+              <label className="staff-field">
                 {t('adminTeams.add.person')}
                 <select name="personId" required defaultValue="">
                   <option value="" disabled>
@@ -243,15 +248,17 @@ export async function TeamPage({
               </label>
             </p>
             <NumberAndRole />
-            <p>
-              <button type="submit">{t('adminTeams.add.submit')}</button>
+            <p className="staff-buttons">
+              <button type="submit" className="ui-button" data-kind="main">
+                {t('adminTeams.add.submit')}
+              </button>
             </p>
           </form>
         )}
       </Section>
 
       <Section title={t('adminTeams.newPerson.title')}>
-        <form action={addNewPersonAction}>
+        <form action={addNewPersonAction} className="staff-form">
           <LeagueField league={here.slug} />
           <input type="hidden" name="team" value={team.id} />
           <TextField
@@ -267,8 +274,10 @@ export async function TeamPage({
             maxLength={100}
           />
           <NumberAndRole />
-          <p>
-            <button type="submit">{t('adminTeams.newPerson.submit')}</button>
+          <p className="staff-buttons">
+            <button type="submit" className="ui-button" data-kind="main">
+              {t('adminTeams.newPerson.submit')}
+            </button>
           </p>
         </form>
       </Section>
@@ -276,11 +285,11 @@ export async function TeamPage({
       <Section title={t('adminTeams.people.title')}>
         <p>{t('adminTeams.people.body')}</p>
         {people.ok ? null : <p role="alert">{t('adminTeams.people.readFailed')}</p>}
-        <ul>
+        <ul className="staff-rows admin-people">
           {everyone.map((person) => (
             <li key={person.id}>
               {nameOf(person)}
-              <form action={removePersonAction}>
+              <form action={removePersonAction} className="admin-person-form">
                 <LeagueField league={here.slug} />
                 <input type="hidden" name="team" value={team.id} />
                 <input type="hidden" name="personId" value={person.id} />
@@ -309,7 +318,7 @@ export async function TeamPage({
 function ConfirmBox() {
   return (
     <p>
-      <label>
+      <label className="staff-check">
         <input type="checkbox" name="confirm" required /> {t('adminTeams.confirm')}
       </label>
     </p>
@@ -318,7 +327,7 @@ function ConfirmBox() {
 
 function RoleSelect({ value }: { readonly value: string }) {
   return (
-    <label>
+    <label className="staff-field">
       {t('adminTeams.roster.role')}
       <select name="role" defaultValue={value}>
         {rosterRoles.map((role) => (
@@ -333,8 +342,8 @@ function RoleSelect({ value }: { readonly value: string }) {
 
 function NumberAndRole() {
   return (
-    <p>
-      <label>
+    <p className="admin-roster-fields">
+      <label className="staff-field" data-size="figure">
         {t('adminTeams.add.number')}
         <input
           name="jerseyNumber"
@@ -369,19 +378,31 @@ function MoveForm({
 }) {
   if (last === 0) return null;
   return (
-    <form action={moveEntryAction}>
+    <form action={moveEntryAction} className="admin-move">
       <LeagueField league={league} />
       <input type="hidden" name="team" value={teamId} />
       <input type="hidden" name="entry" value={entryId} />
       <input type="hidden" name="order" value={order} />
-      <p>
+      <p className="staff-buttons">
         {place === 0 ? null : (
-          <button type="submit" name="moveUp">
+          <button
+            type="submit"
+            name="moveUp"
+            className="ui-button"
+            data-kind="quiet"
+            data-icon="up"
+          >
             {t('adminTeams.roster.moveUp')}
           </button>
         )}{' '}
         {place === last ? null : (
-          <button type="submit" name="moveDown">
+          <button
+            type="submit"
+            name="moveDown"
+            className="ui-button"
+            data-kind="quiet"
+            data-icon="down"
+          >
             {t('adminTeams.roster.moveDown')}
           </button>
         )}
