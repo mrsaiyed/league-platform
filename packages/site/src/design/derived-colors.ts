@@ -152,16 +152,34 @@ const primaryHoverShare = 0.18;
 export const hoveredSurface = (surface: string, primary: string): string =>
   mixColors(surface, primary, hoverTintShare);
 
+/** The tints a frame lays on that are weaker than the one under the pointer (a light design's). */
+const lesserTintShares = [...new Set<number>(Object.values(tintShares))].filter(
+  (share) => share !== hoverTintShare,
+);
+
 /**
- * Every surface text is read on: the page and a panel, each as it is and with the pointer
- * over it. The colors worked out below are fitted to all four, so a hovered row or button
- * reads as well as a still one.
+ * A surface under each weaker tint a frame lays on: a row under the pointer and the ground
+ * of a soft pill in a light design. Between a surface as it is and the same surface under
+ * the strongest tint a color can read a little worse than on either (a lime main color
+ * over an off-white page: found by the sweep in frame-look.test.ts), so these are fitted
+ * too, not taken as read.
+ */
+export const tintedSurfaces = (surface: string, primary: string): readonly string[] =>
+  lesserTintShares.map((share) => mixColors(surface, primary, share));
+
+/**
+ * Every surface text is read on: the page and a panel, each as it is, with the pointer
+ * over it, and under a frame's weaker tint. The colors worked out below are fitted to all
+ * of them, so a hovered row or button and a soft pill read as well as a still page, in a
+ * dark design and in a light one.
  */
 export const textSurfaces = (colors: ChosenColors): readonly string[] => [
   colors.background,
   colors.panel,
   hoveredSurface(colors.background, colors.primary),
   hoveredSurface(colors.panel, colors.primary),
+  ...tintedSurfaces(colors.background, colors.primary),
+  ...tintedSurfaces(colors.panel, colors.primary),
 ];
 
 /**
@@ -404,11 +422,11 @@ export function derivedColors(colors: ChosenColors, base?: 'light' | 'dark'): De
 
 /**
  * The colors worked out from a design that still cannot be read where they are used, on
- * each of the four surfaces they are fitted to: the page and a panel, as they are and
- * with the pointer over them. That happens only when a design's surfaces are so far apart
- * (a light page with a dark panel) that no one color reads on all of them. The league's
- * own text color is checked on the two hovered surfaces too: `contrastWarnings` checks it
- * on the page and the panel as they are.
+ * each of the surfaces they are fitted to: the page and a panel, as they are, with the
+ * pointer over them and under a frame's weaker tint. That happens only when a design's
+ * surfaces are so far apart (a light page with a dark panel) that no one color reads on
+ * all of them. The league's own text color is checked on the hovered and the tinted
+ * surfaces too: `contrastWarnings` checks it on the page and the panel as they are.
  *
  * Nothing calls this yet: no design is saved anywhere until the design editor exists.
  * The editor's save is to report these beside `contrastWarnings`, so no color falls short
@@ -430,7 +448,14 @@ export function derivedColorWarnings(design: DesignDocument): ContrastWarning[] 
     `hovered ${where}`,
     hoveredSurface(surface, colors.primary),
   ]);
-  const everywhere = [...still, ...hovered];
+  const tinted: [string, string][] = still.flatMap(([where, surface]) =>
+    tintedSurfaces(surface, colors.primary).map((under): [string, string] => [
+      `tinted ${where}`,
+      under,
+    ]),
+  );
+  const laidOver = [...hovered, ...tinted];
+  const everywhere = [...still, ...laidOver];
   const inHeader: [string, string][] = headerSurfaces(colors, design.base).map((surface, at) => [
     at === 0 ? 'header' : 'hovered header',
     surface,
@@ -440,7 +465,7 @@ export function derivedColorWarnings(design: DesignDocument): ContrastWarning[] 
     ['main color as text', derived.primaryText, everywhere],
     ['accent as text', derived.accentText, everywhere],
     ['error text', derived.danger, everywhere],
-    ['text', colors.text, hovered],
+    ['text', colors.text, laidOver],
     ['eye-catching color', derived.pop, everywhere],
     ['text on a band', derived.onBand, onBand],
     ['quiet text on a band', derived.bandMuted, onBand],
