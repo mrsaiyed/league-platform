@@ -134,7 +134,9 @@ if (built) {
     PUBLIC_BASE_URL: origin,
   });
   await step('starting the server on the made-up database and the browser', async () => {
-    await waitFor(`${origin}/`, server);
+    // The page its first visit reaches, the first league's standings, drawn once before
+    // the browser starts.
+    await waitFor(`${origin}/`, server, [{ address: `/${leagues[0].slug}/standings` }]);
     browser = await launch();
   });
 }

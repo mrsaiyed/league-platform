@@ -190,3 +190,29 @@ test('with no trace line and no list, it says so and still shows how the output 
   assert.deepEqual(titled(notes, 'printed'), ['Killed']);
   assert.deepEqual(lastLines(notes), ['Killed']);
 });
+
+test("the tracker's own browser check is named, with what failed and its server's lines", () => {
+  const notes = browserFailureNotes(
+    [
+      '> league-platform@0.1.0 test:stats:browser',
+      '> node scripts/check-live-stats-browser.mjs',
+      '',
+      '+ node scripts/check-live-stats-browser.mjs',
+      'Live stats browser check failed:',
+      '  browserType.launch: Executable does not exist at /made-up/chrome (at scripts/check-live-stats-browser.mjs line 120)',
+      'The machine: 4 processors, 12.0 GB memory free, the browser not started.',
+      'The last 2 lines `live-stats server` printed (it was still running):',
+      '  | Live stats: http://127.0.0.1:40123',
+      '  | Database: local PostgreSQL in /tmp/made-up/db',
+    ].join('\n'),
+    machine,
+  );
+  assert.deepEqual(titled(notes, 'browser tests stopped in scripts/check-live-stats-browser.mjs'), [
+    'node scripts/check-live-stats-browser.mjs\nLive stats browser check failed:',
+  ]);
+  assert.deepEqual(titled(notes, 'failed check'), [
+    'browserType.launch: Executable does not exist at /made-up/chrome (at scripts/check-live-stats-browser.mjs line 120)',
+  ]);
+  assert.equal(lastLines(notes).at(-1), '  | Database: local PostgreSQL in /tmp/made-up/db');
+  assert.equal(titled(notes, 'the machine').length, 1);
+});
