@@ -361,10 +361,13 @@ const cases = [
       'Leaders',
       'Dana Whitfield',
       'Owls',
-      'Only team totals are shown for Bears, Owls.',
+      // The note names the team whose totals are on the page. The Bears' players are staff
+      // only too, but nothing is recorded for them, so no totals of theirs are shown and
+      // the note no longer says they are (step 2.147 part 3).
+      'Only team totals are shown for Owls.',
       'ui-stats',
     ],
-    ['This page is not built yet.', 'Jordan', 'Castellanos', 'Imani', 'Brooks'],
+    ['This page is not built yet.', 'shown for Bears', 'Jordan', 'Castellanos', 'Imani', 'Brooks'],
   ],
   ['coach', '/north-valley/stats', 200, ['Dana Whitfield'], ['Jordan', 'Castellanos', 'Brooks']],
   ['visitor', '/north-valley/stats?by=total', 200, ['Season totals']],
