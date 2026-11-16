@@ -311,6 +311,47 @@ export const tableCss = String.raw`
   font-family: var(--font-score);
   font-size: var(--text-16);
 }
+/* The two box scores of one game are read one against the other. The column of the numbers
+   players wear has one width in both, and both give their names the same room (the page
+   counts the letters of the longest name of either: --name-room), up to the name column's
+   limit: so the number columns of the two stand under each other on a phone, and one
+   table never hides a column the other shows. A table that lists no players gives "Total"
+   the width the other's two first columns have together. */
+.ui-box-score tr > .ui-num:first-child {
+  inline-size: var(--step-7);
+}
+.ui-box-score .ui-team-cell > [dir] {
+  min-inline-size: min(calc(var(--name-room, 0) * 1ch), calc(45cqi - var(--step-6)));
+}
+.ui-box-score[data-players='hidden'] .ui-team-cell {
+  inline-size: calc(
+    var(--step-7) + 2 * var(--step-3) +
+      min(calc(var(--name-room, 0) * 1ch), calc(45cqi - var(--step-6)))
+  );
+}
+/* In a box as narrow as a phone's a box score's cells stand a step closer and the column of
+   numbers worn is a step narrower, so one more statistic is in view in both tables. */
+@container (max-width: 30rem) {
+  .ui-box-score th,
+  .ui-box-score td {
+    padding-inline: var(--step-2);
+  }
+  .ui-box-score tr > :first-child {
+    padding-inline-start: var(--step-4);
+  }
+  .ui-box-score tr > :last-child {
+    padding-inline-end: var(--step-4);
+  }
+  .ui-box-score tr > .ui-num:first-child {
+    inline-size: calc(var(--step-6) + var(--step-2));
+  }
+  .ui-box-score[data-players='hidden'] .ui-team-cell {
+    inline-size: calc(
+      var(--step-6) + var(--step-2) + 2 * var(--step-2) +
+        min(calc(var(--name-room, 0) * 1ch), calc(45cqi - var(--step-6)))
+    );
+  }
+}
 /* A cell with no number holds a quiet dash, never nothing. */
 .ui-no-value {
   color: var(--color-muted);

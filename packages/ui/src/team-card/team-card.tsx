@@ -19,6 +19,11 @@ export type TeamCardProps = {
    * this word is only drawn, never said.
    */
   readonly way?: string | undefined;
+  /**
+   * The level of the heading the team's name is: two on a teams page (its title, then its
+   * teams), three for cards that stand under a section's own title.
+   */
+  readonly level?: 2 | 3;
 };
 
 /**
@@ -27,7 +32,8 @@ export type TeamCardProps = {
  * is centered over the name, the record is the number beneath, and the facts and the way on
  * are the card's foot line; in a narrower list it is one row.
  */
-export function TeamCard({ name, href, color, figure, facts, way }: TeamCardProps) {
+export function TeamCard({ name, href, color, figure, facts, way, level = 2 }: TeamCardProps) {
+  const Name = level === 3 ? 'h3' : 'h2';
   return (
     <article
       className="ui-team-card"
@@ -36,12 +42,13 @@ export function TeamCard({ name, href, color, figure, facts, way }: TeamCardProp
     >
       <Emblem name={name} color={color} />
       <div className="ui-team-card-text">
-        {/* Level two: a teams page has its title and then its teams, with no level between. */}
-        <h2 className="ui-team-card-name">
+        {/* Level two unless told: a teams page has its title and then its teams, with no
+            level between. */}
+        <Name className="ui-team-card-name">
           <a href={href} dir="auto">
             {name}
           </a>
-        </h2>
+        </Name>
         <Facts facts={facts} />
       </div>
       <p className="ui-team-card-figure">

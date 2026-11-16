@@ -723,9 +723,14 @@ export const gameCss = String.raw`
   .ui-scoreboard-side:last-child > :is(.ui-scoreboard-role, .ui-scoreboard-name) {
     grid-column: 5;
   }
+  /* Each score has a place of the same width (three figures of the score face), with its
+     figures in the middle of it: so what stands between the two scores (the state's pill)
+     is in the middle of the board whether the scores are "0" and "20" or "58" and "44". */
   .ui-scoreboard-side > .ui-scoreboard-score {
     grid-row: 1 / span 2;
     align-self: center;
+    min-inline-size: 3ch;
+    text-align: center;
   }
   .ui-scoreboard-side:first-child > .ui-scoreboard-score {
     grid-column: 2;

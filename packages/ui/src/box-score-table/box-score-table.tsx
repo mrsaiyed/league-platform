@@ -1,3 +1,5 @@
+import type { CSSProperties, ReactNode } from 'react';
+
 export type BoxScoreColumn = {
   readonly key: string;
   /** Short heading, for example "PTS". */
@@ -22,6 +24,13 @@ export type BoxScoreLabels = {
   readonly jerseyShort?: string | undefined;
   readonly player: string;
   readonly total: string;
+  /**
+   * The heading over "Total" in a table that lists no players (their numbers are hidden):
+   * "Team". Left out, that heading cell holds nothing.
+   */
+  readonly team?: string | undefined;
+  /** Said to screen readers in a cell that holds no number, where a dash is drawn. */
+  readonly noValue?: string | undefined;
 };
 
 export type BoxScoreTableProps = {
@@ -36,7 +45,27 @@ export type BoxScoreTableProps = {
   /** Said under the table when the players are hidden. */
   readonly hiddenNotice?: string;
   readonly labels: BoxScoreLabels;
+  /**
+   * The letters of the longest name in the tables this one is read beside (the two box
+   * scores of one game; `lettersWide`). Every one of them then gives its names the same
+   * room, so their number columns stand under each other and one table never hides a
+   * column the other shows. Left out, the names take what their own words need.
+   */
+  readonly nameRoom?: number | undefined;
 };
+
+/** A number, or a dash with a word for screen readers where there is none: never a blank cell. */
+function valueOrDash(value: string | number | undefined, word: string | undefined): ReactNode {
+  if (value !== undefined && value !== '') return value;
+  return (
+    <>
+      <span className="ui-no-value" aria-hidden="true">
+        –
+      </span>
+      {word === undefined ? null : <span className="ui-visually-hidden">{word}</span>}
+    </>
+  );
+}
 
 /** One team's box score: players in the order given, then the team's totals. */
 export function BoxScoreTable({
@@ -47,6 +76,7 @@ export function BoxScoreTable({
   totals,
   hiddenNotice,
   labels,
+  nameRoom,
 }: BoxScoreTableProps) {
   return (
     <div className="ui-table-frame">
@@ -56,7 +86,13 @@ export function BoxScoreTable({
         role="region"
         aria-label={regionLabel ?? teamName}
       >
-        <table className="ui-table ui-box-score">
+        <table
+          className="ui-table ui-box-score"
+          data-players={players ? undefined : 'hidden'}
+          style={
+            nameRoom === undefined ? undefined : ({ '--name-room': nameRoom } as CSSProperties)
+          }
+        >
           <caption dir="auto">{teamName}</caption>
           <thead>
             <tr>
@@ -76,6 +112,10 @@ export function BoxScoreTable({
                     {labels.player}
                   </th>
                 </>
+              ) : labels.team ? (
+                <th scope="col" className="ui-team-cell">
+                  {labels.team}
+                </th>
               ) : (
                 <td aria-hidden="true" />
               )}
@@ -102,7 +142,7 @@ export function BoxScoreTable({
                   </th>
                   {columns.map((c) => (
                     <td key={c.key} className="ui-num">
-                      {p.cells[c.key] ?? ''}
+                      {valueOrDash(p.cells[c.key], labels.noValue)}
                     </td>
                   ))}
                 </tr>
@@ -119,7 +159,7 @@ export function BoxScoreTable({
               </th>
               {columns.map((c) => (
                 <td key={c.key} className="ui-num">
-                  {totals[c.key] ?? ''}
+                  {valueOrDash(totals[c.key], labels.noValue)}
                 </td>
               ))}
             </tr>

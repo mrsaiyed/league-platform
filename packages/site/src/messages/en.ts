@@ -180,6 +180,9 @@ export const en = {
   'schedule.lead': 'Scores as they come in, and everything still to be played.',
   'standings.heading': 'The standings.',
   'standings.lead': 'Where every team stands after each game.',
+  // What follows the tables on the standings page: the latest decided games, as scoreboards.
+  'standings.results': 'Latest results',
+  'standings.results.kicker': 'How they got here',
   'stats.heading': 'By the numbers.',
   'stats.lead': 'The season’s leaders, then every player and every team.',
   // The number cards at the head of the statistics page's leaders: who leads a statistic,
@@ -296,6 +299,9 @@ export const en = {
   'game.postponed': 'This game has been postponed.',
   'game.cancelled': 'This game has been cancelled.',
   'game.forfeit': 'This game was decided by forfeit.',
+  'game.forfeitBy': '{team} forfeited this game.',
+  // Under the board of a game still to come (or put off): the two teams, each with its record.
+  'game.teams': 'The two teams',
   'game.wasSetFor': 'It was set for {when}',
   'game.region': 'The game',
   'game.live': 'The game, live',

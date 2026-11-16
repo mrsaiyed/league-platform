@@ -504,6 +504,50 @@ describe('tables', () => {
     );
     expect(hidden).toContain('<tfoot><tr><th scope="row" class="ui-team-cell">Total</th>');
   });
+  it('give the two box scores of one game the same column widths, and never a blank cell', () => {
+    const table = (players: Parameters<typeof BoxScoreTable>[0]['players']) =>
+      render(
+        createElement(BoxScoreTable, {
+          teamName: 'Owls',
+          columns: [
+            { key: 'pts', label: 'PTS' },
+            { key: 'pf', label: 'PF' },
+          ],
+          players,
+          totals: { pts: 10, pf: '' },
+          labels: {
+            jersey: 'No.',
+            player: 'Player',
+            total: 'Total',
+            team: 'Team',
+            noValue: 'Nothing recorded',
+          },
+          nameRoom: 12,
+        }),
+      );
+    // The page tells both tables the letters of the longest name of either.
+    const shown = table([{ id: 'p', jersey: '7', name: 'Max', cells: { pts: 4 } }]);
+    expect(shown).toContain('<table class="ui-table ui-box-score" style="--name-room:12">');
+    expect(displayCss).toMatch(
+      /\.ui-box-score \.ui-team-cell > \[dir\] \{\s*min-inline-size: min\(calc\(var\(--name-room, 0\) \* 1ch\), calc\(45cqi - var\(--step-6\)\)\);/,
+    );
+    expect(displayCss).toMatch(
+      /\.ui-box-score tr > \.ui-num:first-child \{\s*inline-size: var\(--step-7\);/,
+    );
+    // A statistic with nothing recorded, in a player's row and in the totals: a dash, and a
+    // word for screen readers.
+    const dash =
+      '<td class="ui-num"><span class="ui-no-value" aria-hidden="true">–</span><span class="ui-visually-hidden">Nothing recorded</span></td>';
+    expect(shown.split(dash)).toHaveLength(3);
+    // A table that lists no players has "Team" over "Total", not an empty heading cell, and
+    // gives that column the width the other table's first two have together.
+    const hidden = table(null);
+    expect(hidden).toContain('data-players="hidden"');
+    expect(hidden).toContain('<thead><tr><th scope="col" class="ui-team-cell">Team</th>');
+    expect(displayCss).toMatch(
+      /\.ui-box-score\[data-players='hidden'\] \.ui-team-cell \{\s*inline-size: calc\(\s*var\(--step-7\) \+ 2 \* var\(--step-3\) \+/,
+    );
+  });
   it("give the team column one width in every division's table, so the numbers line up down the page", () => {
     expect(displayCss).toMatch(/\.ui-standings \.ui-team-cell \{\s*min-inline-size: 7\.5rem;/);
     // With emblems the column is wider by what a shield is wider than a chip (24 and 12),

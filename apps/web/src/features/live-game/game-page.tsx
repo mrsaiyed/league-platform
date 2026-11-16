@@ -18,6 +18,7 @@ import { isGameIdFormat } from '../../server/league-api.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { placeOf } from '../schedule-pages/index.ts';
+import { loadTeamCardsOf } from '../team-pages/index.ts';
 import {
   boardColors,
   boardWhen,
@@ -42,7 +43,7 @@ export async function GamePage({
   const view = await loadLeaguePage(league, 'site');
   const addressee = view.context.league;
   if (!isGameIdFormat(game)) return notFound();
-  const { tracker, publicSchedule } = await webPorts();
+  const { tracker, publicSchedule, publicStats } = await webPorts();
   const names = await tracker.namesShownOf(addressee.id);
   const viewing = {
     leagueId: addressee.id,
@@ -69,6 +70,19 @@ export async function GamePage({
   );
   const place = listed === undefined ? undefined : placeOf(listed);
   const when = boardWhen(page.value.game.startsAt, clock.timeZone, page.value.game.status);
+  // A game still to come, or put off, ends with its two teams and their records. Read only
+  // for such a game: never for one under way, whose page is read again and again.
+  const pending = ['scheduled', 'postponed', 'cancelled'].includes(page.value.game.status);
+  const teams =
+    pending && listed !== undefined
+      ? await loadTeamCardsOf(
+          publicStats.readStoreOf(addressee.id),
+          addressee,
+          { id: page.value.game.seasonId, slug: listed.season.slug },
+          listed.season.isCurrent,
+          [page.value.scoreboard.away.teamId, page.value.scoreboard.home.teamId],
+        )
+      : [];
   return (
     <GameContent
       view={{
@@ -96,6 +110,7 @@ export async function GamePage({
           ...(when === undefined ? {} : { when }),
           ...(place === undefined ? {} : { placeText: place }),
         },
+        teams,
       }}
     />
   );

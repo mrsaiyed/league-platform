@@ -945,7 +945,9 @@ html {
 .game-page > .ui-page-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  /* The number's label has a short rule before it, which has no line of words to stand on:
+     the two are set level by their middles. */
+  align-items: center;
   gap: var(--step-1) var(--step-3);
   margin-block-end: var(--step-3);
 }

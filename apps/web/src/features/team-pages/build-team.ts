@@ -51,7 +51,17 @@ export async function loadTeamCards(
   const records = await readTeamRecords(store, { seasonId: season.id });
   if (!records.ok) return undefined;
   const divisions = new Map((await store.divisions(season.id)).map((d) => [d.id, d.name]));
-  return records.value.map((record) => ({
+  return records.value.map((record) => cardOf(record, divisions, league, season, isCurrent));
+}
+
+function cardOf(
+  record: TeamStanding,
+  divisions: ReadonlyMap<string, string>,
+  league: LeagueAddressee,
+  season: { readonly slug: string },
+  isCurrent: boolean,
+): TeamCard {
+  return {
     slug: record.team.slug,
     name: record.team.name,
     color: record.team.color,
@@ -63,7 +73,28 @@ export async function loadTeamCards(
     recordText: recordText(record),
     divisionName:
       record.team.divisionId === null ? null : (divisions.get(record.team.divisionId) ?? null),
-  }));
+  };
+}
+
+/**
+ * The cards of the teams of one game, in the order asked for (a game's page ends with
+ * them while the game is still to come). A team the season's records do not hold is left
+ * out; a season the public may not see gives none.
+ */
+export async function loadTeamCardsOf(
+  store: StandingsReadStore,
+  league: LeagueAddressee,
+  season: { readonly id: string; readonly slug: string },
+  isCurrent: boolean,
+  teamIds: readonly string[],
+): Promise<readonly TeamCard[]> {
+  const records = await readTeamRecords(store, { seasonId: season.id });
+  if (!records.ok) return [];
+  const divisions = new Map((await store.divisions(season.id)).map((d) => [d.id, d.name]));
+  return teamIds.flatMap((id) => {
+    const record = records.value.find((r) => r.team.id === id);
+    return record === undefined ? [] : [cardOf(record, divisions, league, season, isCurrent)];
+  });
 }
 
 export type RosterRowView = {
