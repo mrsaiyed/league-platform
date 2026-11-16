@@ -172,7 +172,9 @@ describe('the games area actions', () => {
     expect(rows.every((r) => (r.hasPlays ? !r.canScore : r.canScore || r.status === 'final'))).toBe(
       true,
     );
-    expect(rows.some((r) => r.canForfeit || r.canCallOff)).toBe(false);
+    expect(rows.some((r) => r.canForfeit || r.canPostpone || r.canCancel || r.canPutBack)).toBe(
+      false,
+    );
     expect(rows[0]?.homeName).not.toBe('');
   });
 
@@ -213,11 +215,98 @@ describe('the games area actions', () => {
         },
       ],
     };
-    expect(buildGameRows(list, names, limited).some((r) => r.canForfeit || r.canCallOff)).toBe(
-      false,
-    );
+    expect(
+      buildGameRows(list, names, limited).some(
+        (r) => r.canForfeit || r.canPostpone || r.canCancel || r.canPutBack,
+      ),
+    ).toBe(false);
     const postponed = list.map((g) => ({ ...g, status: 'postponed' }));
     const rows = buildGameRows(postponed, names, { accountId: owner, isOwner: true, grants: [] });
     expect(rows.some((r) => r.canScore || r.canForfeit)).toBe(false);
+    // Step 2.158: a postponed game is offered cancelling only; a cancelled one, putting back.
+    expect(rows.every((r) => r.canCancel && !r.canPostpone && !r.canPutBack)).toBe(true);
+    const cancelled = list.map((g) => ({ ...g, status: 'cancelled' }));
+    const back = buildGameRows(cancelled, names, { accountId: owner, isOwner: true, grants: [] });
+    expect(back.every((r) => r.canPutBack && !r.canCancel && !r.canScore)).toBe(true);
+  });
+
+  it('offers postponing and cancelling a scheduled game whose line-ups a scorer’s table set', async () => {
+    const { ports, games } = setup();
+    const list = (await games(owner)).map((g) => ({
+      ...g,
+      status: 'scheduled',
+      hasPlays: true,
+      homeScore: null,
+      awayScore: null,
+    }));
+    const rows = buildGameRows(list, await ports.namesOf(leagueId), {
+      accountId: owner,
+      isOwner: true,
+      grants: [],
+    });
+    // Its forfeit and score are the tracker's (S-46); postponing and cancelling keep its line-ups.
+    expect(rows.every((r) => r.canPostpone && r.canCancel && !r.canForfeit && !r.canScore)).toBe(
+      true,
+    );
+  });
+
+  it('puts a cancelled game back: scheduled again, its line in the activity log', async () => {
+    const world = testWorld(() => access);
+    const ports = standInGames(world, {
+      people: { [keeper]: 'Sam' },
+      namesShownOf: namesShownOf(startingNamePolicy, () => 'adult'),
+    });
+    const as = (accountId: string) => ({ leagueId, accountId, requestId: 'r1' });
+    const listed = await listMyGames(as(owner), {}, ports.deps);
+    const target = (listed.ok ? listed.value.games : []).find((g) => g.status === 'scheduled');
+    const fields = { gameId: target?.id, version: String(target?.version) };
+    expect(await runGameAction('cancel', fields, as(owner), ports.deps)).toEqual({ ok: true });
+    const again = { ...fields, version: String((target?.version ?? 0) + 1) };
+    // No reason, or one not on the list, is refused; a scorekeeper may not.
+    expect(await runGameAction('putBack', again, as(owner), ports.deps)).toEqual({
+      ok: false,
+      code: 'invalid-input',
+    });
+    expect(
+      await runGameAction('putBack', { ...again, reason: 'willBePlayed' }, as(keeper), ports.deps),
+    ).toEqual({ ok: false, code: 'not-allowed' });
+    expect(
+      await runGameAction('putBack', { ...again, reason: 'willBePlayed' }, as(owner), ports.deps),
+    ).toEqual({ ok: true });
+    const read = await world.read(leagueId);
+    expect(read?.games.find((g) => g.id === target?.id)).toMatchObject({
+      status: 'scheduled',
+      homeScore: null,
+      startsAt: target?.startsAt,
+    });
+    expect(read?.activity.slice(-2)).toEqual([
+      expect.objectContaining({ action: 'games.cancel_game', actorAccountId: owner }),
+      expect.objectContaining({
+        action: 'games.put_game_back',
+        actorAccountId: owner,
+        targetId: target?.id,
+        details: { reason: 'willBePlayed' },
+      }),
+    ]);
+  });
+
+  it('refuses a score for a postponed game (game-postponed, said in a plain sentence)', async () => {
+    const { ports, as, games } = setup();
+    const target = (await games(owner)).find((g) => g.status === 'scheduled' && !g.hasPlays);
+    const fields = { gameId: target?.id, version: String(target?.version) };
+    expect(await runGameAction('postpone', fields, as(owner), ports.deps)).toEqual({ ok: true });
+    expect(
+      await runGameAction(
+        'final',
+        {
+          ...fields,
+          version: String((target?.version ?? 0) + 1),
+          homeScore: '50',
+          awayScore: '40',
+        },
+        as(owner),
+        ports.deps,
+      ),
+    ).toEqual({ ok: false, code: 'game-postponed' });
   });
 });

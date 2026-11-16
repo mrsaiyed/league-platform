@@ -47,6 +47,21 @@ export type BoxScoreState =
 /** Any other form of the games area: refused, or nothing said yet. */
 export type FormState = Untouched | Refused;
 
+/** What "Forfeit, postpone or cancel" does to a game (step 2.158): each asks first. */
+export const callOffActs = ['forfeit', 'postpone', 'cancel'] as const;
+export type CallOffAct = (typeof callOffActs)[number];
+
+/**
+ * "Forfeit, postpone or cancel" (step 2.158; A-5): nothing changes on the first tap. Its
+ * forms only ask; the question's own "Yes" changes the game. Refused says which form
+ * (`typed.act`), so the sentence is beside that form.
+ */
+export type CallOffState =
+  | Untouched
+  | Refused
+  /** The question: which change, and what was chosen (the team that forfeits). */
+  | { readonly kind: 'ask'; readonly act: CallOffAct; readonly typed: TypedFields };
+
 export const untouched: Untouched = { kind: 'untouched' };
 
 /** The box score grid's scores, where its refusal and its "Saved" are said. */

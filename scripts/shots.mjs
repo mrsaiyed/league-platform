@@ -284,6 +284,118 @@ const gamesStates = [
   },
 ];
 
+// Step 2.158: forfeiting, postponing and cancelling ask first, and a cancelled game is put
+// back. Each state is reached by the owner's own taps on the games list (nothing rides in
+// the address, record 067), on two games of the first league's week no other picture
+// uses: Owls at Badgers tonight (postponed) and Herons at Falcons (cancelled, then put
+// back). A picture that changes a game finds it already changed at the second width, and
+// starts from there.
+const callOffGame = (page, away, home) =>
+  page.locator('li.admin-game[id^="game-"]').filter({ hasText: away }).filter({ hasText: home });
+const owlsAtBadgers = (page) => callOffGame(page, 'Owls', 'Badgers');
+const heronsAtFalcons = (page) => callOffGame(page, 'Herons', 'Falcons');
+const statusOf = (game) => game.locator('.ui-game-card').first().getAttribute('data-status');
+async function askToCallOff(game, button) {
+  const panel = game.locator('details.admin-game-other');
+  if ((await panel.getAttribute('open')) === null) await panel.locator('> summary').click();
+  await game.getByRole('button', { name: button, exact: true }).click();
+  await game.locator('[data-call-off-ask]').waitFor();
+}
+/** Herons at Falcons cancelled through its question, unless it already is. */
+async function cancelledHerons(page) {
+  const game = heronsAtFalcons(page);
+  if ((await statusOf(game)) !== 'cancelled') {
+    await askToCallOff(game, 'Cancel the game');
+    await game.getByRole('button', { name: 'Yes, cancel it' }).click();
+    await game.getByRole('status').filter({ hasText: 'Saved' }).waitFor();
+  }
+  return game;
+}
+const callOffStates = [
+  {
+    name: 'admin-games-postpone-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      const game = owlsAtBadgers(page);
+      if ((await statusOf(game)) === 'scheduled') await askToCallOff(game, 'Postpone');
+    },
+  },
+  {
+    name: 'admin-games-cancel-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => askToCallOff(heronsAtFalcons(page), 'Cancel the game'),
+  },
+  {
+    // "Team that forfeits" starts empty; a team chosen, the question names both.
+    name: 'admin-games-forfeit-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = heronsAtFalcons(page);
+      const panel = game.locator('details.admin-game-other');
+      if ((await panel.getAttribute('open')) === null) await panel.locator('> summary').click();
+      await game.getByLabel('Team that forfeits').selectOption({ label: 'Herons' });
+      await askToCallOff(game, 'Record forfeit');
+    },
+  },
+  {
+    // "Yes, postpone it": "Saved" says where it waits, its card leads to the list of games
+    // waiting for a new date, and the list holds it.
+    name: 'admin-games-postponed',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      const game = owlsAtBadgers(page);
+      if ((await statusOf(game)) === 'scheduled') {
+        await askToCallOff(game, 'Postpone');
+        await game.getByRole('button', { name: 'Yes, postpone it' }).click();
+        await game.getByRole('status').filter({ hasText: 'Saved' }).waitFor();
+      }
+    },
+  },
+  {
+    // The postponed game's own page: why it has no score, and no grid.
+    name: 'admin-games-box-postponed',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const id = ((await owlsAtBadgers(page).getAttribute('id')) ?? '').slice('game-'.length);
+      await page.goto(page.url().replace(/\/admin\/games.*$/, `/admin/games/${id}`));
+      await page.locator('main h1').waitFor();
+    },
+  },
+  {
+    // Cancelled through its question, then "Put this game back" opened, a reason to choose.
+    name: 'admin-games-put-back',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      const game = await cancelledHerons(page);
+      const panel = game.locator('details[data-action-form]');
+      if ((await panel.getAttribute('open')) === null) await panel.locator('> summary').click();
+    },
+  },
+  {
+    // Put back with a reason: a scheduled game again, "Saved" beside it.
+    name: 'admin-games-put-back-saved',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = await cancelledHerons(page);
+      const panel = game.locator('details[data-action-form]');
+      if ((await panel.getAttribute('open')) === null) await panel.locator('> summary').click();
+      await panel.getByLabel(/Why it is put back/).selectOption({ label: 'Cancelled by mistake' });
+      await panel.getByRole('button', { name: 'Put it back on the schedule' }).click();
+      await game.getByRole('status').filter({ hasText: 'back on the schedule' }).waitFor();
+    },
+  },
+];
+
 // What the league's owner sees.
 const adminPages = [
   { name: 'admin-home', at: '/admin' },
@@ -298,6 +410,11 @@ const adminPages = [
   // (the sentence names the player and the column; the box has the focus). The refusals
   // and "Saved" are taken again in the second league's light design (`…-light`).
   ...gamesStates.flatMap((job) => [
+    job,
+    ...(job.light ? [{ ...job, name: `${job.name}-light`, lookOf: leagues[1] }] : []),
+  ]),
+  // Step 2.158's questions, the postponed game and the put-back (callOffStates).
+  ...callOffStates.flatMap((job) => [
     job,
     ...(job.light ? [{ ...job, name: `${job.name}-light`, lookOf: leagues[1] }] : []),
   ]),

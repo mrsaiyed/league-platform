@@ -32,8 +32,12 @@ export type GameRowView = {
   readonly canScore: boolean;
   /** Forfeit may be recorded. */
   readonly canForfeit: boolean;
-  /** Postpone and cancel are offered (only before the game starts). */
-  readonly canCallOff: boolean;
+  /** Postpone is offered: a scheduled game, before it starts (step 2.158: it asks first). */
+  readonly canPostpone: boolean;
+  /** Cancel is offered: a scheduled or a postponed game (step 2.158: it asks first). */
+  readonly canCancel: boolean;
+  /** "Put this game back" is offered: a cancelled game, to whoever may cancel it (S-51). */
+  readonly canPutBack: boolean;
   /** For a final or forfeited game: how it is put right, or who can (reopen-view.ts). */
   readonly reopen: ReopenView | undefined;
 };
@@ -82,7 +86,12 @@ export function buildGameRows(
         ((status === 'scheduled' && !game.hasPlays) ||
           ((status === 'final' || status === 'forfeit') && game.recording === 'box-score')),
       canForfeit: game.scorable && mayChange && open,
-      canCallOff: game.scorable && mayChange && status === 'scheduled',
+      // A scheduled game that holds line-ups from a scorer's table (it has "plays" by the
+      // store's rule, but is not live) may still be postponed or cancelled: its line-ups
+      // are kept, and the question says so (step 2.158).
+      canPostpone: game.scorable && mayChange && status === 'scheduled',
+      canCancel: game.scorable && mayChange && (status === 'scheduled' || status === 'postponed'),
+      canPutBack: game.scorable && mayChange && status === 'cancelled',
       reopen: game.scorable ? reopens.get(game.id) : undefined,
     };
   });

@@ -233,6 +233,8 @@ if (browser) {
         input.value = '999';
       });
       await forfeit.getByRole('button', { name: 'Record forfeit' }).click();
+      // Since step 2.158 the forfeit asks first; its "Yes" sends what the form held.
+      await game.getByRole('button', { name: 'Yes, record the forfeit' }).click();
       const refusal = forfeit.getByRole('alert');
       await refusal.waitFor();
       const text = ((await refusal.textContent()) ?? '').trim();

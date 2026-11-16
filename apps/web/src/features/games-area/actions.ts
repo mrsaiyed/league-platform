@@ -21,7 +21,8 @@
 // A final score takes two steps of its own on the server (A-5): the score boxes' form
 // only asks (it changes nothing), and only the question's own form, which says it was
 // confirmed, saves it. So a double tap, or going back and sending the boxes again, only
-// asks again.
+// asks again. A forfeit, a postponement and a cancellation take the same two steps (step
+// 2.158, callOffAction); a cancelled game is put back in one, with a reason chosen.
 import { leagueUrl, type CommandContext } from '@srleagues/core';
 import { refresh } from 'next/cache';
 import { headers } from 'next/headers';
@@ -33,10 +34,12 @@ import { t } from '../../server/messages.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere, type NoticeScreen } from '../../server/saved-notice.ts';
 import {
+  callOffActs,
   sheetScoresId,
   typedOf,
   untouched,
   type BoxScoreState,
+  type CallOffState,
   type FinalScoreState,
   type FormState,
   type Refused,
@@ -159,9 +162,16 @@ export async function finalScoreAction(
   );
 }
 
-/** A forfeit, a postponement or a cancellation: saved, back to the game on the list. */
-async function act(action: GameAction, form: FormData): Promise<FormState> {
-  const fields = typedOf(form);
+/**
+ * A change with no typed boxes (a forfeit, a postponement, a cancellation, a cancelled game
+ * put back): saved, back to the game on the list. `field` is the form's one choice, marked
+ * when the command says it is what was wrong.
+ */
+async function act(
+  action: GameAction,
+  fields: TypedFields,
+  field: string | undefined,
+): Promise<Refused | typeof untouched> {
   const { context, list } = await gamesOf(fields);
   const gameId = gameIdOf(fields['gameId']);
   const { games } = await webPorts();
@@ -170,23 +180,56 @@ async function act(action: GameAction, form: FormData): Promise<FormState> {
   );
   if (result.ok && gameId !== undefined) {
     leaveNotice(context, 'games', gameId, action);
+    // Sent from another screen (a cancelled game's own page): to the list, where "Saved" is.
+    if (fields['then'] === 'games') return redirect(`${list}#${gameAnchor(gameId)}`);
     await showSaved(`${list}#${gameAnchor(gameId)}`);
     return untouched;
   }
   if (result.ok) return redirect(list);
-  // A team that is not in the game is the forfeit's one field: it is marked.
-  const wrong = result.code === 'team-not-in-game' ? ['forfeitingTeamId'] : [];
+  // A team not in the game, or a reason not on the list, is the form's one field: marked.
+  const wrong =
+    field !== undefined && (result.code === 'team-not-in-game' || result.code === 'invalid-input')
+      ? [field]
+      : [];
   return refused(result.code, fields, wrong, t(gamesProblemKey(result.code)));
 }
 
-export async function recordForfeitAction(_state: FormState, form: FormData): Promise<FormState> {
-  return act('forfeit', form);
+/** The form's one choice left empty: refused beside it, nothing sent to the command. */
+function notChosen(fields: TypedFields, field: string, code: string): Refused {
+  return { kind: 'refused', code, typed: fields, wrong: [field], said: t(gamesProblemKey(code)) };
 }
-export async function postponeGameAction(_state: FormState, form: FormData): Promise<FormState> {
-  return act('postpone', form);
+
+/**
+ * "Forfeit, postpone or cancel" (step 2.158; A-5), by the step the form says: `ask` (one
+ * of the three forms: nothing is changed; the question, or "Team that forfeits" refused
+ * when no team is chosen), `back` (the question's "No": nothing is changed) and `confirm`
+ * (the question's "Yes": the one form that changes the game; unconfirmed, it only asks).
+ * So a double tap, or going back and sending a form again, only asks again.
+ */
+export async function callOffAction(_state: CallOffState, form: FormData): Promise<CallOffState> {
+  const fields = typedOf(form);
+  const which = callOffActs.find((a) => a === fields['act']);
+  if (which === undefined) {
+    return refused('game-not-found', fields, [], t(gamesProblemKey('game-not-found')));
+  }
+  // The page check (loadLeaguePage) runs first, whatever the step.
+  await gamesOf(fields);
+  if (fields['step'] === 'back') return untouched;
+  // Checked on the server too: the form's own `required` is the browser's, and can be got round.
+  if (which === 'forfeit' && (fields['forfeitingTeamId'] ?? '').trim() === '') {
+    return notChosen(fields, 'forfeitingTeamId', 'choose-team');
+  }
+  if (fields['step'] !== 'confirm' || fields['confirmed'] !== 'yes') {
+    return { kind: 'ask', act: which, typed: fields };
+  }
+  return act(which, fields, which === 'forfeit' ? 'forfeitingTeamId' : undefined);
 }
-export async function cancelGameAction(_state: FormState, form: FormData): Promise<FormState> {
-  return act('cancel', form);
+
+/** "Put this game back" (step 2.158, S-51): a cancelled game, with why from the fixed list. */
+export async function putBackAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
+  if ((fields['reason'] ?? '').trim() === '') return notChosen(fields, 'reason', 'choose-reason');
+  return act('putBack', fields, 'reason');
 }
 
 /** The box score grid's changes: run once per request, by the same rules. */

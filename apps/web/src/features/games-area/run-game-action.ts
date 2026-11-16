@@ -10,6 +10,7 @@ import {
   cancelGame,
   getBoxScoreSheet,
   postponeGame,
+  putGameBack,
   recordFinalScore,
   recordForfeit,
   type CommandContext,
@@ -17,7 +18,7 @@ import {
   type TrackerTx,
 } from '@srleagues/core';
 
-export const gameActions = ['final', 'forfeit', 'postpone', 'cancel'] as const;
+export const gameActions = ['final', 'forfeit', 'postpone', 'cancel', 'putBack'] as const;
 export type GameAction = (typeof gameActions)[number];
 
 export function isGameAction(value: unknown): value is GameAction {
@@ -66,6 +67,9 @@ export async function runGameAction(
         return postponeGame(context, base, deps);
       case 'cancel':
         return cancelGame(context, base, deps);
+      // A cancelled game put back (step 2.158, S-51), with why from the fixed list.
+      case 'putBack':
+        return putGameBack(context, { ...base, reason: fields['reason'] }, deps);
     }
   })();
   if (result.ok) return { ok: true };
