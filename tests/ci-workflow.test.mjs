@@ -7,8 +7,8 @@
 //   - no step's failure can be swallowed: no `continue-on-error`, no `||`, no `; true`, no
 //     `set +e`, a pipe only after `set -o pipefail`, and no condition on a job or a step except
 //     the "say what failed" steps' own `if: failure()…`;
-//   - each matrix is 1 to n and the command is given GitHub's job-total, and the web browser
-//     groups together hold every test once;
+//   - each matrix has one dimension of 1 to n, so GitHub's job-total is n and the command is
+//     given n, and the web browser groups together hold every test once;
 //   - no job waits on another, each starts as the single job did, hosted-build is there with
 //     its steps, and the workflow never becomes one that reaches the live tracker.
 // Each rule is proved by a copy of the real workflow with a fault put in (the faults below),
@@ -195,7 +195,9 @@ function gateProblems(text) {
       say(`${id} opens a browser before it installs one`);
     }
 
-    // A matrix: 1 to n, with fail-fast off.
+    // A matrix: one dimension, 1 to n, so GitHub's strategy.job-total is n. A second
+    // dimension, an include or an exclude would make job-total differ from the number of
+    // groups, and the runner, given that number, would leave some groups unrun.
     const split = Object.values(parts).find((part) => part.job === id);
     if (!split) {
       if ('strategy' in job) say(`${id} has a matrix`);
@@ -208,6 +210,12 @@ function gateProblems(text) {
       say(`${id}'s strategy is not just fail-fast and matrix`);
     }
     if (strategy['fail-fast'] !== false) say(`${id} does not have fail-fast: false`);
+    const dimensions = Object.keys(matrix);
+    if (!isDeepStrictEqual(dimensions, [split.dimension])) {
+      say(
+        `${id}'s matrix has the dimensions ${dimensions.join(', ')}, not just ${split.dimension}`,
+      );
+    }
     const values = Array.isArray(matrix[split.dimension]) ? matrix[split.dimension] : [];
     const n = values.length;
     if (
@@ -219,6 +227,13 @@ function gateProblems(text) {
     ) {
       say(`${id}'s ${split.dimension}s are not 1 to n`);
     }
+    // GitHub's job-total: one job for each combination of the dimensions' values (an
+    // include or exclude, refused above, would change it further).
+    const total = dimensions.reduce(
+      (product, key) => product * (Array.isArray(matrix[key]) ? matrix[key].length : NaN),
+      1,
+    );
+    if (total !== n) say(`${id}'s job-total would be ${total}, not its ${n} ${split.dimension}s`);
   }
 
   /** Whether a step that always runs runs `npm`, whole (or as the matrix part it is). */
@@ -381,6 +396,38 @@ const faults = {
   'a step of hosted-build deleted': [
     put(real, '      - run: npm run build\n        working-directory: apps/varsity-hosted\n', ''),
     /hosted-build does not have its steps/,
+  ],
+  'a second dimension in the web groups matrix': [
+    put(
+      real,
+      '        group: [1, 2, 3]\n',
+      '        group: [1, 2, 3]\n        browser: [chromium, firefox]\n',
+    ),
+    /web-browser's matrix has the dimensions group, browser[\s\S]*web-browser's job-total would be 6, not its 3 groups/,
+  ],
+  'a second dimension in the vitest shards matrix': [
+    put(
+      real,
+      '        shard: [1, 2, 3]\n',
+      '        shard: [1, 2, 3]\n        os: [ubuntu, windows]\n',
+    ),
+    /vitest-tests's matrix has the dimensions shard, os[\s\S]*vitest-tests's job-total would be 6, not its 3 shards/,
+  ],
+  'an include in the web groups matrix': [
+    put(
+      real,
+      '        group: [1, 2, 3]\n',
+      '        group: [1, 2, 3]\n        include:\n          - group: 4\n',
+    ),
+    /web-browser's matrix has the dimensions group, include/,
+  ],
+  'an exclude in the vitest shards matrix': [
+    put(
+      real,
+      '        shard: [1, 2, 3]\n',
+      '        shard: [1, 2, 3]\n        exclude:\n          - shard: 3\n',
+    ),
+    /vitest-tests's matrix has the dimensions shard, exclude/,
   ],
   'web groups that are not 1 to n': [
     put(real, '        group: [1, 2, 3]\n', '        group: [1, 2, 2]\n'),
