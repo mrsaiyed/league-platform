@@ -2,6 +2,12 @@ import { notFound } from 'next/navigation';
 import { localToolScreen } from '../../../../features/local-tools/index.ts';
 import { loadLeaguePage } from '../../../../server/load-league-page.ts';
 
+// Drawn for each request, never once when the site is built (step 2.96): the two local-only
+// pages answered here show this computer's kept emails and made-up people at the moment
+// they are asked for, and are drawn only when the gate allows this request. Being a route
+// of dynamic segments, Next.js would not draw it at build time anyway; this says so.
+export const dynamic = 'force-dynamic';
+
 /**
  * Any address under a league that is no page of it. Without this, Next.js answers such an
  * address itself, outside the league layout, and the visitor loses the league's header and

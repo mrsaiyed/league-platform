@@ -200,6 +200,12 @@ describe.each(['staging', 'production'])('in %s', (appEnv) => {
 });
 
 describe('the routes', () => {
+  // Review of step 2.96, L5: deliberate, not a side effect of reading the cookies.
+  it('the route that answers both addresses is drawn per request, never at build time', async () => {
+    const route = await import('../app/[league]/(site)/[...missing]/page.tsx');
+    expect(route.dynamic).toBe('force-dynamic');
+  });
+
   const app = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'app');
 
   /** Every page or endpoint file under app/, as its address's segments (groups left out). */
