@@ -15,6 +15,7 @@ import {
   openScoringSession,
   publicNames,
   publicViewer,
+  readGamePage,
   readGameSnapshot,
   readTrackerRosters,
   readTrackerState,
@@ -45,6 +46,19 @@ afterAll(async () => {
 });
 
 const refused = { ok: false, error: { code: 'not-allowed' } };
+/** The answer to taps for a game this league does not have: each refused, nothing saved. */
+const unknownGame = (taps: readonly { readonly commandId: string }[]) => ({
+  ok: true,
+  value: {
+    protocolVersion: 1,
+    results: taps.map((t) => ({
+      commandId: t.commandId,
+      status: 'refused',
+      reason: { code: 'unknown-game', message: 'There is no such game.' },
+    })),
+    sequence: 0,
+  },
+});
 
 /** Who scores a game, by the league's rule (P4 §4): all of Games, and the scorekeepers. */
 const scorersUnder = {
@@ -161,6 +175,21 @@ describe('a game scored live on the database ports', () => {
     expect(live.headers?.['Cache-Control']).toBe('public, max-age=0, s-maxage=2');
     expect(live.body).toMatchObject({ status: 'live', score: { home: 3, away: 0 } });
     expect(JSON.stringify(live.body)).toContain('Heronfamily');
+    // The game's page itself, read inside the same read-only snapshot as the names.
+    const page = await w.ports.tracker.gameReadsOf(w.leagueId, (read) =>
+      readGamePage(
+        read.store,
+        { gameId },
+        {
+          leagueId: w.leagueId,
+          viewer: publicViewer(w.leagueId),
+          audience: read.audience,
+          policy: read.policy,
+        },
+      ),
+    );
+    expect(page).toMatchObject({ ok: true, value: { game: { id: gameId, status: 'live' } } });
+    expect(JSON.stringify(page)).toContain('Heronfamily');
     // The standings wait for the end.
     expect(await w.standings()).toEqual(before);
     const ended = await send(scorer, gameId, sessionId, [tap({ type: 'end' })]);
@@ -433,8 +462,8 @@ describe("another league's game", () => {
         w.ports.tracker.deps,
       ),
     ).toEqual({ ok: false, error: { code: 'game-not-found' } });
-    const sent = await send(scorer, w.otherGameId, randomUUID(), tipOff());
-    expect(sent.ok && sent.value.results.map((r) => r.status)).not.toContain('accepted');
+    const taps = tipOff();
+    expect(await send(scorer, w.otherGameId, randomUUID(), taps)).toEqual(unknownGame(taps));
     expect(await readTrackerState(scorer, { gameId: w.otherGameId }, w.ports.tracker.deps)).toEqual(
       { ok: false, error: { code: 'game-not-found' } },
     );
@@ -491,5 +520,53 @@ describe('a season hidden again', () => {
       );
     }
     expect((await watched(gameId)).body).toMatchObject({ score: { home: 2, away: 0 } });
+  });
+});
+
+describe("the tracker: who may reopen, and another league's admin", () => {
+  it('a scorekeeper who did not end the game cannot reopen it; nothing changes', async () => {
+    await saveSetting(whoMayScore.key, 'anyScorekeeper');
+    const gameId = w.take(w.live);
+    expect(await playAndEnd(w.contextOf('scorekeeper'), gameId)).toMatchObject({ ok: true });
+    const before = await w.everything(w.leagueId, [gameId]);
+    // May score the game, did not end it, and may not correct games.
+    const tried = await reopenTrackedGame(
+      w.contextOf('unassignedScorekeeper'),
+      { gameId, requestId: randomUUID(), reason: 'Not mine to reopen' },
+      w.ports.tracker.deps,
+    );
+    expect(tried).toEqual({
+      ok: false,
+      error: { code: 'not-ended-by-you', endedBy: w.accountOf.get('scorekeeper') },
+    });
+    expect(await w.everything(w.leagueId, [gameId])).toEqual(before);
+    expect(await w.gameOf(gameId)).toMatchObject({ status: 'final' });
+  });
+
+  it("another league's admin, through their own league, never reaches this league's game", async () => {
+    const gameId = await underWay();
+    const before = await w.everything(w.leagueId, [gameId]);
+    const theirs = await w.everything(w.otherLeagueId, [w.otherGameId]);
+    const admin = w.contextOf('otherLeagueAdmin', w.otherLeagueId);
+    const notFound = { ok: false, error: { code: 'game-not-found' } };
+    expect(
+      await openScoringSession(admin, { gameId, deviceId: 'tablet' }, w.ports.tracker.deps),
+    ).toEqual(notFound);
+    const taps = tipOff();
+    expect(await send(admin, gameId, randomUUID(), taps)).toEqual(unknownGame(taps));
+    expect(await readTrackerState(admin, { gameId }, w.ports.tracker.deps)).toEqual(notFound);
+    expect(await readTrackerRosters(admin, { gameId }, w.ports.tracker.deps)).toEqual(notFound);
+    expect(await markNotStarted(admin, { gameId, sequence: 3 }, w.ports.tracker.deps)).toEqual(
+      notFound,
+    );
+    expect(
+      await reopenTrackedGame(
+        admin,
+        { gameId, requestId: randomUUID(), reason: 'Not theirs' },
+        w.ports.tracker.deps,
+      ),
+    ).toEqual(notFound);
+    expect(await w.everything(w.leagueId, [gameId])).toEqual(before);
+    expect(await w.everything(w.otherLeagueId, [w.otherGameId])).toEqual(theirs);
   });
 });
