@@ -68,6 +68,61 @@ const buttonsOf = (within) =>
   );
 
 /**
+ * How far past the gap it was meant to have two taps made in the page may land and still
+ * count: a few milliseconds. A pair further apart than that is made again, and counted
+ * as made again, never as a pass or a fail.
+ */
+const overshootMs = 5;
+
+/**
+ * Two taps at one point of the screen, `apart` ms apart, made and timed inside the page,
+ * so the gap between them is not the test's wait plus its trips to the browser and back.
+ * Each tap is what `page.mouse.click` sends (the kit's tap, `tapWhereItIs`): pointerdown,
+ * mousedown, pointerup, mouseup and a click of one press, at that point, on whatever is
+ * under it at the moment of the tap, as a finger lands. The screen reads a tap's time from
+ * its click (`event.timeStamp`); each click's own is given back, with the gap between
+ * them, whether `watch` (the control the test asks about) was drawn resting at the moment
+ * of the second, and what each tap landed on. The wait between them runs on the page's
+ * own timer, so the screen draws what the first tap did before the second, and its last
+ * few milliseconds are counted out to the exact gap.
+ */
+const tapTwiceInPage = (page, at, apart, watch) =>
+  page.evaluate(
+    async ({ x, y, apart, watch }) => {
+      const tap = () => {
+        const el = document.elementFromPoint(x, y);
+        const where = { bubbles: true, cancelable: true, composed: true, view: window };
+        const point = { ...where, clientX: x, clientY: y, screenX: x, screenY: y };
+        const pointer = { ...point, pointerId: 1, pointerType: 'mouse', isPrimary: true };
+        el.dispatchEvent(new PointerEvent('pointerdown', { ...pointer, buttons: 1 }));
+        el.dispatchEvent(new MouseEvent('mousedown', { ...point, detail: 1, buttons: 1 }));
+        el.dispatchEvent(new PointerEvent('pointerup', pointer));
+        el.dispatchEvent(new MouseEvent('mouseup', { ...point, detail: 1 }));
+        const click = new MouseEvent('click', { ...point, detail: 1 });
+        el.dispatchEvent(click);
+        return { on: el, at: click.timeStamp };
+      };
+      const isWatched = (el) => el !== null && el.closest(watch) !== null;
+      const first = tap();
+      await new Promise((done) => setTimeout(done, Math.max(0, apart - 25)));
+      while (performance.now() - first.at < apart) {
+        // The last few milliseconds, counted out.
+      }
+      const restingAtSecond = document.querySelector(watch)?.hasAttribute('data-resting') ?? null;
+      const second = tap();
+      return {
+        firstAt: first.at,
+        secondAt: second.at,
+        gap: second.at - first.at,
+        restingAtSecond,
+        firstOnWatched: isWatched(first.on),
+        secondOnWatched: isWatched(second.on),
+      };
+    },
+    { x: at.x, y: at.y, apart, watch },
+  );
+
+/**
  * The steps of step 2.36. `kit` is what scoring-screen-test.mjs has for every step: its
  * notes, the browser at a size, opening and letting go of the game, and its measures.
  */
@@ -600,49 +655,67 @@ export async function clockSteps(kit) {
         await page.waitForTimeout(3400);
         const ready = (state) =>
           c.root.locator(`[data-clock-toggle][data-state="${state}"]:not([data-resting])`);
-        /** Two taps where the button is, 150 ms apart, as a double tap lands. */
-        const twice = async () => {
-          const box = await c.toggle.boundingBox();
-          const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
-          await page.mouse.click(x, y);
-          await page.waitForTimeout(150);
-          await page.mouse.click(x, y);
-          const drawnResting = (await c.toggle.getAttribute('data-resting')) !== null;
-          await page.waitForTimeout(700);
-          await c.saved();
-          return drawnResting;
+        /**
+         * Two taps where the button is, 150 ms apart, as a double tap lands: made and
+         * timed in the page (`tapTwiceInPage`). A pair that landed more than a few ms
+         * further apart is made again, from the clock as it was, and counted.
+         */
+        const twice = async (from) => {
+          for (let made = 1; ; made += 1) {
+            await ready(from).waitFor();
+            const box = await c.toggle.boundingBox();
+            const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+            const taps = await tapTwiceInPage(page, point, 150, '[data-clock-toggle]');
+            await page.waitForTimeout(700);
+            await c.saved();
+            const timed = taps.gap <= 150 + overshootMs;
+            console.log(
+              `  ${at}: two taps on ${from === 'start' ? 'Start' : 'Pause'} meant 150 ms apart landed ${taps.gap.toFixed(1)} ms apart${timed ? '' : ': made again'}`,
+            );
+            if (timed || made === 10) return { ...taps, made, timed };
+            // Put the clock back as it was before the pair.
+            if ((await c.toggle.getAttribute('data-state')) !== from) {
+              if (from === 'start') await c.pauseClock();
+              else await c.startClock();
+            }
+          }
         };
 
-        await ready('start').waitFor();
-        const restingAfterStart = await twice();
+        const afterStart = await twice('start');
         const running = await c.toggle.getAttribute('data-state');
         const first = seconds(await c.clockText());
         await page.waitForTimeout(1300);
         const later = seconds(await c.clockText());
         note(
           `${at}: two taps on Start 150 ms apart: the clock is running, once, and nothing was refused`,
-          running === 'pause' &&
+          afterStart.timed &&
+            afterStart.firstOnWatched &&
+            afterStart.secondOnWatched &&
+            running === 'pause' &&
             later < first &&
-            restingAfterStart &&
+            afterStart.restingAtSecond === true &&
             (await c.said.innerText()).trim() === '',
-          JSON.stringify({ running, first, later, said: await c.said.innerText() }),
+          JSON.stringify({ afterStart, running, first, later, said: await c.said.innerText() }),
         );
         note(
           `${at}: once it has rested the button is drawn ready again`,
           (await ready('pause').count()) === 1,
         );
 
-        const restingAfterPause = await twice();
+        const afterPause = await twice('pause');
         const paused = await c.toggle.getAttribute('data-state');
         const stoodAt = await c.clockText();
         await page.waitForTimeout(1300);
         note(
           `${at}: two taps on Pause 150 ms apart: the clock is paused, once, and nothing was refused`,
-          paused === 'start' &&
+          afterPause.timed &&
+            afterPause.firstOnWatched &&
+            afterPause.secondOnWatched &&
+            paused === 'start' &&
             (await c.clockText()) === stoodAt &&
-            restingAfterPause &&
+            afterPause.restingAtSecond === true &&
             (await c.said.innerText()).trim() === '',
-          JSON.stringify({ paused, stoodAt, now: await c.clockText() }),
+          JSON.stringify({ afterPause, paused, stoodAt, now: await c.clockText() }),
         );
         note('nothing broke on the page', errors.length === 0, errors.join('; '));
       } finally {
@@ -1527,31 +1600,56 @@ export async function clockSteps(kit) {
               .locator('[data-timeouts-of="home"]')
               .getAttribute('data-taken-count'),
           );
-        // Two taken at least, so one can come back.
-        await c.timeoutsButton.click();
-        await c.timeoutsPad.waitFor();
-        while ((await takenInAll()) < 2) {
-          await c.timeout('home');
-          await c.timeoutsButton.click();
-          await c.timeoutsPad.waitFor();
-        }
-        // Measured with nothing said, then tapped twice, 90 ms apart, where − is.
-        await page.waitForFunction(
-          () => document.querySelector('[data-say]')?.textContent === '',
-          null,
-          { timeout: 10_000 },
-        );
-        const before = await takenInAll();
         const minus = c.timeoutsPad.locator('[data-act="untimeout"][data-side="home"]');
+        const minusIs = '[data-timeout-list] [data-act="untimeout"][data-side="home"]';
         const full = c.timeoutButton('home');
-        const [minusAt, fullAt] = [await minus.boundingBox(), await full.boundingBox()];
-        const [mx, my] = [minusAt.x + minusAt.width / 2, minusAt.y + minusAt.height / 2];
-        await page.mouse.click(mx, my);
-        await page.waitForTimeout(90);
-        await page.mouse.click(mx, my);
-        await said(c, /^Timeout taken back: Hawks, H2 \d+:\d\d\.$/);
-        const [minusNow, fullNow] = [await minus.boundingBox(), await full.boundingBox()];
-        const sayAt = await c.said.boundingBox();
+        /** Two taken at least, so one can come back, with the timeouts open. */
+        const twoTaken = async () => {
+          if (!(await c.timeoutsPad.isVisible())) await c.timeoutsButton.click();
+          await c.timeoutsPad.waitFor();
+          while ((await takenInAll()) < 2) {
+            await c.timeout('home');
+            await c.timeoutsButton.click();
+            await c.timeoutsPad.waitFor();
+          }
+        };
+        /**
+         * Two taps where − is, `apart` ms apart, made and timed in the page
+         * (`tapTwiceInPage`); `then` looks at what they did. A pair that landed more than
+         * a few ms further apart is made again, with two taken again, and counted.
+         */
+        const twiceOnMinus = async (apart, then) => {
+          for (let made = 1; ; made += 1) {
+            await twoTaken();
+            const was = await takenInAll();
+            // Measured with nothing said.
+            await page.waitForFunction(
+              () => document.querySelector('[data-say]')?.textContent === '',
+              null,
+              { timeout: 10_000 },
+            );
+            const [minusAt, fullAt] = [await minus.boundingBox(), await full.boundingBox()];
+            const point = { x: minusAt.x + minusAt.width / 2, y: minusAt.y + minusAt.height / 2 };
+            const taps = await tapTwiceInPage(page, point, apart, minusIs);
+            const seen = await then({ minusAt, fullAt });
+            const timed = taps.gap <= apart + overshootMs;
+            console.log(
+              `  ${at}: two taps on − meant ${apart} ms apart landed ${taps.gap.toFixed(1)} ms apart${timed ? '' : ': made again'}`,
+            );
+            if (timed || made === 10) return { ...taps, ...seen, was, made, timed };
+            await page.waitForTimeout(700);
+          }
+        };
+        // Tapped twice, 90 ms apart, where − is.
+        const fast = await twiceOnMinus(90, async ({ minusAt, fullAt }) => {
+          await said(c, /^Timeout taken back: Hawks, H2 \d+:\d\d\.$/);
+          const [minusNow, fullNow] = [await minus.boundingBox(), await full.boundingBox()];
+          const sayAt = await c.said.boundingBox();
+          await page.waitForTimeout(500);
+          await c.saved();
+          return { minusAt, minusNow, fullAt, fullNow, sayAt, now: await takenInAll() };
+        });
+        const { minusAt, minusNow, fullAt, fullNow, sayAt } = fast;
         note(
           `${at}: what the screen says does not move − or the timeout buttons: it is drawn over the panel’s first line`,
           minusNow !== null &&
@@ -1564,13 +1662,13 @@ export async function clockSteps(kit) {
             sayAt.y + sayAt.height <= fullNow.y,
           JSON.stringify({ minusAt, minusNow, fullAt, fullNow, sayAt }),
         );
-        await page.waitForTimeout(500);
-        await c.saved();
         note(
           `${at}: two fast taps on − take one timeout back, not two, and call none`,
-          (await takenInAll()) === before - 1 &&
+          fast.timed &&
+            fast.firstOnWatched &&
+            fast.now === fast.was - 1 &&
             (await c.timeoutsPad.locator('[data-timeout-ask]').count()) === 0,
-          `${before} taken before, ${await takenInAll()} after`,
+          `${fast.was} taken before, ${fast.now} after; ${JSON.stringify(fast)}`,
         );
         // A slow double tap (the area lead's second look, with touch: two came back at
         // 310 to 340 ms apart): − rests 600 ms after a take-back, so at 350 and at 450 ms
@@ -1578,26 +1676,19 @@ export async function clockSteps(kit) {
         if (size === phoneInBrowser) {
           for (const apart of [350, 450]) {
             await page.waitForTimeout(700);
-            while ((await takenInAll()) < 2) {
-              await c.timeout('home');
-              await c.timeoutsButton.click();
-              await c.timeoutsPad.waitFor();
-            }
-            const was = await takenInAll();
-            const box = await minus.boundingBox();
-            const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
-            await page.mouse.click(x, y);
-            await page.waitForTimeout(apart);
-            await page.mouse.click(x, y);
-            const restingWhenTapped = (await minus.getAttribute('data-resting')) !== null;
-            await page.waitForTimeout(700);
-            await c.saved();
+            const slow = await twiceOnMinus(apart, async () => {
+              await page.waitForTimeout(700);
+              await c.saved();
+              return { now: await takenInAll() };
+            });
             note(
               `${at}: two taps on − ${apart} ms apart take exactly one timeout back, and − was drawn resting for the second`,
-              (await takenInAll()) === was - 1 &&
-                restingWhenTapped &&
+              slow.timed &&
+                slow.firstOnWatched &&
+                slow.now === slow.was - 1 &&
+                slow.restingAtSecond === true &&
                 (await c.timeoutsPad.locator('[data-timeout-ask]').count()) === 0,
-              `${was} taken before, ${await takenInAll()} after; resting at the second: ${restingWhenTapped}`,
+              `${slow.was} taken before, ${slow.now} after; resting at the second: ${slow.restingAtSecond}; ${JSON.stringify(slow)}`,
             );
           }
         }
