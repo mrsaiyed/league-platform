@@ -114,7 +114,7 @@ It never prints an address, a user name or a password. What it says depends on w
 
 This is for the day a league was just made on a real database with a wrong short name, a wrong "who plays", or for the wrong owner. The tool is `npm run league:remove` ([record 063](../architecture/decisions/063-removing-a-league-made-by-mistake.md)). It has the same checks as `npm run league:make`, the same two addresses, and the same rule: **the founder types, at their own terminal**, and no AI session ever passes `--hosted`.
 
-What it removes, and nothing else: a league still in draft, exactly as `league:make` left it, with its first season, its default program and the two lines its making wrote in the league's own activity log. The owner's account goes too, but only if nobody has ever signed in with it and nothing else uses it. One line stays, in the platform's own log: which league, who removed it and when.
+What it removes, and nothing else: a league still in draft, exactly as `league:make` left it, with its first season, its default program, its site and its first published design (the design it was made in; a league made before step 2.187 has neither), and the two lines its making wrote in the league's own activity log. The owner's account goes too, but only if nobody has ever signed in with it and nothing else uses it. One line stays, in the platform's own log: which league, who removed it and when.
 
 What it refuses, with nothing removed: a league with any game, any person, any role given to anyone (even one that has ended), an invitation, a setting saved, anything in its bin, anything changed since it was made, or one that is published, archived or suspended. It says what it found. Removing a league like that is step 2.133, not this tool.
 
