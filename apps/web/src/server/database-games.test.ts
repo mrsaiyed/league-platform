@@ -11,6 +11,7 @@
 // command on the wrong transaction or let a role through would fail. A result moves the
 // public standings in the command's own transaction, and a correction moves them back.
 import {
+  assignScorekeeper,
   cancelGame,
   getBoxScoreSheet,
   listEarlierGames,
@@ -26,6 +27,7 @@ import {
   whoMayScore,
   type CommandContext,
 } from '@srleagues/core';
+import * as database from '@srleagues/database';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { actors, gamesWorld, type Actor, type GamesWorld } from './database-games.test-helper.ts';
 
@@ -400,4 +402,27 @@ describe('a game of another league, through either league', () => {
       expect(await w.everything(w.leagueId, [])).toEqual(ours);
     },
   );
+});
+
+describe('a scorekeeper assigned to a game who no longer holds a role in the league', () => {
+  // Last in this file: it takes the unassigned scorekeeper's role away.
+  it("is named '' beside the game, and nothing else of them is read", async () => {
+    const gameId = w.take(w.byHand);
+    const accountId = w.accountOf.get('unassignedScorekeeper') ?? '';
+    expect(
+      await assignScorekeeper(w.asOwner, { gameId, accountId }, w.ports.games.deps),
+    ).toMatchObject({ ok: true });
+    expect((await w.ports.games.namesOf(w.leagueId)).scorekeepers[gameId]).toHaveLength(2);
+    await database.withTransaction(w.db, w.asOwner, async (scope) => {
+      const access = database.accessStore(scope);
+      const held = (await access.listGrants()).filter((g) => g.accountId === accountId);
+      expect(held).toHaveLength(1);
+      for (const grant of held) await access.revokeGrant(grant.id, w.asOwner.accountId);
+    });
+    // Still assigned, as the row says, and named by nothing: they are not the league's staff.
+    expect((await w.ports.games.namesOf(w.leagueId)).scorekeepers[gameId]).toEqual([
+      'Sky Scorer',
+      '',
+    ]);
+  });
 });
