@@ -11,6 +11,10 @@ export type PanelFacts = {
   /** Whether visitors can see the league at all (live or archived, U-9). */
   readonly leagueShown: boolean;
   readonly seasonName: string;
+  /** Whether it is the league's current season: the home page falls back when it is hidden. */
+  readonly isCurrent: boolean;
+  /** Whether a game of it is being scored now: people following it lose the updates. */
+  readonly gameUnderWay: boolean;
 };
 
 export type PanelWords = {
@@ -22,6 +26,8 @@ export type PanelWords = {
   readonly showAsk: string;
   /** The answer once shown. */
   readonly shown: string;
+  /** The question before hiding: what disappears, and what else changes when it applies. */
+  readonly hideAsk: string;
 };
 
 export function panelWords(facts: PanelFacts): PanelWords {
@@ -47,5 +53,10 @@ export function panelWords(facts: PanelFacts): PanelWords {
     shown: facts.leagueShown
       ? t('seasonSettings.done.shown', { season })
       : t('seasonSettings.done.shownLeagueHidden', { season }),
+    hideAsk: [
+      t('seasonSettings.hideAsk', { season }),
+      ...(facts.isCurrent ? [t('seasonSettings.hideAskCurrent')] : []),
+      ...(facts.gameUnderWay ? [t('seasonSettings.hideAskLive', { season })] : []),
+    ].join(' '),
   };
 }

@@ -560,6 +560,10 @@ export const en = {
   'seasonSettings.showNo': 'No, keep it hidden',
   'seasonSettings.hideAsk':
     'Hide {season} from visitors? Its teams, schedule, results and standings disappear from the public site, and its address shows "Page not found". Nothing is deleted, and you can show it again.',
+  'seasonSettings.hideAskCurrent':
+    "It is the league's current season, so the league's home page and its season picker will show another season visitors can see instead, or no season if there is none.",
+  'seasonSettings.hideAskLive':
+    'A game of {season} is being scored right now: its scorekeeper can keep saving it, but people following it will stop getting updates.',
   'seasonSettings.hideYes': 'Yes, hide it',
   'seasonSettings.hideNo': 'No, keep it shown',
   'seasonSettings.done.shown': 'Visitors can see {season} now.',

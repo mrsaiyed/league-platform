@@ -16,6 +16,7 @@ import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
+import type { PublicSchedulePorts } from '../../server/public-schedule.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { changeVisibilityAction } from './actions.ts';
 import { doneOf, problemKey } from './answer.ts';
@@ -56,6 +57,12 @@ export async function SeasonSettingsPage({
     );
   }
   const read = await getSeason(context, { seasonId: season.id }, ports.adminSettings.deps);
+  // Only while "Hide it again" is being asked: whether a game of the season is being scored
+  // now, read from the season's public schedule (what visitors following it would lose).
+  const gameUnderWay =
+    read.ok && read.value.status === 'active' && firstValue(search['ask']) === 'hide'
+      ? await liveGameIn(ports.publicSchedule, addressee.id, season.id)
+      : false;
   const labels = displayLabels(t);
   return (
     <main>
@@ -79,12 +86,27 @@ export async function SeasonSettingsPage({
           league={addressee.slug}
           leagueHidden={isLeagueHidden(addressee.status)}
           mayChange={mayShowSeason(holder, season, addressee.status)}
+          gameUnderWay={gameUnderWay}
           search={search}
         />
       ) : (
         <p role="alert">{t(problemKey({ problem: read.error.code }) ?? 'error.unknown')}</p>
       )}
     </main>
+  );
+}
+
+/** Whether a published game of a season visitors can see is being scored now. */
+async function liveGameIn(
+  schedules: PublicSchedulePorts,
+  leagueId: string,
+  seasonId: string,
+): Promise<boolean> {
+  const { today } = await schedules.clockOf(leagueId);
+  const schedule = await schedules.scheduleOf(leagueId, seasonId, today);
+  if (schedule === undefined) return false;
+  return [...schedule.rounds.flatMap((r) => r.games), ...schedule.unplacedGames].some(
+    (g) => g.status === 'live',
   );
 }
 
@@ -95,6 +117,7 @@ function VisibilityPanel({
   league,
   leagueHidden,
   mayChange,
+  gameUnderWay,
   search,
 }: {
   readonly season: SeasonView;
@@ -106,11 +129,19 @@ function VisibilityPanel({
   readonly leagueHidden: boolean;
   /** Whether this person gets the buttons (the command checks again). */
   readonly mayChange: boolean;
+  /** Whether a game of the season is being scored now (read only while hiding is asked). */
+  readonly gameUnderWay: boolean;
   readonly search: SearchParams;
 }) {
   const name = season.name;
   const visibility = visibilityOf(season.status);
-  const words = panelWords({ visibility, leagueShown: !leagueHidden, seasonName: name });
+  const words = panelWords({
+    visibility,
+    leagueShown: !leagueHidden,
+    seasonName: name,
+    isCurrent: season.isCurrent,
+    gameUnderWay,
+  });
   const wish = mayChange ? wishOf(season.status) : undefined;
   const asked = firstValue(search['ask']);
   const said = doneOf(search);
@@ -133,7 +164,7 @@ function VisibilityPanel({
       {wish === undefined ? null : asked === wish ? (
         <Question
           wish={wish}
-          ask={wish === 'show' ? words.showAsk : t('seasonSettings.hideAsk', { season: name })}
+          ask={wish === 'show' ? words.showAsk : words.hideAsk}
           season={season}
           league={league}
           back={address()}

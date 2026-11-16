@@ -451,6 +451,18 @@ const cases = [
     200,
     ['Visitors will see its teams, schedule and results.', 'Yes, show it', 'No, keep it hidden'],
   ],
+  // Hiding the current season, with a game being scored (Hawks v Bears), says both.
+  [
+    'owner',
+    '/north-valley/admin/season?ask=hide',
+    200,
+    [
+      'Hide Fall 2026 from visitors?',
+      'will show another season visitors can see instead',
+      'A game of Fall 2026 is being scored right now',
+      'Yes, hide it',
+    ],
+  ],
   // In a league not published, a shown season is never said to be seen by visitors.
   [
     'owner',
