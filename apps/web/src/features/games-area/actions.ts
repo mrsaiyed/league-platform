@@ -98,6 +98,14 @@ async function showSaved(to: string): Promise<void> {
   redirect(to);
 }
 
+/** Refusals answered without drawing the screen again (see `refused`). */
+const keptAsIs: readonly string[] = [
+  'invalid-input',
+  'reopen-reason',
+  'game-postponed',
+  'game-cancelled',
+];
+
 /**
  * A refusal, drawn from the post. When the game itself may have changed, the screen is
  * drawn again as it is now (A-8: the latest is shown), keeping what was typed.
@@ -108,7 +116,10 @@ function refused(
   wrong: readonly string[],
   said: string,
 ): Refused {
-  if (code !== 'invalid-input' && code !== 'reopen-reason') refresh();
+  // Not for a game called off since the form was drawn (step 2.158): drawn again, it would
+  // have no score boxes, and the sentence saying why the score was refused would go with
+  // them. It stays beside the boxes, which say nothing more is saved.
+  if (!keptAsIs.includes(code)) refresh();
   return { kind: 'refused', code, typed, wrong, said };
 }
 

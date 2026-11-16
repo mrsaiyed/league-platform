@@ -81,7 +81,24 @@ export async function runGameAction(
   ) {
     return { ok: true };
   }
+  // A score typed for a game postponed or cancelled since the page was drawn (step 2.158):
+  // said as that, not as "someone changed this game", so the person knows why.
+  if (action === 'final' && code === 'changed-since-read') {
+    const now = await statusNow(fields, context, deps);
+    if (now === 'postponed') return { ok: false, code: 'game-postponed' };
+    if (now === 'cancelled') return { ok: false, code: 'game-cancelled' };
+  }
   return { ok: false, code };
+}
+
+/** The game's status as it is now, or undefined if it cannot be read. */
+async function statusNow(
+  fields: GameFields,
+  context: CommandContext,
+  deps: CommandDeps<TrackerTx>,
+): Promise<string | undefined> {
+  const read = await getBoxScoreSheet(context, { gameId: fields['gameId'] }, deps);
+  return read.ok ? read.value.game.status : undefined;
 }
 
 /** Whether the game is final now with exactly the score these fields asked for. */

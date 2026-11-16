@@ -308,5 +308,30 @@ describe('the games area actions', () => {
         ports.deps,
       ),
     ).toEqual({ ok: false, code: 'game-postponed' });
+    // Typed on a page drawn before it was postponed (the version it read): said the same way,
+    // not as "someone changed this game".
+    expect(
+      await runGameAction(
+        'final',
+        { ...fields, homeScore: '50', awayScore: '40' },
+        as(owner),
+        ports.deps,
+      ),
+    ).toEqual({ ok: false, code: 'game-postponed' });
+  });
+
+  it('says a score typed before a game was cancelled is refused because it is cancelled', async () => {
+    const { ports, as, games } = setup();
+    const target = (await games(owner)).find((g) => g.status === 'scheduled' && !g.hasPlays);
+    const fields = { gameId: target?.id, version: String(target?.version) };
+    expect(await runGameAction('cancel', fields, as(owner), ports.deps)).toEqual({ ok: true });
+    expect(
+      await runGameAction(
+        'final',
+        { ...fields, homeScore: '50', awayScore: '40' },
+        as(owner),
+        ports.deps,
+      ),
+    ).toEqual({ ok: false, code: 'game-cancelled' });
   });
 });
