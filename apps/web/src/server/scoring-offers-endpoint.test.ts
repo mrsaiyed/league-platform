@@ -105,17 +105,24 @@ describe('the scoring read of a public page', () => {
   });
 
   it('answers a hidden league exactly as one that is not there or is in the bin (U-9)', async () => {
-    for (const person of ['visitor', 'stranger', 'coach'] as const) {
-      const [unknown, binned, draft, suspended] = await Promise.all([
+    // Each person with the leagues they may not see: another league's admin (of the other
+    // draft) and another league's scorekeeper (of the live, draft and archived leagues) too.
+    const hidden: readonly (readonly [Person, readonly League[]])[] = [
+      ['visitor', ['draft', 'suspended']],
+      ['stranger', ['draft', 'suspended']],
+      ['coach', ['draft', 'otherDraft', 'suspended']],
+      ['otherAdmin', ['draft', 'suspended']],
+      ['scorekeeper', ['otherDraft', 'suspended']],
+    ];
+    for (const [person, leagues] of hidden) {
+      const [unknown, binned, ...answers] = await Promise.all([
         askById(person, noLeague),
         ask(person, 'inBin'),
-        ask(person, 'draft'),
-        ask(person, 'suspended'),
+        ...leagues.map((league) => ask(person, league)),
       ]);
       // Compared with each other: status, body and headers, all of them.
       expect(binned, `${person}: in the bin`).toEqual(unknown);
-      expect(draft, `${person}: a draft`).toEqual(unknown);
-      expect(suspended, `${person}: suspended`).toEqual(unknown);
+      answers.forEach((answer, n) => expect(answer, `${person}: ${leagues[n]}`).toEqual(unknown));
       expect(unknown.status, person).toBe(404);
     }
     // The draft league's own owner, and its scorekeeper, get the ordinary answer.

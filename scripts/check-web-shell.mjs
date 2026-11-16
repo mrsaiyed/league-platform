@@ -1024,8 +1024,9 @@ async function sameAsNoLeague(origin) {
 /**
  * Step 2.153's read of a page's buttons (GET /api/v1/leagues/{leagueId}/scoring) answers a
  * league its visitor may not see, a draft or a suspended one, exactly as a league that does
- * not exist or is in the bin (U-9): for a visitor and a signed-in stranger the four answers
- * are compared with each other, status, body and every header but the date and the length.
+ * not exist or is in the bin (U-9): for a visitor, a signed-in stranger, another league's
+ * admin and another league's scorekeeper, the answers for the leagues each may not see are
+ * compared with no league's, status, body and every header but the date and the length.
  * The draft league's owner gets the ordinary answer.
  */
 async function scoringSameAsNoLeague(origin) {
@@ -1035,6 +1036,15 @@ async function scoringSameAsNoLeague(origin) {
     'in the bin': leagueOf(6),
     draft: leagueOf(3),
     suspended: leagueOf(5),
+    'another draft': leagueOf(7),
+  };
+  // Who may not see which: another league's admin holds the other draft; another league's
+  // scorekeeper holds north-valley, the draft and the archived league (stand-in-ports.ts).
+  const hiddenFrom = {
+    visitor: ['draft', 'suspended'],
+    stranger: ['draft', 'suspended'],
+    otherAdmin: ['draft', 'suspended'],
+    scorekeeper: ['another draft', 'suspended'],
   };
   const ask = async (who, leagueId) => {
     const response = await fetch(
@@ -1051,10 +1061,10 @@ async function scoringSameAsNoLeague(origin) {
     return { status: response.status, headers, body: await response.text() };
   };
   const found = [];
-  for (const who of ['visitor', 'stranger']) {
+  for (const [who, hidden] of Object.entries(hiddenFrom)) {
     const answers = [];
-    for (const [what, leagueId] of Object.entries(leagues)) {
-      answers.push([what, await ask(who, leagueId)]);
+    for (const what of ['no league', 'in the bin', ...hidden]) {
+      answers.push([what, await ask(who, leagues[what])]);
     }
     const [, first] = answers[0];
     if (first.status !== 404) found.push(`${who}'s scoring read of no league is ${first.status}`);
