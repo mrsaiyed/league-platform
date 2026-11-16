@@ -86,6 +86,16 @@ export class SupabaseAuthUnexpected extends Error {
   }
 }
 
+/**
+ * No answer within the time limit: the same unexpected answer to every caller, told
+ * apart only where the kind is reported (`email-confirmation.ts`, step 2.115).
+ */
+export class SupabaseAuthTimedOut extends SupabaseAuthUnexpected {
+  constructor(what: string) {
+    super(`${what}: no answer in time`);
+  }
+}
+
 export type GoTrueClientOptions = {
   readonly projectUrl: string;
   readonly secretKey: string;
@@ -212,7 +222,7 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
     let timedOut = false;
     let giveUp: () => void = () => {};
     const timeout = new Promise<never>((_, reject) => {
-      giveUp = () => reject(new SupabaseAuthUnexpected(`${what}: no answer in time`));
+      giveUp = () => reject(new SupabaseAuthTimedOut(what));
     });
     const stop = startTimer(timeoutMs, () => {
       timedOut = true;
@@ -224,16 +234,16 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
       try {
         response = await options.fetch(url, { ...init, signal: controller.signal });
       } catch {
-        throw new SupabaseAuthUnexpected(
-          timedOut ? `${what}: no answer in time` : `${what}: no connection`,
-        );
+        throw timedOut
+          ? new SupabaseAuthTimedOut(what)
+          : new SupabaseAuthUnexpected(`${what}: no connection`);
       }
       try {
         return { response, raw: await response.text() };
       } catch {
-        throw new SupabaseAuthUnexpected(
-          timedOut ? `${what}: no answer in time` : `${what}: the answer was cut off`,
-        );
+        throw timedOut
+          ? new SupabaseAuthTimedOut(what)
+          : new SupabaseAuthUnexpected(`${what}: the answer was cut off`);
       }
     })();
     // The loser of the race must not be left rejecting with no one listening.

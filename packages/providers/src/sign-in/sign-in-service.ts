@@ -186,9 +186,36 @@ export type SignOutInput = { readonly accessToken: string } | { readonly refresh
  * they hold the mailbox (step 2.115). `on`: it does. `off`: it takes an address as
  * proved without that, so anyone could sign up with another person's address by
  * typing it. `unknown`: the service could not be asked, or answered in a shape we do
- * not know. Unknown is never taken as `on`.
+ * not know, and why, as one of a few fixed kinds. Unknown is never taken as `on`.
  */
-export type EmailConfirmation = 'on' | 'off' | 'unknown';
+export type EmailConfirmation =
+  | 'on'
+  | 'off'
+  | {
+      readonly unknown: EmailConfirmationUnknown;
+      /**
+       * The answer's status number, for `key-refused` and an `unexpected-answer` that
+       * had one. Nothing else of the answer is ever kept: never its words, never an
+       * address, a key or a token.
+       */
+      readonly status?: number;
+    };
+
+/**
+ * Why a service could not say whether it confirms addresses (step 2.115), so that the
+ * person starting the app can tell a refused key from a timeout:
+ * - `no-answer-in-time`: it did not answer within the time limit;
+ * - `no-connection`: it could not be reached, or its answer was cut off;
+ * - `key-refused`: it refused the key the app holds (401 or 403);
+ * - `setting-missing`: it answered, but not with the setting as a plain yes or no;
+ * - `unexpected-answer`: any other answer, such as a redirect, a 404 or a 5xx.
+ */
+export type EmailConfirmationUnknown =
+  | 'no-answer-in-time'
+  | 'no-connection'
+  | 'key-refused'
+  | 'setting-missing'
+  | 'unexpected-answer';
 
 export type SignInService = {
   /** Emails a 6-digit code, valid 10 minutes, to prove the address (T-67). */
@@ -264,7 +291,7 @@ export type SignInService = {
    * Linking an account made in advance to whoever presents its address
    * (`account_for_sign_in`, record 052) is safe only when it does, so the web app
    * refuses to start on a real service that answers anything but `on`. Never throws:
-   * a failure to ask is `unknown`. Says nothing about any person.
+   * a failure to ask is `unknown`, with its kind. Says nothing about any person.
    */
   readonly emailConfirmation: () => Promise<EmailConfirmation>;
 };

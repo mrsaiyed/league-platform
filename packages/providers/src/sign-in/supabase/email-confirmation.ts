@@ -8,12 +8,21 @@
 // settings answer and is tested against handwritten answers only (record 018).
 //
 // Only a plain `false` is `on`. A `true` is `off`. Anything else (no such field, not a
-// yes or no, a refusal, Supabase down, no answer in time) is `unknown`, never `on`.
-// Nothing here is logged, and nothing returned names a key, an address or a person.
-import type { EmailConfirmation, EmailConfirmationQuestion } from '../sign-in-service.ts';
+// yes or no, a refusal, a redirect, Supabase down, no answer in time) is `unknown`,
+// never `on`, with one of the interface's fixed kinds saying why: a refused key, a
+// timeout and a missing field are told apart, and a status number is the only thing
+// of the answer kept. Nothing here is logged, and nothing returned names a key, an
+// address or a person, nor repeats Supabase's own words.
+import type {
+  EmailConfirmation,
+  EmailConfirmationQuestion,
+  EmailConfirmationUnknown,
+} from '../sign-in-service.ts';
 import {
   checkProjectUrl,
   createGoTrueClient,
+  SupabaseAuthTimedOut,
+  SupabaseAuthUnexpected,
   type FetchLike,
   type GoTrueClient,
   type StartTimer,
@@ -26,16 +35,38 @@ export async function emailConfirmationOf(
   let answer;
   try {
     answer = await auth.settings();
-  } catch {
-    return 'unknown';
+  } catch (error) {
+    return unknownFrom(error);
   }
-  if (!answer.ok) return 'unknown';
+  if (!answer.ok) {
+    const { status } = answer.refusal;
+    return {
+      unknown: status === 401 || status === 403 ? 'key-refused' : 'unexpected-answer',
+      status,
+    };
+  }
   const body = answer.value;
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) return 'unknown';
+  const settingMissing = { unknown: 'setting-missing' } as const;
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return settingMissing;
   const autoconfirm: unknown = (body as Record<string, unknown>)['mailer_autoconfirm'];
   if (autoconfirm === false) return 'on';
   if (autoconfirm === true) return 'off';
-  return 'unknown';
+  return settingMissing;
+}
+
+/** The kind of a failed call: the client throws a timeout, no connection, or a status it cannot read. */
+function unknownFrom(error: unknown): {
+  readonly unknown: EmailConfirmationUnknown;
+  readonly status?: number;
+} {
+  if (error instanceof SupabaseAuthTimedOut) return { unknown: 'no-answer-in-time' };
+  if (error instanceof SupabaseAuthUnexpected) {
+    // With a status it answered (a 3xx or a 5xx); without one it could not be reached.
+    return error.status === undefined
+      ? { unknown: 'no-connection' }
+      : { unknown: 'unexpected-answer', status: error.status };
+  }
+  return { unknown: 'unexpected-answer' };
 }
 
 export type SupabaseEmailConfirmationOptions = {

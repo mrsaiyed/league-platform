@@ -20,7 +20,11 @@
 import type { CommandLogLine } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
-import type { EmailConfirmation, EmailConfirmationQuestion } from '@srleagues/providers';
+import type {
+  EmailConfirmation,
+  EmailConfirmationQuestion,
+  EmailConfirmationUnknown,
+} from '@srleagues/providers';
 import type { Config } from './config-schema.ts';
 import { databasePorts, type DatabaseQueries } from './database-ports.ts';
 import type { WebPorts } from './ports.ts';
@@ -136,26 +140,57 @@ function realSignIn(deps: StartupDeps, service: RealSignInSettings): EmailConfir
 const turnItOn =
   'turn on "Confirm email" in the Supabase project’s dashboard (Authentication, then Sign In / Providers, then Email), then start the app again';
 
-const refusals: Readonly<Record<Exclude<EmailConfirmation, 'on'>, string>> = {
-  off: `the sign-in service does not confirm email addresses, so anyone could take over an account made in advance by typing its address: ${turnItOn}.`,
-  unknown: `the sign-in service could not say whether it confirms email addresses, and the app never starts without that: check that SUPABASE_URL and SUPABASE_SECRET_KEY are the project’s and that it can be reached, and ${turnItOn}.`,
+const refusedOff = `the sign-in service does not confirm email addresses, so anyone could take over an account made in advance by typing its address: ${turnItOn}.`;
+
+/** Why the service could not say, in fixed words of ours: never the service's own. */
+const unknownBecause: Readonly<Record<EmailConfirmationUnknown, string>> = {
+  'no-answer-in-time': 'it did not answer in time',
+  'no-connection': 'it could not be reached',
+  'key-refused': 'it refused the key',
+  'setting-missing': 'it answered without the setting',
+  'unexpected-answer': 'it gave an unexpected answer',
 };
+
+/**
+ * The refusal for an answer that is not `on` or `off`. Only a word looked up in the
+ * fixed list above, and a status that is a whole number in the range of HTTP's, can
+ * reach the sentence: whatever else an adapter put in its answer stays out.
+ */
+function refusedUnknown(answer: unknown): string {
+  let reason = 'the question itself failed';
+  if (typeof answer === 'object' && answer !== null) {
+    const { unknown, status } = answer as { readonly unknown?: unknown; readonly status?: unknown };
+    if (typeof unknown === 'string' && Object.hasOwn(unknownBecause, unknown)) {
+      reason = unknownBecause[unknown as EmailConfirmationUnknown];
+      if (
+        typeof status === 'number' &&
+        Number.isInteger(status) &&
+        status >= 100 &&
+        status <= 599
+      ) {
+        reason += `, status ${status}`;
+      }
+    }
+  }
+  return `the sign-in service could not say whether it confirms email addresses (${reason}), and the app never starts without that: check that SUPABASE_URL and SUPABASE_SECRET_KEY are the project’s and that it can be reached, and ${turnItOn}.`;
+}
 
 /**
  * Step 2.115: the start stops unless the sign-in service plainly says it confirms
  * email addresses before a sign-in counts. `off` and `unknown` stop it alike, each
- * with one sentence saying what to turn on and where. Nothing is logged, and the
- * message names no key, address or person.
+ * with one sentence saying what to turn on and where; `unknown`'s says why, in a
+ * fixed kind (a throw is one too). Nothing is logged, and the message names no key,
+ * address or person.
  */
 export async function requireEmailConfirmation(signIn: EmailConfirmationQuestion): Promise<void> {
-  let answer: EmailConfirmation;
+  let answer: EmailConfirmation | undefined;
   try {
     answer = await signIn.emailConfirmation();
   } catch {
-    answer = 'unknown';
+    answer = undefined;
   }
   if (answer === 'on') return;
-  throw new StartupError(answer === 'off' ? refusals.off : refusals.unknown);
+  throw new StartupError(answer === 'off' ? refusedOff : refusedUnknown(answer));
 }
 
 /** Local work and tests on the made-up database in memory (record 055). */

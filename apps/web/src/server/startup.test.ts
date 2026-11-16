@@ -155,10 +155,15 @@ describe('startWebApp', () => {
 describe('email confirmation on the real sign-in service (step 2.115)', () => {
   const off =
     'The web app cannot start: the sign-in service does not confirm email addresses, so anyone could take over an account made in advance by typing its address: turn on "Confirm email" in the Supabase project’s dashboard (Authentication, then Sign In / Providers, then Email), then start the app again.';
-  const unknown =
-    'The web app cannot start: the sign-in service could not say whether it confirms email addresses, and the app never starts without that: check that SUPABASE_URL and SUPABASE_SECRET_KEY are the project’s and that it can be reached, and turn on "Confirm email" in the Supabase project’s dashboard (Authentication, then Sign In / Providers, then Email), then start the app again.';
+  /** The refusal when the service could not say, with the reason it gives. */
+  const unknown = (reason: string) =>
+    `The web app cannot start: the sign-in service could not say whether it confirms email addresses (${reason}), and the app never starts without that: check that SUPABASE_URL and SUPABASE_SECRET_KEY are the project’s and that it can be reached, and turn on "Confirm email" in the Supabase project’s dashboard (Authentication, then Sign In / Providers, then Email), then start the app again.`;
 
-  /** Nothing about a key, an address or a person in what start-up says. */
+  /** What an adapter, or the service behind it, might try to slip into the refusal. */
+  const serviceWords = 'Invalid API key: sb_secret_made_up_0123, Bearer eyJmade.up.token';
+  const madeUpToken = 'eyJmade.up.token';
+
+  /** Nothing about a key, an address, a token or a person, nor the service's words. */
   const expectNothingPrivate = (message: string) => {
     for (const value of [
       env.SUPABASE_URL,
@@ -166,6 +171,12 @@ describe('email confirmation on the real sign-in service (step 2.115)', () => {
       env.PLATFORM_DATABASE_URL,
       'made-up-project',
       '@',
+      'https://',
+      serviceWords,
+      'Invalid API key',
+      'sb_secret',
+      'Bearer',
+      madeUpToken,
     ]) {
       expect(message).not.toContain(value);
     }
@@ -205,13 +216,67 @@ describe('email confirmation on the real sign-in service (step 2.115)', () => {
 
   it('fails the same way when the answer cannot be had: unknown is not yes', async () => {
     for (const appEnv of ['staging', 'production']) {
-      for (const answer of ['unknown', new Error(`no answer from ${env.SUPABASE_URL}`)] as const) {
+      const answers: [EmailConfirmation | Error, string][] = [
+        [{ unknown: 'key-refused', status: 401 }, 'it refused the key, status 401'],
+        [new Error(`no answer from ${env.SUPABASE_URL}`), 'the question itself failed'],
+      ];
+      for (const [answer, reason] of answers) {
         const d = deps([], answer);
         const failure = await failureOf(appEnv, d);
-        expect(failure.message).toBe(unknown);
+        expect(failure.message).toBe(unknown(reason));
         expectNothingPrivate(failure.message);
         expect(d.close).toHaveBeenCalledOnce();
       }
+    }
+  });
+
+  it('says which kind of unknown it was, so a refused key is told from a timeout', async () => {
+    const kinds: [EmailConfirmation, string][] = [
+      [{ unknown: 'no-answer-in-time' }, 'it did not answer in time'],
+      [{ unknown: 'no-connection' }, 'it could not be reached'],
+      [{ unknown: 'key-refused', status: 401 }, 'it refused the key, status 401'],
+      [{ unknown: 'key-refused', status: 403 }, 'it refused the key, status 403'],
+      [{ unknown: 'setting-missing' }, 'it answered without the setting'],
+      [{ unknown: 'unexpected-answer', status: 302 }, 'it gave an unexpected answer, status 302'],
+      [{ unknown: 'unexpected-answer' }, 'it gave an unexpected answer'],
+    ];
+    for (const [answer, reason] of kinds) {
+      const failure = await requireEmailConfirmation(answering(answer)).catch((e: unknown) => e);
+      expect(String(failure)).toBe(`StartupError: ${unknown(reason)}`);
+      expectNothingPrivate(String(failure));
+    }
+  });
+
+  it('lets only a fixed kind and a status number into the sentence, whatever the adapter says', async () => {
+    // Answers no adapter should give, as a faulty or hostile one might at run time.
+    const odd: unknown[] = [
+      'unknown',
+      { unknown: serviceWords },
+      { unknown: 'toString' },
+      { unknown: 'key-refused', status: serviceWords },
+      { unknown: 'key-refused', status: 401.5 },
+      { unknown: 'key-refused', status: 1e21 },
+      { unknown: 'unexpected-answer', status: -302 },
+      { unknown: 'setting-missing', words: serviceWords, token: madeUpToken },
+      { status: 200 },
+      { on: true },
+      'yes',
+      true,
+      null,
+      undefined,
+      new Error(serviceWords),
+    ];
+    for (const answer of odd) {
+      const adapter = {
+        emailConfirmation: async () => answer,
+      } as unknown as EmailConfirmationQuestion;
+      const failure = await requireEmailConfirmation(adapter).catch((e: unknown) => e);
+      // Never yes, and never anything of what the adapter put in.
+      expect(failure).toBeInstanceOf(Error);
+      expect(String(failure)).toMatch(/could not say whether it confirms email addresses/);
+      expectNothingPrivate(String(failure));
+      // None of these has a status that is a whole number in HTTP's range.
+      expect(String(failure)).not.toMatch(/status/);
     }
   });
 
@@ -250,8 +315,12 @@ describe('email confirmation on the real sign-in service (step 2.115)', () => {
   it('requireEmailConfirmation: on passes; off, unknown and a throw stop it', async () => {
     await expect(requireEmailConfirmation(answering('on'))).resolves.toBeUndefined();
     await expect(requireEmailConfirmation(answering('off'))).rejects.toThrow(off);
-    await expect(requireEmailConfirmation(answering('unknown'))).rejects.toThrow(unknown);
-    await expect(requireEmailConfirmation(answering(new Error('down')))).rejects.toThrow(unknown);
+    await expect(
+      requireEmailConfirmation(answering({ unknown: 'setting-missing' })),
+    ).rejects.toThrow(unknown('it answered without the setting'));
+    await expect(requireEmailConfirmation(answering(new Error('down')))).rejects.toThrow(
+      unknown('the question itself failed'),
+    );
   });
 });
 
