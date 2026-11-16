@@ -250,8 +250,8 @@ if (browser) {
      * No person's or roster place's database id in the page's HTML, the data sent with it
      * included. The server's made-up database makes its ids as it starts, so this test
      * cannot know the seed's person ids by value; instead every id-shaped value in the HTML
-     * must be one the page links to openly (a game's address). A person's id, a roster
-     * place's or any other would be left over and fail.
+     * must be one the page links to openly (a game's address) or the league's own id. A
+     * person's id, a roster place's, a team's or any other would be left over and fail.
      */
     const noPersonIds = async (label) => {
       const idShape = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
@@ -263,7 +263,14 @@ if (browser) {
           )
         ).flatMap((href) => href.toLowerCase().match(idShape) ?? []),
       );
-      const others = [...new Set(html.match(idShape) ?? [])].filter((id) => !linked.has(id));
+      // The league's own id, which every page of the league carries for its own requests.
+      for (const [, id] of html.matchAll(/leagueid\\?":\\?"([0-9a-f-]{36})/g)) linked.add(id);
+      const others = [...new Set(html.match(idShape) ?? [])]
+        .filter((id) => !linked.has(id))
+        .map((id) => {
+          const at = html.indexOf(id);
+          return `${id} in "…${html.slice(Math.max(0, at - 60), at + 40)}…"`;
+        });
       note(
         `${slug}: ${label} holds no person's or roster place's id`,
         others.length === 0,

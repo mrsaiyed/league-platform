@@ -227,7 +227,8 @@ export async function loadTeamStats(
       ? []
       : [
           {
-            id: team.teamId,
+            // One row, the team's own: an opaque key, as the player rows have.
+            id: 'team-totals',
             cells: {
               team: team.name,
               ...Object.fromEntries(

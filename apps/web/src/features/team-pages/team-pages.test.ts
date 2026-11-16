@@ -250,6 +250,8 @@ describe('a team page', () => {
     expect(hidden?.totalsColumns[0]?.label).toBe('Team');
     expect(hidden?.totalsRows[0]?.cells['team']).toBe('Owls');
     expect(hidden?.totalsRows[0]?.chips?.['team']).toBe(owls?.team.color);
+    // An opaque key, not the team's database id.
+    expect(hidden?.totalsRows[0]?.id).toBe('team-totals');
     expect(owls?.team.color).toMatch(/^#[0-9a-f]{6}$/i);
     expect(JSON.stringify(hidden)).not.toContain('Castellanos');
     const falcons = await loadTeamHead(store, adult, s.id, 'falcons');
