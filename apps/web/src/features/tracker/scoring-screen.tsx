@@ -81,6 +81,7 @@ import {
 import {
   clockToggleTap,
   createTapRest,
+  startBarTap,
   takeBackTimeoutTap,
   tapTaken,
   type RestTimers,
@@ -141,6 +142,8 @@ const restTimers: RestTimers = {
  * stylesheet draws it not yet ready.
  */
 const restingPlaces = {
+  /** The pad's large Start clock button and its ×, after the pad comes to rest (M5). */
+  start: '[data-pad] [data-start-bar]',
   /** Start or Pause under the scoreboard, after a tap on it and after its word changes. */
   toggle: '[data-clock-toggle]',
   /** − on a team's timeouts, after a take-back (the area 4 review, M2). */
@@ -210,8 +213,6 @@ function taken(button: Element): () => void {
   return () => button.removeAttribute('data-taken');
 }
 
-/** How long the large Start clock button takes no tap once the pad has come to rest. */
-const restGuardMs = 350;
 /** How often the running clock is read (checklist T3: four times a second). */
 const tickMs = 250;
 
@@ -362,6 +363,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     }
   }, []);
   rests.current ??= {
+    start: createTapRest(restTimers, drawRests),
     toggle: createTapRest(restTimers, drawRests),
     minus: createTapRest(restTimers, drawRests),
     answers: createTapRest(restTimers, drawRests),
@@ -537,21 +539,14 @@ export function ScoringScreen(props: ScoringScreenProps) {
     return () => window.removeEventListener('resize', fit);
   }, [foulsShown]);
 
-  /** When the pad last came to rest on the screen: the Start clock button waits a moment. */
-  const restSince = useRef(0);
+  // The pad's Start clock button rests from the moment the pad comes to rest on the
+  // screen, and is drawn not yet ready for as long (tap-rest.ts): a tap made then is the
+  // second of two fast taps, meant for what was there a moment before. The button lies
+  // where no option lies, and this is the second guard.
   const padKind = pad.kind;
   useLayoutEffect(() => {
-    if (padKind === 'rest') restSince.current = performance.now();
-  }, [padKind]);
-  /**
-   * True for a tap on the pad's Start clock button made as the pad came to rest: the
-   * second of two fast taps, meant for what was there a moment before. It lies where no
-   * option lies, and this is the second guard.
-   */
-  const tooSoonAfterRest = (event: MouseEvent): boolean =>
-    event.detail !== 0 &&
-    event.currentTarget.closest('[data-pad]') !== null &&
-    event.timeStamp - restSince.current < restGuardMs;
+    if (padKind === 'rest') resting.start.begin();
+  }, [padKind, resting]);
 
   const keepPicks = useCallback(
     (next: LineupPicks) => {
@@ -747,9 +742,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       // review, M-a), so the second tap of a double tap is not a tap on Pause.
       const input =
         event.currentTarget.closest('[data-pad]') !== null
-          ? tooSoonAfterRest(event)
-            ? null
-            : ({ type: 'start' } as const)
+          ? startBarTap(resting.start, tapOf(event))
           : clockToggleTap('start', resting.toggle, tapOf(event));
       if (input === null) return;
       // The first tap of a game is often this one: the horn is made ready for later.
@@ -765,7 +758,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
       say(t('tracker.refusal.periodOver'));
     },
     hideStart(event) {
-      if (tooSoonAfterRest(event)) return;
+      // × is where the pad's own × is: the second of two fast taps on that one hides nothing.
+      if (!tapTaken(resting.start, tapOf(event))) return;
       setStartHiddenFor(stopKey(state, view.period));
       // Start is still one tap away, under the scoreboard: the keyboard goes there.
       focusNext.current = { selector: '[data-clock-toggle]' };

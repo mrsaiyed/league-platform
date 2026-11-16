@@ -5,6 +5,7 @@ import {
   clockToggleTap,
   createTapRest,
   restMs,
+  startBarTap,
   takeBackTimeoutTap,
   tapTaken,
   type RestTimers,
@@ -94,6 +95,59 @@ describe('a control that rests', () => {
     vi.advanceTimersByTime(1_000);
     expect(drawn).toEqual([false]);
     expect(rest.ready()).toBe(true);
+  });
+});
+
+describe('the pad’s Start clock button (the area 4 review, M5; the code review, M-c)', () => {
+  it('340 ms after the pad came to rest a tap is not taken, and the button shows not ready', () => {
+    const drawn: boolean[] = [];
+    const rest = createTapRest(timers, () => drawn.push(rest.ready()));
+    // The pad comes to rest: +2 was tapped, and the options closed.
+    rest.begin();
+    expect(drawn).toEqual([false]);
+    vi.advanceTimersByTime(340);
+    expect(startBarTap(rest, finger())).toBeNull();
+    expect(rest.ready()).toBe(false);
+    // A tap that is not taken changes nothing: the button is ready when it would have been.
+    expect(drawn).toEqual([false]);
+  });
+
+  it('360 ms after, it shows ready and a tap starts the clock', () => {
+    const drawn: boolean[] = [];
+    const rest = createTapRest(timers, () => drawn.push(rest.ready()));
+    rest.begin();
+    vi.advanceTimersByTime(360);
+    expect(drawn).toEqual([false, true]);
+    expect(rest.ready()).toBe(true);
+    expect(startBarTap(rest, finger())).toEqual({ type: 'start' });
+  });
+
+  it('the second tap of a double tap on an option never starts the clock, however fast', () => {
+    for (const apart of [50, 90, 150, 250, 349]) {
+      const rest = createTapRest(timers);
+      // The first tap closed the options and the pad came to rest; the second lands on
+      // the Start clock button `apart` ms later.
+      rest.begin();
+      vi.advanceTimersByTime(apart);
+      expect(startBarTap(rest, finger())).toBeNull();
+      rest.stop();
+    }
+  });
+
+  it('is as ready as it looks: never drawn ready while a tap would not be taken', () => {
+    const rest = createTapRest(timers);
+    rest.begin();
+    for (let at = 0; at <= 400; at += 10) {
+      if (rest.ready()) expect(startBarTap(rest, finger())).not.toBeNull();
+      vi.advanceTimersByTime(10);
+    }
+    expect(rest.ready()).toBe(true);
+  });
+
+  it('Enter and Space start the clock at once: no finger landed there by accident', () => {
+    const rest = createTapRest(timers);
+    rest.begin();
+    expect(startBarTap(rest, key())).toEqual({ type: 'start' });
   });
 });
 

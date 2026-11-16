@@ -44,6 +44,23 @@ const overlap = (a, b) =>
   b.left < a.right - 0.5 &&
   a.top < b.bottom - 0.5 &&
   b.top < a.bottom - 0.5;
+/** Every button drawn inside `within`, with where it is; `close` marks the pad's own ×. */
+const buttonsOf = (within) =>
+  within.locator('button').evaluateAll((els) =>
+    els
+      .filter((el) => el.getClientRects().length > 0)
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          name: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30),
+          close: el.matches('.court-close'),
+          left: r.left,
+          top: r.top,
+          right: r.right,
+          bottom: r.bottom,
+        };
+      }),
+  );
 
 /**
  * The steps of step 2.36. `kit` is what scoring-screen-test.mjs has for every step: its
@@ -117,21 +134,7 @@ export async function clockSteps(kit) {
       await tapWhereItIs(page, tile, 'a floor player');
       const options = c.pad.locator(`[data-options="${tileId}"]`);
       await options.waitFor();
-      const buttons = await options.locator('button').evaluateAll((els) =>
-        els
-          .filter((el) => el.getClientRects().length > 0)
-          .map((el) => {
-            const r = el.getBoundingClientRect();
-            return {
-              name: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 30),
-              close: el.matches('.court-close'),
-              left: r.left,
-              top: r.top,
-              right: r.right,
-              bottom: r.bottom,
-            };
-          }),
-      );
+      const buttons = await buttonsOf(options);
       const under = buttons.filter((b) => !b.close && overlap(b, startAt));
       const closeAt = buttons.find((b) => b.close);
       note(
@@ -172,6 +175,65 @@ export async function clockSteps(kit) {
           (await c.toggle.getAttribute('data-state')) === 'start' &&
           (await c.startButton.isVisible()),
         JSON.stringify({ twoOnPoints, twoOnFoul, twoOnClose }),
+      );
+
+      // --- Not yet ready, and seen to be (the area 4 review, M5). For a third of a second
+      // after the pad comes to rest the button takes no tap; a real tap made then used to
+      // do nothing and show nothing. It is now drawn hollow for exactly that long. Tapped
+      // and looked at inside the page, in one go, so the third of a second is not spent
+      // on the way to the browser and back.
+      if (!(await options.isVisible())) await tapWhereItIs(page, tile, 'a floor player');
+      await options.waitFor();
+      const rested = await page.evaluate(async () => {
+        const pad = document.querySelector('[data-pad]');
+        /** A tap as a finger makes it (a click with a pointer behind it), where the thing is. */
+        const tap = (el) =>
+          el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+        const look = () => {
+          const bar = pad.querySelector('[data-start-bar]');
+          if (bar === null) return null;
+          return {
+            resting: bar.hasAttribute('data-resting'),
+            ground: getComputedStyle(bar.querySelector('[data-start-clock]')).backgroundColor,
+            cross: getComputedStyle(bar.querySelector('[data-hide-start]')).opacity,
+          };
+        };
+        const began = performance.now();
+        tap(pad.querySelector('[data-options] .court-close'));
+        const early = look();
+        // The tap that used to be swallowed with no sign: made while the button rests.
+        const button = pad.querySelector('[data-start-clock]');
+        if (button !== null) tap(button);
+        const tappedAfter = performance.now() - began;
+        await new Promise((done) => setTimeout(done, 650));
+        return {
+          early,
+          tappedAfter,
+          late: look(),
+          clock: document.querySelector('[data-clock-toggle]').dataset.state,
+        };
+      });
+      const hollow = (ground) => /rgba\(0, 0, 0, 0\)|transparent/.test(ground ?? '');
+      note(
+        'for a third of a second after the pad comes to rest the Start clock button is drawn not yet ready: hollow, its × faint',
+        rested.early !== null &&
+          rested.early.resting &&
+          hollow(rested.early.ground) &&
+          Number(rested.early.cross) < 0.6,
+        JSON.stringify(rested.early),
+      );
+      note(
+        'a tap made then does not start the clock, and the button is seen not to have taken it',
+        rested.tappedAfter < 300 && rested.clock === 'start' && rested.early?.resting === true,
+        `tapped ${rested.tappedAfter.toFixed(0)} ms after the pad came to rest; the clock: ${rested.clock}`,
+      );
+      note(
+        'once it has rested it is drawn ready: filled, its × whole',
+        rested.late !== null &&
+          !rested.late.resting &&
+          !hollow(rested.late.ground) &&
+          Number(rested.late.cross) === 1,
+        JSON.stringify(rested.late),
       );
 
       // --- The large button starts the clock; Pause is a different word and shape (T2, T3).
@@ -1070,6 +1132,65 @@ export async function clockSteps(kit) {
         );
       });
       await accessible(page, 'the clock stopped, at a phone upright');
+
+      // Nothing that is tapped in the pad lies under the Start clock button, at every
+      // size (the code review, M-c: it was measured at 390 x 664 only). The pad returns
+      // to rest with each of these taps, so a second fast tap lands where the button is:
+      // a floor player's options, a team's whole bench, and a bench player's options.
+      for (const size of sizes) {
+        await page.setViewportSize({ width: size.width, height: size.height });
+        await twoFrames(page);
+        const label = `${size.width} x ${size.height}`;
+        await c.startButton.waitFor();
+        const [startAt, hideAt] = [await rectOf(c.startButton), await rectOf(c.hideStart)];
+        const measured = {};
+        const measure = async (what, within) => {
+          const buttons = await buttonsOf(within);
+          const close = buttons.find((b) => b.close);
+          measured[what] = {
+            buttons: buttons.length,
+            under: buttons.filter((b) => !b.close && overlap(b, startAt)).map((b) => b.name),
+            underCross: buttons.filter((b) => !b.close && overlap(b, hideAt)).map((b) => b.name),
+            crossOnCross: close !== undefined && overlap(close, hideAt),
+          };
+        };
+        const tile = floor(c, 'home');
+        await tile.click();
+        const floorOptions = c.pad.locator(
+          `[data-options="${await tile.getAttribute('data-player')}"]`,
+        );
+        await floorOptions.waitFor();
+        await measure('a floor player’s options', floorOptions);
+        await floorOptions.locator('.court-close').click();
+        await c.pad.locator('[data-rest]').waitFor();
+        // The bench's button is drawn only where the bench is folded away; it is there
+        // at every size, and opens the same panel.
+        await c.benchButton('home').evaluate((button) => button.click());
+        const bench = c.pad.locator('[data-bench-list="home"]');
+        await bench.waitFor();
+        await measure('the whole bench', bench);
+        await bench.locator('[data-bench-pick]').first().click();
+        const benchOptions = c.pad.locator('[data-options]');
+        await benchOptions.waitFor();
+        await measure('a bench player’s options', benchOptions);
+        await benchOptions.locator('.court-close').click();
+        await c.pad.locator('[data-rest]').waitFor();
+        const all = Object.values(measured);
+        note(
+          `${label}: no option, substitute or bench player lies under the Start clock button, and only the pad’s own × lies under its ×`,
+          all.length === 3 &&
+            all.every(
+              (one) =>
+                one.buttons >= 6 &&
+                one.under.length === 0 &&
+                one.underCross.length === 0 &&
+                one.crossOnCross,
+            ),
+          JSON.stringify(measured),
+        );
+      }
+      await page.setViewportSize({ width: phone.width, height: phone.height });
+      await twoFrames(page);
 
       await c.startClock();
       await atEverySize('the clock running', async (size, label) => {

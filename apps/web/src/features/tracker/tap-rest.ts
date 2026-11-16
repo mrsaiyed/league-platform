@@ -3,16 +3,17 @@
 // tap is taken, and when it shows ready again.
 //
 // A scorekeeper double-taps. The second tap lands a tenth to a third of a second after the
-// first, on whatever is under the finger by then: Pause where Start was, − again after
-// the list has lost its latest timeout, an answer where the timeout button was. None of
-// those second taps was meant, and each would change the game. So such a control RESTS
-// for a third of a second after it comes under the finger, and a pointer's tap in that
-// time is not taken.
+// first, on whatever is under the finger by then: the Start clock button the pad shows
+// once a player's options close, Pause where Start was, − again after the list has lost
+// its latest timeout, an answer where the timeout button was. None of those second taps
+// was meant, and each would change the game. So such a control RESTS for a third of a
+// second after it comes under the finger, and a pointer's tap in that time is not taken.
 //
-// A tap that is not taken must never look as if it were. So the rest is also something
-// the screen SHOWS: `ready()` is false while the control rests, the screen draws it not
-// yet ready (dimmed), and `drawn` is called when that changes, at the start of the rest
-// and at its end.
+// A tap that is not taken must never look as if it were (M5: a real tap was swallowed
+// with no sign, and the scorekeeper carried on believing the clock ran). So the rest is
+// also something the screen SHOWS: `ready()` is false while the control rests, the screen
+// draws it not yet ready (hollow, or dimmed), and `drawn` is called when that changes, at
+// the start of the rest and at its end.
 import type { TapInput } from './tracker-controller.ts';
 
 /** How long a control rests: longer than a double tap, shorter than a second thought. */
@@ -86,6 +87,17 @@ export function clockToggleTap(kind: 'start' | 'pause', rest: TapRest, tap: Tap)
   rest.begin(tap.at);
   return { type: kind };
 }
+
+/**
+ * The pad's large Start clock button tapped (checklist T7; the area 4 review, M5, and the
+ * code review, M-c): the tap that starts the clock, or null while the pad has only just
+ * come to rest. The pad returns to rest with +1, +2, +3, Foul, a substitute and ×, and
+ * the second tap of a double tap on one of those must never start the clock. The screen
+ * begins the rest when the pad comes to rest, and draws the button not yet ready for as
+ * long, so a tap that is not taken was plainly not taken.
+ */
+export const startBarTap = (rest: TapRest, tap: Tap): TapInput | null =>
+  tapTaken(rest, tap) ? { type: 'start' } : null;
 
 /**
  * − tapped on a team's timeouts (G7; M2): the tap that takes the latest one back, or null

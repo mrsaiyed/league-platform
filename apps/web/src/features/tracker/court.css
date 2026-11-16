@@ -1252,6 +1252,19 @@
   background: var(--court-gold);
   color: var(--court-gold-ink);
 }
+/* Not yet ready (the area 4 review of step 2.36, M5): for a third of a second after the
+   pad comes to rest the button takes no tap, because that tap is the second of a double
+   tap on +2, Foul or ×. A real tap made then used to do nothing and show nothing. So for
+   exactly that long the button is drawn hollow, as a tile's mark is hollow until its tap
+   is stored, and its × faint: the edge, the words and the place stay, so nothing moves,
+   and the green fills in the moment a tap will be taken. A state, not a movement: there
+   is nothing to stop for people who ask for less motion but the short ease further down. */
+.court-start[data-resting] .court-start-button {
+  background: transparent;
+}
+.court-start[data-resting] .court-close {
+  opacity: 0.4;
+}
 .court-start-words {
   display: flex;
   flex-wrap: wrap;
@@ -1926,10 +1939,16 @@
   [data-resting] > .court-opt {
     transition: none;
   }
-  .court-go {
+  .court-go,
+  .court-start-button {
     transition: background-color 120ms ease-out;
   }
-  .court-go[data-resting] {
+  .court-start .court-close {
+    transition: opacity 120ms ease-out;
+  }
+  .court-go[data-resting],
+  .court-start[data-resting] .court-start-button,
+  .court-start[data-resting] .court-close {
     transition: none;
   }
   /* The Start clock button's triangle breathes while the clock waits to be started, as
