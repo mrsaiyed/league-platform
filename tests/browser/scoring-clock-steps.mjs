@@ -1821,15 +1821,26 @@ export async function clockSteps(kit) {
             withPlayed: widthOf(core) + after.width,
             withWhere: widthOf(where) + widthOf(core) + after.width,
             px: Number.parseFloat(getComputedStyle(el).fontSize),
+            space: (() => {
+              // One space as wide as the line draws it, in the face it is drawn in.
+              const probe = document.createElement('span');
+              probe.style.cssText = 'position: absolute; visibility: hidden; white-space: pre;';
+              probe.textContent = ' ';
+              el.append(probe);
+              const width = probe.getBoundingClientRect().width;
+              probe.remove();
+              return width;
+            })(),
           };
         });
-        // A space's width of doubt: a word that wraps away is measured without its space.
-        const noRoom = (needs) => needs > facts.has - 6;
+        // A space's width of doubt, as wide as a space is in this face: a word that wraps
+        // away is measured without its space.
+        const noRoom = (needs) => needs > facts.has - facts.space;
         const offWhere = facts.leftOff.some((part) => /^On court/.test(part));
         const offPlayed = facts.leftOff.some((part) => /played/.test(part));
-        if (facts.leftOff.length > 0) {
-          console.log(`  ${label}: a picked player’s second line reads “${facts.shows}”`);
-        }
+        console.log(
+          `  ${label}: a picked player’s second line reads “${facts.shows}”: ${facts.has.toFixed(1)} wide, ${facts.withPlayed.toFixed(1)} needed with "played", ${facts.withWhere.toFixed(1)} with "On court" too, a space ${facts.space.toFixed(1)}`,
+        );
         note(
           `${label}: a picked player’s second line is whole, to the end of the minutes`,
           /^(On court · )?\d+ fouls? · \d+ pts · \d+:\d\d( played)?$/.test(facts.shows) &&
