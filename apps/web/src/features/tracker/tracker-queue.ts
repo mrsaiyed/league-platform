@@ -175,6 +175,13 @@ export type TrackerQueue = {
    * list survives a reload (T6 §5). A halt is cleared as `forget` clears it.
    */
   setAside(commandIds: readonly string[]): Promise<void>;
+  /**
+   * Takes waiting taps back before they are sent (step 2.37: "Take back End game"). No
+   * batch goes out while this runs: it waits for the one on its way, then drops those of
+   * `commandIds` the device still holds waiting. Resolves with the ones dropped; a tap the
+   * server took meanwhile is not among them, and stays taken.
+   */
+  withdraw(commandIds: readonly string[]): Promise<readonly string[]>;
   /** The scorekeeper has seen these notices (record 058): they are dropped. */
   dismissNotices(commandIds: readonly string[]): void;
   status(): QueueStatus;
@@ -226,6 +233,8 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
   let singlesLeft = 0;
   let cancelRetry: (() => void) | null = null;
   let pumping: Promise<void> | null = null;
+  /** Taps are being taken back (`withdraw`): nothing is sent until that is done. */
+  let withdrawing = 0;
   let again = false;
   let readsStarted = 0;
   let readsShown = 0;
@@ -275,6 +284,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
 
   const kick = (): void => {
     if (!started || stopped || current.halted !== null || cancelRetry !== null) return;
+    if (withdrawing > 0) return;
     if (pumping !== null) {
       again = true;
       return;
@@ -439,7 +449,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     try {
       for (;;) {
         again = false;
-        if (stopped || current.halted !== null) return;
+        if (stopped || current.halted !== null || withdrawing > 0) return;
         const session = sessionId();
         if (session === null) return;
         const batch = nextBatch(await refresh(), session);
@@ -519,6 +529,23 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     forget: (commandIds) => putAway(commandIds, []),
 
     setAside: (commandIds) => putAway([], commandIds),
+
+    async withdraw(commandIds) {
+      withdrawing += 1;
+      try {
+        while (pumping !== null) await pumping;
+        const list = await refresh();
+        const held = new Set(
+          list.flatMap((entry) => (entry.state === 'waiting' ? [entry.command.commandId] : [])),
+        );
+        const dropped = commandIds.filter((id) => held.has(id));
+        if (dropped.length > 0) await putAway(dropped, []);
+        return dropped;
+      } finally {
+        withdrawing -= 1;
+        kick();
+      }
+    },
 
     dismissNotices(commandIds) {
       const seen = new Set(commandIds);

@@ -39,16 +39,26 @@
 //   the steady clock (iPads, Macs) is told from the wall clock running ahead of it and
 //   carried over at once; `awake()` then measures again. Taps are timed by it, and the
 //   screens paint the clock from it.
+// - Undo, Redo and End game are taps like any other (step 2.37): applied at once, kept,
+//   sent in order. An End the server does not have yet can be taken back on the device
+//   alone (`takeBackEnd`). Reopening and marking not started are not taps: each is asked
+//   of the server once nothing is waiting to send (`reopen`, `markNotStarted`), and on
+//   success the device takes the session again and carries on in place.
 import {
   isTablePlayerCommand,
   sessionRenewSeconds,
   type BatchCommand,
+  type NotStartedReason,
+  type NotStartedRefusal,
+  type ReopenOffer,
+  type ReopenRefusalCode,
   type SessionReply,
   type SessionRequest,
   type TrackerCommand,
 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import type { CommandTransport } from './command-transport.ts';
+import type { GameDoors } from './game-doors.ts';
 import {
   QueueError,
   keptTap,
@@ -180,6 +190,43 @@ export type TakeOverResult =
   /** No answer: try again when the network is back. */
   | { readonly ok: false; readonly reason: 'unanswered' };
 
+/** Taking back an End game tap the server does not have yet (step 2.37). */
+export type TakeBackEndResult =
+  | { readonly ok: true }
+  /** The game shown was not ended on this device, or its End is no longer waiting. */
+  | { readonly ok: false; readonly reason: 'not-waiting' }
+  /** The server took the End while it was being taken back: the game is final; Reopen is the way. */
+  | { readonly ok: false; readonly reason: 'already-saved' }
+  | { readonly ok: false; readonly reason: 'storage' };
+
+/** Why a door (Reopen, Mark not started) did not open, when the server did not say. */
+export type DoorProblem =
+  /** This device has no doors (a test without them), or no game is loaded. */
+  | 'not-offered'
+  /** Plays are still waiting to send: the door is asked only once the server has them all. */
+  | 'plays-waiting'
+  /** No answer: no connection. Tapping again asks again. */
+  | 'unanswered'
+  | 'signed-out'
+  /** The server turned the request away whole (not allowed, no such game, not a request). */
+  | 'rejected';
+
+export type ReopenResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: DoorProblem }
+  /** The server's own refusal, and who ended the game when that is why. */
+  | {
+      readonly ok: false;
+      readonly reason: 'refused';
+      readonly code: ReopenRefusalCode;
+      readonly endedBy: string | null;
+    };
+
+export type MarkNotStartedResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: DoorProblem }
+  | { readonly ok: false; readonly reason: 'refused'; readonly code: NotStartedRefusal };
+
 export type TrackerControllerOptions = {
   readonly gameId: string;
   /** This device's own id, made once and kept on it (T-116). */
@@ -187,6 +234,11 @@ export type TrackerControllerOptions = {
   readonly storage: QueueStorage;
   readonly transport: CommandTransport;
   readonly server: TrackerServer;
+  /**
+   * Reopening and marking not started (game-doors.ts). Left out, neither is offered:
+   * the calls answer `not-offered`.
+   */
+  readonly doors?: GameDoors;
   /** The steady clock the server's time is measured against (finding M3), and the timers. */
   readonly clock?: QueueClock;
   /**
@@ -228,8 +280,33 @@ export type TrackerController = {
    * page wires it (step 2.38); this lane has no page.
    */
   awake(): void;
-  /** The scorekeeper has seen the refused taps: they are dropped for good. */
-  dismissNotApplied(): Promise<void>;
+  /**
+   * Takes back an End game tap that has not reached the server (step 2.37): on the device
+   * alone, with no reason asked and with no signal. The game shown is live again, as it
+   * was before the tap. If the server took the End meanwhile, nothing is taken back.
+   */
+  takeBackEnd(): Promise<TakeBackEndResult>;
+  /**
+   * Asks whether Reopen is offered to this account now and until when (S-36), so nobody
+   * types a reason and is then told it is too late. Null when there was no answer.
+   */
+  reopenOffer(): Promise<ReopenOffer | null>;
+  /**
+   * Reopens a game the server has as final (step 2.120), once nothing is waiting to
+   * send, and carries on scoring in place: the session is taken again and the game
+   * loaded, with no "game over" notice between and no reload.
+   */
+  reopen(reason: string): Promise<ReopenResult>;
+  /**
+   * Marks a game that went live by mistake "not started" (step 2.121), once nothing is
+   * waiting to send, and carries on in place with the scheduled game the server now has.
+   */
+  markNotStarted(reason?: NotStartedReason): Promise<MarkNotStartedResult>;
+  /**
+   * The scorekeeper has seen the refused taps: they are dropped for good. `only`: just
+   * these (an End game the screen has said was refused), the rest stay listed.
+   */
+  dismissNotApplied(only?: readonly string[]): Promise<void>;
   /** The scorekeeper has seen the taps not saved: they are dropped for good. */
   dismissNotSaved(): Promise<void>;
   /**
@@ -1035,6 +1112,78 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     return open();
   };
 
+  // --- The doors: Reopen and Mark not started (step 2.37; game-doors.ts). ---
+
+  /** A door is being gone through: no tap is taken until the device scores again. */
+  let throughDoor = false;
+  /** The reopen being asked for: its id is sent again with every retry (reopen-game.ts). */
+  let reopening: { readonly requestId: string; readonly reason: string } | null = null;
+
+  /** Sends what waits and says whether the server now has every tap of this device. */
+  const nothingWaiting = async (): Promise<boolean> => {
+    queue.wake();
+    await queue.idle();
+    return queue.status().waiting === 0;
+  };
+
+  /**
+   * The number of the last tap this device knows the server has: the queue's, from the
+   * latest batch it took, or the loaded state's when this device has sent nothing since.
+   */
+  const knownSequence = (): number => Math.max(queue.status().sequence ?? 0, base?.sequence ?? 0);
+
+  /**
+   * A door opened: the game is live again, or scheduled again, on the server, and the
+   * session this device had ended with it. The session is taken again and the game
+   * loaded, quietly: the mode shown stays what it is until the device scores, so the
+   * screen is never swapped for "Opening the game…" and nothing says "game over".
+   * Only if the server does not answer now does the device fall back to opening the
+   * game as it does at the start, which keeps trying.
+   */
+  const carryOn = async (): Promise<void> => {
+    stopScoring();
+    const opened = await session({ type: 'open', deviceId });
+    if (opened.kind === 'unanswered') {
+      update({ mode: { kind: 'opening' } });
+      return later(open);
+    }
+    failures = 0;
+    if (opened.kind === 'rejected') return readOnly(reasonOfStatus(opened.httpStatus));
+    const reply = opened.value;
+    if (reply.status !== 'held-by-you') return notHeld(reply);
+    return hold(reply.sessionId);
+  };
+
+  /** Goes through a door: one at a time, with no tap taken meanwhile. */
+  const door = async <T>(
+    work: (doors: GameDoors) => Promise<T>,
+  ): Promise<T | { readonly ok: false; readonly reason: DoorProblem }> => {
+    const { doors } = options;
+    if (doors === undefined || stopped || throughDoor || current.game === null) {
+      return { ok: false, reason: 'not-offered' };
+    }
+    throughDoor = true;
+    try {
+      // Every tap first: the door is judged on the game as the server has it.
+      if (!(await nothingWaiting())) return { ok: false, reason: 'plays-waiting' };
+      return await work(doors);
+    } finally {
+      throughDoor = false;
+    }
+  };
+
+  /** What a door's outcome means when it is not the door's own answer. */
+  const doorProblem = (outcome: Exclude<ServerOutcome<unknown>, { kind: 'answer' }>) =>
+    ({
+      ok: false,
+      reason:
+        outcome.kind === 'unanswered'
+          ? 'unanswered'
+          : outcome.httpStatus === 401
+            ? 'signed-out'
+            : 'rejected',
+    }) as const;
+
   return {
     async start() {
       if (stopped) return;
@@ -1044,7 +1193,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     tap(input) {
       return serially(async (): Promise<TapResult> => {
         const game = current.game;
-        if (current.mode.kind !== 'scoring' || game === null || base === null) {
+        if (current.mode.kind !== 'scoring' || game === null || base === null || throughDoor) {
           return { ok: false, reason: 'not-scoring' };
         }
         const command: TrackerCommand = { commandId: newCommandId(), at: serverNow(), input };
@@ -1167,8 +1316,108 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       backOnline();
     },
 
-    async dismissNotApplied() {
-      const ids = current.notApplied.map((r) => r.command.commandId);
+    takeBackEnd() {
+      return serially(async (): Promise<TakeBackEndResult> => {
+        const end = [...made].reverse().find((c) => isTap(c) && c.input.type === 'end');
+        if (end === undefined || current.game?.status !== 'final' || base === null) {
+          return { ok: false, reason: 'not-waiting' };
+        }
+        let dropped: readonly string[];
+        try {
+          dropped = await queue.withdraw([end.commandId]);
+        } catch {
+          return { ok: false, reason: 'storage' };
+        }
+        // Not held waiting any more: the server took it. The game is final there.
+        if (!dropped.includes(end.commandId)) return { ok: false, reason: 'already-saved' };
+        made = made.filter((c) => c.commandId !== end.commandId);
+        // The End stopped the clock. Taken back, the clock stays stopped where the End
+        // found it, as it does after a reopen (step 2.120): the scorekeeper starts it.
+        const before = replay(base, made);
+        if (basketball.clockAt(before, end.at).running) {
+          const pause: TrackerCommand = {
+            commandId: newCommandId(),
+            at: end.at,
+            input: { type: 'pause' },
+          };
+          try {
+            await queue.enqueue(pause, momentIn(before, end.at));
+            made.push(pause);
+          } catch {
+            // Not kept, so not shown: the game is live with its clock running on.
+          }
+        }
+        showGame();
+        return { ok: true };
+      });
+    },
+
+    async reopenOffer() {
+      const { doors } = options;
+      if (doors === undefined || stopped) return null;
+      const asked = await track(ask((signal) => doors.reopenOffer(signal)));
+      return asked.kind === 'answer' ? asked.value : null;
+    },
+
+    reopen(reason) {
+      return track(
+        door<ReopenResult>(async (doors) => {
+          const asking =
+            reopening !== null && reopening.reason === reason
+              ? reopening
+              : { requestId: newCommandId(), reason };
+          reopening = asking;
+          const sequence = knownSequence();
+          const asked = await ask((signal) =>
+            doors.reopen({ ...asking, ...(sequence > 0 ? { sequence } : {}) }, signal),
+          );
+          // No answer: the same request goes again, and one the server took is answered
+          // "reopened" again.
+          if (asked.kind !== 'answer') return doorProblem(asked);
+          reopening = null;
+          const reply = asked.value;
+          if (reply.status === 'refused') {
+            // Live on the server already (reopened from elsewhere): carry on with it.
+            if (reply.code !== 'game-not-decided') {
+              // Moved on since this device looked: it reads the game again.
+              if (reply.code === 'changed-since-read') void track(load());
+              return {
+                ok: false,
+                reason: 'refused',
+                code: reply.code,
+                endedBy: reply.endedBy?.displayName ?? null,
+              };
+            }
+          }
+          await carryOn();
+          return { ok: true };
+        }),
+      );
+    },
+
+    markNotStarted(reason) {
+      return track(
+        door<MarkNotStartedResult>(async (doors) => {
+          const request = {
+            sequence: knownSequence(),
+            ...(reason === undefined ? {} : { reason }),
+          };
+          const asked = await ask((signal) => doors.markNotStarted(request, signal));
+          if (asked.kind !== 'answer') return doorProblem(asked);
+          const reply = asked.value;
+          if (reply.status === 'refused') {
+            if (reply.code === 'changed-since-read') void track(load());
+            return { ok: false, reason: 'refused', code: reply.code };
+          }
+          await carryOn();
+          return { ok: true };
+        }),
+      );
+    },
+
+    async dismissNotApplied(only) {
+      const all = current.notApplied.map((r) => r.command.commandId);
+      const ids = only === undefined ? all : all.filter((id) => only.includes(id));
       if (ids.length > 0) await track(queue.forget(ids));
     },
 
