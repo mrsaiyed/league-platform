@@ -39,6 +39,7 @@ const problems = {
   'nothing-to-publish': () => t('schedule.admin.error.nothing-to-publish'),
   'round-in-use': () => t('schedule.admin.error.round-in-use'),
   'round-cannot-be-added': () => t('schedule.admin.error.round-cannot-be-added'),
+  'nothing-to-put-back': () => t('schedule.admin.error.nothing-to-put-back'),
 } as const;
 
 const reasons = {

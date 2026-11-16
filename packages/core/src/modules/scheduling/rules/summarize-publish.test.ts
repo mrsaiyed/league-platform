@@ -1,7 +1,47 @@
 import { describe, expect, it } from 'vitest';
 import { applyDraft } from './apply-draft.ts';
 import { baseState, game } from './schedule-test-data.ts';
-import { summarizePublish } from './summarize-publish.ts';
+import { publishChangeCount, summarizePublish } from './summarize-publish.ts';
+
+describe('publishChangeCount (step 2.161)', () => {
+  it('counts what publishing would change, not the draft’s entries', () => {
+    const published = baseState();
+    const g1 = published.games[0] ?? game('g1');
+    // A published game removed and put back as it was: two entries, no change.
+    const back = applyDraft(
+      published,
+      [
+        { kind: 'remove-game', gameId: 'g1' },
+        { kind: 'add-game', game: { ...g1 } },
+      ],
+      [],
+    );
+    expect(back.rejected).toEqual([]);
+    expect(publishChangeCount(summarizePublish(published, back.state))).toBe(0);
+    // A new game added, removed and put back: three entries, one change.
+    const added = game('g9', { homeTeamId: 'c', awayTeamId: 'a', time: '20:00' });
+    const fresh = applyDraft(
+      published,
+      [
+        { kind: 'add-game', game: added },
+        { kind: 'remove-game', gameId: 'g9' },
+        { kind: 'add-game', game: added },
+      ],
+      [],
+    );
+    expect(publishChangeCount(summarizePublish(published, fresh.state))).toBe(1);
+    // A move and a renamed round: two.
+    const two = applyDraft(
+      published,
+      [
+        { kind: 'move-game', gameId: 'g2', to: { ...game('g2'), time: '20:30' } },
+        { kind: 'rename-round', roundId: 'r1', label: 'Opening week' },
+      ],
+      [],
+    );
+    expect(publishChangeCount(summarizePublish(published, two.state))).toBe(2);
+  });
+});
 
 describe('summarizePublish (P7 §4.4)', () => {
   it('has nothing to say when nothing changed', () => {

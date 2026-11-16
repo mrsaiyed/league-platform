@@ -1587,6 +1587,8 @@ export const en = {
   'schedule.admin.noDraft': 'There is no draft yet. You are looking at the published schedule.',
   'schedule.admin.draftChanges_one': 'Draft in progress: {count} change not yet published.',
   'schedule.admin.draftChanges_other': 'Draft in progress: {count} changes not yet published.',
+  'schedule.admin.draftChangesNone':
+    'Draft in progress: as it stands it changes nothing in the published schedule.',
   'schedule.admin.draftOutOfDate':
     'A new version of the schedule was published after this draft was started. Discard the draft and start again from the published schedule.',
   'schedule.admin.rejected_one':
@@ -1628,7 +1630,10 @@ export const en = {
   'schedule.admin.savedGame': 'Saved to the draft: {game}.',
   'schedule.admin.savedGameRemoved': 'Saved to the draft: a game was removed here.',
   // Removing a game from the draft, and putting it back in one tap (step 2.161).
-  'schedule.admin.savedGameRemovedNamed': 'Removed: {game}.',
+  'schedule.admin.savedGameRemovedNamed': 'Removed: {game}, {round}.',
+  'schedule.admin.savedGameRemovedNoRound': 'Removed: {game}, from the games with no round.',
+  'schedule.admin.error.nothing-to-put-back':
+    'That game is no longer waiting to be put back: the draft was published or discarded since, so nothing was added.',
   'schedule.admin.removedDraftOnly':
     'It was only in the draft, so nothing public has changed. Put it back and it is exactly as it was.',
   'schedule.admin.removedPublished':
