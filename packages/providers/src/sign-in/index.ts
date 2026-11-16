@@ -6,6 +6,10 @@ export { isAllowedReturnAddress, type ReturnAddressRules } from './return-addres
 export { signInDefaults, type SignInSettings } from './sign-in-settings.ts';
 export { createSupabaseSignIn, type SupabaseSignInOptions } from './supabase/supabase-sign-in.ts';
 export { SupabaseAuthUnexpected, type FetchLike } from './supabase/gotrue-client.ts';
+export {
+  createSupabaseEmailConfirmation,
+  type SupabaseEmailConfirmationOptions,
+} from './supabase/email-confirmation.ts';
 export type * from './supabase/sign-in-store.ts';
 export {
   createMemorySignInStore,

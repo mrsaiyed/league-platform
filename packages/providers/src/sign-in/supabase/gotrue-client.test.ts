@@ -107,6 +107,53 @@ describe('the Supabase Auth client', () => {
     expect(String(error)).not.toMatch(/ana@|r-1|not-a-jwt/);
   });
 
+  it('never follows a redirect, so the secret key never goes where it points', async () => {
+    const elsewhere = 'https://elsewhere.example.test/catch';
+    // As the real fetch does: unless told `manual`, it follows a redirect with the
+    // same headers and hands back the answer from where it pointed.
+    const reached: Record<string, string>[] = [];
+    const seen: Parameters<FetchLike>[1][] = [];
+    const following: FetchLike = async (url, init) => {
+      seen.push(init);
+      if (url.startsWith(elsewhere)) throw new Error('only the redirect points here');
+      if (init.redirect === 'manual') {
+        return new Response(null, { status: 302, headers: { location: elsewhere } });
+      }
+      reached.push(init.headers);
+      return Response.json({
+        mailer_autoconfirm: false,
+        access_token: accessToken,
+        refresh_token: 'r-1',
+        user: { id: 'u-1', email: 'ana@example.test' },
+        properties: { email_otp: '123456', verification_type: 'magiclink' },
+      });
+    };
+    const client = createGoTrueClient({ projectUrl, secretKey, fetch: following });
+    const calls: [string, () => Promise<unknown>][] = [
+      ['generate_link', () => client.generateCode('magiclink', 'ana@example.test')],
+      ['verify', () => client.verifyCode('magiclink', 'ana@example.test', '123456')],
+      ['verify nothing', () => client.verifyNothing('made-up-hash')],
+      ['user update', () => client.setPassword(accessToken, 'a password here')],
+      ['password sign-in', () => client.signInWithPassword('ana@example.test', 'a password')],
+      ['refresh', () => client.refresh('r-1')],
+      ['pkce exchange', () => client.exchangeCode('code-1', 'verifier-1')],
+      ['user', () => client.user(accessToken)],
+      ['logout', () => client.signOut(accessToken, 'local')],
+      ['settings', () => client.settings()],
+    ];
+    for (const [name, make] of calls) {
+      const error = await make().then(
+        () => new Error(`${name} took the redirect's answer`),
+        (e: unknown) => e,
+      );
+      expect(error, name).toBeInstanceOf(SupabaseAuthUnexpected);
+      expect((error as SupabaseAuthUnexpected).status, name).toBe(302);
+    }
+    expect(reached).toEqual([]);
+    expect(seen).toHaveLength(calls.length);
+    for (const init of seen) expect(init.redirect).toBe('manual');
+  });
+
   it('gives up on a call with no answer in time, and stops the timer after one that answers', async () => {
     const timers: { ms: number; fire: () => void; stopped: boolean }[] = [];
     const startTimer = (ms: number, fire: () => void) => {
