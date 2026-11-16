@@ -81,6 +81,27 @@ test('the web browser tests run in groups 1 to n that together hold every test o
   }
 });
 
+test("vitest's tests run in parts 1 to n, by vitest's own --shard", () => {
+  const lines = jobs['vitest-tests'].join('\n');
+  const matrix = /^\s+shard: \[([\d, ]+)\]\s*$/m.exec(lines);
+  assert.ok(matrix, 'the vitest-tests job has a matrix of parts');
+  const shards = matrix[1].split(',').map((n) => Number(n.trim()));
+  assert.deepEqual(
+    shards,
+    Array.from({ length: shards.length }, (_, i) => i + 1),
+  );
+  assert.match(
+    lines,
+    /npm run test:units -- --shard=\$\{\{ matrix\.shard \}\}\/\$\{\{ strategy\.job-total \}\} /,
+  );
+  assert.match(lines, /^\s+fail-fast: false\s*$/m);
+  // No other job runs a part of a matrix: every other job's commands are whole.
+  for (const [id, other] of Object.entries(jobs)) {
+    if (id === 'vitest-tests' || id === 'web-browser') continue;
+    assert.doesNotMatch(other.join('\n'), /matrix|--shard|--group/, id);
+  }
+});
+
 test('no job waits on another or can be skipped, and each starts as the single job did', () => {
   assert.ok(Object.keys(jobs).length >= 6, Object.keys(jobs).join(', '));
   for (const [id, lines] of Object.entries(jobs)) {

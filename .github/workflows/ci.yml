@@ -57,9 +57,16 @@ jobs:
         if: failure()
         shell: bash
         run: node scripts/verify-failure-notes.mjs "$RUNNER_TEMP/verify-output.txt"
+  # vitest's own --shard=k/n splits its test files into n parts, each file in one part;
+  # vitest.reporter.ts already proves each part's results (step 2.145). The number of parts
+  # is the number of entries below; they must be 1 to n.
   vitest-tests:
-    name: unit tests (vitest)
+    name: unit tests (vitest ${{ matrix.shard }} of ${{ strategy.job-total }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -71,7 +78,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          npm run test:units 2>&1 | tee "$RUNNER_TEMP/verify-output.txt"
+          npm run test:units -- --shard=${{ matrix.shard }}/${{ strategy.job-total }} 2>&1 | tee "$RUNNER_TEMP/verify-output.txt"
       - name: Say what failed in verify
         if: failure()
         shell: bash
