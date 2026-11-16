@@ -126,7 +126,10 @@ export async function markLeftAction(form: FormData): Promise<never> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     const input = markLeftInput(fields);
     const result = await markLeft(context, input, ports.deps);
-    if (result.ok) return { answer: done('left'), teamId: fields['team'] };
+    // Said on the player's "left" line, naming them and the team.
+    if (result.ok) {
+      return { answer: done('left', { entry: input.rosterEntryId }), teamId: fields['team'] };
+    }
     // Said beside the line's leaving date, with the date typed kept in it.
     const at = { entry: input.rosterEntryId, leftOn: input.leftOn };
     return { answer: refused(markLeft.commandName, result.error.code, at), teamId: fields['team'] };

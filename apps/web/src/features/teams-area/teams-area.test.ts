@@ -196,6 +196,33 @@ describe('answers in the address', () => {
     expect(saidOnLine(doneAtOf({ done: 'putBack', entry: 'x' }), lines, 'Falcons')).toBeUndefined();
   });
 
+  it('names who left and which team, on their "left" line', () => {
+    const entry = '01900000-0000-7000-8000-0000000e0002';
+    const left = {
+      id: entry,
+      teamId: 't',
+      personId: 'p',
+      jerseyNumber: '11',
+      role: 'player',
+      joinedOn: null,
+      leftOn: '2026-11-13',
+      sort: 0,
+      version: 2,
+      firstName: 'Marcus',
+      lastName: 'Oyelaran',
+      publicName: null,
+    };
+    expect(answerQuery(done('left', { entry }))).toBe(`?done=left&entry=${entry}#entry-${entry}`);
+    expect(saidOnLine(doneAtOf({ done: 'left', entry }), [left], 'Falcons')).toEqual({
+      entry,
+      text: 'Marcus Oyelaran was marked as having left Falcons.',
+    });
+    // Not said if the line no longer shows them as left.
+    expect(
+      saidOnLine(doneAtOf({ done: 'left', entry }), [{ ...left, leftOn: null }], 'Falcons'),
+    ).toBeUndefined();
+  });
+
   it('offers "Put back" only where it can work, and says why not in words', () => {
     const list = (ids: string[], complete = true) => ({ ids: new Set(ids), complete });
     expect(putBackOffer('p1', new Set(), list(['p1']))).toBe('offer');
