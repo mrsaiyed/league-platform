@@ -35,7 +35,7 @@ export function displayLabels(t: Translate) {
       player: t('display.player'),
       total: t('display.total'),
     },
-    stats: { sortBy: t('display.sortBy') },
+    stats: { sortBy: t('display.sortBy'), noValue: t('display.noValue') },
     live: t('display.live'),
     round: t('display.round'),
     season: t('display.season'),

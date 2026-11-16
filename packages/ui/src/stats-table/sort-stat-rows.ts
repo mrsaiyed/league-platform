@@ -18,6 +18,11 @@ export type StatRow = {
    * player is that team's alone.
    */
   readonly severalTeams?: Readonly<Record<string, boolean>>;
+  /**
+   * The number behind a cell that is drawn as words ("1,204" or "24.3"), by the column's
+   * key: the column is sorted by it, so a written number is never ordered as text.
+   */
+  readonly sortValues?: Readonly<Record<string, number>>;
 };
 
 export type SortDirection = 'ascending' | 'descending';
@@ -34,7 +39,11 @@ export function sortStatRows<R extends StatRow>(
   const collator = new Intl.Collator(locale, { numeric: true, sensitivity: 'base' });
   const sign = sort.direction === 'ascending' ? 1 : -1;
   return rows
-    .map((row, index) => ({ row, index, value: row.cells[sort.key] ?? null }))
+    .map((row, index) => ({
+      row,
+      index,
+      value: row.sortValues?.[sort.key] ?? row.cells[sort.key] ?? null,
+    }))
     .sort((a, b) => {
       if (a.value === null && b.value === null) return a.index - b.index;
       if (a.value === null) return 1;

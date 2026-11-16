@@ -287,6 +287,71 @@ describe('sortable statistics table', () => {
     expect(html.indexOf(arabicName)).toBeLessThan(html.indexOf('Bilal'));
     expect(html).toContain('type="button"');
   });
+  it('sorts a written number by the number behind it, never as text', () => {
+    const written = [
+      { id: 'a', cells: { name: 'A', pts: '999' }, sortValues: { pts: 999 } },
+      { id: 'b', cells: { name: 'B', pts: '1,204' }, sortValues: { pts: 1204 } },
+      { id: 'c', cells: { name: 'C', pts: null } },
+    ];
+    expect(ids(sortStatRows(written, { key: 'pts', direction: 'descending' }))).toEqual([
+      'b',
+      'a',
+      'c',
+    ]);
+  });
+  it('picks out the sorted column, and never leaves a cell blank', () => {
+    const html = render(
+      createElement(SortableStatsTable, {
+        caption: 'Teams',
+        columns: [
+          { key: 'name', label: 'Team' },
+          { key: 'pts', label: 'PTS', numeric: true },
+          { key: 'reb', label: 'REB', numeric: true },
+        ],
+        rows: [
+          { id: 'a', cells: { name: 'Owls', pts: '51.7', reb: '19.0' } },
+          { id: 'b', cells: { name: 'Bears', pts: null, reb: null } },
+        ],
+        initialSort: { key: 'pts', direction: 'descending' },
+        labels: { sortBy: 'Sort by', noValue: 'Nothing recorded' },
+      }),
+    );
+    expect(html).toContain('<td class="ui-num" data-sorted="true">51.7</td>');
+    expect(html).toContain('<td class="ui-num">19.0</td>');
+    expect(
+      html.match(/aria-hidden="true">–<\/span><span class="ui-visually-hidden">Nothing recorded/g),
+    ).toHaveLength(2);
+    expect(displayCss).toMatch(/\.ui-stats td\[data-sorted='true'\] \{\s*font-weight: 700;/);
+  });
+  it('folds a team column into the name in a box as narrow as a phone’s', () => {
+    const html = render(
+      createElement(SortableStatsTable, {
+        caption: 'Players',
+        columns: [
+          { key: 'name', label: 'Player' },
+          { key: 'team', label: 'Team' },
+          { key: 'pts', label: 'PTS', numeric: true },
+        ],
+        rows: [
+          { id: 'a', cells: { name: 'Ada', team: 'Owls', pts: '9.0' }, chips: { team: '#663399' } },
+        ],
+        labels: { sortBy: 'Sort by' },
+        emblems: true,
+        foldTeam: 'team',
+      }),
+    );
+    // The shield before the name and the team's name for screen readers, both kept for the
+    // narrow box; the team's own column is marked as the one that goes.
+    expect(html).toMatch(
+      /<th scope="row" class="ui-team-cell"><span class="ui-fold"><svg class="ui-emblem"/,
+    );
+    expect(html).toContain('<span class="ui-fold ui-visually-hidden"><bdi>Owls</bdi></span>');
+    expect(html.match(/data-folded="true"/g)).toHaveLength(2);
+    expect(displayCss).toMatch(/\.ui-stats \.ui-fold \{\s*display: none;/);
+    expect(displayCss).toMatch(
+      /@container \(max-width: 30rem\) \{\s*\.ui-stats\[data-fold\] \.ui-fold \{\s*display: inline;\s*\}\s*\.ui-stats\[data-fold\] \[data-folded\] \{\s*display: none;/,
+    );
+  });
 });
 
 describe('highlight in the markup', () => {

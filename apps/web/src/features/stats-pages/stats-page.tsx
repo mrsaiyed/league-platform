@@ -132,17 +132,19 @@ export function StatsTables({
             captionHidden
             columns={data.playerColumns}
             rows={data.playerRows}
+            initialSort={data.openingSort}
             locale={locale}
             labels={labels.stats}
             emblems
+            foldTeam="team"
           />
         </Section>
         <Section
           title={t('stats.teams')}
           note={
-            data.totalsOnlyTeams.length > 0
+            data.totalsNoteTeams.length > 0
               ? t('stats.teamsTotalsOnly', {
-                  teams: data.totalsOnlyTeams.join(t('stats.teamsJoin')),
+                  teams: data.totalsNoteTeams.join(t('stats.teamsJoin')),
                 })
               : undefined
           }
@@ -152,6 +154,7 @@ export function StatsTables({
             captionHidden
             columns={data.teamColumns}
             rows={data.teamRows}
+            initialSort={data.openingSort}
             locale={locale}
             labels={labels.stats}
             emblems

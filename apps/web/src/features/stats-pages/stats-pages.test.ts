@@ -81,8 +81,16 @@ describe('statistics page', () => {
     // (56 + 58 + 41) / 3, from the Owls' box score lines.
     expect(data.teamRows.find((r) => r.cells['team'] === 'Owls')?.cells['points']).toBe('51.7');
     expect(text).toContain('Owls');
-    // The Bears keep their players' numbers for their staff too.
-    expect(text).toContain('Only team totals are shown for Bears, Owls.');
+    // The Bears keep their players' numbers for their staff too. They have no numbers
+    // recorded, so the page shows no totals for them, and the note names only the team
+    // whose totals are there (step 2.147 part 3: the note said totals were shown for both).
+    expect(data.totalsOnlyTeams).toEqual(['Bears', 'Owls']);
+    expect(text).toContain('Only team totals are shown for Owls.');
+    expect(text).not.toContain('shown for Bears');
+    // A team with nothing recorded has a dash in each cell, and a word for screen readers.
+    const bears = /<span dir="auto">Bears<\/span><\/th>(.*?)<\/tr>/.exec(text)?.[1] ?? '';
+    expect(bears.match(/aria-hidden="true">–<\/span>/g)).toHaveLength(data.teamColumns.length - 1);
+    expect(bears).toContain('Nothing recorded');
     // ...and none of its players, in the table or among the leaders.
     for (const hidden of ['Jordan', 'Castellanos', 'Imani', 'Brooks']) {
       expect(text).not.toContain(hidden);
@@ -188,6 +196,8 @@ describe('statistics page', () => {
     teamColumns: [{ key: 'team', label: 'Team' }],
     teamRows: [],
     totalsOnlyTeams: [],
+    totalsNoteTeams: [],
+    openingSort: null,
   });
   // The lists of the page, in order: each one's title, whether it follows a card, and the
   // place its first line shows.
@@ -259,10 +269,18 @@ describe('statistics page', () => {
     const text = html(data);
     expect(text).toContain(`--team-color:${colorOfTeam.get('Falcons')}`);
     // One mark for each team in the teams table and one beside each player's team. Since
-    // step 2.147 part 2 the mark is the team's small shield, where a chip used to be.
+    // step 2.147 part 2 the mark is the team's small shield, where a chip used to be. Since
+    // part 3 a player's row carries that shield a second time, beside the player's name:
+    // that one is drawn only on a phone, where the team's own column folds away.
     expect(text.match(/<svg class="ui-emblem" data-size="small"/g)).toHaveLength(
-      data.teamRows.length + data.playerRows.length,
+      data.teamRows.length + 2 * data.playerRows.length,
     );
+    expect(text.match(/<span class="ui-fold"><svg class="ui-emblem"/g)).toHaveLength(
+      data.playerRows.length,
+    );
+    // Both tables open sorted by points, biggest first, and say so on that heading only.
+    expect(data.openingSort).toEqual({ key: 'points', direction: 'descending' });
+    expect(text.match(/aria-sort="descending"/g)).toHaveLength(2);
     expect(text).not.toContain('ui-team-chip');
   });
 

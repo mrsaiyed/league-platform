@@ -73,6 +73,7 @@ export const en = {
   'display.player': 'Player',
   'display.total': 'Total',
   'display.sortBy': 'Sort by',
+  'display.noValue': 'Nothing recorded',
   'display.round': 'Round',
   'display.season': 'Season',
   'display.show': 'Show',

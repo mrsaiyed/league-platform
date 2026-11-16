@@ -311,6 +311,44 @@ export const tableCss = String.raw`
   font-family: var(--font-score);
   font-size: var(--text-16);
 }
+/* A cell with no number holds a quiet dash, never nothing. */
+.ui-no-value {
+  color: var(--color-muted);
+}
+/* The column a table is sorted by is picked out quietly: its numbers are heavier, and its
+   heading is in the text color with the arrow of its direction. */
+.ui-stats td[data-sorted='true'] {
+  font-weight: 700;
+}
+/* A table whose team column folds (the statistics page's players): in a box as narrow as a
+   phone's the team is its shield alone, before the player's name, and the team's own
+   column is gone, so the numbers come straight after the name. The team's name is still
+   said to screen readers there. In a wider box the fold's two parts are not drawn. */
+.ui-stats .ui-fold {
+  display: none;
+}
+@container (max-width: 30rem) {
+  .ui-stats[data-fold] .ui-fold {
+    display: inline;
+  }
+  .ui-stats[data-fold] [data-folded] {
+    display: none;
+  }
+  .ui-stats[data-fold] th,
+  .ui-stats[data-fold] td {
+    padding-inline: var(--step-2);
+  }
+  .ui-stats[data-fold] tr > :first-child {
+    padding-inline-start: var(--step-4);
+  }
+  .ui-stats[data-fold] tr > :last-child {
+    padding-inline-end: var(--step-4);
+  }
+  /* The name gives up what the shield takes, as a standings table's does. */
+  .ui-stats[data-fold] .ui-team-cell > [dir] {
+    max-inline-size: calc(45cqi - var(--step-6) - var(--step-3));
+  }
+}
 /* A note's number sits beside the name without making its row taller than the others. */
 .ui-note-mark {
   font-size: var(--text-12);
