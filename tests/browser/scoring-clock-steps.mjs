@@ -1244,6 +1244,75 @@ export async function clockSteps(kit) {
     },
   );
 
+  // The same double tap on − on a phone (the code review's confirming look): the sentence
+  // is drawn over the panel's first line there too (on two lines lying down), so nothing
+  // under the finger moves and the second tap lands on − again, never on "Full".
+  for (const size of [phoneInBrowser, phoneLying]) {
+    const at = `${size.width} x ${size.height}`;
+    await step(`two fast taps on − in the timeouts, at ${at}`, async () => {
+      const { context, page, errors } = await scorekeeperAt(size);
+      try {
+        await page.goto(`${origin}${trackerPath()}`);
+        const c = await openCourt(page);
+        await c.saved();
+        const takenInAll = async () =>
+          Number(
+            await c.timeoutsPad
+              .locator('[data-timeouts-of="home"]')
+              .getAttribute('data-taken-count'),
+          );
+        // Two taken at least, so one can come back.
+        await c.timeoutsButton.click();
+        await c.timeoutsPad.waitFor();
+        while ((await takenInAll()) < 2) {
+          await c.timeout('home');
+          await c.timeoutsButton.click();
+          await c.timeoutsPad.waitFor();
+        }
+        // Measured with nothing said, then tapped twice, 90 ms apart, where − is.
+        await page.waitForFunction(
+          () => document.querySelector('[data-say]')?.textContent === '',
+          null,
+          { timeout: 10_000 },
+        );
+        const before = await takenInAll();
+        const minus = c.timeoutsPad.locator('[data-act="untimeout"][data-side="home"]');
+        const full = c.timeoutButton('home');
+        const [minusAt, fullAt] = [await minus.boundingBox(), await full.boundingBox()];
+        const [mx, my] = [minusAt.x + minusAt.width / 2, minusAt.y + minusAt.height / 2];
+        await page.mouse.click(mx, my);
+        await page.waitForTimeout(90);
+        await page.mouse.click(mx, my);
+        await said(c, /^Timeout taken back: Hawks, H2 \d+:\d\d\.$/);
+        const [minusNow, fullNow] = [await minus.boundingBox(), await full.boundingBox()];
+        const sayAt = await c.said.boundingBox();
+        note(
+          `${at}: what the screen says does not move − or the timeout buttons: it is drawn over the panel’s first line`,
+          minusNow !== null &&
+            minusNow.x === minusAt.x &&
+            minusNow.y === minusAt.y &&
+            fullNow !== null &&
+            fullNow.x === fullAt.x &&
+            fullNow.y === fullAt.y &&
+            sayAt !== null &&
+            sayAt.y + sayAt.height <= fullNow.y,
+          JSON.stringify({ minusAt, minusNow, fullAt, fullNow, sayAt }),
+        );
+        await page.waitForTimeout(500);
+        await c.saved();
+        note(
+          `${at}: two fast taps on − take one timeout back, not two, and call none`,
+          (await takenInAll()) === before - 1 &&
+            (await c.timeoutsPad.locator('[data-timeout-ask]').count()) === 0,
+          `${before} taken before, ${await takenInAll()} after`,
+        );
+        note(`${at}: nothing broke on the page`, errors.length === 0, errors.join('; '));
+      } finally {
+        await letGo(page, context);
+      }
+    });
+  }
+
   await step('the five sizes: the clock’s states, their targets, nothing scrolling', async () => {
     const { context, page, errors } = await scorekeeperAt(phone);
     try {
