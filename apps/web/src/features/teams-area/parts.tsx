@@ -2,6 +2,7 @@
 // files (T-187). Every form carries the route's league only so the server can find the
 // page again; who is acting comes from the session (run-teams-action.ts).
 import { statsVisibilityChoices, type TeamRecord } from '@srleagues/core';
+import { Emblem } from '@srleagues/ui';
 import type { ReactNode } from 'react';
 import type { AdminDivision } from '../../server/admin-teams.ts';
 import { t, type TextKey } from '../../server/messages.ts';
@@ -27,8 +28,25 @@ export function Notice({
   const problem = problemKey(query);
   const good = doneKey(query);
   if (saidBeside) return null;
-  if (problem !== undefined) return <p role="alert">{t(problem)}</p>;
-  if (good !== undefined) return <p role="status">{t(good)}</p>;
+  // One notice, in kinds told apart at a glance (step 2.103): refused; saved; or removed.
+  if (problem !== undefined) {
+    return (
+      <p className="ui-notice" data-kind="error" role="alert">
+        {t(problem)}
+      </p>
+    );
+  }
+  if (good !== undefined) {
+    return (
+      <p
+        className="ui-notice"
+        data-kind={/removed$/i.test(good) ? 'removed' : 'saved'}
+        role="status"
+      >
+        {t(good)}
+      </p>
+    );
+  }
   return null;
 }
 
@@ -51,9 +69,10 @@ export function TextField({
   readonly hint?: string;
   readonly maxLength?: number;
 }) {
+  // The label above its field, the hint quiet beneath (the staff area's field, step 2.103).
   return (
-    <p>
-      <label>
+    <p className="admin-field-group">
+      <label className="staff-field">
         {label}
         <input
           name={name}
@@ -64,7 +83,7 @@ export function TextField({
           autoComplete="off"
         />
       </label>
-      {hint === undefined ? null : <small> {hint}</small>}
+      {hint === undefined ? null : <small className="ui-field-help"> {hint}</small>}
     </p>
   );
 }
@@ -72,12 +91,12 @@ export function TextField({
 /** A color and the choice to use the league's own: the box is checked when there is no color. */
 export function ColorFields({ color }: { readonly color: string | null }) {
   return (
-    <p>
-      <label>
+    <p className="admin-color-fields">
+      <label className="staff-field">
         {t('adminTeams.field.color')}
         <input name="color" type="color" defaultValue={color ?? '#1f5fbf'} />
       </label>{' '}
-      <label>
+      <label className="staff-check">
         <input name="useOwnColors" type="checkbox" defaultChecked={color === null} />{' '}
         {t('adminTeams.field.useOwnColors')}
       </label>
@@ -94,7 +113,7 @@ export function DivisionField({
 }) {
   return (
     <p>
-      <label>
+      <label className="staff-field">
         {t('adminTeams.field.division')}
         <select name="divisionId" defaultValue={value ?? ''}>
           <option value="">{t('adminTeams.noDivision')}</option>
@@ -119,7 +138,7 @@ export function StatsVisibilityField({
 }) {
   return (
     <p>
-      <label>
+      <label className="staff-field">
         {label}
         <select name="statsVisibility" defaultValue={value}>
           {statsVisibilityChoices.map((choice) => (
@@ -133,33 +152,37 @@ export function StatsVisibilityField({
   );
 }
 
-/** A small swatch of the team's color; the name beside it says everything, so it is hidden from readers. */
-export function Swatch({ team }: { readonly team: TeamRecord }) {
-  if (team.color === null) return null;
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        display: 'inline-block',
-        width: '0.9em',
-        height: '0.9em',
-        marginInlineEnd: '0.4em',
-        background: team.color,
-        border: '1px solid currentColor',
-      }}
-    />
-  );
+/**
+ * The team's mark: its shield with its initial, in the team's own color (the league's
+ * accent for a team with none). The name beside it says everything, so the shield is
+ * hidden from readers. A colored square stood here before step 2.103.
+ */
+export function Swatch({
+  team,
+  size = 'card',
+}: {
+  readonly team: TeamRecord;
+  readonly size?: 'small' | 'card';
+}) {
+  return <Emblem name={team.name} color={team.color} size={size} />;
 }
 
+/** A part of a Teams screen: a panel with its title (the staff area's panel, step 2.103). */
 export function Section({
   title,
+  id,
+  kind,
   children,
 }: {
   readonly title: string;
+  /** The part's own place on the page, for a button at the top that leads to it. */
+  readonly id?: string;
+  /** A part that takes something away is edged as one, apart from the rest. */
+  readonly kind?: 'danger';
   readonly children: ReactNode;
 }) {
   return (
-    <section>
+    <section id={id} className="staff-panel admin-team-part" data-kind={kind}>
       <h2>{title}</h2>
       {children}
     </section>

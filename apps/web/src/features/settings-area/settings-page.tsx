@@ -1,13 +1,19 @@
 // Admin → League settings (step 2.48, P4 §6, T5 §6): a form for every setting the
 // product declares at the league level, drawn from the declarations (T-98).
 import { listLeagueSettings, readNamePolicy, readPrivacyFacts } from '@srleagues/core';
+import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { doneKey, problemKey } from './answer.ts';
 import { privacyNotes } from './privacy-notes.ts';
-import { SettingForms, type Say } from './setting-fields.tsx';
+import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
+
+/** The groups the settings are shown under, in the order they are drawn, each once. */
+const groupsOf = (rows: readonly { readonly key: string }[]): string[] => [
+  ...new Set(rows.map((row) => areaOf(row.key))),
+];
 
 export type SearchProps = {
   readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
@@ -38,15 +44,34 @@ export async function SettingsPage({
   const problem = problemKey(query);
   const good = doneKey(query);
   return (
-    <main>
-      <h1>{t('admin.area.settings')}</h1>
-      {problem === undefined ? null : <p role="alert">{t(problem)}</p>}
-      {problem === undefined && good !== undefined ? <p role="status">{t(good)}</p> : null}
-      <p>{t('adminSettings.intro')}</p>
+    <main className="admin-settings">
+      <PageHead title={t('admin.area.settings')} sub={t('adminSettings.intro')} />
+      {problem === undefined ? null : (
+        <p className="ui-notice" data-kind="error" role="alert">
+          {t(problem)}
+        </p>
+      )}
+      {problem === undefined && good !== undefined ? (
+        <p className="ui-notice" data-kind="saved" role="status">
+          {t(good)}
+        </p>
+      ) : null}
       {rows.length === 0 ? (
-        <p>{t('adminSettings.none')}</p>
+        <EmptyPanel text={t('adminSettings.none')} />
       ) : (
-        <SettingForms rows={rows} league={view.context.league.slug} say={say} notes={notes} />
+        <>
+          {/* The groups, as a short row that reaches each one: the page is long. */}
+          <nav className="settings-jump" aria-label={t('adminSettings.groups')}>
+            <ul>
+              {groupsOf(rows).map((area) => (
+                <li key={area}>
+                  <a href={`#settings-${area}`}>{say(`adminSettings.area.${area}`)}</a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <SettingForms rows={rows} league={view.context.league.slug} say={say} notes={notes} />
+        </>
       )}
     </main>
   );

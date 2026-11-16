@@ -1,0 +1,1225 @@
+/* The staff area's own stylesheet (step 2.103; docs/build/DESIGN.md section 4, lines 20 to
+   23): the frame an owner, admin, scheduler, registrar or scorekeeper works in, and the
+   pieces their pages are made of. Loaded by the admin's layout only, so no public page
+   carries it. Every color, font, corner and space comes from the design's variables
+   (T-90): the workspace's own design is worked out from the league's (packages/site,
+   staff-design.ts), so nothing here names a league or holds a color. Logical properties
+   only, so right-to-left pages mirror themselves (T-188). */
+
+/* ---------- The frame ---------- */
+
+html:has(.staff) {
+  /* A link to a place on the page stops below the row that stays on top. */
+  scroll-padding-block-start: calc(var(--tap) + var(--step-5));
+}
+.staff {
+  --gutter: var(--step-4);
+  /* The row that stays on top on a phone: 56 high. */
+  --staff-bar: calc(var(--tap) + var(--step-3));
+  /* The side menu on a laptop: 256 wide, so "Registration" and its mark share a row in a
+     wide typeface too. */
+  --staff-side: calc(4 * var(--step-8));
+  /* The icons a notice, a row and a button are marked with: drawn once here, as masks. */
+  --staff-tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='m8 12.4 2.8 2.8L16.2 9.5'/%3E%3C/svg%3E");
+  --staff-stop: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.5 21.5 20h-19z'/%3E%3Cpath d='M12 10v4.5M12 17.2v.2'/%3E%3C/svg%3E");
+  --staff-bin: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5'/%3E%3C/svg%3E");
+  --staff-note: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5.5M12 7.6v.2'/%3E%3C/svg%3E");
+  --staff-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 5.5 6.5 6.5L9 18.5'/%3E%3C/svg%3E");
+  --staff-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100vh;
+}
+@media (min-width: 40rem) {
+  .staff {
+    --gutter: var(--step-5);
+  }
+}
+.staff .staff-skip {
+  position: absolute;
+  inset-block-start: var(--step-2);
+  inset-inline-start: var(--step-2);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap);
+  padding-block: var(--step-2);
+  padding-inline: var(--step-4);
+  border-radius: var(--radius-small);
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+.staff .staff-skip:focus {
+  transform: none;
+}
+
+/* The menu's ground, on a phone's top row and at a laptop's side: a dark shade of the
+   league's main color, with its own words, lines and focus ring. */
+.staff-bar,
+.staff-side {
+  background: var(--staff-menu);
+  color: var(--staff-menu-text);
+}
+.staff .staff-bar :focus-visible,
+.staff .staff-side :focus-visible {
+  outline-color: var(--staff-menu-text);
+}
+
+/* On a phone: one row that stays on top. The league's mark, "Admin" over the name of the
+   area the page is in, the pill of a league that is not public, and one menu button. */
+.staff-bar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--step-3);
+  min-block-size: var(--staff-bar);
+  padding-inline: var(--gutter);
+}
+.staff .staff-bar-brand,
+.staff .staff-side-brand {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--step-3);
+  min-inline-size: 0;
+  min-block-size: var(--tap);
+  color: inherit;
+  text-decoration: none;
+}
+.staff-bar-brand .ui-emblem {
+  block-size: var(--step-6);
+}
+/* The league's mark stands on the menu here, not on a public header: it is filled with
+   the tone of the main color that can be told from the menu under any league's colors
+   (the current item's own fill), edged and lettered in the color that reads on it. A
+   public header's fill is worked out against that header, and a pale league's (a band
+   made from its dark text color) was a dark shield lost on the dark menu. */
+.staff .staff-bar .ui-emblem[data-kind='league'],
+.staff .staff-side .ui-emblem[data-kind='league'] {
+  color: var(--staff-on-menu-current);
+}
+.staff .staff-bar .ui-emblem[data-kind='league'] .ui-emblem-shield,
+.staff .staff-side .ui-emblem[data-kind='league'] .ui-emblem-shield {
+  fill: var(--staff-menu-current);
+}
+.staff .staff-bar .ui-emblem[data-kind='league'] .ui-emblem-letter,
+.staff .staff-side .ui-emblem[data-kind='league'] .ui-emblem-letter {
+  color: var(--staff-on-menu-current);
+}
+.staff-bar-words,
+.staff-side-words {
+  display: grid;
+  min-inline-size: 0;
+  line-height: 1.25;
+}
+.staff-bar-label,
+.staff-side-label {
+  color: var(--staff-menu-muted);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+}
+.staff-bar-place {
+  overflow: hidden;
+  font-size: var(--text-16);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The menu button, and the panel it opens under the row: the admin's own areas, never the
+   public site's menu. A plain disclosure, so it works with scripts switched off. */
+.staff-menu {
+  flex: none;
+}
+.staff-menu > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--tap);
+  block-size: var(--tap);
+  /* A control on a filled ground: its edge is the color of the words there, laid on as
+     strongly as it takes to stand 3 to 1 from the menu (line 17; staff-design.ts). */
+  border: 1px solid var(--staff-menu-edge);
+  border-radius: var(--radius-small);
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+.staff-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.staff-menu > summary:hover,
+.staff-menu[open] > summary {
+  border-color: var(--staff-menu-text);
+}
+.staff-menu-icon {
+  position: relative;
+  inline-size: var(--step-4);
+  block-size: var(--step-3);
+  border-block: var(--line-heavy) solid currentColor;
+}
+.staff-menu-icon::before,
+.staff-menu-icon::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: calc(50% - 1px);
+  border-block-start: var(--line-heavy) solid currentColor;
+}
+.staff-menu-icon::after {
+  opacity: 0;
+}
+/* An open menu's button is a cross. */
+.staff-menu[open] .staff-menu-icon {
+  border-block-color: transparent;
+}
+.staff-menu[open] .staff-menu-icon::before {
+  transform: rotate(45deg);
+}
+.staff-menu[open] .staff-menu-icon::after {
+  opacity: 1;
+  transform: rotate(-45deg);
+}
+.staff-menu-panel {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 100%;
+  /* Never taller than the screen under the row: the panel scrolls inside itself. */
+  max-block-size: calc(100vh - var(--staff-bar));
+  max-block-size: calc(100dvh - var(--staff-bar));
+  overflow-y: auto;
+  padding-block: var(--step-3) var(--step-5);
+  padding-inline: var(--gutter);
+  border-block-start: 1px solid var(--staff-menu-line);
+  background: var(--staff-menu);
+  box-shadow: var(--overlay-shadow);
+}
+
+/* The areas, each with its icon; the current one filled. */
+.staff-nav ul {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.staff .staff-nav a,
+.staff .staff-foot-link {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--step-3);
+  inline-size: 100%;
+  min-block-size: var(--tap);
+  padding-block: var(--step-2);
+  padding-inline: var(--step-3);
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--staff-menu-text);
+  font-size: var(--text-14);
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+.staff .staff-nav a:hover,
+.staff .staff-foot-link:hover {
+  background: var(--staff-menu-hover);
+}
+/* The current item is told three ways, so no league's color can leave it unmarked: filled
+   with a tone of the main color that stands 3 to 1 from the menu (staff-design.ts), set
+   heavier, and marked by a bar at its start edge (a border, so it is still drawn when a
+   device takes every background away). Under the pointer it stays as it is. */
+.staff .staff-nav a[aria-current='page'],
+.staff .staff-nav a[aria-current='page']:hover {
+  position: relative;
+  background: var(--staff-menu-current);
+  color: var(--staff-on-menu-current);
+  font-weight: 700;
+}
+.staff .staff-nav a[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  inset-block: var(--step-2);
+  inset-inline-start: 0;
+  border-inline-start: var(--step-1) solid currentColor;
+  border-start-end-radius: var(--radius-pill);
+  border-end-end-radius: var(--radius-pill);
+}
+.staff-icon {
+  flex: none;
+  inline-size: calc(var(--step-4) + var(--step-1));
+  block-size: calc(var(--step-4) + var(--step-1));
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.staff-nav a .staff-icon,
+.staff-foot-link .staff-icon {
+  color: var(--staff-menu-muted);
+}
+.staff-nav a[aria-current='page'] .staff-icon {
+  color: inherit;
+}
+/* An item's name takes the room there is and breaks between its words when it must, so
+   nothing beside it is ever pushed past the item's edge, in any typeface. */
+.staff-nav a > span:not(.staff-nav-mark) {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+/* An area with no screen yet: two quiet words at the end of its row, every one ending on
+   the same line down the menu. Words only: six outlined pills one under another were the
+   loudest thing in a menu that should be the calmest. */
+.staff-nav-mark {
+  flex: none;
+  color: var(--staff-menu-muted);
+  font-size: var(--text-12);
+  font-weight: 400;
+  white-space: nowrap;
+}
+/* On the current item everything is in the one color that reads on its fill. */
+.staff-nav a[aria-current='page'] .staff-nav-mark {
+  color: inherit;
+}
+/* Apart at the foot: the way to the public site, who is signed in, and signing out. */
+.staff-foot {
+  display: grid;
+  gap: var(--step-1);
+  margin-block-start: var(--step-4);
+  padding-block-start: var(--step-4);
+  border-block-start: 1px solid var(--staff-menu-line);
+}
+.staff .staff-foot form {
+  margin: 0;
+}
+/* The account's row: "Your account" over who is signed in, quiet and small. */
+.staff-foot-words {
+  display: grid;
+  min-inline-size: 0;
+}
+.staff-who {
+  color: var(--staff-menu-muted);
+  font-size: var(--text-12);
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.staff-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  /* As wide as an icon, so the address lines up with the words of the rows around it. */
+  inline-size: calc(var(--step-4) + var(--step-1));
+  block-size: calc(var(--step-4) + var(--step-1));
+  border-radius: 50%;
+  background: var(--staff-menu-current);
+  color: var(--staff-on-menu-current);
+  font-size: var(--text-12);
+  font-weight: 700;
+}
+
+/* A league that is not public: a pill in the header that opens the whole sentence. */
+.staff-status {
+  position: relative;
+  flex: none;
+}
+.staff-status > summary {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap);
+  list-style: none;
+  cursor: pointer;
+}
+.staff-status > summary::-webkit-details-marker {
+  display: none;
+}
+.staff .staff-status-says {
+  margin: 0;
+  padding-block: var(--step-3);
+  padding-inline: var(--step-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-small);
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: var(--text-14);
+}
+/* On a phone the opened sentence is a strip of its own under the row that stays on top,
+   in the page's flow: it moves the page down and covers none of it (as a box hung from
+   the pill it lay over the page's label and the top of its title). The strip is the
+   frame's second copy of the sentence, for the eye; the one inside the pill's own
+   disclosure is kept for a screen reader, which meets it right where it was opened. */
+.staff .staff-bar .staff-status-says {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.staff .staff-status-band {
+  display: none;
+  margin: 0;
+  padding-block: var(--step-3);
+  padding-inline: var(--gutter);
+  border-block-end: 1px solid var(--color-line);
+  background: var(--staff-wait-soft);
+  color: var(--color-text);
+  font-size: var(--text-14);
+}
+.staff .staff-status-band[data-status='suspended'] {
+  background: var(--staff-danger-soft);
+}
+@media (max-width: 63.99rem) {
+  .staff:has(.staff-bar .staff-status[open]) > .staff-status-band {
+    display: block;
+  }
+}
+
+/* On a laptop the menu is at the side and stays there while the page scrolls. */
+.staff-side {
+  display: none;
+}
+.staff-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+@media (min-width: 64rem) {
+  .staff {
+    --gutter: var(--step-6);
+    display: grid;
+    grid-template-columns: var(--staff-side) minmax(0, 1fr);
+  }
+  .staff-bar {
+    display: none;
+  }
+  /* The side's dark ground runs the height of the page; what it holds stays on the screen
+     while the page scrolls. */
+  .staff-side {
+    display: block;
+  }
+  .staff-side-held {
+    position: sticky;
+    inset-block-start: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--step-4);
+    block-size: 100vh;
+    padding-block: var(--step-5) var(--step-4);
+    padding-inline: var(--step-4);
+  }
+  /* On a short screen (a laptop 768 high, with ten areas) the areas scroll between the
+     league's name and the foot, so "View the site" and "Sign out" never leave the screen.
+     While areas are out of sight below, the last one in view fades into the menu, so an
+     item is never cut in half as if the menu ended there: a strip that fades to the
+     menu's own color stays at the foot of the list. The strip has its own room after the
+     last area, so with the list at its end (or a list that fits) it covers nothing. */
+  .staff-side .staff-nav {
+    flex: 0 1 auto;
+    min-block-size: 0;
+    margin-inline: calc(-1 * var(--step-2));
+    padding-inline: var(--step-2);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--staff-menu-line) transparent;
+  }
+  .staff-side .staff-nav::after {
+    content: '';
+    position: sticky;
+    inset-block-end: 0;
+    display: block;
+    block-size: var(--step-6);
+    background: linear-gradient(to bottom, transparent, var(--staff-menu) 75%);
+    pointer-events: none;
+  }
+  .staff .staff-side .staff-status-says {
+    position: static;
+    margin-block-start: var(--step-2);
+  }
+  /* At the side the rows are a pointer's: 40 high, so every area of a full menu is on a
+     laptop's screen at once and the current one is never out of sight. */
+  .staff .staff-side .staff-nav a,
+  .staff .staff-side .staff-foot-link {
+    min-block-size: calc(var(--tap) - var(--step-1));
+    padding-block: var(--step-1);
+  }
+  .staff .staff-side-brand {
+    flex: none;
+    padding-inline: var(--step-2);
+  }
+  .staff-side-brand .ui-emblem {
+    block-size: calc(var(--step-6) + var(--step-2));
+  }
+  .staff-side-name {
+    display: -webkit-box;
+    overflow: hidden;
+    font-family: var(--staff-brand-font);
+    font-size: var(--text-16);
+    letter-spacing: 0.02em;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .staff-side .staff-status {
+    padding-inline: var(--step-2);
+  }
+  .staff-side .staff-status > summary {
+    min-block-size: var(--step-6);
+  }
+  .staff-side .staff-foot {
+    flex: none;
+    margin-block-start: auto;
+  }
+}
+
+/* The workspace: the page in a centered column never wider than 1120, then the foot. */
+.staff-body {
+  flex: 1;
+  inline-size: 100%;
+  max-inline-size: calc(70rem + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-block: var(--step-5) var(--step-8);
+  padding-inline: var(--gutter);
+}
+.staff-body:focus {
+  outline: none;
+}
+@media (min-width: 64rem) {
+  .staff-body {
+    padding-block-start: var(--step-6);
+  }
+}
+.staff-body > .ui-message {
+  margin-block: var(--step-6);
+}
+/* The foot of a staff page: the product's small one (Terms, Privacy and "Powered by
+   SR Leagues", which every page a league shows carries: U-8), never the league's public
+   footer with its name and menu. Its look is written here whole, so the frame needs
+   nothing of the public pages' stylesheet: it is also drawn around a refusal, which that
+   stylesheet does not reach (app/forbidden.tsx). */
+.staff .site-footer {
+  border-block-start: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.staff .site-footer .site-column {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-2) var(--step-5);
+  inline-size: 100%;
+  max-inline-size: calc(70rem + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-block: var(--step-4);
+  padding-inline: var(--gutter);
+}
+.staff .site-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--step-5);
+}
+.staff .site-footer nav a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap);
+  color: var(--color-muted);
+  text-decoration: none;
+}
+.staff .site-footer nav a:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+.staff .site-footer .powered-by {
+  font-size: var(--text-12);
+  letter-spacing: 0.04em;
+}
+.staff .site-footer-made-up {
+  flex: 1 1 100%;
+  font-size: var(--text-12);
+}
+
+/* ---------- The shared staff pieces ---------- */
+
+/* Titles in the workspace are read, not announced: one calm size at every width. */
+.staff .staff-body :where(h1) {
+  font-size: var(--text-28);
+  letter-spacing: -0.02em;
+}
+.staff .staff-body :where(h2) {
+  font-size: var(--text-18);
+}
+.staff .staff-body :where(h3) {
+  font-size: var(--text-16);
+}
+
+/* The head of a page: the title, one line of what the page is for, and its main action at
+   the top right (under the words on a phone). */
+.staff .ui-page-head {
+  margin-block-end: var(--step-5);
+}
+.staff .ui-page-head-row {
+  align-items: flex-start;
+}
+.staff .ui-page-sub {
+  max-inline-size: 40rem;
+}
+/* What a page lets you do, beside its title. */
+.staff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-2) var(--step-3);
+}
+
+/* The way back at the top of an inner page: "Teams / Falcons". */
+.staff-trail ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--step-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.staff-trail li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--step-2);
+  min-inline-size: 0;
+  min-block-size: var(--tap);
+}
+.staff-trail li + li::before {
+  content: '/';
+  content: '/' / '';
+  color: var(--color-muted);
+}
+.staff .staff-trail a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap);
+  color: var(--color-primary-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.staff .staff-trail a:hover {
+  text-decoration: underline;
+}
+.staff-trail [aria-current] {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* A small uppercase label over a group of things. */
+.staff .staff-label {
+  margin-block: 0 var(--step-3);
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+}
+
+/* Buttons, three kinds that can be told apart. The second kind (every button not told
+   otherwise) is outlined on white; the main one is filled with the league's main color;
+   a destructive one is in the danger color on a soft ground, and filled only under the
+   pointer. */
+.staff
+  :where(
+    button,
+    input[type='submit'],
+    input[type='button'],
+    input[type='reset'],
+    .ui-button,
+    summary.ui-button
+  ) {
+  background: var(--color-panel);
+}
+.staff .ui-button[data-kind='main'] {
+  background: var(--color-primary);
+}
+.staff .ui-button[data-kind='main']:hover {
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary-hover);
+}
+.staff .ui-button[data-kind='danger'] {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, transparent);
+  background: var(--staff-danger-soft);
+  color: var(--color-danger);
+}
+.staff .ui-button[data-kind='danger']:hover {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+}
+.staff .ui-button[data-kind='quiet'] {
+  background: transparent;
+}
+/* A button that opens a form to add something. */
+.staff .ui-button[data-icon='plus']::before {
+  content: '';
+  flex: none;
+  inline-size: var(--step-4);
+  block-size: var(--step-4);
+  background: currentColor;
+  -webkit-mask: var(--staff-plus) center / contain no-repeat;
+  mask: var(--staff-plus) center / contain no-repeat;
+}
+/* The buttons of a form: Save first; a destructive one apart at the far end. */
+.staff-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--step-3);
+  margin: 0;
+}
+.staff-buttons > [data-kind='danger'],
+.staff-buttons > .staff-apart {
+  margin-inline-start: auto;
+}
+
+/* A field: its label above it, the field 44 high, help quiet beneath, the error in words
+   beside it. A label never sits beside its box, so a box is never read under the wrong
+   label, at any width. */
+.staff-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-1);
+  min-inline-size: 0;
+  margin: 0;
+  /* The label's own words, whether or not they have an element of their own. */
+  font-size: var(--text-14);
+  font-weight: 600;
+}
+.staff
+  .staff-field
+  :is(input:not([type='checkbox'], [type='radio'], [type='color']), select, textarea) {
+  inline-size: 100%;
+  margin-inline-start: 0;
+  font-size: var(--text-16);
+  font-weight: 400;
+}
+.staff .staff-field > .ui-field-help,
+.staff .staff-field > .ui-field-error {
+  margin: 0;
+}
+/* A number of a few figures (a score, a jersey number) has a box as wide as it needs. */
+.staff .staff-field[data-size='figure'] :is(input, select) {
+  inline-size: calc(2 * var(--step-7));
+}
+/* No field shows a browser's own shape: white, a fine edge, and no spinner on a number. */
+.staff
+  :where(
+    input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='color'],
+      [type='file'],
+      [type='range'],
+      [type='submit'],
+      [type='button'],
+      [type='reset'],
+      [type='hidden']
+    ),
+    select,
+    textarea
+  ) {
+  /* The edge of a control, worked out to stand 3 to 1 from the page and a panel
+     (DESIGN.md line 17; packages/site, frame-look.ts). */
+  border-color: var(--color-line-strong);
+  background-color: var(--color-panel);
+}
+/* A field that cannot be changed is read, not filled in: no box around it and no faded
+   words, its value as plain text in the text's own color (a locked box that looked like an
+   empty one asked to be typed in). What it shows when it holds nothing is quiet. */
+.staff
+  .staff-body
+  :where(
+    input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='color'],
+      [type='file'],
+      [type='range'],
+      [type='submit'],
+      [type='button'],
+      [type='reset'],
+      [type='hidden']
+    ),
+    select,
+    textarea
+  ):disabled {
+  border-color: transparent;
+  background-color: transparent;
+  background-image: none;
+  color: var(--color-text);
+  font-weight: 600;
+  opacity: 1;
+  cursor: default;
+  -webkit-text-fill-color: currentColor;
+}
+.staff .staff-body :where(input, textarea):disabled::placeholder {
+  color: var(--color-muted);
+  font-weight: 400;
+  opacity: 1;
+  -webkit-text-fill-color: var(--color-muted);
+}
+.staff input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.staff input[type='number']::-webkit-inner-spin-button,
+.staff input[type='number']::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* A tick or a choice with its words: one row, 44 high, the whole of it tapped. */
+.staff-check {
+  display: flex;
+  align-items: center;
+  gap: var(--step-3);
+  min-block-size: var(--tap);
+  font-weight: 400;
+  cursor: pointer;
+}
+.staff-check > input {
+  flex: none;
+}
+/* The fields of a form, one under another; side by side in pairs where there is room. */
+.staff-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-4);
+  /* A field is never stretched across a laptop's workspace. */
+  max-inline-size: 36rem;
+  margin: 0;
+}
+/* A plain list of choices shows the workspace's own arrow, never a browser's: two fine
+   strokes in the field's own text color, with room kept for them at the field's end. */
+.staff .staff-body select {
+  appearance: none;
+  padding-inline-end: calc(var(--step-3) + var(--step-3) + var(--step-2));
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% + var(--line-heavy) / 2),
+      transparent calc(50% + var(--line-heavy) / 2)
+    ),
+    linear-gradient(
+      -45deg,
+      transparent calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% - var(--line-heavy) / 2),
+      currentColor calc(50% + var(--line-heavy) / 2),
+      transparent calc(50% + var(--line-heavy) / 2)
+    );
+  background-repeat: no-repeat;
+  background-size: calc(var(--step-3) / 2) calc(var(--step-3) / 2);
+  background-position:
+    calc(100% - var(--step-3) - var(--step-3) / 2) 50%,
+    calc(100% - var(--step-3)) 50%;
+}
+[dir='rtl'] .staff .staff-body select {
+  background-position:
+    var(--step-3) 50%,
+    calc(var(--step-3) + var(--step-3) / 2) 50%;
+}
+@media (forced-colors: active) {
+  .staff .staff-body select {
+    appearance: auto;
+    padding-inline-end: var(--step-3);
+    background-image: none;
+  }
+}
+.staff-form > * {
+  min-inline-size: 0;
+  margin: 0;
+}
+.staff-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--step-4);
+  align-items: start;
+}
+
+/* Two teams' scores: each label above its own box, the two side by side where both fit
+   and one under the other where they do not. */
+.staff-scores {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--step-4) var(--step-5);
+}
+
+/* A panel: a form, a list, a group of settings. White, a fine edge, a title of its own. */
+.staff .ui-panel {
+  border-color: var(--color-line);
+}
+.staff-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-4);
+  padding: var(--step-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-panel);
+}
+.staff-panel > * {
+  min-inline-size: 0;
+  margin: 0;
+}
+@media (min-width: 40rem) {
+  .staff-panel {
+    padding: var(--step-5);
+  }
+}
+.staff-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-2) var(--step-4);
+}
+.staff .staff-panel-head :is(h2, h3) {
+  margin: 0;
+}
+.staff-quiet {
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+
+/* How a thing stands, as a small pill in a soft color. */
+.staff-pill {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--step-1);
+  min-block-size: var(--step-5);
+  padding-inline: var(--step-2);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-text) 8%, var(--color-panel));
+  color: var(--color-text);
+  font-size: var(--text-12);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.staff-pill[data-kind='good'] {
+  background: var(--staff-good-soft);
+  color: var(--staff-good);
+}
+.staff-pill[data-kind='wait'] {
+  background: var(--staff-wait-soft);
+  color: var(--staff-wait);
+}
+.staff-pill[data-kind='stop'] {
+  background: var(--staff-danger-soft);
+  color: var(--color-danger);
+}
+
+/* One notice, in kinds that can be told apart at a glance, drawn beside the thing it is
+   about: something to know (a quiet mark), saved (a tick, green), refused (a warning, the
+   danger color) and removed (a bin, with its way back). */
+.staff .ui-notice {
+  position: relative;
+  margin: 0;
+  padding-block: var(--step-3);
+  padding-inline: calc(var(--step-7) - var(--step-1)) var(--step-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-small);
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: var(--text-14);
+  font-weight: 600;
+}
+.staff .ui-notice::before {
+  content: '';
+  position: absolute;
+  inset-block-start: var(--step-3);
+  inset-inline-start: var(--step-3);
+  inline-size: calc(var(--step-4) + var(--step-1));
+  block-size: calc(var(--step-4) + var(--step-1));
+  background: var(--color-muted);
+  -webkit-mask: var(--staff-note) center / contain no-repeat;
+  mask: var(--staff-note) center / contain no-repeat;
+}
+.staff .ui-notice > * {
+  margin-block: 0 var(--step-3);
+}
+.staff .ui-notice > :last-child {
+  margin-block-end: 0;
+}
+.staff .ui-notice > :is(h2, h3) {
+  font-size: var(--text-16);
+}
+.staff .ui-notice :is(p, li) {
+  font-weight: 400;
+}
+.staff .ui-notice > p:first-child {
+  font-weight: 600;
+}
+.staff .ui-notice[data-kind='saved'] {
+  border-color: color-mix(in srgb, var(--staff-good) 35%, transparent);
+  background: var(--staff-good-soft);
+}
+.staff .ui-notice[data-kind='saved']::before {
+  background: var(--staff-good);
+  -webkit-mask-image: var(--staff-tick);
+  mask-image: var(--staff-tick);
+}
+.staff .ui-notice[data-kind='error'] {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, transparent);
+  background: var(--staff-danger-soft);
+  color: var(--color-danger);
+}
+.staff .ui-notice[data-kind='error']::before {
+  background: var(--color-danger);
+  -webkit-mask-image: var(--staff-stop);
+  mask-image: var(--staff-stop);
+}
+.staff .ui-notice[data-kind='removed'] {
+  border-color: color-mix(in srgb, var(--staff-wait) 35%, transparent);
+  background: var(--staff-wait-soft);
+}
+.staff .ui-notice[data-kind='removed']::before {
+  background: var(--staff-wait);
+  -webkit-mask-image: var(--staff-bin);
+  mask-image: var(--staff-bin);
+}
+/* In a stack the gap is the stack's: a notice adds none of its own. */
+.staff .ui-field-error {
+  margin: 0;
+}
+
+/* Something that opens: a row with a chevron in place of the browser's triangle, 44 high. */
+.staff-body details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.staff-body details > summary::-webkit-details-marker {
+  display: none;
+}
+.staff-body details > summary:not(.ui-button) {
+  display: flex;
+  align-items: center;
+  gap: var(--step-2);
+  min-block-size: var(--tap);
+  color: var(--color-primary-text);
+  font-size: var(--text-14);
+  font-weight: 600;
+}
+.staff-body details > summary:not(.ui-button)::after {
+  content: '';
+  flex: none;
+  inline-size: var(--step-4);
+  block-size: var(--step-4);
+  background: currentColor;
+  -webkit-mask: var(--staff-chevron) center / contain no-repeat;
+  mask: var(--staff-chevron) center / contain no-repeat;
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+.staff-body details[open] > summary:not(.ui-button)::after {
+  transform: rotate(-90deg);
+}
+.staff-body details > summary:hover {
+  text-decoration: underline;
+}
+.staff-body details > summary.ui-button:hover {
+  text-decoration: none;
+}
+
+/* An empty place: calm, on white, one sentence and the way on. */
+.staff .ui-empty {
+  border-style: solid;
+  border-color: var(--color-line);
+  background: var(--color-panel);
+}
+
+/* A list: rows in one panel, each with its mark, its facts, how it stands and one way in. */
+.staff-rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-panel);
+  list-style: none;
+}
+.staff-rows > li {
+  min-inline-size: 0;
+}
+.staff-rows > li + li {
+  border-block-start: 1px solid var(--color-line);
+}
+.staff .staff-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--step-3);
+  min-block-size: calc(var(--tap) + var(--step-4));
+  padding-block: var(--step-2);
+  padding-inline: var(--step-4);
+  color: var(--color-text);
+  text-decoration: none;
+}
+/* The row's one way in is the link on its name, which covers the whole row: so the link
+   says the name alone, and the whole row is tapped. */
+.staff .staff-row-link {
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.staff-row-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.staff-row:has(.staff-row-link:hover) {
+  background: var(--color-tint);
+}
+.staff-row > .ui-emblem {
+  block-size: var(--step-6);
+}
+.staff-row-words {
+  display: grid;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+.staff-row-name {
+  font-weight: 600;
+}
+.staff-row-facts {
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+/* The way in: a chevron at the end of a row or a card that is one link. */
+.staff-row:has(.staff-row-link)::after,
+.staff-tile::after {
+  content: '';
+  flex: none;
+  inline-size: var(--step-4);
+  block-size: var(--step-4);
+  background: var(--color-muted);
+  -webkit-mask: var(--staff-chevron) center / contain no-repeat;
+  mask: var(--staff-chevron) center / contain no-repeat;
+}
+[dir='rtl'] .staff-row:has(.staff-row-link)::after,
+[dir='rtl'] .staff-tile::after {
+  transform: scaleX(-1);
+}
+
+/* ---------- The admin's home ---------- */
+
+/* The areas this person can use, as cards: one across on a phone, two across from a
+   tablet up, so four areas are a block of two by two and never three and one. Each is one
+   link: its icon, its name, one line of what it is for. Only an area with a screen is a
+   card; what the home shows beside them (numbers, what to do next) is step 2.129's. */
+.staff-tiles {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (min-width: 40rem) {
+  .staff-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--step-4);
+  }
+}
+.staff-home > section + section {
+  margin-block-start: var(--step-6);
+}
+/* The areas with no screen yet: named quietly in one row under a small label, each a
+   mark and a name. They are not cards and not links, and carry no chevron: nothing here
+   looks like somewhere to go. */
+.staff-coming ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--step-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.staff-coming li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--step-2);
+  min-block-size: calc(var(--step-6) + var(--step-1));
+  padding-inline: var(--step-3);
+  border: 1px dashed color-mix(in srgb, var(--color-text) 22%, transparent);
+  border-radius: var(--radius-pill);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
+.staff-coming .staff-icon {
+  inline-size: var(--step-4);
+  block-size: var(--step-4);
+}
+.staff-tiles > li {
+  display: grid;
+  min-inline-size: 0;
+}
+.staff .staff-tile {
+  display: flex;
+  align-items: center;
+  gap: var(--step-3);
+  min-block-size: calc(var(--step-8) + var(--step-2));
+  padding: var(--step-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-panel);
+  color: var(--color-text);
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+.staff .staff-tile:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+}
+.staff-tile-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--tap);
+  block-size: var(--tap);
+  border-radius: var(--radius-small);
+  background: var(--color-tint);
+  color: var(--color-primary-text);
+}
+.staff-tile-words {
+  display: grid;
+  flex: 1 1 auto;
+  gap: calc(var(--step-1) / 2);
+  min-inline-size: 0;
+}
+.staff-tile-name {
+  font-weight: 600;
+}
+.staff-tile-line {
+  color: var(--color-muted);
+  font-size: var(--text-14);
+  line-height: 1.35;
+}

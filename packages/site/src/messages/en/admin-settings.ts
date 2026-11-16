@@ -18,6 +18,7 @@ export const enAdminSettings = {
   'adminSettings.done.cleared': 'The setting is back to its default.',
   'adminSettings.done.saved': 'The setting was saved.',
   'adminSettings.field.value': 'Value',
+  'adminSettings.groups': 'Groups of settings',
   // The admin's League settings screen (step 2.48). The words for each setting itself are
   // `setting.<key>.label` and `setting.<key>.option.<choice>`, declared with the setting.
   'adminSettings.intro':

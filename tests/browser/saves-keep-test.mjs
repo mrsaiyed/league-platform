@@ -14,6 +14,9 @@
 // - The same for the two boxes on the games list: a tie, asked about, "Yes", refused
 //   beside the boxes, which are still open with the tie in them and marked. The same with
 //   scripts off.
+// - "8o" in a points box and "1-2" in a score of the box score grid are refused in words,
+//   naming the box, kept in the boxes, and the game is not made final. The same with
+//   scripts off.
 // - A save says "Saved", naming the game and its score, beside it, on the screen at 390
 //   without scrolling; a reload does not say it again, and nothing of it is in the address.
 // - A real double tap on a save button (the grid's, and "Yes, make it final") saves once
@@ -26,6 +29,8 @@ import {
   buildNext,
   freePort,
   launch,
+  openStaffMenu,
+  showSheetTeamOf,
   startNext,
   titleInHeadProblem,
   waitFor,
@@ -105,6 +110,8 @@ const gameOn = (page, id) => page.locator(`li[id="game-${id}"]`);
 /** From the admin's home to the games list, by tapping the admin's own "Games". */
 async function openGames(page) {
   await page.goto(`${origin}/north-valley/admin`);
+  // On a phone the admin's areas are behind its menu button (step 2.103).
+  await openStaffMenu(page);
   await Promise.all([
     page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
     page
@@ -161,7 +168,11 @@ async function typeTiedSheet(page, away, home) {
   const points = [3, 4, 5, 6, 7, 5, 10, 4, 4, 4, 4, 4];
   const boxes = pointsBoxes(page);
   note(`the grid has twelve points boxes (${away} at ${home})`, (await boxes.count()) === 12);
-  for (const [i, value] of points.entries()) await boxes.nth(i).fill(String(value));
+  for (const [i, value] of points.entries()) {
+    // At 390 wide one team's grid is shown at a time: the box's team is picked first.
+    await showSheetTeamOf(page, boxes.nth(i));
+    await boxes.nth(i).fill(String(value));
+  }
   await page.getByLabel(`Score for ${away}`).fill('30');
   await page.getByLabel(`Score for ${home}`).fill('30');
   return points.map(String);
@@ -278,12 +289,170 @@ if (browser) {
     }
   });
 
+  // Step 2.103: at 390 wide one team's grid is shown and the other is put away. A number
+  // out of range typed in one team's grid, the other team picked, Save tapped: a browser's
+  // own checking blocked the save on a box it could not show, and said nothing. The form
+  // now leaves the telling to the server: the page says in words what is wrong, shows
+  // that team with that box marked, and keeps what was typed in both grids.
+  for (const scripts of [true, false]) {
+    const label = `a wrong box in the team put away${scripts ? '' : ', with scripts off'}`;
+    await step(`${label}, is said in words with that team shown`, async () => {
+      const { context, page } = await signedInAs('local-scheduler-token', {
+        javaScriptEnabled: scripts,
+      });
+      try {
+        await openBoxScore(page, finalScoreGame, 'Box score: Tigers at Lions');
+        const boxes = pointsBoxes(page);
+        const grids = page.locator('.box-score-grid');
+        const tabs = page.locator('.admin-sheet-tabs label');
+        // The Tigers (away, shown first): a good number, then one over the box's limit.
+        await boxes.nth(0).fill('7');
+        await boxes.nth(1).fill('1000');
+        // The Lions are picked, and a number typed there; the Tigers' grid is put away.
+        await tabs.nth(1).click();
+        await boxes.nth(6).fill('9');
+        note(
+          `${label}: the grid with the wrong box is put away when Save is tapped`,
+          !(await grids.nth(0).isVisible()) && (await grids.nth(1).isVisible()),
+        );
+        const save = page.getByRole('button', { name: 'Save box score and make it final' });
+        await (scripts ? save.click() : Promise.all([page.waitForEvent('load'), save.click()]));
+        const refusal = page.locator('#box-score-scores').getByRole('alert');
+        await refusal.waitFor();
+        const text = ((await refusal.textContent()) ?? '').trim();
+        const named = (await boxes.nth(1).getAttribute('aria-label')) ?? '';
+        note(
+          `${label}: the page says in words what is wrong`,
+          text.endsWith(': enter a whole number from 0 to 999, or leave it empty.') &&
+            text.includes('Points'),
+          text,
+        );
+        note(
+          `${label}: the team with the wrong box is the one shown`,
+          (await grids.nth(0).isVisible()) && !(await grids.nth(1).isVisible()),
+        );
+        note(
+          `${label}: that box is marked, on the screen, and described by the sentence`,
+          (await boxes.nth(1).getAttribute('aria-invalid')) === 'true' &&
+            (await boxes.nth(1).getAttribute('aria-describedby')) ===
+              (await refusal.getAttribute('id')) &&
+            (await boxes.nth(1).isVisible()),
+          named,
+        );
+        note(
+          `${label}: no other box is marked`,
+          (await page.locator('main input[aria-invalid="true"]').count()) === 1,
+        );
+        const kept = await boxes.evaluateAll((all) => all.map((b) => b.value));
+        note(
+          `${label}: what was typed in both grids is kept`,
+          kept[0] === '7' && kept[1] === '1000' && kept[6] === '9',
+          JSON.stringify(kept),
+        );
+        await accessible(page, `${label}, refused`);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  // Step 2.103 (review): the grid's boxes are text boxes. A number box sent text it could
+  // not read ("8o", "1-2") as an empty box, and with the browser's own checking off the
+  // server took that as nothing typed and made the game final with a score nobody typed.
+  // Now the text reaches the server as typed: refused in words, naming the box, kept in
+  // the boxes, and the game is not final. With scripts on and with scripts off.
+  for (const scripts of [true, false]) {
+    const label = `text that is not a number${scripts ? '' : ', with scripts off'}`;
+    await step(`${label}, in the box score, is refused by name and kept`, async () => {
+      const { context, page } = await signedInAs('local-scheduler-token', {
+        javaScriptEnabled: scripts,
+      });
+      try {
+        await openBoxScore(page, finalScoreGame, 'Box score: Tigers at Lions');
+        const stat = pointsBoxes(page).nth(0);
+        const score = page.getByLabel('Score for Lions');
+        const player = ((await stat.locator('xpath=ancestor::tr/th').textContent()) ?? '').trim();
+        await stat.fill('8o');
+        await score.fill('1-2');
+        const save = page.getByRole('button', { name: 'Save box score and make it final' });
+        await (scripts ? save.click() : Promise.all([page.waitForEvent('load'), save.click()]));
+        const refusal = page.locator('#box-score-scores').getByRole('alert');
+        await refusal.waitFor();
+        const text = ((await refusal.textContent()) ?? '').trim();
+        note(
+          `${label}: the refusal names the box in words`,
+          player !== '' &&
+            text.includes('Points') &&
+            text.includes(player) &&
+            text.endsWith(': enter a whole number from 0 to 999, or leave it empty.'),
+          `${player} | ${text}`,
+        );
+        note(
+          `${label}: both boxes are marked, and only they`,
+          (await stat.getAttribute('aria-invalid')) === 'true' &&
+            (await score.getAttribute('aria-invalid')) === 'true' &&
+            (await page.locator('main input[aria-invalid="true"]').count()) === 2,
+        );
+        const kept = [await stat.inputValue(), await score.inputValue()];
+        note(
+          `${label}: what was typed is still in the boxes`,
+          kept[0] === '8o' && kept[1] === '1-2',
+          JSON.stringify(kept),
+        );
+        await accessible(page, `${label}, refused`);
+        await openGames(page);
+        const status = await gameOn(page, finalScoreGame)
+          .locator('.ui-game-card')
+          .getAttribute('data-status');
+        note(`${label}: the game is not made final`, status === 'scheduled', status ?? '');
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
   await step(
     'twelve players’ points and a tie in the box score are kept after the refusal',
     async () => {
       const { context, page } = await signedInAs('local-scheduler-token');
       try {
         await openBoxScore(page, finalScoreGame, 'Box score: Tigers at Lions');
+        // Step 2.103, at 390 wide: one team's grid at a time; with the grid moved to its
+        // last column every row still shows its player; and a tick box is a thumb high.
+        const grids = page.locator('.box-score-grid');
+        note(
+          'the box score shows one team at a time at 390 wide',
+          (await grids.nth(0).isVisible()) && !(await grids.nth(1).isVisible()),
+        );
+        const names = await grids.nth(0).evaluate((grid) => {
+          grid.scrollLeft = grid.scrollWidth;
+          const box = grid.getBoundingClientRect();
+          const moved = grid.scrollLeft > 0;
+          const rows = [...grid.querySelectorAll('tbody th[scope=row]')];
+          const hidden = rows.filter((th) => {
+            const at = th.getBoundingClientRect();
+            return at.left < box.left - 1 || at.right > box.right + 1 || at.width < 40;
+          });
+          grid.scrollLeft = 0;
+          return { moved, rows: rows.length, hidden: hidden.length };
+        });
+        // The grid must really have moved: a grid that never scrolled proves nothing here.
+        note(
+          'the box score: at 390 wide the grid is wider than its box and scrolls in it',
+          names.moved === true,
+          JSON.stringify(names),
+        );
+        note(
+          'the box score: every row still shows its player with the last column in view',
+          names.moved === true && names.rows === 6 && names.hidden === 0,
+          JSON.stringify(names),
+        );
+        const tick = await grids.nth(0).locator('input[type=checkbox]').first().boundingBox();
+        note(
+          'the box score: a tick box is at least 44 high and wide',
+          tick !== null && tick.height >= 43.5 && tick.width >= 43.5,
+          JSON.stringify(tick),
+        );
         const typed = await typeTiedSheet(page, 'Tigers', 'Lions');
         await page.getByRole('button', { name: 'Save box score and make it final' }).click();
         await checkTiedSheetRefused(page, 'the box score', typed, 'Tigers', 'Lions');
@@ -291,6 +460,7 @@ if (browser) {
         // Put right and saved with a real double tap: saved once, "Saved" names the game and
         // its score under the title, on the screen, and nothing says someone changed it;
         // nothing of it is in the address, and a reload does not say it again.
+        await showSheetTeamOf(page, pointsBoxes(page).nth(0));
         await pointsBoxes(page).nth(0).fill('4');
         await page.getByLabel('Score for Tigers').fill('31');
         await page.getByRole('button', { name: 'Save box score and make it final' }).dblclick();
@@ -326,6 +496,78 @@ if (browser) {
     },
   );
 
+  // Step 2.103: the admin's own menu on a phone is a plain disclosure, so it opens with
+  // scripts switched off, and leads on.
+  await step('with scripts off, the admin’s own menu opens on a phone and leads on', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token', {
+      javaScriptEnabled: false,
+    });
+    try {
+      await page.goto(`${origin}/north-valley/admin`);
+      const menu = page.locator('.staff-bar .staff-menu');
+      const areas = menu.getByRole('navigation', { name: 'Admin areas' });
+      const games = areas.locator('a[href="/north-valley/admin/games"]');
+      note(
+        'with scripts off, the admin’s menu is shut behind its button to begin with',
+        (await menu.locator('> summary').isVisible()) && !(await games.isVisible()),
+      );
+      await menu.locator('> summary').click();
+      note(
+        'with scripts off, the menu button opens the admin’s own areas, the site and signing out',
+        (await menu.getAttribute('open')) !== null &&
+          (await games.isVisible()) &&
+          (await menu.getByRole('link', { name: 'View the site' }).isVisible()) &&
+          (await menu.getByRole('button', { name: 'Sign out' }).isVisible()),
+      );
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
+        games.click(),
+      ]);
+      note(
+        'with scripts off, an area tapped in the menu opens',
+        (await page.getByRole('heading', { level: 1, name: 'Games' }).count()) === 1,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  // Step 2.103: tabbing past the menu's last entry moved the focus on to the page under
+  // the open panel, out of sight. The menu shuts when the focus leaves it, and on Escape.
+  await step('the admin’s open menu shuts when the keyboard’s focus leaves it', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token');
+    try {
+      await page.goto(`${origin}/north-valley/admin`);
+      const menu = page.locator('.staff-bar .staff-menu');
+      await openStaffMenu(page);
+      await menu.getByRole('button', { name: 'Sign out' }).focus();
+      await page.keyboard.press('Tab');
+      await page.waitForFunction(() => !document.querySelector('.staff-bar .staff-menu')?.open);
+      const focused = await page.evaluate(() => {
+        const el = document.activeElement;
+        if (!(el instanceof HTMLElement) || el === document.body) return null;
+        const box = el.getBoundingClientRect();
+        const top = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return { inMenu: el.closest('.staff-menu') !== null, seen: el === top || el.contains(top) };
+      });
+      note(
+        'tabbing past "Sign out" shuts the menu, and the focus is on something in sight',
+        focused !== null && !focused.inMenu && focused.seen,
+        JSON.stringify(focused),
+      );
+      await openStaffMenu(page);
+      await menu.getByRole('link', { name: 'View the site' }).focus();
+      await page.keyboard.press('Escape');
+      note(
+        'Escape shuts the menu and gives the focus back to its button',
+        (await menu.getAttribute('open')) === null &&
+          (await page.evaluate(() => document.activeElement?.tagName === 'SUMMARY')),
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
   await step('with scripts off, the box score keeps a refused sheet', async () => {
     const { context, page } = await signedInAs('local-scheduler-token', {
       javaScriptEnabled: false,
@@ -350,6 +592,7 @@ if (browser) {
       await checkTiedSheetRefused(page, 'the box score with scripts off', typed, 'Bears', 'Tigers');
       await page.getByLabel('Score for Bears').fill('');
       await page.getByLabel('Score for Tigers').fill('');
+      await showSheetTeamOf(page, pointsBoxes(page).nth(0));
       await pointsBoxes(page).nth(0).fill('4');
       await Promise.all([
         page.waitForEvent('load'),

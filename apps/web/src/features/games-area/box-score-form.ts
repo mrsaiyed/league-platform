@@ -27,11 +27,16 @@ export type BoxScoreInput = {
   readonly lines: readonly BoxScoreLineInput[];
 };
 
-/** A whole number from 0 to `max`, nothing for an empty box, or 'bad'. */
+/**
+ * A whole number from 0 to `max`, nothing for an empty box, or 'bad'. The boxes are text
+ * boxes (box-score-sheet-form.tsx), so this sees exactly what was typed: spaces around it
+ * are dropped, and anything else but the digits 0 to 9 ("1-2", "+3", "1e2", "1.5", another
+ * script's digits) is 'bad'.
+ */
 function cell(text: string | undefined, max: number): number | undefined | 'bad' {
   const trimmed = (text ?? '').trim();
   if (trimmed === '') return undefined;
-  if (!/^\d{1,4}$/.test(trimmed)) return 'bad';
+  if (!/^[0-9]{1,4}$/.test(trimmed)) return 'bad';
   const value = Number(trimmed);
   return value <= max ? value : 'bad';
 }

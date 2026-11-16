@@ -11,7 +11,13 @@ import {
   testRosters,
   tippedOff,
 } from './scoring-test-game.test-helper.ts';
-import { findTile, inJerseyOrder, scoringView, teamColor } from './scoring-view.ts';
+import {
+  findTile,
+  inJerseyOrder,
+  scoringView,
+  teamColor,
+  timeoutTakenBack,
+} from './scoring-view.ts';
 
 const ids = (tiles: readonly { readonly id: string }[]) => tiles.map((t) => t.id);
 
@@ -203,6 +209,153 @@ describe('the scoring screen’s view of a game', () => {
     expect(view.teams.away.stage).toBe('no-players');
     expect(view.pickingLineups).toBe(false);
     expect(awayFive.every((id) => findTile(view, id) === undefined)).toBe(true);
+  });
+});
+
+/** `count` fouls on one player of `side`. */
+const fouls = (side: 'home' | 'away', playerId: string, count: number): basketball.Command[] =>
+  Array.from({ length: count }, () => ({ type: 'foul', side, playerId }) as const);
+
+describe('team fouls and the bonus (step 2.36; checklist F1 to F5)', () => {
+  // The rec-league format: the bonus on the 7th team foul of a period, the double on the 10th.
+  const halves = () => tippedOff(basketball.HALVES);
+  const team = (game: basketball.GameState, side: 'home' | 'away') =>
+    scoringView(game, testRosters, noLineupPicks).teams[side];
+
+  it('counts a team’s fouls in the period being played', () => {
+    const game = played([...fouls('home', 'h3', 2), ...fouls('home', 'h5', 1)], halves());
+    expect(team(game, 'home')).toMatchObject({ teamFouls: 3, foulLevel: 0, bonus: 0 });
+    expect(team(game, 'away')).toMatchObject({ teamFouls: 0, foulLevel: 0, bonus: 0 });
+  });
+
+  it('grows at the bonus and the double bonus, and gives the OTHER team the badge', () => {
+    const six = played(fouls('home', 'h3', 6), halves());
+    expect(team(six, 'home').foulLevel).toBe(0);
+    expect(team(six, 'away').bonus).toBe(0);
+    const seven = played(fouls('home', 'h5', 1), six);
+    expect(team(seven, 'home')).toMatchObject({ teamFouls: 7, foulLevel: 1, bonus: 0 });
+    expect(team(seven, 'away')).toMatchObject({ teamFouls: 0, foulLevel: 0, bonus: 1 });
+    const ten = played(fouls('home', 'h7', 3), seven);
+    expect(team(ten, 'home')).toMatchObject({ teamFouls: 10, foulLevel: 2 });
+    expect(team(ten, 'away').bonus).toBe(2);
+  });
+
+  it('drops again when a foul is taken back', () => {
+    const seven = played(fouls('home', 'h3', 7), halves());
+    const back = played([{ type: 'unfoul', side: 'home', playerId: 'h3' }], seven);
+    expect(team(back, 'home')).toMatchObject({ teamFouls: 6, foulLevel: 0 });
+    expect(team(back, 'away').bonus).toBe(0);
+  });
+
+  it('starts again each period, and overtime carries on the last period’s count (F5)', () => {
+    const first = played(fouls('home', 'h3', 7), halves());
+    const second = played([{ type: 'period', period: 2 }], first);
+    expect(team(second, 'home')).toMatchObject({ teamFouls: 0, foulLevel: 0 });
+    expect(team(second, 'away').bonus).toBe(0);
+    const late = played(fouls('away', 'a3', 8), second);
+    const overtime = played([{ type: 'period', period: 3 }, ...fouls('away', 'a5', 2)], late);
+    expect(team(overtime, 'away')).toMatchObject({ teamFouls: 10, foulLevel: 2 });
+    expect(team(overtime, 'home').bonus).toBe(2);
+  });
+
+  it('a format with no double bonus never shows one', () => {
+    const game = played(fouls('home', 'h3', 12), tippedOff(basketball.QUARTERS));
+    expect(team(game, 'home')).toMatchObject({ teamFouls: 12, foulLevel: 1 });
+    expect(team(game, 'away').bonus).toBe(1);
+  });
+});
+
+describe('timeouts (step 2.36; checklist G3 to G7)', () => {
+  const timeouts = (game: basketball.GameState, side: 'home' | 'away') =>
+    scoringView(game, testRosters, noLineupPicks).teams[side].timeouts;
+  const call = (side: 'home' | 'away', seconds: 60 | 30): basketball.Command => ({
+    type: 'timeout',
+    side,
+    seconds,
+  });
+
+  it('says how many are left, by length', () => {
+    // Three full and two 30-second a game.
+    const game = tippedOff(basketball.QUARTERS);
+    expect(timeouts(game, 'home')).toMatchObject({ full: 3, short: 2, left: 5, offersShort: true });
+    const after = played([call('home', 60), call('home', 30), call('away', 60)], game);
+    expect(timeouts(after, 'home')).toMatchObject({ full: 2, short: 1, left: 3 });
+    expect(timeouts(after, 'away')).toMatchObject({ full: 2, short: 2, left: 4 });
+  });
+
+  it('lists those taken with their period and clock time, oldest first', () => {
+    const started = played([{ type: 'start' }], tippedOff(basketball.QUARTERS));
+    const first = basketball.apply(started, call('home', 60), {
+      id: 'first',
+      now: started.lastAt + 30_000,
+    });
+    const second = played([{ type: 'period', period: 2 }, call('home', 30)], first);
+    expect(timeouts(second, 'home').taken).toEqual([
+      { id: 'first', period: 1, clockMs: 450_000, seconds: 60 },
+      expect.objectContaining({ period: 2, clockMs: 480_000, seconds: 30 }),
+    ]);
+    expect(timeouts(second, 'away').taken).toEqual([]);
+  });
+
+  it('taking the latest back gives it back', () => {
+    const game = played(
+      [call('home', 60), call('home', 30), { type: 'untimeout', side: 'home' }],
+      tippedOff(basketball.QUARTERS),
+    );
+    expect(timeouts(game, 'home')).toMatchObject({ full: 2, short: 2, left: 4 });
+    expect(timeouts(game, 'home').taken.map((t) => t.seconds)).toEqual([60]);
+  });
+
+  it('knows which timeout a take-back took back, so the screen can say it (M2)', () => {
+    const at = (game: basketball.GameState, id: string, command: basketball.Command) =>
+      basketball.apply(game, command, { id, now: game.lastAt + 30_000 });
+    // Two by the home team with one by the visitors between them, in the second quarter;
+    // then the home team's latest is taken back.
+    const second = played([{ type: 'period', period: 2 }], tippedOff(basketball.QUARTERS));
+    const first = at(second, 'first', call('home', 60));
+    const other = at(first, 'other', call('away', 60));
+    const latest = at(other, 'latest', call('home', 30));
+    const back = at(latest, 'back', { type: 'untimeout', side: 'home' });
+    expect(timeoutTakenBack(back, 'back')).toEqual({
+      id: 'latest',
+      period: 2,
+      clockMs: 480_000,
+      seconds: 30,
+    });
+    // One more take-back finds the one before it, never the other team's.
+    const again = at(back, 'again', { type: 'untimeout', side: 'home' });
+    expect(timeoutTakenBack(again, 'again')?.id).toBe('first');
+    expect(timeoutTakenBack(again, 'back')?.id).toBe('latest');
+    // A play that is not a take-back, and a take-back with nothing to take.
+    expect(timeoutTakenBack(again, 'first')).toBeUndefined();
+    expect(timeoutTakenBack(again, 'nothing')).toBeUndefined();
+  });
+
+  it('never reads below none left when a team took more than it had', () => {
+    // Two full a half and no 30-second ones.
+    const game = played(
+      [call('home', 60), call('home', 60), call('home', 60)],
+      tippedOff(basketball.HALVES),
+    );
+    expect(timeouts(game, 'home')).toMatchObject({ full: 0, short: 0, left: 0 });
+    expect(timeouts(game, 'home').taken).toHaveLength(3);
+    // A new half gives the team its timeouts again.
+    const second = played([{ type: 'period', period: 2 }], game);
+    expect(timeouts(second, 'home')).toMatchObject({ full: 2, left: 2 });
+  });
+
+  it('offers 30-second timeouts only where the format has them, or one was taken', () => {
+    const game = tippedOff(basketball.HALVES);
+    expect(timeouts(game, 'home').offersShort).toBe(false);
+    expect(timeouts(played([call('home', 30)], game), 'home').offersShort).toBe(true);
+    const view = scoringView(game, testRosters, noLineupPicks);
+    expect(view.timeoutRules).toEqual({
+      fullTimeouts: 2,
+      shortTimeouts: 0,
+      timeoutsPer: 'half',
+      overtimeTimeouts: 1,
+      timeoutsCarry: false,
+    });
   });
 });
 
