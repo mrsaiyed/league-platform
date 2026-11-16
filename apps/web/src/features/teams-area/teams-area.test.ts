@@ -194,6 +194,12 @@ describe('answers in the address', () => {
     // A number that is not a jersey number is never carried; an entry not on the page says nothing.
     expect(doneAtOf({ done: 'putBackNoNumber', entry, number: '<b>' })?.at).toEqual({ entry });
     expect(saidOnLine(doneAtOf({ done: 'putBack', entry: 'x' }), lines, 'Falcons')).toBeUndefined();
+    // An address carrying the mark on a line that has a number says nothing about having none.
+    const numbered = [
+      line(entry, 'Marcus', 'Oyelaran', '7'),
+      line('e2', 'Dana', 'Whitfield', '11'),
+    ];
+    expect(saidOnLine(found, numbered, 'Falcons')).toBeUndefined();
   });
 
   it('names who left and which team, on their "left" line', () => {

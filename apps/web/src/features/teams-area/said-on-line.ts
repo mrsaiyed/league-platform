@@ -29,7 +29,10 @@ export function saidOnLine(
       return line.leftOn !== null ? undefined : said(t('adminTeams.said.putBack', { name }));
     case 'putBackNoNumber': {
       const number = found.at.number;
-      if (line.leftOn !== null || number === undefined) return undefined;
+      // A line that has a number again is never said to have none, whatever the address says.
+      if (line.leftOn !== null || line.jerseyNumber !== null || number === undefined) {
+        return undefined;
+      }
       const wearer = lines.find(
         (other) => other.id !== line.id && other.leftOn === null && other.jerseyNumber === number,
       );
