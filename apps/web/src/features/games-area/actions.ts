@@ -22,7 +22,7 @@
 // only asks (it changes nothing), and only the question's own form, which says it was
 // confirmed, saves it. So a double tap, or going back and sending the boxes again, only
 // asks again.
-import { leagueUrl, type CommandContext } from '@srleagues/core';
+import { gameAnchor, leagueUrl, type CommandContext } from '@srleagues/core';
 import { refresh } from 'next/cache';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -49,13 +49,7 @@ import {
   type BoxScoreActionResult,
 } from './run-box-score-action.ts';
 import { runGameAction, type GameAction } from './run-game-action.ts';
-import {
-  gameAnchor,
-  gameIdOf,
-  scoreFields,
-  typedScoresOf,
-  wrongScoreFields,
-} from './score-fields.ts';
+import { gameIdOf, scoreFields, typedScoresOf, wrongScoreFields } from './score-fields.ts';
 
 /** The answers to the saves of the last ten minutes, by request (server/same-request.ts). */
 const requests = () => sameRequestsHere<BoxScoreActionResult>();

@@ -9,7 +9,10 @@
 // (database-public-schedule.ts) and the standings with the seasons a visitor may pick
 // (database-public-stats.ts) and the members' start page the league home reads first
 // (database-public-teams.ts); in part 3 (record 070) the statistics, a team's roster, a
-// member's teams and each league's name (database-league-sites.ts). Every other area
+// member's teams and each league's name (database-league-sites.ts); in part 4 League
+// settings and Season settings (database-admin-settings.ts) and Admin → Schedule, the
+// grid with its drafts, rounds and publishing and its list of seasons
+// (database-schedule-admin.ts). Every other area
 // still runs on the stand-in only: here each one refuses with NotOnTheDatabaseYet
 // the first time it is used, so its page shows the error page rather than made-up
 // data that is not in the database. Each moves in a part of its own.
@@ -30,6 +33,7 @@ import type { SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
+import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
 import {
   databaseLeagueSites,
   type DesignReport,
@@ -38,10 +42,13 @@ import {
 import { databasePublicSchedule, type PublicScheduleQueries } from './database-public-schedule.ts';
 import { databasePublicStats, type PublicStatsQueries } from './database-public-stats.ts';
 import { databasePublicTeams, type PublicTeamsQueries } from './database-public-teams.ts';
+import { databaseScheduleAdmin, type ScheduleAdminQueries } from './database-schedule-admin.ts';
+import type { LocalTools } from './local-tools.ts';
 import { notMovedYet, NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
 import type { WebPorts } from './ports.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
+import { answersOnlyHere } from './this-computer.ts';
 
 export { NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
 
@@ -61,10 +68,12 @@ export type DatabaseQueries = Pick<
   | 'activityLogStore'
   | 'jobsStore'
 > &
+  AdminSettingsQueries &
   PublicScheduleQueries &
   PublicStatsQueries &
   PublicTeamsQueries &
-  LeagueSitesQueries;
+  LeagueSitesQueries &
+  ScheduleAdminQueries;
 
 export type DatabasePortsOptions = {
   readonly database: DatabaseQueries;
@@ -85,6 +94,17 @@ export type DatabasePortsOptions = {
    */
   readonly reportDesign?: DesignReport;
   readonly now?: () => Date;
+  /**
+   * The kept emails and "be this made-up person" (step 2.96): given only on the made-up
+   * database (startup.ts), with the site's address (PUBLIC_BASE_URL). Ports that carry them
+   * answer only requests made on this computer (answersOnlyHere, as the stand-in's do), so
+   * no other computer on the network can read a code or press "Be …". A real database has
+   * none, so both pages answer "not found" and its ports answer every request.
+   */
+  readonly localTools?: {
+    readonly tools: LocalTools;
+    readonly publicBaseUrl: string;
+  } | null;
 };
 
 /** How often one sign-in user's account problem is logged again: once an hour (T-86). */
@@ -190,6 +210,8 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     return ok({ ...who.value, accountId: account.value });
   };
 
+  const accessOf = accessOfVia(deps);
+
   return {
     findLeague: (shortName) =>
       database.withTransaction(db, {}, (scope) => database.findLeagueByShortName(scope, shortName)),
@@ -208,7 +230,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     signIn,
     signInMail: options.signInMail,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
-    accessOf: accessOfVia(deps),
+    accessOf,
     // The one read across leagues (record 066): in a transaction set to the session's
     // account and no league, through my_leagues(), which answers for that account only.
     leaguesOfAccount: (accountId) =>
@@ -217,15 +239,17 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
       ...(options.reportDesign === undefined ? {} : { report: options.reportDesign }),
       now: () => now().getTime(),
     }),
+    localTools: options.localTools?.tools ?? null,
     publicStats: databasePublicStats(database, db),
     games: notMovedYet('games area'),
     fixtureImport: notMovedYet('fixture import'),
     publicSchedule: databasePublicSchedule(database, db, now),
-    // When moved (step 2.93), its seasonsOf lists only what mayListSeason allows the holder.
-    scheduleAdmin: notMovedYet('schedule grid'),
+    // Its seasonsOf lists only what mayListSeason allows the holder, read again for the
+    // league it lists (part 4).
+    scheduleAdmin: databaseScheduleAdmin(database, db, options.log, accessOf),
     publicTeams: databasePublicTeams(database, db),
     adminTeams: notMovedYet('Admin → Teams'),
-    adminSettings: notMovedYet('league settings'),
+    adminSettings: databaseAdminSettings(database, db, options.log),
     tracker: notMovedYet('tracker'),
     publishPlays: async () => {
       throw new NotOnTheDatabaseYet('tracker');
@@ -233,6 +257,10 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // No live hub until the tracker moves: nothing would publish to it.
     liveFeed: null,
     madeUpWorld: false,
-    answers: () => true,
+    // Carrying the local tools, only requests made on this computer (step 2.96).
+    answers:
+      options.localTools === undefined || options.localTools === null
+        ? () => true
+        : answersOnlyHere(options.localTools.publicBaseUrl),
   };
 }

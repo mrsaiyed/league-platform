@@ -47,6 +47,58 @@ Two computers building on the same branch would overwrite each other.
    stall on approval prompts, tell the founder: which mode sessions run in is theirs to pick
    in the app.
 
+## 2a. If "this computer" is a cloud session of the Claude app (since 2026-11-16)
+
+The founder may start you in the app's cloud instead of on a computer of their own. The
+repository is then already cloned on a temporary Linux machine. What differs from section 2:
+
+- **Nothing is the founder's to install, and nothing outside the repository's folder is
+  changed.** Node 24 is on the machine (`/opt/node24`) but Node 22 comes first; the
+  project's Playwright looks for one Chromium build and the machine has another, and
+  downloading a browser is not allowed there (do NOT run `npx playwright install`). Both
+  are settled by one git-ignored file that every command starts with,
+  `. <the repository folder>/.local/env.sh`:
+
+  ```bash
+  export PATH="/opt/node24/bin:$PATH"
+  # Node's own fetch does not use the machine's network proxy unless told to (github-check.mjs needs it).
+  export NODE_USE_ENV_PROXY=1
+  # Links in .local/pw-browsers give the machine's Chromium under the name Playwright looks for.
+  export PLAYWRIGHT_BROWSERS_PATH="<the repository folder>/.local/pw-browsers"
+  export BROWSER_EXECUTABLE="/opt/pw-browsers/chromium"
+  # As on GitHub's machines: the browser tests and picture scripts pick Edge unless CI is set, and
+  # Next.js does not stop a first start with its upgrade notice.
+  export CI=1
+  ```
+
+  and by links made once in `.local/pw-browsers` (the numbers are the builds on the day:
+  read the error a first launch prints and `ls /opt/pw-browsers`):
+  `ln -s /opt/pw-browsers/chromium-1243 chromium-1234`, the same for
+  `chromium_headless_shell-…`, and `ln -s /opt/pw-browsers/ffmpeg-1011 ffmpeg-1011`.
+  Every helper's brief gives it the line to start its commands with.
+
+- **Whose commits.** The machine's git is set to the cloud session's own name and signs
+  with its key: leave that alone. Set only the AUTHOR, for this repository, from the
+  branch's own history, without printing it:
+  `git config author.name "$(git log -1 --format=%an origin/build/stage-1)"` and the same
+  with `author.email` and `%ae`. Lanes share the setting.
+- **Pushing.** The app's safety check refused the lead's first push of a lane branch on
+  2026-11-16, until the founder said in the chat that lane branches may be pushed; a
+  scheduled check was refused in the same way until they approved it. A founder's own
+  words in the chat are what the app goes by, so if a push or a schedule is refused, say
+  so to the founder in one plain sentence and carry on with what does not need it. Some
+  helpers' own pushes are still refused: the lead pushes every lane each time it takes a
+  turn. Deleting a branch on GitHub is not possible from a cloud session (403).
+- **The machine is taken away when it stands idle.** Only what is on GitHub survives.
+  Section 5's two lead sessions and two scheduled checks rest on one shared folder and do
+  not exist in the cloud: there is one lead, and one scheduled check of the app that
+  wakes it every hour (`STATUS.md`, "Next step", says how the build is led there).
+- **The progress page** cannot be served from the cloud machine to the founder: a small
+  copy of it is published as a private page of the app (`STATUS.md`, the log line of
+  2026-11-16, 22:39 UTC).
+- **Speed.** Four processors: three heavy turns, one whole lane gate at a time
+  (`STATUS.md`, "Lanes").
+
 ## 3. What did not come with the repository
 
 | What                                                         | What to do                                                                                                                                                                                                                                                                                                                                                     |
