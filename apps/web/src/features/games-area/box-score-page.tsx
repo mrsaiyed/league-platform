@@ -255,6 +255,7 @@ export async function BoxScorePage({
           teamShown: t('admin.boxScore.teamShown'),
           columnsKey: t('admin.boxScore.columnsKey'),
           noPlayers: t('admin.boxScore.noPlayers'),
+          empty: t('admin.boxScore.empty'),
           scoreHelp: t('admin.boxScore.scoreHelp'),
           save: t('admin.boxScore.save'),
           wrongCell: t('admin.boxScore.refused.cell', { cell: '{cell}' }),

@@ -66,6 +66,8 @@ export type SheetTexts = {
   /** What the list of column names above the grids is called. */
   readonly columnsKey: string;
   readonly noPlayers: string;
+  /** What an empty box of a grid that cannot be changed shows: a dash. */
+  readonly empty: string;
   readonly scoreHelp: string;
   readonly save: string;
   /** A stat box that is not a count, with {cell} for the box's label. */
@@ -166,6 +168,9 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
   );
   const shownFirst = Math.max(0, wrongTeam);
 
+  // A grid that cannot be changed (a final game's) is read, not filled: its boxes are drawn
+  // as plain values (staff.css), and one with nothing in it shows a quiet mark, not a hole.
+  const emptyMark = editable ? undefined : texts.empty;
   const columns = [...(texts.minutes === undefined ? [] : [texts.minutes]), ...texts.columns];
   return (
     <form
@@ -213,77 +218,88 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
           {team.rows.length === 0 ? (
             <p className="staff-quiet">{texts.noPlayers}</p>
           ) : (
-            <div className="box-score-grid" role="region" aria-label={team.name} tabIndex={0}>
-              <table>
-                <thead>
-                  <tr>
-                    <th scope="col">{texts.player}</th>
-                    <th scope="col">{texts.played}</th>
-                    {texts.minutes === undefined ? null : (
-                      <th scope="col">
-                        <abbr title={texts.minutes.full}>{texts.minutes.short}</abbr>
-                      </th>
-                    )}
-                    {texts.columns.map((column) => (
-                      <th scope="col" key={column.key}>
-                        <abbr title={column.full}>{column.short}</abbr>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {team.rows.map((row) => (
-                    <tr key={row.personId}>
-                      <th scope="row">{row.heading}</th>
-                      <td>
-                        <input
-                          type="checkbox"
-                          name={row.played.field}
-                          defaultChecked={
-                            refused === undefined
-                              ? row.played.saved
-                              : refused.typed[row.played.field] !== undefined
-                          }
-                          disabled={!editable}
-                          aria-label={row.played.label}
-                        />
-                      </td>
-                      {row.minutes === undefined ? null : (
-                        <td>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            max={1440}
-                            step={1}
-                            name={row.minutes.field}
-                            defaultValue={text(row.minutes)}
-                            disabled={!editable}
-                            aria-label={row.minutes.label}
-                            {...marked(row.minutes.field)}
-                          />
-                        </td>
+            <div className="ui-table-frame box-score-frame">
+              {/* The frame stays still while the grid scrolls in it, so its far edge can
+                  say the grid goes on, as a public table's does (DESIGN.md line 14). */}
+              <div
+                className="ui-table-wrap box-score-grid"
+                role="region"
+                aria-label={team.name}
+                tabIndex={0}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">{texts.player}</th>
+                      <th scope="col">{texts.played}</th>
+                      {texts.minutes === undefined ? null : (
+                        <th scope="col">
+                          <abbr title={texts.minutes.full}>{texts.minutes.short}</abbr>
+                        </th>
                       )}
-                      {row.stats.map((box) => (
-                        <td key={box.field}>
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={0}
-                            max={999}
-                            step={1}
-                            name={box.field}
-                            defaultValue={text(box)}
-                            disabled={!editable}
-                            aria-label={box.label}
-                            {...marked(box.field)}
-                          />
-                        </td>
+                      {texts.columns.map((column) => (
+                        <th scope="col" key={column.key}>
+                          <abbr title={column.full}>{column.short}</abbr>
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {team.rows.map((row) => (
+                      <tr key={row.personId}>
+                        <th scope="row">{row.heading}</th>
+                        <td>
+                          <input
+                            type="checkbox"
+                            name={row.played.field}
+                            defaultChecked={
+                              refused === undefined
+                                ? row.played.saved
+                                : refused.typed[row.played.field] !== undefined
+                            }
+                            disabled={!editable}
+                            aria-label={row.played.label}
+                          />
+                        </td>
+                        {row.minutes === undefined ? null : (
+                          <td>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              max={1440}
+                              step={1}
+                              name={row.minutes.field}
+                              defaultValue={text(row.minutes)}
+                              disabled={!editable}
+                              placeholder={emptyMark}
+                              aria-label={row.minutes.label}
+                              {...marked(row.minutes.field)}
+                            />
+                          </td>
+                        )}
+                        {row.stats.map((box) => (
+                          <td key={box.field}>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              max={999}
+                              step={1}
+                              name={box.field}
+                              defaultValue={text(box)}
+                              disabled={!editable}
+                              placeholder={emptyMark}
+                              aria-label={box.label}
+                              {...marked(box.field)}
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </section>

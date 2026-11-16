@@ -789,6 +789,8 @@ export const en = {
   'admin.boxScore.minutes': 'Minutes',
   'admin.boxScore.minutes.short': 'MIN',
   'admin.boxScore.noPlayers': 'This team has no players on its roster yet. Add them in Teams.',
+  // An empty box of a final game's grid, which is read and not filled in.
+  'admin.boxScore.empty': '–',
   'admin.boxScore.save': 'Save box score and make it final',
   'admin.boxScore.locked.decided':
     'This game is final. To correct it, reopen it with a reason; then enter its result again.',

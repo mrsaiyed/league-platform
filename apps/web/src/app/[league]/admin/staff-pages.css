@@ -541,20 +541,24 @@
   }
 }
 /* The grid (step 2.64): on a phone it scrolls sideways in its own box, never the page
-   (A-2). The player's name stays in place while the columns move, and a shadow at either
-   edge says there are more columns that way. */
+   (A-2). The player's name stays in place while the columns move. While there are more
+   columns out of sight the far edge says so exactly as a public table's does (DESIGN.md
+   line 14): the grid sits in the shared table frame, whose far edge fades and carries a
+   small arrow that points on, on the line of the column names. The frame is already
+   inside a panel here, so it draws no box of its own. */
+.staff .box-score-frame {
+  /* The arrow sits on the line of the column names. */
+  --ui-table-arrow: var(--step-2);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.staff .box-score-frame::after {
+  inset-block-start: var(--step-2);
+}
 .box-score-grid {
   max-inline-size: 100%;
   overflow-x: auto;
-  background:
-    linear-gradient(90deg, var(--color-panel) 40%, transparent) 0 0 / var(--step-6) 100% no-repeat
-      local,
-    linear-gradient(270deg, var(--color-panel) 40%, transparent) 100% 0 / var(--step-6) 100%
-      no-repeat local,
-    linear-gradient(90deg, var(--scroll-shadow), transparent) 0 0 / var(--step-3) 100% no-repeat
-      scroll,
-    linear-gradient(270deg, var(--scroll-shadow), transparent) 100% 0 / var(--step-3) 100% no-repeat
-      scroll;
 }
 .box-score-grid table {
   border-collapse: collapse;
@@ -630,8 +634,25 @@
   -webkit-mask: var(--staff-check) center / var(--step-4) no-repeat;
   mask: var(--staff-check) center / var(--step-4) no-repeat;
 }
+/* In a grid that cannot be changed a tick is read, not tapped: no box, a plain tick for
+   a player who played and a short quiet line for one who did not. */
 .staff .box-score-grid input[type='checkbox']:disabled {
-  cursor: not-allowed;
+  opacity: 1;
+  cursor: default;
+}
+.staff .box-score-grid input[type='checkbox']:disabled::before {
+  border-color: transparent;
+  background: transparent;
+}
+.staff .box-score-grid input[type='checkbox']:disabled:checked::after {
+  background: var(--color-text);
+}
+.staff .box-score-grid input[type='checkbox']:disabled:not(:checked)::after {
+  inline-size: var(--step-2);
+  block-size: 1px;
+  align-self: center;
+  justify-self: center;
+  background: var(--color-muted);
 }
 /* The two scores, the warning while typing, the refusal and "Saved", in one panel. */
 .staff .admin-sheet-scores {
