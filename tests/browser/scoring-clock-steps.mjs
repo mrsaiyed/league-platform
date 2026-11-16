@@ -910,17 +910,28 @@ export async function clockSteps(kit) {
       });
       await c.root.locator('[data-saved-banner][data-state="waiting"]').waitFor();
       const fullest = await c.score();
-      /** Each name on the scoreboard, as wide as it is drawn, and whether its text is cut. */
+      /**
+       * Each name on the scoreboard, as wide as it is drawn, and whether its text is cut:
+       * lying down a name is one line, upright it takes two before it is cut.
+       */
       const names = () =>
         page.evaluate(() =>
-          [...document.querySelectorAll('[data-score] .court-score-name')].map((name) => ({
-            says: name.textContent,
-            width: Math.round(name.clientWidth),
-            cut: name.scrollWidth > name.clientWidth + 0.5,
-            ends: getComputedStyle(name).textOverflow,
-          })),
+          [...document.querySelectorAll('[data-score] .court-score-name')].map((name) => {
+            const style = getComputedStyle(name);
+            return {
+              says: name.textContent,
+              width: Math.round(name.clientWidth),
+              cut:
+                name.scrollWidth > name.clientWidth + 0.5 ||
+                name.scrollHeight > name.clientHeight + 0.5,
+              ends: style.webkitLineClamp === '2' ? 'ellipsis' : style.textOverflow,
+            };
+          }),
         );
-      /** Writes words into the page for a moment, and puts back what was there. */
+      /**
+       * Writes words into the page for a moment (`null` puts back what was there): a
+       * sentence, or the lines of the banner's short form, drawn as the screen draws them.
+       */
       const written = (into) =>
         page.evaluate((words) => {
           window.keptWords ??= new Map();
@@ -928,28 +939,84 @@ export async function clockSteps(kit) {
             for (const el of document.querySelectorAll(selector)) {
               if (text === null) {
                 el.replaceChildren(...(window.keptWords.get(el) ?? []));
-              } else {
-                if (!window.keptWords.has(el)) window.keptWords.set(el, [...el.childNodes]);
-                el.textContent = text;
+                continue;
               }
+              if (!window.keptWords.has(el)) window.keptWords.set(el, [...el.childNodes]);
+              if (typeof text === 'string') {
+                el.textContent = text;
+                continue;
+              }
+              const span = (name, says) => {
+                const part = document.createElement('span');
+                part.className = name;
+                part.textContent = says;
+                return part;
+              };
+              el.replaceChildren(
+                ...text.flatMap((line, index) => [
+                  ...(index === 0 ? [] : [span('court-banner-dot', ' · ')]),
+                  span('court-banner-line', line),
+                ]),
+              );
             }
           }
         }, into);
-      for (const { size, letters, family } of await fits(page, [phoneLying])) {
+      /** Whether anything is pushed off the screen, under the pad, or made to scroll. */
+      const pushed = () =>
+        page.evaluate(() => {
+          const pad = document.querySelector('[data-pad]').getBoundingClientRect();
+          const rest = document.querySelector('[data-pad] [data-rest]');
+          return {
+            page: document.scrollingElement.scrollHeight - window.innerHeight,
+            sideways: document.documentElement.scrollWidth - window.innerWidth,
+            panels: [...document.querySelectorAll('.court-team')].map(
+              (panel) => panel.scrollHeight - panel.clientHeight,
+            ),
+            tilesUnderThePad: [...document.querySelectorAll('[data-floor] .court-tile')].filter(
+              (el) => {
+                const r = el.getBoundingClientRect();
+                const under =
+                  r.bottom > pad.top + 0.5 &&
+                  r.top < pad.bottom &&
+                  r.right > pad.left &&
+                  r.left < pad.right;
+                return under || r.top < 0 || r.bottom > window.innerHeight;
+              },
+            ).length,
+            hintCutBy: rest === null ? null : rest.scrollHeight - rest.clientHeight,
+          };
+        });
+      // On both phones that are short of room: lying down (the banner sits beside the
+      // scoreboard there and takes its width from the names), and upright in a browser
+      // (where a name of two lines and a banner of two lines push the players down).
+      for (const { size, letters, family } of await fits(page, [phoneLying, phoneInBrowser])) {
         await drawIn(page, family);
         await page.setViewportSize({ width: size.width, height: size.height });
         await twoFrames(page);
         const at = `${size.width} x ${size.height}${letters}`;
-        // The three checks keep the names they had in this device's own letters.
-        const again = letters === '' ? '' : ` (${at})`;
+        // The three checks keep the names they had: lying down, in this device's own letters.
+        const again = letters === '' && size === phoneLying ? '' : ` (${at})`;
         const asTheyAre = await names();
-        const bannerNow = (await c.banner.textContent()) ?? '';
-        // The longest the banner says: all three of its lines at once (queue-banner.ts).
+        const bannerNow = (await c.banner.locator('.court-banner-long').textContent()) ?? '';
+        const bannerShort = (await c.banner.locator('.court-banner-short').textContent()) ?? '';
+        // What the banner shows a scorekeeper here, and what it gives a screen reader.
+        const bannerShows = {
+          words: (await c.banner.innerText()).trim(),
+          heard: (await c.banner.ariaSnapshot()).trim(),
+        };
+        // The longest the banner says: all three of its lines at once (queue-banner.ts),
+        // in its long form and in the short one that a phone short of room shows.
         await written({
-          '[data-saved-banner]': `This device could not save to its storage · ${bannerNow} · 12 actions not saved`,
+          '[data-saved-banner] .court-banner-long': `This device could not save to its storage · ${bannerNow} · 12 actions not saved`,
+          '[data-saved-banner] .court-banner-short': [
+            'Storage failed',
+            bannerShort,
+            '12 not saved',
+          ],
         });
         await twoFrames(page);
         const longestBanner = await names();
+        const longestShows = (await c.banner.innerText()).trim().replace(/\s*\n\s*/g, ' · ');
         // A name of fifteen letters, and a truly long one (made-up names, written in).
         await written({
           '[data-score="home"] .court-score-name': 'Riverside Bears',
@@ -957,8 +1024,10 @@ export async function clockSteps(kit) {
         });
         await twoFrames(page);
         const longNames = await names();
+        const atItsFullest = await pushed();
         await written({
-          '[data-saved-banner]': null,
+          '[data-saved-banner] .court-banner-long': null,
+          '[data-saved-banner] .court-banner-short': null,
           '[data-score="home"] .court-score-name': null,
           '[data-score="away"] .court-score-name': null,
         });
@@ -972,9 +1041,19 @@ export async function clockSteps(kit) {
           JSON.stringify({ fullest, bannerNow, asTheyAre }),
         );
         note(
+          `${at}: the banner says it shorter (“68 to send”), in one form for the eye and for a screen reader`,
+          /^\d+ to send$/.test(bannerShows.words) &&
+            bannerShows.words === bannerShort &&
+            bannerShows.heard.includes(bannerShort) &&
+            !bannerShows.heard.includes('waiting to send'),
+          JSON.stringify({ bannerShows, bannerShort }),
+        );
+        note(
           `…and with the longest the banner says, neither name is cut${again}`,
-          longestBanner.length === 2 && longestBanner.every((name) => !name.cut),
-          JSON.stringify(longestBanner),
+          longestBanner.length === 2 &&
+            longestBanner.every((name) => !name.cut) &&
+            /^Storage failed · \d+ to send · 12 not saved$/.test(longestShows),
+          JSON.stringify({ longestBanner, longestShows }),
         );
         note(
           `…a name of fifteen letters is whole; only a truly long one is cut, ending in "…", with room for fifteen${again}`,
@@ -985,8 +1064,28 @@ export async function clockSteps(kit) {
             longNames[1].width >= longNames[0].width - 1,
           JSON.stringify(longNames),
         );
+        note(
+          `…and with all of that at once, nothing is pushed under the pad or off the screen, nothing scrolls and the hint is whole (${at})`,
+          atItsFullest.page <= 0 &&
+            atItsFullest.sideways <= 0 &&
+            atItsFullest.panels.every((over) => over <= 0) &&
+            atItsFullest.tilesUnderThePad === 0 &&
+            atItsFullest.hintCutBy !== null &&
+            atItsFullest.hintCutBy <= 0,
+          JSON.stringify(atItsFullest),
+        );
       }
       await drawIn(page, '');
+      // Where there is room (a phone upright at its full height, a tablet) the banner
+      // says it at length.
+      await page.setViewportSize({ width: phone.width, height: phone.height });
+      await twoFrames(page);
+      const atLength = (await c.banner.innerText()).trim();
+      note(
+        '390 x 844: the banner says it at length (“68 actions waiting to send”)',
+        /^\d+ actions waiting to send$/.test(atLength),
+        atLength,
+      );
       await page.setViewportSize({ width: phoneLying.width, height: phoneLying.height });
       await context.setOffline(false);
       await page.evaluate(() => window.dispatchEvent(new Event('online')));

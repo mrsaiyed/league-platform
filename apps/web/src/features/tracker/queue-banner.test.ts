@@ -1,7 +1,7 @@
 import { createTranslator } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
 import { tap } from './queue-storage-contract.test-helper.ts';
-import { savedBanner, savedBannerText } from './queue-banner.ts';
+import { savedBanner, savedBannerShortLines, savedBannerText } from './queue-banner.ts';
 
 const t = createTranslator('en');
 const refused = { command: tap(1), refusal: { code: 'rule', message: '' } } as const;
@@ -39,5 +39,23 @@ describe('saved banner (T6 §4)', () => {
     expect(text(2, 1, true)).toBe(
       'This device could not save to its storage · 2 actions waiting to send · 1 action not saved',
     );
+  });
+
+  it('says the same shorter, a line for each thing, for a phone short of room', () => {
+    const short = (waiting: number, refusedCount: number, storageFailed = false) =>
+      savedBannerShortLines(
+        savedBanner({
+          waiting,
+          refused: Array.from({ length: refusedCount }, () => refused),
+          storageFailure: storageFailed ? { code: 'storage-write-failed', since: 0 } : null,
+        }),
+        t,
+      );
+    expect(short(0, 0)).toEqual(['All saved']);
+    expect(short(1, 0)).toEqual(['1 to send']);
+    expect(short(12, 3)).toEqual(['12 to send', '3 not saved']);
+    // Never fewer lines than the long form, and the storage's failure first there too.
+    expect(short(2, 1, true)).toEqual(['Storage failed', '2 to send', '1 not saved']);
+    expect(short(0, 0, true)).toEqual(['Storage failed']);
   });
 });

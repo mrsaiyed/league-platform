@@ -534,10 +534,24 @@ const states = [
       await c.root.locator('[data-bonus="away"][data-level="2"]').waitFor();
       await c.root.locator('[data-saved-banner][data-state="waiting"]').waitFor();
       // Written into the page for the picture only: the banner's three lines at once
-      // (queue-banner.ts), and long made-up names.
+      // (queue-banner.ts), in its long form and in the short one these two phones show,
+      // and long made-up names.
       await page.evaluate(() => {
-        const banner = document.querySelector('[data-saved-banner]');
-        banner.textContent = `This device could not save to its storage · ${banner.textContent} · 12 actions not saved`;
+        const long = document.querySelector('[data-saved-banner] .court-banner-long');
+        const short = document.querySelector('[data-saved-banner] .court-banner-short');
+        long.textContent = `This device could not save to its storage · ${long.textContent} · 12 actions not saved`;
+        const span = (name, says) => {
+          const part = document.createElement('span');
+          part.className = name;
+          part.textContent = says;
+          return part;
+        };
+        short.replaceChildren(
+          ...['Storage failed', short.textContent, '12 not saved'].flatMap((line, index) => [
+            ...(index === 0 ? [] : [span('court-banner-dot', ' · ')]),
+            span('court-banner-line', line),
+          ]),
+        );
         const [home, away] = document.querySelectorAll('[data-score] .court-score-name');
         home.textContent = 'Riverside Bears';
         away.textContent = 'Northside Academy Hawks of the Valley';

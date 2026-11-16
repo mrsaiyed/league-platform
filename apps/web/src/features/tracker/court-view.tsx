@@ -17,7 +17,14 @@
 // once-a-game buttons behind More (2.37, 2.118, 2.119).
 import type { Translate } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
-import { memo, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from 'react';
+import {
+  Fragment,
+  memo,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import {
   ClockButton,
   ClockControls,
@@ -61,6 +68,11 @@ export type CourtSlots = {
 
 export type CourtBanner = {
   readonly text: string;
+  /**
+   * The same said shorter, a line for each thing it says: what a phone short of room
+   * shows in place of `text` (the stylesheet picks which).
+   */
+  readonly short: readonly string[];
   /** `saved`: nothing waits; `waiting`: plays wait to be sent; `trouble`: not saved or not kept. */
   readonly state: 'saved' | 'waiting' | 'trouble';
 };
@@ -204,7 +216,7 @@ export function CourtView(props: CourtViewProps) {
           data-saved-banner=""
           data-state={props.banner.state}
         >
-          {props.banner.text}
+          <SavedWords t={t} banner={props.banner} />
         </p>
         {props.notices === undefined || props.notices === null ? null : (
           <div className="court-notices">{props.notices}</div>
@@ -249,6 +261,30 @@ export function CourtView(props: CourtViewProps) {
       )}
       {props.children}
     </main>
+  );
+}
+
+/**
+ * What the saved banner says. Where its short form says the same ("All saved") there is
+ * one form; otherwise both are drawn and the stylesheet shows one: the long one, or, on a
+ * phone whose scoreboard has no room for it, the short one (a line for each thing it
+ * says where the banner is a narrow column, joined as the long one is where it is a row).
+ */
+function SavedWords({ t, banner }: { readonly t: Translate; readonly banner: CourtBanner }) {
+  const separator = t('tracker.queue.separator');
+  if (banner.short.join(separator) === banner.text) return banner.text;
+  return (
+    <>
+      <span className="court-banner-long">{banner.text}</span>
+      <span className="court-banner-short">
+        {banner.short.map((line, index) => (
+          <Fragment key={line}>
+            {index === 0 ? null : <span className="court-banner-dot">{separator}</span>}
+            <span className="court-banner-line">{line}</span>
+          </Fragment>
+        ))}
+      </span>
+    </>
   );
 }
 

@@ -1810,6 +1810,15 @@ export const en = {
   'tracker.queue.notSaved_other': '{count} actions not saved',
   'tracker.queue.storageFailed': 'This device could not save to its storage',
   'tracker.queue.separator': ' · ',
+  // The same lines said shorter, for a phone whose scoreboard has no room for the long
+  // ones (lying down, where the banner sits beside the scores and takes its width from
+  // the teams' names; upright in a browser, where a second line of it would push the
+  // players under the pad). "All saved" is said the same.
+  'tracker.queue.waitingShort_one': '{count} to send',
+  'tracker.queue.waitingShort_other': '{count} to send',
+  'tracker.queue.notSavedShort_one': '{count} not saved',
+  'tracker.queue.notSavedShort_other': '{count} not saved',
+  'tracker.queue.storageFailedShort': 'Storage failed',
   // What the tracker says about holding the game and refused taps (T6 §5, T-113),
   // chosen from the controller's status by apps/web/src/features/tracker/tracker-notice.ts.
   'tracker.readOnly.taken-over':

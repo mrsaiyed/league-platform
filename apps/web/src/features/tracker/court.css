@@ -766,6 +766,11 @@
   background: var(--court-red);
   color: var(--court-text);
 }
+/* The same said shorter ("12 to send"): only on a phone whose scoreboard has no room for
+   the long one (lying down, and upright in its browser: further down). */
+.court-banner-short {
+  display: none;
+}
 .court-notices {
   grid-area: notices;
   display: flex;
@@ -2243,9 +2248,20 @@
     font-size: var(--court-size-small);
     line-height: 1.1;
   }
+  /* The saved line says it shorter here ("12 to send"), so it stays one line beside the
+     title: a second line of it pushes the scoreboard down, and on a phone in its browser
+     the players under it then reach the pad. Only when it says three things at once in
+     wide letters does it take a second line, and that still fits. */
   .court-banner {
     min-block-size: 18px;
     font-size: var(--court-size-small);
+    line-height: 1.2;
+  }
+  .court-banner-long {
+    display: none;
+  }
+  .court-banner-short {
+    display: inline;
   }
   /* Start and the timeouts are 8 above the chips of the team under them. */
   .court-controls {
@@ -2425,10 +2441,24 @@
     min-inline-size: 0;
     padding-inline: 8px;
   }
+  /* The saved line sits beside the scoreboard here, and every pixel of its width comes
+     out of the two teams' names. So it says it shorter ("12 to send"), a line for each
+     thing it says, in a column of 96 at most: a name of fifteen letters is then whole
+     on a device whose letters are a sixth wider than most (it was cut at 132), and three
+     lines of it are as high as the scoreboard, so the row does not grow. */
   .court-banner {
-    max-inline-size: 132px;
+    max-inline-size: 96px;
+    padding-inline: 4px;
     font-size: var(--court-size-small);
     line-height: 1.2;
+  }
+  .court-banner-long,
+  .court-banner-dot {
+    display: none;
+  }
+  .court-banner-short,
+  .court-banner-line {
+    display: block;
   }
   .court-who-where {
     display: none;
