@@ -226,8 +226,14 @@ if (browser) {
           JSON.stringify(cardOf(home, liveGame)),
         );
         note(
-          'a game final this morning has no button',
-          cardOf(home, decided) !== undefined && cardOf(home, decided)?.offer === null,
+          // (At noon the home may show it among the results or not at all; the schedule's
+          // check below holds it on its card.)
+          'no game final on the league home has a button',
+          (cardOf(home, decided)?.offer ?? null) === null &&
+            (await page
+              .locator('main .ui-game-card:is([data-status="final"], [data-status="forfeit"])')
+              .locator('[data-offer]')
+              .count()) === 0,
           JSON.stringify(cardOf(home, decided)),
         );
         await accessible(page, 'the league home with the buttons');
@@ -413,7 +419,8 @@ if (browser) {
         await openMenu(page);
         await Promise.all([
           page.waitForURL((url) => url.pathname === '/signin'),
-          page.locator('.site-header .site-account-sign-out').click(),
+          // The menu's own button: the header holds one for each width, one of them shown.
+          page.locator('.site-header .site-account-sign-out').filter({ visible: true }).click(),
         ]);
 
         // Back to the league home they were on: asked again, as nobody, and no button.
@@ -628,7 +635,8 @@ if (browser) {
           await route.continue();
         });
         await page.goto(`${origin}/north-valley/schedule`);
-        await page.locator('main .ui-game-card').first().waitFor();
+        // In the page, not in sight: a finished round's cards are folded away.
+        await page.locator('main .ui-game-card').first().waitFor({ state: 'attached' });
         const before = await boxes(page);
         const read = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/scoring'));
         release();
