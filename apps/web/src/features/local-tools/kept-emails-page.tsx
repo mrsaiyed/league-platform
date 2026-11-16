@@ -1,21 +1,17 @@
-import { cookies } from 'next/headers';
-import { notFound } from 'next/navigation';
-import { StandalonePage } from '../../../../features/shell/index.ts';
-import { localTools } from '../../../../server/local-only.ts';
-import { t } from '../../../../server/messages.ts';
-import { timeInWords } from '../../../../server/sign-in/sign-in-mail.ts';
+import { StandalonePage } from '../shell/index.ts';
+import type { LocalTools } from '../../server/local-tools.ts';
+import { t } from '../../server/messages.ts';
+import { timeInWords } from '../../server/sign-in/sign-in-mail.ts';
 
-// The emails kept on this computer (step 2.96, T-140's viewer): LOCAL WORK AND TESTS ONLY.
-// In staging and production it answers "not found", as an address that does not exist
-// (local-only.ts decides, from the app's own settings). Newest first: who each was to, its
-// subject, its code and its links to this site, and its words, always as text (an email's
-// HTML is never drawn here). Linked from no page a visitor sees; run-it-locally.md says
-// where it is.
-export default async function Page() {
-  // The cookies first: this makes the page drawn per request, never at build time.
-  await cookies();
-  const tools = await localTools();
-  if (tools === undefined) notFound();
+/**
+ * The emails kept on this computer (step 2.96, T-140's viewer): LOCAL WORK AND TESTS ONLY.
+ * Drawn only with the local tools the gate gave (local-only.ts); the route that answers
+ * this address answers it as any unknown address otherwise (local-tool-page.ts). Newest
+ * first: who each was to, its subject, its code and its links to this site, and its
+ * words, always as text (an email's HTML is never drawn here). Linked from no page a
+ * visitor sees; run-it-locally.md says where it is.
+ */
+export async function KeptEmailsPage({ tools }: { readonly tools: LocalTools }) {
   const emails = await tools.keptEmails();
   return (
     <StandalonePage>

@@ -1,23 +1,18 @@
 import { leagueUrl, platformUrl, type LeagueMembership } from '@srleagues/core';
-import { cookies } from 'next/headers';
-import { notFound } from 'next/navigation';
-import { membershipsInWords, StandalonePage } from '../../../../features/shell/index.ts';
-import type { MadeUpPlace } from '../../../../server/local-tools.ts';
-import { localTools } from '../../../../server/local-only.ts';
-import { t } from '../../../../server/messages.ts';
-import { beMadeUpPersonAction } from '../../../../server/sign-in/local-actions.ts';
+import { membershipsInWords, StandalonePage } from '../shell/index.ts';
+import type { LocalTools, MadeUpPlace } from '../../server/local-tools.ts';
+import { t } from '../../server/messages.ts';
+import { beMadeUpPersonAction } from '../../server/sign-in/local-actions.ts';
 
-// "Be this made-up person" (step 2.96): LOCAL WORK AND TESTS ONLY. In staging and
-// production the page and its form's action answer "not found", as an address that does
-// not exist (local-only.ts decides, from the app's own settings). It lists the made-up
-// people, with what they are in which league, and signs this browser in as the one chosen
-// through the ordinary sign-in on the sign-in stand-in (be-made-up-person.ts). Linked from
-// no page a visitor sees; run-it-locally.md says where it is.
-export default async function Page() {
-  // The cookies first: this makes the page drawn per request, never at build time.
-  await cookies();
-  const tools = await localTools();
-  if (tools === undefined) notFound();
+/**
+ * "Be this made-up person" (step 2.96): LOCAL WORK AND TESTS ONLY. Drawn only with the
+ * local tools the gate gave (local-only.ts); its form's action asks the gate again. It
+ * lists the made-up people, with what they are in which league, and signs this browser in
+ * as the one chosen through the ordinary sign-in on the sign-in stand-in
+ * (be-made-up-person.ts). Linked from no page a visitor sees; run-it-locally.md says where
+ * it is.
+ */
+export async function MadeUpPeoplePage({ tools }: { readonly tools: LocalTools }) {
   const people = await tools.madeUpPeople();
   return (
     <StandalonePage>

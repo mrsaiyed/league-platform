@@ -151,8 +151,8 @@ const cases = [
   ),
   // Step 2.96: the two local-only pages answer on made-up data (here APP_ENV=test) and
   // show no password; nothing is served under the kept emails' page, not its files; and
-  // no page a visitor sees links to either. In staging and production they answer "not
-  // found" before the app is asked for anything (apps/web/src/server/local-only.test.ts):
+  // no page a visitor sees links to either. In staging and production they answer as an
+  // unknown /signin/<name>, by the same route (apps/web/src/server/local-only.test.ts):
   // neither mode can serve a page today, as the check at the end of this file shows.
   [
     'visitor',
@@ -835,7 +835,8 @@ try {
 
 // Staging, and since step 2.96 production too, with a database that answers nobody: the app
 // must refuse to start, so in neither mode does any page answer, the local-only pages of
-// step 2.96 among them (their own "not found" there is apps/web/src/server/local-only.test.ts).
+// step 2.96 among them (that they answer there as an unknown address is
+// apps/web/src/server/local-only.test.ts).
 for (const appEnv of ['staging', 'production']) {
   const deployed = start(['start', '--port', String(await freePort())], {
     APP_ENV: appEnv,
