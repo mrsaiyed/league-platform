@@ -32,8 +32,41 @@ const paperTint = 0.012;
 const inkTint = 0.1;
 /** How far the main color is deepened for the side menu, and how much deeper where it must be. */
 const menuDepth = 0.8;
-/** The menu must carry pale words with room to spare. */
-const menuContrast = 11;
+/**
+ * The menu must carry pale words with room to spare, and be deep enough that a filled
+ * item can stand out from it and still carry white words: 15 to 1 against white leaves a
+ * band of tones that do both (see `currentFill`).
+ */
+const menuContrast = 15;
+/** The current item stands this far from the menu (DESIGN.md line 20: "the current one filled"). */
+const currentStandsOut = 3;
+/** Words on a filled item, and every other word of the menu, read at least this well. */
+const wordsRead = 4.5;
+
+/**
+ * The fill of the menu's current item: the league's main color, brought to a tone that
+ * stands at least 3 to 1 from the menu and carries white words at 4.5 to 1. A main color
+ * too dark to stand out (a black, a navy, a deep wine) is lightened towards white only as
+ * far as it must be; one too pale to carry white words (a yellow, a sky blue) is deepened
+ * towards the menu only as far as it must be. So a black league's current item is a grey
+ * that can be seen, and a yellow league's is a deep gold, not a patch of bright yellow.
+ */
+function currentFill(main: string, menu: string): string {
+  const fits = (fill: string) =>
+    contrastRatio(fill, menu) >= currentStandsOut && contrastRatio('#ffffff', fill) >= wordsRead;
+  const towards = contrastRatio('#ffffff', main) < wordsRead ? menu : '#ffffff';
+  for (let step = 0; step <= 200; step++) {
+    const fill = mixColors(main, towards, step / 200);
+    if (fits(fill)) return fill;
+  }
+  // No tone of the main color does both (it cannot happen while the menu is as deep as
+  // `menuContrast` makes it): a plain grey between the menu and white that does.
+  for (let step = 0; step <= 200; step++) {
+    const fill = mixColors(menu, '#ffffff', step / 200);
+    if (fits(fill)) return fill;
+  }
+  return mixColors(menu, '#ffffff', 0.4);
+}
 
 /** The design document the staff area is drawn with, for a league whose design is `design`. */
 export function staffDesignOf(design: DesignDocument): DesignDocument {
@@ -66,7 +99,10 @@ export type StaffColors = {
   /** A fine line on the menu, and an item under the pointer. */
   readonly menuLine: string;
   readonly menuHover: string;
-  /** The current item, filled, and the words on it. */
+  /**
+   * The current item, filled with a tone of the main color that stands 3 to 1 from the
+   * menu, and the one color of everything written on it (name, icon, "Not ready" mark).
+   */
   readonly menuCurrent: string;
   readonly onMenuCurrent: string;
   /** A state's pill: its words and its soft ground, for "done" and for "waiting". */
@@ -78,10 +114,18 @@ export type StaffColors = {
   readonly dangerSoft: string;
 };
 
-/** The staff area's own colors for a league whose main color is `main`. */
+/** The staff area's own colors for a league whose design is `design`. */
 export function staffColors(design: DesignDocument): StaffColors {
   const staff = staffDesignOf(design);
-  const main = staff.colors.primary;
+  return colorsOf(staff.colors.primary, dangerOf(designToCssVariables(staff)));
+}
+
+/** The workspace's danger color, among its design's variables. */
+const dangerOf = (variables: Readonly<Record<string, string>>): string =>
+  variables['--color-danger'] ?? '#b3261e';
+
+/** The staff area's own colors, from the main color and the workspace's danger color. */
+function colorsOf(main: string, dangerRed: string): StaffColors {
   // A dark shade of the main color; a pale main color (a gold, a sky blue) is deepened
   // further, until pale words read on it with room to spare.
   let menu = mixColors(main, night, menuDepth);
@@ -90,20 +134,22 @@ export function staffColors(design: DesignDocument): StaffColors {
     menu = mixColors(main, night, depth);
   }
   const menuText = mixColors('#ffffff', menu, 0.12);
-  // The current item is filled with the main color, drawn back towards the menu so it sits
-  // in it; its words are whichever of the menu's own read on it.
-  const menuCurrent = mixColors(main, menu, 0.4);
+  const menuHover = mixColors(menu, '#ffffff', 0.08);
+  // The current item is filled with a tone of the main color that can be told from the
+  // menu by anyone (3 to 1); everything written on it (its name, its icon, a "Not ready"
+  // mark) is in one color that reads on it.
+  const menuCurrent = currentFill(main, menu);
   const soft = (hue: string, share: number) => mixColors(sheet, hue, share);
   const goodSoft = soft(goodGreen, 0.13);
   const waitSoft = soft(waitAmber, 0.16);
-  const dangerRed = designToCssVariables(staff)['--color-danger'] ?? '#b3261e';
   const dangerSoft = soft(dangerRed, 0.08);
   return {
     menu,
     menuText,
-    menuMuted: readableOn(mixColors('#ffffff', menu, 0.42), [menu]),
+    // Quiet words read on the menu and on an item under the pointer.
+    menuMuted: readableOn(mixColors('#ffffff', menu, 0.42), [menu, menuHover]),
     menuLine: mixColors(menu, '#ffffff', 0.14),
-    menuHover: mixColors(menu, '#ffffff', 0.08),
+    menuHover,
     menuCurrent,
     onMenuCurrent: textOn(menuCurrent, ['#ffffff', menuText]),
     good: readableOn(goodGreen, [goodSoft, sheet]),
@@ -116,9 +162,11 @@ export function staffColors(design: DesignDocument): StaffColors {
 
 /** Every variable the staff area is drawn with: its design's, then its own. */
 export function staffCssVariables(design: DesignDocument): Record<string, string> {
-  const colors = staffColors(design);
+  const staff = staffDesignOf(design);
+  const variables = designToCssVariables(staff);
+  const colors = colorsOf(staff.colors.primary, dangerOf(variables));
   return {
-    ...designToCssVariables(staffDesignOf(design)),
+    ...variables,
     '--staff-menu': colors.menu,
     '--staff-menu-text': colors.menuText,
     '--staff-menu-muted': colors.menuMuted,

@@ -215,9 +215,25 @@ html:has(.staff) {
 .staff .staff-foot-link:hover {
   background: var(--staff-menu-hover);
 }
-.staff .staff-nav a[aria-current='page'] {
+/* The current item is told three ways, so no league's color can leave it unmarked: filled
+   with a tone of the main color that stands 3 to 1 from the menu (staff-design.ts), set
+   heavier, and marked by a bar at its start edge (a border, so it is still drawn when a
+   device takes every background away). Under the pointer it stays as it is. */
+.staff .staff-nav a[aria-current='page'],
+.staff .staff-nav a[aria-current='page']:hover {
+  position: relative;
   background: var(--staff-menu-current);
   color: var(--staff-on-menu-current);
+  font-weight: 700;
+}
+.staff .staff-nav a[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  inset-block: var(--step-2);
+  inset-inline-start: 0;
+  border-inline-start: var(--step-1) solid currentColor;
+  border-start-end-radius: var(--radius-pill);
+  border-end-end-radius: var(--radius-pill);
 }
 .staff-icon {
   flex: none;
@@ -246,6 +262,11 @@ html:has(.staff) {
   font-size: var(--text-12);
   font-weight: 600;
   white-space: nowrap;
+}
+/* On the current item everything is in the one color that reads on its fill. */
+.staff-nav a[aria-current='page'] .staff-nav-mark {
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
+  color: inherit;
 }
 /* Apart at the foot: the way to the public site, who is signed in, and signing out. */
 .staff-foot {
