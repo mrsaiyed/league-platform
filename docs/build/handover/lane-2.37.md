@@ -1,5 +1,32 @@
 # Lane 2.37, part 1: handover
 
+## 0. Where it stands now (the second design lead, 2026-11-16, after its first stop)
+
+**Things 1 and 2 of section 9 are built, pictured and committed; thing 3 (End game and everything after it) is not started.** Sections 1 to 9 below are the first lead's and still hold, except where this section says otherwise. Read this section first.
+
+**Built since the first lead left** (every word of it is in DESIGN.md section 7, lines 5 and 8, which is the rule now):
+
+- The controller has its doors in the browser (`open-tracker-game.ts` takes `doors`, `tracker-opening.tsx` hands it `createFetchGameDoors`).
+- **The saved banner never makes anything above the two teams grow.** On an upright phone, tall or short, the first row is the title over the saved line in a place of a fixed height (`.court-top-start`, a wrapper around the title and the banner in `court-view.tsx`); the title gives way whole when the line is long. Lying down the line is a column of 104 at most, never higher than its row (48). The banner's short form has a new shape: the dot is inside the thing before it (`bannerShortHtml` in `tests/browser/tracker-driver.mjs` writes it for a test or a picture). A two-line team name fits at both upright phones.
+- **Undo and Redo** (`plays-parts.tsx`, `UndoRedo`) in the row under the scoreboard at every size, the timeouts button in two lines where the row is narrow, the pad's column lying down two fifths of the screen. Each rests 600 ms after a tap taken (`restingPlaces.undo` and `.redo` in `scoring-screen.tsx`). What the screen says with the pad open is drawn over the pad's first line in every mode, not only the timeouts.
+- **The latest play's line** (`LatestPlays`) in the pad at rest once the game is live; the hint gives it room (one sentence with the Start clock button, three with the clock running, on phones) and never shows a cut line (`.court-hint` wraps whole sentences out of sight).
+- **The play log**: `PlayLogSheet` over the screen at every size (from the pad's line, the panel, More), `PlayLogPanel` under the pad at 1180 x 820 only (`useScreenIs` in `scoring-screen.tsx` keeps a phone from wording thirty lines a tap). `playLog` takes how many rows to word.
+- Tests: `plays-parts.test.ts` (15), `play-log.test.ts` (18), `open-tracker-game.test.ts` (12); a browser test of its own, `tests/browser/scoring-plays-test.mjs`: the short game by touch on a fresh made-up world for each size and face (so far: baskets, Undo, Redo, Undo with options open, two fast taps on Undo, a foul undone, the log with the network held back). **Thing 3 adds its End game steps to that file**, not to `scoring-screen-test.mjs`, whose game is in overtime at a hundred each by then.
+- Pictures: `scripts/tracker-shots.mjs` has two chapters; `--chapter=plays` plays only step 2.37's game (states 41 to 47, fifteen a side). Thing 3 adds its states from 48.
+
+**For thing 3, on top of sections 2 and 6 below:**
+
+- **The lead's answers** (2026-11-16): (1) YES, the device is told whether the season allows ties (S-73, "Decided for you"): send it with the rosters, as `uniqueJerseys` already travels (`readTrackerRosters` in core, `TrackerRosters` in `packages/contracts/src/tracker-protocol.ts`, `tracker-rosters-reply.ts`, `device-rosters.ts`, `DeviceRosters` in `opened-game-storage.ts`): the page and its rosters come from one release, so an older page never meets a field it does not know (the state read is a strict object and would). The server stays the judge; its refusal after the tap is still handled calmly. Record 078 and T-282 are reserved if it needs a technical record. (2) KEEP: after "Take back End game" the clock stays stopped, and the screen says so (S-72, "Decided for you"). (3) YES for the wording only: the Mark not started question may word itself from the person's areas (`scoresOnly(view.areas)` in `tracker-page.tsx`); no decision row.
+- **End game from More must work in the MIDDLE of a period** (the lead, 2026-11-16): the founder's first test ends a game long before forty minutes are played, and a real scorekeeper ends one early (a forfeit, a gym that closes). The question then says plainly that time is still on the clock, and which period, as well as the score. Checked: the engine's `end` refuses only a game with nothing recorded (`live.ts`, `case 'end'`), the server's `finish-tracked-game.ts` has no clock or period check, and P7 says only "End game locks the result": nothing forbids it. The pad still OFFERS End by itself only at 0:00 of the last period with a team ahead (S-65). A mid-period End goes in the browser test's short game.
+- The pad's modes are in `scoring-moves.ts` (`PadMode`); the question, the final panel and the Reopen and Mark not started questions are new modes of it or a state beside it. `data-pad-mode` is on the screen's root and the sentence's place depends on it (`court.css`).
+- A class named `court-play` is the scoring screen's own root (`court court-play`): do not name a part `court-play` (the log's rows are `court-logged`).
+
+**This machine** (a Linux cloud machine): start every command with `. /home/user/league-platform/.local/env.sh &&`; Next.js stops a build now and then with an upgrade notice (exit 1 after the routes are listed): run the same build once more, never what the notice suggests. This machine's own face is Inter and its wider one DejaVu Sans, exactly as wide as GitHub's.
+
+**Found and not fixed (not this step's):** at 1180 x 820 in wide letters a team's heading cuts "HAWKS" to "H…" beside its two chips (step 2.36's heading; this lane did not change that panel's width).
+
+---
+
 Written on 2026-11-16 by the design lead who started the lane, for a design lead who has only GitHub. Branch `lane/2.37-plays-undo-end`. It started from the tip of lane 2.36 (not from the build branch) and has `build/stage-1` merged in once; when lane 2.36 lands, merge `build/stage-1` again and do not merge `lane/2.36-clock` yourself.
 
 **Where it stands in one line:** the controller, the words and all the working-out are built and tested; NOTHING IS DRAWN YET. The scoring screen looks exactly as step 2.36 left it, except that the saved banner now says "No connection" and "plays".
