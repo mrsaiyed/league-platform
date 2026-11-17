@@ -52,6 +52,8 @@ describe('leagueUrl (T-34)', () => {
     );
     // @ts-expect-error: the link takes no season.
     leagueUrl(north, 'invitation', { token, season: 'fall-2025' });
+    // Where the link sends the browser once its token is held (step 2.97): no secret in it.
+    expect(leagueUrl(north, 'invitation-held')).toBe('/north-league/invitation');
   });
 
   it('builds pages inside an admin area, each part encoded and checked', () => {
