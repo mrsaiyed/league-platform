@@ -406,6 +406,11 @@ const adminPages = [
       winterSteps(page, 'hidden', '/admin/schedule?season=winter-2027&done=published'),
   },
   { name: 'admin-settings', at: '/admin/settings' },
+  // Step 2.97: League settings → Admins (the stand-in's grants and made-up names; its
+  // invitations are pictured on the made-up database by admins-invitations-test.mjs --shots),
+  // and the accept page with no invitation held: "This link does not work".
+  { name: 'admin-settings-admins', at: '/admin/settings/admins' },
+  { name: 'invitation-not-usable', at: '/invitation' },
   { name: 'admin-people', at: '/admin/people' },
   { name: 'admin-standings', at: '/admin/standings' },
   // The admin's own frame (step 2.103): its menu, open, as a phone holds it (on a laptop the
