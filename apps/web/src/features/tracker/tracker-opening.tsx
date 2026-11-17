@@ -26,7 +26,7 @@ import {
 } from './queue-banner.ts';
 import { ScoringScreen } from './scoring-screen.tsx';
 import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controller.ts';
-import { trackerNoticeText, trackerNotices } from './tracker-notice.ts';
+import { showsFinalPanel, trackerNoticeText, trackerNotices } from './tracker-notice.ts';
 import { holdSignOut } from './tracker-sign-out.ts';
 
 export type TrackerOpeningProps = {
@@ -51,6 +51,11 @@ export type TrackerOpeningProps = {
   readonly account?: ReactNode;
   /** The sign-in screen, coming back to this game: offered once the device is signed out. */
   readonly signInHref: string;
+  /**
+   * The account works in more areas than scoring, so it may correct games: a hint for
+   * the words of the Mark not started question only (step 2.37; S-40).
+   */
+  readonly mayCorrect?: boolean;
   readonly locale: string;
   /** The tracker's own messages (tracker-catalog.ts). */
   readonly catalog: Catalog;
@@ -77,6 +82,7 @@ export function TrackerOpening({
   accountHref,
   account = null,
   signInHref,
+  mayCorrect = false,
   locale,
   catalog,
 }: TrackerOpeningProps) {
@@ -289,14 +295,19 @@ export function TrackerOpening({
 
   const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
 
-  // The scoring screen, once this device holds the game and its format is confirmed.
+  // The scoring screen, once this device holds the game and its format is confirmed. And
+  // it stays while the game it shows is final (step 2.37): about half a minute after an
+  // End is saved the league tells the device the game is over, and the screen with its
+  // final panel (the score, Reopen with the time left) is not swapped for a card that
+  // says "this game is over". Reopened, the same screen carries on.
   if (
     phase.kind === 'open' &&
     phase.status.game !== null &&
-    screenOf(phase.status, phase.confirmed).kind === 'scoring'
+    (screenOf(phase.status, phase.confirmed).kind === 'scoring' || showsFinalPanel(phase.status))
   ) {
     // With no connection the banner says so, and never "All saved" (step 2.37).
-    const banner = savedBanner(phase.status.queue, isOffline(phase.status.queue, browserOnline));
+    const offline = isOffline(phase.status.queue, browserOnline);
+    const banner = savedBanner(phase.status.queue, offline);
     const notices = trackerNotices(phase.status);
     const anythingToTell = notices.length > 0 || signIn !== null || storeFailedNotice !== null;
     return (
@@ -326,6 +337,8 @@ export function TrackerOpening({
         account={account}
         leave={leaveBy}
         onNotRecorded={() => setLastTapLost(true)}
+        mayCorrect={mayCorrect}
+        offline={offline}
       />
     );
   }

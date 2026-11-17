@@ -123,6 +123,9 @@ export async function TrackerPage({
       accountHref={platformUrl('account')}
       account={menu === null ? null : <AccountButton account={menu} />}
       signInHref={signInFirstUrl(trackerHref, { problem: 'signInAgain' })}
+      // Whoever works in more areas than scoring may correct games: only the words of
+      // the Mark not started question follow from it. The league stays the judge (S-40).
+      mayCorrect={!scoresOnly(view.areas)}
       locale={locale}
       catalog={trackerCatalog(catalogs[locale] ?? en)}
     />
