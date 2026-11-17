@@ -165,20 +165,56 @@ function levelNote(
   return { id: null, text: sentences.join(join) };
 }
 
-function columnsOf(table: CoreTable, rankBy: Standings['rankBy']): StandingsColumn[] {
-  const anyTies = table.lines.some((line) => line.ties > 0);
-  return [
-    { key: 'played', label: t('standings.col.played') },
-    { key: 'wins', label: t('standings.col.wins') },
-    { key: 'losses', label: t('standings.col.losses') },
-    ...(anyTies ? [{ key: 'ties', label: t('standings.col.ties') }] : []),
-    { key: 'winPercentage', label: t('standings.col.winPercentage') },
-    ...(rankBy === 'points' ? [{ key: 'points', label: t('standings.col.points') }] : []),
-    { key: 'pointsFor', label: t('standings.col.pointsFor') },
-    { key: 'pointsAgainst', label: t('standings.col.pointsAgainst') },
-    { key: 'pointDifference', label: t('standings.col.pointDifference') },
-    { key: 'streak', label: t('standings.col.streak') },
-  ];
+/**
+ * The table's columns by the season's own names (`standings.columns`), with the key each
+ * row's cell has and its heading. "Last five" has no cell: nothing works it out yet, so
+ * Season settings does not offer it, and a season that holds it draws nothing for it.
+ */
+const seasonColumns = {
+  played: { key: 'played', label: 'standings.col.played' },
+  wins: { key: 'wins', label: 'standings.col.wins' },
+  losses: { key: 'losses', label: 'standings.col.losses' },
+  ties: { key: 'ties', label: 'standings.col.ties' },
+  'win-percentage': { key: 'winPercentage', label: 'standings.col.winPercentage' },
+  points: { key: 'points', label: 'standings.col.points' },
+  'points-for': { key: 'pointsFor', label: 'standings.col.pointsFor' },
+  'points-against': { key: 'pointsAgainst', label: 'standings.col.pointsAgainst' },
+  'point-difference': { key: 'pointDifference', label: 'standings.col.pointDifference' },
+  streak: { key: 'streak', label: 'standings.col.streak' },
+} as const;
+type SeasonColumn = keyof typeof seasonColumns;
+const isSeasonColumn = (name: string): name is SeasonColumn => Object.hasOwn(seasonColumns, name);
+
+/** What a season whose rules cannot be read is drawn with: every column with a cell. */
+const everyColumn: readonly SeasonColumn[] = [
+  'played',
+  'wins',
+  'losses',
+  'win-percentage',
+  'points-for',
+  'points-against',
+  'point-difference',
+  'streak',
+];
+
+/**
+ * The columns the season chose, in its order (P7 §1; step 2.47, the numbers audit's M7).
+ * Two are added when the season left them out, so the table never hides what it stands
+ * on: the ties column when a game of the table was tied (else W and L do not add up to
+ * GP), after the losses; and the points column in a table ranked by points, at the end.
+ */
+function columnsOf(table: CoreTable, standings: Standings): StandingsColumn[] {
+  const chosen = standings.columns.filter(isSeasonColumn);
+  const names: SeasonColumn[] = [...(chosen.length === 0 ? everyColumn : chosen)];
+  if (!names.includes('ties') && table.lines.some((line) => line.ties > 0)) {
+    const after = names.indexOf('losses');
+    names.splice(after === -1 ? names.length : after + 1, 0, 'ties');
+  }
+  if (!names.includes('points') && standings.rankBy === 'points') names.push('points');
+  return names.map((name) => ({
+    key: seasonColumns[name].key,
+    label: t(seasonColumns[name].label),
+  }));
 }
 
 function cellsOf(line: StandingsLine): Record<string, string | number> {
@@ -267,7 +303,7 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
   return {
     key: table.division?.id ?? `table-${index}`,
     caption: table.division?.name ?? t('standings.allTeams'),
-    columns: columnsOf(table, standings.rankBy),
+    columns: columnsOf(table, standings),
     rows,
     footnotes,
   };

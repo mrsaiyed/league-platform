@@ -477,3 +477,46 @@ describe('the note beside each team of the standings', () => {
     nothingPlacedAbove(made);
   });
 });
+
+describe('the columns the season chose (step 2.47; the numbers audit M7)', () => {
+  const games: readonly Game[] = [
+    ['Ash', 50, 'Birch', 40],
+    ['Birch', 45, 'Cedar', 44],
+  ];
+  const withColumns = (columns: SeasonRules['standings']['columns'], more = {}): SeasonRules => ({
+    ...defaultSeasonRules(),
+    ...more,
+    standings: { ...defaultSeasonRules().standings, columns },
+  });
+  const keys = (made: Made) => made.view.columns.map((c) => c.key);
+
+  it('draws the chosen columns in the season’s own order, and no other', async () => {
+    const made = await tableAfter(['Ash', 'Birch', 'Cedar'], games, {
+      rules: withColumns(['wins', 'losses', 'point-difference', 'played', 'streak']),
+    });
+    expect(keys(made)).toEqual(['wins', 'losses', 'pointDifference', 'played', 'streak']);
+    // The headings, and nothing of a column left out.
+    expect(made.html).toContain('>DIFF<');
+    expect(made.html).not.toContain('>PF<');
+    expect(made.html).not.toContain('>PCT<');
+  });
+
+  it('draws the starting columns for a season on the starting rules', async () => {
+    const made = await tableAfter(['Ash', 'Birch', 'Cedar'], games);
+    expect(keys(made)).toEqual(['played', 'wins', 'losses', 'winPercentage', 'pointDifference']);
+  });
+
+  it('draws nothing for "last five", which nothing works out yet', async () => {
+    const made = await tableAfter(['Ash', 'Birch', 'Cedar'], games, {
+      rules: withColumns(['played', 'last-five', 'wins']),
+    });
+    expect(keys(made)).toEqual(['played', 'wins']);
+  });
+
+  it('adds the ties column after the losses when a game was tied, so the record adds up', async () => {
+    const made = await tableAfter(['Ash', 'Birch'], [['Ash', 40, 'Birch', 40]], {
+      rules: withColumns(['played', 'wins', 'losses', 'win-percentage'], { allowTies: true }),
+    });
+    expect(keys(made)).toEqual(['played', 'wins', 'losses', 'ties', 'winPercentage']);
+  });
+});
