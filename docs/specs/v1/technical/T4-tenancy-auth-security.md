@@ -136,4 +136,6 @@ Product rules are in [P6](../product/P6-registration-and-accounts.md) section 7.
 | A repeated payment message changes nothing                                     | Section 8 |
 | Browser code contains no secrets                                               | Section 9 |
 
+The script-injection test is `tests/browser/harmful-text-test.mjs` (step 2.98): an attacker's text typed through the screens' own forms into every free-text field (it fails on a field it does not know, so a new field must join it) comes out as text on every page that shows it, with the script policy switched off in the browser, so the pages' own escaping is what keeps it text.
+
 Before sign-up opens to strangers (stage 5), the founder decides whether to commission an independent security review (T-181). My advice at that point will be yes, because that is when strangers' data and money arrive.
