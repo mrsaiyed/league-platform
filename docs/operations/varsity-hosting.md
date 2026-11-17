@@ -31,6 +31,8 @@ Before expanding to paid/general leagues, agree the managed PostgreSQL/provider 
 8. Deploy the exact saved private version using Sites. Verify a practice action via a fresh API read and database inspection before announcing completion.
 9. Commit all authored code, migrations, current specs and handoff updates to GitHub. The provider mirror is generated deployment source, not a second authoring repository.
 
+Moving the pilot to newer libraries is a release of its own, with its checks and the way back: [scoring-pilot-release.md](scoring-pilot-release.md).
+
 Native Sites access is needed to publish; ordinary GitHub push alone does not deploy the scorer. The GitHub Pages workflow affects only the preserved static intramural concept.
 
 ## Local hosted-adapter preview
