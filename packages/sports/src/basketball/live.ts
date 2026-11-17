@@ -613,10 +613,14 @@ export type ClockSetEffect =
   | { kind: 'none' }
   /** The clock has not run in this period: the set says where it starts. */
   | { kind: 'start' }
-  /** `ms` comes off the minutes of the players on the court; `wholePeriod` when that is all this period has run. */
-  | { kind: 'back'; ms: number; wholePeriod: boolean }
-  /** `ms` is added to the minutes of the players on the court (played with the clock stopped). */
-  | { kind: 'added'; ms: number };
+  /**
+   * `ms` comes off the minutes of the players on the court; `wholePeriod` when that is all
+   * this period has run. Of it, `takesBackMs` takes back earlier sets of this period
+   * (`takenBackMs`): those minutes go back to the players they came from.
+   */
+  | { kind: 'back'; ms: number; wholePeriod: boolean; takesBackMs: number }
+  /** `ms` is added to the minutes of the players on the court; of it, `takesBackMs` as above. */
+  | { kind: 'added'; ms: number; takesBackMs: number };
 
 /**
  * What setting the clock to `ms` at `now` would do to the players' minutes, under the
@@ -639,10 +643,39 @@ export function clockSetEffect(state: GameState, ms: number, now: number): Clock
     return { kind: 'none' };
   }
   const change = s.clock.elapsedMs - before;
+  const takesBackMs = takenBackMs(before, s);
   if (change < 0)
-    return { kind: 'back', ms: -change, wholePeriod: s.clock.elapsedMs === periodStart };
-  if (change > 0) return { kind: 'added', ms: change };
+    return {
+      kind: 'back',
+      ms: -change,
+      wholePeriod: s.clock.elapsedMs === periodStart,
+      takesBackMs,
+    };
+  if (change > 0) return { kind: 'added', ms: change, takesBackMs };
   return notRun ? { kind: 'start' } : { kind: 'none' };
+}
+
+/**
+ * Of what a set clock moved the game's time by, the part that took back earlier sets of
+ * the same period (S-71 as changed on November 17): those minutes went back to the players
+ * they came from, and the plays to their own times. `beforeMs` is the game's time just
+ * before the set, `after` the game after it. The rest is a new correction. Always 0 on the
+ * tracker's own rule, where a set takes nothing back.
+ */
+export function takenBackMs(beforeMs: number, after: GameState): number {
+  if (!onGameClock(after.rules) || after.clock.running) return 0;
+  const ran = ranOfClock(after.clock);
+  const segment = segmentNow(after, after.clockSets ?? []);
+  const { lengthMs } = segment;
+  const base = after.clock.elapsedMs - lengthMs + Math.min(lengthMs, after.clock.remainingMs);
+  // The game's time at this moment from the earlier sets alone, as they now count.
+  const earlier = segment.counted.filter((e) => e.ranMs !== ran);
+  const reading = readingAt({ ...segment, sets: earlier }, ran);
+  const justBefore = base + lengthMs - Math.min(lengthMs, reading);
+  const change = after.clock.elapsedMs - beforeMs;
+  const back = justBefore - beforeMs;
+  // Only a part of the move itself, in its own direction.
+  return Math.sign(back) === Math.sign(change) ? Math.min(Math.abs(back), Math.abs(change)) : 0;
 }
 
 const bonusLevel = (fouls: number, rules: Rules): 0 | 1 | 2 =>

@@ -575,6 +575,17 @@ const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back']
 
 /** What the form says a set will do to the minutes, before it is done. */
 function effectSaid(t: Translate, effect: SetEffect): string {
+  // Taking back an earlier change to this period's clock: said as that, then what is
+  // left over as a new correction, if anything.
+  if (effect.kind !== 'start' && effect.takenBack !== null) {
+    if (effect.rest === null) return t('tracker.clockSheet.takesBack', { time: effect.takenBack });
+    return t(
+      effect.kind === 'back'
+        ? 'tracker.clockSheet.takesBackPutsBack'
+        : 'tracker.clockSheet.takesBackAdds',
+      { time: effect.takenBack, more: effect.rest },
+    );
+  }
   switch (effect.kind) {
     case 'back':
       return t(
@@ -602,6 +613,24 @@ export function clockSetSaid(
 ): string | { readonly text: string; readonly short: string } {
   const plain = t('tracker.say.clockSet', { clock });
   if (moved === null) return plain;
+  // An earlier change taken back: the minutes go back to the players they came from, so
+  // no even figure is promised; the short form names only the clock's change taken back.
+  if (moved.takenBack !== null) {
+    if (moved.rest === null)
+      return {
+        text: t('tracker.say.clockSetTakesBack', { clock, time: moved.takenBack }),
+        short: t('tracker.say.clockSetTakesBackShort', { clock, time: moved.takenBack }),
+      };
+    return {
+      text: t(
+        moved.kind === 'back'
+          ? 'tracker.say.clockSetTakesBackBack'
+          : 'tracker.say.clockSetTakesBackAdded',
+        { clock, time: moved.takenBack, more: moved.rest },
+      ),
+      short: plain,
+    };
+  }
   const text =
     moved.kind === 'back'
       ? t('tracker.say.clockSetBack', { clock, back: moved.time })

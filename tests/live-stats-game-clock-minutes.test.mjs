@@ -16,6 +16,7 @@ import {
   formatMinutes,
   newGame,
   periodMs,
+  takenBackMs,
   HALVES,
   QUARTERS,
 } from '../packages/sports/src/basketball/live.ts';
@@ -344,24 +345,53 @@ test('the reckoning holds while the clock runs, and a reload reads the same', ()
 
 test('the form’s helper says what a set will do, from the engine itself', () => {
   const at16 = game(HALVES_G).tap({ type: 'pause' }, 185_000);
-  assert.deepEqual(clockSetEffect(at16.state, 720_000, 186_000), { kind: 'added', ms: 295_000 });
+  assert.deepEqual(clockSetEffect(at16.state, 720_000, 186_000), {
+    kind: 'added',
+    ms: 295_000,
+    takesBackMs: 0,
+  });
   assert.deepEqual(clockSetEffect(at16.state, 1_100_000, 186_000), {
     kind: 'back',
     ms: 85_000,
     wholePeriod: false,
+    takesBackMs: 0,
   });
   assert.deepEqual(clockSetEffect(at16.state, 1_200_000, 186_000), {
     kind: 'back',
     ms: 185_000,
     wholePeriod: true,
+    takesBackMs: 0,
   });
   assert.deepEqual(clockSetEffect(at16.state, 1_015_000, 186_000), { kind: 'none' });
   at16.tap({ type: 'set-clock', ms: 720_000 }, 186_000);
   assert.deepEqual(
     clockSetEffect(at16.state, 1_015_000, 187_000),
-    { kind: 'back', ms: 295_000, wholePeriod: false },
-    'back from 12:00 to 16:55 takes off the 4:55 it added, not the half',
+    { kind: 'back', ms: 295_000, wholePeriod: false, takesBackMs: 295_000 },
+    'back from 12:00 to 16:55 takes back the 4:55 it added, not the half',
   );
+  // A mistake that ran, put right (the reviews' probe): 7:50 at 6:00, 10 seconds, then
+  // 5:50 takes all 1:50 of it back; 4:00 takes it back and adds 1:50 more.
+  const probe = game(QUARTERS_G)
+    .tap({ type: 'pause' }, 120_000)
+    .tap({ type: 'set-clock', ms: 470_000 }, 121_000)
+    .tap({ type: 'start' }, 130_000)
+    .tap({ type: 'pause' }, 140_000);
+  assert.deepEqual(clockSetEffect(probe.state, 350_000, 141_000), {
+    kind: 'added',
+    ms: 110_000,
+    takesBackMs: 110_000,
+  });
+  assert.deepEqual(clockSetEffect(probe.state, 240_000, 141_000), {
+    kind: 'added',
+    ms: 220_000,
+    takesBackMs: 110_000,
+  });
+  const putRight = apply(
+    probe.state,
+    { type: 'set-clock', ms: 350_000 },
+    { id: 'p', now: 141_000 },
+  );
+  assert.equal(takenBackMs(probe.state.clock.elapsedMs, putRight), 110_000);
   // Before the clock has run in a period, a set only says where it starts.
   const second = cases.f(QUARTERS_G);
   assert.deepEqual(clockSetEffect(second.state, 420_000, 493_000), { kind: 'start' });
@@ -378,6 +408,7 @@ test('the form’s helper says what a set will do, from the engine itself', () =
     kind: 'back',
     ms: 185_000,
     wholePeriod: true,
+    takesBackMs: 0,
   });
 });
 

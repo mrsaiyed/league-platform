@@ -196,11 +196,29 @@ export type SetEffect =
    * `time` ("4:55") comes off the minutes of the players on the court; `wholePeriod` when
    * that is all this period has run.
    */
-  | { readonly kind: 'back'; readonly time: string; readonly wholePeriod: boolean }
+  | ({ readonly kind: 'back'; readonly time: string; readonly wholePeriod: boolean } & TakesBack)
   /** `time` is added to the minutes of the players on the court. */
-  | { readonly kind: 'added'; readonly time: string }
+  | ({ readonly kind: 'added'; readonly time: string } & TakesBack)
   /** The clock has not run in this period: it will start at `clock`, and no minutes change. */
   | { readonly kind: 'start'; readonly clock: string };
+
+/**
+ * Of what a set moves, what takes back earlier changes to this period's clock (S-71 as
+ * changed on November 17): those minutes go back to the players they came from, and the
+ * plays to their own times. `takenBack` ("1:50") when that is a second or more, else null;
+ * `rest`, what is left over as a new correction, when that is a second or more.
+ */
+export type TakesBack = { readonly takenBack: string | null; readonly rest: string | null };
+
+/** The take-back of `totalMs`, as the form and the sentence say it. */
+function takesBack(totalMs: number, takenBackMs: number): TakesBack {
+  if (takenBackMs < 1000) return { takenBack: null, rest: null };
+  const rest = totalMs - takenBackMs;
+  return {
+    takenBack: basketball.formatClock(takenBackMs),
+    rest: rest < 1000 ? null : basketball.formatClock(rest),
+  };
+}
 
 /**
  * What setting the clock to `ms` at `serverNow` will do to the players' minutes, so the
@@ -228,9 +246,14 @@ export function setEffect(
         kind: 'back',
         time: basketball.formatClock(effect.ms),
         wholePeriod: effect.wholePeriod,
+        ...takesBack(effect.ms, effect.takesBackMs),
       };
     case 'added':
-      return { kind: 'added', time: basketball.formatClock(effect.ms) };
+      return {
+        kind: 'added',
+        time: basketball.formatClock(effect.ms),
+        ...takesBack(effect.ms, effect.takesBackMs),
+      };
     case 'start':
       return { kind: 'start', clock: basketball.formatClock(ms) };
     case 'none':
@@ -249,7 +272,7 @@ export type MinutesMoved = {
    * and a player who came on or went off in it moved by less.
    */
   readonly even: boolean;
-};
+} & TakesBack;
 
 /**
  * What a set clock truly did to the minutes, for the sentence said once it is done: the
@@ -275,6 +298,7 @@ export function minutesMoved(
     kind: change < 0 ? 'back' : 'added',
     time: basketball.formatClock(Math.abs(change)),
     even,
+    ...takesBack(Math.abs(change), basketball.takenBackMs(before.elapsedMs, after)),
   };
 }
 

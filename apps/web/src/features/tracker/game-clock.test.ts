@@ -236,6 +236,8 @@ describe('the clock’s keys (T5)', () => {
 
   // These games keep the rule they were saved with (the engine's rules without
   // minutesFollow): the form says what that rule does. The new product's rule is below.
+  // On that rule a set never takes back an earlier one.
+  const none = { takenBack: null, rest: null } as const;
   it('knows when a time puts time back on the clock, which comes off the minutes', () => {
     const paused = at(at(tippedOff(), 10_000, { type: 'start' }), 100_000, { type: 'pause' });
     const reading = readClock(paused, 101_000);
@@ -244,6 +246,7 @@ describe('the clock’s keys (T5)', () => {
       kind: 'back',
       time: '0:30',
       wholePeriod: false,
+      ...none,
     });
     expect(setEffect(paused, 6 * 60_000, 101_000)).toBeNull();
     // Before the clock has run there are no minutes to take off: the period starts there.
@@ -273,6 +276,7 @@ describe('the clock’s keys (T5)', () => {
       kind: 'back',
       time: '0:30',
       wholePeriod: false,
+      ...none,
     });
     expect(tookOff(paused, 711_000, 7 * 60_000)).toBe(30_000);
     // 8:00 puts a minute and a half back: all this quarter has run, and no more than it.
@@ -280,6 +284,7 @@ describe('the clock’s keys (T5)', () => {
       kind: 'back',
       time: '1:30',
       wholePeriod: true,
+      ...none,
     });
     expect(tookOff(paused, 711_000, 8 * 60_000)).toBe(90_000);
   });
@@ -299,6 +304,7 @@ describe('the clock’s keys (T5)', () => {
       kind: 'back',
       time: '3:05',
       wholePeriod: true,
+      ...none,
     });
     expect(tookOff(wrong, 201_000, 1_015_000)).toBe(185_000);
     const right = at(wrong, 210_000, { type: 'set-clock', ms: 1_015_000 });
@@ -313,19 +319,26 @@ describe('the clock’s keys (T5)', () => {
     });
     expect(readClock(paused, 196_000).text).toBe('16:55');
     // 12:00 takes 4:55 off the clock: the form says it adds 4:55, and the engine does.
-    expect(setEffect(paused, 12 * 60_000, 196_000)).toEqual({ kind: 'added', time: '4:55' });
+    expect(setEffect(paused, 12 * 60_000, 196_000)).toEqual({
+      kind: 'added',
+      time: '4:55',
+      ...none,
+    });
     const wrong = at(paused, 200_000, { type: 'set-clock', ms: 12 * 60_000 });
     expect(minutesMoved(paused, readClock(paused, 200_000), wrong)).toEqual({
       kind: 'added',
       time: '4:55',
       even: true,
+      ...none,
     });
     expect(basketball.derive(wrong).players['h3']?.ms).toBe(480_000);
-    // Put right: the same 4:55 comes off again, not the half.
+    // Put right: the same 4:55 comes off again, not the half: it takes back the mistake.
     expect(setEffect(wrong, 1_015_000, 201_000)).toEqual({
       kind: 'back',
       time: '4:55',
       wholePeriod: false,
+      takenBack: '4:55',
+      rest: null,
     });
     expect(tookOff(wrong, 201_000, 1_015_000)).toBe(295_000);
     const right = at(wrong, 210_000, { type: 'set-clock', ms: 1_015_000 });
@@ -333,6 +346,8 @@ describe('the clock’s keys (T5)', () => {
       kind: 'back',
       time: '4:55',
       even: true,
+      takenBack: '4:55',
+      rest: null,
     });
     expect(basketball.formatMinutes(basketball.derive(right).players['h3']?.ms ?? -1)).toBe('3:05');
     // The same time as the clock shows already moves nothing, and says nothing.
@@ -355,6 +370,40 @@ describe('the clock’s keys (T5)', () => {
       kind: 'back',
       time: '2:00',
       even: false,
+      ...none,
+    });
+    // A mistake that ran, put right (S-71 as changed on November 17): 7:50 set at 6:00, 10
+    // seconds run, then 5:50. The form says it takes the mistake back, with 1:50 of it;
+    // 4:00 takes it back and adds 1:50 more; 7:00 takes back 0:40 of it.
+    const quarters: basketball.Rules = { ...basketball.QUARTERS, minutesFollow: 'game-clock' };
+    const tip = tippedOff(quarters);
+    const t0 = tip.lastAt;
+    let ran = at(at(tip, t0, { type: 'start' }), t0 + 120_000, { type: 'pause' });
+    ran = at(ran, t0 + 121_000, { type: 'set-clock', ms: 470_000 });
+    ran = at(at(ran, t0 + 130_000, { type: 'start' }), t0 + 140_000, { type: 'pause' });
+    expect(setEffect(ran, 350_000, t0 + 141_000)).toEqual({
+      kind: 'added',
+      time: '1:50',
+      takenBack: '1:50',
+      rest: null,
+    });
+    expect(setEffect(ran, 240_000, t0 + 141_000)).toEqual({
+      kind: 'added',
+      time: '3:40',
+      takenBack: '1:50',
+      rest: '1:50',
+    });
+    expect(setEffect(ran, 420_000, t0 + 141_000)).toEqual({
+      kind: 'added',
+      time: '0:40',
+      takenBack: '0:40',
+      rest: null,
+    });
+    const putRight = at(ran, t0 + 141_000, { type: 'set-clock', ms: 350_000 });
+    expect(minutesMoved(ran, readClock(ran, t0 + 141_000), putRight)).toMatchObject({
+      kind: 'added',
+      takenBack: '1:50',
+      rest: null,
     });
     // Before the clock has run in the period, a set only says where the period starts.
     expect(setEffect(tippedOff(rules), 15 * 60_000, 0)).toEqual({ kind: 'start', clock: '15:00' });

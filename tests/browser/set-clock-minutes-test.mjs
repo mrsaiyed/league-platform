@@ -9,14 +9,15 @@
 // 19:00. The scorekeeper sets the clock to 12:00 by mistake and back to 16:55. Before, all
 // ten read 0:00 and the basket 16:55. Now (S-71, minutes on the game clock):
 // - the form says before each set what it will do, from the engine's own helper: 12:00
-//   adds 4:55 to the minutes of the players on the court; 16:55 then takes the 4:55 off;
+//   adds 4:55 to the minutes of the players on the court; 16:55 then takes back the 4:55 of
+//   that earlier change (S-71 as changed on November 17);
 // - after each set, the sentence says what truly happened, with the same figure;
 // - all ten read 3:05 at the end, on the screen and again after a reload, and the basket
 //   still reads 19:00 in the game the server holds.
 // - At the five sizes, in the device's face and in the wider one, the sentence after each
 //   set fits: where the screen is short of room (upright in a browser, and lying down, as
 //   the saved banner decides) it says it in one line ("Clock 12:00 · 4:55 added", "Clock
-//   16:55 · 4:55 off"), the full sentence kept out of sight for a screen reader; elsewhere
+//   16:55 · 4:55 taken back"), the full sentence kept out of sight for a screen reader; elsewhere
 //   the full sentence is shown.
 import {
   court,
@@ -199,8 +200,9 @@ if (browser) {
       await c.typeClock('1655');
       const takes = (await c.clockSheet.locator('[data-clock-note]').innerText()).trim();
       note(
-        'before the set back to 16:55 the form says it takes the 4:55 off, not the half',
-        takes === 'This takes 4:55 off the minutes of the players on the court.',
+        'before the set back to 16:55 the form says it takes back the 4:55 of the mistake, not the half',
+        takes ===
+          'This takes back 4:55 of an earlier change to this period’s clock. Minutes and play times go back as they were.',
         takes,
       );
       await c.root.locator('[data-clock-sheet] [data-set-clock]').click();
@@ -212,9 +214,9 @@ if (browser) {
         /^Clock set to 16:55\./.test(document.querySelector('[data-say]')?.textContent ?? ''),
       );
       note(
-        'once set back, the sentence says 4:55 came off',
+        'once set back, the sentence says the 4:55 of the mistake was taken back',
         (await c.said.innerText()).trim() ===
-          'Clock set to 16:55. 4:55 came off the minutes of the players on the court.',
+          'Clock set to 16:55. 4:55 of an earlier change to this period’s clock was taken back: minutes and play times are as they were.',
         await c.said.innerText(),
       );
       shown = await minutesShown(page);
@@ -284,8 +286,18 @@ const forms = [
   },
   {
     digits: '1655',
-    text: 'Clock set to 16:55. 4:55 came off the minutes of the players on the court.',
-    short: 'Clock 16:55 · 4:55 off',
+    text: 'Clock set to 16:55. 4:55 of an earlier change to this period’s clock was taken back: minutes and play times are as they were.',
+    short: 'Clock 16:55 · 4:55 taken back',
+  },
+  {
+    digits: '1700',
+    text: 'Clock set to 17:00. 0:05 came off the minutes of the players on the court.',
+    short: 'Clock 17:00 · 0:05 off',
+  },
+  {
+    digits: '1655',
+    text: 'Clock set to 16:55. 0:05 of an earlier change to this period’s clock was taken back: minutes and play times are as they were.',
+    short: 'Clock 16:55 · 0:05 taken back',
   },
 ];
 
