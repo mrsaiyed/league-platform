@@ -78,6 +78,7 @@ function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
       slug: found?.slug ?? '',
       name: found?.name ?? '',
       color: found?.color ?? null,
+      removed: found?.binned === true,
     };
   };
   const venue = s.venues.find((v) => v.id === game.venueId);

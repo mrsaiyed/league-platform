@@ -33,7 +33,7 @@ import { gridTeamName, pageGrid } from './build-grid.ts';
 const anId = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 /** The first made-up league with its current season's Badgers put in the bin, and them. */
-function worldWithBadgersBinned(bin = true) {
+function worldWithBadgersBinned(bin = true, cancelTheirGames = false) {
   let league: LeagueWorld | undefined;
   let badgers: TeamRecord | undefined;
   const world = testWorld(undefined, undefined, (leagues) => {
@@ -45,6 +45,13 @@ function worldWithBadgersBinned(bin = true) {
     if (found === undefined) throw new Error('no Badgers');
     badgers = found;
     if (bin) league.teams = league.teams.map((t) => (t === found ? { ...t, binned: true } : t));
+    if (cancelTheirGames) {
+      league.games = league.games.map((g) =>
+        g.homeTeamId === found.id || g.awayTeamId === found.id
+          ? { ...g, status: 'cancelled', homeScore: null, awayScore: null, finalizedAt: null }
+          : g,
+      );
+    }
   });
   if (league === undefined || badgers === undefined) throw new Error('not made');
   const seasonId = league.currentSeasonId ?? '';
@@ -125,6 +132,25 @@ describe('a team in the bin with games is named on every screen (A-17)', () => {
     expect(html.replace(/href="[^"]*"/g, '').replace(/data-[a-z-]+="[^"]*"/g, '')).not.toMatch(
       anId,
     );
+  });
+
+  it("the public schedule's team picker offers a removed team only while it has a game not cancelled", async () => {
+    const optionsOf = async (w: ReturnType<typeof worldWithBadgersBinned>) => {
+      const schedules = standInPublicSchedule(w.world);
+      const clock = await schedules.clockOf(w.league.leagueId);
+      const schedule = await schedules.scheduleOf(w.league.leagueId, w.seasonId, clock.today);
+      if (schedule === undefined) throw new Error('no public schedule');
+      const addressee = { id: w.league.leagueId, slug: w.league.slug, customDomain: null };
+      return buildScheduleView(schedule, clock, addressee as never, {}).teamOptions.map(
+        (o) => o.label,
+      );
+    };
+    expect(await optionsOf(worldWithBadgersBinned())).toContain('Badgers');
+    const cancelled = await optionsOf(worldWithBadgersBinned(true, true));
+    expect(cancelled).not.toContain('Badgers');
+    expect(cancelled).toContain('Herons');
+    // A team not in the bin whose games are all cancelled is still offered, as before.
+    expect(await optionsOf(worldWithBadgersBinned(false, true))).toContain('Badgers');
   });
 
   it("a game's page leaves out their team card, so nothing links to a page that is not there", async () => {
