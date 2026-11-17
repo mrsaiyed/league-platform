@@ -80,7 +80,7 @@ There are three different kinds of "undo", for three different mistakes.
 3. It is promoted to **production** with one action. New copies start, are checked, and take over from the old ones with no downtime.
 
 - **T-156: every release can be reversed in minutes** by promoting the previous version. That works because database changes are always made so that the previous version still runs against them (T-49).
-- **T-157: unfinished features ship switched off** behind our own rollout flags (T-100), so releasing is routine and small.
+- **T-157: unfinished features ship switched off** behind our own rollout flags (T-100), so releasing is routine and small. Today that flag is one list in code (T-289, [record 087](../../../architecture/decisions/087-nothing-unfinished-in-production.md)): every page of ours, every league page and every admin area is released or not built yet; in staging and production a page not built yet answers exactly as an address that does not exist and no menu or link leads to it, while local work and tests show everything.
 - **T-158: no releases while many games are live.** The release step checks how many games are in progress and refuses above a small number unless overridden for an emergency fix.
 
 ## 7. Knowing what is happening
