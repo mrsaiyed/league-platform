@@ -414,6 +414,44 @@ const schedulerPages = [
   { name: 'scheduler-admin-home', at: '/admin' },
   { name: 'scheduler-admin-refused', at: '/admin/teams' },
 ];
+// A refusal as each kind of person meets it (step 2.157): staff outside their role (a
+// scheduler and a scorekeeper at People), a coach and a signed-in stranger at the admin,
+// a signed-in stranger at a draft league's admin ("Page not found", nothing of the league),
+// a visitor at an admin area, another league's game under this league's address (on the
+// scoring page and in the admin), and a club admin's team page, which may not show the
+// league's list of people. `who` is the made-up person's cookie; null is a visitor.
+const otherLeaguesGame = '01900000-0000-7000-8000-006a00000002';
+const refusalPages = [
+  {
+    name: 'refusal-scheduler-people',
+    who: 'local-scheduler-token',
+    at: '/north-valley/admin/people',
+  },
+  {
+    name: 'refusal-scorekeeper-people',
+    who: 'local-scorekeeper-token',
+    at: '/north-valley/admin/people',
+  },
+  { name: 'refusal-coach-admin', who: 'local-coach-token', at: '/north-valley/admin' },
+  { name: 'refusal-stranger-admin', who: 'local-stranger-token', at: '/north-valley/admin' },
+  { name: 'refusal-stranger-draft-admin', who: 'local-stranger-token', at: '/quiet-pines/admin' },
+  { name: 'refusal-visitor-admin-area', who: null, at: '/north-valley/admin/teams' },
+  {
+    name: 'refusal-other-leagues-game',
+    who: 'local-owner-token',
+    at: `/harbor-city/score/${otherLeaguesGame}`,
+  },
+  {
+    name: 'refusal-other-leagues-box-score',
+    who: 'local-owner-token',
+    at: `/harbor-city/admin/games/${otherLeaguesGame}`,
+  },
+  {
+    name: 'refusal-club-admin-team',
+    who: 'local-club-admin-token',
+    at: '/quiet-pines/admin/teams/01900000-0000-7000-8000-007e00000004',
+  },
+];
 // The games list's taps (step 2.155): a game's place on the list, its boxes opened, and a
 // score typed and saved, which only asks.
 function gameRow(page, n) {
@@ -1169,6 +1207,16 @@ try {
     await keeper.addCookies([{ ...scorekeeper, url: origin }]);
     const planner = await browser.newContext({ viewport: width.viewport });
     await planner.addCookies([{ ...scheduler, url: origin }]);
+    // One browser for each person a refusal is pictured for (step 2.157).
+    const refused = new Map();
+    for (const page of design === '' ? refusalPages.filter((p) => wanted(p.name)) : []) {
+      if (refused.has(page.who)) continue;
+      const context = await browser.newContext({ viewport: width.viewport });
+      if (page.who !== null) {
+        await context.addCookies([{ name: 'srl_session', value: page.who, url: origin }]);
+      }
+      refused.set(page.who, context);
+    }
     const jobs = [
       ...(design === '' ? platformPages : []).map((page) => ({
         ...page,
@@ -1233,6 +1281,9 @@ try {
         context: planner,
         base: `/${leagues[0]}`,
       })),
+      ...(design === '' ? refusalPages : [])
+        .filter((page) => refused.has(page.who))
+        .map((page) => ({ ...page, context: refused.get(page.who), base: '' })),
       ...(design === '' ? draftPages : []).map((page) => ({
         ...page,
         name: `${draftLeague}-${page.name}`,
@@ -1340,6 +1391,7 @@ try {
     await staffTapping.close();
     await keeper.close();
     await planner.close();
+    for (const context of refused.values()) await context.close();
   }
   // The phone menu, open (`--only=menu`), at 390 in each league's own look.
   {
