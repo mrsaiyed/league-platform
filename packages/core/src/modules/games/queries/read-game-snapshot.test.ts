@@ -63,6 +63,7 @@ function store(
             captureMode: 'live',
             homeScore: 3,
             awayScore: 0,
+            overtimePeriods: null,
             finalizedAt: null,
             binned: false,
             rules: over.rules ?? null,

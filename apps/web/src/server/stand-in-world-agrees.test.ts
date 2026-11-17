@@ -647,6 +647,8 @@ describe('the one world and the database, the same season by the same commands',
   it('read the same published schedule', async () => {
     const [a, b] = await both(async (side) => side.schedule(await seasonOfSide(side), today));
     expect(b).toEqual(a);
+    // The tracked game's card has its overtime period on both (step 2.200).
+    expect(JSON.stringify(a)).toContain('"overtimePeriods":1');
   });
 
   it('read the same game pages: the box score, the tracked game, the corrected one', async () => {
@@ -661,6 +663,9 @@ describe('the one world and the database, the same season by the same commands',
         side.games((store) => readGamePage(store, { gameId }, viewing(side))),
       );
       expect(b, gameId).toEqual(a);
+      // The tracked game's page keeps its overtime period on both (step 2.200).
+      const overtime = (a as { value?: { game?: { overtimePeriods?: unknown } } }).value?.game;
+      expect(overtime?.overtimePeriods, gameId).toBe(gameId === gameIds.tracked ? 1 : null);
     }
   });
 

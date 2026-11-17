@@ -29,6 +29,7 @@ function world(publisher: LivePublisher) {
             captureMode: 'live',
             homeScore: seq.get(id) ?? 0,
             awayScore: 0,
+            overtimePeriods: null,
             finalizedAt: null,
             binned: false,
             rules: null,

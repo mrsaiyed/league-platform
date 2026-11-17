@@ -190,6 +190,7 @@ function gameStore(status: 'live' | 'final'): GameSnapshotStore {
             captureMode: 'live',
             homeScore: 10,
             awayScore: 10,
+            overtimePeriods: null,
             finalizedAt: null,
             binned: false,
             rules: null,

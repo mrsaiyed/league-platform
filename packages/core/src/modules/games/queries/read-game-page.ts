@@ -103,6 +103,12 @@ export type GamePage = {
     readonly finalizedAt: string | null;
     /** The date a final game was last corrected, never the reason (S-7). */
     readonly correctedOn: string | null;
+    /**
+     * How many overtime periods a final game had (P7 §5.6), as its result keeps them: 0 in
+     * regulation; null when not known (a score typed in, a box score, a game final before
+     * the count was kept) and for every game that is not final.
+     */
+    readonly overtimePeriods: number | null;
   };
   readonly scoreboard: {
     readonly home: {
@@ -314,6 +320,7 @@ export async function readGamePage(
       startsAt: game.startsAt,
       finalizedAt: game.finalizedAt,
       correctedOn: correctedOn ?? null,
+      overtimePeriods: game.status === 'final' ? game.overtimePeriods : null,
     },
     scoreboard: {
       home: { teamId: home.id, name: home.name, score: live ? running.home : game.homeScore },

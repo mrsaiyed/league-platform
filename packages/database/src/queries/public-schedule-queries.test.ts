@@ -118,6 +118,8 @@ beforeAll(async () => {
       status: 'final',
       home_score: 40,
       away_score: 31,
+      // Won in the first overtime (step 2.200).
+      overtime_periods: 1,
       finalized_at: new Date('2026-11-01T20:00:00Z'),
       starts_at: new Date('2026-11-01T18:00:00Z'),
       venue_id: venue.id,
@@ -292,6 +294,7 @@ describe('schedule', () => {
       status: 'final',
       homeScore: 40,
       awayScore: 31,
+      overtimePeriods: 1,
       localDate: '2026-11-01',
       venue: { name: 'North Gym', address: '1 Court St', mapLink: null },
     });
@@ -308,6 +311,12 @@ describe('schedule', () => {
   it("lists one team's games, and none of a season being set up", async () => {
     const mine = await inLeague((scope) => listPublicGames(scope, seasonId, owls));
     expect(mine).toHaveLength(3);
+    // The final game's overtime periods; none for the games still to play.
+    expect(mine.map((g) => [g.status, g.overtimePeriods])).toEqual([
+      ['final', 1],
+      ['scheduled', null],
+      ['scheduled', null],
+    ]);
     expect(await inLeague((scope) => listPublicGames(scope, draftSeasonId))).toEqual([]);
   });
 });

@@ -33,6 +33,7 @@ export function gamesReadStore(scope: LeagueScope): GameSnapshotStore {
             captureMode: game.captureMode,
             homeScore: game.homeScore,
             awayScore: game.awayScore,
+            overtimePeriods: game.overtimePeriods,
             finalizedAt: game.finalizedAt,
             binned: game.binned,
             rules: game.format ?? season.rules,

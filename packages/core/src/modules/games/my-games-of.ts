@@ -26,6 +26,8 @@ export type MyGame = {
   /** The score so far, or null while there is none. */
   readonly homeScore: number | null;
   readonly awayScore: number | null;
+  /** A final game's overtime periods (P7 §5.6); null when not known or not final. */
+  readonly overtimePeriods: number | null;
   readonly recording: ReturnType<typeof recordingOf>;
   /** Whether the person is assigned to score it. */
   readonly assignedToMe: boolean;
@@ -59,6 +61,7 @@ const view = (
   status: game.status,
   homeScore: game.homeScore,
   awayScore: game.awayScore,
+  overtimePeriods: game.status === 'final' ? game.overtimePeriods : null,
   recording: recordingOf(game.captureMode),
   assignedToMe: assigned,
   scorable,

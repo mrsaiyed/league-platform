@@ -42,6 +42,12 @@ export type PublicGame = {
   /** Null until the game is decided (or while it is live and only final scores are kept). */
   readonly homeScore: number | null;
   readonly awayScore: number | null;
+  /**
+   * How many overtime periods a final game had (P7 §5.6): 0 in regulation. Null when it
+   * is not known (a score typed in, a box score, a game final before the count was kept)
+   * and for every game that is not final.
+   */
+  readonly overtimePeriods: number | null;
   readonly divisionName: string | null;
   /** A venue is public: where to turn up. */
   readonly venue: {

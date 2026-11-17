@@ -91,6 +91,7 @@ function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
     awayTeam: team(game.awayTeamId),
     homeScore: game.homeScore,
     awayScore: game.awayScore,
+    overtimePeriods: game.overtimePeriods,
     divisionName: s.divisions.find((d) => d.id === game.divisionId)?.name ?? null,
     venue:
       venue === undefined

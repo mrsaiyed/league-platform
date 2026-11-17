@@ -1,6 +1,7 @@
 // A season's published games for the public pages, in time order (those with no time
 // last), all of them or one team's (P7 §4, U-5). Built field by field (T-29): teams
-// by name and color, the venue's name and place, scores and status, and no person.
+// by name and color, the venue's name and place, scores, status and a final game's
+// overtime periods (0021), and no person.
 // A game in the bin, or one of a season still being set up, is not there.
 import { sql } from 'kysely';
 import type { PublicGame } from '@srleagues/core';
@@ -58,6 +59,7 @@ export async function listPublicGames(
       'games.status as status',
       'games.home_score as home_score',
       'games.away_score as away_score',
+      'games.overtime_periods as overtime_periods',
       'home.id as home_id',
       'home.slug as home_slug',
       'home.name as home_name',
@@ -98,6 +100,7 @@ export async function listPublicGames(
     awayTeam: { id: row.away_id, slug: row.away_slug, name: row.away_name, color: row.away_color },
     homeScore: row.home_score,
     awayScore: row.away_score,
+    overtimePeriods: row.overtime_periods,
     divisionName: row.division_name,
     venue:
       row.venue_name === null

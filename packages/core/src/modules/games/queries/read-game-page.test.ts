@@ -23,6 +23,7 @@ const store = (over: Partial<GamesReadStore> = {}): GamesReadStore => ({
           captureMode: 'live',
           homeScore: 52,
           awayScore: 48,
+          overtimePeriods: null,
           finalizedAt: '2026-12-06T19:30:00.000Z',
           binned: false,
           rules: null,
@@ -146,5 +147,34 @@ describe('readGamePage', () => {
     const r = await readGamePage(bare, { gameId }, viewing(publicViewer(leagueId)));
     expect(r.ok && r.value.plays).toEqual([]);
     expect(r.ok && r.value.scoreboard.period).toBeNull();
+  });
+
+  it('gives a final game’s overtime periods as its result keeps them, and none for any other (step 2.200)', async () => {
+    const withGame = (status: string, overtimePeriods: number | null) => {
+      const base = store();
+      return store({
+        findGame: async (id) => {
+          const found = await base.findGame(id);
+          return found === undefined ? undefined : { ...found, status, overtimePeriods };
+        },
+      });
+    };
+    const read = async (status: string, count: number | null) => {
+      const r = await readGamePage(
+        withGame(status, count),
+        { gameId },
+        viewing(publicViewer(leagueId)),
+      );
+      return r.ok ? r.value.game.overtimePeriods : 'not found';
+    };
+    // Case 44: won in the first overtime.
+    expect(await read('final', 1)).toBe(1);
+    expect(await read('final', 2)).toBe(2);
+    expect(await read('final', 0)).toBe(0);
+    // Not known: a score typed in, a box score, a game final before the count was kept.
+    expect(await read('final', null)).toBeNull();
+    // Only a final game says it, whatever a store hands over.
+    expect(await read('live', 1)).toBeNull();
+    expect(await read('forfeit', 1)).toBeNull();
   });
 });
