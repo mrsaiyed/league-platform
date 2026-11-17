@@ -157,7 +157,7 @@ describe('a team in the bin with games is named on every screen (A-17)', () => {
     const { world, league, badgers, seasonId } = worldWithBadgersBinned();
     const herons = league.teams.find((t) => t.name === 'Herons' && t.seasonId === seasonId);
     if (herons === undefined) throw new Error('no Herons');
-    const store = worldStandingsRead(() => world.read(league.leagueId));
+    const store = worldStandingsRead(() => world.read(league.leagueId), world.now);
     const addressee = { id: league.leagueId, slug: league.slug, customDomain: null } as never;
     const season = { id: seasonId, slug: 'fall-2026' };
     const cards = await loadTeamCardsOf(store, addressee, season, true, [badgers.id, herons.id]);
@@ -170,7 +170,7 @@ describe('a team in the bin with games is named on every screen (A-17)', () => {
     const standingsOf = async (w: typeof kept) => {
       const rebuilt = await rebuildStandings(w.context, { seasonId: w.seasonId }, w.world.deps);
       if (!rebuilt.ok) throw new Error(rebuilt.error.code);
-      const store = worldStandingsRead(() => w.world.read(w.league.leagueId));
+      const store = worldStandingsRead(() => w.world.read(w.league.leagueId), w.world.now);
       const read = await readStandings(store, { seasonId: w.seasonId });
       if (!read.ok) throw new Error('no standings');
       return read.value;
@@ -216,7 +216,10 @@ describe('a team in the bin with games is named on every screen (A-17)', () => {
     expect(html).toContain('Badgers');
     expect(html).not.toContain(`/teams/${binned.badgers.slug}`);
     // The teams page's cards (and so the "Seed" there) leave Badgers out: they have no page.
-    const store = worldStandingsRead(() => binned.world.read(binned.league.leagueId));
+    const store = worldStandingsRead(
+      () => binned.world.read(binned.league.leagueId),
+      binned.world.now,
+    );
     const records = await readTeamRecords(store, { seasonId: binned.seasonId });
     if (!records.ok) throw new Error('no records');
     expect(records.value.map((r) => r.team.name)).not.toContain('Badgers');

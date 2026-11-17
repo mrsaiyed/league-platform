@@ -547,7 +547,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       },
     },
     publicStats: standInPublicStats(world, namePolicy),
-    adminTeams: standInAdminTeams(world),
+    adminTeams: standInAdminTeams(world, accessOf),
     adminSettings,
     publicSchedule: standInPublicSchedule(world),
     scheduleAdmin: standInSchedule(world),

@@ -31,15 +31,23 @@ export type StandInGames = GamesAreaPorts & {
 
 export function standInGames(world: World, options: StandInGamesOptions): StandInGames {
   const deps = world.deps;
-  const snapshotStoreOf = (leagueId: string) => worldGameSnapshot(() => world.read(leagueId));
+  const snapshotStoreOf = (leagueId: string) =>
+    worldGameSnapshot(() => world.read(leagueId), world.now);
   return {
     deps,
     tracker: {
       deps,
       snapshotStoreOf,
-      // The world's game reads with its league's name settings (record 076).
-      gameReadsOf: async (leagueId, work) =>
-        work({ store: snapshotStoreOf(leagueId), ...(await options.namesShownOf(leagueId)) }),
+      // The world's game reads with its league's name settings (record 076), and one
+      // "today" for the whole read (R-28): who is a child is read on one day.
+      gameReadsOf: async (leagueId, work) => {
+        const moment = world.now();
+        const store = worldGameSnapshot(
+          () => world.read(leagueId),
+          () => moment,
+        );
+        return work({ store, ...(await options.namesShownOf(leagueId)) });
+      },
       namesShownOf: options.namesShownOf,
       displayNameOf: async (leagueId, accountId) =>
         (await world.read(leagueId)) === undefined ? '' : (options.people[accountId] ?? ''),

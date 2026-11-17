@@ -85,23 +85,28 @@ export async function TeamPage({
   const here = view.context.league;
   if (!uuidShape.test(teamId)) return notFound();
   const ports = (await webPorts()).adminTeams;
-  const season = await ports.currentSeason(here.id);
+  const context = commandContextOf(view.context);
+  const season = await ports.currentSeason(context);
   if (season === undefined) return notFound();
   const [teams, divisions] = await Promise.all([
-    ports.teams(here.id, season.id),
-    ports.divisions(here.id, season.id),
+    ports.teams(context, season.id),
+    ports.divisions(context, season.id),
   ]);
   const team = teams.find((candidate) => candidate.id === teamId.toLowerCase());
   if (team === undefined) return notFound();
 
-  const context = commandContextOf(view.context);
   const roster = await listRoster(context, { teamId: team.id }, ports.deps);
   const lines: readonly RosterLine[] = roster.ok ? roster.value : [];
   const open = lines.filter((line) => line.leftOn === null);
   // S-44: a clash of numbers is marked on both players, for the admin to put right.
   const wornTwice = numbersWornTwice(open);
   const left = lines.filter((line) => line.leftOn !== null);
-  const people = await listPeople(context, { limit: peopleShown }, ports.deps);
+  // Names only: the page shows no private field, so none is read (T-76).
+  const people = await listPeople(
+    context,
+    { limit: peopleShown, privateFields: false },
+    ports.deps,
+  );
   const everyone: readonly PersonRecord[] = people.ok ? people.value : [];
   const leagueList = people.ok
     ? { ids: new Set(everyone.map((person) => person.id)), complete: everyone.length < peopleShown }

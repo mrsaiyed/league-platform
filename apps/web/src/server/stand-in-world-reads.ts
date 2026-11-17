@@ -20,7 +20,7 @@ import {
 import type { LeagueClock, PublicGameFacts } from './public-schedule.ts';
 import type { PublicSeason } from './public-stats.ts';
 import type { StartPage } from './public-teams.ts';
-import { dayIn } from './stand-in-world-clock.ts';
+import { dayIn, minorAt } from './stand-in-world-clock.ts';
 import { gameRecordOf } from './stand-in-world-games.ts';
 import type {
   WorldGame as StoredGame,
@@ -167,7 +167,11 @@ export function worldGameFacts(
  * What a game's page and its snapshot read (games-read-store.ts), each over the world as
  * it stands once the transactions before it have ended.
  */
-export function worldGameSnapshot(read: () => Promise<ReadWorld | undefined>): GameSnapshotStore {
+export function worldGameSnapshot(
+  read: () => Promise<ReadWorld | undefined>,
+  /** The world's one clock: the day a birth date is read against (R-28). */
+  now: () => Date,
+): GameSnapshotStore {
   return {
     // A game of a season still being set up (or retired) is not there at all. Its rules
     // are its own once fixed, else its season's.
@@ -207,16 +211,20 @@ export function worldGameSnapshot(read: () => Promise<ReadWorld | undefined>): G
           secondsPlayed: l.secondsPlayed,
           stats: l.stats,
         })),
-    people: async (personIds) =>
-      ((await read())?.people ?? [])
+    people: async (personIds) => {
+      const s = await read();
+      const moment = now();
+      return (s?.people ?? [])
         .filter((p) => personIds.includes(p.id) && !p.binned)
         .map((p) => ({
           id: p.id,
           firstName: p.firstName,
           lastName: p.lastName,
-          isMinor: p.sensitive.isMinor,
+          // R-28: the birth date or the tick (list-people-for-display.ts).
+          isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment),
           visibility: p.visibility,
-        })),
+        }));
+    },
     correctedOn: async (gameId) =>
       ((await read())?.corrections ?? [])
         .filter((c) => c.gameId === gameId)
@@ -231,6 +239,8 @@ export function worldPublicRoster(
   s: ReadWorld | undefined,
   teamId: string,
   display: Parameters<typeof publicRosterLine>[2],
+  /** The moment the roster is read at: the day a birth date is read against (R-28). */
+  now: Date,
 ): PublicRoster {
   const team = s?.teams.find((t) => t.id === teamId && !t.binned);
   if (s === undefined || team === undefined || publicSeason(s, team.seasonId) === undefined) {
@@ -256,7 +266,8 @@ export function worldPublicRoster(
             leftOn: e.leftOn,
             firstName: p?.firstName ?? '',
             lastName: p?.lastName ?? '',
-            isMinor: p?.sensitive.isMinor ?? null,
+            // R-28: the birth date or the tick (list-public-roster.ts).
+            isMinor: p === undefined ? null : minorAt(p, s.timeZone, now),
             nameRequest: p?.visibility ?? 'none',
             personBinned: p === undefined || p.binned,
           },

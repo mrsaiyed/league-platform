@@ -145,6 +145,7 @@ const statsStore: StandingsReadStore = {
   playerTeams: async () =>
     people.map((p) => ({ personId: p.id, teamId: p.side === 'home' ? home : away })),
   decidedGamesOf: async () => [],
+  decidedGames: async () => [],
   teamStatTotals: async () => [],
   people: async (ids) =>
     people

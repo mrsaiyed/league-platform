@@ -48,7 +48,9 @@ export const defaultNamePolicy: NamePolicy = Object.freeze({
 
 /**
  * Whether a person is shown under the children's rule (R-14: never in full without the
- * confirmation; R-25: their request for initials always taken). A league that never asks for a
+ * confirmation; R-25: their request for initials always taken). `isMinor` is whether
+ * they count as a child as R-28 decides it (isMinorOn, minor-by-age.ts: a child if the
+ * birth date says so or the tick is on), never the tick read alone. A league that never asks for a
  * date of birth may not know (`isMinor` is null): then a youth or mixed league treats
  * the person as a child and an adult league as an adult. Any value other than true or
  * false counts as not known.
