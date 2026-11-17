@@ -397,6 +397,15 @@ export const layoutCss = String.raw`
 .ui-message .ui-button {
   margin-block-start: var(--step-3);
 }
+.ui-message-also {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--step-2);
+}
+.ui-message .ui-message-also .ui-button {
+  margin-block-start: 0;
+}
 .ui-message-mark {
   inline-size: var(--step-7);
   block-size: var(--line-heavy);

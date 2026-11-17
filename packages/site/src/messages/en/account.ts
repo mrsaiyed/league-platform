@@ -4,8 +4,16 @@
 // A comment above a key is about that key or, from before the split, about the keys
 // that followed it in the one file there was.
 export const enAccount = {
+  // Step 2.157: the refusal's ways on, for someone the league may be shown to.
+  'access.noAccess.backToLeague': 'Back to {league}',
+  // For someone who is not signed in.
   'access.noAccess.body':
     'This page is for the people who run this league. If you should have access, ask the league to invite you.',
+  // For someone signed in who holds no part of the league's admin.
+  'access.noAccess.notStaff': 'This account does not help run this league.',
+  // For staff of this league at a page their role does not include.
+  'access.noAccess.notYourRole':
+    "Your role in this league does not include this page. If it should, ask the league's owner or an admin.",
   'access.noAccess.signedInAs': 'You are signed in as {email}.',
   'access.noAccess.switch': 'Use another account',
   // U-6: an address you are not allowed to open.

@@ -8,6 +8,7 @@
 // its short name.
 import type { DesignDocument } from '@srleagues/site';
 import { neutralStartingDesign, startingDesign } from '@srleagues/site';
+import { cache } from 'react';
 import { webPorts } from './container.ts';
 
 export type LeagueSite = {
@@ -39,6 +40,16 @@ export async function siteOf(
 ): Promise<LeagueSite> {
   return siteFrom(league, await lookup(league.id));
 }
+
+/**
+ * A league's name and design for this request, read once however many of its frames and
+ * screens ask (React cache, one per request): the league's layout, the admin's frame and
+ * the refusal screen that Next.js draws into every page (step 2.157).
+ */
+export const siteOfThisRequest = cache(
+  async (leagueId: string, slug: string): Promise<LeagueSite> =>
+    siteOf({ id: leagueId, slug }, await leagueSites()),
+);
 
 function siteFrom(league: { readonly slug: string }, found: FoundSite | undefined): LeagueSite {
   return {
