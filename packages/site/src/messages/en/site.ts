@@ -267,8 +267,7 @@ export const enSite = {
   'team.makeMine': 'Make this my team',
   'team.mineNote': 'This device will open the league on this team.',
   // A member's own page of a league, `/{league}/my` (step 2.168).
-  'team.my.none':
-    'You are not on a team in this league this season. Once the league puts you on one, it opens here.',
+  'team.my.none': 'You are not on a team in this league this season.',
   'team.my.seeTeams': 'See the teams',
   'team.my.several': 'Your teams.',
   'team.my.severalLead': 'You are on more than one team this season. Open the one you want.',

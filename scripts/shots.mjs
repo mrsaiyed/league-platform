@@ -647,6 +647,7 @@ const yoursDrawn = (page) =>
     .waitFor({ state: 'attached', timeout: 60_000 });
 const coachPages = [
   { name: 'coach-menu-open', at: '', opens: true },
+  { name: 'coach-league-home', at: '', steps: yoursDrawn },
   { name: 'coach-team', at: '/teams/herons', steps: yoursDrawn },
   { name: 'coach-team-opens-here', league: 'harbor-city', at: '/teams/rockets', steps: yoursDrawn },
   { name: 'coach-teams', league: 'harbor-city', at: '/teams', steps: yoursDrawn },
