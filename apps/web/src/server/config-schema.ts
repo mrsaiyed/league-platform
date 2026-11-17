@@ -34,6 +34,7 @@ export const fields = {
   SUPABASE_SECRET_KEY: { secret: true },
   RESEND_API_KEY: { secret: true },
   EMAIL_FROM: { secret: false },
+  CONTACT_EMAIL: { secret: false },
   STRIPE_SECRET_KEY: { secret: true },
   STRIPE_WEBHOOK_SECRET: { secret: true },
 } as const satisfies Record<string, ConfigField>;
@@ -88,6 +89,10 @@ const schema = z.object({
   // Only production sends email (T-140); elsewhere every email is captured.
   RESEND_API_KEY: secretText(8).optional(),
   EMAIL_FROM: text.regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'must be an email address'),
+  // Where the Terms and Privacy pages tell people to write to the people who run the site
+  // (step 2.135): an address the founder gives, never one written in the code. Without
+  // it the pages send a question through the league's admin instead.
+  CONTACT_EMAIL: text.regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'must be an email address').optional(),
 });
 
 export type Config = Readonly<z.infer<typeof schema>>;
@@ -106,6 +111,7 @@ const optional: readonly ConfigName[] = [
   'SUPABASE_URL',
   'SUPABASE_SECRET_KEY',
   'RESEND_API_KEY',
+  'CONTACT_EMAIL',
 ];
 
 /** Optional in local and test, but required in these, so its choice is a decision. */
