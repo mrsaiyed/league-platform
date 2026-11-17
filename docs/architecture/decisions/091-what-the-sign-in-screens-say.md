@@ -1,0 +1,29 @@
+# 091 — What the sign-in screens say, and where it comes from
+
+Date: 2026-11-17. Step 2.163 (the using-it audit, findings M24, M26 to M30, L9 and L10; R-30, R-31). Serves T-67, T-68, T-69, T-71 and T-85; follows record 031 (the sign-in screens) and record 067 (a form's answer never rides in the address). Decided by the step's builder (technical, T-291).
+
+## Problem
+
+The sign-in screens worked but said too little: the code screen did not say where the code went, "Send a new code" went back to an empty first screen, a lock-out said "900 seconds", a refused sign-in emptied the email box, signing out ended on a bare form, the device list gave times in UTC, and "Continue with Google" was drawn where Google could only fail. Saying more meant the screens had to know things they did not: the address typed, where the person was, whether Google is set up,. Each had to be learned without telling a stranger whether an address has an account (T-68) and without putting anything personal in an address bar.
+
+## What
+
+- **The address typed comes from the device's own cookies, never the address bar.** The code screen reads the address from the flow cookie the sign-up or reset already keeps (record 031): "We sent a 6-digit code to …" on sign-up, "If … has an account, we sent it a code" on the forgotten-password route. Both are true whether or not the address has an account, so they say the same for both (T-68). "Wrong address? Change it" goes back to the first screen with the address in its box. A refused sign-in keeps the address typed in a cookie of its own, `srl_typed` (HttpOnly, SameSite=Lax, ten minutes), set on every refusal alike so the answer's cookies never differ (the web shell check compares them); it is cleared on signing in and on signing out, so a shared device keeps no one's address.
+- **"Send a new code" is a form of its own** (`sendCodeAgain`): another code for the same address and purpose, under the same limits as the first (T-225), back on the code screen with `?notice=codeSentAgain`, or with the limit's wait.
+- **What was done is said by name in the address (`?notice=`), like a problem (`?problem=`).** Only fixed names (`signedOut`, `signedOutEverywhere`, `alreadySignedOut`, `codeSentAgain`); each is still true on a reload, and "You are signed out." is said only while the person is signed out. This is record 031's way, kept for the sign-in screens, which hold no typed data (record 067 left them to the lead). A league page reads it from the address as it arrived (the proxy's header), in the league's layout.
+- **Signing out leaves the person where they were (R-30).** Every sign-out form says which page it is on (`next`) and, on the admin and the scoring page, `staff`. The server checks the page again (safeReturnPath): a page of ours gets "You are signed out."; none, or one that is not ours, is our front page; a staff page, which asks a signed-out person to sign in (U-15), becomes the sign-in screen, saying so and coming back to it.
+- **"Sign out everywhere" says only what is true (M30).** A device whose session had already ended is signed out and told just that; "We could not sign out your other devices" is said only when the service refused for a live session. It asks first, on the account page (`?ask=signOutEverywhere`), so it needs no script.
+- **Times in the reader's own time.** The server does not know a person's time zone, so the device list is drawn in UTC, said as such, and the browser puts each time into its own ("today at 8:41 PM") as soon as the page's script runs (`local-time.tsx`).
+- **Google is drawn only where it is set up: `GOOGLE_SIGN_IN` (`on` or `off`, `off` unless set).** The sign-in service cannot tell us cheaply whether Google is configured on it, so the setting says so; with it off no screen draws the button and a hand-sent post is answered as a failed try without asking the service.
+- **"Show" on every password field** is drawn once the page's script runs; with scripts off it could do nothing, so it is not drawn. Its name is "Show" or "Hide", never "Show password": the field keeps the only label that says "Password".
+
+## What else was considered
+
+- **The typed address in the address bar.** Refused: an address bar is kept in history and shared in links.
+- **React's form state for a refused sign-in (record 067).** It would answer a refused post with a page, not a redirect: the web shell check's T-68 lines, which compare redirects and cookies for an address with an account and one without, would no longer hold unchanged.
+- **A cookie to carry "You are signed out." once.** A league page cannot clear a cookie while it draws, and a page drawn in the answer to a post does not reliably see a cookie that post set (record 067); the name in the address is true for as long as it shows.
+- **Asking the sign-in service whether Google is set up.** Possible on Supabase's settings answer, but a change to the adapter that step 2.93 owns; the setting is plain and the admin of the deployment sets it once.
+
+## Revisit if
+
+The site runs on more than one server and the same request may be answered by two (nothing here keeps state in memory, so nothing changes); a person's own time zone is kept with their settings (then the server can draw it); the sign-in service reports its providers itself (then `GOOGLE_SIGN_IN` goes).
