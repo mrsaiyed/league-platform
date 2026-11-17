@@ -85,6 +85,11 @@ export async function runBoxScoreAction(
   }
   const sheet = await getBoxScoreSheet(context, { gameId }, deps);
   if (!sheet.ok) return { ok: false, code: sheet.error.code };
+  // A sheet typed on a page drawn before the game was postponed or cancelled (step 2.158):
+  // said as that, not as "someone changed this game"; the grid keeps what was typed.
+  const now = sheet.value.game.status;
+  if (now === 'postponed') return { ok: false, code: 'game-postponed' };
+  if (now === 'cancelled') return { ok: false, code: 'game-cancelled' };
   const input = readBoxScoreForm(sheet.value, fields);
   if (input === undefined) {
     return { ok: false, code: 'invalid-input', wrong: wrongBoxScoreFields(sheet.value, fields) };

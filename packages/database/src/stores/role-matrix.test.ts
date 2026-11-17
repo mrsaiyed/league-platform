@@ -102,6 +102,7 @@ import {
   publishSchedule,
   publishSiteDesign,
   putBackOnRoster,
+  putGameBack,
   readReopenOffer,
   readTrackerRosters,
   readTrackerState,
@@ -936,6 +937,18 @@ const gameCommandRows: readonly Row[] = [
     'games.results',
     async (league, program) => ({ gameId: (await gameIn(league, program)).gameId, version: 1 }),
     (c, i) => cancelGame(c, i, gamesDeps),
+  ),
+  // Whoever may cancel a game may put it back (S-51).
+  ...gameRows(
+    'games.put_game_back',
+    'put a cancelled game back',
+    'games.results',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program, { status: 'cancelled' })).gameId,
+      version: 1,
+      reason: 'cancelledByMistake',
+    }),
+    (c, i) => putGameBack(c, i, gamesDeps),
   ),
   ...gameRows(
     'games.reopen_game',

@@ -46,6 +46,13 @@ export type { ScoringRule } from './scoring-access.ts';
 export { inScoringReach } from './scoring-access.ts';
 export { listPostponedGames, type PostponedGame } from './commands/list-postponed-games.ts';
 export { postponeGame, type PostponeGameError } from './commands/postpone-game.ts';
+export {
+  putBackReasons,
+  putGameBack,
+  type PutGameBack,
+  type PutBackReason,
+  type PutGameBackError,
+} from './commands/put-game-back.ts';
 export { recordFinalScore, type RecordFinalScoreError } from './commands/record-final-score.ts';
 export { recordForfeit, type RecordForfeitError } from './commands/record-forfeit.ts';
 export {
@@ -156,6 +163,7 @@ export type {
 export type {
   EarlierRoundCount,
   EarlierRoundRef,
+  GameAtSameTime,
   GameInWindow,
   GamesWindow,
   ScoringReach,
