@@ -8,10 +8,15 @@ import { signOutAction } from '../../server/sign-in/actions.ts';
 import { waitingQuestionWords, type AccountMenu } from '../shell/index.ts';
 import { leagueHomeStayUrl } from '../team-pages/index.ts';
 import { SignOutForm } from '../tracker/index.ts';
-import { isReadyArea, type StaffPlace } from './staff-area.ts';
+import { isReadyArea } from '../../server/releases.ts';
+import type { StaffPlace } from './staff-area.ts';
 import { StaffIcon } from './staff-icon.tsx';
 
-/** The areas of the admin open to this person, the current one marked for everyone. */
+/**
+ * The areas of the admin open to this person that may be shown here (the frame leaves out
+ * those not built yet in staging and production), the current one marked for everyone. An
+ * area with no screen yet, drawn only in local work and tests, is marked "Not ready".
+ */
 export function StaffNav({
   league,
   areas,

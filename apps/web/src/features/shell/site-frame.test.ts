@@ -8,10 +8,11 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { siteOf } from '../../server/league-site.ts';
+import { shownWhen } from '../../server/releases.ts';
 import { standInLeagueSites } from '../../server/stand-in-league-sites.ts';
 import { standInLeagues } from '../../server/stand-in-ports.ts';
 import { DesignStyle } from './design-style.tsx';
-import { SiteFooter } from './site-footer.tsx';
+import { footerPagesOf, SiteFooter } from './site-footer.tsx';
 import type { AccountMenu } from './account-menu.ts';
 import { SiteHeader } from './site-header.tsx';
 
@@ -322,6 +323,20 @@ describe('header, menu and footer', () => {
     expect(named).toContain('<p class="site-footer-name" dir="auto">دوري الوادي</p>');
     expect(named.indexOf('site-footer-name')).toBeLessThan(named.indexOf(en['footer.terms']));
     expect(html).not.toContain('site-footer-name');
+  });
+
+  // Step 2.140: a page not built yet is no page in staging and production; nothing leads to it.
+  it('links only to the footer pages it is given, and draws no empty list of links', () => {
+    const one = renderToStaticMarkup(createElement(SiteFooter, { pages: ['privacy'] }));
+    expect(one).toContain('href="/privacy"');
+    expect(one).not.toContain('href="/terms"');
+    const none = renderToStaticMarkup(createElement(SiteFooter, { pages: [] }));
+    expect(none).not.toContain('<nav');
+    expect(none).not.toContain(en['footer.terms']);
+    expect(none).toContain('Powered by SR Leagues');
+    expect(footerPagesOf(shownWhen(true))).toEqual(['terms', 'privacy']);
+    // Neither is built yet (server/releases.ts): staging and production link to neither.
+    expect(footerPagesOf(shownWhen(false))).toEqual([]);
   });
 
   // Step 2.147: the header with presence.

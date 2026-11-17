@@ -36,18 +36,3 @@ export function staffPlaceAt(
   }
   return null;
 }
-
-/**
- * The areas that have a screen of their own today. The others are listed in the menu with
- * a quiet "Not ready" mark, and their page is a calm panel that says so; which areas are
- * listed at all is steps 2.140 and 2.171's to decide.
- */
-export const readyAreas: readonly AdminArea[] = [
-  'teams',
-  'schedule',
-  'games',
-  'season',
-  'settings',
-];
-
-export const isReadyArea = (area: AdminArea): boolean => readyAreas.includes(area);

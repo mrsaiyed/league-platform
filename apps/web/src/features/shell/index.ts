@@ -17,7 +17,7 @@ export { membershipsInWords, MyLeaguesList } from './my-leagues-list.tsx';
 export { LeagueSitePage } from './league-site-page.tsx';
 export { NotBuilt } from './not-built.tsx';
 export { LeagueNotFound, PlatformNotFound } from './not-found-screens.tsx';
-export { SiteFooter } from './site-footer.tsx';
+export { footerPagesOf, SiteFooter, type FooterPage } from './site-footer.tsx';
 export { AccountButton, SiteHeader } from './site-header.tsx';
 export { StandalonePage } from './standalone-page.tsx';
 

@@ -4,6 +4,7 @@ import {
   accountMenuOf,
   currentMenuPage,
   DesignStyle,
+  footerPagesOf,
   headerSeason,
   LeagueNotice,
   signInHrefFrom,
@@ -18,6 +19,7 @@ import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { leagueSites, siteOf } from '../../server/league-site.ts';
 import { leagueView, signedInEmail } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
+import { shownHere } from '../../server/releases.ts';
 import { pathHeader } from '../../server/request-facts-header.ts';
 import './league-site.css';
 
@@ -77,7 +79,11 @@ export default async function LeagueLayout({
       <div className="site-body" id="content">
         {children}
       </div>
-      <SiteFooter name={site.name} madeUp={(await webPorts()).madeUpWorld} />
+      <SiteFooter
+        name={site.name}
+        madeUp={(await webPorts()).madeUpWorld}
+        pages={footerPagesOf(shownHere())}
+      />
     </div>
   );
 }
