@@ -8,6 +8,7 @@ export {
   rebuildOnGameReopened,
   standingsHandlers,
 } from './on-game-result.ts';
+export { levelDocument, readLevel, type LevelDocument } from './level-document.ts';
 export { rebuildSeason, type SeasonRebuilt } from './rebuild-season.ts';
 export { previewRulesChange, type RulesChangePreview } from './preview-rules-change.ts';
 export { whatWouldMove, type MovedField, type TeamMove } from './what-would-move.ts';

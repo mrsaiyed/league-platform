@@ -39,6 +39,12 @@ export type StandingsRowRecord = {
   readonly streakLength: number | null;
   /** What put the team where it is: a tiebreaker, 'still-tied', or nothing (its record). */
   readonly decidedBy: string | null;
+  /**
+   * How the teams level with it were ordered (step 2.198): the engine's document as
+   * stored, null for a team level with nobody and on rows saved before it. Read with
+   * care: whatever is not that document gives the note it gave before.
+   */
+  readonly level: unknown;
 };
 
 /** An adjustment an admin entered, with its reason (S-10), not in the bin. Never who entered it. */

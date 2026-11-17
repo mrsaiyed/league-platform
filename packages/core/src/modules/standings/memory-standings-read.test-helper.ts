@@ -51,6 +51,7 @@ export function memoryStandingsRead(): StandingsReadStore {
         streakResult: 'won',
         streakLength: 2,
         decidedBy: 'head-to-head',
+        level: null,
       },
       {
         teamId: openTeam,
@@ -67,6 +68,7 @@ export function memoryStandingsRead(): StandingsReadStore {
         streakResult: 'lost',
         streakLength: 2,
         decidedBy: null,
+        level: null,
       },
     ],
     adjustments: async () => [

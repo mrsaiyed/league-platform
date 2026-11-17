@@ -4,7 +4,7 @@
 // the page's own builder: the very tables the first test's walk ends on. Each test reads
 // the words beside the LOWER team of a level group, where the old note said "placed above".
 import { defaultSeasonRules, type SeasonRules } from '@srleagues/contracts';
-import { readStandings, type StandingsReadStore } from '@srleagues/core';
+import { levelDocument, readStandings, type StandingsReadStore } from '@srleagues/core';
 import { calculateStandings, type CoinFlip, type StandingsAdjustment } from '@srleagues/sports';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -92,6 +92,7 @@ async function tableAfter(
           streakResult: row.streak?.result ?? null,
           streakLength: row.streak?.length ?? null,
           decidedBy: row.decidedBy,
+          level: levelDocument(row.level),
         })),
       ),
     adjustments: async () =>
