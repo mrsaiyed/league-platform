@@ -399,10 +399,55 @@ if (browser) {
         text.slice(0, 200),
       );
       note('nothing tells them to reload the page', !text.includes('could not be read just now'));
+      // No form that could only be refused (the lead's rule since step 2.180).
+      note(
+        'the club admin is not offered "Someone not in the list yet"',
+        (await page.getByRole('heading', { name: 'Someone not in the list yet' }).count()) === 0,
+      );
+      note(
+        'the club admin is not offered the head’s "Add a player", which could lead nowhere',
+        (await page.locator('main a[href="#add-player"]').count()) === 0,
+      );
     } finally {
       await context.close();
     }
   });
+
+  await step(
+    'an admin is offered "Someone not in the list yet"; a post by hand is refused plainly',
+    async () => {
+      const { context, page } = await asToken('local-admin-token');
+      try {
+        await page.goto(`${origin}/quiet-pines/admin/teams/${draftTeam}`);
+        const heading = page.getByRole('heading', { name: 'Someone not in the list yet' });
+        await heading.waitFor();
+        note('the draft league’s admin is offered "Someone not in the list yet"', true);
+        note(
+          'the admin has the head’s "Add a player"',
+          (await page.locator('main a[href="#add-player"]').count()) === 1,
+        );
+        // The form, sent by a club admin who never had it: the command still refuses, in
+        // plain words (signed in as the club admin before the form is sent).
+        await context.clearCookies();
+        await context.addCookies([
+          { name: 'srl_session', value: 'local-club-admin-token', url: origin },
+        ]);
+        const form = page.locator('section', { has: heading }).locator('form');
+        await form.locator('input[name="firstName"]').fill('Made');
+        await form.locator('input[name="lastName"]').fill('Up');
+        await form
+          .getByRole('button', { name: 'Add the person and put them on the roster' })
+          .click();
+        await page
+          .getByText('Your role in this league does not include adding people to its list.')
+          .first()
+          .waitFor();
+        note('a post by hand from a club admin is refused in plain words', true);
+      } finally {
+        await context.close();
+      }
+    },
+  );
 }
 
 await browser?.close();

@@ -16,7 +16,7 @@
 // Both are given the route's `[league]` value. When it is not the league of the
 // address the proxy wrote down, the proxy did not run for this request, and the
 // answer is "not found" (league-gate.ts, addressMatchesRoute).
-import { platformUrl, type AdminArea } from '@srleagues/core';
+import { holdsAnywhere, platformUrl, type AdminArea, type Permission } from '@srleagues/core';
 import { headers } from 'next/headers';
 import { forbidden, notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
@@ -159,6 +159,18 @@ export async function signedInEmail(): Promise<string | null> {
 export async function requestPath(): Promise<string> {
   // Read from the proxy's header alone, so it never waits on (or fails with) the session.
   return (await headers()).get(pathHeader) ?? '';
+}
+
+/**
+ * Whether the person of this request holds `permission` anywhere in the league of the
+ * address (step 2.157): so a page offers no form that could only be refused (a club admin,
+ * who may not add a person to the league, is not offered "Someone not in the list yet").
+ * It reads what the gate already read for this request, and decides nothing: the command
+ * behind the form still checks, and refuses a post sent by hand.
+ */
+export async function holdsHere(permission: Permission): Promise<boolean> {
+  const { resolved } = await resolvedRequest();
+  return resolved.kind === 'league' && holdsAnywhere(resolved.holder, permission);
 }
 
 /** For a layout: the view when the page may be shown, else null (the page refuses). */
