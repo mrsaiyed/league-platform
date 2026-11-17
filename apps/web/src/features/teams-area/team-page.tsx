@@ -96,8 +96,10 @@ export async function TeamPage({
   const leagueList = people.ok
     ? { ids: new Set(everyone.map((person) => person.id)), complete: everyone.length < peopleShown }
     : undefined;
-  // A read that fails is shown as such, never as an empty roster or list.
-  const readFailed = !roster.ok || !people.ok;
+  // A role that may not read the league's list of people (a club admin) is told so, in
+  // calm words; a read that fails is shown as such, never as an empty roster or list.
+  const peopleNotAllowed = !people.ok && people.error.code === 'not-allowed';
+  const readFailed = !roster.ok || (!people.ok && !peopleNotAllowed);
   const onRoster = new Set(open.map((line) => line.personId));
   const available = everyone.filter((person) => !onRoster.has(person.id));
   const listUrl = leagueUrl(here, 'admin-area', { area: 'teams' });
@@ -294,6 +296,8 @@ export async function TeamPage({
       <Section title={t('adminTeams.add.title')} id={addPlayerAnchor}>
         {readFailed ? (
           <StaffNotice kind="refused">{t('adminTeams.add.readFailed')}</StaffNotice>
+        ) : peopleNotAllowed ? (
+          <p className="staff-quiet">{t('adminTeams.add.notAllowed')}</p>
         ) : available.length === 0 ? (
           <p className="staff-quiet">{t('adminTeams.add.noOne')}</p>
         ) : (
@@ -350,8 +354,12 @@ export async function TeamPage({
       </Section>
 
       <Section title={t('adminTeams.people.title')}>
-        <p className="staff-quiet">{t('adminTeams.people.body')}</p>
-        {people.ok ? null : (
+        {peopleNotAllowed ? (
+          <p className="staff-quiet">{t('adminTeams.people.notAllowed')}</p>
+        ) : (
+          <p className="staff-quiet">{t('adminTeams.people.body')}</p>
+        )}
+        {people.ok || peopleNotAllowed ? null : (
           <StaffNotice kind="refused">{t('adminTeams.people.readFailed')}</StaffNotice>
         )}
         <ul className="staff-rows admin-people">

@@ -695,21 +695,31 @@ const cases = [
   ],
   ['visitor', '/signin?problem=signInToScore', 200, ['Sign in to score this game.']],
   ['otherAdmin', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
-  // No such game: the tracker's own refusal, with the way back (step 2.33).
+  // No such game: "Page not found" with status 404, in the tracker's own look, with the way
+  // back (step 2.33; status 404 since step 2.157).
   [
     'owner',
     '/north-valley/score/game-1',
-    200,
-    ['We could not find that game.', 'Back to your games'],
-    [notFound],
+    404,
+    [notFound, 'We could not find that game.', 'Back to your games'],
+    [noAccess],
   ],
-  // Another league's game asked for through this league's address is not there.
+  // Another league's game asked for through this league's address is not there: status 404
+  // and nothing of the other league (step 2.157).
   [
     'owner',
     `/harbor-city/score/${liveGame}`,
-    200,
-    ['We could not find that game.'],
-    ['Bears at Hawks'],
+    404,
+    [notFound, 'We could not find that game.'],
+    ['Bears at Hawks', 'North Valley'],
+  ],
+  // The same in the admin's games: the box score of another league's game (step 2.157).
+  [
+    'owner',
+    `/harbor-city/admin/games/${liveGame}`,
+    404,
+    [notFound],
+    ['Bears at Hawks', 'North Valley', 'That game is not there'],
   ],
   // A scorekeeper's admin: their games, each with a button to the tracker (P4 §4).
   [

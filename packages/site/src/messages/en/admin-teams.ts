@@ -6,6 +6,9 @@
 export const enAdminTeams = {
   'adminTeams.add.choose': 'Choose a person',
   'adminTeams.add.noOne': 'Everyone in the league list is already on this roster.',
+  // Step 2.157: for a role that may not read the league's list of people (a club admin).
+  'adminTeams.add.notAllowed':
+    "Your role in this league does not include its list of people, so no one can be chosen from it here. If it should, ask the league's owner or an admin.",
   'adminTeams.add.number': 'Jersey number (0 to 99, or 00)',
   'adminTeams.add.person': 'Person',
   'adminTeams.add.readFailed':
@@ -57,6 +60,9 @@ export const enAdminTeams = {
   'adminTeams.ownColors': "The league's own colors",
   'adminTeams.people.body':
     'Taking someone off the list is refused while they are on a roster: mark them as having left first. A place on a team that was moved to the bin does not count.',
+  // Step 2.157: for a role that may not read the league's list of people (a club admin).
+  'adminTeams.people.notAllowed':
+    'Your role in this league does not include its list of people, so it is not shown here.',
   'adminTeams.people.readFailed':
     'The league list could not be read just now, so it is not shown. Reload the page to try again.',
   'adminTeams.people.remove': 'Remove from the league list',

@@ -129,6 +129,17 @@ export async function staffViewOfAddress(): Promise<LeagueView | null> {
 }
 
 /**
+ * For "not found" at a game's scoring address (`[league]/score/[game]/not-found.tsx`, step
+ * 2.157): the league of the address the proxy wrote down, when this person may score
+ * there, else null. The same worked-out request the page used; never used to decide access.
+ */
+export async function scorerViewOfAddress(): Promise<LeagueView | null> {
+  const { resolved } = await resolvedRequest();
+  const outcome = leaguePageOutcome(resolved, { page: 'score' });
+  return outcome.kind === 'show' ? outcome.view : null;
+}
+
+/**
  * For the account button (U-8) and the refusal page: the address the signed-in person is
  * signed in with, as the sign-in service holds it; null for a visitor. Drawn for this
  * request only: the pages it appears on are drawn per request (record 066).

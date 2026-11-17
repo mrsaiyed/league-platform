@@ -111,8 +111,12 @@ export async function BoxScorePage({
   const context = commandContextOf(view.context);
   const read = await getBoxScoreSheet(context, { gameId: gameId.toLowerCase() }, ports.games.deps);
   const back = leagueUrl(here, 'admin-area', { area: 'games' });
+  // A game that is not this league's, another league's among them, is "Page not found"
+  // with status 404, inside the admin's frame (step 2.157): nothing of the other league.
+  if (!read.ok && read.error.code === 'game-not-found') return notFound();
   if (!read.ok) {
-    // A finished page too (DESIGN.md section 4, line 19): centered, titled, one way on.
+    // A game this person may not score here. A finished page too (DESIGN.md section 4,
+    // line 19): centered, titled, one way on.
     return (
       <MessagePage
         className="admin-games"
