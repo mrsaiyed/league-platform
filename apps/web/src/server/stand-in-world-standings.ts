@@ -8,6 +8,7 @@
 import {
   leagueStatuses,
   type AccessReader,
+  type DivisionRecord,
   type DivisionsStore,
   type LeaguesStore,
   type SettingPlace,
@@ -17,7 +18,7 @@ import {
 import { minorAt } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
-import type { LeagueWorld, SavedPlayerTotals } from './stand-in-world-state.ts';
+import type { LeagueWorld, SavedPlayerTotals, WorldDivision } from './stand-in-world-state.ts';
 import type { Frozen, ReadWorld } from './stand-in-world.ts';
 
 const decided = (status: string) => status === 'final' || status === 'forfeit';
@@ -276,12 +277,12 @@ const samePlace = (a: SettingPlace, b: SettingPlace) => JSON.stringify(a) === JS
  * season through them) as the database's seasons table does it: the version is checked
  * and raised, and making a season current takes the mark from its program's other current
  * season, raising that one's version too. So the setCurrentSeason command, which changes
- * a season through updateSeason, works here. Creating leagues, seasons and divisions,
+ * a season through updateSeason, works here. Creating leagues and seasons,
  * changing a league's name, address or state and saving a season's rules have no screen
  * on the stand-in yet: those parts fail by name (createLeague, setLeagueName,
  * renameShortName, setLeagueStatus, createSeason, setSeasonRules, setSeasonRosterSettings,
- * the store's own setCurrentSeason, which only createLeague calls, and every division
- * command). Publishing a site design has no screen yet either: the stand-in's made-up
+ * and the store's own setCurrentSeason, which only createLeague calls). The divisions are
+ * the world's own rows, changed as the database's divisions store changes them (step 2.49). Publishing a site design has no screen yet either: the stand-in's made-up
  * leagues keep their designs as data (stand-in-league-sites.ts), so its two site parts fail
  * by name.
  */
@@ -408,14 +409,74 @@ export function worldLeaguesStores(
     },
     seasonProgramId: async (seasonId) => s.seasons.find((x) => x.id === seasonId)?.programId,
   };
+  // As packages/database's divisions store (0007): a name differs from its siblings' not in
+  // the bin, whatever the capitals; a change checks the version when one is given.
+  const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const record = (d: WorldDivision): DivisionRecord => ({
+    id: d.id,
+    seasonId: d.seasonId,
+    parentDivisionId: d.parentDivisionId,
+    name: d.name,
+    color: d.color,
+    sort: d.sort,
+    binned: d.binned,
+    version: d.version,
+  });
+  const nameTaken = (
+    d: Pick<WorldDivision, 'seasonId' | 'parentDivisionId'>,
+    name: string,
+    except?: string,
+  ) =>
+    s.divisions.some(
+      (x) =>
+        x.id !== except &&
+        !x.binned &&
+        x.seasonId === d.seasonId &&
+        x.parentDivisionId === d.parentDivisionId &&
+        sameName(x.name, name),
+    );
   const divisions: DivisionsStore = {
-    find: notYet('divisions.find'),
-    list: notYet('divisions.list'),
-    create: notYet('divisions.create'),
-    update: notYet('divisions.update'),
-    setBinned: notYet('divisions.setBinned'),
-    hasLiveSubdivisions: notYet('divisions.hasLiveSubdivisions'),
-    hasLiveTeams: notYet('divisions.hasLiveTeams'),
+    find: async (divisionId) => {
+      const found = s.divisions.find((d) => d.id === divisionId);
+      return found === undefined ? undefined : record(found);
+    },
+    list: async (seasonId) =>
+      s.divisions
+        .filter((d) => d.seasonId === seasonId && !d.binned)
+        .sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+        .map(record),
+    create: async (division) => {
+      if (nameTaken(division, division.name)) return 'name-taken';
+      const id = newId();
+      s.divisions = [...s.divisions, { id, ...division, binned: false, version: 1 }];
+      return id;
+    },
+    update: async (divisionId, change, version) => {
+      const at = s.divisions.findIndex((d) => d.id === divisionId);
+      const found = s.divisions[at];
+      if (found === undefined || found.binned) return undefined;
+      if (version !== undefined && found.version !== version) return undefined;
+      if (change.name !== undefined && nameTaken(found, change.name, divisionId))
+        return 'name-taken';
+      s.divisions = replacedAt(s.divisions, at, {
+        ...found,
+        ...change,
+        version: found.version + 1,
+      });
+      return found.version + 1;
+    },
+    setBinned: async (divisionId, binned) => {
+      const at = s.divisions.findIndex((d) => d.id === divisionId);
+      const found = s.divisions[at];
+      if (found === undefined) return false;
+      if (!binned && nameTaken(found, found.name, divisionId)) return 'name-taken';
+      s.divisions = replacedAt(s.divisions, at, { ...found, binned, version: found.version + 1 });
+      return true;
+    },
+    hasLiveSubdivisions: async (divisionId) =>
+      s.divisions.some((d) => d.parentDivisionId === divisionId && !d.binned),
+    hasLiveTeams: async (divisionId) =>
+      s.teams.some((t) => t.divisionId === divisionId && !t.binned),
   };
   return { leagues, divisions };
 }

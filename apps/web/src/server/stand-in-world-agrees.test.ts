@@ -220,9 +220,13 @@ beforeAll(async () => {
         divisions: divisionIds.map((id, sort) => ({
           id,
           seasonId,
+          // Made by createDivision on the database above: at the top, no color, version 1.
+          parentDivisionId: null,
           name: sort === 0 ? 'North' : 'South',
+          color: null,
           sort,
           binned: false,
+          version: 1,
         })),
       },
     ],

@@ -1203,7 +1203,16 @@ function leagueOf(
     const { rules, ...rest } = spec.season;
     s.seasons.push({ ...rest, rules, statKeys: [...statKeys], version: 1 });
     spec.divisions.forEach((d, sort) =>
-      s.divisions.push({ id: d.id, seasonId: spec.season.id, name: d.name, sort, binned: false }),
+      s.divisions.push({
+        id: d.id,
+        seasonId: spec.season.id,
+        parentDivisionId: null,
+        name: d.name,
+        color: null,
+        sort,
+        binned: false,
+        version: 1,
+      }),
     );
     for (const t of spec.teams) {
       const kept: TeamRecord = {

@@ -515,6 +515,16 @@ const cases = [
     ['Import fixtures', staffFrameAt('/north-valley/admin/schedule'), oneHeading],
     [adminPlaceholder],
   ],
+  // Step 2.49: a season's divisions under Season settings (the owner's), and the league's
+  // venues under Schedule (the scheduler's); a scheduler is refused the divisions.
+  [
+    'owner',
+    '/north-valley/admin/season/divisions',
+    200,
+    ['Divisions', 'East', 'West', staffFrameAt('/north-valley/admin/season'), oneHeading],
+    [adminPlaceholder],
+  ],
+  ['scheduler', '/north-valley/admin/season/divisions', 403, [noAccess]],
   [
     'scheduler',
     '/north-valley/admin/games',

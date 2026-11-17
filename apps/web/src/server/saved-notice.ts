@@ -11,15 +11,20 @@
 // same-request.ts, behind a port both servers share.
 
 /** The screens that say "Saved" from a notice. */
-export const noticeScreens = ['games', 'box-score'] as const;
+export const noticeScreens = ['games', 'box-score', 'divisions', 'venues'] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 
 export type SavedNotice = {
   readonly screen: NoticeScreen;
-  /** The id of the thing saved: a game. */
+  /** The id of the thing saved: a game, a division, a venue or a court. */
   readonly thing: string;
   /** What was done to it, as the last part of a message key: `final`, `reopen`… */
   readonly said: string;
+  /**
+   * The thing's name as stored, for a thing the screen no longer lists (a division or court
+   * just moved to the bin, step 2.49): never anything typed.
+   */
+  readonly name?: string;
 };
 
 export type SavedNotices = {
@@ -60,7 +65,12 @@ export function savedNotices(options: {
       if (found === undefined || found.screen !== screen) return undefined;
       left.delete(holder);
       if (found.at < now() - options.keepMs) return undefined;
-      return { screen: found.screen, thing: found.thing, said: found.said };
+      return {
+        screen: found.screen,
+        thing: found.thing,
+        said: found.said,
+        ...(found.name === undefined ? {} : { name: found.name }),
+      };
     },
   };
 }
