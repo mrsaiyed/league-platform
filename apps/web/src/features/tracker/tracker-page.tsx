@@ -197,19 +197,25 @@ function TrackerRefusal({
  * the way back to their games, answered with status 404 by Next.js. Nothing of any other
  * league is read or said.
  */
-export function TrackerGameNotFound({ view }: { readonly view: LeagueView }) {
+export async function TrackerGameNotFound({ view }: { readonly view: LeagueView }) {
   const here = view.context.league;
   const backHref = scoresOnly(view.areas)
     ? leagueUrl(here, 'admin')
     : leagueUrl(here, 'admin-area', { area: 'games' });
+  const site = await siteOfThisRequest(here.id, here.slug);
+  // In the league's look, centred on the screen in the same place as SR Leagues' own plain
+  // "Page not found" (ui-standalone), with none of the page body's padding around it.
   return (
-    <LeagueLook league={here}>
-      <MessagePage
-        title={t('common.notFoundTitle')}
-        action={{ href: backHref, label: t('tracker.back') }}
-      >
-        <p>{t('tracker.unknownGame')}</p>
-      </MessagePage>
-    </LeagueLook>
+    <div className="league-site ui-root">
+      <DesignStyle design={site.design} />
+      <div className="ui-standalone">
+        <MessagePage
+          title={t('common.notFoundTitle')}
+          action={{ href: backHref, label: t('tracker.back') }}
+        >
+          <p>{t('tracker.unknownGame')}</p>
+        </MessagePage>
+      </div>
+    </div>
   );
 }
