@@ -10,16 +10,13 @@
 // (`game-postponed`, step 2.158): it has not been played.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
-import { decideGame, openGameByHand, type DecideGameError } from '../decide-game.ts';
+import { decideGame, openGameToScore, type DecideGameError } from '../decide-game.ts';
 import { gameScore, gameVersion } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
 
-export type RecordFinalScoreError =
-  | DecideGameError
-  /** Postponed: it waits for a new date and is scored once it is played (P7 §5.6). */
-  | { readonly code: 'game-postponed' };
+export type RecordFinalScoreError = DecideGameError;
 
 export const recordFinalScore = defineCommand({
   name: 'games.record_final_score',
@@ -38,12 +35,10 @@ export const recordFinalScore = defineCommand({
     tx,
     emit,
   }): Promise<Result<{ version: number }, RecordFinalScoreError>> => {
-    const open = await openGameByHand(tx, input.gameId, input.version);
+    // A postponed game is refused there too (step 2.158, S-75): it has not been played.
+    const open = await openGameToScore(tx, input.gameId, input.version);
     if (!open.ok) return open;
     const game = open.value;
-    // A postponed game has not been played: it is scored once it has its new date and is
-    // played then (step 2.158, M32), never through a form or an address left open.
-    if (game.status === 'postponed') return fail({ code: 'game-postponed' });
     if (input.homeScore === input.awayScore) {
       const rules = await effectiveRulesOf(tx, game);
       if (!rules.allowTies) return fail({ code: 'tie-not-allowed' });

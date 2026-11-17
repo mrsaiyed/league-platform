@@ -41,6 +41,7 @@ import {
   findGameEvent,
   findLastGameEnd,
   findSavedGameState,
+  findStatusBeforeCancelled,
   insertGameEvents,
   listGamePlayers,
   listTakenCommands,
@@ -54,6 +55,7 @@ import {
   isGameAssigned,
   listDecidedGameLines,
   listDecidedGames,
+  listGameClashes,
   listGameLines,
   listGameRoster,
   listEarlierRound,
@@ -171,6 +173,35 @@ registerCommandCase(postponeGame, harnessTx, {
 registerCommandCase(cancelGame, harnessTx, {
   name: "cancel the target's upcoming game",
   input: (target) => ({ gameId: target.upcomingGameId, version: 1 }),
+});
+
+// Step 2.158: what the target's upcoming game was when it was cancelled, read from the
+// activity log; the cancelling is done in the run's own scope (refused in any other league,
+// which then has no entry).
+registerIsolationCase({
+  subject: findStatusBeforeCancelled,
+  name: "read what the target's upcoming game was when it was cancelled",
+  run: async (scope, target) => {
+    await runAsApp(cancelGame, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      version: 1,
+    }).catch(() => undefined);
+    return findStatusBeforeCancelled(scope, target.upcomingGameId);
+  },
+});
+
+// Step 2.158: the games holding the target's upcoming game's place, once it is moved to the
+// time of the target's final game, which has the same teams (in the run's own scope).
+registerIsolationCase({
+  subject: listGameClashes,
+  name: "list the games at the target's upcoming game's time with one of its teams",
+  run: async (scope, target) => {
+    await sql`update games set starts_at = '2026-12-06T18:00:00Z'
+      where league_id = ${scope.leagueId} and id = ${target.upcomingGameId}`.execute(
+      transactionOf(scope),
+    );
+    return listGameClashes(scope, target.upcomingGameId);
+  },
 });
 
 // Step 2.158 (S-51): the target's upcoming game cancelled in the run's own scope (in any

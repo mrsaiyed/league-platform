@@ -192,7 +192,7 @@ describe('fixture import against the database', () => {
     expect(created.created.scores).toHaveLength(2);
     expect(await recordImportedScores(w.as, { importId }, deps)).toEqual({
       ok: true,
-      value: { recorded: 0, waiting: 2, refused: 0, leftAlone: 0 },
+      value: { recorded: 0, waiting: 2, refused: 0, leftAlone: 0, postponed: 0 },
     });
     // Publishing is a later step (2.21): stand in for it by making the first game.
     const first = created.created.scores[0]?.gameId;
@@ -213,7 +213,7 @@ describe('fixture import against the database', () => {
     );
     expect(await recordImportedScores(w.as, { importId }, deps)).toEqual({
       ok: true,
-      value: { recorded: 1, waiting: 1, refused: 0, leftAlone: 0 },
+      value: { recorded: 1, waiting: 1, refused: 0, leftAlone: 0, postponed: 0 },
     });
     const game = await one<{ status: string; home_score: number; away_score: number }>(
       pglite,
@@ -223,7 +223,7 @@ describe('fixture import against the database', () => {
     expect(game).toEqual({ status: 'final', home_score: 52, away_score: 48 });
     expect(await recordImportedScores(w.as, { importId }, deps)).toEqual({
       ok: true,
-      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 0 },
+      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 0, postponed: 0 },
     });
   });
 

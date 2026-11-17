@@ -285,7 +285,7 @@ describe('the games area actions', () => {
         action: 'games.put_game_back',
         actorAccountId: owner,
         targetId: target?.id,
-        details: { reason: 'willBePlayed' },
+        details: { reason: 'willBePlayed', was: 'cancelled', now: 'scheduled' },
       }),
     ]);
   });

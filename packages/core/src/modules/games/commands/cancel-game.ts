@@ -39,6 +39,8 @@ export const cancelGame = defineCommand({
     await recordActivity(tx, context, {
       action: 'games.cancel_game',
       target: { type: 'game', id: game.id },
+      // What it was, so putting it back returns it to that (step 2.158).
+      details: { was: game.status },
     });
     return ok({ version: updated });
   },

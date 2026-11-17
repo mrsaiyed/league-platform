@@ -49,6 +49,7 @@ export { postponeGame, type PostponeGameError } from './commands/postpone-game.t
 export {
   putBackReasons,
   putGameBack,
+  type PutGameBack,
   type PutBackReason,
   type PutGameBackError,
 } from './commands/put-game-back.ts';
@@ -162,6 +163,7 @@ export type {
 export type {
   EarlierRoundCount,
   EarlierRoundRef,
+  GameAtSameTime,
   GameInWindow,
   GamesWindow,
   ScoringReach,

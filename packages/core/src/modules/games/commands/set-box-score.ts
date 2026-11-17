@@ -16,7 +16,7 @@
 // (`game-postponed`, step 2.158): it has not been played yet.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
-import { decideGame, openGameByHand, type DecideGameError } from '../decide-game.ts';
+import { decideGame, openGameToScore, type DecideGameError } from '../decide-game.ts';
 import { gameScore, gameVersion } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GameRosterPlayer, GamesTx, NewGameLine } from '../ports.ts';
@@ -25,11 +25,7 @@ import { effectiveRulesOf } from '../season-rules-of.ts';
 export type SetBoxScoreError =
   | DecideGameError
   | {
-      readonly code:
-        | 'player-not-on-team'
-        | 'player-listed-twice'
-        | 'did-not-play-has-stats'
-        | 'game-postponed';
+      readonly code: 'player-not-on-team' | 'player-listed-twice' | 'did-not-play-has-stats';
     };
 
 /** A stat key as the database takes it (is_stat_counts, migration 0010). */
@@ -70,12 +66,11 @@ export const setBoxScore = defineCommand({
   }): Promise<Result<{ version: number }, SetBoxScoreError>> => {
     // A game with plays is refused by openGameByHand; one under way with none yet is too:
     // a sheet is copied afterwards.
-    const open = await openGameByHand(tx, input.gameId, input.version);
+    // A postponed game is refused there too (step 2.158, S-75): its sheet waits for its date.
+    const open = await openGameToScore(tx, input.gameId, input.version);
     if (!open.ok) return open;
     const game = open.value;
     if (game.status === 'live') return fail({ code: 'game-is-tracked' });
-    // A postponed game has not been played (step 2.158, M32): its sheet waits for its new date.
-    if (game.status === 'postponed') return fail({ code: 'game-postponed' });
     if (input.homeScore === input.awayScore) {
       const rules = await effectiveRulesOf(tx, game);
       if (!rules.allowTies) return fail({ code: 'tie-not-allowed' });
