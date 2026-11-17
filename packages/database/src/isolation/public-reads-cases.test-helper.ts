@@ -14,7 +14,6 @@ import {
   readStatLeaders,
   readTeamRecords,
 } from '@srleagues/core';
-import { sql } from 'kysely';
 import {
   findGameCorrectedDate,
   findGameState,
@@ -85,22 +84,11 @@ registerIsolationCase({
 });
 registerIsolationCase({
   subject: listTeamTurnoverGames,
-  name: "list the target's season's final games with a turnover charged to a team",
-  run: async (scope, target) => {
-    // The seeded final game gets a team turnover in its plays (inside the run's
-    // rolled-back transaction), so the control run has a game to reach.
-    await transactionOf(scope)
-      .updateTable('game_states')
-      .set({
-        state: sql`jsonb_set(state, '{plays}', (state -> 'plays') || ${JSON.stringify([
-          { type: 'team-turnover', side: 'home' },
-        ])}::jsonb)`,
-      })
-      .where('league_id', '=', scope.leagueId)
-      .where('game_id', '=', target.gameId)
-      .execute();
-    return listTeamTurnoverGames(scope, target.seasonId);
-  },
+  // Every league's seeded final game has a turnover charged to its away team
+  // (two-leagues.test-helper.ts), so the target's is there in every run, not only the
+  // control: only the query's own league filter keeps it out of the code-only run.
+  name: "count the turnovers charged to a team in the target's season's final games",
+  run: (scope, target) => listTeamTurnoverGames(scope, target.seasonId),
 });
 registerIsolationCase({
   subject: listPeopleForDisplay,
