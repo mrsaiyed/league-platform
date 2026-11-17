@@ -53,6 +53,8 @@ export type MemoryScheduling = {
   /** Rounds publishing created and removed, in order. */
   roundsAdded: NewRound[];
   roundsRemoved: string[];
+  /** Ids games of another league have: the database makes no second game with one. */
+  takenElsewhere: string[];
   /** Games outside the published schedule and the bin (no date yet) and the round each is in. */
   gamesInOtherRounds: GameInRound[];
   /** Games in the bin and the round each is in: they do not hold it (S-60). */
@@ -138,6 +140,7 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
     roundChanges: [],
     roundsAdded: [],
     roundsRemoved: [],
+    takenElsewhere: [],
     gamesInOtherRounds: [],
     binnedInRounds: [],
     roundsCleared: [],
@@ -198,7 +201,12 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           ...s.otherGames.filter((g) => ids.includes(g.id)),
         ],
         countPeopleOnTeams: async () => s.people,
-        insertPublishedGames: async (_season, games) => void s.inserted.push(...games),
+        insertPublishedGames: async (_season, games) => {
+          // An id another league's game has is not made, as on the database.
+          const made = games.filter((g) => !s.takenElsewhere.includes(g.id));
+          s.inserted.push(...made);
+          return made.length;
+        },
         updatePublishedGame: async (_season, gameId, change) => {
           const game = s.schedule.games.find((g) => g.id === gameId);
           if (game === undefined || ['live', 'final', 'forfeit'].includes(game.status)) {
