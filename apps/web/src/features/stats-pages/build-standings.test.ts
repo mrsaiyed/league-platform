@@ -173,6 +173,28 @@ const game1: Game = ['Ravens', 7, 'Wolves', 6];
 const game2: Game = ['Wolves', 50, 'Ravens', 45];
 
 describe('the note beside each team of the standings', () => {
+  // The lead's review, item 3: one number, one way. The PCT column writes a win percentage
+  // as the notes do, as a basketball table does, never 0.500.
+  it('writes the PCT column as the notes do: .500, 1.000, .000', async () => {
+    const walk = await tableAfter(['Ravens', 'Wolves'], [game1, game2]);
+    expect(walk.view.rows.map((row) => row.cells['winPercentage'])).toEqual(['.500', '.500']);
+    expect(levelNoteBeside(walk, 'Ravens')).toContain('(.500)');
+    const round = await tableAfter(
+      ['Ash', 'Birch', 'Cedar'],
+      [
+        ['Ash', 50, 'Birch', 45],
+        ['Ash', 50, 'Cedar', 40],
+        ['Cedar', 50, 'Birch', 40],
+      ],
+    );
+    expect(round.view.rows.map((row) => [row.team, row.cells['winPercentage']])).toEqual([
+      ['Ash', '1.000'],
+      ['Cedar', '.500'],
+      ['Birch', '.000'],
+    ]);
+    expect(round.html).not.toMatch(/>0\.\d{3}</);
+  });
+
   it('two teams and one game: nobody is level, so no team carries a note', async () => {
     const made = await tableAfter(['Ravens', 'Wolves'], [game1]);
     expect(order(made)).toEqual(['Ravens', 'Wolves']);

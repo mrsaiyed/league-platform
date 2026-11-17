@@ -68,6 +68,13 @@ const columnOf = {
 /** Checks every note of a page's tables against the rows it is beside. */
 function checkNotes(label, tables) {
   const all = tables.flatMap((table) => table.rows.map((row) => ({ ...row, table })));
+  // One number, one way: a win percentage reads .500, .667, 1.000 or .000, never 0.500.
+  const pct = all.map((row) => row.cell['PCT']).filter((cell) => cell !== undefined);
+  note(
+    `${label}: every PCT is written as a basketball table writes it`,
+    pct.length > 0 && pct.every((cell) => /^(\.\d{3}|1\.000)$/.test(cell)),
+    pct.join(' '),
+  );
   note(
     `${label}: some team carries a note`,
     all.some((row) => row.notes.length > 0),
@@ -80,18 +87,30 @@ function checkNotes(label, tables) {
       const level = row.table.rows.filter((other) => other.notes.includes(text));
       const named = level.every((other) => text.includes(other.team));
       note(`${where} names every team it is beside`, named);
+      if (/ have not played yet\.$/.test(text)) {
+        // Only beside a team with no games (the GP column, where the table shows it).
+        note(
+          `${where} is beside teams with no games only`,
+          level.every((other) => other.cell['GP'] === undefined || other.cell['GP'] === '0'),
+        );
+        continue;
+      }
       const two = twoTeams.exec(text);
       const several = severalTeams.exec(text);
       const on = two?.[3] ?? several?.[2];
       const value = two?.[4] ?? several?.[3];
       note(`${where} is a note this step writes`, two !== null || several !== null);
-      // The number they are level on is each marked team's own (PCT, or PTS by points).
+      // The number they are level on is each marked team's own (PCT, or PTS by points),
+      // written the same way in the note and in the column (.500, never 0.500).
       const column = on === 'points' ? 'PTS' : 'PCT';
-      // By value: a note writes .500 where the column still writes 0.500 (the audit's L3).
       note(
-        `${where} gives each team's own ${column}`,
-        value !== undefined && level.every((other) => Number(other.cell[column]) === Number(value)),
+        `${where} gives each team's own ${column}, written as the column writes it`,
+        value !== undefined && level.every((other) => other.cell[column] === value),
         level.map((other) => `${other.team} ${other.cell[column]}`).join(', '),
+      );
+      note(
+        `${where} is beside teams that have played`,
+        level.every((other) => other.cell['GP'] === undefined || other.cell['GP'] !== '0'),
       );
       if (two === null) continue;
       note(`${where} is beside two teams`, level.length === 2);

@@ -187,7 +187,7 @@ function cellsOf(line: StandingsLine): Record<string, string | number> {
     wins: line.wins,
     losses: line.losses,
     ties: line.ties,
-    winPercentage: percent.format(line.winPercentage),
+    winPercentage: winPercentText(line.winPercentage),
     points: line.points ?? '',
     pointsFor: line.pointsFor,
     pointsAgainst: line.pointsAgainst,
