@@ -84,12 +84,19 @@ export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
     games: async (teamId, seasonId) => {
       const mine = s.games
         .filter((g) => !g.binned && (g.homeTeamId === teamId || g.awayTeamId === teamId))
-        .sort((a, b) => a.id.localeCompare(b.id));
+        .sort(
+          (a, b) =>
+            (a.startsAt ?? '9999').localeCompare(b.startsAt ?? '9999') || a.id.localeCompare(b.id),
+        );
       return {
         played: mine.filter((g) => g.status === 'final' || g.status === 'forfeit').length,
-        toPlayIds: mine
+        toPlay: mine
           .filter((g) => ['scheduled', 'postponed', 'live'].includes(g.status))
-          .map((g) => g.id),
+          .map((g) => ({
+            id: g.id,
+            date: g.localDate,
+            round: s.rounds.find((r) => r.id === g.roundId)?.number ?? null,
+          })),
         draftChanges: s.drafts.find((d) => d.seasonId === seasonId)?.changes ?? null,
       };
     },

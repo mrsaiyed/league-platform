@@ -41,6 +41,9 @@ export type MemoryGame = {
   awayTeamId: string;
   status: string;
   binned: boolean;
+  /** Its day (yyyy-mm-dd) and round's number, or null. */
+  date: string | null;
+  round: number | null;
 };
 
 export const gameUuid = (n: number) =>
@@ -54,6 +57,8 @@ export function game(n: number, home: number, away: number, status: string, binn
     awayTeamId: teamUuid(away),
     status,
     binned,
+    date: `2026-12-${String(n).padStart(2, '0')}`,
+    round: n,
   };
 }
 
@@ -217,9 +222,10 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
           );
           return {
             played: mine.filter((g) => g.status === 'final' || g.status === 'forfeit').length,
-            toPlayIds: mine
+            toPlay: mine
               .filter((g) => ['scheduled', 'postponed', 'live'].includes(g.status))
-              .map((g) => g.id),
+              .map((g) => ({ id: g.id, date: g.date, round: g.round }))
+              .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999')),
             draftChanges: s.drafts[seasonId] ?? null,
           };
         },

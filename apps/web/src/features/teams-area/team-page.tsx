@@ -27,7 +27,8 @@ import {
   removeRefusalOf,
   removeTeamAnchor,
 } from './answer.ts';
-import { gamesLine, refusalWords } from './remove-team-words.ts';
+import { removePanel, tapRefusal, type RemoveWayOn } from './remove-team-words.ts';
+import { backToTeamParam, publishAnchor } from '../schedule-builder/index.ts';
 import { putBackOffer } from './put-back-offer.ts';
 import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
@@ -119,11 +120,11 @@ export async function TeamPage({
   // What the team has of games, and why "Remove this team" was refused, said in its panel (A-17).
   const counted = await countTeamGames(context, { teamId: team.id }, ports.deps);
   const games = counted.ok ? counted.value : undefined;
+  const panel = removePanel(team.name, games);
+  // A tap's refusal from the address is said only where the panel does not already say
+  // what is true now (a box not ticked, a team gone): never a refusal outliving its cause.
   const removeCode = removeRefusalOf(query);
-  const removeRefused =
-    removeCode === undefined
-      ? undefined
-      : { code: removeCode, ...refusalWords(team.name, removeCode, games) };
+  const tapRefused = removeCode === undefined ? undefined : tapRefusal(removeCode);
   const saidHere = (entryId: string) =>
     onLine?.entry !== entryId ? null : (
       <StaffNotice kind="saved" data={{ 'data-said-on': entryId }}>
@@ -144,7 +145,7 @@ export async function TeamPage({
       <Notice
         query={query}
         saidBeside={
-          leavingProblem !== undefined || onLine !== undefined || removeRefused !== undefined
+          leavingProblem !== undefined || onLine !== undefined || removeCode !== undefined
         }
       />
 
@@ -398,14 +399,38 @@ export async function TeamPage({
 
       <Section title={t('adminTeams.remove.title')} kind="danger" id={removeTeamAnchor}>
         <p className="staff-quiet">{t('adminTeams.remove.body')}</p>
-        {/* What the team has of games (A-17), and how many people the bin would take with
-            it, said before anything is confirmed. */}
-        <p
-          className="staff-quiet"
-          data-remove-games={games === undefined ? 'unknown' : `${games.played}/${games.toPlay}`}
-        >
-          {gamesLine(team.name, games)}
-        </p>
+        {panel.kind === 'held' ? (
+          // A team with games cannot go to the bin (A-17): said up front, with what it has
+          // and the way on, and no tick or button that could only be refused.
+          <div className="ui-notice" data-remove-held={games?.played === 0 ? 'yet' : 'season'}>
+            <p>{panel.why}</p>
+            {panel.lines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+            {panel.ways.length === 0 ? null : (
+              <p className="staff-buttons">
+                {panel.ways.map((way) => (
+                  <a
+                    key={way.label}
+                    className="ui-button"
+                    href={wayOnHref(here, way, team.id)}
+                    data-way-on={way.anchor ?? way.area}
+                  >
+                    {t(way.label)}
+                  </a>
+                ))}
+              </p>
+            )}
+          </div>
+        ) : (
+          // What the team has of games, and how many people the bin would take with it,
+          // said before anything is confirmed.
+          panel.lines.map((line) => (
+            <p key={line} className="staff-quiet" data-remove-games="">
+              {line}
+            </p>
+          ))
+        )}
         <p className="staff-quiet" data-remove-roster-count={open.length}>
           {!roster.ok
             ? t('adminTeams.remove.rosterUnknown')
@@ -413,37 +438,41 @@ export async function TeamPage({
               ? t('adminTeams.remove.rosterNone')
               : t.plural('adminTeams.remove.roster', open.length)}
         </p>
-        {removeRefused === undefined ? null : (
-          <StaffNotice kind="refused" data={{ 'data-remove-refused': removeRefused.code }}>
-            <p>{removeRefused.text}</p>
-            {removeRefused.wayOn === null ? null : (
-              <p>
-                <a
-                  className="ui-button"
-                  href={leagueUrl(here, 'admin-area', { area: removeRefused.wayOn })}
-                >
-                  {t(
-                    removeRefused.wayOn === 'schedule'
-                      ? 'adminTeams.remove.toSchedule'
-                      : 'adminTeams.remove.toGames',
-                  )}
-                </a>
-              </p>
-            )}
+        {tapRefused === undefined ? null : (
+          <StaffNotice kind="refused" data={{ 'data-remove-refused': removeCode ?? '' }}>
+            <p>{tapRefused}</p>
           </StaffNotice>
         )}
-        <form action={removeTeamAction} className="staff-form">
-          <LeagueField league={here.slug} />
-          <input type="hidden" name="team" value={team.id} />
-          <ConfirmBox />
-          <p className="staff-buttons">
-            <button type="submit" className="ui-button" data-kind="danger">
-              {t('adminTeams.remove.submit')}
-            </button>
-          </p>
-        </form>
+        {panel.kind === 'held' ? null : <RemoveForm league={here.slug} teamId={team.id} />}
       </Section>
     </main>
+  );
+}
+
+/** Where a way on from "Remove this team" leads, with the team to come back to (Schedule). */
+function wayOnHref(
+  league: Parameters<typeof leagueUrl>[0],
+  way: RemoveWayOn,
+  teamId: string,
+): string {
+  const address = leagueUrl(league, 'admin-area', { area: way.area });
+  if (way.area !== 'schedule') return address;
+  return `${address}?${backToTeamParam}=${teamId}${way.anchor === 'publish' ? `#${publishAnchor}` : ''}`;
+}
+
+/** The tick and "Move the team to the bin", for a team with no games (or none read). */
+function RemoveForm({ league, teamId }: { readonly league: string; readonly teamId: string }) {
+  return (
+    <form action={removeTeamAction} className="staff-form">
+      <LeagueField league={league} />
+      <input type="hidden" name="team" value={teamId} />
+      <ConfirmBox />
+      <p className="staff-buttons">
+        <button type="submit" className="ui-button" data-kind="danger">
+          {t('adminTeams.remove.submit')}
+        </button>
+      </p>
+    </form>
   );
 }
 

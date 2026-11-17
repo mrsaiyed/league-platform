@@ -23,11 +23,19 @@ describe('countTeamGames', () => {
     game(6, 1, 2, 'final', true),
   ];
 
-  it('says how many games a team has played and still has to play (A-17)', async () => {
+  it('says how many games a team has played, and which have no result yet (A-17)', async () => {
     const { deps, as } = memoryTeams({ teams: [team(1), team(2)], games });
     expect(await countTeamGames(as(ownerId), { teamId: teamUuid(1) }, deps)).toEqual({
       ok: true,
-      value: { played: 2, toPlay: 2 },
+      value: {
+        played: 2,
+        toPlay: 2,
+        removedInDraft: 0,
+        which: [
+          { date: '2026-12-03', round: 3 },
+          { date: '2026-12-04', round: 4 },
+        ],
+      },
     });
   });
 

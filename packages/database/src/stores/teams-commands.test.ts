@@ -25,6 +25,7 @@ import {
   newAccount,
   newLeague,
   newGame,
+  newRound,
   newSeason,
   newStage,
   newTeam,
@@ -215,14 +216,24 @@ describe('a team with games stays out of the bin (A-17)', () => {
 
   it('counts the games to play and the results, leaving out cancelled ones and the bin', async () => {
     const l = await twoTeams();
-    await l.game('scheduled');
+    const roundId = await newRound(pglite, l.leagueId, l.seasonId, 4);
+    // A day in the league's own zone and the round's number; a game with neither last.
+    await l.game('scheduled', l.a, l.b, { starts_at: '2026-12-06T18:00:00Z', round_id: roundId });
     await l.game('postponed', l.b, l.a);
     await l.game('final');
     await l.game('cancelled');
     await l.game('scheduled', l.a, l.b, { deleted_at: new Date().toISOString() });
     expect(await countTeamGames(l.as, { teamId: l.a }, deps)).toEqual({
       ok: true,
-      value: { played: 1, toPlay: 2 },
+      value: {
+        played: 1,
+        toPlay: 2,
+        removedInDraft: 0,
+        which: [
+          { date: '2026-12-06', round: 4 },
+          { date: null, round: null },
+        ],
+      },
     });
   });
 

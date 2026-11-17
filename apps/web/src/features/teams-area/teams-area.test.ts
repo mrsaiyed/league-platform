@@ -11,9 +11,11 @@ import {
   problemKey,
   refused,
   removeRefusalOf,
+  removeTeamAnchor,
   done,
 } from './answer.ts';
-import { gamesLine, refusalWords } from './remove-team-words.ts';
+import { removePanel, tapRefusal } from './remove-team-words.ts';
+import { removeTeamPanelAnchor } from '../schedule-builder/back-to-team.ts';
 import {
   changeEntryInput,
   changeTeamInput,
@@ -258,51 +260,104 @@ describe('answers in the address', () => {
     );
   });
 
-  it('says what a team has of games before it is removed (A-17)', () => {
-    expect(gamesLine('Badgers', { played: 4, toPlay: 3 })).toBe(
-      'Badgers have played 4 games and have 3 still to play.',
-    );
-    expect(gamesLine('Badgers', { played: 1, toPlay: 0 })).toBe(
-      'Badgers have played 1 game and have none still to play.',
-    );
-    expect(gamesLine('Wrens', { played: 0, toPlay: 3 })).toBe(
-      'Wrens have played no games and have 3 still to play.',
-    );
-    expect(gamesLine('Wrens', { played: 0, toPlay: 0 })).toBe(
-      'Wrens have played no games and have none to play.',
-    );
-    expect(gamesLine('Wrens', undefined)).toContain('could not be read just now');
-  });
+  describe('"Remove this team" says what is true now (A-17)', () => {
+    const at = (date: string, round: number | null = 6) => ({ date, round });
+    const has = (
+      played: number,
+      which: { date: string | null; round: number | null }[],
+      removedInDraft = 0,
+    ) => ({ played, toPlay: which.length, removedInDraft, which });
+    const ways = (panel: ReturnType<typeof removePanel>) =>
+      panel.kind === 'held' ? panel.ways.map((w) => w.anchor ?? w.area) : [];
 
-  it('says a refused removal in the panel, with the count and the way on (A-17)', () => {
-    const address = answerQuery(refused('teams.remove_team', 'team-has-games-to-play'));
-    expect(address).toBe('?problem=teams.remove_team.team-has-games-to-play#remove-team');
-    expect(removeRefusalOf({ problem: 'teams.remove_team.team-has-results' })).toBe(
-      'team-has-results',
-    );
-    expect(removeRefusalOf({ problem: 'teams.mark_left.already-left' })).toBeUndefined();
-    expect(removeRefusalOf({})).toBeUndefined();
+    it('a team with no games, or whose games could not be read, has the tick and the button', () => {
+      expect(removePanel('Wrens', has(0, []))).toEqual({
+        kind: 'free',
+        lines: ['This team has played no games.', 'It has no game without a result.'],
+      });
+      expect(removePanel('Wrens', undefined)).toMatchObject({ kind: 'free' });
+    });
 
-    expect(refusalWords('Wrens', 'team-has-games-to-play', { played: 0, toPlay: 3 })).toEqual({
-      text: 'Wrens still have 3 games to play. Remove them from the schedule, or record them as forfeited or cancelled, first.',
-      wayOn: 'schedule',
+    it('a team with results cannot be removed this season; advice only when it has games to come', () => {
+      const panel = removePanel('Badgers', has(3, [at('2026-11-22'), at('2026-11-29', 7)]));
+      expect(panel).toMatchObject({
+        kind: 'held',
+        why: 'Badgers cannot be removed this season: its results are part of other teams’ records.',
+        lines: [
+          'This team has played 3 games.',
+          'It has 2 games without a result yet: Round 6, Sun, Nov 22; Round 7, Sun, Nov 29.',
+          'If the team has left the league, record this week’s games as forfeited in Games, and remove its later games from the schedule in Schedule. Either way the team stays, with the games it played.',
+        ],
+      });
+      expect(ways(panel)).toEqual(['games', 'schedule']);
+      // No games to come: no advice to forfeit them, and no way on.
+      const done = removePanel('Badgers', has(1, []));
+      expect(done).toMatchObject({
+        kind: 'held',
+        lines: ['This team has played 1 game.', 'It has no game without a result.'],
+      });
+      expect(ways(done)).toEqual([]);
     });
-    expect(refusalWords('Badgers', 'team-has-results', { played: 4, toPlay: 3 })).toEqual({
-      text: 'Badgers have results in 4 games. Those results are part of other teams’ records, so the team stays. If the team has left, record its games to come as forfeited; it keeps the games it played.',
-      wayOn: 'games',
+
+    it('a team with only games without a result cannot be removed yet: remove or cancel, never forfeit', () => {
+      const panel = removePanel('Kestrels', has(0, [at('2026-11-22'), at('2026-11-22')]));
+      expect(panel).toMatchObject({
+        kind: 'held',
+        why: 'Kestrels cannot be removed yet: it has games without a result.',
+        lines: [
+          'This team has played no games.',
+          'It has 2 games without a result yet: Round 6, Sun, Nov 22; Round 6, Sun, Nov 22.',
+          'Remove them from the schedule in Schedule, or cancel this week’s in Games. Do not record them as forfeited: a forfeit is a result, and a team with a result cannot be removed.',
+        ],
+      });
+      expect(ways(panel)).toEqual(['schedule', 'games']);
+      // Many games: counted, not named one by one.
+      const many = removePanel(
+        'Kestrels',
+        has(
+          0,
+          [1, 2, 3, 4].map(() => at('2026-11-22')),
+        ),
+      );
+      expect(many.kind === 'held' && many.lines[1]).toBe('It has 4 games without a result yet.');
+      expect(t('adminTeams.remove.noDay')).toBe('no day yet');
     });
-    expect(refusalWords('Badgers', 'team-has-results', { played: 1, toPlay: 0 })).toMatchObject({
-      text: expect.stringMatching(/^Badgers have a result in 1 game\. That result is/),
-      wayOn: null,
+
+    it('games removed in the draft and not yet published: say so, and lead to publishing', () => {
+      const all = removePanel('Kestrels', has(0, [at('2026-11-22'), at('2026-11-29')], 2));
+      expect(all).toMatchObject({
+        kind: 'held',
+        lines: [
+          'This team has played no games.',
+          'It has 2 games without a result yet: Round 6, Sun, Nov 22; Round 6, Sun, Nov 29.',
+          '2 of them are removed in the draft, which is not published yet: publish the schedule to finish.',
+        ],
+      });
+      expect(ways(all)).toEqual(['publish']);
+      const some = removePanel('Kestrels', has(0, [at('2026-11-22'), at('2026-11-29')], 1));
+      expect(some.kind === 'held' && some.lines).toContain(
+        '1 of them is removed in the draft, which is not published yet: publish the schedule to finish.',
+      );
+      expect(ways(some)).toEqual(['schedule', 'games', 'publish']);
     });
-    // Counts that have since gone, and other refusals, in their general words.
-    expect(refusalWords('Wrens', 'team-has-games-to-play', { played: 0, toPlay: 0 })).toEqual({
-      text: t('error.teams.remove_team.team-has-games-to-play'),
-      wayOn: null,
+
+    it('never draws a refusal for games or results from the address: only a tap’s own', () => {
+      const address = answerQuery(refused('teams.remove_team', 'team-has-games-to-play'));
+      expect(address).toBe('?problem=teams.remove_team.team-has-games-to-play#remove-team');
+      expect(removeRefusalOf({ problem: 'teams.remove_team.team-has-results' })).toBe(
+        'team-has-results',
+      );
+      expect(removeRefusalOf({ problem: 'teams.mark_left.already-left' })).toBeUndefined();
+      expect(tapRefusal('team-has-games-to-play')).toBeUndefined();
+      expect(tapRefusal('team-has-results')).toBeUndefined();
+      expect(tapRefusal('not-confirmed')).toBe(
+        'Tick the box to confirm first. Nothing was changed.',
+      );
+      expect(tapRefusal('team-not-found')).toBe('That team is not there.');
     });
-    expect(refusalWords('Wrens', 'not-confirmed', undefined)).toEqual({
-      text: 'Tick the box to confirm first. Nothing was changed.',
-      wayOn: null,
+
+    it('the way back from Schedule lands on this panel', () => {
+      expect(removeTeamPanelAnchor).toBe(removeTeamAnchor);
     });
   });
 

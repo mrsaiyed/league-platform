@@ -42,14 +42,26 @@ export type TeamChange = {
 };
 
 /**
- * What a team has of games, for whether it may go to the bin (A-17): its games not in the
- * bin with a final or forfeited result, the ids of those still to play (scheduled,
- * postponed or live), and its season's schedule draft as stored, whose games to come
- * count too (team-games.ts reads it).
+ * A game of the team not in the bin and without a result yet (scheduled, postponed, or
+ * being played now): its day in the league's own time zone and its round's number, where
+ * it has them.
+ */
+export type TeamGameToPlay = {
+  readonly id: string;
+  /** yyyy-mm-dd, or null for a game with no day yet. */
+  readonly date: string | null;
+  readonly round: number | null;
+};
+
+/**
+ * What a team has of games, for whether it may go to the bin (A-17): how many of its games
+ * not in the bin have a final or forfeited result, those without a result yet, and its
+ * season's schedule draft as stored, whose games count too (team-games.ts reads it).
  */
 export type TeamGamesRecord = {
   readonly played: number;
-  readonly toPlayIds: readonly string[];
+  /** By day, those with no day last. */
+  readonly toPlay: readonly TeamGameToPlay[];
   /** The season's schedule draft's changes as stored, or null when the season has none. */
   readonly draftChanges: unknown;
 };

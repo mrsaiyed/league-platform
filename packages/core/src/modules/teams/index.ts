@@ -32,7 +32,7 @@ export {
   type RosterLineSource,
 } from './public-team.ts';
 export { statsVisibilityChoices, type TeamStatsVisibility } from './team-fields.ts';
-export type { TeamGames } from './team-games.ts';
+export type { GameWithoutResult, TeamGames } from './team-games.ts';
 export { rosterRoles } from './roster-fields.ts';
 export type {
   NewRosterEntry,
@@ -43,6 +43,7 @@ export type {
   RosterTaken,
   TeamChange,
   TeamGamesRecord,
+  TeamGameToPlay,
   TeamRecord,
   TeamsStore,
   TeamsTx,
