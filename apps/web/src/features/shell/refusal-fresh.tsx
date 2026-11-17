@@ -8,8 +8,10 @@
 // back to the wrong place. When the refusal comes into view that way, this asks the server
 // for the page again, once, and Next.js draws the refusal afresh for whoever is signed in
 // now. A refusal that came with its own whole page is already fresh and asks nothing. With
-// scripts off every page is a whole page, so this is not needed. It draws nothing and holds
-// no words.
+// scripts off this does nothing, and neither the refusal nor "Page not found" is drawn at
+// all: Next.js 16.4 sends a refused page as an empty shell that only its script fills in
+// (record 020). Drawing them without scripts is step 2.217. It draws nothing and holds no
+// words.
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
