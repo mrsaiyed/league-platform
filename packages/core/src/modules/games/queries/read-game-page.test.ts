@@ -97,10 +97,12 @@ describe('readGamePage', () => {
     expect(homeBox.players.map((p) => p.name)).toEqual(['Hana Player']);
     expect(awayBox.playerLinesShown).toBe(false);
     expect(awayBox.players).toEqual([]);
-    // The Total's points are the game's score, 48; its players' points add to 41 (S-26 as
-    // changed by step 2.196): the page says so where it shows the lines.
+    // The Total's points are the game's score, 48 (S-26 as changed by step 2.196). What
+    // the hidden players' points add to (41) is not handed to this visitor; the team's
+    // coach gets it, below, where the lines show.
     expect(awayBox.totals).toEqual({ points: 48, fouls: 1 });
-    expect(awayBox.playersPoints).toBe(41);
+    expect(awayBox.playersPoints).toBeNull();
+    expect(JSON.stringify(page)).not.toContain('41');
     expect(awayBox.teamTurnovers).toBe(0);
     const text = JSON.stringify(page);
     expect(text).not.toContain(awayPlayer);
@@ -128,6 +130,16 @@ describe('readGamePage', () => {
       'Avery Player',
     ]);
     expect(await withLines({ leagueId, leagueAdmin: false, staffOfTeamIds: [home] })).toEqual([]);
+    // The team's coach sees the lines, so is told what they add to beside the score's 48.
+    const coach = await readGamePage(
+      store(),
+      { gameId },
+      viewing({ leagueId, leagueAdmin: false, staffOfTeamIds: [away] }),
+    );
+    expect(coach.ok && coach.value.boxScores[1]).toMatchObject({
+      totals: { points: 48 },
+      playersPoints: 41,
+    });
   });
 
   it('keeps a person who asked to be removed nameless and finds no binned or missing game', async () => {

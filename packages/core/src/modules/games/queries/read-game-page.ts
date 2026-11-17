@@ -277,9 +277,12 @@ export async function readGamePage(
     }
     const teamTurnovers = teamOwn[side].turnovers;
     if (teamTurnovers > 0) totals['turnovers'] = (totals['turnovers'] ?? 0) + teamTurnovers;
-    const playersPoints = totals['points'] ?? null;
+    // What the players' points add to, said only where their lines are shown: a viewer
+    // who sees the team's Total alone has nothing to add up, and is handed nothing more.
+    const linesPoints = totals['points'] ?? null;
+    const playersPoints = shown[side] ? linesPoints : null;
     const score = scoreOf(side);
-    if (playersPoints !== null && score !== null) totals['points'] = score;
+    if (linesPoints !== null && score !== null) totals['points'] = score;
     const players: BoxScorePlayer[] = shown[side]
       ? [...own]
           .sort(
