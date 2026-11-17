@@ -1,7 +1,8 @@
-// The statistics page's data and the words around it. The viewer is always the public
-// one: the page is the cached page that looks the same for everyone, and people allowed
-// to see more get their own signed-in request later (step 2.46, T-87, T-95). Players of
-// a team whose numbers are staff only never reach this file: core takes them out first.
+// The statistics page's data and the words around it. The page reads it as the public
+// viewer: it is the cached page that looks the same for everyone. People allowed to see
+// more get their own signed-in request after it (step 2.46, T-87, T-95, T-287), which reads
+// it again as the viewer their roles make. Players of a team whose numbers this viewer may
+// not see never reach this file: core takes them out first.
 import {
   publicViewer,
   readStatLeaders,
@@ -9,6 +10,7 @@ import {
   type StatisticsTable,
   type StatLeader,
   type StatLeaders,
+  type Viewer,
 } from '@srleagues/core';
 import type { Sort, StatRow, StatsColumn } from '@srleagues/ui';
 import type { PublicStatsSettings } from '../../server/public-stats.ts';
@@ -114,11 +116,17 @@ export const noLeaderCard: ReadonlySet<string> = new Set(['fouls', 'turnovers'])
 export async function loadStatsPage(
   store: StandingsReadStore,
   settings: PublicStatsSettings,
-  input: { readonly leagueId: string; readonly seasonId: string; readonly by: StatsBy },
+  input: {
+    readonly leagueId: string;
+    readonly seasonId: string;
+    readonly by: StatsBy;
+    /** Who is looking, from the server's session; the public viewer when left out. */
+    readonly viewer?: Viewer;
+  },
 ): Promise<StatsPageData | StatsFailure> {
   const viewing = {
     leagueId: input.leagueId,
-    viewer: publicViewer(input.leagueId),
+    viewer: input.viewer ?? publicViewer(input.leagueId),
     audience: settings.audience,
     policy: settings.namePolicy,
   };

@@ -1,43 +1,16 @@
 import { leagueUrl } from '@srleagues/core';
-import {
-  EmptyPanel,
-  FilterToolbar,
-  LeaderCard,
-  LeaderSpot,
-  OptionPicker,
-  PageHead,
-  Section,
-  SortableStatsTable,
-  type LeaderEntry,
-} from '@srleagues/ui';
+import { EmptyPanel, FilterToolbar, OptionPicker, PageHead } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { locale, t } from '../../server/messages.ts';
-import { loadStatsPage, parseBy, type LeaderBoard, type StatsPageData } from './build-stats.ts';
+import { t } from '../../server/messages.ts';
+import { loadStatsPage, parseBy, type StatsPageData } from './build-stats.ts';
 import { chooseSeason, firstValue } from './choose-season.ts';
 import type { SearchParams } from './standings-page.tsx';
-
-/** How many statistics open with a number card: three, as many as stand across a laptop. */
-const cardLimit = 3;
-
-/** One leader board as the card draws it: each leader's place and name, team and games, and number. */
-function leaderEntries(board: LeaderBoard): readonly LeaderEntry[] {
-  return board.rows.map((row) => {
-    const games = row.cells['games'];
-    return {
-      id: row.id,
-      name: String(row.cells['player'] ?? ''),
-      detail: t('stats.leaderDetail', {
-        team: String(row.cells['team'] ?? ''),
-        games: t.plural('stats.leaderGames', typeof games === 'number' ? games : 0),
-      }),
-      value: String(row.cells['value'] ?? ''),
-    };
-  });
-}
+import { StatsTablesDrawn } from './stats-tables-drawn.tsx';
+import { statsTablesView } from './stats-tables-view.ts';
 
 /** The leaders, the full table of players and the teams' totals. Nothing here reads anything. */
 export function StatsTables({
@@ -48,134 +21,7 @@ export function StatsTables({
   /** Where "See the full schedule" goes while no numbers have been recorded. */
   readonly scheduleHref?: string;
 }) {
-  const labels = displayLabels(t);
-  const boards = data.leaders.filter((board) => board.rows.length > 0);
-  const hasNumbers =
-    data.playerRows.length > 0 ||
-    data.teamRows.some((row) =>
-      Object.entries(row.cells).some(([key, value]) => key !== 'team' && value !== null),
-    );
-  if (!hasNumbers) {
-    return (
-      <EmptyPanel
-        text={t('stats.empty')}
-        action={
-          scheduleHref === undefined
-            ? undefined
-            : { href: scheduleHref, label: t('home.fullSchedule') }
-        }
-      />
-    );
-  }
-  // Each statistic is a column of its own. The first three that one player leads alone
-  // open with a number card (one very large number, the first on the league's main color),
-  // and the rest of that statistic's list stands right under its own card, going on from
-  // second place: the leader is not said twice. A statistic whose first place is shared
-  // names no one leader: it has no card, and its list shows the players level at 1. So
-  // does a statistic after the third card: a plain list from first place.
-  const alone = boards.filter((board) => board.first !== undefined && !board.first.tied);
-  const carded = new Set(alone.slice(0, cardLimit).map((board) => board.key));
-  const columns = boards.map((board) => {
-    const entries = leaderEntries(board);
-    const card = carded.has(board.key) ? board.first : undefined;
-    return { board, card, entries: card === undefined ? entries : entries.slice(1) };
-  });
-  const firstCard = columns.find((column) => column.card !== undefined)?.board.key;
-  // Few statistics: the players' table and the teams' sit side by side on a laptop, so a
-  // row's numbers stay near its name. Many: each takes the page's width.
-  const sideBySide = data.playerColumns.length <= 7;
-  return (
-    <>
-      <Section
-        title={t('stats.leaders')}
-        note={data.minimumGames > 0 ? t.plural('stats.minimumGames', data.minimumGames) : undefined}
-      >
-        {boards.length > 0 ? (
-          <ul
-            className="ui-spot-row stats-leaders"
-            data-across={(['one', 'two', 'three'] as const)[Math.min(columns.length, 3) - 1]}
-          >
-            {columns.map(({ board, card, entries }) => (
-              <li key={board.key} className="stats-leader">
-                {card === undefined ? null : (
-                  <LeaderSpot
-                    label={t('stats.leaderOf', { stat: board.title })}
-                    value={card.value}
-                    unit={t(data.by === 'average' ? 'home.leaders.perGame' : 'stats.inAll')}
-                    name={card.name}
-                    detail={t('stats.leaderDetail', {
-                      team: card.teams,
-                      games: t.plural('stats.leaderGames', card.games),
-                    })}
-                    team={card.team}
-                    first={board.key === firstCard}
-                  />
-                )}
-                {entries.length === 0 ? null : (
-                  <LeaderCard
-                    title={board.title}
-                    entries={entries}
-                    afterLeader={card !== undefined}
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyPanel text={t('stats.leadersNone')} />
-        )}
-      </Section>
-      {/* What both tables' numbers count, said once above them (build-stats.ts, tableNotes):
-          read on a phone before the players' table, and the two tables start level on a
-          laptop. */}
-      <p className="ui-section-note">{data.tableNotes.join(t('stats.noteJoin'))}</p>
-      <div className="stats-tables" data-layout={sideBySide ? 'pair' : 'stack'}>
-        <Section
-          title={t('stats.allPlayers')}
-          note={
-            // Said where the eye is: the table lists everyone and opens sorted by points, so
-            // its first row may be a player with too few games to lead a card above.
-            data.playerRows.some((row) => row.quiet !== undefined)
-              ? t.plural('stats.listedNotRanked', data.minimumGames)
-              : undefined
-          }
-        >
-          <SortableStatsTable
-            caption={t('stats.allPlayers')}
-            captionHidden
-            columns={data.playerColumns}
-            rows={data.playerRows}
-            initialSort={data.openingSort}
-            locale={locale}
-            labels={labels.stats}
-            emblems
-            foldTeam="team"
-          />
-        </Section>
-        <Section
-          title={t('stats.teams')}
-          note={
-            data.totalsNoteTeams.length > 0
-              ? t('stats.teamsTotalsOnly', {
-                  teams: data.totalsNoteTeams.join(t('stats.teamsJoin')),
-                })
-              : undefined
-          }
-        >
-          <SortableStatsTable
-            caption={t('stats.teams')}
-            captionHidden
-            columns={data.teamColumns}
-            rows={data.teamRows}
-            initialSort={data.openingSort}
-            locale={locale}
-            labels={labels.stats}
-            emblems
-          />
-        </Section>
-      </div>
-    </>
-  );
+  return <StatsTablesDrawn view={statsTablesView(data, scheduleHref)} />;
 }
 
 /** `/{league}/stats`: leaders with the league's minimum games and the full sortable tables, following each team's statistics setting. */
