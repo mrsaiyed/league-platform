@@ -49,8 +49,8 @@ export type DraftEditError =
         | 'unknown-venue'
         | 'unknown-court'
         /**
-         * A game the draft does not hold is in the round: one in the bin, one with no
-         * date, or one the draft removes (step 2.160).
+         * A game the draft does not hold is in the round: one with no date yet (steps
+         * 2.160 and 2.181). A game in the bin, or one the draft removes, does not hold it.
          */
         | 'round-in-use';
     }
@@ -93,9 +93,9 @@ export async function editDraft(args: {
   change: DraftChange;
   /**
    * Further checks on what the change names, run once the basis is known to be current,
-   * on the schedule as the draft so far leaves it.
+   * on the schedule as the draft so far leaves it (and as it is published).
    */
-  check?: (sofar: ScheduleState) => Promise<DraftEditError | undefined>;
+  check?: (sofar: ScheduleState, published: ScheduleState) => Promise<DraftEditError | undefined>;
 }): Promise<Result<DraftEditValue, DraftEditError>> {
   const { context, tx, input, change } = args;
   const store = tx.scheduling;
@@ -124,7 +124,7 @@ export async function editDraft(args: {
   // The draft so far is replayed on the published schedule; the new change must fit on it.
   const published = await store.loadSchedule(input.seasonId);
   const sofar = applyDraft(published, document.changes, []).state;
-  const refused = await args.check?.(sofar);
+  const refused = await args.check?.(sofar, published);
   if (refused !== undefined) return fail(refused);
 
   const applied = applyDraftChange(sofar, change, []);

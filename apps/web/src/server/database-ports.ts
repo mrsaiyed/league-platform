@@ -12,8 +12,10 @@
 // member's teams and each league's name (database-league-sites.ts); in part 4 League
 // settings and Season settings (database-admin-settings.ts) and Admin → Schedule, the
 // grid with its drafts, rounds and publishing and its list of seasons
-// (database-schedule-admin.ts); in part 5 Admin → Teams, its teams, rosters and the league
-// list of people (database-admin-teams.ts). Every other area
+// (database-schedule-admin.ts); in part 6 (record 076) Admin → Games and "My games to
+// score" (database-games.ts) and the tracker with its game page and snapshot
+// (database-tracker.ts); in part 5 Admin → Teams, its teams, rosters and the league list
+// of people (database-admin-teams.ts). Every other area
 // still runs on the stand-in only: here each one refuses with NotOnTheDatabaseYet
 // the first time it is used, so its page shows the error page rather than made-up
 // data that is not in the database. Each moves in a part of its own.
@@ -36,6 +38,7 @@ import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
 import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
 import { databaseAdminTeams, type AdminTeamsQueries } from './database-admin-teams.ts';
+import { databaseGames, databaseGamesDeps, type GamesQueries } from './database-games.ts';
 import {
   databaseLeagueSites,
   type DesignReport,
@@ -45,8 +48,9 @@ import { databasePublicSchedule, type PublicScheduleQueries } from './database-p
 import { databasePublicStats, type PublicStatsQueries } from './database-public-stats.ts';
 import { databasePublicTeams, type PublicTeamsQueries } from './database-public-teams.ts';
 import { databaseScheduleAdmin, type ScheduleAdminQueries } from './database-schedule-admin.ts';
+import { databaseTracker, type TrackerQueries } from './database-tracker.ts';
 import type { LocalTools } from './local-tools.ts';
-import { notMovedYet, NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
+import { notMovedYet } from './not-on-the-database-yet.ts';
 import type { WebPorts } from './ports.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
@@ -72,11 +76,13 @@ export type DatabaseQueries = Pick<
 > &
   AdminSettingsQueries &
   AdminTeamsQueries &
+  GamesQueries &
   PublicScheduleQueries &
   PublicStatsQueries &
   PublicTeamsQueries &
   LeagueSitesQueries &
-  ScheduleAdminQueries;
+  ScheduleAdminQueries &
+  TrackerQueries;
 
 export type DatabasePortsOptions = {
   readonly database: DatabaseQueries;
@@ -214,6 +220,9 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
   };
 
   const accessOf = accessOfVia(deps);
+  // The games commands' one transaction, the tracker's too (database-games.ts).
+  const clock = { now: () => now().getTime() };
+  const gamesDeps = databaseGamesDeps(database, db, { log: options.log, clock });
 
   return {
     findLeague: (shortName) =>
@@ -244,7 +253,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     }),
     localTools: options.localTools?.tools ?? null,
     publicStats: databasePublicStats(database, db),
-    games: notMovedYet('games area'),
+    games: databaseGames(database, db, gamesDeps),
     fixtureImport: notMovedYet('fixture import'),
     publicSchedule: databasePublicSchedule(database, db, now),
     // Its seasonsOf lists only what mayListSeason allows the holder, read again for the
@@ -254,11 +263,10 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // Its commands run with core's event handlers, never an empty list (part 5).
     adminTeams: databaseAdminTeams(database, db, options.log, accessOf),
     adminSettings: databaseAdminSettings(database, db, options.log),
-    tracker: notMovedYet('tracker'),
-    publishPlays: async () => {
-      throw new NotOnTheDatabaseYet('tracker');
-    },
-    // No live hub until the tracker moves: nothing would publish to it.
+    tracker: databaseTracker(database, db, gamesDeps, clock),
+    // No live service on the database yet (steps 2.124 and 2.116): nothing listens, so a
+    // saved play is not published; a watcher's page asks for the snapshot again.
+    publishPlays: async () => {},
     liveFeed: null,
     madeUpWorld: false,
     // Carrying the local tools, only requests made on this computer (step 2.96).

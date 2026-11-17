@@ -125,6 +125,7 @@ export { updateGameResult } from './update-game-result.ts';
 export { updateGameNotStarted } from './update-game-not-started.ts';
 export { findGameCorrectedDate } from './find-game-corrected-date.ts';
 export { findGameState } from './find-game-state.ts';
+export { listGameNames, type GameNamesRows } from './list-game-names.ts';
 export { listGamePlayerLines } from './list-game-player-lines.ts';
 export { listGameTeams } from './list-game-teams.ts';
 export { listPeopleForDisplay, type PersonForDisplayRow } from './list-people-for-display.ts';

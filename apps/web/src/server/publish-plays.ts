@@ -15,16 +15,15 @@
 //   newest state: the second is not sent twice). Different games go at once.
 // - A message that could not be published is reported and dropped: the play is saved,
 //   and viewers recover from the gap (LivePublishError).
+// - The game and the league's name settings are read in one snapshot (gameReadsOf,
+//   record 076).
 import { leagueScoreFrom } from '@srleagues/contracts';
 import { liveMessageOf, publicViewer, readGameSnapshot } from '@srleagues/core';
 import { LivePublishError } from '@srleagues/providers';
 import type { PublishPlays } from './tracker-commands-endpoint.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
-export type PlayPublisherDeps = Pick<
-  TrackerPorts,
-  'publisher' | 'snapshotStoreOf' | 'namesShownOf' | 'clock'
-> & {
+export type PlayPublisherDeps = Pick<TrackerPorts, 'publisher' | 'gameReadsOf' | 'clock'> & {
   /** Where a message that did not go out is reported: its reason only. */
   readonly warn: (message: string, fields: { readonly reason: string }) => void;
 };
@@ -38,12 +37,13 @@ export function createPlayPublisher(deps: PlayPublisherDeps): PublishPlays {
 
   async function publishLatest(leagueId: string, gameId: string): Promise<void> {
     const key = `${leagueId}|${gameId}`;
-    const names = await deps.namesShownOf(leagueId);
-    const read = await readGameSnapshot(
-      deps.snapshotStoreOf(leagueId),
-      { gameId },
-      { leagueId, viewer: publicViewer(leagueId), audience: names.audience, policy: names.policy },
-      deps.clock.now(),
+    const read = await deps.gameReadsOf(leagueId, ({ store, audience, policy }) =>
+      readGameSnapshot(
+        store,
+        { gameId },
+        { leagueId, viewer: publicViewer(leagueId), audience, policy },
+        deps.clock.now(),
+      ),
     );
     if (!read.ok) return;
     const message = liveMessageOf(read.value);

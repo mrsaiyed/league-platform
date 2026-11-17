@@ -47,8 +47,7 @@ function world(publisher: LivePublisher) {
   const warnings: string[] = [];
   const publish = createPlayPublisher({
     publisher,
-    snapshotStoreOf: () => store,
-    namesShownOf: async () => ({ audience: 'adult', policy: defaultNamePolicy }),
+    gameReadsOf: (_leagueId, work) => work({ store, audience: 'adult', policy: defaultNamePolicy }),
     clock: { now: () => 1_800_000_000_000 },
     warn: (_message, fields) => void warnings.push(fields.reason),
   });

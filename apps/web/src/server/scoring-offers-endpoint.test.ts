@@ -7,8 +7,6 @@ import { describe, expect, it } from 'vitest';
 import { offersAskedAtOnce } from '../features/schedule-pages/index.ts';
 import { gameSnapshot } from './game-snapshot-endpoint.ts';
 import { resolveLeagueApi } from './league-api.ts';
-import { notMovedYet } from './not-on-the-database-yet.ts';
-import type { WebPorts } from './ports.ts';
 import { standInLeagues, standInPeople } from './stand-in-ports.ts';
 import { askedGameIds, offerHref, scoringOffersRequest } from './scoring-offers-endpoint.ts';
 import { trackerWorld, type League, type Person } from './tracker-endpoints.test-helper.ts';
@@ -28,12 +26,7 @@ const noLeague = '01900000-0000-7000-8000-0000000fffff';
  * The read as `person` through the address of `league` (by its id), as the route makes it;
  * with `notMoved`, its games area refuses as on the database before it has moved there.
  */
-async function askById(
-  person: Person,
-  leagueId: string,
-  games: string | null = firstFive,
-  notMoved = false,
-) {
+async function askById(person: Person, leagueId: string, games: string | null = firstFive) {
   const world = trackerWorld();
   const { ports } = world;
   const session = person === 'visitor' ? null : await ports.identify(standInPeople[person].token);
@@ -44,8 +37,7 @@ async function askById(
     { ...ports, siteOrigin: 'http://localhost:3000' },
     'visitor',
   );
-  const area = notMoved ? notMovedYet<WebPorts['games']>('games area') : ports.games;
-  const read = { accessOf: ports.accessOf, games: () => area.deps };
+  const read = { accessOf: ports.accessOf, games: () => ports.games.deps };
   return scoringOffersRequest(resolved.ok ? { ...resolved, ports: read } : resolved, games);
 }
 const ask = (person: Person, league: League = 'live', games: string | null = firstFive) =>
@@ -132,7 +124,9 @@ describe('the scoring read of a public page', () => {
     expect((await ask('scorekeeper', 'draft')).status).toBe(200);
   });
 
-  it('answers no games, never an error, while the games area is not on the database', async () => {
+  // Until step 2.93 part 6 the games area refused on the database and a scorer's read was
+  // answered no games; it runs there now, so whatever the games area throws is an error.
+  it('answers a coach no games, never an error, and lets an error of the games area through', async () => {
     const none = {
       status: 200,
       body: { games: [] },
@@ -141,10 +135,8 @@ describe('the scoring read of a public page', () => {
     const leagueId = standInLeagues.live.id;
     // A coach scores nowhere: no games, and no error (that the games area is not even reached
     // is the next test's).
-    expect(await askById('coach', leagueId, firstFive, true)).toEqual(none);
-    // A scorekeeper's read reaches it, and its refusal is answered as no games.
-    expect(await askById('scorekeeper', leagueId, firstFive, true)).toEqual(none);
-    // Only that refusal: anything else the games area throws is still an error.
+    expect(await askById('coach', leagueId, firstFive)).toEqual(none);
+    // Whatever the games area throws is an error, never passed off as no games.
     const world = trackerWorld();
     const context = await world.contextAs('scorekeeper', 'live', ['scoring']);
     const broken = {
