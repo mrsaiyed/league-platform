@@ -112,7 +112,7 @@ A past season is the same address with `?season=fall-2025`. Without it, you get 
 **U-7 (agreed) rules for the `{league}` name:**
 
 - 3 to 40 characters: lowercase letters, numbers and hyphens.
-- First come, first served. We keep a blocked list of our own words (`account`, `admin`, `api`, `find`, `help`, `pricing`, `signin`, `start`, `status`, `terms`, `privacy` and a few dozen more) and of obviously offensive words.
+- First come, first served. We keep a blocked list of our own words (`account`, `admin`, `api`, `find`, `help`, `pricing`, `signin`, `start`, `status`, `terms`, `privacy` and a few dozen more) and of obviously offensive words. **U-16 (decided for you):** the offensive list starts with a few dozen English words for the founder to review, and refuses a name that is one of them or has one as a word between its hyphens (`shit-hoops`); our own words are refused only as the whole name.
 - An organizer can change it. The old address forwards to the new one for 12 months and is not given to anyone else during that time.
 - We can take back a name that impersonates another organization. This is in the terms.
 

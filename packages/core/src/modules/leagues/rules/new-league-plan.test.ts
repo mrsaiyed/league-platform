@@ -133,6 +133,7 @@ describe('planNewLeague', () => {
     ['shortName', 'ab', 'invalid'],
     ['shortName', 'has space', 'invalid'],
     ['shortName', 'admin', 'blocked'],
+    ['shortName', 'shit-hoops', 'blocked'],
     ['sport', 'curling', 'invalid'],
     ['timeZone', 'Mars/Olympus', 'invalid'],
     ['contactEmail', 'not-an-email', 'invalid'],

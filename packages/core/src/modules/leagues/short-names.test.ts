@@ -45,4 +45,30 @@ describe('short names (U-7)', () => {
     }
     expect(blockedShortNames.size).toBe(systemShortNames.size + offensiveShortNames.size);
   });
+
+  it('starts with a list of offensive words (U-16), kept in alphabetical order', () => {
+    expect(offensiveShortNames.size).toBeGreaterThan(20);
+    const words = [...offensiveShortNames];
+    expect(words).toEqual([...words].sort());
+    for (const word of words) expect(systemShortNames.has(word)).toBe(false);
+  });
+
+  it('refuses an offensive word as the whole name, as any word of it and in any capitals', () => {
+    for (const name of ['shit', 'SHIT', 'shit-hoops', 'north-fuck-league', 'ballers-xxx']) {
+      expect(isBlockedShortName(name)).toBe(true);
+    }
+  });
+
+  it('takes a name that only holds an offensive word inside one of its words, and our words in a name', () => {
+    // "grape", "assassins", "scrapers", "shitake": an offensive word inside another word is not refused.
+    for (const name of [
+      'grapevine-hoops',
+      'assassins',
+      'scrapers-league',
+      'news-league',
+      'admin-hoops',
+    ]) {
+      expect(isBlockedShortName(name)).toBe(false);
+    }
+  });
 });
