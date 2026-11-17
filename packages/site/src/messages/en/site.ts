@@ -296,7 +296,7 @@ export const enSite = {
   'team.statsTotalsOnly': "Only this team's totals are shown. Its players' numbers are not public.",
   // Said to a signed-in member on their own team's page, once the page has asked (step 2.168).
   'team.yours': 'This is your team.',
-  'team.yoursOpensHere': 'The league opens here for you.',
+  'team.yoursOpensHere': 'This is your team. The league opens here for you.',
   'teams.call.text': 'Every game of the season, round by round.',
   // The band that closes the teams page, with the way to the schedule.
   'teams.call.title': 'See them play.',

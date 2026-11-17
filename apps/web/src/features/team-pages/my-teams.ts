@@ -8,6 +8,7 @@
 // then id; start-page.ts, chooseMyTeam), so the first is the team the league opens on for
 // them when the league starts members on their team.
 import type { AccessHolder } from '@srleagues/core';
+import { myTeamSlugOf } from '../../server/my-team-cookie.ts';
 import type { WebPorts } from '../../server/ports.ts';
 import { chooseSeason } from '../stats-pages/index.ts';
 import { teamIdsFromGrants } from './start-page.ts';
@@ -62,6 +63,30 @@ export async function myTeamsOf(
     .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
     .map(({ id, slug, name, color }) => ({ id, slug, name, color }));
   return { teams: own, startsOn: startPage === 'myTeam' ? own[0]?.slug : undefined };
+}
+
+/**
+ * The team of the current season this device chose ("Make this my team", U-5, R-10), by the
+ * short name its cookie holds: only while the league offers the choice (it starts members
+ * on their team's page, as the team page's button is offered then), and only a team of the
+ * season. Undefined for anything else.
+ */
+export async function chosenTeamOf(
+  ports: Pick<WebPorts, 'publicTeams' | 'publicStats'>,
+  leagueId: string,
+  remembered: string | undefined,
+): Promise<MyTeam | undefined> {
+  const slug = myTeamSlugOf(remembered);
+  if (slug === undefined) return undefined;
+  if ((await ports.publicTeams.startPageOf(leagueId)) !== 'myTeam') return undefined;
+  const season = chooseSeason(await ports.publicStats.seasonsOf(leagueId), undefined);
+  if (season === undefined) return undefined;
+  const team = (await ports.publicStats.readStoreOf(leagueId).teams(season.id)).find(
+    (row) => row.slug === slug,
+  );
+  return team === undefined
+    ? undefined
+    : { id: team.id, slug: team.slug, name: team.name, color: team.color };
 }
 
 /** Where `/{league}/my` takes a signed-in member (step 2.168). */

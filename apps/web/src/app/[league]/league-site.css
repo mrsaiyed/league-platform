@@ -939,6 +939,40 @@ html {
   color: var(--color-muted);
   font-size: var(--text-14);
 }
+/* The league home's "Your team" line (step 2.168), drawn after the page: the badge, then the
+   team's shield and name as one link, as tall as anything tapped. */
+.league-site .site-column > .team-mine[data-your-team] {
+  margin-block: var(--step-5) var(--step-3);
+}
+.league-site .team-mine-way {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--step-2);
+  min-block-size: var(--tap);
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.league-site .team-mine-way:hover > span {
+  text-decoration: underline;
+}
+/* "Your team" on a team's card (step 2.168): under its facts while the card is one row; in
+   the top corner of an upright card, so the foot lines of a row of cards stay level. */
+@media (min-width: 48rem) {
+  /* The shield keeps the first row, which the mark shares at its end. */
+  .league-site .ui-card-grid[data-layout='teams'] .ui-team-card > .ui-emblem {
+    grid-row: 1;
+  }
+  .league-site .ui-card-grid[data-layout='teams'] [data-your-team] {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
+  }
+}
+.team-mine-way > .ui-emblem {
+  block-size: var(--step-6);
+}
 
 /* A game's page opens with its board: the two teams, their shields and the score. The
    page's title says the same two names, so it is kept for screen readers and for the

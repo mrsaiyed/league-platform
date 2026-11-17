@@ -2,6 +2,7 @@ import { leagueUrl } from '@srleagues/core';
 import { CallBand, EmptyPanel, Hero, Section, StandingsTable, StatStrip } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { leagueSites, siteOf } from '../../server/league-site.ts';
@@ -40,10 +41,17 @@ export function compactStandings(table: StandingsTableView): StandingsTableView 
 export async function HomePage({
   league,
   search,
+  yourTeam = null,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
   readonly search: SearchParams;
+  /**
+   * The person's own team, or this device's, at the top of the column: drawn by the page's
+   * script after it has arrived (team-pages, YourTeamLine; step 2.168), so nothing here
+   * reads anyone's.
+   */
+  readonly yourTeam?: ReactNode;
 }) {
   const view = await loadLeaguePage(league, 'site');
   const addressee = view.context.league;
@@ -118,6 +126,7 @@ export async function HomePage({
         ) : null}
       </Hero>
       <div className="site-column">
+        {yourTeam}
         <div className="home-numbers">
           <StatStrip label={t('home.numbers')} items={buildHomeNumbers(schedule, teamCount)} />
         </div>

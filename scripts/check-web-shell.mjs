@@ -410,6 +410,59 @@ const cases = [
     undefined,
     `srl_my_team_${harborCity}=rockets`,
   ],
+  // Step 2.168: a coach finds their team. The team page a coach is served holds no trace of
+  // them (it is a visitor's); their team is read after it, privately: the coach is told of
+  // the Rockets and that the league opens there, a visitor of nothing, or of the team their
+  // device chose, and only a team of the league. `/my` signed out is the sign-in screen,
+  // coming back; signed in, the coach's team; for someone on no team, a sentence.
+  [
+    'coach',
+    '/harbor-city/teams/rockets',
+    200,
+    ['Make this my team', 'Rockets'],
+    ['This is your team.', 'The league opens here for you.', 'data-your-team'],
+  ],
+  [
+    'coach',
+    `/api/v1/leagues/${harborCity}/my-team`,
+    200,
+    ['"teams":["rockets"]', '"startsOn":"rockets"', '"href":"/harbor-city/teams/rockets"'],
+    ['herons'],
+  ],
+  [
+    'visitor',
+    `/api/v1/leagues/${harborCity}/my-team`,
+    200,
+    ['{"teams":[],"startsOn":null,"marked":[]}'],
+    ['Your team'],
+  ],
+  [
+    'visitor',
+    `/api/v1/leagues/${harborCity}/my-team`,
+    200,
+    ['"marked":[{"slug":"comets"', '"mark":"Your team"'],
+    ['rockets'],
+    undefined,
+    `srl_my_team_${harborCity}=comets`,
+  ],
+  [
+    'visitor',
+    `/api/v1/leagues/${harborCity}/my-team`,
+    200,
+    ['{"teams":[],"startsOn":null,"marked":[]}'],
+    [],
+    undefined,
+    `srl_my_team_${harborCity}=herons`,
+  ],
+  ['visitor', '/north-valley/my', 307, [], [], '/signin?next=%2Fnorth-valley%2Fmy'],
+  ['coach', '/north-valley/my', 307, [], [], '/north-valley/teams/herons'],
+  [
+    'stranger',
+    '/north-valley/my',
+    200,
+    ['You are not on a team in this league this season.', 'See the teams'],
+    ['This page is not built yet.'],
+  ],
   // The design as variables once per page, the header and the mark (step 1.18, T-90, U-8):
   // two leagues, two looks.
   [

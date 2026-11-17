@@ -1,4 +1,4 @@
-import { leagueUrl, publicViewer } from '@srleagues/core';
+import { leagueApiUrl, leagueUrl, publicViewer } from '@srleagues/core';
 import {
   Emblem,
   EmptyPanel,
@@ -28,6 +28,7 @@ import {
   type TeamStatsView,
 } from './build-team.ts';
 import { chooseMyTeamAction, clearMyTeamAction } from './my-team-actions.ts';
+import { TeamMine } from './my-team-marks.tsx';
 import { leagueHomeStayUrl } from './start-page.ts';
 
 function RosterTable({
@@ -266,25 +267,34 @@ export async function TeamPage({
         ]}
         lead={<Emblem name={head.team.name} color={head.team.color} size="large" />}
       >
-        {offersMyTeam ? (
-          isMine ? (
-            <form className="team-mine" action={clearMyTeamAction}>
-              <input type="hidden" name="league" value={addressee.slug} />
-              <input type="hidden" name="team" value={head.team.slug} />
-              {season.isCurrent ? null : <input type="hidden" name="season" value={season.slug} />}
-              <p>{t('team.isMine')}</p>
-              <button type="submit">{t('team.clearMine')}</button>
-            </form>
-          ) : (
-            <form className="team-mine" action={chooseMyTeamAction}>
-              <input type="hidden" name="league" value={addressee.slug} />
-              <input type="hidden" name="team" value={head.team.slug} />
-              {season.isCurrent ? null : <input type="hidden" name="season" value={season.slug} />}
-              <button type="submit">{t('team.makeMine')}</button>
-              <p>{t('team.mineNote')}</p>
-            </form>
-          )
-        ) : null}
+        {/* What a signed-in member is told of their own team is read after the page, for
+            them alone (TeamMine, step 2.168): the page is the same for everyone. Until it
+            answers, and for everyone else, the device's choice, where the league offers it. */}
+        <TeamMine address={leagueApiUrl(addressee, ['my-team'])} slug={head.team.slug}>
+          {offersMyTeam ? (
+            isMine ? (
+              <form className="team-mine" action={clearMyTeamAction}>
+                <input type="hidden" name="league" value={addressee.slug} />
+                <input type="hidden" name="team" value={head.team.slug} />
+                {season.isCurrent ? null : (
+                  <input type="hidden" name="season" value={season.slug} />
+                )}
+                <p>{t('team.isMine')}</p>
+                <button type="submit">{t('team.clearMine')}</button>
+              </form>
+            ) : (
+              <form className="team-mine" action={chooseMyTeamAction}>
+                <input type="hidden" name="league" value={addressee.slug} />
+                <input type="hidden" name="team" value={head.team.slug} />
+                {season.isCurrent ? null : (
+                  <input type="hidden" name="season" value={season.slug} />
+                )}
+                <button type="submit">{t('team.makeMine')}</button>
+                <p>{t('team.mineNote')}</p>
+              </form>
+            )
+          ) : null}
+        </TeamMine>
       </PageHead>
       {/* The games come first in the page and sit first on the screen, at every width, so
           the keyboard goes through the page in the order it is read. */}

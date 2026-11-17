@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Emblem } from '../emblem/emblem.tsx';
 import { safeColor } from '../team-color.ts';
 import { Facts, type Fact } from '../facts/facts.tsx';
@@ -24,6 +24,11 @@ export type TeamCardProps = {
    * teams), three for cards that stand under a section's own title.
    */
   readonly level?: 2 | 3;
+  /**
+   * A mark the page adds under the facts, such as "Your team" (step 2.168), drawn by the
+   * page's own script after it has arrived; nothing when the page gives none.
+   */
+  readonly mark?: ReactNode;
 };
 
 /**
@@ -32,7 +37,16 @@ export type TeamCardProps = {
  * is centered over the name, the record is the number beneath, and the facts and the way on
  * are the card's foot line; in a narrower list it is one row.
  */
-export function TeamCard({ name, href, color, figure, facts, way, level = 2 }: TeamCardProps) {
+export function TeamCard({
+  name,
+  href,
+  color,
+  figure,
+  facts,
+  way,
+  level = 2,
+  mark,
+}: TeamCardProps) {
   const Name = level === 3 ? 'h3' : 'h2';
   return (
     <article
@@ -50,6 +64,7 @@ export function TeamCard({ name, href, color, figure, facts, way, level = 2 }: T
           </a>
         </Name>
         <Facts facts={facts} />
+        {mark}
       </div>
       <p className="ui-team-card-figure">
         <span className="ui-visually-hidden">{figure.label}</span> {figure.value}
