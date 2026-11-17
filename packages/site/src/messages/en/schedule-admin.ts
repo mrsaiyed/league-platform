@@ -17,6 +17,8 @@ export const enScheduleAdmin = {
   'schedule.admin.addRoundSubmit': 'Add round',
   'schedule.admin.askToShow': "Ask the league's owner or an admin to show it.",
   'schedule.admin.away': 'Away team',
+  // The way back to the team whose "Remove this team" led here (step 2.180).
+  'schedule.admin.backToTeam': 'Back to {name}',
   'schedule.admin.blocker.change-no-longer-fits':
     'A change in the draft no longer fits the schedule.',
   'schedule.admin.blocker.draft-unreadable': 'The saved draft cannot be read.',

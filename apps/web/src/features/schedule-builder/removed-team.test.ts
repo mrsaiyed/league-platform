@@ -23,7 +23,8 @@ import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { loadTeamCardsOf } from '../team-pages/index.ts';
 import { buildScheduleView } from '../schedule-pages/build-schedule.ts';
 import { RoundSections } from '../schedule-pages/schedule-views.tsx';
-import { buildGrid, gridTeamName, pickableTeams } from './build-grid.ts';
+import { backToTeamId, backToTeamOf } from './back-to-team.ts';
+import { gridTeamName, pageGrid } from './build-grid.ts';
 
 const anId = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
@@ -57,10 +58,12 @@ describe('a team in the bin with games is named on every screen (A-17)', () => {
     const ports = standInSchedule(world);
     const teams = await ports.teamsOf(league.leagueId, seasonId);
     expect(teams.find((t) => t.id === badgers.id)).toMatchObject({ removed: true });
-    expect(pickableTeams(teams).map((t) => t.id)).not.toContain(badgers.id);
     const draft = await getScheduleDraft(context, { seasonId }, ports.deps);
     if (!draft.ok) throw new Error(draft.error.code);
-    const grid = buildGrid(draft.value, teams, []);
+    // The page's own wiring (pageGrid): the grid names every team, the forms offer the rest.
+    const { grid, teams: offered } = pageGrid(draft.value, teams, []);
+    expect(offered.map((t) => t.id)).not.toContain(badgers.id);
+    expect(offered.length).toBe(teams.length - 1);
     const theirs = grid.allGames.filter(
       (g) => g.homeTeamId === badgers.id || g.awayTeamId === badgers.id,
     );
@@ -75,6 +78,18 @@ describe('a team in the bin with games is named on every screen (A-17)', () => {
       expect(`${game.homeName} ${game.awayName}`).not.toMatch(anId);
     }
     expect(grid.clashes.map((c) => c.text).join(' ')).not.toMatch(anId);
+  });
+
+  it('offers the way back only to a team of the season not in the bin, by an id of its shape', () => {
+    const teams = [
+      { id: '01900000-0000-7000-8000-0000000a0001', name: 'Kestrels' },
+      { id: '01900000-0000-7000-8000-0000000a0002', name: 'Badgers', removed: true },
+    ];
+    expect(backToTeamOf('01900000-0000-7000-8000-0000000A0001', teams)?.name).toBe('Kestrels');
+    expect(backToTeamOf('01900000-0000-7000-8000-0000000a0002', teams)).toBeUndefined();
+    expect(backToTeamOf('01900000-0000-7000-8000-0000000a0009', teams)).toBeUndefined();
+    expect(backToTeamId('<script>')).toBeUndefined();
+    expect(backToTeamId(undefined)).toBeUndefined();
   });
 
   it('a team the list does not hold is named in words, never by its id', () => {
