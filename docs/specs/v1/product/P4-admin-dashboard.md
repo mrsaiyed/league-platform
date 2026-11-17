@@ -88,7 +88,7 @@ What each role sees is trimmed to what they can use. A scorekeeper who opens the
 
 - **Profile**: league name, address (short name), logo, contact email, city and time zone, adult or youth.
 - **Admins**: the people with roles, pending invitations, the activity log.
-- **Features**: switches for the optional parts: registration fees, draft, awards and trophies, sponsors, media, news, player pages, live stats. Switching a feature off hides it from the site and the admin but keeps its data. Player pages start switched on (**A-15**, decided for you, November 14).
+- **Features**: switches for the optional parts: registration fees, draft, awards and trophies, sponsors, media, news, player pages, live stats. Switching a feature off hides it from the site and the admin but keeps its data. Player pages start switched off in a league of under-18s and on in an adult league; the league's admin switches them either way (**A-15**, decided for you on November 14 as "on", changed on November 17: where nobody decides, a child's page must not be public).
 - **Wording**: the league's own words for division, round, team leader and club (U-4).
 - **Start page for members**: the league home, or each member's own team page (U-5).
 - **Privacy**: what is public about players ("Names on public pages": full names, first name and last initial, or hidden by jersey number only, followed for every player once chosen, every league starting on full names, R-24 and R-29; the parents' confirmation that lets children be shown in full, R-14; and whether adults may ask to appear as initials, R-15), whether photos are shown, whether the league is listed in search ([P6](P6-registration-and-accounts.md) section 7).

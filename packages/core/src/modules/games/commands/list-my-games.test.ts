@@ -74,6 +74,8 @@ describe('listMyGames', () => {
       scorable: true,
       hasPlays: false,
       version: 1,
+      // The starting rules' forfeit score (step 2.158: the forfeit's question says it).
+      forfeitScore: { winner: 20, loser: 0 },
     });
     expect(result.ok && result.value.games[3]).toMatchObject({
       day: '2026-12-12',
