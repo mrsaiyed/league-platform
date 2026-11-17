@@ -110,6 +110,7 @@ import {
   clockToggleTap,
   createTapRest,
   drawRest,
+  restMs,
   startBarTap,
   takeBackRestMs,
   takeBackTimeoutTap,
@@ -1065,6 +1066,13 @@ export function ScoringScreen(props: ScoringScreenProps) {
   // final panel, taking the End back, Reopen and Mark not started. What is asked and the
   // taps are use-end-game.ts's; the pad draws them (end-parts.tsx). ---
   const names = { home: view.teams.home.name, away: view.teams.away.name };
+  /**
+   * End game and Mark not started close More and ask in the pad. The second tap of a
+   * double tap on either would land on whatever lay under the button (the clock, a
+   * team's turnovers) and put that in the question's place: so for a third of a second
+   * from the tap that closed More, a finger's tap anywhere on the screen is not taken.
+   */
+  const quietUntil = useRef(Number.NEGATIVE_INFINITY);
   const end = useEndGame({
     controller,
     status,
@@ -1080,7 +1088,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
     say,
     quiet: () => setSaid(null),
     tap,
-    closeMore: () => setMoreOpen(false),
+    closeMore: (at) => {
+      quietUntil.current = at + restMs;
+      setMoreOpen(false);
+    },
     focus: (selector) => {
       focusNext.current = { selector };
     },
@@ -1349,7 +1360,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
       if (pressed.cancel(event.pointerId)) endDrag();
     },
     onClickCapture(event: MouseEvent<HTMLElement>) {
-      if (!swallowClick.current) return;
+      // The double of a tap that closed More for a question (see `quietUntil`).
+      const double = event.detail !== 0 && event.timeStamp < quietUntil.current;
+      if (!double && !swallowClick.current) return;
       swallowClick.current = false;
       event.stopPropagation();
       event.preventDefault();

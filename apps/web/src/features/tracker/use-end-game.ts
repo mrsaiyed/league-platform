@@ -71,7 +71,11 @@ export type EndGameArgs = {
   readonly quiet: () => void;
   /** The screen's own way to hand a tap to the controller: a refusal is said by it. */
   readonly tap: (input: TapInput) => Promise<{ readonly ok: boolean }>;
-  readonly closeMore: () => void;
+  /**
+   * Closes More, where End game and Mark not started are. `at` is when the tap was made:
+   * its double is taken nowhere on the screen.
+   */
+  readonly closeMore: (at: number) => void;
   /** Where the keyboard goes once the pad is drawn. */
   readonly focus: (selector: string) => void;
   readonly rests: { readonly asked: TapRest; readonly final: TapRest };
@@ -200,7 +204,7 @@ export function useEndGame(args: EndGameArgs): EndGame {
 
   const on: EndHandlers = {
     endAsk(event) {
-      args.closeMore();
+      args.closeMore(event.timeStamp);
       const game = controller.status().game ?? state;
       if (game.status === 'final') return say(t('tracker.refusal.gameFinal'));
       const question = endQuestion(game, names, args.allowTies, args.reading(), t);
@@ -265,6 +269,9 @@ export function useEndGame(args: EndGameArgs): EndGame {
       if (event !== null && !tapTaken(rests.asked, tapOf(event))) return;
       if (!reopen) {
         setProblem(null);
+        // "Reopen game" lies where "Keep it final" was: the final panel rests from this
+        // tap, so its double does not ask the question again.
+        rests.final.begin(event?.timeStamp);
         return showPad(padAtRest);
       }
       const reason = reopenReason.trim();
@@ -292,7 +299,7 @@ export function useEndGame(args: EndGameArgs): EndGame {
     },
     reopenReason: setReopenReason,
     notStartedAsk(event) {
-      args.closeMore();
+      args.closeMore(event.timeStamp);
       const game = controller.status().game ?? state;
       if (game.status === 'final') return say(t('tracker.notStarted.refused.game-final'));
       if (game.status !== 'live') return say(t('tracker.notStarted.refused.game-not-started'));
