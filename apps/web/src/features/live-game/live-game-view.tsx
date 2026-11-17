@@ -83,6 +83,11 @@ export type LiveGameBoard = {
   readonly placeText?: string | undefined;
   /** A sentence under a decided game: a forfeit says so. */
   readonly noteText?: string | undefined;
+  /**
+   * A final game won in overtime: its pill, "Final, OT" (P7 §5.6), as the result the page
+   * was drawn with keeps it. Drawn only while the game is still that result.
+   */
+  readonly finalText?: string | undefined;
 };
 
 type Side = 'home' | 'away';
@@ -267,6 +272,13 @@ export function LiveGameView({
             : undefined
         }
         stateText={game.status === 'live' ? undefined : board?.stateText}
+        // The result's overtime as the page was drawn: only while it is still that result
+        // (a game reopened since is drawn again from the server, redrawsFor).
+        finalText={
+          game.status === 'final' && game.sequence === initial.sequence
+            ? board?.finalText
+            : undefined
+        }
         when={started ? undefined : board?.when}
         placeText={board?.placeText}
         noteText={started ? board?.noteText : labels.notStarted}

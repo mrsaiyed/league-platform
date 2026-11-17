@@ -12,6 +12,10 @@ export const enSite = {
   'display.cancelled': 'Cancelled',
   'display.filters': 'Choose what to show',
   'display.final': 'Final',
+  // A final game's pill when it went to overtime (step 2.200, P7 §5.6): one overtime, or
+  // {count} of them. A game ended in regulation says "Final" alone.
+  'display.finalOvertime_one': 'Final, OT',
+  'display.finalOvertime_other': 'Final, {count}OT',
   'display.forfeit': 'Forfeit',
   'display.home': 'Home',
   'display.jersey': 'Number',

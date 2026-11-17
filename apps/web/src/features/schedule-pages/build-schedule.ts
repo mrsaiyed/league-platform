@@ -8,6 +8,7 @@ import {
   type PublicGame,
   type PublicSchedule,
 } from '@srleagues/core';
+import { finalLinkState, finalPillText } from '@srleagues/site';
 import type { GameStatus } from '@srleagues/ui';
 import type { LeagueClock } from '../../server/public-schedule.ts';
 import { locale, t } from '../../server/messages.ts';
@@ -25,6 +26,13 @@ export type GameView = {
     readonly color: string | null;
   };
   readonly status: GameStatus;
+  /**
+   * A final game won in overtime (P7 §5.6): what its pill says, "Final, OT", and what its
+   * link says to a screen reader in place of "final", "final after overtime". Left out for
+   * any other game, which its pill and link name as before.
+   */
+  readonly finalText?: string;
+  readonly finalSaid?: string;
   readonly whenText: string;
   /**
    * The same line as it reads beside the state's pill, where that is shorter: a scoreboard
@@ -148,6 +156,9 @@ export function gameView(
   const status = statusOf(game.status);
   const place = placeOf(game);
   const day = dayOf(game, clock);
+  const overtime = status === 'final' ? game.overtimePeriods : null;
+  const finalText = finalPillText(t, overtime);
+  const finalSaid = finalLinkState(t, overtime);
   const awaiting =
     status === 'scheduled' &&
     (game.startsAt !== null
@@ -158,6 +169,8 @@ export function gameView(
     home: { name: game.homeTeam.name, score: game.homeScore, color: game.homeTeam.color },
     away: { name: game.awayTeam.name, score: game.awayScore, color: game.awayTeam.color },
     status,
+    ...(finalText === undefined ? {} : { finalText }),
+    ...(finalSaid === undefined ? {} : { finalSaid }),
     whenText: whenOf(game, clock),
     // Beside a pill that says "Postponed" the old day is still never written bare.
     ...(status === 'postponed' && day !== null

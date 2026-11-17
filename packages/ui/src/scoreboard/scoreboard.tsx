@@ -33,6 +33,12 @@ export type ScoreboardProps = {
    * game decided off the court, "Postponed" or "Cancelled" for one not played.
    */
   readonly stateText?: string | undefined;
+  /**
+   * What a final game's pill says in place of "Final", already written by the page:
+   * "Final, OT" for a game won in overtime (P7 §5.6). As quiet as "Final"; a `stateText`
+   * (a forfeit) goes before it.
+   */
+  readonly finalText?: string | undefined;
   /** For a game still to play: its day and, when it has one, its time, between the teams. */
   readonly when?: { readonly day: string; readonly time?: string | undefined } | undefined;
   /** Where the game is played, already written by the page. */
@@ -85,6 +91,7 @@ export function Scoreboard({
   state,
   periodText,
   stateText,
+  finalText,
   when,
   placeText,
   noteText,
@@ -95,7 +102,7 @@ export function Scoreboard({
   const decided = state === 'final' && home.score !== null && away.score !== null;
   const homeWins = decided && home.score > away.score;
   const awayWins = decided && away.score > home.score;
-  const pill = stateText ?? (state === 'final' ? labels.final : undefined);
+  const pill = stateText ?? (state === 'final' ? finalText || labels.final : undefined);
   return (
     <section
       className="ui-scoreboard"

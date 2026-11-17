@@ -8,7 +8,13 @@ import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts'
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
 import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
-import { buildHomeGames, buildScheduleView, comingOrder, parseRound } from './build-schedule.ts';
+import {
+  buildHomeGames,
+  buildScheduleView,
+  comingOrder,
+  gameView,
+  parseRound,
+} from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
 import { LatestResultsSection, latestResultsCount } from './latest-results.tsx';
 import { applyUpdate } from './live-game-list.tsx';
@@ -421,6 +427,38 @@ describe('live updates', () => {
     expect(applyUpdate(game, { sequence: 6, status: 'final', home: 50, away: 40 }).status).toBe(
       'final',
     );
+  });
+});
+
+describe('a card’s overtime mark and the live channel (step 2.200)', () => {
+  it('keeps the mark while the game is the result it was drawn with, and drops it once reopened', async () => {
+    const { clock, schedule } = await load(adult);
+    const final = schedule.rounds.flatMap((r) => r.games).find((g) => g.status === 'final');
+    if (final === undefined || final.homeScore === null || final.awayScore === null) {
+      throw new Error('no final game');
+    }
+    const drawn = gameView({ ...final, overtimePeriods: 1 }, clock, addressee, 'fall-2026');
+    expect(drawn).toMatchObject({ finalText: 'Final, OT', finalSaid: 'final after overtime' });
+    const result = { home: final.homeScore, away: final.awayScore };
+    // A message about the same result (one sent as it ended, arriving late) keeps it.
+    expect(applyUpdate(drawn, { sequence: 9, status: 'final', ...result })).toMatchObject({
+      finalText: 'Final, OT',
+    });
+    // Reopened: live, no mark; ended again, still none, whatever the score: the channel
+    // does not say a result's overtime, and the page is drawn again with the new one.
+    const live = applyUpdate(drawn, { sequence: 10, status: 'live', ...result, leftFinal: true });
+    expect(live.finalText).toBeUndefined();
+    const again = applyUpdate(drawn, { sequence: 11, status: 'final', ...result, leftFinal: true });
+    expect(again).toMatchObject({ status: 'final' });
+    expect(again.finalText).toBeUndefined();
+    expect(again.finalSaid).toBeUndefined();
+    expect(gameLinkText(again, gameLinkWords())).not.toContain('overtime');
+    // A game ended in regulation, or whose overtime is not known, has no mark at all.
+    for (const overtimePeriods of [0, null]) {
+      const plain = gameView({ ...final, overtimePeriods }, clock, addressee, 'fall-2026');
+      expect(plain.finalText).toBeUndefined();
+      expect(gameLinkText(plain, gameLinkWords())).toContain(', final, ');
+    }
   });
 });
 

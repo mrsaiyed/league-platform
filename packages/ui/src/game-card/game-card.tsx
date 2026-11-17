@@ -29,6 +29,12 @@ export type GameCardProps = {
   readonly home: GameCardTeam;
   readonly away: GameCardTeam;
   readonly status: GameStatus;
+  /**
+   * What a final game's pill says in place of "Final", already written by the page:
+   * "Final, OT" for a game won in overtime (P7 §5.6). Drawn exactly as "Final" is, and
+   * only while the game is final.
+   */
+  readonly finalText?: string | undefined;
   /** The date and time, already written for the reader by the page. */
   readonly whenText: string;
   /** Where it is played, already written by the page; drawn on a line of its own. */
@@ -254,6 +260,7 @@ export function GameCard({
   home,
   away,
   status,
+  finalText,
   whenText,
   placeText,
   numberText,
@@ -271,7 +278,11 @@ export function GameCard({
   let state: ReactNode = null;
   if (status === 'live') state = <LiveMarker label={labels.live} />;
   else if (status !== 'scheduled')
-    state = <span className="ui-game-state">{labels[statusKey[status]]}</span>;
+    state = (
+      <span className="ui-game-state">
+        {status === 'final' && finalText ? finalText : labels[statusKey[status]]}
+      </span>
+    );
   else if (note)
     state = (
       <span className="ui-game-state" data-kind="quiet">

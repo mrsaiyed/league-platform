@@ -855,6 +855,16 @@ describe('a game as a scoreboard', () => {
       );
     expect(big({})).toContain('data-state="final" data-pill="quiet"');
     expect(big({})).toContain('<span class="ui-game-state">Final</span>');
+    // A game won in overtime is as quiet as a plain "Final" (step 2.200), and a forfeit
+    // is named as a forfeit whatever it is given for a final game.
+    expect(big({ finalText: 'Final, OT' })).toContain('data-state="final" data-pill="quiet"');
+    expect(big({ finalText: 'Final, OT' })).toContain(
+      '<span class="ui-game-state">Final, OT</span>',
+    );
+    expect(big({ finalText: 'Final, OT', stateText: 'Forfeit' })).toContain(
+      '<span class="ui-game-state">Forfeit</span>',
+    );
+    expect(big({ finalText: 'Final, OT', state: 'live' })).not.toContain('Final, OT');
     expect(big({ stateText: 'Forfeit' })).not.toContain('data-pill');
     expect(big({ state: 'other', stateText: 'Postponed' })).not.toContain('data-pill');
     expect(big({ state: 'live' })).not.toContain('data-pill');

@@ -15,6 +15,13 @@ export type Update = {
   readonly status: GameStatus;
   readonly home: number;
   readonly away: number;
+  /**
+   * The live channel has said, since the page was drawn, that the game is not final: it
+   * was reopened (or had not ended when the page was drawn). Kept once true, so a game
+   * reopened and ended again never shows the overtime its page was drawn with: the
+   * channel does not say a result's overtime periods.
+   */
+  readonly leftFinal?: boolean;
 };
 
 const known: readonly GameStatus[] = [
@@ -32,8 +39,18 @@ const known: readonly GameStatus[] = [
  */
 export function applyUpdate(game: GameView, update: Update | undefined): GameView {
   if (update === undefined) return game;
+  // The overtime words are the result's the page was drawn with: they stand only while
+  // the game is still that result, final with the same score and never reopened since.
+  const { finalText, finalSaid, ...rest } = game;
+  const sameResult =
+    update.status === 'final' &&
+    update.leftFinal !== true &&
+    update.home === game.home.score &&
+    update.away === game.away.score;
   return {
-    ...game,
+    ...rest,
+    ...(sameResult && finalText !== undefined ? { finalText } : {}),
+    ...(sameResult && finalSaid !== undefined ? { finalSaid } : {}),
     status: update.status,
     home: { ...game.home, score: update.home },
     away: { ...game.away, score: update.away },
@@ -103,7 +120,13 @@ export function LiveGameList({
         }
         return {
           ...prev,
-          [m.gameId]: { sequence: m.sequence, status, home: m.score.home, away: m.score.away },
+          [m.gameId]: {
+            sequence: m.sequence,
+            status,
+            home: m.score.home,
+            away: m.score.away,
+            leftFinal: before?.leftFinal === true || status !== 'final',
+          },
         };
       });
     });
@@ -148,6 +171,7 @@ export function LiveGameList({
                 home={g.home}
                 away={g.away}
                 status={g.status}
+                finalText={g.finalText}
                 whenText={
                   // A board's pill says "Postponed", so its date line need not: the shorter
                   // line is drawn there (and only while the game is still postponed).

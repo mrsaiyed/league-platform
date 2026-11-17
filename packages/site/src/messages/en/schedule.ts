@@ -25,6 +25,9 @@ export const enSchedule = {
   'schedule.link.awaiting': '{away} against {home}, {when}, awaiting the result',
   'schedule.link.cancelled': 'cancelled',
   'schedule.link.final': 'final',
+  // The same as the card's link says it to a screen reader, for a game won in overtime.
+  'schedule.link.finalOvertime_one': 'final after overtime',
+  'schedule.link.finalOvertime_other': 'final after {count} overtimes',
   'schedule.link.forfeit': 'forfeit',
   'schedule.link.live': 'live',
   'schedule.link.postponed': 'postponed',

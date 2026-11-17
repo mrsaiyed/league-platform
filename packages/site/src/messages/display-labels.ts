@@ -3,6 +3,33 @@
 // match packages/ui's label types; the web app checks that when it passes them.
 import type { Translate } from './messages.ts';
 
+/**
+ * What a final game's pill says when it went to overtime (P7 §5.6): "Final, OT" for one,
+ * "Final, 2OT" for two. Undefined for a game ended in regulation (0) and one whose
+ * overtime is not known (null): those say "Final" alone.
+ */
+export function finalPillText(
+  t: Translate,
+  overtimePeriods: number | null | undefined,
+): string | undefined {
+  return overtimePeriods === null || overtimePeriods === undefined || overtimePeriods < 1
+    ? undefined
+    : t.plural('display.finalOvertime', overtimePeriods);
+}
+
+/**
+ * The same as a card's link says it to a screen reader, in place of "final": "final after
+ * overtime", "final after 2 overtimes". Undefined where the pill says "Final" alone.
+ */
+export function finalLinkState(
+  t: Translate,
+  overtimePeriods: number | null | undefined,
+): string | undefined {
+  return overtimePeriods === null || overtimePeriods === undefined || overtimePeriods < 1
+    ? undefined
+    : t.plural('schedule.link.finalOvertime', overtimePeriods);
+}
+
 export function displayLabels(t: Translate) {
   return {
     game: {

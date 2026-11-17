@@ -3,7 +3,7 @@
 // words and numbers leave here; the page and its live part draw them.
 import type { GamePage, PlayLine } from '@srleagues/core';
 import type { BoxScoreColumn, BoxScorePlayer, PlayRow } from '@srleagues/ui';
-import { displayLabels } from '@srleagues/site';
+import { displayLabels, finalPillText } from '@srleagues/site';
 import { locale, t } from '../../server/messages.ts';
 import { hasStatLabel, statLabel } from '../stats-pages/index.ts';
 import { formatClock } from './clock.ts';
@@ -291,7 +291,16 @@ export type GameBoard = {
   readonly when?: { readonly day: string; readonly time?: string } | undefined;
   /** Where it is played: the venue, and the court when it has one. */
   readonly placeText?: string | undefined;
+  /** A final game won in overtime: its pill, "Final, OT" (P7 §5.6). */
+  readonly finalText?: string | undefined;
 };
+
+/**
+ * The board's pill for a final game won in overtime, as its result keeps it (P7 §5.6):
+ * "Final, OT", "Final, 2OT". Undefined for any other game, whose pill is as before.
+ */
+export const boardFinalText = (page: GamePage): string | undefined =>
+  finalPillText(t, page.game.overtimePeriods);
 
 /** The two teams' own colors, as the game's page read them. */
 export const boardColors = (page: GamePage): GameBoard['colors'] => ({
