@@ -38,7 +38,8 @@ const homeOf = (league: LeagueAddressee) => leagueHomeStayUrl(league);
 /**
  * The refusal for this person. `view` is the league's public view when the league may be
  * shown to them (null otherwise, or when the refused address is no league's); `leagueName`
- * its public name; `path` the refused address, for the way back after signing in again.
+ * its public name (null when it could not be read: its short name is used); `path` the
+ * refused address, for the way back after signing in again.
  */
 export function refusalScreenOf(input: {
   readonly email: string | null;
@@ -57,7 +58,7 @@ export function refusalScreenOf(input: {
       also: [],
     };
   }
-  if (view === null || leagueName === null) {
+  if (view === null) {
     return {
       kind: 'no-league',
       says: ['access.noAccess.notStaff', 'access.noAccess.signedInAs'],
@@ -67,10 +68,12 @@ export function refusalScreenOf(input: {
     };
   }
   const league = view.context.league;
+  // Who they are is the view's alone; a name that could not be read is the league's short
+  // name, as its own pages show it then (league-site.ts).
   const backToLeague: WayOn = {
     href: homeOf(league),
     label: 'access.noAccess.backToLeague',
-    league: leagueName,
+    league: leagueName ?? league.slug,
   };
   if (view.runsTheLeague) {
     return {

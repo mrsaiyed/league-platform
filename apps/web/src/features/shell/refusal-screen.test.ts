@@ -85,6 +85,17 @@ describe('refusalScreenOf', () => {
     }
   });
 
+  it('keeps staff and outsiders apart when the league’s name cannot be read', () => {
+    const staff = refusalScreenOf({ email, view: viewOf(['schedule']), leagueName: null, path });
+    expect(staff.kind).toBe('staff');
+    expect(staff.says[0]).toBe('access.noAccess.notYourRole');
+    expect(staff.action.label).toBe('admin.backToAdmin');
+    expect(drawn(staff)).toContain('Back to north-valley');
+    const other = refusalScreenOf({ email, view: viewOf([]), leagueName: null, path });
+    expect(other.kind).toBe('outsider');
+    expect(drawn(other)).toContain('This account does not help run this league.');
+  });
+
   it('names no league it was not given as one that may be shown', () => {
     const screen = refusalScreenOf({ email, view: null, leagueName: null, path });
     expect(screen.kind).toBe('no-league');
