@@ -8,7 +8,9 @@
 // the number it says they are level on is the number in each of their rows, and for two
 // teams the numbers it gives are the two rows' own, with the team it puts ahead above the
 // other. No note anywhere says a team was "placed above". North Valley East (the numbers
-// audit's case 45) is read word for word. On the statistics page the teams' table counts
+// audit's case 45) is read word for word. Step 2.198: a note for three or more says what
+// placed each (their records among them, then what separated those still level), and each
+// of its sentences is read against the rows: North Valley West (case 46) word for word. On the statistics page the teams' table counts
 // its games beside the team, and the sentence on which games count stands with it.
 import {
   accessibilityProblems,
@@ -31,6 +33,8 @@ const countsSentence =
   'Statistics count the games that were scored live or entered as a box score. A game with only a final score counts in the standings, not here.';
 const eastNote =
   'Owls and Falcons are level on win percentage (.667). The game between them puts Owls ahead.';
+const westNote =
+  'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Point difference puts Tigers ahead of Hawks: +3 against -3.';
 const stillTied =
   'Level with another team: nothing in the rules separates them yet, so they are shown in a fixed order.';
 
@@ -41,14 +45,17 @@ const readTables = (page) =>
       const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
       const rows = [...table.querySelectorAll('tbody tr')].map((tr, place) => {
         const cells = [...tr.children].map((cell) => cell.textContent.trim());
-        const notes = [...tr.querySelectorAll('.ui-note-mark a')].map(
+        const rawNotes = [...tr.querySelectorAll('.ui-note-mark a')].map(
           (a) => document.getElementById(a.getAttribute('href').slice(1))?.textContent.trim() ?? '',
         );
         return {
           place,
           team: tr.querySelector('.ui-team-name')?.textContent.trim() ?? '',
           cell: Object.fromEntries(heads.map((head, i) => [head, cells[i] ?? ''])),
-          notes,
+          // As a person reads them: without the invisible joiners that hold a record's dash
+          // to its numbers (step 2.198); rawNotes keeps them.
+          notes: rawNotes.map((text) => text.replaceAll('⁠', '')),
+          rawNotes,
         };
       });
       return { caption: table.querySelector('caption')?.textContent.trim() ?? '', heads, rows };
@@ -57,13 +64,121 @@ const readTables = (page) =>
 
 const twoTeams =
   /^(.+) and (.+) are level on (win percentage|points) \(([^)]+)\)\. (?:(Point difference|Points scored|Fewer points allowed) puts (.+) ahead: (\S+) against (\S+)\.|A coin flip puts (.+) ahead\.|The games? between them puts? (.+) ahead\.)$/;
-const severalTeams =
-  /^(.+) are level on (win percentage|points) \(([^)]+)\)\. The season’s tiebreakers set their order/;
+const severalTeams = /^(.+) are level on (win percentage|points) \(([^)]+)\)\. (.+)$/;
 const columnOf = {
   'Point difference': 'DIFF',
   'Points scored': 'PF',
   'Fewer points allowed': 'PA',
+  'point difference': 'DIFF',
+  'points scored': 'PF',
+  'fewest points allowed': 'PA',
+  'points allowed': 'PA',
 };
+
+/** "Lions 1–0, Tigers 1–1" or "Birch +5, Ash +3": each team with its figure, in order. */
+const entriesOf = (list) =>
+  list.split(', ').map((entry) => {
+    const [, team = entry, figure = ''] = /^(.+) (\S+)$/.exec(entry) ?? [];
+    return { team, figure };
+  });
+
+/**
+ * Step 2.198: the sentences after "level on…" for three or more, each read against the
+ * rows the note is beside (`level`, in the table's order): every team named is one of
+ * them, named in the table's order; every figure is the row's own where the table shows
+ * that column; a team put "ahead of" another is above it.
+ */
+function checkSteps(where, rest, level) {
+  const placeOf = (team) => level.findIndex((row) => row.team === team);
+  const rowOf = (team) => level.find((row) => row.team === team);
+  const inOrder = (teams) =>
+    teams.every((team) => placeOf(team) >= 0) &&
+    teams.every((team, i) => i === 0 || placeOf(team) > placeOf(teams[i - 1]));
+  const figuresMatch = (entries, column) =>
+    entries.every(
+      ({ team, figure }) =>
+        rowOf(team)?.cell[column] === undefined || rowOf(team)?.cell[column] === figure,
+    );
+  const sentences = rest.replace(/\.$/, '').split(/\. (?=[A-Z])/);
+  for (const sentence of sentences) {
+    const said = `${where}, "${sentence}"`;
+    let m;
+    if (
+      /^The season’s tiebreakers set their order|are still level after all of them/.test(sentence)
+    ) {
+      continue;
+    }
+    if ((m = /^In the games among these (\w+): (.+)$/.exec(sentence))) {
+      const entries = entriesOf(m[2]);
+      note(
+        `${said} gives every team's record, in the table's order`,
+        entries.length === level.length && inOrder(entries.map((e) => e.team)),
+      );
+      note(
+        `${said} gives records`,
+        entries.every((e) => /^\d+–\d+(–\d+)?$/.test(e.figure)),
+      );
+    } else if ((m = /^In the games (?:between|among) (.+?): (.+)$/.exec(sentence))) {
+      const entries = entriesOf(m[2]);
+      note(
+        `${said} names teams of the note, in the table's order`,
+        inOrder(entries.map((e) => e.team)),
+      );
+    } else if (/^Head-to-head does not count here: /.test(sentence)) {
+      continue;
+    } else if (
+      (m =
+        /^(Point difference|Points scored|Fewer points allowed) puts (.+) ahead of (.+): (\S+) against (\S+)$/.exec(
+          sentence,
+        ))
+    ) {
+      const column = columnOf[m[1]];
+      note(`${said} puts the higher team ahead`, inOrder([m[2], m[3]]));
+      note(
+        `${said} quotes the two rows' ${column}`,
+        figuresMatch(
+          [
+            { team: m[2], figure: m[4] },
+            { team: m[3], figure: m[5] },
+          ],
+          column,
+        ),
+      );
+    } else if ((m = /^A coin flip puts (.+) ahead of (.+)$/.exec(sentence))) {
+      note(`${said} puts the higher team ahead`, inOrder([m[1], m[2]]));
+    } else if (
+      (m = /^By (point difference|points scored|fewest points allowed): (.+)$/.exec(sentence))
+    ) {
+      const entries = entriesOf(m[2]);
+      note(`${said} lists them in the table's order`, inOrder(entries.map((e) => e.team)));
+      note(`${said} quotes each row's ${columnOf[m[1]]}`, figuresMatch(entries, columnOf[m[1]]));
+    } else if ((m = /^A coin flip puts them in this order: (.+)$/.exec(sentence))) {
+      note(`${said} lists them in the table's order`, inOrder(m[1].split(', ')));
+    } else if (
+      (m =
+        /^(.+) are also level on (point difference|points scored|points allowed) \((\S+)\)$/.exec(
+          sentence,
+        ))
+    ) {
+      const teams = m[1].split(/, and |, | and /);
+      note(
+        `${said} gives the figure each of them has`,
+        figuresMatch(
+          teams.map((team) => ({ team, figure: m[3] })),
+          columnOf[m[2]],
+        ) && inOrder(teams),
+      );
+    } else if (
+      /^Nothing in the season’s tiebreakers separates (.+) yet, so they are shown in a fixed order$/.test(
+        sentence,
+      )
+    ) {
+      continue;
+    } else {
+      note(`${said} is a sentence step 2.198 writes`, false);
+    }
+  }
+}
 
 /** Checks every note of a page's tables against the rows it is beside. */
 function checkNotes(label, tables) {
@@ -112,7 +227,10 @@ function checkNotes(label, tables) {
         `${where} is beside teams that have played`,
         level.every((other) => other.cell['GP'] === undefined || other.cell['GP'] !== '0'),
       );
-      if (two === null) continue;
+      if (two === null) {
+        if (several !== null) checkSteps(where, several[4], level);
+        continue;
+      }
       note(`${where} is beside two teams`, level.length === 2);
       const [first, second] = level;
       const ahead = two[6] ?? two[9] ?? two[10];
@@ -215,6 +333,21 @@ if (built) {
       note(
         `case 45 at ${width}: the Owls carry the same note, the Herons none`,
         beside('Owls')[0] === eastNote && beside('Herons').length === 0,
+      );
+      // Step 2.198, case 46: the four level teams of the West, word for word beside each,
+      // and each record held whole on the page (no "0–" at a line's end).
+      const west = standings.find((table) => table.caption === 'West');
+      for (const team of ['Lions', 'Tigers', 'Hawks', 'Bears']) {
+        const row = west?.rows.find((r) => r.team === team);
+        note(
+          `case 46 at ${width}: ${team} read what placed each of the four`,
+          row?.notes.includes(westNote) === true,
+          JSON.stringify(row?.notes),
+        );
+      }
+      note(
+        `case 46 at ${width}: each record's dash is held to its numbers`,
+        west?.rows.some((r) => r.rawNotes.some((t) => t.includes('Bears 0⁠–⁠1'))) === true,
       );
 
       await tapMenu('Stats', /\/north-valley\/stats$/);
