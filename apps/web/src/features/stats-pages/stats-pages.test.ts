@@ -234,6 +234,7 @@ describe('statistics page', () => {
     totalsOnlyTeams: [],
     totalsNoteTeams: [],
     openingSort: null,
+    tableNotes: [],
   });
   // The lists of the page, in order: each one's title, whether it follows a card, and the
   // place its first line shows.
@@ -553,8 +554,15 @@ describe('statistics page', () => {
     ]);
     const text = html(data);
     expect(text).toContain(
-      '<h2>Teams</h2></div><p class="ui-section-note">Statistics count the games that were scored live or entered as a box score. A game with only a final score counts in the standings, not here.</p>',
+      '</section><p class="ui-section-note">Statistics count the games that were scored live or entered as a box score. A game with only a final score counts in the standings, not here.</p><div class="stats-tables"',
     );
+    // Once, above both tables, before the players' table (the lead's review, item 7).
+    expect(text.match(/Statistics count the games/g)).toHaveLength(1);
+    expect(text.indexOf('Statistics count the games')).toBeLessThan(
+      text.indexOf('<h2>All players</h2>'),
+    );
+    // Every statistic here was kept in the one game each team has numbers from.
+    expect(text).not.toContain('averaged over the games where it was');
     expect(text).toContain('<span class="ui-visually-hidden">Games with statistics</span>');
     // Season totals carry the same count: the totals are over the same one game.
     const totals = await loadStatsPage(
@@ -569,9 +577,11 @@ describe('statistics page', () => {
     });
   });
 
-  it('keeps the note about staff-only teams after the sentence on which games count', async () => {
+  it('keeps the note about staff-only teams under the teams’ title, alone', async () => {
     const text = html(await statsFor(adult));
-    expect(text).toContain('not here. Only team totals are shown for Owls.</p>');
+    expect(text).toContain(
+      '<h2>Teams</h2></div><p class="ui-section-note">Only team totals are shown for Owls.</p>',
+    );
   });
 
   it('names a statistic it has words for, and shows the key of one it has not', () => {

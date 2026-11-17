@@ -125,6 +125,10 @@ export function StatsTables({
           <EmptyPanel text={t('stats.leadersNone')} />
         )}
       </Section>
+      {/* What both tables' numbers count, said once above them (build-stats.ts, tableNotes):
+          read on a phone before the players' table, and the two tables start level on a
+          laptop. */}
+      <p className="ui-section-note">{data.tableNotes.join(t('stats.noteJoin'))}</p>
       <div className="stats-tables" data-layout={sideBySide ? 'pair' : 'stack'}>
         <Section
           title={t('stats.allPlayers')}
@@ -150,18 +154,13 @@ export function StatsTables({
         </Section>
         <Section
           title={t('stats.teams')}
-          note={[
-            // Which games the numbers count (P7 §8): a team's games here may be fewer than
-            // in the standings, and the page says why where the two are compared.
-            t('stats.countsGames'),
-            ...(data.totalsNoteTeams.length > 0
-              ? [
-                  t('stats.teamsTotalsOnly', {
-                    teams: data.totalsNoteTeams.join(t('stats.teamsJoin')),
-                  }),
-                ]
-              : []),
-          ].join(t('stats.noteJoin'))}
+          note={
+            data.totalsNoteTeams.length > 0
+              ? t('stats.teamsTotalsOnly', {
+                  teams: data.totalsNoteTeams.join(t('stats.teamsJoin')),
+                })
+              : undefined
+          }
         >
           <SortableStatsTable
             caption={t('stats.teams')}

@@ -96,6 +96,8 @@ export type StatsPageData = {
   readonly totalsNoteTeams: readonly string[];
   /** How both tables are sorted when the page opens; nothing while the sport has no statistic. */
   readonly openingSort: Sort | null;
+  /** Sentences said once, above both tables, of what their numbers count. */
+  readonly tableNotes: readonly string[];
 };
 
 export type StatsFailure = { readonly code: 'season-not-found' | 'invalid-input' };
@@ -291,6 +293,18 @@ function pageData(
   // The statistic both tables open sorted by, biggest first: points where the sport counts
   // them, otherwise the first statistic it has.
   const sortKey = table.statKeys.includes('points') ? 'points' : table.statKeys[0];
+  // A row's statistic kept in fewer of its games than the GP beside it is averaged over its
+  // own games (P7 §5.2, T6 §9): right, and a parent dividing by GP would get it wrong.
+  const keptInFewer = (games: number | null, stats: StatisticsTable['teams'][number]['stats']) =>
+    games !== null &&
+    table.statKeys.some((key) => {
+      const entry = stats[key];
+      return entry !== undefined && entry.gamesRecorded < games;
+    });
+  const averagedOverFewer =
+    by === 'average' &&
+    (table.players.some((player) => keptInFewer(player.gamesPlayed, player.stats)) ||
+      table.teams.some((team) => keptInFewer(gamesWithStatistics(team.stats), team.stats)));
   return {
     by,
     minimumGames: settings.minimumGames,
@@ -309,5 +323,12 @@ function pageData(
       )
       .map((team) => team.name),
     openingSort: sortKey === undefined ? null : { key: sortKey, direction: 'descending' },
+    // What is said once, above both tables, of what their numbers count (step 2.195): which
+    // games the statistics count, and, where it applies, that a statistic not kept in every
+    // game is averaged over its own. A later sentence about both tables goes in this list.
+    tableNotes: [
+      t('stats.countsGames'),
+      ...(averagedOverFewer ? [t('stats.averagedOverOwnGames')] : []),
+    ],
   };
 }

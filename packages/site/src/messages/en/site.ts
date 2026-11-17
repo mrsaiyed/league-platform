@@ -210,6 +210,10 @@ export const enSite = {
   // The standings and statistics pages (step 2.43).
   'standings.title': 'Standings',
   'stats.allPlayers': 'All players',
+  // Said above both tables only where some statistic shown was kept in fewer games than
+  // the GP beside it (P7 §5.2; the review of step 2.195).
+  'stats.averagedOverOwnGames':
+    'A statistic not recorded in every game is averaged over the games where it was.',
   'stats.by.average': 'Per game',
   'stats.by.total': 'Season totals',
   'stats.col.games': 'GP',
