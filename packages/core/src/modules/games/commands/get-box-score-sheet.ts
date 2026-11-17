@@ -24,17 +24,23 @@ export type BoxScoreSheet = {
    * reopened by them through games.reopen_game, which hands it back to its tracker (S-46).
    */
   readonly mayCorrect: boolean;
+  /**
+   * For a game called off (postponed or cancelled): whether this reader may put it back,
+   * by games.put_game_back's own check (games.results at its program). False otherwise.
+   */
+  readonly mayCallOff: boolean;
   readonly players: readonly GameRosterPlayer[];
   readonly lines: readonly GameLine[];
   readonly statKeys: readonly string[];
   /** Whether the grid asks for minutes played. */
   readonly minutes: boolean;
   /**
-   * Null when the sheet can be saved; otherwise why not: the game is cancelled, tracked
-   * live (corrected in the tracker's grid, even once final), or decided (reopen it to
-   * correct it).
+   * Null when the sheet can be saved; otherwise why not: the game is cancelled,
+   * postponed (it waits for a new date and is not played yet: step 2.158), tracked live
+   * (corrected in the tracker's grid, even once final), or decided (reopen it to correct
+   * it).
    */
-  readonly locked: 'decided' | 'cancelled' | 'tracked' | null;
+  readonly locked: 'decided' | 'cancelled' | 'postponed' | 'tracked' | null;
 };
 
 export type GetBoxScoreSheetError = { readonly code: 'game-not-found' };
@@ -58,19 +64,29 @@ export const getBoxScoreSheet = defineCommand({
     const locked =
       game.status === 'cancelled'
         ? 'cancelled'
-        : tracked
-          ? 'tracked'
-          : isDecided(game.status)
-            ? 'decided'
-            : null;
+        : game.status === 'postponed'
+          ? 'postponed'
+          : tracked
+            ? 'tracked'
+            : isDecided(game.status)
+              ? 'decided'
+              : null;
     const mayCorrect =
       context.accountId !== null &&
       (await mayChangeGames(context, tx, 'games.correct', await gameScope(tx, game.id)));
     const mayReopen = locked === 'decided' && mayCorrect;
+    // Whether this reader may call the game off or put it back (games.results at its
+    // program, as games.cancel_game and games.put_game_back check): asked only for a
+    // game called off, whose page offers putting it back (step 2.158).
+    const mayCallOff =
+      (game.status === 'cancelled' || game.status === 'postponed') &&
+      context.accountId !== null &&
+      (await mayChangeGames(context, tx, 'games.results', await gameScope(tx, game.id)));
     return ok({
       game,
       mayReopen,
       mayCorrect,
+      mayCallOff,
       players,
       lines,
       statKeys,
