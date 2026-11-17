@@ -138,6 +138,20 @@ describe('setBoxScore', () => {
     });
   });
 
+  it('refuses a postponed game, which has not been played (step 2.158, M32)', async () => {
+    const { db, deps, as, events } = memoryGames({
+      games: [game(1, { status: 'postponed' })],
+      roster,
+    });
+    expect(await setBoxScore(as(ownerId), input, deps)).toEqual({
+      ok: false,
+      error: { code: 'game-postponed' },
+    });
+    expect(db.state.games[0]).toMatchObject({ status: 'postponed', homeScore: null });
+    expect(db.state.lines).toEqual([]);
+    expect(events).toEqual([]);
+  });
+
   it('refuses a decided game (reopen it first), a moved-on one and a tie', async () => {
     const decided = memoryGames({ games: [finalGame(1)], roster });
     expect(await setBoxScore(decided.as(ownerId), input, decided.deps)).toEqual({
