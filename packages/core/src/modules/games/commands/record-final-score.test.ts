@@ -34,7 +34,14 @@ describe('recordFinalScore', () => {
       ok: true,
       value: { version: 2 },
     });
-    expect(db.state.games[0]).toMatchObject({ status: 'final', homeScore: 52, awayScore: 48 });
+    // Two numbers say nothing of overtime: no count, so no mark (step 2.200; step 2.56
+    // lets a typed score say it).
+    expect(db.state.games[0]).toMatchObject({
+      status: 'final',
+      homeScore: 52,
+      awayScore: 48,
+      overtimePeriods: null,
+    });
     expect(db.state.games[0]?.finalizedAt).not.toBeNull();
     expect(db.state.games[0]?.format).toMatchObject({ version: 1 });
     expect(db.state.activity.map((a) => a.action)).toEqual(['games.record_final_score']);

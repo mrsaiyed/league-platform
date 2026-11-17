@@ -359,3 +359,108 @@ describe('reopening a tracked game hands it back to the tracker (T6 §8)', () =>
     expect(t.db.state.events).toHaveLength(events);
   });
 });
+
+describe('overtime on the result (P7 §5.6, step 2.200)', () => {
+  const home = (points: 1 | 2 | 3): Input => ({
+    type: 'score',
+    side: 'home',
+    playerId: homeIds[0] ?? '',
+    points,
+  });
+  const away = (points: 1 | 2 | 3): Input => ({
+    type: 'score',
+    side: 'away',
+    playerId: awayIds[0] ?? '',
+    points,
+  });
+  /** The clock stopped, the next period picked and the clock started (a quarters game). */
+  const periodTaps = (period: number): Input[] => [
+    { type: 'pause' },
+    { type: 'period', period },
+    { type: 'start' },
+  ];
+  const regulation: Input[] = [2, 3, 4].flatMap(periodTaps);
+  const end = (t: Tracker) =>
+    endTrackedGame(t.as(ownerId), { gameId, version: versionOf(t) }, t.deps);
+
+  it('case 44: level after regulation, End refused, won in the first overtime: the result keeps 1', async () => {
+    const t = setUp();
+    await tap(t, [...tipOff, home(2), away(2), ...regulation], 1);
+    lapse(t);
+    expect(await end(t)).toMatchObject({ error: { code: 'tie-not-allowed' } });
+    expect(t.db.state.games[0]).toMatchObject({ status: 'live', overtimePeriods: null });
+    await tap(t, [...periodTaps(5), home(3)], 30);
+    lapse(t);
+    expect(await end(t)).toMatchObject({ ok: true });
+    expect(t.db.state.games[0]).toMatchObject({
+      status: 'final',
+      homeScore: 5,
+      awayScore: 2,
+      overtimePeriods: 1,
+    });
+  });
+
+  it('keeps 2 for two overtimes, and 0 for a game ended in regulation', async () => {
+    const two = setUp();
+    await tap(two, [...tipOff, home(2), away(2), ...regulation, ...periodTaps(5)], 1);
+    await tap(two, [away(2), home(2), ...periodTaps(6), away(3)], 30);
+    lapse(two);
+    expect(await end(two)).toMatchObject({ ok: true });
+    expect(two.db.state.games[0]).toMatchObject({
+      status: 'final',
+      homeScore: 4,
+      awayScore: 7,
+      overtimePeriods: 2,
+    });
+
+    const inRegulation = setUp();
+    await tap(inRegulation, [...tipOff, home(2), ...regulation, away(3)], 1);
+    lapse(inRegulation);
+    expect(await end(inRegulation)).toMatchObject({ ok: true });
+    expect(inRegulation.db.state.games[0]).toMatchObject({ status: 'final', overtimePeriods: 0 });
+  });
+
+  it('is kept by the tracker’s own End game tap too', async () => {
+    const t = setUp();
+    await tap(t, [...tipOff, home(2), away(2), ...regulation, ...periodTaps(5), away(2)], 1);
+    await tap(t, [{ type: 'end' }], 40);
+    expect(t.db.state.games[0]).toMatchObject({
+      status: 'final',
+      homeScore: 2,
+      awayScore: 4,
+      overtimePeriods: 1,
+    });
+  });
+
+  it('a game reopened loses it, and one ended again in regulation keeps 0', async () => {
+    const t = setUp();
+    await tap(t, [...tipOff, home(2), away(2), ...regulation, ...periodTaps(5), home(3)], 1);
+    lapse(t);
+    await end(t);
+    expect(t.db.state.games[0]?.overtimePeriods).toBe(1);
+    const reopened = await reopenGame(
+      t.as(ownerId),
+      { gameId, version: versionOf(t), reason: 'The overtime basket was before the horn' },
+      t.deps,
+    );
+    expect(reopened).toMatchObject({ ok: true });
+    expect(t.db.state.games[0]).toMatchObject({ status: 'live', overtimePeriods: null });
+    // The correction keeps the result's words and numbers as before (T-220).
+    expect(t.db.state.corrections.at(-1)?.after).toEqual({
+      version: 1,
+      status: 'live',
+      homeScore: 5,
+      awayScore: 2,
+    });
+    // The basket and the overtime undone: it was the last basket of the fourth quarter.
+    await tap(t, [{ type: 'undo' }, { type: 'undo' }, home(3)], 60);
+    lapse(t);
+    expect(await end(t)).toMatchObject({ ok: true });
+    expect(t.db.state.games[0]).toMatchObject({
+      status: 'final',
+      homeScore: 5,
+      awayScore: 2,
+      overtimePeriods: 0,
+    });
+  });
+});

@@ -535,7 +535,8 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
       deps,
     ),
   );
-  // A tracked game, played and ended on the tracker.
+  // A tracked game, played and ended on the tracker: level after regulation and won in
+  // the first overtime, so its result keeps one overtime period (step 2.200).
   const session = ok(
     'session',
     await openScoringSession(as, { gameId: gameIds.tracked, deviceId: 'agree-tablet' }, deps),
@@ -561,6 +562,13 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
         tap({ type: 'start' }),
         tap({ type: 'score', side: 'home', playerId: herons[0], points: 2 }),
         tap({ type: 'score', side: 'away', playerId: kestrels[1], points: 3 }),
+        tap({ type: 'pause' }),
+        tap({ type: 'period', period: 2 }),
+        tap({ type: 'start' }),
+        tap({ type: 'score', side: 'home', playerId: herons[2], points: 1 }),
+        tap({ type: 'pause' }),
+        tap({ type: 'period', period: 3 }),
+        tap({ type: 'start' }),
         tap({ type: 'score', side: 'home', playerId: herons[2], points: 2 }),
         tap({ type: 'end' }),
       ],
@@ -654,6 +662,27 @@ describe('the one world and the database, the same season by the same commands',
       );
       expect(b, gameId).toEqual(a);
     }
+  });
+
+  it('agree on each game’s overtime count: 1 for the tracked game, none for the rest (step 2.200)', async () => {
+    const [a, b] = await both(async (side) =>
+      side.deps.transaction(side.as, async (tx) => {
+        const counts: Record<string, number | null | undefined> = {};
+        for (const [name, gameId] of Object.entries(gameIds)) {
+          counts[name] = (await tx.games.find(gameId))?.overtimePeriods;
+        }
+        return counts;
+      }),
+    );
+    expect(b).toEqual(a);
+    expect(a).toMatchObject({
+      tracked: 1,
+      box: null,
+      final: null,
+      forfeit: null,
+      postponed: null,
+      cancelled: null,
+    });
   });
 
   it('agree on putting back a player marked as left, and on a team in the bin (step 2.161)', async () => {

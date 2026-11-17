@@ -1,7 +1,8 @@
 // Which box score lines are written again (changedLines): only those that differ from
 // the saved ones, compared field by field, whatever order the fields come in.
+import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
-import { changedLines } from './live-game.ts';
+import { changedLines, overtimePeriodsOf } from './live-game.ts';
 import type { LiveGameLine } from './ports.ts';
 
 const line: LiveGameLine = {
@@ -56,5 +57,30 @@ describe('changedLines', () => {
       lines: [other],
       removed: ['p1'],
     });
+  });
+});
+
+describe('overtimePeriodsOf (P7 §5.6, step 2.200)', () => {
+  /** A state moved through these periods, as the tracker's period taps move it. */
+  const through = (rules: basketball.Rules, periods: readonly number[]) =>
+    periods.reduce(
+      (state, period, i) =>
+        basketball.apply(state, { type: 'period', period }, { id: `p${i}`, now: 1000 + i }),
+      basketball.newGame(rules, 0),
+    );
+
+  it('is 0 in regulation, and one for each period past it, halves or quarters', () => {
+    expect(overtimePeriodsOf(through(basketball.HALVES, []))).toBe(0);
+    expect(overtimePeriodsOf(through(basketball.HALVES, [2]))).toBe(0);
+    expect(overtimePeriodsOf(through(basketball.HALVES, [2, 3]))).toBe(1);
+    expect(overtimePeriodsOf(through(basketball.QUARTERS, [2, 3, 4]))).toBe(0);
+    expect(overtimePeriodsOf(through(basketball.QUARTERS, [2, 3, 4, 5]))).toBe(1);
+    expect(overtimePeriodsOf(through(basketball.QUARTERS, [2, 3, 4, 5, 6]))).toBe(2);
+  });
+
+  it('counts the period the game stands in: an overtime picked and undone is none', () => {
+    const picked = through(basketball.HALVES, [2, 3]);
+    const undone = basketball.apply(picked, { type: 'undo' }, { id: 'u', now: 5000 });
+    expect(overtimePeriodsOf(undone)).toBe(0);
   });
 });

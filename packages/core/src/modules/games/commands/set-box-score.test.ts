@@ -65,6 +65,8 @@ describe('setBoxScore', () => {
       captureMode: 'box',
       homeScore: 30,
       awayScore: 18,
+      // A sheet from paper says nothing of overtime yet: no count, so no mark (step 2.200).
+      overtimePeriods: null,
     });
     expect(db.state.games[0]?.format).toMatchObject({ version: 1 });
     expect(db.state.lines).toEqual(input.lines.map((l) => ({ gameId: gameUuid(1), ...l })));

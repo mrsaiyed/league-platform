@@ -252,6 +252,15 @@ export function changedLines(
   return { lines, removed };
 }
 
+/**
+ * How many overtime periods a state's game has had (P7 §5.6): the period it stands in,
+ * less the regulation periods of its rules; 0 while it is still in regulation. Read when
+ * the tracker ends a game, so the result keeps the period it ended in.
+ */
+export function overtimePeriodsOf(state: basketball.GameState): number {
+  return Math.max(0, basketball.derive(state).period - state.rules.periods);
+}
+
 /** The score each side has in a state. */
 export function scoreOf(state: basketball.GameState): { home: number; away: number } {
   const teams = basketball.derive(state).teams;

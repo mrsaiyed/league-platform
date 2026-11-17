@@ -49,6 +49,7 @@ export function gamesForLists(
       'g.capture_mode',
       'g.home_score',
       'g.away_score',
+      'g.overtime_periods',
       'g.format',
       'g.finalized_at',
       'g.deleted_at',

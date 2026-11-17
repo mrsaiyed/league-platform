@@ -410,7 +410,12 @@ export const applyTrackerCommands = defineCommand({
     ) {
       const updated = await tx.games.setResult(
         gameId,
-        { ...result, decided: false, ...(fixRules ? { format: rules } : {}) },
+        {
+          ...result,
+          decided: false,
+          overtimePeriods: null,
+          ...(fixRules ? { format: rules } : {}),
+        },
         game.version,
       );
       // The game is locked and was read after the lock: it cannot have moved on.

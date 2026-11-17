@@ -32,7 +32,13 @@ export const cancelGame = defineCommand({
     }
     const updated = await tx.games.setResult(
       game.id,
-      { status: 'cancelled', homeScore: null, awayScore: null, decided: false },
+      {
+        status: 'cancelled',
+        homeScore: null,
+        awayScore: null,
+        decided: false,
+        overtimePeriods: null,
+      },
       input.version,
     );
     if (updated === undefined) return fail({ code: 'changed-since-read' });

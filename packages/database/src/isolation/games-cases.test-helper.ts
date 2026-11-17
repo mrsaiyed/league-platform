@@ -96,7 +96,13 @@ const postponeTargetGame = (scope: LeagueScope, target: LeagueRecords) =>
   updateGameResult(
     scope,
     target.upcomingGameId,
-    { status: 'postponed', homeScore: null, awayScore: null, decided: false },
+    {
+      status: 'postponed',
+      homeScore: null,
+      awayScore: null,
+      decided: false,
+      overtimePeriods: null,
+    },
     1,
   );
 
@@ -129,7 +135,13 @@ registerIsolationCase({
     updateGameResult(
       scope,
       target.upcomingGameId,
-      { status: 'postponed', homeScore: null, awayScore: null, decided: false },
+      {
+        status: 'postponed',
+        homeScore: null,
+        awayScore: null,
+        decided: false,
+        overtimePeriods: null,
+      },
       1,
     ),
 });
