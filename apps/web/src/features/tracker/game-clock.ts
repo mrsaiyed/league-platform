@@ -210,6 +210,18 @@ export type SetEffect =
  */
 export type TakesBack = { readonly takenBack: string | null; readonly rest: string | null };
 
+/**
+ * How far the minutes moved, as the two clock times differ where the clock SHOWS them in
+ * whole seconds (the reviews' LOW 3: 16:55, truly 16:54.6, set to 17:30 moves 0:35, and a
+ * starter goes from 3:05 to 2:30), never more than truly moved (`movedMs`, which can be
+ * less: only what the period has run comes off).
+ */
+function shownMove(movedMs: number, fromMs: number, toMs: number): string {
+  const shown = Math.abs(Math.ceil(fromMs / 1000) - Math.ceil(toMs / 1000)) * 1000;
+  const moved = Math.ceil(movedMs / 1000) * 1000;
+  return basketball.formatClock(shown > 0 ? Math.min(shown, moved) : moved);
+}
+
 /** The take-back of `totalMs`, as the form and the sentence say it. */
 function takesBack(totalMs: number, takenBackMs: number): TakesBack {
   if (takenBackMs < 1000) return { takenBack: null, rest: null };
@@ -240,18 +252,20 @@ export function setEffect(
   serverNow: number,
 ): SetEffect | null {
   const effect = basketball.clockSetEffect(game, ms, serverNow);
+  // A set lands on the second typed (or, on that same second, the exact time it read).
+  const from = basketball.clockAt(game, serverNow).remainingMs;
   switch (effect.kind) {
     case 'back':
       return {
         kind: 'back',
-        time: basketball.formatClock(effect.ms),
+        time: shownMove(effect.ms, from, ms),
         wholePeriod: effect.wholePeriod,
         ...takesBack(effect.ms, effect.takesBackMs),
       };
     case 'added':
       return {
         kind: 'added',
-        time: basketball.formatClock(effect.ms),
+        time: shownMove(effect.ms, from, ms),
         ...takesBack(effect.ms, effect.takesBackMs),
       };
     case 'start':
@@ -296,7 +310,7 @@ export function minutesMoved(
   });
   return {
     kind: change < 0 ? 'back' : 'added',
-    time: basketball.formatClock(Math.abs(change)),
+    time: shownMove(Math.abs(change), before.remainingMs, after.clock.remainingMs),
     even,
     ...takesBack(Math.abs(change), basketball.takenBackMs(before.elapsedMs, after)),
   };

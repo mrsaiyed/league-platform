@@ -409,6 +409,30 @@ describe('the clock’s keys (T5)', () => {
     expect(setEffect(tippedOff(rules), 15 * 60_000, 0)).toEqual({ kind: 'start', clock: '15:00' });
   });
 
+  it('off the whole second, says the difference the clock shows (LOW 3): 16:55, truly 16:54.6, to 17:30 is 0:35', () => {
+    const rules: basketball.Rules = { ...basketball.HALVES, minutesFollow: 'game-clock' };
+    const tip = tippedOff(rules);
+    const t0 = tip.lastAt;
+    const paused = at(at(tip, t0, { type: 'start' }), t0 + 185_400, { type: 'pause' });
+    const reading = readClock(paused, t0 + 186_000);
+    expect(reading).toMatchObject({ text: '16:55', remainingMs: 1_014_600 });
+    expect(setEffect(paused, 1_050_000, t0 + 186_000)).toEqual({
+      kind: 'back',
+      time: '0:35',
+      wholePeriod: false,
+      takenBack: null,
+      rest: null,
+    });
+    const set = at(paused, t0 + 186_000, { type: 'set-clock', ms: 1_050_000 });
+    expect(minutesMoved(paused, reading, set)).toMatchObject({ kind: 'back', time: '0:35' });
+    // What a starter's tile shows: 3:05, then 2:30, 0:35 less.
+    const starter = (s: basketball.GameState) =>
+      basketball.formatMinutes(basketball.derive(s).players['h3']?.ms ?? -1);
+    expect([starter(paused), starter(set)]).toEqual(['3:05', '2:30']);
+    // Taken off, the same way: 16:55 to 12:00 is 4:55.
+    expect(setEffect(paused, 720_000, t0 + 186_000)).toMatchObject({ kind: 'added', time: '4:55' });
+  });
+
   it('refuses a time longer than the period being played, in words (L5)', () => {
     const half = basketball.periodMs(basketball.HALVES, 1);
     expect(clockEntry('2500', half)).toEqual({ text: '25:00', ms: null, problem: 'period' });
