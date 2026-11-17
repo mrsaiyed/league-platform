@@ -12,8 +12,10 @@ import {
   type LeagueRouteProps,
 } from '../../features/shell/index.ts';
 import { isStaffAddress } from '../../features/staff/index.ts';
+import { myTeamsOf } from '../../features/team-pages/index.ts';
 import { isTrackerAddress } from '../../features/tracker/index.ts';
 import { webPorts } from '../../server/container.ts';
+import { commandContextOf } from '../../server/context.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { leagueSites, siteOf } from '../../server/league-site.ts';
 import { leagueView, signedInEmail } from '../../server/load-league-page.ts';
@@ -32,7 +34,9 @@ import './league-site.css';
  * pages the header also holds the season picker, so the seasons are read here; the page
  * under it reads the same ones without asking again (league-seasons.ts). The account button
  * (U-8) is the signed-in person's own, drawn for this request only (account-menu.ts); it is
- * on the admin's pages and the scoring page too, which sit under this layout.
+ * on the admin's pages and the scoring page too, which sit under this layout. Here it has
+ * "My team" for someone with a team of the season (step 2.168), so their teams are read
+ * for a signed-in person only.
  */
 export default async function LeagueLayout({
   children,
@@ -59,6 +63,18 @@ export default async function LeagueLayout({
   const current = currentMenuPage(league, path);
   const season =
     current === null ? null : headerSeason(league, path, await seasonsOfLeague(league.id));
+  const account = view.context.account;
+  const ports = await webPorts();
+  const teams =
+    account === null
+      ? 0
+      : (
+          await myTeamsOf(ports, {
+            leagueId: league.id,
+            accountId: account.accountId,
+            holder: () => ports.accessOf(commandContextOf(view.context)),
+          })
+        ).teams.length;
   return (
     <div className="league-site ui-root">
       <DesignStyle design={site.design} />
@@ -68,7 +84,7 @@ export default async function LeagueLayout({
       <SiteHeader
         league={league}
         name={site.name}
-        account={accountMenuOf(view, await signedInEmail(), path)}
+        account={accountMenuOf(view, await signedInEmail(), path, teams)}
         signInHref={signInHrefFrom(path)}
         current={current}
         season={season}
@@ -77,7 +93,7 @@ export default async function LeagueLayout({
       <div className="site-body" id="content">
         {children}
       </div>
-      <SiteFooter name={site.name} madeUp={(await webPorts()).madeUpWorld} />
+      <SiteFooter name={site.name} madeUp={ports.madeUpWorld} />
     </div>
   );
 }

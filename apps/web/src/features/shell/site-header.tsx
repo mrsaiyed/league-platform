@@ -43,7 +43,7 @@ function MenuLinks({
 
 /**
  * What the account button holds for a signed-in person (U-8): who they are signed in as,
- * then the admin, their games, their account, and signing out. Drawn twice, as the menu
+ * then their team (step 2.168), the admin, their games, their account, and signing out. Drawn twice, as the menu
  * and sign-in are: in the phone menu's panel and in the account button of the first row;
  * only one of the two is shown at any width. Signing out also clears the games the tracker
  * kept on this device (T-115), so a shared tablet can be signed out from any page. On the
@@ -56,6 +56,13 @@ function AccountEntries({ account }: { readonly account: AccountMenu }) {
     <>
       <p className="site-account-who">{t('account.signedInAs', { email: account.email })}</p>
       <ul>
+        {account.myTeam === null ? null : (
+          <li>
+            <a href={account.myTeam.href}>
+              {t(account.myTeam.several ? 'account.menu.myTeams' : 'account.menu.myTeam')}
+            </a>
+          </li>
+        )}
         {account.adminHref === null ? null : (
           <li>
             <a href={account.adminHref}>{t('account.menu.admin')}</a>

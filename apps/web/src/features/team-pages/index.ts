@@ -2,5 +2,7 @@
 export { TeamsPage } from './teams-page.tsx';
 export { TeamPage } from './team-page.tsx';
 export { loadTeamCardsOf, type TeamCard } from './build-team.ts';
+export { MyPage } from './my-page.tsx';
+export { myTeamsOf, type MyTeam, type MyTeams } from './my-teams.ts';
 export { startPageRedirect } from './start-redirect.ts';
 export { leagueHomeStayUrl, stayAtHome } from './start-page.ts';

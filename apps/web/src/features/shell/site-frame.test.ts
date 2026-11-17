@@ -22,6 +22,7 @@ const madeUpAccount: AccountMenu = {
   email: 'owner@example.test',
   adminHref: '/north-valley/admin',
   gamesHref: '/north-valley/admin/games',
+  myTeam: null,
   accountHref: '/account',
   onScoringPage: false,
 };

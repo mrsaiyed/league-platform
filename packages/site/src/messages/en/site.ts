@@ -266,6 +266,12 @@ export const enSite = {
   'team.leagueHome': 'League home',
   'team.makeMine': 'Make this my team',
   'team.mineNote': 'This device will open the league on this team.',
+  // A member's own page of a league, `/{league}/my` (step 2.168).
+  'team.my.none':
+    'You are not on a team in this league this season. Once the league puts you on one, it opens here.',
+  'team.my.seeTeams': 'See the teams',
+  'team.my.several': 'Your teams.',
+  'team.my.severalLead': 'You are on more than one team this season. Open the one you want.',
   'team.nameLeft': '{name} (left {date})',
   'team.nameNotShown': 'Name not shown',
   'team.noNumber': 'No number',
@@ -288,6 +294,9 @@ export const enSite = {
   'team.statsPlayers': 'Players',
   'team.statsTotals': 'Team totals',
   'team.statsTotalsOnly': "Only this team's totals are shown. Its players' numbers are not public.",
+  // Said to a signed-in member on their own team's page, once the page has asked (step 2.168).
+  'team.yours': 'This is your team.',
+  'team.yoursOpensHere': 'The league opens here for you.',
   'teams.call.text': 'Every game of the season, round by round.',
   // The band that closes the teams page, with the way to the schedule.
   'teams.call.title': 'See them play.',
@@ -305,4 +314,6 @@ export const enSite = {
   'teams.recordTies': '{wins}-{losses}-{ties}',
   // The teams list and a team's page (step 2.44).
   'teams.title': 'Teams',
+  // The mark on a person's own team, or the one this device chose (step 2.168).
+  'teams.yours': 'Your team',
 } as const;
