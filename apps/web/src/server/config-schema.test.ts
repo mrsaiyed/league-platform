@@ -19,6 +19,7 @@ const valid: Record<ConfigName, string> = {
   LOCAL_DATA: 'stand-in',
   LOCAL_DESIGN: 'crest-light',
   LOCAL_NOW: '2026-11-15T20:01:00Z',
+  LOCAL_UNRELEASED: 'hidden',
   SESSION_SECRET: longValue('SESSION_SECRET'),
   SUPABASE_URL: 'http://localhost:54321',
   SUPABASE_SECRET_KEY: longValue('SUPABASE_SECRET_KEY'),
@@ -29,10 +30,16 @@ const valid: Record<ConfigName, string> = {
 };
 const names = Object.keys(fields) as ConfigName[];
 /**
- * Every setting, for staging and production: LOCAL_DATA, LOCAL_DESIGN and LOCAL_NOW are
- * for local work and tests only.
+ * Every setting, for staging and production: LOCAL_DATA, LOCAL_DESIGN, LOCAL_NOW and
+ * LOCAL_UNRELEASED are for local work and tests only.
  */
-const hosted = { ...valid, LOCAL_DATA: undefined, LOCAL_DESIGN: undefined, LOCAL_NOW: undefined };
+const hosted = {
+  ...valid,
+  LOCAL_DATA: undefined,
+  LOCAL_DESIGN: undefined,
+  LOCAL_NOW: undefined,
+  LOCAL_UNRELEASED: undefined,
+};
 /** Required in every environment. */
 const required: readonly ConfigName[] = ['APP_ENV', 'PUBLIC_BASE_URL', 'EMAIL_FROM'];
 /** Where something uses it (R8): only those environments require it. */
@@ -120,6 +127,7 @@ describe('loadConfig', () => {
       LOCAL_DATA: undefined,
       LOCAL_DESIGN: undefined,
       LOCAL_NOW: undefined,
+      LOCAL_UNRELEASED: undefined,
       EMAIL_FROM: undefined,
     });
     expect(error.missing).toEqual(['EMAIL_FROM']);
@@ -308,6 +316,27 @@ describe('loadConfig', () => {
       expect(failure({ ...production, APP_ENV: appEnv, LOCAL_NOW: at }).invalid).toEqual([
         'LOCAL_NOW: invalid, may be set only when APP_ENV is local or test',
       ]);
+    }
+  });
+
+  it('takes LOCAL_UNRELEASED in local work and tests only, shown by default (step 2.140)', () => {
+    expect(loadConfig(localOnly).LOCAL_UNRELEASED).toBe('shown');
+    for (const appEnv of ['local', 'test']) {
+      for (const set of ['shown', 'hidden'] as const) {
+        expect(
+          loadConfig({ ...localOnly, APP_ENV: appEnv, LOCAL_UNRELEASED: set }).LOCAL_UNRELEASED,
+        ).toBe(set);
+      }
+    }
+    expect(failure({ ...localOnly, LOCAL_UNRELEASED: 'everything' }).invalid).toEqual([
+      'LOCAL_UNRELEASED: invalid, not one of the allowed values',
+    ]);
+    for (const appEnv of ['staging', 'production']) {
+      for (const set of ['shown', 'hidden']) {
+        expect(failure({ ...production, APP_ENV: appEnv, LOCAL_UNRELEASED: set }).invalid).toEqual([
+          'LOCAL_UNRELEASED: invalid, may be set only when APP_ENV is local or test',
+        ]);
+      }
     }
   });
 
