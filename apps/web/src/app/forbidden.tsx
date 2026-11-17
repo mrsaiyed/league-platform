@@ -1,5 +1,10 @@
 import { cookies } from 'next/headers';
-import { RefusalPage, refusalScreenOf, StandalonePage } from '../features/shell/index.ts';
+import {
+  RefusalFresh,
+  RefusalPage,
+  refusalScreenOf,
+  StandalonePage,
+} from '../features/shell/index.ts';
 import { isStaffAddress, StaffFrame } from '../features/staff/index.ts';
 import type { LeagueView } from '../server/league-gate.ts';
 import { siteOfThisRequest } from '../server/league-site.ts';
@@ -52,7 +57,9 @@ async function nameOf(view: LeagueView | null): Promise<string | null> {
  * league frame (U-9); the mark (U-8) belongs to pages a league shows.
  *
  * The session is read once per request, shared with the page (this-request.ts); if it
- * cannot be read the screen is a visitor's.
+ * cannot be read the screen is a visitor's. Next.js keeps this screen from the last whole
+ * page it sent; when it comes into view after the browser moved on without one, it is
+ * drawn again for whoever is signed in now (RefusalFresh, features/shell/refusal-fresh.tsx).
  */
 export default async function Forbidden() {
   // Next.js draws this screen into every page it sends, before it is known whether the
@@ -76,12 +83,14 @@ export default async function Forbidden() {
     return (
       <StaffFrame view={staff}>
         <RefusalPage screen={screen} />
+        <RefusalFresh />
       </StaffFrame>
     );
   }
   return (
     <StandalonePage>
       <RefusalPage screen={screen} />
+      <RefusalFresh />
     </StandalonePage>
   );
 }
