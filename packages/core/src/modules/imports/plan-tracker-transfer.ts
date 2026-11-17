@@ -32,7 +32,7 @@
 // action's players must be on the roster of its side's team, and a player's number is
 // the one on the entry they had on the game's day.
 import type { SeasonRules } from '@srleagues/contracts';
-import { engineRulesOf, withoutMercyOrLastMinutes } from '../games/index.ts';
+import { engineRulesOf, trackerEngineRulesOf } from '../games/index.ts';
 import { compareLines, type ComparableLine, type LineDifference } from './tracker-lines.ts';
 import {
   localDateOf,
@@ -472,10 +472,11 @@ export async function planTrackerTransfer(
     const wrongSide = sideProblem(replay, people, sides);
     if (wrongSide !== undefined) return blocked(wrongSide);
     // Played as the door will play it: without a mercy rule or a last-minutes stop
-    // clock, which the tracker it was scored on never had (record 062).
+    // clock, which the tracker it was scored on never had (record 062), and with the
+    // tracker's way of counting minutes when the clock is set (record 077).
     const simulation = simulateReplay(
       replay,
-      engineRulesOf(withoutMercyOrLastMinutes(fact.rules)),
+      trackerEngineRulesOf(fact.rules),
       fact.rules.allowTies,
       options.now,
     );
