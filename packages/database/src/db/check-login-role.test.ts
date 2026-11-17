@@ -17,6 +17,8 @@ beforeAll(async () => {
     create role made_up_owner login;
     grant app_user to made_up_owner;
     grant postgres to made_up_owner;
+    create role made_up_admin_only login;
+    grant app_user to made_up_admin_only with admin true, inherit false, set false;
   `);
   db = createDatabase({ kind: 'pglite', pglite });
 });
@@ -47,5 +49,12 @@ describe('checkLoginRole', () => {
       'it owns tables in public, or can act as their owner',
     ]);
     expect(await checkLoginRole(db, 'made_up_nobody')).toEqual(['the login role does not exist']);
+  });
+
+  it('reports a member of app_user that may not switch to it, as the tables’ owner is', async () => {
+    // The membership the role that made app_user holds from PostgreSQL 16 on (step 2.202).
+    expect(await checkLoginRole(db, 'made_up_admin_only')).toEqual([
+      'it is a member of app_user but may not switch to it (set role)',
+    ]);
   });
 });

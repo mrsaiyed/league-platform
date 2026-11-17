@@ -2,6 +2,11 @@
 // drops every transaction to app_user, but the login role's own powers are what a
 // query would have if it ever escaped that, so the login must have none to spare.
 // The app calls this once at startup and refuses to start on any problem.
+//
+// Being a member is not enough: from PostgreSQL 16 on, the role that made app_user (the
+// tables' owner, as Supabase's `postgres`) is a member of it with ADMIN only, and may not
+// switch to it, so every transaction would be refused. Seen on a real PostgreSQL (step
+// 2.202); PGlite runs everything as a superuser, which may.
 import { sql } from 'kysely';
 import { kyselyOf, type DatabaseHandle } from './database-handle.ts';
 
@@ -11,6 +16,7 @@ type RoleFacts = {
   bypasses_rls: boolean;
   owns_tables: boolean;
   is_app_user: boolean;
+  may_become_app_user: boolean;
 };
 
 /**
@@ -26,7 +32,8 @@ export async function checkLoginRole(db: DatabaseHandle, role?: string): Promise
         select 1 from pg_catalog.pg_tables t
         where t.schemaname = 'public' and pg_catalog.pg_has_role(r.oid, t.tableowner, 'MEMBER')
       )), false) as owns_tables,
-      coalesce(bool_or(pg_catalog.pg_has_role(r.oid, 'app_user', 'MEMBER')), false) as is_app_user
+      coalesce(bool_or(pg_catalog.pg_has_role(r.oid, 'app_user', 'MEMBER')), false) as is_app_user,
+      coalesce(bool_or(pg_catalog.pg_has_role(r.oid, 'app_user', 'SET')), false) as may_become_app_user
     from pg_catalog.pg_roles r
     where r.rolname = coalesce(${role ?? null}::text, session_user)`.execute(kyselyOf(db));
   const facts = rows[0];
@@ -36,5 +43,8 @@ export async function checkLoginRole(db: DatabaseHandle, role?: string): Promise
   if (facts.bypasses_rls) problems.push('it bypasses row-level security');
   if (facts.owns_tables) problems.push('it owns tables in public, or can act as their owner');
   if (!facts.is_app_user) problems.push('it is not app_user and not a member of app_user');
+  else if (!facts.may_become_app_user) {
+    problems.push('it is a member of app_user but may not switch to it (set role)');
+  }
   return problems;
 }
