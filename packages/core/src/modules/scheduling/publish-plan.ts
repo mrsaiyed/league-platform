@@ -32,7 +32,7 @@ export type PublishBlocker =
         | 'unknown-team'
         | 'unknown-venue'
         | 'unknown-court'
-        /** The draft removes a round a game it does not hold is still in (step 2.160). */
+        /** The draft removes a round a game with no date yet is still in (steps 2.160, 2.181). */
         | 'round-in-use';
       readonly gameId?: string;
       readonly roundId?: string;
@@ -77,7 +77,13 @@ export async function planPublication(
 
   const nothing = publishChangeCount(summary) === 0;
   if (nothing) blockers.push({ code: 'nothing-to-publish' });
-  const inUse = await roundsStillInUse(tx, seasonId, summary.roundsRemoved, applied.state);
+  const inUse = await roundsStillInUse(
+    tx,
+    seasonId,
+    summary.roundsRemoved,
+    published,
+    applied.state,
+  );
   for (const roundId of summary.roundsRemoved) {
     if (inUse.has(roundId)) blockers.push({ code: 'round-in-use', roundId });
   }

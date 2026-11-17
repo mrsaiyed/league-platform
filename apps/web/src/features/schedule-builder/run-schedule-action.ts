@@ -51,8 +51,11 @@ export type SavedDetail =
    * on the server, never from the address.
    */
   | { readonly what: 'game-removed'; readonly roundId: string | null; readonly gameId?: string }
-  /** A removed game was put back in the draft as it was. */
-  | { readonly what: 'game-put-back'; readonly gameId: string };
+  /**
+   * A removed game was put back in the draft as it was; with `fromRoundId`, the round it was
+   * in has since been removed from the draft, so it came back with no round (S-60).
+   */
+  | { readonly what: 'game-put-back'; readonly gameId: string; readonly fromRoundId?: string };
 
 /** Which form a refusal belongs beside: the new round's, or one round's own. */
 export type RefusedAt =
@@ -277,6 +280,12 @@ async function putBackGame(
   if (was === undefined || view.draft === null || was.status !== 'scheduled') {
     return { kind: 'refused', code: 'nothing-to-put-back' };
   }
+  // Its round removed from the draft since (step 2.181): it comes back with no round, as a
+  // game brought back from the bin does (S-60), never refused for a round that is gone.
+  const fromRoundId =
+    was.roundId !== null && !view.result.rounds.some((r) => r.id === was.roundId)
+      ? was.roundId
+      : undefined;
   const done = await addDraftGame(
     context,
     {
@@ -287,7 +296,7 @@ async function putBackGame(
       gameId,
       homeTeamId: was.homeTeamId,
       awayTeamId: was.awayTeamId,
-      roundId: was.roundId,
+      roundId: fromRoundId === undefined ? was.roundId : null,
       date: was.date,
       time: was.time,
       venueId: was.venueId,
@@ -296,5 +305,14 @@ async function putBackGame(
     },
     deps,
   );
-  return done.ok ? { kind: 'saved', detail: { what: 'game-put-back', gameId } } : refusal(done);
+  return done.ok
+    ? {
+        kind: 'saved',
+        detail: {
+          what: 'game-put-back',
+          gameId,
+          ...(fromRoundId === undefined ? {} : { fromRoundId }),
+        },
+      }
+    : refusal(done);
 }
