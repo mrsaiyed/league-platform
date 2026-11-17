@@ -21,6 +21,7 @@ export type {
 export {
   readStandings,
   winPercentageOf,
+  type LevelGroup,
   type ReadStandingsError,
   type Standings,
   type StandingsFootnote,

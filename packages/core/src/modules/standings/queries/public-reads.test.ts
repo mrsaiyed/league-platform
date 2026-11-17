@@ -53,6 +53,85 @@ describe('readStandings', () => {
     expect(JSON.stringify(result)).not.toMatch(/account/i);
   });
 
+  it('finds level teams from the whole numbers, never from rounded percentages (step 2.195)', async () => {
+    const base = memoryStandingsRead();
+    const [first] = await base.standingsRows(seasonId);
+    if (first === undefined) throw new Error('expected a row');
+    const team = (id: string, name: string) => ({
+      id,
+      name,
+      slug: name.toLowerCase(),
+      color: null,
+      divisionId,
+      statsVisibility: 'everyone',
+    });
+    const row = (
+      teamId: string,
+      rank: number,
+      record: { wins: number; losses: number; ties?: number },
+      decidedBy: string | null,
+    ) => ({ ...first, teamId, rank, seed: rank, ties: 0, ...record, decidedBy });
+    // 2–1 and 667–333 both read 0.667, and are not level; 1–2 and 2–4 are, exactly; a
+    // team with no games is level with one that lost its only game (both 0, as ranked).
+    const store: StandingsReadStore = {
+      ...base,
+      teams: async () => ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => team(id, id.toUpperCase())),
+      standingsRows: async () => [
+        row('a', 1, { wins: 667, losses: 333 }, null),
+        row('b', 2, { wins: 2, losses: 1 }, null),
+        row('c', 3, { wins: 1, losses: 2 }, 'head-to-head'),
+        row('d', 4, { wins: 2, losses: 4 }, 'head-to-head'),
+        row('e', 5, { wins: 0, losses: 0 }, 'point-difference'),
+        row('f', 6, { wins: 0, losses: 1 }, 'point-difference'),
+      ],
+      adjustments: async () => [],
+      decidedGamesOf: async () =>
+        ['g1', 'g2'].map((gameId) => ({
+          gameId,
+          status: 'final',
+          captureMode: 'final',
+          homeTeamId: 'c',
+          awayTeamId: 'd',
+          lines: [],
+        })),
+    };
+    const result = await readStandings(store, { seasonId });
+    if (!result.ok) throw new Error('expected a table');
+    expect(result.value.tiebreakers).toEqual(['head-to-head', 'point-difference', 'points-scored']);
+    expect(result.value.tables[0]?.levelGroups).toEqual([
+      { teamIds: ['c', 'd'], on: 'win-percentage', gamesBetween: 2 },
+      { teamIds: ['e', 'f'], on: 'win-percentage', gamesBetween: null },
+    ]);
+    // In a table ranked by points, teams are level on their points alone.
+    const byPoints: StandingsReadStore = {
+      ...store,
+      findSeason: async (id) =>
+        id === seasonId
+          ? {
+              id,
+              name: 'Fall',
+              rules: {
+                ...defaultSeasonRules(),
+                standings: {
+                  ...defaultSeasonRules().standings,
+                  rankBy: 'points',
+                  columns: ['played', 'wins', 'losses', 'points'],
+                },
+              },
+            }
+          : undefined,
+      standingsRows: async () => [
+        { ...row('a', 1, { wins: 2, losses: 0 }, 'points-scored'), standingsPoints: 4 },
+        { ...row('b', 2, { wins: 1, losses: 0, ties: 2 }, 'points-scored'), standingsPoints: 4 },
+        { ...row('c', 3, { wins: 0, losses: 1 }, null), standingsPoints: 0 },
+      ],
+    };
+    const points = await readStandings(byPoints, { seasonId });
+    expect(points.ok && points.value.tables[0]?.levelGroups).toEqual([
+      { teamIds: ['a', 'b'], on: 'points', gamesBetween: null },
+    ]);
+  });
+
   it('says when the season is not in the league', async () => {
     expect(await readStandings(memoryStandingsRead(), { seasonId: 'nope' })).toEqual({
       ok: false,

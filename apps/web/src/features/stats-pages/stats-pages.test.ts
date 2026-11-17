@@ -57,9 +57,44 @@ describe('standings page', () => {
     const text = renderToStaticMarkup(createElement(StandingsTables, { tables: views }));
     expect(text).toContain('Played an ineligible player in round 3.');
     expect(text).toContain('Adjusted by -1 win');
-    expect(text).toContain('games they played against each other');
     expect(text).toContain('Owls');
     expect(text).toContain('Seed');
+  });
+
+  // North Valley East (the numbers audit's case 45): Owls and Falcons both 2–1; the Owls won
+  // their one game, so they are first despite the worse difference. The note beside the
+  // Falcons, second, is true of them (step 2.195: it used to tell them they were "placed
+  // above"). West: Lions, Tigers, Hawks and Bears all 1–1, and the note claims no more than
+  // the stored rows can say (step 2.198 says which tiebreaker placed whom).
+  it('writes one note for each group of level teams, true of every team it is beside', async () => {
+    const [season] = await seasonsOf(adult);
+    const result = await readStandings(stats.readStoreOf(adult), { seasonId: season?.id ?? '' });
+    if (!result.ok) throw new Error('expected standings');
+    const [east, west] = buildStandingsViews(result.value);
+    const beside = (table: typeof east, team: string) =>
+      (table?.rows.find((row) => row.team === team)?.notes ?? []).map(
+        (id) => table?.footnotes.find((f) => f.id === id)?.text,
+      );
+    expect(east?.rows.map((row) => row.team)).toEqual(['Owls', 'Falcons', 'Herons']);
+    const eastNote =
+      'Owls and Falcons are level on win percentage (0.667). The game between them puts Owls ahead.';
+    expect(beside(east, 'Falcons')).toEqual([eastNote]);
+    expect(beside(east, 'Owls')).toEqual([eastNote]);
+    expect(beside(east, 'Herons')).toEqual([]);
+    const westNote =
+      'Lions, Tigers, Hawks, and Bears are level on win percentage (0.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
+    for (const team of ['Lions', 'Tigers', 'Hawks', 'Bears']) {
+      expect(beside(west, team)).toEqual([westNote]);
+    }
+    expect(beside(west, 'Otters')).toEqual([]);
+    expect(beside(west, 'Badgers')).toEqual([
+      'Adjusted by -1 win. Played an ineligible player in round 3.',
+    ]);
+    const text = renderToStaticMarkup(
+      createElement(StandingsTables, { tables: [east, west].flatMap((t) => (t ? [t] : [])) }),
+    );
+    expect(text).not.toMatch(/placed above/i);
+    expect(text).toContain(eastNote);
   });
 
   it('ranks by points for a league that does, and says when teams are still level', async () => {
