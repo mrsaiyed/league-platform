@@ -1,9 +1,17 @@
+import { leagueApiUrl } from '@srleagues/core';
 import { Group } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { t } from '../../server/messages.ts';
 import type { GameView, RoundView } from './build-schedule.ts';
 import type { GameLinkWords } from './game-link-text.ts';
 import { LiveGameList } from './live-game-list.tsx';
+
+/**
+ * Where a page's script asks which of its games the signed-in person may score (step 2.153):
+ * the same address for everyone, so it is no trace of anyone in the page.
+ */
+export const scoringAddressOf = (leagueId: string): string =>
+  leagueApiUrl({ id: leagueId }, ['scoring']);
 
 /** The words of a game card's link, braces and all, for the page to fill (game-link-text.ts). */
 export function gameLinkWords(): GameLinkWords {
@@ -54,6 +62,7 @@ export function GameList({
       across={across}
       featured={featured}
       awaitingLabel={t('schedule.awaitingResult')}
+      scoringAddress={scoringAddressOf(leagueId)}
       labels={displayLabels(t).game}
       linkWords={gameLinkWords()}
       announcement={t('schedule.liveAnnouncement', {

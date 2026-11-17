@@ -25,6 +25,7 @@ import {
   type PlayPeriodView,
 } from './build-game.ts';
 import { webLiveAddress } from '../live-updates/index.ts';
+import { GameOffer, scoringAddressOf } from '../schedule-pages/index.ts';
 import { LiveGameView } from './live-game-view.tsx';
 import { NewerPlaysLink } from './newer-plays-link.tsx';
 
@@ -108,6 +109,13 @@ export function GameContent({ view }: { readonly view: GameView }) {
         {view.corrected === null ? null : (
           <p className="ui-page-sub game-corrected">{view.corrected}</p>
         )}
+        {/* "Score this game" or "Enter the score", drawn on the device of a signed-in person
+            who may, after the page; the page itself is the same for everyone (step 2.153). */}
+        <GameOffer
+          address={scoringAddressOf(view.leagueId)}
+          gameId={view.snapshot.gameId}
+          status={view.status}
+        />
       </header>
       <LiveGameView
         leagueId={view.leagueId}

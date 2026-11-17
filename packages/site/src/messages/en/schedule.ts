@@ -35,6 +35,13 @@ export const enSchedule = {
   'schedule.liveAnnouncement': '{away} {awayScore}, {home} {homeScore}: {status}',
   'schedule.noMatch': 'No games match that choice.',
   'schedule.noSeason': 'There is no season to show yet.',
+  // On a game's card and its page, for a signed-in person who may score it (step 2.153;
+  // S-38, S-50, S-70): the tracker for a game recorded live, Games for one recorded as a
+  // final score or a box score. `which` is what a screen reader hears where several are
+  // near: the button's words ({action}) and the game.
+  'schedule.offer.enter': 'Enter the score',
+  'schedule.offer.score': 'Score this game',
+  'schedule.offer.which': '{action}: {away} against {home}',
   'schedule.otherGames': 'Other games',
   'schedule.phase.current': 'This round',
   'schedule.phase.past': 'Finished',

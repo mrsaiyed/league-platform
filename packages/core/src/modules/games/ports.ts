@@ -207,6 +207,12 @@ export type GamesStore = {
    */
   readonly listWindow: (accountId: string, days: number) => Promise<GamesWindow>;
   /**
+   * The games of these ids that are in this league, not in the bin and of a season not in
+   * the bin, with the account's assignments, in no set order (step 2.153: the games a
+   * public page shows, for its "Score this game"). An id of no such game is left out.
+   */
+  readonly listByIds: (accountId: string, gameIds: readonly string[]) => Promise<GamesWindow>;
+  /**
    * The games that still need a result (needs-result.ts) by the store's clock: live, or
    * scheduled with their start passed; in no bin, of a season in no bin; of those, the ones
    * in `reach`; oldest first, at most `limit`.
