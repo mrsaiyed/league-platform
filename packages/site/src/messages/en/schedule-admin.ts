@@ -206,7 +206,7 @@ export const enScheduleAdmin = {
     'Nothing public changes until you publish. Put it back now and it is as it was, under "Games with no round". After you publish, it cannot be brought back from here yet.',
   // A removed game that has started, been decided or called off since (step 2.185).
   'schedule.admin.removedSince.cancelled':
-    'Removed in this draft. It has been cancelled since; publishing still removes it.',
+    'Removed in this draft, and cancelled since: publishing still removes it. Putting it back in the draft keeps it in the schedule, still cancelled; the game itself is put back from its page in Games.',
   'schedule.admin.removedSince.final':
     'Removed in this draft, but it has been played since. Put it back in the draft to publish.',
   'schedule.admin.removedSince.forfeit':
@@ -214,7 +214,7 @@ export const enScheduleAdmin = {
   'schedule.admin.removedSince.live':
     'Removed in this draft, but it has started since. Put it back in the draft to publish.',
   'schedule.admin.removedSince.postponed':
-    'Removed in this draft. It has been postponed since; publishing still removes it.',
+    'Removed in this draft, and postponed since: publishing still removes it. Putting it back in the draft keeps it in the schedule, still waiting in Games for a new date.',
   'schedule.admin.renameRound': 'Round name',
   'schedule.admin.renameRoundSubmit': 'Rename round',
   'schedule.admin.reviewPublish': 'Review and publish',

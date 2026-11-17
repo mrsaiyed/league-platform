@@ -493,6 +493,66 @@ if (built) {
           page.locator('[data-draft-count]').getByRole('button', { name: 'Discard the draft' }),
           page.locator('[role=status]', { hasText: 'The draft was discarded.' }),
         );
+
+        // A game removed in the draft and then postponed, and one then cancelled, in Games
+        // (step 2.158): each struck row says so truly, and its button says "in the draft",
+        // so it is never read as Games' own way to put a called-off game back.
+        for (const [button, yes, words] of [
+          [
+            'Postpone',
+            'Yes, postpone it',
+            'Removed in this draft, and postponed since: publishing still removes it. Putting it back in the draft keeps it in the schedule, still waiting in Games for a new date.',
+          ],
+          [
+            'Cancel the game',
+            'Yes, cancel it',
+            'Removed in this draft, and cancelled since: publishing still removes it. Putting it back in the draft keeps it in the schedule, still cancelled; the game itself is put back from its page in Games.',
+          ],
+        ]) {
+          at = `${way}: a game removed in the draft is called off in Games (${button})`;
+          const next = editable.first();
+          const calledId = await next.getAttribute('data-game');
+          const called = await nameOf(next);
+          await next.locator('summary', { hasText: 'Edit this game' }).click();
+          const calledRow = page.locator(`li[data-removed-game="${calledId}"]`);
+          await tap(next.getByRole('button', { name: 'Remove game' }), calledRow);
+          await page.goto(`${origin}/north-valley/admin/games`);
+          const listed = page.locator(`li[id="game-${calledId}"]`);
+          const panel = listed.locator('details[data-call-off]').last();
+          if ((await panel.getAttribute('open')) === null) {
+            await panel.locator('> summary').click();
+          }
+          await listed.getByRole('button', { name: button, exact: true }).click();
+          await listed.locator('[data-call-off-ask]').waitFor();
+          // The server takes a "Yes" sooner than a person reads the question as a double tap.
+          await page.waitForTimeout(1000);
+          await Promise.all([
+            page.waitForEvent('load'),
+            listed.getByRole('button', { name: yes }).click(),
+          ]);
+          await page.goto(`${origin}/north-valley/admin/schedule`);
+          const calledText = await calledRow.innerText();
+          const inDraft = calledRow.getByRole('button', {
+            name: `Put it back in the draft: ${called}`,
+          });
+          check(
+            `a removed game ${button === 'Postpone' ? 'postponed' : 'cancelled'} since says so truly, its button "Put it back in the draft"`,
+            calledText.includes(words) &&
+              (await inDraft.count()) === 1 &&
+              (await inDraft.innerText()).trim() === 'Put it back in the draft',
+            calledText,
+          );
+          await tap(inDraft, page.locator(`li[data-game="${calledId}"]`));
+          check(
+            `put back in the draft, it is the ${button === 'Postpone' ? 'postponed' : 'cancelled'} game it is, with Games' own way on`,
+            (await page.locator(`li[data-game="${calledId}"] [data-called-off]`).count()) === 1 &&
+              (await counts(`after putting back a game called off since (${button})`)) === 0,
+          );
+          await tap(
+            page.locator('[data-draft-count]').getByRole('button', { name: 'Discard the draft' }),
+            page.locator('[role=status]', { hasText: 'The draft was discarded.' }),
+          );
+        }
       }
       await context.close();
     }
