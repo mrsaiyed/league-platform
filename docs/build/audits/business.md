@@ -17,7 +17,7 @@ Written 2026-11-17 by the area lead for the business, from build branch commit `
 
 ## How this was done
 
-- **Read whole:** `CLAUDE.md`; `docs/build/LEADS.md`; the step's own line in `STAGE-2.md`; `docs/specs/v1/PROGRESS.md`; all nine product files (P1 to P9); `docs/specs/v1/DECISIONS.md` (the "Decided for you" table, the record of why, the three rounds, the change log and the full list); the note in `docs/specs/v1/decisions-pending/` (no decision is waiting there on this branch); the legal brief (`docs/specs/v1/LEGAL-BRIEF.md`); "Needs the founder" in `STATUS.md` and in `STAGE-2.md`; `docs/build/handover/founder-design-direction.md`; and, for costs and for what you are asked to do by hand, T1 sections 6 to 8, T4 sections 7 to 12, T8 and T10 of the technical files, `STAGE-1-REPORT.md` and the documents in `docs/operations/`.
+- **Read whole:** `CLAUDE.md`; `docs/build/LEADS.md`; the step's own line in `STAGE-2.md`; `docs/specs/v1/PROGRESS.md`; all nine product files (P1 to P9); `docs/specs/v1/DECISIONS.md` (the "Decided for you" table, the record of why, the three rounds, the technical sign-off, the change log and the full list: its product rows whole, its technical rows by their opening words); the note in `docs/specs/v1/decisions-pending/` (no decision is waiting there on this branch); the legal brief (`docs/specs/v1/LEGAL-BRIEF.md`); "Needs the founder" in `STATUS.md` and in `STAGE-2.md`; `docs/build/handover/founder-design-direction.md`; and, for costs and for what you are asked to do by hand, T1 sections 6 to 8, T4 sections 7 to 12, T8 and T10 of the technical files, `STAGE-1-REPORT.md` and the documents in `docs/operations/`.
 - **Counted, not estimated:** the decisions were counted by a small script from `DECISIONS.md` and counted again in this file (section 2).
 - **Not done:** no price was looked up, no vendor was contacted and nothing was read on the internet, as the brief requires. No screen was opened: this area has no screens of its own. What else I could not check is the last section.
 
@@ -107,7 +107,7 @@ These are the ones that can hurt. What they have in common: when the product is 
 ### 2.2 Money, promises and your name (10 numbers, 14 lines)
 
 - **B-13 · Showing sponsors is free; our cut applies only to sponsor money paid through us.** Commits you to: no income from sponsors until payments exist, at stage 5 or after. You asked for a cut of sponsorships; this is a cut only of what passes through us. · Change later: cheap now; once leagues have been told that showing sponsors is free, charging for it would cost goodwill. · Keep: yes. A share of a handshake deal cannot be collected.
-- **B-14 · Until the lawyer's versions exist, the Terms and Privacy pages hold a short plain note worded by the lead.** Commits you to: a public statement of what you keep, why, who sees it and who to write to, written by no lawyer, and saying the lawyer's terms come before any stranger signs up. It needs an address to write to, and none exists. · Change later: any word, any time. · Keep: the note, yes; its order, no: see "decide differently", number 2.
+- **B-14 · Until the lawyer's versions exist, the Terms and Privacy pages hold a short plain note worded by the lead.** Commits you to: a public statement of what you keep, why, who sees it and who to write to, written by no lawyer, and saying the lawyer's terms come before any stranger signs up. It needs an address to write to, and the repository names none. · Change later: any word, any time. · Keep: the note, yes; its order, no: see "decide differently", number 2.
 - **B-15 · The six measures of whether it is working are counted by the product from stage 5; until then by hand, with no tracking of visitors.** Commits you to: reading them by hand from Faraj and the demo league until then. · Change later: counting earlier is a step of its own. · Keep: yes.
 - **N-15 · Group chats arrive in two steps: announcement chats at stage 4, open chats after sign-up opens to strangers.** Commits you to: no "everyone can talk" chat for at least two stages. · Change later: cheap, nothing is built. · Keep: yes. I would decide on open chats only after seeing whether announcement chats are used; an open chat competes with a free one already on every phone.
 - **N-16 · Chat rules: text only, no private one-to-one messages, parents stand in for children under 13, admins remove and mute, members report.** Commits you to: one thing that is easy to miss. Reports go "to us if the league does not act" (P8 section 10). That makes the business a moderator, with no named person and no time to answer in. · Change later: cheap now. · Keep: yes; question 20 of the legal brief asks what else is owed.
@@ -224,7 +224,7 @@ Who they are: Al-Hadi's coach and scorekeepers at the demo (stage 2's milestone)
 
 1. **The school's written permission** (legal brief, section 2). Yours: one email. Open on your list. It is about today's tracker as much as the new product.
 2. **The words on the Terms and Privacy pages (B-14).** The lead writes them; you read them first (section 2, "decide differently").
-3. **An address people can write to.** The note promises to say "who to write to", and the site has a `/contact` page in its plan (P2 section 4). No such address exists. Yours.
+3. **An address people can write to.** The note promises to say "who to write to", and the site has a `/contact` page in its plan (P2 section 4). The repository names no such address. Yours.
 4. **A domain, and email that really sends.** An invitation to Al-Hadi's coach is a real email. The test copy sends none: every email is kept, not sent (T-270). Real email needs a domain to send from, with its proofs of authenticity (step 2.137 puts them on your list). No domain is chosen (B-12). So the name question arrives here in a small form: a working domain is enough, and the final name can wait.
 5. **Whether any of Al-Hadi's scorekeepers is under 18.** If so, a teenager has an account before any lawyer has answered (R-12). Yours to find out.
 6. **A way to remove a person, and to remove a league.** `docs/operations/make-a-league.md` lists both as missing "before a real school's league": step 2.114 (a person on a roster can be erased) and step 2.133 (a league that has been used can be deleted). Step 2.133 is named for stage 4, which is after the demo. The lead's, as a change of order (section 8).
@@ -268,7 +268,7 @@ When this is: stage 4, by your own decision to recruit two or three more small l
 ### 3.5 The same, by subject
 
 - **Prices and how money is taken.** Undecided: the amount, our share of fees, how an invoice is paid, our own refund terms. The unit is only "likely" one price per league per season. A written price blocks the first outside league. Everything else blocks the first dollar.
-- **What a league is promised.** Decided in pieces: export of everything at any time (O-9); deletion on request, with 30 days to change your mind (O-10); a season never interrupted (O-6); history never deleted over a failed payment (U-9); a reply within one business day (B-8); our own staff inside a league only with a recorded reason the owner can see (T-77); the whole database restorable to any moment of the last seven days (T8 section 5).
+- **What a league is promised.** Decided in pieces: export of everything at any time (O-9); deletion on request, with 30 days to change your mind (O-10); a season never interrupted (O-6); history never deleted over a failed payment (U-9); a reply within one business day (B-8); our own staff inside a league only with a recorded reason the owner can see (T-77); the whole database restorable to any moment of the last seven days, once continuous backup is switched on (T8 section 5).
 - **What a league is not promised.** Any figure for staying up: 99.9% is our own target, and a number is promised only in an association's contract, and only once met for six months (T-152). Restoring one league alone from backup: "possible but manual" (T-155). Any sport but basketball (B-6). Removing our mark (U-8). Code of its own (B-3). Any size we have not tested (F-9). Referees, gyms or insurance (P1 section 4). All of it blocks the first outside league, as one page the organizer reads before saying yes.
 - **Terms, privacy and children's data.** Undecided: everything the lawyer must say (32 questions in the brief). In its place for now: the lead's plain note (B-14). The note blocks the first real account. The children's answers block real children on the new product, in my view; the first outside youth league, in the plan's. The full terms block the first outside league whose players register.
 - **Support.** Decided: email, one business day, no phone, you on game nights (B-8). Undecided: the address; who besides you; what leagues are told when you travel; who answers a report about a chat (N-16). The address blocks the first real account. The rest blocks the first outside league.
@@ -315,3 +315,122 @@ When this is: stage 4, by your own decision to recruit two or three more small l
 - **Your time:** quoting each league by hand (B-4); answering support within one business day (B-8); watching the first game nights (T-160); a supervised session for every change to the real service, because AI sessions may not touch it (T-201); and gathering TCSAAL's fixtures and results by hand, "a few hours… repeated as results come in" (P9 section 3).
 
 **What this means for the price.** At ten leagues, hosting is covered by $10 to $20 a league a month. So hosting is not what the price has to cover. The professionals, the build and your own time are. A real break-even needs their figures, which only you can get.
+
+## 5. The risks the build cannot remove
+
+**The answer first: four of them, and for each the first move is cheap and is yours.**
+
+### A child's data
+
+- **Where it is real today.** Al-Hadi's players are children, and their names and statistics are public on the live tracker, with no written permission from the school (legal brief, section 2). The tracker's own guide already says: "Enter only what the team is comfortable showing; numbers without names work everywhere."
+- **Where it grows.** The demo league puts those players on the new product, with other schools' teams beside them. Stage 4 adds parents' and teenagers' email addresses, and birth dates, emergency contacts or medical notes wherever a league's form asks for them (legal brief, section 3).
+- **What is already in place.** One function decides every name a public page shows. When unsure, it shows less. A guardian's request to show less always wins. No advertising and no tracking. The wall between leagues is tested on every change. No AI session touches real data.
+- **What would lower it.** The school's email, this week. One short meeting with a lawyer on questions 16 to 19 and 30 before the demo is shown to anyone outside. No other school's roster in the demo (section 6, number 2). Al-Hadi kept on first name and last initial unless the school's email says full names. Backup and two-step sign-in on before real data is. A way to delete a person and a league before real data is (steps 2.114 and 2.133). One page on what happens after a leak. And advice to every league to ask for less on its form: no birth dates or medical notes unless it truly needs them (T4 section 7 already says "encourage forms to ask for less").
+
+### A game night that fails
+
+- **What is already in place.** The scoring screen keeps working with no signal and sends later (T-114). A game can be saved to a file (S-5). Today's tracker keeps running until the new one has passed a full rehearsal (T-213), and the plan is to score the first real game in both. No release goes out while games are live (T-158).
+- **What cannot be removed.** A vendor being down. One of our own changes going wrong. Nobody at a keyboard when it happens. And one thing about today: the tracker's guide tells the scorer, the day before a game, to press Restore if the database "is paused". That is how a free plan behaves; the repository does not name the plan.
+- **What would lower it.** A paper scoresheet at every game for a league's first season, written into what a league is promised. A named person watching the first game nights (T-160). No promise about staying up outside a signed contract (the legal brief already asks for this). The day-before check, which is in the guide.
+
+### Everything resting on you
+
+- **What it is.** You are the owner, the seller, the support desk and the only person who can approve anything. Because no AI session may touch the real service (T-201), you are also the only hands on it.
+- **What is already in place.** Saif is named as the second person (T-166). Each procedure is to count as written only once someone has followed it (T-165).
+- **What is not.** The vault is still open on your list. Nothing says Saif can do more than hold the passwords. No procedure has been followed by anyone yet.
+- **What would lower it.** The vault, this week. Saif himself following two procedures once: taking a release back, and restoring the database. One support address that reaches you both. A rule for what leagues are told when you are away. And few leagues until this has been tried: your own figure of two or three in stage 4 is the right size.
+
+### A vendor changing its free plan
+
+- **What is on a free plan today.** The live tracker (GitHub's free pages, and a database that can pause). The first online test: Render's free website instance "sleeps after 15 minutes without a visitor and takes about a minute to wake", and the test database is on Supabase's free plan (T-270). Vercel was turned down partly because its free plan is for non-commercial use only (T-270). A term like that can sit in any free plan.
+- **What is already in place.** Every outside service sits behind a small part of our own, so one vendor can be swapped for another (T-14). The program runs anywhere a standard container runs. The database is PostgreSQL, which "runs everywhere" (T1 section 7).
+- **What would lower it.** Nothing that real people depend on stays on a free plan: settle T-167 before the demo has real accounts. Read each vendor's terms for "commercial use" when you sign up; opening the account is yours. Spending alerts on every account (T8 section 10). Count on the $100 to $200 a month from the first real league.
+
+### Four more, in a line each
+
+- **Code written by AI, with no outside review (T-181).** Fair for your own leagues. At stage 5 strangers' data and money arrive; the lead's advice then will be an outside security review, and I agree.
+- **Promising TCSAAL more than is built.** Your own rules cover it (F-4, F-5, F-9): say what is built, what is not and what size was tested; ask for a pilot; sign nothing without the lawyer's pilot agreement.
+- **Months of cost with no income.** Nothing is charged before stage 5 (B-5), and five stages come first. Agreeing prices in writing with the stage 4 leagues is the first real proof that anyone will pay.
+- **You, in person, are the business until a company exists.** The legal brief's first question. Ask it first.
+
+## 6. Where the product as planned would embarrass or expose the business
+
+**The answer first: twelve places. The first two are about children and are the ones to act on now.**
+
+1. **Children's names public today without the school's written yes.** Today's tracker; legal brief, section 2. One email from you ends it.
+2. **Other schools' students in the demo.** P9 section 3 shows another school's roster "only where TCSAAL's own site already shows it". That is still our site showing a child whose school has never heard of us, inside a demo meant to win that school's association. One parent's complaint to TCSAAL before the meeting ends the pitch. I recommend teams, fixtures and results for the other schools, and rosters for none until a school or TCSAAL asks. The transfer already starts that way (F-12). It needs your word, because the demo's contents are your decision (F-6).
+3. **The Terms and Privacy pages.** Today they say they are not built yet. As decided, they will hold a note that neither a lawyer nor you has read (B-14).
+4. **Real accounts with no way to delete a person or a league.** Steps 2.114 and 2.133 come after the demo in the plan's order.
+5. **A youth league published with no privacy check.** P3 section 3 says a youth league cannot be published until its privacy choices are confirmed. That check is in stage 5 ("the readiness check", T10). The first youth league, the demo, is published in stage 2 by the Publish button of step 2.125. For the demo you are the publisher, so a line on a checklist is enough. It must not be missed for the first outside youth league.
+6. **A teenager with an account before any lawyer has answered,** if a scorekeeper at the demo is a student (R-12).
+7. **A recap email with the wrong score.** The scorekeeper has 30 minutes to reopen a game (S-36); the recap goes out after ten (N-5).
+8. **"Not built yet" on the real site.** Step 2.140 hides unfinished pages and must land before the first release. It is in the plan.
+9. **"A reply within one business day" (B-8), kept by one person.**
+10. **An admin's tick that "the parents have agreed" (R-29).** If it is untrue, the child's full name is on our site all the same. The tick moves the blame, not the harm. Question 19 for the lawyer.
+11. **Our mark on every page leads to our front page (U-8).** Until stage 5 that page cannot start a league. Someone from TCSAAL who taps it should at least find who we are and how to reach us, which again needs an address.
+12. **A business account in a private person's name.** The test database is in an account from Saif. Fine for made-up data; not for real people's.
+
+## 7. The founder's questions, shortest first
+
+**The answer first: 22 questions for you, each answerable in a sentence, and 8 new ones for the lawyer. For each: my recommendation, then what waits on it.**
+
+The order is by length, shortest question first, as the step asks. It is not the order of urgency. The five to answer first are numbers 9, 7, 15, 8 together with 6, and 5.
+
+### For you
+
+1. **Is two-step sign-in on?** (T-83) Recommendation: today, on GitHub and the email account it recovers to. · Waits: every real account.
+2. **A company now, or later?** Recommendation: ask the lawyer at the first meeting (number 15); I would have a company before the first outside league. · Waits: any signed agreement and any money.
+3. **Is the vault with Saif set up?** (T-166) Recommendation: this week. · Waits: every real account.
+4. **What is the demo league called?** (F-10) Recommendation: a plain descriptive name with "unofficial demo" in it, and never TCSAAL's name alone. · Waits: making the demo league (step 2.60).
+5. **Do you say yes to the 93 answers?** Recommendation: yes to all, except A-15 for leagues of under-18s and the order of B-14; hold R-12 for the lawyer. · Waits: nothing in the build. Your yes makes them yours.
+6. **Which address do people write to?** Recommendation: one address on the working domain (number 8), reaching you and Saif. · Waits: the Terms and Privacy note, the contact page, support.
+7. **Do the first outside leagues pay?** (B-4, B-5) Recommendation: a free first season, with the price of the next one agreed in writing now. · Waits: recruiting them (T-219).
+8. **Will you buy a working domain now?** (B-12) Recommendation: yes; the final name can wait until before stage 5, with the working one kept forwarding. · Waits: real email, so inviting Al-Hadi's staff.
+9. **Has the school said yes in writing?** Recommendation: ask today, and ask in which form (full names, or first name and last initial). · Waits: Al-Hadi's players on the new product. It also covers today's tracker.
+10. **Which postal address goes in our emails?** Recommendation: a business mailing address, not your home. · Waits: stage 4's emails (already on your list in `STATUS.md`).
+11. **What may we promise a league in writing?** Recommendation: the two lists in section 3.5, on one page, plus "keep a paper scoresheet in your first season". · Waits: the first outside league.
+12. **Are any of Al-Hadi's scorekeepers students?** Recommendation: if so, an adult holds the account until the lawyer has answered the legal brief's question 17. · Waits: inviting Al-Hadi's staff.
+13. **Who watches on game nights when you cannot?** (T-160) Recommendation: Saif, once he has followed the procedures himself. · Waits: the first outside league.
+14. **What share do we take of fees paid through us?** (B-4) Recommendation: 1 percent to begin with, settled with the accountant; the first draft said 1 to 2. Stripe's own share comes on top, so say both to a league. · Waits: stage 5.
+15. **Will you see a lawyer now, about children only?** (B-10) Recommendation: yes: the legal brief's questions 16 to 19 and 30, the school's email and the Terms and Privacy note, in one short meeting. · Waits: showing the demo to anyone outside.
+16. **Other schools' rosters in the demo: shown or not?** (F-6) Recommendation: not shown until a school or TCSAAL asks. · Waits: gathering the demo league's content (step 2.59).
+17. **Do an outside league's players count as "strangers"?** (B-9) Recommendation: yes. So either the lawyer's terms come before those leagues open registration, or those leagues are kept to adults added by hand. · Waits: stage 4's plan.
+18. **An outside security review before strangers sign up?** (T-181) Recommendation: yes. · Waits: stage 5.
+19. **What do you open with when you quote a small league?** (B-4) Recommendation: $300 a season for a league of Faraj's size, settling no lower than $150. This is my estimate, not market research: the first draft's price was $29 a month (change log, B-4), about $90 to $120 for a season, and you said to start high and come down. · Waits: the first conversation with an outside league.
+20. **Yes to paying for continuous backup before real data is on it?** (T-153) Recommendation: yes, after checking the price. · Waits: Al-Hadi's season on the new product.
+21. **Player pages in a league of under-18s: on or off to begin with?** (A-15) Recommendation: off. · Waits: nothing; it is cheapest to change before a youth league exists.
+22. **Will you read the Terms and Privacy note before a real person does?** (B-14) Recommendation: yes. · Waits: the first real account, not the build.
+
+### For the lawyer, beyond the 32 in the brief
+
+1. **May a student under 18 hold a scorekeeper's account now?** (R-12)
+2. **Is the plain note safe to publish before the real terms exist?** (B-14)
+3. **Until a company exists, what is the founder personally answerable for?**
+4. **What do we owe a league if a game night's record is lost through our fault?**
+5. **Does the admin's tick that parents have agreed protect us, and must it be renewed?** (R-29; three more questions on it are already on the founder's list in `STATUS.md`)
+6. **When a report about a chat reaches us because the league did not act, what must we do, and how fast?** (N-16)
+7. **Do the first outside leagues need the full terms, or is a one-page agreement with the organizer enough?** (B-9, T-219)
+8. **Can a parent have a child's details removed without waiting for the league, and how fast must it happen?** (R-22)
+
+## 8. Steps I propose for the plan
+
+By the step's own line, only a decided business rule that is missing from the plans becomes a step. Everything else in this audit belongs under "Needs the founder". The lead numbers these, or writes in the log why not.
+
+1. **Delete a league and erase a person before real children's data.** What: the "delete the league" half of step 2.133 (O-10) and step 2.114 move ahead of the demo's milestone. · For: a school or a parent who asks to be removed. · Blocks: before Al-Hadi's players are put on the new product. `make-a-league.md` already says so; the plan's order does not.
+2. **The youth-league check at publishing (P3 section 3).** What: publishing a league of under-18s asks for its privacy choices to be confirmed (names, player pages, statistics, listing); or, for the demo league only, a line in the "load the demo league" procedure that step 2.82 writes. · For: the admin of a youth league. · Blocks: before the first youth league is published, which is the demo.
+3. **One contact address, set in one place.** What: the contact page, the Terms and Privacy note and the footer all carry it (P2 section 4; B-14). · For: anyone who needs to reach the business. · Blocks: before the first real account. It waits on your answer to question 6 in section 7.
+4. **The incident page and continuous backup, earlier (T-84, T-153).** What: a one-page version of the incident procedure, and backup switched on, before the first real accounts and not only "before the first outside league". A document and a setting; no code. · For: you, Saif and the school. · Blocks: before Al-Hadi's staff are invited.
+5. **The record of what a league agreed, in stage 4 (B-4; P3 section 6; P4 section 6).** What: our own staff can write a league's price, term and limits, and its owner can read them. · For: you when you quote, and the organizer. · Blocks: before the first outside league (T-219).
+6. **Emails counted for each league, and the allowance given a number, in stage 4 (T-141, T-164, N-9).** · For: every league, since they share one sending domain. · Blocks: before the first outside league sends anything.
+7. **The spec's wording brought into line (T-185).** What: the eight answers the product files still call "recommended, needs the founder's yes" (end of section 2); "by invoice" and "a page hosted by our payment provider" said once (section 3.4); and what happens to old addresses if our own domain changes (section 3.3). · For: whoever plans stages 4 and 5. · Blocks: nothing today.
+
+## 9. What I could not check
+
+- **No price.** By the brief I looked nothing up and contacted no vendor. Every figure is the repository's, or is marked as an estimate with how I made it.
+- **No law.** I am not a lawyer. Where a law is named, it is the legal brief's own question, never my claim that it applies.
+- **The "going online" audit (step 2.110) is not on this branch,** so I could not carry its costs or vendor facts. Section 4 rests on T1, T8, `STAGE-1-REPORT.md` and `STATUS.md` alone.
+- **Stages 3 to 6 have no written plan.** For anything after stage 2, "in the plans" can only mean "named in the build order".
+- **I opened no screen and ran nothing.** This audit read documents. That the two footer pages say "not built yet" is taken from step 2.135's own line, not seen in a browser.
+- **I did not read everything whole.** The stage 2 plan is 380,000 characters: I read the step's line, "Needs the founder", the section named for later stages and the steps named here. Of `STATUS.md` I read the top and "Needs the founder", not the log. Of the technical files I read T8 and T10 whole and parts of T1, T4 and T7, and I read the technical rows of the decisions list by their opening words only. I leaned on the "nothing left out" audit (step 2.105) for where each promise sits in the plans.
+- **Facts that are not in the repository:** which plan the live tracker's database is on; whose name each vendor account is in, beyond the test database; whether the school has answered; whether the vault exists; who Al-Hadi's scorekeepers are and how old; what Faraj charges its players and whether it has a waiver; what the AI plan costs.
+- **Decisions still in a lane.** The folder for decision rows waiting to be folded in is empty on this branch. Lanes that had not landed by commit `ce7a1bf` may hold more "Decided for you" answers than the 93 counted here.
