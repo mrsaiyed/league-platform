@@ -73,22 +73,33 @@ export const enTracker = {
   'tracker.court.watch': 'Open the public game page',
   'tracker.court.watchHelp': 'Opens in a new tab. This screen stays open.',
   // End game (step 2.37; checklist J1 to J3): the question says the score and what ending
-  // does. At a level score it says first what happens in a season with no ties, since
-  // the device is not told whether this one allows them: the league's answer follows.
-  'tracker.end.ask.level':
-    'The score is level: {home} {homeScore}, {away} {awayScore}. If this season allows no ties the game stays live: play overtime instead.',
-  'tracker.end.ask.text':
-    '{home} {homeScore}, {away} {awayScore}. The result goes into the standings.',
+  // does, and, when the game is ended early, that time is still on the clock and in which
+  // period. The device is told whether the season allows ties (S-73): at a level score
+  // the question says the game ends as a tie, or End game is refused at once in words
+  // that say to play overtime.
+  'tracker.end.ask.does':
+    'This becomes the final score and goes into the standings. A game ended by mistake can be reopened.',
+  'tracker.end.ask.level': 'The score is level, so the game ends as a tie.',
+  'tracker.end.ask.notLast': '{period} is over, and {next} has not been played.',
+  'tracker.end.ask.timeLeft': '{period} still has {clock} on the clock.',
   'tracker.end.ask.title': 'End the game?',
   'tracker.end.button': 'End game',
+  'tracker.end.ending': 'Ending…',
   'tracker.end.help': 'Makes the game final. You are asked first.',
   'tracker.end.keep': 'Keep playing',
   'tracker.end.level':
-    'The score is level and this season allows no ties, so the game is still live. Play overtime: tap the clock and pick the next period.',
+    'This season allows no ties, so a level game cannot end. Play overtime until a team is ahead.',
+  'tracker.end.levelTitle': 'The score is level',
   // In the pad when the last period's clock has run out with a team ahead: offered,
   // never done by itself (S-65).
-  'tracker.end.offer': '{period} is over and {team} lead. End the game when it is over.',
+  'tracker.end.offer':
+    '{period} is over. {team} lead {high}–{low}: end the game once the score is right.',
+  // The league did not take an End tap this device made (an older page, a rule changed
+  // mid-game): the game is live again, and the pad says why.
   'tracker.end.refused': 'The league did not take End game: {why}',
+  'tracker.end.refusedLevel':
+    'The league did not take End game: the score is level and this season allows no ties. Play overtime until a team is ahead.',
+  'tracker.end.refusedTitle': 'The game is still live',
   'tracker.end.savedMeanwhile':
     'The league already has the end of this game, so it cannot be taken back here. Reopen it instead.',
   'tracker.end.takeBack': 'Take back End game',
@@ -97,16 +108,21 @@ export const enTracker = {
   // The final panel, in the pad's place once the game is ended (checklist J4).
   'tracker.final.back': 'Back to the games',
   'tracker.final.checking': 'Checking whether this game can be reopened here…',
+  // What a tile, a team's turnovers or its bench says when tapped on a final game (D12)
+  // is `tracker.refusal.gameFinal`. The panel's own name, for a screen reader:
+  'tracker.final.label': 'The game is final',
   'tracker.final.notSent':
-    'Not sent yet: the league gets the result once the connection is back. Until then End game can be taken back here.',
+    'The league gets the result once the connection is back. Until then End game can be taken back here.',
+  'tracker.final.notSentLead': 'Not sent yet.',
   'tracker.final.reopenAlways': 'You can reopen it at any time.',
   'tracker.final.reopenLeft_one': 'You can reopen it for {count} more minute.',
   'tracker.final.reopenLeft_other': 'You can reopen it for {count} more minutes.',
   'tracker.final.saved': 'Saved. It counts in the standings.',
   'tracker.final.score': '{home} {homeScore}, {away} {awayScore}',
-  'tracker.final.tied': 'The game ended level.',
+  'tracker.final.sending': 'Sending the result to the league…',
+  'tracker.final.tied': 'A tie, {high}–{low}',
   'tracker.final.title': 'Final',
-  'tracker.final.won': '{team} won.',
+  'tracker.final.won': '{team} won, {high}–{low}',
   'tracker.floor.title': 'On court',
   'tracker.format.clock.running': 'Running clock: the clock keeps going through fouls and timeouts',
   'tracker.format.clock.stop': 'Stop clock: fouls and timeouts stop the clock',

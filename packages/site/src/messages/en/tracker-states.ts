@@ -56,6 +56,7 @@ export const enTrackerStates = {
   'tracker.notStarted.refused.unknown-game': 'This game could not be found.',
   'tracker.notStarted.refused.was-decided':
     'This game was final once, so it was played and cannot be marked not started. Correct its plays instead.',
+  'tracker.notStarted.working': 'Clearing…',
   'tracker.notStarted.yes': 'Yes, mark not started',
   'tracker.readOnly.expired':
     'This device was away too long and another device has had the game since. This one is now read-only.',
@@ -149,10 +150,12 @@ export const enTrackerStates = {
   'tracker.reopen.problem.rejected': 'The league turned that away. A league admin can help.',
   'tracker.reopen.problem.signed-out': 'You are signed out. Sign in again, then try once more.',
   'tracker.reopen.problem.unanswered': 'No connection. Try again when it is back.',
-  'tracker.reopen.question':
-    'Reopen this game? It goes back to live with every play as it was, and it stops counting in the standings until you end it again.',
-  'tracker.reopen.reasonLabel':
-    'Why it is being reopened (kept in the game’s corrections, never shown publicly)',
+  // The question in the pad (step 2.37): its title, what reopening does, and the reason,
+  // already filled in and editable, in words short enough for a phone's pad.
+  'tracker.reopen.question': 'Reopen this game?',
+  'tracker.reopen.questionDetail':
+    'It goes back to live with every play as it was, and stops counting in the standings until it is ended again.',
+  'tracker.reopen.reasonLabel': 'Why (kept with the game, never shown publicly)',
   'tracker.reopen.reasonReady': 'End game tapped by mistake',
   // Each refusal of POST …/reopen by its code (ReopenReply), in the tracker's words.
   'tracker.reopen.refused.changed-since-read':
@@ -174,4 +177,5 @@ export const enTrackerStates = {
   'tracker.reopen.refused.scorekeepers-may-not-reopen':
     'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
   'tracker.reopen.until': 'You can reopen this game until {time}.',
+  'tracker.reopen.working': 'Reopening…',
 } as const;
