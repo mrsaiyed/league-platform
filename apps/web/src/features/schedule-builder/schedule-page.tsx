@@ -58,6 +58,7 @@ import type { SavedDetail } from './run-schedule-action.ts';
 import { importLinkOf } from './import-link.ts';
 import { addRoundProblemOf, noticeOf, whyNotSaved } from './notice.ts';
 import { publishedNotice } from './published-notice.ts';
+import { RoundFacts, RoundRemoval, roundIsEmpty } from './round-parts.tsx';
 import { ScheduleHeading } from './schedule-heading.tsx';
 import { seasonControls } from './season-controls.ts';
 
@@ -492,22 +493,7 @@ function RoundSection({
         <h2 id={headingId}>
           {t('schedule.admin.round', { number: round.number, label: round.label })}
         </h2>
-        <p className="admin-round-facts">
-          <span>
-            {round.date === null
-              ? t('schedule.admin.roundNoDate')
-              : t('schedule.admin.roundDate', { date: dayText(round.date) })}
-          </span>{' '}
-          <StaffPill>{t.plural('schedule.admin.roundGames', round.games.length)}</StaffPill>
-          {/* Games with no date yet hold the round though the grid cannot place them (step
-              2.181): counted beside the others, so the round never looks emptier than it is. */}
-          {round.undated === 0 ? null : (
-            <>
-              {' '}
-              <StaffPill>{t.plural('schedule.admin.roundUndated', round.undated)}</StaffPill>
-            </>
-          )}
-        </p>
+        <RoundFacts round={round} />
       </div>
       {saved}
       {problem === undefined ? null : (
@@ -544,36 +530,21 @@ function RoundSection({
                 </button>
               </p>
             </form>
-            {/* Removing is apart from the two saves, and looks like neither. It is offered
-                only when the tap will succeed: no game is in the round, placed or with no
-                date yet; a game in the bin does not count (S-60, step 2.181). */}
-            {round.games.length === 0 && round.undated === 0 ? (
-              <form
-                action={removeRoundAction}
-                data-remove-round={round.id}
-                className="staff-form admin-round-remove"
-              >
-                <BasisFields basis={basis} />
-                <input type="hidden" name="roundId" value={round.id} />
-                <input type="hidden" name="afterRoundId" value={previousRoundId ?? ''} />
-                <p className="ui-field-help">{t('schedule.admin.removeRoundNote')}</p>
-                <p className="staff-buttons">
-                  <button type="submit" className="ui-button" data-kind="danger">
-                    {t('schedule.admin.removeRound')}
-                  </button>
-                </p>
-              </form>
-            ) : (
-              <p className="ui-field-help admin-round-remove" data-remove-round-blocked={round.id}>
-                {round.games.length > 0
-                  ? t.plural('schedule.admin.removeRoundBlocked', round.games.length)
-                  : t.plural('schedule.admin.removeRoundUndated', round.undated)}
-              </p>
-            )}
+            <RoundRemoval
+              round={round}
+              action={removeRoundAction}
+              fields={
+                <>
+                  <BasisFields basis={basis} />
+                  <input type="hidden" name="roundId" value={round.id} />
+                  <input type="hidden" name="afterRoundId" value={previousRoundId ?? ''} />
+                </>
+              }
+            />
           </div>
         </details>
       ) : null}
-      {round.games.length === 0 && round.undated === 0 ? (
+      {roundIsEmpty(round) ? (
         <p className="staff-quiet">{t('schedule.admin.noGamesInRound')}</p>
       ) : null}
       <GameList
