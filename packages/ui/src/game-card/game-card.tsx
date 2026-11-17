@@ -22,6 +22,26 @@ export function FinalPillWords({ pill }: { readonly pill: FinalPill }) {
   );
 }
 
+/**
+ * A final game's state by itself, outside a card: the same quiet pill as on its card,
+ * "Final", or "Final, OT" for a game won in overtime (P7 §5.6). For a page about one game
+ * that draws no card or board, such as its box score sheet.
+ */
+export function FinalStatePill({
+  label,
+  finalPill,
+}: {
+  /** "Final". */
+  readonly label: string;
+  readonly finalPill?: FinalPill | undefined;
+}) {
+  return (
+    <span className="ui-game-state" data-kind="quiet">
+      {finalPill ? <FinalPillWords pill={finalPill} /> : label}
+    </span>
+  );
+}
+
 export type GameCardTeam = {
   readonly name: string;
   /** Null until the team has a score to show. */

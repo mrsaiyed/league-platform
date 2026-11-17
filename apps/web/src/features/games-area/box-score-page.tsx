@@ -16,7 +16,8 @@ import {
   type GameLine,
   type GameRosterPlayer,
 } from '@srleagues/core';
-import { MessagePage, PageHead } from '@srleagues/ui';
+import { finalPillOf } from '@srleagues/site';
+import { FinalStatePill, MessagePage, PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
@@ -189,7 +190,16 @@ export async function BoxScorePage({
             ? t('admin.boxScore.help')
             : t(`admin.boxScore.locked.${sheet.locked}`)
         }
-      />
+      >
+        {/* A final game's state, as its card says it: "Final", or "Final, OT" for one the
+            tracker ended in overtime (step 2.200). */}
+        {game.status === 'final' ? (
+          <FinalStatePill
+            label={t('display.final')}
+            finalPill={finalPillOf(t, game.overtimePeriods)}
+          />
+        ) : null}
+      </PageHead>
       {reopened === undefined ? null : <SavedLine text={reopened} />}
       {reopen.kind === 'correct' ? (
         <div className="staff-panel">

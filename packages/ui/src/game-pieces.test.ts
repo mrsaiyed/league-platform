@@ -3,7 +3,14 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { BoxScoreTable, GameCard, PlayTable, Scoreboard, displayCss } from '../index.ts';
+import {
+  BoxScoreTable,
+  FinalStatePill,
+  GameCard,
+  PlayTable,
+  Scoreboard,
+  displayCss,
+} from '../index.ts';
 
 const arabicName = 'نسور الصحراء';
 const render = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el);
@@ -272,6 +279,21 @@ describe('a game card in any state', () => {
       }),
     );
     expect(plain).toContain('<span class="ui-game-state">Final</span>');
+  });
+  it('stands by itself, as quiet as on a card, on a page that draws no card (step 2.200)', () => {
+    expect(render(createElement(FinalStatePill, { label: 'Final' }))).toBe(
+      '<span class="ui-game-state" data-kind="quiet">Final</span>',
+    );
+    expect(
+      render(
+        createElement(FinalStatePill, {
+          label: 'Final',
+          finalPill: { text: 'Final, OT', said: 'Final after overtime' },
+        }),
+      ),
+    ).toBe(
+      '<span class="ui-game-state" data-kind="quiet"><span aria-hidden="true">Final, OT</span><span class="ui-visually-hidden">Final after overtime</span></span>',
+    );
   });
   // Step 2.153: "Score this game" for one person, never inside the card's link.
   it('draws a second action after the card’s link and outside it, at the foot of the board', () => {
