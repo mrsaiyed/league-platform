@@ -170,12 +170,16 @@ How the grid works (built in step 2.64):
 | ------------ | -------------------------------------------------------------------------------- |
 | Forfeit      | Winner and loser recorded with the league's forfeit score. No player statistics. |
 | Cancelled    | Does not count for anything                                                      |
-| Postponed    | Waits for a new date                                                             |
+| Postponed    | Waits for a new date; no score until then, but it can be forfeited (S-75)        |
 | Tie          | Only if the season allows ties                                                   |
 | Overtime     | Added periods; shown on the result                                               |
 | Did not play | A rostered player who never entered gets no "game played"                        |
 
-A cancelled game can be put back, with a reason, by whoever may cancel it; it is a scheduled game again (**S-51**, decided for you).
+A cancelled game can be put back, with a reason, by whoever may cancel it; it is a game again, as it was when it was cancelled (**S-51**, decided for you; **S-75** below).
+
+Forfeiting, postponing and cancelling each ask once, naming the game, before anything changes; the team that forfeits is always chosen, never filled in. The reason a game is put back is chosen from a short list ("cancelled by mistake", "the game will be played after all", "the wrong game was cancelled", "another reason"), because the activity log keeps fixed words only. A game whose line-ups were already set at the scorer's table can still be postponed or cancelled: its line-ups are kept for when it is played (step 2.158).
+
+**S-75 (decided for you, November 17):** a postponed game has no score until it is played on a new date or forfeited. A forfeit is the one result it takes (a team that cannot make any new date), and the screen offers it; a score typed, a box score, the tracker and an imported score are all refused until it has a date again (the import leaves that score waiting and says why). A postponement made by mistake is put back on its old date, with a reason, by whoever may postpone. A cancelled game put back is what it was when it was cancelled: scheduled, or postponed and waiting. Its team, venue or court must not be in the bin; if another game has taken its court or one of its teams at that time since, it is put back all the same and the screen names that game at once.
 
 ## 6. Standings and statistics
 

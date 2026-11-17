@@ -1,4 +1,11 @@
-import { getBoxScoreSheet, listMyGames, readReopenOffer, type AccessReader } from '@srleagues/core';
+import {
+  cancelGame,
+  getBoxScoreSheet,
+  listMyGames,
+  postponeGame,
+  readReopenOffer,
+  type AccessReader,
+} from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { namesShownOf, startingNamePolicy } from '../../server/name-policy-of.ts';
 import { standInGameId, standInGames } from '../../server/stand-in-games.ts';
@@ -339,6 +346,36 @@ describe('the box score grid', () => {
         ports.deps,
       ),
     ).toEqual({ ok: false, code: 'game-is-tracked' });
+  });
+
+  it('says a sheet typed before the game was postponed or cancelled is refused for that (step 2.158)', async () => {
+    const { ports, ctx, games } = setup();
+    const target = (await games()).find((g) => g.id === lionsTigers);
+    const typed = {
+      gameId: target?.id,
+      version: String(target?.version),
+      homeScore: '50',
+      awayScore: '40',
+    };
+    expect(
+      await postponeGame(ctx, { gameId: lionsTigers, version: target?.version }, ports.deps),
+    ).toMatchObject({ ok: true });
+    expect(await runBoxScoreAction('save', typed, ctx, ports.deps)).toEqual({
+      ok: false,
+      code: 'game-postponed',
+    });
+    expect(
+      await cancelGame(
+        ctx,
+        { gameId: lionsTigers, version: (target?.version ?? 0) + 1 },
+        ports.deps,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(await runBoxScoreAction('save', typed, ctx, ports.deps)).toEqual({
+      ok: false,
+      code: 'game-cancelled',
+    });
+    expect(boxScoreProblemKey('game-postponed')).toBe('admin.games.error.game-postponed');
   });
 
   it('a game made final by hand while it had plays is reopened by an admin, not by a scorekeeper', async () => {
