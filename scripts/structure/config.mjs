@@ -185,7 +185,13 @@ export const settingsReaderFiles = ['apps/web/src/server/config.ts', 'apps/worke
 export const workerOnlySteps = [
   {
     name: 'issueInvitationLink',
-    allowedIn: ['apps/worker/', 'packages/core/src/modules/access/'],
+    // The web app takes the worker's turn on the made-up database only, which lives in its
+    // own memory where no worker can reach it (step 2.97, record 086).
+    allowedIn: [
+      'apps/worker/',
+      'packages/core/src/modules/access/',
+      'apps/web/src/server/made-up-invitation-mail.ts',
+    ],
     why: 'it makes a working invitation link with no permission check',
   },
 ];

@@ -36,6 +36,7 @@ import type { SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
+import { databaseAdminAccess, type AdminAccessQueries } from './database-admin-access.ts';
 import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
 import { databaseAdminTeams, type AdminTeamsQueries } from './database-admin-teams.ts';
 import { databaseGames, databaseGamesDeps, type GamesQueries } from './database-games.ts';
@@ -50,6 +51,7 @@ import { databasePublicTeams, type PublicTeamsQueries } from './database-public-
 import { databaseScheduleAdmin, type ScheduleAdminQueries } from './database-schedule-admin.ts';
 import { databaseTracker, type TrackerQueries } from './database-tracker.ts';
 import type { LocalTools } from './local-tools.ts';
+import type { SendQueuedInvitations } from './made-up-invitation-mail.ts';
 import { notMovedYet } from './not-on-the-database-yet.ts';
 import type { WebPorts } from './ports.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
@@ -74,6 +76,7 @@ export type DatabaseQueries = Pick<
   | 'activityLogStore'
   | 'jobsStore'
 > &
+  AdminAccessQueries &
   AdminSettingsQueries &
   AdminTeamsQueries &
   GamesQueries &
@@ -114,6 +117,12 @@ export type DatabasePortsOptions = {
     readonly tools: LocalTools;
     readonly publicBaseUrl: string;
   } | null;
+  /**
+   * The worker's turn for invitation emails (step 2.97, made-up-invitation-mail.ts): given
+   * only on the made-up database, whose jobs no worker can reach. Left out, the worker
+   * sends them.
+   */
+  readonly sendQueuedInvitations?: SendQueuedInvitations | null;
 };
 
 /** How often one sign-in user's account problem is logged again: once an hour (T-86). */
@@ -260,6 +269,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // league it lists (part 4).
     scheduleAdmin: databaseScheduleAdmin(database, db, options.log, accessOf),
     publicTeams: databasePublicTeams(database, db),
+    adminAccess: databaseAdminAccess(database, db, deps, options.sendQueuedInvitations ?? null),
     // Its commands run with core's event handlers, never an empty list (part 5).
     adminTeams: databaseAdminTeams(database, db, options.log, accessOf),
     adminSettings: databaseAdminSettings(database, db, options.log),

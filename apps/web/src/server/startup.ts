@@ -28,6 +28,7 @@ import type {
 import type { Config } from './config-schema.ts';
 import { databasePorts, type DatabaseQueries } from './database-ports.ts';
 import { madeUpDatabaseTools } from './made-up-database-people.ts';
+import { madeUpInvitationMail } from './made-up-invitation-mail.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
 import type { WebPorts } from './ports.ts';
 import {
@@ -50,7 +51,7 @@ export class StartupError extends Error {
  */
 export type DatabasePackage = Pick<
   typeof DatabaseModule,
-  'createDatabase' | 'checkLoginRole' | 'madeUpDatabase' | 'seedLeagues'
+  'createDatabase' | 'checkLoginRole' | 'madeUpDatabase' | 'seedLeagues' | 'tableQueue'
 > &
   DatabaseQueries;
 
@@ -246,5 +247,19 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
       publicBaseUrl: options.publicBaseUrl,
     },
     reportDesign: (message, fields) => deps.warn?.(message, fields),
+    // No worker can reach a database in this process's memory, so the app sends the
+    // invitation emails itself, to the made-up capture (step 2.97, record 086).
+    sendQueuedInvitations: madeUpInvitationMail({
+      transaction: database.commandTransaction(db, (scope) => ({
+        jobs: database.jobsStore(scope),
+        leagues: database.leaguesStore(scope),
+        access: database.accessStore(scope),
+        activity: database.activityLogStore(scope),
+      })),
+      email: signIn.mail,
+      siteOrigin: options.publicBaseUrl,
+      sendingAddress: options.emailFrom,
+      runDue: database.tableQueue(db).runDue,
+    }),
   });
 }
