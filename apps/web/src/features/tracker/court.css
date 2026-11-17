@@ -1656,6 +1656,19 @@
 .court-hint > * {
   inline-size: 100%;
 }
+/* The first sentence too (step 2.37): the first thing in a line of such a box never
+   wraps, so where the pad had room for one line of it only (End game offered at 0:00,
+   a two-line sentence being said and the latest play's line, on a short phone) the first
+   sentence showed its first line and no more. With nothing of no height before it, it
+   is no longer the first thing, and leaves whole like the others. The margin takes back
+   the gap after it, so nothing moves where the hint fits. */
+.court-hint::before {
+  content: '';
+  flex: none;
+  inline-size: 100%;
+  block-size: 0;
+  margin-block-end: -3px;
+}
 .court-pregame ~ .court-hint p:nth-of-type(n + 3) {
   display: none;
 }
@@ -1968,6 +1981,14 @@
   padding-block: 3px;
   font-size: 13px;
   line-height: 1.25;
+}
+/* The panels about ending a game (step 2.37) have no × at the end of their first line:
+   the sentence is as wide as the panel, so nothing of the line under it shows beside it. */
+.court[data-pad-mode='end'] .court-say,
+.court[data-pad-mode='final'] .court-say,
+.court[data-pad-mode='reopen'] .court-say,
+.court[data-pad-mode='not-started'] .court-say {
+  inset-inline-end: var(--court-say-inset);
 }
 .court-timeout-head {
   flex: 1;
