@@ -40,10 +40,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   addPlayers,
-  admin,
   bannerShortHtml,
   court,
   evenMorePlayers,
+  owner,
   playStretch,
   scorekeeper,
   sizes,
@@ -925,7 +925,7 @@ const chapters = [
     name: 'end-admin',
     about: 'step 2.37: the same two doors for someone who may correct games',
     states: endAdminStates,
-    as: admin,
+    as: owner,
     prepare: async (origin) => {
       await addPlayers(origin);
       await addPlayers(origin, evenMorePlayers);

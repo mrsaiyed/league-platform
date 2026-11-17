@@ -54,6 +54,7 @@ import {
   drawIn,
   league,
   lettersHere,
+  owner,
   scorekeeper,
   sizes,
   starters,
@@ -1081,8 +1082,16 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
   }
 }
 
-/** A made-up world of its own: a server started for it, players added, stopped after `run`. */
-async function onItsOwnWorld(browser, viewport, run, { hasTouch = false, family = '' } = {}) {
+/**
+ * A made-up world of its own: a server started for it, players added, stopped after
+ * `run`. `as` is who opens the game: the scorekeeper, unless told otherwise.
+ */
+async function onItsOwnWorld(
+  browser,
+  viewport,
+  run,
+  { hasTouch = false, family = '', as = scorekeeper } = {},
+) {
   const origin = `http://localhost:${await freePort()}`;
   const server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
@@ -1093,7 +1102,7 @@ async function onItsOwnWorld(browser, viewport, run, { hasTouch = false, family 
     await waitFor(`${origin}/`, server);
     await addPlayers(origin);
     context = await browser.newContext({ viewport, hasTouch });
-    await context.addCookies([{ ...scorekeeper, url: origin }]);
+    await context.addCookies([{ ...as, url: origin }]);
     if (family !== '') {
       await context.addInitScript((face) => {
         document.addEventListener('DOMContentLoaded', () => {
@@ -1328,6 +1337,78 @@ async function endAtEverySize(browser, faces) {
       asks,
     );
   });
+  // The fullest panel of all is the Mark not started question as someone who may correct
+  // games is asked it (the league's owner here): what is cleared, a reason from the list,
+  // and the answer in red. And their final panel says Reopen is offered at any time.
+  await onItsOwnWorld(
+    browser,
+    { width: 390, height: 844 },
+    async ({ page, c }) => {
+      const everywhere = async (state) => {
+        for (const face of faces) {
+          for (const size of sizes) {
+            await page.setViewportSize({ width: size.width, height: size.height });
+            await drawIn(page, face.family);
+            const label = `${size.width} x ${size.height}${face.letters}, ${state}`;
+            await panelFits(page, label);
+            await still(page, label);
+          }
+        }
+        await drawIn(page, '');
+        await page.setViewportSize({ width: 390, height: 844 });
+      };
+      await c.pick('home', starters);
+      await c.pick('away', starters);
+      await c.startClock();
+      await c.play('home', 11, 'p3');
+      await c.play('away', 3, 'foul');
+      await c.saved();
+      await c.fromMore('more-not-started');
+      await c.notStartedAsk.waitFor();
+      const asks = words(await c.notStartedAsk.innerText());
+      const reasons = await c.notStartedAsk
+        .locator('[data-not-started-reason] option')
+        .allInnerTexts();
+      note(
+        'someone who may correct games is told how many plays and what score Mark not started clears, and picks a reason from the fixed list',
+        asks.startsWith(
+          'Mark this game as not started? 2 plays and the score, Hawks 3, Bears 0, will be cleared. Why it needs clearing (kept in the log, never shown publicly)',
+        ) &&
+          asks.endsWith('Keep scoring Yes, mark not started') &&
+          reasons.join(' | ') ===
+            'Started by mistake | Only trying the tracker | Wrong game | Wrong game format | Another reason',
+        `${asks} / ${reasons.join(' | ')}`,
+      );
+      await everywhere('Mark not started, what is cleared and why');
+      await accessible(page, 'Mark not started, what is cleared and why');
+      await c.answer('yes').click();
+      await c.said.filter({ hasText: /scheduled again/ }).waitFor();
+      note(
+        'with the reason chosen the league clears the game: the lineups are asked for again',
+        (await c.root.getAttribute('data-stage')) === 'lineups' &&
+          Number(await c.root.getAttribute('data-plays')) === 0,
+      );
+      await c.pick('home', starters);
+      await c.pick('away', starters);
+      await c.startClock();
+      await c.play('home', 11, 'p3');
+      await c.endGame();
+      await c.pad.locator('[data-final="saved"]').waitFor();
+      await c.pad
+        .locator('[data-reopen-line]')
+        .filter({ hasText: /any time/ })
+        .waitFor();
+      const panel = words(await c.finalPanel.innerText());
+      note(
+        'for someone who may correct games the final panel says the game can be reopened at any time',
+        /^final Hawks won, 3–0 Saved\. It counts in the standings\. You can reopen it at any time\. Reopen game Back to the games$/i.test(
+          panel,
+        ),
+        panel,
+      );
+    },
+    { as: owner },
+  );
 }
 
 /**

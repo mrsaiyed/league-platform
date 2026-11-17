@@ -12,8 +12,8 @@ export const league = 'north-valley';
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const liveGame = '01900000-0000-7000-8000-006a00000002';
 export const scorekeeper = { name: 'srl_session', value: 'local-scorekeeper-token' };
-/** A made-up league admin: may score the game and may correct games too (step 2.37). */
-export const admin = { name: 'srl_session', value: 'local-admin-token' };
+/** The made-up league's owner: may score the game and may correct games too (step 2.37). */
+export const owner = { name: 'srl_session', value: 'local-owner-token' };
 export const trackerPath = (game = liveGame) => `/${league}/score/${game}`;
 
 /** The five sizes every scoring screen is designed and photographed at (DESIGN.md section 7, line 8). */
