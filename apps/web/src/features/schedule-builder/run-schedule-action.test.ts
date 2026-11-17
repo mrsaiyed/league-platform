@@ -13,7 +13,7 @@ import { standInSchedule } from '../../server/stand-in-schedule.ts';
 import { adultTeams } from '../../server/stand-in-world-seed.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildGrid, parsePlace, placeValue } from './build-grid.ts';
-import { answerParams, savedDetailOf } from './grid-answer.ts';
+import { answerParams, noticeOfAnswer, savedDetailOf, savedDetailOfNotice } from './grid-answer.ts';
 import { runScheduleAction, type ScheduleActionKind } from './run-schedule-action.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -225,10 +225,40 @@ describe('schedule grid', () => {
       expect(out.result.games.some((g) => g.id === id)).toBe(false);
       // The draft keeps its own record of the game as it was: "Put it back" reads that.
       expect(out.removed.map((g) => g.id)).toEqual([id]);
-      // The address carries only which game.
+      // A game of the published schedule stays in the grid, struck through, in its round,
+      // as it was (step 2.185); one only ever in the draft is gone. Neither is a game of
+      // the grid (no count, clash or swap holds it).
+      const shown = buildGrid(out, teams, venues.ok ? venues.value : []);
+      const stays = [...shown.rounds.flatMap((r) => r.removed), ...shown.looseRemoved];
+      expect(stays.map((g) => g.id)).toEqual(id === published.id ? [id] : []);
+      if (id === published.id) {
+        const { roundGone, ...was } = stays[0] ?? { roundGone: 'missing' };
+        expect(roundGone).toBeNull();
+        expect(was).toEqual({ ...before, clashed: false, offRoundDate: null, outsideRound: false });
+        expect(shown.rounds.find((r) => r.id === before.roundId)?.removed).toHaveLength(1);
+      }
+      expect(shown.allGames.some((g) => g.id === id)).toBe(false);
+      // The address carries nothing of the answer (step 2.185): it is a one-time notice
+      // naming only which game and its round, and the page reads it back as it was.
       const answer = answerParams(removed);
-      expect(answer.query).toMatchObject({ saved: 'game-removed', game: id });
-      expect(savedDetailOf(answer.query)).toEqual(removed.kind === 'saved' && removed.detail);
+      expect(answer.query).toEqual({});
+      expect(answer.hash).toBe('#saved');
+      const notice = noticeOfAnswer(removed);
+      expect(notice).toEqual({
+        thing: id,
+        said: 'game-removed',
+        ...(before.roundId === null ? {} : { about: before.roundId }),
+      });
+      expect(savedDetailOfNotice(notice)).toEqual(removed.kind === 'saved' && removed.detail);
+      // An old address that names the removal says no more than "Saved".
+      expect(
+        savedDetailOf({
+          done: 'saved',
+          saved: 'game-removed',
+          game: id,
+          round: before.roundId ?? undefined,
+        }),
+      ).toBeUndefined();
       // The form names only the game, with a basis that is out of date: still put back.
       expect(
         await press('put-back-game', { gameId: id, version: '1', homeTeamId: team(5) }),
@@ -237,11 +267,14 @@ describe('schedule grid', () => {
         (g) => g.id === id,
       );
       expect(after).toEqual(before);
-      // Tapped again (a reload): it is back, said so, and nothing is added twice.
+      // Tapped again (a double tap, or Back to the page before): it is already back, said
+      // so (step 2.185), and nothing is added twice.
       const entries = (await read()).draft?.savedEdits;
-      expect(await press('put-back-game', { gameId: id })).toEqual({
-        kind: 'saved',
-        detail: { what: 'game-put-back', gameId: id },
+      const again = await press('put-back-game', { gameId: id });
+      expect(again).toEqual({ kind: 'saved', detail: { what: 'game-already-back', gameId: id } });
+      expect(savedDetailOfNotice(noticeOfAnswer(again))).toEqual({
+        what: 'game-already-back',
+        gameId: id,
       });
       expect((await read()).draft?.savedEdits).toBe(entries);
     }

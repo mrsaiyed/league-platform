@@ -42,7 +42,7 @@ export function RoundRemoval({
   fields,
 }: {
   readonly round: GridRound;
-  readonly action: (form: FormData) => Promise<never>;
+  readonly action: (form: FormData) => Promise<void>;
   readonly fields: ReactNode;
 }) {
   if (roundIsEmpty(round)) {

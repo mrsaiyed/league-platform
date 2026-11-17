@@ -51,8 +51,7 @@ export const enScheduleAdmin = {
   'schedule.admin.discardNote': 'This throws away every unpublished change. It cannot be undone.',
   'schedule.admin.discardSubmit': 'Discard all draft changes',
   'schedule.admin.discarded': 'The draft was discarded.',
-  'schedule.admin.draftChangesNone':
-    'Draft in progress: as it stands it changes nothing in the published schedule.',
+  'schedule.admin.draftChangesNone': 'The draft is the same as the published schedule.',
   'schedule.admin.draftChanges_one': 'Draft in progress: {count} change not yet published.',
   'schedule.admin.draftChanges_other': 'Draft in progress: {count} changes not yet published.',
   'schedule.admin.draftOutOfDate':
@@ -130,6 +129,8 @@ export const enScheduleAdmin = {
   'schedule.admin.publishBlocked': 'It cannot be published yet:',
   'schedule.admin.publishClashes_one': '{count} clash is still in the schedule.',
   'schedule.admin.publishClashes_other': '{count} clashes are still in the schedule.',
+  'schedule.admin.publishCount_one': 'Publishing makes {count} change.',
+  'schedule.admin.publishCount_other': 'Publishing makes {count} changes.',
   'schedule.admin.publishNothing': 'There is nothing to publish.',
   'schedule.admin.publishRounds':
     'Rounds added: {added}. Rounds removed: {removed}. Rounds renamed: {renamed}. Round dates changed: {dates}.',
@@ -183,6 +184,11 @@ export const enScheduleAdmin = {
     'It was only in the draft, so nothing public has changed. Put it back and it is exactly as it was.',
   'schedule.admin.removedDraftOnlyNoRound':
     'It was only in the draft, so nothing public has changed. Put it back and it is as it was, under "Games with no round".',
+  // A game of the published schedule the draft removes stays where it was, struck through,
+  // until the draft is published or discarded (step 2.185).
+  'schedule.admin.removedInDraft': 'Removed in this draft.',
+  'schedule.admin.removedInDraftNoRound':
+    'Removed in this draft, from {round}, which the draft removes too. Put it back and it comes back here, with no round.',
   'schedule.admin.removedPublished':
     'Nothing public changes until you publish. Put it back now and it is exactly as it was. Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
   'schedule.admin.removedPublishedNoRound':
@@ -203,6 +209,8 @@ export const enScheduleAdmin = {
   'schedule.admin.save': 'Save game',
   'schedule.admin.saved': 'Saved to the draft. It is not public until you publish.',
   'schedule.admin.savedGame': 'Saved to the draft: {game}.',
+  'schedule.admin.savedGameAlreadyBack':
+    '{game} is already back in the draft. Nothing more was changed.',
   'schedule.admin.savedGamePutBack': 'Put back in the draft: {game}, as it was.',
   'schedule.admin.savedGamePutBackNoRound':
     'Put back in the draft: {game}, under "Games with no round": {round} was removed from the draft.',

@@ -55,7 +55,12 @@ export type SavedDetail =
    * A removed game was put back in the draft as it was; with `fromRoundId`, the round it was
    * in has since been removed from the draft, so it came back with no round (S-60).
    */
-  | { readonly what: 'game-put-back'; readonly gameId: string; readonly fromRoundId?: string };
+  | { readonly what: 'game-put-back'; readonly gameId: string; readonly fromRoundId?: string }
+  /**
+   * "Put it back" on a game the draft holds already (a second tap, or a page from before
+   * the first): nothing was added, and the grid says the game is already back (step 2.185).
+   */
+  | { readonly what: 'game-already-back'; readonly gameId: string };
 
 /** Which form a refusal belongs beside: the new round's, or one round's own. */
 export type RefusedAt =
@@ -274,7 +279,7 @@ async function putBackGame(
   if (!read.ok) return refusal(read);
   const view = read.value;
   if (view.result.games.some((g) => g.id === gameId)) {
-    return { kind: 'saved', detail: { what: 'game-put-back', gameId } };
+    return { kind: 'saved', detail: { what: 'game-already-back', gameId } };
   }
   const was = view.removed.find((g) => g.id === gameId);
   if (was === undefined || view.draft === null || was.status !== 'scheduled') {

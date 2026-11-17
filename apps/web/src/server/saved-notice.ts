@@ -11,7 +11,7 @@
 // same-request.ts, behind a port both servers share.
 
 /** The screens that say "Saved" from a notice. */
-export const noticeScreens = ['games', 'box-score'] as const;
+export const noticeScreens = ['games', 'box-score', 'schedule'] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 
 export type SavedNotice = {
@@ -20,6 +20,11 @@ export type SavedNotice = {
   readonly thing: string;
   /** What was done to it, as the last part of a message key: `final`, `reopen`… */
   readonly said: string;
+  /**
+   * Another id the answer needs, if any: on the schedule, the round a game was removed from
+   * (step 2.185). Never anything typed.
+   */
+  readonly about?: string;
 };
 
 export type SavedNotices = {
@@ -60,7 +65,12 @@ export function savedNotices(options: {
       if (found === undefined || found.screen !== screen) return undefined;
       left.delete(holder);
       if (found.at < now() - options.keepMs) return undefined;
-      return { screen: found.screen, thing: found.thing, said: found.said };
+      return {
+        screen: found.screen,
+        thing: found.thing,
+        said: found.said,
+        ...(found.about === undefined ? {} : { about: found.about }),
+      };
     },
   };
 }

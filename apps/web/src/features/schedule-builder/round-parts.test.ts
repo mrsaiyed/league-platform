@@ -33,6 +33,7 @@ const round = (games: number, undated: number): GridRound => ({
   date: '2026-11-30',
   games: Array.from({ length: games }, (_, i) => game(i + 1)),
   undated,
+  removed: [],
 });
 const action = async (): Promise<never> => {
   throw new Error('not posted in a test');

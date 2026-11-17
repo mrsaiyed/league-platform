@@ -4,6 +4,11 @@
 // takes the phone there; and, for a refused round form, which form it was and what was
 // typed in it, so the form opens again with it kept and the reason beside it. Ids must be
 // ids, and typed text is only ever put back into its own field, never shown as text (T-187).
+//
+// A game removed, put back or already back is answered by a one-time notice instead (record
+// 067, step 2.185): the address holds only the place, so a reload, or the phone's Back to
+// it, never shows an old "Removed … Put it back".
+import type { SavedNotice } from '../../server/saved-notice.ts';
 import type { RefusedAt, SavedDetail, ScheduleActionOutcome } from './run-schedule-action.ts';
 
 type Search = Readonly<Record<string, string | readonly string[] | undefined>>;
@@ -68,31 +73,66 @@ export function answerParams(outcome: ScheduleActionOutcome): {
         },
         hash,
       };
-    case 'game-removed':
-      return {
-        query: {
-          ...query,
-          saved: detail.what,
-          ...(detail.roundId === null ? {} : { round: detail.roundId }),
-          // Which game, so "Put it back" can be offered; what it was is the draft's to say.
-          ...(detail.gameId === undefined ? {} : { game: detail.gameId }),
-        },
-        hash,
-      };
     case 'game-saved':
     case 'game-round':
       return { query: { ...query, saved: detail.what, game: detail.gameId }, hash };
+    case 'game-removed':
+    case 'game-put-back':
+    case 'game-already-back':
+      // Said by the one-time notice (noticeOfAnswer); the address keeps only the place.
+      return { query: {}, hash };
+  }
+}
+
+/** What a notice holds of an answer: the screen is the schedule's. */
+export type GridNotice = Omit<SavedNotice, 'screen'>;
+
+/**
+ * The answers that travel as a one-time notice (step 2.185): which game, what was done and,
+ * for a removal, the round it was in, or for a put back, the round the draft had removed
+ * since. Undefined for every other answer, which still rides in the address.
+ */
+export function noticeOfAnswer(outcome: ScheduleActionOutcome): GridNotice | undefined {
+  if (outcome.kind !== 'saved' || outcome.detail === undefined) return undefined;
+  const detail = outcome.detail;
+  switch (detail.what) {
+    case 'game-removed':
+      if (detail.gameId === undefined) return undefined;
+      return {
+        thing: detail.gameId,
+        said: detail.what,
+        ...(detail.roundId === null ? {} : { about: detail.roundId }),
+      };
     case 'game-put-back':
       return {
-        query: {
-          ...query,
-          saved: detail.what,
-          game: detail.gameId,
-          // The round it was in, removed from the draft since: it came back with no round.
-          ...(detail.fromRoundId === undefined ? {} : { round: detail.fromRoundId }),
-        },
-        hash,
+        thing: detail.gameId,
+        said: detail.what,
+        ...(detail.fromRoundId === undefined ? {} : { about: detail.fromRoundId }),
       };
+    case 'game-already-back':
+      return { thing: detail.gameId, said: detail.what };
+    default:
+      return undefined;
+  }
+}
+
+/** The answer a notice the grid took says, if it is one of ours with ids that are ids. */
+export function savedDetailOfNotice(notice: GridNotice | undefined): SavedDetail | undefined {
+  if (notice === undefined) return undefined;
+  const gameId = idOf(notice.thing);
+  const about = idOf(notice.about);
+  if (gameId === undefined) return undefined;
+  switch (notice.said) {
+    case 'game-removed':
+      return { what: 'game-removed', roundId: about ?? null, gameId };
+    case 'game-put-back':
+      return about === undefined
+        ? { what: 'game-put-back', gameId }
+        : { what: 'game-put-back', gameId, fromRoundId: about };
+    case 'game-already-back':
+      return { what: 'game-already-back', gameId };
+    default:
+      return undefined;
   }
 }
 
@@ -109,22 +149,13 @@ export function savedDetailOf(search: Search): SavedDetail | undefined {
     }
     case 'round-removed':
       return { what, afterRoundId: idOf(first(search['after'])) ?? null };
-    case 'game-removed': {
-      const roundId = idOf(round) ?? null;
-      const gameId = idOf(first(search['game']));
-      return gameId === undefined ? { what, roundId } : { what, roundId, gameId };
-    }
     case 'game-saved':
     case 'game-round': {
       const gameId = idOf(first(search['game']));
       return gameId === undefined ? undefined : { what, gameId };
     }
-    case 'game-put-back': {
-      const gameId = idOf(first(search['game']));
-      const fromRoundId = idOf(round);
-      if (gameId === undefined) return undefined;
-      return fromRoundId === undefined ? { what, gameId } : { what, gameId, fromRoundId };
-    }
+    // A removal or a put back is never read from the address (step 2.185): an old address
+    // that still names one says no more than "Saved".
     default:
       return undefined;
   }

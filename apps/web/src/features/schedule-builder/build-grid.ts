@@ -48,6 +48,21 @@ export type GridRound = {
    * them, but they hold the round, so it says so and offers no "Remove this round".
    */
   readonly undated: number;
+  /**
+   * Games of the published schedule the draft removes, where they were (step 2.185): shown
+   * struck through with "Put it back" until the draft is published or discarded. They hold
+   * nothing: not the round (S-60), not a count, not a clash.
+   */
+  readonly removed: readonly RemovedGridGame[];
+};
+
+/** A game of the published schedule that the draft removes, as the draft last held it. */
+export type RemovedGridGame = GridGame & {
+  /**
+   * The name of the round it was in, when the draft has removed that round too: it is shown
+   * under "Games with no round", and "Put it back" brings it back there (S-60).
+   */
+  readonly roundGone: string | null;
 };
 
 export type GridClash = { readonly key: string; readonly text: string };
@@ -56,6 +71,8 @@ export type Grid = {
   readonly rounds: readonly GridRound[];
   /** Games that belong to no round. */
   readonly looseGames: readonly GridGame[];
+  /** Removed games of the published schedule whose round is not in the draft (step 2.185). */
+  readonly looseRemoved: readonly RemovedGridGame[];
   readonly clashes: readonly GridClash[];
   readonly allGames: readonly GridGame[];
 };
@@ -110,11 +127,23 @@ const byWhen = (a: GridGame, b: GridGame) =>
   (a.time ?? '99:99').localeCompare(b.time ?? '99:99') ||
   a.id.localeCompare(b.id);
 
+/**
+ * A round's games and the games the draft removes from it, one list in the order of their
+ * days and times: a removed game stays where it was (step 2.185).
+ */
+export function gamesInOrder(
+  games: readonly GridGame[],
+  removed: readonly RemovedGridGame[],
+): readonly (GridGame | RemovedGridGame)[] {
+  return [...games, ...removed].sort(byWhen);
+}
+
 const gamesOf = (c: Clash): readonly string[] =>
   c.kind === 'skipped-date' ? [c.gameId] : c.gameIds;
 
 export function buildGrid(
-  view: Pick<ScheduleDraftView, 'result' | 'clashes'> & Partial<Pick<ScheduleDraftView, 'undated'>>,
+  view: Pick<ScheduleDraftView, 'result' | 'clashes'> &
+    Partial<Pick<ScheduleDraftView, 'undated' | 'removed' | 'published'>>,
   teams: readonly GridTeam[],
   venues: readonly VenueWithCourts[],
 ): Grid {
@@ -143,27 +172,45 @@ export function buildGrid(
     const end = dated.find((d) => d > roundDate) ?? daysAfter(roundDate, 7) ?? roundDate;
     return date < roundDate || date >= end;
   };
-  const all: GridGame[] = view.result.games
+  const gridGame = (g: ScheduleGame): GridGame => ({
+    id: g.id,
+    homeTeamId: g.homeTeamId,
+    awayTeamId: g.awayTeamId,
+    homeName: teamName(g.homeTeamId),
+    awayName: teamName(g.awayTeamId),
+    roundId: g.roundId,
+    date: g.date,
+    time: g.time,
+    place: placeValue(g.venueId, g.court),
+    placeLabel: labelOf(g.venueId, g.court),
+    recording: g.recording ?? null,
+    status: g.status,
+    editable: g.status === 'scheduled',
+    clashed: clashed.has(g.id),
+    offRoundDate: offRoundDate(g.roundId, g.date),
+    outsideRound: outsideRound(g.roundId, g.date),
+  });
+  const all: GridGame[] = view.result.games.map(gridGame).sort(byWhen);
+  const roundIds = new Set(view.result.rounds.map((r) => r.id));
+  // The draft's own record of what it removes, read from the draft (never the address):
+  // only games of the published schedule stay in sight; one that was only ever in the
+  // draft is gone, as its answer says.
+  const publishedIds = new Set((view.published?.games ?? []).map((g) => g.id));
+  const removedRounds = view.result.removedRounds ?? [];
+  const removed: RemovedGridGame[] = (view.removed ?? [])
+    .filter((g) => publishedIds.has(g.id))
     .map((g) => ({
-      id: g.id,
-      homeTeamId: g.homeTeamId,
-      awayTeamId: g.awayTeamId,
-      homeName: teamName(g.homeTeamId),
-      awayName: teamName(g.awayTeamId),
-      roundId: g.roundId,
-      date: g.date,
-      time: g.time,
-      place: placeValue(g.venueId, g.court),
-      placeLabel: labelOf(g.venueId, g.court),
-      recording: g.recording ?? null,
-      status: g.status,
-      editable: g.status === 'scheduled',
-      clashed: clashed.has(g.id),
-      offRoundDate: offRoundDate(g.roundId, g.date),
-      outsideRound: outsideRound(g.roundId, g.date),
+      ...gridGame(g),
+      // Nothing about a removed game is a flag: it holds no place.
+      clashed: false,
+      offRoundDate: null,
+      outsideRound: false,
+      roundGone:
+        g.roundId === null || roundIds.has(g.roundId)
+          ? null
+          : (removedRounds.find((r) => r.id === g.roundId)?.label ?? null),
     }))
     .sort(byWhen);
-  const roundIds = new Set(view.result.rounds.map((r) => r.id));
   const gameText = (id: string) => {
     const g = all.find((x) => x.id === id);
     return g === undefined
@@ -201,8 +248,10 @@ export function buildGrid(
       date: r.date,
       games: all.filter((g) => g.roundId === r.id),
       undated: (view.undated ?? []).filter((g) => g.roundId === r.id).length,
+      removed: removed.filter((g) => g.roundId === r.id),
     })),
     looseGames: all.filter((g) => g.roundId === null || !roundIds.has(g.roundId)),
+    looseRemoved: removed.filter((g) => g.roundId === null || !roundIds.has(g.roundId)),
     clashes: view.clashes.map((c, i) => ({ key: `${c.kind}-${i}`, text: clashText(c) })),
     allGames: all,
   };
