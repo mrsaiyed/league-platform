@@ -19,6 +19,7 @@ import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { SavedLine } from '../games-area/saved-line.tsx';
 import { StaffTrail } from '../staff/index.ts';
 import { removePersonAction, savePersonAction } from './actions.ts';
+import { tickKeepsAChild } from './age-on-record.ts';
 import { detailsAnchor, removeAnchor } from './anchors.ts';
 import { personFormWords, todayForBirthDates } from './form-words.ts';
 import { readPerson } from './people-view.ts';
@@ -81,6 +82,11 @@ export async function PersonPage({
           }}
           values={{ firstName: person.firstName, lastName: person.lastName }}
           privateDetails={person.private}
+          childNote={
+            person.private !== undefined && tickKeepsAChild(person.private, todayForBirthDates())
+              ? t('adminPeople.field.childByTick')
+              : undefined
+          }
           today={todayForBirthDates()}
           words={personFormWords(t('adminPeople.save.submit'))}
           main

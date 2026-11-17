@@ -265,6 +265,45 @@ if (built) {
     await details.getByText('Saved: Jonathan Smith.').waitFor();
     note('saving again then works', true);
 
+    at = 'an unlikely date of birth is shown back before it is saved (R-28)';
+    const twoYearsAgo = `${new Date().getUTCFullYear() - 2}-01-15`;
+    await details.getByLabel('Date of birth (optional)').fill(twoYearsAgo);
+    await details.getByRole('button', { name: 'Save details' }).click();
+    const ask = details.locator('[data-wrong="birthDate"]');
+    await ask.waitFor();
+    note(
+      'a date making a player very young is said back with the age, and not saved',
+      /makes them [12] years? old today/.test(await ask.innerText()) &&
+        (await details.getByLabel('Date of birth (optional)').inputValue()) === twoYearsAgo,
+      await ask.innerText(),
+    );
+    await details.getByLabel('Yes, this date of birth is right').check();
+    await details.getByRole('button', { name: 'Save details' }).click();
+    await ask.waitFor({ state: 'detached' });
+    note(
+      'once ticked as right, it is saved',
+      (await details.getByText('Saved: Jonathan Smith.').count()) === 1 &&
+        (await details.getByLabel('Date of birth (optional)').inputValue()) === twoYearsAgo,
+    );
+    await accessible('an unlikely date of birth asked about');
+
+    at = 'a date that says adult does not untick a child (R-28)';
+    await details.getByLabel('Date of birth (optional)').fill('1990-05-05');
+    await details.getByLabel('Child or adult').selectOption('child');
+    await details.getByRole('button', { name: 'Save details' }).click();
+    // "Saved" from the save before is still on screen: wait for what this save brings.
+    const byTick = details.locator('[data-child-by-tick]');
+    await byTick.waitFor();
+    note(
+      'the record says beside the tick that they are treated as a child until it is changed',
+      (await byTick.count()) === 1 &&
+        (await byTick.innerText()).includes('they are treated as a child'),
+    );
+    await details.getByLabel('Child or adult').selectOption('adult');
+    await details.getByRole('button', { name: 'Save details' }).click();
+    await byTick.waitFor({ state: 'detached' });
+    note('and says nothing once they are marked as an adult', (await byTick.count()) === 0);
+
     at = "a child's name on a youth team's public roster is put right";
     await page.goto(`${origin}/harbor-city`);
     await page.goto(`${origin}/harbor-city/admin`);

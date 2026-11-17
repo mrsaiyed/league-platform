@@ -34,6 +34,8 @@ export type PersonFormWords = {
   /** Each box's sentence when it is wrong. */
   readonly wrong: Readonly<Record<PersonBox, string>>;
   readonly submit: string;
+  /** The tick under an unlikely date of birth shown back before saving (R-28). */
+  readonly birthDateChecked: string;
 };
 
 export function PersonForm({
@@ -44,6 +46,7 @@ export function PersonForm({
   privateDetails,
   today,
   words,
+  childNote,
   main = false,
 }: {
   readonly action: (state: FormState, form: FormData) => Promise<FormState>;
@@ -57,6 +60,11 @@ export function PersonForm({
   /** The league's today, the latest date of birth the box offers. */
   readonly today: string;
   readonly words: PersonFormWords;
+  /**
+   * Said beside the child-or-adult choice when the record's date of birth makes them an
+   * adult but they are marked as a child, who is then treated as a child (R-28).
+   */
+  readonly childNote?: string | undefined;
   /** The page's one filled button (DESIGN.md line 22); else outlined. */
   readonly main?: boolean;
 }) {
@@ -86,7 +94,9 @@ export function PersonForm({
         <>
           {wrong(name) ? (
             <small id={errorId} className="ui-field-error" role="alert" data-wrong={name}>
-              {words.wrong[name]}
+              {name === 'birthDate' && refused?.code === 'birth-date-check'
+                ? refused.said
+                : words.wrong[name]}
             </small>
           ) : null}
           {help === undefined ? null : (
@@ -172,8 +182,20 @@ export function PersonForm({
                 ))}
               </select>
               {child.after}
+              {childNote === undefined ? null : (
+                <small className="ui-field-help" data-child-by-tick="true">
+                  {childNote}
+                </small>
+              )}
             </label>
           </div>
+          {refused?.code === 'birth-date-check' ? (
+            <p>
+              <label className="staff-check">
+                <input type="checkbox" name="birthDateChecked" /> {words.birthDateChecked}
+              </label>
+            </p>
+          ) : null}
         </>
       )}
       {general ? (

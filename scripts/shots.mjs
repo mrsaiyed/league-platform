@@ -397,16 +397,19 @@ const adminPages = [
   // Step 2.50, Admin → People: a search by name; one person's record (the first on the
   // list); and, by the owner's own taps with scripts off (peopleSteps), a child added by hand
   // with an email and a date of birth, landing on their record that says so; the add form
-  // refused beside its boxes, with what was typed kept; and a misspelt name put right,
-  // "Saved" beside the details. Each taken in the first league only.
+  // refused beside its boxes, with what was typed kept; a misspelt name put right, "Saved"
+  // beside the details; and a date of birth that makes a player two years old shown back
+  // before it is saved (R-28). Each taken in the first league only.
   { name: 'admin-people-search', at: '/admin/people?q=ta' },
   { name: 'admin-person', at: '/admin/people', first: '/admin/people/' },
-  ...['person-added', 'person-add-refused', 'person-saved'].map((step) => ({
-    name: `admin-${step}`,
-    at: '/admin/people',
-    league: 'north-valley',
-    steps: (page) => peopleSteps(page, step),
-  })),
+  ...['person-added', 'person-add-refused', 'person-saved', 'person-birth-date-asked'].map(
+    (step) => ({
+      name: `admin-${step}`,
+      at: '/admin/people',
+      league: 'north-valley',
+      steps: (page) => peopleSteps(page, step),
+    }),
+  ),
   { name: 'admin-standings', at: '/admin/standings' },
   // The admin's own frame (step 2.103): its menu, open, as a phone holds it (on a laptop the
   // menu is always at the side, so the picture is the page's first screen); and "not
@@ -978,6 +981,15 @@ async function peopleSteps(page, what) {
   }
   if (what === 'person-added') return;
   const details = page.locator('#details');
+  if (what === 'person-birth-date-asked') {
+    // A date of birth that makes a player two years old is shown back before it is saved
+    // (R-28 as changed on 2026-11-17).
+    const year = new Date().getUTCFullYear() - 2;
+    await details.getByLabel('Date of birth (optional)').fill(`${year}-01-15`);
+    await send(details, 'Save details');
+    await page.locator('#details [data-wrong="birthDate"]').waitFor();
+    return;
+  }
   await details.getByLabel('Last name').fill('Smith');
   await send(details, 'Save details');
   await page.getByText('Saved: Jon Smith.').waitFor();

@@ -18,6 +18,7 @@
 //   answered as the first (server/same-request.ts), so nobody is added twice.
 import {
   createPerson,
+  getPerson,
   leagueUrl,
   removePerson,
   updatePerson,
@@ -40,7 +41,9 @@ import {
   type Refused,
   type TypedFields,
 } from '../games-area/form-state.ts';
+import { unlikelyYears } from './age-on-record.ts';
 import { detailsAnchor } from './anchors.ts';
+import { todayForBirthDates } from './form-words.ts';
 import { newPersonInput, personChangeInput, wrongBoxes, type PersonBox } from './person-input.ts';
 
 type Outcome =
@@ -106,12 +109,36 @@ async function showSaved(to: string): Promise<void> {
   redirect(to);
 }
 
+/**
+ * A date of birth that makes a player very young or very old is shown back before it is
+ * saved (R-28 as changed on 2026-11-17: a wrong year is the mistake that rule guards
+ * against). Nothing is saved; the box keeps the date, the sentence says the age it makes,
+ * and a tick under it lets the admin save it as it is. Undefined when there is nothing to ask.
+ */
+function askAboutBirthDate(fields: TypedFields, storedBirthDate?: string): Refused | undefined {
+  const typed = (fields['birthDate'] ?? '').trim();
+  if (typed === '' || typed === storedBirthDate || fields['birthDateChecked'] === 'on') {
+    return undefined;
+  }
+  const years = unlikelyYears(typed, todayForBirthDates());
+  if (years === undefined) return undefined;
+  return {
+    kind: 'refused',
+    code: 'birth-date-check',
+    typed: fields,
+    wrong: ['birthDate'],
+    said: t.plural('adminPeople.birthDate.check', years),
+  };
+}
+
 /** "Add a person": saved, the browser goes to their own new page, which says so. */
 export async function addPersonAction(_state: FormState, form: FormData): Promise<FormState> {
   const fields = typedOf(form);
   const { context, deps, record } = await peopleOf(fields);
   const wrong = wrongBoxes(fields);
   if (wrong.length > 0) return refused('create_person', 'invalid-input', fields, wrong);
+  const ask = askAboutBirthDate(fields);
+  if (ask !== undefined) return ask;
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const made = await createPerson(context, newPersonInput(fields), deps);
     return made.ok
@@ -130,6 +157,15 @@ export async function savePersonAction(_state: FormState, form: FormData): Promi
   const personId = (fields['personId'] ?? '').trim().toLowerCase();
   const wrong = wrongBoxes(fields);
   if (wrong.length > 0) return refused('update_person', 'invalid-input', fields, wrong);
+  // Asked only about a date that is changed: one already saved is not asked about again.
+  if ((fields['birthDate'] ?? '').trim() !== '' && fields['birthDateChecked'] !== 'on') {
+    const stored = await getPerson(context, { personId }, deps);
+    const ask = askAboutBirthDate(
+      fields,
+      stored.ok ? (stored.value.sensitive?.birthDate ?? undefined) : undefined,
+    );
+    if (ask !== undefined) return ask;
+  }
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const saved = await updatePerson(context, personChangeInput(fields), deps);
     return saved.ok ? { ok: true, personId } : { ok: false, code: saved.error.code };

@@ -28,6 +28,7 @@ export function personFormWords(submit: string): PersonFormWords {
       child: t('error.invalid-input'),
     },
     submit,
+    birthDateChecked: t('adminPeople.birthDate.checked'),
   };
 }
 

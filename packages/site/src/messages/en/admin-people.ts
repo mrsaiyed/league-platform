@@ -6,6 +6,11 @@ export const enAdminPeople = {
   'adminPeople.add.title': 'Add a person',
   'adminPeople.added':
     'Added to the league: {name}. They are on no team yet; a team’s page in Teams puts them on its roster.',
+  'adminPeople.birthDate.check_one':
+    'That date of birth makes them {count} year old today. Check the year; if it is right, tick the box and save again.',
+  'adminPeople.birthDate.check_other':
+    'That date of birth makes them {count} years old today. Check the year; if it is right, tick the box and save again.',
+  'adminPeople.birthDate.checked': 'Yes, this date of birth is right',
   'adminPeople.details.title': 'Details',
   'adminPeople.empty':
     'Everyone in the league will be listed here: players, coaches and captains, on a team or not. Add the first person.',
@@ -15,6 +20,8 @@ export const enAdminPeople = {
   'adminPeople.field.child.adult': 'An adult (18 or over)',
   'adminPeople.field.child.child': 'A child (under 18)',
   'adminPeople.field.child.unknown': 'Not recorded',
+  'adminPeople.field.childByTick':
+    'The date of birth makes them an adult, but they are marked as a child, so they are treated as a child: shown with less on public pages. To show more, change this to “An adult”.',
   'adminPeople.field.childHelp': 'Children are shown with less on the league’s public pages.',
   'adminPeople.field.email': 'Email (optional)',
   'adminPeople.field.emailHelp': 'Nothing is sent to it yet.',
