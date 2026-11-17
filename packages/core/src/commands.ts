@@ -82,6 +82,7 @@ import {
 } from './modules/leagues/index.ts';
 import {
   createPerson,
+  getPerson,
   listPeople,
   removePerson,
   setNameRequest,
@@ -151,6 +152,7 @@ export const commands = commandRegistry([
   endTrackedGame,
   getBoxScoreSheet,
   getFixtureImport,
+  getPerson,
   getScheduleDraft,
   getSeason,
   invite,

@@ -29,6 +29,7 @@ export {
 } from './rules/stats-shown.ts';
 export { publicViewer, type Viewer } from './rules/viewer.ts';
 export { createPerson, type CreatePersonError } from './commands/create-person.ts';
+export { getPerson, type GetPersonError } from './commands/get-person.ts';
 export { listPeople } from './commands/list-people.ts';
 export { removePerson, type RemovePersonError } from './commands/remove-person.ts';
 export {

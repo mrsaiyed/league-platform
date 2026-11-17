@@ -75,6 +75,7 @@ import {
   engineRulesOf,
   getBoxScoreSheet,
   getFixtureImport,
+  getPerson,
   getScheduleDraft,
   getSeason,
   invite,
@@ -1663,6 +1664,15 @@ const peopleRows: readonly Row[] = [
     needs: 'people.manage',
     prepare: async () => ({ input: { firstName: 'Sam', lastName: 'Ng' } }),
     run: (c, i) => createPerson(c, i, peopleDeps),
+  },
+  {
+    command: 'people.get_person',
+    name: "read one person's record",
+    needs: 'people.read',
+    prepare: async (league) => ({
+      input: { personId: await newPerson(pglite, league.leagueId) },
+    }),
+    run: (c, i) => getPerson(c, i, peopleDeps),
   },
   {
     command: 'people.update_person',

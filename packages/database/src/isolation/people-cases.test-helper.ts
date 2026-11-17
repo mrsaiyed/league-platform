@@ -3,6 +3,7 @@
 // isolation-cases.test-helper.ts, which registers the rest.
 import {
   createPerson,
+  getPerson,
   listPeople as listPeopleCommand,
   removePerson,
   setNameRequest,
@@ -84,6 +85,11 @@ registerIsolationCase({
 registerCommandCase(createPerson, harnessTx, {
   name: 'add a person',
   input: () => ({ firstName: 'Harness', lastName: 'Person', contactEmail: 'h@example.test' }),
+});
+
+registerCommandCase(getPerson, harnessTx, {
+  name: "read the target's person, with the sensitive fields",
+  input: (target) => ({ personId: target.personId }),
 });
 
 registerCommandCase(updatePersonCommand, harnessTx, {
