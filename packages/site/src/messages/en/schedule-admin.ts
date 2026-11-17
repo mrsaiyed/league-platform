@@ -32,7 +32,7 @@ export const enScheduleAdmin = {
   'schedule.admin.blocker.revision-out-of-date':
     'A newer schedule was published after this draft was started.',
   'schedule.admin.blocker.round-in-use':
-    'The draft removes a round that a game in the bin or with no date is still in.',
+    'The draft removes a round that a game with no date yet is still in.',
   'schedule.admin.blocker.unknown-court': 'A game in the draft names a court that is gone.',
   'schedule.admin.blocker.unknown-team':
     'A game in the draft names a team that is not in the season.',
@@ -88,7 +88,7 @@ export const enScheduleAdmin = {
     'A new round in the draft could not be added to the season. Discard the draft and add it again.',
   'schedule.admin.error.round-cannot-be-updated': 'A round in the draft is gone from the season.',
   'schedule.admin.error.round-in-use':
-    'A game that is in the bin, has no date yet or was removed in this draft is still in this round, so it cannot be removed.',
+    'A game with no date yet is still in this round, so it cannot be removed.',
   'schedule.admin.error.season-not-found': 'That season is not there.',
   'schedule.admin.error.unknown-court': 'That court is not at the chosen venue.',
   'schedule.admin.error.unknown-team': 'One of those teams is not in this season.',
@@ -177,10 +177,18 @@ export const enScheduleAdmin = {
   'schedule.admin.removeRoundBlocked_other':
     'This round has {count} games, so it cannot be removed. Move or remove its games first.',
   'schedule.admin.removeRoundNote': 'It has no games, so it can be removed from the draft.',
+  'schedule.admin.removeRoundUndated_one':
+    'This round has {count} game with no date yet, so it cannot be removed.',
+  'schedule.admin.removeRoundUndated_other':
+    'This round has {count} games with no date yet, so it cannot be removed.',
   'schedule.admin.removedDraftOnly':
     'It was only in the draft, so nothing public has changed. Put it back and it is exactly as it was.',
+  'schedule.admin.removedDraftOnlyNoRound':
+    'It was only in the draft, so nothing public has changed. Put it back and it is as it was, under "Games with no round".',
   'schedule.admin.removedPublished':
     'Nothing public changes until you publish. Put it back now and it is exactly as it was. Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
+  'schedule.admin.removedPublishedNoRound':
+    'Nothing public changes until you publish. Put it back now and it is as it was, under "Games with no round". Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
   // A team in the bin, named in a game it played or was to play (A-17, step 2.180).
   'schedule.admin.removedTeam': '{name} (removed)',
   'schedule.admin.renameRound': 'Round name',
@@ -190,6 +198,9 @@ export const enScheduleAdmin = {
   'schedule.admin.roundDate': 'Date: {date}',
   'schedule.admin.roundEdit': 'Change or remove this round',
   'schedule.admin.roundField': 'Round',
+  // A round holding games with no date yet (step 2.181): one count, all its games.
+  'schedule.admin.roundGamesUndated_one': '{count} game, with no date yet',
+  'schedule.admin.roundGamesUndated_other': '{count} games, {undated} of them with no date yet',
   'schedule.admin.roundGames_one': '{count} game',
   'schedule.admin.roundGames_other': '{count} games',
   'schedule.admin.roundNoDate': 'No date set',
@@ -197,10 +208,14 @@ export const enScheduleAdmin = {
   'schedule.admin.saved': 'Saved to the draft. It is not public until you publish.',
   'schedule.admin.savedGame': 'Saved to the draft: {game}.',
   'schedule.admin.savedGamePutBack': 'Put back in the draft: {game}, as it was.',
+  'schedule.admin.savedGamePutBackNoRound':
+    'Put back in the draft: {game}, under "Games with no round": {round} was removed from the draft.',
   'schedule.admin.savedGameRemoved': 'Saved to the draft: a game was removed here.',
   // Removing a game from the draft, and putting it back in one tap (step 2.161).
   'schedule.admin.savedGameRemovedNamed': 'Removed: {game}, {round}.',
   'schedule.admin.savedGameRemovedNoRound': 'Removed: {game}, from the games with no round.',
+  'schedule.admin.savedGameRemovedRoundGone':
+    'Removed: {game}, {round}. {round} has since been removed from the draft.',
   'schedule.admin.savedGameRound': 'Saved to the draft: {game} is now in {round}.',
   'schedule.admin.savedRound': 'Saved to the draft: {round}.',
   'schedule.admin.savedRoundAdded':

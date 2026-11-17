@@ -1,0 +1,698 @@
+{
+  "quarters": {
+    "rules": {
+      "periods": 4,
+      "periodSeconds": 480,
+      "overtimeSeconds": 240,
+      "bonusFouls": 5,
+      "doubleBonusFouls": null,
+      "fullTimeouts": 3,
+      "shortTimeouts": 2,
+      "timeoutsPer": "game",
+      "overtimeTimeouts": 1,
+      "timeoutsCarry": false
+    },
+    "steps": [
+      {
+        "command": {
+          "type": "lineup",
+          "side": "home",
+          "playerIds": ["h1", "h2", "h3", "h4", "h5"]
+        },
+        "now": 0
+      },
+      {
+        "command": {
+          "type": "lineup",
+          "side": "away",
+          "playerIds": ["a1", "a2", "a3", "a4", "a5"]
+        },
+        "now": 0
+      },
+      { "command": { "type": "start" }, "now": 0 },
+      {
+        "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+        "now": 30000
+      },
+      { "command": { "type": "sub", "side": "home", "inId": "h6", "outId": "h1" }, "now": 90000 },
+      { "command": { "type": "foul", "side": "away", "playerId": "a2" }, "now": 120000 },
+      { "command": { "type": "set-clock", "ms": 450000 }, "now": 125000 },
+      { "command": { "type": "set-clock", "ms": 360000 }, "now": 126000 },
+      { "command": { "type": "start" }, "now": 130000 },
+      {
+        "command": { "type": "score", "side": "away", "playerId": "a3", "points": 3 },
+        "now": 150000
+      },
+      { "command": { "type": "pause" }, "now": 160000 },
+      { "command": { "type": "set-clock", "ms": 8000 }, "now": 161000 },
+      { "command": { "type": "sub", "side": "away", "inId": "a6", "outId": "a1" }, "now": 162000 },
+      { "command": { "type": "set-clock", "ms": 328000 }, "now": 163000 },
+      { "command": { "type": "start" }, "now": 170000 },
+      { "command": { "type": "timeout", "side": "home", "seconds": 60 }, "now": 200000 },
+      { "command": { "type": "set-clock", "ms": 3000000 }, "now": 201000 },
+      { "command": { "type": "start" }, "now": 210000 },
+      { "command": { "type": "pause" }, "now": 250000 },
+      { "command": { "type": "period", "period": 2 }, "now": 251000 },
+      { "command": { "type": "set-clock", "ms": 420000 }, "now": 252000 },
+      { "command": { "type": "set-clock", "ms": 480000 }, "now": 253000 },
+      { "command": { "type": "start" }, "now": 260000 },
+      {
+        "command": { "type": "score", "side": "home", "playerId": "h2", "points": 1 },
+        "now": 320000
+      },
+      { "command": { "type": "undo" }, "now": 321000 },
+      { "command": { "type": "redo" }, "now": 322000 },
+      { "command": { "type": "pause" }, "now": 330000 },
+      { "command": { "type": "set-clock", "ms": 7000 }, "now": 331000 },
+      { "command": { "type": "set-clock", "ms": 410000 }, "now": 332000 },
+      { "command": { "type": "period", "period": 3 }, "now": 333000 },
+      { "command": { "type": "start" }, "now": 340000 },
+      { "command": { "type": "pause" }, "now": 350000 },
+      { "command": { "type": "undo" }, "now": 351000 },
+      { "command": { "type": "redo" }, "now": 352000 },
+      { "command": { "type": "start" }, "now": 360000 },
+      {
+        "command": { "type": "score", "side": "home", "playerId": "h6", "points": 2 },
+        "now": 400000
+      },
+      { "command": { "type": "pause" }, "now": 410000 },
+      { "command": { "type": "set-clock", "ms": 500000 }, "now": 411000 },
+      { "command": { "type": "period", "period": 5 }, "now": 412000 },
+      { "command": { "type": "start" }, "now": 420000 },
+      { "command": { "type": "pause" }, "now": 480000 },
+      { "command": { "type": "set-clock", "ms": 7000 }, "now": 481000 },
+      { "command": { "type": "set-clock", "ms": 180000 }, "now": 482000 },
+      { "command": { "type": "end" }, "now": 483000 }
+    ],
+    "state": {
+      "version": 1,
+      "status": "final",
+      "rules": {
+        "periods": 4,
+        "periodSeconds": 480,
+        "overtimeSeconds": 240,
+        "bonusFouls": 5,
+        "doubleBonusFouls": null,
+        "fullTimeouts": 3,
+        "shortTimeouts": 2,
+        "timeoutsPer": "game",
+        "overtimeTimeouts": 1,
+        "timeoutsCarry": false
+      },
+      "clock": { "remainingMs": 180000, "running": false, "anchorAt": 480000, "elapsedMs": 40000 },
+      "plays": [
+        {
+          "type": "lineup",
+          "side": "home",
+          "playerIds": ["h1", "h2", "h3", "h4", "h5"],
+          "id": "pin0",
+          "at": 0,
+          "period": 1,
+          "clockMs": 480000,
+          "elapsedMs": 0
+        },
+        {
+          "type": "lineup",
+          "side": "away",
+          "playerIds": ["a1", "a2", "a3", "a4", "a5"],
+          "id": "pin1",
+          "at": 0,
+          "period": 1,
+          "clockMs": 480000,
+          "elapsedMs": 0
+        },
+        {
+          "type": "score",
+          "side": "home",
+          "playerId": "h1",
+          "points": 2,
+          "id": "pin3",
+          "at": 30000,
+          "period": 1,
+          "clockMs": 328000,
+          "elapsedMs": 0
+        },
+        {
+          "type": "sub",
+          "side": "home",
+          "inId": "h6",
+          "outId": "h1",
+          "id": "pin4",
+          "at": 90000,
+          "period": 1,
+          "clockMs": 328000,
+          "elapsedMs": 0
+        },
+        {
+          "type": "foul",
+          "side": "away",
+          "playerId": "a2",
+          "id": "pin5",
+          "at": 120000,
+          "period": 1,
+          "clockMs": 328000,
+          "elapsedMs": 0,
+          "stoppedClock": true
+        },
+        {
+          "type": "score",
+          "side": "away",
+          "playerId": "a3",
+          "points": 3,
+          "id": "pin9",
+          "at": 150000,
+          "period": 1,
+          "clockMs": 328000,
+          "elapsedMs": 0
+        },
+        {
+          "type": "sub",
+          "side": "away",
+          "inId": "a6",
+          "outId": "a1",
+          "id": "pin12",
+          "at": 162000,
+          "period": 1,
+          "clockMs": 328000,
+          "elapsedMs": 0
+        },
+        {
+          "type": "timeout",
+          "side": "home",
+          "seconds": 60,
+          "id": "pin15",
+          "at": 200000,
+          "period": 1,
+          "clockMs": 3000000,
+          "elapsedMs": 0,
+          "stoppedClock": true
+        },
+        {
+          "type": "period",
+          "period": 2,
+          "id": "pin19",
+          "at": 251000,
+          "clockMs": 480000,
+          "elapsedMs": 40000,
+          "prevClockMs": 2960000
+        },
+        {
+          "type": "score",
+          "side": "home",
+          "playerId": "h2",
+          "points": 1,
+          "id": "pin23",
+          "at": 320000,
+          "period": 2,
+          "clockMs": 410000,
+          "elapsedMs": 40000
+        },
+        {
+          "type": "period",
+          "period": 3,
+          "id": "pin29",
+          "at": 333000,
+          "clockMs": 480000,
+          "elapsedMs": 40000,
+          "prevClockMs": 410000
+        },
+        {
+          "type": "score",
+          "side": "home",
+          "playerId": "h6",
+          "points": 2,
+          "id": "pin35",
+          "at": 400000,
+          "period": 3,
+          "clockMs": 500000,
+          "elapsedMs": 40000
+        },
+        {
+          "type": "period",
+          "period": 5,
+          "id": "pin38",
+          "at": 412000,
+          "clockMs": 240000,
+          "elapsedMs": 40000,
+          "prevClockMs": 500000
+        }
+      ],
+      "redo": [],
+      "colorsSwapped": false,
+      "recent": [
+        "pin0",
+        "pin1",
+        "pin2",
+        "pin3",
+        "pin4",
+        "pin5",
+        "pin6",
+        "pin7",
+        "pin8",
+        "pin9",
+        "pin10",
+        "pin11",
+        "pin12",
+        "pin13",
+        "pin14",
+        "pin15",
+        "pin16",
+        "pin17",
+        "pin18",
+        "pin19",
+        "pin20",
+        "pin21",
+        "pin22",
+        "pin23",
+        "pin24",
+        "pin25",
+        "pin26",
+        "pin27",
+        "pin28",
+        "pin29",
+        "pin30",
+        "pin31",
+        "pin32",
+        "pin33",
+        "pin34",
+        "pin35",
+        "pin36",
+        "pin37",
+        "pin38",
+        "pin39",
+        "pin40",
+        "pin41",
+        "pin42",
+        "pin43"
+      ],
+      "lastAt": 483000
+    },
+    "derived": {
+      "period": 5,
+      "periodStartElapsedMs": 40000,
+      "clockMode": "stop",
+      "teams": {
+        "home": {
+          "score": 5,
+          "fouls": 0,
+          "turnovers": 0,
+          "teamTurnovers": 0,
+          "periodFouls": 0,
+          "onCourt": ["h6", "h2", "h3", "h4", "h5"],
+          "penalty": 0,
+          "bonus": 0,
+          "timeouts": [{ "period": 1, "seconds": 60 }],
+          "timeoutsLeft": { "full": 1, "short": 0 }
+        },
+        "away": {
+          "score": 3,
+          "fouls": 1,
+          "turnovers": 0,
+          "teamTurnovers": 0,
+          "periodFouls": 0,
+          "onCourt": ["a6", "a2", "a3", "a4", "a5"],
+          "penalty": 0,
+          "bonus": 0,
+          "timeouts": [],
+          "timeoutsLeft": { "full": 1, "short": 0 }
+        }
+      },
+      "players": {
+        "h1": {
+          "side": "home",
+          "points": 2,
+          "fg1": 0,
+          "fg2": 1,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "h2": {
+          "side": "home",
+          "points": 1,
+          "fg1": 1,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 40000,
+          "appeared": true
+        },
+        "h3": {
+          "side": "home",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 40000,
+          "appeared": true
+        },
+        "h4": {
+          "side": "home",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 40000,
+          "appeared": true
+        },
+        "h5": {
+          "side": "home",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 40000,
+          "appeared": true
+        },
+        "a1": {
+          "side": "away",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "a2": {
+          "side": "away",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 1,
+          "turnovers": 0,
+          "ms": 40000,
+          "appeared": true
+        },
+        "a3": {
+          "side": "away",
+          "points": 3,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 1,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 40000,
+          "appeared": true
+        },
+        "a4": {
+          "side": "away",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 40000,
+          "appeared": true
+        },
+        "a5": {
+          "side": "away",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 40000,
+          "appeared": true
+        },
+        "h6": {
+          "side": "home",
+          "points": 2,
+          "fg1": 0,
+          "fg2": 1,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 40000,
+          "appeared": true
+        },
+        "a6": {
+          "side": "away",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 40000,
+          "appeared": true
+        }
+      },
+      "standing": { "a2": [1] }
+    }
+  },
+  "halves": {
+    "rules": {
+      "periods": 2,
+      "periodSeconds": 1200,
+      "overtimeSeconds": 300,
+      "bonusFouls": 7,
+      "doubleBonusFouls": 10,
+      "fullTimeouts": 2,
+      "shortTimeouts": 0,
+      "timeoutsPer": "half",
+      "overtimeTimeouts": 1,
+      "timeoutsCarry": false
+    },
+    "steps": [
+      {
+        "command": {
+          "type": "lineup",
+          "side": "home",
+          "playerIds": ["h1", "h2", "h3", "h4", "h5"]
+        },
+        "now": 0
+      },
+      {
+        "command": {
+          "type": "lineup",
+          "side": "away",
+          "playerIds": ["a1", "a2", "a3", "a4", "a5"]
+        },
+        "now": 0
+      },
+      { "command": { "type": "start" }, "now": 0 },
+      {
+        "command": { "type": "score", "side": "home", "playerId": "h3", "points": 2 },
+        "now": 60000
+      },
+      { "command": { "type": "pause" }, "now": 185000 },
+      { "command": { "type": "set-clock", "ms": 720000 }, "now": 186000 },
+      { "command": { "type": "set-clock", "ms": 1015000 }, "now": 187000 },
+      { "command": { "type": "start" }, "now": 190000 },
+      { "command": { "type": "pause" }, "now": 200400 },
+      { "command": { "type": "set-clock", "ms": 1200000 }, "now": 201000 }
+    ],
+    "state": {
+      "version": 1,
+      "status": "live",
+      "rules": {
+        "periods": 2,
+        "periodSeconds": 1200,
+        "overtimeSeconds": 300,
+        "bonusFouls": 7,
+        "doubleBonusFouls": 10,
+        "fullTimeouts": 2,
+        "shortTimeouts": 0,
+        "timeoutsPer": "half",
+        "overtimeTimeouts": 1,
+        "timeoutsCarry": false
+      },
+      "clock": { "remainingMs": 1200000, "running": false, "anchorAt": 200400, "elapsedMs": 0 },
+      "plays": [
+        {
+          "type": "lineup",
+          "side": "home",
+          "playerIds": ["h1", "h2", "h3", "h4", "h5"],
+          "id": "pin0",
+          "at": 0,
+          "period": 1,
+          "clockMs": 1200000,
+          "elapsedMs": 0
+        },
+        {
+          "type": "lineup",
+          "side": "away",
+          "playerIds": ["a1", "a2", "a3", "a4", "a5"],
+          "id": "pin1",
+          "at": 0,
+          "period": 1,
+          "clockMs": 1200000,
+          "elapsedMs": 0
+        },
+        {
+          "type": "score",
+          "side": "home",
+          "playerId": "h3",
+          "points": 2,
+          "id": "pin3",
+          "at": 60000,
+          "period": 1,
+          "clockMs": 1015000,
+          "elapsedMs": 0
+        }
+      ],
+      "redo": [],
+      "colorsSwapped": false,
+      "recent": ["pin0", "pin1", "pin2", "pin3", "pin4", "pin5", "pin6", "pin7", "pin8", "pin9"],
+      "lastAt": 201000
+    },
+    "derived": {
+      "period": 1,
+      "periodStartElapsedMs": 0,
+      "clockMode": "stop",
+      "teams": {
+        "home": {
+          "score": 2,
+          "fouls": 0,
+          "turnovers": 0,
+          "teamTurnovers": 0,
+          "periodFouls": 0,
+          "onCourt": ["h1", "h2", "h3", "h4", "h5"],
+          "penalty": 0,
+          "bonus": 0,
+          "timeouts": [],
+          "timeoutsLeft": { "full": 2, "short": 0 }
+        },
+        "away": {
+          "score": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "teamTurnovers": 0,
+          "periodFouls": 0,
+          "onCourt": ["a1", "a2", "a3", "a4", "a5"],
+          "penalty": 0,
+          "bonus": 0,
+          "timeouts": [],
+          "timeoutsLeft": { "full": 2, "short": 0 }
+        }
+      },
+      "players": {
+        "h1": {
+          "side": "home",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "h2": {
+          "side": "home",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "h3": {
+          "side": "home",
+          "points": 2,
+          "fg1": 0,
+          "fg2": 1,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "h4": {
+          "side": "home",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "h5": {
+          "side": "home",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "a1": {
+          "side": "away",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "a2": {
+          "side": "away",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "a3": {
+          "side": "away",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "a4": {
+          "side": "away",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        },
+        "a5": {
+          "side": "away",
+          "points": 0,
+          "fg1": 0,
+          "fg2": 0,
+          "fg3": 0,
+          "fouls": 0,
+          "turnovers": 0,
+          "ms": 0,
+          "appeared": true
+        }
+      },
+      "standing": {}
+    }
+  }
+}

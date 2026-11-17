@@ -334,6 +334,19 @@ const adminPages = [
     league: 'north-valley',
     steps: (page) => undoSteps(page, 'schedule-game-removed'),
   },
+  // Step 2.181, in the first made-up league's current season, by the owner's own taps
+  // (emptiedRoundSteps): both games of the last round removed from the draft, the round's
+  // controls opened ("0 games" and whether it can be removed), and then "Remove this
+  // round" tapped, with its answer. The draft is discarded again once the page is drawn.
+  ...[
+    { name: 'admin-schedule-round-emptied', remove: false },
+    { name: 'admin-schedule-round-emptied-removed', remove: true },
+  ].map(({ name, remove }) => ({
+    name,
+    at: '/admin/schedule',
+    league: 'north-valley',
+    steps: (page) => emptiedRoundSteps(page, remove),
+  })),
   // Step 2.160, in the first made-up league's season that is not public yet (only it has
   // one), each also in the second league's light look: the empty season with its form;
   // "Saved" after adding a round; the moved game's question; a game outside its round with
@@ -1036,6 +1049,50 @@ async function winterSteps(page, want, then) {
     await tapTo(panel.getByRole('button', { name: yes }), answer);
   }
   if (then !== undefined) await page.goto(`${origin}/north-valley${then}`);
+}
+
+/**
+ * Step 2.181's pictures: from the current season's schedule with no draft, the owner
+ * removes both games of its last round from the draft and opens the round's controls;
+ * with `remove`, taps "Remove this round" too. Scripts are off. Once the page is drawn the
+ * draft is discarded from a second page, so the pictures after these find the season as
+ * the seed has it (the drawn page does not change: it has no scripts).
+ */
+async function emptiedRoundSteps(page, remove) {
+  const tapTo = async (on, locator, url) => {
+    await Promise.all([on.waitForEvent('load'), locator.click()]);
+    if (!url.test(on.url())) throw new Error(`a step landed on ${on.url()}, not ${url}`);
+  };
+  const discard = async (on) => {
+    const box = on.locator('details', {
+      has: on.locator('button', { hasText: 'Discard all draft changes' }),
+    });
+    if ((await box.count()) === 0) return;
+    await box.locator('summary').click();
+    await tapTo(on, box.locator('button'), /done=discarded/);
+  };
+  await discard(page);
+  const last = page.locator('section[data-round]').last();
+  const games = last.locator('li[data-game]', {
+    has: page.locator('summary', { hasText: 'Edit this game' }),
+  });
+  while ((await games.count()) > 0) {
+    const game = games.first();
+    await game.locator('summary', { hasText: 'Edit this game' }).click();
+    await tapTo(page, game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+  }
+  await last.locator('summary', { hasText: 'Change or remove this round' }).click();
+  if (remove) {
+    const button = last.getByRole('button', { name: 'Remove this round' });
+    await tapTo(page, button, /saved=round-removed|at=round/);
+  }
+  const other = await page.context().newPage();
+  try {
+    await other.goto(page.url().replace(/\?.*$/, ''));
+    await discard(other);
+  } finally {
+    await other.close();
+  }
 }
 
 async function roundSteps(page, steps) {

@@ -29,7 +29,7 @@ export const pickableTeams = (teams: readonly GridTeam[]): readonly GridTeam[] =
  * the teams its forms offer for a game, those not in the bin.
  */
 export function pageGrid(
-  view: Pick<ScheduleDraftView, 'result' | 'clashes'>,
+  view: Pick<ScheduleDraftView, 'result' | 'clashes'> & Partial<Pick<ScheduleDraftView, 'undated'>>,
   seasonTeams: readonly GridTeam[],
   venues: readonly VenueWithCourts[],
 ): { readonly grid: Grid; readonly teams: readonly GridTeam[] } {
@@ -71,6 +71,11 @@ export type GridRound = {
   readonly label: string;
   readonly date: string | null;
   readonly games: readonly GridGame[];
+  /**
+   * How many games with no date yet are in the round (step 2.181): the grid cannot place
+   * them, but they hold the round, so it says so and offers no "Remove this round".
+   */
+  readonly undated: number;
 };
 
 export type GridClash = { readonly key: string; readonly text: string };
@@ -137,7 +142,7 @@ const gamesOf = (c: Clash): readonly string[] =>
   c.kind === 'skipped-date' ? [c.gameId] : c.gameIds;
 
 export function buildGrid(
-  view: Pick<ScheduleDraftView, 'result' | 'clashes'>,
+  view: Pick<ScheduleDraftView, 'result' | 'clashes'> & Partial<Pick<ScheduleDraftView, 'undated'>>,
   teams: readonly GridTeam[],
   venues: readonly VenueWithCourts[],
 ): Grid {
@@ -223,6 +228,7 @@ export function buildGrid(
       label: r.label,
       date: r.date,
       games: all.filter((g) => g.roundId === r.id),
+      undated: (view.undated ?? []).filter((g) => g.roundId === r.id).length,
     })),
     looseGames: all.filter((g) => g.roundId === null || !roundIds.has(g.roundId)),
     clashes: view.clashes.map((c, i) => ({ key: `${c.kind}-${i}`, text: clashText(c) })),
