@@ -222,7 +222,7 @@ export function EndAsk(props: {
         <p className="court-ask-score" data-ask-score="">
           {question.score}
         </p>
-        {/* Ended early: said before anything else, in the amber of a thing to check. */}
+        {/* Ended early: said right under the score, in the clock's own gold, and in words. */}
         {question.early === null ? null : (
           <p className="court-ask-warn" data-ask-early="">
             {question.early.before}

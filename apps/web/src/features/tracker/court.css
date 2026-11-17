@@ -2152,10 +2152,10 @@
   font-weight: 800;
   line-height: 1.2;
 }
-/* Ended early: time is still on the clock. A thing to check before answering, in the
-   amber of things that wait, and in words. */
+/* Ended early: time is still on the clock. Said in the clock's own color, gold (line 2:
+   gold is labels and the clock), heavy, right under the score, and in words. */
 .court-ask-warn {
-  color: var(--court-amber);
+  color: var(--court-gold);
   font-weight: 700;
 }
 .court-ask-more {
