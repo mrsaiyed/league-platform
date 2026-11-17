@@ -12,10 +12,10 @@
 // nothing.
 //
 // What this does not prove: what Next.js itself sends over the network for these addresses
-// (the status line, the markup, the page data it streams, its headers). Neither mode can
-// start today (record 055), so no server can be asked; when staging can serve, the pages
-// and the posted action are to be compared byte for byte with an unknown address in
-// staging and in production mode (record 075, "Not done yet").
+// (the status line, the markup, the page data it streams, its headers). Since step 2.93's
+// last part, tests/browser/test-copy-test.mjs compares those byte for byte with an
+// unknown address in staging, where the app now serves (record 081); production still
+// refuses to start, so nothing of it can be asked over the network.
 //
 // In local and test both pages are drawn from the tools of the made-up ports, and refused
 // as an unknown address when the ports carry none or the request was not made here.

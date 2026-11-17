@@ -236,6 +236,10 @@ npm run test:web:browser
 
 CI runs them after `npm run verify`.
 
+### The test copy's start, on this computer
+
+`npm run test:web:browser` includes `tests/browser/test-copy-test.mjs`, which starts the built web app exactly as the online test copy starts (`APP_ENV=staging`), with nothing standing in but the world outside: the made-up seed database served as a PostgreSQL server on this computer, and a fake of the sign-in service. It signs a new person up and in, checks the health check and the "do not index" marks, and that production still refuses. To run it alone after a build: `node tests/browser/test-copy-test.mjs --no-build`. It never needs a real key or address, and none should be given ([record 081](../architecture/decisions/081-how-the-test-copy-starts.md)).
+
 ## Schema types
 
 After adding a migration, regenerate the typed description of the schema:
