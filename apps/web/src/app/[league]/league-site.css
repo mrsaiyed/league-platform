@@ -877,7 +877,7 @@ html {
    2.46): something to know, a quiet mark beside what it is about, never a band across the
    page. A rule in the league's main color at its start edge, on the panel's ground. */
 .staff-numbers-note {
-  margin-block: var(--step-5) 0;
+  margin-block: var(--step-5) var(--step-4);
   padding-block: var(--step-3);
   padding-inline: var(--step-4);
   border-inline-start: var(--line-heavy) solid var(--color-pop);
