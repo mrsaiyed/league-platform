@@ -725,7 +725,7 @@ describe('the one world and the database, the same season by the same commands',
     expect(said.slice(8)).toEqual(['ok', 'ok', 'roster-entry-not-found']);
   });
 
-  it('agree on who is a child: the birth date decides where there is one (R-28)', async () => {
+  it('agree on who is a child: by the birth date or the tick (R-28)', async () => {
     const yearsBefore = (day: string, years: number) =>
       `${String(Number(day.slice(0, 4)) - years).padStart(4, '0')}${day.slice(4)}`;
     const [a, b] = await both(async (side) => {
@@ -739,8 +739,10 @@ describe('the one world and the database, the same season by the same commands',
       for (const [firstName, birthDate, isMinor] of [
         // Eighteen tomorrow, the tick off: a child today.
         ['Lark1', yearsBefore(addDays(today, 1), 18), false],
-        // Eighteen today, the tick on: an adult.
-        ['Lark2', yearsBefore(today, 18), true],
+        // Eighteen today, the tick off: an adult.
+        ['Lark2', yearsBefore(today, 18), false],
+        // Eighteen today, the tick on: a child (a date unticks no one).
+        ['Lark3', yearsBefore(today, 18), true],
       ] as const) {
         const person = ok(
           'person',
@@ -759,6 +761,7 @@ describe('the one world and the database, the same season by the same commands',
     const shown = JSON.stringify(a);
     expect(shown).toContain('Lark1 P.');
     expect(shown).toContain('Lark2 Player');
+    expect(shown).toContain('Lark3 P.');
     expect(shown).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 

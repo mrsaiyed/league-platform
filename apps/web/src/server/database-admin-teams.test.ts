@@ -686,35 +686,87 @@ describe("a child's private fields (R-16, T-76) and R-28 on the database", () =>
     );
   });
 
-  it('treats an adult by birth date with the tick on as an adult', async () => {
-    const people = must('people', await listPeople(ownerOf(leagueId), { limit: 200 }, deps()));
-    const morgan = people.find((p) => p.firstName === 'Morgan');
-    if (morgan === undefined) throw new Error('no Morgan in the seed');
+  it('treats an adult by birth date with the tick ON as a child, until the admin unticks them', async () => {
+    // Changed with R-28 (November 17): a date that says adult unticks no one.
+    const morganNow = async () => {
+      const people = must('people', await listPeople(ownerOf(leagueId), { limit: 200 }, deps()));
+      const found = people.find((p) => p.firstName === 'Morgan');
+      if (found === undefined) throw new Error('no Morgan in the seed');
+      return found;
+    };
+    const tick = async (isMinor: boolean) => {
+      const morgan = await morganNow();
+      must(
+        'tick',
+        await updatePerson(
+          ownerOf(leagueId),
+          { personId: morgan.id, version: morgan.version, isMinor },
+          deps(),
+        ),
+      );
+    };
+    const [season] = await ports.publicStats.seasonsOf(leagueId);
+    const teams = await ports.adminTeams.teams(leagueId, season?.id ?? '');
+    /** Morgan's name in the statistics and on every public roster. */
+    const shownAs = () =>
+      ports.publicStats.statisticsOf(leagueId, async ({ store, settings, rosterOf }) => {
+        const table = must(
+          'statistics',
+          await readStatisticsTable(store, {
+            seasonId: season?.id ?? '',
+            viewing: {
+              leagueId,
+              viewer: publicViewer(leagueId),
+              audience: settings.audience,
+              policy: settings.namePolicy,
+            },
+          }),
+        );
+        const names = table.players.map((p) => p.name.text);
+        for (const team of teams) {
+          const roster = await rosterOf(team.id, publicViewer(leagueId));
+          names.push(...roster.lines.map((line) => (line.name.shown ? line.name.text : '')));
+        }
+        return names.filter((name) => name?.startsWith('Morgan'));
+      });
+    // Born 1990, the tick on: a child everywhere the ports answer.
+    await tick(true);
+    const asChild = await shownAs();
+    expect(asChild.length).toBeGreaterThan(1);
+    expect(new Set(asChild)).toEqual(new Set(['Morgan E.']));
+    const morgan = await morganNow();
+    const asked = await setNameRequest(
+      contextOf('admin'),
+      { personId: morgan.id, version: morgan.version, showAs: 'initials', reason: 'guardianAsked' },
+      deps(),
+    );
+    answers.push(asked);
+    // A child's request for initials is always taken (R-25), though adults may not ask.
+    expect(asked).toMatchObject({ ok: true });
+    const back = await morganNow();
     must(
-      'tick',
-      await updatePerson(
+      'back',
+      await setNameRequest(
         ownerOf(leagueId),
-        { personId: morgan.id, version: morgan.version, isMinor: true },
+        { personId: back.id, version: back.version, showAs: 'none', reason: 'guardianAsked' },
         deps(),
       ),
     );
-    const [season] = await ports.publicStats.seasonsOf(leagueId);
-    const names = await ports.publicStats.statisticsOf(leagueId, async ({ store, settings }) => {
-      const table = must(
-        'statistics',
-        await readStatisticsTable(store, {
-          seasonId: season?.id ?? '',
-          viewing: {
-            leagueId,
-            viewer: publicViewer(leagueId),
-            audience: settings.audience,
-            policy: settings.namePolicy,
-          },
-        }),
-      );
-      return table.players.map((p) => p.name.text);
-    });
-    expect(names).toContain('Morgan Example');
+    // The admin unticks them: an adult by their date, shown in full.
+    await tick(false);
+    expect(new Set(await shownAs())).toEqual(new Set(['Morgan Example']));
+    const refused = await setNameRequest(
+      contextOf('admin'),
+      {
+        personId: (await morganNow()).id,
+        version: (await morganNow()).version,
+        showAs: 'initials',
+        reason: 'guardianAsked',
+      },
+      deps(),
+    );
+    answers.push(refused);
+    expect(refused).toEqual({ ok: false, error: { code: 'initials-not-offered' } });
   });
 
   it('never writes a private value or a name into a log line or a warning', async () => {

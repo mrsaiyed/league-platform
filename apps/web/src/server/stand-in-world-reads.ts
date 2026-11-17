@@ -219,7 +219,7 @@ export function worldGameSnapshot(
           id: p.id,
           firstName: p.firstName,
           lastName: p.lastName,
-          // R-28: the birth date decides where there is one (list-people-for-display.ts).
+          // R-28: the birth date or the tick (list-people-for-display.ts).
           isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment),
           visibility: p.visibility,
         }));
@@ -265,7 +265,7 @@ export function worldPublicRoster(
             leftOn: e.leftOn,
             firstName: p?.firstName ?? '',
             lastName: p?.lastName ?? '',
-            // R-28: the birth date decides where there is one (list-public-roster.ts).
+            // R-28: the birth date or the tick (list-public-roster.ts).
             isMinor: p === undefined ? null : minorAt(p, s.timeZone, now),
             nameRequest: p?.visibility ?? 'none',
             personBinned: p === undefined || p.binned,

@@ -1,5 +1,5 @@
-// R-28: a birth date, where there is one, decides whether a person is a child; the tick
-// only where there is none.
+// R-28 (changed November 17): a child if their birth date says so or the "minor" tick is
+// on; a date that says adult unticks no one; a date that cannot be read is a child's.
 import { describe, expect, it } from 'vitest';
 import { dayIn } from '../../leagues/index.ts';
 import { isMinorOn, type MinorFacts } from './minor-by-age.ts';
@@ -14,12 +14,18 @@ const person = (birthDate: string | null, isMinor: boolean | null): MinorFacts =
 describe('isMinorOn (R-28)', () => {
   it('counts a person whose birth date makes them a child as a child, the tick off', () => {
     expect(isMinorOn(person('2012-09-03', false), today)).toBe(true);
-    // And where the league does not know either: the date decides.
+    // And where the league does not know either: the date says.
     expect(isMinorOn(person('2012-09-03', null), today)).toBe(true);
   });
 
-  it('counts a person whose birth date makes them an adult as an adult, the tick on', () => {
-    expect(isMinorOn(person('1990-04-12', true), today)).toBe(false);
+  it('keeps a ticked person a child though their birth date says adult', () => {
+    expect(isMinorOn(person('1990-04-12', true), today)).toBe(true);
+    // A birth year mistyped far in the past unticks no one.
+    expect(isMinorOn(person('1912-09-03', true), today)).toBe(true);
+  });
+
+  it('counts an unticked person whose birth date says adult as an adult', () => {
+    expect(isMinorOn(person('1990-04-12', false), today)).toBe(false);
     expect(isMinorOn(person('1990-04-12', null), today)).toBe(false);
   });
 
@@ -31,10 +37,12 @@ describe('isMinorOn (R-28)', () => {
     expect(isMinorOn({ birthDate: null, isMinor: 'yes' as unknown as boolean }, today)).toBeNull();
   });
 
-  it('is a child the day before their 18th birthday, and an adult on it', () => {
-    const born = person('2008-11-16', true);
+  it('is a child the day before their 18th birthday, and an adult on it, unticked', () => {
+    const born = person('2008-11-16', false);
     expect(isMinorOn(born, '2026-11-15')).toBe(true);
     expect(isMinorOn(born, '2026-11-16')).toBe(false);
+    // Ticked, their 18th birthday changes nothing: the admin unticks to show more.
+    expect(isMinorOn(person('2008-11-16', true), '2026-11-16')).toBe(true);
     expect(isMinorOn(person('2008-11-17', false), '2026-11-16')).toBe(true);
     // Across a year's end.
     expect(isMinorOn(person('2009-01-01', false), '2026-12-31')).toBe(true);
@@ -61,7 +69,7 @@ describe('isMinorOn (R-28)', () => {
     expect(isMinorOn(person('2004-02-29', false), '2022-02-28')).toBe(true);
     expect(isMinorOn(person('2004-02-29', false), '2022-03-01')).toBe(false);
     // Born on a 28th or a 1st in a year 18 before a leap year: the 29th changes nothing.
-    expect(isMinorOn(person('2006-02-28', true), '2024-02-28')).toBe(false);
+    expect(isMinorOn(person('2006-02-28', null), '2024-02-28')).toBe(false);
     expect(isMinorOn(person('2006-03-01', false), '2024-02-29')).toBe(true);
   });
 
@@ -70,17 +78,22 @@ describe('isMinorOn (R-28)', () => {
     expect(isMinorOn(person('2030-01-01', null), today)).toBe(true);
   });
 
-  it('takes a value that is not a yyyy-mm-dd date as no birth date', () => {
-    expect(isMinorOn(person('3 Sept 2012', false), today)).toBe(false);
-    expect(isMinorOn(person('', null), today)).toBeNull();
+  it('counts a birth date that cannot be read as a child, tick on or off', () => {
+    for (const isMinor of [true, false, null]) {
+      for (const birthDate of ['3 Sept 2012', '', '2012-02-30', '2012-13-01', '20120903']) {
+        expect(isMinorOn(person(birthDate, isMinor), today), `${birthDate} ${isMinor}`).toBe(true);
+      }
+    }
   });
 
-  it('is what shownAsChild is given, so an unticked child is never shown as an adult', () => {
+  it('is what shownAsChild is given, so a child is never shown as an adult', () => {
     // An adult league, the tick off: by the tick alone the person would be an adult.
     expect(shownAsChild(false, 'adult')).toBe(false);
     expect(shownAsChild(isMinorOn(person('2012-09-03', false), today), 'adult')).toBe(true);
-    // A youth league, the tick on, the date an adult's: shown as an adult.
-    expect(shownAsChild(isMinorOn(person('1990-04-12', true), today), 'youth')).toBe(false);
+    // The tick on, the date an adult's: still shown as a child.
+    expect(shownAsChild(isMinorOn(person('1990-04-12', true), today), 'adult')).toBe(true);
+    // Unticked, the date an adult's: an adult, in a youth league too.
+    expect(shownAsChild(isMinorOn(person('1990-04-12', false), today), 'youth')).toBe(false);
     // Nothing known: the audience decides (R-15).
     expect(shownAsChild(isMinorOn(person(null, null), today), 'youth')).toBe(true);
     expect(shownAsChild(isMinorOn(person(null, null), today), 'adult')).toBe(false);

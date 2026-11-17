@@ -1,7 +1,7 @@
 // What the one name function (T-81) needs about some people, and nothing more: their
 // names, whether they are a child and their own request. Never a birth date, contact
 // field, address or account (R-16): whether they are a child is worked out in SQL from
-// the birth date where there is one, else the tick (R-28, minor-by-age-sql.ts), so the
+// the birth date and the tick (R-28, minor-by-age-sql.ts), so the
 // date never leaves the database. People in the bin are not read.
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { isMinorSql } from './minor-by-age-sql.ts';

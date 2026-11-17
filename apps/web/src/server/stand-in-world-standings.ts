@@ -244,7 +244,7 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
           id: p.id,
           firstName: p.firstName,
           lastName: p.lastName,
-          // R-28: the birth date decides where there is one (list-people-for-display.ts).
+          // R-28: the birth date or the tick (list-people-for-display.ts).
           isMinor: minorAt(p, s?.timeZone ?? 'UTC', moment),
           visibility: p.visibility,
         })),
@@ -288,7 +288,7 @@ export function worldLeaguesStores(
     // child, read from its own rows, so the Privacy settings say what the public pages do
     // (record 065; has-recorded-child.ts reads the people table the same way).
     leagueAudience: async () => s.audience,
-    // R-28: a child by birth date counts, whatever the tick says.
+    // R-28: a child by birth date or by the tick counts.
     hasRecordedChild: async () =>
       s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
     // The permission check asks who the league is and whether it may be changed.

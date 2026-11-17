@@ -82,6 +82,8 @@ describe('isMinorSql gives what core gives (R-28)', () => {
     '2009-01-01',
     // After every today above: a child, as core counts it (it cannot be saved).
     '2030-01-01',
+    // A birth year mistyped far in the past: an adult's date, which unticks no one.
+    '1912-09-03',
   ];
   const ticks = [true, false, null];
   const cases = todays.flatMap((today) =>
@@ -97,6 +99,39 @@ describe('isMinorSql gives what core gives (R-28)', () => {
         differ.push(`${birthDate} ${isMinor} on ${today}: ${database} v ${core}`);
     }
     expect(differ).toEqual([]);
+  });
+
+  it('keeps a ticked person a child whatever adult date they have, as core does', async () => {
+    for (const birthDate of ['1990-04-12', '1912-09-03', '2008-11-16']) {
+      expect(await sqlAnswer(birthDate, true, '2026-11-16'), birthDate).toBe(true);
+      expect(isMinorOn({ birthDate, isMinor: true }, '2026-11-16'), birthDate).toBe(true);
+    }
+  });
+
+  it('counts a date it cannot read against a today as a child, tick on or off', async () => {
+    // A date column holds no unreadable text; the database's counterpart is a comparison
+    // with no answer, as when no league row gives a today: a child, as core counts a date it
+    // cannot read.
+    for (const isMinor of [true, false, null]) {
+      const { rows } = await withTransaction(db, { leagueId: a.leagueId }, (scope) =>
+        sql<{ minor: boolean | null }>`
+          select ${isMinorSql(sql<string>`null::date`)} as minor
+            from (values ('1990-04-12'::date, ${isMinor}::boolean, ${a.leagueId}::uuid))
+              as people (birth_date, is_minor, league_id)`.execute(transactionOf(scope)),
+      );
+      expect(rows[0]?.minor, String(isMinor)).toBe(true);
+      for (const unreadable of ['12/09/2012', '2012-02-30', '']) {
+        expect(isMinorOn({ birthDate: unreadable, isMinor }, '2026-11-16')).toBe(true);
+      }
+    }
+    // And a person whose league row the subquery cannot find: a child too.
+    const { rows } = await withTransaction(db, { leagueId: a.leagueId }, (scope) =>
+      sql<{ minor: boolean | null }>`
+        select ${isMinorSql()} as minor
+          from (values ('1990-04-12'::date, false, gen_random_uuid()))
+            as people (birth_date, is_minor, league_id)`.execute(transactionOf(scope)),
+    );
+    expect(rows[0]?.minor).toBe(true);
   });
 });
 
@@ -135,6 +170,7 @@ describe("isMinorSql reads the person's own league's today, in its time zone", (
 describe('the queries that say whether someone is a child read it through isMinorSql', () => {
   let child: string;
   let grown: string;
+  let ticked: string;
   let teamId: string;
 
   beforeAll(async () => {
@@ -144,27 +180,35 @@ describe('the queries that say whether someone is a child read it through isMino
     const today = dayIn('America/Chicago', Date.now());
     child = await newPerson(pglite, a.leagueId, { firstName: 'Kit', lastName: 'Young' });
     grown = await newPerson(pglite, a.leagueId, { firstName: 'Ada', lastName: 'Grown' });
-    // A child by birth date with the tick off; an adult by birth date with the tick on.
+    ticked = await newPerson(pglite, a.leagueId, { firstName: 'Tia', lastName: 'Ticked' });
+    // A child by birth date with the tick off; an adult by birth date with the tick off;
+    // an adult by birth date with the tick on, a child (a date unticks no one).
     await pglite.query('update people set birth_date = $2, is_minor = false where id = $1', [
       child,
       yearsBefore(addDays(today, 1), 18),
     ]);
-    await pglite.query('update people set birth_date = $2, is_minor = true where id = $1', [
+    await pglite.query('update people set birth_date = $2, is_minor = false where id = $1', [
       grown,
       yearsBefore(today, 18),
     ]);
-    await newRosterEntry(pglite, a.leagueId, teamId, child);
-    await newRosterEntry(pglite, a.leagueId, teamId, grown);
+    await pglite.query('update people set birth_date = $2, is_minor = true where id = $1', [
+      ticked,
+      yearsBefore(today, 18),
+    ]);
+    for (const person of [child, grown, ticked]) {
+      await newRosterEntry(pglite, a.leagueId, teamId, person);
+    }
   });
 
   const inA = <T>(work: (scope: LeagueScope) => Promise<T>) =>
     withTransaction(db, { leagueId: a.leagueId }, work);
 
   it('the people for the name function: a yes or a no, never the date', async () => {
-    const rows = await inA((scope) => listPeopleForDisplay(scope, [child, grown]));
+    const rows = await inA((scope) => listPeopleForDisplay(scope, [child, grown, ticked]));
     const byId = new Map(rows.map((row) => [row.id, row]));
     expect(byId.get(child)?.isMinor).toBe(true);
     expect(byId.get(grown)?.isMinor).toBe(false);
+    expect(byId.get(ticked)?.isMinor).toBe(true);
     expect(JSON.stringify(rows)).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
@@ -176,22 +220,25 @@ describe('the queries that say whether someone is a child read it through isMino
       }),
     );
     const names = roster.lines.map((line) => (line.name.shown ? line.name.text : line.name.why));
-    expect(names).toEqual(expect.arrayContaining(['Kit Y.', 'Ada Grown']));
+    expect(names).toEqual(expect.arrayContaining(['Kit Y.', 'Ada Grown', 'Tia T.']));
     expect(JSON.stringify(roster)).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
-  it('whether the league has a recorded child: by birth date, whatever the tick', async () => {
+  it('whether the league has a recorded child: by birth date or by the tick', async () => {
     const other = await newLeague(pglite);
     const recorded = () =>
       withTransaction(db, { leagueId: other.leagueId }, (scope) => hasRecordedChild(scope));
     const today = dayIn('America/Chicago', Date.now());
     const person = await newPerson(pglite, other.leagueId);
-    // An adult by birth date, the tick on: none.
-    await pglite.query('update people set birth_date = $2, is_minor = true where id = $1', [
+    // An adult by birth date, the tick off: none.
+    await pglite.query('update people set birth_date = $2, is_minor = false where id = $1', [
       person,
       yearsBefore(today, 18),
     ]);
     expect(await recorded()).toBe(false);
+    // The same date with the tick on: one (a date unticks no one).
+    await pglite.query('update people set is_minor = true where id = $1', [person]);
+    expect(await recorded()).toBe(true);
     // A child by birth date, the tick off: one.
     await pglite.query('update people set birth_date = $2, is_minor = false where id = $1', [
       person,

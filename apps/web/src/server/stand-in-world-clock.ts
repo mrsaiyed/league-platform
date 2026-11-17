@@ -41,7 +41,7 @@ export function dayIn(moment: Date, timeZone: string): string {
 
 /**
  * Whether a person of the world counts as a child at `moment`, by core's one rule (R-28,
- * isMinorOn): their birth date on the league's own day where they have one, else the tick.
+ * isMinorOn): a child if their birth date says so on the league's own day or the tick is on.
  * Every read of the world that says whether someone is a child goes through this.
  */
 export function minorAt(
