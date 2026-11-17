@@ -77,6 +77,10 @@ Before starting the builder, write the lane under "In progress" in `STATUS.md`: 
 - the migration file number, for a step whose plan line says "Migration: yes";
 - the decision record number and the `T-` number, for a step likely to need a technical decision (give one to any step touching the stack, the database shape, sign-in or the tracker; an unused number is simply given to the next lane).
 
+### A lane on a machine of its own
+
+Where the lead's machine is the limit (2026-11-17: four processors at a load of 13 with eleven helpers), a step that touches nothing an open lane touches is given to a **child session** of the Claude app instead of a helper on the lead's machine: the app's session tool starts it on a cloud machine of its own, on Opus at high effort, with the repository at the build branch and its one lane branch as the only branch it may push. Its brief is a builder's brief with four things added: it is a builder and not the lead (the repository's own instructions would otherwise tell it to take the build over); it sets its machine up from `START-HERE.md`, section 2a; it runs the whole gate on its own machine at the end, since nothing else runs there; and it reports to the lead by a session message. Its lane's line in `STATUS.md` names the session. The lead fetches the branch, has it reviewed and lands it as any lane. A design step, a scoring screen, and a step that changes files another open lane is changing stay with a helper on the lead's machine, where the lead can look and send it on.
+
 ### What the builder is told
 
 Every builder's brief says, in these words or close to them:

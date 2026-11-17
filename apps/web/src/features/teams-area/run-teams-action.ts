@@ -43,7 +43,7 @@ export async function runTeamsAction(
   const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'teams');
   const { adminTeams: ports } = await webPorts();
   const context = commandContextOf(view.context);
-  const season = await ports.currentSeason(context.leagueId);
+  const season = await ports.currentSeason(context);
   const result = await work({
     context,
     ports,

@@ -20,6 +20,7 @@ import { constraintOf } from '../queries/constraint-of.ts';
 import { inSavepoint } from '../queries/in-savepoint.ts';
 import { currentLeague } from '../queries/find-current-league.ts';
 import { leagueStatusOf } from '../queries/league-status-of.ts';
+import { isMinorSql } from '../queries/minor-by-age-sql.ts';
 import { divisionSummary } from '../queries/division-summary.ts';
 import { gameSummary } from '../queries/game-summary.ts';
 import { gameInList, gamesForLists, inReachOf } from '../queries/games-for-lists.ts';
@@ -122,6 +123,10 @@ const reachNoLeagueData = new Map<unknown, string>([
   [grantFromRow, 'turns a row already read into the returned shape; runs no SQL'],
   [invitationFromRow, 'turns a row already read into the returned shape; runs no SQL'],
   [invitationStatus, 'builds a column expression for the queries that use it; runs no SQL'],
+  [
+    isMinorSql,
+    "builds R-28's column expression for the queries that use it (own cases); runs no SQL",
+  ],
   [scopeColumns, 'turns a scope into its two column values; runs no SQL'],
   [databasePackage.jobsStore, 'binds insertJob, which has its own case, to a scope'],
   // The worker's one look across leagues, by design (record 012), so no league case

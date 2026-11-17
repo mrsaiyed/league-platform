@@ -1,8 +1,8 @@
 // What the admin's games area needs from outside (step 2.55): the games commands'
 // dependencies (the transaction runner over storage) and the names a page shows beside
 // the ids the commands use. The league comes from each call's context, never from the
-// request body. Today only the made-up stand-in fills it; the database-backed one comes
-// in its own part of step 2.93 (record 055).
+// request body. The made-up stand-in fills it (stand-in-games.ts), and so does the
+// database (database-games.ts, step 2.93 part 6, record 076).
 import type { CommandDeps, TrackerTx } from '@srleagues/core';
 
 /** The words shown beside a league's games: teams by id, and who scores each game. */

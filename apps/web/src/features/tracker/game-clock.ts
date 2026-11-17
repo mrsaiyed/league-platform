@@ -190,40 +190,130 @@ export function clockEntryKey(digits: string, key: string): string {
   return typed.length < clockEntryDigits ? typed + key : digits;
 }
 
-/** What setting the clock will take off the players' minutes. */
-export type MinutesBack = {
-  /** How much comes off, in milliseconds of game clock; 0 when nothing does. */
-  readonly ms: number;
+/** What setting the clock will do to the players' minutes, as the clock's form says it. */
+export type SetEffect =
   /**
-   * It is all the time the clock has run in this period: the period is wound back to its
-   * start, and everything played in it so far comes off the minutes.
+   * `time` ("4:55") comes off the minutes of the players on the court; `wholePeriod` when
+   * that is all this period has run.
    */
-  readonly wholePeriod: boolean;
-};
+  | ({ readonly kind: 'back'; readonly time: string; readonly wholePeriod: boolean } & TakesBack)
+  /** `time` is added to the minutes of the players on the court. */
+  | ({ readonly kind: 'added'; readonly time: string } & TakesBack)
+  /** The clock has not run in this period: it will start at `clock`, and no minutes change. */
+  | { readonly kind: 'start'; readonly clock: string };
 
 /**
- * What setting the clock to `ms` takes off the minutes of the players, so the form can
- * say so before it is done: the engine's own figure (`setClock` of the engine, which is
- * used as it is). Time put back on the clock is time it should not have run, so it comes
- * off the minutes, but only time of the period BEING PLAYED: never more than the clock
- * has run since this period began. In the second period, with 8:00 on the clock after a
- * full first one, setting 10:00 takes nothing off anybody (the code review of step 2.36,
- * M-b: the form used to say 2:00). Setting the clock lower takes nothing off either.
- *
- * And when what comes off is ALL this period has run, the form says that too: a clock
- * set lower by mistake and then put right winds the period back to its start (the area 4
- * review, M4: 16:55, set to 12:00, set back to 16:55, and all ten on the court read 0:00).
+ * Of what a set moves, what takes back earlier changes to this period's clock (S-71 as
+ * changed on November 17): those minutes go back to the players they came from, and the
+ * plays to their own times. `takenBack` ("1:50") when that is a second or more, else null;
+ * `rest`, what is left over as a new correction, when that is a second or more.
  */
-export function minutesBack(
+export type TakesBack = { readonly takenBack: string | null; readonly rest: string | null };
+
+/**
+ * How far the minutes moved, as the two clock times differ where the clock SHOWS them in
+ * whole seconds (the reviews' LOW 3: 16:55, truly 16:54.6, set to 17:30 moves 0:35, and a
+ * starter goes from 3:05 to 2:30), never more than truly moved (`movedMs`, which can be
+ * less: only what the period has run comes off).
+ */
+function shownMove(movedMs: number, fromMs: number, toMs: number): string {
+  const shown = Math.abs(Math.ceil(fromMs / 1000) - Math.ceil(toMs / 1000)) * 1000;
+  const moved = Math.ceil(movedMs / 1000) * 1000;
+  return basketball.formatClock(shown > 0 ? Math.min(shown, moved) : moved);
+}
+
+/** The take-back of `totalMs`, as the form and the sentence say it. */
+function takesBack(totalMs: number, takenBackMs: number): TakesBack {
+  if (takenBackMs < 1000) return { takenBack: null, rest: null };
+  const rest = totalMs - takenBackMs;
+  return {
+    takenBack: basketball.formatClock(takenBackMs),
+    rest: rest < 1000 ? null : basketball.formatClock(rest),
+  };
+}
+
+/**
+ * What setting the clock to `ms` at `serverNow` will do to the players' minutes, so the
+ * form can say so before it is done; null when the minutes do not move. It is the
+ * engine's own helper (`clockSetEffect`), which makes the set on a copy of the game, so
+ * the form never says other than what the engine then does, under the game's own rule.
+ *
+ * A game of the new product counts minutes on the game clock (S-71, step 2.189): time put
+ * back comes off the players on the court, time taken off is added to them, and a clock
+ * set wrongly and put right changes nothing (16:55 set to 12:00 adds 4:55; set back to
+ * 16:55, it takes the 4:55 off again, and every starter is at 3:05 as before). A game
+ * saved before keeps the rule it was played by: there, only time of the period being
+ * played comes off (the code review of step 2.36, M-b), and it can be all of it (the
+ * area 4 review, M4), which the form says too.
+ */
+export function setEffect(
   game: basketball.GameState,
-  reading: ClockReading,
   ms: number,
-): MinutesBack {
-  if (ms <= reading.remainingMs) return { ms: 0, wholePeriod: false };
-  const periodStart = Math.min(reading.elapsedMs, basketball.derive(game).periodStartElapsedMs);
-  const ranThisPeriod = reading.elapsedMs - periodStart;
-  const back = Math.min(ms - reading.remainingMs, ranThisPeriod);
-  return { ms: back, wholePeriod: back > 0 && back === ranThisPeriod };
+  serverNow: number,
+): SetEffect | null {
+  const effect = basketball.clockSetEffect(game, ms, serverNow);
+  // A set lands on the second typed (or, on that same second, the exact time it read).
+  const from = basketball.clockAt(game, serverNow).remainingMs;
+  switch (effect.kind) {
+    case 'back':
+      return {
+        kind: 'back',
+        time: shownMove(effect.ms, from, ms),
+        wholePeriod: effect.wholePeriod,
+        ...takesBack(effect.ms, effect.takesBackMs),
+      };
+    case 'added':
+      return {
+        kind: 'added',
+        time: shownMove(effect.ms, from, ms),
+        ...takesBack(effect.ms, effect.takesBackMs),
+      };
+    case 'start':
+      return { kind: 'start', clock: basketball.formatClock(ms) };
+    case 'none':
+      return null;
+  }
+}
+
+/** What a set clock did to the minutes; see `minutesMoved`. */
+export type MinutesMoved = {
+  readonly kind: 'back' | 'added';
+  /** "4:59": how far the game's time moved. */
+  readonly time: string;
+  /**
+   * Every player on the court moved by exactly that, and nobody else moved: so a short
+   * form may say the figure alone. False when a correction reached past a substitution
+   * and a player who came on or went off in it moved by less.
+   */
+  readonly even: boolean;
+} & TakesBack;
+
+/**
+ * What a set clock truly did to the minutes, for the sentence said once it is done: the
+ * game (`game`) and its clock (`before`) as the form was used, against the engine's own
+ * after the set. Null when the minutes did not move.
+ */
+export function minutesMoved(
+  game: basketball.GameState,
+  before: ClockReading,
+  after: basketball.GameState,
+): MinutesMoved | null {
+  const change = after.clock.elapsedMs - before.elapsedMs;
+  if (change === 0) return null;
+  const was = basketball.derive(game, before.elapsedMs);
+  const now = basketball.derive(after);
+  const onCourt = new Set([...now.teams.home.onCourt, ...now.teams.away.onCourt]);
+  const ids = new Set([...Object.keys(was.players), ...Object.keys(now.players)]);
+  const even = [...ids].every((id) => {
+    const moved = (now.players[id]?.ms ?? 0) - (was.players[id]?.ms ?? 0);
+    return moved === (onCourt.has(id) ? change : 0);
+  });
+  return {
+    kind: change < 0 ? 'back' : 'added',
+    time: shownMove(Math.abs(change), before.remainingMs, after.clock.remainingMs),
+    even,
+    ...takesBack(Math.abs(change), basketball.takenBackMs(before.elapsedMs, after)),
+  };
 }
 
 /** A period the picker offers. */

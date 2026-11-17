@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { standInLeagues, standInPeople } from '../../server/stand-in-cast.ts';
 import { standInSchedule } from '../../server/stand-in-schedule.ts';
 import { standInSeasonIds } from '../../server/stand-in-world-seed.ts';
+import type { LeagueWorld } from '../../server/stand-in-world-state.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildGrid, dayText, daysAfter } from './build-grid.ts';
 import { answerParams, refusedAtOf, savedDetailOf } from './grid-answer.ts';
@@ -288,5 +289,138 @@ describe('rounds an owner can make (step 2.160)', () => {
   it('suggests a day a week on', () => {
     expect(daysAfter('2026-11-29', 7)).toBe('2026-12-06');
     expect(daysAfter('not a day', 7)).toBeUndefined();
+  });
+});
+
+describe('a game in the bin does not hold its round (step 2.181, S-60)', () => {
+  const current = standInSeasonIds.adultFall;
+  /** The current season's last round and its games, as the seed has them. */
+  function lastRound(world: LeagueWorld) {
+    const round = world.rounds
+      .filter((r) => r.seasonId === current)
+      .sort((a, b) => b.number - a.number)[0];
+    if (round === undefined) throw new Error('the season has rounds');
+    return { round, games: world.games.filter((g) => g.roundId === round.id) };
+  }
+  function setupIn(change: (league: LeagueWorld) => void = () => undefined) {
+    const world = testWorld(undefined, undefined, (leagues) => {
+      const adult = leagues.find((l) => l.leagueId === leagueId);
+      if (adult === undefined) throw new Error('the adult league');
+      change(adult);
+    });
+    const ports = standInSchedule(world);
+    const read = async (): Promise<ScheduleDraftView> => {
+      const got = await getScheduleDraft(context, { seasonId: current }, ports.deps);
+      if (!got.ok) throw new Error('could not read the draft');
+      return got.value;
+    };
+    const press = async (kind: ScheduleActionKind, fields: Record<string, string>) => {
+      const view = await read();
+      const form = new FormData();
+      const all = {
+        seasonId: current,
+        basedOnRevision: view.latestRevision === null ? '' : String(view.latestRevision),
+        version: view.draft === null ? '' : String(view.draft.version),
+        draftId: view.draft?.id ?? '',
+        ...fields,
+      };
+      for (const [k, v] of Object.entries(all)) form.set(k, v);
+      return runScheduleAction(kind, form, context, ports.deps);
+    };
+    return { world, ports, read, press };
+  }
+
+  it('removes a round whose games were removed and published, and they keep everything but their round', async () => {
+    let roundOf = '';
+    let gameIds: string[] = [];
+    const { world, ports, read, press } = setupIn((league) => {
+      const { round, games } = lastRound(league);
+      roundOf = round.id;
+      gameIds = games.map((g) => g.id);
+    });
+    expect(gameIds.length).toBeGreaterThan(0);
+    for (const gameId of gameIds) {
+      expect(await press('remove-game', { gameId })).toMatchObject({ kind: 'saved' });
+    }
+    expect(await press('publish', {})).toEqual({ kind: 'published' });
+
+    // The round shows no game, and offers the tap: it succeeds.
+    const teams = await ports.teamsOf(leagueId, current);
+    const shown = buildGrid(await read(), teams, []).rounds.find((r) => r.id === roundOf);
+    expect(shown).toMatchObject({ games: [], undated: 0 });
+    expect(await press('remove-round', { roundId: roundOf })).toEqual({
+      kind: 'saved',
+      detail: { what: 'round-removed', afterRoundId: null },
+    });
+    expect(await press('publish', {})).toEqual({ kind: 'published' });
+    expect((await read()).published.rounds.map((r) => r.id)).not.toContain(roundOf);
+    // In the bin, with their teams and date, and no round.
+    const left = (await world.read(leagueId))?.games.filter((g) => gameIds.includes(g.id));
+    expect(left?.map((g) => [g.binned, g.roundId, g.startsAt !== null])).toEqual(
+      gameIds.map(() => [true, null, true]),
+    );
+  });
+
+  it('puts a game back with no round when its round was removed in the same draft', async () => {
+    let roundOf = '';
+    let gameIds: string[] = [];
+    const { ports, read, press } = setupIn((league) => {
+      const { round, games } = lastRound(league);
+      roundOf = round.id;
+      gameIds = games.map((g) => g.id);
+    });
+    const [gameId] = gameIds;
+    if (gameId === undefined) throw new Error('the last round has a game');
+    for (const id of gameIds) await press('remove-game', { gameId: id });
+    expect(await press('remove-round', { roundId: roundOf })).toMatchObject({ kind: 'saved' });
+
+    const back = await press('put-back-game', { gameId });
+    expect(back).toEqual({
+      kind: 'saved',
+      detail: { what: 'game-put-back', gameId, fromRoundId: roundOf },
+    });
+    // The answer's address carries the round it was in, so the page can say where it went.
+    expect(savedDetailOf(answerParams(back).query)).toEqual({
+      what: 'game-put-back',
+      gameId,
+      fromRoundId: roundOf,
+    });
+    const view = await read();
+    expect(view.result.games.find((g) => g.id === gameId)?.roundId).toBeNull();
+    expect(view.result.removedRounds?.map((r) => r.id)).toContain(roundOf);
+    const grid = buildGrid(view, await ports.teamsOf(leagueId, current), []);
+    expect(grid.looseGames.map((g) => g.id)).toContain(gameId);
+    expect(await press('publish', {})).toEqual({ kind: 'published' });
+    const published = (await read()).published;
+    expect(published.games.find((g) => g.id === gameId)?.roundId).toBeNull();
+    expect(published.rounds.map((r) => r.id)).not.toContain(roundOf);
+  });
+
+  it('refuses a round a game with no date is in, and the grid shows that game in it', async () => {
+    let roundOf = '';
+    const { ports, read, press } = setupIn((league) => {
+      const { round, games } = lastRound(league);
+      roundOf = round.id;
+      // One game of the last round has no date yet; the others are in the bin.
+      league.games = league.games.map((g) =>
+        g.roundId !== round.id
+          ? g
+          : g.id === games[0]?.id
+            ? { ...g, startsAt: null, localDate: null, localTime: null }
+            : { ...g, binned: true },
+      );
+    });
+    const teams = await ports.teamsOf(leagueId, current);
+    const shown = buildGrid(await read(), teams, []).rounds.find((r) => r.id === roundOf);
+    expect(shown).toMatchObject({ games: [], undated: 1 });
+    const refused = await press('remove-round', { roundId: roundOf });
+    expect(refused).toEqual({
+      kind: 'refused',
+      code: 'round-in-use',
+      at: { form: 'round', roundId: roundOf },
+    });
+    expect(whyNotSaved(answerParams(refused).query)).toBe(
+      'A game with no date yet is still in this round, so it cannot be removed.',
+    );
   });
 });

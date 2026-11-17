@@ -95,8 +95,9 @@ describe('openTwoLeagues', () => {
         ])),
         ...(await texts('select file_name as t from imports where league_id = $1', [leagueId])),
       ];
-      // 25 since step 2.160 gave the season a second, empty round.
-      expect(found.length).toBe(25);
+      // 25 since step 2.160 gave the season a second, empty round; 26 since step 2.181 gave
+      // it a third, whose only game is in the bin.
+      expect(found.length).toBe(26);
       for (const text of found) expect(text.toLowerCase()).toContain(marker);
     }
     const shared = await texts(
@@ -143,8 +144,12 @@ describe('openTwoLeagues', () => {
     for (const league of [a, b]) {
       const own = prints.get(league.leagueId)?.rows;
       expect(own?.get('stages')).toEqual([league.stageId]);
-      expect(own?.get('rounds')?.sort()).toEqual([league.roundId, league.emptyRoundId].sort());
-      expect(own?.get('games')?.sort()).toEqual([league.gameId, league.upcomingGameId].sort());
+      expect(own?.get('rounds')?.sort()).toEqual(
+        [league.roundId, league.emptyRoundId, league.binnedRoundId].sort(),
+      );
+      expect(own?.get('games')?.sort()).toEqual(
+        [league.gameId, league.upcomingGameId, league.binnedGameId].sort(),
+      );
       expect(own?.get('schedule_revisions')).toEqual([league.scheduleRevisionId]);
       expect(own?.get('schedule_drafts')).toEqual([league.scheduleDraftId]);
       expect(own?.get('game_assignments')).toEqual([league.gameAssignmentId]);

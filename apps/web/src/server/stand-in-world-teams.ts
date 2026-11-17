@@ -13,7 +13,7 @@ import type {
   TeamRecord,
   TeamsStore,
 } from '@srleagues/core';
-import { dayIn } from './stand-in-world-clock.ts';
+import { dayIn, minorAt } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { uniqueJerseysOf } from './stand-in-world-games.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
@@ -178,7 +178,8 @@ const shown = (p: WorldPerson, sensitive: boolean): PersonRecord => {
   return sensitive ? { ...plain, sensitive: kept } : plain;
 };
 
-export function worldPeopleStore(s: LeagueWorld): PeopleStore {
+/** The people store over one league's world; `now` is the world's one clock (stand-in-world.ts). */
+export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
   return {
     find: async (id, sensitive) => {
       const p = s.people.find((x) => x.id === id);
@@ -254,6 +255,11 @@ export function worldPeopleStore(s: LeagueWorld): PeopleStore {
           s.teams.some((t) => t.id === r.teamId && !t.binned),
       ),
     leagueAudience: async () => s.audience,
+    // R-28 on the league's own today, by the world's one clock (find-person-is-minor.ts).
+    isMinor: async (personId) => {
+      const p = s.people.find((x) => x.id === personId);
+      return p === undefined ? true : minorAt(p, s.timeZone, now());
+    },
     leagueSettingRows: async (key) =>
       s.settings
         .filter((r) => r.key === key && r.place.level === 'league')

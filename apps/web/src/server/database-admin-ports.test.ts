@@ -10,9 +10,10 @@
 // module's rule (mayListSeason): a season not public yet only to someone with
 // `schedule.read` at its program.
 //
-// A coach is not here: a coach's grant is for a team, which the database does not take
-// yet (role_grants_scope_available), so no coach can exist on it; the stand-in's coach
-// holds nothing in Admin either.
+// A coach is not here: a coach's grant is for one team, and a coach holds nothing in
+// League settings, Season settings or the schedule, on the database as on the stand-in.
+// The database does take a coach's grant for a team of the league (role_grants_scope_
+// available); database-games.test.ts makes one and finds it refused in the games area.
 import {
   addDraftGame,
   addDraftRound,

@@ -7,7 +7,8 @@ import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { parseDraftDocument } from '../draft-document.ts';
 import { maySeeSchedule } from '../policy.ts';
-import type { SchedulingTx } from '../ports.ts';
+import type { GameInRound, SchedulingTx } from '../ports.ts';
+import { undatedGamesIn } from '../round-use.ts';
 import { applyDraft, type ApplyDraftResult } from '../rules/apply-draft.ts';
 import { summarizePublish, type PublishSummary } from '../rules/summarize-publish.ts';
 
@@ -28,6 +29,11 @@ export type ScheduleDraftView = {
   readonly clashes: ApplyDraftResult['clashes'];
   /** Games the draft removes, as they were just before: what "Put it back" adds again. */
   readonly removed: ApplyDraftResult['removed'];
+  /**
+   * Games with no date yet, by the round they are in (step 2.181): the draft does not hold
+   * them, but they keep their round, so the grid shows them in it.
+   */
+  readonly undated: readonly GameInRound[];
   readonly summary: PublishSummary;
 };
 
@@ -66,6 +72,12 @@ export const getScheduleDraft = defineCommand({
       rejected: applied.rejected,
       clashes: applied.clashes,
       removed: applied.removed,
+      undated: await undatedGamesIn(
+        tx,
+        input.seasonId,
+        applied.state.rounds.map((r) => r.id),
+        published,
+      ),
       summary: summarizePublish(published, applied.state),
     });
   },

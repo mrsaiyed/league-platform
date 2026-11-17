@@ -133,6 +133,14 @@ registerIsolationCase({
 });
 registerIsolationCase({
   subject: standingsReadStore,
+  name: "list the target's season's decided games for the standings' notes",
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return standingsReadStore(scope).decidedGames(target.seasonId);
+  },
+});
+registerIsolationCase({
+  subject: standingsReadStore,
   name: "read the target's season's team records",
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
