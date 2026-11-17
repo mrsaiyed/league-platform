@@ -3,6 +3,7 @@ import {
   adminAreas,
   checkedSiteOrigin,
   forwardedLeagueUrl,
+  gameAnchor,
   isLeagueIdFormat,
   isLeagueSiteName,
   leagueApiUrl,
@@ -228,6 +229,16 @@ describe('forwardedLeagueUrl (U-7)', () => {
   it('cannot be turned into an address on another site', () => {
     expect(() => forwardedLeagueUrl(north, 'evil.example')).toThrow(TypeError);
     expect(forwardedLeagueUrl(north, '//evil.example')).toBe('/north-league//evil.example');
+  });
+});
+
+describe('gameAnchor', () => {
+  it("names a game's place on a page that lists games, for an address to lead to", () => {
+    const id = '01900000-0000-7000-8000-006a00000001';
+    expect(gameAnchor(id)).toBe(`game-${id}`);
+    expect(
+      `${leagueUrl({ slug: 'north-league' }, 'admin-area', { area: 'games' })}#${gameAnchor(id)}`,
+    ).toBe(`/north-league/admin/games#game-${id}`);
   });
 });
 

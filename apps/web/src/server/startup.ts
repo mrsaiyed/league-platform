@@ -27,8 +27,15 @@ import type {
 } from '@srleagues/providers';
 import type { Config } from './config-schema.ts';
 import { databasePorts, type DatabaseQueries } from './database-ports.ts';
+import { madeUpDatabaseTools } from './made-up-database-people.ts';
+import { runsOnMadeUpData } from './made-up-mode.ts';
 import type { WebPorts } from './ports.ts';
-import { standInPorts, standInSignIn, type StandInOptions } from './stand-in-ports.ts';
+import {
+  standInMember,
+  standInPorts,
+  standInSignIn,
+  type StandInOptions,
+} from './stand-in-ports.ts';
 
 export class StartupError extends Error {
   constructor(message: string) {
@@ -43,7 +50,7 @@ export class StartupError extends Error {
  */
 export type DatabasePackage = Pick<
   typeof DatabaseModule,
-  'createDatabase' | 'checkLoginRole' | 'madeUpDatabase'
+  'createDatabase' | 'checkLoginRole' | 'madeUpDatabase' | 'seedLeagues'
 > &
   DatabaseQueries;
 
@@ -67,10 +74,16 @@ export type StartupDeps = {
    * only). Never an address, a token or a secret (T-86).
    */
   readonly warn?: (message: string, fields: Readonly<Record<string, string>>) => void;
+  /**
+   * Local work and tests only: the working folder's `.local/captured-email`, where a copy
+   * of each email to a made-up address is written once the app has started (step 2.96,
+   * kept-emails.ts). Left out, nothing is written.
+   */
+  readonly keptEmailsFolder?: string | null;
 };
 
 export async function startWebApp(config: Config, deps: StartupDeps): Promise<WebPorts> {
-  if (config.APP_ENV === 'local' || config.APP_ENV === 'test') {
+  if (runsOnMadeUpData(config.APP_ENV)) {
     const options: StandInOptions = {
       appEnv: config.APP_ENV,
       publicBaseUrl: config.PUBLIC_BASE_URL,
@@ -79,11 +92,14 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       emailFrom: config.EMAIL_FROM,
       localDesign: config.LOCAL_DESIGN,
       ...(config.LOCAL_NOW === undefined ? {} : { worldStartsAt: config.LOCAL_NOW }),
+      keptEmailsFolder: deps.keptEmailsFolder ?? null,
     };
     if (config.LOCAL_DATA === 'made-up-database') return onMadeUpDatabase(options, deps);
     const ports = standInPorts(options);
     await ports.signUpMadeUpMember();
     await ports.signUpMadeUpStaff();
+    // The made-up people's own sign-ups above are not kept; every email from here on is.
+    ports.startKeeping();
     return ports;
   }
   // loadConfig requires these here; checked again so the type says so.
@@ -214,6 +230,7 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
     await made.close();
     throw error;
   }
+  signIn.startKeeping();
   // Open for as long as the process runs; it holds nothing that must be kept.
   return databasePorts({
     database,
@@ -222,6 +239,12 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
     signInMail: signIn.signInMail,
     log: options.log,
     warn: (message, fields) => deps.warn?.(message, fields),
+    // The kept emails, and the seed leagues' people to sign in as by a code (step 2.96).
+    // With them the ports answer only requests made on this computer, as the stand-in's.
+    localTools: {
+      tools: madeUpDatabaseTools(database.seedLeagues, standInMember, signIn),
+      publicBaseUrl: options.publicBaseUrl,
+    },
     reportDesign: (message, fields) => deps.warn?.(message, fields),
   });
 }

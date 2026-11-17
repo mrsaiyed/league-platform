@@ -14,6 +14,12 @@ export const platformPages = {
   forgotPassword: ['signin', 'forgot'],
   /** Where Google sends the browser back to (T-67). */
   googleReturn: ['signin', 'google'],
+  /**
+   * Local work and tests only (step 2.96): the emails kept on this computer, and signing in
+   * as a made-up person. Anywhere else the web app answers "not found" for both.
+   */
+  keptEmails: ['signin', 'kept-emails'],
+  madeUpPeople: ['signin', 'made-up-people'],
   signup: ['signup'],
   /** Sign-up and forgotten password share these two screens (T-67). */
   enterCode: ['signup', 'code'],

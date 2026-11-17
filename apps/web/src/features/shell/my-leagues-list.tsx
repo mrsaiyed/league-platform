@@ -15,6 +15,11 @@ const membershipWords: Readonly<Record<LeagueMembership, TextKey>> = {
   'on-a-team': 'account.role.on-a-team',
 };
 
+/** What a person is in one league, in words: "Owner, Scheduler". */
+export function membershipsInWords(memberships: readonly LeagueMembership[]): string {
+  return memberships.map((m) => t(membershipWords[m])).join(', ');
+}
+
 /**
  * The leagues a signed-in person belongs to, each a link to its home with their role in it
  * (P2 lines 67 and 71): on the front page and the account page. Only leagues they may see
@@ -30,7 +35,7 @@ export function MyLeaguesList({ leagues }: { readonly leagues: readonly MyLeague
           <a className="ui-button" href={leagueUrl(league, 'home')} dir="auto">
             {league.name}
           </a>
-          <span>{league.memberships.map((m) => t(membershipWords[m])).join(', ')}</span>
+          <span>{membershipsInWords(league.memberships)}</span>
         </li>
       ))}
     </ul>

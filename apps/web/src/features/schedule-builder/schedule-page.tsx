@@ -1,4 +1,5 @@
 import {
+  gameAnchor,
   getScheduleDraft,
   isLeagueHidden,
   leagueUrl,
@@ -48,7 +49,6 @@ import {
 } from './build-grid.ts';
 import {
   addRoundAnchor,
-  gameAnchor,
   refusedAtOf,
   roundAnchor,
   savedAnchor,

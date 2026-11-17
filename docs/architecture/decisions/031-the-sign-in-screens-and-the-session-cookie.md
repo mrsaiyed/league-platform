@@ -26,6 +26,6 @@ Date: 2026-11-13. Step 1.14; carries out T-67, T-68, T-69, T-70, T-71, T-85 and 
 - **Sign-in emails through the queue.** Production should record a job for every request for a code, whether or not an account exists, and let the job send nothing when there is no code (record 013 says so of the code sender). Then the email is retried, not lost, and the request costs the same either way. Today the code email is handed over without waiting, and a failed one is lost (the person asks again).
 - **`TRUSTED_PROXY=one` on the real host,** once it is checked that exactly one proxy appends the real address in front of the app. Until then every visitor's guesses count against one network key, so the per-network limits (30 codes an hour, 100 wrong guesses in 15 minutes) apply to the whole site at once.
 - **The shared renewal is per server.** With more than one web server, a renewal race between two servers ends the session; the production store (or the vendor's own window) has to cover it.
-- **Reading the codes in local work.** The stand-in's emails are kept in memory only; a developer cannot yet read a code on this computer. A folder for the capture (it can write files) or a local email page is a small follow-up.
+- **Reading the codes in local work.** Done in step 2.96: see record 075 (reading kept emails), the local page `/signin/kept-emails` and "be this made-up person".
 - **The header's account button** (P6 §6) still says "Sign in" for everyone; it comes with the member pages.
 - **A bot check in front of sign-in** (T4 §6) is not built.

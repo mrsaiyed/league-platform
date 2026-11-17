@@ -16,9 +16,11 @@ const dateShape = /^\d{4}-\d{2}-\d{2}$/;
 const idOf = (value: string | undefined): string | undefined =>
   value !== undefined && uuidShape.test(value) ? value : undefined;
 
-/** The anchors: a round's section, a game's line, the "Add a round" form, a "Saved". */
+/**
+ * The anchors: a round's section, the "Add a round" form, a "Saved". A game's line carries
+ * core's gameAnchor, the one maker of that anchor.
+ */
 export const roundAnchor = (roundId: string): string => `round-${roundId}`;
-export const gameAnchor = (gameId: string): string => `game-${gameId}`;
 export const addRoundAnchor = 'add-round';
 export const savedAnchor = 'saved';
 

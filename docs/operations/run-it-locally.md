@@ -110,6 +110,13 @@ To try it as a league's admin:
    (account button, "Sign out") and look at the home page, the team, the game, the
    standings and the statistics.
 
+To try the whole job from an empty league: sign in as the made-up owner, open Still Waters
+(`http://127.0.0.1:3000/still-waters/admin`, a draft league with one current season, "First
+Season", and nothing in it yet). Add the teams and their people in Admin → Teams; add rounds
+and games in Admin → Schedule and publish the schedule; show the season to the public in
+the season's settings; then score a game in Admin → Games (or with the tracker) and look at
+the final table on the standings. It starts empty again every time the app restarts.
+
 ### Signing in as the made-up people
 
 To walk the product by tapping, open `http://127.0.0.1:3000/north-valley` (as above), tap "Sign in or create an account" and sign in as one of these. They exist only in the made-up world on this computer, in the app's memory: the made-up stand-in refuses to start anywhere but on this computer or a test address (`APP_ENV` must be `local` or `test`, and `PUBLIC_BASE_URL` must be this computer's own address or a `.test` name).
@@ -126,7 +133,17 @@ The list is in `apps/web/src/server/stand-in-sign-ins.ts`. The account button at
 
 To switch from one made-up person to another, tap the account button, tap "Sign out", then "Sign in or create an account" and sign in as the next person. Signing in again on the same device also ends the session it had before.
 
-These passwords work on the made-up stand-in only. With `LOCAL_DATA=made-up-database` (below) only the made-up member (`member@example.test`) has a password; the made-up database's own people can be given one through "Create an account" with their address.
+These passwords work on the made-up stand-in only. With `LOCAL_DATA=made-up-database` (below) only the made-up member (`member@example.test`) has a password; the made-up database's own people can be given one through "Create an account" with their address, reading the code as below.
+
+### Be a made-up person without typing anything
+
+Open `http://127.0.0.1:3000/signin/made-up-people` (step 2.96). It lists the made-up people, with what each is in which league, and a button for each: "Be Olive Owner" signs this browser in and opens the front page; "Open North Valley League as Olive Owner" signs in and opens that league's admin (or its home, for a coach or a player). On `LOCAL_DATA=made-up-database` it lists the seed leagues' owners and staff (`owner@lakeside.example.test` and the others): none of them has a password, so the button asks for a code, reads it for you and takes you to "Choose your password"; choose any password of 8 or more characters and you are signed in. It is an ordinary sign-in on the made-up sign-in service, the same as typing the password or the code yourself.
+
+### Read an emailed code or link
+
+No email ever leaves this computer (T-140). Every email the app sends to a made-up address (ending in `.test`, `.example`, `.invalid` or `.localhost`, or at `example.com`, `example.net` or `example.org` or a name under them) is kept in `.local/captured-email/` in the working folder (git-ignored) and shown, newest first, on `http://127.0.0.1:3000/signin/kept-emails`: who it was to, its subject, its code on a line of its own, and its links to this site, which you can follow. So to create a new account, or to sign in as a seed person on the made-up database: tap "Create an account", type the address, tap "Email me a code", open the kept emails' page in another tab, copy the code, and type it in. An email to any other address is not kept and cannot be read. Delete the folder whenever you like; it is made again.
+
+Both pages exist only with `APP_ENV` local or test, and only for a request made on this computer. Anywhere else they, and the button's form, answer "not found", as an address that does not exist (they are answered by the same route as one); no page links to them. A browser test signs in as a seed person on the made-up database the same way (`tests/browser/kept-emails-test.mjs`): it asks for a code on `/signup`, reads it from `li[data-kept-email="<address>"] code[data-code]` on `/signin/kept-emails`, types it on `/signup/code` and a password on `/signup/password`.
 
 To run it on the made-up database instead, put `LOCAL_DATA=made-up-database` in `.env` (local and test only). The app then builds a database in memory when it starts, with every migration and the two seed leagues (below), and reads leagues, signed-in people and what they hold from it. Each seed league's season is already under way: in each division one game was played a week ago, with its final score, and one is a week from today, so `/lakeside` and `/maple-street` show a home page, a schedule and standings, read from that database (step 2.93 part 2, record 069). Sign-in still uses the stand-in's screens; the stand-in's made-up people do not exist there. The areas not yet moved onto the database (step 2.93, records 055 and 069), the statistics and the team pages among them, show an error page; the home page leaves out its leaders until the statistics move. It too opens no address and is gone when the app stops.
 
