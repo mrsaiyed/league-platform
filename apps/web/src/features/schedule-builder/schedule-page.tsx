@@ -6,6 +6,7 @@ import {
   previewSchedulePublish,
   publishChangeCount,
   type ScheduleGame,
+  type ScheduleRound,
   type VenueWithCourts,
 } from '@srleagues/core';
 import { Emblem, EmptyPanel, PageHead } from '@srleagues/ui';
@@ -229,6 +230,7 @@ export async function ScheduleBuilderPage({
     teams,
     published: new Set(draft.published.games.map((g) => g.id)),
     removed: draft.removed,
+    removedRounds: draft.result.removedRounds ?? [],
   });
   const top = saidBeside || here !== undefined ? null : plainNotice;
   const noRounds = grid.rounds.length === 0;
@@ -1044,6 +1046,8 @@ function savedHere(
     readonly published: ReadonlySet<string>;
     /** The games the draft removes, each as it was just before (the draft's own record). */
     readonly removed: readonly ScheduleGame[];
+    /** The rounds the draft removes: a game put back after its round went has no round (S-60). */
+    readonly removedRounds: readonly ScheduleRound[];
   },
 ): { readonly place: SavedPlace; readonly node: ReactNode; readonly asks?: true } | undefined {
   if (saved === undefined) return undefined;
@@ -1082,9 +1086,20 @@ function savedHere(
       // Already back (a reload after "Put it back"): said at the game, truthfully.
       const back = grid.allGames.find((g) => g.id === saved.gameId);
       if (back !== undefined) {
+        const goneFrom =
+          back.roundId === null
+            ? season.removedRounds.find((r) => r.id === saved.roundId)
+            : undefined;
         return {
           place: { game: back.id },
-          node: said(t('schedule.admin.savedGamePutBack', { game: gameName(back) })),
+          node: said(
+            goneFrom === undefined
+              ? t('schedule.admin.savedGamePutBack', { game: gameName(back) })
+              : t('schedule.admin.savedGamePutBackNoRound', {
+                  game: gameName(back),
+                  round: goneFrom.label,
+                }),
+          ),
         };
       }
       // What it was is the draft's own record of it, never the address (step 2.161).
@@ -1106,18 +1121,32 @@ function savedHere(
         };
       }
       const game = t('schedule.admin.gameVs', { away, home });
+      // Its round removed from the draft since (step 2.181): "Put it back" brings it back
+      // under "Games with no round", and says so before the tap.
+      const gone = season.removedRounds.find(
+        (r) => r.id === removed.roundId && roundOf(r.id) === undefined,
+      );
+      const headline =
+        gone !== undefined
+          ? t('schedule.admin.savedGameRemovedRoundGone', { game, round: gone.label })
+          : roundShown === undefined
+            ? t('schedule.admin.savedGameRemovedNoRound', { game })
+            : t('schedule.admin.savedGameRemovedNamed', { game, round: roundShown.label });
+      const published = season.published.has(removed.id);
+      const way =
+        gone !== undefined
+          ? published
+            ? 'schedule.admin.removedPublishedNoRound'
+            : 'schedule.admin.removedDraftOnlyNoRound'
+          : published
+            ? 'schedule.admin.removedPublished'
+            : 'schedule.admin.removedDraftOnly';
       return {
         place: { round },
         node: said(
-          roundShown === undefined
-            ? t('schedule.admin.savedGameRemovedNoRound', { game })
-            : t('schedule.admin.savedGameRemovedNamed', { game, round: roundShown.label }),
+          headline,
           <div data-put-back={removed.id}>
-            <p>
-              {season.published.has(removed.id)
-                ? t('schedule.admin.removedPublished')
-                : t('schedule.admin.removedDraftOnly')}
-            </p>
+            <p>{t(way)}</p>
             <PutBack gameId={removed.id} basis={basis} />
           </div>,
           'removed',
@@ -1127,9 +1156,20 @@ function savedHere(
     case 'game-put-back': {
       const game = grid.allGames.find((g) => g.id === saved.gameId);
       if (game === undefined) return undefined;
+      const gone =
+        game.roundId === null
+          ? season.removedRounds.find((r) => r.id === saved.fromRoundId)
+          : undefined;
       return {
         place: { game: game.id },
-        node: said(t('schedule.admin.savedGamePutBack', { game: gameName(game) })),
+        node: said(
+          gone === undefined
+            ? t('schedule.admin.savedGamePutBack', { game: gameName(game) })
+            : t('schedule.admin.savedGamePutBackNoRound', {
+                game: gameName(game),
+                round: gone.label,
+              }),
+        ),
       };
     }
     case 'game-saved':

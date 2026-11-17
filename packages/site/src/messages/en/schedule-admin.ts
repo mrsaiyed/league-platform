@@ -181,8 +181,12 @@ export const enScheduleAdmin = {
     'This round has {count} games with no date yet, so it cannot be removed.',
   'schedule.admin.removedDraftOnly':
     'It was only in the draft, so nothing public has changed. Put it back and it is exactly as it was.',
+  'schedule.admin.removedDraftOnlyNoRound':
+    'It was only in the draft, so nothing public has changed. Put it back and it is as it was, under "Games with no round".',
   'schedule.admin.removedPublished':
     'Nothing public changes until you publish. Put it back now and it is exactly as it was. Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
+  'schedule.admin.removedPublishedNoRound':
+    'Nothing public changes until you publish. Put it back now and it is as it was, under "Games with no round". Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
   'schedule.admin.renameRound': 'Round name',
   'schedule.admin.renameRoundSubmit': 'Rename round',
   'schedule.admin.reviewPublish': 'Review and publish',
@@ -199,10 +203,14 @@ export const enScheduleAdmin = {
   'schedule.admin.saved': 'Saved to the draft. It is not public until you publish.',
   'schedule.admin.savedGame': 'Saved to the draft: {game}.',
   'schedule.admin.savedGamePutBack': 'Put back in the draft: {game}, as it was.',
+  'schedule.admin.savedGamePutBackNoRound':
+    'Put back in the draft: {game}, under "Games with no round": {round} was removed from the draft.',
   'schedule.admin.savedGameRemoved': 'Saved to the draft: a game was removed here.',
   // Removing a game from the draft, and putting it back in one tap (step 2.161).
   'schedule.admin.savedGameRemovedNamed': 'Removed: {game}, {round}.',
   'schedule.admin.savedGameRemovedNoRound': 'Removed: {game}, from the games with no round.',
+  'schedule.admin.savedGameRemovedRoundGone':
+    'Removed: {game}, {round}. {round} has since been removed from the draft.',
   'schedule.admin.savedGameRound': 'Saved to the draft: {game} is now in {round}.',
   'schedule.admin.savedRound': 'Saved to the draft: {round}.',
   'schedule.admin.savedRoundAdded':
