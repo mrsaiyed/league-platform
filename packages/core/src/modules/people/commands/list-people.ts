@@ -14,6 +14,9 @@ export const listPeople = defineCommand({
     search: z.string().trim().min(1).max(100).optional(),
     limit: z.number().int().min(1).max(200).default(50),
     offset: z.number().int().min(0).default(0),
+    // False for a screen that shows names only (Admin → Teams): the private columns are
+    // then not read at all, whoever asks. True gives them to those who may see them.
+    privateFields: z.boolean().default(true),
   }),
   allowed: (context, _input, tx: PeopleTx) => mayReadPeople(context, tx, 'people.read'),
   run: async ({ context, input, tx }): Promise<Result<readonly PersonRecord[], never>> =>
@@ -22,7 +25,7 @@ export const listPeople = defineCommand({
         ...(input.search === undefined ? {} : { search: input.search }),
         limit: input.limit,
         offset: input.offset,
-        sensitive: await maySeeSensitive(context, tx),
+        sensitive: input.privateFields && (await maySeeSensitive(context, tx)),
       }),
     ),
 });

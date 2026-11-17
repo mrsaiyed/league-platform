@@ -25,7 +25,9 @@ const openPlayerId = randomUUID();
 const openPoints = 8765;
 const otherHiddenPoints = 1000;
 const otherHiddenPlayerId = randomUUID();
-const mixedPlayerId = randomUUID();
+// Shown to a visitor (the player is on the open team too), and on purpose it spells every
+// hidden number below: an id's digits are not a number the reads give (step 2.201).
+const mixedPlayerId = '04321000-4040-4047-8000-000000009361';
 const mixedHiddenPoints = 4040;
 const mixedOpenPoints = 7;
 
@@ -180,17 +182,42 @@ async function everythingFor(viewer: Viewer): Promise<string> {
   );
 }
 
+const anId = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+/**
+ * The text with every id taken out. Ids are made at random, and their digits can spell any
+ * number by chance (GitHub once failed a run on "4047" inside a team's id, step 2.201), so
+ * a number is looked for in what is left, where only the reads' own words and numbers are.
+ */
+function withoutIds(text: string): string {
+  return text.replace(anId, '<id>');
+}
+
+/** Every number the reads give, wherever in the answer it sits. */
+function numbersIn(value: unknown): number[] {
+  if (typeof value === 'number') return [value];
+  if (Array.isArray(value)) return value.flatMap(numbersIn);
+  if (typeof value === 'object' && value !== null) return Object.values(value).flatMap(numbersIn);
+  return [];
+}
+
+/** A hidden number is in no number of the answer and in none of its words. */
+function expectNowhere(text: string, hidden: number): void {
+  expect(numbersIn(JSON.parse(text))).not.toContain(hidden);
+  expect(withoutIds(text)).not.toContain(String(hidden));
+}
+
 describe('the public reads against the database (S-22, T-87)', () => {
   it("never show a visitor the staff-only team's player numbers, names or ids", async () => {
     const text = await everythingFor(publicViewer(leagues.a.leagueId));
-    expect(text).not.toContain(String(hiddenPoints));
+    expectNowhere(text, hiddenPoints);
     expect(text).not.toContain(leagues.a.personId);
     expect(text).not.toContain(otherHiddenPlayerId);
     expect(text).not.toContain('Sam');
     expect(text).not.toContain('alpha P.');
     expect(text).not.toContain('"41"');
     // What everyone may see is there: the other team's numbers, both teams' totals.
-    expect(text).toContain(String(openPoints));
+    expect(numbersIn(JSON.parse(text))).toContain(openPoints);
     expect(text).toContain(openPlayerId);
     expect(text).toContain('Olive Open');
     expect(text).toContain('Team alpha');
@@ -226,8 +253,10 @@ describe('the public reads against the database (S-22, T-87)', () => {
   it("counts a player of a public team who also sits on the staff-only team only for the public team's game", async () => {
     const { a } = leagues;
     const text = await everythingFor(publicViewer(a.leagueId));
-    expect(text).not.toContain(String(mixedHiddenPoints));
-    expect(text).not.toContain(String(mixedHiddenPoints + mixedOpenPoints));
+    expectNowhere(text, mixedHiddenPoints);
+    expectNowhere(text, mixedHiddenPoints + mixedOpenPoints);
+    // The player is there, under their id, for the open team's game.
+    expect(text).toContain(mixedPlayerId);
     const table = await withTransaction(leagues.db, { leagueId: a.leagueId }, (scope) =>
       readStatisticsTable(standingsReadStore(scope), {
         seasonId: a.seasonId,

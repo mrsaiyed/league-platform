@@ -119,7 +119,7 @@ export const enErrorScheduling = {
   'error.scheduling.remove_draft_round.revision-out-of-date':
     'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
   'error.scheduling.remove_draft_round.round-in-use':
-    'A game that is in the bin, has no date yet or was removed in this draft is still in this round, so it cannot be removed.',
+    'A game with no date yet is still in this round, so it cannot be removed.',
   'error.scheduling.remove_draft_round.season-not-found': 'That season is not there.',
   'error.scheduling.rename_draft_round.change-refused':
     'That change cannot be made to the schedule as it stands.',

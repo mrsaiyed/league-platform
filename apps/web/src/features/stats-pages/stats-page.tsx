@@ -125,6 +125,10 @@ export function StatsTables({
           <EmptyPanel text={t('stats.leadersNone')} />
         )}
       </Section>
+      {/* What both tables' numbers count, said once above them (build-stats.ts, tableNotes):
+          read on a phone before the players' table, and the two tables start level on a
+          laptop. */}
+      <p className="ui-section-note">{data.tableNotes.join(t('stats.noteJoin'))}</p>
       <div className="stats-tables" data-layout={sideBySide ? 'pair' : 'stack'}>
         <Section
           title={t('stats.allPlayers')}
