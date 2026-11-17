@@ -177,7 +177,7 @@ export function worldGameSnapshot(read: () => Promise<ReadWorld | undefined>): G
       const season = publicSeason(s, game.seasonId);
       if (season === undefined) return undefined;
       const { format, version: _version, divisionId: _division, ...record } = gameRecordOf(game);
-      return { ...record, rules: format ?? season.rules };
+      return { ...record, rules: format ?? season.rules, seasonStatKeys: season.statKeys };
     },
     teams: async (teamIds) =>
       ((await read())?.teams ?? [])

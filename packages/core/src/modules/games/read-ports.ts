@@ -47,6 +47,9 @@ export type GamesReadStore = {
         /** The rules it is played under, as stored: its own once fixed (`format`), else
          * its season's; null or undefined when neither is stored (the starting set). */
         readonly rules: unknown;
+        /** The statistics the game's season names itself, in its order; empty when it
+         * names none and keeps its rules' set (record 070, step 2.196). */
+        readonly seasonStatKeys: readonly string[];
       }
     | undefined
   >;

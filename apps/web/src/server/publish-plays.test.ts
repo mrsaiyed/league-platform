@@ -32,6 +32,7 @@ function world(publisher: LivePublisher) {
             finalizedAt: null,
             binned: false,
             rules: null,
+            seasonStatKeys: [],
           }
         : undefined,
     teams: async () => [

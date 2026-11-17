@@ -66,6 +66,7 @@ function store(
             finalizedAt: null,
             binned: false,
             rules: over.rules ?? null,
+            seasonStatKeys: [],
           }
         : undefined,
     teams: async () => [

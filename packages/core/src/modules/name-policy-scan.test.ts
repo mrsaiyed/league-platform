@@ -194,6 +194,7 @@ function gameStore(status: 'live' | 'final'): GameSnapshotStore {
             finalizedAt: null,
             binned: false,
             rules: null,
+            seasonStatKeys: [],
           }
         : undefined,
     teams: async () => [
