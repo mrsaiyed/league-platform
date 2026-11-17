@@ -427,6 +427,15 @@ const schedulerPages = [
   { name: 'scheduler-admin-home', at: '/admin' },
   { name: 'scheduler-admin-refused', at: '/admin/teams' },
 ];
+// What the made-up registrar of the draft league sees (step 2.140): both their areas,
+// Registration and People, have no screen yet. Here they are in the menu marked "Not ready";
+// with LOCAL_UNRELEASED=hidden, as in staging and production, the menu is the home alone and
+// the home says calmly that what their role looks after will be listed there.
+const registrar = { name: 'srl_session', value: 'local-registrar-token' };
+const registrarPages = [
+  { name: 'registrar-admin-home', at: '/admin' },
+  { name: 'registrar-admin-menu-open', at: '/admin', opensStaffMenu: true },
+];
 // The games list's taps (step 2.155): a game's place on the list, its boxes opened, and a
 // score typed and saved, which only asks.
 function gameRow(page, n) {
@@ -1226,6 +1235,8 @@ try {
     await keeper.addCookies([{ ...scorekeeper, url: origin }]);
     const planner = await browser.newContext({ viewport: width.viewport });
     await planner.addCookies([{ ...scheduler, url: origin }]);
+    const clerk = await browser.newContext({ viewport: width.viewport });
+    await clerk.addCookies([{ ...registrar, url: origin }]);
     const jobs = [
       ...(design === '' ? platformPages : []).map((page) => ({
         ...page,
@@ -1294,6 +1305,12 @@ try {
         ...page,
         name: `${draftLeague}-${page.name}`,
         context: staff,
+        base: `/${draftLeague}`,
+      })),
+      ...(design === '' ? registrarPages : []).map((page) => ({
+        ...page,
+        name: `${draftLeague}-${page.name}`,
+        context: clerk,
         base: `/${draftLeague}`,
       })),
     ].filter((job) => wanted(job.name));
@@ -1397,6 +1414,7 @@ try {
     await staffTapping.close();
     await keeper.close();
     await planner.close();
+    await clerk.close();
   }
   // The phone menu, open (`--only=menu`), at 390 in each league's own look.
   {
