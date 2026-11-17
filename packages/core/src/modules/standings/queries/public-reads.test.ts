@@ -105,8 +105,14 @@ describe('readStandings', () => {
     if (!result.ok) throw new Error('expected a table');
     expect(result.value.tiebreakers).toEqual(['head-to-head', 'point-difference', 'points-scored']);
     expect(result.value.tables[0]?.levelGroups).toEqual([
-      { teamIds: ['c', 'd'], notPlayed: [], on: 'win-percentage', gamesBetween: 2 },
-      { teamIds: ['e', 'f'], notPlayed: ['e'], on: 'win-percentage', gamesBetween: null },
+      { teamIds: ['c', 'd'], notPlayed: [], on: 'win-percentage', gamesBetween: 2, steps: null },
+      {
+        teamIds: ['e', 'f'],
+        notPlayed: ['e'],
+        on: 'win-percentage',
+        gamesBetween: null,
+        steps: null,
+      },
     ]);
     // In a table ranked by points, teams are level on their points alone.
     const byPoints: StandingsReadStore = {
@@ -134,7 +140,7 @@ describe('readStandings', () => {
     };
     const points = await readStandings(byPoints, { seasonId });
     expect(points.ok && points.value.tables[0]?.levelGroups).toEqual([
-      { teamIds: ['a', 'b'], notPlayed: [], on: 'points', gamesBetween: null },
+      { teamIds: ['a', 'b'], notPlayed: [], on: 'points', gamesBetween: null, steps: null },
     ]);
   });
 

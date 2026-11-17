@@ -65,16 +65,19 @@ describe('standings page', () => {
   // North Valley East (the numbers audit's case 45): Owls and Falcons both 2–1; the Owls won
   // their one game, so they are first despite the worse difference. The note beside the
   // Falcons, second, is true of them (step 2.195: it used to tell them they were "placed
-  // above"). West: Lions, Tigers, Hawks and Bears all 1–1, and the note claims no more than
-  // the stored rows can say (step 2.198 says which tiebreaker placed whom).
+  // above"). West (case 46): Lions, Tigers, Hawks and Bears all 1–1, and the note says what
+  // placed each (step 2.198, S-74): the Lions beat the Bears, the only one of the others
+  // they played; Tigers and Hawks split, and point difference put the Tigers ahead.
   it('writes one note for each group of level teams, true of every team it is beside', async () => {
     const [season] = await seasonsOf(adult);
     const result = await readStandings(stats.readStoreOf(adult), { seasonId: season?.id ?? '' });
     if (!result.ok) throw new Error('expected standings');
     const [east, west] = buildStandingsViews(result.value);
+    // Read as a person reads it: without the invisible joiners that hold a record's dash
+    // to its numbers (U+2060; build-standings.test.ts checks the page keeps them).
     const beside = (table: typeof east, team: string) =>
-      (table?.rows.find((row) => row.team === team)?.notes ?? []).map(
-        (id) => table?.footnotes.find((f) => f.id === id)?.text,
+      (table?.rows.find((row) => row.team === team)?.notes ?? []).map((id) =>
+        table?.footnotes.find((f) => f.id === id)?.text.replaceAll('⁠', ''),
       );
     expect(east?.rows.map((row) => row.team)).toEqual(['Owls', 'Falcons', 'Herons']);
     const eastNote =
@@ -83,7 +86,7 @@ describe('standings page', () => {
     expect(beside(east, 'Owls')).toEqual([eastNote]);
     expect(beside(east, 'Herons')).toEqual([]);
     const westNote =
-      'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
+      'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Point difference puts Tigers ahead of Hawks: +3 against -3.';
     for (const team of ['Lions', 'Tigers', 'Hawks', 'Bears']) {
       expect(beside(west, team)).toEqual([westNote]);
     }

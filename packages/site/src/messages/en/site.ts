@@ -172,6 +172,23 @@ export const enSite = {
   // 2.195), marked beside each of them, so every word of it is true of each. Two teams: what
   // they are level on, then what put the first ahead, with its numbers. Three or more: what
   // they are level on and the season's tiebreakers, never which one placed which team.
+  // Three or more, from the engine's own steps (step 2.198, S-74): each team's record in the
+  // games among them, then what separated the teams still level, with the figures.
+  'standings.level.ahead.coin-flip': 'A coin flip puts {team} ahead of {other}.',
+  'standings.level.ahead.fewest-points-allowed':
+    'Fewer points allowed puts {team} ahead of {other}: {ahead} against {behind}.',
+  'standings.level.ahead.point-difference':
+    'Point difference puts {team} ahead of {other}: {ahead} against {behind}.',
+  'standings.level.ahead.points-scored':
+    'Points scored puts {team} ahead of {other}: {ahead} against {behind}.',
+  'standings.level.alsoLevel.fewest-points-allowed':
+    '{teams} are also level on points allowed ({value}).',
+  'standings.level.alsoLevel.point-difference':
+    '{teams} are also level on point difference ({value}).',
+  'standings.level.alsoLevel.points-scored': '{teams} are also level on points scored ({value}).',
+  'standings.level.among': 'In the games among {teams}: {records}.',
+  'standings.level.amongThese': 'In the games among these {count}: {records}.',
+  'standings.level.between': 'In the games between {teams}: {records}.',
   'standings.level.by.coin-flip': 'A coin flip puts {team} ahead.',
   'standings.level.by.fewest-points-allowed':
     'Fewer points allowed puts {team} ahead: {ahead} against {behind}.',
@@ -180,9 +197,35 @@ export const enSite = {
   'standings.level.by.point-difference':
     'Point difference puts {team} ahead: {ahead} against {behind}.',
   'standings.level.by.points-scored': 'Points scored puts {team} ahead: {ahead} against {behind}.',
+  // A team and its figure in a list: "Lions 1–0", "Tigers +3".
+  'standings.level.entry': '{team} {figure}',
+  'standings.level.metNoneOfThem':
+    'Head-to-head does not count here: none of them has played another.',
+  'standings.level.metNone_one':
+    'Head-to-head does not count here: {teams} has played none of the others.',
+  'standings.level.metNone_other':
+    'Head-to-head does not count here: {teams} have played none of the others.',
   // Beside a team level with others only because it has no games yet (0 counts as 0).
   'standings.level.notPlayed': '{teams} have not played yet.',
+  // "In the games among these four": a word up to ten, then the number.
+  'standings.level.number.10': 'ten',
+  'standings.level.number.3': 'three',
+  'standings.level.number.4': 'four',
+  'standings.level.number.5': 'five',
+  'standings.level.number.6': 'six',
+  'standings.level.number.7': 'seven',
+  'standings.level.number.8': 'eight',
+  'standings.level.number.9': 'nine',
+  'standings.level.order.coin-flip': 'A coin flip puts them in this order: {values}.',
+  'standings.level.order.fewest-points-allowed': 'By fewest points allowed: {values}.',
+  'standings.level.order.point-difference': 'By point difference: {values}.',
+  'standings.level.order.points-scored': 'By points scored: {values}.',
   'standings.level.points': '{teams} are level on points ({value}).',
+  // A record in the games among level teams: wins–losses, and ties when any of them tied.
+  // An invisible word joiner (U+2060) on each side of the dash keeps a record on one line
+  // on a narrow phone ("0–" then "1" read wrongly at 320 wide).
+  'standings.level.record': '{wins}⁠–⁠{losses}',
+  'standings.level.recordTies': '{wins}⁠–⁠{losses}⁠–⁠{ties}',
   'standings.level.sentenceJoin': ' ',
   'standings.level.stillLevel':
     '{teams} are still level after all of them, so they are shown in a fixed order.',
@@ -190,6 +233,8 @@ export const enSite = {
   'standings.level.tiebreakers': 'The season’s tiebreakers set their order: {tiebreakers}.',
   'standings.level.tiebreakersPartly':
     'The season’s tiebreakers set their order as far as they can: {tiebreakers}.',
+  'standings.level.unbroken':
+    'Nothing in the season’s tiebreakers separates {teams} yet, so they are shown in a fixed order.',
   'standings.level.winPercentage': '{teams} are level on win percentage ({value}).',
   'standings.noSeason': 'There is no season to show yet.',
   // Teams that nothing in the rules separates: true of each of them, however many.
