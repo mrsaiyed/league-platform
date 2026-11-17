@@ -283,6 +283,38 @@ The binned league answers exactly as a missing one everywhere. The draft and sus
 - The only thing of a hidden league in any answer is D-H1's id.
 - The JSON routes' field names were listed level by level for every route and person: none carries a birth date, an email or a phone.
 
+## 2. Roles, whole
+
+**How who may do what is decided.** A command names one permission (`defineCommand`, `packages/core/src/command/define-command.ts`); `hasPermission` (`access/policy.ts:20`) reads the owner and the account's live grants in the command's own transaction (T-75) and asks whether a grant's role holds the permission (`access/roles.ts:96`) at a scope that covers the target (`access/scopes.ts:49`: a league grant covers everything, a program grant only its program). The web app's league gate opens an admin area to anyone holding one of its permissions **at any scope** (`leagues/rules/admin-area-access.ts:11`), so a program-limited role opens every area its permissions name, and from there each page's reads either go through a command (checked again in core) or not (below).
+
+**The role-against-command test** (`packages/database/src/stores/role-matrix.test.ts`) has a row for every one of the 104 commands in core's registry and tries each against 12 actors: owner, admin, an admin limited to one program, registrar, scheduler, editor, scorekeeper, a scheduler limited to one program, a signed-in person with no role, a revoked admin, our staff, a visitor (`:199`). Ran it: 210 tests pass in 64 s. Who should succeed is written out by hand from the spec (`heldBy`, `:377`), not read from core, so a command that checks the wrong permission fails. What it never tries: **club admins, coaches and captains** (its header, `:21`, says their scopes cannot be granted until the teams tables exist; team scopes have been storable since migration 0008, so the reason is out of date); a registrar, editor or scorekeeper limited to one program; a scorekeeper when the league scores "assigned games only"; an archived or suspended league; and what a read **returns** (only allowed or refused). Its own table gives scorekeepers `schedule.read` as core does (`:403`), so it cannot catch D-M6 below.
+
+**Every command**, with the permission it names and where that is checked. "Who may" is the owner and the holders of that permission in `roles.ts` (admin everything but the owner's three; registrar people and registration; scheduler schedule, venues and games; editor the site; scorekeeper `games.score` and `schedule.read`; club admin, coach and captain their own club's or team's rosters), and matches P4 §3 and §4 unless the last column says otherwise. RO: refused in an archived or suspended league (U-9).
+
+The full table, one row per command (its file, the permission it names, where and how that is checked, how many role-against-command rows it has, and where the spec and the code part), is Appendix B. Every command not listed below matches the spec.
+
+**Where the spec and the code disagree** (each also a finding in the list at the end):
+
+- **A scorekeeper can read every season's unpublished schedule draft in core** (D-M6). `roles.ts:124` gives scorekeepers `schedule.read`; with it `get_schedule_draft` (`scheduling/policy.ts:118`) answers for any season, hidden ones included, and `list_venues` and `list_postponed_games` answer too. P4 §4: a scorekeeper sees "a list of their games and nothing else". Only the gate stops it today: the Schedule area needs `schedule.edit` or `schedule.publish` (`admin-area-access.ts:17`), and no scorekeeper screen calls these. This is the leftover "a scorekeeper holds `schedule.read`".
+- **`list_postponed_games` filters by neither program nor the season's visibility** (`games/commands/list-postponed-games.ts:37`, `packages/database/src/queries/list-postponed-games.ts:11`): a program-limited role would get every program's postponed games, hidden seasons' included. Nothing in the web app calls it yet (D-L5).
+- **A scheduler removes venues and courts but cannot restore them** (`remove-venue.ts:16`, `remove-court.ts:14` need `venues.manage`; `restore-venue.ts:14`, `restore-court.ts:17` need `bin.restore`, admins only), against A-5 "whoever may remove a kind of thing may restore it" (D-L6). And only league-wide owners and admins may list the bin (`list-bin.ts:15`), so a scheduler, registrar or program admin who may restore their own kind of thing cannot see the bin to find it.
+- **Not built yet, so not mismatches today:** no command checks a club or team scope, so a club admin, coach or captain can do nothing (stage 4); the roster lock date (S-41) is step 2.138; a scorekeeper reopening a score they typed (S-52) is step 2.177.
+- **Unsure, for the lead:** the box score sheet and the tracker's reads are refused in an archived league (`games/policy.ts:50`) though U-9 makes it read-only, not unreadable; a registrar or editor limited to one program can do nothing at all; a program scheduler cannot manage venues; a scorekeeper may list venues (P4 §4 says no, record 019 line 38 says yes, and venues are public on the schedule).
+
+**Checks that exist only in the page or the gate.** Every server action and page under `apps/web/src/features` and `apps/web/src/server` was followed to what it reads:
+
+| Where                                                                    | What it reads or sends                                                                                                                                                                                                                                     | The only check                                                                                                                                                                                     | Who gets more than their role                                                                                                                                             |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| League settings page (`settings-area/settings-page.tsx:32`)              | `listLeagueSettings` (`leagues/settings/list-league-settings.ts:23`), `readPrivacyFacts`, `readNamePolicy`: all nine league settings with their values, versions and dates, the league's audience, whether anyone is recorded as a child, the names policy | The gate (`settings` opens on `league.settings` at any scope, `admin-area-access.ts:24`). Core runs no permission check on these reads; saving is refused by core (`leagues/settings/place.ts:65`) | An admin limited to one program is sent the whole league's settings (D-M7; the leftover "the League settings page's read has no check in core")                           |
+| "Make this my team" and "Stop" (`team-pages/my-team-actions.ts:14`)      | Looks up the league named in the form, reads its seasons' teams, sets a cookie named with the league's id                                                                                                                                                  | None: it refuses only a league in the bin or a former name (`:22`)                                                                                                                                 | Anyone, a visitor included, learns that a draft or suspended league exists, its id, and whether a team short name is one of its teams (D-H1, section 1)                   |
+| Games area names (`server/database-games.ts:112`, `namesOf`)             | Every team name, every season name (hidden ones too) and every scorekeeper assignment of the league                                                                                                                                                        | None of its own; pages draw only the names beside games a command returned                                                                                                                         | Nobody today; one component that hands the map to the browser would give a scorekeeper hidden seasons' names (D-L7)                                                       |
+| Teams pages (`server/admin-teams.ts:17`)                                 | The current season, its teams and divisions                                                                                                                                                                                                                | The gate (`teams` area)                                                                                                                                                                            | Nobody on the made-up world (only owners and admins open Teams). Once on the database (`database-ports.ts:260`), a program admin would see another program's teams (D-L7) |
+| Fixture import page (`server/fixture-import-ports.ts:17`)                | The current season's name and how many unpublished changes its draft holds                                                                                                                                                                                 | The gate                                                                                                                                                                                           | As above, once on the database (`database-ports.ts:254`)                                                                                                                  |
+| A season's team names for the schedule (`database-schedule-admin.ts:65`) | Team names                                                                                                                                                                                                                                                 | Core's `mayListSeason` has already filtered the season                                                                                                                                             | Nobody                                                                                                                                                                    |
+| Staff display names in the tracker (`database-tracker.ts:98`)            | A display name                                                                                                                                                                                                                                             | Used only after a command named the account (S-36)                                                                                                                                                 | Nobody                                                                                                                                                                    |
+
+**What a refusal changes and gives away.** Read for 21 commands across every module: bad input is refused before a transaction opens (`define-command.ts:148`); every other refusal happens inside the command's one transaction and undoes everything it wrote (`:181`, `:203`), including the two that refuse after writing (`record-final-score.ts:47`, `add-adjustment.ts:51`). The one intended exception is a tracker batch, whose accepted taps are kept while refused ones are answered in the reply (`apply-tracker-commands.ts:12`). A target that is not found is checked league-wide, so a program-limited role gets the same `not-allowed` for a missing id, another league's id and another program's id, and a league-wide role gets the same "not found" for a missing id and another league's. The three answers that say a little more (`assign_scorekeeper` says whether an account may score; `reopen_tracked_game` who ended the game; `accept_invitation` the link's state) are told only to someone who already holds a role over the thing or holds the link.
+
 ## Appendix A. Every query and every store method
 
 Paths are under `packages/database/src/`. Made from commit `7443bb1` by reading every function and running its own cases with its league filters made always-true (section 1a). The two tables are kept out of the formatter's column padding (`prettier-ignore`), which would make them twenty times their size.
@@ -576,5 +608,120 @@ Fourteen store factories are excused in `isolation-coverage.test.ts` ("binds the
 | **.findDivision :48** | `findDivision` → `{seasonId, binned}` | L=scope | via query | = query | |
 
 No store method writes SQL of its own: every store method reaches the database only through the queries above, so the scope's league reaches every statement the stores run.
+
+<!-- prettier-ignore-end -->
+
+## Appendix B. Every command against the roles
+
+Paths are under `packages/core/src/modules/`; inside a cell `m/` is the same folder. "At program" means the check is made at the program of the target's season, and league-wide when the target is not found; "held anywhere" means the permission at any scope passes; RO means refused in an archived or suspended league. "Role matrix rows" is the number of rows in `role-matrix.test.ts`, each run against its 12 actors. Kept out of the formatter's column padding (`prettier-ignore`).
+
+<!-- prettier-ignore-start -->
+
+| # | Command | File (under `packages/core/src/modules/`) | Permission | Where it is checked | Role matrix rows | Spec against fact |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `access.accept_invitation` | `access/commands/accept-invitation.ts:42` | `signed-in` | signed-in | yes (1) | — |
+| 2 | `access.cancel_invitation` | `access/commands/cancel-invitation.ts:15` | `access.manage` | access.manage at the invitation's scope, league-wide if missing | yes (2) | — |
+| 3 | `access.invite` | `access/commands/invite.ts:31` | `access.manage` | access.manage at input scope | yes (2) | — |
+| 4 | `access.list_access` | `access/queries/list-access.ts:19` | `access.manage` | access.manage at input scope | yes (2) | — |
+| 5 | `access.list_activity` | `access/queries/list-activity.ts:11` | `activity.read` | activity.read at input scope | yes (2) | — |
+| 6 | `access.my_access` | `access/queries/my-access.ts:19` | `signed-in` | signed-in | yes (1) | — |
+| 7 | `access.resend_invitation` | `access/commands/resend-invitation.ts:26` | `access.manage` | access.manage at the invitation's scope | yes (2) | — |
+| 8 | `access.revoke_grant` | `access/commands/revoke-grant.ts:19` | `access.manage` | access.manage at the grant's scope | yes (2) | — |
+| 9 | `games.apply_tracker_commands` | `games/commands/apply-tracker-commands.ts:126` | `games.score` | games.score at the game's program + assignment rule; + games.correct when withoutMercyOrLastMinutes | yes (6) | — |
+| 10 | `games.assign_scorekeeper` | `games/commands/assign-scorekeeper.ts:16` | `games.manage` | games.manage at game's program | yes (2) | — |
+| 11 | `games.cancel_game` | `games/commands/cancel-game.ts:19` | `games.results` | games.results at game's program | yes (2) | — |
+| 12 | `games.end_tracked_game` | `games/commands/end-tracked-game.ts:37` | `games.score` | mayScoreGame (allowed :42) | yes (2) | — |
+| 13 | `games.get_box_score_sheet` | `games/commands/get-box-score-sheet.ts:42` | `games.score` | mayScoreGame (a read, but RO-refused: m/games/policy.ts:50-51) (allowed :46) | yes (2) | unsure: U-9 makes archived leagues read-only, yet this read is refused there |
+| 14 | `games.list_earlier_games` | `games/commands/list-earlier-games.ts:58` | `games.score` | games.score held anywhere | yes (1) | — |
+| 15 | `games.list_games_needing_result` | `games/commands/list-games-needing-result.ts:32` | `games.score` | games.score held anywhere | yes (1) | — |
+| 16 | `games.list_my_games` | `games/commands/list-my-games.ts:24` | `games.score` | games.score held anywhere | yes (1) | — |
+| 17 | `games.list_postponed_games` | `games/commands/list-postponed-games.ts:33` | `schedule.read` | schedule.read held anywhere | yes (1) | YES (M2): K/pK get it; program-limited roles see other programs' and hidden seasons' postponed games. Not wired in apps/web yet |
+| 18 | `games.list_scoring_offers` | `games/commands/list-scoring-offers.ts:51` | `games.score` | games.score held anywhere | yes (1) | — |
+| 19 | `games.mark_not_started` | `games/commands/mark-not-started.ts:103` | `games.score` | mayScoreGame OR games.correct at program (m/games/commands/mark-not-started.ts:70-72, 82-88); run applies S-40 | yes (4) | — |
+| 20 | `games.open_scoring_session` | `games/commands/open-scoring-session.ts:21` | `games.score` | mayScoreGame (allowed :25) | yes (2) | — |
+| 21 | `games.postpone_game` | `games/commands/postpone-game.ts:19` | `games.results` | games.results at program | yes (2) | — |
+| 22 | `games.read_reopen_offer` | `games/commands/read-reopen-offer.ts:17` | `games.score` | mayScoreGame (allowed :21) | yes (2) | — |
+| 23 | `games.read_tracker_rosters` | `games/commands/read-tracker-rosters.ts:43` | `games.score` | mayScoreGame (allowed :47) | yes (2) | — |
+| 24 | `games.read_tracker_state` | `games/commands/read-tracker-state.ts:35` | `games.score` | mayScoreGame (allowed :39) | yes (2) | — |
+| 25 | `games.record_final_score` | `games/commands/record-final-score.ts:20` | `games.score` | mayScoreGame (allowed :30) | yes (2) | — |
+| 26 | `games.record_forfeit` | `games/commands/record-forfeit.ts:18` | `games.results` | games.results at program | yes (2) | — |
+| 27 | `games.release_scoring_session` | `games/commands/release-scoring-session.ts:18` | `games.score` | mayScoreGame (allowed :22) | yes (2) | — |
+| 28 | `games.renew_scoring_session` | `games/commands/renew-scoring-session.ts:26` | `games.score` | mayScoreGame (allowed :30) | yes (2) | — |
+| 29 | `games.reopen_game` | `games/commands/reopen-game.ts:25` | `games.correct` | games.correct at program | yes (2) | not built (M7): S-52 (step 2.177 open, docs/build/STAGE-2.md:357) |
+| 30 | `games.reopen_tracked_game` | `games/commands/reopen-tracked-game.ts:48` | `games.score` | mayScoreGame + reopen-window rule in run (reopen-tracked-game.ts:1-7, :81) (allowed :57) | yes (2) | — |
+| 31 | `games.set_box_score` | `games/commands/set-box-score.ts:48` | `games.score` | mayScoreGame (allowed :59) | yes (2) | — |
+| 32 | `games.take_over_scoring` | `games/commands/take-over-scoring.ts:29` | `games.score` | mayScoreGame (allowed :39) | yes (2) | — |
+| 33 | `games.unassign_scorekeeper` | `games/commands/unassign-scorekeeper.ts:14` | `games.manage` | games.manage at program | yes (2) | — |
+| 34 | `imports.apply_fixture_import` | `imports/apply-fixture-import.ts:50` | `schedule.import` | schedule.import at import's season's program | yes (2) | — |
+| 35 | `imports.discard_fixture_import` | `imports/discard-fixture-import.ts:13` | `schedule.import` | mayImportInto (allowed :17) | yes (2) | — |
+| 36 | `imports.get_fixture_import` | `imports/get-fixture-import.ts:40` | `schedule.import` | schedule.import at season's program, any state | yes (2) | — |
+| 37 | `imports.record_imported_scores` | `imports/record-imported-scores.ts:26` | `schedule.import` | mayImportInto(schedule.import) AND mayImportInto(games.score) (allowed :30) | yes (2) | — |
+| 38 | `imports.start_fixture_import` | `imports/start-fixture-import.ts:19` | `schedule.import` | mayImportInto(input.seasonId) (allowed :28) | yes (2) | — |
+| 39 | `imports.undo_fixture_import` | `imports/undo-fixture-import.ts:23` | `schedule.import` | mayImportInto (allowed :27) | yes (2) | — |
+| 40 | `leagues.clear_setting` | `leagues/commands/clear-setting.ts:23` | `league.settings` | the setting's declared permission at the place's program; unknown key/place → league.settings league-wide; R-2 | yes (12) | — |
+| 41 | `leagues.create` | `leagues/commands/create-league.ts:81` | `platform-staff` | platform-staff | yes (1) | — |
+| 42 | `leagues.create_division` | `leagues/commands/create-division.ts:15` | `divisions.manage` | divisions.manage at season's program | yes (2) | — |
+| 43 | `leagues.create_season` | `leagues/commands/create-season.ts:14` | `season.settings` | season.settings at input program (league-wide if omitted/missing) | yes (2) | — |
+| 44 | `leagues.get_season` | `leagues/commands/get-season.ts:12` | `season.settings` | season.settings at season's program, any state | yes (2) | — |
+| 45 | `leagues.list_bin` | `leagues/commands/list-bin.ts:11` | `bin.restore` | bin.restore league-wide, any state | yes (1) | partial (M4): S, R, pA may restore their kind but cannot list the bin to find it |
+| 46 | `leagues.list_divisions` | `leagues/commands/list-divisions.ts:9` | `divisions.manage` | divisions.manage at season's program, any state (allowed :13) | yes (2) | — |
+| 47 | `leagues.preview_season_rules` | `leagues/commands/preview-season-rules.ts:19` | `season.settings` | season.settings at program | yes (2) | — |
+| 48 | `leagues.publish_site_design` | `leagues/commands/publish-site-design.ts:35` | `site.publish` | site.publish league-wide | yes (1) | — |
+| 49 | `leagues.remove_division` | `leagues/commands/remove-division.ts:16` | `divisions.manage` | divisions.manage at division's program | yes (2) | — |
+| 50 | `leagues.remove_draft` | `leagues/commands/remove-draft-league.ts:43` | `platform-staff` | platform-staff | yes (1) | — |
+| 51 | `leagues.rename_short_name` | `leagues/commands/rename-short-name.ts:18` | `league.settings` | league.settings league-wide | yes (1) | — |
+| 52 | `leagues.reorder_divisions` | `leagues/commands/reorder-divisions.ts:16` | `divisions.manage` | divisions.manage at season's program | yes (2) | — |
+| 53 | `leagues.restore_division` | `leagues/commands/restore-division.ts:16` | `bin.restore` | bin.restore at division's program | yes (2) | — |
+| 54 | `leagues.restore_game` | `leagues/commands/restore-game.ts:25` | `schedule.publish` | schedule.publish at game's season's program | yes (2) | — |
+| 55 | `leagues.restore_person` | `leagues/commands/restore-person.ts:14` | `people.manage` | people.manage league-wide | yes (1) | — |
+| 56 | `leagues.restore_team` | `leagues/commands/restore-team.ts:23` | `teams.manage` | teams.manage at team's season's program | yes (2) | — |
+| 57 | `leagues.set_current_season` | `leagues/commands/set-current-season.ts:15` | `season.settings` | season.settings at season's program | yes (2) | — |
+| 58 | `leagues.set_name` | `leagues/commands/set-league-name.ts:16` | `league.settings` | league.settings league-wide | yes (1) | — |
+| 59 | `leagues.set_season_roster_settings` | `leagues/commands/set-season-roster-settings.ts:21` | `season.settings` | season.settings at program | yes (2) | — |
+| 60 | `leagues.set_season_rules` | `leagues/commands/set-season-rules.ts:46` | `season.settings` | season.settings at program | yes (2) | — |
+| 61 | `leagues.set_setting` | `leagues/commands/set-setting.ts:67` | `league.settings` | as clear_setting | yes (12) | — |
+| 62 | `leagues.set_status` | `leagues/commands/set-league-status.ts:17` | `league.settings` | transition "by platform" (suspend, lift: m/leagues/league-states.ts:23-26) → PS; others → league.settings leag | yes (2) | — |
+| 63 | `leagues.update_division` | `leagues/commands/update-division.ts:14` | `divisions.manage` | divisions.manage at division's program | yes (2) | — |
+| 64 | `leagues.update_season` | `leagues/commands/update-season.ts:18` | `season.settings` | season.settings at season's program | yes (2) | — |
+| 65 | `people.create_person` | `people/commands/create-person.ts:14` | `people.manage` | people.manage league-wide | yes (1) | unsure: a program-limited registrar can do nothing with people |
+| 66 | `people.list_people` | `people/commands/list-people.ts:10` | `people.read` | people.read league-wide, any state | yes (1) | — |
+| 67 | `people.remove_person` | `people/commands/remove-person.ts:14` | `people.manage` | people.manage league-wide | yes (1) | — |
+| 68 | `people.set_name_request` | `people/commands/set-name-request.ts:64` | `people.manage` | people.manage league-wide; in RO only a request that shows less (R-26) | yes (2) | — |
+| 69 | `people.update_person` | `people/commands/update-person.ts:16` | `people.manage` | people.manage league-wide | yes (1) | — |
+| 70 | `scheduling.add_draft_game` | `scheduling/commands/add-draft-game.ts:20` | `schedule.edit` | schedule.edit at season's program | yes (2) | — |
+| 71 | `scheduling.add_draft_round` | `scheduling/commands/add-draft-round.ts:14` | `schedule.edit` | mayEditSchedule (allowed :23) | yes (2) | — |
+| 72 | `scheduling.change_draft_round_date` | `scheduling/commands/change-draft-round-date.ts:11` | `schedule.edit` | mayEditSchedule (allowed :15) | yes (2) | — |
+| 73 | `scheduling.create_court` | `scheduling/commands/create-court.ts:13` | `venues.manage` | venues.manage league-wide | yes (1) | unsure: a program scheduler cannot manage venues |
+| 74 | `scheduling.create_venue` | `scheduling/commands/create-venue.ts:12` | `venues.manage` | venues.manage league-wide | yes (1) | unsure (as create_court) |
+| 75 | `scheduling.discard_schedule_draft` | `scheduling/commands/discard-schedule-draft.ts:14` | `schedule.edit` | mayEditSchedule (allowed :22) | yes (2) | — |
+| 76 | `scheduling.get_schedule_draft` | `scheduling/commands/get-schedule-draft.ts:42` | `schedule.read` | schedule.read at season's program, any state | yes (2) | YES (M1): K holds schedule.read (m/access/roles.ts:124). Not reachable in apps/web today (Schedule area needs schedule.edit/publish, m/leagues/rules/admin-area-access.ts:17) |
+| 77 | `scheduling.list_venues` | `scheduling/commands/list-venues.ts:9` | `schedule.read` | schedule.read held anywhere | yes (1) | unsure: K beyond P4 §4, but record 019 allows it (venues are shared, and public on schedules) |
+| 78 | `scheduling.move_draft_game` | `scheduling/commands/move-draft-game.ts:17` | `schedule.edit` | mayEditSchedule (allowed :29) | yes (2) | — |
+| 79 | `scheduling.preview_schedule_publish` | `scheduling/commands/preview-schedule-publish.ts:30` | `schedule.publish` | schedule.publish at program, any state | yes (2) | — |
+| 80 | `scheduling.publish_schedule` | `scheduling/commands/publish-schedule.ts:45` | `schedule.publish` | schedule.publish at program | yes (2) | — |
+| 81 | `scheduling.remove_court` | `scheduling/commands/remove-court.ts:10` | `venues.manage` | venues.manage league-wide | yes (1) | see restore_court (M3) |
+| 82 | `scheduling.remove_draft_game` | `scheduling/commands/remove-draft-game.ts:11` | `schedule.edit` | mayEditSchedule (allowed :15) | yes (2) | — |
+| 83 | `scheduling.remove_draft_round` | `scheduling/commands/remove-draft-round.ts:16` | `schedule.edit` | mayEditSchedule (allowed :20) | yes (2) | — |
+| 84 | `scheduling.remove_venue` | `scheduling/commands/remove-venue.ts:12` | `venues.manage` | venues.manage league-wide | yes (1) | see restore_venue (M3) |
+| 85 | `scheduling.rename_draft_round` | `scheduling/commands/rename-draft-round.ts:10` | `schedule.edit` | mayEditSchedule (allowed :14) | yes (2) | — |
+| 86 | `scheduling.restore_court` | `scheduling/commands/restore-court.ts:15` | `bin.restore` | bin.restore league-wide | yes (1) | YES (M3): S removes courts (remove-court.ts:14) but cannot restore them |
+| 87 | `scheduling.restore_venue` | `scheduling/commands/restore-venue.ts:12` | `bin.restore` | bin.restore league-wide | yes (1) | YES (M3): S removes venues (remove-venue.ts:16) but cannot restore them |
+| 88 | `scheduling.set_draft_recording` | `scheduling/commands/set-draft-recording.ts:12` | `schedule.edit` | mayEditSchedule (allowed :16) | yes (2) | — |
+| 89 | `scheduling.swap_draft_games` | `scheduling/commands/swap-draft-games.ts:10` | `schedule.edit` | mayEditSchedule (allowed :14) | yes (2) | — |
+| 90 | `scheduling.update_court` | `scheduling/commands/update-court.ts:16` | `venues.manage` | venues.manage league-wide | yes (1) | — |
+| 91 | `scheduling.update_venue` | `scheduling/commands/update-venue.ts:14` | `venues.manage` | venues.manage league-wide | yes (1) | — |
+| 92 | `standings.add_adjustment` | `standings/commands/add-adjustment.ts:20` | `standings.adjust` | standings.adjust at season's program | yes (2) | — |
+| 93 | `standings.rebuild_season` | `standings/commands/rebuild-standings.ts:15` | `standings.adjust` | mayAdjustStandings (allowed :19) | yes (2) | — |
+| 94 | `standings.remove_adjustment` | `standings/commands/remove-adjustment.ts:15` | `standings.adjust` | mayAdjustStandings (allowed :19) | yes (2) | — |
+| 95 | `teams.add_to_roster` | `teams/commands/add-to-roster.ts:19` | `rosters.manage` | rosters.manage at team's program | yes (2) | not built (M5, M6): CA/Co/Ca roster tools (stage 4); S-41 lock (step 2.138), moot today |
+| 96 | `teams.change_roster_entry` | `teams/commands/change-roster-entry.ts:17` | `rosters.manage` | mayChangeRosters at entry's team's program (allowed :31) | yes (2) | not built (M5, M6) |
+| 97 | `teams.create_team` | `teams/commands/create-team.ts:23` | `teams.manage` | teams.manage at season's program | yes (2) | not built (M5): CA |
+| 98 | `teams.list_roster` | `teams/commands/list-roster.ts:13` | `rosters.manage` | rosters.manage at team's program, any state | yes (2) | not built (M5) |
+| 99 | `teams.mark_left` | `teams/commands/mark-left.ts:24` | `rosters.manage` | mayChangeRosters at entry's program (allowed :32) | yes (2) | not built (M5, M6) |
+| 100 | `teams.put_back_on_roster` | `teams/commands/put-back-on-roster.ts:35` | `rosters.manage` | mayChangeRosters at entry's program (input.teamId must match, :51-52) (allowed :43) | yes (2) | not built (M5, M6) |
+| 101 | `teams.remove_team` | `teams/commands/remove-team.ts:12` | `teams.manage` | mayChangeTeams at team's program (allowed :16) | yes (2) | not built (M5) |
+| 102 | `teams.reorder_roster` | `teams/commands/reorder-roster.ts:24` | `rosters.manage` | mayChangeRosters at team's program (allowed :35) | yes (2) | not built (M5, M6) |
+| 103 | `teams.set_stats_visibility` | `teams/commands/set-team-stats-visibility.ts:20` | `teams.manage` | mayChangeTeams at team's program (allowed :28) | yes (2) | — |
+| 104 | `teams.update_team` | `teams/commands/update-team.ts:22` | `teams.manage` | mayChangeTeams at team's program (allowed :44) | yes (2) | not built (M5) |
 
 <!-- prettier-ignore-end -->
