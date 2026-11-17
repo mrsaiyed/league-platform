@@ -45,6 +45,7 @@ export type PlayerName = {
 export type VisiblePlayer = {
   readonly personId: string;
   readonly name: PlayerName;
+  /** The teams the player has numbers with: never a team they had only a roster place on. */
   readonly teamIds: readonly string[];
   readonly gamesPlayed: number;
   readonly seconds: StatEntry;
@@ -81,6 +82,23 @@ function statsOf(document: unknown): Record<string, StatEntry> {
     if (wholeCount(total) && wholeCount(gamesRecorded)) out[key] = entryOf(total, gamesRecorded);
   }
   return out;
+}
+
+/**
+ * The teams the stored totals say the player played for (the document's `teamIds`, written
+ * with the totals), kept to the teams the player is linked to; the links alone when the
+ * document names none. A roster place on a team a player left before its first game puts
+ * that team in the links, which decide whose numbers may be shown (S-22), but not here.
+ */
+function teamsPlayedFor(document: unknown, linked: readonly string[]): string[] {
+  const named: unknown =
+    typeof document === 'object' && document !== null
+      ? (document as { teamIds?: unknown }).teamIds
+      : undefined;
+  const all = [...new Set(linked)].sort();
+  if (!Array.isArray(named)) return all;
+  const played = new Set(named.filter((id): id is string => typeof id === 'string'));
+  return all.filter((id) => played.has(id));
 }
 
 function teamSetting(leagueId: string, team: SeasonTeamRow): TeamStatsSetting {
@@ -198,24 +216,30 @@ export async function statisticsSource(
   const rows: Array<{
     personId: string;
     teamIds: string[];
+    /** The team whose setting the name function reads: the first the player is linked to. */
+    nameTeamId: string;
     gamesPlayed: number;
     seconds: StatEntry;
     stats: Record<string, StatEntry>;
   }> = [
-    ...stored.map((row) => ({
-      personId: row.personId,
-      teamIds: [...new Set(teamsOf.get(row.personId) ?? [])].sort(),
-      gamesPlayed: row.gamesPlayed,
-      seconds: entryOf(row.secondsPlayed, row.secondsGames),
-      stats: statsOf(row.stats),
-    })),
-    ...recomputed,
+    ...stored.map((row) => {
+      const linked = [...new Set(teamsOf.get(row.personId) ?? [])].sort();
+      return {
+        personId: row.personId,
+        teamIds: teamsPlayedFor(row.stats, linked),
+        nameTeamId: linked[0] ?? '',
+        gamesPlayed: row.gamesPlayed,
+        seconds: entryOf(row.secondsPlayed, row.secondsGames),
+        stats: statsOf(row.stats),
+      };
+    }),
+    ...recomputed.map((row) => ({ ...row, nameTeamId: row.teamIds[0] ?? '' })),
   ].sort((x, y) => (x.personId < y.personId ? -1 : x.personId > y.personId ? 1 : 0));
   const people = await store.people(rows.map((row) => row.personId));
   const personOf = new Map(people.map((p) => [p.id, p]));
   const players: VisiblePlayer[] = rows.map((row) => {
     const person = personOf.get(row.personId);
-    const setting = settings.get(row.teamIds[0] ?? '');
+    const setting = settings.get(row.nameTeamId);
     const shown =
       person === undefined || setting === undefined
         ? undefined
