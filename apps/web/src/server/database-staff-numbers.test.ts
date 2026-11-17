@@ -217,6 +217,21 @@ describe('the staff numbers read on the database, role by role (S-22, T-87, T-28
     }
   });
 
+  it('names no person by their id: a line is keyed by its place (audit 2.108, D-M4)', async () => {
+    const teams = await ports.publicStats.readStoreOf(lakeside().leagueId).teams(facts.seasonId);
+    // The only ids an answer may hold: the season's teams, the season and the game.
+    const known = new Set([...teams.map((team) => team.id), facts.seasonId, facts.game]);
+    for (const [page, question] of Object.entries(questions())) {
+      const text = JSON.stringify(await ask('owner', question));
+      const ids = text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g) ?? [];
+      expect(
+        ids.filter((id) => !known.has(id)),
+        page,
+      ).toEqual([]);
+      expect(text, page).toMatch(/"id":"(away-|home-)?player-0"/);
+    }
+  });
+
   it('answers everyone else exactly as for a page with nothing kept back', async () => {
     for (const who of notAllowed) {
       for (const [page, question] of Object.entries(questions())) {
