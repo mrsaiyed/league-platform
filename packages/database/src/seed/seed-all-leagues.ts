@@ -1,13 +1,15 @@
 // Development-only (T-195, T-201): everything `npm run seed` loads into a local test
 // database, in one go. The seed leagues (seed-data.ts) are loaded, their seasons put under
 // way (seed-season-under-way.ts) and given their venue and one tracked game
-// (seed-tracked-games.ts). Made-up data only: it takes a PGlite, never an address.
+// (seed-tracked-games.ts); then the demo-shaped league (seed-demo-league.ts). Made-up data
+// only: it takes a PGlite, never an address.
 //
 // Safe to run again: a league already there is left alone. Each part runs its own
 // commands, so a load that stopped part-way is found and stops with a plain message,
 // never a false "Already there": start again from a fresh database.
 import type { PGlite } from '@electric-sql/pglite';
 import { seedLeagues } from './seed-data.ts';
+import { seedDemoLeagueInto } from './seed-demo-league.ts';
 import { seedLeaguesInto } from './seed-leagues.ts';
 import { putSeedSeasonsUnderWay } from './seed-season-under-way.ts';
 import { addSeedTrackedGames } from './seed-tracked-games.ts';
@@ -53,9 +55,10 @@ export async function seedAllLeaguesInto(
       if (!(await hasTrackedGame(pglite, league.leagueId))) throw partlyLoaded(league.slug);
     }
   }
-  return loaded.map((league) => ({
+  const seeded = loaded.map((league) => ({
     slug: league.slug,
     name: seedLeagues.find((l) => l.slug === league.slug)?.name ?? league.slug,
     created: league.created,
   }));
+  return [...seeded, await seedDemoLeagueInto(pglite, now)];
 }

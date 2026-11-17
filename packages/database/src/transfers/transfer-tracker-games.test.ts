@@ -26,7 +26,7 @@ import {
   newStage,
   newTeam,
 } from '../schema/schema.test-helper.ts';
-import { writeDataFolder } from './data-folder.test-helper.ts';
+import { writeDataFolder } from './data-folder.ts';
 import { transferTrackerGames, type TransferTrackerGamesOptions } from './index.ts';
 
 const schemaFile = fileURLToPath(new URL('../live-stats/001-schema.sql', import.meta.url));

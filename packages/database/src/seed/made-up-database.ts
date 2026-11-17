@@ -17,6 +17,7 @@ import { applyMigrations } from '../migrations/apply-migrations.ts';
 import { pgliteDriver } from '../migrations/pglite-driver.ts';
 import { seedLeaguesInto } from './seed-leagues.ts';
 import { putSeedSeasonsUnderWay } from './seed-season-under-way.ts';
+import { seedDemoLeagueInto } from './seed-demo-league.ts';
 import { addSeedTrackedGames } from './seed-tracked-games.ts';
 
 /** The login role a made-up database is used as. */
@@ -57,6 +58,12 @@ export type MadeUpOptions = {
    * the web app's pages and their tests are checked against the season under way alone.
    */
   readonly tracked?: boolean;
+  /**
+   * The seed's demo-shaped league as well (seed-demo-league.ts): a large league's one
+   * program, its districts and teams, every game final, one team's tracked. Off by
+   * default: it takes some seconds to load.
+   */
+  readonly demo?: boolean;
 };
 
 /** Opens a new made-up database in memory. Close it when done. */
@@ -68,6 +75,7 @@ export async function madeUpDatabase(options: MadeUpOptions = {}): Promise<MadeU
     await seedLeaguesInto(pglite);
     if (options.underWay === true) await putSeedSeasonsUnderWay(pglite);
     if (options.underWay === true && options.tracked === true) await addSeedTrackedGames(pglite);
+    if (options.demo === true) await seedDemoLeagueInto(pglite);
     for (const [slug, audience] of Object.entries(options.audiences ?? {})) {
       const told = await pglite.query('update leagues set audience = $2 where slug = $1', [
         slug,

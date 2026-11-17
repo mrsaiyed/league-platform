@@ -1,9 +1,10 @@
 // What `npm run seed` loads (seed-all-leagues.ts): every seed league, its season under way
-// and its tracked game, in one go; a second run leaves everything alone; a load that
-// stopped part-way is never called "Already there".
+// and its tracked game, and the demo-shaped league, in one go; a second run leaves
+// everything alone; a load that stopped part-way is never called "Already there".
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { applyMigrations, pgliteDriver } from '../migrations/index.ts';
+import { demoLeague } from './demo-league-data.ts';
 import { seedAllLeaguesInto } from './seed-all-leagues.ts';
 import { seedLeagues } from './seed-data.ts';
 import { seedLeaguesInto } from './seed-leagues.ts';
@@ -50,7 +51,11 @@ describe('seedAllLeaguesInto', () => {
   it('loads every seed league with its season under way, its venue and its tracked game', async () => {
     const loaded = await seedAllLeaguesInto(pglite);
     expect(loaded).toEqual(
-      seedLeagues.map((league) => ({ slug: league.slug, name: league.name, created: true })),
+      [...seedLeagues, demoLeague].map((league) => ({
+        slug: league.slug,
+        name: league.name,
+        created: true,
+      })),
     );
     for (const league of seedLeagues) {
       const { rows } = await pglite.query<{ games: number; finals: number; tracked: number }>(
@@ -72,7 +77,7 @@ describe('seedAllLeaguesInto', () => {
   it('leaves everything alone when run again', async () => {
     const before = await counts(pglite);
     const again = await seedAllLeaguesInto(pglite);
-    expect(again.map((league) => league.created)).toEqual(seedLeagues.map(() => false));
+    expect(again.map((league) => league.created)).toEqual([false, false, false]);
     expect(await counts(pglite)).toEqual(before);
   }, 120_000);
 

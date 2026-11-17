@@ -1,5 +1,6 @@
 // The made-up seed leagues (T-195): their data and the loader, and a made-up
 // database in memory that holds them, for local work and the apps' tests.
+export { demoLeague, type DemoLeague } from './demo-league-data.ts';
 export {
   madeUpDatabase,
   madeUpLoginRole,
