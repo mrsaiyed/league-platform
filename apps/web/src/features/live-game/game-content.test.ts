@@ -6,6 +6,7 @@ import {
   publicViewer,
   readGamePage,
   readGameSnapshot,
+  readStatisticsTable,
   type GamePage,
 } from '@srleagues/core';
 import { readFileSync } from 'node:fs';
@@ -398,13 +399,15 @@ describe('a game page', () => {
 
   it('lists the box scores of a tracked final game, away team first', () => {
     const page = {
-      game: { recording: 'live' },
+      game: { recording: 'live', statKeys: ['points', 'mystery_stat', 'fouls'] },
       boxScores: [
         {
           side: 'home',
           name: 'Hawks',
           playerLinesShown: true,
           totals: { points: 5, mystery_stat: 1 },
+          playersPoints: 5,
+          teamTurnovers: 0,
           players: [
             {
               personId: 'p',
@@ -431,6 +434,8 @@ describe('a game page', () => {
           name: 'Bears',
           playerLinesShown: false,
           totals: { points: 2 },
+          playersPoints: 2,
+          teamTurnovers: 0,
           players: [],
         },
       ],
@@ -536,9 +541,209 @@ describe('a game page', () => {
     );
   });
 
+  describe("a box score's Total counts everything the team did (step 2.196)", () => {
+    /** A finished game's page with these lines for the home team, as core reads it. */
+    const pageWith = (
+      statKeys: readonly string[],
+      home: Partial<GamePage['boxScores'][number]>,
+    ): GamePage =>
+      ({
+        game: { recording: 'live', statKeys },
+        boxScores: [
+          {
+            side: 'home',
+            name: 'Hawks',
+            playerLinesShown: true,
+            totals: {},
+            playersPoints: null,
+            teamTurnovers: 0,
+            players: [],
+            ...home,
+          },
+          {
+            side: 'away',
+            name: 'Bears',
+            playerLinesShown: true,
+            totals: { points: 2, fouls: 0, fg1: 0, fg3: 0, turnovers: 0 },
+            playersPoints: 2,
+            teamTurnovers: 0,
+            players: [],
+          },
+        ],
+      }) as unknown as GamePage;
+    const player = (stats: Record<string, number>) => ({
+      personId: 'p1',
+      name: 'Pia',
+      jersey: '9',
+      unnamed: false,
+      played: true,
+      seconds: 60,
+      stats,
+    });
+    const tracked = { points: 3, fg1: 1, fg3: 0, fg2: 1, fouls: 1, turnovers: 1 };
+    const tables = (built: ReturnType<typeof buildBoxScores>) => {
+      if (built.kind !== 'tables') throw new Error(built.kind);
+      return built.tables;
+    };
+    const standard = ['points', 'fg3', 'fg1', 'fouls'];
+    const full = [...standard, 'rebounds', 'assists', 'steals', 'blocks', 'turnovers'];
+
+    it('draws the columns the season keeps, in its order: no TO in a standard season, TO in a full one', () => {
+      const home = { totals: tracked, playersPoints: 3, players: [player(tracked)] };
+      const labels = (keys: readonly string[]) =>
+        tables(buildBoxScores(pageWith(keys, home)))[1]?.columns.map((c) => c.label);
+      expect(labels(standard)).toEqual(['PTS', '3PM', 'FTM', 'PF']);
+      // A full season's columns this game recorded: rebounds and the rest were not.
+      expect(labels(full)).toEqual(['PTS', '3PM', 'FTM', 'PF', 'TO']);
+      // The statistics a season names itself, as the statistics page shows them.
+      expect(labels(['points', 'rebounds', 'fouls'])).toEqual(['PTS', 'PF']);
+    });
+
+    it("case 18 in a full season: the Total's 2 turnovers, and a sentence for the team's own", () => {
+      const lines = { points: 0, fouls: 0, fg1: 0, fg3: 0, turnovers: 1 };
+      const built = buildBoxScores(
+        pageWith(full, {
+          totals: { ...lines, turnovers: 2 },
+          playersPoints: 0,
+          teamTurnovers: 1,
+          players: [player(lines)],
+        }),
+      );
+      const hawks = tables(built)[1];
+      expect(hawks?.totals['turnovers']).toBe(2);
+      expect(hawks?.notes).toEqual([
+        'The Total includes 1 turnover charged to the team, not to a player.',
+      ]);
+      expect(tables(built)[0]?.notes).toEqual([]);
+      // In a standard season there is no TO column, so nothing to explain.
+      const quiet = buildBoxScores(
+        pageWith(standard, {
+          totals: { ...lines, turnovers: 2 },
+          playersPoints: 0,
+          teamTurnovers: 1,
+          players: [player(lines)],
+        }),
+      );
+      expect(tables(quiet)[1]?.notes).toEqual([]);
+      expect(
+        buildBoxScores(
+          pageWith(full, {
+            totals: { ...lines, turnovers: 4 },
+            teamTurnovers: 3,
+            playersPoints: 0,
+            players: [player(lines)],
+          }),
+        ),
+      ).toMatchObject({
+        tables: [
+          {},
+          { notes: ['The Total includes 3 turnovers charged to the team, not to a player.'] },
+        ],
+      });
+    });
+
+    it('case 40: the Total shows the typed 50, and one sentence says the players add to 48', async () => {
+      const built = buildBoxScores(
+        pageWith(standard, {
+          totals: { points: 50, fouls: 2 },
+          playersPoints: 48,
+          players: [
+            player({ points: 30, fouls: 1 }),
+            { ...player({ points: 18, fouls: 1 }), personId: 'p2' },
+          ],
+        }),
+      );
+      const hawks = tables(built)[1];
+      expect(hawks?.totals['points']).toBe(50);
+      expect(hawks?.notes).toEqual([
+        "The players' points add to 48, not the 50 entered as the final score: the box score was entered by hand, or is not complete.",
+      ]);
+      // Drawn on the page under the table, and no "Team" row is made up for the 2 points:
+      // the Hawks' table has its two players and its Total, nothing else.
+      const { view } = await viewOf(trackerWorld(), games.decided);
+      const html = draw({ ...view, boxScores: built });
+      const hawksTable = html.slice(html.lastIndexOf('<table'), html.lastIndexOf('</table>'));
+      expect(hawksTable).toContain('<caption dir="auto">Hawks</caption>');
+      expect(hawksTable.match(/<tr>/g)).toHaveLength(1 + 2 + 1);
+      expect(html.slice(html.lastIndexOf('</table>'))).toContain(
+        '<p class="ui-table-notice" dir="auto">The players&#x27; points add to 48, not the 50 entered as the final score: the box score was entered by hand, or is not complete.</p>',
+      );
+    });
+
+    it('says nothing where the players are hidden: there is no column to add up', () => {
+      const built = buildBoxScores(
+        pageWith(full, {
+          playerLinesShown: false,
+          totals: { points: 50, turnovers: 2 },
+          playersPoints: 48,
+          teamTurnovers: 1,
+        }),
+      );
+      expect(tables(built)[1]?.notes).toEqual([]);
+    });
+
+    it("a game scored on the tablet with a team turnover: every Total adds up from the page, and the season's team totals count it", async () => {
+      const world = trackerWorld();
+      const teamTurnoversOf = async (seasonId: string) =>
+        world.ports.publicStats.statisticsOf(liveLeagueId, async ({ store }) => {
+          const table = await readStatisticsTable(store, { seasonId, viewing });
+          if (!table.ok) throw new Error('no statistics');
+          return table.value.teams.find((team) => team.name === 'Hawks')?.stats['turnovers'];
+        });
+      const context = (part: string) =>
+        world.contextAs('scorekeeper', 'live', ['games', games.hawksBears, part]);
+      const opened = await scoringSessionRequest(
+        await context('session'),
+        games.hawksBears,
+        { type: 'open', deviceId: 'tablet-1' },
+        world.tracker,
+      );
+      const { sessionId } = opened.body as { sessionId: string };
+      const sent = await sendTrackerCommands(
+        await context('commands'),
+        games.hawksBears,
+        {
+          protocolVersion: 1,
+          sessionId,
+          commands: [
+            tap({ type: 'lineup', side: 'home', playerIds: hawks }),
+            tap({ type: 'lineup', side: 'away', playerIds: bears }),
+            tap({ type: 'start' }),
+            tap({ type: 'score', side: 'home', playerId: hawks[0], points: 3 }),
+            // The audit's case 18: one charged to the team, one to a player.
+            tap({ type: 'team-turnover', side: 'home' }),
+            tap({ type: 'turnover', side: 'home', playerId: hawks[2] }),
+            tap({ type: 'score', side: 'away', playerId: bears[0], points: 2 }),
+            tap({ type: 'end' }),
+          ],
+        },
+        world.tracker,
+        world.publishPlays,
+      );
+      expect(sent.answer.status).toBe(200);
+      const { page } = await viewOf(world, games.hawksBears);
+      expect(page.game.status).toBe('final');
+      const hawksBox = page.boxScores.find((box) => box.name === 'Hawks');
+      expect(hawksBox?.teamTurnovers).toBe(1);
+      expect(hawksBox?.totals['turnovers']).toBe(2);
+      // The season's team totals count the same 2 (the made-up season's other games
+      // recorded no turnovers).
+      expect(await teamTurnoversOf(page.game.seasonId)).toMatchObject({ total: 2 });
+      // The page's own builder: each Total it shows is its column added up, or a sentence
+      // under the table says why.
+      for (const table of tables(buildBoxScores(page))) {
+        if (table.players === null) continue;
+        for (const column of table.columns) {
+          const sum = table.players.reduce((n, p) => n + Number(p.cells[column.key] ?? 0), 0);
+          if (sum !== table.totals[column.key]) expect(table.notes.length).toBeGreaterThan(0);
+        }
+      }
+    });
+  });
+
   it('leaves out a statistic with no words, and has no stats if that was all', () => {
     const page = {
-      game: { recording: 'box-score' },
+      game: { recording: 'box-score', statKeys: ['odd', 'points'] },
       boxScores: [
         { side: 'home', name: 'Hawks', playerLinesShown: true, totals: { odd: 1 }, players: [] },
         { side: 'away', name: 'Bears', playerLinesShown: true, totals: {}, players: [] },

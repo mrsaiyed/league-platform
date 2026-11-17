@@ -63,6 +63,10 @@ export const enGame = {
   'game.player': '{name}',
   'game.playerJersey': '#{jersey} {name}',
   'game.playersHidden': "Only this team's total is shown. Its players' numbers are not public.",
+  // Under a box score whose Total's points are a typed final score its players' points do
+  // not add up to (S-26 as changed by step 2.196): the score stands, and no row is made up.
+  'game.playersPointsDiffer':
+    "The players' points add to {players}, not the {score} entered as the final score: the box score was entered by hand, or is not complete.",
   'game.plays': 'Play by play',
   'game.playsAsOpened': 'These are the plays up to when you opened this page.',
   'game.playsBeforeStart': 'Before the start',
@@ -72,6 +76,11 @@ export const enGame = {
   'game.spokenScore': '{away} {awayScore}, {home} {homeScore}.',
   'game.startsAt': 'Starts {when}',
   'game.teamFouls': 'Team fouls this period: {away} {awayFouls}, {home} {homeFouls}',
+  // Under a box score whose Total counts turnovers charged to the team itself, which are
+  // in no player's line (step 2.196).
+  'game.teamTurnovers_one': 'The Total includes 1 turnover charged to the team, not to a player.',
+  'game.teamTurnovers_other':
+    'The Total includes {count} turnovers charged to the team, not to a player.',
   // Under the board of a game still to come (or put off): the two teams, each with its record.
   'game.teams': 'The two teams',
   // A game's page (step 2.45, P7 §5.3). Words with {braces} are filled on the device too.

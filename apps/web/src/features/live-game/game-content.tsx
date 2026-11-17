@@ -199,6 +199,7 @@ export function GameContent({ view }: { readonly view: GameView }) {
                   players={table.players}
                   totals={table.totals}
                   hiddenNotice={t('game.playersHidden')}
+                  notes={table.notes}
                   labels={labels.boxScore}
                   nameRoom={nameRoom}
                 />

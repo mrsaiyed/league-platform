@@ -181,6 +181,8 @@ export type BoxScoreView = {
   /** Null: this team's players are hidden from visitors (S-22). */
   readonly players: readonly BoxScorePlayer[] | null;
   readonly totals: Readonly<Record<string, number>>;
+  /** Sentences under the table saying why a Total is not its column added up. */
+  readonly notes: readonly string[];
 };
 
 export type BoxScoresView =
@@ -189,21 +191,44 @@ export type BoxScoresView =
   | { readonly kind: 'tables'; readonly tables: readonly BoxScoreView[] };
 
 /**
- * A finished game's box scores, away team first as on the scoreboard. A statistic the
- * message file has no words for is left out, so no raw key is ever a heading (T-187).
+ * Why a team's Total is not what its column adds up to, where the page shows the column
+ * (step 2.196): its points are the typed final score, not its players' points (S-26), or
+ * its turnovers count some charged to the team itself. Nothing where the players' lines
+ * are hidden: there is no column to add up.
+ */
+function totalNotes(box: GamePage['boxScores'][number], keys: readonly string[]): string[] {
+  if (!box.playerLinesShown) return [];
+  const notes: string[] = [];
+  const score = box.totals['points'];
+  if (
+    keys.includes('points') &&
+    box.playersPoints !== null &&
+    score !== undefined &&
+    score !== box.playersPoints
+  ) {
+    notes.push(t('game.playersPointsDiffer', { players: box.playersPoints, score }));
+  }
+  if (keys.includes('turnovers') && box.teamTurnovers > 0) {
+    notes.push(t.plural('game.teamTurnovers', box.teamTurnovers));
+  }
+  return notes;
+}
+
+/**
+ * A finished game's box scores, away team first as on the scoreboard. The columns are the
+ * statistics the season keeps, in its order, as the statistics page draws them (P7 §1;
+ * the numbers audit's L7), each one this game recorded: a column wholly empty in both
+ * teams' lines was not kept for this game (P7 §5.2). A statistic the message file has no
+ * words for is left out, so no raw key is ever a heading (T-187).
  */
 export function buildBoxScores(page: GamePage): BoxScoresView {
   if (page.game.recording === 'final-score') return { kind: 'final-score-only' };
-  const keys: string[] = [];
-  const add = (stats: Readonly<Record<string, number>>) => {
-    for (const key of Object.keys(stats)) {
-      if (hasStatLabel(key) && !keys.includes(key)) keys.push(key);
-    }
-  };
+  const recorded = new Set<string>();
   for (const box of page.boxScores) {
-    add(box.totals);
-    for (const p of box.players) add(p.stats);
+    for (const key of Object.keys(box.totals)) recorded.add(key);
+    for (const p of box.players) for (const key of Object.keys(p.stats)) recorded.add(key);
   }
+  const keys = page.game.statKeys.filter((key) => hasStatLabel(key) && recorded.has(key));
   if (keys.length === 0) return { kind: 'no-stats' };
   const columns = keys.map(column);
   const ordered = [...page.boxScores].sort((a, b) =>
@@ -224,6 +249,7 @@ export function buildBoxScores(page: GamePage): BoxScoresView {
           }))
         : null,
       totals: box.totals,
+      notes: totalNotes(box, keys),
     })),
   };
 }
