@@ -76,6 +76,14 @@ describe('startWebApp', () => {
     // The seed's demo-shaped league is there too, for the pages a demo is shown (step 2.59).
     const { demoLeague } = await import('@srleagues/database');
     expect(await ports.findLeague(demoLeague.slug)).toMatchObject({ slug: demoLeague.slug });
+    // "Be this made-up person" lists its owner and one scorekeeper, besides the seed's.
+    const listed = (await ports.localTools?.madeUpPeople()) ?? [];
+    const inDemo = listed.filter((p) => p.places.some((place) => place.slug === demoLeague.slug));
+    expect(inDemo.map((p) => [p.email, p.places.flatMap((place) => place.memberships)])).toEqual([
+      [demoLeague.owner.email, ['owner']],
+      [demoLeague.members.find((m) => m.role === 'scorekeeper')?.email, ['scorekeeper']],
+    ]);
+    expect(listed.some((p) => p.email === 'owner@lakeside.example.test')).toBe(true);
     // The made-up member signs in on the sign-in stand-in, as on the stand-in.
     const signedIn = await ports.signIn.signIn({
       email: 'member@example.test',

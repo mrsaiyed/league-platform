@@ -336,6 +336,26 @@ if (browser) {
     }
   });
 
+  await step('"be this made-up person" lists the league\'s owner and a scorekeeper', async () => {
+    await page.goto(`${origin}/signin/made-up-people`);
+    await page.getByRole('heading', { level: 1, name: 'Be a made-up person' }).waitFor();
+    const scorer = demoLeague.members.find((member) => member.role === 'scorekeeper');
+    const listed = await page.evaluate(() =>
+      [...document.querySelectorAll('li[data-made-up-person]')].map(
+        (li) => li.getAttribute('data-made-up-person') ?? '',
+      ),
+    );
+    const ofLeague = listed.filter((email) => email.endsWith(`@${slug}.example.test`));
+    note(
+      'the made-up people list the league’s owner and one scorekeeper',
+      JSON.stringify(ofLeague.sort()) ===
+        JSON.stringify([demoLeague.owner.email, scorer?.email].sort()),
+      ofLeague.join(', '),
+    );
+    const problems = await accessibilityProblems(page);
+    note('accessibility: "be this made-up person"', problems.length === 0, problems.join('; '));
+  });
+
   // P9 §3, item 2: every game of the tracked school's season with its box score.
   await step("the tracked school's box scores", async () => {
     /** The games a team's page links to, each once. */

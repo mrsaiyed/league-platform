@@ -27,7 +27,7 @@ import type {
 } from '@srleagues/providers';
 import type { Config } from './config-schema.ts';
 import { databasePorts, type DatabaseQueries } from './database-ports.ts';
-import { madeUpDatabaseTools } from './made-up-database-people.ts';
+import { madeUpDatabaseTools, type SeedLeagueFacts } from './made-up-database-people.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
 import type { WebPorts } from './ports.ts';
 import {
@@ -50,7 +50,7 @@ export class StartupError extends Error {
  */
 export type DatabasePackage = Pick<
   typeof DatabaseModule,
-  'createDatabase' | 'checkLoginRole' | 'madeUpDatabase' | 'seedLeagues'
+  'createDatabase' | 'checkLoginRole' | 'demoLeague' | 'madeUpDatabase' | 'seedLeagues'
 > &
   DatabaseQueries;
 
@@ -209,6 +209,27 @@ export async function requireEmailConfirmation(signIn: EmailConfirmationQuestion
   throw new StartupError(answer === 'off' ? refusedOff : refusedUnknown(answer));
 }
 
+/**
+ * Whom "be this made-up person" lists on the made-up database (step 2.96): the seed
+ * leagues' owners and staff, and the demo-shaped league's owner and one scorekeeper (step
+ * 2.59), who can score a game of its tracked school.
+ */
+export function madeUpPeopleLeagues(
+  database: Pick<DatabasePackage, 'demoLeague' | 'seedLeagues'>,
+): SeedLeagueFacts[] {
+  const demo = database.demoLeague;
+  const scorer = demo.members.find((member) => member.role === 'scorekeeper');
+  return [
+    ...database.seedLeagues,
+    {
+      slug: demo.slug,
+      name: demo.name,
+      owner: demo.owner,
+      members: scorer === undefined ? [] : [scorer],
+    },
+  ];
+}
+
 /** Local work and tests on the made-up database in memory (record 055). */
 async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Promise<WebPorts> {
   // The sign-in stand-in first: it refuses a site address that is not local or a test name.
@@ -244,7 +265,7 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
     // The kept emails, and the seed leagues' people to sign in as by a code (step 2.96).
     // With them the ports answer only requests made on this computer, as the stand-in's.
     localTools: {
-      tools: madeUpDatabaseTools(database.seedLeagues, standInMember, signIn),
+      tools: madeUpDatabaseTools(madeUpPeopleLeagues(database), standInMember, signIn),
       publicBaseUrl: options.publicBaseUrl,
     },
     reportDesign: (message, fields) => deps.warn?.(message, fields),
