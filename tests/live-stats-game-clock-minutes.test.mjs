@@ -139,6 +139,131 @@ test('half a second: paused at 16:54.6, set to 12:00 and to 16:55, is back to th
   assert.deepEqual(minutes, everyone(minutes, 185_400));
 });
 
+// A mistaken set that ran before it was put right (the reviews of step 2.189, MEDIUM 1):
+// the later set takes the earlier one back as far as it goes the other way (S-71 as
+// changed on November 17). The area 6 lead's four examples, worked by hand first.
+/** Taps at whole seconds from tip-off, five a side; minutes and plays as the screen reads them. */
+function played(rules, taps) {
+  let s = newGame(rules, 0);
+  let n = 0;
+  const tap = (command, at) => (s = apply(s, command, { id: `k${++n}`, now: at * 1000 }));
+  tap({ type: 'lineup', side: 'home', playerIds: ['h1', 'h2', 'h3', 'h4', 'h5'] }, 0);
+  tap({ type: 'lineup', side: 'away', playerIds: ['a1', 'a2', 'a3', 'a4', 'a5'] }, 0);
+  tap({ type: 'start' }, 0);
+  for (const [at, command] of taps) tap(command, at);
+  const minutes = Object.fromEntries(
+    Object.entries(derive(s).players).map(([id, line]) => [id, formatMinutes(line.ms)]),
+  );
+  const plays = s.plays
+    .filter((p) => p.type !== 'lineup')
+    .map((p) => `${p.type} ${p.playerId ?? p.inId}@${formatClock(p.clockMs)}`);
+  return { minutes, plays, clock: formatClock(s.clock.remainingMs) };
+}
+const setTo = (seconds) => ({ type: 'set-clock', ms: seconds * 1000 });
+const subIn = (side, inId, outId) => ({ type: 'sub', side, inId, outId });
+const two = (side, playerId) => ({ type: 'score', side, playerId, points: 2 });
+const STOP_Q = { ...QUARTERS_G, clockMode: 'stop', playerFoulLimit: 5 };
+const RUNNING_H = { ...HALVES_G, clockMode: 'running', playerFoulLimit: 5 };
+const some = (minutes, ids) => Object.fromEntries(ids.map((id) => [id, minutes[id]]));
+
+test('the probe: 7:50 set by mistake, 10 seconds run, set right to 5:50: h1 1:00, h6 1:10, plays at 7:00 and 6:30', () => {
+  const got = played(STOP_Q, [
+    [60, subIn('home', 'h6', 'h1')],
+    [90, two('home', 'h6')],
+    [120, { type: 'pause' }],
+    [121, setTo(470)],
+    [130, { type: 'start' }],
+    [140, { type: 'pause' }],
+    [141, setTo(350)],
+  ]);
+  assert.deepEqual(some(got.minutes, ['h1', 'h6', 'h2', 'a1']), {
+    h1: '1:00',
+    h6: '1:10',
+    h2: '2:10',
+    a1: '2:10',
+  });
+  assert.deepEqual(got.plays, ['sub h6@7:00', 'score h6@6:30']);
+  assert.equal(got.clock, '5:50');
+});
+
+test('above: meaning 17:00, setting 19:00, plays between, set to 16:30: each play keeps its own time', () => {
+  const got = played(RUNNING_H, [
+    [120, subIn('away', 'a6', 'a1')],
+    [150, two('home', 'h1')],
+    [185, { type: 'pause' }],
+    [186, setTo(1140)],
+    [190, { type: 'start' }],
+    [200, two('away', 'a6')],
+    [210, subIn('home', 'h6', 'h1')],
+    [220, { type: 'pause' }],
+    [221, setTo(990)],
+    [230, { type: 'start' }],
+    [260, { type: 'foul', side: 'away', playerId: 'a2' }],
+  ]);
+  assert.deepEqual(some(got.minutes, ['a1', 'a6', 'h1', 'h6', 'h2', 'a2']), {
+    a1: '2:00',
+    a6: '2:00',
+    h1: '3:20',
+    h6: '0:40',
+    h2: '4:00',
+    a2: '4:00',
+  });
+  assert.deepEqual(got.plays, [
+    'sub a6@18:00',
+    'score h1@17:30',
+    'score a6@16:50',
+    'sub h6@16:40',
+    'foul a2@16:00',
+  ]);
+  assert.equal(got.clock, '16:00');
+});
+
+test('below: meaning 5:50, setting 0:50, plays between, set to 5:40: each play keeps its own time', () => {
+  const got = played(STOP_Q, [
+    [90, subIn('home', 'h6', 'h1')],
+    [110, two('away', 'a1')],
+    [120, { type: 'pause' }],
+    [121, setTo(50)],
+    [130, { type: 'start' }],
+    [135, two('home', 'h2')],
+    [138, subIn('away', 'a6', 'a1')],
+    [140, { type: 'pause' }],
+    [141, setTo(340)],
+    [150, { type: 'start' }],
+    [180, two('home', 'h6')],
+  ]);
+  assert.deepEqual(some(got.minutes, ['h1', 'h6', 'a1', 'a6', 'h2', 'a2']), {
+    h1: '1:30',
+    h6: '1:20',
+    a1: '2:18',
+    a6: '0:32',
+    h2: '2:50',
+    a2: '2:50',
+  });
+  assert.deepEqual(got.plays, [
+    'sub h6@6:30',
+    'score a1@6:10',
+    'score h2@5:45',
+    'sub a6@5:42',
+    'score h6@5:10',
+  ]);
+  assert.equal(got.clock, '5:10');
+});
+
+test('two real corrections in opposite directions are read as the second taking back the first', () => {
+  const got = played(RUNNING_H, [
+    [305, { type: 'pause' }],
+    [306, setTo(915)],
+    [307, subIn('away', 'a6', 'a1')],
+    [315, { type: 'start' }],
+    [375, two('away', 'a6')],
+    [435, setTo(780)],
+  ]);
+  assert.deepEqual(some(got.minutes, ['a1', 'a6', 'h1']), { a1: '5:00', a6: '2:00', h1: '7:00' });
+  assert.deepEqual(got.plays, ['sub a6@15:00', 'score a6@14:00']);
+  assert.equal(got.clock, '13:00');
+});
+
 test('set forward then back leaves every minute and every play time as they were', () => {
   const g = game(QUARTERS_G)
     .tap({ type: 'score', side: 'home', playerId: 'h2', points: 3 }, 20_000)
@@ -448,4 +573,67 @@ test('property: a play’s game time never goes down along the log', () => {
         }
         assert.ok(s.clock.elapsedMs >= last, `seed ${seed}: the clock behind its plays`);
       }
+});
+
+test('property: a mistake that ran, put right to what the clock would show, is as if never made', () => {
+  let tried = 0;
+  for (const seed of Array.from({ length: 400 }, (_, i) => i + 1)) {
+    const r = random(seed * 7919);
+    const whole = (most) => 1000 * Math.floor(r() * (most / 1000));
+    const rules = r() < 0.5 ? QUARTERS_G : HALVES_G;
+    const length = periodMs(rules, 1);
+    // A first stretch of the period, the same in both games, then a stop.
+    const played = 1000 + whole(length / 2);
+    const prefix = [{ type: 'pause' }];
+    let base = newGame(rules, 0);
+    let n = 0;
+    const tap = (s, command, at) => apply(s, command, { id: `m${seed}-${n++}`, now: at });
+    base = tap(
+      base,
+      { type: 'lineup', side: 'home', playerIds: ['h1', 'h2', 'h3', 'h4', 'h5'] },
+      0,
+    );
+    base = tap(
+      base,
+      { type: 'lineup', side: 'away', playerIds: ['a1', 'a2', 'a3', 'a4', 'a5'] },
+      0,
+    );
+    base = tap(base, { type: 'start' }, 0);
+    base = tap(base, subIn('home', 'h6', 'h1'), whole(played));
+    for (const command of prefix) base = tap(base, command, played);
+    const reading = base.clock.remainingMs;
+    // The mistake: any whole second up to the period's start, two seconds or more off.
+    const mistake = whole(length + 1000);
+    const run = 1000 + whole(Math.min(reading, mistake) - 2000);
+    if (Math.abs(mistake - reading) < 2000 || run >= Math.min(reading, mistake)) continue;
+    // The same taps in the stretch the clock then runs, in both games.
+    const during = [
+      [1000 + whole(run - 1000), two('away', 'a3')],
+      [1000 + whole(run - 1000), subIn('away', 'a6', 'a2')],
+    ].sort((x, y) => x[0] - y[0]);
+    const afterwards = (s, wrong) => {
+      let t = played + 1000;
+      if (wrong) s = tap(s, { type: 'set-clock', ms: mistake }, t);
+      s = tap(s, { type: 'start' }, t);
+      for (const [at, command] of during) s = tap(s, command, t + at);
+      s = tap(s, { type: 'pause' }, t + run);
+      return s;
+    };
+    n = 1000;
+    const never = afterwards(base, false);
+    n = 1000;
+    let mistaken = afterwards(base, true);
+    // Put right to what the clock would show, had the mistake never been made.
+    mistaken = tap(
+      mistaken,
+      { type: 'set-clock', ms: never.clock.remainingMs },
+      played + 1000 + run + 1000,
+    );
+    tried += 1;
+    const stamps = (s) =>
+      s.plays.map(({ type, clockMs, elapsedMs }) => ({ type, clockMs, elapsedMs }));
+    assert.deepEqual(derive(mistaken), derive(never), `seed ${seed}: ${mistake} ran ${run}`);
+    assert.deepEqual(stamps(mistaken), stamps(never), `seed ${seed}: ${mistake} ran ${run}`);
+  }
+  assert.ok(tried >= 200, `${tried} mistakes tried`);
 });

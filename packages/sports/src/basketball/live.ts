@@ -460,8 +460,13 @@ type Segment = {
   startRan: number;
   /** L: the reading it started with. */
   lengthMs: number;
-  /** Its sets, in order of running time. */
+  /** Its sets, in order of running time, as they were made. */
   sets: ClockSet[];
+  /**
+   * The same sets with the time each COUNTS as, once later sets of the period have taken
+   * back what they take back (S-71 as changed on November 17).
+   */
+  counted: ClockSet[];
 };
 
 function segmentOf(
@@ -473,8 +478,31 @@ function segmentOf(
 ): Segment {
   const sets = all.filter((e) => e.segment === index).sort((x, y) => x.ranMs - y.ranMs);
   const first = sets.find((e) => e.ranMs === startRan);
-  return { index, period, startRan, lengthMs: first?.ms ?? periodMs(rules, period), sets };
+  const lengthMs = first?.ms ?? periodMs(rules, period);
+  // What a set says the period started with, had the clock run truly ever since: its time
+  // plus the period's running time up to it. From the last set back to the first, a set
+  // counts as the middle one of three: the period's start, what it says itself, and what
+  // the next set counts as; the last counts whole. So a later set takes an earlier one
+  // back as far as it goes the other way. A set at the period's first moment is L itself.
+  const counted: ClockSet[] = [];
+  let next: number | undefined;
+  for (let i = sets.length - 1; i >= 0; i--) {
+    const e = sets[i]!;
+    if (e.ranMs === startRan) {
+      counted.unshift(e);
+      continue;
+    }
+    const says = e.ms + (e.ranMs - startRan);
+    const start = next === undefined ? says : middle(lengthMs, says, next);
+    next = start;
+    counted.unshift({ ...e, ms: start - (e.ranMs - startRan) });
+  }
+  return { index, period, startRan, lengthMs, sets, counted };
 }
+
+/** The middle one of three numbers. */
+const middle = (a: number, b: number, c: number): number =>
+  Math.max(Math.min(a, b), Math.min(Math.max(a, b), c));
 
 /** The segment the game is in now, with the sets given. */
 function segmentNow(state: GameState, sets: readonly ClockSet[]): Segment {
@@ -502,10 +530,13 @@ function readingAt(segment: Segment, r: number): number {
   return Math.max(0, ms - (r - from));
 }
 
-/** The reading at `r`, corrected by every later set and never above the segment's start. */
+/**
+ * The reading at `r`, from the sets as they count, corrected by every later one and never
+ * above the segment's start.
+ */
 function correctedAt(segment: Segment, r: number): number {
-  let reading = readingAt(segment, r);
-  for (const e of segment.sets) if (e.ranMs > r) reading = Math.max(reading, e.ms);
+  let reading = readingAt({ ...segment, sets: segment.counted }, r);
+  for (const e of segment.counted) if (e.ranMs > r) reading = Math.max(reading, e.ms);
   return Math.min(segment.lengthMs, reading);
 }
 
