@@ -29,7 +29,6 @@ import type { ScoringOfferReply } from '../features/schedule-pages/index.ts';
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { isGameIdFormat, refusalAnswer, type ApiAnswer, type ApiRefusal } from './league-api.ts';
 import { t } from './messages.ts';
-import { NotOnTheDatabaseYet } from './not-on-the-database-yet.ts';
 
 const privately = { 'Cache-Control': 'private, no-store' } as const;
 const answer = (body: ScoringOfferReply): ApiAnswer => ({ status: 200, body, headers: privately });
@@ -107,15 +106,7 @@ export async function scoringOffersRequest(
   if (context.account === null || !mayOpenTracker(holder)) return none;
   const gameIds = askedGameIds(games);
   if (gameIds.length === 0) return none;
-  try {
-    return await scoringOffers(context, gameIds, ports.games);
-  } catch (error) {
-    // On the database the games area has not moved yet (database-ports.ts, notMovedYet):
-    // until it has, a scorer's page gets no buttons rather than an error. Only that one
-    // refusal is caught; this catch goes when the games area moves (step 2.93).
-    if (error instanceof NotOnTheDatabaseYet) return none;
-    throw error;
-  }
+  return scoringOffers(context, gameIds, ports.games);
 }
 
 /** The read for someone who may see the league and scores somewhere in it. */

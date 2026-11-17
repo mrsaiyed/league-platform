@@ -12,6 +12,7 @@ import {
 import {
   findLeagueAudience,
   findPerson,
+  findPersonIsMinor,
   hasRecordedChild,
   insertPerson,
   isPersonOnRoster,
@@ -28,6 +29,12 @@ registerIsolationCase({
   subject: findPerson,
   name: "find the target's person, with the sensitive fields",
   run: (scope, target) => findPerson(scope, target.personId, true),
+});
+
+registerIsolationCase({
+  subject: findPersonIsMinor,
+  name: "ask whether the target's person is a child",
+  run: (scope, target) => findPersonIsMinor(scope, target.personId),
 });
 
 registerIsolationCase({

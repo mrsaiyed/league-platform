@@ -11,6 +11,9 @@
 // proxy may renew its session on the way in and set new cookies on this very answer
 // (proxy.ts, renew-session.ts), and an answer that sets cookies must never be kept by
 // a shared cache, which would hand one person's session to the next viewer.
+//
+// The game and the league's name settings are read in one snapshot (gameReadsOf, record
+// 076), so a name is shown by the settings as they stood when the game was read.
 import { mayOpenLeague, publicViewer, readGameSnapshot } from '@srleagues/core';
 import { isGameIdFormat, type ApiAnswer, type LeagueApiRequest } from './league-api.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
@@ -27,22 +30,18 @@ export async function gameSnapshot(
     readonly carriesSignIn: boolean;
   },
   game: string,
-  ports: Pick<TrackerPorts, 'snapshotStoreOf' | 'namesShownOf' | 'clock'>,
+  ports: Pick<TrackerPorts, 'gameReadsOf' | 'clock'>,
 ): Promise<ApiAnswer> {
   const { league } = request.context;
   if (!mayOpenLeague(league.status, request.holder)) return notFound;
   if (!isGameIdFormat(game)) return notFound;
-  const names = await ports.namesShownOf(league.id);
-  const read = await readGameSnapshot(
-    ports.snapshotStoreOf(league.id),
-    { gameId: game },
-    {
-      leagueId: league.id,
-      viewer: publicViewer(league.id),
-      audience: names.audience,
-      policy: names.policy,
-    },
-    ports.clock.now(),
+  const read = await ports.gameReadsOf(league.id, ({ store, audience, policy }) =>
+    readGameSnapshot(
+      store,
+      { gameId: game },
+      { leagueId: league.id, viewer: publicViewer(league.id), audience, policy },
+      ports.clock.now(),
+    ),
   );
   if (!read.ok) return notFound;
   const shared =

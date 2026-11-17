@@ -44,17 +44,20 @@ export async function GamePage({
   const addressee = view.context.league;
   if (!isGameIdFormat(game)) return notFound();
   const { tracker, publicSchedule, publicStats } = await webPorts();
-  const names = await tracker.namesShownOf(addressee.id);
-  const viewing = {
-    leagueId: addressee.id,
-    viewer: publicViewer(addressee.id),
-    audience: names.audience,
-    policy: names.policy,
-  };
-  const store = tracker.snapshotStoreOf(addressee.id);
-  const [snapshot, page, clock] = await Promise.all([
-    readGameSnapshot(store, { gameId: game }, viewing, tracker.clock.now()),
-    readGamePage(store, { gameId: game }, viewing),
+  // The game and the league's name settings in one snapshot (record 076), the snapshot
+  // and the page one after another, as they share its one connection.
+  const read = tracker.gameReadsOf(addressee.id, async ({ store, audience, policy }) => {
+    const viewing = {
+      leagueId: addressee.id,
+      viewer: publicViewer(addressee.id),
+      audience,
+      policy,
+    };
+    const shown = await readGameSnapshot(store, { gameId: game }, viewing, tracker.clock.now());
+    return { snapshot: shown, page: await readGamePage(store, { gameId: game }, viewing) };
+  });
+  const [{ snapshot, page }, clock] = await Promise.all([
+    read,
     publicSchedule.clockOf(addressee.id),
   ]);
   if (!snapshot.ok || !page.ok) return notFound();

@@ -160,7 +160,7 @@ export function madeUpWorld(options: WorldOptions): World {
       liveGames: worldLiveGames(s, now),
       standings: worldStandingsStore(s),
       teams: worldTeamsStore(s, now),
-      people: worldPeopleStore(s),
+      people: worldPeopleStore(s, now),
       scheduling: worldSchedulingStore(s),
       imports: worldImportsStore(s, now),
       ...worldLeaguesStores(s, access, now),

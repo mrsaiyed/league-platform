@@ -251,15 +251,17 @@ beforeAll(async () => {
       name: 'world',
       deps: madeUp.deps,
       as,
-      standings: (work) => work(worldStandingsRead(() => madeUp.read(league.leagueId))),
-      games: (work) => work(worldGameSnapshot(() => madeUp.read(league.leagueId))),
+      standings: (work) => work(worldStandingsRead(() => madeUp.read(league.leagueId), madeUp.now)),
+      games: (work) => work(worldGameSnapshot(() => madeUp.read(league.leagueId), madeUp.now)),
       schedule: async (id, today) =>
         worldPublicSchedule(await madeUp.read(league.leagueId), id, today),
       roster: async (teamId) =>
-        worldPublicRoster(await madeUp.read(league.leagueId), teamId, {
-          viewer: publicViewer(league.leagueId),
-          policy: adultPolicy,
-        }),
+        worldPublicRoster(
+          await madeUp.read(league.leagueId),
+          teamId,
+          { viewer: publicViewer(league.leagueId), policy: adultPolicy },
+          madeUp.now(),
+        ),
       names: new Map(),
     },
   ];
@@ -721,6 +723,46 @@ describe('the one world and the database, the same season by the same commands',
     ]);
     expect(said.slice(6, 7)).toEqual(['person-on-a-roster']);
     expect(said.slice(8)).toEqual(['ok', 'ok', 'roster-entry-not-found']);
+  });
+
+  it('agree on who is a child: by the birth date or the tick (R-28)', async () => {
+    const yearsBefore = (day: string, years: number) =>
+      `${String(Number(day.slice(0, 4)) - years).padStart(4, '0')}${day.slice(4)}`;
+    const [a, b] = await both(async (side) => {
+      const { as, deps } = side;
+      const seasonId = await seasonOfSide(side);
+      const made = ok(
+        'team Larks',
+        await createTeam(as, { seasonId, name: 'Larks', shortName: 'larks' }, deps),
+      );
+      side.names.set(made.teamId, 'team:Larks');
+      for (const [firstName, birthDate, isMinor] of [
+        // Eighteen tomorrow, the tick off: a child today.
+        ['Lark1', yearsBefore(addDays(today, 1), 18), false],
+        // Eighteen today, the tick off: an adult.
+        ['Lark2', yearsBefore(today, 18), false],
+        // Eighteen today, the tick on: a child (a date unticks no one).
+        ['Lark3', yearsBefore(today, 18), true],
+      ] as const) {
+        const person = ok(
+          'person',
+          await createPerson(as, { firstName, lastName: 'Player', birthDate, isMinor }, deps),
+        );
+        side.names.set(person.personId, `person:${firstName}`);
+        ok(
+          'roster',
+          await addToRoster(as, { teamId: made.teamId, personId: person.personId }, deps),
+        );
+      }
+      return side.roster(made.teamId);
+    });
+    expect(b).toEqual(a);
+    // An adult league shows adults in full and a child by first name and last initial.
+    const shown = JSON.stringify(a);
+    expect(shown).toContain('Lark1 P.');
+    expect(shown).toContain('Lark2 Player');
+    expect(shown).toContain('Lark3 P.');
+    expect(shown).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
   it("read the same team's roster", async () => {

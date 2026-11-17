@@ -769,12 +769,17 @@ const scheduleDraftRows: readonly Row[] = [
   ),
   ...scheduleRows(
     'scheduling.remove_draft_round',
-    'remove an empty round in the draft',
+    'remove a round whose only game is in the bin, in the draft',
     'schedule.edit',
-    async (s, league) => ({
-      ...firstEdit(s),
-      roundId: await newRound(pglite, league.leagueId, s.seasonId, 2),
-    }),
+    async (s, league) => {
+      const roundId = await newRound(pglite, league.leagueId, s.seasonId, 2);
+      // A game in the bin does not hold its round (S-60, step 2.181).
+      await pglite.query('update games set round_id = $1, deleted_at = now() where id = $2', [
+        roundId,
+        s.second,
+      ]);
+      return { ...firstEdit(s), roundId };
+    },
     (c, i) => removeDraftRound(c, i, schedulingDeps),
   ),
   ...scheduleRows(
