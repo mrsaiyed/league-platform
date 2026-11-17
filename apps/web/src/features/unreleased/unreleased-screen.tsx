@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { shownHere } from '../../server/releases.ts';
-import { LeagueSitePage, NotBuilt } from '../shell/index.ts';
+import { LeagueSitePage, NotBuilt, StandalonePage } from '../shell/index.ts';
 import { AdminArea } from '../staff/index.ts';
 import { unreleasedPageAt } from './unreleased-page.ts';
 
@@ -17,7 +17,12 @@ export function unreleasedScreen(address: readonly string[]): ReactNode | null {
   const [league = ''] = address;
   switch (page.kind) {
     case 'platform':
-      return <NotBuilt title={page.title} />;
+      // SR Leagues' own plain frame, as its "not found" has: a page of no league.
+      return (
+        <StandalonePage>
+          <NotBuilt title={page.title} />
+        </StandalonePage>
+      );
     case 'league':
       return <LeagueSitePage league={league} title={page.title} />;
     case 'admin':
