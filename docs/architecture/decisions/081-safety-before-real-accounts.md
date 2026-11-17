@@ -55,3 +55,22 @@ Cloudflare's list (`cloudflareIpv4Ranges`, `cloudflareIpv6Ranges`) is copied by 
 ## Harmful text comes out as text (T4 §12)
 
 React writes every value as text, and nothing in the product takes HTML from anyone (T-78); the places our own code writes markup itself (the league's and the staff screens' style variables, drawn from a checked design whose values are colors and fixed words; the plain "not answered here" page; and the emails, whose values are escaped, `packages/emails`) escape or refuse anything else. `tests/browser/harmful-text-test.mjs` proves it the way an attacker would meet it: an attacker's text (ending a quoted attribute, an element with a handler, a script) is typed through the screens' own forms into every free-text field there is today: a team's name, a person's first and last names, a round's name, a reason to reopen a result, an imported file's name and a venue in it, a name typed at the scorer's table, the email boxes and the numbers' boxes (refused, and drawn back), and the addresses' own questions. Every page that shows them is then opened as a visitor, the owner and the scorekeeper with the browser's script policy switched off, and each shows the text as typed with nothing of it run or made into an element; with the policy on, the browser had nothing to refuse; the raw answer never holds it unescaped. The test reads every admin and public page it opens for free-text fields and fails on one it does not know, so a new field must be added to it.
+
+## The starter list of offensive short names (U-16)
+
+A product answer, decided for the founder to review (U-16, a pending decision file): 43 English words in `offensiveShortNames`, refused as the whole short name or as any word of it between hyphens, in any capitals; our own words stay refused only as the whole name. The script that makes a league says "that word is not allowed (one of ours, or offensive). Choose another." (`tests/make-league-words.test.mjs` runs the script itself).
+
+## Not done here, and where it goes
+
+- **Staging and production ports.** They do not exist yet (startup refuses both until step 2.93's last part). When they are built, they take their bot check from `botCheckFor` with the two Turnstile settings, which the settings check already requires.
+- **Kept pages and the nonce** (step 2.176): above.
+- **The rest of the policy** (`style-src`, `img-src`, `connect-src`, `form-action`, reports): above.
+- **Public registration's bot check** (T4 §6) comes with the registration forms, stage 4.
+- **Unproved until the site is on a real host:** that Cloudflare and Render put the addresses where this record says (the `TRUSTED_PROXY=cloudflare` checks above); Turnstile's widget and its answers; HSTS kept by a browser over HTTPS; Cloudflare adding headers of its own that clash with ours (it should add none: leave its "security headers" features off, or set them to the same words).
+
+## Questions for the founder (product, not decided here)
+
+1. With the bot check, a person whose browser runs no scripts cannot sign in or sign up (Turnstile needs scripts). Built that way, as the cautious answer. Should there be another way in for them?
+2. When Cloudflare's check cannot be reached, nobody can sign in or sign up until it can. Built that way (fails closed). Should it instead let people through on the attempt limits alone while it is down?
+3. The words a refused person reads ("We could not check that you are a person…").
+4. The starter list of offensive short names (U-16): its words, and whether a word inside a longer name should be refused.
