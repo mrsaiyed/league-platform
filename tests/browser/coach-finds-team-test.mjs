@@ -16,7 +16,9 @@
 // - `/my` signed out leads to sign-in and back, on to the team's page;
 // - a member of no team who opens `/my` is told so in a sentence, with a way on;
 // - the team page a coach is served holds no trace of them: the marks are read after it,
-//   privately.
+//   privately;
+// - the "Make this my team" and "stop" buttons answer a hidden league exactly as one that is
+//   not there, and still work for a draft league's own staff (audit finding D-H1).
 // And the page-step checks: the accessibility checks (T-186) on each screen, no sideways
 // scrolling at phone width, everything tapped at least 44 high, and the account button by
 // keyboard on a laptop. `--no-build` serves the build already here.
@@ -403,6 +405,141 @@ if (browser) {
       await context.close();
     }
   });
+
+  // From the audit of each league's data (finding D-H1): the "Make this my team" and "stop"
+  // buttons go through the league's gate. Posted as a page with no script posts them, with a
+  // draft, a suspended, a binned and a missing league's short name, each answers exactly as
+  // the others (status, where it forwards to, and no cookie) for a visitor, a signed-in
+  // stranger and another league's admin; the draft league's own staff still set and clear
+  // their team.
+  await step(
+    'the my-team buttons answer a hidden league exactly as one that is not there',
+    async () => {
+      const tokens = {
+        visitor: null,
+        stranger: 'local-stranger-token',
+        otherAdmin: 'local-other-admin-token',
+        owner: 'local-owner-token',
+      };
+      /** The hidden fields of the form that holds the button `label`, on the page at `path`. */
+      const formOf = async (path, label, cookie) => {
+        const html = await (
+          await fetch(`${origin}${path}`, { headers: cookie ? { cookie } : {} })
+        ).text();
+        const form = html.split('<form').find((part) => part.includes(`>${label}</button>`));
+        if (form === undefined) throw new Error(`no "${label}" form on ${path}`);
+        return [...form.matchAll(/<input type="hidden" name="([^"]+)"(?: value="([^"]*)")?/g)].map(
+          ([, name, value]) => [name, value ?? ''],
+        );
+      };
+      /** The button's form posted to `path`, with the form's league and team changed. */
+      const post = async (fields, path, league, team, token) => {
+        const body = new FormData();
+        for (const [name, value] of fields) {
+          body.append(name, name === 'league' ? league : name === 'team' ? team : value);
+        }
+        const answer = await fetch(`${origin}${path}`, {
+          method: 'POST',
+          body,
+          headers: { origin, ...(token === null ? {} : { cookie: `srl_session=${token}` }) },
+          redirect: 'manual',
+        });
+        await answer.arrayBuffer();
+        return {
+          status: answer.status,
+          location: answer.headers.get('location'),
+          setCookie: answer.headers.get('set-cookie'),
+        };
+      };
+      const choose = await formOf('/harbor-city/teams/comets', 'Make this my team');
+      const stop = await formOf(
+        '/harbor-city/teams/comets',
+        'Stop using this as my team',
+        'srl_my_team_01900000-0000-7000-8000-000000000002=comets',
+      );
+      const hidden = {
+        draft: ['quiet-pines', 'lions'],
+        suspended: ['closed-gate', 'lions'],
+        binned: ['binned-league', 'lions'],
+        missing: ['no-such-league', 'lions'],
+      };
+      for (const [button, fields] of [
+        ['make', choose],
+        ['stop', stop],
+      ]) {
+        for (const who of ['visitor', 'stranger', 'otherAdmin']) {
+          const answers = [];
+          for (const [kind, [league, team]] of Object.entries(hidden)) {
+            const path = `/${league}/teams/${team}`;
+            answers.push([kind, await post(fields, path, league, team, tokens[who])]);
+          }
+          const [, first] = answers[0];
+          note(
+            `"${button}" sets no cookie for ${who} in a hidden league`,
+            first.setCookie === null,
+            String(first.setCookie),
+          );
+          note(
+            `"${button}" is "not found" for ${who} in a hidden league`,
+            first.status === 404,
+            String(first.status),
+          );
+          for (const [kind, answer] of answers.slice(1)) {
+            note(
+              `"${button}" answers ${who} for a ${kind} league as for a draft one`,
+              JSON.stringify(answer) === JSON.stringify(first),
+              `${JSON.stringify(answer)} / ${JSON.stringify(first)}`,
+            );
+          }
+        }
+        // A league named in the form that is not the address's: "not found" too.
+        const elsewhere = await post(
+          fields,
+          '/harbor-city/teams/comets',
+          'quiet-pines',
+          'lions',
+          null,
+        );
+        note(
+          `"${button}" believes no league but the address's`,
+          elsewhere.status === 404 && elsewhere.setCookie === null,
+          JSON.stringify(elsewhere),
+        );
+      }
+      // The draft league's own owner may open it: the buttons work there as anywhere.
+      const set = await post(
+        choose,
+        '/quiet-pines/teams/lions',
+        'quiet-pines',
+        'lions',
+        tokens.owner,
+      );
+      note(
+        "a draft league's own staff set their team",
+        set.status === 303 &&
+          set.location === '/quiet-pines/teams/lions' &&
+          (set.setCookie ?? '').startsWith(
+            'srl_my_team_01900000-0000-7000-8000-000000000003=lions;',
+          ),
+        JSON.stringify(set),
+      );
+      const cleared = await post(
+        stop,
+        '/quiet-pines/teams/lions',
+        'quiet-pines',
+        'lions',
+        tokens.owner,
+      );
+      note(
+        "a draft league's own staff clear their team",
+        cleared.status === 303 &&
+          (cleared.setCookie ?? '').startsWith(
+            'srl_my_team_01900000-0000-7000-8000-000000000003=;',
+          ),
+        JSON.stringify(cleared),
+      );
+    },
+  );
 
   await step(
     'on a laptop, by keyboard, "My team" is the first entry of the account button',
