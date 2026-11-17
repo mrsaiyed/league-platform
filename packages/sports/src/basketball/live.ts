@@ -633,9 +633,12 @@ export function clockSetEffect(state: GameState, ms: number, now: number): Clock
   const s: GameState = { ...state, clock: clockAt(state, at), lastAt: at };
   const before = s.clock.elapsedMs;
   const periodStart = Math.min(before, derive(s).periodStartElapsedMs);
+  // On the tracker's rule a wiped period is back at its start in minutes but not on the
+  // clock, so the clock must also still read the period's start (the reviews' LOW 5).
+  const startedAt = s.plays.findLast((p) => p.type === 'period')?.clockMs ?? periodMs(s.rules, 1);
   const notRun = onGameClock(s.rules)
     ? ranOfClock(s.clock) === segmentNow(s, []).startRan
-    : before === periodStart;
+    : before === periodStart && s.clock.remainingMs === startedAt;
   try {
     if (s.status === 'final') return { kind: 'none' };
     setClock(s, ms);

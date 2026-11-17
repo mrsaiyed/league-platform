@@ -410,6 +410,13 @@ test('the form’s helper says what a set will do, from the engine itself', () =
     wholePeriod: true,
     takesBackMs: 0,
   });
+  // Once that rule has wiped the half, a lower set moves nobody's minutes, but the half
+  // has run: it is not said to start there (the reviews' LOW 5).
+  old.tap({ type: 'set-clock', ms: 1_015_000 }, 187_000);
+  assert.equal(old.state.clock.elapsedMs, 0);
+  assert.deepEqual(clockSetEffect(old.state, 600_000, 188_000), { kind: 'none' });
+  // Before it has run, it is.
+  assert.deepEqual(clockSetEffect(game(HALVES).state, 600_000, 0), { kind: 'start' });
 });
 
 test('the rules command keeps minutes on the game clock; reset keeps it too', () => {
