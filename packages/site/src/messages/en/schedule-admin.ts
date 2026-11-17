@@ -231,4 +231,5 @@ export const enScheduleAdmin = {
   'schedule.admin.title': 'Schedule',
   'schedule.admin.venueCourt': '{venue}: {court}',
   'schedule.admin.venueOnly': '{venue} (any court)',
+  'schedule.admin.venuesLink': 'Venues and courts',
 } as const;

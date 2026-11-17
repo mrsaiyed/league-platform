@@ -374,6 +374,7 @@ const adminPages = [
   // Step 2.49: a season's divisions (the first league's two, each holding teams) and the
   // league's venues with their courts; the answers are taken by divisionVenueSteps' taps.
   { name: 'admin-divisions', at: '/admin/season/divisions' },
+  { name: 'admin-venues', at: '/admin/schedule/venues' },
   // Step 2.182, Season settings' first panel: the first league's season not public yet; the
   // question before showing it and before hiding the current one; the answer after the
   // owner really shows it (winterSteps taps Show and Yes); and the schedule's "published"

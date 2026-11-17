@@ -527,6 +527,13 @@ const cases = [
   ['scheduler', '/north-valley/admin/season/divisions', 403, [noAccess]],
   [
     'scheduler',
+    '/north-valley/admin/schedule/venues',
+    200,
+    ['Venues', 'Central Gym', 'Court 2', staffFrameAt('/north-valley/admin/schedule'), oneHeading],
+    [adminPlaceholder],
+  ],
+  [
+    'scheduler',
     '/north-valley/admin/games',
     200,
     ['Enter the final score', staffFrameAt('/north-valley/admin/games'), oneHeading],

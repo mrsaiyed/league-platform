@@ -24,6 +24,7 @@ import {
 } from '../season-settings/index.ts';
 import { StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
+import { venuesAddress } from '../venues-area/index.ts';
 import {
   addGameAction,
   addRoundAction,
@@ -119,6 +120,9 @@ export async function ScheduleBuilderPage({
     <div className="staff-actions">
       <a className="ui-button" href={importLinkOf(addressee)}>
         {t('schedule.admin.importLink')}
+      </a>
+      <a className="ui-button" href={venuesAddress(addressee)}>
+        {t('schedule.admin.venuesLink')}
       </a>
       {reviewHref === null ? null : (
         <a className="ui-button" data-kind="main" href={reviewHref}>
