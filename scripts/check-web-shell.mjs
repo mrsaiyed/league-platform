@@ -467,7 +467,8 @@ const cases = [
   ['visitor', '/harbor-city/standings', 200, ['Level with another team', 'PTS']],
   ['scheduler', '/north-valley/admin', 200, ['Powered by SR Leagues', '--color-primary: #96062d']],
   // Someone not signed in at the admin's home (a scorekeeper's games) is sent to sign in
-  // and brought back (step 2.33); at an admin area they are still refused (U-6).
+  // and brought back (step 2.33), and since step 2.157 at every admin area too (U-15,
+  // changed November 17: this row was 403 "you do not have access" before).
   [
     'visitor',
     '/north-valley/admin',
@@ -476,7 +477,23 @@ const cases = [
     ['Admin areas'],
     '/signin?next=%2Fnorth-valley%2Fadmin',
   ],
-  ['visitor', '/north-valley/admin/teams', 403, [noAccess], ['Admin areas']],
+  [
+    'visitor',
+    '/north-valley/admin/teams',
+    307,
+    [],
+    ['Admin areas', noAccess],
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fteams',
+  ],
+  // A scorekeeper whose phone was signed out, at their own games (finding H3 of the audit).
+  [
+    'visitor',
+    '/north-valley/admin/games',
+    307,
+    [],
+    ['Admin areas', noAccess],
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fgames',
+  ],
   // Someone the admin is not open to at all is refused on the plain screen of SR Leagues'
   // own: nothing of the admin's frame, and no way "back to the admin" (U-9).
   ['stranger', '/north-valley/admin', 403, [noAccess], ['Admin areas', 'Back to the admin']],
@@ -1231,7 +1248,7 @@ function firstDifference(a, b) {
  * nobody has (U-9, steps 2.87 and 2.157): the same status, headers, markup and page data,
  * once each name is put in the same place. Only the date, the length and how the stream
  * happened to be cut (settle above) may differ. Asked by each kind of person, at the
- * admin's home, an admin area, the league's home and a game's scoring address, for each
+ * admin's home, two admin areas, the league's home and a game's scoring address, for each
  * league hidden from them: a draft, a suspended league, a league in the bin, and another
  * league's draft. The refusal Next.js draws into every page names the person signed in, so
  * this also proves it says nothing more of a hidden league than of no league at all.
@@ -1259,7 +1276,7 @@ async function sameAsNoLeague(origin) {
     scheduler: ['closed-gate', 'binned-league', 'still-waters'],
     otherAdmin: ['quiet-pines', 'closed-gate', 'binned-league'],
   };
-  const addresses = ['/admin', '/admin/people', '', `/score/${liveGame}`];
+  const addresses = ['/admin', '/admin/people', '/admin/games', '', `/score/${liveGame}`];
   const found = [];
   for (const [who, hidden] of Object.entries(hiddenFrom)) {
     for (const rest of addresses) {
