@@ -5,6 +5,8 @@ import type { DatabaseHandle } from '@srleagues/database';
 import type { EmailConfirmation, EmailConfirmationQuestion } from '@srleagues/providers';
 import { loadConfig } from './config-schema.ts';
 import {
+  botCheckOffLine,
+  hostedBotCheck,
   requireEmailConfirmation,
   startWebApp,
   type DatabasePackage,
@@ -161,6 +163,59 @@ describe('startWebApp', () => {
     );
     expect(d.checkLoginRole).toHaveBeenCalledOnce();
     expect(d.realSignIn).toHaveBeenCalledOnce();
+  });
+});
+
+describe("staging's bot check (record 081, T-270)", () => {
+  /** Starts staging as far as it goes today, and gives back what it warned. */
+  async function warnedIn(settings: Record<string, string | undefined>) {
+    const d = deps([]);
+    const warned: unknown[] = [];
+    const config = loadConfig({ ...env, APP_ENV: 'staging', ...settings });
+    await startWebApp(config, { ...d.given, warn: (m, f) => warned.push([m, f]) }).catch(
+      () => undefined,
+    );
+    return warned;
+  }
+
+  it('without either Turnstile key starts with the check off, and says so in one plain line', async () => {
+    const warned = await warnedIn({
+      TURNSTILE_SITE_KEY: undefined,
+      TURNSTILE_SECRET_KEY: undefined,
+    });
+    expect(warned).toEqual([[botCheckOffLine, {}]]);
+    expect(botCheckOffLine).not.toMatch(/made-up/);
+    expect(
+      hostedBotCheck(
+        loadConfig({
+          ...env,
+          APP_ENV: 'staging',
+          TURNSTILE_SITE_KEY: undefined,
+          TURNSTILE_SECRET_KEY: undefined,
+        }),
+        {},
+      ).widget.kind,
+    ).toBe('off');
+  });
+
+  it('with both keys uses Turnstile and says nothing', async () => {
+    expect(await warnedIn({})).toEqual([]);
+    expect(hostedBotCheck(configFor('staging'), {}).widget.kind).toBe('turnstile');
+  });
+
+  it('with one key refuses to start, naming the missing one', () => {
+    expect(() =>
+      loadConfig({ ...env, APP_ENV: 'staging', TURNSTILE_SECRET_KEY: undefined }),
+    ).toThrow(/TURNSTILE_SECRET_KEY: missing, must be set with TURNSTILE_SITE_KEY/);
+  });
+
+  it('production without both keys refuses to start, never with the check off', () => {
+    for (const missing of ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY']) {
+      expect(() => loadConfig({ ...env, APP_ENV: 'production', [missing]: undefined })).toThrow(
+        new RegExp(`${missing}: missing, must be set when APP_ENV is production`),
+      );
+    }
+    expect(hostedBotCheck(configFor('production'), {}).widget.kind).toBe('turnstile');
   });
 });
 

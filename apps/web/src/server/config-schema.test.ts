@@ -42,8 +42,8 @@ const requiredWhereUsed: Readonly<Partial<Record<ConfigName, readonly string[]>>
   PLATFORM_DATABASE_URL: ['staging', 'production'],
   SUPABASE_URL: ['staging', 'production'],
   SUPABASE_SECRET_KEY: ['staging', 'production'],
-  TURNSTILE_SITE_KEY: ['staging', 'production'],
-  TURNSTILE_SECRET_KEY: ['staging', 'production'],
+  TURNSTILE_SITE_KEY: ['production'],
+  TURNSTILE_SECRET_KEY: ['production'],
   RESEND_API_KEY: ['production'],
 };
 /** What local work needs: no database, no sign-in service, no keys. */
@@ -115,6 +115,35 @@ describe('loadConfig', () => {
           set,
         );
       }
+    }
+  });
+
+  it("takes Turnstile's two keys together: production needs both, staging both or neither", () => {
+    const staging = { ...production, APP_ENV: 'staging', RESEND_API_KEY: undefined };
+    const none = { TURNSTILE_SITE_KEY: undefined, TURNSTILE_SECRET_KEY: undefined };
+    // Staging with neither: starts, the bot check off (T-270).
+    expect(loadConfig({ ...staging, ...none }).TURNSTILE_SITE_KEY).toBeUndefined();
+    // Staging with both: starts, with Turnstile.
+    expect(loadConfig(staging).TURNSTILE_SITE_KEY).toBe(valid.TURNSTILE_SITE_KEY);
+    // Staging with one: refused, naming the one missing and no value.
+    const onlySite = failure({ ...staging, TURNSTILE_SECRET_KEY: undefined });
+    expect(onlySite.invalid).toEqual([
+      'TURNSTILE_SECRET_KEY: missing, must be set with TURNSTILE_SITE_KEY (or leave out both to switch the bot check off)',
+    ]);
+    const onlySecret = failure({ ...staging, TURNSTILE_SITE_KEY: ' ' });
+    expect(onlySecret.invalid).toEqual([
+      'TURNSTILE_SITE_KEY: missing, must be set with TURNSTILE_SECRET_KEY (or leave out both to switch the bot check off)',
+    ]);
+    expect(onlySecret.message).not.toContain(valid.TURNSTILE_SECRET_KEY);
+    // Production with neither, or one: refused.
+    for (const missing of [
+      none,
+      { TURNSTILE_SITE_KEY: undefined },
+      { TURNSTILE_SECRET_KEY: undefined },
+    ]) {
+      expect(failure({ ...production, ...missing }).invalid.join()).toMatch(
+        /TURNSTILE_(SITE|SECRET)_KEY: missing, must be set when APP_ENV is production/,
+      );
     }
   });
 

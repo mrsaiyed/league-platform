@@ -91,8 +91,9 @@ const schema = z.object({
   SUPABASE_URL: webUrl.optional(),
   SUPABASE_SECRET_KEY: secretText(16).optional(),
   // The bot check in front of sign-in and sign-up (T4 §6, record 081): Cloudflare
-  // Turnstile's public site key and its secret key, staging and production only; local
-  // work and tests use the stand-in whatever is given.
+  // Turnstile's public site key and its secret key. Production needs both; staging takes
+  // both or neither (neither switches the check off, T-270); local work and tests use the
+  // stand-in whatever is given.
   TURNSTILE_SITE_KEY: z
     .string()
     .trim()
@@ -134,8 +135,10 @@ const requiredIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   PLATFORM_DATABASE_URL: ['staging', 'production'],
   SUPABASE_URL: ['staging', 'production'],
   SUPABASE_SECRET_KEY: ['staging', 'production'],
-  TURNSTILE_SITE_KEY: ['staging', 'production'],
-  TURNSTILE_SECRET_KEY: ['staging', 'production'],
+  // Staging may leave out both, switching the bot check off (T-270, record 081); one
+  // without the other is refused below.
+  TURNSTILE_SITE_KEY: ['production'],
+  TURNSTILE_SECRET_KEY: ['production'],
   RESEND_API_KEY: ['production'],
 };
 
@@ -210,6 +213,24 @@ export function loadConfig(
   for (const [name, environments] of Object.entries(requiredIn)) {
     if (given[name] === undefined && appEnv !== undefined && environments.includes(appEnv)) {
       invalid.set(name, `${name}: missing, must be set when APP_ENV is ${appEnv}`);
+    }
+  }
+  // Turnstile's two keys go together (record 081): staging without either switches the bot
+  // check off, but one without the other is a mistake, named here.
+  if (appEnv === 'staging') {
+    const site = given['TURNSTILE_SITE_KEY'];
+    const secret = given['TURNSTILE_SECRET_KEY'];
+    if (site !== undefined && secret === undefined) {
+      invalid.set(
+        'TURNSTILE_SECRET_KEY',
+        'TURNSTILE_SECRET_KEY: missing, must be set with TURNSTILE_SITE_KEY (or leave out both to switch the bot check off)',
+      );
+    }
+    if (secret !== undefined && site === undefined) {
+      invalid.set(
+        'TURNSTILE_SITE_KEY',
+        'TURNSTILE_SITE_KEY: missing, must be set with TURNSTILE_SECRET_KEY (or leave out both to switch the bot check off)',
+      );
     }
   }
   // The tracker's database guard (packages/providers, shared with the worker).

@@ -1094,9 +1094,15 @@ for (const appEnv of ['staging', 'production']) {
     PLATFORM_DATABASE_URL: 'postgres://made-up:made-up-password@localhost:1/nowhere',
     SUPABASE_URL: 'http://localhost:54321',
     SUPABASE_SECRET_KEY: 'made-up-supabase-secret-key',
-    TURNSTILE_SITE_KEY: 'made-up-turnstile-site-key',
-    TURNSTILE_SECRET_KEY: 'made-up-turnstile-secret-key',
-    ...(appEnv === 'production' ? { RESEND_API_KEY: 'made-up-resend-key' } : {}),
+    // Production needs Turnstile's keys; staging is left without them, so its bot check is
+    // off and start-up says so (T-270, record 081).
+    ...(appEnv === 'production'
+      ? {
+          RESEND_API_KEY: 'made-up-resend-key',
+          TURNSTILE_SITE_KEY: 'made-up-turnstile-site-key',
+          TURNSTILE_SECRET_KEY: 'made-up-turnstile-secret-key',
+        }
+      : {}),
   });
   const code = await new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -1122,6 +1128,10 @@ for (const appEnv of ['staging', 'production']) {
     failures.push(`the ${appEnv} refusal printed RESEND_API_KEY`);
   } else if (deployed.output().includes('made-up-turnstile-secret-key')) {
     failures.push(`the ${appEnv} refusal printed TURNSTILE_SECRET_KEY`);
+  } else if (deployed.output().includes('The bot check is off') !== (appEnv === 'staging')) {
+    failures.push(
+      `${appEnv} ${appEnv === 'staging' ? 'did not say' : 'said'} its bot check is off`,
+    );
   }
 }
 

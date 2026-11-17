@@ -4,8 +4,10 @@
 // `widget.field`, and the server asks the check about it (`verify`) before the sign-in
 // service hears of the request at all.
 //
-// Adapters: the local stand-in (local work and tests, local-bot-check.ts) and Cloudflare
-// Turnstile (staging and production, turnstile-bot-check.ts); botCheckFor picks one.
+// Adapters: the local stand-in (local work and tests, local-bot-check.ts), Cloudflare
+// Turnstile (production, and staging when given its keys, turnstile-bot-check.ts), and the
+// check switched off (staging without Turnstile's keys only, bot-check-off.ts); botCheckFor
+// picks one.
 
 /** Which form the check is in front of; Turnstile's answer must name the same one. */
 export type BotCheckAction = 'reset' | 'sign-in' | 'sign-up';
@@ -17,6 +19,14 @@ export type BotCheckWidget =
       readonly kind: 'stand-in';
       readonly field: string;
       readonly passingAnswer: string;
+    }
+  | {
+      /**
+       * No check (staging without Turnstile's keys, T-270): the page draws nothing and every
+       * form passes. `field` is named only so a form reads one; nothing is put in it.
+       */
+      readonly kind: 'off';
+      readonly field: string;
     }
   | {
       /** Cloudflare Turnstile: its script and frame, from its one origin. */

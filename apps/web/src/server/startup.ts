@@ -20,10 +20,12 @@
 import type { CommandLogLine } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
-import type {
-  EmailConfirmation,
-  EmailConfirmationQuestion,
-  EmailConfirmationUnknown,
+import {
+  botCheckFor,
+  type BotCheck,
+  type EmailConfirmation,
+  type EmailConfirmationQuestion,
+  type EmailConfirmationUnknown,
 } from '@srleagues/providers';
 import type { Config } from './config-schema.ts';
 import { databasePorts, type DatabaseQueries } from './database-ports.ts';
@@ -114,6 +116,8 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       `SUPABASE_URL and SUPABASE_SECRET_KEY are needed when APP_ENV is ${config.APP_ENV}.`,
     );
   }
+  // The bot check (record 081): step 2.93's last part hands this one to the real ports.
+  hostedBotCheck(config, deps);
   const database = await deps.database();
   const db = database.createDatabase({ kind: 'postgres', url });
   try {
@@ -140,6 +144,35 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
   } finally {
     await db.close();
   }
+}
+
+/** Said once at start-up when staging runs without Turnstile's keys (T-270, record 081). */
+export const botCheckOffLine =
+  'The bot check is off: TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY are not set, so sign-in and sign-up are not checked for bots (staging only: production refuses to start without them).';
+
+/**
+ * Staging's and production's bot check (botCheckFor): Turnstile, or in staging with neither
+ * key the check switched off, said in one plain line. A problem Turnstile reports is warned
+ * of by its kind only. The settings check has already refused one key without the other.
+ */
+export function hostedBotCheck(config: Config, deps: Pick<StartupDeps, 'warn'>): BotCheck {
+  let check: BotCheck;
+  try {
+    check = botCheckFor({
+      appEnv: config.APP_ENV,
+      siteHostname: new URL(config.PUBLIC_BASE_URL).hostname,
+      turnstileSiteKey: config.TURNSTILE_SITE_KEY,
+      turnstileSecretKey: config.TURNSTILE_SECRET_KEY,
+      onProblem: (kind) => deps.warn?.('bot check not asked', { kind }),
+    });
+  } catch (error) {
+    // botCheckFor's words name settings only, never a value.
+    throw new StartupError(
+      error instanceof Error ? error.message : 'the bot check could not be set up.',
+    );
+  }
+  if (check.widget.kind === 'off') deps.warn?.(botCheckOffLine, {});
+  return check;
 }
 
 /** The real sign-in service; a fault in its settings is said in fixed words, never with a value. */

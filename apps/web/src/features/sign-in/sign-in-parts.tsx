@@ -89,6 +89,8 @@ export function BotCheckField({
   readonly action: BotCheckAction;
   readonly nonce?: string | undefined;
 }) {
+  // Switched off (staging without Turnstile's keys, T-270): nothing is drawn or asked.
+  if (widget.kind === 'off') return null;
   if (widget.kind === 'stand-in') {
     return <input type="hidden" name={widget.field} value={widget.passingAnswer} />;
   }
