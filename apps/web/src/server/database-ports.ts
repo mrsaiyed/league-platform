@@ -38,6 +38,7 @@ import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
 import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
 import { databaseAdminTeams, type AdminTeamsQueries } from './database-admin-teams.ts';
+import { coreEventHandlers } from './database-event-handlers.ts';
 import { databaseGames, databaseGamesDeps, type GamesQueries } from './database-games.ts';
 import {
   databaseLeagueSites,
@@ -143,8 +144,11 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
       jobs: database.jobsStore(scope),
       activity: database.activityLogStore(scope),
       access: database.accessStore(scope),
+      standings: database.standingsStore(scope),
+      games: database.gamesStore(scope),
     })),
-    events: [],
+    // Core's handlers, from the one place every database port takes them.
+    events: coreEventHandlers<AccessTx>(),
     log: options.log,
     now: () => performance.now(),
   };
