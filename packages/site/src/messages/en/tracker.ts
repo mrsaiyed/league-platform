@@ -479,7 +479,11 @@ export const enTracker = {
   'tracker.undo.doneClock': 'Undone: {play}. The clock is back at {clock}, stopped.',
   'tracker.undo.doneStopped':
     'Undone: {play}. The clock stays stopped: start it when play goes on.',
+  // The two long ones said shorter where a phone is short of room (as the sentence after
+  // a set clock, step 2.189): the play and the players in their shortest words.
+  'tracker.undo.doneStoppedShort': '{play} undone · clock stopped',
   'tracker.undo.doneSub': 'Undone: {out} is back on the court and {in} is on the bench.',
+  'tracker.undo.doneSubShort': '{out} back on · {in} off',
   'tracker.undo.label': 'Undo {play}',
   'tracker.undo.nothing': 'Undo: nothing to take back',
   'tracker.unknownGame': 'We could not find that game.',

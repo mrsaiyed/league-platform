@@ -247,6 +247,67 @@ async function accessible(page, label) {
 /** What a part of the screen says, on one line. */
 const words = (text) => text.replace(/\s+/g, ' ').trim();
 
+/** The sentence the screen is saying, as drawn: each form, whether shown, and its lines. */
+const saidDrawn = (page) =>
+  page.evaluate(() => {
+    const p = document.querySelector('[data-say]');
+    const long = p?.querySelector('.court-say-long');
+    const short = p?.querySelector('.court-say-short');
+    const shown = (el) =>
+      el !== null && el !== undefined && getComputedStyle(el).display !== 'none'
+        ? el.getBoundingClientRect().width > 1
+        : false;
+    const style = p === null ? null : getComputedStyle(p);
+    const inner =
+      p === null || style === null
+        ? 0
+        : p.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    return {
+      long: long?.textContent ?? '',
+      short: short?.textContent ?? '',
+      longShown: shown(long),
+      shortShown: shown(short),
+      shortHidden: short?.getAttribute('aria-hidden') === 'true',
+      lines: style === null ? 0 : Math.round(inner / parseFloat(style.lineHeight)),
+    };
+  });
+
+/**
+ * A long sentence fits (the two the first design lead named: after undoing a foul that
+ * had stopped the clock, and after undoing a substitution). On the phone a scorekeeper
+ * holds it is said shorter, in one line, with the full sentence kept out of sight for a
+ * screen reader; where the pad has the room (a tablet) the full sentence is shown. And
+ * with the phone turned on its side, where the pad is narrowest, the short form is what
+ * shows, in two lines at the most.
+ */
+async function sentenceFits(page, size, at, said) {
+  const drawn = await saidDrawn(page);
+  const both = drawn.long === said.text && drawn.short === said.short && drawn.shortHidden;
+  const roomless = size.width < 700;
+  note(
+    roomless
+      ? `${at}: short of room, “${said.short}” is one line and the full sentence is kept out of sight for a screen reader`
+      : `${at}: with room, the full sentence “${said.text}” is shown`,
+    both &&
+      (roomless
+        ? drawn.shortShown && !drawn.longShown && drawn.lines === 1
+        : drawn.longShown && !drawn.shortShown),
+    JSON.stringify(drawn),
+  );
+  if (!roomless) return;
+  const [, lying] = sizes;
+  await page.setViewportSize({ width: lying.width, height: lying.height });
+  await twoFrames(page);
+  const turned = await saidDrawn(page);
+  await page.setViewportSize({ width: size.width, height: size.height });
+  await twoFrames(page);
+  note(
+    `${at}, the phone turned on its side: “${said.short}” is what shows, in two lines at the most`,
+    turned.short === said.short && turned.shortShown && !turned.longShown && turned.lines <= 2,
+    JSON.stringify(turned),
+  );
+}
+
 /** A team's record in the standings ("3-1") with a win more, or a loss more. */
 const won = (record) => record.replace(/^(\d+)-/, (_, wins) => `${Number(wins) + 1}-`);
 const lost = (record) => record.replace(/-(\d+)$/, (_, losses) => `-${Number(losses) + 1}`);
@@ -582,9 +643,15 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
       );
       await quiet();
       await c.recorded(() => c.root.locator('[data-undo]:not([data-resting])').tap());
+      // The sentence has a short form for a phone short of room (as the sentence after a
+      // set clock, step 2.189): the full one is first in the page, for a screen reader.
       await said(
-        /^Undone: Foul on #5 Tam Bearsley\. The clock stays stopped: start it when play goes on\.$/,
+        /^Undone: Foul on #5 Tam Bearsley\. The clock stays stopped: start it when play goes on\./,
       );
+      await sentenceFits(page, size, at, {
+        text: 'Undone: Foul on #5 Tam Bearsley. The clock stays stopped: start it when play goes on.',
+        short: 'Foul #5 Tam undone · clock stopped',
+      });
       note(
         `${at}: the foul is taken back, the clock is still stopped and the screen says so`,
         (await c.fouls('away', 5)) === 0 && (await c.toggle.getAttribute('data-state')) === 'start',
@@ -593,6 +660,35 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
       await quiet();
       await c.startButton.tap();
       await c.root.locator('[data-clock-toggle][data-state="pause"]').waitFor();
+    });
+
+    await step(`${at}: a substitution undone`, async () => {
+      // #13 comes in for #3 by "Sub in" (a short phone's bench is folded away), and Undo
+      // puts them back: the screen says who is where now.
+      await c.tile('home', 3).tap();
+      const options = c.pad.locator('[data-options]');
+      await options.waitFor();
+      await c.recorded(() => options.locator('[data-act="sub"]').first().tap());
+      await c.pad.locator('[data-rest]').waitFor();
+      note(
+        `${at}: #13 came in for #3`,
+        (await c.onCourt('home', 13)) && !(await c.onCourt('home', 3)),
+      );
+      await quiet();
+      await c.recorded(() => c.root.locator('[data-undo]:not([data-resting])').tap());
+      await said(
+        /^Undone: #3 Max Hawkins is back on the court and #13 Ray Hawkins is on the bench\./,
+      );
+      await sentenceFits(page, size, at, {
+        text: 'Undone: #3 Max Hawkins is back on the court and #13 Ray Hawkins is on the bench.',
+        short: '#3 Max back on · #13 Ray off',
+      });
+      note(
+        `${at}: the substitution is taken back: #3 is on the court again and #13 on the bench`,
+        (await c.onCourt('home', 3)) && !(await c.onCourt('home', 13)),
+      );
+      await still(page, `${at}, a substitution undone`);
+      await quiet();
     });
 
     await step(`${at}: the play log, with the network held back`, async () => {

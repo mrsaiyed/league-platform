@@ -5,7 +5,14 @@
 // the message files; the engine's own numbers are never copied (`basketball.derive`).
 import type { Translate } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
-import { findPlayer, periodText, playShortText, playText, playerLabel } from './engine-words.ts';
+import {
+  findPlayer,
+  periodText,
+  playShortText,
+  playText,
+  playerLabel,
+  playerShortLabel,
+} from './engine-words.ts';
 import type { DeviceRosters } from './opened-game-storage.ts';
 import type { KeptTap } from './queue-storage.ts';
 import type { TrackerControllerStatus } from './tracker-controller.ts';
@@ -122,6 +129,13 @@ export const redoTarget = (
 ): NamedPlay | null => (game.status === 'final' ? null : named(game.redo.at(-1), game, rosters, t));
 
 /**
+ * What the screen says: a sentence, or one with a short form of one line that a phone
+ * short of room shows in its place (court-view.tsx, step 2.189). The full text is always
+ * what a screen reader is given.
+ */
+export type Said = string | { readonly text: string; readonly short: string };
+
+/**
  * What the screen says once Undo has taken a play back (checklist I2): the play in the
  * tracker's words, and what the scorekeeper would not see by itself. A period change
  * undone puts the clock back; a foul or a timeout that had stopped the clock leaves it
@@ -133,7 +147,7 @@ export function undoneText(
   after: basketball.GameState,
   rosters: DeviceRosters,
   t: Translate,
-): string {
+): Said {
   const play = before.plays.at(-1);
   if (play === undefined) return t('tracker.refusal.nothingToUndo');
   const text = playText(play, rosters, before.rules.periods, t);
@@ -143,12 +157,23 @@ export function undoneText(
       clock: basketball.formatClock(after.clock.remainingMs),
     });
   }
+  // The two long ones have a short form for a phone short of room: the players by number
+  // and first name, the play in the words Undo's own button used.
   if (play.type === 'sub') {
     const player = (id: string) => playerLabel(findPlayer(rosters, id), t);
-    return t('tracker.undo.doneSub', { in: player(play.inId), out: player(play.outId) });
+    const short = (id: string) => playerShortLabel(findPlayer(rosters, id), t);
+    return {
+      text: t('tracker.undo.doneSub', { in: player(play.inId), out: player(play.outId) }),
+      short: t('tracker.undo.doneSubShort', { in: short(play.inId), out: short(play.outId) }),
+    };
   }
   if (play.stoppedClock === true && !after.clock.running) {
-    return t('tracker.undo.doneStopped', { play: text });
+    return {
+      text: t('tracker.undo.doneStopped', { play: text }),
+      short: t('tracker.undo.doneStoppedShort', {
+        play: playShortText(play, rosters, before.rules.periods, t),
+      }),
+    };
   }
   return t('tracker.undo.done', { play: text });
 }

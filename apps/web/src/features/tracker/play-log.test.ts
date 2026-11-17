@@ -171,16 +171,19 @@ describe('what the screen says once Undo or Redo is done (checklist I2)', () => 
       tippedOff(stopClock),
     );
     expect(game.plays.at(-1)?.stoppedClock).toBe(true);
-    expect(said(game)).toBe(
-      'Undone: Foul on #5 Ned Hawkins. The clock stays stopped: start it when play goes on.',
-    );
+    // With a short form for a phone short of room: the play as Undo's button said it.
+    expect(said(game)).toEqual({
+      text: 'Undone: Foul on #5 Ned Hawkins. The clock stays stopped: start it when play goes on.',
+      short: 'Foul #5 Ned undone · clock stopped',
+    });
   });
 
   it('a substitution: who is back on the court and who is on the bench', () => {
     const game = played([{ type: 'sub', side: 'home', inId: 'h13', outId: 'h5' }], tippedOff());
-    expect(said(game)).toBe(
-      'Undone: #5 Ned Hawkins is back on the court and #13 Ray Hawkins is on the bench.',
-    );
+    expect(said(game)).toEqual({
+      text: 'Undone: #5 Ned Hawkins is back on the court and #13 Ray Hawkins is on the bench.',
+      short: '#5 Ned back on · #13 Ray off',
+    });
   });
 
   it('a period change: the clock is back where it was', () => {
