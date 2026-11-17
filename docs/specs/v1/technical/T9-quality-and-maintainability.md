@@ -41,6 +41,7 @@ A change cannot be merged unless all of these pass. They run automatically.
 - Structure rules: imports only in allowed directions (T-21); no league named in code (T-27); no SQL outside `packages/database`; no secrets in browser code (T-30); steps of the worker's jobs that are not commands are named only by the worker (T-226, record 014).
 - Type checking in strict mode.
 - Rule tests and database tests, including the two-league harness (T-65) and the role-by-command matrix.
+- **T-292: database tests on a real PostgreSQL**, beside those on the in-process one: a throw-away server made on the computer from the programs it already has, this computer only, encrypted, with the roles of a hosted database (`npm run test:real-postgres`, [record 092](../../../architecture/decisions/092-a-real-postgresql-for-tests.md)). It fails, never skips, where no PostgreSQL is found. Run on the builder's computer until GitHub's machines have run it; then it joins these checks (step 2.99).
 - The public-field scan (T-81).
 - A build of the web app and worker.
 - The browser journeys (a fast subset on each change; all of them before release).
