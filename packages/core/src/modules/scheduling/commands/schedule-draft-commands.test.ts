@@ -21,6 +21,7 @@ import { discardScheduleDraft } from './discard-schedule-draft.ts';
 import { getScheduleDraft } from './get-schedule-draft.ts';
 import { moveDraftGame } from './move-draft-game.ts';
 import { previewSchedulePublish } from './preview-schedule-publish.ts';
+import { putBackDraftGame } from './put-back-draft-game.ts';
 import { removeDraftGame } from './remove-draft-game.ts';
 import { renameDraftRound } from './rename-draft-round.ts';
 import { setDraftRecording } from './set-draft-recording.ts';
@@ -464,9 +465,8 @@ describe("the draft's count of what publishing would change (step 2.185)", () =>
     ).toMatchObject({ ok: true });
     expect(await counts(w)).toEqual({ view: 2, preview: 2, summary: 2 });
     // "Put it back": the game as the draft last held it, with its own id.
-    const { id, status: _status, ...was } = game(1);
     expect(
-      await addDraftGame(w.as(ownerId), { ...basis(2), ...was, gameId: id }, w.deps),
+      await putBackDraftGame(w.as(ownerId), { ...basis(2), gameId: gameUuid(1) }, w.deps),
     ).toMatchObject({ ok: true });
     expect(await counts(w)).toEqual({ view: 1, preview: 1, summary: 1 });
     // The move undone by hand: the draft holds four edits and changes nothing.

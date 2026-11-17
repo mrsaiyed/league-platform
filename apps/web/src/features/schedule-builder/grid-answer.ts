@@ -8,6 +8,7 @@
 // A game removed, put back or already back is answered by a one-time notice instead (record
 // 067, step 2.185): the address holds only the place, so a reload, or the phone's Back to
 // it, never shows an old "Removed … Put it back".
+import { gameAnchor } from '@srleagues/core';
 import type { SavedNotice } from '../../server/saved-notice.ts';
 import type { RefusedAt, SavedDetail, ScheduleActionOutcome } from './run-schedule-action.ts';
 
@@ -73,14 +74,27 @@ export function answerParams(outcome: ScheduleActionOutcome): {
         },
         hash,
       };
+    // An answer said at a game takes the phone to the game's row, so its name is in view
+    // above the answer, not under the bar at the top (step 2.185).
     case 'game-saved':
     case 'game-round':
-      return { query: { ...query, saved: detail.what, game: detail.gameId }, hash };
+      return {
+        query: { ...query, saved: detail.what, game: detail.gameId },
+        hash: `#${gameAnchor(detail.gameId)}`,
+      };
     case 'game-removed':
+      // Said by the one-time notice (noticeOfAnswer); the address keeps only the place:
+      // the struck row, or the round of a game only ever in the draft.
+      return {
+        query: {},
+        hash:
+          detail.stays === true && detail.gameId !== undefined
+            ? `#${gameAnchor(detail.gameId)}`
+            : hash,
+      };
     case 'game-put-back':
     case 'game-already-back':
-      // Said by the one-time notice (noticeOfAnswer); the address keeps only the place.
-      return { query: {}, hash };
+      return { query: {}, hash: `#${gameAnchor(detail.gameId)}` };
   }
 }
 

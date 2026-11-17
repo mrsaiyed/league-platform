@@ -3,7 +3,12 @@
 // it to the third, offer that round's date and flag the game until it is on it; a round
 // with games is not removed and says so beside it; an empty one is; the address carries
 // each answer back; nothing is published until Publish.
-import { getScheduleDraft, type CommandContext, type ScheduleDraftView } from '@srleagues/core';
+import {
+  gameAnchor,
+  getScheduleDraft,
+  type CommandContext,
+  type ScheduleDraftView,
+} from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { standInLeagues, standInPeople } from '../../server/stand-in-cast.ts';
 import { standInSchedule } from '../../server/stand-in-schedule.ts';
@@ -110,8 +115,8 @@ describe('rounds an owner can make (step 2.160)', () => {
     expect(moved).toEqual({ kind: 'saved', detail: { what: 'game-round', gameId } });
     const answer = answerParams(moved);
     expect(savedDetailOf(answer.query)).toEqual({ what: 'game-round', gameId });
-    // The phone is taken to the "Saved" beside the game.
-    expect(answer.hash).toBe('#saved');
+    // The phone is taken to the game's row, its name above its "Saved" (step 2.185).
+    expect(answer.hash).toBe(`#${gameAnchor(gameId)}`);
     let grid = buildGrid(await read(), teams, []);
     const game = () => grid.allGames.find((g) => g.id === gameId);
     expect(game()).toMatchObject({

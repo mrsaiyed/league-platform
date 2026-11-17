@@ -2,6 +2,7 @@
 // a clash flagged the moment it happens and fixed, every edit held in the draft until
 // publishing, and the grid's rows read back from the draft.
 import {
+  gameAnchor,
   getScheduleDraft,
   listVenues,
   publishChangeCount,
@@ -219,7 +220,13 @@ describe('schedule grid', () => {
       });
       expect(removed).toEqual({
         kind: 'saved',
-        detail: { what: 'game-removed', roundId: before.roundId, gameId: id },
+        detail: {
+          what: 'game-removed',
+          roundId: before.roundId,
+          gameId: id,
+          // A published game stays in the grid, struck through: the answer is said at it.
+          ...(id === published.id ? { stays: true } : {}),
+        },
       });
       const out = await read();
       expect(out.result.games.some((g) => g.id === id)).toBe(false);
@@ -242,14 +249,20 @@ describe('schedule grid', () => {
       // naming only which game and its round, and the page reads it back as it was.
       const answer = answerParams(removed);
       expect(answer.query).toEqual({});
-      expect(answer.hash).toBe('#saved');
+      // The phone goes to the struck row, or to the round's "Saved" for a game that is gone.
+      expect(answer.hash).toBe(id === published.id ? `#${gameAnchor(id)}` : '#saved');
       const notice = noticeOfAnswer(removed);
       expect(notice).toEqual({
         thing: id,
         said: 'game-removed',
         ...(before.roundId === null ? {} : { about: before.roundId }),
       });
-      expect(savedDetailOfNotice(notice)).toEqual(removed.kind === 'saved' && removed.detail);
+      // The notice does not carry `stays`: the page knows it from the draft.
+      const { stays: _stays, ...said } =
+        removed.kind === 'saved' && removed.detail?.what === 'game-removed'
+          ? removed.detail
+          : { stays: undefined };
+      expect(savedDetailOfNotice(notice)).toEqual(said);
       // An old address that names the removal says no more than "Saved".
       expect(
         savedDetailOf({
@@ -311,6 +324,50 @@ describe('schedule grid', () => {
     const after = await read();
     expect(after.draft).toBeNull();
     expect(after.result.games.some((g) => g.id === game.id)).toBe(false);
+  });
+
+  it('says nothing is to put back once someone else discarded the draft, not "already back" (step 2.185)', async () => {
+    const { read, press } = setup();
+    const game = (await read()).published.games.find((g) => g.status === 'scheduled');
+    if (game === undefined) throw new Error('no published game');
+    expect(await press('remove-game', { gameId: game.id })).toMatchObject({ kind: 'saved' });
+    expect(await press('discard', {})).toEqual({ kind: 'discarded' });
+    // The game is in the published schedule again, but nothing was put back by this tap.
+    expect(await press('put-back-game', { gameId: game.id })).toEqual({
+      kind: 'refused',
+      code: 'nothing-to-put-back',
+    });
+    expect((await read()).draft).toBeNull();
+  });
+
+  it('answers a second tap on "Remove game" as the first, never "someone else changed it" (step 2.185)', async () => {
+    const { read, press } = setup();
+    const game = (await read()).published.games.find((g) => g.status === 'scheduled');
+    if (game === undefined) throw new Error('no published game');
+    const wasSlot = [game.roundId ?? '', game.date, game.time ?? '', ''].join('~');
+    const first = await press('remove-game', { gameId: game.id, wasSlot });
+    expect(first).toEqual({
+      kind: 'saved',
+      detail: { what: 'game-removed', roundId: game.roundId, gameId: game.id, stays: true },
+    });
+    const edits = (await read()).draft?.savedEdits;
+    // The same form again, with the basis it was drawn with (no draft yet).
+    const second = await press('remove-game', {
+      gameId: game.id,
+      wasSlot,
+      version: '',
+      draftId: '',
+    });
+    expect(second).toEqual(first);
+    expect((await read()).draft?.savedEdits).toBe(edits);
+    // A stale tap on a game the draft does not remove is still refused as before.
+    const other = (await read()).result.games.find(
+      (g) => g.status === 'scheduled' && g.id !== game.id,
+    );
+    if (other === undefined) throw new Error('no other game');
+    expect(
+      await press('remove-game', { gameId: other.id, version: '', draftId: '' }),
+    ).toMatchObject({ kind: 'refused', code: 'changed-since-read' });
   });
 
   it('says the move was saved when the recording change after it is refused', async () => {
