@@ -248,6 +248,8 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // league it lists (part 4).
     scheduleAdmin: databaseScheduleAdmin(database, db, options.log, accessOf),
     publicTeams: databasePublicTeams(database, db),
+    // People moves with Admin → Teams, whose rosters are made of its rows (step 2.93).
+    adminPeople: notMovedYet('Admin → People'),
     adminTeams: notMovedYet('Admin → Teams'),
     adminSettings: databaseAdminSettings(database, db, options.log),
     tracker: notMovedYet('tracker'),
