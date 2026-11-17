@@ -12,6 +12,8 @@ export const league = 'north-valley';
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const liveGame = '01900000-0000-7000-8000-006a00000002';
 export const scorekeeper = { name: 'srl_session', value: 'local-scorekeeper-token' };
+/** A made-up league admin: may score the game and may correct games too (step 2.37). */
+export const admin = { name: 'srl_session', value: 'local-admin-token' };
 export const trackerPath = (game = liveGame) => `/${league}/score/${game}`;
 
 /** The five sizes every scoring screen is designed and photographed at (DESIGN.md section 7, line 8). */
@@ -458,6 +460,38 @@ export function court(page) {
     async closeLog() {
       await root.locator('[data-play-log] .court-close').click();
       await root.locator('[data-play-log]').waitFor({ state: 'detached' });
+    },
+
+    // --- Ending a game (step 2.37): each is in the pad. ---
+    /** "End the game?", and why it cannot end now (a level score, or what the league said). */
+    endAsk: pad.locator('[data-end-ask]'),
+    endRefused: pad.locator('[data-end-refused]'),
+    /** End game offered in the pad's first line, at 0:00 of the last period with a team ahead. */
+    endOffer: pad.locator('[data-end-offer] [data-end-game]'),
+    /** The final panel; `data-final` says sending, not-sent or saved. */
+    finalPanel: pad.locator('[data-final]'),
+    reopenAsk: pad.locator('[data-reopen-ask]'),
+    notStartedAsk: pad.locator('[data-not-started-ask]'),
+    /**
+     * An answer of the question the pad asks, "yes" or "no", once it takes a tap: the
+     * answers rest for a moment after a question is asked (they are marked `data-resting`).
+     */
+    answer: (which) =>
+      pad.locator(`[data-ask-answers]:not([data-resting]) [data-answer="${which}"]`),
+    /** A button of the final panel, once the panel takes a tap: `take-back`, `reopen`, `final-back`. */
+    finalButton: (which) => pad.locator(`[data-final-actions]:not([data-resting]) [data-${which}]`),
+    /** Opens More and taps one of its buttons: `more-end` (End game), `more-not-started`. */
+    async fromMore(which) {
+      await root.locator('.court-more-button').click();
+      await root.locator(`[data-more] [data-${which}]`).click();
+      await root.locator('[data-more] [role="dialog"]').waitFor({ state: 'detached' });
+    },
+    /** Ends the game from More: the question, then "End game". The pad shows the final panel. */
+    async endGame() {
+      await this.fromMore('more-end');
+      await pad.locator('[data-end-ask]').waitFor();
+      await this.answer('yes').click();
+      await pad.locator('[data-final]').waitFor();
     },
 
     /** Opens the timeouts and calls one for a team; answers "Record it anyway" if asked. */

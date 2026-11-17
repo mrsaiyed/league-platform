@@ -40,6 +40,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   addPlayers,
+  admin,
   bannerShortHtml,
   court,
   evenMorePlayers,
@@ -678,6 +679,216 @@ const playsStates = [
   },
 ];
 
+/**
+ * Step 2.37's states of ending a game, from 48: Mark not started and its question, End
+ * game behind More, the question in the middle of a period and at the end, the level
+ * score, End offered in the pad, the final panel not sent and saved, the End taken back,
+ * a tile tapped on a final game, the Reopen question and the game carried on. A game of
+ * its own with fifteen a side, on the made-up league's own format: two 20-minute halves
+ * on a running clock, as the founder's first test is played.
+ */
+const endStates = [
+  {
+    name: '48-not-started-ask',
+    about:
+      'a game started by mistake, nothing recorded yet: Mark not started (behind More) asks first, in the pad',
+    run: async (page) => {
+      const c = court(page);
+      await c.open();
+      await c.pick('home', starters);
+      await c.pick('away', starters);
+      await c.startClock();
+      await c.fromMore('more-not-started');
+      await c.notStartedAsk.waitFor();
+    },
+  },
+  {
+    name: '49-more-end',
+    about:
+      'More on a game in play: End game first, then Swap colors, the play log and Mark not started',
+    run: async (page) => {
+      const c = court(page);
+      await c.answer('no').click();
+      await playStretch(c);
+      await c.saved();
+      await page.waitForTimeout(3400);
+      await c.more.click();
+      await c.sheet.waitFor();
+    },
+  },
+  {
+    name: '50-not-started-undo-first',
+    about:
+      'Mark not started with baskets and fouls standing: a scorekeeper is told to undo them first, and is offered no "yes"',
+    run: async (page) => {
+      const c = court(page);
+      await c.sheet.locator('[data-more-not-started]').click();
+      await c.notStartedAsk.waitFor();
+    },
+  },
+  {
+    name: '51-end-ask-early',
+    about:
+      'End game from More in the middle of the second half: the question says the score, that time is still on the clock, and what ending does',
+    run: async (page) => {
+      const c = court(page);
+      await c.answer('no').click();
+      await c.pickPeriod(2);
+      await c.startClock();
+      await c.fromMore('more-end');
+      await c.endAsk.waitFor();
+    },
+  },
+  {
+    name: '52-end-level',
+    about:
+      'End game at a level score in a season with no ties: refused on the device at once, in words that say to play overtime',
+    run: async (page) => {
+      const c = court(page);
+      await c.answer('no').click();
+      // 10 to 7 after the first stretch: a three makes it level.
+      await c.play('away', 3, 'p3');
+      await c.saved();
+      await page.waitForTimeout(3400);
+      await c.fromMore('more-end');
+      await c.endRefused.waitFor();
+    },
+  },
+  {
+    name: '53-end-offered',
+    about:
+      'the last period has run out with a team ahead: the pad’s first line offers End game, in gold',
+    run: async (page) => {
+      const c = court(page);
+      await c.answer('no').click();
+      await c.play('home', 5, 'p2');
+      await c.saved();
+      await c.setClock('2');
+      await c.startClock().catch(() => undefined);
+      await c.endOffer.waitFor();
+      await page.waitForTimeout(3400);
+    },
+  },
+  {
+    name: '54-end-ask',
+    about: 'End game tapped in the pad: the question, with its answers in the pad’s lowest band',
+    run: async (page) => {
+      const c = court(page);
+      await c.endOffer.click();
+      await c.endAsk.waitFor();
+    },
+  },
+  {
+    name: '55-final-not-sent',
+    about:
+      'the game ended with no connection: the final panel says who won and that the result is not sent yet, and offers "Take back End game"',
+    run: async (page) => {
+      const c = court(page);
+      await page.context().setOffline(true);
+      await c.answer('yes').click();
+      await c.pad.locator('[data-final="not-sent"]').waitFor();
+    },
+  },
+  {
+    name: '56-end-taken-back',
+    about:
+      'the End taken back on the device, with no connection: the game is live again, and the screen says the clock is stopped',
+    run: async (page) => {
+      const c = court(page);
+      await c.finalButton('take-back').click();
+      await c.said.filter({ hasText: /^End game taken back/ }).waitFor();
+    },
+  },
+  {
+    name: '57-final-saved',
+    about:
+      'the game ended and the league has it: the final panel says so, and "Reopen game" with the time left',
+    run: async (page) => {
+      const c = court(page);
+      await page.context().setOffline(false);
+      await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      await c.saved();
+      await page.waitForTimeout(3400);
+      await c.endOffer.click();
+      await c.endAsk.waitFor();
+      await c.answer('yes').click();
+      await c.pad.locator('[data-final="saved"]').waitFor();
+      await c.pad
+        .locator('[data-reopen-line]')
+        .filter({ hasText: /minutes/ })
+        .waitFor();
+    },
+  },
+  {
+    name: '58-final-tile-tapped',
+    about: 'a player tapped on a final game: the screen says it is final, and to reopen it',
+    run: async (page) => {
+      const c = court(page);
+      await c.tile('home', 5).click();
+      await c.said.filter({ hasText: /^This game is final/ }).waitFor();
+    },
+  },
+  {
+    name: '59-reopen-ask',
+    about:
+      '"Reopen game" tapped: the question says what reopening does, with the reason already filled in',
+    run: async (page) => {
+      const c = court(page);
+      await page.waitForTimeout(3400);
+      await c.finalButton('reopen').click();
+      await c.reopenAsk.waitFor();
+    },
+  },
+  {
+    name: '60-reopened',
+    about: 'reopened: the same screen carries on, live, the clock stopped where the End found it',
+    run: async (page) => {
+      const c = court(page);
+      await c.answer('yes').click();
+      await c.said.filter({ hasText: /live again/ }).waitFor();
+    },
+  },
+];
+
+/**
+ * The same two doors for someone who may correct games (a league admin at the table): the
+ * Mark not started question says how many plays and what score will be cleared and asks
+ * for a reason from the fixed list, and a final game can be reopened at any time.
+ */
+const endAdminStates = [
+  {
+    name: '61-not-started-clears',
+    about:
+      'Mark not started for someone who may correct games, with plays standing: how many plays and what score are cleared, and a reason from the list',
+    run: async (page) => {
+      const c = court(page);
+      await c.open();
+      await c.pick('home', starters);
+      await c.pick('away', starters);
+      await c.startClock();
+      await playStretch(c);
+      await c.saved();
+      await page.waitForTimeout(3400);
+      await c.fromMore('more-not-started');
+      await c.notStartedAsk.waitFor();
+    },
+  },
+  {
+    name: '62-final-reopen-always',
+    about: 'a game ended by someone who may correct games: it can be reopened at any time',
+    run: async (page) => {
+      const c = court(page);
+      await c.answer('no').click();
+      await c.endGame();
+      await c.pad.locator('[data-final="saved"]').waitFor();
+      await c.pad
+        .locator('[data-reopen-line]')
+        .filter({ hasText: /any time/ })
+        .waitFor();
+    },
+  },
+];
+
 /** The chapters photographed: each is a game of its own on a made-up world of its own. */
 const chapters = [
   {
@@ -697,6 +908,25 @@ const chapters = [
       await addPlayers(origin);
       await addPlayers(origin, evenMorePlayers);
       await stopClockGame(origin);
+    },
+  },
+  {
+    name: 'end',
+    about: 'step 2.37: End game, the final panel, Reopen and Mark not started',
+    states: endStates,
+    prepare: async (origin) => {
+      await addPlayers(origin);
+      await addPlayers(origin, evenMorePlayers);
+    },
+  },
+  {
+    name: 'end-admin',
+    about: 'step 2.37: the same two doors for someone who may correct games',
+    states: endAdminStates,
+    as: admin,
+    prepare: async (origin) => {
+      await addPlayers(origin);
+      await addPlayers(origin, evenMorePlayers);
     },
   },
 ];
@@ -719,7 +949,7 @@ async function main() {
   console.log(`pictures saved in ${out}`);
 }
 
-async function shootChapter({ states, prepare }) {
+async function shootChapter({ states, prepare, as = scorekeeper }) {
   const origin = `http://localhost:${await freePort()}`;
   const server = startNext([flag('dev') ? 'dev' : 'start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
@@ -734,7 +964,7 @@ async function shootChapter({ states, prepare }) {
     const context = await browser.newContext({
       viewport: { width: first.width, height: first.height },
     });
-    await context.addCookies([{ ...scorekeeper, url: origin }]);
+    await context.addCookies([{ ...as, url: origin }]);
     if (face !== '') {
       // On every page the game is opened in, from its first drawing, as a device's own
       // face is.
