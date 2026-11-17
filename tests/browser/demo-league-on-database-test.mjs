@@ -10,7 +10,10 @@
 //    each school's ten games, the schedule, and the teams page with every school.
 // 2. One team's whole season: the tracked school's page holds its ten results, its record as
 //    the standings give it, its roster with every number, and its players' statistics; the
-//    statistics page lists its players and their leaders.
+//    statistics page lists its players and their leaders. Each of its ten games' pages has
+//    its box score: its players' points add up to its total and to its final score, and
+//    the school it played shows its team's total only, none of its players named, in the
+//    box scores or the plays. A game between two other schools shows its final score only.
 // 3. The other teams' players' numbers hidden (S-22): the statistics page lists no other
 //    school's player and says those schools show team totals only; another school's page
 //    says its players' numbers are not public and shows none.
@@ -330,6 +333,105 @@ if (browser) {
         JSON.stringify(tables.map((t) => t.headers)),
       );
       await everyPage(`/${slug}/teams/${school.shortName}`);
+    }
+  });
+
+  // P9 §3, item 2: every game of the tracked school's season with its box score.
+  await step("the tracked school's box scores", async () => {
+    /** The games a team's page links to, each once. */
+    const gamesOf = async (school) => {
+      await open(`/${slug}/teams/${school.shortName}`);
+      return [
+        ...new Set(
+          await page.evaluate(() =>
+            [...document.querySelectorAll('main a[href*="/games/"]')].map(
+              (a) => a.getAttribute('href') ?? '',
+            ),
+          ),
+        ),
+      ];
+    };
+    /** A number in a box score's cell; "–" (nothing recorded) is none. */
+    const number = (cell) => (/^\d+$/.test(cell ?? '') ? Number(cell) : 0);
+    const games = await gamesOf(tracked);
+    note(`${tracked.name}'s page links to its ten games`, games.length === 10, games.join(' '));
+    for (const [n, address] of games.entries()) {
+      const label = `${tracked.name}'s game ${n + 1}`;
+      const game = await open(address);
+      note(`${label}: its page is served`, game.status === 200);
+      const boxes = await page.evaluate(() =>
+        [...document.querySelectorAll('main table.ui-box-score')].map((table) => ({
+          caption: table.querySelector('caption')?.textContent?.trim() ?? '',
+          hidden: table.getAttribute('data-players') === 'hidden',
+          headers: [...table.querySelectorAll('thead th')].map((th) =>
+            th.textContent.replace(/\s+/g, ' ').trim(),
+          ),
+          rows: [...table.querySelectorAll('tbody tr, tfoot tr')].map((tr) =>
+            [...tr.children].map((cell) => cell.textContent.replace(/\s+/g, ' ').trim()),
+          ),
+        })),
+      );
+      const ours = boxes.find((box) => has(box.caption, tracked.name));
+      const theirs = boxes.find((box) => box !== ours);
+      const opponent = opponents.find((school) => has(theirs?.caption ?? '', school.name));
+      // The game's own sentence: "Away 55, Home 64."
+      const scoreOf = (name) =>
+        Number(game.text.match(new RegExp(`${name} (\\d+)[,.]`))?.[1] ?? Number.NaN);
+      note(
+        `${label}: two box scores, its own and the school it played`,
+        boxes.length === 2 && ours !== undefined && opponent !== undefined,
+        JSON.stringify(boxes.map((box) => box.caption)),
+      );
+      if (ours === undefined || theirs === undefined || opponent === undefined) continue;
+      const points = column(ours, 'PTS');
+      const isTotal = (cells) => cells.some((cell) => cell === 'Total');
+      const lines = ours.rows.filter((cells) => !isTotal(cells));
+      const total = number(ours.rows.find(isTotal)?.[points]);
+      const added = lines.reduce((sum, cells) => sum + number(cells[points]), 0);
+      note(
+        `${label}: its players' points add up to its total and its final score`,
+        points >= 0 && added === total && total === scoreOf(tracked.name) && total > 0,
+        `${added} / ${total} / ${scoreOf(tracked.name)}`,
+      );
+      note(
+        `${label}: its box score lists its players by number`,
+        lines.length > 0 && lines.every((cells) => /^\d+$/.test(cells[0] ?? '')),
+        JSON.stringify(lines.map((cells) => cells.slice(0, 2))),
+      );
+      const theirTotal = number(theirs.rows.find(isTotal)?.[column(theirs, 'PTS')]);
+      note(
+        `${label}: ${opponent.name} shows its team's total only, its final score`,
+        theirs.hidden &&
+          theirs.rows.length === 1 &&
+          theirTotal === scoreOf(opponent.name) &&
+          (has(game.text, "players' numbers are not public") ||
+            has(game.text, 'players’ numbers are not public')),
+        JSON.stringify(theirs.rows),
+      );
+      const html = await page.content();
+      const named = demoLeague.trackerPlayers[opponent.shortName]
+        .map(([, name]) => shownAs(name))
+        .filter((shown) => html.includes(shown));
+      note(
+        `${label}: no player of ${opponent.name} is named, in the box scores or the plays`,
+        named.length === 0,
+        named.join(', '),
+      );
+      await everyPage(`${label}'s page`);
+    }
+    // A game between two other schools: its final score, and no box score to show.
+    const other = schools.find((s) => !opponents.includes(s) && s !== tracked);
+    const [elsewhere] = other === undefined ? [] : await gamesOf(other);
+    if (elsewhere !== undefined) {
+      const game = await open(elsewhere);
+      note(
+        "another school's game shows its final score only",
+        game.status === 200 &&
+          has(game.text, 'Only the final score was recorded') &&
+          (await page.locator('main table.ui-box-score').count()) === 0,
+        game.text.slice(0, 400),
+      );
+      await everyPage(`${other.name}'s game page`);
     }
   });
 }
