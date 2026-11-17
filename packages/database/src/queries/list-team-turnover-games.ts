@@ -1,39 +1,61 @@
-// The final games of a season, not in the bin, whose saved plays hold a turnover charged
-// to a team rather than a player (step 2.196, the numbers audit's H1): each with its two
-// teams and the engine's saved state as stored. Core reads the team's own count out of the
-// state with the engine (teamOwnCounts), as a game's page does, and adds it to the team's
-// season totals; the query only picks the games that have such a play, so a season's
-// statistics never read every game's plays. A play taken back stays in the plays with the
-// play that takes it back, so the engine, not this query, says what stands.
+// The turnovers charged to a team rather than a player in each final game of a season,
+// not in the bin (step 2.196, the numbers audit's H1): a row per team and game where the
+// team was charged any, with whether the game is counted already among the games its
+// turnovers were recorded in (a line of one of its players who came on carries turnovers).
+// Core adds them to the team's season totals (statistics-source.ts).
+//
+// Counted from the saved plays, per side: the team turnovers less those taken back. That
+// is the engine's own count (packages/sports, `derive`, `teamTurnovers`): Undo takes a
+// play out of the plays (onto the redo stack), and the engine refuses a take-back while
+// the team has none standing, so every take-back in the plays took one back. A game's
+// page reads the same count by the engine itself (teamOwnCounts); the tests hold the two
+// to the same number. Only the count leaves the database, never a game's saved state.
 import { sql } from 'kysely';
-import type { TeamTurnoverGame } from '@srleagues/core';
+import type { TeamOwnTurnoversRecord } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
-/** A play of the engine's that is charged to a team itself (packages/sports, `team-turnover`). */
+/** A play of the engine's charged to a team itself (packages/sports, `team-turnover`). */
 const teamTurnoverPlay = JSON.stringify([{ type: 'team-turnover' }]);
 
 export async function listTeamTurnoverGames(
   scope: LeagueScope,
   seasonId: string,
-): Promise<TeamTurnoverGame[]> {
+): Promise<TeamOwnTurnoversRecord[]> {
   const result = await sql<{
     game_id: string;
-    home_team_id: string;
-    away_team_id: string;
-    state: unknown;
+    team_id: string;
+    turnovers: string;
+    counted: boolean;
   }>`
-    select g.id as game_id, g.home_team_id, g.away_team_id, s.state
-      from games g
-      join game_states s on s.league_id = g.league_id and s.game_id = g.id
-     where g.league_id = ${scope.leagueId} and g.season_id = ${seasonId}
-       and g.status = 'final' and g.deleted_at is null
-       and jsonb_typeof(s.state -> 'plays') = 'array'
-       and s.state -> 'plays' @> ${teamTurnoverPlay}::jsonb
-     order by g.id`.execute(transactionOf(scope));
+    select game_id, team_id, turnovers::text, counted
+      from (
+        select g.id as game_id,
+               case t.side when 'home' then g.home_team_id else g.away_team_id end as team_id,
+               (select count(*) filter (where p ->> 'type' = 'team-turnover')
+                     - count(*) filter (where p ->> 'type' = 'team-unturnover')
+                  from jsonb_array_elements(s.state -> 'plays') p
+                 where p ->> 'side' = t.side) as turnovers,
+               exists (
+                 select 1 from player_game_stats l
+                  where l.league_id = g.league_id and l.game_id = g.id and l.played
+                    and l.team_id = case t.side when 'home' then g.home_team_id
+                                                else g.away_team_id end
+                    and jsonb_typeof(l.stats -> 'turnovers') = 'number'
+               ) as counted
+          from games g
+          join game_states s on s.league_id = g.league_id and s.game_id = g.id
+          cross join (values ('home'), ('away')) as t (side)
+         where g.league_id = ${scope.leagueId} and g.season_id = ${seasonId}
+           and g.status = 'final' and g.deleted_at is null
+           and jsonb_typeof(s.state -> 'plays') = 'array'
+           and s.state -> 'plays' @> ${teamTurnoverPlay}::jsonb
+      ) own
+     where turnovers > 0
+     order by game_id, team_id`.execute(transactionOf(scope));
   return result.rows.map((row) => ({
     gameId: row.game_id,
-    homeTeamId: row.home_team_id,
-    awayTeamId: row.away_team_id,
-    state: row.state,
+    teamId: row.team_id,
+    turnovers: Number(row.turnovers),
+    countedByLines: row.counted,
   }));
 }

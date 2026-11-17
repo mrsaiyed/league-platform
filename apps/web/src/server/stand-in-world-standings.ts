@@ -232,28 +232,42 @@ function standingsReadOver(s: ReadWorld | undefined): StandingsReadStore {
           return { teamId, statKey, total: sum.total, gamesRecorded: sum.games.size };
         });
     },
-    // As list-team-turnover-games.ts picks them: final games whose saved plays hold a
-    // turnover charged to a team, with the state as saved; core reads the count.
+    // As list-team-turnover-games.ts counts them: in each final game, per side, the team
+    // turnovers in the saved plays less those taken back, and whether a played line of
+    // the team carries turnovers.
     teamTurnoverGames: async (seasonId) => {
       const finals = decidedGames(seasonId).filter((g) => g.status === 'final');
-      return finals.flatMap((g) => {
+      const rows = finals.flatMap((g) => {
         const state = at()?.states.find((x) => x.gameId === g.id)?.state;
         const plays: unknown =
           typeof state === 'object' && state !== null
             ? (state as { plays?: unknown }).plays
             : undefined;
-        const teamTurnover =
-          Array.isArray(plays) &&
-          plays.some(
-            (play: unknown) =>
-              typeof play === 'object' &&
-              play !== null &&
-              (play as { type?: unknown }).type === 'team-turnover',
+        if (!Array.isArray(plays)) return [];
+        return (['home', 'away'] as const).flatMap((side) => {
+          const teamId = side === 'home' ? g.homeTeamId : g.awayTeamId;
+          const count = (type: string) =>
+            plays.filter(
+              (play: unknown) =>
+                typeof play === 'object' &&
+                play !== null &&
+                (play as { type?: unknown }).type === type &&
+                (play as { side?: unknown }).side === side,
+            ).length;
+          const turnovers = count('team-turnover') - count('team-unturnover');
+          const countedByLines = (at()?.lines ?? []).some(
+            (l) =>
+              l.gameId === g.id &&
+              l.teamId === teamId &&
+              l.played &&
+              typeof l.stats['turnovers'] === 'number',
           );
-        return teamTurnover
-          ? [{ gameId: g.id, homeTeamId: g.homeTeamId, awayTeamId: g.awayTeamId, state }]
-          : [];
+          return turnovers > 0 ? [{ gameId: g.id, teamId, turnovers, countedByLines }] : [];
+        });
       });
+      return rows.sort(
+        (a, b) => a.gameId.localeCompare(b.gameId) || a.teamId.localeCompare(b.teamId),
+      );
     },
     people: async (personIds) =>
       (at()?.people ?? [])

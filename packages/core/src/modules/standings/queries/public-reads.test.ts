@@ -1,5 +1,4 @@
 import { defaultSeasonRules } from '@srleagues/contracts';
-import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import { defaultNamePolicy, publicViewer, type Viewer } from '../../people/index.ts';
 import type { StandingsReadStore } from '../read-ports.ts';
@@ -206,21 +205,6 @@ describe('the statistics a season keeps (P7 §1, record 070)', () => {
 });
 
 describe("a team's season totals count what was charged to the team itself (step 2.196, H1)", () => {
-  /** The audit's case 18 in one game, by the engine: a team turnover and a player's. */
-  const case18 = (): basketball.GameState => {
-    const taps: basketball.Command[] = [
-      { type: 'lineup', side: 'home', playerIds: [openPlayer] },
-      { type: 'lineup', side: 'away', playerIds: [staffPlayer] },
-      { type: 'start' },
-      { type: 'team-turnover', side: 'home' },
-      { type: 'turnover', side: 'home', playerId: openPlayer },
-    ];
-    return taps.reduce(
-      (state, command, i) =>
-        basketball.apply(state, command, { id: `c${i}`, now: 1_000 * (i + 1) }),
-      basketball.newGame(),
-    );
-  };
   const full = { ...defaultSeasonRules(), statistics: 'full' as const };
   const storeWith = (over: Partial<StandingsReadStore>): StandingsReadStore => ({
     ...memoryStandingsRead(),
@@ -242,8 +226,9 @@ describe("a team's season totals count what was charged to the team itself (step
         { teamId: openTeam, statKey: 'turnovers', total: 1, gamesRecorded: 1 },
         { teamId: staffTeam, statKey: 'turnovers', total: 0, gamesRecorded: 1 },
       ],
+      // The audit's case 18: one charged to the team, one to its player, who came on.
       teamTurnoverGames: async () => [
-        { gameId: 'g18', homeTeamId: openTeam, awayTeamId: staffTeam, state: case18() },
+        { gameId: 'g18', teamId: openTeam, turnovers: 1, countedByLines: true },
       ],
     });
     expect(await turnoversOf(store, openTeam)).toEqual({ total: 2, gamesRecorded: 1, average: 2 });
@@ -252,21 +237,12 @@ describe("a team's season totals count what was charged to the team itself (step
   });
 
   it('counts a game where only the team itself was charged, with no player of it on, once', async () => {
-    const onlyTheTeam = [
-      { type: 'lineup', side: 'away', playerIds: [staffPlayer] },
-      { type: 'start' },
-      { type: 'team-turnover', side: 'home' },
-    ] satisfies basketball.Command[];
-    const state = onlyTheTeam.reduce(
-      (s, command, i) => basketball.apply(s, command, { id: `t${i}`, now: 1_000 * (i + 1) }),
-      basketball.newGame(),
-    );
     const store = storeWith({
       teamStatTotals: async () => [
         { teamId: openTeam, statKey: 'turnovers', total: 3, gamesRecorded: 2 },
       ],
       teamTurnoverGames: async () => [
-        { gameId: 'g9', homeTeamId: openTeam, awayTeamId: staffTeam, state },
+        { gameId: 'g9', teamId: openTeam, turnovers: 1, countedByLines: false },
       ],
     });
     expect(await turnoversOf(store, openTeam)).toEqual({
@@ -276,15 +252,17 @@ describe("a team's season totals count what was charged to the team itself (step
     });
   });
 
-  it('reads nothing of its own from a state the engine did not write', async () => {
+  it("gives a team with no turnover line of its own its team's turnovers, over that game", async () => {
     const store = storeWith({
-      teamStatTotals: async () => [
-        { teamId: openTeam, statKey: 'turnovers', total: 1, gamesRecorded: 1 },
-      ],
       teamTurnoverGames: async () => [
-        { gameId: 'gx', homeTeamId: openTeam, awayTeamId: staffTeam, state: { version: 1 } },
+        { gameId: 'g1', teamId: staffTeam, turnovers: 2, countedByLines: false },
+        { gameId: 'g2', teamId: staffTeam, turnovers: 1, countedByLines: false },
       ],
     });
-    expect(await turnoversOf(store, openTeam)).toEqual({ total: 1, gamesRecorded: 1, average: 1 });
+    expect(await turnoversOf(store, staffTeam)).toEqual({
+      total: 3,
+      gamesRecorded: 2,
+      average: 1.5,
+    });
   });
 });

@@ -1,6 +1,7 @@
-// Step 2.196 against the real database: the season's final games whose saved plays hold
-// a turnover charged to a team, with their teams and state, and no other game. The
-// two-league case is in ../isolation (public-reads-cases.test-helper.ts).
+// Step 2.196 against the real database: the turnovers charged to a team in each of the
+// season's final games, counted from the saved plays, are the engine's own count (the one
+// a game's page shows, teamOwnCounts) in every case here: undone, taken back, done again,
+// on both sides. The two-league case is in ../isolation (public-reads-cases.test-helper.ts).
 import { teamOwnCounts } from '@srleagues/core';
 import { basketball } from '@srleagues/sports';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -10,18 +11,12 @@ import { listTeamTurnoverGames } from './list-team-turnover-games.ts';
 
 let leagues: TwoLeagues;
 
-/** The engine's state after these taps: a turnover charged to the home team, and one undone. */
-const withTeamTurnover = (undone: boolean) => {
-  const taps: basketball.Command[] = [
-    { type: 'start' },
-    { type: 'team-turnover', side: 'home' },
-    ...(undone ? [{ type: 'undo' } as const] : []),
-  ];
-  return taps.reduce(
+/** The engine's state after these taps, a second apart. */
+const played = (taps: readonly basketball.Command[]) =>
+  taps.reduce(
     (state, command, i) => basketball.apply(state, command, { id: `c${i}`, now: 1_000 * (i + 1) }),
     basketball.newGame(),
   );
-};
 
 beforeAll(async () => {
   leagues = await openTwoLeagues();
@@ -41,26 +36,54 @@ const setState = async (gameId: string, state: unknown) =>
   ]);
 
 describe('listTeamTurnoverGames', () => {
-  it('lists nothing while no final game has a turnover charged to a team', async () => {
-    expect(await listed()).toEqual([]);
+  it("counts the seeded game's turnover charged to the away team, whose players have no line", async () => {
+    const { a } = leagues;
+    expect(await listed()).toEqual([
+      { gameId: a.gameId, teamId: a.opponentId, turnovers: 1, countedByLines: false },
+    ]);
   });
 
-  it('lists a final game with one, with its two teams and the state the engine reads', async () => {
+  it("gives the engine's own count, per side, however the plays went", async () => {
     const { a, pglite } = leagues;
-    await setState(a.gameId, withTeamTurnover(false));
-    const games = await listed();
-    expect(games.map((g) => [g.gameId, g.homeTeamId, g.awayTeamId])).toEqual([
-      [a.gameId, a.teamId, a.opponentId],
+    const start: basketball.Command[] = [{ type: 'start' }];
+    const home: basketball.Command = { type: 'team-turnover', side: 'home' };
+    const away: basketball.Command = { type: 'team-turnover', side: 'away' };
+    const cases: (readonly basketball.Command[])[] = [
+      [...start, home],
+      [...start, home, { type: 'undo' }],
+      [...start, home, { type: 'undo' }, { type: 'redo' }],
+      [...start, home, home, { type: 'team-unturnover', side: 'home' }],
+      [...start, home, { type: 'team-unturnover', side: 'home' }, home, home, away],
+      [...start, away, home, away, { type: 'team-unturnover', side: 'away' }, { type: 'undo' }],
+    ];
+    for (const taps of cases) {
+      const state = played(taps);
+      await setState(a.gameId, state);
+      const engine = teamOwnCounts(state);
+      const counted = new Map((await listed()).map((row) => [row.teamId, row.turnovers]));
+      expect(counted.get(a.teamId) ?? 0, JSON.stringify(taps)).toBe(engine.home.turnovers);
+      expect(counted.get(a.opponentId) ?? 0, JSON.stringify(taps)).toBe(engine.away.turnovers);
+    }
+    // A played line of the team that carries turnovers counts the game already.
+    await pglite.query(
+      `update player_game_stats set stats = stats || '{"turnovers": 0}' where game_id = $1`,
+      [a.gameId],
+    );
+    await setState(a.gameId, played([...start, home]));
+    expect(await listed()).toEqual([
+      { gameId: a.gameId, teamId: a.teamId, turnovers: 1, countedByLines: true },
     ]);
-    expect(teamOwnCounts(games[0]?.state).home.turnovers).toBe(1);
-    // An undone team turnover is still a play on the redo stack, never in the plays: not listed.
-    await setState(a.gameId, withTeamTurnover(true));
-    expect(await listed()).toEqual([]);
-    // A game that is not final, or is in the bin, is not counted in a season's totals.
-    await setState(a.gameId, withTeamTurnover(false));
+  });
+
+  it('leaves out a game that is not final, or is in the bin, and another season', async () => {
+    const { a, b, pglite } = leagues;
+    const withOne = JSON.stringify(
+      played([{ type: 'start' }, { type: 'team-turnover', side: 'home' }]),
+    );
+    await setState(a.gameId, played([{ type: 'start' }, { type: 'team-turnover', side: 'away' }]));
     await pglite.query(
       'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 1, $3)',
-      [a.leagueId, a.upcomingGameId, JSON.stringify(withTeamTurnover(false))],
+      [a.leagueId, a.upcomingGameId, withOne],
     );
     const binned = await pglite.query<{ id: string }>(
       `insert into games (league_id, season_id, stage_id, home_team_id, away_team_id, status,
@@ -71,14 +94,10 @@ describe('listTeamTurnoverGames', () => {
     );
     await pglite.query(
       'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 1, $3)',
-      [a.leagueId, binned.rows[0]?.id, JSON.stringify(withTeamTurnover(false))],
+      [a.leagueId, binned.rows[0]?.id, withOne],
     );
-    expect((await listed()).map((g) => g.gameId)).toEqual([a.gameId]);
-  });
-
-  it("never lists the other league's game, though it has one too", async () => {
-    const { b } = leagues;
-    await setState(b.gameId, withTeamTurnover(false));
-    expect((await listed()).map((g) => g.gameId)).not.toContain(b.gameId);
+    expect((await listed()).map((row) => row.gameId)).toEqual([a.gameId]);
+    // The other league's game has one too, in its own season: never counted here.
+    expect((await listed()).map((row) => row.gameId)).not.toContain(b.gameId);
   });
 });

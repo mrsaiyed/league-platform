@@ -92,15 +92,17 @@ export type TeamStatTotalRecord = {
 };
 
 /**
- * A final game whose saved plays hold a turnover charged to a team rather than a player
- * (step 2.196): its two teams and the engine's saved state, as stored. The games module
- * reads the team's own count out of it (teamOwnCounts), as the game's page does.
+ * The turnovers charged to a team rather than a player in one final game (step 2.196),
+ * as they stand in its saved plays: the engine's count, the one the game's page shows.
  */
-export type TeamTurnoverGame = {
+export type TeamOwnTurnoversRecord = {
   readonly gameId: string;
-  readonly homeTeamId: string;
-  readonly awayTeamId: string;
-  readonly state: unknown;
+  readonly teamId: string;
+  /** More than 0: a team charged none in a game has no record. */
+  readonly turnovers: number;
+  /** A line of one of the team's players who came on carries turnovers: the game is
+   * counted already among the games the team's turnovers were recorded in. */
+  readonly countedByLines: boolean;
 };
 
 /** What the name function (T-81) needs to know about a person, and nothing more. */
@@ -137,7 +139,7 @@ export type StandingsReadStore = {
     personIds: readonly string[],
   ) => Promise<readonly DecidedGameLines[]>;
   readonly teamStatTotals: (seasonId: string) => Promise<readonly TeamStatTotalRecord[]>;
-  /** The season's final games, not in the bin, with a turnover charged to a team. */
-  readonly teamTurnoverGames: (seasonId: string) => Promise<readonly TeamTurnoverGame[]>;
+  /** Each team's own turnovers in each of the season's final games, not in the bin. */
+  readonly teamTurnoverGames: (seasonId: string) => Promise<readonly TeamOwnTurnoversRecord[]>;
   readonly people: (personIds: readonly string[]) => Promise<readonly PersonDisplayRecord[]>;
 };

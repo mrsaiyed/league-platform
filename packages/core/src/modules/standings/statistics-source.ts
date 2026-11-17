@@ -3,7 +3,7 @@
 // before anything is ranked, so a rank, a gap in ranks or a count can never show that a
 // hidden player exists. Names come only through the one name function (T-81).
 import { seasonTotals, type CaptureMode, type StatsGame } from '@srleagues/sports';
-import { statisticsKept, teamOwnCounts } from '../games/index.ts';
+import { statisticsKept } from '../games/index.ts';
 import type { Audience } from '../leagues/index.ts';
 import {
   showName,
@@ -17,8 +17,8 @@ import type {
   PlayerTotalsRecord,
   SeasonTeamRow,
   StandingsReadStore,
+  TeamOwnTurnoversRecord,
   TeamStatTotalRecord,
-  TeamTurnoverGame,
 } from './read-ports.ts';
 
 /** Who is looking and how the league shows names. The server builds it, never the request. */
@@ -147,31 +147,25 @@ async function recompute(
 /**
  * A team's season total counts everything the team did (step 2.196, the numbers audit's
  * H1): the turnovers charged to the team itself, which are in no player's line, are
- * added to its turnovers, read by the engine from each game's saved plays as the game's
- * page reads them. A game counts once among the games a team's turnovers were recorded
- * in: it is counted already when a player of the team came on (a tracked game's lines
- * always carry turnovers), and added when none did.
+ * added to its turnovers, counted from each game's saved plays as the game's page counts
+ * them. A game counts once among the games a team's turnovers were recorded in: it is
+ * counted already when a line of one of the team's players carries turnovers (a tracked
+ * game's lines always do), and added when none does.
  */
 function addTeamTurnovers(
   totalsByTeam: Map<string, Record<string, StatEntry>>,
-  games: readonly TeamTurnoverGame[],
+  records: readonly TeamOwnTurnoversRecord[],
 ): void {
-  for (const game of games) {
-    const counts = teamOwnCounts(game.state);
-    for (const [teamId, own] of [
-      [game.homeTeamId, counts.home],
-      [game.awayTeamId, counts.away],
-    ] as const) {
-      if (own.turnovers === 0) continue;
-      const stats = totalsByTeam.get(teamId) ?? {};
-      const before = stats['turnovers'];
-      const counted = own.playersPlayed && before !== undefined;
-      stats['turnovers'] = entryOf(
-        (before?.total ?? 0) + own.turnovers,
-        (before?.gamesRecorded ?? 0) + (counted ? 0 : 1),
-      );
-      totalsByTeam.set(teamId, stats);
-    }
+  for (const own of records) {
+    if (own.turnovers <= 0) continue;
+    const stats = totalsByTeam.get(own.teamId) ?? {};
+    const before = stats['turnovers'];
+    const counted = own.countedByLines && before !== undefined;
+    stats['turnovers'] = entryOf(
+      (before?.total ?? 0) + own.turnovers,
+      (before?.gamesRecorded ?? 0) + (counted ? 0 : 1),
+    );
+    totalsByTeam.set(own.teamId, stats);
   }
 }
 
