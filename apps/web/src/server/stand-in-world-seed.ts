@@ -84,6 +84,9 @@ type TeamSpec = {
   readonly statsVisibility: 'everyone' | 'staff';
 };
 
+/** The adult league's Owls: their players' numbers are staff only (S-22). */
+export const standInOwlsTeamId = team(3);
+
 export const adultTeams: readonly TeamSpec[] = [
   {
     id: team(1),
@@ -102,7 +105,7 @@ export const adultTeams: readonly TeamSpec[] = [
     statsVisibility: 'everyone',
   },
   {
-    id: team(3),
+    id: standInOwlsTeamId,
     name: 'Owls',
     slug: 'owls',
     color: '#5b3f9a',

@@ -252,6 +252,10 @@ export const enSite = {
   // Between two sentences of one note under a title.
   'stats.noteJoin': ' ',
   'stats.showBy': 'Show',
+  // Above the numbers a signed-in coach, captain or admin sees beyond the public's (step 2.46).
+  'stats.staffNumbers.text':
+    "The players' numbers of {teams} are shown only to the team's staff and the league's admins. Visitors see the team's totals only, so please keep these to yourself.",
+  'stats.staffNumbers.title': 'Not public: shown to you as staff',
   'stats.teams': 'Teams',
   'stats.teamsJoin': ', ',
   'stats.teamsTotalsOnly': 'Only team totals are shown for {teams}.',

@@ -76,7 +76,7 @@ import {
   standInMemberAccountId,
   standInStaffSignIns,
 } from './stand-in-sign-ins.ts';
-import { madeUpLeagues } from './stand-in-world-seed.ts';
+import { madeUpLeagues, standInOwlsTeamId } from './stand-in-world-seed.ts';
 import { madeUpWorld } from './stand-in-world.ts';
 import { answersOnlyHere, isLocalOrTestHost } from './this-computer.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
@@ -129,6 +129,11 @@ const grants = [
   // A scorekeeper still holding the role in an archived league is told it is archived,
   // not "no access" (step 2.33).
   grantOf(13, scorekeeper.accountId, 'scorekeeper', standInLeagues.archived.id),
+  // The Owls' coach, by a role on that one team (stand-in-world-seed.ts, adultTeams).
+  grantOf(14, standInPeople.teamCoach.accountId, 'coach', standInLeagues.live.id, {
+    type: 'team',
+    id: standInOwlsTeamId,
+  }),
 ];
 
 const leagues: readonly (typeof standInLeagues)[keyof typeof standInLeagues][] =

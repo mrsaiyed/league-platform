@@ -38,6 +38,11 @@ export const standInPeople = {
   programScheduler: { accountId: id(0xaa), token: 'local-program-scheduler-token' },
   /** The admin of another league, a draft too, and nothing in the others. */
   otherAdmin: { accountId: id(0xab), token: 'local-other-admin-token' },
+  /**
+   * The coach of the live league's Owls, a team whose players' numbers are staff only, by
+   * a coach role on that team alone (step 2.46): sees those numbers, and no other team's.
+   */
+  teamCoach: { accountId: id(0xad), token: 'local-team-coach-token' },
 } as const satisfies Record<string, MadeUpPerson>;
 
 function league(
