@@ -52,6 +52,7 @@ const rosters: DeviceRosters = {
   home: { teamId: 'hawks', name: 'Hawks', players: teamOf(3, 'Hawkins', names.home) },
   away: { teamId: 'bears', name: 'Bears', players: teamOf(4, 'Bearsley', names.away) },
   uniqueJerseys: false,
+  allowTies: false,
 };
 const hawkBench = standInPlayerId(3, 6);
 const bearBench = standInPlayerId(4, 6);

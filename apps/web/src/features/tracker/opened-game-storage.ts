@@ -38,12 +38,15 @@ export type DeviceTeam = {
 /**
  * The game's two teams as the device keeps them, and whether the season wants unique
  * numbers (S-37): what the page hands the device and what the rosters address gives
- * it again (record 058), with the teams' names.
+ * it again (record 058), with the teams' names. Since step 2.37 also whether a level
+ * score may end the game (S-73), so End game is refused on the device at once when it
+ * may not, with or without a signal.
  */
 export type DeviceRosters = {
   readonly home: DeviceTeam;
   readonly away: DeviceTeam;
   readonly uniqueJerseys: boolean;
+  readonly allowTies: boolean;
 };
 
 /** The game format the scorekeeper is asked to confirm (P7 §1, §5.1). */
