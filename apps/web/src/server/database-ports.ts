@@ -66,6 +66,7 @@ export type DatabaseQueries = Pick<
   | 'commandTransaction'
   | 'findLeagueByShortName'
   | 'findCurrentLeague'
+  | 'databaseAnswers'
   | 'findAccountOfSignIn'
   | 'accountForSignIn'
   | 'isSignInLinkConflict'
@@ -273,6 +274,8 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     publishPlays: async () => {},
     liveFeed: null,
     madeUpWorld: false,
+    // The health check asks the database itself (health.ts).
+    databaseCheck: () => database.databaseAnswers(db),
     // Carrying the local tools, only requests made on this computer (step 2.96).
     answers:
       options.localTools === undefined || options.localTools === null

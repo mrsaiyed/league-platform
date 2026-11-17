@@ -10,12 +10,17 @@ import {
 } from './config-schema.ts';
 
 const longValue = (name: string) => `value-of-${name.toLowerCase()}-0123456789-abcdefghij`;
+/** A made-up certificate's shape: what the setting checks, not a real one. */
+const madeUpCertificate =
+  '-----BEGIN CERTIFICATE-----\nMADEUPmadeup0123\n-----END CERTIFICATE-----';
 const valid: Record<ConfigName, string> = {
   APP_ENV: 'test',
   PUBLIC_BASE_URL: 'http://localhost:3000',
   LOG_LEVEL: 'debug',
   TRUSTED_PROXY: 'one',
   PLATFORM_DATABASE_URL: 'postgres://app:hunter2-made-up@localhost:5432/x',
+  PLATFORM_DATABASE_SSL: 'verify',
+  PLATFORM_DATABASE_CA: madeUpCertificate,
   LOCAL_DATA: 'stand-in',
   LOCAL_DESIGN: 'crest-light',
   LOCAL_NOW: '2026-11-15T20:01:00Z',
@@ -171,6 +176,45 @@ describe('loadConfig', () => {
     ]);
     expect(error.message).not.toContain('tracker-made-up');
     expect(Object.values(loadConfig({ ...valid, DATABASE_URL: tracker }))).not.toContain(tracker);
+  });
+
+  it('reaches the database over SSL with its certificate checked unless it is on this computer (record 081)', () => {
+    expect(loadConfig(production).PLATFORM_DATABASE_SSL).toBe('verify');
+    const remote = 'postgres://app:hunter2-made-up@db.made-up.example.test:5432/x';
+    // No SSL only for a database on this computer.
+    expect(loadConfig({ ...production, PLATFORM_DATABASE_SSL: 'off' }).PLATFORM_DATABASE_SSL).toBe(
+      'off',
+    );
+    const offRemote = failure({
+      ...production,
+      PLATFORM_DATABASE_URL: remote,
+      PLATFORM_DATABASE_SSL: 'off',
+    });
+    expect(offRemote.invalid).toEqual([
+      'PLATFORM_DATABASE_SSL: invalid, "off" is allowed only for a database on this computer (an address naming localhost); any other is reached over SSL with its certificate checked',
+    ]);
+    expect(offRemote.message).not.toContain('hunter2-made-up');
+    // Never SSL without the check: the only other word is refused.
+    expect(failure({ ...production, PLATFORM_DATABASE_SSL: 'no-verify' }).invalid.join()).toContain(
+      'PLATFORM_DATABASE_SSL: invalid, not one of the allowed values',
+    );
+    // The certificate is a certificate, and only where SSL is on.
+    const certificate = { ...production, PLATFORM_DATABASE_URL: remote };
+    expect(
+      loadConfig({ ...certificate, PLATFORM_DATABASE_CA: madeUpCertificate }).PLATFORM_DATABASE_CA,
+    ).toBe(madeUpCertificate);
+    expect(failure({ ...certificate, PLATFORM_DATABASE_CA: 'not a certificate' }).invalid).toEqual([
+      'PLATFORM_DATABASE_CA: invalid, must be the server’s certificate as PEM text, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----',
+    ]);
+    expect(
+      failure({
+        ...production,
+        PLATFORM_DATABASE_SSL: 'off',
+        PLATFORM_DATABASE_CA: madeUpCertificate,
+      }).invalid,
+    ).toEqual([
+      'PLATFORM_DATABASE_CA: invalid, a certificate is checked only over SSL, and PLATFORM_DATABASE_SSL is "off"',
+    ]);
   });
 
   it('refuses a platform address that is the tracker’s DATABASE_URL, before connecting', () => {

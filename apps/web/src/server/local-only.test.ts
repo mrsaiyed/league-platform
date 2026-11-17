@@ -65,6 +65,7 @@ function portsCarrying(localTools: LocalTools | null): object {
   const target: Record<string, unknown> = {
     localTools,
     madeUpWorld: false,
+    databaseCheck: async () => true,
     answers: () => true,
     newRequestId: () => 'made-up-request',
     findLeague: async () => undefined,

@@ -1,7 +1,8 @@
 // A database of made-up data, in memory, for running the apps on one computer and for
 // their tests (T-195, T-201): every migration applied, the made-up seed leagues loaded,
-// and then logged in as a login role fit for the app (T-60): a member of app_user that
-// is not a superuser and owns nothing, as a hosted login is meant to be. So the app's
+// and then logged in as a login role fit for the app (T-60): a member of app_user (and of
+// sign_in_store, record 052) that is not a superuser and owns nothing, as a hosted login
+// is meant to be. So the app's
 // start-up check (checkLoginRole) passes here for the same reasons it must pass on a
 // hosted database, and the app's queries run as that login, not as the superuser.
 // That shows the app needs no more than the login's powers; it is not a wall. The
@@ -87,6 +88,7 @@ export async function madeUpDatabase(options: MadeUpOptions = {}): Promise<MadeU
     await pglite.exec(`
       create role ${madeUpLoginRole} login nosuperuser nocreatedb nocreaterole nobypassrls;
       grant app_user to ${madeUpLoginRole};
+      grant sign_in_store to ${madeUpLoginRole};
       set session authorization ${madeUpLoginRole};
     `);
     return {

@@ -48,6 +48,11 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * myLeagues may turn them into a list, in its one caller (signed-in-leagues.ts).
    */
   readonly leaguesOfAccount: (accountId: string) => Promise<readonly AccountLeagueRow[]>;
+  /**
+   * Whether the database answers right now, for the health check (health.ts): true or
+   * false, never an error. Null on the made-up stand-in, which has no database.
+   */
+  readonly databaseCheck: (() => Promise<boolean>) | null;
   /** What the admin's League settings screen runs on (step 2.48). */
   readonly adminSettings: AdminSettingsPorts;
   /** What the admin's Teams screens read and run (step 2.51). */

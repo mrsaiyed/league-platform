@@ -502,6 +502,8 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     }),
     liveFeed: (request) => hub.serve(request),
     madeUpWorld: true,
+    // The made-up world in memory: no database for the health check to ask.
+    databaseCheck: null,
     // The made-up owner's cookie is in the code and the world takes writes. Other computers
     // cannot connect at all: the server listens on the loopback address alone
     // (scripts/web-listen.mjs). This keeps out what can still arrive on this computer

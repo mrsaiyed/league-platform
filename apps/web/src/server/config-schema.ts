@@ -2,6 +2,7 @@
 // them. It takes the environment as an argument and never reads process.env itself,
 // so tests can hand it any set of values. config.ts reads the real environment once.
 import {
+  addressOnThisComputer,
   platformDatabaseProblem,
   platformServiceProblem,
   trackerProjectProblem,
@@ -26,6 +27,8 @@ export const fields = {
   LOG_LEVEL: { secret: false },
   TRUSTED_PROXY: { secret: false },
   PLATFORM_DATABASE_URL: { secret: true },
+  PLATFORM_DATABASE_SSL: { secret: false },
+  PLATFORM_DATABASE_CA: { secret: false },
   LOCAL_DATA: { secret: false },
   LOCAL_DESIGN: { secret: false },
   LOCAL_NOW: { secret: false },
@@ -63,6 +66,25 @@ const schema = z.object({
     .trim()
     .regex(/^postgres(?:ql)?:\/\//, 'must be a postgres:// address')
     .optional(),
+  // How the connection to PLATFORM_DATABASE_URL is encrypted (record 081): 'verify', the
+  // default, is SSL with the server's certificate checked, against PLATFORM_DATABASE_CA when
+  // it is given, else the system's certificate authorities; 'off' is no SSL, allowed only
+  // for a database on this computer (its address names localhost), where no network lies
+  // between. There is no way to use SSL without checking the certificate. The address
+  // itself cannot change this: its ssl settings are taken out (create-database.ts).
+  PLATFORM_DATABASE_SSL: z.enum(['verify', 'off']).default('verify'),
+  // The database server's certificate authority, as PEM text (Supabase's is not one the
+  // system knows: it is downloaded from the project's database settings, as for
+  // MIGRATION_DATABASE_CA). Public, not a secret; a value that is not a certificate is
+  // refused.
+  PLATFORM_DATABASE_CA: z
+    .string()
+    .trim()
+    .regex(
+      /^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$/,
+      'must be the server’s certificate as PEM text, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----',
+    )
+    .optional(),
   // What local work and tests run on (record 055): 'stand-in', the made-up leagues in
   // this process's memory (the default), or 'made-up-database', the made-up seed
   // leagues in a database in memory with every migration. Only local and test read it.
@@ -97,6 +119,8 @@ const optional: readonly ConfigName[] = [
   'LOG_LEVEL',
   'TRUSTED_PROXY',
   'PLATFORM_DATABASE_URL',
+  'PLATFORM_DATABASE_SSL',
+  'PLATFORM_DATABASE_CA',
   'LOCAL_DATA',
   'LOCAL_DESIGN',
   'LOCAL_NOW',
@@ -202,6 +226,22 @@ export function loadConfig(
       ? undefined
       : platformDatabaseProblem('PLATFORM_DATABASE_URL', database, facts);
   if (databaseProblem !== undefined) invalid.set('PLATFORM_DATABASE_URL', databaseProblem);
+  // No SSL only where no network lies between: a database on this computer (record 081).
+  if (
+    given['PLATFORM_DATABASE_SSL'] === 'off' &&
+    (database === undefined || addressOnThisComputer(database) !== true)
+  ) {
+    invalid.set(
+      'PLATFORM_DATABASE_SSL',
+      'PLATFORM_DATABASE_SSL: invalid, "off" is allowed only for a database on this computer (an address naming localhost); any other is reached over SSL with its certificate checked',
+    );
+  }
+  if (given['PLATFORM_DATABASE_SSL'] === 'off' && given['PLATFORM_DATABASE_CA'] !== undefined) {
+    invalid.set(
+      'PLATFORM_DATABASE_CA',
+      'PLATFORM_DATABASE_CA: invalid, a certificate is checked only over SSL, and PLATFORM_DATABASE_SSL is "off"',
+    );
+  }
   const service = given['SUPABASE_URL'];
   const serviceProblem =
     service === undefined ? undefined : platformServiceProblem('SUPABASE_URL', service, facts);
