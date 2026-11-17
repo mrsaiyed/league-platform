@@ -82,6 +82,7 @@ const rowFor = (target: LeagueRecords): StandingsRow => ({
   points: null,
   streak: { result: 'won', length: 2 },
   decidedBy: null,
+  level: null,
   adjustments: [],
 });
 
