@@ -114,6 +114,8 @@ None contains real people.
 
 _Stage 1 (step 1.21):_ stage 1 seeds two simple made-up leagues (`npm run seed`, data in `packages/database/src/seed/`): different designs, an owner, an admin and other members, one season, divisions, teams and people. The Faraj-like league, the Al-Hadi-like demo league and the generated association above come in later stages, as further entries of the same seed data. Until the design editor exists, a seed league's design is kept in the seed data, not in the database (T-185).
 
+_Stage 2 (step 2.59):_ `npm run seed` loads three leagues. The two of stage 1 have their season under way: divisions, venues, teams, rosters, a published schedule, final scores and one game scored live through the tracker. The third is the demo-like league above, made up and shaped like a large association (not a copy of one): one program, a 2026–27 season, four districts, 24 teams, every game final, loaded through the product's own fixture import from `supabase/seed/demo-league/fixtures.csv` (which doubles as the template for real results), and one team's games scored live, brought in by the tracker transfer from a made-up backup; every other team's players' statistics are for staff only. The web app's made-up database holds it too. The Faraj-like league and the generated association are still to come.
+
 ## 12. What every command records
 
 **T-196:** each command logs its name, league, acting account, how long it took and whether it succeeded, tagged with an ID shared by everything in the same request. When something goes wrong at 8 pm on a Sunday, the question "what happened to this game?" has an answer.

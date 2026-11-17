@@ -73,6 +73,9 @@ describe('startWebApp', () => {
     expect(database).toHaveBeenCalledOnce();
     expect(await ports.findLeague('lakeside')).toMatchObject({ slug: 'lakeside' });
     expect(await ports.findLeague('north-valley')).toBeUndefined();
+    // The seed's demo-shaped league is there too, for the pages a demo is shown (step 2.59).
+    const { demoLeague } = await import('@srleagues/database');
+    expect(await ports.findLeague(demoLeague.slug)).toMatchObject({ slug: demoLeague.slug });
     // The made-up member signs in on the sign-in stand-in, as on the stand-in.
     const signedIn = await ports.signIn.signIn({
       email: 'member@example.test',
