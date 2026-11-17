@@ -435,7 +435,8 @@ const states = [
   },
   {
     name: '35-end-of-period',
-    about: 'the last period’s clock ran out: "End of H2."',
+    about:
+      'the last period’s clock ran out: "End of H2.", and since step 2.37 End game offered in the pad when a team is ahead',
     run: async (page) => {
       const c = court(page);
       // Two team fouls for the home team and one for the visitors in the second half:
@@ -445,7 +446,8 @@ const states = [
       await c.play('away', 21, 'foul');
       await c.setClock('2');
       await c.startClock().catch(() => undefined);
-      await c.pickPeriodButton.waitFor();
+      // The way to the next period at a level score, End game with a team ahead.
+      await c.pickPeriodButton.or(c.endOffer).first().waitFor();
     },
   },
   {

@@ -2306,6 +2306,22 @@ export async function clockSteps(kit) {
 
       await c.setClock('1');
       await c.startClock().catch(() => undefined);
+      // Since step 2.37 the pad's first line at 0:00 is End game when the last period (or
+      // an overtime) has run out with a team ahead, and the way to the next period at any
+      // other 0:00. This game is past regulation by now: whichever its score calls for is
+      // checked where it is, and then the way to the next period as before, at the 0:00
+      // of an earlier period.
+      await c.pickPeriodButton.or(c.endOffer).first().waitFor();
+      if (await c.endOffer.isVisible()) {
+        await page.waitForTimeout(3400);
+        await atEverySize('the last period over, a team ahead', async (size, label) => {
+          note(`${label}: End game is offered whole in the pad`, await wholeInPad(c.endOffer));
+          await restFits(page, label, 'offered');
+        });
+        await c.pickPeriod(1);
+        await c.setClock('1');
+        await c.startClock().catch(() => undefined);
+      }
       await c.pickPeriodButton.waitFor();
       await page.waitForTimeout(3400);
       await atEverySize('the period over', async (size, label) => {
