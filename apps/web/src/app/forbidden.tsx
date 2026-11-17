@@ -11,6 +11,7 @@ import { siteOfThisRequest } from '../server/league-site.ts';
 import {
   leagueViewOfAddress,
   requestPath,
+  rolesHere,
   signedInEmail,
   staffViewOfAddress,
 } from '../server/load-league-page.ts';
@@ -58,8 +59,9 @@ async function nameOf(view: LeagueView | null): Promise<string | null> {
  *
  * The session is read once per request, shared with the page (this-request.ts); if it
  * cannot be read the screen is a visitor's. Next.js keeps this screen from the last whole
- * page it sent; when it comes into view after the browser moved on without one, it is
- * drawn again for whoever is signed in now (RefusalFresh, features/shell/refusal-fresh.tsx).
+ * page it sent; when it comes into view after the browser moved on without one, nothing
+ * is drawn until it has been drawn again for whoever is signed in now (RefusalFresh,
+ * features/shell/refusal-fresh.tsx). Staff are told their own roles in this league.
  */
 export default async function Forbidden() {
   // Next.js draws this screen into every page it sends, before it is known whether the
@@ -74,23 +76,28 @@ export default async function Forbidden() {
     view,
     leagueName: await orNull(() => nameOf(view)),
     path,
+    roles: email === null ? [] : ((await orNull(rolesHere)) ?? []),
   });
   const staff =
     screen.kind === 'staff' && view !== null && isStaffAddress(view.context.league, path)
       ? await orNull(staffViewOfAddress)
       : null;
+  // RefusalFresh is outermost in both, so a copy kept from an earlier load (the admin's
+  // frame of the person signed in before, say) is never drawn while the fresh one comes.
   if (staff !== null) {
     return (
-      <StaffFrame view={staff}>
-        <RefusalPage screen={screen} />
-        <RefusalFresh />
-      </StaffFrame>
+      <RefusalFresh>
+        <StaffFrame view={staff}>
+          <RefusalPage screen={screen} />
+        </StaffFrame>
+      </RefusalFresh>
     );
   }
   return (
-    <StandalonePage>
-      <RefusalPage screen={screen} />
-      <RefusalFresh />
-    </StandalonePage>
+    <RefusalFresh>
+      <StandalonePage>
+        <RefusalPage screen={screen} />
+      </StandalonePage>
+    </RefusalFresh>
   );
 }

@@ -30,20 +30,32 @@ const email = 'sky@example.test';
 const name = 'North Valley League';
 const drawn = (screen: ReturnType<typeof refusalScreenOf>) =>
   renderToStaticMarkup(createElement(RefusalPage, { screen }));
+const keys = (screen: ReturnType<typeof refusalScreenOf>) => screen.says.map((s) => s.key);
 const ways = (screen: ReturnType<typeof refusalScreenOf>) =>
   [screen.action, ...screen.also].map((way) => [way.label, way.href]);
 
 describe('refusalScreenOf', () => {
-  it('tells staff that their role does not include the page, and leads back to the admin', () => {
-    const screen = refusalScreenOf({ email, view: viewOf(['schedule']), leagueName: name, path });
+  it('tells staff their own role, that it does not include the page, and leads to the admin', () => {
+    const screen = refusalScreenOf({
+      email,
+      view: viewOf(['schedule']),
+      leagueName: name,
+      path,
+      roles: ['scheduler'],
+    });
     expect(screen.kind).toBe('staff');
-    expect(screen.says).toEqual(['access.noAccess.notYourRole', 'access.noAccess.signedInAs']);
+    expect(keys(screen)).toEqual([
+      'access.noAccess.youAre',
+      'access.noAccess.notYourRole',
+      'access.noAccess.signedInAs',
+    ]);
     expect(ways(screen)).toEqual([
       ['admin.backToAdmin', '/north-valley/admin'],
       ['access.noAccess.backToLeague', '/north-valley?start=league'],
       ['access.noAccess.switch', '/signin?next=%2Fnorth-valley%2Fadmin%2Fpeople'],
     ]);
     const html = drawn(screen);
+    expect(html).toContain('You are a scheduler in this league.');
     expect(html).toContain(
       'Your role in this league does not include this page. If it should, ask the league&#x27;s owner or an admin.',
     );
@@ -60,26 +72,56 @@ describe('refusalScreenOf', () => {
     expect(screen.action.href).toBe('/north-valley/admin');
   });
 
-  it('tells anyone else signed in that this account does not help run the league', () => {
+  it('names both roles of someone who holds two, plainly', () => {
+    const html = drawn(
+      refusalScreenOf({
+        email,
+        view: viewOf(['schedule', 'games']),
+        leagueName: name,
+        path,
+        roles: ['scheduler', 'coach'],
+      }),
+    );
+    expect(html).toContain('You are a scheduler and a coach in this league.');
+  });
+
+  it('tells anyone else signed in that the page is for the people who run the league', () => {
     // A coach, a member or a stranger: no area of the admin here.
     const screen = refusalScreenOf({ email, view: viewOf([]), leagueName: name, path });
     expect(screen.kind).toBe('outsider');
-    expect(screen.says).toEqual(['access.noAccess.notStaff', 'access.noAccess.signedInAs']);
+    expect(keys(screen)).toEqual(['access.noAccess.notStaff', 'access.noAccess.signedInAs']);
     expect(ways(screen)).toEqual([
       ['access.noAccess.backToLeague', '/north-valley?start=league'],
       ['access.noAccess.switch', '/signin?next=%2Fnorth-valley%2Fadmin%2Fpeople'],
     ]);
     const html = drawn(screen);
-    expect(html).toContain('This account does not help run this league.');
+    expect(html).toContain(
+      'This page is for the people who run North Valley League. If you should be one of them, ask the league&#x27;s owner or an admin.',
+    );
     expect(html).not.toContain('Back to the admin');
+    // A coach is not told their role: nothing of roles is said to anyone outside the staff.
+    const coach = drawn(
+      refusalScreenOf({ email, view: viewOf([]), leagueName: name, path, roles: ['coach'] }),
+    );
+    expect(coach).not.toContain('coach');
   });
 
-  it('offers nobody signed in "Sign in", and says nothing of roles or areas', () => {
-    for (const areas of [[], ['schedule'], ['games']] as const) {
-      const html = drawn(refusalScreenOf({ email, view: viewOf(areas), leagueName: name, path }));
+  it('offers nobody signed in "Sign in", and names no role or area but the person’s own', () => {
+    const cases = [
+      [[], []],
+      [['schedule', 'games'], ['scheduler']],
+      [['games'], ['scorekeeper']],
+    ] as const;
+    for (const [areas, own] of cases) {
+      const html = drawn(
+        refusalScreenOf({ email, view: viewOf(areas), leagueName: name, path, roles: own }),
+      );
       expect(html).not.toMatch(/>Sign in</);
       expect(html).not.toContain('/signin"');
-      for (const word of ['scheduler', 'Schedule', 'People', 'Games', 'admin areas']) {
+      const others = ['admin', 'registrar', 'scheduler', 'editor', 'scorekeeper', 'club admin']
+        .map((role) => `a ${role}`)
+        .filter((phrase) => !own.some((role) => phrase === `a ${role}`));
+      for (const word of [...others, 'an admin in', 'Schedule', 'People', 'Games', 'areas']) {
         expect(html).not.toContain(word);
       }
     }
@@ -88,12 +130,12 @@ describe('refusalScreenOf', () => {
   it('keeps staff and outsiders apart when the league’s name cannot be read', () => {
     const staff = refusalScreenOf({ email, view: viewOf(['schedule']), leagueName: null, path });
     expect(staff.kind).toBe('staff');
-    expect(staff.says[0]).toBe('access.noAccess.notYourRole');
+    expect(keys(staff)[0]).toBe('access.noAccess.notYourRole');
     expect(staff.action.label).toBe('admin.backToAdmin');
     expect(drawn(staff)).toContain('Back to north-valley');
     const other = refusalScreenOf({ email, view: viewOf([]), leagueName: null, path });
     expect(other.kind).toBe('outsider');
-    expect(drawn(other)).toContain('This account does not help run this league.');
+    expect(drawn(other)).toContain('This page is for the people who run north-valley.');
   });
 
   it('names no league it was not given as one that may be shown', () => {
@@ -114,7 +156,7 @@ describe('refusalScreenOf', () => {
     ] as const) {
       const screen = refusalScreenOf({ email: given, view, leagueName: name, path });
       expect(screen.kind).toBe('visitor');
-      expect(screen.says).toEqual(['access.noAccess.body']);
+      expect(keys(screen)).toEqual(['access.noAccess.body']);
       expect(ways(screen)).toEqual([
         ['nav.signIn', '/signin?next=%2Fnorth-valley%2Fadmin%2Fpeople'],
       ]);
@@ -129,7 +171,7 @@ describe('refusalScreenOf', () => {
       refusalScreenOf({ email: null, view: null, leagueName: null, path }),
     ];
     for (const screen of screens) {
-      for (const key of [...screen.says, ...ways(screen).map(([label]) => label)]) {
+      for (const key of [...keys(screen), ...ways(screen).map(([label]) => label)]) {
         expect(en).toHaveProperty([key as string]);
       }
     }

@@ -5,15 +5,16 @@
 // a form is sent, for instance. So when the session changed in between (another account
 // signed in on this device, in another tab) or the refused address is not the one the copy
 // was drawn for, the copy named the account signed in before and the admin it had, and led
-// back to the wrong place. When the refusal comes into view that way, this asks the server
-// for the page again, once, and Next.js draws the refusal afresh for whoever is signed in
-// now. A refusal that came with its own whole page is already fresh and asks nothing. With
-// scripts off this does nothing, and neither the refusal nor "Page not found" is drawn at
-// all: Next.js 16.4 sends a refused page as an empty shell that only its script fills in
-// (record 020). Drawing them without scripts is step 2.217. It draws nothing and holds no
-// words.
+// back to the wrong place. When the refusal comes into view that way, this draws nothing,
+// asks the server for the page again, once, and draws the refusal only when the fresh one
+// has come, for whoever is signed in now: on a slow connection the person sees the page go
+// blank for a moment, never another account's name. A refusal that came with its own whole
+// page is already fresh, and is drawn at once. With scripts off this does nothing, and
+// neither the refusal nor "Page not found" is drawn at all: Next.js 16.4 sends a refused
+// page as an empty shell that only its script fills in (record 020). Drawing them without
+// scripts is step 2.217. It holds no words.
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState, useTransition, type ReactNode } from 'react';
 
 /** Whether this document's first page has come into view: anything after it was moved to. */
 let documentShown = false;
@@ -32,16 +33,27 @@ export function DocumentShown() {
   return null;
 }
 
-/** Put in the refusal: draws it again from the server when it came from an earlier load. */
-export function RefusalFresh() {
+/** Whether a refusal coming into view now is a copy kept from an earlier load. */
+function keptFromEarlier(): boolean {
+  if (!documentShown) return false;
+  const at = window.location.pathname + window.location.search;
+  // The copy drawn again just after this one asked is the fresh one.
+  return !(asked !== null && asked.at === at && Date.now() - asked.when < askOnceWithinMs);
+}
+
+/** Wraps the refusal: draws it only once it is the one drawn for whoever is signed in now. */
+export function RefusalFresh({ children }: { readonly children: ReactNode }) {
   const router = useRouter();
+  const [state, setState] = useState<'fresh' | 'asking' | 'asked'>(() =>
+    typeof window !== 'undefined' && keptFromEarlier() ? 'asking' : 'fresh',
+  );
+  const [pending, startTransition] = useTransition();
   useEffect(() => {
-    if (!documentShown) return;
-    const at = window.location.pathname + window.location.search;
-    const now = Date.now();
-    if (asked !== null && asked.at === at && now - asked.when < askOnceWithinMs) return;
-    asked = { at, when: now };
-    router.refresh();
-  }, [router]);
-  return null;
+    if (state !== 'asking') return;
+    asked = { at: window.location.pathname + window.location.search, when: Date.now() };
+    startTransition(() => router.refresh());
+    setState('asked');
+  }, [state, router]);
+  if (state === 'asking' || (state === 'asked' && pending)) return null;
+  return <>{children}</>;
 }
