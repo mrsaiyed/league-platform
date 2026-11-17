@@ -11,14 +11,14 @@
 // same-request.ts, behind a port both servers share.
 
 /** The screens that say "Saved" from a notice. */
-export const noticeScreens = ['games', 'box-score'] as const;
+export const noticeScreens = ['games', 'box-score', 'season'] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 
 export type SavedNotice = {
   readonly screen: NoticeScreen;
-  /** The id of the thing saved: a game. */
+  /** The id of the thing saved: a game, or a season (Season settings, step 2.47). */
   readonly thing: string;
-  /** What was done to it, as the last part of a message key: `final`, `reopen`… */
+  /** What was done to it, as the last part of a message key: `final`, `reopen`, a part… */
   readonly said: string;
 };
 
