@@ -29,12 +29,14 @@ import {
   moveDraftGame,
   ok,
   previewSchedulePublish,
+  previewSeasonRules,
   publicViewer,
   publishSchedule,
   removeDraftGame,
   removeDraftRound,
   renameDraftRound,
   setDraftRecording,
+  setSeasonRules,
   setSetting,
   swapDraftGames,
   updateSeason,
@@ -296,6 +298,42 @@ describe('League settings and Season settings on the database ports, role by rol
     );
     expect(back).toMatchObject({ ok: true });
   });
+
+  it.each(actors)(
+    "saves a season's rules only as the owner or an admin, standings stores and all: %s",
+    async (actor) => {
+      const before = await seasonNow(winterId);
+      // A change to the standings part, which works the season's standings out again.
+      const tiebreakers =
+        before.rules.tiebreakers[0] === 'points-scored'
+          ? (['head-to-head', 'point-difference'] as const)
+          : (['points-scored', 'head-to-head'] as const);
+      const rules = { ...before.rules, tiebreakers: [...tiebreakers] };
+      const preview = await previewSeasonRules(
+        contextOf(actor),
+        { seasonId: winterId, rules },
+        ports.adminSettings.seasons,
+      );
+      const saved = await setSeasonRules(
+        contextOf(actor),
+        { seasonId: winterId, version: before.version, rules, confirmed: false },
+        ports.adminSettings.seasons,
+      );
+      if (!settingsPeople.includes(actor)) {
+        expect(preview).toEqual({ ok: false, error: { code: 'not-allowed' } });
+        expect(saved).toEqual({ ok: false, error: { code: 'not-allowed' } });
+        expect((await seasonNow(winterId)).rules).toEqual(before.rules);
+        return;
+      }
+      // No game of the season is decided: nothing moves, so it simply saves (S-1).
+      expect(preview).toEqual({ ok: true, value: { gamesDecided: false, moves: [] } });
+      expect(saved).toMatchObject({ ok: true });
+      const after = await seasonNow(winterId);
+      expect(after.rules.tiebreakers).toEqual([...tiebreakers]);
+      expect(after.rulesSaved).toBe(true);
+      expect(after.version).toBeGreaterThan(before.version);
+    },
+  );
 
   it("never finds another league's season, even for its own owner", async () => {
     const maple = made.leagues.find((l) => l.slug === 'maple-street');
