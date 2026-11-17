@@ -1,13 +1,16 @@
 // The made-up league shaped like the demo league (step 2.59, T-195; P9 §3, F-6): a large
-// association's one program, a 2026–27 season, several districts as divisions, dozens of
-// teams, one team's games scored live in the tracker and every other team's results as
-// final scores. It is shaped like a big league, never a copy of one: every league, school,
-// place, venue and person here is invented, and the email addresses end in .test.
+// association's one program, a 2025–26 season played from November to January, several
+// districts as divisions, dozens of teams, one team's games scored live in the tracker and
+// every other team's results as final scores. It is shaped like a big league, never a copy
+// of one: every league, school, place, venue and person here is invented, and the email
+// addresses end in .test.
 //
 // The schedule and its results are not here: they are the fixtures file in
 // supabase/seed/demo-league, which the loader (seed-demo-league.ts) imports through the
-// product's own fixture import, and which doubles as the template for real results. The
-// tracked team's games are made up as a backup of the current live tracker would hold them
+// product's own fixture import, and which doubles as the template for real results. Its
+// results were played from each school's `strength` below (a home side a few points better
+// than on the road); the tracked team's games, which the file leaves without a score, are
+// made up from the same strengths as a backup of the current live tracker would hold them
 // (demo-tracker-backup.ts) and brought in by the transfer (step 2.58).
 import type { StartingDesignKey } from '@srleagues/contracts';
 import type { Audience } from '@srleagues/core';
@@ -19,6 +22,8 @@ export type DemoTeam = {
   readonly color: string;
   /** The school's own gym, where its home games are played. */
   readonly venue: { readonly name: string; readonly address: string };
+  /** How good the team is, from -1 to 1: what its results were played from. */
+  readonly strength: number;
 };
 
 export type DemoDivision = { readonly name: string; readonly teams: readonly DemoTeam[] };
@@ -43,23 +48,26 @@ export type DemoLeague = {
   /** The team whose games were scored live in the tracker, by its short name. */
   readonly trackedTeam: string;
   /**
-   * The made-up tracker's rosters, by team short name: the tracked team's and those of
-   * the teams it played, as the tracker keeps both sides' players.
+   * The made-up tracker's rosters, by team short name, each team's five starters first:
+   * the tracked team's and those of the teams it played, as the tracker keeps both sides'
+   * players.
    */
   readonly trackerPlayers: Readonly<Record<string, readonly DemoTrackerPlayer[]>>;
   /**
-   * Surnames every made-up player has one of. Each is a word, not a family name, so no
-   * player can be mistaken for a real student (the seed's no-real-names check reads it).
+   * Every made-up player's surname is one of these coined words, in the style of the
+   * school names: no real family name. The seed's checks read this one list (no surname
+   * in full on a public page, and none of them a real name).
    */
   readonly madeUpSurnames: readonly string[];
 };
 
-const team = (name: string, shortName: string, color: string, address: string): DemoTeam => ({
-  name,
-  shortName,
-  color,
-  venue: { name: `${name} Gym`, address },
-});
+const team = (
+  name: string,
+  shortName: string,
+  color: string,
+  address: string,
+  strength: number,
+): DemoTeam => ({ name, shortName, color, venue: { name: `${name} Gym`, address }, strength });
 
 export const demoLeague: DemoLeague = {
   slug: 'larkvale',
@@ -73,50 +81,50 @@ export const demoLeague: DemoLeague = {
     { email: 'scheduler@larkvale.example.test', displayName: 'Lark Scheduler', role: 'scheduler' },
     { email: 'scorer@larkvale.example.test', displayName: 'Lark Scorer', role: 'scorekeeper' },
   ],
-  season: { slug: '2026-27', name: '2026–27' },
+  season: { slug: '2025-26', name: '2025–26' },
   divisions: [
     {
       name: 'District 1',
       teams: [
-        team('Amberwick Academy', 'amberwick', '#1d4e89', '100 Lantern Road'),
-        team('Briarquill Prep', 'briarquill', '#7a1f2b', '107 Quillstone Road'),
-        team('Cobaltine Charter', 'cobaltine', '#2456a6', '114 Copperbell Road'),
-        team('Dunmorrow STEM', 'dunmorrow', '#3c6e47', '121 Mistral Road'),
-        team('Elderfen Collegiate', 'elderfen', '#5b3a8c', '128 Harrowgate Road'),
-        team('Fernquill Academy', 'fernquill', '#2f7d6d', '135 Tinderbox Road'),
+        team('Nettlewyn Charter', 'nettlewyn', '#1d4e89', '100 Lanternwick Road', 0.55),
+        team('Amberwick Collegiate', 'amberwick', '#7a1f2b', '107 Quillstone Road', -0.1),
+        team('Sablewynd Prep', 'sablewynd', '#2456a6', '114 Copperbell Road', 0.2),
+        team('Kestrelmark STEM', 'kestrelmark', '#3c6e47', '121 Mistralen Road', -0.35),
+        team('Dunmorrow Academy', 'dunmorrow', '#5b3a8c', '128 Gorsebury Road', 0.05),
+        team('Willowquill Prep', 'willowquill', '#2f7d6d', '135 Tinderlark Road', -0.25),
       ],
     },
     {
       name: 'District 2',
       teams: [
-        team('Glimmerstone Prep', 'glimmerstone', '#8c6d1f', '142 Bramblecourt Road'),
-        team('Hazelmoor Collegiate', 'hazelmoor', '#0f5c4a', '149 Saltmarsh Road'),
-        team('Ironwhistle Charter', 'ironwhistle', '#4a4a4a', '156 Whistledown Road'),
-        team('Junipine Academy', 'junipine', '#2e6b30', '163 Thistlecroft Road'),
-        team('Kestrelmark STEM', 'kestrelmark', '#a3461f', '170 Ravenmoss Road'),
-        team('Lindenquay Prep', 'lindenquay', '#1f5f8c', '177 Gilderwisp Road'),
+        team('Glimmerstone Academy', 'glimmerstone', '#8c6d1f', '142 Bramblecourt Road', 0.3),
+        team('Hazelmoor Collegiate', 'hazelmoor', '#0f5c4a', '149 Saltwhistle Road', 0.15),
+        team('Pebblewick Charter', 'pebblewick', '#4a4a4a', '156 Dapplebrook Road', -0.2),
+        team('Junipine STEM', 'junipine', '#2e6b30', '163 Thistlecroft Road', 0.0),
+        team('Umberfell Prep', 'umberfell', '#a3461f', '170 Ravenmoss Road', -0.35),
+        team('Briarquill Academy', 'briarquill', '#1f5f8c', '177 Gilderwisp Road', 0.1),
       ],
     },
     {
       name: 'District 3',
       teams: [
-        team('Marrowbrook Academy', 'marrowbrook', '#6b2d5c', '184 Lantern Road'),
-        team('Nettlewyn Charter', 'nettlewyn', '#3d7a2a', '191 Quillstone Road'),
-        team('Oakmistle Prep', 'oakmistle', '#7b5a2e', '198 Copperbell Road'),
-        team('Pebblewick Collegiate', 'pebblewick', '#335c99', '205 Mistral Road'),
-        team('Quarrymoor STEM', 'quarrymoor', '#6e6e2a', '212 Harrowgate Road'),
-        team('Rushfennel Academy', 'rushfennel', '#9c2f2f', '219 Tinderbox Road'),
+        team('Marrowbrook Prep', 'marrowbrook', '#6b2d5c', '184 Lanternwick Road', 0.85),
+        team('Cobaltine Academy', 'cobaltine', '#3d7a2a', '191 Quillstone Road', -0.05),
+        team('Yarrowmere Charter', 'yarrowmere', '#7b5a2e', '198 Copperbell Road', 0.15),
+        team('Fernquill Collegiate', 'fernquill', '#335c99', '205 Mistralen Road', -0.3),
+        team('Tamblewick STEM', 'tamblewick', '#6e6e2a', '212 Gorsebury Road', 0.25),
+        team('Ironwhistle Academy', 'ironwhistle', '#9c2f2f', '219 Tinderlark Road', -0.15),
       ],
     },
     {
       name: 'District 4',
       teams: [
-        team('Sablewynd Prep', 'sablewynd', '#2b2b5c', '226 Bramblecourt Road'),
-        team('Thornquist Charter', 'thornquist', '#5c7a1f', '233 Saltmarsh Road'),
-        team('Umberfell Collegiate', 'umberfell', '#8a4b1d', '240 Whistledown Road'),
-        team('Vantmesa Academy', 'vantmesa', '#1f7a7a', '247 Thistlecroft Road'),
-        team('Willowquill STEM', 'willowquill', '#4f6b2e', '254 Ravenmoss Road'),
-        team('Yarrowmere Prep', 'yarrowmere', '#7a3d1f', '261 Gilderwisp Road'),
+        team('Quarrymoor Charter', 'quarrymoor', '#2b2b5c', '226 Bramblecourt Road', -0.85),
+        team('Lindenquay Academy', 'lindenquay', '#5c7a1f', '233 Saltwhistle Road', 0.2),
+        team('Elderfen Prep', 'elderfen', '#8a4b1d', '240 Dapplebrook Road', 0.4),
+        team('Vantmesa Collegiate', 'vantmesa', '#1f7a7a', '247 Thistlecroft Road', 0.0),
+        team('Oakmistle Charter', 'oakmistle', '#4f6b2e', '254 Ravenmoss Road', -0.2),
+        team('Rushfennel STEM', 'rushfennel', '#7a3d1f', '261 Gilderwisp Road', 0.1),
       ],
     },
   ],
@@ -124,88 +132,91 @@ export const demoLeague: DemoLeague = {
   trackedTeam: 'hazelmoor',
   trackerPlayers: {
     hazelmoor: [
-      ['0', 'Avery Madeup'],
-      ['4', 'Blake Testerly'],
-      ['12', 'Cameron Pretend'],
-      ['20', 'Dakota Placeholt'],
-      ['24', 'Emerson Fictive'],
-      ['33', 'Finley Inventa'],
-      ['1', 'Gray Notreal'],
-      ['5', 'Harper Dreamley'],
-      ['13', 'Jules Imagino'],
-      ['21', 'Kendall Storyfield'],
-      ['25', 'Logan Sampleby'],
-      ['34', 'Marlow Makebelieve'],
+      ['3', 'Kit Cindermarsh'],
+      ['33', 'Jasper Dapplemere'],
+      ['20', 'Cyrus Gorsewick'],
+      ['11', 'Tatum Quenderwick'],
+      ['52', 'Rowan Bramblequill'],
+      ['0', 'Joss Larkspindle'],
+      ['1', 'Marlow Emberwhit'],
+      ['15', 'Gray Saltmere'],
+      ['21', 'Fitz Mossglade'],
+      ['42', 'Reese Thistlewyn'],
+      ['34', 'Vance Copperwick'],
+      ['13', 'Hayes Kettleburr'],
     ],
     glimmerstone: [
-      ['20', 'Noel Mockwell'],
-      ['24', 'Oakley Madeup'],
-      ['33', 'Parker Testerly'],
-      ['1', 'Quincy Pretend'],
-      ['5', 'Reese Placeholt'],
-      ['13', 'Sawyer Fictive'],
-      ['21', 'Tatum Inventa'],
-      ['25', 'Wren Notreal'],
-      ['34', 'Arlo Dreamley'],
+      ['52', 'Jules Saltmere'],
+      ['44', 'Nash Quenderwick'],
+      ['10', 'Lev Brindlemoor'],
+      ['33', 'Arlo Wrenhallow'],
+      ['31', 'Finley Copperwick'],
+      ['3', 'Quincy Ravelthorn'],
+      ['11', 'Teo Thistlewyn'],
+      ['14', 'Tobin Fallowmint'],
+      ['42', 'Silas Kettleburr'],
     ],
-    ironwhistle: [
-      ['34', 'Bodhi Imagino'],
-      ['2', 'Callum Storyfield'],
-      ['10', 'Dorian Sampleby'],
-      ['14', 'Ellis Makebelieve'],
-      ['22', 'Flynn Mockwell'],
-      ['30', 'Gideon Madeup'],
-      ['35', 'Hollis Testerly'],
-      ['3', 'Jasper Pretend'],
-      ['11', 'Kit Placeholt'],
+    pebblewick: [
+      ['12', 'Kendall Cindermarsh'],
+      ['44', 'Logan Brindlemoor'],
+      ['30', 'Ezra Gorsewick'],
+      ['10', 'Lennox Fallowmint'],
+      ['22', 'Cameron Copperwick'],
+      ['32', 'Mack Wrenhallow'],
+      ['4', 'Callum Saltmere'],
+      ['42', 'Dex Quenderwick'],
+      ['23', 'Noel Thistlewyn'],
     ],
     junipine: [
-      ['11', 'Lennox Fictive'],
-      ['15', 'Milo Inventa'],
-      ['23', 'Nico Notreal'],
-      ['32', 'Orion Dreamley'],
-      ['0', 'Rowan Imagino'],
-      ['4', 'Silas Storyfield'],
-      ['12', 'Teo Sampleby'],
-      ['20', 'Wells Makebelieve'],
-      ['24', 'Zeke Mockwell'],
+      ['0', 'Wells Brindlemoor'],
+      ['20', 'Bodhi Kettleburr'],
+      ['35', 'Dakota Dapplemere'],
+      ['34', 'Avery Gorsewick'],
+      ['22', 'Rhys Fallowmint'],
+      ['3', 'Blake Quenderwick'],
+      ['31', 'Hollis Emberwhit'],
+      ['5', 'Zeke Thistlewyn'],
+      ['4', 'Pike Bramblequill'],
     ],
-    kestrelmark: [
-      ['24', 'Bram Madeup'],
-      ['33', 'Cyrus Testerly'],
-      ['1', 'Dex Pretend'],
-      ['5', 'Ezra Placeholt'],
-      ['13', 'Fitz Fictive'],
-      ['21', 'Hayes Inventa'],
-      ['25', 'Idris Notreal'],
-      ['34', 'Joss Dreamley'],
-      ['2', 'Knox Imagino'],
+    umberfell: [
+      ['33', 'Wren Ravelthorn'],
+      ['11', 'Bram Fallowmint'],
+      ['20', 'Orion Saltmere'],
+      ['22', 'Knox Mossglade'],
+      ['21', 'Idris Dapplemere'],
+      ['30', 'Sawyer Thistlewyn'],
+      ['14', 'Dorian Quenderwick'],
+      ['50', 'Nico Wrenhallow'],
+      ['25', 'Gideon Emberwhit'],
     ],
-    lindenquay: [
-      ['2', 'Lev Storyfield'],
-      ['10', 'Mack Sampleby'],
-      ['14', 'Nash Makebelieve'],
-      ['22', 'Otis Mockwell'],
-      ['30', 'Pike Madeup'],
-      ['35', 'Rhys Testerly'],
-      ['3', 'Soren Pretend'],
-      ['11', 'Tobin Placeholt'],
-      ['15', 'Vance Fictive'],
+    briarquill: [
+      ['10', 'Ellis Wrenhallow'],
+      ['2', 'Otis Kettleburr'],
+      ['15', 'Soren Dapplemere'],
+      ['22', 'Harper Copperwick'],
+      ['11', 'Oakley Saltmere'],
+      ['42', 'Emerson Brindlemoor'],
+      ['50', 'Milo Cindermarsh'],
+      ['13', 'Flynn Thistlewyn'],
+      ['12', 'Parker Fallowmint'],
     ],
   },
   madeUpSurnames: [
-    'Madeup',
-    'Pretend',
-    'Fictive',
-    'Notreal',
-    'Imagino',
-    'Sampleby',
-    'Mockwell',
-    'Testerly',
-    'Placeholt',
-    'Inventa',
-    'Dreamley',
-    'Storyfield',
-    'Makebelieve',
+    'Brindlemoor',
+    'Thistlewyn',
+    'Copperwick',
+    'Saltmere',
+    'Larkspindle',
+    'Wrenhallow',
+    'Emberwhit',
+    'Cindermarsh',
+    'Bramblequill',
+    'Ravelthorn',
+    'Quenderwick',
+    'Mossglade',
+    'Fallowmint',
+    'Gorsewick',
+    'Dapplemere',
+    'Kettleburr',
   ],
 };

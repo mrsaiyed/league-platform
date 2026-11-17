@@ -11,6 +11,7 @@ import type { PGlite } from '@electric-sql/pglite';
 import { seedLeagues } from './seed-data.ts';
 import { seedDemoLeagueInto } from './seed-demo-league.ts';
 import { seedLeaguesInto } from './seed-leagues.ts';
+import { SeedPartlyLoaded } from './seed-partly-loaded.ts';
 import { putSeedSeasonsUnderWay } from './seed-season-under-way.ts';
 import { addSeedTrackedGames } from './seed-tracked-games.ts';
 
@@ -20,11 +21,6 @@ export type SeedLoad = {
   /** False when the league was already there, whole, and was left alone. */
   readonly created: boolean;
 };
-
-const partlyLoaded = (slug: string) =>
-  new Error(
-    `The seed league ${slug} is only partly loaded (an earlier load stopped part-way). Start again from a fresh database.`,
-  );
 
 /** Whether a seed league already there got as far as its tracked game, the last part. */
 async function hasTrackedGame(pglite: PGlite, leagueId: string): Promise<boolean> {
@@ -49,10 +45,10 @@ export async function seedAllLeaguesInto(
     await putSeedSeasonsUnderWay(pglite, now, slugs);
     await addSeedTrackedGames(pglite, now, slugs);
   } else if (made.length > 0) {
-    throw partlyLoaded(made[0]!.slug);
+    throw new SeedPartlyLoaded(made[0]!.slug);
   } else {
     for (const league of loaded) {
-      if (!(await hasTrackedGame(pglite, league.leagueId))) throw partlyLoaded(league.slug);
+      if (!(await hasTrackedGame(pglite, league.leagueId))) throw new SeedPartlyLoaded(league.slug);
     }
   }
   const seeded = loaded.map((league) => ({
@@ -60,5 +56,5 @@ export async function seedAllLeaguesInto(
     name: seedLeagues.find((l) => l.slug === league.slug)?.name ?? league.slug,
     created: league.created,
   }));
-  return [...seeded, await seedDemoLeagueInto(pglite, now)];
+  return [...seeded, await seedDemoLeagueInto(pglite)];
 }

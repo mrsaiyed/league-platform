@@ -4,22 +4,28 @@
 //
 // Everything goes through the product's own commands and the product's own two doors for
 // bringing results in, as a league's admin would use them:
-// 1. Our own staff creates the league with its 2026–27 season; its owner publishes the
+// 1. Our own staff creates the league with its 2025–26 season; its owner publishes the
 //    league's starting design, makes it live, opens the season on the high-school rules,
 //    and adds the districts, the schools' teams and each school's gym. Every team's
 //    players' statistics are for staff only (S-22), except the tracked team's, whose
 //    school shows them. Role grants are written through the access store, as the seed
 //    leagues' are.
 // 2. The fixtures file (supabase/seed/demo-league) is uploaded through the fixture import,
-//    read as the worker reads it, applied to the schedule draft, published, and its final
-//    scores recorded. The tracked team's rows carry no score: the tracker has them.
+//    read as the worker reads it, and applied to the schedule draft. The import keeps no
+//    round (step 2.166), so the file's weeks are made rounds with the schedule builder's
+//    own commands (scheduling.add_draft_round, scheduling.move_draft_game) and each game
+//    put in its week; then the schedule is published and the file's final scores recorded.
+//    The tracked team's rows carry no score: the tracker has them.
 // 3. A made-up backup of the live tracker (demo-tracker-backup.ts) holding the tracked
 //    team's games is written to a folder and brought in by the transfer (step 2.58), with
 //    the other teams' players its games name, as the league's admin.
 //
-// The file's dates are a season's; the seed moves them back by whole weeks, when it must,
-// so its last game is before today and the tracked games could have been played. A rerun
-// finds a whole league and leaves it alone; a partly loaded one stops with a plain message.
+// The season is a past one, on the file's own dates, and the whole load acts at one fixed
+// moment, the day after its last game (`loadedAt`): every command, scoring session and the
+// transfer read that moment, never the system clock, so a load on any day writes the same
+// league and shows the same pages. A rerun finds a whole league and leaves it alone; a
+// partly loaded one stops with a plain message (SeedPartlyLoaded).
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -32,10 +38,11 @@ import {
   createLeague,
   createTeam,
   createVenue,
-  dayIn,
+  addDraftRound,
   eventHandlers,
   getFixtureImport,
   getScheduleDraft,
+  moveDraftGame,
   leagueScope,
   publishSchedule,
   publishSiteDesign,
@@ -77,6 +84,7 @@ import { demoLeague, type DemoLeague } from './demo-league-data.ts';
 import { writeMadeUpTrackerBackup, type MadeUpBackup } from './demo-tracker-backup.ts';
 import type { SeedLoad } from './seed-all-leagues.ts';
 import { seedStaff } from './seed-data.ts';
+import { SeedPartlyLoaded } from './seed-partly-loaded.ts';
 
 /** This repository's root, where the data's files are named from. */
 const repositoryRoot = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -87,11 +95,6 @@ function must<T>(what: string, result: { ok: true; value: T } | { ok: false; err
   if (!result.ok) throw new Error(`Seeding failed at ${what}: ${JSON.stringify(result.error)}`);
   return result.value;
 }
-
-const partlyLoaded = (slug: string) =>
-  new Error(
-    `The seed league ${slug} is only partly loaded (an earlier load stopped part-way). Start again from a fresh database.`,
-  );
 
 async function accountId(pglite: PGlite, email: string, displayName: string): Promise<string> {
   const found = await pglite.query<{ id: string }>(
@@ -106,39 +109,22 @@ async function accountId(pglite: PGlite, email: string, displayName: string): Pr
   return made.rows[0]!.id;
 }
 
-/** yyyy-mm-dd, `days` days on from `day` (or back, when negative). */
-function addDays(day: string, days: number): string {
-  const date = new Date(`${day}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
+/** The fixtures file as the loader imports it, as the repository has it. */
+export function demoFixturesText(league: DemoLeague = demoLeague): Promise<string> {
+  return readFile(path.join(repositoryRoot, league.fixturesFile), 'utf8');
 }
-
-const dayPattern = /\b(\d{4}-\d{2}-\d{2})\b/g;
 
 /**
- * How many days the file's dates are moved: none when its last game is before `today`,
- * or back by whole weeks (so each game keeps its weekday) until it is.
+ * The one moment the whole load acts at: 6 pm (UTC) on the day after the season's last
+ * game. Commands, scoring sessions and the transfer read it in place of the system clock.
  */
-export function daysMovedBack(fileText: string, today: string): number {
-  const days = [...fileText.matchAll(dayPattern)].map((match) => match[1]!).sort();
-  const last = days.at(-1);
-  if (last === undefined || last < today) return 0;
-  const behind = (Date.parse(`${last}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000;
-  return 7 * (Math.floor(behind / 7) + 1);
-}
-
-/** The file with every date moved back by `days`. */
-export function movedBack(fileText: string, days: number): string {
-  return days === 0 ? fileText : fileText.replace(dayPattern, (day) => addDays(day, -days));
-}
-
-/** The fixtures file as the loader imports it: read, with its dates moved back if need be. */
-export async function demoFixturesText(
-  league: DemoLeague = demoLeague,
-  now: Date = new Date(),
-): Promise<string> {
-  const text = await readFile(path.join(repositoryRoot, league.fixturesFile), 'utf8');
-  return movedBack(text, daysMovedBack(text, dayIn(league.timeZone, now.getTime())));
+export function loadedAt(fixtures: readonly DraftFixture[]): number {
+  const last =
+    fixtures
+      .map((f) => f.date)
+      .sort()
+      .at(-1) ?? '2000-01-01';
+  return Date.parse(`${last}T18:00:00Z`) + 86_400_000;
 }
 
 /** The file's games, read by the product's own reader with the teams named by their names. */
@@ -182,16 +168,17 @@ async function holdsEverything(pglite: PGlite, leagueId: string, league: DemoLea
 /** Loads the demo-shaped league unless it is there (above). */
 export async function seedDemoLeagueInto(
   pglite: PGlite,
-  now: Date = new Date(),
   league: DemoLeague = demoLeague,
 ): Promise<SeedLoad> {
-  const fileText = await demoFixturesText(league, now);
+  const fileText = await demoFixturesText(league);
+  const fixtures = fixturesOf(league, fileText);
+  const at = loadedAt(fixtures);
   const existing = (
     await pglite.query<{ id: string }>('select id from leagues where slug = $1', [league.slug])
   ).rows[0];
   if (existing !== undefined) {
     if (!(await holdsEverything(pglite, existing.id, league, fileText))) {
-      throw partlyLoaded(league.slug);
+      throw new SeedPartlyLoaded(league.slug);
     }
     return { slug: league.slug, name: league.name, created: false };
   }
@@ -214,7 +201,7 @@ export async function seedDemoLeagueInto(
       standings: standingsStore(scope),
     }));
     // Setting the league up emits nothing the seed needs handled; results update standings.
-    const setUp: CommandDeps<DemoTx> = { transaction, events: [], log: () => {}, now: Date.now };
+    const setUp: CommandDeps<DemoTx> = { transaction, events: [], log: () => {}, now: () => at };
     const deps: CommandDeps<DemoTx> = { ...setUp, events: eventHandlers };
     const as = (actor: string | null): CommandContext => ({
       leagueId,
@@ -342,6 +329,7 @@ export async function seedDemoLeagueInto(
       'applying the fixture import',
       await applyFixtureImport(owner, { importId: started.importId, version: view.version }, setUp),
     );
+    await putInRounds(pglite, owner, seasonId, fixtures, setUp);
     const draft = must('the schedule draft', await getScheduleDraft(owner, { seasonId }, setUp));
     must(
       'publishing the schedule',
@@ -365,7 +353,7 @@ export async function seedDemoLeagueInto(
     }
 
     // 3. The tracked team's games, through the transfer from a made-up tracker backup.
-    const backup = await madeUpBackup(pglite, league, fixturesOf(league, fileText));
+    const backup = await madeUpBackup(pglite, league, fixtures);
     const work = await mkdtemp(path.join(tmpdir(), 'seed-tracker-'));
     try {
       const backupFolder = path.join(work, 'backup');
@@ -381,6 +369,7 @@ export async function seedDemoLeagueInto(
         actorEmail: admin.email,
         dryRun: false,
         withOpponents: true,
+        clock: { now: () => at },
       });
       if (
         !outcome.ok ||
@@ -402,6 +391,76 @@ export async function seedDemoLeagueInto(
     await db.close();
   }
   return { slug: league.slug, name: league.name, created: true };
+}
+
+/**
+ * The file's weeks as the schedule's rounds: one round for each, on its day, and every game
+ * moved into its week, each a change to the schedule draft, as the schedule builder makes
+ * them (the import itself keeps no round yet, step 2.166).
+ */
+async function putInRounds(
+  pglite: PGlite,
+  as: CommandContext,
+  seasonId: string,
+  fixtures: readonly DraftFixture[],
+  deps: CommandDeps<DemoTx>,
+): Promise<void> {
+  const teamIds = new Map(
+    (
+      await pglite.query<{ id: string; name: string }>(
+        'select id, name from teams where season_id = $1 and deleted_at is null',
+        [seasonId],
+      )
+    ).rows.map((row) => [row.name, row.id]),
+  );
+  let draft = must('the schedule draft', await getScheduleDraft(as, { seasonId }, deps));
+  let basis = {
+    seasonId,
+    basedOnRevision: draft.latestRevision,
+    draftId: draft.draft?.id ?? null,
+    version: draft.draft?.version ?? null,
+  };
+  const weeks = new Map<string, { id: string; date: string }>();
+  for (const fixture of fixtures) {
+    const label = fixture.round ?? '';
+    if (label === '' || weeks.has(label)) continue;
+    const week = { id: randomUUID(), date: fixture.date };
+    const added = must(
+      'a round',
+      await addDraftRound(as, { ...basis, roundId: week.id, label, date: week.date }, deps),
+    );
+    basis = { ...basis, draftId: added.draftId, version: added.version };
+    weeks.set(label, week);
+  }
+  draft = must('the schedule draft', await getScheduleDraft(as, { seasonId }, deps));
+  for (const fixture of fixtures) {
+    const week = weeks.get(fixture.round ?? '');
+    if (week === undefined) continue;
+    const game = draft.result.games.find(
+      (g) =>
+        g.date === fixture.date &&
+        g.homeTeamId === teamIds.get(fixture.homeTeamId) &&
+        g.awayTeamId === teamIds.get(fixture.awayTeamId),
+    );
+    if (game === undefined) throw new Error('Seeding failed at the rounds: a game is missing.');
+    const moved = must(
+      'putting a game in its round',
+      await moveDraftGame(
+        as,
+        {
+          ...basis,
+          gameId: game.id,
+          roundId: week.id,
+          date: game.date,
+          time: game.time,
+          venueId: game.venueId,
+          court: game.court,
+        },
+        deps,
+      ),
+    );
+    basis = { ...basis, draftId: moved.draftId, version: moved.version };
+  }
 }
 
 /**
@@ -435,6 +494,7 @@ async function madeUpBackup(
       key: team.shortName,
       name: team.name,
       tracked: team.shortName === tracked.shortName,
+      strength: team.strength,
     })),
     players: teams.flatMap((team) =>
       (league.trackerPlayers[team.shortName] ?? []).map(([jersey, name]) => ({
