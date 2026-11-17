@@ -9,9 +9,10 @@
 // context, which comes from the session (T-23, T-28), never the request.
 //
 // The screens' three reads that are not commands (the league's current season, its
-// divisions and its teams) are transactions set to the league only: the page that asks
-// is staff's (loadLeaguePage), they name no person, and what anyone may change is the
-// commands' to decide. An id that cannot be a row's is no row, asked of no database.
+// divisions and its teams) are transactions set to the league of the session's context;
+// they name no person, and each answers only someone who may manage the season's teams
+// (mayListSeasonTeams), what they hold read afresh, so they are safe whatever page asks.
+// An id that cannot be a row's is no row, asked of no database.
 //
 // Whether a person is a child (R-28) is worked out in SQL, by the database's own reads and
 // by the people store's answer to the commands (record 080), so a birth date never leaves
@@ -28,13 +29,15 @@
 // (container.ts), so Next.js never bundles it.
 import {
   eventHandlers,
+  type AccessHolder,
+  type CommandContext,
   type CommandDeps,
   type EventHandler,
   type StandingsTx,
 } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle, LeagueScope } from '@srleagues/database';
-import type { AdminTeamsPorts, AdminTeamsTx } from './admin-teams.ts';
+import { mayListSeasonTeams, type AdminTeamsPorts, type AdminTeamsTx } from './admin-teams.ts';
 import { isDatabaseId } from './database-id.ts';
 
 /** What these ports use of packages/database. */
@@ -80,6 +83,8 @@ export function databaseAdminTeams(
   database: AdminTeamsQueries,
   db: DatabaseHandle,
   log: CommandDeps<AdminTeamsTx>['log'],
+  /** What an account holds in a league, read fresh (the web ports' own accessOf). */
+  accessOf: (context: CommandContext) => Promise<AccessHolder | undefined>,
 ): AdminTeamsPorts {
   return {
     deps: {
@@ -102,29 +107,44 @@ export function databaseAdminTeams(
       now: () => performance.now(),
     },
     // The league's current season, as the stand-in's: the one marked current, first among
-    // the league's seasons as listLeagueSeasons orders them (one per program at most).
-    currentSeason: async (leagueId) => {
-      const seasons = await database.withTransaction(db, { leagueId }, (scope) =>
-        database.listLeagueSeasons(scope),
-      );
-      const current = seasons.find((season) => season.isCurrent);
+    // the league's seasons as listLeagueSeasons orders them (one per program at most),
+    // and only to someone who may manage its teams.
+    currentSeason: async (context) => {
+      const current = (await seasonsOf(context)).find((season) => season.isCurrent);
       return current === undefined ? undefined : { id: current.id, name: current.name };
     },
     // Not in the bin, in order: by their place, then name (list-divisions.ts).
-    divisions: async (leagueId, seasonId) =>
-      isDatabaseId(seasonId)
+    divisions: async (context, seasonId) =>
+      (await mayList(context, seasonId))
         ? (
-            await database.withTransaction(db, { leagueId }, (scope) =>
+            await database.withTransaction(db, { leagueId: context.leagueId }, (scope) =>
               database.listDivisions(scope, seasonId),
             )
           ).map(({ id, name }) => ({ id, name }))
         : [],
     // Not in the bin, by name, whatever the season's state (list-staff-season-teams.ts).
-    teams: async (leagueId, seasonId) =>
-      isDatabaseId(seasonId)
-        ? database.withTransaction(db, { leagueId }, (scope) =>
+    teams: async (context, seasonId) =>
+      (await mayList(context, seasonId))
+        ? database.withTransaction(db, { leagueId: context.leagueId }, (scope) =>
             database.listStaffSeasonTeams(scope, seasonId),
           )
         : [],
   };
+
+  /** The league's seasons whose teams this person may manage, what they hold read afresh. */
+  async function seasonsOf(context: CommandContext) {
+    const holder = await accessOf(context);
+    if (holder === undefined) return [];
+    const seasons = await database.withTransaction(db, { leagueId: context.leagueId }, (scope) =>
+      database.listLeagueSeasons(scope),
+    );
+    return seasons.filter((season) => mayListSeasonTeams(holder, season.programId));
+  }
+
+  /** Whether the season is the league's (an id that cannot be a row's is not) and theirs. */
+  async function mayList(context: CommandContext, seasonId: string) {
+    if (!isDatabaseId(seasonId)) return false;
+    const id = seasonId.toLowerCase();
+    return (await seasonsOf(context)).some((season) => season.id === id);
+  }
 }

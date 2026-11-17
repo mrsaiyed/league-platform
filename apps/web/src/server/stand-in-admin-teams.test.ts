@@ -14,6 +14,7 @@ import {
   reorderRoster,
   setTeamStatsVisibility,
   updateTeam,
+  type AccessHolder,
   type AccessReader,
   type CommandContext,
 } from '@srleagues/core';
@@ -39,9 +40,20 @@ const access: AccessReader = {
   activeGrantsOf: async () => [],
 };
 
+/** What an account holds, as the web ports' accessOf reads it: the owner owns every league. */
+const accessOf = async (context: CommandContext): Promise<AccessHolder | undefined> =>
+  context.accountId === ownerId ? { accountId: ownerId, isOwner: true, grants: [] } : undefined;
+/** The owner, in a league: whom the screens' reads answer. */
+const ownerIn = (league: string): CommandContext => ({
+  leagueId: league,
+  accountId: ownerId,
+  requestId: 'request-1',
+});
+
 function made(uniqueJerseys = false) {
   const ports = standInAdminTeams(
     testWorld(() => access, undefined, uniqueJerseys ? withUniqueJerseys : undefined),
+    accessOf,
   );
   const as = (accountId: string | null): CommandContext => ({
     leagueId,
@@ -52,7 +64,7 @@ function made(uniqueJerseys = false) {
 }
 
 async function seasonOf(ports: ReturnType<typeof made>['ports']): Promise<string> {
-  const season = await ports.currentSeason(leagueId);
+  const season = await ports.currentSeason(ownerIn(leagueId));
   if (season === undefined) throw new Error('no season');
   return season.id;
 }
@@ -222,7 +234,7 @@ describe('the admin Teams screens over the stand-in', () => {
       () => access,
       () => new Date('2030-03-01T18:00:00Z'),
     );
-    const m = { ...made(), ports: standInAdminTeams(world) };
+    const m = { ...made(), ports: standInAdminTeams(world, accessOf) };
     const { entries } = await teamOfTen(m);
     const leave = (n: number, leftOn: string) =>
       markLeft(
@@ -259,7 +271,7 @@ describe('the admin Teams screens over the stand-in', () => {
         }
       },
     );
-    const m = { ...made(), ports: standInAdminTeams(world) };
+    const m = { ...made(), ports: standInAdminTeams(world, accessOf) };
     const read = await world.read(leagueId);
     const pat = read?.people.find((p) => p.firstName === 'Pat' && p.lastName === 'Gorski');
     const entry = read?.roster.find((r) => r.personId === pat?.id);
@@ -307,7 +319,7 @@ describe('the admin Teams screens over the stand-in', () => {
     const { teamId } = await teamOfTen(m);
     const seasonId = await seasonOf(m.ports);
     // Beside the season's own made-up teams, by name.
-    const teams = await m.ports.teams(leagueId, seasonId);
+    const teams = await m.ports.teams(ownerIn(leagueId), seasonId);
     expect(teams.map((team) => [team.name, team.slug, team.color])).toContainEqual([
       'Blue Jays',
       'blue-jays',
@@ -320,7 +332,7 @@ describe('the admin Teams screens over the stand-in', () => {
       m.ports.deps,
     );
     expect(renamed.ok).toBe(true);
-    const after = await m.ports.teams(leagueId, seasonId);
+    const after = await m.ports.teams(ownerIn(leagueId), seasonId);
     expect(after.map((team) => [team.name, team.color])).toContainEqual(['Jays', '#112233']);
     expect(after.map((team) => team.name)).not.toContain('Blue Jays');
     expect(after).toHaveLength(teams.length);
@@ -346,26 +358,37 @@ describe('the admin Teams screens over the stand-in', () => {
   it('refuses a person who holds no role in the league', async () => {
     const m = made();
     const seasonId = await seasonOf(m.ports);
-    const before = await m.ports.teams(leagueId, seasonId);
+    const before = await m.ports.teams(ownerIn(leagueId), seasonId);
     const result = await createTeam(
       m.stranger,
       newTeamInput({ name: 'Nope' }, seasonId),
       m.ports.deps,
     );
     expect(!result.ok && result.error.code).toBe('not-allowed');
-    expect(await m.ports.teams(leagueId, seasonId)).toEqual(before);
+    expect(await m.ports.teams(ownerIn(leagueId), seasonId)).toEqual(before);
   });
 
   it('keeps one league apart from another', async () => {
     const m = made();
     await teamOfTen(m);
     const otherLeague = '01900000-0000-7000-8000-000000000002';
-    const season = await m.ports.currentSeason(otherLeague);
+    const season = await m.ports.currentSeason(ownerIn(otherLeague));
     expect(season).toBeDefined();
     // The other league has its own teams, and none of this one's.
-    const theirs = (await m.ports.teams(otherLeague, season?.id ?? '')).map((t) => t.name);
+    const theirs = (await m.ports.teams(ownerIn(otherLeague), season?.id ?? '')).map((t) => t.name);
     expect(theirs).toEqual(['Comets', 'Meteors', 'Rockets']);
-    expect(await m.ports.teams(otherLeague, await seasonOf(m.ports))).toEqual([]);
+    expect(await m.ports.teams(ownerIn(otherLeague), await seasonOf(m.ports))).toEqual([]);
+  });
+
+  it('tells nobody but who may manage teams of the season, its divisions or teams', async () => {
+    const m = made();
+    const seasonId = await seasonOf(m.ports);
+    for (const who of [m.stranger, { ...m.stranger, accountId: null }]) {
+      expect(await m.ports.currentSeason(who)).toBeUndefined();
+      expect(await m.ports.teams(who, seasonId)).toEqual([]);
+      expect(await m.ports.divisions(who, seasonId)).toEqual([]);
+    }
+    expect((await m.ports.teams(m.owner, seasonId)).length).toBeGreaterThan(0);
   });
 
   it('adds a new person to the roster, and leaves no orphan when the number is worn', async () => {

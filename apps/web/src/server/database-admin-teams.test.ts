@@ -149,9 +149,9 @@ beforeAll(async () => {
     log: (line) => void logLines.push(line),
     warn: (message) => void warnings.push(message),
   });
-  seasonId = (await ports.adminTeams.currentSeason(leagueId))?.id ?? '';
-  otherSeasonId = (await ports.adminTeams.currentSeason(otherLeagueId))?.id ?? '';
-  const teams = await ports.adminTeams.teams(leagueId, seasonId);
+  seasonId = (await ports.adminTeams.currentSeason(ownerOf(leagueId)))?.id ?? '';
+  otherSeasonId = (await ports.adminTeams.currentSeason(ownerOf(otherLeagueId)))?.id ?? '';
+  const teams = await ports.adminTeams.teams(ownerOf(leagueId), seasonId);
   teamId = teams[0]?.id ?? '';
   anotherTeamId = teams[1]?.id ?? '';
   const asOwner = { leagueId, accountId: lakeside.ownerAccountId };
@@ -207,8 +207,9 @@ afterAll(async () => {
 /** Everything Admin → Teams shows of a league, read by its owner: teams, rosters, people. */
 async function everything(league: string) {
   const as = ownerOf(league);
-  const season = await ports.adminTeams.currentSeason(league);
-  const teams = season === undefined ? [] : await ports.adminTeams.teams(league, season.id);
+  const season = await ports.adminTeams.currentSeason(ownerOf(league));
+  const teams =
+    season === undefined ? [] : await ports.adminTeams.teams(ownerOf(league), season.id);
   const rosters: Record<string, readonly RosterLine[]> = {};
   for (const team of teams) {
     rosters[team.id] = must('roster', await listRoster(as, { teamId: team.id }, deps()));
@@ -242,7 +243,9 @@ async function fixture() {
     'left',
     await markLeft(as, markLeftInput({ entry: gone, version: '1', leftOn: today }), deps()),
   );
-  const team = (await ports.adminTeams.teams(leagueId, seasonId)).find((t) => t.id === made);
+  const team = (await ports.adminTeams.teams(ownerOf(leagueId), seasonId)).find(
+    (t) => t.id === made,
+  );
   if (team === undefined) throw new Error('the fixture team is not listed');
   return { team, e1, e2, gone, free, today };
 }
@@ -400,16 +403,38 @@ describe('Admin → Teams on the database ports, role by role', () => {
     }
   });
 
+  it.each(actors)(
+    'tells of the season, its divisions and teams only those who may manage them: %s',
+    async (actor) => {
+      const as = contextOf(actor);
+      const season = await ports.adminTeams.currentSeason(as);
+      const teams = await ports.adminTeams.teams(as, seasonId);
+      const divisions = await ports.adminTeams.divisions(as, seasonId);
+      if (actorMayChange(actor)) {
+        expect(season?.id).toBe(seasonId);
+        expect(teams.length).toBeGreaterThanOrEqual(6);
+        expect(divisions.map((d) => d.name)).toEqual(['North', 'South']);
+      } else {
+        // An admin of another program, a coach, a scorekeeper, a stranger, another
+        // league's admin and nobody signed in are told of no season and no team name.
+        expect(season).toBeUndefined();
+        expect(teams).toEqual([]);
+        expect(divisions).toEqual([]);
+      }
+    },
+  );
+
   it('gives the screens their reads: the current season, its divisions and teams', async () => {
-    expect(await ports.adminTeams.currentSeason(leagueId)).toEqual({
+    expect(await ports.adminTeams.currentSeason(ownerOf(leagueId))).toEqual({
       id: seasonId,
       name: 'Winter Season',
     });
-    expect((await ports.adminTeams.divisions(leagueId, seasonId)).map((d) => d.name)).toEqual([
-      'North',
-      'South',
-    ]);
-    const names = (await ports.adminTeams.teams(leagueId, seasonId)).map((t: TeamRecord) => t.name);
+    expect(
+      (await ports.adminTeams.divisions(ownerOf(leagueId), seasonId)).map((d) => d.name),
+    ).toEqual(['North', 'South']);
+    const names = (await ports.adminTeams.teams(ownerOf(leagueId), seasonId)).map(
+      (t: TeamRecord) => t.name,
+    );
     expect(names.filter((n) => n.startsWith('Lakeside'))).toEqual([
       'Lakeside Foxes',
       'Lakeside Gulls',
@@ -420,23 +445,23 @@ describe('Admin → Teams on the database ports, role by role', () => {
     ]);
     // The other league's season, asked for through this league: nothing of it.
     expect(otherSeasonId).not.toBe('');
-    expect(await ports.adminTeams.teams(leagueId, otherSeasonId)).toEqual([]);
-    expect(await ports.adminTeams.divisions(leagueId, otherSeasonId)).toEqual([]);
-    expect((await ports.adminTeams.teams(otherLeagueId, otherSeasonId)).length).toBe(4);
+    expect(await ports.adminTeams.teams(ownerOf(leagueId), otherSeasonId)).toEqual([]);
+    expect(await ports.adminTeams.divisions(ownerOf(leagueId), otherSeasonId)).toEqual([]);
+    expect((await ports.adminTeams.teams(ownerOf(otherLeagueId), otherSeasonId)).length).toBe(4);
     // An id that cannot be a row's is no row, asked of no database.
-    expect(await ports.adminTeams.teams(leagueId, 'not-an-id')).toEqual([]);
-    expect(await ports.adminTeams.divisions(leagueId, 'not-an-id')).toEqual([]);
+    expect(await ports.adminTeams.teams(ownerOf(leagueId), 'not-an-id')).toEqual([]);
+    expect(await ports.adminTeams.divisions(ownerOf(leagueId), 'not-an-id')).toEqual([]);
   });
 });
 
 describe("another league's teams, roster lines and people are not found, through either league", () => {
   /** One league's own ids, read by its owner. */
   async function idsOf(league: string) {
-    const season = await ports.adminTeams.currentSeason(league);
+    const season = await ports.adminTeams.currentSeason(ownerOf(league));
     if (season === undefined) throw new Error('no season');
     // A seed team with a player on it (the season under way put the people on rosters).
     let found: { team: TeamRecord; entry: RosterLine } | undefined;
-    for (const team of await ports.adminTeams.teams(league, season.id)) {
+    for (const team of await ports.adminTeams.teams(ownerOf(league), season.id)) {
       const roster = must('roster', await listRoster(ownerOf(league), { teamId: team.id }, deps()));
       const entry = roster.find((line) => line.leftOn === null);
       if (entry !== undefined && team.name.startsWith('Fixture') === false) {
@@ -448,7 +473,7 @@ describe("another league's teams, roster lines and people are not found, through
     const person = people[0];
     if (found === undefined || person === undefined) throw new Error('no roster line or person');
     const { team, entry } = found;
-    const division = (await ports.adminTeams.divisions(league, season.id))[0];
+    const division = (await ports.adminTeams.divisions(ownerOf(league), season.id))[0];
     return { season: season.id, team, entry, person, division: division?.id ?? '' };
   }
 
@@ -524,8 +549,8 @@ describe("another league's teams, roster lines and people are not found, through
       ),
       removePerson: await run(await removePerson(as, { personId: theirs.person.id }, deps())),
       removeTeam: await run(await removeTeam(as, { teamId: team }, deps())),
-      teamsOfTheirSeason: (await ports.adminTeams.teams(as.leagueId, theirs.season)).length,
-      divisionsOfTheirSeason: (await ports.adminTeams.divisions(as.leagueId, theirs.season)).length,
+      teamsOfTheirSeason: (await ports.adminTeams.teams(as, theirs.season)).length,
+      divisionsOfTheirSeason: (await ports.adminTeams.divisions(as, theirs.season)).length,
     };
   }
 
@@ -626,7 +651,7 @@ describe("a child's private fields (R-16, T-76) and R-28 on the database", () =>
     expect((await quinn()).sensitive?.isMinor).toBe(false);
     const { id: publicSeason } = (await ports.publicStats.seasonsOf(leagueId))[0] ?? { id: '' };
     // Read first: one snapshot transaction is open at a time.
-    const teams = await ports.adminTeams.teams(leagueId, publicSeason);
+    const teams = await ports.adminTeams.teams(ownerOf(leagueId), publicSeason);
     // The statistics and a team's public roster, as the pages read them: first name and
     // last initial in an adult league that shows adults in full.
     const shown = await ports.publicStats.statisticsOf(
@@ -706,7 +731,7 @@ describe("a child's private fields (R-16, T-76) and R-28 on the database", () =>
       );
     };
     const [season] = await ports.publicStats.seasonsOf(leagueId);
-    const teams = await ports.adminTeams.teams(leagueId, season?.id ?? '');
+    const teams = await ports.adminTeams.teams(ownerOf(leagueId), season?.id ?? '');
     /** Morgan's name in the statistics and on every public roster. */
     const shownAs = () =>
       ports.publicStats.statisticsOf(leagueId, async ({ store, settings, rosterOf }) => {
@@ -836,7 +861,9 @@ describe("core's event handlers on the teams area's commands (T-24)", () => {
         deps(),
       ),
     );
-    const listed = (await ports.adminTeams.teams(leagueId, season?.id ?? '')).map((t) => t.id);
+    const listed = (await ports.adminTeams.teams(ownerOf(leagueId), season?.id ?? '')).map(
+      (t) => t.id,
+    );
     expect(await teamsIn()).not.toEqual([...listed].sort());
     const event = { type: gameFinalized, leagueId, gameId: randomUUID(), seasonId: season?.id };
     await ports.adminTeams.deps.transaction(ownerOf(leagueId), (tx) => handler.handle(event, tx));

@@ -252,7 +252,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     scheduleAdmin: databaseScheduleAdmin(database, db, options.log, accessOf),
     publicTeams: databasePublicTeams(database, db),
     // Its commands run with core's event handlers, never an empty list (part 5).
-    adminTeams: databaseAdminTeams(database, db, options.log),
+    adminTeams: databaseAdminTeams(database, db, options.log, accessOf),
     adminSettings: databaseAdminSettings(database, db, options.log),
     tracker: notMovedYet('tracker'),
     publishPlays: async () => {
