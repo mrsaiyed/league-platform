@@ -331,6 +331,20 @@ const adminPages = [
     league: 'north-valley',
     steps: (page) => undoSteps(page, 'schedule-game-removed'),
   },
+  // Step 2.185, in the first made-up league's current season, by the owner's own taps
+  // (draftPutBackSteps): a published game removed and another moved, the removed one still
+  // in its place, struck through, with "Removed in this draft" and "Put it back"; and a
+  // game removed and put back, the draft then "the same as the published schedule" with
+  // "Discard the draft" beside it. The draft is discarded again once the page is drawn.
+  ...[
+    { name: 'admin-schedule-removed-stays', then: 'move' },
+    { name: 'admin-schedule-draft-same', then: 'put-back' },
+  ].map(({ name, then }) => ({
+    name,
+    at: '/admin/schedule',
+    league: 'north-valley',
+    steps: (page) => draftPutBackSteps(page, then),
+  })),
   // Step 2.181, in the first made-up league's current season, by the owner's own taps
   // (emptiedRoundSteps): both games of the last round removed from the draft, the round's
   // controls opened ("0 games" and whether it can be removed), and then "Remove this
@@ -959,7 +973,10 @@ async function undoSteps(page, what) {
       .locator('li[data-game]', { has: page.locator('summary', { hasText: 'Edit this game' }) })
       .first();
     await game.locator('summary', { hasText: 'Edit this game' }).click();
-    await tapTo(game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+    await tapTo(
+      game.getByRole('button', { name: 'Remove game' }),
+      /\/admin\/schedule(\?season=[\w-]+)?#saved$/,
+    );
     return;
   }
   if (what === 'team-put-back-no-number') {
@@ -1040,6 +1057,53 @@ async function winterSteps(page, want, then) {
  * draft is discarded from a second page, so the pictures after these find the season as
  * the seed has it (the drawn page does not change: it has no scripts).
  */
+/**
+ * Step 2.185's pictures, by taps with scripts off: any draft discarded first; the first
+ * game that can be edited removed; then either the next one moved by half an hour, or the
+ * removed one put back from the grid. A second page discards the draft afterwards, as
+ * emptiedRoundSteps does, so the pictures after these find the season as the seed has it.
+ */
+async function draftPutBackSteps(page, then) {
+  const answered = /\/admin\/schedule(\?[^#]*)?#saved$/;
+  const tapTo = async (on, locator, url) => {
+    await Promise.all([on.waitForEvent('load'), locator.click()]);
+    if (!url.test(on.url())) throw new Error(`a step landed on ${on.url()}, not ${url}`);
+  };
+  const discard = async (on) => {
+    const box = on.locator('details', {
+      has: on.locator('button', { hasText: 'Discard all draft changes' }),
+    });
+    if ((await box.count()) === 0) return;
+    await box.locator('summary').click();
+    await tapTo(on, box.locator('button'), /done=discarded/);
+  };
+  await discard(page);
+  const editable = page.locator('li[data-game]', {
+    has: page.locator('summary', { hasText: 'Edit this game' }),
+  });
+  const first = editable.first();
+  const gameId = await first.getAttribute('data-game');
+  await first.locator('summary', { hasText: 'Edit this game' }).click();
+  await tapTo(page, first.getByRole('button', { name: 'Remove game' }), answered);
+  if (then === 'move') {
+    const next = editable.first();
+    await next.locator('summary', { hasText: 'Edit this game' }).click();
+    await next.locator('input[name=time]').fill('21:30');
+    await tapTo(page, next.getByRole('button', { name: 'Save game' }), /saved=game-saved/);
+  } else {
+    const struck = page.locator(`li[data-removed-game="${gameId}"]`);
+    await tapTo(page, struck.getByRole('button', { name: 'Put it back' }), answered);
+    await page.goto(page.url().replace(/#.*$/, ''));
+  }
+  const other = await page.context().newPage();
+  try {
+    await other.goto(page.url().replace(/\?.*$/, ''));
+    await discard(other);
+  } finally {
+    await other.close();
+  }
+}
+
 async function emptiedRoundSteps(page, remove) {
   const tapTo = async (on, locator, url) => {
     await Promise.all([on.waitForEvent('load'), locator.click()]);
@@ -1061,7 +1125,11 @@ async function emptiedRoundSteps(page, remove) {
   while ((await games.count()) > 0) {
     const game = games.first();
     await game.locator('summary', { hasText: 'Edit this game' }).click();
-    await tapTo(page, game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+    await tapTo(
+      page,
+      game.getByRole('button', { name: 'Remove game' }),
+      /\/admin\/schedule(\?season=[\w-]+)?#saved$/,
+    );
   }
   await last.locator('summary', { hasText: 'Change or remove this round' }).click();
   if (remove) {
