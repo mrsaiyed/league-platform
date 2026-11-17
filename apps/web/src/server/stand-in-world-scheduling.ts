@@ -226,11 +226,14 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
           !s.games.some((g) => g.roundId === r.id && !g.binned),
       );
       const goneIds = new Set(gone.map((r) => r.id));
-      s.games = s.games.map((g) =>
-        g.binned && g.roundId !== null && goneIds.has(g.roundId) ? { ...g, roundId: null } : g,
-      );
+      const cleared: string[] = [];
+      s.games = s.games.map((g) => {
+        if (!g.binned || g.roundId === null || !goneIds.has(g.roundId)) return g;
+        cleared.push(g.id);
+        return { ...g, roundId: null };
+      });
       s.rounds = s.rounds.filter((r) => !goneIds.has(r.id));
-      return gone.length;
+      return { roundIds: [...goneIds].sort(), gameIds: cleared.sort() };
     },
     // As list-games-in-rounds.ts: the games not in the bin, dated or not.
     gamesInRounds: async (seasonId, roundIds) =>

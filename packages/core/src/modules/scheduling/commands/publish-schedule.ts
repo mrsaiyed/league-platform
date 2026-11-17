@@ -140,7 +140,9 @@ export const publishSchedule = defineCommand({
     // Last, once every game has left them or is in the bin: the games in the bin lose their
     // round (S-60); a round a game outside the bin still names stays (the plan blocks it).
     const removedRounds = await store.deleteRounds(input.seasonId, summary.roundsRemoved);
-    if (removedRounds !== summary.roundsRemoved.length) return fail({ code: 'round-in-use' });
+    if (removedRounds.roundIds.length !== summary.roundsRemoved.length) {
+      return fail({ code: 'round-in-use' });
+    }
 
     const revision = (latest ?? 0) + 1;
     const teamCount = summary.teamsAffected.length;
@@ -179,6 +181,15 @@ export const publishSchedule = defineCommand({
         gamesMoved: summary.gamesMoved.length,
         teamsAffected: teamCount,
         peopleAffected: plan.peopleAffected,
+        // Which rounds went, and which games in the bin lost their round with them (S-60):
+        // the bin can then say a game's round was removed. Ids of this league, space apart
+        // (the log keeps single values).
+        ...(removedRounds.roundIds.length === 0
+          ? {}
+          : { roundsRemoved: removedRounds.roundIds.join(' ') }),
+        ...(removedRounds.gameIds.length === 0
+          ? {}
+          : { gamesLeftWithoutRound: removedRounds.gameIds.join(' ') }),
       },
     });
     return ok({ revision, summary, teamCount, peopleCount: plan.peopleAffected });

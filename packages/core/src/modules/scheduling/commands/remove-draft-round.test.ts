@@ -144,6 +144,14 @@ describe('removing a round from the schedule draft (step 2.160)', () => {
     expect(await publishSchedule(as(ownerId), publish, deps)).toMatchObject({ ok: true });
     expect(db.state.roundsRemoved).toEqual([roundUuid(2)]);
     expect(db.state.roundsCleared).toEqual([gameUuid(8), gameUuid(9)]);
+    // The publication's log entry keeps which round went and which games lost it.
+    expect(db.state.activity.at(-1)).toMatchObject({
+      action: 'scheduling.publish_schedule',
+      details: {
+        roundsRemoved: roundUuid(2),
+        gamesLeftWithoutRound: `${gameUuid(8)} ${gameUuid(9)}`,
+      },
+    });
   });
 
   it('removes a round whose games the same draft removes: publishing bins them, then removes the round', async () => {

@@ -176,10 +176,14 @@ export type SchedulingStore = {
    */
   readonly insertRounds: (seasonId: string, rounds: readonly NewRound[]) => Promise<number>;
   /**
-   * Removes these rounds of the season that no game outside the bin is in: how many went.
-   * The games in the bin that are in them lose their round and keep everything else (S-60).
+   * Removes these rounds of the season that no game outside the bin is in: which went. The
+   * games in the bin that are in them lose their round and keep everything else (S-60):
+   * which, so the publication's log entry keeps that they had one.
    */
-  readonly deleteRounds: (seasonId: string, roundIds: readonly string[]) => Promise<number>;
+  readonly deleteRounds: (
+    seasonId: string,
+    roundIds: readonly string[],
+  ) => Promise<{ readonly roundIds: readonly string[]; readonly gameIds: readonly string[] }>;
   /** The season's games not in the bin, dated or not, that are in any of these rounds (S-60). */
   readonly gamesInRounds: (
     seasonId: string,

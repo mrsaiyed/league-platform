@@ -241,11 +241,12 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
             ...s.schedule.games.filter((g) => s.binned.includes(g.id)),
             ...s.binnedInRounds,
           ];
-          s.roundsCleared.push(
-            ...inBin.filter((g) => g.roundId !== null && gone.includes(g.roundId)).map((g) => g.id),
-          );
+          const cleared = inBin
+            .filter((g) => g.roundId !== null && gone.includes(g.roundId))
+            .map((g) => g.id);
+          s.roundsCleared.push(...cleared);
           s.roundsRemoved.push(...gone);
-          return gone.length;
+          return { roundIds: [...gone].sort(), gameIds: [...cleared].sort() };
         },
         // As list-games-in-rounds.ts: games not in the bin, dated or not.
         gamesInRounds: async (_season, ids) => [

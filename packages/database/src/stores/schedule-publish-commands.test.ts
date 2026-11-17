@@ -667,6 +667,17 @@ describe('publishing against the database', () => {
     );
     expect(teamsOf).toEqual({ home_team_id: s.teams.c, away_team_id: s.teams.d });
     expect((await gameRow(stays)).round_id).toBe(s.round1);
+    // The publication's log entry keeps which round went and which games lost it (S-60).
+    const logged = await one<{ details: Record<string, unknown> }>(
+      pglite,
+      `select details from activity_log where league_id = $1
+         and action = 'scheduling.publish_schedule' and details->>'revision' = '3'`,
+      [s.leagueId],
+    );
+    expect(logged.details).toMatchObject({
+      roundsRemoved: s.round2,
+      gamesLeftWithoutRound: [first, second].sort().join(' '),
+    });
 
     // Brought back from the bin, it has no round.
     expect(await restoreGame(s.as, { gameId: first }, deps)).toEqual({
