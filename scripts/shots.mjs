@@ -50,6 +50,9 @@
 //
 // `--only=menu` takes the phone menu, open, at 390 in each league's look (`…-menu-open.jpg`).
 //
+// `--only=overtime` plays a game won in overtime and takes the pages that show its result
+// (`north-valley-overtime-….jpg`, step 2.200): see overtimePages.
+//
 // Signed in as the made-up owner (step 2.127): the front page and the account page with
 // their leagues (`platform-home-signed-in`, `platform-account`), and the account button's
 // menu, open, on the first league's home (`north-valley-account-menu-open`): in the phone
@@ -472,6 +475,21 @@ const scorekeeperPages = [
   // The games list as a scorekeeper sees it: a final game says who can reopen it (2.154).
   { name: 'scorekeeper-games-list', at: '/admin/games' },
 ];
+// A game won in overtime (step 2.200, `--only=overtime`): Lions v Tigers, the first league's
+// game 1, played level through regulation and won in the first overtime by this script's
+// own taps (scoreOvertimeGame), after every other picture is taken, so none of them
+// changes. Then its page, its card on the schedule, the home page and the Lions' page, and
+// the games lists of the owner and the scorekeeper: each says "Final, OT", beside the
+// made-up season's other results, which say "Final" alone.
+const overtimeGame = trackedGame(1);
+const overtimePages = [
+  { name: 'overtime-game', at: `/games/${overtimeGame}`, as: 'visitor' },
+  { name: 'overtime-schedule', at: '/schedule', as: 'visitor' },
+  { name: 'overtime-home', at: '', as: 'visitor' },
+  { name: 'overtime-team', at: '/teams/lions', as: 'visitor' },
+  { name: 'overtime-admin-games', at: '/admin/games', as: 'owner' },
+  { name: 'overtime-scorekeeper-games', at: '/admin', as: 'scorekeeper' },
+];
 // SR Leagues' own pages, signed in as the made-up owner (step 2.127).
 const signedInPlatformPages = [
   { name: 'platform-home-signed-in', at: '/' },
@@ -857,6 +875,56 @@ async function waitFor(url, server) {
     }
   }
   throw new Error(`the server did not answer within two minutes:\n${server.output()}`);
+}
+
+/**
+ * Plays Lions v Tigers (the first league's game 1, a halves game) level through both halves,
+ * then the first overtime, which the Lions win (step 2.200), as the owner's tablet would.
+ */
+async function scoreOvertimeGame(origin) {
+  const five = (team) => [1, 2, 3, 4, 5].map((n) => trackedPlayer(team, n));
+  const [lions, tigers] = [five(1), five(2)];
+  const post = async (at, body) => {
+    const answer = await fetch(
+      `${origin}/api/v1/leagues/${trackedLeagueId}/games/${overtimeGame}${at}`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: `${owner.name}=${owner.value}`,
+          origin,
+        },
+        body: JSON.stringify(body),
+      },
+    );
+    const text = await answer.text();
+    if (!answer.ok) throw new Error(`${at} answered ${answer.status}: ${text.slice(0, 200)}`);
+    return JSON.parse(text);
+  };
+  const { sessionId } = await post('/session', { type: 'open', deviceId: 'overtime-tablet' });
+  const score = (side, playerId, points) => ({ type: 'score', side, playerId, points });
+  const next = (period) => [{ type: 'pause' }, { type: 'period', period }, { type: 'start' }];
+  const inputs = [
+    { type: 'lineup', side: 'home', playerIds: lions },
+    { type: 'lineup', side: 'away', playerIds: tigers },
+    { type: 'start' },
+    score('home', lions[0], 3),
+    score('away', tigers[0], 2),
+    ...next(2),
+    score('away', tigers[1], 3),
+    score('home', lions[1], 2),
+    // Level at 5 when the second half ends: the first overtime.
+    ...next(3),
+    score('home', lions[2], 2),
+    { type: 'end' },
+  ];
+  const reply = await post('/commands', {
+    protocolVersion: 1,
+    sessionId,
+    commands: inputs.map((input) => ({ commandId: randomUUID(), at: Date.now(), input })),
+  });
+  const refused = reply.results.filter((r) => r.status !== 'accepted');
+  if (refused.length > 0) throw new Error(`refused: ${JSON.stringify(refused)}`);
 }
 
 /**
@@ -1397,6 +1465,61 @@ try {
     await staffTapping.close();
     await keeper.close();
     await planner.close();
+  }
+  // A game won in overtime (`--only=overtime`): scored now, after every other picture.
+  {
+    const jobs = (design === '' ? overtimePages : []).filter((job) =>
+      wanted(`${leagues[0]}-${job.name}`),
+    );
+    let scored = jobs.length > 0;
+    if (scored) {
+      try {
+        await scoreOvertimeGame(origin);
+      } catch (error) {
+        scored = false;
+        missed.push(`the overtime game was not scored: ${String(error.message ?? error)}`);
+      }
+    }
+    for (const width of scored ? widths : []) {
+      fs.mkdirSync(path.join(out, width.name), { recursive: true });
+      const contexts = {};
+      for (const [as, cookie] of [
+        ['visitor', null],
+        ['owner', owner],
+        ['scorekeeper', scorekeeper],
+      ]) {
+        contexts[as] = await browser.newContext({ viewport: width.viewport });
+        if (cookie !== null) await contexts[as].addCookies([{ ...cookie, url: origin }]);
+      }
+      for (const job of jobs) {
+        const name = `${leagues[0]}-${job.name}`;
+        const label = `${width.name}/${name}`;
+        const page = await contexts[job.as].newPage();
+        page.setDefaultTimeout(90_000);
+        try {
+          await page.goto(`${origin}/${leagues[0]}${job.at}`, { waitUntil: 'networkidle' });
+          await page.evaluate(() => {
+            const style = document.createElement('style');
+            style.textContent = 'nextjs-portal { display: none !important; }';
+            document.head.append(style);
+            return document.fonts.ready.then(() => undefined);
+          });
+          await page.mouse.move(0, 0);
+          await page.screenshot({
+            path: path.join(out, width.name, `${name}.jpg`),
+            fullPage: true,
+            type: 'jpeg',
+            quality: 80,
+          });
+          taken.push(`${label}.jpg`);
+        } catch (error) {
+          missed.push(`${label}: ${String(error.message ?? error).split('\n')[0]}`);
+        } finally {
+          await page.close();
+        }
+      }
+      for (const context of Object.values(contexts)) await context.close();
+    }
   }
   // The phone menu, open (`--only=menu`), at 390 in each league's own look.
   {
