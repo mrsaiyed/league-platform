@@ -482,13 +482,11 @@ function randomGame(seed, rules, taps = 80) {
       else if (roll < 0.78) {
         if (s.plays.at(-1)?.type !== 'lineup') tap({ type: 'undo' });
       } else if (roll < 0.86) tap({ type: 'redo' });
-      else
-        tap({
-          type: 'score',
-          side: pick(['home', 'away']),
-          playerId: pick(d.teams.home.onCourt),
-          points: 2,
-        });
+      else {
+        // A basket by one of that team's own players on the court (the reviews' LOW 6).
+        const side = pick(['home', 'away']);
+        tap({ type: 'score', side, playerId: pick(d.teams[side].onCourt), points: 2 });
+      }
     } catch {
       // A tap the engine refuses (a period already being played, nothing to undo): skipped.
     }
