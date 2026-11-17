@@ -96,6 +96,8 @@ export type StatsPageData = {
   readonly totalsNoteTeams: readonly string[];
   /** How both tables are sorted when the page opens; nothing while the sport has no statistic. */
   readonly openingSort: Sort | null;
+  /** Sentences said once, above both tables, of what their numbers count. */
+  readonly tableNotes: readonly string[];
 };
 
 export type StatsFailure = { readonly code: 'season-not-found' | 'invalid-input' };
@@ -258,11 +260,31 @@ function pageData(
       : {}),
     ...(player.teamIds.length > 1 ? { severalTeams: { team: true } } : {}),
   }));
-  const teamColumns: StatsColumn[] = [{ key: 'team', label: t('stats.col.team') }, ...statColumns];
+  // A team's numbers come from the games where they were recorded (P7 §8), which may be
+  // fewer than the games the standings count: the table says how many (step 2.195). A
+  // statistic kept in fewer of them is averaged over its own games, as before.
+  const teamColumns: StatsColumn[] = [
+    { key: 'team', label: t('stats.col.team') },
+    {
+      key: 'games',
+      label: t('stats.col.games'),
+      fullName: t('stats.col.teamGamesFull'),
+      numeric: true,
+    },
+    ...statColumns,
+  ];
+  const gamesWithStatistics = (stats: StatisticsTable['teams'][number]['stats']): number | null => {
+    const counts = table.statKeys.flatMap((key) => {
+      const entry = stats[key];
+      return entry === undefined ? [] : [entry.gamesRecorded];
+    });
+    return counts.length === 0 ? null : Math.max(...counts);
+  };
   const teamRows: StatRow[] = table.teams.map((team) => ({
     id: team.teamId,
     cells: {
       team: team.name,
+      games: gamesWithStatistics(team.stats),
       ...Object.fromEntries(table.statKeys.map((key) => [key, valueOf(team.stats[key])])),
     },
     chips: { team: team.color },
@@ -271,6 +293,18 @@ function pageData(
   // The statistic both tables open sorted by, biggest first: points where the sport counts
   // them, otherwise the first statistic it has.
   const sortKey = table.statKeys.includes('points') ? 'points' : table.statKeys[0];
+  // A row's statistic kept in fewer of its games than the GP beside it is averaged over its
+  // own games (P7 §5.2, T6 §9): right, and a parent dividing by GP would get it wrong.
+  const keptInFewer = (games: number | null, stats: StatisticsTable['teams'][number]['stats']) =>
+    games !== null &&
+    table.statKeys.some((key) => {
+      const entry = stats[key];
+      return entry !== undefined && entry.gamesRecorded < games;
+    });
+  const averagedOverFewer =
+    by === 'average' &&
+    (table.players.some((player) => keptInFewer(player.gamesPlayed, player.stats)) ||
+      table.teams.some((team) => keptInFewer(gamesWithStatistics(team.stats), team.stats)));
   return {
     by,
     minimumGames: settings.minimumGames,
@@ -289,5 +323,12 @@ function pageData(
       )
       .map((team) => team.name),
     openingSort: sortKey === undefined ? null : { key: sortKey, direction: 'descending' },
+    // What is said once, above both tables, of what their numbers count (step 2.195): which
+    // games the statistics count, and, where it applies, that a statistic not kept in every
+    // game is averaged over its own. A later sentence about both tables goes in this list.
+    tableNotes: [
+      t('stats.countsGames'),
+      ...(averagedOverFewer ? [t('stats.averagedOverOwnGames')] : []),
+    ],
   };
 }

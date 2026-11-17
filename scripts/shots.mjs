@@ -1509,8 +1509,9 @@ try {
   // Long names (`--only=long-name`), at the two narrowest phones. In the picture only, the
   // league's name in the header is rewritten to a made-up one of 54 letters, and a made-up
   // team name of 36 letters is put wherever the page names a team first: the first row of
-  // every table, the first team of a scoreboard, of the first game card and of the first
-  // team card, and a team page's own heading. Each page is taken as it opens and again
+  // every table (and every note under a standings table that names that team), the first
+  // team of a scoreboard, of the first game card and of the first team card, and a team
+  // page's own heading. Each page is taken as it opens and again
   // with its tables scrolled to their far end, which shows the numbers can still be reached.
   for (const width of longNameWidths) {
     const jobs = longNamePages.filter(
@@ -1535,7 +1536,17 @@ try {
               // element of their own, with a note's mark after it in the same flow, and
               // the picture must show where the mark lands.
               const cell = table.querySelector('tbody .ui-team-cell > [dir]');
-              put(cell?.querySelector('.ui-team-name') ?? cell, name);
+              const named = cell?.querySelector('.ui-team-name') ?? cell;
+              const before = named?.textContent ?? '';
+              put(named, name);
+              // A standings note names the teams it is beside (step 2.195): the long name
+              // goes into the notes under that table too, wherever they name the team.
+              const notes = table.closest('.ui-table-wrap')?.querySelectorAll('.ui-footnotes li');
+              for (const note of notes ?? []) {
+                if (before !== '' && note.textContent.includes(before)) {
+                  note.textContent = note.textContent.split(before).join(name);
+                }
+              }
             }
             put(document.querySelector('.ui-scoreboard-name > [dir]'), name);
             // The first game card gets the long name, and the next card one long word. A

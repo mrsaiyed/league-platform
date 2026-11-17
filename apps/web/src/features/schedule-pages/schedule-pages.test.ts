@@ -1,6 +1,7 @@
 // The home and schedule pages' content (step 2.42), on the made-up stand-in schedules:
 // the two leagues differ, past rounds are closed and the current one open, the team and
 // round choices narrow the list, and a live message moves a game without a refresh.
+import { readStandings } from '@srleagues/core';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -8,8 +9,10 @@ import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts'
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
 import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
+import { buildStandingsViews } from '../stats-pages/index.ts';
 import { buildHomeGames, buildScheduleView, comingOrder, parseRound } from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
+import { compactStandings } from './home-page.tsx';
 import { LatestResultsSection, latestResultsCount } from './latest-results.tsx';
 import { applyUpdate } from './live-game-list.tsx';
 import { RoundSections, gameLinkWords } from './schedule-views.tsx';
@@ -451,5 +454,21 @@ describe('recent results order', () => {
     for (const listed of [...home.recent, ...home.upcoming]) {
       expect(listed.detailsHref, listed.status).toContain(`/games/${listed.id}`);
     }
+  });
+});
+
+// The lead's review of step 2.195, item 3: one number, one way. The home page's small
+// table writes a win percentage as the full table and the notes do: .667, never 0.667.
+describe('the home page’s small standings', () => {
+  it('writes PCT as the notes do, and keeps the notes, which carry their own numbers', async () => {
+    const [season] = await stats.seasonsOf(adult);
+    const result = await readStandings(stats.readStoreOf(adult), { seasonId: season?.id ?? '' });
+    if (!result.ok) throw new Error('expected standings');
+    const [east] = buildStandingsViews(result.value).map(compactStandings);
+    expect(east?.columns.map((c) => c.key)).toEqual(['played', 'wins', 'losses', 'winPercentage']);
+    expect(east?.rows.map((row) => row.cells['winPercentage'])).toEqual(['.667', '.667', '.000']);
+    expect(east?.footnotes.map((f) => f.text)).toEqual([
+      'Owls and Falcons are level on win percentage (.667). The game between them puts Owls ahead.',
+    ]);
   });
 });
