@@ -7,5 +7,6 @@ export {
   type MadeUpLeague,
   type MadeUpOptions,
 } from './made-up-database.ts';
+export { seedAllLeaguesInto, type SeedLoad } from './seed-all-leagues.ts';
 export { seedLeagues, seedStaff, type SeedLeague } from './seed-data.ts';
 export { seedLeaguesInto, type SeededLeague } from './seed-leagues.ts';
