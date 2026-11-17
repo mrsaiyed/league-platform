@@ -3,7 +3,7 @@
 // before anything is ranked, so a rank, a gap in ranks or a count can never show that a
 // hidden player exists. Names come only through the one name function (T-81).
 import { seasonTotals, type CaptureMode, type StatsGame } from '@srleagues/sports';
-import { boxScoreColumns, rulesOfGame } from '../games/index.ts';
+import { statisticsKept, teamOwnCounts } from '../games/index.ts';
 import type { Audience } from '../leagues/index.ts';
 import {
   showName,
@@ -18,6 +18,7 @@ import type {
   SeasonTeamRow,
   StandingsReadStore,
   TeamStatTotalRecord,
+  TeamTurnoverGame,
 } from './read-ports.ts';
 
 /** Who is looking and how the league shows names. The server builds it, never the request. */
@@ -144,14 +145,34 @@ async function recompute(
 }
 
 /**
- * The statistics a season's rules keep ("Statistics kept", P7 §1): the columns the box
- * score grid asks for, its rules read as the games module reads them (rules that cannot
- * be read, or none saved, are the starting set), so the page shows what was asked for. A
- * season that names its statistics itself keeps those; one that names none (no command
- * writes the list, record 070) keeps its rules' set.
+ * A team's season total counts everything the team did (step 2.196, the numbers audit's
+ * H1): the turnovers charged to the team itself, which are in no player's line, are
+ * added to its turnovers, read by the engine from each game's saved plays as the game's
+ * page reads them. A game counts once among the games a team's turnovers were recorded
+ * in: it is counted already when a player of the team came on (a tracked game's lines
+ * always carry turnovers), and added when none did.
  */
-function keptByRules(rules: unknown): readonly string[] {
-  return boxScoreColumns(rulesOfGame(null, rules).statistics).statKeys;
+function addTeamTurnovers(
+  totalsByTeam: Map<string, Record<string, StatEntry>>,
+  games: readonly TeamTurnoverGame[],
+): void {
+  for (const game of games) {
+    const counts = teamOwnCounts(game.state);
+    for (const [teamId, own] of [
+      [game.homeTeamId, counts.home],
+      [game.awayTeamId, counts.away],
+    ] as const) {
+      if (own.turnovers === 0) continue;
+      const stats = totalsByTeam.get(teamId) ?? {};
+      const before = stats['turnovers'];
+      const counted = own.playersPlayed && before !== undefined;
+      stats['turnovers'] = entryOf(
+        (before?.total ?? 0) + own.turnovers,
+        (before?.gamesRecorded ?? 0) + (counted ? 0 : 1),
+      );
+      totalsByTeam.set(teamId, stats);
+    }
+  }
 }
 
 /** Undefined when the season is not in this league. */
@@ -163,12 +184,14 @@ export async function statisticsSource(
   const season = await store.findSeason(seasonId);
   const named = season === undefined ? undefined : await store.seasonStatKeys(season.id);
   if (season === undefined || named === undefined) return undefined;
-  const keys = named.length > 0 ? named : keptByRules(season.rules);
-  const [teams, totals, links, teamTotalRows] = await Promise.all([
+  // "Statistics kept" (P7 §1): the same answer a game's box score draws its columns from.
+  const keys = statisticsKept(named, season.rules);
+  const [teams, totals, links, teamTotalRows, teamTurnoverGames] = await Promise.all([
     store.teams(season.id),
     store.playerTotals(season.id),
     store.playerTeams(season.id),
     store.teamStatTotals(season.id),
+    store.teamTurnoverGames(season.id),
   ]);
   const settings = new Map(teams.map((team) => [team.id, teamSetting(viewing.leagueId, team)]));
   const shownTeam = (teamId: string): boolean => {
@@ -259,6 +282,7 @@ export async function statisticsSource(
     own[row.statKey] = entryOf(row.total, row.gamesRecorded);
     totalsByTeam.set(row.teamId, own);
   }
+  addTeamTurnovers(totalsByTeam, teamTurnoverGames);
   return {
     seasonId: season.id,
     statKeys: keys,

@@ -14,6 +14,7 @@ import {
   listStandingsAdjustments,
   listStandingsRows,
   listTeamStatTotals,
+  listTeamTurnoverGames,
 } from '../queries/index.ts';
 
 /** The seasons whose standings, statistics and games the public may read. */
@@ -51,6 +52,7 @@ export function standingsReadStore(scope: LeagueScope): StandingsReadStore {
       }));
     },
     teamStatTotals: (seasonId) => listTeamStatTotals(scope, seasonId),
+    teamTurnoverGames: (seasonId) => listTeamTurnoverGames(scope, seasonId),
     people: (personIds) => listPeopleForDisplay(scope, personIds),
   };
 }

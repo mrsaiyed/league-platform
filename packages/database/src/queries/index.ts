@@ -133,6 +133,7 @@ export { listSeasonStatKeys } from './list-season-stat-keys.ts';
 export { listSeasonTeams } from './list-season-teams.ts';
 export { listStandingsRows } from './list-standings-rows.ts';
 export { listTeamStatTotals } from './list-team-stat-totals.ts';
+export { listTeamTurnoverGames } from './list-team-turnover-games.ts';
 export { listDecidedGames } from './list-decided-games.ts';
 export { listDecidedGameLines } from './list-decided-game-lines.ts';
 export { listGameLines } from './list-game-lines.ts';

@@ -59,6 +59,10 @@ export {
   type GetBoxScoreSheetError,
 } from './commands/get-box-score-sheet.ts';
 export { boxScoreColumns } from './box-score-columns.ts';
+// One answer for the columns of the statistics page and a game's box score (step 2.196).
+export { statisticsKept } from './statistics-kept.ts';
+// A team's own count, from the saved plays: in its Total and its season's (step 2.196).
+export { teamOwnCounts, type TeamOwnCount, type TeamOwnCounts } from './team-own-counts.ts';
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
 export { endTrackedGame, type EndTrackedGameError } from './commands/end-tracked-game.ts';
 export { markNotStarted, type MarkNotStartedError } from './commands/mark-not-started.ts';

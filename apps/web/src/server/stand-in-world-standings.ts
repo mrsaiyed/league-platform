@@ -93,6 +93,7 @@ export function worldStandingsRead(read: () => Promise<ReadWorld | undefined>): 
     decidedGamesOf: async (seasonId, personIds) =>
       (await over()).decidedGamesOf(seasonId, personIds),
     teamStatTotals: async (seasonId) => (await over()).teamStatTotals(seasonId),
+    teamTurnoverGames: async (seasonId) => (await over()).teamTurnoverGames(seasonId),
     people: async (personIds) => (await over()).people(personIds),
   };
 }
@@ -230,6 +231,29 @@ function standingsReadOver(s: ReadWorld | undefined): StandingsReadStore {
           const [teamId = '', statKey = ''] = at.split('|');
           return { teamId, statKey, total: sum.total, gamesRecorded: sum.games.size };
         });
+    },
+    // As list-team-turnover-games.ts picks them: final games whose saved plays hold a
+    // turnover charged to a team, with the state as saved; core reads the count.
+    teamTurnoverGames: async (seasonId) => {
+      const finals = decidedGames(seasonId).filter((g) => g.status === 'final');
+      return finals.flatMap((g) => {
+        const state = at()?.states.find((x) => x.gameId === g.id)?.state;
+        const plays: unknown =
+          typeof state === 'object' && state !== null
+            ? (state as { plays?: unknown }).plays
+            : undefined;
+        const teamTurnover =
+          Array.isArray(plays) &&
+          plays.some(
+            (play: unknown) =>
+              typeof play === 'object' &&
+              play !== null &&
+              (play as { type?: unknown }).type === 'team-turnover',
+          );
+        return teamTurnover
+          ? [{ gameId: g.id, homeTeamId: g.homeTeamId, awayTeamId: g.awayTeamId, state }]
+          : [];
+      });
     },
     people: async (personIds) =>
       (at()?.people ?? [])

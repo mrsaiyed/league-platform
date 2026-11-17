@@ -14,6 +14,7 @@ import {
   readStatLeaders,
   readTeamRecords,
 } from '@srleagues/core';
+import { sql } from 'kysely';
 import {
   findGameCorrectedDate,
   findGameState,
@@ -28,6 +29,7 @@ import {
   listStandingsAdjustments,
   listStandingsRows,
   listTeamStatTotals,
+  listTeamTurnoverGames,
 } from '../queries/index.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { gamesReadStore, standingsReadStore } from '../stores/index.ts';
@@ -80,6 +82,25 @@ registerIsolationCase({
   subject: listTeamStatTotals,
   name: "total the target's season's team statistics",
   run: (scope, target) => listTeamStatTotals(scope, target.seasonId),
+});
+registerIsolationCase({
+  subject: listTeamTurnoverGames,
+  name: "list the target's season's final games with a turnover charged to a team",
+  run: async (scope, target) => {
+    // The seeded final game gets a team turnover in its plays (inside the run's
+    // rolled-back transaction), so the control run has a game to reach.
+    await transactionOf(scope)
+      .updateTable('game_states')
+      .set({
+        state: sql`jsonb_set(state, '{plays}', (state -> 'plays') || ${JSON.stringify([
+          { type: 'team-turnover', side: 'home' },
+        ])}::jsonb)`,
+      })
+      .where('league_id', '=', scope.leagueId)
+      .where('game_id', '=', target.gameId)
+      .execute();
+    return listTeamTurnoverGames(scope, target.seasonId);
+  },
 });
 registerIsolationCase({
   subject: listPeopleForDisplay,
