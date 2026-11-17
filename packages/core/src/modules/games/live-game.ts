@@ -252,13 +252,25 @@ export function changedLines(
   return { lines, removed };
 }
 
+/** Taps that only move the clock: the period picked and the clock mode switched (S-40). */
+const clockOnly: ReadonlySet<string> = new Set(['period', 'clock-mode']);
+
 /**
- * How many overtime periods a state's game has had (P7 §5.6): the period it stands in,
- * less the regulation periods of its rules; 0 while it is still in regulation. Read when
- * the tracker ends a game, so the result keeps the period it ended in.
+ * How many overtime periods a state's game was played in (P7 §5.6): the latest period past
+ * regulation that holds a standing play other than a clock tap (a basket, a foul, a
+ * turnover, a timeout, a substitution, a line-up), less the regulation periods of its
+ * rules; 0 when nothing stands past regulation. Not the period the screen stands on when
+ * End is tapped: a game reopened and put right in an earlier period keeps the overtime it
+ * was won in, and an overtime picked by mistake with nothing in it counts for nothing.
+ * Undone plays are not standing and count for nothing. Read when the tracker ends a game.
  */
 export function overtimePeriodsOf(state: basketball.GameState): number {
-  return Math.max(0, basketball.derive(state).period - state.rules.periods);
+  const regulation = state.rules.periods;
+  let latest: number = regulation;
+  for (const play of state.plays) {
+    if (!clockOnly.has(play.type) && play.period > latest) latest = play.period;
+  }
+  return latest - regulation;
 }
 
 /** The score each side has in a state. */
