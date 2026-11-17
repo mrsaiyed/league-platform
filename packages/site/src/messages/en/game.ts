@@ -27,6 +27,9 @@ export const enGame = {
   'game.noPlays': 'No plays have been recorded yet.',
   'game.noStats': 'No statistics were recorded for this game.',
   'game.notStarted': 'This game has not started yet.',
+  // In place of a team's box score when nothing was recorded for it (a box score typed for
+  // the other team only): no Total of dashes beside a score on the board (step 2.196).
+  'game.nothingRecordedForTeam': 'No player numbers were recorded for this team.',
   'game.periodClock': '{period} {clock}',
   'game.periodHalf': 'Half {number}',
   'game.periodOvertime': 'OT{number}',
@@ -63,10 +66,11 @@ export const enGame = {
   'game.player': '{name}',
   'game.playerJersey': '#{jersey} {name}',
   'game.playersHidden': "Only this team's total is shown. Its players' numbers are not public.",
-  // Under a box score whose Total's points are a typed final score its players' points do
-  // not add up to (S-26 as changed by step 2.196): the score stands, and no row is made up.
+  // Under a box score whose Total's points are a final score its players' points do not
+  // add up to, more or fewer (S-26 as changed by step 2.196): the score stands, no row is
+  // made up.
   'game.playersPointsDiffer':
-    "The players' points add to {players}, not the {score} entered as the final score: the box score was entered by hand, or is not complete.",
+    "The players' points add to {players}. The final score was entered as {score}.",
   'game.plays': 'Play by play',
   'game.playsAsOpened': 'These are the plays up to when you opened this page.',
   'game.playsBeforeStart': 'Before the start',

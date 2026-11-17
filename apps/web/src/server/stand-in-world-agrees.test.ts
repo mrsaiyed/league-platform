@@ -753,8 +753,12 @@ describe('the one world and the database, the same season by the same commands',
     });
     expect(tableOf(read.tracked, 'home').totals['points']).toBe(4);
     expect(herons.notes).toEqual([
-      "The players' points add to 48, not the 50 entered as the final score: the box score was entered by hand, or is not complete.",
+      "The players' points add to 48. The final score was entered as 50.",
     ]);
+    // Nothing was entered for the Gulls: one sentence in place of a table of dashes.
+    expect(tableOf(read.typed, 'away').nothingRecorded).toBe(
+      'No player numbers were recorded for this team.',
+    );
   });
 
   it('agree on putting back a player marked as left, and on a team in the bin (step 2.161)', async () => {

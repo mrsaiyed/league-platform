@@ -656,7 +656,7 @@ describe('a game page', () => {
       const hawks = tables(built)[1];
       expect(hawks?.totals['points']).toBe(50);
       expect(hawks?.notes).toEqual([
-        "The players' points add to 48, not the 50 entered as the final score: the box score was entered by hand, or is not complete.",
+        "The players' points add to 48. The final score was entered as 50.",
       ]);
       // Drawn on the page under the table, and no "Team" row is made up for the 2 points:
       // the Hawks' table has its two players and its Total, nothing else.
@@ -666,7 +666,60 @@ describe('a game page', () => {
       expect(hawksTable).toContain('<caption dir="auto">Hawks</caption>');
       expect(hawksTable.match(/<tr>/g)).toHaveLength(1 + 2 + 1);
       expect(html.slice(html.lastIndexOf('</table>'))).toContain(
-        '<p class="ui-table-notice" dir="auto">The players&#x27; points add to 48, not the 50 entered as the final score: the box score was entered by hand, or is not complete.</p>',
+        '<p class="ui-table-notice" dir="auto">The players&#x27; points add to 48. The final score was entered as 50.</p>',
+      );
+    });
+
+    it('says it as plainly when the players add to more than the score entered', () => {
+      const built = buildBoxScores(
+        pageWith(standard, {
+          totals: { points: 40 },
+          playersPoints: 44,
+          players: [player({ points: 44 })],
+        }),
+      );
+      expect(tables(built)[1]?.notes).toEqual([
+        "The players' points add to 44. The final score was entered as 40.",
+      ]);
+    });
+
+    it('leaves out the table of a team nothing was recorded for, with one sentence, not a Total of dashes', async () => {
+      // A box score typed for the Hawks only: the Bears' score is on the board.
+      const built = buildBoxScores({
+        ...pageWith(standard, {
+          totals: { points: 50 },
+          playersPoints: 50,
+          players: [player({ points: 50 })],
+        }),
+        boxScores: [
+          {
+            side: 'home',
+            name: 'Hawks',
+            playerLinesShown: true,
+            totals: { points: 50 },
+            playersPoints: 50,
+            teamTurnovers: 0,
+            players: [player({ points: 50 })],
+          },
+          {
+            side: 'away',
+            name: 'Bears',
+            playerLinesShown: true,
+            totals: {},
+            playersPoints: null,
+            teamTurnovers: 0,
+            players: [],
+          },
+        ],
+      } as unknown as GamePage);
+      const [bears, hawks] = tables(built);
+      expect(bears?.nothingRecorded).toBe('No player numbers were recorded for this team.');
+      expect(hawks?.nothingRecorded).toBeNull();
+      const { view } = await viewOf(trackerWorld(), games.decided);
+      const html = draw({ ...view, boxScores: built });
+      expect(html.match(/<table class="ui-table ui-box-score"/g)).toHaveLength(1);
+      expect(html).toContain(
+        '<div class="ui-empty"><p class="ui-empty-title">Bears</p><p>No player numbers were recorded for this team.</p></div>',
       );
     });
 

@@ -183,6 +183,12 @@ export type BoxScoreView = {
   readonly totals: Readonly<Record<string, number>>;
   /** Sentences under the table saying why a Total is not its column added up. */
   readonly notes: readonly string[];
+  /**
+   * Set when nothing at all was recorded for this team (a box score typed for one team
+   * only): the table is left out and this one sentence stands in its place, rather than
+   * a Total of dashes beside a score on the board (step 2.196).
+   */
+  readonly nothingRecorded: string | null;
 };
 
 export type BoxScoresView =
@@ -250,6 +256,8 @@ export function buildBoxScores(page: GamePage): BoxScoresView {
         : null,
       totals: box.totals,
       notes: totalNotes(box, keys),
+      nothingRecorded:
+        Object.keys(box.totals).length === 0 ? t('game.nothingRecordedForTeam') : null,
     })),
   };
 }
