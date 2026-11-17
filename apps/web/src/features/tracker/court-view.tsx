@@ -137,8 +137,11 @@ export type CourtViewProps = {
   /** What the tracker has to tell about holding the game; nothing most of the time. */
   readonly notices?: ReactNode;
   readonly pad: PadMode;
-  /** The latest thing the screen said, or null. */
-  readonly said: string | null;
+  /**
+   * The latest thing the screen said, or null; with a short form where a phone is short
+   * of room (as the saved banner), the full text always the one a screen reader is given.
+   */
+  readonly said: string | { readonly text: string; readonly short: string } | null;
   readonly moreOpen: boolean;
   readonly links: {
     readonly back: string;
@@ -629,7 +632,16 @@ function Pad(props: CourtViewProps) {
         : null}
       {/* Always in the page, so a screen reader hears what is said the moment it is. */}
       <p className="court-say" role="status" aria-live="polite" data-say="">
-        {props.said}
+        {props.said === null || typeof props.said === 'string' ? (
+          props.said
+        ) : (
+          <>
+            <span className="court-say-long">{props.said.text}</span>
+            <span className="court-say-short" aria-hidden="true">
+              {props.said.short}
+            </span>
+          </>
+        )}
       </p>
       {tile !== undefined ? <PlayerPad {...props} tile={tile} /> : null}
       {pad.kind === 'turnovers' ? <TurnoversPad {...props} team={view.teams[pad.side]} /> : null}

@@ -124,7 +124,7 @@ export {
   type ReadTrackerRostersError,
   type TrackerRosters,
 } from './commands/read-tracker-rosters.ts';
-export { engineRulesOf, withoutMercyOrLastMinutes } from './engine-rules.ts';
+export { engineRulesOf, trackerEngineRulesOf, withoutMercyOrLastMinutes } from './engine-rules.ts';
 export { rulesOfGame } from './season-rules-of.ts';
 export {
   leaseMs,

@@ -27,6 +27,9 @@ export const enTracker = {
   // Start and Pause differ in word and in shape; at 0:00 the button says why it is greyed.
   'tracker.clock.start': 'Start',
   'tracker.clock.startLabel': 'Start the clock',
+  // What a time that takes time off the clock adds to the minutes (S-71): it was played
+  // with the clock stopped. The engine's own figure, "4:55" for 16:55 set to 12:00.
+  'tracker.clockSheet.adds': 'This adds {time} to the minutes of the players on the court.',
   'tracker.clockSheet.backLabel': 'Delete the last digit',
   'tracker.clockSheet.clear': 'Clear',
   'tracker.clockSheet.clearLabel': 'Clear the time typed',
@@ -41,7 +44,8 @@ export const enTracker = {
   'tracker.clockSheet.periodNow': '{period}, the period being played',
   // What a time that puts time back on the clock takes off the minutes: the engine's own
   // figure, which is never more than the period being played has run. The second says
-  // that it is all of it (a clock set lower by mistake and then put right).
+  // that it is all of it (a time put back above where the period started; or, in a game
+  // saved before minutes followed the game clock, a clock set lower and put right).
   'tracker.clockSheet.putsBack': 'This takes {back} off the minutes of the players on the court.',
   'tracker.clockSheet.putsBackAll':
     'This takes {back} off the players’ minutes: all they have played this period.',
@@ -49,7 +53,18 @@ export const enTracker = {
   'tracker.clockSheet.seconds': 'Seconds go up to 59.',
   'tracker.clockSheet.set': 'Set clock',
   'tracker.clockSheet.setTo': 'Set clock to {clock}',
+  // Before the clock has run in a period, a set only says where the period starts.
+  'tracker.clockSheet.startsAt': 'The period will start at {clock}. Nobody’s minutes change.',
   'tracker.clockSheet.stops': 'Setting the clock stops it.',
+  // A set that takes back an earlier change to this period's clock (S-71 as changed on
+  // November 17): those minutes return to the players they came from. Then, if anything
+  // is left over, the new correction ({more}).
+  'tracker.clockSheet.takesBack':
+    'This takes back {time} of an earlier change to this period’s clock. Minutes and play times go back as they were.',
+  'tracker.clockSheet.takesBackAdds':
+    'This takes back {time} of an earlier change to this period’s clock. Minutes and play times go back as they were. This adds {more} to the minutes of the players on the court.',
+  'tracker.clockSheet.takesBackPutsBack':
+    'This takes back {time} of an earlier change to this period’s clock. Minutes and play times go back as they were. This takes {more} off the minutes of the players on the court.',
   'tracker.clockSheet.time': 'Time left',
   // The form that sets the clock and picks the period.
   'tracker.clockSheet.title': 'Clock and period',
@@ -319,9 +334,25 @@ export const enTracker = {
   'tracker.say.bonus.1': 'Bonus: {team}.',
   'tracker.say.bonus.2': 'Double bonus: {team}.',
   'tracker.say.clockSet': 'Clock set to {clock}.',
+  // {time} is what was added to the minutes: the time taken off the clock (S-71).
+  'tracker.say.clockSetAdded':
+    'Clock set to {clock}. {time} was added to the minutes of the players on the court.',
+  // The same said in one line, where a phone is short of room: "Clock 15:00 · 4:59 added".
+  'tracker.say.clockSetAddedShort': 'Clock {clock} · {time} added',
   // {back} is what came off the minutes, which can be less than went back on the clock.
   'tracker.say.clockSetBack':
     'Clock set to {clock}. {back} came off the minutes of the players on the court.',
+  // The same said in one line, where a phone is short of room: "Clock 15:00 · 4:59 off".
+  'tracker.say.clockSetBackShort': 'Clock {clock} · {back} off',
+  // The same as the clock form's takesBack sentences, once the set is done; the short form
+  // is one line, where a phone is short of room.
+  'tracker.say.clockSetTakesBack':
+    'Clock set to {clock}. {time} of an earlier change to this period’s clock was taken back: minutes and play times are as they were.',
+  'tracker.say.clockSetTakesBackAdded':
+    'Clock set to {clock}. {time} of an earlier change to this period’s clock was taken back, and {more} was added to the minutes of the players on the court.',
+  'tracker.say.clockSetTakesBackBack':
+    'Clock set to {clock}. {time} of an earlier change to this period’s clock was taken back, and {more} came off the minutes of the players on the court.',
+  'tracker.say.clockSetTakesBackShort': 'Clock {clock} · {time} taken back',
   'tracker.say.foulStopped': 'Foul on {player}. Clock stopped.',
   'tracker.say.halftime': 'Halftime.',
   'tracker.say.notScoring':

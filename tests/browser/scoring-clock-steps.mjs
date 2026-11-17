@@ -461,30 +461,34 @@ export async function clockSteps(kit) {
       await page.keyboard.type('0');
       // What the form says comes off the minutes is the engine's own figure (the code
       // review, M-b): never more than this half has run, and, when it is all of that,
-      // said so. The sentence after the tap then says the same figure.
+      // said so. The sentence after the tap then says the same figure. The clock was set
+      // to 15:00 above and has run since, so 18:00 takes that earlier change back (S-71
+      // as changed on November 17, step 2.189): the form says so, with what is left over.
       const warning = (await c.clockSheet.locator('[data-clock-note]').innerText()).trim();
       const warned =
-        /^This takes (\d+:\d\d) off (?:the minutes of the players on the court|the players’ minutes: all they have played this period)\.$/.exec(
+        /^This takes back (\d+:\d\d) of an earlier change to this period’s clock\. Minutes and play times go back as they were\.(?: This takes (\d+:\d\d) off the minutes of the players on the court\.)?$/.exec(
           warning,
         );
       note(
-        'time put back on the clock is said before it is set: what comes off the players’ minutes',
+        'time put back on the clock is said before it is set: what comes off the players’ minutes, here the earlier 15:00 taken back',
         warned !== null,
         warning,
       );
       await tapWhereItIs(page, c.clockSheet.locator('[data-set-clock]'), 'Set clock');
       await c.root.locator('[data-clock-sheet]').waitFor({ state: 'detached' });
-      await said(c, /^Clock set to 18:00\. \d+:\d\d came off the minutes/);
-      const after = /^Clock set to 18:00\. (\d+:\d\d) came off/.exec(
-        (await c.said.innerText()).trim(),
-      );
+      await said(c, /^Clock set to 18:00\. \d+:\d\d of an earlier change/);
+      const after =
+        /^Clock set to 18:00\. (\d+:\d\d) of an earlier change to this period’s clock was taken back(?:: minutes and play times are as they were\.|, and (\d+:\d\d) came off the minutes of the players on the court\.)/.exec(
+          (await c.said.innerText()).trim(),
+        );
       note(
         'the clock is set, stopped, and the screen says what came off the minutes: the figure the form said',
         (await c.clockText()) === '18:00' &&
           (await c.toggle.getAttribute('data-state')) === 'start' &&
           after !== null &&
-          after[1] === warned?.[1],
-        `${warned?.[1]} said before, ${after?.[1]} after`,
+          after[1] === warned?.[1] &&
+          after[2] === warned?.[2],
+        `${warned?.slice(1).join(' and ')} said before, ${after?.slice(1).join(' and ')} after`,
       );
       // Set wrongly: put right by setting it again (finding M2).
       await c.setClock('1200');

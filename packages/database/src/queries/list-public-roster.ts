@@ -1,10 +1,12 @@
 // One team's roster for its public page (P7 §2, R-17): those on it now, then those who
 // left, marked as former, each by place. A name comes only from the one name function
 // (T-81) under the league's audience and name rules; a person's id, birth date and
-// contact details are never read into the answer (T-29, R-16).
+// contact details are never read into the answer (T-29, R-16): whether they are a child is
+// worked out in SQL (R-28, minor-by-age-sql.ts).
 import { publicRosterLine, type PublicDisplay, type PublicRoster } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
+import { isMinorSql } from './minor-by-age-sql.ts';
 
 export async function listPublicRoster(
   scope: LeagueScope,
@@ -41,7 +43,8 @@ export async function listPublicRoster(
       sql<string | null>`to_char(roster_entries.left_on, 'YYYY-MM-DD')`.as('left_on'),
       'people.first_name as first_name',
       'people.last_name as last_name',
-      'people.is_minor as is_minor',
+      // R-28: worked out here, so the birth date never leaves the database.
+      isMinorSql().as('is_minor'),
       'people.visibility as visibility',
       'people.deleted_at as person_deleted_at',
     ])

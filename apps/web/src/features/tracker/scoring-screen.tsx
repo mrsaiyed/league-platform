@@ -37,7 +37,7 @@ import {
   type BonusHorn,
   type BonusShown,
 } from './bonus-horn.ts';
-import type { ClockSheet, CourtClock } from './clock-parts.tsx';
+import { clockSetSaid, type ClockSheet, type CourtClock } from './clock-parts.tsx';
 import { createClockTicker } from './clock-ticker.ts';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
 import {
@@ -61,11 +61,12 @@ import { findPlayer, periodText, playerLabel, refusalText } from './engine-words
 import {
   clockEntry,
   clockEntryKey,
-  minutesBack,
+  minutesMoved,
   minutesNow,
   periodChoices,
   periodEnd,
   readClock,
+  setEffect,
   startOffered,
   stopKey,
   stopReason,
@@ -414,7 +415,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const root = useRef<HTMLElement | null>(null);
   const [picks, setPicks] = useState<LineupPicks>(() => game.lineupPicks());
   const [padMode, setPadMode] = useState<PadMode>(padAtRest);
-  const [said, setSaid] = useState<string | null>(null);
+  const [said, setSaid] = useState<ReturnType<typeof clockSetSaid> | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
   /** The whole play log, open over the screen (step 2.37). */
   const [logOpen, setLogOpen] = useState(false);
@@ -498,7 +499,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
   );
 
   const sayTimer = useRef<number | null>(null);
-  const say = useCallback((text: string) => {
+  const say = useCallback((text: ReturnType<typeof clockSetSaid>) => {
     if (sayTimer.current !== null) window.clearTimeout(sayTimer.current);
     setSaid(text);
     sayTimer.current = window.setTimeout(() => setSaid(null), saidForMs);
@@ -603,17 +604,13 @@ export function ScoringScreen(props: ScoringScreenProps) {
     toggleDrawn.current = toggleWord;
   }, [toggleWord, resting]);
   // The clock's form: a time longer than the period being played is not taken, and what
-  // a time takes off the players' minutes is the engine's own figure (game-clock.ts).
+  // a time does to the players' minutes is the engine's own helper (game-clock.ts).
   const periodLengthMs = basketball.periodMs(state.rules, view.period);
   const entry = clockEntry(digits, periodLengthMs);
-  const back = entry.ms === null ? null : minutesBack(state, reading, entry.ms);
   const clockSheet: ClockSheet | null = clockOpen
     ? {
         entry,
-        minutesBack:
-          back !== null && back.ms > 0
-            ? { back: basketball.formatClock(back.ms), wholePeriod: back.wholePeriod }
-            : null,
+        effect: entry.ms === null ? null : setEffect(state, entry.ms, status.now()),
         periodLength: basketball.formatClock(periodLengthMs),
         periods: periodChoices(state.rules, view.period),
       }
@@ -915,16 +912,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
       setClockOpen(false);
       void tap({ type: 'set-clock', ms: typed.ms }).then((result) => {
         if (!result.ok || result.game === null) return;
-        // What the engine really took off the minutes: time put back on, within the period.
-        const tookOff = before.elapsedMs - result.game.clock.elapsedMs;
-        say(
-          tookOff > 0
-            ? t('tracker.say.clockSetBack', {
-                clock: typed.text,
-                back: basketball.formatClock(tookOff),
-              })
-            : t('tracker.say.clockSet', { clock: typed.text }),
-        );
+        // What the engine truly did to the minutes: what came off, or what was added.
+        say(clockSetSaid(t, typed.text, minutesMoved(state, before, result.game)));
       });
     },
     pickPeriod(period) {
