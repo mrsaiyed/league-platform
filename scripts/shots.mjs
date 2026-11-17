@@ -430,7 +430,8 @@ const schedulerPages = [
 // A refusal as each kind of person meets it (step 2.157): staff outside their role (a
 // scheduler and a scorekeeper at People), a coach and a signed-in stranger at the admin,
 // a signed-in stranger at a draft league's admin ("Page not found", nothing of the league),
-// a visitor at an admin area, another league's game under this league's address (on the
+// a long address (a visitor at an admin area is sent to sign in since U-15 changed, so has
+// no picture here), another league's game under this league's address (on the
 // scoring page and in the admin), and a club admin's team page, which may not show the
 // league's list of people. `who` is the made-up person's cookie; null is a visitor.
 const otherLeaguesGame = '01900000-0000-7000-8000-006a00000002';
@@ -448,7 +449,18 @@ const refusalPages = [
   { name: 'refusal-coach-admin', who: 'local-coach-token', at: '/north-valley/admin' },
   { name: 'refusal-stranger-admin', who: 'local-stranger-token', at: '/north-valley/admin' },
   { name: 'refusal-stranger-draft-admin', who: 'local-stranger-token', at: '/quiet-pines/admin' },
-  { name: 'refusal-visitor-admin-area', who: null, at: '/north-valley/admin/teams' },
+  // A scheduler signed in with a long address (52 letters): it breaks inside the card, in
+  // the admin's frame and on the plain screen.
+  {
+    name: 'refusal-long-address-people',
+    who: 'local-scheduler-with-long-address-token',
+    at: '/north-valley/admin/people',
+  },
+  {
+    name: 'refusal-long-address-plain',
+    who: 'local-scheduler-with-long-address-token',
+    at: '/harbor-city/admin',
+  },
   {
     name: 'refusal-other-leagues-game',
     who: 'local-owner-token',
