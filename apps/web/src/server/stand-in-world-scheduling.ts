@@ -319,6 +319,35 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       s.courts = replacedAt(s.courts, at, { ...found, binned, version: found.version + 1 });
       return true;
     },
+    // As find-place-games.ts: games not in the bin by venue and court, and every draft.
+    placeGames: async () => {
+      const counts = new Map<
+        string,
+        { venueId: string; courtId: string | null; played: number; toCome: number }
+      >();
+      for (const g of s.games) {
+        if (g.binned || g.venueId === null) continue;
+        const played = ['final', 'forfeit'].includes(g.status);
+        const toCome = ['scheduled', 'postponed', 'live'].includes(g.status);
+        if (!played && !toCome) continue;
+        const key = `${g.venueId}|${g.courtId ?? ''}`;
+        const row = counts.get(key) ?? {
+          venueId: g.venueId,
+          courtId: g.courtId,
+          played: 0,
+          toCome: 0,
+        };
+        counts.set(key, {
+          ...row,
+          played: row.played + (played ? 1 : 0),
+          toCome: row.toCome + (toCome ? 1 : 0),
+        });
+      }
+      return {
+        published: [...counts.values()],
+        drafts: s.drafts.map((d) => ({ seasonId: d.seasonId, changes: d.changes })),
+      };
+    },
   };
 }
 

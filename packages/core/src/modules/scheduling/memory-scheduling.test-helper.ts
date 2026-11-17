@@ -16,6 +16,7 @@ import type {
   NewPublishedGame,
   NewRound,
   NewScheduleRevision,
+  PlacePublishedGames,
   PublishedGameChange,
   SchedulingTx,
   VenueRecord,
@@ -62,6 +63,8 @@ export type MemoryScheduling = {
   revisions: NewScheduleRevision[];
   /** Makes every round update find no such round, to test the refusal. */
   roundsMissing?: boolean;
+  /** The published games by venue and court, as the database counts them (step 2.49). */
+  placed: PlacePublishedGames[];
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -121,6 +124,7 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
     status: 'draft',
     venues: [],
     courts: [],
+    placed: [],
     grants: [],
     activity: [],
     seasons: [{ id: seasonId, programId }],
@@ -323,6 +327,11 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           s.courts[at] = { ...found, binned, version: found.version + 1 };
           return true;
         },
+        placeGames: async () => ({
+          published: structuredClone(s.placed),
+          drafts:
+            s.draft === undefined ? [] : [{ seasonId: s.draft.seasonId, changes: s.draft.changes }],
+        }),
       },
     };
   });

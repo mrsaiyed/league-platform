@@ -29,6 +29,28 @@ export type CourtRecord = {
 
 export type VenueWithCourts = VenueRecord & { readonly courts: readonly CourtRecord[] };
 
+/**
+ * How many published games not in the bin are at one place (a venue, and a court of it or
+ * none): with a final or forfeited result, and without a result yet (scheduled, postponed,
+ * or being played now). A cancelled game is in neither.
+ */
+export type PlacePublishedGames = {
+  readonly venueId: string;
+  readonly courtId: string | null;
+  readonly played: number;
+  readonly toCome: number;
+};
+
+/**
+ * What the league's games are at its venues and courts (step 2.49): the published ones by
+ * place, and every season's schedule draft as stored, whose games count too
+ * (place-games.ts reads them).
+ */
+export type PlaceGamesRecord = {
+  readonly published: readonly PlacePublishedGames[];
+  readonly drafts: readonly { readonly seasonId: string; readonly changes: unknown }[];
+};
+
 export type NewVenue = {
   readonly name: string;
   readonly address: string | null;
@@ -227,6 +249,8 @@ export type SchedulingStore = {
     version?: number,
   ) => Promise<number | 'name-taken' | undefined>;
   readonly setCourtBinned: (courtId: string, binned: boolean) => Promise<boolean | 'name-taken'>;
+  /** The league's games at its venues and courts, and its schedule drafts (step 2.49). */
+  readonly placeGames: () => Promise<PlaceGamesRecord>;
 };
 
 /** A scheduling command's transaction: its store, the permission reader and the activity log. */

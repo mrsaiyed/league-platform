@@ -35,6 +35,22 @@ describe('removeVenue', () => {
     });
   });
 
+  it('refuses while games are still to come there with no court; games played do not hold it', async () => {
+    const { db, deps, as } = memoryScheduling({
+      venues: [venue(1)],
+      placed: [{ venueId: venueUuid(1), courtId: null, played: 3, toCome: 1 }],
+    });
+    expect(await removeVenue(as(ownerId), { venueId: venueUuid(1) }, deps)).toEqual({
+      ok: false,
+      error: { code: 'venue-has-games-to-come' },
+    });
+    expect(db.state.venues[0]?.binned).toBe(false);
+    db.state.placed = [{ venueId: venueUuid(1), courtId: null, played: 3, toCome: 0 }];
+    expect(await removeVenue(as(ownerId), { venueId: venueUuid(1) }, deps)).toMatchObject({
+      ok: true,
+    });
+  });
+
   it('refuses one already in the bin or missing, and people with no role', async () => {
     const { deps, as } = memoryScheduling({ venues: [venue(1, { binned: true })] });
     for (const n of [1, 9]) {

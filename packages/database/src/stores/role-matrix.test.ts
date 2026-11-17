@@ -60,6 +60,7 @@ import {
   changeRosterEntry,
   clearSettingFor,
   commands,
+  countPlaceGames,
   createCourt,
   createDivision,
   createLeague,
@@ -1581,6 +1582,15 @@ const divisionAndVenueRows: readonly Row[] = [
     scope: 'program',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listVenues(c, i, schedulingDeps),
+  },
+  {
+    command: 'scheduling.count_place_games',
+    name: 'see how many games each venue and court has',
+    needs: 'venues.manage',
+    // As the venues it counts: league-shared, so a program-limited scheduler reads it too.
+    scope: 'program',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => countPlaceGames(c, i, schedulingDeps),
   },
 ];
 
