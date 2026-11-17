@@ -139,12 +139,24 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.createDatabase, 'opens connections; reads no rows'],
   [databasePackage.checkLoginRole, "reads the login role's facts from pg_roles only"],
   [
+    databasePackage.databaseAnswers,
+    'the health check: `select 1` in a transaction with no league and no account set; reads no table',
+  ],
+  [
     databasePackage.checkQueueSchema,
     "reads whether pg-boss's schema exists and the login may make tables in it, from the catalog only",
   ],
   [
+    databasePackage.checkSignInStoreLogin,
+    'reads whether the login is a member of sign_in_store from pg_roles, then opens one empty sign-in store transaction (record 052); no league rows',
+  ],
+  [
     databasePackage.madeUpDatabase,
     'development-only: a new in-memory database built as its owner (migrations, seedLeaguesInto), then used as a member of app_user; takes nothing and reads no league for anyone',
+  ],
+  [
+    databasePackage.serveMadeUpDatabase,
+    'tests only: madeUpDatabase served as a PostgreSQL server on 127.0.0.1 (record 081); takes nothing and reads no league for anyone',
   ],
   [
     databasePackage.createDatabaseSignInStore,
