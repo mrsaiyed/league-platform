@@ -16,6 +16,15 @@ const everyAnswer = [
   },
 ];
 
+const doNotIndexFile = { key: 'X-Robots-Tag', value: 'noindex' };
+const filesTheProxyNeverSees = [
+  '/_next/static/:path*',
+  '/_next/image',
+  '/favicon.ico',
+  '/display.css',
+  '/standalone.css',
+];
+
 const config: NextConfig = {
   // Our packages are TypeScript source used through their index.ts; Next.js compiles them.
   transpilePackages: [
@@ -67,6 +76,10 @@ const config: NextConfig = {
       source: '/signin/google',
       headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
     },
+    // The files the proxy never sees (its matcher, proxy.ts) are marked "do not index" here,
+    // in every mode: they are files, never pages. Every other answer gets the header from
+    // the proxy, outside production only (do-not-index.ts, record 081).
+    ...filesTheProxyNeverSees.map((source) => ({ source, headers: [doNotIndexFile] })),
   ],
 };
 
