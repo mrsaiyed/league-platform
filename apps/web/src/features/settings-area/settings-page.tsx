@@ -1,6 +1,6 @@
 // Admin → League settings (step 2.48, P4 §6, T5 §6): a form for every setting the
 // product declares at the league level, drawn from the declarations (T-98).
-import { listLeagueSettings, readNamePolicy, readPrivacyFacts } from '@srleagues/core';
+import { leagueUrl, listLeagueSettings, readNamePolicy, readPrivacyFacts } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
@@ -46,6 +46,23 @@ export async function SettingsPage({
   return (
     <main className="admin-settings">
       <PageHead title={t('admin.area.settings')} sub={t('adminSettings.intro')} />
+      {/* Who helps run the league (step 2.97): its own page, one row that leads to it. */}
+      <ul className="staff-rows settings-admins">
+        <li className="staff-row">
+          <span className="staff-row-words">
+            <a
+              className="staff-row-link"
+              href={leagueUrl(view.context.league, 'admin-area', {
+                area: 'settings',
+                subpath: ['admins'],
+              })}
+            >
+              {t('adminAccess.title')}
+            </a>
+            <span className="staff-row-facts">{t('adminAccess.fromSettings')}</span>
+          </span>
+        </li>
+      </ul>
       {problem === undefined ? null : (
         <p className="ui-notice" data-kind="error" role="alert">
           {t(problem)}
