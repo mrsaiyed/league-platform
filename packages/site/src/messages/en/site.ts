@@ -14,6 +14,10 @@ export const enSite = {
   'display.final': 'Final',
   // A final game's pill when it went to overtime (step 2.200, P7 §5.6): one overtime, or
   // {count} of them. A game ended in regulation says "Final" alone.
+  // For translators: the form is picked by the language's plural rule, and "_one" has no
+  // {count}. In a language whose "one" form also covers other numbers (21, 31...), that
+  // count would be lost: write {count} into the "one" form there, or ask for an exact form
+  // for 1.
   'display.finalOvertime_one': 'Final, OT',
   'display.finalOvertime_other': 'Final, {count}OT',
   'display.forfeit': 'Forfeit',
