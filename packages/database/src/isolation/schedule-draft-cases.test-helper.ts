@@ -303,6 +303,14 @@ registerIsolationCase({
 });
 
 registerIsolationCase({
+  subject: deleteRounds,
+  name: "remove the target's round whose only game is in the bin, which loses its round",
+  // The seed's third round holds only a game in the bin (S-60, step 2.181): the control run
+  // removes the round and clears that game's round; any other run must change neither.
+  run: (scope, target) => deleteRounds(scope, target.seasonId, [target.binnedRoundId]),
+});
+
+registerIsolationCase({
   subject: listGamesInRounds,
   name: "list the games in the target's round",
   run: (scope, target) => listGamesInRounds(scope, target.seasonId, [target.roundId]),

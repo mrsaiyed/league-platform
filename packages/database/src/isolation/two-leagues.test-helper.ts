@@ -64,6 +64,12 @@ export type LeagueRecords = MadeLeague & {
   roundId: string;
   /** A second round of the season, with no games in it (step 2.160). */
   emptyRoundId: string;
+  /**
+   * A third round whose only game is in the bin (step 2.181): removing it clears that
+   * game's round (S-60), so a query that forgot its league would change this league's game.
+   */
+  binnedRoundId: string;
+  binnedGameId: string;
   /** A second team of the season, the team's opponent. */
   opponentId: string;
   /** The schedule's first published revision, and a draft based on it. */
@@ -399,6 +405,21 @@ async function seededLeague(
      values ($1, $2, $3, $4, 2, $5, $6, '2026-12-13T18:00:00Z', $7, 'final')`,
     [leagueId, seasonId, stageId, roundId, opponentId, teamId, venueId],
   );
+  // A round whose one game a publication removed: in the bin, never played (S-60).
+  const binnedRoundId = await id(
+    pglite,
+    `insert into rounds (league_id, season_id, number, label, date)
+     values ($1, $2, 3, $3, '2026-12-20')`,
+    [leagueId, seasonId, `Week 3 ${m}`],
+  );
+  const binnedGameId = await id(
+    pglite,
+    `insert into games (league_id, season_id, stage_id, round_id, game_number, home_team_id,
+       away_team_id, starts_at, venue_id, capture_mode, deleted_at)
+     values ($1, $2, $3, $4, 3, $5, $6, '2026-12-20T18:00:00Z', $7, 'final',
+       '2026-12-01T00:00:00Z')`,
+    [leagueId, seasonId, stageId, binnedRoundId, teamId, opponentId, venueId],
+  );
   const gameAssignmentId = await id(
     pglite,
     'insert into game_assignments (league_id, game_id, account_id) values ($1, $2, $3)',
@@ -598,6 +619,8 @@ async function seededLeague(
     stageId,
     roundId,
     emptyRoundId,
+    binnedRoundId,
+    binnedGameId,
     opponentId,
     scheduleRevisionId,
     scheduleDraftId,
