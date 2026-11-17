@@ -52,7 +52,25 @@ describe('accountMenuOf', () => {
       gamesHref: '/north-valley/admin/games',
       accountHref: '/account',
       onScoringPage: false,
+      signOutFields: { next: '/north-valley' },
     });
+  });
+
+  it('tells "Sign out" the page it is on, and whether a staff page asks to sign in (R-30, U-15)', () => {
+    const fields = (path: string) =>
+      accountMenuOf(viewOf(everyArea, true), 'olive@example.test', path)?.signOutFields;
+    expect(fields('/north-valley/schedule?team=owls')).toEqual({
+      next: '/north-valley/schedule?team=owls',
+    });
+    for (const staff of [
+      '/north-valley/admin',
+      '/North-Valley/Admin/teams',
+      '/north-valley/score/g1',
+    ]) {
+      expect(fields(staff), staff).toEqual({ next: staff, staff: 'yes' });
+    }
+    // A page whose name only starts like the admin's is not the admin.
+    expect(fields('/north-valley/administer')).toEqual({ next: '/north-valley/administer' });
   });
 
   it('gives a scorekeeper their games, which are their admin home, and no second "Admin"', () => {

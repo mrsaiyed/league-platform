@@ -34,6 +34,7 @@ export const fields = {
   SUPABASE_SECRET_KEY: { secret: true },
   RESEND_API_KEY: { secret: true },
   EMAIL_FROM: { secret: false },
+  GOOGLE_SIGN_IN: { secret: false },
   STRIPE_SECRET_KEY: { secret: true },
   STRIPE_WEBHOOK_SECRET: { secret: true },
 } as const satisfies Record<string, ConfigField>;
@@ -88,6 +89,10 @@ const schema = z.object({
   // Only production sends email (T-140); elsewhere every email is captured.
   RESEND_API_KEY: secretText(8).optional(),
   EMAIL_FROM: text.regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'must be an email address'),
+  // Whether "Continue with Google" is set up on the sign-in service (record 091): 'on' once
+  // Google is configured there, so the sign-in screens draw the button; 'off' (the default)
+  // draws none, so nobody taps a button that can only fail (the using-it audit, M27).
+  GOOGLE_SIGN_IN: z.enum(['on', 'off']).default('off'),
 });
 
 export type Config = Readonly<z.infer<typeof schema>>;
@@ -106,6 +111,7 @@ const optional: readonly ConfigName[] = [
   'SUPABASE_URL',
   'SUPABASE_SECRET_KEY',
   'RESEND_API_KEY',
+  'GOOGLE_SIGN_IN',
 ];
 
 /** Optional in local and test, but required in these, so its choice is a decision. */

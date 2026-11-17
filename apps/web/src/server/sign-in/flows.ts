@@ -23,10 +23,11 @@ import {
   setSessionCookies,
   writeFlow,
   writeGoogleFlow,
+  writeTypedEmail,
   type CookieJar,
 } from './cookies.ts';
 import { deviceOf, safeReturnPath, type Visit } from './device.ts';
-import { screenUrl, type Problem } from './problems.ts';
+import { screenUrl, withNotice, type Problem } from './problems.ts';
 import type { SignInMail } from './sign-in-mail.ts';
 
 export type FlowDeps = {
@@ -37,6 +38,12 @@ export type FlowDeps = {
   /** PUBLIC_BASE_URL, for Google's return address. */
   readonly siteOrigin: string;
   readonly now: () => Date;
+  /**
+   * Whether "Continue with Google" is set up here (GOOGLE_SIGN_IN, record 091). When it
+   * is not, the screens draw no button and a hand-sent post is answered as a failed try.
+   * Left out, it is.
+   */
+  readonly google?: boolean;
 };
 
 /** Where to send the browser next: one of our paths, or Google's address. */
@@ -67,7 +74,41 @@ export async function askForCode(
 ): Promise<FlowAnswer> {
   const page = purpose === 'sign-up' ? 'signup' : 'forgotPassword';
   const next = safeReturnPath(fields['next']);
-  const input = { email: fields['email'] ?? '', networkAddress: visit.networkAddress };
+  const asked = await sendCode(purpose, fields['email'] ?? '', next, visit, deps);
+  if (asked.ok) return goTo(platformUrl('enterCode'));
+  return goTo(screenUrl(page, { ...asked.problem, next }));
+}
+
+/**
+ * "Send a new code" (step 2.163, M24): another code to the address the code screen
+ * names, for the same purpose, under the same limits as the first; the person stays on
+ * the code screen and is told it was sent, or why it was not. With no sign-up or reset
+ * under way it is the first screen again, as an old code is.
+ */
+export async function sendCodeAgain(visit: Visit, deps: FlowDeps): Promise<FlowAnswer> {
+  const flow = readFlow(visit.jar);
+  if (flow === undefined) return goTo(screenUrl('signup', { problem: 'codeExpired' }));
+  const asked = await sendCode(flow.purpose, flow.email, flow.next, visit, deps);
+  if (asked.ok) return goTo(screenUrl('enterCode', { notice: 'codeSentAgain' }));
+  return goTo(screenUrl('enterCode', asked.problem));
+}
+
+/**
+ * Asks the service for a code and, when it is sent, keeps the address, the purpose and
+ * the page to come back to in the flow cookie: whatever the address, the same answer
+ * and the same cookie (T-68).
+ */
+async function sendCode(
+  purpose: 'sign-up' | 'reset',
+  typed: string,
+  next: string | null,
+  visit: Visit,
+  deps: FlowDeps,
+): Promise<
+  | { readonly ok: true }
+  | { readonly ok: false; readonly problem: { problem: Problem; wait?: number } }
+> {
+  const input = { email: typed, networkAddress: visit.networkAddress };
   const asked =
     purpose === 'sign-up'
       ? await deps.signIn.startSignUp(input)
@@ -75,10 +116,12 @@ export async function askForCode(
   if (!asked.ok) {
     const error = asked.error;
     if (error.code === 'too-many-attempts') {
-      return goTo(screenUrl(page, { ...tooMany(error.retryAfterSeconds), next }));
+      return { ok: false, problem: tooMany(error.retryAfterSeconds) };
     }
-    const problem: Problem = error.code === 'invalid-email' ? 'invalidEmail' : 'codeNotSent';
-    return goTo(screenUrl(page, { problem, next }));
+    return {
+      ok: false,
+      problem: { problem: error.code === 'invalid-email' ? 'invalidEmail' : 'codeNotSent' },
+    };
   }
   // The service accepted the address, so it is one; kept as the service keeps it.
   const email = signInEmail.parse(input.email);
@@ -87,7 +130,7 @@ export async function askForCode(
     { purpose, email, minutes: asked.value.codeValidMinutes, next },
     deps.secureCookies,
   );
-  return goTo(platformUrl('enterCode'));
+  return { ok: true };
 }
 
 /** The 6-digit code from the email. */
@@ -171,6 +214,9 @@ export async function signInWithPassword(
   });
   if (!signed.ok) {
     const error = signed.error;
+    // The address typed is kept for the screen to fill in again (M28), whatever the
+    // answer and whether or not it has an account (T-68): never in the address bar.
+    writeTypedEmail(visit.jar, fields['email'] ?? '', deps.secureCookies);
     return goTo(
       error.code === 'too-many-attempts'
         ? screenUrl('signin', { ...tooMany(error.retryAfterSeconds), next })
@@ -193,6 +239,7 @@ export async function startGoogle(
   deps: FlowDeps,
 ): Promise<FlowAnswer> {
   const next = safeReturnPath(fields['next']);
+  if (deps.google === false) return goTo(screenUrl('signin', { problem: 'googleFailed', next }));
   const started = await deps.signIn.startExternalSignIn({
     provider: 'google',
     returnAddress: deps.siteOrigin + platformUrl('googleReturn'),
@@ -262,16 +309,29 @@ export async function confirmPassword(
   }
 }
 
-/** Signs this device out. Harmless with no session. */
-export async function signOut(visit: Visit, deps: FlowDeps): Promise<FlowAnswer> {
+/**
+ * Signs this device out. Harmless with no session. The person is left where they were
+ * (R-30), told "You are signed out.": on the page the form names (`next`, checked again
+ * here), or our front page when it names none. A staff page (`staff`: the admin, the
+ * scoring page) asks a signed-out person to sign in (U-15), so it becomes the sign-in
+ * screen, which says so and brings them back to it.
+ */
+export async function signOut(fields: Fields, visit: Visit, deps: FlowDeps): Promise<FlowAnswer> {
   await endSessionIn(visit.jar, deps);
-  return goTo(platformUrl('signin'));
+  const next = safeReturnPath(fields['next']);
+  if (next !== null && fields['staff'] === 'yes') {
+    return goTo(screenUrl('signin', { notice: 'signedOut', next }));
+  }
+  return goTo(withNotice(next ?? platformUrl('home'), 'signedOut'));
 }
 
 /**
- * Ends every session of the account, this one too (T-71). When that cannot be done
- * (no session here, or it has ended), this device is still signed out and the
- * person is told to sign in and try again: they are never told it worked.
+ * Ends every session of the account, this one too (T-71), and leaves the person on our
+ * front page, saying so. When this device's own session had already ended (signed out
+ * from elsewhere, or by a changed password), this device is signed out and the person
+ * is told just that (M30): nothing is claimed about the others. Only when the service
+ * could not do it for a session that was alive are they told it failed, and never that
+ * it worked.
  */
 export async function signOutEverywhere(visit: Visit, deps: FlowDeps): Promise<FlowAnswer> {
   const accessToken = cookie(visit.jar, cookieNames.session);
@@ -280,12 +340,15 @@ export async function signOutEverywhere(visit: Visit, deps: FlowDeps): Promise<F
       ? undefined
       : await deps.signIn.signOutEverywhere({ accessToken, keepThisSession: false });
   await endSessionIn(visit.jar, deps);
-  if (ended === undefined || !ended.ok) {
+  if (ended === undefined || (!ended.ok && ended.error.code === 'session-ended')) {
+    return goTo(screenUrl('home', { notice: 'alreadySignedOut' }));
+  }
+  if (!ended.ok) {
     return goTo(
       screenUrl('signin', { problem: 'signOutEverywhereFailed', next: platformUrl('account') }),
     );
   }
-  return goTo(platformUrl('signin'));
+  return goTo(screenUrl('home', { notice: 'signedOutEverywhere' }));
 }
 
 /** Puts a new session in the cookies, ending the one this device had before. */
@@ -294,7 +357,10 @@ async function startSession(jar: CookieJar, session: SessionTokens, deps: FlowDe
   setSessionCookies(jar, session, deps.secureCookies, deps.now());
 }
 
-/** Ends this device's session, if any, and forgets any sign-up or reset under way. */
+/**
+ * Ends this device's session, if any, and forgets any sign-up or reset under way and any
+ * address typed into a refused sign-in, so a shared device keeps no one's address.
+ */
 async function endSessionIn(jar: CookieJar, deps: FlowDeps) {
   const refreshToken = cookie(jar, cookieNames.renew);
   const accessToken = cookie(jar, cookieNames.session);
@@ -302,4 +368,5 @@ async function endSessionIn(jar: CookieJar, deps: FlowDeps) {
   else if (accessToken !== undefined) await deps.signIn.signOut({ accessToken });
   clearSessionCookies(jar);
   jar.delete(cookieNames.flow);
+  jar.delete(cookieNames.typed);
 }

@@ -1,31 +1,51 @@
 import { platformUrl } from '@srleagues/core';
-import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import {
   SignInScreen,
   SubmitButton,
   type SearchProps,
 } from '../../../../features/sign-in/index.ts';
 import { t } from '../../../../server/messages.ts';
-import { enterCodeAction } from '../../../../server/sign-in/actions.ts';
-import { readFlow } from '../../../../server/sign-in/cookies.ts';
+import { enterCodeAction, sendCodeAgainAction } from '../../../../server/sign-in/actions.ts';
+import { noticeOf, screenUrl } from '../../../../server/sign-in/problems.ts';
+import { flowOfThisRequest } from '../../../../server/sign-in/this-screen.ts';
+import { signedInPerson } from '../../../../server/signed-in-leagues.ts';
 
-// The 6-digit code from the email (T-67). "If that address can sign in, we have sent
-// it a code", whether or not it can (T-68).
+// The 6-digit code from the email (T-67). Since step 2.163 (M24) it says where the code
+// went, by the address typed, so a slip in it can be seen: "We sent a 6-digit code to …"
+// on sign-up; "If … has an account, we sent it a code" on the forgotten-password route,
+// whether or not it has (T-68). "Wrong address? Change it" goes back to the first screen
+// with the address filled in; "Send a new code" sends one to the same address and comes
+// back here saying so. The address comes from this device's own cookie, never the
+// address bar. With nothing under way (an old tab, Back after the account was made) there
+// is no code to enter: a signed-in person goes to their account, anyone else starts again.
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
-  const jar = await cookies();
-  const flow = readFlow({
-    get: (name) => jar.get(name)?.value,
-    set: () => undefined,
-    delete: () => undefined,
-  });
-  const again = platformUrl(flow?.purpose === 'reset' ? 'forgotPassword' : 'signup');
+  const flow = await flowOfThisRequest();
+  if (flow === undefined) {
+    if ((await signedInPerson()).kind === 'signed-in') redirect(platformUrl('account'));
+    redirect(screenUrl('signup', { problem: 'codeExpired' }));
+  }
+  // The code was right already (Back from the password screen): that screen, not this one again.
+  if (flow.proof !== undefined) redirect(platformUrl('choosePassword'));
+  const reset = flow.purpose === 'reset';
+  const words = { email: flow.email, minutes: flow.minutes };
+  const sentAgain = noticeOf(search) === 'codeSentAgain';
   return (
     <SignInScreen
       title="code.title"
-      intro={t('code.sent', { minutes: flow?.minutes ?? 10 })}
+      intro={sentAgain ? undefined : t(reset ? 'code.sentReset' : 'code.sentSignUp', words)}
+      noticeWords={
+        sentAgain ? t(reset ? 'code.sentAgainReset' : 'code.sentAgain', words) : undefined
+      }
       search={search}
     >
+      <p data-code-address="">
+        {t('code.wrongAddress')}{' '}
+        <a href={screenUrl(reset ? 'forgotPassword' : 'signup', { next: flow.next })}>
+          {t('code.changeAddress')}
+        </a>
+      </p>
       <form action={enterCodeAction}>
         <p>
           <label>
@@ -41,9 +61,11 @@ export default async function Page({ searchParams }: SearchProps) {
         </p>
         <SubmitButton words="code.submit" />
       </form>
-      <p>
-        <a href={again}>{t('code.again')}</a>
-      </p>
+      <form action={sendCodeAgainAction}>
+        <button className="ui-button" data-kind="quiet" type="submit">
+          {t('code.again')}
+        </button>
+      </form>
     </SignInScreen>
   );
 }

@@ -10,7 +10,11 @@ export const enAccount = {
   'access.noAccess.switch': 'Use another account',
   // U-6: an address you are not allowed to open.
   'access.noAccess.title': 'You do not have access',
+  'account.alreadySignedOutNotice':
+    'This device was already signed out. To sign out your other devices, sign in and choose "Sign out everywhere" again.',
   'account.devices': 'Signed-in devices',
+  'account.devicesUnreadable':
+    'We could not read the list of devices just now. Reload the page to try again.',
   'account.lastActive': 'Last active {when}',
   'account.leagues': 'Your leagues',
   'account.leaguesEmpty':
@@ -30,7 +34,10 @@ export const enAccount = {
   'account.signInOrCreate': 'Sign in or create an account',
   'account.signOut': 'Sign out',
   'account.signOutEverywhere': 'Sign out everywhere',
+  'account.signOutEverywhereAsk': 'Sign out every device that uses your account, this one too?',
+  'account.signOutEverywhereConfirm': 'Yes, sign out everywhere',
   'account.signOutEverywhereHelp': 'Signs out every device that uses your account, this one too.',
+  'account.signOutEverywhereKeep': 'No, keep them signed in',
   // Signing out with a game open on the device and plays not yet sent (step 2.127).
   'account.signOutWaiting_one':
     '{count} play is not sent yet. It stays on this device and is sent when you sign in again. Sign out?',
@@ -40,13 +47,22 @@ export const enAccount = {
   // every league page (U-8), the account page's leagues, the front page.
   'account.signedInAs': 'Signed in as {email}',
   'account.signedInAt': 'Signed in {when}',
+  'account.signedOutEverywhereNotice': 'You are signed out on every device that used your account.',
+  'account.signedOutNotice': 'You are signed out.',
   'account.thisDevice': 'This device',
+  'account.when.day': '{date} at {time}',
+  'account.when.today': 'today at {time}',
+  'account.when.yesterday': 'yesterday at {time}',
   'code.again': 'Send a new code',
+  'code.changeAddress': 'Change it',
   'code.label': 'Code',
-  'code.sent':
-    'If that address can sign in, we have sent it a code. It works for {minutes} minutes.',
+  'code.sentAgain': 'We sent a new code to {email}. Use the newest one.',
+  'code.sentAgainReset': 'If {email} has an account, we sent it a new code. Use the newest one.',
+  'code.sentReset': 'If {email} has an account, we sent it a code. It works for {minutes} minutes.',
+  'code.sentSignUp': 'We sent a 6-digit code to {email}. It works for {minutes} minutes.',
   'code.submit': 'Continue',
   'code.title': 'Enter your code',
+  'code.wrongAddress': 'Wrong address?',
   'confirm.google': 'Sign in with Google again',
   'confirm.intro': 'This needs your password when you have not entered it in the last hour.',
   'confirm.submit': 'Continue',
@@ -85,18 +101,32 @@ export const enAccount = {
   // code, {minutes} how long it works, {device} a device's name, {when} a time, {url}
   // an address of ours.
   'email.signInCode.subjectSignUp': 'Your code to create your account',
+  'forgot.backToSignIn': 'Back to sign in',
   'forgot.intro':
-    'Enter your email. If that address can sign in, we will send it a code to choose a new password.',
-  'forgot.title': 'Forgot your password',
+    'Enter your email. If it has an account, we will send it a 6-digit code, and then you choose a new password.',
+  'forgot.title': 'Choose a new password',
+  'password.existing':
+    'You already have an account. This changes its password and signs out your other devices.',
+  'password.hide': 'Hide',
   'password.rules': 'At least 8 characters. Passwords that have leaked are refused.',
+  'password.show': 'Show',
   'password.submit': 'Save and sign in',
   'password.title': 'Choose your password',
+  'password.titleReset': 'Choose a new password',
   'problem.codeExpired': 'That code has run out. Ask for a new one.',
   'problem.codeNotSent': 'We could not send the email just now. Please try again in a minute.',
   'problem.codeUsedUp': 'Too many tries with this code. Ask for a new one.',
   'problem.codeWrong': 'That code is not right. Check the email and try again.',
   'problem.googleFailed': 'Signing in with Google did not work. Please try again.',
   'problem.invalidEmail': 'That does not look like an email address.',
+  'problem.lockedOutMinutes_one':
+    'Too many tries. Please wait {count} minute, or tap "Forgot your password?" to choose a new one now.',
+  'problem.lockedOutMinutes_other':
+    'Too many tries. Please wait {count} minutes, or tap "Forgot your password?" to choose a new one now.',
+  'problem.lockedOut_one':
+    'Too many tries. Please wait {count} second, or tap "Forgot your password?" to choose a new one now.',
+  'problem.lockedOut_other':
+    'Too many tries. Please wait {count} seconds, or tap "Forgot your password?" to choose a new one now.',
   'problem.noPassword': 'Your account has no password. Sign in with Google again instead.',
   'problem.passwordLeaked':
     'That password appears in lists of leaked passwords. Please choose another.',
@@ -107,6 +137,9 @@ export const enAccount = {
   'problem.signInToScore': 'Sign in to score this game.',
   'problem.signOutEverywhereFailed':
     'We could not sign out your other devices. This one is signed out: sign in and try again.',
+  'problem.tooManyAttemptsMinutes_one': 'Too many tries. Please wait {count} minute and try again.',
+  'problem.tooManyAttemptsMinutes_other':
+    'Too many tries. Please wait {count} minutes and try again.',
   'problem.tooManyAttempts_one': 'Too many tries. Please wait {count} second and try again.',
   'problem.tooManyAttempts_other': 'Too many tries. Please wait {count} seconds and try again.',
   'problem.wrongEmailOrPassword': 'Wrong email or password.',
@@ -121,6 +154,11 @@ export const enAccount = {
   'role.registrar': 'Registrar',
   'role.scheduler': 'Scheduler',
   'role.scorekeeper': 'Scorekeeper',
+  'signIn.already.account': 'Go to your account',
+  'signIn.already.body': 'You are signed in as {email}.',
+  'signIn.already.carryOn': 'Carry on',
+  'signIn.already.switch': 'Sign out and use another account',
+  'signIn.already.title': 'You are already signed in',
   'signIn.backTo': 'Back to {league}',
   'signIn.createAccount': 'New here? Create an account',
   // The sign-in screens (step 1.14, P6 §2 and §5). The same words whether or not an

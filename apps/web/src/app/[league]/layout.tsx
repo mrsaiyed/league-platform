@@ -6,6 +6,7 @@ import {
   DesignStyle,
   headerSeason,
   LeagueNotice,
+  SignedOutNotice,
   signInHrefFrom,
   SiteFooter,
   SiteHeader,
@@ -32,7 +33,8 @@ import './league-site.css';
  * pages the header also holds the season picker, so the seasons are read here; the page
  * under it reads the same ones without asking again (league-seasons.ts). The account button
  * (U-8) is the signed-in person's own, drawn for this request only (account-menu.ts); it is
- * on the admin's pages and the scoring page too, which sit under this layout.
+ * on the admin's pages and the scoring page too, which sit under this layout. A page the
+ * person has just signed out from says "You are signed out." under the header (R-30).
  */
 export default async function LeagueLayout({
   children,
@@ -59,6 +61,7 @@ export default async function LeagueLayout({
   const current = currentMenuPage(league, path);
   const season =
     current === null ? null : headerSeason(league, path, await seasonsOfLeague(league.id));
+  const account = accountMenuOf(view, await signedInEmail(), path);
   return (
     <div className="league-site ui-root">
       <DesignStyle design={site.design} />
@@ -68,11 +71,12 @@ export default async function LeagueLayout({
       <SiteHeader
         league={league}
         name={site.name}
-        account={accountMenuOf(view, await signedInEmail(), path)}
+        account={account}
         signInHref={signInHrefFrom(path)}
         current={current}
         season={season}
       />
+      <SignedOutNotice path={path} signedIn={account !== null} />
       <LeagueNotice status={view.context.league.status} />
       <div className="site-body" id="content">
         {children}

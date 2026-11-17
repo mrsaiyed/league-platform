@@ -29,6 +29,11 @@ export function secureCookies(): boolean {
   return new URL(getConfig().PUBLIC_BASE_URL).protocol === 'https:';
 }
 
+/** Whether "Continue with Google" is set up here (GOOGLE_SIGN_IN, record 091). */
+export function googleSetUp(): boolean {
+  return getConfig().GOOGLE_SIGN_IN === 'on';
+}
+
 export async function flowDeps(): Promise<FlowDeps> {
   const ports = await webPorts();
   return {
@@ -37,6 +42,7 @@ export async function flowDeps(): Promise<FlowDeps> {
     secureCookies: secureCookies(),
     siteOrigin: getConfig().PUBLIC_BASE_URL,
     now: () => new Date(),
+    google: googleSetUp(),
   };
 }
 

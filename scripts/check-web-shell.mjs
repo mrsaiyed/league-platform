@@ -245,14 +245,57 @@ const cases = [
   // The sign-in screens (step 1.14).
   ['visitor', '/account', 307, [], [], '/signin?next=%2Faccount'],
   ['owner', '/account', 200, ['Your account', 'Signed-in devices', 'Sign out everywhere']],
-  ['visitor', '/signin', 200, ['Sign in', 'Continue with Google', 'Forgot your password?']],
+  // Google is not set up here (GOOGLE_SIGN_IN), so no screen offers it (step 2.163, M27).
+  [
+    'visitor',
+    '/signin',
+    200,
+    ['Sign in', 'Forgot your password?', 'New here? Create an account'],
+    ['Continue with Google'],
+  ],
   ['visitor', '/signin?problem=wrongEmailOrPassword', 200, ['Wrong email or password.']],
   ['visitor', '/signin?problem=%3Cscript%3E', 200, ['Sign in'], ['role="alert"']],
-  ['visitor', '/signup', 200, ['Create your account', 'Email me a code']],
-  ['visitor', '/signin/forgot', 200, ['Forgot your password']],
-  ['visitor', '/signup/code', 200, ['Enter your code', 'If that address can sign in']],
-  ['visitor', '/signup/password', 200, ['Choose your password']],
-  ['visitor', '/account/confirm', 200, ['Enter your password again']],
+  // A lock-out is said in minutes, with the way in that does not wait (step 2.163, M28).
+  [
+    'visitor',
+    '/signin?problem=tooManyAttempts&wait=900',
+    200,
+    ['Please wait 15 minutes, or tap &quot;Forgot your password?&quot; to choose a new one now.'],
+    ['900 seconds'],
+  ],
+  ['visitor', '/signup', 200, ['Create your account', 'Email me a code'], ['Continue with Google']],
+  // The forgotten-password route is "Choose a new password", with a way back (step 2.163).
+  ['visitor', '/signin/forgot', 200, ['Choose a new password', 'Back to sign in']],
+  // With no sign-up or reset under way there is no code to enter and no password to choose
+  // (step 2.163, L10): the first screen again, saying why. The code screen's words, which
+  // name the address the code went to, are checked in a browser (sign-in-says-test.mjs).
+  ['visitor', '/signup/code', 307, [], [], '/signup?problem=codeExpired'],
+  ['visitor', '/signup/password', 307, [], [], '/signup?problem=proofInvalid'],
+  // The password again is for a signed-in person: anyone else signs in and comes back.
+  ['visitor', '/account/confirm', 307, [], [], '/signin?next=%2Faccount%2Fconfirm'],
+  ['owner', '/account/confirm', 200, ['Enter your password again'], ['Continue with Google']],
+  ['visitor', '/account/inbox', 307, [], [], '/signin?next=%2Faccount%2Finbox'],
+  // A signed-in person at /signin and /signup is told so (step 2.163, L10).
+  [
+    'owner',
+    '/signin',
+    200,
+    ['You are already signed in', 'You are signed in as local-owner-token@example.test'],
+    ['name="password"'],
+  ],
+  ['owner', '/signup', 200, ['You are already signed in'], ['name="email"']],
+  // Signing out leaves the person on the page, told so, and only while signed out (R-30).
+  ['visitor', '/?notice=signedOut', 200, ['You are signed out.']],
+  ['owner', '/?notice=signedOut', 200, [], ['You are signed out.']],
+  ['visitor', '/north-valley?notice=signedOut', 200, ['You are signed out.']],
+  ['owner', '/north-valley?notice=signedOut', 200, [], ['You are signed out.']],
+  // "Sign out everywhere" asks first (step 2.163, M30).
+  [
+    'owner',
+    '/account?ask=signOutEverywhere',
+    200,
+    ['Sign out every device that uses your account, this one too?', 'No, keep them signed in'],
+  ],
   // The home and schedule pages (step 2.42): real content, not the placeholder; the two
   // leagues have different rounds.
   [

@@ -24,6 +24,7 @@ const madeUpAccount: AccountMenu = {
   gamesHref: '/north-valley/admin/games',
   accountHref: '/account',
   onScoringPage: false,
+  signOutFields: { next: '/north-valley' },
 };
 
 describe('league design', () => {

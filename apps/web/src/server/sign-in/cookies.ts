@@ -14,6 +14,9 @@
 // - flow: the address being proved and, after the right code, the proof, between
 //   the screens of sign-up and forgotten password. Fifteen minutes.
 // - google: what Google's return needs (the verifier and where to go next). Ten minutes.
+// - typed: the address typed into a sign-in that was refused, so the screen fills it in
+//   again (step 2.163, M28) without it ever riding in the address bar. Set on every
+//   refusal, whatever the address (T-68); gone after ten minutes, and on signing in or out.
 import { z } from 'zod';
 import { sessionCookieName } from '../session-cookie.ts';
 
@@ -23,6 +26,7 @@ export const cookieNames = {
   device: 'srl_device',
   flow: 'srl_flow',
   google: 'srl_google',
+  typed: 'srl_typed',
 } as const;
 
 export type CookieOptions = {
@@ -93,14 +97,30 @@ export type GoogleFlow = z.infer<typeof googleShape>;
 
 const flowSeconds = 15 * 60;
 const googleSeconds = 10 * 60;
+const typedSeconds = 10 * 60;
+const typedShape = z.string().max(254);
 
 export function writeFlow(jar: CookieJar, flow: Flow, secure: boolean): void {
   jar.set(cookieNames.flow, encode(flow), cookieOptions(secure, flowSeconds));
 }
 
 /** The flow under way, or undefined when there is none or it was tampered into another shape. */
-export function readFlow(jar: CookieJar): Flow | undefined {
+export function readFlow(jar: Pick<CookieJar, 'get'>): Flow | undefined {
   return decode(jar.get(cookieNames.flow), flowShape);
+}
+
+/** Keeps the address typed into a refused sign-in, as typed (trimmed, at most 254 characters). */
+export function writeTypedEmail(jar: CookieJar, typed: string, secure: boolean): void {
+  jar.set(
+    cookieNames.typed,
+    encode(typed.trim().slice(0, 254)),
+    cookieOptions(secure, typedSeconds),
+  );
+}
+
+/** The address typed into the last refused sign-in on this device, or undefined. */
+export function readTypedEmail(jar: Pick<CookieJar, 'get'>): string | undefined {
+  return decode(jar.get(cookieNames.typed), typedShape);
 }
 
 export function writeGoogleFlow(jar: CookieJar, flow: GoogleFlow, secure: boolean): void {

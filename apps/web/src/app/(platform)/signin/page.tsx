@@ -1,4 +1,5 @@
 import {
+  AlreadySignedIn,
   EmailField,
   NextField,
   PasswordField,
@@ -9,26 +10,36 @@ import {
 import { t } from '../../../server/messages.ts';
 import { googleAction, signInAction } from '../../../server/sign-in/actions.ts';
 import { safeReturnPath } from '../../../server/sign-in/device.ts';
+import { googleSetUp } from '../../../server/sign-in/next-visit.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
 import { returnLeagueOf } from '../../../server/sign-in/return-league.ts';
+import { typedEmailOfThisRequest } from '../../../server/sign-in/this-screen.ts';
+import { signedInPerson } from '../../../server/signed-in-leagues.ts';
 
 // Email and password, or Google (R-2, T-67). The same screen whether or not the
 // address has an account (T-68). Opened from a league's page, it names the league and
 // leads back to that page (step 2.127); "Forgot your password?" keeps the page to come
 // back to as well. A league this person may not see is not named (return-league.ts).
+// Since step 2.163: a signed-in person is told they are (L10); after a refused try the
+// address typed is filled in again (M28: from this device's own cookie, never the address
+// bar); a lock-out gives the wait in minutes and says "Forgot your password?" gets them in
+// now; "Continue with Google" is drawn only where Google is set up (M27).
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const next = safeReturnPath(search['next']);
+  const person = await signedInPerson();
+  if (person.kind === 'signed-in') return <AlreadySignedIn email={person.email} next={next} />;
   const from = await returnLeagueOf(next);
   return (
     <SignInScreen
       title="page.signIn"
       intro={from === null ? undefined : t('signIn.fromLeague', { league: from.name })}
       search={search}
+      forgotHint
     >
       <form action={signInAction}>
         <NextField next={next} />
-        <EmailField />
+        <EmailField value={await typedEmailOfThisRequest()} />
         <PasswordField />
         <SubmitButton words="signIn.submit" />
       </form>
@@ -37,11 +48,15 @@ export default async function Page({ searchParams }: SearchProps) {
           {t('signIn.forgot')}
         </a>
       </p>
-      <p>{t('signIn.or')}</p>
-      <form action={googleAction}>
-        <NextField next={next} />
-        <SubmitButton words="signIn.google" />
-      </form>
+      {googleSetUp() ? (
+        <>
+          <p>{t('signIn.or')}</p>
+          <form action={googleAction}>
+            <NextField next={next} />
+            <SubmitButton words="signIn.google" />
+          </form>
+        </>
+      ) : null}
       <p>
         <a className="ui-button" data-kind="quiet" href={screenUrl('signup', { next })}>
           {t('signIn.createAccount')}

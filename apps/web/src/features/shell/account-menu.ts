@@ -29,6 +29,13 @@ export type AccountMenu = {
    * out does, and with scripts off is a link to the account page (tracker-sign-out.ts).
    */
   readonly onScoringPage: boolean;
+  /**
+   * What "Sign out" tells the server (step 2.163, R-30): the page the person is on, so
+   * they are left on it, told "You are signed out."; on a staff page (the admin, the
+   * scoring page), which asks a signed-out person to sign in (U-15), also `staff`, so the
+   * sign-in screen says it and brings them back. The server checks the page again.
+   */
+  readonly signOutFields: Readonly<Record<string, string>>;
 };
 
 /** The account button for the person `view` is for, or null for a visitor. */
@@ -53,6 +60,10 @@ export function accountMenuOf(
         : leagueUrl(league, 'admin-area', { area: 'games' }),
     accountHref: platformUrl('account'),
     onScoringPage: isScoringPage(league, path),
+    signOutFields:
+      isScoringPage(league, path) || isAdminPage(league, path)
+        ? { next: path, staff: 'yes' }
+        : { next: path },
   };
 }
 
@@ -64,6 +75,13 @@ export function isScoringPage(league: LeagueAddressee, path: string): boolean {
   const base = plain(sample.slice(0, sample.length - 'game'.length));
   const at = plain(path);
   return at.startsWith(base) && at.length > base.length;
+}
+
+/** Whether `path` (the address as it arrived) is one of the admin's pages in `league`. */
+export function isAdminPage(league: LeagueAddressee, path: string): boolean {
+  const base = plain(leagueUrl(league, 'admin'));
+  const at = plain(path);
+  return at === base || at.startsWith(`${base}/`);
 }
 
 /** The question asked before signing out with plays waiting, in the page's words. */

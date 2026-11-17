@@ -24,6 +24,7 @@ const valid: Record<ConfigName, string> = {
   SUPABASE_SECRET_KEY: longValue('SUPABASE_SECRET_KEY'),
   RESEND_API_KEY: longValue('RESEND_API_KEY'),
   EMAIL_FROM: 'hello@example.test',
+  GOOGLE_SIGN_IN: 'on',
   STRIPE_SECRET_KEY: longValue('STRIPE_SECRET_KEY'),
   STRIPE_WEBHOOK_SECRET: longValue('STRIPE_WEBHOOK_SECRET'),
 };

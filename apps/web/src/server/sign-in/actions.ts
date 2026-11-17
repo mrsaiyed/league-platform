@@ -9,6 +9,7 @@ import {
   choosePassword,
   confirmPassword,
   enterCode,
+  sendCodeAgain,
   signInWithPassword,
   signOut,
   signOutEverywhere,
@@ -22,6 +23,10 @@ export async function signUpAction(form: FormData): Promise<never> {
 
 export async function forgotPasswordAction(form: FormData): Promise<never> {
   redirect((await askForCode('reset', fieldsOf(form), await nextVisit(), await flowDeps())).to);
+}
+
+export async function sendCodeAgainAction(): Promise<never> {
+  redirect((await sendCodeAgain(await nextVisit(), await flowDeps())).to);
 }
 
 export async function enterCodeAction(form: FormData): Promise<never> {
@@ -44,8 +49,9 @@ export async function confirmPasswordAction(form: FormData): Promise<never> {
   redirect((await confirmPassword(fieldsOf(form), await nextVisit(), await flowDeps())).to);
 }
 
-export async function signOutAction(): Promise<never> {
-  redirect((await signOut(await nextVisit(), await flowDeps())).to);
+/** The form says where the person is (`next`) and whether it is a staff page (`staff`). */
+export async function signOutAction(form: FormData): Promise<never> {
+  redirect((await signOut(fieldsOf(form), await nextVisit(), await flowDeps())).to);
 }
 
 export async function signOutEverywhereAction(): Promise<never> {

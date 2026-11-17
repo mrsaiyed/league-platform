@@ -4,6 +4,7 @@
 // league, and the two "not found" screens (step 2.85).
 export {
   accountMenuOf,
+  isAdminPage,
   isScoringPage,
   signInHrefFrom,
   waitingQuestionWords,
@@ -17,8 +18,9 @@ export { membershipsInWords, MyLeaguesList } from './my-leagues-list.tsx';
 export { LeagueSitePage } from './league-site-page.tsx';
 export { NotBuilt } from './not-built.tsx';
 export { LeagueNotFound, PlatformNotFound } from './not-found-screens.tsx';
+export { SignedOutNotice } from './signed-out-notice.tsx';
 export { SiteFooter } from './site-footer.tsx';
-export { AccountButton, SiteHeader } from './site-header.tsx';
+export { AccountButton, SignOutFields, SiteHeader } from './site-header.tsx';
 export { StandalonePage } from './standalone-page.tsx';
 
 /** What Next.js gives every page and layout under `[league]`. */
