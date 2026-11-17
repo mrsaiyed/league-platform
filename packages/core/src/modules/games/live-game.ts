@@ -83,13 +83,24 @@ export function withCurrentRules(
     return state;
   }
   const untouched = state.clock.remainingMs === basketball.periodMs(state.rules, 1);
-  return {
+  const moved = {
     ...state,
     rules: { ...rules },
     clock: {
       ...state.clock,
       remainingMs: untouched ? basketball.periodMs(rules, 1) : state.clock.remainingMs,
     },
+  };
+  // A state saved before minutes followed the game clock, moved onto it now (record 077):
+  // it gains that rule's facts, the clock's running time and, if the scorer set the clock
+  // before tip-off, that set as made at the period's first moment, where the period starts.
+  if (rules.minutesFollow !== 'game-clock' || state.rules.minutesFollow === 'game-clock') {
+    return moved;
+  }
+  return {
+    ...moved,
+    clock: { ...moved.clock, ranMs: 0 },
+    clockSets: untouched ? [] : [{ segment: 0, ranMs: 0, ms: state.clock.remainingMs }],
   };
 }
 
