@@ -1,0 +1,418 @@
+// Step 2.50: Admin → People, in a real browser at phone width (390), on the web app's
+// made-up stand-in (APP_ENV=test). Nothing leaves this computer; every person is made up.
+// Builds the app first unless given --no-build; --dev runs `next dev` instead.
+//
+// The made-up owner signs in as the other browser tests do (the stand-in's session cookie),
+// starts at the admin's home and from there only taps, with scripts on as on a phone:
+// - a misspelt name put right where the public sees it (the 2.106 audit, H11): "Jon Smiht"
+//   is added by hand with a name only and on no team, found by a search, put on the
+//   Falcons, and his name on the Falcons' roster leads to his record, where it becomes
+//   "Jon Smith", "Saved" beside it; the public Falcons page then says Smith, never Smiht;
+// - a child's first name on a youth team's public roster put right the same way;
+// - a refused save keeps what was typed and marks the box, beside it in words; a save
+//   that someone else's save overtook is refused, keeps what was typed and works again;
+// - with scripts off, adding someone wrong is refused the same way;
+// - nothing of a person (a name, an email, a date of birth) is ever in an address.
+// Then, role by role, what the server SENDS (the page's HTML, which holds the page's data
+// too): a registrar adds a child with an email and a date of birth in the draft league;
+// that record's page holds them for the owner, an admin and the registrar only; the list
+// holds names only, for them; every other made-up person (a scheduler, an editor, a
+// scorekeeper, a club admin, a coach, another league's admin, someone with no role, a
+// visitor) is refused both, and the refusal holds nothing of the person (R-16, T-76).
+import {
+  accessibilityProblems,
+  buildNext,
+  freePort,
+  launch,
+  openStaffMenu,
+  startNext,
+  waitFor,
+  whatWentWrong,
+} from './web-browser-kit.mjs';
+
+const failures = [];
+const checked = [];
+const note = (label, ok, detail = '') => {
+  checked.push(label);
+  if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ''}`);
+};
+
+const dev = process.argv.includes('--dev');
+let built = true;
+if (!dev && !process.argv.includes('--no-build')) {
+  built = await buildNext();
+  if (!built) failures.push('next build failed or took over 10 minutes');
+}
+
+const screen = { width: 390, height: 844 };
+/** The made-up people's session cookies (apps/web/src/server/stand-in-cast.ts). */
+const tokens = {
+  owner: 'local-owner-token',
+  admin: 'local-admin-token',
+  registrar: 'local-registrar-token',
+  scheduler: 'local-scheduler-token',
+  programScheduler: 'local-program-scheduler-token',
+  editor: 'local-editor-token',
+  scorekeeper: 'local-scorekeeper-token',
+  clubAdmin: 'local-club-admin-token',
+  coach: 'local-coach-token',
+  stranger: 'local-stranger-token',
+  otherAdmin: 'local-other-admin-token',
+};
+const child = {
+  first: 'Noa',
+  last: 'Quellbrook',
+  email: 'noa.guardian@example.test',
+  born: '2015-03-09',
+};
+
+if (built) {
+  const origin = `http://localhost:${await freePort()}`;
+  const port = new URL(origin).port;
+  const server = startNext(dev ? ['dev', '--port', port] : ['start', '--port', port], {
+    APP_ENV: 'test',
+    PUBLIC_BASE_URL: origin,
+  });
+  let browser;
+  let at = 'starting';
+  try {
+    await waitFor(`${origin}/`, server);
+    browser = await launch();
+    const signedIn = async (token, scripts = true) => {
+      const context = await browser.newContext({ javaScriptEnabled: scripts, viewport: screen });
+      await context.addCookies([{ name: 'srl_session', value: token, url: origin }]);
+      const page = await context.newPage();
+      page.setDefaultTimeout(dev ? 120_000 : 60_000);
+      return { context, page };
+    };
+    const { page } = await signedIn(tokens.owner);
+    const visitor = await browser.newContext({ javaScriptEnabled: false, viewport: screen });
+    const publicPage = await visitor.newPage();
+    publicPage.setDefaultTimeout(dev ? 120_000 : 60_000);
+    const publicText = async (path) => {
+      await publicPage.goto(`${origin}${path}`);
+      return publicPage.locator('main').innerText();
+    };
+    /** Every address the owner's browser was at, to prove none held a person. */
+    const addresses = [];
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) addresses.push(frame.url());
+    });
+    const accessible = async (label, on = page) => {
+      const problems = await accessibilityProblems(on);
+      note(`accessibility: ${label}`, problems.length === 0, problems.join('; '));
+      const wide = await on.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      );
+      note(`no sideways scrolling at phone width: ${label}`, wide);
+    };
+    const main = () => page.locator('main');
+    const toPeople = async () => {
+      await openStaffMenu(page);
+      await Promise.all([
+        page.waitForURL(/\/admin\/people$/),
+        page.locator('nav').getByRole('link', { name: 'People', exact: true }).first().click(),
+      ]);
+    };
+    const toTeam = async (name) => {
+      await openStaffMenu(page);
+      await Promise.all([
+        page.waitForURL(/\/admin\/teams$/),
+        page.locator('nav').getByRole('link', { name: 'Teams', exact: true }).first().click(),
+      ]);
+      await Promise.all([
+        page.waitForURL(/\/admin\/teams\/[0-9a-f-]{36}$/),
+        main().getByRole('link', { name, exact: true }).click(),
+      ]);
+    };
+    const details = page.locator('#details');
+
+    at = 'the owner opens People from the admin';
+    await page.goto(`${origin}/north-valley`);
+    await page.goto(`${origin}/north-valley/admin`);
+    await toPeople();
+    note(
+      'People is a screen, titled, with its main action at the top',
+      (await page.getByRole('heading', { level: 1, name: 'People' }).count()) === 1 &&
+        (await page.locator('header').getByRole('link', { name: 'Add a person' }).count()) === 1,
+    );
+    note(
+      'a person on no team is listed (Leo Fischer, a free agent)',
+      (await main().getByRole('link', { name: 'Leo Fischer', exact: true }).count()) === 1,
+    );
+    await accessible('the People list');
+
+    at = 'the owner adds Jon Smiht by hand, with a name only';
+    await page.getByRole('link', { name: 'Add a person' }).first().click();
+    const add = page.locator('#add-person');
+    await add.getByLabel('First name').fill('Jon');
+    await add.getByLabel('Last name').fill('Smiht');
+    await Promise.all([
+      page.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/),
+      add.getByRole('button', { name: 'Add to the league' }).click(),
+    ]);
+    await page.getByText('Added to the league: Jon Smiht.').waitFor();
+    note(
+      'his record opens, saying he was added and is on no team yet',
+      (await page.getByRole('heading', { level: 1, name: 'Jon Smiht' }).count()) === 1 &&
+        (await page.getByText('They are on no team yet', { exact: false }).count()) === 1,
+    );
+    const jonAddress = page.url().split('#')[0];
+    await accessible('a person just added');
+
+    at = 'the owner finds him by a search';
+    await toPeople();
+    await page.getByLabel('Search by name').fill('smi');
+    await Promise.all([
+      page.waitForURL(/q=smi/),
+      page.getByRole('button', { name: 'Search', exact: true }).click(),
+    ]);
+    const found = await main().locator('.staff-rows a').allInnerTexts();
+    note('a search by part of a name finds him', found.includes('Jon Smiht'), found.join(', '));
+    note(
+      'and only people whose name matches',
+      found.every((name) => /smi/i.test(name)),
+      found.join(', '),
+    );
+    await page.getByLabel('Search by name').fill('jon@example.test');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    note(
+      'an email address typed in the search is not sent: it would ride in the address',
+      !page.url().includes('example.test'),
+      page.url(),
+    );
+
+    at = 'the owner puts him on the Falcons';
+    await toTeam('Falcons');
+    const adding = page.locator('#add-player');
+    await adding.getByLabel('Person').selectOption({ label: 'Jon Smiht' });
+    await Promise.all([
+      page.waitForURL(/done=added/),
+      adding.getByRole('button', { name: 'Add to the roster' }).click(),
+    ]);
+    note(
+      'the public Falcons page shows the misspelt name',
+      (await publicText('/north-valley/teams/falcons')).includes('Jon Smiht'),
+    );
+
+    at = "the owner taps his name on the Falcons' roster and puts it right";
+    await Promise.all([
+      page.waitForURL(/\/admin\/people\/[0-9a-f-]{36}$/),
+      main().getByRole('link', { name: 'Jon Smiht', exact: true }).click(),
+    ]);
+    note(
+      "the roster line's name leads to his record",
+      page.url() === jonAddress,
+      `${page.url()} is not ${jonAddress}`,
+    );
+    // A box emptied by mistake is refused in words beside it, with what was typed kept.
+    await details.getByLabel('First name').fill('');
+    await details.getByLabel('Last name').fill('Smith');
+    await details.getByRole('button', { name: 'Save details' }).click();
+    const wrongFirst = details.locator('[data-wrong="firstName"]');
+    await wrongFirst.waitFor();
+    note(
+      'an empty first name is refused beside its box',
+      (await wrongFirst.innerText()) === 'Type a first name, up to 100 letters.' &&
+        (await details.getByLabel('First name').getAttribute('aria-invalid')) === 'true',
+    );
+    note(
+      'and the last name typed is kept',
+      (await details.getByLabel('Last name').inputValue()) === 'Smith',
+    );
+    await accessible('a save refused beside its box');
+    await details.getByLabel('First name').fill('Jon');
+    await details.getByRole('button', { name: 'Save details' }).click();
+    const saved = details.getByText('Saved: Jon Smith.');
+    await saved.waitFor();
+    note('"Saved" is said beside his details, naming him as he is now', await saved.isVisible());
+    note(
+      'the page is his, by his right name',
+      (await page.getByRole('heading', { level: 1, name: 'Jon Smith' }).count()) === 1,
+    );
+    const falcons = await publicText('/north-valley/teams/falcons');
+    note(
+      'the public Falcons page says Jon Smith, and never Smiht',
+      falcons.includes('Jon Smith') && !falcons.includes('Smiht'),
+    );
+    await page.reload();
+    note('a reload says nothing old', (await page.getByText('Saved: Jon Smith.').count()) === 0);
+
+    at = 'two people save the same person';
+    const { page: other } = await signedIn(tokens.owner);
+    await other.goto(jonAddress);
+    await page.reload();
+    await other.locator('#details').getByLabel('Last name').fill('Smithson');
+    await other.locator('#details').getByRole('button', { name: 'Save details' }).click();
+    await other.getByText('Saved: Jon Smithson.').waitFor();
+    await details.getByLabel('First name').fill('Jonathan');
+    await details.getByRole('button', { name: 'Save details' }).click();
+    const stale = details.getByText('Someone else changed this person’s details', {
+      exact: false,
+    });
+    await stale.waitFor();
+    note(
+      'a save someone else overtook is refused, and what was typed is kept',
+      (await details.getByLabel('First name').inputValue()) === 'Jonathan',
+    );
+    note(
+      'and the page shows their version',
+      (await page.getByRole('heading', { level: 1, name: 'Jon Smithson' }).count()) === 1,
+    );
+    // Saving again puts what this person typed in place of the other's change: the last
+    // name in their box was still "Smith".
+    await details.getByRole('button', { name: 'Save details' }).click();
+    await details.getByText('Saved: Jonathan Smith.').waitFor();
+    note('saving again then works', true);
+
+    at = "a child's name on a youth team's public roster is put right";
+    await page.goto(`${origin}/harbor-city`);
+    await page.goto(`${origin}/harbor-city/admin`);
+    note(
+      'the public Comets page shows Maya before',
+      (await publicText('/harbor-city/teams/comets')).includes('Maya'),
+    );
+    await toTeam('Comets');
+    await Promise.all([
+      page.waitForURL(/\/admin\/people\/[0-9a-f-]{36}$/),
+      main().getByRole('link', { name: 'Maya Cho', exact: true }).click(),
+    ]);
+    await details.getByLabel('First name').fill('Maia');
+    await details.getByRole('button', { name: 'Save details' }).click();
+    await details.getByText('Saved: Maia Cho.').waitFor();
+    const comets = await publicText('/harbor-city/teams/comets');
+    note(
+      'the public Comets page shows Maia, and no Maya',
+      comets.includes('Maia') && !comets.includes('Maya'),
+    );
+    await accessible("a child's record, saved");
+
+    at = 'with scripts off, adding someone wrong is refused the same way';
+    const { page: plain } = await signedIn(tokens.owner, false);
+    await plain.goto(`${origin}/north-valley/admin/people`);
+    const plainAdd = plain.locator('#add-person');
+    await plainAdd.getByLabel('First name').fill('Ola');
+    await plainAdd.getByLabel('Last name').fill('Brandt');
+    await plainAdd.getByLabel('Email (optional)').fill('ola.example.test');
+    await Promise.all([
+      plain.waitForEvent('load'),
+      plainAdd.getByRole('button', { name: 'Add to the league' }).click(),
+    ]);
+    note(
+      'refused beside the email box, with scripts off',
+      (await plain.locator('#add-person [data-wrong="contactEmail"]').count()) === 1,
+    );
+    note(
+      'the names and the address typed are kept',
+      (await plain.locator('#add-person').getByLabel('Last name').inputValue()) === 'Brandt' &&
+        (await plain.locator('#add-person').getByLabel('Email (optional)').inputValue()) ===
+          'ola.example.test',
+    );
+    note('nothing was added', !(await plain.locator('main').innerText()).includes('Ola Brandt'));
+    note('and nothing typed is in the address', !/Brandt|example/.test(plain.url()), plain.url());
+
+    note(
+      'no address the owner was at held a name, an email or a date of birth',
+      addresses.every((url) => !/Smiht|Smith|Maia|Maya|example\.test|\d{4}-\d{2}-\d{2}/.test(url)),
+      addresses.filter((url) => /Smi|Mai|Maya|example|\d{4}-/.test(url)).join(' '),
+    );
+
+    at = 'a registrar adds a child in the draft league';
+    const { page: registrar } = await signedIn(tokens.registrar);
+    await registrar.goto(`${origin}/quiet-pines/admin/people`);
+    const regAdd = registrar.locator('#add-person');
+    await regAdd.getByLabel('First name').fill(child.first);
+    await regAdd.getByLabel('Last name').fill(child.last);
+    await regAdd.getByLabel('Email (optional)').fill(child.email);
+    await regAdd.getByLabel('Date of birth (optional)').fill(child.born);
+    await regAdd.getByLabel('Child or adult').selectOption('child');
+    await Promise.all([
+      registrar.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/),
+      regAdd.getByRole('button', { name: 'Add to the league' }).click(),
+    ]);
+    const record = registrar.url().split('#')[0].replace(origin, '');
+    note(
+      "the registrar sees the child's private details on the record",
+      (await registrar.locator('#details').getByLabel('Email (optional)').inputValue()) ===
+        child.email &&
+        (await registrar
+          .locator('#details')
+          .getByLabel('Date of birth (optional)')
+          .inputValue()) === child.born,
+    );
+    await accessible("a registrar on a child's record", registrar);
+
+    at = 'what the server sends to each made-up person';
+    const sent = async (token, path) => {
+      const answer = await fetch(`${origin}${path}`, {
+        redirect: 'manual',
+        headers: token === null ? {} : { cookie: `srl_session=${token}` },
+      });
+      return { status: answer.status, html: await answer.text() };
+    };
+    const holds = (html, ...words) => words.some((word) => html.includes(word));
+    for (const who of ['owner', 'admin', 'registrar']) {
+      const page = await sent(tokens[who], record);
+      note(
+        `${who}: the record is sent with the email and the date of birth`,
+        page.status === 200 && holds(page.html, child.email) && holds(page.html, child.born),
+        `${page.status}`,
+      );
+      const list = await sent(tokens[who], '/quiet-pines/admin/people');
+      note(
+        `${who}: the list is sent with the name and no private detail`,
+        list.status === 200 &&
+          holds(list.html, child.last) &&
+          !holds(list.html, child.email, child.born),
+        `${list.status}`,
+      );
+    }
+    const refused = [
+      'scheduler',
+      'programScheduler',
+      'editor',
+      'scorekeeper',
+      'clubAdmin',
+      'coach',
+      'otherAdmin',
+      'stranger',
+    ];
+    for (const who of [...refused, 'visitor']) {
+      const token = who === 'visitor' ? null : tokens[who];
+      for (const path of [record, '/quiet-pines/admin/people']) {
+        const page = await sent(token, path);
+        note(
+          `${who}: ${path === record ? 'the record' : 'the list'} is refused and holds nothing of the person`,
+          page.status !== 200 &&
+            !holds(page.html, child.first, child.last, child.email, child.born),
+          `${page.status}`,
+        );
+      }
+    }
+
+    at = "a club admin on a team's page";
+    const { page: club } = await signedIn(tokens.clubAdmin);
+    await club.goto(`${origin}/quiet-pines/admin/teams`);
+    await Promise.all([
+      club.waitForURL(/\/admin\/teams\/[0-9a-f-]{36}$/),
+      club.locator('main').getByRole('link', { name: 'Lions', exact: true }).click(),
+    ]);
+    note(
+      'a club admin, who does not run People, gets no link to a person from the roster',
+      (await club.locator('main a[href*="/admin/people/"]').count()) === 0 &&
+        (await club.getByText('Ada Lionel').count()) >= 1,
+    );
+    await visitor.close();
+  } catch (error) {
+    failures.push(`${at}: ${whatWentWrong(error)}`);
+  } finally {
+    await browser?.close();
+    server.child.kill();
+  }
+}
+
+if (failures.length > 0) {
+  console.error(`People screens browser test failed:\n  ${failures.join('\n  ')}`);
+  process.exit(1);
+}
+console.log(`People screens browser test passed: ${checked.length} checks in a real browser.`);
