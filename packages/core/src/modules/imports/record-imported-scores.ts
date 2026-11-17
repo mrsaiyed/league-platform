@@ -1,6 +1,7 @@
 // Records the final scores an applied fixtures import carried, for the games that have been
 // published since (O-4). Games not yet published stay waiting; a game already decided or
 // cancelled, or one the live tracker has recorded plays of (S-46), is left as it is; a tie the rules of the game refuse is left waiting and counted.
+// A score for a game postponed since is left waiting and counted apart (step 2.158, S-75).
 // Running it again records nothing twice: a score is marked once it is done.
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../command/index.ts';
@@ -21,6 +22,11 @@ export type ImportedScoresRecorded = {
   readonly refused: number;
   /** Games already decided or cancelled by other means, or scored in the live tracker, left as they are. */
   readonly leftAlone: number;
+  /**
+   * Scores for games postponed since (step 2.158, S-75): left waiting, and counted apart so
+   * the import can say why. A postponed game has no score until it is played on a new date.
+   */
+  readonly postponed: number;
 };
 
 export const recordImportedScores = defineCommand({
@@ -55,6 +61,7 @@ export const recordImportedScores = defineCommand({
     let waiting = 0;
     let refused = 0;
     let leftAlone = 0;
+    let postponed = 0;
     const scores: CreatedFixtures['scores'] = [];
     for (const score of created.scores) {
       if (score.recorded) {
@@ -82,6 +89,10 @@ export const recordImportedScores = defineCommand({
       } else if (result.error.code === 'tie-not-allowed') {
         refused += 1;
         scores.push(score);
+      } else if (result.error.code === 'game-postponed') {
+        // Not played yet (step 2.158, S-75): the score waits, counted as such.
+        postponed += 1;
+        scores.push(score);
       } else if (
         result.error.code === 'game-already-decided' ||
         result.error.code === 'game-cancelled' ||
@@ -105,6 +116,6 @@ export const recordImportedScores = defineCommand({
       );
       if (saved === undefined) return fail({ code: 'changed-since-read' });
     }
-    return ok({ recorded, waiting, refused, leftAlone });
+    return ok({ recorded, waiting, refused, leftAlone, postponed });
   },
 });

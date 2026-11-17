@@ -22,6 +22,7 @@ import {
   seasonSettingsAddress,
   visibilityAnchor,
 } from '../season-settings/index.ts';
+import { waitingListAnchor } from '../games-area/index.ts';
 import { StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import {
@@ -72,6 +73,13 @@ type Basis = {
   /** What the viewer may do; the commands check again, this only hides what cannot work. */
   readonly canEdit: boolean;
   readonly canPublish: boolean;
+  /**
+   * Where a game that is not scheduled goes on from (step 2.158): a postponed one waits in
+   * Admin → Games for its new date ("Waiting for a new date"); a cancelled one is put back
+   * from its own page there.
+   */
+  readonly waitingHref: string;
+  readonly gameHref: (gameId: string) => string;
 };
 
 const recordings = ['final-score', 'box-score', 'live'] as const;
@@ -214,6 +222,8 @@ export async function ScheduleBuilderPage({
     basedOnRevision: draft.latestRevision,
     version: draft.draft?.version ?? null,
     draftId: draft.draft?.id ?? null,
+    waitingHref: `${leagueUrl(addressee, 'admin-area', { area: 'games' })}#${waitingListAnchor}`,
+    gameHref: (gameId) => leagueUrl(addressee, 'admin-area', { area: 'games', subpath: [gameId] }),
   };
   const preview =
     draft.draft === null
@@ -702,11 +712,26 @@ function GameItem({
         </div>
       )}
       {!basis.canEdit ? null : !game.editable ? (
-        <p className="staff-quiet">
-          {game.status === 'postponed' || game.status === 'cancelled'
-            ? t('schedule.admin.gameNotScheduled', { status: game.status })
-            : t('schedule.admin.gameLocked')}
-        </p>
+        game.status === 'postponed' || game.status === 'cancelled' ? (
+          // Where it goes from here (step 2.158): a postponed game waits in Games for its new
+          // date; a cancelled one is put back from its own page there.
+          <p className="staff-quiet" data-called-off={game.status}>
+            {t(
+              game.status === 'postponed'
+                ? 'schedule.admin.gamePostponed'
+                : 'schedule.admin.gameCancelled',
+            )}{' '}
+            <a href={game.status === 'postponed' ? basis.waitingHref : basis.gameHref(game.id)}>
+              {t(
+                game.status === 'postponed'
+                  ? 'schedule.admin.toWaiting'
+                  : 'schedule.admin.toPutBack',
+              )}
+            </a>
+          </p>
+        ) : (
+          <p className="staff-quiet">{t('schedule.admin.gameLocked')}</p>
+        )
       ) : (
         <details>
           <summary>{t('schedule.admin.edit')}</summary>
