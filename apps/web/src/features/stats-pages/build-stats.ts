@@ -258,11 +258,31 @@ function pageData(
       : {}),
     ...(player.teamIds.length > 1 ? { severalTeams: { team: true } } : {}),
   }));
-  const teamColumns: StatsColumn[] = [{ key: 'team', label: t('stats.col.team') }, ...statColumns];
+  // A team's numbers come from the games where they were recorded (P7 §8), which may be
+  // fewer than the games the standings count: the table says how many (step 2.195). A
+  // statistic kept in fewer of them is averaged over its own games, as before.
+  const teamColumns: StatsColumn[] = [
+    { key: 'team', label: t('stats.col.team') },
+    {
+      key: 'games',
+      label: t('stats.col.games'),
+      fullName: t('stats.col.teamGamesFull'),
+      numeric: true,
+    },
+    ...statColumns,
+  ];
+  const gamesWithStatistics = (stats: StatisticsTable['teams'][number]['stats']): number | null => {
+    const counts = table.statKeys.flatMap((key) => {
+      const entry = stats[key];
+      return entry === undefined ? [] : [entry.gamesRecorded];
+    });
+    return counts.length === 0 ? null : Math.max(...counts);
+  };
   const teamRows: StatRow[] = table.teams.map((team) => ({
     id: team.teamId,
     cells: {
       team: team.name,
+      games: gamesWithStatistics(team.stats),
       ...Object.fromEntries(table.statKeys.map((key) => [key, valueOf(team.stats[key])])),
     },
     chips: { team: team.color },

@@ -214,7 +214,12 @@ export const enSite = {
   'stats.col.gamesFull': 'Games played',
   'stats.col.player': 'Player',
   'stats.col.team': 'Team',
+  // The teams' table: how many games a team's numbers come from (P7 §8; step 2.195).
+  'stats.col.teamGamesFull': 'Games with statistics',
   'stats.col.value': 'Value',
+  // Said with the tables: the statistics may count fewer games than the standings (P7 §8).
+  'stats.countsGames':
+    'Statistics count the games that were scored live or entered as a box score. A game with only a final score counts in the standings, not here.',
   'stats.empty': 'Statistics appear here once games have been played.',
   'stats.heading': 'By the numbers.',
   'stats.inAll': 'this season',
@@ -238,6 +243,8 @@ export const enSite = {
   'stats.minimumGames_other': 'A player needs at least {count} games to be ranked.',
   'stats.noSeason': 'There is no season to show yet.',
   'stats.notRankedYet': 'not ranked yet',
+  // Between two sentences of one note under a title.
+  'stats.noteJoin': ' ',
   'stats.showBy': 'Show',
   'stats.teams': 'Teams',
   'stats.teamsJoin': ', ',

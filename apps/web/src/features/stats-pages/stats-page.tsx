@@ -150,13 +150,18 @@ export function StatsTables({
         </Section>
         <Section
           title={t('stats.teams')}
-          note={
-            data.totalsNoteTeams.length > 0
-              ? t('stats.teamsTotalsOnly', {
-                  teams: data.totalsNoteTeams.join(t('stats.teamsJoin')),
-                })
-              : undefined
-          }
+          note={[
+            // Which games the numbers count (P7 §8): a team's games here may be fewer than
+            // in the standings, and the page says why where the two are compared.
+            t('stats.countsGames'),
+            ...(data.totalsNoteTeams.length > 0
+              ? [
+                  t('stats.teamsTotalsOnly', {
+                    teams: data.totalsNoteTeams.join(t('stats.teamsJoin')),
+                  }),
+                ]
+              : []),
+          ].join(t('stats.noteJoin'))}
         >
           <SortableStatsTable
             caption={t('stats.teams')}
