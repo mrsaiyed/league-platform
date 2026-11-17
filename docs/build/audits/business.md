@@ -203,3 +203,115 @@ All three are the technical lead's to settle, and all three spend your money, so
 - **T-216 · The hosting vendor, between equals, by price.** Since this was written, the first online test copy was put on Render (T-270). The row still says "Open". Changing host later is allowed for: the program runs anywhere a standard container runs (T8 section 12).
 
 **One note for the lead, not for you.** Eight of these answers are still worded in the product files as "recommended, needs the founder's yes" (B-13 in P1; O-1 in P3; R-11 and R-12 in P6; N-15 and N-16 in P8; F-2 and F-10 in P9), while `DECISIONS.md` calls them "Decided for you". The spec should say one thing (T-185).
+
+## 3. What is still undecided, and when it starts to block
+
+**The answer first: nothing undecided blocks the first online test. A short list blocks the first real people. The large ones (a price in writing, the lawyer's wording, a company) block the first outside league, and your own plan brings that league in stage 4, one stage before the plan says the lawyer is needed.**
+
+Four points in time matter. Each list below says what must be settled by then and who settles it.
+
+### 3.1 Before the first online test (made-up data only)
+
+Nothing in the business is undecided here. It needs your hands and about $7 a month.
+
+- **Your list in `STATUS.md`:** a new password for the test database, Supabase's certificate file, a Render account with a payment card, then one supervised session with the lead.
+- **Still open, and worth doing first:** two-step sign-in on GitHub and the email account it recovers to (T-83), and the shared vault with Saif (T-166).
+- **One thing to settle while it is cheap: whose accounts these are.** The test database sits in an account from Saif (`STATUS.md`). That is fine for made-up data. The accounts that will hold real people's data should be opened by you, on an address that belongs to the business, with two-step sign-in, and with Saif's emergency access through the vault. Moving a live database from one person's account to another later is real work.
+
+### 3.2 Before the first real people have accounts
+
+Who they are: Al-Hadi's coach and scorekeepers at the demo (stage 2's milestone), then the helpers in the "Faraj test" season, then Al-Hadi's parents when they follow a team (stage 4).
+
+1. **The school's written permission** (legal brief, section 2). Yours: one email. Open on your list. It is about today's tracker as much as the new product.
+2. **The words on the Terms and Privacy pages (B-14).** The lead writes them; you read them first (section 2, "decide differently").
+3. **An address people can write to.** The note promises to say "who to write to", and the site has a `/contact` page in its plan (P2 section 4). No such address exists. Yours.
+4. **A domain, and email that really sends.** An invitation to Al-Hadi's coach is a real email. The test copy sends none: every email is kept, not sent (T-270). Real email needs a domain to send from, with its proofs of authenticity (step 2.137 puts them on your list). No domain is chosen (B-12). So the name question arrives here in a small form: a working domain is enough, and the final name can wait.
+5. **Whether any of Al-Hadi's scorekeepers is under 18.** If so, a teenager has an account before any lawyer has answered (R-12). Yours to find out.
+6. **A way to remove a person, and to remove a league.** `docs/operations/make-a-league.md` lists both as missing "before a real school's league": step 2.114 (a person on a roster can be erased) and step 2.133 (a league that has been used can be deleted). Step 2.133 is named for stage 4, which is after the demo. The lead's, as a change of order (section 8).
+7. **Backup switched on and restored once, and a release that can be taken back.** Step 2.95 builds the procedures. Continuous backup (T-153) costs money and needs your yes. As written it is due "before the first outside league joins". Real children's records arrive sooner, with Al-Hadi's season.
+8. **One page on what happens if details leak:** who notices, who is told, how fast. The incident procedure (T-84) names you as the person responsible and is due only "before the first outside league". I would have a short version before the first real account.
+9. **What the demo league is called, and whether other schools' rosters appear in it** (F-10, F-6; question 30 of the legal brief). Yours, with the lawyer.
+10. **Your own sign-off on holding children's data.** `make-a-league.md` lists "the founder's legal sign-off on holding children's data" as a condition. Your decision of November 12 puts the lawyer after our own tests. Put together, that means you would give this sign-off alone. That is yours to choose. Choose it knowingly; my recommendation is one short meeting first (section 7).
+
+### 3.3 Before the first league that is not your own
+
+When this is: stage 4, by your own decision to recruit two or three more small leagues then (T-219), and whenever TCSAAL says yes to a pilot.
+
+**The gap in the plan's wording.** The lawyer's terms are due "before any stranger signs up" (B-9), which the build order reads as stage 5. Children's data is due "before any youth league other than our own demo" (B-10). But the players of a friend's league are strangers to us, even if its organizer is not. So some of stage 5's list is needed in stage 4:
+
+1. **The lawyer's terms and privacy policy,** if those leagues' players register online. The other way is to keep those first leagues to adults whom the organizer adds by hand, with a one-page agreement signed by the organizer. Yours to choose; either works.
+2. **A price in writing, and whether they pay yet (B-4, B-5).** B-5 says nothing is charged until strangers can sign up and payments exist. P1 section 7 says we "agree a price with each" of these leagues. Both are true only if the price is agreed now and charged later. Each league is meant to carry "a record of what was agreed (price, term, any limits)" (P1 section 5); no step gives that record a screen before stage 5.
+3. **One page saying what a league is promised and what it is not** (section 3.5 has the list). Today the promises are spread over nine files.
+4. **A company, and insurance.** The spec only asks: "Should this be a company before any outside league uses it?" and "Do we need insurance before strangers sign up?" (legal brief, questions 1 and 4). Nobody has answered. Until a company exists, the business is you in person; ask the lawyer what that means for you.
+5. **Support:** the address; who answers when you are away; who watches the first game nights (T-160).
+6. **The incident procedure (T-84), continuous backup (T-153) and our own staff tool** (step 2.136: suspending a league, a support visit with a recorded reason). The spec dates the first two "before the first outside league". The plan has the tool at stage 5, one stage late for these leagues.
+7. **A limit on email.** Every league sends from our one mail domain, so one careless league hurts delivery for all (N-9, T-139). The monthly allowance (T-141) has no number, and announcements have no limit "for now".
+8. **If any of them is a youth league:** the lawyer first (B-10). No way round it.
+9. **For TCSAAL:** nothing is signed, "even for a small pilot", without a pilot agreement from the lawyer (legal brief, section 1 and question 31), and nothing is promised about size before the load test (F-5, F-9).
+10. **The name.** These leagues will print an address and a QR code. A change of the product's domain later is cheap only if the old domain is kept and forwards. The spec says that for a league's short name (U-7) and for league addresses of their own (U-13); it does not yet say it for our own domain.
+
+### 3.4 Before the first dollar is charged (stage 5)
+
+1. **The starting price, and whether it is published** (B-4; T10 stage 5). Yours.
+2. **Our share of money paid through us:** registration fees, and sponsor money if B-13 stands. "The rate is not decided" (P1 section 5). The first draft said 1 to 2 percent (change log, B-4). Yours, with the accountant.
+3. **The accountant's six questions (B-11):** sales tax on what we charge, how our share is taxed, who issues tax forms to leagues, whether we need a licence to handle money, who bears refunds and chargebacks, and what changes for nonprofit leagues.
+4. **A company and a bank account for the money to arrive in.** The spec only asks the question.
+5. **How a league pays us.** The legal brief and the build order say "by invoice". P3 section 6 says "through a page hosted by our payment provider". These are probably one thing; the spec should say it once.
+6. **Our own refund and cancellation terms** for a league that leaves in the middle of a season it paid for. This is nowhere in the spec. (A league's refund policy toward its own players is covered, P6 section 9.)
+7. **What happens when a league does not pay.** Decided (O-6): 14 days of notices; what pauses is adding teams and seasons; a season in progress is never interrupted. It is in no step yet.
+8. **The lawyer's terms and privacy policy, and how people accept them** (B-9; questions 5 to 7).
+9. **An outside security review** (T-181). The lead has already written that its advice will be yes (T4 section 12). It costs money; the repository holds no figure.
+10. **A second sign-in step for owners who collect money** (T-72). Decided; stage 5.
+11. **The final name and domain (B-12),** whether to register the name (question 3), and league addresses of their own (U-13, before stage 5).
+12. **Later, and blocking nothing now:** spending on marketing (B-7), and text messages, which cost money per message (N-14).
+
+### 3.5 The same, by subject
+
+- **Prices and how money is taken.** Undecided: the amount, our share of fees, how an invoice is paid, our own refund terms. The unit is only "likely" one price per league per season. A written price blocks the first outside league. Everything else blocks the first dollar.
+- **What a league is promised.** Decided in pieces: export of everything at any time (O-9); deletion on request, with 30 days to change your mind (O-10); a season never interrupted (O-6); history never deleted over a failed payment (U-9); a reply within one business day (B-8); our own staff inside a league only with a recorded reason the owner can see (T-77); the whole database restorable to any moment of the last seven days (T8 section 5).
+- **What a league is not promised.** Any figure for staying up: 99.9% is our own target, and a number is promised only in an association's contract, and only once met for six months (T-152). Restoring one league alone from backup: "possible but manual" (T-155). Any sport but basketball (B-6). Removing our mark (U-8). Code of its own (B-3). Any size we have not tested (F-9). Referees, gyms or insurance (P1 section 4). All of it blocks the first outside league, as one page the organizer reads before saying yes.
+- **Terms, privacy and children's data.** Undecided: everything the lawyer must say (32 questions in the brief). In its place for now: the lead's plain note (B-14). The note blocks the first real account. The children's answers block real children on the new product, in my view; the first outside youth league, in the plan's. The full terms block the first outside league whose players register.
+- **Support.** Decided: email, one business day, no phone, you on game nights (B-8). Undecided: the address; who besides you; what leagues are told when you travel; who answers a report about a chat (N-16). The address blocks the first real account. The rest blocks the first outside league.
+- **Who owns a league's data, and how they leave with it.** Decided: the league owns it, can export all of it and can delete it. Not built: export (step 2.132, stage 3), deletion (step 2.133, stage 4), an owner who disappears (O-8, in no step). Undecided, for the lawyer: how long waivers and payment records are kept (question 12), and whether keeping a nameless line of statistics is acceptable (question 11). Deletion blocks real children's data. Export blocks the first outside league.
+- **The name and the domain.** The working name is SR Leagues; no domain is chosen or checked (B-12). A working domain blocks the first real email. The final name blocks the lawyer's terms and the first stranger.
+- **A company, and insurance.** The spec speaks of both only as questions for the lawyer. By the wording of question 1 they block the first outside league; at the very latest, the first dollar.
+
+## 4. What it costs to run
+
+**The answer first: about $7 a month for the first online test; $100 to $200 a month from the day real leagues are on it, whether one or ten; under $450 a month at a hundred; and, by my own estimate, $1,000 to $4,000 a month at a thousand. None of these is a quote.**
+
+| Leagues                 | A month          | Where the figure comes from                                                                                                                                                      |
+| ----------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| None online yet (today) | $0               | Nothing of the new product is running. Today's Al-Hadi tracker has "no server to run or pay for" (`docs/operations/live-stats-hosting.md`).                                      |
+| The first online test   | about $7         | T1, decision T-270: the worker on Render's smallest paid instance; the website on Render's free one; the database on the free Supabase test project. To be confirmed at sign-up. |
+| 1, with real people     | $100 to $200     | P1 section 5 says "$100 to $200"; T1 section 8 says "under $150". Both are the lead's, "from my knowledge of typical pricing, not quotes".                                       |
+| 10                      | $100 to $200     | An estimate. How: P1 section 5 says "one small league adds almost nothing", and T1 gives one "launch" column for all the early leagues.                                          |
+| 100                     | under $450       | T1 section 8, "with around 100 leagues".                                                                                                                                         |
+| 1,000                   | $1,000 to $4,000 | An estimate, mine; the repository has no figure. How: below.                                                                                                                     |
+
+**For each league, that is** $10 to $20 a month at ten leagues, under $4.50 at a hundred, and $1 to $4 at a thousand.
+
+**The lines behind T1's figures** (a month, at launch, then at around a hundred leagues): the database, sign-in and files at Supabase, about $25, then $25 to $100 · the servers at Render, $15 to $50, then $50 to $150 · Cloudflare in front, $0 to $20, then $20 · email through Resend, $0 to $20, then $20 to $90 · error reports and uptime checks, $0 to $30, then $30 to $60.
+
+**How I made the figure for a thousand.** I took T1's hundred-league column, multiplied by ten the three lines that grow with use (database, servers, email), and by one to three the two that mostly do not. That gives about $1,000 at the low end and about $3,600 at the high end, which I rounded up to $4,000 because of the doubt about email below. T8 says its own sizes are estimates until the first load test, and the product is to count each league's use (T-164) so that this becomes a measurement.
+
+**What those figures leave out.** Each is named in the repository with no price:
+
+- Continuous backup: "a paid extra on Supabase" (`STAGE-1-REPORT.md`, your checklist, item 7).
+- Refusing leaked passwords: "it may need a paid Supabase plan" (the same report).
+- A domain. An estimate from my general knowledge, not looked up: tens of dollars a year.
+- Stripe: no monthly cost; it takes a share of each payment (T1 section 8). The share is not in the repository.
+- Text messages, if they are ever sent: a cost per message (N-14).
+- A second database region (T-168): not until an association's contract asks for it.
+
+**The line most likely to be wrong is email.** Worked from the spec's own sizes: T8 says a thousand leagues play 100,000 games a season, so a hundred leagues play about 10,000. Each game sends a reminder and a recap to the players, guardians, coaches and followers of both teams (P8 section 2). Faraj has 70 people in 6 teams (T8 section 1), about 12 a team, so 24 players a game; add coaches, guardians and followers and call it 30 to 50 people a game, with two emails each. That is 600,000 to 1,000,000 emails a season at a hundred leagues, or 150,000 to 330,000 a month if a season lasts three or four months, and ten times that at a thousand. Whether "$20 to $90" buys that is the first thing the vendor decision (T-167) should check. I have not looked the price up. It matters for your price too: email is the one cost that grows with every league, which is why the email allowance (T-141) should be a number before you quote anyone.
+
+**The costs that are not hosting.** The repository holds no figure for any of these, and they are the large ones:
+
+- **The lawyer:** 32 questions and three documents (terms, a privacy policy, a pilot agreement). **The accountant:** six questions. Ask each for a fixed price against the written brief.
+- **A company,** its yearly upkeep, insurance, registering the name. Only questions so far.
+- **An outside security review** before stage 5 (T-181).
+- **The AI plan that builds and maintains the product.** `STATUS.md` speaks of the week's allowance and says extra usage "costs money, so that stays yours"; it gives no dollar figure. This cost does not end at launch: fixes and changes will be made the same way.
+- **Your time:** quoting each league by hand (B-4); answering support within one business day (B-8); watching the first game nights (T-160); a supervised session for every change to the real service, because AI sessions may not touch it (T-201); and gathering TCSAAL's fixtures and results by hand, "a few hours… repeated as results come in" (P9 section 3).
+
+**What this means for the price.** At ten leagues, hosting is covered by $10 to $20 a league a month. So hosting is not what the price has to cover. The professionals, the build and your own time are. A real break-even needs their figures, which only you can get.
