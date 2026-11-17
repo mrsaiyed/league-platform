@@ -82,8 +82,10 @@ export function databasePublicStats(
         (work) => inLeague(leagueId, (scope) => work(database.standingsReadStore(scope))),
         false,
       ),
-    // The standings' five reads in one snapshot of the season (above), never a table
-    // half from before a result and half from after it.
+    // The standings' reads in one snapshot of the season (above), never a table half from
+    // before a result and half from after it: the season, its teams, divisions, rows and
+    // adjustments, and its decided games' teams when head-to-head separated two level
+    // teams (step 2.195: their notes count the games between them).
     standingsOf: (leagueId, seasonId) =>
       isId(seasonId)
         ? inLeague(leagueId, (scope) =>
@@ -138,6 +140,7 @@ function readStore(
       isId(seasonId)
         ? read((store) => store.decidedGamesOf(seasonId, personIds.filter(isId)))
         : Promise.resolve([]),
+    decidedGames: ofSeason([], (store, id) => store.decidedGames(id)),
     teamStatTotals: ofSeason([], (store, id) => store.teamStatTotals(id)),
     teamTurnoverGames: ofSeason([], (store, id) => store.teamTurnoverGames(id)),
     people: async (personIds) => {

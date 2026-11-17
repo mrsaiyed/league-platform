@@ -26,6 +26,22 @@ export function withoutMercyOrLastMinutes(rules: SeasonRules): SeasonRules {
   return { ...rules, clock: { ...clock, stopClockLastSeconds: null, mercyLead: null } };
 }
 
+/**
+ * The rules for a game brought over from the Al-Hadi tracker (the transfer, step 2.58):
+ * without the mercy lead and the last-minutes stop clock, and with the tracker's own way
+ * of counting minutes when the clock is set, so it keeps the tracker's numbers (S-71,
+ * record 077).
+ */
+export function trackerEngineRulesOf(rules: SeasonRules): basketball.Rules {
+  const { minutesFollow: _minutes, ...asTracked } = engineRulesOf(withoutMercyOrLastMinutes(rules));
+  return asTracked;
+}
+
+/**
+ * Every game of the new product counts minutes on the game clock (S-71): a clock set
+ * wrongly and put right changes nothing. It is not a league's setting, since there is
+ * one right answer; a game saved before it keeps the rules it was saved with (S-1).
+ */
 export function engineRulesOf(rules: SeasonRules): basketball.Rules {
   const { stopClockLastSeconds, stopClockScope, mercyLead } = rules.clock;
   const { playerFoulLimit } = rules.fouls;
@@ -46,5 +62,6 @@ export function engineRulesOf(rules: SeasonRules): basketball.Rules {
     ...(stopClockLastSeconds === null || stopClockScope === undefined ? {} : { stopClockScope }),
     ...(mercyLead === null ? {} : { mercyLead }),
     ...(playerFoulLimit === null ? {} : { playerFoulLimit }),
+    minutesFollow: 'game-clock',
   };
 }

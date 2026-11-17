@@ -82,6 +82,14 @@ export type DecidedGameLines = {
   }[];
 };
 
+/** A decided game of the season, its teams only: what the standings' notes count meetings from. */
+export type DecidedGameRecord = {
+  readonly gameId: string;
+  readonly status: string;
+  readonly homeTeamId: string;
+  readonly awayTeamId: string;
+};
+
 /** One stat of one team over its final games, summed over its players' lines. */
 export type TeamStatTotalRecord = {
   readonly teamId: string;
@@ -138,6 +146,8 @@ export type StandingsReadStore = {
     seasonId: string,
     personIds: readonly string[],
   ) => Promise<readonly DecidedGameLines[]>;
+  /** The season's decided games (not in the bin), their teams only, no box score line. */
+  readonly decidedGames: (seasonId: string) => Promise<readonly DecidedGameRecord[]>;
   readonly teamStatTotals: (seasonId: string) => Promise<readonly TeamStatTotalRecord[]>;
   /** Each team's own turnovers in each of the season's final games, not in the bin. */
   readonly teamTurnoverGames: (seasonId: string) => Promise<readonly TeamOwnTurnoversRecord[]>;

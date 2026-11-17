@@ -1,7 +1,10 @@
 import { SeasonRules, seasonRulesPreset } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
-import { engineRulesOf, withoutMercyOrLastMinutes } from './engine-rules.ts';
+import { engineRulesOf, trackerEngineRulesOf, withoutMercyOrLastMinutes } from './engine-rules.ts';
+
+// Every game of the new product counts minutes on the game clock (S-71, record 077).
+const gameClock = { minutesFollow: 'game-clock' } as const;
 
 describe("a season's rules as the engine reads them (T-128, S-1)", () => {
   it('the high-school preset is the engine’s quarters format, with a stop clock', () => {
@@ -10,6 +13,7 @@ describe("a season's rules as the engine reads them (T-128, S-1)", () => {
       clockMode: 'stop',
       // The preset's limit (P7 §1), carried since step 2.122.
       playerFoulLimit: 5,
+      ...gameClock,
     });
   });
 
@@ -18,7 +22,23 @@ describe("a season's rules as the engine reads them (T-128, S-1)", () => {
       ...basketball.HALVES,
       clockMode: 'running',
       playerFoulLimit: 5,
+      ...gameClock,
     });
+  });
+
+  it('counts minutes on the game clock, whatever the season, and the tracker’s way for a game brought over', () => {
+    for (const preset of ['high-school', 'rec-league', 'custom'] as const) {
+      expect(engineRulesOf(seasonRulesPreset(preset)).minutesFollow).toBe('game-clock');
+      const tracked = trackerEngineRulesOf(seasonRulesPreset(preset));
+      expect(Object.hasOwn(tracked, 'minutesFollow')).toBe(false);
+      expect(tracked).toEqual(
+        Object.fromEntries(
+          Object.entries(
+            engineRulesOf(withoutMercyOrLastMinutes(seasonRulesPreset(preset))),
+          ).filter(([key]) => key !== 'minutesFollow'),
+        ),
+      );
+    }
   });
 
   it('carries every value the admin set', () => {
@@ -40,6 +60,7 @@ describe("a season's rules as the engine reads them (T-128, S-1)", () => {
       timeoutsCarry: true,
       clockMode: 'stop',
       playerFoulLimit: 5,
+      ...gameClock,
     });
   });
 
@@ -74,7 +95,7 @@ describe("a season's rules as the engine reads them (T-128, S-1)", () => {
     };
     rules.fouls = { ...rules.fouls, playerFoulLimit: null };
     const engine = engineRulesOf(rules);
-    expect(engine).toEqual({ ...basketball.HALVES, clockMode: 'running' });
+    expect(engine).toEqual({ ...basketball.HALVES, clockMode: 'running', ...gameClock });
     for (const key of ['stopClockLastSeconds', 'stopClockScope', 'mercyLead', 'playerFoulLimit']) {
       expect(Object.hasOwn(engine, key), key).toBe(false);
     }
@@ -95,7 +116,16 @@ describe("a season's rules as the engine reads them (T-128, S-1)", () => {
       { type: 'rules', rules: engine },
       { id: 'r', now: 0 },
     );
-    expect(set.rules).toEqual(engine);
+    // The format is kept whole; how minutes are counted is never a format's to change
+    // (the engine's checkRules leaves it out), so a game keeps its own.
+    const { minutesFollow: _minutes, ...format } = engine;
+    expect(set.rules).toEqual(format);
+    const ours = basketball.apply(
+      basketball.newGame(engine, 0),
+      { type: 'rules', rules: engine },
+      { id: 'r', now: 0 },
+    );
+    expect(ours.rules).toEqual(engine);
   });
 
   it('without the mercy rule and the last-minutes stop clock, for a game played without them (record 062)', () => {
@@ -105,7 +135,7 @@ describe("a season's rules as the engine reads them (T-128, S-1)", () => {
     const played = withoutMercyOrLastMinutes(stop);
     expect(SeasonRules.safeParse(played).success).toBe(true);
     expect(played).toEqual({ ...stop, clock: { ...stop.clock, mercyLead: null } });
-    expect(engineRulesOf(played)).toEqual({
+    expect(trackerEngineRulesOf(stop)).toEqual({
       ...basketball.QUARTERS,
       clockMode: 'stop',
       playerFoulLimit: 4,

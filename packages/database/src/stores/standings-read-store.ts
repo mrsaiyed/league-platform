@@ -51,6 +51,14 @@ export function standingsReadStore(scope: LeagueScope): StandingsReadStore {
         lines: lines.filter((line) => line.gameId === game.id && wanted.has(line.personId)),
       }));
     },
+    // Its teams only, for the standings' notes: no box score line is read.
+    decidedGames: async (seasonId) =>
+      (await listDecidedGames(scope, seasonId)).map((game) => ({
+        gameId: game.id,
+        status: game.status,
+        homeTeamId: game.homeTeamId,
+        awayTeamId: game.awayTeamId,
+      })),
     teamStatTotals: (seasonId) => listTeamStatTotals(scope, seasonId),
     teamTurnoverGames: (seasonId) => listTeamTurnoverGames(scope, seasonId),
     people: (personIds) => listPeopleForDisplay(scope, personIds),
