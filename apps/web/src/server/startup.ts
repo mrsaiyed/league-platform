@@ -94,7 +94,9 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       ...(config.LOCAL_NOW === undefined ? {} : { worldStartsAt: config.LOCAL_NOW }),
       keptEmailsFolder: deps.keptEmailsFolder ?? null,
     };
-    if (config.LOCAL_DATA === 'made-up-database') return onMadeUpDatabase(options, deps);
+    if (config.LOCAL_DATA === 'made-up-database') {
+      return onMadeUpDatabase(options, deps, config.LOCAL_DEMO_LEAGUE === 'on');
+    }
     const ports = standInPorts(options);
     await ports.signUpMadeUpMember();
     await ports.signUpMadeUpStaff();
@@ -231,14 +233,22 @@ export function madeUpPeopleLeagues(
 }
 
 /** Local work and tests on the made-up database in memory (record 055). */
-async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Promise<WebPorts> {
+async function onMadeUpDatabase(
+  options: StandInOptions,
+  deps: StartupDeps,
+  demoLeague: boolean,
+): Promise<WebPorts> {
   // The sign-in stand-in first: it refuses a site address that is not local or a test name.
   const signIn = standInSignIn(options);
   const database = await deps.database();
   // Each seed league's season under way, with its venue and one game scored live, so the
-  // public pages have something to show, and the seed's demo-shaped league with its whole
-  // season played (step 2.59).
-  const made = await database.madeUpDatabase({ underWay: true, tracked: true, demo: true });
+  // public pages have something to show; and, with LOCAL_DEMO_LEAGUE=on only, the seed's
+  // demo-shaped league with its whole season played (step 2.59), which takes some seconds.
+  const made = await database.madeUpDatabase({
+    underWay: true,
+    tracked: true,
+    demo: demoLeague,
+  });
   const db = database.createDatabase(made.source);
   try {
     const problems = await database.checkLoginRole(db);
@@ -265,7 +275,11 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
     // The kept emails, and the seed leagues' people to sign in as by a code (step 2.96).
     // With them the ports answer only requests made on this computer, as the stand-in's.
     localTools: {
-      tools: madeUpDatabaseTools(madeUpPeopleLeagues(database), standInMember, signIn),
+      tools: madeUpDatabaseTools(
+        demoLeague ? madeUpPeopleLeagues(database) : database.seedLeagues,
+        standInMember,
+        signIn,
+      ),
       publicBaseUrl: options.publicBaseUrl,
     },
     reportDesign: (message, fields) => deps.warn?.(message, fields),
