@@ -10,7 +10,7 @@ import {
 import { t } from '../../../server/messages.ts';
 import { googleAction, signInAction } from '../../../server/sign-in/actions.ts';
 import { safeReturnPath } from '../../../server/sign-in/device.ts';
-import { botCheckWidget } from '../../../server/sign-in/next-visit.ts';
+import { botCheckOnPage } from '../../../server/sign-in/next-visit.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
 import { returnLeagueOf } from '../../../server/sign-in/return-league.ts';
 
@@ -22,7 +22,7 @@ export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const next = safeReturnPath(search['next']);
   const from = await returnLeagueOf(next);
-  const widget = await botCheckWidget();
+  const botCheck = await botCheckOnPage();
   return (
     <SignInScreen
       title="page.signIn"
@@ -33,7 +33,7 @@ export default async function Page({ searchParams }: SearchProps) {
         <NextField next={next} />
         <EmailField />
         <PasswordField />
-        <BotCheckField widget={widget} action="sign-in" />
+        <BotCheckField {...botCheck} action="sign-in" />
         <SubmitButton words="signIn.submit" />
       </form>
       <p>

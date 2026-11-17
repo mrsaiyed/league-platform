@@ -4,6 +4,7 @@ import type { BotCheckWidget } from '@srleagues/providers';
 import { cookies, headers } from 'next/headers';
 import { getConfig } from '../config.ts';
 import { webPorts } from '../container.ts';
+import { nonceOf } from '../security-headers.ts';
 import { networkAddressOf, type Visit } from './device.ts';
 import type { FlowDeps } from './flows.ts';
 
@@ -25,9 +26,16 @@ export async function nextVisit(): Promise<Visit> {
   };
 }
 
-/** The bot check's widget, for a sign-in form to draw (T4 §6, record 081). */
-export async function botCheckWidget(): Promise<BotCheckWidget> {
-  return (await webPorts()).botCheck.widget;
+/**
+ * The bot check's widget, for a sign-in form to draw (T4 §6, record 081), and this
+ * answer's script nonce (security-headers.ts), which Turnstile's script must carry to run.
+ */
+export async function botCheckOnPage(): Promise<{
+  readonly widget: BotCheckWidget;
+  readonly nonce: string | undefined;
+}> {
+  const policy = (await headers()).get('content-security-policy');
+  return { widget: (await webPorts()).botCheck.widget, nonce: nonceOf(policy) };
 }
 
 /** Whether the site is on HTTPS, so its cookies are Secure (T-69). */

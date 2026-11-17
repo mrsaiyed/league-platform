@@ -920,10 +920,56 @@ const cases = [
 // Sent with every answer, refusals and forwards included (apps/web/next.config.ts).
 const securityHeaders = {
   'x-frame-options': 'DENY',
-  'content-security-policy': "frame-ancestors 'none'",
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
 };
+
+/**
+ * The script policy every answer the proxy handles carries (T-79, record 081): scripts only
+ * from our own address or with the answer's own nonce, no plugins, no <base>, no frames, and
+ * never in another site's frame. The nonce is 18 random bytes, written as 24 characters.
+ */
+const scriptPolicy =
+  /^script-src 'self' 'nonce-([A-Za-z0-9+/]{24})'; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'$/;
+
+/** Every nonce an answer has carried: none may come twice (security-headers.ts, newNonce). */
+const noncesSeen = new Set();
+
+/**
+ * What is wrong with one answer's script policy: not the policy above, a nonce an earlier
+ * answer had, or a page with a script that does not carry the answer's own nonce (it would
+ * not run). Every <script> of a page is counted, inline or not.
+ */
+function policyProblems(label, response, text) {
+  const policy = response.headers.get('content-security-policy') ?? '';
+  const nonce = scriptPolicy.exec(policy)?.[1];
+  if (nonce === undefined) return [`${label}: content-security-policy is "${policy}"`];
+  const found = [];
+  if (noncesSeen.has(nonce)) found.push(`${label}: a nonce came twice`);
+  noncesSeen.add(nonce);
+  if ((response.headers.get('content-type') ?? '').includes('text/html')) {
+    for (const [tag] of text.matchAll(/<script\b[^>]*>/g)) {
+      if (!tag.includes(` nonce="${nonce}"`)) found.push(`${label}: a script without its nonce`);
+    }
+  }
+  return found;
+}
+
+/**
+ * An answer's text with its own nonce, the one random part of it, put in one place, so two
+ * answers can be compared byte for byte: only after checking that the header's nonce is the
+ * one every script of the page carries, so nothing else is hidden by it.
+ */
+function oneNonce(headers, body, found, label) {
+  const nonce = /'nonce-([A-Za-z0-9+/=]+)'/.exec(headers)?.[1];
+  const inBody = [...body.matchAll(/ nonce="([^"]*)"/g)].map((m) => m[1]);
+  if (nonce === undefined || inBody.some((n) => n !== nonce)) {
+    found.push(`${label}: its scripts do not all carry the nonce of its policy`);
+  }
+  const same = (text) => (nonce === undefined ? text : text.replaceAll(nonce, '{nonce}'));
+  return { headers: same(headers), body: same(body) };
+}
 
 /** [who, address asked, address header the browser sends]: all must be "not found". */
 const spoofs = [
@@ -991,6 +1037,7 @@ try {
     for (const [name, value] of Object.entries(securityHeaders)) {
       if (response.headers.get(name) !== value) failures.push(`${label}: ${name} not "${value}"`);
     }
+    failures.push(...policyProblems(label, response, text));
     if (!response.headers.get('permissions-policy')?.includes('camera=()')) {
       failures.push(`${label}: no permissions-policy`);
     }
@@ -1023,6 +1070,7 @@ try {
   failures.push(...(await sameAsNoLeague(origin)));
   failures.push(...(await scoringSameAsNoLeague(origin)));
   failures.push(...(await checkStylesheets(origin)));
+  failures.push(...(await checkScriptPolicy(origin)));
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
   failures.push(...(await checkSettings(origin)));
@@ -1168,7 +1216,7 @@ function freePort() {
 function settle(body) {
   const pieces = [];
   const markup = body.replace(
-    /<script>self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)<\/script>/g,
+    /<script(?: nonce="[^"]*")?>self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)<\/script>/g,
     (_, piece) => {
       pieces.push(JSON.parse(piece));
       return '';
@@ -1202,11 +1250,11 @@ async function sameAsNoLeague(origin) {
       .map(([header, value]) => `${header}: ${value.replaceAll(name, '{name}')}`)
       .join('\n');
     const body = (await response.text()).replaceAll(name, '{name}');
-    return { status: response.status, headers, body };
+    return { status: response.status, ...oneNonce(headers, body, found, name) };
   };
+  const found = [];
   const draft = await ask('quiet-pines');
   const nobody = await ask('nobody-has-this');
-  const found = [];
   if (draft.status !== 404 || nobody.status !== 404) {
     found.push(`draft and no league answer ${draft.status} and ${nobody.status}, not 404`);
   }
@@ -1222,6 +1270,89 @@ async function sameAsNoLeague(origin) {
   }
   if (a.rows !== b.rows) {
     found.push(`a draft's page data differs from no league's ${firstDifference(a.rows, b.rows)}`);
+  }
+  return found;
+}
+
+/**
+ * The script policy and HTTPS on the answers the cases above do not reach (T-79, record
+ * 081): the static files and the two stylesheets, which the proxy never sees (the fixed
+ * policy: no nonce, so nothing inline runs), the live feed, which must still stream, a
+ * form's answer, the plain page for a request passed on by another server, and a request
+ * that brings a policy of its own with a nonce it chose, which must be thrown away.
+ */
+async function checkScriptPolicy(origin) {
+  const found = [];
+  const fixed =
+    "script-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; frame-ancestors 'none'";
+  const https = securityHeaders['strict-transport-security'];
+  const home = await (await fetch(`${origin}/north-valley`)).text();
+  const chunk = /<script src="(\/_next\/static\/[^"]+\.js)"/.exec(home)?.[1];
+  if (chunk === undefined) found.push('no script file named in a page');
+  for (const address of [
+    chunk ?? '/_next/static/none.js',
+    '/display.css',
+    '/standalone.css',
+    '/favicon.ico',
+    '/_next/static/none.js',
+  ]) {
+    const response = await fetch(origin + address, { redirect: 'manual' });
+    await response.arrayBuffer();
+    if (response.headers.get('content-security-policy') !== fixed) {
+      found.push(
+        `${address}: content-security-policy "${response.headers.get('content-security-policy')}"`,
+      );
+    }
+    if (response.headers.get('strict-transport-security') !== https) {
+      found.push(`${address}: no strict-transport-security`);
+    }
+  }
+  // The live feed still streams: its first bytes arrive, with the policy and HTTPS on it.
+  const channel = encodeURIComponent(`league:${northValley}:game:${liveGame}`);
+  const stop = new AbortController();
+  const live = await fetch(`${origin}/api/v1/live?channel=${channel}`, { signal: stop.signal });
+  found.push(...policyProblems('the live feed', live, ''));
+  if (live.headers.get('strict-transport-security') !== https)
+    found.push('the live feed: no strict-transport-security');
+  if (
+    live.status !== 200 ||
+    !(live.headers.get('content-type') ?? '').includes('text/event-stream')
+  ) {
+    found.push(`the live feed answers ${live.status} ${live.headers.get('content-type')}`);
+  } else {
+    const first = await Promise.race([
+      live.body
+        .getReader()
+        .read()
+        .then(() => 'streamed'),
+      new Promise((resolve) => setTimeout(() => resolve('nothing in 20 seconds'), 20_000)),
+    ]);
+    if (first !== 'streamed') found.push(`the live feed sent ${first}`);
+  }
+  stop.abort();
+  // A request passed on by another server gets the plain page, which has no script: the
+  // fixed policy, and HTTPS.
+  const passedOn = await fetch(`${origin}/north-valley`, { headers: { via: '1.1 a-proxy' } });
+  await passedOn.text();
+  if (passedOn.status !== 421 || passedOn.headers.get('content-security-policy') !== fixed) {
+    found.push(
+      `the page for a request passed on: ${passedOn.status}, "${passedOn.headers.get('content-security-policy')}"`,
+    );
+  }
+  if (passedOn.headers.get('strict-transport-security') !== https)
+    found.push('the page for a request passed on: no strict-transport-security');
+  // A policy the browser sends, with a nonce it chose, is replaced: its nonce is on nothing.
+  const chosen = 'AAAAAAAAAAAAAAAAAAAAAAAA';
+  const brought = await fetch(`${origin}/north-valley`, {
+    headers: { 'content-security-policy': `script-src 'nonce-${chosen}'` },
+  });
+  const broughtPage = await brought.text();
+  found.push(...policyProblems('a page asked with a policy of its own', brought, broughtPage));
+  if (
+    broughtPage.includes(chosen) ||
+    (brought.headers.get('content-security-policy') ?? '').includes(chosen)
+  ) {
+    found.push('a nonce the browser chose was used');
   }
   return found;
 }
@@ -1263,7 +1394,8 @@ async function scoringSameAsNoLeague(origin) {
       .filter(([header]) => !['date', 'content-length'].includes(header))
       .map(([header, value]) => `${header}: ${value}`)
       .join('\n');
-    return { status: response.status, headers, body: await response.text() };
+    const body = await response.text();
+    return { status: response.status, ...oneNonce(headers, body, found, `${who} ${leagueId}`) };
   };
   const found = [];
   for (const [who, hidden] of Object.entries(hiddenFrom)) {
@@ -1288,11 +1420,15 @@ async function scoringSameAsNoLeague(origin) {
   );
   const snapshotAnswer = {
     status: snapshot.status,
-    headers: [...snapshot.headers]
-      .filter(([header]) => !['date', 'content-length'].includes(header))
-      .map(([header, value]) => `${header}: ${value}`)
-      .join('\n'),
-    body: await snapshot.text(),
+    ...oneNonce(
+      [...snapshot.headers]
+        .filter(([header]) => !['date', 'content-length'].includes(header))
+        .map(([header, value]) => `${header}: ${value}`)
+        .join('\n'),
+      await snapshot.text(),
+      found,
+      'the snapshot',
+    ),
   };
   const scoringAnswer = await ask('visitor', leagues.draft);
   if (JSON.stringify(scoringAnswer) !== JSON.stringify(snapshotAnswer)) {
@@ -1790,6 +1926,7 @@ async function checkSignIn(origin) {
         to: where(response),
         cookies: cookieNamesOf(response),
       });
+      problems.push(...policyProblems(`${page}'s form`, response, ''));
       for (const cookie of response.headers.getSetCookie()) {
         if (!/HttpOnly/i.test(cookie) || !/SameSite=lax/i.test(cookie)) {
           problems.push(
