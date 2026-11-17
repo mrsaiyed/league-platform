@@ -25,7 +25,7 @@ import {
   trackerWorld,
 } from '../../server/tracker-endpoints.test-helper.ts';
 import { GameList, gameView } from '../schedule-pages/index.ts';
-import { boardFinalText, buildBoxScores, buildPlays, gameTitle, gameWords } from './build-game.ts';
+import { boardFinalPill, buildBoxScores, buildPlays, gameTitle, gameWords } from './build-game.ts';
 import { GameContent, type GameView } from './game-content.tsx';
 
 type World = ReturnType<typeof trackerWorld>;
@@ -109,7 +109,7 @@ async function pageHtml(world: World) {
     selfAddress: '/self',
     boxScores: snapshot.value.status === 'final' ? buildBoxScores(page.value) : null,
     plays: buildPlays(page.value, gameWords()),
-    board: { colors: { home: null, away: null }, finalText: boardFinalText(page.value) },
+    board: { colors: { home: null, away: null }, finalPill: boardFinalPill(page.value) },
   };
   return { html: renderToStaticMarkup(createElement(GameContent, { view })), page: page.value };
 }
@@ -127,7 +127,22 @@ async function cardHtml(world: World, seasonId: string) {
 }
 
 /** The pill of the one card or board drawn. */
-const pillOf = (html: string) => /<span class="ui-game-state">([^<]*)<\/span>/.exec(html)?.[1];
+/**
+ * The pill of the one card or board drawn: its drawn letters, and what a screen reader is
+ * told in their place ("Final" alone is both).
+ */
+const pillOf = (html: string) => {
+  const marked =
+    /<span class="ui-game-state"><span aria-hidden="true">([^<]*)<\/span><span class="ui-visually-hidden">([^<]*)<\/span><\/span>/.exec(
+      html,
+    );
+  if (marked !== null) return marked[1];
+  return /<span class="ui-game-state">([^<]*)<\/span>/.exec(html)?.[1];
+};
+const saidOf = (html: string) =>
+  /<span class="ui-game-state"><span aria-hidden="true">[^<]*<\/span><span class="ui-visually-hidden">([^<]*)<\/span>/.exec(
+    html,
+  )?.[1];
 
 describe('overtime on the result (step 2.200)', () => {
   it('case 44 reads "Final, OT" on its page and on its card', async () => {
@@ -139,9 +154,12 @@ describe('overtime on the result (step 2.200)', () => {
     // The big board: as quiet as a plain "Final".
     expect(html).toContain('data-state="final" data-pill="quiet"');
     expect(pillOf(html)).toBe('Final, OT');
+    // A screen reader is told the words, on the board as on the card.
+    expect(saidOf(html)).toBe('Final after overtime');
     // Its card, and the words its link says to a screen reader.
     const card = await cardHtml(world, page.game.seasonId);
     expect(pillOf(card)).toBe('Final, OT');
+    expect(saidOf(card)).toBe('Final after overtime');
     expect(card).toContain('data-status="final"');
     expect(card).toContain('Bears against Hawks, final after overtime, 2 to 5');
   });
@@ -166,6 +184,7 @@ describe('overtime on the result (step 2.200)', () => {
     expect(pillOf(html)).toBe('Final, 2OT');
     const card = await cardHtml(world, page.game.seasonId);
     expect(pillOf(card)).toBe('Final, 2OT');
+    expect(saidOf(card)).toBe('Final after 2 overtimes');
     expect(card).toContain('Bears against Hawks, final after 2 overtimes, 5 to 2');
   });
 

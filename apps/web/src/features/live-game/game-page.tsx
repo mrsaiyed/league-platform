@@ -21,7 +21,7 @@ import { placeOf } from '../schedule-pages/index.ts';
 import { loadTeamCardsOf } from '../team-pages/index.ts';
 import {
   boardColors,
-  boardFinalText,
+  boardFinalPill,
   boardWhen,
   buildBoxScores,
   buildPlays,
@@ -114,7 +114,7 @@ export async function GamePage({
           ...(when === undefined ? {} : { when }),
           ...(place === undefined ? {} : { placeText: place }),
           // "Final, OT" for a game won in overtime (P7 §5.6); "Final" alone otherwise.
-          finalText: boardFinalText(page.value),
+          finalPill: boardFinalPill(page.value),
         },
         teams,
       }}

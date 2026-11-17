@@ -6,7 +6,7 @@
 // games the scorekeeper is assigned to (P7 §5.1). Shown on the admin's home to anyone
 // whose only area of the admin is Games; everyone else gets the admin's home as before.
 import { leagueUrl, listMyGames, platformUrl, type MyGame } from '@srleagues/core';
-import { displayLabels, finalPillText } from '@srleagues/site';
+import { displayLabels, finalPillOf } from '@srleagues/site';
 import { EmptyPanel, GameCard, PageHead, type GameStatus } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
@@ -92,7 +92,7 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
                   home={{ name: names[game.homeTeamId] ?? '', score: game.homeScore }}
                   away={{ name: names[game.awayTeamId] ?? '', score: game.awayScore }}
                   status={statusOf(game.status)}
-                  finalText={finalPillText(t, game.overtimePeriods)}
+                  finalPill={finalPillOf(t, game.overtimePeriods)}
                   whenText={gameWhenText(game.startsAt, times, { today: game.isToday })}
                   labels={labels}
                 />

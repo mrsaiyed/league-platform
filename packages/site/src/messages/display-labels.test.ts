@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { displayLabels, finalLinkState, finalPillText } from './display-labels.ts';
+import { displayLabels, finalLinkState, finalPillOf } from './display-labels.ts';
 import { createTranslator } from './messages.ts';
 
 describe('display labels', () => {
@@ -18,11 +18,11 @@ describe('display labels', () => {
 
   it('words a final game that went to overtime, and nothing more for one that did not (step 2.200)', () => {
     const t = createTranslator('en');
-    expect(finalPillText(t, 1)).toBe('Final, OT');
-    expect(finalPillText(t, 2)).toBe('Final, 2OT');
-    expect(finalPillText(t, 3)).toBe('Final, 3OT');
-    expect(finalPillText(t, 0)).toBeUndefined();
-    expect(finalPillText(t, null)).toBeUndefined();
+    expect(finalPillOf(t, 1)).toEqual({ text: 'Final, OT', said: 'Final after overtime' });
+    expect(finalPillOf(t, 2)).toEqual({ text: 'Final, 2OT', said: 'Final after 2 overtimes' });
+    expect(finalPillOf(t, 3)?.text).toBe('Final, 3OT');
+    expect(finalPillOf(t, 0)).toBeUndefined();
+    expect(finalPillOf(t, null)).toBeUndefined();
     expect(finalLinkState(t, 1)).toBe('final after overtime');
     expect(finalLinkState(t, 2)).toBe('final after 2 overtimes');
     expect(finalLinkState(t, 0)).toBeUndefined();

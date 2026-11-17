@@ -52,7 +52,7 @@ export function applyUpdate(
   overtime?: OvertimeWords,
 ): GameView {
   if (update === undefined) return game;
-  const { finalText, finalSaid, ...rest } = game;
+  const { finalPill, finalSaid, ...rest } = game;
   const moved = {
     ...rest,
     status: update.status,
@@ -65,7 +65,7 @@ export function applyUpdate(
     const said = count > 0 ? overtime.said[count] : undefined;
     return {
       ...moved,
-      ...(pill === undefined || pill === '' ? {} : { finalText: pill }),
+      ...(pill === undefined || pill === null ? {} : { finalPill: pill }),
       ...(said === undefined || said === '' ? {} : { finalSaid: said }),
     };
   }
@@ -76,7 +76,7 @@ export function applyUpdate(
     update.away === game.away.score;
   return {
     ...moved,
-    ...(sameResult && finalText !== undefined ? { finalText } : {}),
+    ...(sameResult && finalPill !== undefined ? { finalPill } : {}),
     ...(sameResult && finalSaid !== undefined ? { finalSaid } : {}),
   };
 }
@@ -199,7 +199,7 @@ export function LiveGameList({
                 home={g.home}
                 away={g.away}
                 status={g.status}
-                finalText={g.finalText}
+                finalPill={g.finalPill}
                 whenText={
                   // A board's pill says "Postponed", so its date line need not: the shorter
                   // line is drawn there (and only while the game is still postponed).

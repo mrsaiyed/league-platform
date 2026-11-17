@@ -241,7 +241,7 @@ describe('a game card in any state', () => {
           home: { name: 'Birch', score: 5 },
           away: { name: 'Aspen', score: 2 },
           status,
-          finalText: 'Final, OT',
+          finalPill: { text: 'Final, OT', said: 'Final after overtime' },
           whenText: 'Sat 9:00',
           labels: cardLabels,
           layout,
@@ -250,13 +250,16 @@ describe('a game card in any state', () => {
     for (const layout of ['rows', 'board'] as const) {
       const final = card('final', layout);
       expect(final, layout).toContain('data-status="final"');
-      expect(final, layout).toContain('<span class="ui-game-state">Final, OT</span>');
+      // The letters for the eye, the words for a screen reader (step 2.200).
+      expect(final, layout).toContain(
+        '<span class="ui-game-state"><span aria-hidden="true">Final, OT</span><span class="ui-visually-hidden">Final after overtime</span></span>',
+      );
       expect(final, layout).not.toContain('>Final<');
       expect(card('forfeit', layout), layout).toContain(
         '<span class="ui-game-state">Forfeit</span>',
       );
-      expect(card('forfeit', layout), layout).not.toContain('Final, OT');
-      expect(card('live', layout), layout).not.toContain('Final, OT');
+      expect(card('forfeit', layout), layout).not.toContain('overtime');
+      expect(card('live', layout), layout).not.toContain('overtime');
     }
     // Without the words, a final game says "Final" alone.
     const plain = render(

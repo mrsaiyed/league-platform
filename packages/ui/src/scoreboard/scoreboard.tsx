@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { Emblem } from '../emblem/emblem.tsx';
+import { FinalPillWords, type FinalPill } from '../game-card/game-card.tsx';
 import { LiveMarker } from '../live-marker/live-marker.tsx';
 import { safeColor } from '../team-color.ts';
 
@@ -34,11 +35,11 @@ export type ScoreboardProps = {
    */
   readonly stateText?: string | undefined;
   /**
-   * What a final game's pill says in place of "Final", already written by the page:
-   * "Final, OT" for a game won in overtime (P7 §5.6). As quiet as "Final"; a `stateText`
-   * (a forfeit) goes before it.
+   * What a final game's pill says in place of "Final": "Final, OT" for a game won in
+   * overtime (P7 §5.6), "Final after overtime" to a screen reader. As quiet as "Final";
+   * a `stateText` (a forfeit) goes before it.
    */
-  readonly finalText?: string | undefined;
+  readonly finalPill?: FinalPill | undefined;
   /** For a game still to play: its day and, when it has one, its time, between the teams. */
   readonly when?: { readonly day: string; readonly time?: string | undefined } | undefined;
   /** Where the game is played, already written by the page. */
@@ -91,7 +92,7 @@ export function Scoreboard({
   state,
   periodText,
   stateText,
-  finalText,
+  finalPill,
   when,
   placeText,
   noteText,
@@ -102,7 +103,13 @@ export function Scoreboard({
   const decided = state === 'final' && home.score !== null && away.score !== null;
   const homeWins = decided && home.score > away.score;
   const awayWins = decided && away.score > home.score;
-  const pill = stateText ?? (state === 'final' ? finalText || labels.final : undefined);
+  const pill =
+    stateText ??
+    (state !== 'final' ? undefined : finalPill ? (
+      <FinalPillWords pill={finalPill} />
+    ) : (
+      labels.final
+    ));
   return (
     <section
       className="ui-scoreboard"

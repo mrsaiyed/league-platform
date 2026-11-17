@@ -15,6 +15,7 @@ import {
   type BoxScoreColumn,
   type BoxScoreLabels,
   type BoxScorePlayer,
+  type FinalPill,
   type ScoreboardLabels,
 } from '@srleagues/ui';
 import { useEffect, useRef, useState } from 'react';
@@ -87,7 +88,7 @@ export type LiveGameBoard = {
    * A final game won in overtime: its pill, "Final, OT" (P7 §5.6), as the result the page
    * was drawn with keeps it. Drawn only while the game is still that result.
    */
-  readonly finalText?: string | undefined;
+  readonly finalPill?: FinalPill | undefined;
 };
 
 type Side = 'home' | 'away';
@@ -274,9 +275,9 @@ export function LiveGameView({
         stateText={game.status === 'live' ? undefined : board?.stateText}
         // The result's overtime as the page was drawn: only while it is still that result
         // (a game reopened since is drawn again from the server, redrawsFor).
-        finalText={
+        finalPill={
           game.status === 'final' && game.sequence === initial.sequence
-            ? board?.finalText
+            ? board?.finalPill
             : undefined
         }
         when={started ? undefined : board?.when}
