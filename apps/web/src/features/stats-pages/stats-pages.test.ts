@@ -527,6 +527,7 @@ describe('statistics page', () => {
         { teamId: wolves, statKey: 'fg1', ...entry(1) },
         { teamId: wolves, statKey: 'fouls', ...entry(1) },
       ],
+      teamTurnoverGames: async () => [],
       people: async (ids) =>
         ids.map((id) => ({
           id,
@@ -563,6 +564,43 @@ describe('statistics page', () => {
     );
     // Every statistic here was kept in the one game each team has numbers from.
     expect(text).not.toContain('averaged over the games where it was');
+    // Each team's totals are its players' numbers added up: nothing to say (step 2.196).
+    const teamsCountMore = "A team's totals count what was charged to the team";
+    expect(data.tableNotes.join(' ')).not.toContain(teamsCountMore);
+    const notesWith = async (over: Partial<StandingsReadStore>) => {
+      const read = await loadStatsPage(
+        { ...store, ...over },
+        { audience: 'adult', namePolicy: defaultNamePolicy, minimumGames: 3 },
+        { leagueId: adult, seasonId: season, by: 'average' },
+      );
+      if ('code' in read) throw new Error(read.code);
+      return read.tableNotes;
+    };
+    // A turnover charged to the Ravens, in a season that keeps no turnovers: no column
+    // shows it, so still nothing to say.
+    expect(
+      (
+        await notesWith({
+          teamTurnoverGames: async () => [
+            { gameId: 'g1', teamId: ravens, turnovers: 1, countedByLines: true },
+          ],
+        })
+      ).join(' '),
+    ).not.toContain(teamsCountMore);
+    // The Ravens' points a final score entered as 9 where their players add to 7: said
+    // once, after the page's other sentences.
+    const typed = await notesWith({
+      teamStatTotals: async (id) =>
+        (await store.teamStatTotals(id)).map((row) =>
+          row.teamId === ravens && row.statKey === 'points'
+            ? { ...row, total: 9, linesTotal: 7 }
+            : row,
+        ),
+    });
+    expect(typed.at(-1)).toBe(
+      "A team's totals count what was charged to the team and the final scores as entered, so they can differ from what its players' numbers add up to.",
+    );
+    expect(typed.filter((note) => note.startsWith(teamsCountMore))).toHaveLength(1);
     expect(text).toContain('<span class="ui-visually-hidden">Games with statistics</span>');
     // Season totals carry the same count: the totals are over the same one game.
     const totals = await loadStatsPage(

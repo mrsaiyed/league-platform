@@ -26,8 +26,8 @@ describe('listTeamStatTotals', () => {
     const { a } = leagues;
     // The seeded final game: 52 to 48, and one home player's line of 2 points, one 2.
     expect(await totals()).toEqual([
-      { teamId: a.teamId, statKey: 'fg2', total: 1, gamesRecorded: 1 },
-      { teamId: a.teamId, statKey: 'points', total: 52, gamesRecorded: 1 },
+      { teamId: a.teamId, statKey: 'fg2', total: 1, linesTotal: 1, gamesRecorded: 1 },
+      { teamId: a.teamId, statKey: 'points', total: 52, linesTotal: 2, gamesRecorded: 1 },
     ]);
   });
 
@@ -44,9 +44,9 @@ describe('listTeamStatTotals', () => {
       [a.leagueId, a.gameId, a.teamId],
     );
     expect(await totals()).toEqual([
-      { teamId: a.teamId, statKey: 'fg2', total: 1, gamesRecorded: 1 },
-      { teamId: a.teamId, statKey: 'fouls', total: 1, gamesRecorded: 1 },
-      { teamId: a.teamId, statKey: 'points', total: 52, gamesRecorded: 1 },
+      { teamId: a.teamId, statKey: 'fg2', total: 1, linesTotal: 1, gamesRecorded: 1 },
+      { teamId: a.teamId, statKey: 'fouls', total: 1, linesTotal: 1, gamesRecorded: 1 },
+      { teamId: a.teamId, statKey: 'points', total: 52, linesTotal: 9, gamesRecorded: 1 },
     ]);
   });
 });

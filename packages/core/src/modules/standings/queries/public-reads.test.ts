@@ -411,4 +411,38 @@ describe("a team's season totals count what was charged to the team itself (step
       average: 1.5,
     });
   });
+
+  it("names the statistics whose team total is not its players' numbers, for a team whose players show", async () => {
+    const teamsOf = async (store: StandingsReadStore) => {
+      const table = await readStatisticsTable(store, { seasonId, viewing: visitor });
+      if (!table.ok) throw new Error('no table');
+      return Object.fromEntries(table.value.teams.map((t) => [t.teamId, t.countsMoreThanPlayers]));
+    };
+    // Points typed as 50 where the players add to 48, and a team turnover, for both teams.
+    const store = storeWith({
+      teamStatTotals: async () => [
+        { teamId: openTeam, statKey: 'points', total: 50, linesTotal: 48, gamesRecorded: 1 },
+        { teamId: staffTeam, statKey: 'points', total: 45, linesTotal: 40, gamesRecorded: 1 },
+      ],
+      teamTurnoverGames: async () => [
+        { gameId: 'g', teamId: openTeam, turnovers: 1, countedByLines: true },
+        { gameId: 'g', teamId: staffTeam, turnovers: 1, countedByLines: true },
+      ],
+    });
+    // The staff-only team's players are not shown to a visitor: nothing to add up there.
+    expect(await teamsOf(store)).toEqual({
+      [openTeam]: ['points', 'turnovers'],
+      [staffTeam]: [],
+    });
+    // Points that are what the players add to, and no team turnover: none.
+    expect(
+      await teamsOf(
+        storeWith({
+          teamStatTotals: async () => [
+            { teamId: openTeam, statKey: 'points', total: 48, linesTotal: 48, gamesRecorded: 1 },
+          ],
+        }),
+      ),
+    ).toEqual({ [openTeam]: [], [staffTeam]: [] });
+  });
 });

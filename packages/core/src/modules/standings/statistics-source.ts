@@ -59,6 +59,12 @@ export type TeamTotals = {
   /** True when this viewer sees the team's player lines; false means totals only. */
   readonly playerLinesShown: boolean;
   readonly stats: Readonly<Record<string, StatEntry>>;
+  /**
+   * The statistics, of those the season keeps, whose team total is not what the team's
+   * players' lines add to (step 2.196): turnovers charged to the team itself, or points
+   * that are final scores entered as other than its players' points. Empty for most.
+   */
+  readonly countsMoreThanPlayers: readonly string[];
 };
 
 export const entryOf = (total: number, gamesRecorded: number): StatEntry => ({
@@ -271,12 +277,20 @@ export async function statisticsSource(
     };
   });
   const totalsByTeam = new Map<string, Record<string, StatEntry>>();
+  /** By team, the statistics whose total is not its players' lines added up. */
+  const notLines = new Map<string, Set<string>>();
+  const differs = (teamId: string, key: string) =>
+    notLines.set(teamId, new Set([...(notLines.get(teamId) ?? []), key]));
   for (const row of teamTotalRows as readonly TeamStatTotalRecord[]) {
     const own = totalsByTeam.get(row.teamId) ?? {};
     own[row.statKey] = entryOf(row.total, row.gamesRecorded);
     totalsByTeam.set(row.teamId, own);
+    if (row.linesTotal !== undefined && row.linesTotal !== row.total) {
+      differs(row.teamId, row.statKey);
+    }
   }
   addTeamTurnovers(totalsByTeam, teamTurnoverGames);
+  for (const own of teamTurnoverGames) if (own.turnovers > 0) differs(own.teamId, 'turnovers');
   return {
     seasonId: season.id,
     statKeys: keys,
@@ -287,6 +301,10 @@ export async function statisticsSource(
       color: team.color,
       playerLinesShown: shownTeam(team.id),
       stats: totalsByTeam.get(team.id) ?? {},
+      // Said only of a team whose players' numbers this viewer sees: nothing to add up else.
+      countsMoreThanPlayers: shownTeam(team.id)
+        ? keys.filter((key) => notLines.get(team.id)?.has(key) === true)
+        : [],
     })),
   };
 }

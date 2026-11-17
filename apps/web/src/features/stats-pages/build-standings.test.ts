@@ -118,6 +118,7 @@ async function tableAfter(
         awayTeamId: game.awayTeamId,
       })),
     teamStatTotals: async () => [],
+    teamTurnoverGames: async () => [],
     people: async () => [],
   };
   const read = await readStandings(store, { seasonId });

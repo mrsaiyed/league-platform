@@ -7,7 +7,8 @@
 // A team's points are its final scores instead (S-26 as changed by step 2.196, decided for
 // you): over the same games, those where its players' points were recorded, the score the
 // game's page and the standings show, which a typed box score can make different from what
-// its players' points add to. A player's own points stay their lines'.
+// its players' points add to. A player's own points stay their lines'. `linesTotal` is what
+// the players' lines add to, so the statistics page can say when a team's total differs.
 import { sql } from 'kysely';
 import type { TeamStatTotalRecord } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -20,11 +21,13 @@ export async function listTeamStatTotals(
     team_id: string;
     stat_key: string;
     total: string;
+    lines_total: string;
     games_recorded: string;
   }>`
     select c.team_id, c.stat_key,
            sum(case when c.stat_key = 'points' and c.score is not null then c.score
                     else c.total end)::text as total,
+           sum(c.total)::text as lines_total,
            count(*)::text as games_recorded
       from (
         select s.team_id, e.key as stat_key, s.game_id,
@@ -45,6 +48,7 @@ export async function listTeamStatTotals(
     teamId: row.team_id,
     statKey: row.stat_key,
     total: Number(row.total),
+    linesTotal: Number(row.lines_total),
     gamesRecorded: Number(row.games_recorded),
   }));
 }

@@ -231,16 +231,21 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
         if (g.homeTeamId === teamId) return g.homeScore;
         return g.awayTeamId === teamId ? g.awayScore : null;
       };
-      const sums = new Map<string, { total: number; games: Set<string> }>();
+      const sums = new Map<string, { total: number; lines: number; games: Set<string> }>();
       for (const line of at()?.lines ?? []) {
         if (!finals.has(line.gameId) || !line.played) continue;
         for (const [key, value] of Object.entries(line.stats)) {
           if (!Number.isInteger(value) || value < 0) continue;
-          const sum = sums.get(`${line.teamId}|${key}`) ?? { total: 0, games: new Set<string>() };
+          const sum = sums.get(`${line.teamId}|${key}`) ?? {
+            total: 0,
+            lines: 0,
+            games: new Set<string>(),
+          };
           // A team's points are its final scores, over the same games (as
           // list-team-stat-totals.ts: S-26 as changed by step 2.196); added once a game.
           if (key !== 'points' || scoreOf(line.gameId, line.teamId) === null) sum.total += value;
           else if (!sum.games.has(line.gameId)) sum.total += scoreOf(line.gameId, line.teamId) ?? 0;
+          sum.lines += value;
           sum.games.add(line.gameId);
           sums.set(`${line.teamId}|${key}`, sum);
         }
@@ -249,7 +254,13 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([at, sum]) => {
           const [teamId = '', statKey = ''] = at.split('|');
-          return { teamId, statKey, total: sum.total, gamesRecorded: sum.games.size };
+          return {
+            teamId,
+            statKey,
+            total: sum.total,
+            linesTotal: sum.lines,
+            gamesRecorded: sum.games.size,
+          };
         });
     },
     // As list-team-turnover-games.ts counts them: in each final game, per side, the team

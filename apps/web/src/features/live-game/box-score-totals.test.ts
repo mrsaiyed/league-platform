@@ -94,13 +94,13 @@ async function play(world: ReturnType<typeof testWorld>, taps: readonly unknown[
   );
   if (!result.ok) throw new Error(result.error.code);
   const page = await readGamePage(
-    worldGameSnapshot(() => world.read(liveLeagueId)),
+    worldGameSnapshot(() => world.read(liveLeagueId), world.now),
     { gameId: games.hawksBears },
     viewing,
   );
   if (!page.ok) throw new Error('no page');
   const statistics = await readStatisticsTable(
-    worldStandingsRead(() => world.read(liveLeagueId)),
+    worldStandingsRead(() => world.read(liveLeagueId), world.now),
     { seasonId: page.value.game.seasonId, viewing },
   );
   if (!statistics.ok) throw new Error('no statistics');

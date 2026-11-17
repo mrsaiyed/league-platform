@@ -95,6 +95,9 @@ export type TeamStatTotalRecord = {
   readonly teamId: string;
   readonly statKey: string;
   readonly total: number;
+  /** What the players' lines add to, where it is not `total` (a team's points are its
+   * final scores, step 2.196); left out, the same as `total`. */
+  readonly linesTotal?: number | undefined;
   /** Final games in which any of the team's players had this stat recorded. */
   readonly gamesRecorded: number;
 };
