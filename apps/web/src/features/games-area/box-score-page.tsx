@@ -12,7 +12,6 @@
 import {
   getBoxScoreSheet,
   leagueUrl,
-  putBackReasons,
   readReopenOffer,
   type BoxScoreSheet,
   type GameLine,
@@ -22,7 +21,7 @@ import { MessagePage, PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
-import { clockTimeText } from '../../server/game-when.ts';
+import { clockTimeText, gameWhenText } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
@@ -30,7 +29,15 @@ import { StaffTrail } from '../staff/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
 import { hasName, rosterName } from '../teams-area/index.ts';
 import { ActionForm } from './action-form.tsx';
-import { putBackAction, reopenBoxScoreAction, saveBoxScoreAction } from './actions.ts';
+import {
+  callOffAction,
+  putBackAction,
+  reopenBoxScoreAction,
+  saveBoxScoreAction,
+} from './actions.ts';
+import { CallOffForms } from './call-off-forms.tsx';
+import { putBackChoice, restoreTexts } from './call-off-texts.ts';
+import { waitingListAnchor } from './waiting-anchor.ts';
 import { boxScoreField } from './box-score-form.ts';
 import { BoxScoreSheetForm, type SheetRow, type SheetTeam } from './box-score-sheet-form.tsx';
 import { sheetScoresId } from './form-state.ts';
@@ -161,6 +168,15 @@ export async function BoxScorePage({
       : undefined,
   );
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
+  // Postponed or cancelled: no box score, no grid; the way it is put back (step 2.158).
+  const calledOff = sheet.locked === 'cancelled' || sheet.locked === 'postponed';
+  const named = t('admin.games.game', { away: awayName, home: homeName });
+  const calledOffHidden = {
+    league,
+    gameId: game.id,
+    version: String(game.version),
+    then: 'games',
+  };
   const sides = [
     { teamId: game.awayTeamId, name: awayName, score: game.awayScore, field: 'awayScore' },
     { teamId: game.homeTeamId, name: homeName, score: game.homeScore, field: 'homeScore' },
@@ -186,7 +202,10 @@ export async function BoxScorePage({
         here={t('admin.games.game', { away: awayName, home: homeName })}
       />
       <PageHead
-        title={t('admin.boxScore.title', { away: awayName, home: homeName })}
+        title={t(calledOff ? 'admin.boxScore.titleCalledOff' : 'admin.boxScore.title', {
+          away: awayName,
+          home: homeName,
+        })}
         sub={
           sheet.locked === null
             ? t('admin.boxScore.help')
@@ -228,41 +247,45 @@ export async function BoxScorePage({
           {t(`admin.games.reopenWho.${reopen.because}`)}
         </p>
       ) : null}
-      {sheet.locked === 'cancelled' && sheet.mayCorrect ? (
-        // Its own page puts it back too (step 2.158, S-51), so a cancelled game outside this
-        // week's list is never stuck. games.correct is held by exactly the roles that hold
-        // games.results, which cancelling and putting back need (roles.ts); the command
-        // checks again. Done, it goes to the games list, where "Saved" names it.
-        <div className="staff-panel">
-          <ActionForm
-            action={putBackAction}
-            permalink={sheetHref}
-            hidden={{
-              league,
-              gameId: game.id,
-              version: String(game.version),
-              requestToken: crypto.randomUUID(),
-              then: 'games',
-            }}
-            summary={t('admin.games.putBack')}
-            choice={{
-              name: 'reason',
-              label: t('admin.games.putBack.reason'),
-              choose: t('admin.games.putBack.choose'),
-              options: putBackReasons.map((reason) => ({
-                value: reason,
-                label: t(`admin.games.putBack.reasons.${reason}`),
-              })),
-            }}
-            button={t('admin.games.putBack.save')}
-            refusal={t('admin.games.refusedAbout', {
-              game: t('admin.games.game', { away: awayName, home: homeName }),
-              problem: '{problem}',
-            })}
-          />
+      {calledOff ? (
+        // Its own page puts it back too (step 2.158, S-51, S-75), so a game called off
+        // outside this week's list is never stuck: a cancelled one to what it was, a
+        // postponed one on its date (asking first), with the way to the games waiting for a
+        // new date. For whoever may call it off (games.results); the command checks again.
+        // Done, it goes to the games list, where "Saved" names it.
+        <div className="staff-panel ui-stack">
+          {sheet.locked === 'postponed' ? (
+            <p>
+              <a className="ui-more" href={`${back}#${waitingListAnchor}`}>
+                {t('admin.games.waiting.link')}
+              </a>
+            </p>
+          ) : null}
+          {!sheet.mayCallOff ? null : sheet.locked === 'cancelled' ? (
+            <ActionForm
+              action={putBackAction}
+              permalink={sheetHref}
+              hidden={{ ...calledOffHidden, requestToken: crypto.randomUUID() }}
+              summary={t('admin.games.putBack')}
+              choice={putBackChoice()}
+              button={t('admin.games.putBack.save')}
+              refusal={t('admin.games.refusedAbout', { game: named, problem: '{problem}' })}
+            />
+          ) : (
+            <CallOffForms
+              action={callOffAction}
+              permalink={sheetHref}
+              hidden={{ ...calledOffHidden, requestToken: crypto.randomUUID() }}
+              summaryButton
+              texts={restoreTexts(
+                { homeName, awayName },
+                gameWhenText(game.startsAt, { locale, timeZone }),
+              )}
+            />
+          )}
         </div>
       ) : null}
-      {sheet.locked === 'cancelled' || sheet.locked === 'postponed' ? null : (
+      {calledOff ? null : (
         // A game called off has no score to enter (step 2.158, M32): no grid at all.
         <BoxScoreSheetForm
           action={saveBoxScoreAction}

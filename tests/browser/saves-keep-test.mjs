@@ -225,7 +225,7 @@ if (browser) {
       await game.getByText('Forfeit, postpone or cancel').click();
       const forfeit = game.locator('form', { has: page.locator('select') });
       const team = forfeit.getByLabel('Team that forfeits');
-      // The away team, the second choice: a reset would put back the first (the Tigers).
+      // Since step 2.158 the choice starts empty: a reset would empty it again.
       await team.selectOption({ label: 'Bears' });
       const bears = await team.inputValue();
       // A form whose game has changed since it was drawn: another version than the game's.
@@ -233,7 +233,10 @@ if (browser) {
         input.value = '999';
       });
       await forfeit.getByRole('button', { name: 'Record forfeit' }).click();
-      // Since step 2.158 the forfeit asks first; its "Yes" sends what the form held.
+      // Since step 2.158 the forfeit asks first; its "Yes", once read (a "Yes" within the
+      // first moments is taken as a double tap and only asks again), sends what the form held.
+      await game.locator('[data-call-off-ask]').waitFor();
+      await page.waitForTimeout(1000);
       await game.getByRole('button', { name: 'Yes, record the forfeit' }).click();
       const refusal = forfeit.getByRole('alert');
       await refusal.waitFor();

@@ -15,7 +15,10 @@ const gamesKeys: readonly TextKey[] = [
   'admin.games.error.game-not-postponable',
   'admin.games.error.game-not-cancellable',
   'admin.games.error.game-postponed',
-  'admin.games.error.game-not-cancelled',
+  'admin.games.error.game-not-called-off',
+  'admin.games.error.game-now-cancelled',
+  'admin.games.error.game-now-postponed',
+  'admin.games.error.game-part-in-bin',
   'admin.games.error.choose-team',
   'admin.games.error.choose-reason',
 ];

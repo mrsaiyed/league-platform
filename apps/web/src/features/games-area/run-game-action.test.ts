@@ -222,9 +222,14 @@ describe('the games area actions', () => {
     ).toBe(false);
     const postponed = list.map((g) => ({ ...g, status: 'postponed' }));
     const rows = buildGameRows(postponed, names, { accountId: owner, isOwner: true, grants: [] });
-    expect(rows.some((r) => r.canScore || r.canForfeit)).toBe(false);
-    // Step 2.158: a postponed game is offered cancelling only; a cancelled one, putting back.
-    expect(rows.every((r) => r.canCancel && !r.canPostpone && !r.canPutBack)).toBe(true);
+    // A postponed game takes no score; since S-75 (step 2.158) it may be forfeited, cancelled
+    // or put back on its date, never postponed again; a cancelled one is only put back.
+    expect(rows.some((r) => r.canScore)).toBe(false);
+    expect(
+      rows.every(
+        (r) => r.canForfeit && r.canCancel && r.canRestore && !r.canPostpone && !r.canPutBack,
+      ),
+    ).toBe(true);
     const cancelled = list.map((g) => ({ ...g, status: 'cancelled' }));
     const back = buildGameRows(cancelled, names, { accountId: owner, isOwner: true, grants: [] });
     expect(back.every((r) => r.canPutBack && !r.canCancel && !r.canScore)).toBe(true);
@@ -272,7 +277,7 @@ describe('the games area actions', () => {
     ).toEqual({ ok: false, code: 'not-allowed' });
     expect(
       await runGameAction('putBack', { ...again, reason: 'willBePlayed' }, as(owner), ports.deps),
-    ).toEqual({ ok: true });
+    ).toEqual({ ok: true, putBack: { status: 'scheduled', clashes: [] } });
     const read = await world.read(leagueId);
     expect(read?.games.find((g) => g.id === target?.id)).toMatchObject({
       status: 'scheduled',
@@ -318,6 +323,26 @@ describe('the games area actions', () => {
         ports.deps,
       ),
     ).toEqual({ ok: false, code: 'game-postponed' });
+  });
+
+  it('says why nothing happened when someone else called the game off meanwhile', async () => {
+    const { ports, as, games } = setup();
+    const target = (await games(owner)).find((g) => g.status === 'scheduled' && !g.hasPlays);
+    const fields = { gameId: target?.id, version: String(target?.version) };
+    expect(await runGameAction('cancel', fields, as(owner), ports.deps)).toEqual({ ok: true });
+    // Postponing or forfeiting from the page drawn before: "Someone cancelled this game".
+    expect(await runGameAction('postpone', fields, as(owner), ports.deps)).toEqual({
+      ok: false,
+      code: 'game-now-cancelled',
+    });
+    expect(
+      await runGameAction(
+        'forfeit',
+        { ...fields, forfeitingTeamId: target?.homeTeamId },
+        as(owner),
+        ports.deps,
+      ),
+    ).toEqual({ ok: false, code: 'game-now-cancelled' });
   });
 
   it('says a score typed before a game was cancelled is refused because it is cancelled', async () => {

@@ -286,60 +286,90 @@ const gamesStates = [
   },
 ];
 
-// Step 2.158: forfeiting, postponing and cancelling ask first, and a cancelled game is put
+// Step 2.158: forfeiting, postponing and cancelling ask first, and a game called off is put
 // back. Each state is reached by the owner's own taps on the games list (nothing rides in
-// the address, record 067), on two games of the first league's week no other picture
-// uses: Owls at Badgers tonight (postponed) and Herons at Falcons (cancelled, then put
-// back). A picture that changes a game finds it already changed at the second width, and
-// starts from there.
+// the address, record 067), on games of the first league's week no other picture uses:
+// Owls at Badgers tonight (asked about, never changed), Lions at Hawks tomorrow (postponed,
+// then asked to go back on its date) and Herons at Falcons (cancelled, then put back). A
+// picture that changes a game finds it already changed at the second width, and starts
+// from there. A "Yes" is tapped once the question has been read: the server takes a "Yes"
+// within its first moments as the second tap of a double tap (call-off-step.ts).
 const callOffGame = (page, away, home) =>
   page.locator('li.admin-game[id^="game-"]').filter({ hasText: away }).filter({ hasText: home });
 const owlsAtBadgers = (page) => callOffGame(page, 'Owls', 'Badgers');
+const lionsAtHawks = (page) => callOffGame(page, 'Lions', 'Hawks');
 const heronsAtFalcons = (page) => callOffGame(page, 'Herons', 'Falcons');
 const statusOf = (game) => game.locator('.ui-game-card').first().getAttribute('data-status');
-async function askToCallOff(game, button) {
-  const panel = game.locator('details.admin-game-other');
+/** A game's panel by its button's words; the last one ("Forfeit, …") when none is named. */
+const panelOf = (game, summary) =>
+  summary === undefined
+    ? game.locator('details[data-call-off]').last()
+    : game.locator('details[data-call-off]').filter({
+        has: game.page().locator('summary', { hasText: summary }),
+      });
+async function openPanel(panel) {
   if ((await panel.getAttribute('open')) === null) await panel.locator('> summary').click();
+}
+async function askToCallOff(game, button, summary) {
+  await openPanel(panelOf(game, summary));
   await game.getByRole('button', { name: button, exact: true }).click();
   await game.locator('[data-call-off-ask]').waitFor();
+}
+async function sayYes(game, name) {
+  await game.page().waitForTimeout(1000);
+  await game.getByRole('button', { name }).click();
+  await game.getByRole('status').filter({ hasText: 'Saved' }).waitFor();
+}
+/** Lions at Hawks postponed through its question, unless it already is. */
+async function postponedLions(page) {
+  const game = lionsAtHawks(page);
+  if ((await statusOf(game)) === 'scheduled') {
+    await askToCallOff(game, 'Postpone');
+    await sayYes(game, 'Yes, postpone it');
+  }
+  return game;
 }
 /** Herons at Falcons cancelled through its question, unless it already is. */
 async function cancelledHerons(page) {
   const game = heronsAtFalcons(page);
   if ((await statusOf(game)) !== 'cancelled') {
     await askToCallOff(game, 'Cancel the game');
-    await game.getByRole('button', { name: 'Yes, cancel it' }).click();
-    await game.getByRole('status').filter({ hasText: 'Saved' }).waitFor();
+    await sayYes(game, 'Yes, cancel it');
   }
   return game;
 }
 const callOffStates = [
   {
+    // "Forfeit, postpone or cancel" open: its three buttons apart, the destructive one at
+    // the far end of its row.
+    name: 'admin-games-panel-open',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => openPanel(panelOf(owlsAtBadgers(page))),
+  },
+  {
+    // "No" stands where "Postpone" was; the question and its "Yes" come after.
     name: 'admin-games-postpone-ask',
     at: '/admin/games',
     onlyIn: leagues[0],
     light: true,
-    tap: async (page) => {
-      const game = owlsAtBadgers(page);
-      if ((await statusOf(game)) === 'scheduled') await askToCallOff(game, 'Postpone');
-    },
+    tap: async (page) => askToCallOff(owlsAtBadgers(page), 'Postpone'),
   },
   {
     name: 'admin-games-cancel-ask',
     at: '/admin/games',
     onlyIn: leagues[0],
-    tap: async (page) => askToCallOff(heronsAtFalcons(page), 'Cancel the game'),
+    tap: async (page) => askToCallOff(owlsAtBadgers(page), 'Cancel the game'),
   },
   {
-    // "Team that forfeits" starts empty; a team chosen, the question names both.
+    // "Team that forfeits" starts empty; a team chosen, the question names both and the score.
     name: 'admin-games-forfeit-ask',
     at: '/admin/games',
     onlyIn: leagues[0],
     tap: async (page) => {
-      const game = heronsAtFalcons(page);
-      const panel = game.locator('details.admin-game-other');
-      if ((await panel.getAttribute('open')) === null) await panel.locator('> summary').click();
-      await game.getByLabel('Team that forfeits').selectOption({ label: 'Herons' });
+      const game = owlsAtBadgers(page);
+      await openPanel(panelOf(game));
+      await game.getByLabel('Team that forfeits').selectOption({ label: 'Owls' });
       await askToCallOff(game, 'Record forfeit');
     },
   },
@@ -351,21 +381,32 @@ const callOffStates = [
     onlyIn: leagues[0],
     light: true,
     tap: async (page) => {
-      const game = owlsAtBadgers(page);
-      if ((await statusOf(game)) === 'scheduled') {
-        await askToCallOff(game, 'Postpone');
-        await game.getByRole('button', { name: 'Yes, postpone it' }).click();
-        await game.getByRole('status').filter({ hasText: 'Saved' }).waitFor();
-      }
+      await postponedLions(page);
     },
   },
   {
-    // The postponed game's own page: why it has no score, and no grid.
+    // "Put it back on its date": a reason chosen, the question naming its old date.
+    name: 'admin-games-restore-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = await postponedLions(page);
+      const panel = panelOf(game, 'Put it back on its date');
+      await openPanel(panel);
+      await panel.getByLabel(/Why are you putting it back/).selectOption({
+        label: 'Postponed by mistake',
+      });
+      await askToCallOff(game, 'Put it back', 'Put it back on its date');
+    },
+  },
+  {
+    // The postponed game's own page: why it has no score, no grid, the way to its new date.
     name: 'admin-games-box-postponed',
     at: '/admin/games',
     onlyIn: leagues[0],
     tap: async (page) => {
-      const id = ((await owlsAtBadgers(page).getAttribute('id')) ?? '').slice('game-'.length);
+      const game = await postponedLions(page);
+      const id = ((await game.getAttribute('id')) ?? '').slice('game-'.length);
       await page.goto(page.url().replace(/\/admin\/games.*$/, `/admin/games/${id}`));
       await page.locator('main h1').waitFor();
     },
@@ -378,8 +419,7 @@ const callOffStates = [
     light: true,
     tap: async (page) => {
       const game = await cancelledHerons(page);
-      const panel = game.locator('details[data-action-form]');
-      if ((await panel.getAttribute('open')) === null) await panel.locator('> summary').click();
+      await openPanel(game.locator('details[data-action-form]'));
     },
   },
   {
@@ -390,8 +430,10 @@ const callOffStates = [
     tap: async (page) => {
       const game = await cancelledHerons(page);
       const panel = game.locator('details[data-action-form]');
-      if ((await panel.getAttribute('open')) === null) await panel.locator('> summary').click();
-      await panel.getByLabel(/Why it is put back/).selectOption({ label: 'Cancelled by mistake' });
+      await openPanel(panel);
+      await panel.getByLabel(/Why are you putting it back/).selectOption({
+        label: 'Cancelled by mistake',
+      });
       await panel.getByRole('button', { name: 'Put it back on the schedule' }).click();
       await game.getByRole('status').filter({ hasText: 'back on the schedule' }).waitFor();
     },

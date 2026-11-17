@@ -136,9 +136,23 @@ describe('getBoxScoreSheet', () => {
   });
 
   it('says a postponed game cannot be saved here: it has not been played (step 2.158)', async () => {
-    const { deps, as } = memoryGames({ games: [game(1, { status: 'postponed' })] });
+    const { deps, as } = memoryGames({
+      games: [game(1, { status: 'postponed' }), game(2, { status: 'cancelled' }), game(3)],
+      grants: [scorekeeperGrant],
+    });
     expect(await getBoxScoreSheet(as(ownerId), { gameId: gameUuid(1) }, deps)).toMatchObject({
-      value: { locked: 'postponed', mayReopen: false },
+      value: { locked: 'postponed', mayReopen: false, mayCallOff: true },
+    });
+    // Who may put it back is who may call it off (games.results): not a scorekeeper.
+    expect(await getBoxScoreSheet(as(scorekeeperId), { gameId: gameUuid(2) }, deps)).toMatchObject({
+      value: { locked: 'cancelled', mayCallOff: false },
+    });
+    expect(await getBoxScoreSheet(as(ownerId), { gameId: gameUuid(2) }, deps)).toMatchObject({
+      value: { mayCallOff: true },
+    });
+    // Only asked of a game called off.
+    expect(await getBoxScoreSheet(as(ownerId), { gameId: gameUuid(3) }, deps)).toMatchObject({
+      value: { mayCallOff: false },
     });
   });
 

@@ -29,7 +29,17 @@ export function isGameAction(value: unknown): value is GameAction {
 export type GameFields = Readonly<Record<string, string | undefined>>;
 
 export type GameActionResult =
-  | { readonly ok: true }
+  | {
+      readonly ok: true;
+      /**
+       * A game put back (step 2.158): what it is now, and the games that took its place at
+       * that time since, by id (put-game-back.ts).
+       */
+      readonly putBack?: {
+        readonly status: 'scheduled' | 'postponed';
+        readonly clashes: readonly string[];
+      };
+    }
   | { readonly ok: false; readonly code: string };
 
 /** A whole number written in a field; undefined (so the command refuses it) when it is not. */
@@ -45,6 +55,15 @@ export async function runGameAction(
   deps: CommandDeps<TrackerTx>,
 ): Promise<GameActionResult> {
   const base = { gameId: fields['gameId'], version: numberOf(fields['version']) };
+  if (action === 'putBack') {
+    // A game called off put back (step 2.158, S-51, S-75), with why from the fixed list.
+    const back = await putGameBack(context, { ...base, reason: fields['reason'] }, deps);
+    if (back.ok) {
+      const { status, clashes } = back.value;
+      return { ok: true, putBack: { status, clashes: clashes.map((c) => c.id) } };
+    }
+    return { ok: false, code: await calledOffSince(back.error.code, fields, context, deps) };
+  }
   const result = await (async () => {
     switch (action) {
       case 'final':
@@ -67,9 +86,6 @@ export async function runGameAction(
         return postponeGame(context, base, deps);
       case 'cancel':
         return cancelGame(context, base, deps);
-      // A cancelled game put back (step 2.158, S-51), with why from the fixed list.
-      case 'putBack':
-        return putGameBack(context, { ...base, reason: fields['reason'] }, deps);
     }
   })();
   if (result.ok) return { ok: true };
@@ -88,7 +104,25 @@ export async function runGameAction(
     if (now === 'postponed') return { ok: false, code: 'game-postponed' };
     if (now === 'cancelled') return { ok: false, code: 'game-cancelled' };
   }
-  return { ok: false, code };
+  if (action === 'final') return { ok: false, code };
+  return { ok: false, code: await calledOffSince(code, fields, context, deps) };
+}
+
+/**
+ * A forfeit, postponement, cancellation or put-back refused because someone else called the
+ * game off meanwhile (step 2.158): said as that, so the person knows why nothing happened.
+ */
+async function calledOffSince(
+  code: string,
+  fields: GameFields,
+  context: CommandContext,
+  deps: CommandDeps<TrackerTx>,
+): Promise<string> {
+  if (code !== 'changed-since-read') return code;
+  const now = await statusNow(fields, context, deps);
+  if (now === 'cancelled') return 'game-now-cancelled';
+  if (now === 'postponed') return 'game-now-postponed';
+  return code;
 }
 
 /** The game's status as it is now, or undefined if it cannot be read. */

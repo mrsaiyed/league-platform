@@ -33,8 +33,8 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere, type NoticeScreen } from '../../server/saved-notice.ts';
+import { callOffStep, choiceOf } from './call-off-step.ts';
 import {
-  callOffActs,
   sheetScoresId,
   typedOf,
   untouched,
@@ -51,11 +51,13 @@ import {
   type BoxScoreAction,
   type BoxScoreActionResult,
 } from './run-box-score-action.ts';
-import { runGameAction, type GameAction } from './run-game-action.ts';
+import { runGameAction, type GameAction, type GameActionResult } from './run-game-action.ts';
 import { gameIdOf, scoreFields, typedScoresOf, wrongScoreFields } from './score-fields.ts';
 
 /** The answers to the saves of the last ten minutes, by request (server/same-request.ts). */
 const requests = () => sameRequestsHere<BoxScoreActionResult>();
+/** The same, for the games list's changes, whose answer may say what a game is now. */
+const gameRequests = () => sameRequestsHere<GameActionResult>();
 
 /** The games area of the league the form came from, checked by the gate. */
 async function gamesOf(fields: TypedFields) {
@@ -73,9 +75,21 @@ async function gamesOf(fields: TypedFields) {
 }
 
 /** The one-time notice that the screen is to say "Saved" beside this game. */
-function leaveNotice(context: CommandContext, screen: NoticeScreen, thing: string, said: string) {
+function leaveNotice(
+  context: CommandContext,
+  screen: NoticeScreen,
+  thing: string,
+  said: string,
+  about?: readonly string[],
+) {
   const holder = noticeHolderOf(context);
-  if (holder !== undefined) savedNoticesHere().leave(holder, { screen, thing, said });
+  if (holder === undefined) return;
+  savedNoticesHere().leave(holder, {
+    screen,
+    thing,
+    said,
+    ...(about === undefined || about.length === 0 ? {} : { about }),
+  });
 }
 
 /**
@@ -98,6 +112,8 @@ const keptAsIs: readonly string[] = [
   'reopen-reason',
   'game-postponed',
   'game-cancelled',
+  'choose-team',
+  'choose-reason',
 ];
 
 /**
@@ -180,23 +196,37 @@ async function act(
   const { context, list } = await gamesOf(fields);
   const gameId = gameIdOf(fields['gameId']);
   const { games } = await webPorts();
-  const result = await requests().once(requestKeyOf(context, fields), () =>
+  const result = await gameRequests().once(requestKeyOf(context, fields), () =>
     runGameAction(action, fields, context, games.deps),
   );
   if (result.ok && gameId !== undefined) {
-    leaveNotice(context, 'games', gameId, action);
-    // Sent from another screen (a cancelled game's own page): to the list, where "Saved" is.
+    // A game put back says what it is now, and names any game that took its place since.
+    const said =
+      result.putBack === undefined
+        ? action
+        : fields['act'] === 'restore'
+          ? 'putBackDate'
+          : result.putBack.status === 'postponed'
+            ? 'putBackPostponed'
+            : 'putBack';
+    leaveNotice(context, 'games', gameId, said, result.putBack?.clashes);
+    // Sent from another screen (a game's own page): to the list, where "Saved" is.
     if (fields['then'] === 'games') return redirect(`${list}#${gameAnchor(gameId)}`);
     await showSaved(`${list}#${gameAnchor(gameId)}`);
     return untouched;
   }
   if (result.ok) return redirect(list);
-  // A team not in the game, or a reason not on the list, is the form's one field: marked.
-  const wrong =
-    field !== undefined && (result.code === 'team-not-in-game' || result.code === 'invalid-input')
-      ? [field]
-      : [];
-  return refused(result.code, fields, wrong, t(gamesProblemKey(result.code)));
+  // A team not in the game, or a reason not on the list, is the form's one field: marked,
+  // and said as that field's own sentence (a choice sent tampered with, step 2.158).
+  const fieldWrong =
+    field !== undefined && (result.code === 'team-not-in-game' || result.code === 'invalid-input');
+  const code =
+    fieldWrong && result.code === 'invalid-input'
+      ? field === 'reason'
+        ? 'choose-reason'
+        : 'choose-team'
+      : result.code;
+  return refused(code, fields, fieldWrong ? [field] : [], t(gamesProblemKey(code)));
 }
 
 /** The form's one choice left empty: refused beside it, nothing sent to the command. */
@@ -205,29 +235,27 @@ function notChosen(fields: TypedFields, field: string, code: string): Refused {
 }
 
 /**
- * "Forfeit, postpone or cancel" (step 2.158; A-5), by the step the form says: `ask` (one
- * of the three forms: nothing is changed; the question, or "Team that forfeits" refused
- * when no team is chosen), `back` (the question's "No": nothing is changed) and `confirm`
- * (the question's "Yes": the one form that changes the game; unconfirmed, it only asks).
- * So a double tap, or going back and sending a form again, only asks again.
+ * "Forfeit, postpone or cancel" and "Put it back on its date" (step 2.158; A-5, S-75), by
+ * the step the form says (call-off-step.ts): one of the forms only asks (or is refused
+ * beside its empty choice, checked here too: the browser's own `required` can be got
+ * round); the question's "No" changes nothing; only its "Yes", read for long enough, runs
+ * the change. So a double tap, or going back and sending a form again, only asks again.
  */
 export async function callOffAction(_state: CallOffState, form: FormData): Promise<CallOffState> {
   const fields = typedOf(form);
-  const which = callOffActs.find((a) => a === fields['act']);
-  if (which === undefined) {
-    return refused('game-not-found', fields, [], t(gamesProblemKey('game-not-found')));
-  }
   // The page check (loadLeaguePage) runs first, whatever the step.
   await gamesOf(fields);
-  if (fields['step'] === 'back') return untouched;
-  // Checked on the server too: the form's own `required` is the browser's, and can be got round.
-  if (which === 'forfeit' && (fields['forfeitingTeamId'] ?? '').trim() === '') {
-    return notChosen(fields, 'forfeitingTeamId', 'choose-team');
+  const step = callOffStep(fields, Date.now());
+  if (step === undefined) {
+    return refused('game-not-found', fields, [], t(gamesProblemKey('game-not-found')));
   }
-  if (fields['step'] !== 'confirm' || fields['confirmed'] !== 'yes') {
-    return { kind: 'ask', act: which, typed: fields };
+  if (step.kind === 'back') return untouched;
+  if (step.kind === 'refused') return notChosen(fields, step.field, step.code);
+  if (step.kind === 'ask') {
+    return { kind: 'ask', act: step.act, typed: fields, askedAt: step.askedAt };
   }
-  return act(which, fields, which === 'forfeit' ? 'forfeitingTeamId' : undefined);
+  const action: GameAction = step.act === 'restore' ? 'putBack' : step.act;
+  return act(action, fields, choiceOf[step.act]?.field);
 }
 
 /** "Put this game back" (step 2.158, S-51): a cancelled game, with why from the fixed list. */

@@ -24,6 +24,11 @@ export type BoxScoreSheet = {
    * reopened by them through games.reopen_game, which hands it back to its tracker (S-46).
    */
   readonly mayCorrect: boolean;
+  /**
+   * For a game called off (postponed or cancelled): whether this reader may put it back,
+   * by games.put_game_back's own check (games.results at its program). False otherwise.
+   */
+  readonly mayCallOff: boolean;
   readonly players: readonly GameRosterPlayer[];
   readonly lines: readonly GameLine[];
   readonly statKeys: readonly string[];
@@ -70,10 +75,18 @@ export const getBoxScoreSheet = defineCommand({
       context.accountId !== null &&
       (await mayChangeGames(context, tx, 'games.correct', await gameScope(tx, game.id)));
     const mayReopen = locked === 'decided' && mayCorrect;
+    // Whether this reader may call the game off or put it back (games.results at its
+    // program, as games.cancel_game and games.put_game_back check): asked only for a
+    // game called off, whose page offers putting it back (step 2.158).
+    const mayCallOff =
+      (game.status === 'cancelled' || game.status === 'postponed') &&
+      context.accountId !== null &&
+      (await mayChangeGames(context, tx, 'games.results', await gameScope(tx, game.id)));
     return ok({
       game,
       mayReopen,
       mayCorrect,
+      mayCallOff,
       players,
       lines,
       statKeys,

@@ -21,6 +21,7 @@ import {
   seasonSettingsAddress,
   visibilityAnchor,
 } from '../season-settings/index.ts';
+import { waitingListAnchor } from '../games-area/index.ts';
 import { StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import {
@@ -219,7 +220,7 @@ export async function ScheduleBuilderPage({
     basedOnRevision: draft.latestRevision,
     version: draft.draft?.version ?? null,
     draftId: draft.draft?.id ?? null,
-    waitingHref: `${leagueUrl(addressee, 'admin-area', { area: 'games' })}#to-reschedule`,
+    waitingHref: `${leagueUrl(addressee, 'admin-area', { area: 'games' })}#${waitingListAnchor}`,
     gameHref: (gameId) => leagueUrl(addressee, 'admin-area', { area: 'games', subpath: [gameId] }),
   };
   const preview =

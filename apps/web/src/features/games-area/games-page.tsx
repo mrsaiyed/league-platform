@@ -16,7 +16,6 @@ import {
   listMyGames,
   listPostponedGames,
   needsResultLimit,
-  putBackReasons,
   type CommandContext,
   type CommandDeps,
   type LeagueAddressee,
@@ -36,7 +35,8 @@ import { noticeHolderOf, savedNoticesHere, type SavedNotice } from '../../server
 import { ActionForm } from './action-form.tsx';
 import { callOffAction, finalScoreAction, putBackAction } from './actions.ts';
 import { buildGameRows, type GameRowView } from './build-games-view.ts';
-import { CallOffForms, type CallOffTexts } from './call-off-forms.tsx';
+import { CallOffForms } from './call-off-forms.tsx';
+import { callOffTexts, putBackChoice, restoreTexts } from './call-off-texts.ts';
 import { earlyWhen, nowOf } from './early-when.ts';
 import { FinalScoreBoxes, type FinalScoreTexts } from './final-score-boxes.tsx';
 import { earlierEmptyText, needsResultEmptyText } from './empty-list-text.ts';
@@ -45,6 +45,7 @@ import { gamesSections } from './games-sections.ts';
 import { readReopenViews } from './read-reopen-views.ts';
 import { ReopenLine } from './reopen-line.tsx';
 import { SavedLine } from './saved-line.tsx';
+import { waitingListAnchor as waitingAnchor } from './waiting-anchor.ts';
 
 /** What the words of a saved notice read of the game it names. */
 type NamedGame = Pick<
@@ -66,17 +67,41 @@ function resultText(game: NamedGame, homeScore: number | string, awayScore: numb
 const gameText = (game: NamedGame) =>
   t('admin.games.game', { away: game.awayName, home: game.homeName });
 
-const savedKeys = ['forfeit', 'postpone', 'cancel', 'putBack'] as const;
+const savedKeys = ['postpone', 'cancel', 'putBack', 'putBackDate', 'putBackPostponed'] as const;
 
-/** The anchor of "Waiting for a new date" on this page (step 2.158). */
-const waitingAnchor = 'to-reschedule';
+/**
+ * "Saved: Falcons forfeited Herons at Falcons. Herons win 20–0." (step 2.158): who
+ * forfeited is the side the forfeit score left behind.
+ */
+function forfeitText(game: NamedGame): string | undefined {
+  if (game.homeScore === null || game.awayScore === null) return undefined;
+  const homeLost = game.homeScore < game.awayScore;
+  return t('admin.games.saved.forfeit', {
+    team: homeLost ? game.homeName : game.awayName,
+    winner: homeLost ? game.awayName : game.homeName,
+    game: gameText(game),
+    winnerScore: String(Math.max(game.homeScore, game.awayScore)),
+    loserScore: String(Math.min(game.homeScore, game.awayScore)),
+  });
+}
 
 /**
  * What was just saved, as words, naming the game, read from the game as it is now: a
- * final score names its score too ("Saved: Tigers 47, Lions 51 is final.").
+ * final score names its score too ("Saved: Tigers 47, Lions 51 is final."); a game put back
+ * over games that took its place since names them at once (`others`, step 2.158).
  */
-function noticeText(notice: SavedNotice, game: NamedGame | undefined): string {
+function noticeText(
+  notice: SavedNotice,
+  game: NamedGame | undefined,
+  others: readonly string[] = [],
+): string {
   const said = notice.said;
+  const clash =
+    others.length === 0 ? '' : ` ${t('admin.games.saved.clash', { others: others.join(', ') })}`;
+  return savedWords(said, game) + clash;
+}
+
+function savedWords(said: string, game: NamedGame | undefined): string {
   if (said === 'reopen') {
     return t(
       game?.hasPlays === true ? 'admin.games.done.reopenTracked' : 'admin.games.done.reopen',
@@ -89,6 +114,8 @@ function noticeText(notice: SavedNotice, game: NamedGame | undefined): string {
       'admin.games.done.postpone',
       'admin.games.done.cancel',
       'admin.games.done.putBack',
+      'admin.games.done.putBackDate',
+      'admin.games.done.putBackPostponed',
     ];
     return t(doneKeys.find((k) => k === `admin.games.done.${said}`) ?? 'admin.games.done.final');
   }
@@ -97,6 +124,7 @@ function noticeText(notice: SavedNotice, game: NamedGame | undefined): string {
       result: resultText(game, game.homeScore, game.awayScore),
     });
   }
+  if (said === 'forfeit') return forfeitText(game) ?? t('admin.games.done.forfeit');
   const kind = savedKeys.find((k) => k === said);
   return kind === undefined
     ? t('admin.games.done.final')
@@ -230,21 +258,26 @@ function Controls({
           )}
         </>
       ) : null}
+      {game.canRestore ? (
+        // A postponement made by mistake, put back on its old date (S-75): asks first.
+        <CallOffForms
+          action={callOffAction}
+          permalink={permalink}
+          hidden={hiddenOf(league, game)}
+          summaryButton
+          texts={restoreTexts(game, gameWhenText(game.startsAt, times))}
+        />
+      ) : null}
       {game.canForfeit || game.canPostpone || game.canCancel ? (
         <CallOffForms
           action={callOffAction}
           permalink={permalink}
           hidden={hiddenOf(league, game)}
-          offers={{
+          texts={callOffTexts(game, {
             forfeit: game.canForfeit,
             postpone: game.canPostpone,
             cancel: game.canCancel,
-          }}
-          teams={[
-            { value: game.homeTeamId, label: game.homeName },
-            { value: game.awayTeamId, label: game.awayName },
-          ]}
-          texts={callOffTexts(game)}
+          })}
         />
       ) : null}
       {game.canPutBack ? (
@@ -253,83 +286,13 @@ function Controls({
           permalink={permalink}
           hidden={hiddenOf(league, game)}
           summary={t('admin.games.putBack')}
-          choice={{
-            name: 'reason',
-            label: t('admin.games.putBack.reason'),
-            choose: t('admin.games.putBack.choose'),
-            options: putBackReasons.map((reason) => ({
-              value: reason,
-              label: t(`admin.games.putBack.reasons.${reason}`),
-            })),
-          }}
+          choice={putBackChoice()}
           button={t('admin.games.putBack.save')}
           refusal={refusal}
         />
       ) : null}
     </div>
   );
-}
-
-/**
- * The words of "Forfeit, postpone or cancel" for one game (step 2.158): each question
- * names the game; a forfeit's names the team that forfeits and the one that wins.
- */
-function callOffTexts(game: GameRowView): CallOffTexts {
-  const named = gameText(game);
-  // A scheduled game a scorer's table has set line-ups for: they are kept (the question says so).
-  const lineups = game.status === 'scheduled' && game.hasPlays;
-  const sides = [
-    { team: game.homeTeamId, name: game.homeName, other: game.awayName },
-    { team: game.awayTeamId, name: game.awayName, other: game.homeName },
-  ];
-  return {
-    summary: t(
-      game.status === 'postponed'
-        ? 'admin.games.otherActionsPostponed'
-        : 'admin.games.otherActions',
-    ),
-    refusal: t('admin.games.refusedAbout', { game: named, problem: '{problem}' }),
-    postpone: {
-      button: t('admin.games.postpone'),
-      ask: t(
-        lineups ? 'admin.games.callOff.ask.postponeLineups' : 'admin.games.callOff.ask.postpone',
-        {
-          game: named,
-        },
-      ),
-    },
-    cancel: {
-      button: t('admin.games.cancel'),
-      ask: t(lineups ? 'admin.games.callOff.ask.cancelLineups' : 'admin.games.callOff.ask.cancel', {
-        game: named,
-      }),
-    },
-    forfeit: {
-      button: t('admin.games.recordForfeit'),
-      label: t('admin.games.forfeitBy'),
-      choose: t('admin.games.callOff.chooseTeam'),
-      ask: Object.fromEntries(
-        sides.map((side) => [
-          side.team,
-          t('admin.games.callOff.ask.forfeit', {
-            team: side.name,
-            winner: side.other,
-            game: named,
-          }),
-        ]),
-      ),
-    },
-    yes: {
-      forfeit: t('admin.games.callOff.yes.forfeit'),
-      postpone: t('admin.games.callOff.yes.postpone'),
-      cancel: t('admin.games.callOff.yes.cancel'),
-    },
-    no: {
-      forfeit: t('admin.games.callOff.no.forfeit'),
-      postpone: t('admin.games.callOff.no.postpone'),
-      cancel: t('admin.games.callOff.no.cancel'),
-    },
-  };
 }
 
 /** What every game on the page is drawn with. */
@@ -515,7 +478,13 @@ export async function GamesPage({
     notice === undefined || aboutRow !== undefined
       ? undefined
       : await gameNamedOff(notice.thing, context, names, ports.games.deps);
-  const saved = notice === undefined ? undefined : noticeText(notice, aboutRow ?? offPage);
+  // The games a game put back now shares its place with, named from their records.
+  const others: string[] = [];
+  for (const other of notice?.about ?? []) {
+    const named = await gameNamedOff(other, context, names, ports.games.deps);
+    if (named !== undefined) others.push(gameText(named));
+  }
+  const saved = notice === undefined ? undefined : noticeText(notice, aboutRow ?? offPage, others);
   const scene: ListScene = {
     league,
     here: addressee,

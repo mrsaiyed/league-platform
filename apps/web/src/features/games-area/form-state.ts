@@ -48,7 +48,8 @@ export type BoxScoreState =
 export type FormState = Untouched | Refused;
 
 /** What "Forfeit, postpone or cancel" does to a game (step 2.158): each asks first. */
-export const callOffActs = ['forfeit', 'postpone', 'cancel'] as const;
+/** `restore`: a postponed game put back on its old date (S-75). */
+export const callOffActs = ['forfeit', 'postpone', 'cancel', 'restore'] as const;
 export type CallOffAct = (typeof callOffActs)[number];
 
 /**
@@ -59,8 +60,16 @@ export type CallOffAct = (typeof callOffActs)[number];
 export type CallOffState =
   | Untouched
   | Refused
-  /** The question: which change, and what was chosen (the team that forfeits). */
-  | { readonly kind: 'ask'; readonly act: CallOffAct; readonly typed: TypedFields };
+  /**
+   * The question: which change, what was chosen (the team that forfeits, the reason), and
+   * when the server drew it (call-off-step.ts: a "Yes" sent too soon after only asks again).
+   */
+  | {
+      readonly kind: 'ask';
+      readonly act: CallOffAct;
+      readonly typed: TypedFields;
+      readonly askedAt: number;
+    };
 
 export const untouched: Untouched = { kind: 'untouched' };
 
