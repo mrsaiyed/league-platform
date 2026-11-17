@@ -251,8 +251,19 @@ async function checkStats(page, width) {
       (s) => s.querySelector('h2')?.textContent.trim() === 'Teams',
     );
     const table = section?.querySelector('table');
+    // Said once, above both tables: the line just before them.
+    const both = document.querySelector('.stats-tables');
+    const players = [...document.querySelectorAll('section.ui-section')].find(
+      (s) => s.querySelector('h2')?.textContent.trim() === 'All players',
+    );
     return {
-      note: section?.querySelector('.ui-section-note')?.textContent.trim() ?? '',
+      note: both?.previousElementSibling?.textContent.trim() ?? '',
+      said: (document.querySelector('main')?.textContent.match(/Statistics count the games/g) ?? [])
+        .length,
+      // On a laptop the two tables stand side by side and start level.
+      tops: [players, section].map((s) =>
+        Math.round(s?.querySelector('table')?.getBoundingClientRect().top ?? -1),
+      ),
       heads: [...(table?.querySelectorAll('thead th') ?? [])].map((th) => th.innerText.trim()),
       full: [...(table?.querySelectorAll('thead th') ?? [])].map((th) => th.textContent.trim()),
       rows: [...(table?.querySelectorAll('tbody tr') ?? [])].map((tr) =>
@@ -266,10 +277,17 @@ async function checkStats(page, width) {
     };
   });
   note(
-    `the statistics say which games they count, with the teams' table, at ${width}`,
-    teams.note.startsWith(countsSentence),
+    `the statistics say which games they count, once, above both tables, at ${width}`,
+    teams.note.startsWith(countsSentence) && teams.said === 1,
     teams.note,
   );
+  if (width >= 1024) {
+    note(
+      `the two tables start level at ${width}`,
+      teams.tops[0] > 0 && teams.tops[0] === teams.tops[1],
+      JSON.stringify(teams.tops),
+    );
+  }
   note(
     `the teams' table counts its games right after the team at ${width}`,
     /\bGP\b/.test(teams.heads[1] ?? '') && /Games with statistics/.test(teams.full[1] ?? ''),
