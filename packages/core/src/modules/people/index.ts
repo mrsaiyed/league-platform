@@ -7,6 +7,7 @@ export {
   type NamePolicy,
   type NameRequest,
 } from './rules/name-policy.ts';
+export { personFieldNames, wrongPersonFields, type PersonFieldName } from './person-fields.ts';
 export {
   findPrivateFields,
   privateValuesOf,
