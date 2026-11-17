@@ -152,6 +152,38 @@ describe('what each seeded league holds', () => {
     }
   });
 
+  it('makes the other programs the data names, and limits a role to one where it says so', async () => {
+    const limited = seedLeagues.flatMap((l) => l.members.filter((m) => m.program !== undefined));
+    expect(limited.length).toBeGreaterThan(0);
+    for (const league of seedLeagues) {
+      const programs = await pglite.query<{ slug: string; name: string; is_default: boolean }>(
+        `select p.slug, p.name, p.is_default from programs p join leagues l on l.id = p.league_id
+         where l.slug = $1 and not p.is_default order by p.slug`,
+        [league.slug],
+      );
+      expect(programs.rows).toEqual(
+        (league.programs ?? []).map((p) => ({ slug: p.slug, name: p.name, is_default: false })),
+      );
+      const scopes = await pglite.query<{ email: string; scope_type: string; program: string }>(
+        `select a.email, g.scope_type, coalesce(p.slug, '') as program
+         from role_grants g join accounts a on a.id = g.account_id
+         join leagues l on l.id = g.league_id
+         left join programs p on p.league_id = g.league_id and p.id = g.scope_id
+         where l.slug = $1 and g.revoked_at is null order by a.email`,
+        [league.slug],
+      );
+      expect(scopes.rows).toEqual(
+        league.members
+          .map((m) => ({
+            email: m.email,
+            scope_type: m.program === undefined ? 'league' : 'program',
+            program: m.program ?? '',
+          }))
+          .sort((a, b) => a.email.localeCompare(b.email)),
+      );
+    }
+  });
+
   it('shows a league only its own teams and people when scoped to it', async () => {
     const ids = new Map<string, string>();
     for (const league of seedLeagues) {

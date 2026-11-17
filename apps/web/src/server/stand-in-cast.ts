@@ -83,7 +83,10 @@ export const standInSeedCast: SeedCast = {
   draftProgramId: standInDraftProgramId,
   // The archived league has a long season behind it: 300 games, all played (step 2.156).
   historyLeague: standInLeagues.archived,
-  otherLeagues: [standInLeagues.suspended, standInLeagues.inBin, standInLeagues.otherDraft],
+  // A draft league with a current season and nothing else, to start the whole job from
+  // (step 2.192); its admin holds nothing elsewhere.
+  emptyLeague: standInLeagues.otherDraft,
+  otherLeagues: [standInLeagues.suspended, standInLeagues.inBin],
   // The made-up coach has a roster place on a team of each league.
   memberAccountId: standInPeople.coach.accountId,
   assignees: [standInPeople.scorekeeper.accountId, standInPeople.owner.accountId],

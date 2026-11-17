@@ -1,5 +1,5 @@
 // T-140: captured, never sent; one email per idempotency key (T-137).
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { EmailMessage } from '@srleagues/core';
@@ -66,5 +66,34 @@ describe('captureEmail', () => {
     const json = JSON.parse(await readFile(path.join(folder, 'new', files[1]!), 'utf8'));
     expect(json).toMatchObject({ ...message, id });
     expect(await readFile(path.join(folder, 'new', files[0]!), 'utf8')).toBe(message.html);
+  });
+
+  it('removes its own oldest files past filesKept, and never a file it did not write', async () => {
+    const dir = path.join(folder, 'kept');
+    // Files this capture did not write: another capture's (the worker's, an earlier run's,
+    // in the very same form) and anyone's.
+    const other = captureEmail({ directory: dir, now: () => new Date('2026-11-13T09:00:00Z') });
+    const { id: othersId } = await other.send({ ...message, idempotencyKey: 'other' });
+    await writeFile(path.join(dir, 'notes.json'), '{}');
+    await writeFile(path.join(dir, 'notes.txt'), 'mine');
+    const times = ['10:00', '10:01', '10:02', '10:03'].map((at) => `2026-11-13T${at}:00Z`);
+    let at = 0;
+    const capture = captureEmail({
+      directory: dir,
+      filesKept: 2,
+      now: () => new Date(times[at] ?? '2026-11-13T11:00:00Z'),
+    });
+    const ids: string[] = [];
+    for (const key of ['one', 'two', 'three', 'four']) {
+      ids.push((await capture.send({ ...message, idempotencyKey: key })).id);
+      at += 1;
+    }
+    const files = await readdir(dir);
+    const ofId = (id: string) => files.filter((file) => file.includes(id)).length;
+    expect(ids.map(ofId)).toEqual([0, 0, 2, 2]);
+    expect(ofId(othersId)).toBe(2);
+    expect(files).toContain('notes.json');
+    expect(files).toContain('notes.txt');
+    expect(files).toHaveLength(2 + 2 + 2 + 2);
   });
 });

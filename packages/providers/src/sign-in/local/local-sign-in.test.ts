@@ -933,3 +933,10 @@ describe('reset by code', () => {
     expect(withPassword.accountId).toBe(google.accountId);
   });
 });
+
+describe('email confirmation (step 2.115)', () => {
+  it('says it confirms every address: none counts without a code or Google', async () => {
+    const env = setup();
+    expect(await env.sign.emailConfirmation()).toBe('on');
+  });
+});

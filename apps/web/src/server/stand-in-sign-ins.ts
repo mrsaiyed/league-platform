@@ -15,6 +15,8 @@
 
 /** A made-up person who signs in with a password, and who they are in the made-up leagues. */
 export type MadeUpSignIn = {
+  /** Their made-up name, on the "be this made-up person" page (step 2.96). */
+  readonly name: string;
   readonly email: string;
   readonly password: string;
   /** Who they are among the stand-in's made-up people (standInPeople, stand-in-cast.ts). */
@@ -30,21 +32,25 @@ export const standInMemberAccountId = '01900000-0000-7000-8000-0000000000ac';
 /** The made-up staff of the first made-up league, by role. */
 export const standInStaffSignIns = {
   owner: {
+    name: 'Olive Owner',
     email: 'owner@example.test',
     password: 'made-up owner password',
     person: 'owner',
   },
   scheduler: {
+    name: 'Sky Scheduler',
     email: 'scheduler@example.test',
     password: 'made-up scheduler password',
     person: 'scheduler',
   },
   scorekeeper: {
+    name: 'Sam Scorekeeper',
     email: 'scorekeeper@example.test',
     password: 'made-up scorekeeper password',
     person: 'scorekeeper',
   },
   coach: {
+    name: 'Casey Coach',
     email: 'coach@example.test',
     password: 'made-up coach password',
     person: 'coach',

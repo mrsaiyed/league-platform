@@ -7,7 +7,12 @@
 // is thrown as unexpected, never guessed at. Nothing thrown carries an address,
 // a password, a code or a token (T-86).
 
-/** The part of `fetch` the adapter uses, so tests can pass a fake Supabase. */
+/**
+ * The part of `fetch` the adapter uses, so tests can pass a fake Supabase. Every call
+ * is sent with `redirect: 'manual'`: the real `fetch` would otherwise follow a redirect
+ * with the same headers, carrying the secret key (`apikey`) to wherever it points and
+ * reading that place's answer as Supabase's. A redirect is a failed call instead.
+ */
 export type FetchLike = (
   url: string,
   init: {
@@ -15,6 +20,7 @@ export type FetchLike = (
     readonly headers: Record<string, string>;
     readonly body?: string;
     readonly signal?: AbortSignal;
+    readonly redirect?: 'manual';
   },
 ) => Promise<Response>;
 
@@ -83,6 +89,16 @@ export class SupabaseAuthUnexpected extends Error {
     this.name = 'SupabaseAuthUnexpected';
     this.status = status;
     this.code = code;
+  }
+}
+
+/**
+ * No answer within the time limit: the same unexpected answer to every caller, told
+ * apart only where the kind is reported (`email-confirmation.ts`, step 2.115).
+ */
+export class SupabaseAuthTimedOut extends SupabaseAuthUnexpected {
+  constructor(what: string) {
+    super(`${what}: no answer in time`);
   }
 }
 
@@ -181,6 +197,20 @@ function refusalOf(status: number, body: unknown, headers: Headers): GoTrueRefus
   };
 }
 
+/** The project's address must be https, or plain http to this machine when allowed (development only). */
+export function checkProjectUrl(projectUrl: string, allowLocalHttp: boolean) {
+  let url: URL;
+  try {
+    url = new URL(projectUrl);
+  } catch {
+    throw new Error('The Supabase project address is not an address.');
+  }
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  if (url.protocol !== 'https:' && !(allowLocalHttp && local && url.protocol === 'http:')) {
+    throw new Error('The Supabase project address must use https.');
+  }
+}
+
 export type GoTrueClient = ReturnType<typeof createGoTrueClient>;
 
 export function createGoTrueClient(options: GoTrueClientOptions) {
@@ -198,7 +228,7 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
     let timedOut = false;
     let giveUp: () => void = () => {};
     const timeout = new Promise<never>((_, reject) => {
-      giveUp = () => reject(new SupabaseAuthUnexpected(`${what}: no answer in time`));
+      giveUp = () => reject(new SupabaseAuthTimedOut(what));
     });
     const stop = startTimer(timeoutMs, () => {
       timedOut = true;
@@ -208,18 +238,24 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
     const exchange = (async () => {
       let response: Response;
       try {
-        response = await options.fetch(url, { ...init, signal: controller.signal });
+        // Never followed: the key would go with it (FetchLike). The 3xx, or the status 0
+        // a browser's fetch gives for one, is then thrown below like any answer it cannot use.
+        response = await options.fetch(url, {
+          ...init,
+          redirect: 'manual',
+          signal: controller.signal,
+        });
       } catch {
-        throw new SupabaseAuthUnexpected(
-          timedOut ? `${what}: no answer in time` : `${what}: no connection`,
-        );
+        throw timedOut
+          ? new SupabaseAuthTimedOut(what)
+          : new SupabaseAuthUnexpected(`${what}: no connection`);
       }
       try {
         return { response, raw: await response.text() };
       } catch {
-        throw new SupabaseAuthUnexpected(
-          timedOut ? `${what}: no answer in time` : `${what}: the answer was cut off`,
-        );
+        throw timedOut
+          ? new SupabaseAuthTimedOut(what)
+          : new SupabaseAuthUnexpected(`${what}: the answer was cut off`);
       }
     })();
     // The loser of the race must not be left rejecting with no one listening.
@@ -234,8 +270,8 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
 
   /**
    * One call. `bearer` is the person's access token, or the secret key for the admin
-   * calls. A 4xx comes back as a refusal; a 5xx, a failed connection or no answer in
-   * time is thrown.
+   * calls. A 4xx comes back as a refusal; a redirect (never followed), a 5xx, a failed
+   * connection or no answer in time is thrown.
    */
   async function call(
     what: string,
@@ -366,6 +402,15 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
     async signOut(accessToken: string, scope: 'local' | 'others' | 'global') {
       const answer = await call('logout', 'POST', `/logout?scope=${scope}`, accessToken);
       return mapAnswer(answer, () => null);
+    },
+
+    /**
+     * The project's public sign-in settings (`GET /settings`): the same answer any
+     * visitor with the project's key gets, so it needs no power the app does not hold.
+     * Read by `email-confirmation.ts`; the body is handed back as it came.
+     */
+    async settings() {
+      return call('settings', 'GET', '/settings', admin);
     },
 
     /** Where to send the browser for Google: Supabase's authorize address, with our PKCE challenge. */

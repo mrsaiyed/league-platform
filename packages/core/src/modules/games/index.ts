@@ -21,6 +21,13 @@ export {
   type EarlierGames,
   type EarlierRound,
 } from './commands/list-earlier-games.ts';
+// Which of a public page's games the signed-in person may score (step 2.153).
+export {
+  listScoringOffers,
+  scoringOffersLimit,
+  type ScoringOffer,
+  type ScoringOffers,
+} from './commands/list-scoring-offers.ts';
 export { needsResult, oldestFirst, type ResultFacts } from './needs-result.ts';
 export { earlierRoundKey, parseEarlierRoundKey } from './earlier-round-key.ts';
 export {

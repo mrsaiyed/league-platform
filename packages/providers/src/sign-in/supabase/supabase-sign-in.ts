@@ -52,7 +52,9 @@ import type {
   SignInService,
   TooManyAttempts,
 } from '../sign-in-service.ts';
+import { emailConfirmationOf } from './email-confirmation.ts';
 import {
+  checkProjectUrl,
   createGoTrueClient,
   SupabaseAuthUnexpected,
   type FetchLike,
@@ -132,19 +134,6 @@ const expectedRefusal = <C extends string>(
   const found = expected.find((code) => code === refusal.code);
   return found === undefined ? unexpected(what, refusal) : found;
 };
-
-function checkProjectUrl(projectUrl: string, allowLocalHttp: boolean) {
-  let url: URL;
-  try {
-    url = new URL(projectUrl);
-  } catch {
-    throw new Error('The Supabase project address is not an address.');
-  }
-  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if (url.protocol !== 'https:' && !(allowLocalHttp && local && url.protocol === 'http:')) {
-    throw new Error('The Supabase project address must use https.');
-  }
-}
 
 export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInService {
   const allowLocalHttp = options.allowLocalHttp ?? false;
@@ -683,6 +672,9 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
         }));
       return ok(list);
     },
+
+    // Supabase's own setting, read from the project (email-confirmation.ts, step 2.115).
+    emailConfirmation: () => emailConfirmationOf(auth),
   };
 
   return service;

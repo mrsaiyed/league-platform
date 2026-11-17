@@ -8,6 +8,7 @@
 import {
   earlierRoundGamesLimit,
   earlierRoundsLimit,
+  gameAnchor,
   getBoxScoreSheet,
   leagueUrl,
   listEarlierGames,
@@ -45,7 +46,6 @@ import { gamesSections } from './games-sections.ts';
 import { readReopenViews } from './read-reopen-views.ts';
 import { ReopenLine } from './reopen-line.tsx';
 import { SavedLine } from './saved-line.tsx';
-import { gameAnchor } from './score-fields.ts';
 
 /** What the words of a saved notice read of the game it names. */
 type NamedGame = Pick<
