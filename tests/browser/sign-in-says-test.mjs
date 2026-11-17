@@ -708,6 +708,10 @@ await step('signing out from the admin is the sign-in screen, saying so (U-15)',
     );
     const url = new URL(page.url());
     note(
+      '"Back to North Valley League" there leads to the league\'s home, not the admin again',
+      (await link(page, 'Back to North Valley League').getAttribute('href')) === '/north-valley',
+    );
+    note(
       'signed out from the admin: the sign-in screen says so and comes back to the admin',
       url.searchParams.get('next') === '/north-valley/admin' &&
         (await page.getByText('You are signed out.', { exact: true }).count()) === 1,

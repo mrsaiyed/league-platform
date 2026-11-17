@@ -77,18 +77,33 @@ describe('returnLeagueFor (U-9)', () => {
     });
   }
 
-  it('names a league the person may see, and leads back to the page they came from', async () => {
+  it('names a league the person may see, and leads back to its home', async () => {
     const found = await returnLeagueFor(
       safeReturnPath('/north-valley/schedule?team=owls'),
       await factsOf('visitor'),
       deps,
       standInLeagueSites,
     );
-    expect(found).toEqual({
-      name: 'North Valley League',
-      href: '/north-valley/schedule?team=owls',
-    });
+    expect(found).toEqual({ name: 'North Valley League', href: '/north-valley' });
     expect(await named('visitor', '/old-meadow')).toBe('Old Meadow League');
+  });
+
+  it('never leads back to the page that refused the person (review of step 2.157)', async () => {
+    for (const who of ['visitor', 'coach', 'stranger'] as const) {
+      for (const raw of ['/north-valley/admin', '/north-valley/admin/teams']) {
+        const found = await returnLeagueFor(
+          safeReturnPath(raw),
+          await factsOf(who),
+          deps,
+          standInLeagueSites,
+        );
+        expect({ who, raw, found }).toEqual({
+          who,
+          raw,
+          found: { name: 'North Valley League', href: '/north-valley' },
+        });
+      }
+    }
   });
 
   it("names a draft to its own staff only, and never another draft's", async () => {

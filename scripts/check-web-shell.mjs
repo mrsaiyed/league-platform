@@ -184,6 +184,30 @@ const cases = [
     200,
     ['Sign in to carry on at North Valley League.', 'Back to North Valley League'],
   ],
+  // Sent to sign in from a page that refused them, "Back to" leads to the league's home,
+  // never to the refusal again; signing in still goes on to the page (review of 2.157).
+  [
+    'visitor',
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fteams',
+    200,
+    [
+      '<a class="ui-button" data-kind="quiet" href="/north-valley">Back to North Valley League</a>',
+      'name="next" value="/north-valley/admin/teams"',
+    ],
+  ],
+  // A signed-in person refused there ("Use another account") is told who they are signed in
+  // as and can sign out to use another, coming back to sign in for the same page (2.163).
+  [
+    'coach',
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fteams',
+    200,
+    [
+      'You are already signed in',
+      'Sign out and use another account',
+      'name="next" value="/signin?next=%2Fnorth-valley%2Fadmin%2Fteams"',
+    ],
+    ['name="password"'],
+  ],
   ...['visitor', 'coach'].flatMap((who) =>
     ['%2Fquiet-pines', '%2Fquiet-pines%2Fadmin', '%2Fclosed-gate', '%2Fno-such-league'].map(
       (next) => [
