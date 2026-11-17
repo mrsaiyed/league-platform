@@ -121,6 +121,8 @@ export { findGame } from './find-game.ts';
 export { gameSummary } from './game-summary.ts';
 export { insertGameCorrection } from './insert-game-correction.ts';
 export { listPostponedGames } from './list-postponed-games.ts';
+export { findStatusBeforeCancelled } from './find-status-before-cancelled.ts';
+export { listGameClashes } from './list-game-clashes.ts';
 export { updateGameResult } from './update-game-result.ts';
 export { updateGameNotStarted } from './update-game-not-started.ts';
 export { findGameCorrectedDate } from './find-game-corrected-date.ts';
