@@ -388,6 +388,7 @@ All dated November 12, 2026.
 | T-277                 | New                                                                          | Agreed (delegated): a design is kept as site releases (history) and a draft site, checked by one schema in contracts, read again on draw (rec. 073)                                           | Step 2.187: nothing stored a league's design; every league on the database was drawn neutral         |
 | T-279                 | New (serves T-140)                                                           | Agreed (delegated): local emails kept in `.local/captured-email` and read on a local-only page; "be this made-up person"; the test copy's kept in its own database, read by script (rec. 075) | Step 2.96: a new address could not finish signing up on this computer; codes were lost in memory     |
 | T-283                 | New                                                                          | Agreed (delegated): a release with a known hole is left at once for its line's newest patch, by hand; Next.js 16.4.3 to 16.4.6 (rec. 079)                                                     | Step 2.193: Next.js's notice called 16.4.3 vulnerable and stopped every first build away from GitHub |
+| T-280                 | New                                                                          | Agreed (delegated): the games area and the tracker run on the database; what a watcher reads of a game is one snapshot with the league's name settings (rec. 076)                             | Step 2.93 part 6: the game page read the names settings and the game in separate transactions        |
 
 ## The full list
 
@@ -828,6 +829,7 @@ Each line is the decision's opening sentence. The reasoning and detail are in th
 | T-261 | Players added, changed and taken off at the scorer's table travel in the tracker's own queue (protocol 2), handled before the engine and kept as events without names; the device refreshes rosters from `GET …/games/{game}/rosters` (record 058)                      | Agreed (delegated) |         |
 | T-263 | `games.reopen_tracked_game`: a game its tracker ended, by whoever may score it, if they may correct games or sent its end within `games.scorekeeperReopenMinutes` (0 to 1440) of `finalized_at`, timed in the database; GET says before the tap (record 060)            | Agreed (delegated) |         |
 | T-265 | A season's foul limit, mercy lead and last-minutes stop clock reach the engine, left out when off; the device gets them in the state it loads; taps take the platform's command shape, clock-mode switch included, still protocol 2, version 1 as it was (record 062)   | Agreed (delegated) |         |
+| T-280 | A game's snapshot, page and live message read the game and the league's name settings and audience in one snapshot; its reads alone read no person; no live service on the database yet (rec. 076)                                                                      | Agreed (delegated) |         |
 
 ### [T7 — Notifications and jobs](technical/T7-notifications-and-jobs.md)
 
