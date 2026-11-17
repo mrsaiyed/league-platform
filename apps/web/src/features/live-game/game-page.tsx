@@ -18,6 +18,7 @@ import { isGameIdFormat } from '../../server/league-api.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { placeOf } from '../schedule-pages/index.ts';
+import { staffNumbersAddress } from '../staff-numbers/index.ts';
 import { loadTeamCardsOf } from '../team-pages/index.ts';
 import {
   boardColors,
@@ -114,6 +115,15 @@ export async function GamePage({
           ...(place === undefined ? {} : { placeText: place }),
         },
         teams,
+        // A team whose players are kept from the public: the box score says so already.
+        ...(page.value.boxScores.some((box) => !box.playerLinesShown)
+          ? {
+              staffNumbersAddress: staffNumbersAddress(addressee, {
+                page: 'game',
+                game: snapshot.value.gameId,
+              }),
+            }
+          : {}),
       }}
     />
   );

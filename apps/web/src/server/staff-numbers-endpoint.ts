@@ -34,6 +34,7 @@ import {
 import { z } from 'zod';
 import { buildBoxScores, buildPlays, gameWords } from '../features/live-game/build-game.ts';
 import { gameNumbersView, type GameNumbersView } from '../features/live-game/game-numbers-view.ts';
+import { staffNumbersParts } from '../features/staff-numbers/index.ts';
 import { loadStatsPage, parseBy } from '../features/stats-pages/build-stats.ts';
 import {
   statsTablesView,
@@ -47,8 +48,7 @@ import { t } from './messages.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
-/** The address parts of this endpoint, under the league's (leagueApiUrl). */
-export const staffNumbersParts = ['staff-numbers'] as const;
+export { staffNumbersParts };
 
 const privately = { 'Cache-Control': 'private, no-store' } as const;
 

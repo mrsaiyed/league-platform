@@ -21,6 +21,7 @@ import { GameOffer, scoringAddressOf } from '../schedule-pages/index.ts';
 import { LiveGameView } from './live-game-view.tsx';
 import { GameNumbersDrawn } from './game-numbers-drawn.tsx';
 import { gameNumbersView } from './game-numbers-view.ts';
+import { StaffGameNumbers } from './staff-game-numbers.tsx';
 
 export type GameView = {
   readonly leagueId: string;
@@ -48,6 +49,11 @@ export type GameView = {
    * still to come or put off: such a page has no box score and no plays to end with.
    */
   readonly teams?: readonly GameTeamCard[] | undefined;
+  /**
+   * Where the page asks, after it has arrived, for the numbers it leaves out (step 2.46):
+   * only for a game whose box score or plays keep a team's players from the public.
+   */
+  readonly staffNumbersAddress?: string | undefined;
 };
 
 /** A team as the foot of a game's page draws it: the same facts as on the teams page. */
@@ -65,6 +71,16 @@ export type GameTeamCard = {
 export function GameContent({ view }: { readonly view: GameView }) {
   const arrivedFinal = view.snapshot.status === 'final';
   const pending = ['scheduled', 'postponed', 'cancelled'].includes(view.status);
+  const numbers = (
+    <GameNumbersDrawn
+      view={gameNumbersView({
+        boxScores: view.boxScores,
+        plays: view.plays,
+        live: view.snapshot.status === 'live',
+        selfAddress: view.selfAddress,
+      })}
+    />
+  );
   return (
     <main className="game-page">
       {view.scheduleAddress === undefined ? null : (
@@ -154,14 +170,15 @@ export function GameContent({ view }: { readonly view: GameView }) {
           </ul>
         </Section>
       ) : null}
-      <GameNumbersDrawn
-        view={gameNumbersView({
-          boxScores: view.boxScores,
-          plays: view.plays,
-          live: view.snapshot.status === 'live',
-          selfAddress: view.selfAddress,
-        })}
-      />
+      {view.staffNumbersAddress === undefined ? (
+        numbers
+      ) : (
+        // Drawn again from the start when the page is drawn again as the game starts or ends
+        // (record 051), so it asks again then.
+        <StaffGameNumbers key={view.snapshot.status} address={view.staffNumbersAddress}>
+          {numbers}
+        </StaffGameNumbers>
+      )}
     </main>
   );
 }

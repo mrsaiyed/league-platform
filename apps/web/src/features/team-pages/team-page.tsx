@@ -19,7 +19,9 @@ import {
   type TeamStatsView,
 } from './build-team.ts';
 import { chooseMyTeamAction, clearMyTeamAction } from './my-team-actions.ts';
+import { staffNumbersAddress } from '../staff-numbers/index.ts';
 import { leagueHomeStayUrl } from './start-page.ts';
+import { StaffTeamStats } from './staff-team-stats.tsx';
 import { TeamStatsDrawn } from './team-stats-drawn.tsx';
 import { teamStatsView } from './team-stats-view.ts';
 
@@ -261,8 +263,21 @@ export async function TeamPage({
       <Section title={t('team.stats')}>
         {stats === undefined ? (
           <EmptyPanel text={t('team.statsNone')} />
-        ) : (
+        ) : stats.playerLinesShown ? (
           <TeamStatsSection stats={stats} />
+        ) : (
+          // The page says already that this team's players are not shown: only then can
+          // someone see more, and only then does the page ask, after it has arrived, as
+          // whoever is signed in here (step 2.46, T-95).
+          <StaffTeamStats
+            address={staffNumbersAddress(addressee, {
+              page: 'team',
+              season: season.id,
+              team: head.teamId,
+            })}
+          >
+            <TeamStatsSection stats={stats} />
+          </StaffTeamStats>
         )}
       </Section>
     </main>

@@ -9,6 +9,8 @@ import { t } from '../../server/messages.ts';
 import { loadStatsPage, parseBy, type StatsPageData } from './build-stats.ts';
 import { chooseSeason, firstValue } from './choose-season.ts';
 import type { SearchParams } from './standings-page.tsx';
+import { staffNumbersAddress } from '../staff-numbers/index.ts';
+import { StaffStatsTables } from './staff-stats-tables.tsx';
 import { StatsTablesDrawn } from './stats-tables-drawn.tsx';
 import { statsTablesView } from './stats-tables-view.ts';
 
@@ -51,6 +53,15 @@ export async function StatsPage({
   if (data !== undefined && 'code' in data) return notFound();
   const labels = displayLabels(t);
   const action = leagueUrl(addressee, 'stats');
+  const tables =
+    data === undefined ? null : (
+      <StatsTables
+        data={data}
+        scheduleHref={leagueUrl(addressee, 'schedule', {
+          season: asked === undefined || asked === '' ? undefined : asked,
+        })}
+      />
+    );
   return (
     <main>
       <PageHead title={t('stats.heading')} kicker={season?.name} sub={t('stats.lead')} />
@@ -72,12 +83,18 @@ export async function StatsPage({
               keep={asked === undefined || asked === '' ? {} : { season: asked }}
             />
           </FilterToolbar>
-          <StatsTables
-            data={data}
-            scheduleHref={leagueUrl(addressee, 'schedule', {
-              season: asked === undefined || asked === '' ? undefined : asked,
-            })}
-          />
+          {/* A team whose players' numbers are kept from the public is named on the page
+              already: only then can someone see more, and only then does the page ask, after
+              it has arrived, as whoever is signed in here (step 2.46, T-95). */}
+          {data.totalsOnlyTeams.length > 0 ? (
+            <StaffStatsTables
+              address={staffNumbersAddress(addressee, { page: 'stats', season: season.id, by })}
+            >
+              {tables}
+            </StaffStatsTables>
+          ) : (
+            tables
+          )}
         </>
       )}
     </main>

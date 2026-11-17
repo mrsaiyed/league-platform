@@ -873,6 +873,33 @@ html {
   }
 }
 
+/* Above the numbers a signed-in coach, captain or admin sees beyond the public's (step
+   2.46): something to know, a quiet mark beside what it is about, never a band across the
+   page. A rule in the league's main color at its start edge, on the panel's ground. */
+.staff-numbers-note {
+  margin-block: var(--step-5) 0;
+  padding-block: var(--step-3);
+  padding-inline: var(--step-4);
+  border-inline-start: var(--line-heavy) solid var(--color-pop);
+  border-radius: var(--radius-small);
+  background: var(--color-panel);
+  color: var(--color-text);
+  font-size: var(--text-14);
+}
+.staff-numbers-note > p {
+  margin: 0;
+}
+.staff-numbers-note-title {
+  color: var(--color-accent-text);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+}
+.staff-numbers-note-title + p {
+  margin-block-start: var(--step-1);
+}
+
 /* The teams page of a league with divisions: each division's cards under its own small
    label, as its standings are. */
 .teams-divisions {
