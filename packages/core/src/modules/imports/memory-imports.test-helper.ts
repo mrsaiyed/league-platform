@@ -223,6 +223,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
         assign: async () => false,
         unassign: async () => false,
         listWindow: async () => ({ today: '2026-12-20', games: [] }),
+        listByIds: async () => ({ today: '2026-12-20', games: [] }),
         listNeedingResult: async () => ({ today: '2026-12-20', games: [] }),
         listEarlierRounds: async () => [],
         listEarlierRound: async () => ({ today: '2026-12-20', games: [] }),

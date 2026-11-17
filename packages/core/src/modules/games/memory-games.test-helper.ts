@@ -11,7 +11,7 @@ import {
 import { boxScoreStores } from '../../command/testing/memory-box-scores.ts';
 import type { DomainEvent, EventHandler, JobQueue } from '../../command/index.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
-import type { StoredSetting } from '../leagues/index.ts';
+import { dayIn, type StoredSetting } from '../leagues/index.ts';
 import { isDecided } from './game-fields.ts';
 import {
   earlierRoundsOf,
@@ -48,6 +48,12 @@ export type MemoryGames = {
   settings: Record<string, StoredSetting[]>;
   /** The league's today (YYYY-MM-DD); the stand-in's league keeps UTC. */
   today: string;
+  /**
+   * The league's time zone, where a test is about it: then the read of games by id works
+   * out today from `now` and each game's day in that zone, by core's own rule (dayIn of
+   * the leagues module), as the web app's stand-in does; `today` is not read there.
+   */
+  timeZone?: string;
   /** The store's clock now, on the league's today. */
   now: string;
   /** The round each game is in, by game id; a game not here is in no round. */
@@ -286,6 +292,26 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
           .sort((a, b) => oldestFirst(a.g, b.g))
           .map(({ g }) => entryOf(s, g, accountId));
         return { today: s.today, games };
+      },
+      // As the database: games of these ids not in the bin, of a season that is here, each
+      // with its day in the league's zone when the test gives one.
+      listByIds: async (accountId, gameIds) => {
+        const zone = s.timeZone;
+        const today = zone === undefined ? s.today : dayIn(zone, Date.parse(s.now));
+        return {
+          today,
+          games: s.games
+            .filter(
+              (g) =>
+                gameIds.includes(g.id) && !g.binned && s.seasons.some((x) => x.id === g.seasonId),
+            )
+            .map((g) => {
+              const entry = entryOf(s, g, accountId);
+              if (zone === undefined) return entry;
+              const day = g.startsAt === null ? today : dayIn(zone, Date.parse(g.startsAt));
+              return { ...entry, day };
+            }),
+        };
       },
       // Each keeps the games in the person's reach first, then cuts, as the database does.
       listNeedingResult: async (accountId, reach, limit) => ({

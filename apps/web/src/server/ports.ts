@@ -12,6 +12,7 @@ import type { ContextDeps, IdentifyError } from './context.ts';
 import type { FixtureImportPorts } from './fixture-import-ports.ts';
 import type { GamesAreaPorts } from './games-area-ports.ts';
 import type { LeagueSiteLookup } from './league-site.ts';
+import type { LocalTools } from './local-tools.ts';
 import type { PublicSchedulePorts } from './public-schedule.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 import type { PublicTeamsPorts } from './public-teams.ts';
@@ -57,6 +58,11 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly games: GamesAreaPorts;
   /** Each league's name and design, as its pages show them (league-site.ts). */
   readonly leagueSites: LeagueSiteLookup;
+  /**
+   * The kept emails' page and "be this made-up person" (step 2.96, local-tools.ts): only on
+   * made-up data, null on a real database. The pages ask the app's mode first (local-only.ts).
+   */
+  readonly localTools: LocalTools | null;
   /** What the public home and schedule pages read (step 2.42). */
   readonly publicSchedule: PublicSchedulePorts;
   /** What the public standings and statistics pages read (step 2.43). */
@@ -80,9 +86,10 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    */
   readonly madeUpWorld: boolean;
   /**
-   * Whether a request with these headers may be answered at all. The made-up world answers
-   * only one addressed to this computer's names (or its own `.test` name) and not passed
-   * on by another server (stand-in-ports.ts, answersOnlyHere); a database always answers.
+   * Whether a request with these headers may be answered at all. The made-up world, and any
+   * ports that carry the local tools (the made-up database's), answer only one addressed to
+   * this computer's names (or its own `.test` name) and not passed on by another server
+   * (this-computer.ts, answersOnlyHere); a real database always answers.
    */
   readonly answers: (headers: Headers) => boolean;
 };

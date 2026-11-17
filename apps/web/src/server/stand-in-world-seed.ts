@@ -61,6 +61,8 @@ export const standInSeasonIds = {
   draftLeague: madeUp('005e', 1),
   /** The archived league's one long season, all played (step 2.156: 300 past games). */
   history: madeUp('005e', 3),
+  /** The empty league's current season, holding nothing yet (step 2.192). */
+  empty: madeUp('005e', 4),
 } as const;
 
 /** A tracked game's id: game 1 to 6 of the adult league (and the draft league's same games). */
@@ -1005,6 +1007,11 @@ export type SeedCast = {
   readonly draftProgramId: string;
   /** The archived league: one long season, 300 games, all played long ago (step 2.156). */
   readonly historyLeague: CastLeague;
+  /**
+   * The league to start the whole job from (step 2.192): a current season with the
+   * product's default rules and nothing else, no teams, people, rounds, games or venues.
+   */
+  readonly emptyLeague: CastLeague;
   /** Every other made-up league: no seasons yet. */
   readonly otherLeagues: readonly CastLeague[];
   /** The account that has a roster place in each league (a made-up member). */
@@ -1452,8 +1459,47 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   );
   history.currentSeasonId = null;
 
+  // The empty league (step 2.192): one current season, with the product's default rules,
+  // that holds nothing yet, so the whole job can be walked from the start. Adults play, so
+  // no youth name policy is needed on the way.
+  const emptyTimeZone = adultTimeZone;
+  const emptyToday = dayIn(now, emptyTimeZone);
+  const empty = leagueOf(
+    {
+      league: cast.emptyLeague,
+      audience: 'adult',
+      timeZone: emptyTimeZone,
+      minimumGames: minimumGamesToRank.default,
+      programId: madeUp('009a', 4),
+      venues: [],
+    },
+    [
+      {
+        season: {
+          id: standInSeasonIds.empty,
+          programId: madeUp('009a', 4),
+          programSlug: 'basketball',
+          name: 'First Season',
+          slug: 'first-season',
+          startsOn: addDays(emptyToday, -7),
+          endsOn: addDays(emptyToday, 90),
+          status: 'active',
+          rules: { version: 1 },
+        },
+        teams: [],
+        rosters: {},
+        divisions: [],
+        rounds: [],
+        games: [],
+      },
+    ],
+    standInSeasonIds.empty,
+    cast.memberAccountId,
+    now,
+  );
+
   const others = cast.otherLeagues.map((league) =>
     emptyLeagueWorld(league, { audience: 'youth', timeZone: 'UTC' }),
   );
-  return [adult, youth, draft, history, ...others];
+  return [adult, youth, draft, history, empty, ...others];
 }

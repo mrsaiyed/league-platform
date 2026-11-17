@@ -88,6 +88,7 @@ import {
   listPeople,
   listPostponedGames,
   listRoster,
+  listScoringOffers,
   listVenues,
   markLeft,
   markNotStarted,
@@ -989,6 +990,18 @@ const gameCommandRows: readonly Row[] = [
     scope: 'program',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listMyGames(c, i, gamesDeps),
+  },
+  // Step 2.153: which of a public page's games the person may score.
+  {
+    command: 'games.list_scoring_offers',
+    name: "ask which of a page's games I may score",
+    needs: 'games.score',
+    // Anyone who scores somewhere may ask; the answer holds only what they may score.
+    scope: 'program',
+    prepare: async (league) => ({
+      input: { gameIds: [(await gameIn(league, true)).gameId] },
+    }),
+    run: (c, i) => listScoringOffers(c, i, gamesDeps),
   },
   // Step 2.156: the top of the games list, and its earlier games by round.
   {

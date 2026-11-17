@@ -10,6 +10,7 @@ import {
   listGamesNeedingResult as listGamesNeedingResultCommand,
   listMyGames,
   listPostponedGames as listPostponedGamesCommand,
+  listScoringOffers,
   openScoringSession,
   postponeGame,
   putGameBack,
@@ -57,6 +58,7 @@ import {
   listGameRoster,
   listEarlierRound,
   listEarlierRounds,
+  listGamesByIds,
   listGamesInWindow,
   listGamesNeedingResult,
   listPostponedGames,
@@ -337,6 +339,14 @@ registerIsolationCase({
   },
 });
 
+// Step 2.153: the games of a public page, asked which the person may score.
+registerIsolationCase({
+  subject: listGamesByIds,
+  name: "list the target's two games by their ids",
+  run: (scope, target) =>
+    listGamesByIds(scope, target.memberId, [target.upcomingGameId, target.gameId]),
+});
+
 // Step 2.156: the games that still need a result, and the earlier games by round.
 const startTargetGameAnHourAgo = (scope: LeagueScope, target: LeagueRecords) =>
   sql`update games set starts_at = now() - interval '1 hour'
@@ -472,6 +482,11 @@ registerIsolationCase({
     await bringTargetGameNear(scope, target);
     return runAsApp(listMyGames, harnessTx, scope, {});
   },
+});
+
+registerCommandCase(listScoringOffers, harnessTx, {
+  name: "ask which of the target's two games the scope's account may score",
+  input: (target) => ({ gameIds: [target.upcomingGameId, target.gameId] }),
 });
 
 registerIsolationCase({

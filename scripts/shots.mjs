@@ -8,6 +8,8 @@
 //   node scripts/shots.mjs --only=home,admin    only pictures whose name contains one of these
 //   node scripts/shots.mjs --design=pine        the first made-up league under a named design
 //   node scripts/shots.mjs --measure            also measures the contrast of every public page
+//   LOCAL_NOW=<UTC time> node scripts/shots.mjs  the made-up world's clock starts there, as in
+//                                                the browser tests (a game day at noon: worldAtNoon)
 //
 // `--measure` sets every piece of text on each public page it pictures against what the
 // text stands on, and every control's edge against what is around it, and writes what it
@@ -551,8 +553,24 @@ async function askFinal(page, n, away, home) {
   return game;
 }
 
+/** The buttons are read after the page (step 2.153): the picture waits for the first one. */
+const offersDrawn = (page) =>
+  page.locator('main [data-offer]').first().waitFor({ state: 'attached', timeout: 60_000 });
 // What the scorekeeper sees (step 2.33): their games, and the tracker opened from them.
 const scorekeeperPages = [
+  // The league's own pages as the scorekeeper sees them (step 2.153): "Score this game" or
+  // "Enter the score" on the cards of the games they may score, and on a game's page.
+  { name: 'scorekeeper-home', at: '', steps: offersDrawn },
+  { name: 'scorekeeper-schedule', at: '/schedule', steps: offersDrawn },
+  { name: 'scorekeeper-game', at: `/games/${liveGame}`, steps: offersDrawn },
+  // In the draft league, which scores assigned games only: the scorekeeper's one game whose
+  // day has come carries the button, its neighbours none (S-70; the card's foot, 2.153).
+  {
+    name: 'scorekeeper-schedule-assigned',
+    league: 'quiet-pines',
+    at: '/schedule',
+    steps: offersDrawn,
+  },
   { name: 'scorekeeper-games', at: '/admin' },
   { name: 'scorekeeper-tracker', at: '/admin', first: '/score/' },
   // The games list as a scorekeeper sees it: a final game says who can reopen it (2.154).
@@ -1322,9 +1340,9 @@ try {
       })),
       ...scorekeeperPages.map((page) => ({
         ...page,
-        name: `${leagues[0]}-${page.name}`,
+        name: `${page.league ?? leagues[0]}-${page.name}`,
         context: keeper,
-        base: `/${leagues[0]}`,
+        base: `/${page.league ?? leagues[0]}`,
       })),
       ...(design === '' ? schedulerPages : []).map((page) => ({
         ...page,
