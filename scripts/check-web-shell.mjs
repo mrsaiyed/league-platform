@@ -721,13 +721,39 @@ const cases = [
     [notFound, 'We could not find that game.'],
     ['Bears at Hawks', 'North Valley'],
   ],
-  // The same in the admin's games: the box score of another league's game (step 2.157).
+  // The same in the admin's games: the box score of another league's game, "Page not
+  // found" in the box score's own words (step 2.157).
   [
     'owner',
     `/harbor-city/admin/games/${liveGame}`,
     404,
-    [notFound],
-    ['Bears at Hawks', 'North Valley', 'That game is not there'],
+    [notFound, 'That game is not there, or you may not score it.', 'Back to the games'],
+    ['Bears at Hawks', 'North Valley', noAccess],
+  ],
+  // Every box score a person cannot open is the same 404, never a page answered 200 (step
+  // 2.157): a game not assigned to a scorekeeper in the draft league, which scores assigned
+  // games only (the same game the tracker refuses them above), a game of
+  // an archived league (nobody scores there), and an address that is no game.
+  [
+    'scorekeeper',
+    `/quiet-pines/admin/games/${liveGame}`,
+    404,
+    [notFound, 'That game is not there, or you may not score it.'],
+    [noAccess],
+  ],
+  [
+    'owner',
+    `/old-meadow/admin/games/${liveGame}`,
+    404,
+    [notFound, 'That game is not there, or you may not score it.'],
+    [noAccess],
+  ],
+  [
+    'owner',
+    `/north-valley/admin/games/${game(99)}`,
+    404,
+    [notFound, 'That game is not there, or you may not score it.'],
+    [noAccess],
   ],
   // A scorekeeper's admin: their games, each with a button to the tracker (P4 §4).
   [

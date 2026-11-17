@@ -15,6 +15,7 @@ import {
   type BoxScoreSheet,
   type GameLine,
   type GameRosterPlayer,
+  type LeagueAddressee,
 } from '@srleagues/core';
 import { MessagePage, PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
@@ -111,22 +112,14 @@ export async function BoxScorePage({
   const context = commandContextOf(view.context);
   const read = await getBoxScoreSheet(context, { gameId: gameId.toLowerCase() }, ports.games.deps);
   const back = leagueUrl(here, 'admin-area', { area: 'games' });
-  // A game that is not this league's, another league's among them, is "Page not found"
-  // with status 404, inside the admin's frame (step 2.157): nothing of the other league.
-  if (!read.ok && read.error.code === 'game-not-found') return notFound();
-  if (!read.ok) {
-    // A game this person may not score here. A finished page too (DESIGN.md section 4,
-    // line 19): centered, titled, one way on.
-    return (
-      <MessagePage
-        className="admin-games"
-        title={t('common.notFoundTitle')}
-        action={{ href: back, label: t('admin.boxScore.back') }}
-      >
-        <p role="alert">{t('admin.boxScore.notFound')}</p>
-      </MessagePage>
-    );
-  }
+  // Any game this person cannot open here is "Page not found" with status 404, inside the
+  // admin's frame, in this page's own words (BoxScoreNotFound; step 2.157): a game that is
+  // not this league's (another league's among them: nothing of it is said), and one they
+  // may not score. The second is not answered as a refusal: who may score is checked before
+  // the game is looked up, so it never tells an existing game from a missing one, and it
+  // covers a league that is archived or suspended, where nobody scores, for which "your role
+  // does not include this page" would be untrue.
+  if (!read.ok) return notFound();
   const sheet = read.value;
   const { game } = sheet;
   const names = (await ports.games.namesOf(here.id)).teams;
@@ -283,5 +276,25 @@ export async function BoxScorePage({
           : {})}
       />
     </main>
+  );
+}
+
+/**
+ * "Page not found" at a game's box score address, for someone with the admin's Games area
+ * (app/[league]/admin/games/[game]/not-found.tsx, step 2.157): a game that is not there for
+ * them to score, with the way back to the games. The admin's frame is drawn around it.
+ */
+export function BoxScoreNotFound({ league }: { readonly league: LeagueAddressee }) {
+  return (
+    <MessagePage
+      className="admin-games"
+      title={t('common.notFoundTitle')}
+      action={{
+        href: leagueUrl(league, 'admin-area', { area: 'games' }),
+        label: t('admin.boxScore.back'),
+      }}
+    >
+      <p>{t('admin.boxScore.notFound')}</p>
+    </MessagePage>
   );
 }
