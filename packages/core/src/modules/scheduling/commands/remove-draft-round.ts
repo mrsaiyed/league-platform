@@ -1,8 +1,9 @@
-// Removes a round from the season's schedule draft (P7 §4.3, step 2.160). Only a round no
-// game is in can go: a game of the draft in it is refused by the schedule rules
-// (`round-has-games`), and a game the draft does not hold (in the bin, with no date yet,
-// or removed by the draft, which keeps its round in the bin) as `round-in-use`. The round
-// itself is removed when the draft is published.
+// Removes a round from the season's schedule draft (P7 §4.3, steps 2.160 and 2.181). Only
+// a round no game is in can go: a game of the draft in it is refused by the schedule rules
+// (`round-has-games`), and a game with no date yet, which the draft does not hold, as
+// `round-in-use`. A game in the bin does not hold its round, nor does one the draft
+// removes (S-60): when the draft is published the round is removed and those games, in
+// the bin by then, lose their round.
 import { z } from 'zod';
 import { defineCommand, type Result } from '../../../command/index.ts';
 import { draftBasis, editDraft, type DraftEditError, type DraftEditValue } from '../draft-edit.ts';
@@ -24,10 +25,10 @@ export const removeDraftRound = defineCommand({
       action: 'scheduling.remove_draft_round',
       input,
       change: { kind: 'remove-round', roundId: input.roundId },
-      check: async (sofar) => {
+      check: async (sofar, published) => {
         // The rules say it best when the draft's own games are in the round.
         if (sofar.games.some((g) => g.roundId === input.roundId)) return undefined;
-        const used = await roundsStillInUse(tx, input.seasonId, [input.roundId], sofar);
+        const used = await roundsStillInUse(tx, input.seasonId, [input.roundId], published, sofar);
         return used.has(input.roundId) ? { code: 'round-in-use' } : undefined;
       },
     }),
