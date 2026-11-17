@@ -11,7 +11,7 @@ Written 2026-11-17 by the area lead for data safety, from build branch commit `7
   - The two-league test with a query's league filter taken out, **76 times, one query at a time, in a copy outside the repository** (section 1b), and every one of the 172 queries that run SQL once more with all its league filters made always-true by a loader hook (section 1a).
   - The role-against-command test (210 tests pass) and the core T-81 scan (49 pass).
   - **6,754 requests** to the web app on the made-up world (`APP_ENV=local`, 5,434 requests and 64 posted server actions, as 13 kinds of person against 10 kinds of league) and on the seeded made-up database (`LOCAL_DATA=made-up-database`, 1,320 requests as 10 kinds of person). Every answer's status, headers and body were saved and compared, and searched for every made-up person's email, phone and birth date and for the names that must be withheld.
-  - The findings marked High were each requested again by hand from a fresh start of the app.
+  - Each High finding was checked again by hand from a fresh start of the app: D-H1 by request, D-H2 by running the product's own name functions.
 - **Not checked:**
   - **Nothing ran on real PostgreSQL.** PGlite is one session, so no lock, race, pooler or role question can be judged here (section 6).
   - **The made-up database has no hidden league.** Both seed leagues are live and no screen changes a league's state, so every hidden-against-missing comparison comes from the made-up world. On the made-up database Admin → Teams and the fixture import answer 500 to staff (`NotOnTheDatabaseYet`, step 2.93) and the live feed does not exist.
@@ -32,7 +32,7 @@ What must be fixed **before real leagues, and above all children, are put on it*
    - the "Make this my team" button answers a visitor differently for it, gives away its internal id, and confirms its team names one guess at a time;
    - the scorer's six tracker routes answer "not signed in" or "not allowed" where a missing league gets "not found" (D-M2);
    - a signed-in person's "not found" page streams in a different order (D-M3).
-2. **A child recorded by birth date would be shown by full name** (D-H2, High). The code decides "child" by the tick alone and never reads a birth date. Neither the written R-28 nor the lead's change of 2026-11-17 is built. Today no screen records a birth date, so it cannot yet happen by tapping. It will the day a screen or import does. Step 2.93 part 5 is to build it.
+2. **A child recorded by birth date would be shown by full name** (D-H2, High). The code decides "child" by the tick alone and never reads a birth date. Neither the written R-28 nor the lead's change of 2026-11-17 is built. Today no screen records a birth date, so it cannot yet happen by tapping. It will the day a screen or import does. Step 2.93 part 5 builds it, with the change in its fix round.
 3. **One of the three fences is not proved for the public pages, the bin and two other places** (D-M1). With a query's own league filter taken out, the two-league test still passed for 12 queries that then reached league B once B's records were set up directly:
    - six public reads;
    - the bin's list, restore and purge, where the purge deleted B's binned venue for good;
@@ -59,9 +59,9 @@ What must be fixed **before real leagues, and above all children, are put on it*
 | Commands                    | 104, every one with a role-against-command row                                                                                                                                                     |
 | Routes                      | 45 pages, 13 route handlers (8 league API routes, the live feed, health, Google sign-in, 2 stylesheets), 7 layouts and error screens, 46 server actions in 9 files                                 |
 | Pages opened                | Every league page and admin area, as visitor, signed-in stranger, another league's admin, owner, admin, program scheduler, scheduler, scorekeeper, coach, registrar, editor, club admin and member |
-| Findings                    | 2 High, 9 Medium, 13 Low                                                                                                                                                                           |
-| One league reaching another | Never, in any request or any test                                                                                                                                                                  |
-| Proposed steps              | 12, none needed before the test copy goes online (none marked TEST 2)                                                                                                                              |
+| Findings                    | 2 High, 10 Medium, 12 Low                                                                                                                                                                          |
+| One league reaching another | Never, in any request nor in any test of the code as it stands                                                                                                                                     |
+| Proposed steps              | 11 (P-1 to P-11), none needed before the test copy goes online, so none marked TEST 2                                                                                                              |
 
 ## 1. The fence, whole
 
@@ -374,7 +374,7 @@ Signed-in strangers, coaches and members are sent exactly what a visitor is on e
 - **The test that should catch it cannot.** The T-81 scan expects a 15-year-old with the tick off in full (`name-policy-scan.test.ts:88`).
 - **Not reachable today.** No screen or import records a date or the tick.
 - **Why it is High all the same:** it breaks R-14, R-25 and R-28 on the day it can happen, and the first leagues are a school's.
-- **Already planned.** Step 2.93 part 5 is to build R-28, as "where a person has a birth date, that date decides, whatever the tick says", the rule before the change.
+- **Already planned.** Step 2.93 part 5 builds R-28, with the lead's change in its fix round (`STATUS.md`, the note of 00:58 UTC). The plan's line for part 5 still words the rule as it was before the change.
 - Proposed step P-2.
 
 **D-M4 (Medium). A player's fixed person id goes to every visitor on the game page and in the snapshot.**
@@ -494,6 +494,210 @@ What every history table does: `activity_log`, `command_receipts`, `support_acce
 | L15 | Area 5 review of 2.153       | For a signed-in person a hidden league costs one more read (`accessOf`) than a missing one                                                                                           | It shows already, on the made-up world, as a different order of the streamed page (D-M3, step P-1). The time it costs on a real database is for section 6                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | L16 | Area 5 review of 2.93 part 6 | The public game snapshot carries each listed player's person id, also when names are hidden                                                                                          | Confirmed; and the game page's box score rows carry it too. D-M4, step P-4                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | L17 | Reviews of 2.180             | `remove-team` reads the team's games and the draft without a lock while `add-draft-game` and publish check only that the team is not in the bin                                      | On this branch `remove-team.ts` reads neither: it bins the team whatever games it has (step 2.180, open, adds the check that has the race). The race is one case of a pattern found in section 4: check here, write there, no lock. D-L8; proposed step P-6 takes the shared lock on the parent row for all of them                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+
+## 6. What cannot be judged without real PostgreSQL
+
+For the founder's supervised session on the test copy. The plan's line for step 2.93 already carries four lists from the area 5 reviews: part 3, step 2.187, part 4 and part 6, and step 2.96's. Together they cover:
+
+- the app's role and row-level security with no league set;
+- the pooler not carrying a league into the next transaction;
+- REPEATABLE READ snapshots;
+- the purge by the migrations' owner;
+- `sites` and releases;
+- the tracker's races;
+- the cache;
+- the staff-names function.
+
+These are only what they do not hold. Each needs two sessions at once, a pooler or the hosted runtime, none of which PGlite has. All of it is on made-up data.
+
+1. **Check here, write there** (D-L8). In two sessions at the same moment:
+   - remove a person while adding them to a roster;
+   - remove a division while creating a team in it;
+   - remove a court while adding a game on it;
+   - once step 2.180 lands, remove a team while adding a draft game with it.
+
+   Note whether both commit, and whether something live then names a row in the bin. Repeat once step P-6 lands: one must wait, and then refuse.
+
+2. **A hidden league over the network** (D-M2, D-M3; the made-up database has no hidden league). On the test copy, with one draft and one suspended league, compare each against a missing short name of the same length and an id that does not exist:
+   - for a visitor and for a signed-in stranger;
+   - on every league page, the six tracker routes and "Make this my team";
+   - status, every header but the date, the body, and the order of the streamed rows.
+
+   Time 50 "not found" answers of each kind as the stranger, through the pooler. The extra read of the person's access (leftover L15) must not show in the time once step P-1 lands.
+
+3. **The bin's nightly purge across two leagues** (D-M1; step 2.91). Bin a venue in each of two leagues with the same date. Run `bin.empty` for one as the worker runs it: only that league's venue goes. The purge's own league filter is the one the two-league test cannot see.
+4. **Emptying a history table** (D-L1). As the tables' owner, `truncate public.activity_log` on a copy holding made-up data only:
+   - today it empties the table;
+   - once step P-11's trigger exists, it is refused.
+
+   Whether Supabase's owner login is filtered by the forced fence is already on the 2.187 list.
+
+5. **An error that quotes a row** (D-L4, T-86). Cause a database error whose detail names a person's row on the hosted runtime: a clash on a `people` unique index, or a foreign key naming a roster entry. Read what reaches the host's log and the browser, by the made-up name and birth date.
+
+## Every finding
+
+Severity as LEADS.md section 1 and the brief define it:
+
+- **High:** one league can reach another's data; a person is sent what their role may not have; a child's details reach someone who may not have them; something is lost for good by accident; or the product cannot go online.
+- **Medium:** must be fixed before real people use it.
+- **Low:** tidying.
+
+| Id    | Severity | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                              | Proof                                                                                                                                                                                                                        | Spec                                            | Step                      |
+| ----- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------- |
+| D-H1  | High     | "Make this my team" and "Stop" run no league gate: anyone learns that a draft or suspended league exists, its id, and which team short names it has                                                                                                                                                                                                                                                                                                  | Section 1c: a visitor's post for `quiet-pines` answers `303 /quiet-pines/teams/lions` with a cookie named by the league's id; for a missing or binned league, `303 /` and no cookie (`my-team-actions.ts:22`)                | U-9, T-229                                      | P-1                       |
+| D-H2  | High     | The code decides "child" by the tick alone and never reads a birth date: a child recorded by date with the tick off (or empty, in an adult league) would be shown by full name everywhere, and a guardian's request for initials refused                                                                                                                                                                                                             | Section 3: worked through `shownAsChild` and `showName` (`name-policy.ts:56`; `list-people-for-display.ts:21`); `name-policy-scan.test.ts:88` expects it. Not reachable by tapping today: nothing records a date or the tick | R-14, R-25, R-28 (and its change of 2026-11-17) | P-2                       |
+| D-M1  | Medium   | The two-league test cannot see a missing league filter in 28 queries and both read stores, and 8 more are tested only with every filter out. For 12 queries of the sample, the changed query was then shown to reach league B: six public reads, the bin's list, restore and purge (which deleted B's venue for good), postponed games, the schedule draft's insert. Four cases depend on the calendar                                               | Section 1b: 76 filters taken out in a copy, 18 survived; 172 loader runs. Row-level security held in every app run                                                                                                           | T-28, T-65                                      | P-3                       |
+| D-M2  | Medium   | The tracker's six routes answer 401 or 403 for a draft or suspended league and 404 for a missing one                                                                                                                                                                                                                                                                                                                                                 | Section 1c: `GET …/000000000003/games/…/state` 401 or 403 against `…0000000000ee` 404                                                                                                                                        | U-9, T-229                                      | P-1                       |
+| D-M3  | Medium   | A signed-in person's "not found" page streams in another order for a hidden league than for a missing one                                                                                                                                                                                                                                                                                                                                            | Section 1c: `/quiet-pines/teams` against `/quiet-pinez/teams` as the stranger and the coach, always different, equal once sorted (`league-gate.ts:132`)                                                                      | U-9                                             | P-1                       |
+| D-M4  | Medium   | The game page and the snapshot send each player's fixed person id to every visitor, a hidden or removed child's included                                                                                                                                                                                                                                                                                                                             | Section 3: `read-game-snapshot.ts:210`; the box score's row keys seen on `/north-valley/games/…b20032c8`                                                                                                                     | Record 070; T-81                                | P-4                       |
+| D-M5  | Medium   | Staff screens (the scorer's rosters, which the device stores, the box score sheet, Teams, the bin) get every name as stored, a removed child's included; the spec is silent                                                                                                                                                                                                                                                                          | Section 3 (`list-game-roster.ts:33`, `box-score-page.tsx:50`)                                                                                                                                                                | R-16, T-76, T-81 (silent)                       | P-5                       |
+| D-M6  | Medium   | A scorekeeper's `schedule.read` opens every season's unpublished draft in core, and venues and postponed games; only the gate stops it                                                                                                                                                                                                                                                                                                               | Section 2 (`roles.ts:124`, `scheduling/policy.ts:118`)                                                                                                                                                                       | P4 §4                                           | P-7                       |
+| D-M7  | Medium   | An admin limited to one program is sent the whole league's settings, its audience and whether a child is recorded; core checks nothing on that read                                                                                                                                                                                                                                                                                                  | Section 2 (`settings-page.tsx:32`, `admin-area-access.ts:24`)                                                                                                                                                                | T-74, P4 §4                                     | P-7                       |
+| D-M8  | Medium   | A box score reopened and saved again as a final score loses every player's line for good; the correction keeps only the two scores                                                                                                                                                                                                                                                                                                                   | Section 4 (`record-final-score.ts:47`, `reopen-game.ts:55`)                                                                                                                                                                  | A-5, S-7, S-27                                  | P-9                       |
+| D-M9  | Medium   | A "removed" person keeps their name, birth date, contact email and link for good; nothing erases them, and the purge keeps anyone with a history                                                                                                                                                                                                                                                                                                     | Section 4 (`purge-binned.ts:96`; no erasure command)                                                                                                                                                                         | T-52, R-17                                      | P-10                      |
+| D-M10 | Medium   | The role-against-command test never tries a club admin, coach or captain, a registrar, editor or scorekeeper limited to one program, a scorekeeper on "assigned games only", or an archived or suspended league, and checks only "allowed or refused", never what a read returns. The T-81 scans cannot see R-28, person ids, or a page as it is served                                                                                              | Section 2 (`role-matrix.test.ts:21`, `:199`, `:403`); section 3                                                                                                                                                              | T4 §12                                          | P-8, P-2, P-4             |
+| D-L1  | Low      | The tables' owner can TRUNCATE the eight history tables                                                                                                                                                                                                                                                                                                                                                                                              | Section 4: the row trigger does not stop it; a statement trigger does (tried on PGlite)                                                                                                                                      | T-45                                            | P-11                      |
+| D-L2  | Low      | The staff tools' `--as` is the address as typed                                                                                                                                                                                                                                                                                                                                                                                                      | Section 5, L3                                                                                                                                                                                                                | T-77                                            | A sentence for step 2.133 |
+| D-L3  | Low      | The activity log does not hold the value a setting was saved to or cleared from                                                                                                                                                                                                                                                                                                                                                                      | `set-setting.ts:110`, `clear-setting.ts:42`                                                                                                                                                                                  | T-226, R-29                                     | P-11                      |
+| D-L4  | Low      | The log masking lets `birthDate`, `birth_date` and `dateOfBirth` through                                                                                                                                                                                                                                                                                                                                                                             | Section 3: tried                                                                                                                                                                                                             | T-86                                            | P-11                      |
+| D-L5  | Low      | `list_postponed_games` filters by neither program nor season visibility; nothing calls it yet                                                                                                                                                                                                                                                                                                                                                        | `list-postponed-games.ts:37`                                                                                                                                                                                                 | T-74                                            | P-7                       |
+| D-L6  | Low      | A scheduler may remove a venue or court but not restore it, and only league-wide admins may list the bin                                                                                                                                                                                                                                                                                                                                             | `restore-venue.ts:14`, `list-bin.ts:15`                                                                                                                                                                                      | A-5                                             | P-11                      |
+| D-L7  | Low      | Five more reads rest on the gate alone (the games area's names map, the Teams pages, the import page, the schedule's team names, staff display names)                                                                                                                                                                                                                                                                                                | Section 2                                                                                                                                                                                                                    | T-74                                            | P-7                       |
+| D-L8  | Low      | Check here, write there, no lock: two admins at once can leave something in the bin that something live names                                                                                                                                                                                                                                                                                                                                        | Section 4                                                                                                                                                                                                                    | A-5                                             | P-6                       |
+| D-L9  | Low      | A standings adjustment's reason, typed freely by staff, is shown to everyone, and nothing tells the admin not to name a player there                                                                                                                                                                                                                                                                                                                 | `build-standings.ts:84`                                                                                                                                                                                                      | T-81 (silent)                                   | P-11                      |
+| D-L10 | Low      | Fence tidying: `listAccessNames` takes its league from the transaction, not the scope; the reviewed list of owner-run functions is compared for schema `public` only; the `schedulingStore` excuse is out of date; `renameLeagueSlug` answers "taken" with the transaction aborted; a caller-supplied id that clashes with another league's answers differently (`insert-rounds.ts:28`, `insert-table-player.ts:50`, `insert-published-games.ts:48`) | Appendix A; `app-role.test.ts:528`                                                                                                                                                                                           | T-28, T-221                                     | P-11                      |
+| D-L11 | Low      | "Public" and "decided" are written out by hand in twelve and four places, and one of them (`list-team-stat-totals.ts:27`) differs                                                                                                                                                                                                                                                                                                                    | Section 5, L13                                                                                                                                                                                                               | —                                               | P-11                      |
+| D-L12 | Low      | The lead's change to R-28 of 2026-11-17 is written only in `STATUS.md`; until part 5's fix round lands, `DECISIONS.md:79` and `:529`, P6 line 127 and the plan's line for part 5 say the opposite, and T4 does not say who is a child                                                                                                                                                                                                                | Section 3                                                                                                                                                                                                                    | CLAUDE.md, T-185                                | P-2                       |
+
+## The steps proposed
+
+None is needed before the test copy goes online: it holds made-up data only, and nothing below exposes the staff accounts that will sign in to it. So none is marked (TEST 2). The High ones come first among this area's steps, ahead of new features (LEADS.md section 5). P-1 and P-2 are needed before a real league is published.
+
+**P-1 (High: D-H1, D-M2, D-M3). One league gate for every way into a league.**
+
+- **For:** every league that is not yet published, or suspended, and the people in it.
+- **Build:**
+  - "Make this my team" and "Stop" take the league from the page's own gate (`mayOpenLeague`) and answer a hidden league exactly as a missing one.
+  - The six tracker routes run `mayOpenLeague` in `resolveLeagueApi` itself, before the session or the body is read, and answer a hidden league with the missing league's 404.
+  - The page gate reads the person's access for a missing league too, or answers a hidden league before reading it, so both take the same path.
+  - The structure check (`npm run check`) fails on any `'use server'` file or route under `/api/v1/leagues` that does not go through the gate.
+- **Done test:** the probe of section 1c as a test in `test:web`. For every league page, every league API route by GET and POST, and both actions, a hidden league's answer equals a missing one's byte for byte (status, headers but the date, body, stream order), for a visitor, a signed-in stranger and another league's admin.
+
+**P-2 (High: D-H2, D-L12; part of D-M10). Who is a child, as decided on 2026-11-17, everywhere.**
+
+- **For:** every child on the platform, and their guardian.
+- **The rule.** One function decides who is a child, and the same one serves names, R-25's requests and the Privacy screen. A person is a child if:
+  - their birth date says under 18 today, in the league's time zone;
+  - or the tick is on;
+  - or there is neither and the league is youth or mixed.
+
+  A date that cannot be read counts as a child.
+
+- **Build:**
+  - Every query that feeds a name selects the birth date.
+  - The T-81 scans expect the four cases of section 3 in an adult, a youth and a mixed league. The core scan no longer expects a 15-year-old in full.
+  - The world-against-database agreement test runs under a youth league too.
+  - `DECISIONS.md` (both tables), P6 §7 and T4's T-81 say the rule.
+- **Where:** this is what step 2.93 part 5's fix round already carries (`STATUS.md`, 00:58 UTC). The proposal is that its line says the new rule and this done test.
+- **Done test:** a person born 15 years ago with the tick off, and one with the tick on and a date that says 30, are both "Ada L." on the roster, statistics, game page, snapshot and live feed, on the stand-in and on the database. A guardian's request for initials for the first is accepted in a league where adults may not ask.
+
+**P-3 (Medium: D-M1). The two-league test sees the code's own fence.**
+
+- **For:** every league, the day row-level security is ever wrong.
+- **Build:**
+  - Put the cases' setup of league B in B's own fence, before the runs: open B's season, postpone a B game, bin a B team, division, venue, court and person, drop B's draft. Or seed B with them.
+  - Aim `restoreBinnedGame` at the B game already in the bin.
+  - Make the cases that name no target change A's own row first, as `findLeagueName` does.
+  - Freeze the database's clock in the harness, or seed games relative to today.
+  - Add cases for the statements no case reaches (section 1b).
+  - Make the loader of section 1a a standing check that fails when any query's case still passes with its league filters made always-true. The 8 queries with duplicated filters are judged with all of them taken out.
+- **Done test:** that check passes over all 172 queries. Each of the 12 confirmed gaps of section 1b fails its own case with its filter taken out.
+
+**P-4 (Medium: D-M4; part of D-M10). No person's id in any public answer.**
+
+- **For:** a player who asks to be hidden, a child above all.
+- **Build:**
+  - The snapshot's `playerId` becomes a key that means something only inside that game's answers, not the same in two games. The contract and the live view change with it.
+  - The box score rows are keyed by line number.
+  - T4's T-81 gains the record 070 rule: "no public answer carries a person's or roster place's database id".
+  - The scans look for every made-up person's id on the game page and in the snapshot, as served.
+- **Done test:** no made-up person's id or roster place's id appears in any public page or API answer, as served by the running app, on the stand-in and on the database.
+
+**P-5 (Medium: D-M5). Names on staff screens.**
+
+- **For:** a child whose guardian asked for "removed", and the volunteer who scores them.
+- **Decide first.** The lead decides the rule (a product decision, "decided for you" if the founder is away). The proposal is in section 3.
+- **Build it in:**
+  - the scorer's rosters and what the device stores;
+  - the score page;
+  - the box score sheet;
+  - a league setting "scorekeepers see full names", off to start;
+  - T4 §7.
+- **Done test:** with a removed child and an initials adult in a youth league, the scorer's rosters, the device's stored copy and the box score sheet show "#12" and the initials; with the setting on, full names. Admin → Teams shows the name with its "Show as".
+
+**P-6 (Low: D-L8). Locks where a command checks one row and writes another.**
+
+- **For:** two admins tidying at the same moment.
+- **Build:** each `remove-*` takes `for update` on the row it bins, and each command that adds something pointing at a row takes `for share` on it. That covers people with rosters, teams with draft games and publish, divisions with teams, and venues and courts with games. Two PostgreSQL sessions are needed to prove it.
+- **Done test:** section 6, item 1; on PGlite, a test that each of those queries' SQL carries its lock.
+
+**P-7 (Medium: D-M6, D-M7, D-L5, D-L7). Reads checked in core, not only by the gate.**
+
+- **For:** every staff member's own role.
+- **Build:**
+  - A scorekeeper loses `schedule.read`, unless the lead decides record 019's venues list stays. Then `get_schedule_draft` needs `schedule.edit`.
+  - `list_postponed_games` filters by the program and the season's visibility.
+  - The League settings page reads through a command needing `league.settings` at the league's scope.
+  - The games area's names map, the Teams pages' season and teams, and the import page's counts go through commands checking the program, before they move to the database (step 2.93's later parts).
+  - The role matrix's own table stops giving scorekeepers `schedule.read`.
+- **Done test:** role-against-command rows for the new read commands. A scorekeeper is refused `get_schedule_draft`. An admin limited to one program is refused the league settings read and sees only its program's teams.
+
+**P-8 (Medium: D-M10). The role-against-command test whole.**
+
+- **For:** every role.
+- **Build:** add actors for:
+  - a coach and a captain on a team, whose scope has been storable since 0008, refused everything today;
+  - a registrar, editor and scorekeeper limited to one program;
+  - a scorekeeper when the league scores assigned games only, with and without the assignment;
+  - an archived and a suspended league, for every row (U-9, R-26's exceptions included).
+
+  And for every read command, the fields each actor gets: T-76's "the query for that role does not select it". Update the header's reason.
+
+- **Done test:** the matrix fails if a scorekeeper on "assigned games only" can score an unassigned game, or if any read gives a role a field it lacks the permission for.
+
+**P-9 (Medium: D-M8). A correction keeps what it replaces.**
+
+- **For:** an admin who reopens a box score by mistake.
+- **Build:**
+  - A correction's `before` document holds the game's box score lines (ids and numbers only, T-220) whenever the correction or the save after it removes them.
+  - The games area offers "put back the sheet as it was" while nothing newer has been saved.
+- **Done test:** reopen a box-score game, save a final score, put the sheet back. Every line is as before, and the standings and totals are as before.
+
+**P-10 (Medium: D-M9). Erasing a person's details on request (T-52).**
+
+- **For:** a parent who asks for a child to be removed, and anyone who leaves.
+- **Decide first.** T-52 ("loses its name, contact details and link") and R-23 ("removed" hides) say different things; the lead decides which, with legal question 11.
+- **Build:**
+  - A command, with the password asked again (T-70), that empties a person's name, birth date, contact email and link in place and keeps their lines nameless.
+  - The bin's purge does the same to a binned person it must keep for their history.
+- **Done test:** after the erasure, no query returns the person's name, birth date or email. Their numbers still add up in the team's totals and the standings.
+
+**P-11 (Low: D-L1, D-L3, D-L4, D-L6, D-L9, D-L10, D-L11). Tidying of the fence and the logs, one step.**
+
+- A `before truncate` statement trigger on the eight history tables, with a test that the owner's TRUNCATE is refused.
+- The activity entry for a setting holds the old and new value (every value is a fixed word, a yes or no, or a number).
+- The log masking covers every `people` column name in each casing, with a test over the schema's own column list.
+- A-5 for venues and courts: whoever removes may restore, and sees their own part of the bin (or the lead decides otherwise and A-5 says so).
+- The adjustment's reason field says it is public.
+- `listAccessNames` passes the scope's league to its function, which checks it against the transaction's.
+- The reviewed list of owner-run functions compares every schema.
+- The `schedulingStore` excuse is reworded.
+- `renameLeagueSlug` uses a savepoint.
+- A caller-supplied id that is taken answers as "not found" whichever league holds it.
+- One function or constant says what "public" and "decided" are, used in all sixteen places.
+- **Done test:** each item's own test.
+
+Already planned, so no new step: step 2.91 empties the bin each night and lets adjustments be restored, and it must land before a real league relies on the bin (section 4). The sentence of L3 goes into step 2.133. The sentences of L7, L8 and L9 go into the assets step and the design editor's step.
 
 ## Appendix A. Every query and every store method
 
