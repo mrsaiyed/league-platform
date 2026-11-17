@@ -16,7 +16,11 @@
 // - a game of another league opened under this league's address, on the scoring page and in
 //   the admin, is "Page not found" with status 404 and nothing of the other league;
 // - a club admin at a team's page is told that their role does not include the league's
-//   list of people, not that it could not be read.
+//   list of people, not that it could not be read, and is offered no form that could only
+//   be refused;
+// - a long address breaks inside the card at 390 and 320;
+// - a signed-out person at any admin address is sent to sign in and back (U-15), and a
+//   form sent after signing out elsewhere ends on the sign-in screen.
 // And the page-step checks on each refusal: the accessibility checks (T-186), no sideways
 // scrolling at phone width, everything tapped at least 44 high, and the way on reached by
 // keyboard. `--no-build` serves the build already here.
@@ -58,7 +62,8 @@ const draftTeam = '01900000-0000-7000-8000-007e00000004';
 const title = 'You do not have access';
 const staffWords =
   "Your role in this league does not include this page. If it should, ask the league's owner or an admin.";
-const otherWords = 'This account does not help run this league.';
+const otherWords =
+  "This page is for the people who run North Valley League. If you should be one of them, ask the league's owner or an admin.";
 
 let built = true;
 if (!process.argv.includes('--no-build')) {
@@ -183,6 +188,12 @@ if (browser) {
       );
       note('nothing says "ask the league to invite you" to staff', !text.includes('invite you'));
       note(
+        'the scheduler is told their own role, and no other',
+        text.includes('You are a scheduler in this league.') &&
+          !/an admin in|a registrar|a scorekeeper|an editor|a club admin/.test(text),
+        text,
+      );
+      note(
         'the refusal is drawn inside the admin’s own frame',
         (await page.locator('.staff-bar').count()) === 1,
       );
@@ -215,7 +226,13 @@ if (browser) {
       try {
         await page.goto(`${origin}/north-valley/admin/people`);
         await refusalShown(page);
-        note('the scorekeeper reads the staff words', (await mainText(page)).includes(staffWords));
+        const text = await mainText(page);
+        note('the scorekeeper reads the staff words', text.includes(staffWords));
+        note(
+          'the scorekeeper is told their own role',
+          text.includes('You are a scorekeeper in this league.'),
+          text,
+        );
         await pageChecks(page, 'a scorekeeper at People');
         await page.locator('main').getByRole('link', { name: 'Back to the admin' }).click();
         await page.getByRole('heading', { level: 1, name: 'Your games' }).waitFor();
@@ -237,7 +254,7 @@ if (browser) {
       note('the coach’s refusal answers 403', answer?.status() === 403, String(answer?.status()));
       const text = await mainText(page);
       note(
-        'the coach reads that this account does not help run the league',
+        'the coach reads that the page is for the people who run the league',
         text.includes(otherWords),
         text,
       );
@@ -249,7 +266,8 @@ if (browser) {
         'the coach is offered no way into the admin and nothing of it',
         (await page.getByRole('link', { name: 'Back to the admin' }).count()) === 0 &&
           (await page.locator('.staff-bar').count()) === 0 &&
-          !text.includes(staffWords),
+          !text.includes(staffWords) &&
+          !text.includes('a coach'),
       );
       await pageChecks(page, 'a coach at the admin');
       await page.locator('main').getByRole('link', { name: 'Back to North Valley League' }).click();
@@ -335,6 +353,26 @@ if (browser) {
       // Another tab on the same device: the coach is signed in now.
       await context.clearCookies();
       await context.addCookies([{ name: 'srl_session', value: 'local-coach-token', url: origin }]);
+      // On a weak signal: the page's second ask for itself (the refusal drawn afresh) takes
+      // a second and a half, and meanwhile nothing of the scheduler may be drawn.
+      await page.route('**/*', async (route) => {
+        const asked = route.request().headers();
+        if (asked['rsc'] === '1' && route.request().method() === 'GET') {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+        await route.continue();
+      });
+      // The old page may stay while the answer comes; a refusal kept from the scheduler's
+      // load (their name, or the admin's frame around it) may never be drawn.
+      const staleRefusal = (text) =>
+        text.includes(title) && (text.includes('local-scheduler-token') || text.includes('ADMIN'));
+      const seen = [];
+      const watching = setInterval(() => {
+        page
+          .evaluate(() => document.body.innerText)
+          .then((text) => seen.push(text))
+          .catch(() => {});
+      }, 50);
       // A form sent from the old tab, which the app answers without loading a whole page.
       const form = page
         .locator('main form')
@@ -346,6 +384,13 @@ if (browser) {
         el.requestSubmit();
       });
       await page.getByText('You are signed in as local-coach-token@example.test.').waitFor();
+      clearInterval(watching);
+      note(
+        'on a weak signal the scheduler’s name and admin are never drawn while the fresh refusal comes',
+        seen.length > 5 && !seen.some(staleRefusal),
+        `${seen.length} looks; ${seen.find(staleRefusal) ?? ''}`,
+      );
+      await page.unroute('**/*');
       const text = await mainText(page);
       note(
         'the refusal names the coach, who is signed in now',
@@ -448,6 +493,100 @@ if (browser) {
       }
     },
   );
+  await step('a long address breaks inside the refusal’s card, at 390 and 320', async () => {
+    // A made-up scheduler of the first league signed in with a 52-letter address: refused
+    // at People inside the admin's frame, and at the second league's admin on the plain screen.
+    const longEmail = 'local-scheduler-with-long-address-token@example.test';
+    for (const width of [390, 320]) {
+      const context = await browser.newContext({ viewport: { width, height: 844 } });
+      await context.addCookies([
+        { name: 'srl_session', value: 'local-scheduler-with-long-address-token', url: origin },
+      ]);
+      const page = await context.newPage();
+      try {
+        for (const at of ['/north-valley/admin/people', '/harbor-city/admin']) {
+          await page.goto(`${origin}${at}`);
+          await refusalShown(page);
+          const line = page.locator('main p', { hasText: longEmail });
+          const fits = await line.evaluate((el) => {
+            const card = el.closest('main').getBoundingClientRect();
+            const box = el.getBoundingClientRect();
+            return {
+              inside: box.left >= card.left - 0.5 && box.right <= card.right + 0.5,
+              page: document.documentElement.scrollWidth <= window.innerWidth,
+            };
+          });
+          note(
+            `${width}: at ${at} the long address breaks inside the card, and nothing scrolls sideways`,
+            fits.inside && fits.page,
+            JSON.stringify(fits),
+          );
+        }
+      } finally {
+        await context.close();
+      }
+    }
+  });
+
+  await step(
+    'a signed-out person at an admin area is sent to sign in and back (U-15)',
+    async () => {
+      const { context, page } = await fresh();
+      try {
+        const answer = await page.goto(`${origin}/north-valley/admin/games`);
+        await page.getByRole('heading', { level: 1, name: 'Sign in' }).waitFor();
+        note(
+          'a signed-out scorekeeper at their games is sent to sign in, not refused',
+          pathOf(page) === '/signin' &&
+            new URL(page.url()).searchParams.get('next') === '/north-valley/admin/games' &&
+            (await page.getByText(title).count()) === 0,
+          `${answer?.status()} ${page.url()}`,
+        );
+        await signIn(page, people.scorekeeper);
+        note(
+          'signed in, they are back where they were going',
+          pathOf(page) === '/north-valley/admin/games',
+          page.url(),
+        );
+        // A league hidden from them is still "not found", as no league at all.
+        await context.clearCookies();
+        const hidden = await page.goto(`${origin}/quiet-pines/admin/games`);
+        await page.getByRole('heading', { level: 1, name: 'Page not found' }).waitFor();
+        note(
+          'a signed-out person at a draft league’s admin area gets 404',
+          hidden?.status() === 404,
+        );
+      } finally {
+        await context.close();
+      }
+    },
+  );
+
+  await step('an owner signed out in another tab who sends a form is sent to sign in', async () => {
+    const { context, page } = await asToken('local-owner-token');
+    try {
+      await page.goto(`${origin}/north-valley/admin/schedule`);
+      await page.locator('main form').first().waitFor();
+      await context.clearCookies();
+      const form = page
+        .locator('main form')
+        .filter({ has: page.locator('input[name^="$ACTION"]') })
+        .first();
+      await form.evaluate((el) => {
+        for (const field of el.querySelectorAll('[required]')) field.removeAttribute('required');
+        el.noValidate = true;
+        el.requestSubmit();
+      });
+      await page.waitForURL((url) => url.pathname === '/signin');
+      note(
+        'the form is answered by the sign-in screen, which comes back to the schedule',
+        new URL(page.url()).searchParams.get('next') === '/north-valley/admin/schedule',
+        page.url(),
+      );
+    } finally {
+      await context.close();
+    }
+  });
 }
 
 await browser?.close();
