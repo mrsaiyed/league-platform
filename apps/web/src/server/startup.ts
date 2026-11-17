@@ -214,9 +214,10 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
   // The sign-in stand-in first: it refuses a site address that is not local or a test name.
   const signIn = standInSignIn(options);
   const database = await deps.database();
-  // Each seed league's season under way, so the public pages have something to show, and
-  // the seed's demo-shaped league with its whole season played (step 2.59).
-  const made = await database.madeUpDatabase({ underWay: true, demo: true });
+  // Each seed league's season under way, with its venue and one game scored live, so the
+  // public pages have something to show, and the seed's demo-shaped league with its whole
+  // season played (step 2.59).
+  const made = await database.madeUpDatabase({ underWay: true, tracked: true, demo: true });
   const db = database.createDatabase(made.source);
   try {
     const problems = await database.checkLoginRole(db);

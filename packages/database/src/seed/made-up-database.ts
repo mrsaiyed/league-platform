@@ -54,8 +54,9 @@ export type MadeUpOptions = {
   readonly underWay?: boolean;
   /**
    * With `underWay`: each seed league's venue and one game scored live through the
-   * tracker as well (seed-tracked-games.ts), as `npm run seed` loads them. Off by default:
-   * the web app's pages and their tests are checked against the season under way alone.
+   * tracker as well (seed-tracked-games.ts), as `npm run seed` loads them and the web app
+   * runs on them. Off by default: the database tests here start from the season under way
+   * alone.
    */
   readonly tracked?: boolean;
   /**
