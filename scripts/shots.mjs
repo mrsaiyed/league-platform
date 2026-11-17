@@ -479,8 +479,8 @@ const scorekeeperPages = [
 // game 1, played level through regulation and won in the first overtime by this script's
 // own taps (scoreOvertimeGame), after every other picture is taken, so none of them
 // changes. Then its page, its card on the schedule, the home page and the Lions' page, and
-// the games lists of the owner and the scorekeeper: each says "Final, OT", beside the
-// made-up season's other results, which say "Final" alone.
+// the games lists of the owner and the scorekeeper, and its box score sheet: each says
+// "Final, OT", beside the made-up season's other results, which say "Final" alone.
 const overtimeGame = trackedGame(1);
 const overtimePages = [
   { name: 'overtime-game', at: `/games/${overtimeGame}`, as: 'visitor' },
@@ -489,6 +489,7 @@ const overtimePages = [
   { name: 'overtime-team', at: '/teams/lions', as: 'visitor' },
   { name: 'overtime-admin-games', at: '/admin/games', as: 'owner' },
   { name: 'overtime-scorekeeper-games', at: '/admin', as: 'scorekeeper' },
+  { name: 'overtime-box-score', at: `/admin/games/${overtimeGame}`, as: 'owner' },
 ];
 // SR Leagues' own pages, signed in as the made-up owner (step 2.127).
 const signedInPlatformPages = [
