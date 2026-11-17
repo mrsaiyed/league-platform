@@ -6,10 +6,11 @@
 // loses its old lines in the same transaction (S-27), so they no longer count. A game
 // the live tracker has recorded plays of is refused (`game-is-tracked`, S-46): it is
 // ended in the tracker, so its plays still explain its numbers; one set to live tracking
-// with no plays yet can still be finished with two numbers.
+// with no plays yet can still be finished with two numbers. A postponed game is refused
+// (`game-postponed`, step 2.158): it has not been played.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
-import { decideGame, openGameByHand, type DecideGameError } from '../decide-game.ts';
+import { decideGame, openGameToScore, type DecideGameError } from '../decide-game.ts';
 import { gameScore, gameVersion } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
@@ -34,7 +35,8 @@ export const recordFinalScore = defineCommand({
     tx,
     emit,
   }): Promise<Result<{ version: number }, RecordFinalScoreError>> => {
-    const open = await openGameByHand(tx, input.gameId, input.version);
+    // A postponed game is refused there too (step 2.158, S-75): it has not been played.
+    const open = await openGameToScore(tx, input.gameId, input.version);
     if (!open.ok) return open;
     const game = open.value;
     if (input.homeScore === input.awayScore) {
