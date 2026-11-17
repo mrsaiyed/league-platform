@@ -782,13 +782,17 @@ describe('a game page', () => {
       // The season's team totals count the same 2 (the made-up season's other games
       // recorded no turnovers).
       expect(await teamTurnoversOf(page.game.seasonId)).toMatchObject({ total: 2 });
-      // The page's own builder: each Total it shows is its column added up, or a sentence
-      // under the table says why.
+      // The page's own builder, in this season that keeps no turnovers (it names points,
+      // rebounds and fouls): no TO column, so every Total it shows is exactly its column
+      // added up and no sentence is wanted. The full-set case, where the sentence is
+      // required word for word, is box-score-totals.test.ts.
       for (const table of tables(buildBoxScores(page))) {
+        expect(table.columns.map((c) => c.key)).not.toContain('turnovers');
+        expect(table.notes).toEqual([]);
         if (table.players === null) continue;
         for (const column of table.columns) {
           const sum = table.players.reduce((n, p) => n + Number(p.cells[column.key] ?? 0), 0);
-          if (sum !== table.totals[column.key]) expect(table.notes.length).toBeGreaterThan(0);
+          expect(table.totals[column.key], `${table.teamName} ${column.key}`).toBe(sum);
         }
       }
     });
