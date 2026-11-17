@@ -71,6 +71,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.seedLeaguesInto,
     'development-only bootstrap: takes a PGlite, not a scope; runs the scoped commands (own cases) per league and writes accounts and role grants directly',
   ],
+  [
+    databasePackage.seedAllLeaguesInto,
+    'development-only bootstrap (`npm run seed`): takes a PGlite, not a scope; seedLeaguesInto, then per league the scoped commands (own cases), the fixture import and the tracker transfer, each in its league',
+  ],
   [rosterEntrySummary, 'turns a row already read into the returned shape; runs no SQL'],
   [databasePackage.binStore, 'binds the bin queries (own cases) to a scope'],
   [databasePackage.teamsStore, 'binds the team queries, each with its own cases, to a scope'],
