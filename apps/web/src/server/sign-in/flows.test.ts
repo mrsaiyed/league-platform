@@ -6,7 +6,7 @@ import type { EmailSender } from '@srleagues/core';
 import { captureEmail, createLocalSignInStandIn } from '@srleagues/providers';
 import { describe, expect, it, vi } from 'vitest';
 import { cookieNames, type CookieJar, type CookieOptions } from './cookies.ts';
-import type { Visit } from './device.ts';
+import { networkAddressOf, type Visit } from './device.ts';
 import {
   askForCode,
   choosePassword,
@@ -316,6 +316,61 @@ describe('attempt limits (T-85, T-225)', () => {
     expect(await enterCode({ code: env.codeFor('new@example.test') }, b.visit, env.deps)).toEqual({
       to: '/signup/code?problem=codeUsedUp',
     });
+  });
+});
+
+describe('the network behind Cloudflare (TRUSTED_PROXY=cloudflare, record 081)', () => {
+  /** A browser whose request reached the host as these headers say, read as the app reads them. */
+  const arriving = (forwardedFor: string, cloudflareSays: string) =>
+    browser(
+      networkAddressOf(
+        new Headers({ 'x-forwarded-for': forwardedFor, 'cf-connecting-ip': cloudflareSays }),
+        'cloudflare',
+      ),
+    );
+  /** Wrong passwords for `count` different addresses, so only the network's limit can stop them. */
+  async function wrongPasswords(env: Env, count: number, next: () => ReturnType<typeof browser>) {
+    const answers = [];
+    for (let i = 0; i < count; i++) {
+      answers.push(
+        await signInWithPassword(
+          { email: `guess-${i}@example.test`, password: 'not the password' },
+          next().visit,
+          env.deps,
+        ),
+      );
+    }
+    return answers;
+  }
+  const limited = /^\/signin\?problem=tooManyAttempts&wait=\d+$/;
+
+  it('counts each visitor apart, not every visitor as Cloudflare', async () => {
+    const env = setup();
+    // One visitor through Cloudflare's server 104.16.0.1 reaches the network's limit (30).
+    const one = await wrongPasswords(env, 31, () =>
+      arriving('192.0.2.10, 104.16.0.1', '192.0.2.10'),
+    );
+    expect(one.slice(0, 30).every((a) => a.to === '/signin?problem=wrongEmailOrPassword')).toBe(
+      true,
+    );
+    expect(one[30]?.to).toMatch(limited);
+    // Another visitor through the same Cloudflare server is not held by it.
+    const other = await wrongPasswords(env, 1, () =>
+      arriving('198.51.100.7, 104.16.0.1', '198.51.100.7'),
+    );
+    expect(other[0]).toEqual({ to: '/signin?problem=wrongEmailOrPassword' });
+  });
+
+  it('a sender straight to the host cannot reset the count with a new header or a new browser', async () => {
+    const env = setup();
+    let n = 0;
+    // A new cookie jar and a new CF-Connecting-IP on every try, from 203.0.113.9 itself.
+    const spoofer = () => {
+      n += 1;
+      return arriving('104.16.0.1, 203.0.113.9', `198.51.100.${n}`);
+    };
+    const answers = await wrongPasswords(env, 31, spoofer);
+    expect(answers[30]?.to).toMatch(limited);
   });
 });
 

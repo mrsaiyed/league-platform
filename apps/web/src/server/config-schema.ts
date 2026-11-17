@@ -48,12 +48,15 @@ const schema = z.object({
   APP_ENV: z.enum(appEnvs),
   PUBLIC_BASE_URL: webUrl,
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  // Whether X-Forwarded-For is believed for the sign-in attempt limits (record 031):
-  // 'none' never; 'one' when exactly one proxy of the host appends the address it
-  // was reached from. The default 'none' is for local and test only: in staging and
-  // production it must be set (mustBeExplicit), because with 'none' every visitor
-  // shares one address and one person's wrong guesses lock out everyone.
-  TRUSTED_PROXY: z.enum(['none', 'one']).default('none'),
+  // Whose word is taken for a visitor's address in the sign-in attempt limits (records
+  // 031 and 081, device.ts): 'none' nobody's; 'one' when exactly one proxy of the host
+  // appends the address it was reached from; 'cloudflare' when Cloudflare stands in
+  // front of that proxy, its CF-Connecting-IP believed only on a request that reached
+  // the host from one of Cloudflare's addresses. The default 'none' is for local and
+  // test only: in staging and production it must be set (mustBeExplicit), because with
+  // 'none' every visitor shares one address and one person's wrong guesses lock out
+  // everyone.
+  TRUSTED_PROXY: z.enum(['none', 'one', 'cloudflare']).default('none'),
   // The platform's own database (R8): not DATABASE_URL, which the Al-Hadi tracker
   // reads, so a settings file made for the tracker can never point the web app at the
   // tracker's database. Local work and tests never open an address (T-201), so it is

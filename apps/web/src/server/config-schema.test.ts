@@ -104,7 +104,7 @@ describe('loadConfig', () => {
           `TRUSTED_PROXY: missing, must be set explicitly when APP_ENV is ${appEnv}`,
         ]);
       }
-      for (const set of ['none', 'one'] as const) {
+      for (const set of ['none', 'one', 'cloudflare'] as const) {
         expect(loadConfig({ ...hosted, APP_ENV: appEnv, TRUSTED_PROXY: set }).TRUSTED_PROXY).toBe(
           set,
         );

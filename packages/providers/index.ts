@@ -8,6 +8,7 @@ export {
 } from './src/email/capture-email.ts';
 export { emailSenderFor, type EmailSettings } from './src/email/email-sender-for.ts';
 export { resendEmail, type ResendEmailOptions } from './src/email/resend-email.ts';
+export * from './src/cloudflare/index.ts';
 export * from './src/sign-in/index.ts';
 export * from './src/live-updates/index.ts';
 export * from './src/platform-database/index.ts';

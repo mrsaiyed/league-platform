@@ -1636,6 +1636,7 @@ async function checkOtherHosts(port) {
     ...['example.com', 'srleagues.example.com:443', 'localhost.evil.example', 'other.test'].map(
       (host) => [`Host ${host}`, host, {}],
     ),
+    ['CF-Connecting-IP', local, { 'cf-connecting-ip': '10.0.0.5' }],
     ['Forwarded', local, { forwarded: 'for=10.0.0.5' }],
     ['Via', local, { via: '1.1 a-proxy' }],
     ['X-Forwarded-For from elsewhere', local, { 'x-forwarded-for': '10.0.0.5' }],
