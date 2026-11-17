@@ -305,17 +305,9 @@ registerIsolationCase({
 registerIsolationCase({
   subject: deleteRounds,
   name: "remove the target's round whose only game is in the bin, which loses its round",
-  run: async (scope, target) => {
-    // In the scope's own league only: the upcoming game goes to the empty round and the bin
-    // (S-60, step 2.181), so the control run removes the round and clears the game's round.
-    await transactionOf(scope)
-      .updateTable('games')
-      .set({ round_id: target.emptyRoundId, deleted_at: new Date() })
-      .where('league_id', '=', scope.leagueId)
-      .where('id', '=', target.upcomingGameId)
-      .execute();
-    return deleteRounds(scope, target.seasonId, [target.emptyRoundId]);
-  },
+  // The seed's third round holds only a game in the bin (S-60, step 2.181): the control run
+  // removes the round and clears that game's round; any other run must change neither.
+  run: (scope, target) => deleteRounds(scope, target.seasonId, [target.binnedRoundId]),
 });
 
 registerIsolationCase({
