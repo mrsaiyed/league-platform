@@ -1,29 +1,35 @@
 // Step 2.59: the seed's demo-shaped league on the made-up database, in a real browser, page by
 // page as P9 §3 lists what the demo shows a large association. The web app is started on its
-// made-up database (APP_ENV=test, LOCAL_DATA=made-up-database): every migration, the seed
-// leagues and the demo-shaped league in memory, its 120 games loaded through the fixture
-// import and its tracked school's ten games through the transfer from a made-up tracker
-// backup (packages/database/src/seed/seed-demo-league.ts). Nothing leaves this computer;
-// every league, school and person is made up. Builds the app first unless given --no-build.
+// made-up database with the demo-shaped league asked for (APP_ENV=test, LOCAL_DATA=made-up-
+// database, LOCAL_DEMO_LEAGUE=on): every migration, the seed leagues and the demo-shaped
+// league in memory, its 120 games loaded through the fixture import and put into ten weeks,
+// and its tracked school's ten games through the transfer from a made-up tracker backup
+// (packages/database/src/seed/seed-demo-league.ts). Nothing leaves this computer; every
+// league, school and person is made up. Builds the app first unless given --no-build.
 //
-// 1. Their league as a site: the home page, every district's table with its six schools and
-//    each school's ten games, the schedule, and the teams page with every school.
+// 1. Their league as a site: the home page (24 schools, 120 games, 10 rounds), every
+//    district's table with its six schools and each school's ten games, the schedule as its
+//    ten weeks of 12 games, and the teams page with every school.
 // 2. One team's whole season: the tracked school's page holds its ten results, its record as
 //    the standings give it, its roster with every number, and its players' statistics; the
 //    statistics page lists its players and their leaders. Each of its ten games' pages has
 //    its box score: its players' points add up to its total and to its final score, and
 //    the school it played shows its team's total only, none of its players named, in the
-//    box scores or the plays. A game between two other schools shows its final score only.
-// 3. The other teams' players' numbers hidden (S-22): the statistics page lists no other
-//    school's player and says those schools show team totals only; another school's page
-//    says its players' numbers are not public and shows none.
-// And on every page: no real name (the live tracker's own fixtures are the real names we
-// hold: none of them anywhere, counted and never printed), no student's surname in full (a
-// school league shows children by first name and last initial, R-14), and the accessibility
-// checks.
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+//    box scores, the plays or the page's data. A game between two other schools shows its
+//    final score only.
+// 3. Every other school's players' numbers hidden (S-22): the statistics page, its leaders
+//    and its data name no other school's player and say the schools it played show team
+//    totals only; each of the 23 other schools' pages shows no player's statistics, the
+//    five it played saying their players' numbers are not public, the eighteen others
+//    listing no one.
+// 4. "Be this made-up person" lists the league's owner and one scorekeeper.
+// And on every page: no real name, whole or word by word (the live tracker's own fixtures are
+// the real names we hold; counted, never printed), no student's surname in full (a school
+// league shows children by first name and last initial, R-14), and the accessibility checks.
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { demoLeague } from '../../packages/database/src/seed/demo-league-data.ts';
+import { realNames, realNamesIn } from '../../packages/database/src/seed/real-names.test-helper.ts';
 import {
   accessibilityProblems,
   buildNext,
@@ -71,24 +77,21 @@ const opponentPlayers = opponents.flatMap((school) =>
 const gamesInFile =
   readFileSync(`${repository}${demoLeague.fixturesFile}`, 'utf8').trim().split('\n').length - 1;
 
-/** The real names we hold (the live tracker's fixtures): none may be on any page. */
-const realNames = (() => {
-  const folder = `${repository}apps/live-stats/data/`;
-  const names = new Set();
-  const collect = (value, key = '') => {
-    if (typeof value === 'string') {
-      const keep = ['name', 'school', 'venue', 'address', 'source', 'division'].includes(key);
-      if (keep && value.trim().length > 3) names.add(value.trim().toLowerCase());
-    } else if (Array.isArray(value)) for (const item of value) collect(item, key);
-    else if (value !== null && typeof value === 'object') {
-      for (const [k, v] of Object.entries(value)) collect(v, k);
-    }
-  };
-  const files = existsSync(folder) ? readdirSync(folder).filter((f) => f.endsWith('.json')) : [];
-  for (const file of files) collect(JSON.parse(readFileSync(`${folder}${file}`, 'utf8')));
-  return [...names];
-})();
-note('the real names to look for are read from the tracker’s own fixtures', realNames.length > 0);
+/**
+ * The real names we hold (the live tracker's own fixtures), whole and word by word: none may
+ * be on any page or in its data. Counted, never printed.
+ */
+const real = realNames(repository);
+note(
+  'the real names to look for are read from the tracker’s own fixtures',
+  real.values.length > 0 && real.words.length > 0,
+);
+
+/**
+ * A page's HTML, its data included, with its tags taken out: a name the markup splits
+ * ("Jules<!-- --> C.") reads whole again.
+ */
+const withoutTags = (html) => html.replace(/<[^>]*>/g, '');
 
 /** Whether a page's text holds some words, whatever case the page's styles draw them in. */
 const has = (text, words) => text.toLowerCase().includes(words.toLowerCase());
@@ -109,6 +112,8 @@ if (built) {
   server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
     LOCAL_DATA: 'made-up-database',
+    // The demo-shaped league is loaded only where asked (step 2.59).
+    LOCAL_DEMO_LEAGUE: 'on',
     PUBLIC_BASE_URL: origin,
   });
   await step('starting the server on the made-up database and the browser', async () => {
@@ -133,8 +138,12 @@ if (browser) {
     note(`accessibility: ${label}`, problems.length === 0, problems.join('; '));
     const html = (await page.content()).toLowerCase();
     // Counted, never listed: a failure must not print the real names.
-    const real = realNames.filter((name) => html.includes(name)).length;
-    note(`${label}: no real name on the page`, real === 0, `${real} found`);
+    const found = realNamesIn(html, real);
+    note(
+      `${label}: no real name on the page, whole or word by word`,
+      found === 0,
+      `${found} found`,
+    );
     const surnames = demoLeague.madeUpSurnames.filter((name) => has(html, name));
     note(`${label}: no student's surname in full`, surnames.length === 0, surnames.join(', '));
   };
@@ -210,9 +219,10 @@ if (browser) {
     note('the home page names the league', has(home.text, demoLeague.name.split(' ')[0]));
     note('the home page names the season', has(home.text, demoLeague.season.name));
     note(
-      'the home page counts every school and every game played',
+      'the home page counts every school, every game played and the ten weeks',
       /TEAMS\s+24\b/i.test(home.text) &&
-        new RegExp(`GAMES PLAYED\\s+${gamesInFile}\\b`, 'i').test(home.text),
+        new RegExp(`GAMES PLAYED\\s+${gamesInFile}\\b`, 'i').test(home.text) &&
+        /ROUNDS\s+10\b/i.test(home.text),
       home.text.slice(0, 400),
     );
     await everyPage(`/${slug}`);
@@ -220,10 +230,14 @@ if (browser) {
     const schedule = await open(`/${slug}/schedule`);
     note('the schedule page is served', schedule.status === 200);
     note('the schedule names its season', has(schedule.text, demoLeague.season.name));
+    const weeks = schedule.text.match(/\bWeek \d+\s+Finished\s+12 games on Fri\b/gi) ?? [];
     note(
-      'the schedule shows played games as final, with their gyms',
-      (schedule.text.match(/\bFinal\b/gi) ?? []).length > 0 && /\bGym\b/.test(schedule.text),
-      schedule.text.slice(0, 400),
+      'the schedule reads as its ten weeks, each of 12 games on a Friday, all finished',
+      weeks.length === 10 &&
+        Array.from({ length: 10 }, (_, n) => `Week ${n + 1}`).every((week) =>
+          has(schedule.text, week),
+        ),
+      schedule.text.slice(0, 600),
     );
     await everyPage(`/${slug}/schedule`);
 
@@ -297,9 +311,12 @@ if (browser) {
       leaders.slice(0, 300),
     );
     // 3. Every other school's players' numbers hidden, here and on their own pages.
+    const statisticsData = withoutTags(await page.content());
     note(
-      "no other school's player is in the statistics",
-      opponentPlayers.every((shown) => !statistics.text.includes(shown)),
+      "no other school's player is in the statistics or the leaders, or in the page's data",
+      opponentPlayers.every(
+        (shown) => !statistics.text.includes(shown) && !statisticsData.includes(shown),
+      ),
     );
     const totalsOnly = statistics.text.match(/Only team totals are shown for ([^\n]*)/);
     note(
@@ -310,26 +327,27 @@ if (browser) {
     await everyPage(`/${slug}/stats`);
   });
 
-  await step("the other schools' players' numbers hidden", async () => {
-    // Every school the tracked one played has players' lines from those games; one it never
-    // played has none to hide.
-    const neverPlayed = schools.find((s) => !opponents.includes(s) && s !== tracked);
-    for (const school of [...opponents, neverPlayed]) {
-      if (school === undefined) continue;
+  await step("every other school's players' numbers hidden", async () => {
+    // Every school but the tracked one: the five it played have players' lines from those
+    // games, hidden; the other eighteen have no one listed at all.
+    for (const school of schools.filter((s) => s !== tracked)) {
       const team = await open(`/${slug}/teams/${school.shortName}`);
       note(`${school.name}'s page is served`, team.status === 200);
-      if (school !== neverPlayed) {
+      if (opponents.includes(school)) {
         note(
           `${school.name}'s page says its players' numbers are not public`,
           has(team.text, "players' numbers are not public") ||
             has(team.text, 'players’ numbers are not public'),
           team.text.slice(-400),
         );
+      } else {
+        // The product's own sentence for a roster not listed (step 2.232 words it again).
+        note(`${school.name}'s page lists no one`, has(team.text, 'No one is on this team yet'));
       }
       const tables = await tablesOnPage();
       note(
         `${school.name}'s page shows no player's statistics`,
-        tables.every((t) => column(t, 'PTS') < 0),
+        tables.every((t) => column(t, 'PTS') < 0 && column(t, 'GP') < 0),
         JSON.stringify(tables.map((t) => t.headers)),
       );
       await everyPage(`/${slug}/teams/${school.shortName}`);
@@ -428,10 +446,10 @@ if (browser) {
             has(game.text, 'players’ numbers are not public')),
         JSON.stringify(theirs.rows),
       );
-      const html = await page.content();
+      const html = withoutTags(await page.content());
       const named = demoLeague.trackerPlayers[opponent.shortName]
         .map(([, name]) => shownAs(name))
-        .filter((shown) => html.includes(shown));
+        .filter((shown) => html.includes(shown) || game.text.includes(shown));
       note(
         `${label}: no player of ${opponent.name} is named, in the box scores or the plays`,
         named.length === 0,
