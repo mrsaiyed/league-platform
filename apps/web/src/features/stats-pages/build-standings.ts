@@ -30,6 +30,9 @@ const orderKeys = {
 } as const;
 
 type OrderKey = keyof typeof orderKeys;
+
+/** The note of a team no longer in the league, kept in the table for its results (A-17). */
+const removedNote = 'removed-team';
 const isOrderKey = (value: string): value is OrderKey => Object.hasOwn(orderKeys, value);
 
 function columnsOf(table: CoreTable, rankBy: Standings['rankBy']): StandingsColumn[] {
@@ -96,6 +99,13 @@ function tableView(
   const orderNoteIds = new Set<string>();
   const rows = table.lines.map((line): StandingsRow => {
     const notes = line.footnotes.map((n) => `adjustment-${n}`);
+    // A team in the bin kept for its results (A-17): its row stays, with a quiet note.
+    if (line.team.removed) {
+      if (!footnotes.some((f) => f.id === removedNote)) {
+        footnotes.push({ id: removedNote, text: t('standings.removedTeam') });
+      }
+      notes.push(removedNote);
+    }
     if (isOrderKey(line.orderedBy)) {
       const id = `order-${line.orderedBy}`;
       if (!orderNoteIds.has(id)) {

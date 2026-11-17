@@ -3,7 +3,11 @@
 // (T-28). Every shape is a row of words and numbers: no contact field, birth date or
 // account id can be in one (T-29, T-81).
 
-/** A team of a season, not in the bin, with who may see its players' numbers (S-22). */
+/**
+ * A team of a season with who may see its players' numbers (S-22): one not in the bin, or
+ * one in the bin with a final or forfeited result in a game not in the bin, `removed` (A-17):
+ * its row stays in the standings, so its opponents' records add up, but it has no page.
+ */
 export type SeasonTeamRow = {
   readonly id: string;
   readonly name: string;
@@ -12,6 +16,8 @@ export type SeasonTeamRow = {
   readonly divisionId: string | null;
   /** As stored; statsShown reads anything it does not know as "totals only". */
   readonly statsVisibility: string;
+  /** In the bin, kept for its results: listed in the standings only, never linked. */
+  readonly removed: boolean;
 };
 
 /** A division of a season, not in the bin. */

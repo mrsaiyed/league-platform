@@ -5,6 +5,8 @@
 import type { PGlite } from '@electric-sql/pglite';
 import {
   eventHandlers,
+  readStandings,
+  readTeamRecords,
   rebuildStandings,
   recordFinalScore,
   recordForfeit,
@@ -20,6 +22,7 @@ import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import type { LeagueScope } from '../db/transaction-scope.ts';
+import { withTransaction } from '../db/with-transaction.ts';
 import {
   freshSchema,
   newDivision,
@@ -37,6 +40,7 @@ import { activityLogStore } from './activity-log-store.ts';
 import { gamesStore } from './games-store.ts';
 import { liveGamesStore } from './live-games-store.ts';
 import { scoringSessionsStore } from './scoring-sessions-store.ts';
+import { standingsReadStore } from './standings-read-store.ts';
 import { standingsStore } from './standings-store.ts';
 
 let pglite: PGlite;
@@ -329,5 +333,21 @@ describe('standings follow every result (step 2.24)', () => {
     expect(after.rows).toEqual(before.rows);
     const winner = after.rows.find((r) => r.team_id === s.teams[0]);
     expect(winner).toMatchObject({ games_played: 1, wins: 1, losses: 0 });
+
+    // The public reads keep its row, marked, with every place filled; it has no card.
+    await pglite.query(`update seasons set status = 'active' where id = $1`, [s.seasonId]);
+    const read = await withTransaction(db, { leagueId: s.l.leagueId }, async (scope) => ({
+      standings: await readStandings(standingsReadStore(scope), { seasonId: s.seasonId }),
+      records: await readTeamRecords(standingsReadStore(scope), { seasonId: s.seasonId }),
+    }));
+    if (!read.standings.ok || !read.records.ok) throw new Error('no public read');
+    const lines = read.standings.value.tables.flatMap((t) => t.lines);
+    expect(lines).toHaveLength(4);
+    expect(lines.filter((l) => l.team.removed).map((l) => l.team.id)).toEqual([s.teams[1]]);
+    for (const table of read.standings.value.tables) {
+      expect(table.lines.map((l) => l.seed)).toEqual(table.lines.map((_, i) => i + 1));
+    }
+    expect(read.records.value.map((r) => r.team.id)).not.toContain(s.teams[1]);
+    expect(read.records.value).toHaveLength(3);
   });
 });

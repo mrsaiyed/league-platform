@@ -3,14 +3,18 @@
 // links its name to a page that is not there. Admin → Schedule's grid reads "Badgers
 // (removed) at Herons" and offers it for no new game; the public schedule lists its games
 // under "Badgers" and its game cards lead to the game only; a game's page leaves out its
-// team card; and its results stay in its opponents' records after the standings are
-// worked out again, though its own row is not drawn.
+// team card; and the public standings, worked out again, keep its row (marked with a note,
+// never linked) with every place filled and every opponent's record as it was.
 import {
   getScheduleDraft,
   readStandings,
+  readTeamRecords,
   rebuildStandings,
+  type Standings,
   type TeamRecord,
 } from '@srleagues/core';
+import { StandingsTable } from '@srleagues/ui';
+import { buildStandingsViews } from '../stats-pages/index.ts';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -134,23 +138,62 @@ describe('a team in the bin with games is named on every screen (A-17)', () => {
     expect(cards.map((c) => c.name)).toEqual(['Herons']);
   });
 
-  it("their results stay in their opponents' records when the standings are worked out again", async () => {
+  it('the public standings keep their row, marked and unlinked, ranks with no gap, every record unchanged', async () => {
     const kept = worldWithBadgersBinned(false);
     const binned = worldWithBadgersBinned();
-    const tableOf = async (w: typeof kept) => {
+    const standingsOf = async (w: typeof kept) => {
       const rebuilt = await rebuildStandings(w.context, { seasonId: w.seasonId }, w.world.deps);
       if (!rebuilt.ok) throw new Error(rebuilt.error.code);
       const store = worldStandingsRead(() => w.world.read(w.league.leagueId));
       const read = await readStandings(store, { seasonId: w.seasonId });
       if (!read.ok) throw new Error('no standings');
-      return read.value.tables.flatMap((table) =>
-        table.lines.map((line) => [line.team.name, line.wins, line.losses, line.gamesPlayed]),
-      );
+      return read.value;
     };
-    const before = await tableOf(kept);
-    const after = await tableOf(binned);
-    expect(before.map(([name]) => name)).toContain('Badgers');
-    // Every other team's record is as it was; only Badgers' own row is not drawn.
-    expect(after).toEqual(before.filter(([name]) => name !== 'Badgers'));
+    const rowsOf = (standings: Standings) =>
+      standings.tables.flatMap((table) =>
+        table.lines.map((line) => [line.rank, line.seed, line.team.name, line.wins, line.losses]),
+      );
+    const before = await standingsOf(kept);
+    const after = await standingsOf(binned);
+    expect(rowsOf(before).map((row) => row[2])).toContain('Badgers');
+    // Every team that played is listed, each in its place, every record as it was.
+    expect(rowsOf(after)).toEqual(rowsOf(before));
+    for (const table of after.tables) {
+      expect(table.lines.map((line) => line.seed)).toEqual(table.lines.map((_, i) => i + 1));
+    }
+    // Only Badgers are marked; the page draws the mark as a note, and links no team.
+    const marked = after.tables.flatMap((t) => t.lines.filter((l) => l.team.removed));
+    expect(marked.map((l) => l.team.name)).toEqual(['Badgers']);
+    const views = buildStandingsViews(after);
+    const badgersRow = views.flatMap((v) => v.rows).find((r) => r.team === 'Badgers');
+    expect(badgersRow?.notes).toContain('removed-team');
+    expect(views.flatMap((v) => v.footnotes).map((f) => f.text)).toContain(
+      'No longer in the league. Its results stay in the table, as they are part of other teams’ records.',
+    );
+    const html = renderToStaticMarkup(
+      createElement(
+        'div',
+        null,
+        views.map((v) =>
+          createElement(StandingsTable, {
+            key: v.key,
+            caption: v.caption,
+            columns: v.columns,
+            rows: v.rows,
+            footnotes: v.footnotes,
+            idPrefix: v.key,
+            labels: { seed: 'Seed', team: 'Team', note: 'Note', notes: 'Notes' },
+          }),
+        ),
+      ),
+    );
+    expect(html).toContain('Badgers');
+    expect(html).not.toContain(`/teams/${binned.badgers.slug}`);
+    // The teams page's cards (and so the "Seed" there) leave Badgers out: they have no page.
+    const store = worldStandingsRead(() => binned.world.read(binned.league.leagueId));
+    const records = await readTeamRecords(store, { seasonId: binned.seasonId });
+    if (!records.ok) throw new Error('no records');
+    expect(records.value.map((r) => r.team.name)).not.toContain('Badgers');
+    expect(records.value.length).toBeGreaterThan(0);
   });
 });

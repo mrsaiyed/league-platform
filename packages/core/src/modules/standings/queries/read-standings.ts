@@ -37,6 +37,8 @@ export type StandingsLine = {
     readonly name: string;
     readonly slug: string;
     readonly color: string | null;
+    /** In the bin, kept for its results (A-17): marked, and never linked to a page. */
+    readonly removed: boolean;
   };
   readonly gamesPlayed: number;
   readonly wins: number;
@@ -133,7 +135,13 @@ function buildTable(
       seed: row.seed,
       tied: shown.some((other) => other !== row && other.rank === row.rank),
       orderedBy: row.decidedBy ?? 'record',
-      team: { id: team.id, name: team.name, slug: team.slug, color: team.color },
+      team: {
+        id: team.id,
+        name: team.name,
+        slug: team.slug,
+        color: team.color,
+        removed: team.removed,
+      },
       gamesPlayed: row.gamesPlayed,
       wins: row.wins,
       losses: row.losses,
