@@ -115,9 +115,10 @@ export type GamePage = {
     /** The date a final game was last corrected, never the reason (S-7). */
     readonly correctedOn: string | null;
     /**
-     * "Statistics kept" (P7 §1), in order: what the box score's columns may be, the same
-     * answer as the statistics page's (statisticsKept), from the rules the game is played
-     * under (its own once fixed, S-1) where its season names none.
+     * "Statistics kept" (P7 §1), in order: what the box score's columns may be. The
+     * season's, as it is today, by the same function and from the same reads as the
+     * statistics page (statisticsKept), so the two pages agree after a season's
+     * statistics change, for games decided before it too (step 2.196).
      */
     readonly statKeys: readonly string[];
   };
@@ -186,11 +187,12 @@ export async function readGamePage(
 ): Promise<Result<GamePage, ReadGamePageError>> {
   const game = await store.findGame(input.gameId);
   if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
-  const [teamRows, state, lines, correctedOn] = await Promise.all([
+  const [teamRows, state, lines, correctedOn, season] = await Promise.all([
     store.teams([game.homeTeamId, game.awayTeamId]),
     store.state(game.id),
     store.lines(game.id),
     store.correctedOn(game.id),
+    store.seasonStatistics(game.seasonId),
   ]);
   const team = (id: string): GamePageTeam | undefined => teamRows.find((t) => t.id === id);
   const home = team(game.homeTeamId);
@@ -359,7 +361,7 @@ export async function readGamePage(
       startsAt: game.startsAt,
       finalizedAt: game.finalizedAt,
       correctedOn: correctedOn ?? null,
-      statKeys: statisticsKept(game.seasonStatKeys, game.rules),
+      statKeys: statisticsKept(season?.statKeys ?? [], season?.rules),
     },
     scoreboard: {
       home: { teamId: home.id, name: home.name, score: scoreOf('home') },

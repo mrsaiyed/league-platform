@@ -177,7 +177,14 @@ export function worldGameSnapshot(read: () => Promise<ReadWorld | undefined>): G
       const season = publicSeason(s, game.seasonId);
       if (season === undefined) return undefined;
       const { format, version: _version, divisionId: _division, ...record } = gameRecordOf(game);
-      return { ...record, rules: format ?? season.rules, seasonStatKeys: season.statKeys };
+      return { ...record, rules: format ?? season.rules };
+    },
+    // As games-read-store.ts reads it: the list a public season names, and its rules.
+    seasonStatistics: async (seasonId) => {
+      const s = await read();
+      const season = s?.seasons.find((x) => x.id === seasonId);
+      if (season === undefined) return undefined;
+      return { statKeys: publicSeason(s, seasonId)?.statKeys ?? [], rules: season.rules };
     },
     teams: async (teamIds) =>
       ((await read())?.teams ?? [])

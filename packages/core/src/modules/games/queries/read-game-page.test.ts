@@ -29,9 +29,9 @@ const store = (over: Partial<GamesReadStore> = {}): GamesReadStore => ({
           finalizedAt: '2026-12-06T19:30:00.000Z',
           binned: false,
           rules: null,
-          seasonStatKeys: [],
         }
       : undefined,
+  seasonStatistics: async (id) => (id === 's' ? { statKeys: [], rules: null } : undefined),
   teams: async () => [
     { id: home, name: 'Home', slug: 'h', color: null, statsVisibility: 'everyone' },
     { id: away, name: 'Away', slug: 'a', color: null, statsVisibility: 'staff' },
@@ -189,9 +189,9 @@ describe('readGamePage', () => {
               finalizedAt: '2026-12-06T19:30:00.000Z',
               binned: false,
               rules: full,
-              seasonStatKeys: [],
             }
           : undefined,
+      seasonStatistics: async () => ({ statKeys: [], rules: full }),
       state: async () => state,
       lines: async () => lines,
     });
@@ -226,7 +226,6 @@ describe('readGamePage', () => {
               finalizedAt: '2026-12-06T19:30:00.000Z',
               binned: false,
               rules: null,
-              seasonStatKeys: [],
             }
           : undefined,
       state: async () => undefined,
@@ -251,22 +250,23 @@ describe('readGamePage', () => {
     expect(r.value.boxScores[1].playersPoints).toBeNull();
   });
 
-  it("gives the statistics kept, as the statistics page does: the season's own list, else the game's rules", async () => {
-    const keysWith = async (rules: unknown, seasonStatKeys: readonly string[]) => {
+  it("gives the statistics the season keeps today, as the statistics page does, not the game's own fixed rules", async () => {
+    const full = { ...defaultSeasonRules(), statistics: 'full' as const };
+    const keysWith = async (seasonRules: unknown, statKeys: readonly string[]) => {
       const base = store();
       const s = store({
+        // The game kept the full set when it was played (S-1); the season may differ now.
         findGame: async (id) => {
           const found = await base.findGame(id);
-          return found === undefined ? undefined : { ...found, rules, seasonStatKeys };
+          return found === undefined ? undefined : { ...found, rules: full };
         },
+        seasonStatistics: async () => ({ statKeys, rules: seasonRules }),
       });
       const r = await readGamePage(s, { gameId }, viewing(publicViewer(leagueId)));
       return r.ok ? r.value.game.statKeys : undefined;
     };
-    expect(await keysWith(null, [])).toEqual(['points', 'fg3', 'fg1', 'fouls']);
-    expect(await keysWith({ ...defaultSeasonRules(), statistics: 'full' }, [])).toContain(
-      'turnovers',
-    );
+    expect(await keysWith(defaultSeasonRules(), [])).toEqual(['points', 'fg3', 'fg1', 'fouls']);
+    expect(await keysWith(full, [])).toContain('turnovers');
     expect(await keysWith(null, ['points', 'rebounds'])).toEqual(['points', 'rebounds']);
   });
 

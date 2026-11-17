@@ -47,12 +47,18 @@ export type GamesReadStore = {
         /** The rules it is played under, as stored: its own once fixed (`format`), else
          * its season's; null or undefined when neither is stored (the starting set). */
         readonly rules: unknown;
-        /** The statistics the game's season names itself, in its order; empty when it
-         * names none and keeps its rules' set (record 070, step 2.196). */
-        readonly seasonStatKeys: readonly string[];
       }
     | undefined
   >;
+  /**
+   * What a season keeps ("Statistics kept", P7 §1), as the statistics page reads it: the
+   * statistics it names itself, in its order (empty when it names none, record 070), and
+   * its rules as stored. Undefined when the season is not here. Only the game's page asks
+   * for it (step 2.196): its box score's columns are the season's, as it is today.
+   */
+  readonly seasonStatistics: (
+    seasonId: string,
+  ) => Promise<{ readonly statKeys: readonly string[]; readonly rules: unknown } | undefined>;
   readonly teams: (teamIds: readonly string[]) => Promise<readonly GamePageTeam[]>;
   /** The engine's saved state of the game (T3 §8), as stored, or undefined if it has none. */
   readonly state: (gameId: string) => Promise<unknown>;

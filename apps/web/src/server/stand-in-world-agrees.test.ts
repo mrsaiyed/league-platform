@@ -822,4 +822,50 @@ describe('the one world and the database, the same season by the same commands',
     });
     expect(b).toEqual(a);
   });
+
+  // Last: it changes the season's rules, which the reads above rest on. On the database
+  // only: the made-up world does not save a season's rules yet (step 2.47's screen); the
+  // world's own case is in features/live-game/game-content.test.ts.
+  it("give an earlier game's page the columns of the statistics page when the season's statistics change mid-season (step 2.196)", async () => {
+    const [database] = sides ?? [];
+    if (database === undefined) throw new Error('no sides');
+    /** The season switched to `statistics`; the tracked game's columns and the page's. */
+    const columnsWith = async (statistics: 'standard' | 'full') =>
+      (async (side: Side) => {
+        const seasonId = await seasonOfSide(side);
+        const version = await side.deps.transaction(
+          side.as,
+          async (tx) => (await tx.leagues.findSeason(seasonId))?.version ?? 0,
+        );
+        ok(
+          `${side.name}: rules`,
+          await setSeasonRules(
+            side.as,
+            { seasonId, version, rules: { ...defaultSeasonRules(), statistics } },
+            side.deps,
+          ),
+        );
+        const page = await side.games((store) =>
+          readGamePage(store, { gameId: gameIds.tracked }, viewing(side)),
+        );
+        if (!page.ok) throw new Error(`${side.name}: no page`);
+        const built = buildBoxScores(page.value);
+        const table = await side.standings((store) =>
+          readStatisticsTable(store, { seasonId, viewing: viewing(side) }),
+        );
+        if (built.kind !== 'tables' || !table.ok) throw new Error(`${side.name}: no tables`);
+        return {
+          game: built.tables[0]?.columns.map((c) => c.key),
+          statistics: table.value.statKeys,
+        };
+      })(database);
+    // The tracked game was played while the season kept the full set: its own rules (S-1).
+    expect(await columnsWith('standard')).toEqual({
+      game: ['points', 'fg3', 'fg1', 'fouls'],
+      statistics: ['points', 'fg3', 'fg1', 'fouls'],
+    });
+    const full = await columnsWith('full');
+    expect(full.game).toEqual(['points', 'fg3', 'fg1', 'fouls', 'turnovers']);
+    expect(full.statistics).toContain('turnovers');
+  });
 });

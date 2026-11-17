@@ -66,9 +66,12 @@ function store(
             finalizedAt: null,
             binned: false,
             rules: over.rules ?? null,
-            seasonStatKeys: [],
           }
         : undefined,
+    // Only the game's page draws a box score's columns: a snapshot never asks (step 2.196).
+    seasonStatistics: async () => {
+      throw new Error('A snapshot read the season’s statistics, which it never shows.');
+    },
     teams: async () => [
       { id: home, name: 'Home', slug: 'h', color: null, statsVisibility: 'everyone' },
       {

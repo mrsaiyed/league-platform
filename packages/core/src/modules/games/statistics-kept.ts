@@ -8,8 +8,9 @@ import { boxScoreColumns } from './box-score-columns.ts';
 import { rulesOfGame } from './season-rules-of.ts';
 
 /**
- * `named` is the season's own list (empty when it names none); `rules` the rules as
- * stored: the season's, or a game's own once fixed (S-1), which a game's page reads.
+ * `named` is the season's own list (empty when it names none); `rules` the season's rules
+ * as stored. A game's page asks with its season's, not the rules the game kept (S-1), so
+ * its columns are the statistics page's after a season's statistics change.
  */
 export function statisticsKept(named: readonly string[], rules: unknown): readonly string[] {
   return named.length > 0 ? named : boxScoreColumns(rulesOfGame(null, rules).statistics).statKeys;
