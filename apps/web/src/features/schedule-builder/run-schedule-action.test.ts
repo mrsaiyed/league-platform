@@ -255,7 +255,7 @@ describe('schedule grid', () => {
       expect(notice).toEqual({
         thing: id,
         said: 'game-removed',
-        ...(before.roundId === null ? {} : { about: before.roundId }),
+        ...(before.roundId === null ? {} : { about: [before.roundId] }),
       });
       // The notice does not carry `stays`: the page knows it from the draft.
       const { stays: _stays, ...said } =

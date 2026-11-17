@@ -115,13 +115,13 @@ export function noticeOfAnswer(outcome: ScheduleActionOutcome): GridNotice | und
       return {
         thing: detail.gameId,
         said: detail.what,
-        ...(detail.roundId === null ? {} : { about: detail.roundId }),
+        ...(detail.roundId === null ? {} : { about: [detail.roundId] }),
       };
     case 'game-put-back':
       return {
         thing: detail.gameId,
         said: detail.what,
-        ...(detail.fromRoundId === undefined ? {} : { about: detail.fromRoundId }),
+        ...(detail.fromRoundId === undefined ? {} : { about: [detail.fromRoundId] }),
       };
     case 'game-already-back':
       return { thing: detail.gameId, said: detail.what };
@@ -134,7 +134,7 @@ export function noticeOfAnswer(outcome: ScheduleActionOutcome): GridNotice | und
 export function savedDetailOfNotice(notice: GridNotice | undefined): SavedDetail | undefined {
   if (notice === undefined) return undefined;
   const gameId = idOf(notice.thing);
-  const about = idOf(notice.about);
+  const about = idOf(notice.about?.[0]);
   if (gameId === undefined) return undefined;
   switch (notice.said) {
     case 'game-removed':

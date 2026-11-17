@@ -21,10 +21,11 @@ export type SavedNotice = {
   /** What was done to it, as the last part of a message key: `final`, `reopen`… */
   readonly said: string;
   /**
-   * Another id the answer needs, if any: on the schedule, the round a game was removed from
-   * (step 2.185). Never anything typed.
+   * Other things the notice names, by id: the games that took a game's place since it was
+   * called off, when it is put back (step 2.158); on the schedule, the round a game was
+   * removed from (step 2.185). Ids only, never anything typed.
    */
-  readonly about?: string;
+  readonly about?: readonly string[];
 };
 
 export type SavedNotices = {

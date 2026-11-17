@@ -8,6 +8,7 @@ import { accessOfAccount, readOnlyLeagueStatuses, type Scope } from '../access/i
 import { recordingOf } from './game-fields.ts';
 import type { GameInWindow, GamesTx } from './ports.ts';
 import { mayScoreUnder, scoringRuleOf } from './scoring-access.ts';
+import { rulesOfGame } from './season-rules-of.ts';
 
 /** A game on one of the person's lists. */
 export type MyGame = {
@@ -39,6 +40,11 @@ export type MyGame = {
    */
   readonly hasPlays: boolean;
   readonly version: number;
+  /**
+   * The score a forfeit would record, winner's and loser's, by the rules the game is played
+   * under (its own, else its season's): what the question before a forfeit says (step 2.158).
+   */
+  readonly forfeitScore: { readonly winner: number; readonly loser: number };
 };
 
 const view = (
@@ -46,6 +52,7 @@ const view = (
   today: string,
   scorable: boolean,
   hasPlays: boolean,
+  forfeitScore: MyGame['forfeitScore'],
 ): MyGame => ({
   id: game.id,
   seasonId: game.seasonId,
@@ -64,6 +71,7 @@ const view = (
   scorable,
   hasPlays,
   version: game.version,
+  forfeitScore,
 });
 
 /** Only a game still to be decided can be ended by hand, so only it is asked about. */
@@ -95,9 +103,21 @@ export async function myGamesOf(
   });
   // One after another: they share the transaction's one connection.
   const listed: MyGame[] = [];
+  // Each season's stored rules read once (a list holds a season's games side by side).
+  const seasonRules = new Map<string, unknown>();
   for (const entry of mine) {
     const plays = stillOpen(entry.game.status) && (await tx.games.hasPlays(entry.game.id));
-    listed.push(view(entry, today, scorable, plays));
+    const { seasonId } = entry.game;
+    if (!seasonRules.has(seasonId)) {
+      seasonRules.set(seasonId, (await tx.games.findSeason(seasonId))?.rules);
+    }
+    const { forfeit } = rulesOfGame(entry.game.format, seasonRules.get(seasonId));
+    listed.push(
+      view(entry, today, scorable, plays, {
+        winner: forfeit.winnerScore,
+        loser: forfeit.loserScore,
+      }),
+    );
   }
   return listed;
 }

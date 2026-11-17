@@ -17,6 +17,7 @@ export const enActivity = {
   'activity.games.end_tracked_game': 'Ended a tracked game',
   'activity.games.mark_not_started': 'Marked a started game not started',
   'activity.games.postpone_game': 'Postponed a game',
+  'activity.games.put_game_back': 'Put a cancelled game back on the schedule',
   'activity.games.record_final_score': 'Recorded a final score',
   'activity.games.record_forfeit': 'Recorded a forfeit',
   'activity.games.reopen_game': 'Reopened a final game to correct it',

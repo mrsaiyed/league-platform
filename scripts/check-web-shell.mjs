@@ -428,12 +428,20 @@ const cases = [
   ],
   // The standings and statistics pages (step 2.43): real tables, not the placeholder; a
   // team set to staff only shows its totals and none of its players to a visitor (S-22).
+  // Since step 2.195 the note on level teams is true of each team it is beside: it never
+  // tells one it was "placed above".
   [
     'visitor',
     '/north-valley/standings',
     200,
-    ['East', 'West', 'Owls', 'Played an ineligible player in round 3.', 'games they played'],
-    ['This page is not built yet.'],
+    [
+      'East',
+      'West',
+      'Owls',
+      'Played an ineligible player in round 3.',
+      'The game between them puts Owls ahead.',
+    ],
+    ['This page is not built yet.', 'Placed above'],
   ],
   ['visitor', '/north-valley/standings?season=spring-2026', 200, ['Spring 2026', 'All teams']],
   ['visitor', '/north-valley/standings?season=nope', 404, [notFound]],

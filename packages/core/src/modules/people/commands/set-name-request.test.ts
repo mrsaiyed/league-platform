@@ -190,6 +190,49 @@ describe('setNameRequest: initials for children always, for adults where offered
     expect(db.state.people[1]?.visibility).toBe('initials');
   });
 
+  it('asks the store whether the person is a child (R-28), reading no private field', async () => {
+    const facts = (birthDate: string, isMinor: boolean) => ({
+      contactEmail: null,
+      birthDate,
+      isMinor,
+    });
+    const { db, deps, as } = memoryPeople({
+      status: 'live',
+      audience: 'adult',
+      today: '2026-11-16',
+      people: [
+        // A child by the date, the tick off: initials always (R-25).
+        person(1, { sensitiveFields: facts('2012-09-03', false) }),
+        // An adult by the date, the tick off: initials only where offered (R-15).
+        person(2, { sensitiveFields: facts('1990-04-12', false) }),
+        // Eighteen tomorrow, in the league's own day: still a child today.
+        person(3, { sensitiveFields: facts('2008-11-17', false) }),
+        // An adult by the date, the tick on: a child, whom the admin unticks to show more.
+        person(4, { sensitiveFields: facts('1990-04-12', true) }),
+      ],
+      grants: [registrarGrant],
+    });
+    expect(codeOf(await setNameRequest(as(registrarId), ask(child, 'initials'), deps))).toBe('ok');
+    expect(await setNameRequest(as(registrarId), ask(adult, 'initials'), deps)).toEqual({
+      ok: false,
+      error: { code: 'initials-not-offered' },
+    });
+    expect(codeOf(await setNameRequest(as(registrarId), ask(unknownAge, 'initials'), deps))).toBe(
+      'ok',
+    );
+    expect(
+      codeOf(await setNameRequest(as(registrarId), ask(personUuid(4), 'initials'), deps)),
+    ).toBe('ok');
+    expect(db.state.people.map((p) => p.visibility)).toEqual([
+      'initials',
+      'none',
+      'initials',
+      'initials',
+    ]);
+    // The birth dates stayed in the store.
+    expect(db.state.sensitiveReads).toBe(0);
+  });
+
   it('always saves removed, for anyone, whatever the settings (R-17)', async () => {
     const { db, deps, as } = league({ audience: 'adult' });
     for (const [i, who] of [child, adult, unknownAge].entries()) {

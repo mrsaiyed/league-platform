@@ -213,7 +213,8 @@ test("every table of DECISIONS.md's full list is kept by ID, T4 once (its rows w
     assert.ok(keptById(ids), `${heading}: one ID a row, each once, in order`);
   }
   const t4 = tables.find((t) => t.heading.startsWith('T4 '));
-  assert.equal(t4?.ids.length, 41);
+  // 41 when the three copies were made one; 42 since T-284 was folded in (step 2.93 part 5).
+  assert.equal(t4?.ids.length, 42);
 });
 
 test('every pending file in the folder folds into DECISIONS.md under the same rules, formatted', async () => {

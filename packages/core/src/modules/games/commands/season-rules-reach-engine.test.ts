@@ -431,6 +431,9 @@ describe('a game brought over from a tracker without those rules (the transfer; 
     const state = savedState(t);
     expect(state.rules.mercyLead).toBeUndefined();
     expect(state.rules.playerFoulLimit).toBe(5);
+    // And minutes counted as the tracker counted them when its clock was set (record 077).
+    expect(state.rules.minutesFollow).toBeUndefined();
+    expect(state.clock.ranMs).toBeUndefined();
     expect(t.db.state.games[0]?.format).toEqual(
       seasonRules((r) => {
         r.clock = { mode: 'stop', stopClockLastSeconds: null, mercyLead: null };
@@ -446,6 +449,8 @@ describe('a game brought over from a tracker without those rules (the transfer; 
     const { withoutMercyOrLastMinutes: _off, ...plain } = replayed();
     const result = await applyTrackerCommands(t.as(schedulerId), plain, t.deps);
     expect(result.ok && result.value.results.at(-1)?.status).toBe('refused');
+    // A game scored here counts minutes on the game clock (S-71).
+    expect(savedState(t).rules.minutesFollow).toBe('game-clock');
   });
 
   it('is only for whoever may also correct the game: a scorekeeper is refused', async () => {

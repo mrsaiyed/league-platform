@@ -410,6 +410,78 @@ describe('the people commands on the database', () => {
     expect(rows.rows.map((r) => r.visibility)).toEqual(['initials', 'initials']);
   });
 
+  it("decides a child's initials by the database's answer on the league's own day (R-28)", async () => {
+    // Kiritimati is 14 hours ahead of UTC and Pago Pago 11 behind: at any hour at least one
+    // of them is on another day than UTC, so the server's day would answer otherwise.
+    const utcToday = new Date().toISOString().slice(0, 10);
+    const zones = ['Pacific/Kiritimati', 'Pacific/Pago_Pago'];
+    const dayOf = (timeZone: string) =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(new Date());
+    const yearsBefore = (day: string) =>
+      `${String(Number(day.slice(0, 4)) - 18).padStart(4, '0')}${day.slice(4)}`;
+    const nextDay = (day: string) => {
+      const date = new Date(`${day}T12:00:00Z`);
+      date.setUTCDate(date.getUTCDate() + 1);
+      return date.toISOString().slice(0, 10);
+    };
+    let checked = 0;
+    for (const zone of zones) {
+      const leagueDay = dayOf(zone);
+      // Unless the clock passed the zone's midnight while this ran.
+      if (leagueDay === utcToday) continue;
+      const l = await league();
+      await pglite.query('update leagues set time_zone = $2 where id = $1', [l.leagueId, zone]);
+      const born = async (birthDate: string, isMinor = false) => {
+        const personId = await newPerson(pglite, l.leagueId);
+        await pglite.query('update people set birth_date = $2, is_minor = $3 where id = $1', [
+          personId,
+          birthDate,
+          isMinor,
+        ]);
+        return personId;
+      };
+      const ask = async (personId: string) => {
+        const result = await setNameRequest(
+          l.as(l.ownerId),
+          {
+            personId,
+            version: (
+              await one<{ version: number }>(pglite, 'select version from people where id = $1', [
+                personId,
+              ])
+            ).version,
+            showAs: 'initials',
+            reason: 'guardianAsked',
+          },
+          deps,
+        );
+        return result.ok ? 'ok' : result.error.code;
+      };
+      // Eighteen today, the league's day: an adult, so initials are not offered to them
+      // (an adult league, adults may not ask). Eighteen tomorrow there: still a child.
+      // A birth date older than the league's today is never after the database's today,
+      // so both can be saved.
+      if (leagueDay > utcToday) {
+        // Ahead of UTC: by the server's day this person is still 17, a child.
+        expect(await ask(await born(yearsBefore(leagueDay))), zone).toBe('initials-not-offered');
+      } else {
+        // Behind UTC: by the server's day this person turned 18 today, an adult.
+        expect(await ask(await born(yearsBefore(nextDay(leagueDay)))), zone).toBe('ok');
+        expect(await ask(await born(yearsBefore(leagueDay))), zone).toBe('initials-not-offered');
+      }
+      // Eighteen tomorrow in the league: a child. Eighteen today with the tick on: a child.
+      expect(await ask(await born(yearsBefore(nextDay(leagueDay)))), zone).toBe('ok');
+      expect(await ask(await born(yearsBefore(leagueDay), true)), zone).toBe('ok');
+      checked += 1;
+    }
+    expect(checked).toBeGreaterThan(0);
+  });
+
   it('lets a request show less, and only less, in an archived league (R-26)', async () => {
     const l = await league();
     const personId = await newPerson(pglite, l.leagueId);

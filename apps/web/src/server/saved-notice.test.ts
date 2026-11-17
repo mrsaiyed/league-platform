@@ -25,7 +25,7 @@ describe('the one-time "Saved" notice (T-271)', () => {
       screen: 'schedule',
       thing: game,
       said: 'game-removed',
-      about: leagueId,
+      about: [leagueId],
     };
     notices.leave('p', removed);
     expect(notices.take('p', 'games')).toBeUndefined();
