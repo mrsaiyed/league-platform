@@ -245,7 +245,10 @@ export function CallOffForms(props: CallOffFormsProps) {
 
   return (
     <details
-      className="admin-game-other"
+      // A panel behind a quiet button is "the other things to do"; one behind a button of its
+      // own (the card's one thing to do) is drawn as "Put this game back" is, its button not
+      // stretched across the card.
+      className={props.summaryButton === true ? undefined : 'admin-game-other'}
       open={asked !== undefined || refused !== undefined}
       data-call-off=""
     >
