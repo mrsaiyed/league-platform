@@ -120,7 +120,7 @@ if (built) {
       await game.locator('summary', { hasText: 'Edit this game' }).click();
       await tap(
         game.getByRole('button', { name: 'Remove game' }),
-        /\/admin\/schedule(\?season=[\w-]+)?#saved$/,
+        /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
       );
       const said = (await page.locator('#saved').textContent()) ?? '';
       note(`removed game ${i + 1}: said beside the round`, said.includes('Removed:'), said);
@@ -221,7 +221,7 @@ if (built) {
       await game.locator('summary', { hasText: 'Edit this game' }).click();
       await tap(
         game.getByRole('button', { name: 'Remove game' }),
-        /\/admin\/schedule(\?season=[\w-]+)?#saved$/,
+        /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
       );
       answer = page.url();
     }
@@ -257,7 +257,7 @@ if (built) {
     await accessible('a removed game whose round was removed since');
     await tap(
       struck.getByRole('button', { name: 'Put it back' }),
-      /\/admin\/schedule(\?season=[\w-]+)?#saved$/,
+      /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
     );
     const backSaid = (await page.locator('#saved').textContent()) ?? '';
     note(

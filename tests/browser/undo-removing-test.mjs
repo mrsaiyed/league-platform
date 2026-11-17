@@ -287,7 +287,7 @@ if (built) {
         (await game.getByRole('button', { name: 'Save game' }).getAttribute('data-kind')) ===
           'main',
     );
-    await tap(remove, /\/admin\/schedule(\?season=[\w-]+)?#saved$/);
+    await tap(remove, /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/);
     const removedAddress = page.url();
     const answer = page.locator('#saved');
     const answerText = (await answer.count()) === 1 ? await answer.innerText() : '';
@@ -307,7 +307,7 @@ if (built) {
     await accessible('a game removed from the draft');
 
     at = 'the game is put back in one tap';
-    await tap(putBack, /\/admin\/schedule(\?season=[\w-]+)?#saved$/);
+    await tap(putBack, /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/);
     const again = page.locator(`li[data-game="${gameId}"]`);
     note('the game is back', (await again.count()) === 1);
     note(
@@ -319,7 +319,9 @@ if (built) {
     note(
       'publishing would change nothing for it',
       summaryBefore === ''
-        ? summaryAfter.startsWith('Publishing will add 0, move 0, remove 0, and change how 0')
+        ? // Since step 2.185 the box says it in one sentence, not a row of zeros.
+          summaryAfter ===
+            'The draft is the same as the published schedule, so there is nothing to publish.'
         : summaryAfter === summaryBefore,
       summaryAfter,
     );

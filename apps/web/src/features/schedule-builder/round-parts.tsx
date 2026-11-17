@@ -23,9 +23,14 @@ export function RoundFacts({ round }: { readonly round: GridRound }) {
           : t('schedule.admin.roundDate', { date: dayText(round.date) })}
       </span>{' '}
       <StaffPill>
-        {round.undated === 0
-          ? t.plural('schedule.admin.roundGames', total)
-          : t.plural('schedule.admin.roundGamesUndated', total, { undated: round.undated })}
+        {round.undated !== 0
+          ? t.plural('schedule.admin.roundGamesUndated', total, { undated: round.undated })
+          : round.removed.length !== 0
+            ? // Struck games are said apart: they hold nothing (S-60; step 2.185).
+              t.plural('schedule.admin.roundGamesRemoved', total, {
+                removed: round.removed.length,
+              })
+            : t.plural('schedule.admin.roundGames', total)}
       </StaffPill>
     </p>
   );

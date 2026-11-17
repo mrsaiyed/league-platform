@@ -78,3 +78,21 @@ describe("a round's count and its removal (step 2.181)", () => {
     expect(html).toContain(`data-remove-round="${roundId}"`);
   });
 });
+
+describe('a round with games the draft removes (step 2.185)', () => {
+  const struck = (games: number, removed: number): GridRound => ({
+    ...round(games, 0),
+    removed: Array.from({ length: removed }, (_, i) => ({ ...game(i + 5), roundGone: null })),
+  });
+
+  it('says its games and the struck ones apart', () => {
+    expect(facts(struck(7, 3))).toContain('>7 games, 3 removed in this draft</span>');
+    expect(facts(struck(1, 1))).toContain('>1 game, 1 removed in this draft</span>');
+  });
+
+  it('can be removed when only struck games are in it (S-60)', () => {
+    const html = removal(struck(0, 2));
+    expect(facts(struck(0, 2))).toContain('>0 games, 2 removed in this draft</span>');
+    expect(html).toContain('data-kind="danger">Remove this round</button>');
+  });
+});

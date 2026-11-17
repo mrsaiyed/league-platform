@@ -975,7 +975,7 @@ async function undoSteps(page, what) {
     await game.locator('summary', { hasText: 'Edit this game' }).click();
     await tapTo(
       game.getByRole('button', { name: 'Remove game' }),
-      /\/admin\/schedule(\?season=[\w-]+)?#saved$/,
+      /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
     );
     return;
   }
@@ -1064,12 +1064,15 @@ async function winterSteps(page, want, then) {
  * emptiedRoundSteps does, so the pictures after these find the season as the seed has it.
  */
 async function draftPutBackSteps(page, then) {
-  const answered = /\/admin\/schedule(\?[^#]*)?#saved$/;
+  const answered = /\/admin\/schedule(\?[^#]*)?#(saved|game-[\w-]+)$/;
   const tapTo = async (on, locator, url) => {
     await Promise.all([on.waitForEvent('load'), locator.click()]);
     if (!url.test(on.url())) throw new Error(`a step landed on ${on.url()}, not ${url}`);
   };
   const discard = async (on) => {
+    // A draft that changes nothing is discarded in one tap (step 2.185).
+    const same = on.locator('[data-discard-same] button').first();
+    if ((await same.count()) > 0) return tapTo(on, same, /done=discarded/);
     const box = on.locator('details', {
       has: on.locator('button', { hasText: 'Discard all draft changes' }),
     });
@@ -1110,6 +1113,9 @@ async function emptiedRoundSteps(page, remove) {
     if (!url.test(on.url())) throw new Error(`a step landed on ${on.url()}, not ${url}`);
   };
   const discard = async (on) => {
+    // A draft that changes nothing is discarded in one tap (step 2.185).
+    const same = on.locator('[data-discard-same] button').first();
+    if ((await same.count()) > 0) return tapTo(on, same, /done=discarded/);
     const box = on.locator('details', {
       has: on.locator('button', { hasText: 'Discard all draft changes' }),
     });
@@ -1128,7 +1134,7 @@ async function emptiedRoundSteps(page, remove) {
     await tapTo(
       page,
       game.getByRole('button', { name: 'Remove game' }),
-      /\/admin\/schedule(\?season=[\w-]+)?#saved$/,
+      /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
     );
   }
   await last.locator('summary', { hasText: 'Change or remove this round' }).click();

@@ -19,6 +19,9 @@
 // draft is "the same as the published schedule" with "Discard the draft" beside it, which
 // is tapped. At every step the top line and the publish box give the same number, and the
 // publish box's summary adds up to it.
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   accessibilityProblems,
   buildNext,
@@ -38,6 +41,9 @@ const note = (label, ok, detail = '') => {
 };
 
 const dev = process.argv.includes('--dev');
+/** With --pictures, the picture of a removed game played since goes to .local/shots/390. */
+const pictures = process.argv.includes('--pictures');
+const shotsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.local/shots');
 let built = true;
 if (!dev && !process.argv.includes('--no-build')) {
   built = await buildNext();
@@ -111,9 +117,16 @@ if (built) {
           summary === null || rounds === null
             ? ''
             : String([...summary.slice(1), ...rounds.slice(1)].reduce((a, n) => a + Number(n), 0));
+        // A draft that changes nothing: one calm sentence in the box, no zeros, no red.
+        const calm =
+          boxText.includes(
+            'The draft is the same as the published schedule, so there is nothing to publish.',
+          ) &&
+          !boxText.includes('Publishing will add') &&
+          (await publishBox.locator('[data-kind="error"]').count()) === 0;
         const said =
           top === '0'
-            ? lineText.includes('The draft is the same as the published schedule.')
+            ? lineText.includes('The draft is the same as the published schedule.') && calm
             : top === '1'
               ? lineText.includes('Draft in progress: 1 change not yet published.') &&
                 boxText.includes('Publishing makes 1 change.')
@@ -121,7 +134,7 @@ if (built) {
                 boxText.includes(`Publishing makes ${top} changes.`);
         check(
           `the top line and the publish box give the same number: ${label}`,
-          top !== '' && top === box && top === sum && said,
+          top !== '' && top === box && (top === '0' ? sum === '' : top === sum) && said,
           `top ${top}, box ${box}, summary ${sum}: ${lineText} / ${boxText.slice(0, 240)}`,
         );
         return Number(top);
@@ -166,6 +179,18 @@ if (built) {
       );
       check('the answer is where the phone is looking', await onScreen(answer));
       check(
+        "the struck game's own name is in view too, not under the bar at the top",
+        await onScreen(struck.locator('strong')),
+      );
+      check(
+        '"Put it back" in the answer is the filled button, spoken with the game\'s name',
+        (await answer
+          .getByRole('button', { name: `Put it back in the draft: ${name}` })
+          .count()) === 1 &&
+          (await answer.getByRole('button', { name: 'Put it back' }).getAttribute('data-kind')) ===
+            'main',
+      );
+      check(
         'the answer is a removal, told apart from a save',
         (await answer.getAttribute('data-kind')) === 'removed',
       );
@@ -178,9 +203,14 @@ if (built) {
 
       at = `${way}: two other games are moved`;
       const moved = [];
+      // Chosen first: a moved game takes its new place in the round's order.
+      const toMove = [
+        await editable.nth(0).getAttribute('data-game'),
+        await editable.nth(1).getAttribute('data-game'),
+      ];
       for (const [i, time] of ['21:15', '21:45'].entries()) {
-        const game = editable.nth(i);
-        const id = await game.getAttribute('data-game');
+        const id = toMove[i];
+        const game = page.locator(`li[data-game="${id}"]`);
         await game.locator('summary', { hasText: 'Edit this game' }).click();
         const field = game.locator('input[name=time]');
         moved.push({ id, was: await field.inputValue() });
@@ -198,6 +228,18 @@ if (built) {
           still,
         );
       }
+      // Quieter than the round's games: an outlined button beside one sentence. Its height is
+      // bounded by the shared notice (its padding and a 44-high button); a compact notice is
+      // the design lead's piece to add (DESIGN.md section 1).
+      const standing = struck.getByRole('button', { name: 'Put it back' });
+      const heightOf = async (locator) => (await locator.boundingBox())?.height ?? 0;
+      const live = editable.nth(2);
+      const [struckHeight, liveHeight] = [await heightOf(struck), await heightOf(live)];
+      check(
+        'the standing struck row has an outlined "Put it back" beside its sentence, under 1.45 games tall',
+        (await standing.getAttribute('data-kind')) === null && struckHeight <= liveHeight * 1.45,
+        `struck ${struckHeight}, game ${liveHeight}`,
+      );
       await accessible('a removed game after two other edits');
 
       at = `${way}: the removed game is put back from the grid`;
@@ -352,10 +394,19 @@ if (built) {
           (await onScreen(discard)),
         await sameLine.innerText(),
       );
+      const boxDiscard = publishBox.getByRole('button', { name: 'Discard the draft' });
       check(
-        'the publish box says the same: nothing to publish',
-        (await publishBox.innerText()).includes('The draft changes nothing.') &&
-          (await publishBox.getByRole('button', { name: 'Publish this schedule' }).count()) === 0,
+        'the publish box says the same in one calm sentence, its "Discard the draft" the same one tap',
+        (await publishBox.innerText()).includes('so there is nothing to publish.') &&
+          !(await publishBox.innerText()).includes('Publishing will add 0') &&
+          (await publishBox.locator('[data-kind="error"]').count()) === 0 &&
+          (await publishBox.getByRole('button', { name: 'Publish this schedule' }).count()) === 0 &&
+          (await boxDiscard.count()) === 1 &&
+          (await publishBox.locator('details.admin-discard').count()) === 0,
+      );
+      check(
+        'nothing offers "Review and publish" when nothing would be published',
+        (await page.getByRole('link', { name: 'Review and publish' }).count()) === 0,
       );
       await accessible('a draft the same as the published schedule');
 
@@ -366,6 +417,83 @@ if (built) {
         (await page.locator('[data-draft-count]').count()) === 0 &&
           (await page.locator('main').innerText()).includes('There is no draft yet.'),
       );
+
+      // Once, with scripts off: it scores a game of the made-up world for good.
+      if (!scripts) {
+        at = `${way}: a game removed in the draft is played meanwhile`;
+        const target = editable.first();
+        const playedId = await target.getAttribute('data-game');
+        const played = await nameOf(target);
+        const [away, home] = played.split(' at ');
+        await target.locator('summary', { hasText: 'Edit this game' }).click();
+        const playedRow = page.locator(`li[data-removed-game="${playedId}"]`);
+        await tap(target.getByRole('button', { name: 'Remove game' }), playedRow);
+        // On the games list, the game is played and its final score saved.
+        await page.goto(`${origin}/north-valley/admin/games`);
+        const onList = page.locator(`li[id="game-${playedId}"]`);
+        await onList.getByText('Enter the final score').click();
+        await onList.getByLabel(`Score for ${away}`).fill('40');
+        await onList.getByLabel(`Score for ${home}`).fill('44');
+        await onList.getByRole('button', { name: 'Save final score' }).click();
+        await onList.locator('[data-question]').waitFor();
+        await Promise.all([
+          page.waitForEvent('load'),
+          onList.getByRole('button', { name: 'Yes, make it final' }).click(),
+        ]);
+        await page.goto(`${origin}/north-valley/admin/schedule`);
+        const playedText = await playedRow.innerText();
+        check(
+          'the struck game says it has been played since, and still offers "Put it back"',
+          playedText.includes(
+            'Removed in this draft, but it has been played since. Put it back in the draft to publish.',
+          ) && (await playedRow.getByRole('button', { name: 'Put it back' }).count()) === 1,
+          playedText,
+        );
+        const line = page.locator('[data-draft-count]');
+        check(
+          'the top line says it cannot be published, with a way to why, and no "Review and publish"',
+          (await line.innerText()).includes('It cannot be published yet.') &&
+            (await line.getByRole('link', { name: 'See why' }).count()) === 1 &&
+            (await page.getByRole('link', { name: 'Review and publish' }).count()) === 0,
+          await line.innerText(),
+        );
+        const goTo = publishBox.getByRole('link', { name: `Go to ${played}` });
+        check(
+          'the publish box names the game it is blocked by, with a way to its row',
+          (await goTo.count()) === 1 && (await goTo.getAttribute('href')) === `#game-${playedId}`,
+          await publishBox.innerText(),
+        );
+        await accessible('a removed game played since');
+        if (pictures) {
+          // The row and the publish box as the person meets them, at 390 (step 2.185, B1).
+          fs.mkdirSync(path.join(shotsDir, '390'), { recursive: true });
+          await playedRow.screenshot({
+            path: path.join(shotsDir, '390', 'draft-put-back-played-row.png'),
+          });
+          await publishBox.screenshot({
+            path: path.join(shotsDir, '390', 'draft-put-back-played-box.png'),
+          });
+          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.screenshot({
+            path: path.join(shotsDir, '390', 'draft-put-back-played-top.png'),
+          });
+        }
+        await tap(
+          playedRow.getByRole('button', { name: 'Put it back' }),
+          page.locator(`li[data-game="${playedId}"]`),
+        );
+        const backAgain = page.locator(`li[data-game="${playedId}"]`);
+        check(
+          'put back, it is the played game it is now: no change to publish, nothing lost',
+          (await backAgain.innerText()).includes('started or been decided') &&
+            (await counts('after putting back a game played since')) === 0,
+          await backAgain.innerText(),
+        );
+        await tap(
+          page.locator('[data-draft-count]').getByRole('button', { name: 'Discard the draft' }),
+          page.locator('[role=status]', { hasText: 'The draft was discarded.' }),
+        );
+      }
       await context.close();
     }
   } catch (error) {

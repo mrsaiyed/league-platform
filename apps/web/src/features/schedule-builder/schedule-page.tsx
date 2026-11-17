@@ -232,6 +232,23 @@ export async function ScheduleBuilderPage({
   // the publish box shows, where the viewer may see it; else the draft's own, counted alike.
   // The draft's line and the box both say this one number (step 2.185).
   const toPublish = preview !== undefined && preview.ok ? preview.value.toPublish : draft.toPublish;
+  // Publishing is blocked by more than "nothing to publish" (step 2.185).
+  const blocked =
+    toPublish > 0 &&
+    preview !== undefined &&
+    preview.ok &&
+    preview.value.blockers.some((b) => b.code !== 'nothing-to-publish');
+  /** A game's name, live or struck, for a blocker that is about it. */
+  const gameName = (gameId: string): string | undefined => {
+    const g = [
+      ...grid.allGames,
+      ...grid.rounds.flatMap((r) => r.removed),
+      ...grid.looseRemoved,
+    ].find((x) => x.id === gameId);
+    return g === undefined
+      ? undefined
+      : t('schedule.admin.gameVs', { away: g.awayName, home: g.homeName });
+  };
   const saidBeside = basis.canEdit && (besideRound !== undefined || besideAdd !== undefined);
   const roundName = (r: GridRound) =>
     t('schedule.admin.round', { number: r.number, label: r.label });
@@ -268,7 +285,7 @@ export async function ScheduleBuilderPage({
         top,
         firstRound,
         // Nothing to review while the draft changes nothing (step 2.185): its line says so.
-        draft.draft !== null && toPublish > 0 && (basis.canEdit || basis.canPublish)
+        draft.draft !== null && toPublish > 0 && !blocked && (basis.canEdit || basis.canPublish)
           ? '#publish-heading'
           : null,
       )}
@@ -283,15 +300,15 @@ export async function ScheduleBuilderPage({
               ? t('schedule.admin.draftChangesNone')
               : t.plural('schedule.admin.draftChanges', toPublish)}
           </span>
-          {/* A draft that changes nothing loses nothing when thrown away: one tap, here. */}
-          {toPublish === 0 && basis.canEdit ? (
-            <form action={discardAction} data-discard-same="">
-              <BasisFields basis={basis} />
-              <button type="submit" className="ui-button">
-                {t('schedule.admin.discard')}
-              </button>
-            </form>
+          {/* Blocked: said here, never offered as if all were well (step 2.185). */}
+          {blocked ? (
+            <span data-draft-blocked="">
+              {t('schedule.admin.draftBlocked')}{' '}
+              <a href="#publish-heading">{t('schedule.admin.draftBlockedWhy')}</a>
+            </span>
           ) : null}
+          {/* A draft that changes nothing loses nothing when thrown away: one tap, here. */}
+          {toPublish === 0 && basis.canEdit ? <DiscardSame basis={basis} /> : null}
         </div>
       ) : (
         <p className="admin-schedule-draft">
@@ -368,10 +385,18 @@ export async function ScheduleBuilderPage({
         <section aria-labelledby="publish-heading" className="staff-panel admin-publish">
           <h2 id="publish-heading">{t('schedule.admin.publish')}</h2>
           {!basis.canPublish || preview === undefined || !preview.ok ? null : (
-            <PublishPanel preview={preview.value} basis={basis} count={toPublish} />
+            <PublishPanel
+              preview={preview.value}
+              basis={basis}
+              count={toPublish}
+              gameName={gameName}
+            />
           )}
-          {/* Throwing the draft away is apart from publishing it, and looks like neither. */}
-          {basis.canEdit ? (
+          {/* Throwing the draft away is apart from publishing it, and looks like neither.
+              A draft that changes nothing loses nothing: the same one tap as at the top. */}
+          {!basis.canEdit ? null : toPublish === 0 ? (
+            <DiscardSame basis={basis} />
+          ) : (
             <details className="admin-discard">
               <summary>{t('schedule.admin.discard')}</summary>
               <form action={discardAction} className="staff-form">
@@ -384,7 +409,7 @@ export async function ScheduleBuilderPage({
                 </p>
               </form>
             </details>
-          ) : null}
+          )}
         </section>
       )}
     </main>
@@ -564,7 +589,8 @@ function RoundSection({
           </div>
         </details>
       ) : null}
-      {roundIsEmpty(round) ? (
+      {/* Not while struck games stand in it: they are its rows (step 2.185). */}
+      {roundIsEmpty(round) && round.removed.length === 0 ? (
         <p className="staff-quiet">{t('schedule.admin.noGamesInRound')}</p>
       ) : null}
       <GameList
@@ -687,19 +713,38 @@ function RemovedGameItem({
         </span>
       </p>
       {saved?.node ?? (
+        // One line and an outlined button: told by its strike, its bin and its words,
+        // quieter than the round's games (step 2.185).
         <div className="ui-notice" data-kind="removed" data-put-back={game.id}>
-          <p>
-            {game.roundGone === null
-              ? t('schedule.admin.removedInDraft')
-              : t('schedule.admin.removedInDraftNoRound', { round: game.roundGone })}
-          </p>
-          {basis.canEdit && game.status === 'scheduled' ? (
-            <PutBack gameId={game.id} basis={basis} />
-          ) : null}
+          <div className="staff-buttons">
+            <span>{removedLineOf(game)}</span>
+            {/* Dropping a removal is always allowed: it gives the draft the game back. */}
+            {basis.canEdit ? (
+              <PutBack
+                gameId={game.id}
+                game={t('schedule.admin.gameVs', { away: game.awayName, home: game.homeName })}
+                basis={basis}
+                // Where Games has its own "Put this game back" (a called-off game), the
+                // button says which one it is (step 2.158).
+                inDraft={game.status === 'postponed' || game.status === 'cancelled'}
+              />
+            ) : null}
+          </div>
         </div>
       )}
     </li>
   );
+}
+
+/**
+ * What a struck row says: removed in this draft, and what has happened to the game since
+ * (played, started, postponed, cancelled), or that its round was removed too (S-60).
+ */
+function removedLineOf(game: RemovedGridGame): string {
+  if (game.status !== 'scheduled') return t(`schedule.admin.removedSince.${game.status}`);
+  return game.roundGone === null
+    ? t('schedule.admin.removedInDraft')
+    : t('schedule.admin.removedInDraftNoRound', { round: game.roundGone });
 }
 
 /** A game's day, time, place and how it is recorded, as its row says them. */
@@ -947,13 +992,48 @@ function MoveToRoundDate({
  * and its round, date, time, court and recording as they were. The form names only the
  * game: the server reads what it was from the draft (step 2.161).
  */
-function PutBack({ gameId, basis }: { readonly gameId: string; readonly basis: Basis }) {
+function PutBack({
+  gameId,
+  game,
+  basis,
+  main = false,
+  inDraft = false,
+}: {
+  readonly gameId: string;
+  /** The game's name, so the button is spoken with it (step 2.185). */
+  readonly game: string;
+  readonly basis: Basis;
+  /** Filled only in the answer to a removal; on a struck row it is outlined (step 2.185). */
+  readonly main?: boolean;
+  /** Says "in the draft" on the button itself, not only in its spoken name. */
+  readonly inDraft?: boolean;
+}) {
   return (
     <form action={putBackGameAction}>
       <BasisFields basis={basis} />
       <input type="hidden" name="gameId" value={gameId} />
-      <button type="submit" className="ui-button" data-kind="main">
-        {t('schedule.admin.putBack')}
+      <button
+        type="submit"
+        className="ui-button"
+        data-kind={main ? 'main' : undefined}
+        aria-label={t('schedule.admin.putBackNamed', { game })}
+      >
+        {t(inDraft ? 'schedule.admin.putBackInDraft' : 'schedule.admin.putBack')}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * "Discard the draft" in one tap, for a draft that changes nothing (step 2.185): nothing
+ * is lost. The same words do the same thing wherever they stand on the page.
+ */
+function DiscardSame({ basis }: { readonly basis: Basis }) {
+  return (
+    <form action={discardAction} data-discard-same="">
+      <BasisFields basis={basis} />
+      <button type="submit" className="ui-button">
+        {t('schedule.admin.discard')}
       </button>
     </form>
   );
@@ -1133,13 +1213,7 @@ function savedHere(
       const home = removed === undefined ? undefined : name(removed.homeTeamId);
       const away = removed === undefined ? undefined : name(removed.awayTeamId);
       // "Put it back" only while the draft still removes it and it can be added again.
-      if (
-        removed === undefined ||
-        home === undefined ||
-        away === undefined ||
-        removed.status !== 'scheduled' ||
-        !basis.canEdit
-      ) {
+      if (removed === undefined || home === undefined || away === undefined || !basis.canEdit) {
         return {
           place: { round },
           node: said(t('schedule.admin.savedGameRemoved'), undefined, 'removed'),
@@ -1176,7 +1250,7 @@ function savedHere(
           headline,
           <div data-put-back={removed.id}>
             <p>{t(way)}</p>
-            <PutBack gameId={removed.id} basis={basis} />
+            <PutBack gameId={removed.id} game={game} basis={basis} main />
           </div>,
           'removed',
         ),
@@ -1263,6 +1337,7 @@ function PublishPanel({
   preview,
   basis,
   count,
+  gameName,
 }: {
   readonly preview: {
     readonly summary: {
@@ -1278,21 +1353,53 @@ function PublishPanel({
     readonly teamCount: number;
     readonly peopleCount: number;
     readonly clashes: readonly unknown[];
-    readonly blockers: readonly { readonly code: string }[];
+    readonly blockers: readonly { readonly code: string; readonly gameId?: string }[];
     readonly canPublish: boolean;
   };
   readonly basis: Basis;
   /** What publishing would change: the same number as the draft's line at the top. */
   readonly count: number;
+  /** A game's name, for a blocker about it; undefined when it is not on the page. */
+  readonly gameName: (gameId: string) => string | undefined;
 }) {
   const s = preview.summary;
+  // "Nothing to publish" is said once, calmly, in place of a row of zeros (step 2.185).
+  const blockers = preview.blockers.filter((b) => b.code !== 'nothing-to-publish');
+  const blocked =
+    blockers.length === 0 ? null : (
+      <div className="ui-notice" data-kind="error">
+        <p>{t('schedule.admin.publishBlocked')}</p>
+        <ul>
+          {blockers.map((b, i) => {
+            // A blocker about one game names it, with a way to its row (step 2.185).
+            const name = b.gameId === undefined ? undefined : gameName(b.gameId);
+            return (
+              <li key={`${b.code}-${i}`}>
+                {noticeOf({ blocker: b.code })?.text}{' '}
+                {name === undefined || b.gameId === undefined ? null : (
+                  <a href={`#${gameAnchor(b.gameId)}`}>
+                    {t('schedule.admin.blockerGoTo', { game: name })}
+                  </a>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  if (count === 0) {
+    return (
+      <>
+        <p data-publish-nothing="">{t('schedule.admin.publishNothing')}</p>
+        {blocked}
+      </>
+    );
+  }
   return (
     <>
-      {count === 0 ? null : (
-        <p data-publish-count={count}>
-          <strong>{t.plural('schedule.admin.publishCount', count)}</strong>
-        </p>
-      )}
+      <p data-publish-count={count}>
+        <strong>{t.plural('schedule.admin.publishCount', count)}</strong>
+      </p>
       <p>
         {t('schedule.admin.publishSummary', {
           added: s.gamesAdded.length,
@@ -1316,16 +1423,7 @@ function PublishPanel({
           {t.plural('schedule.admin.publishClashes', preview.clashes.length)}
         </p>
       )}
-      {preview.blockers.length > 0 ? (
-        <div className="ui-notice" data-kind="error">
-          <p>{t('schedule.admin.publishBlocked')}</p>
-          <ul>
-            {preview.blockers.map((b, i) => (
-              <li key={`${b.code}-${i}`}>{noticeOf({ blocker: b.code })?.text}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      {blocked}
       {preview.canPublish ? (
         <form action={publishAction} className="staff-form">
           <BasisFields basis={basis} />
