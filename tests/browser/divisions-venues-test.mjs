@@ -489,11 +489,56 @@ async function whoMay() {
   );
   const open = await page.goto(`${origin}/${league}/admin/schedule/venues`);
   note('a scheduler may use the venues screen', open?.status() === 200, String(open?.status()));
+  // The scheduler who removes a court by mistake puts it back (A-5; D-L6).
+  const hall = `Scheduler Hall ${run}`;
+  const add = page.locator('form[data-form="add-venue"]');
+  await add.getByLabel('Name').fill(hall);
+  await tap(
+    page,
+    add.getByRole('button', { name: 'Add the venue' }),
+    venue(page, hall).getByRole('status'),
+    true,
+  );
+  const addCourt = venue(page, hall).locator('form[data-form="add-court"]');
+  await addCourt.getByLabel('Court name').fill('Side court');
+  await tap(
+    page,
+    addCourt.getByRole('button', { name: 'Add the court' }),
+    court(page, hall, 'Side court').getByRole('status'),
+    true,
+  );
+  const side = court(page, hall, 'Side court');
+  await side.getByLabel('Yes, remove Side court').check();
+  const removed = venue(page, hall).locator('[data-said="removed"]');
+  await tap(page, side.getByRole('button', { name: 'Remove the court' }), removed, true);
+  await tap(
+    page,
+    removed.getByRole('button', { name: 'Put it back' }),
+    court(page, hall, 'Side court').getByRole('status'),
+    true,
+  );
   note(
-    'a scheduler, who cannot restore from the bin, is never offered "Put it back" (no button that could only be refused)',
-    (await page.getByRole('button', { name: 'Put it back' }).count()) === 0,
+    'a scheduler puts back the court they removed',
+    (await court(page, hall, 'Side court').count()) === 1,
   );
   await context.close();
+
+  // A scheduler of one program sees the league's venues, but no form that could only be
+  // refused: venues are the whole league's.
+  const limited = await signedInAs('local-program-scheduler-token');
+  const shown = await limited.page.goto(`${origin}/quiet-pines/admin/schedule/venues`);
+  note(
+    'a scheduler of one program may open the venues screen',
+    shown?.status() === 200,
+    String(shown?.status()),
+  );
+  note(
+    'a scheduler of one program is shown the venues with no form and no button',
+    (await limited.page.locator('main form').count()) === 0 &&
+      (await limited.page.locator('section[data-venue="Pine Hollow Gym"]').count()) === 1,
+  );
+  await accessible(limited.page, 'venues, read only');
+  await limited.context.close();
 }
 
 if (browser !== undefined) {

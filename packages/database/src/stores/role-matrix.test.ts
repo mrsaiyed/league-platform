@@ -1539,7 +1539,7 @@ const divisionAndVenueRows: readonly Row[] = [
   {
     command: 'scheduling.restore_venue',
     name: 'restore a venue',
-    needs: 'bin.restore',
+    needs: 'venues.manage',
     prepare: async (league) => ({
       input: { venueId: await binned('venues', await newVenue(pglite, league.leagueId)) },
     }),
@@ -1578,7 +1578,7 @@ const divisionAndVenueRows: readonly Row[] = [
   {
     command: 'scheduling.restore_court',
     name: 'restore a court',
-    needs: 'bin.restore',
+    needs: 'venues.manage',
     prepare: async (league) => {
       const venueId = await newVenue(pglite, league.leagueId);
       const courtId = await newCourt(pglite, league.leagueId, venueId);

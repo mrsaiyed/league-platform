@@ -51,9 +51,9 @@ export const enAdminVenues = {
   'adminVenues.mapLink': 'Open the map',
   'adminVenues.move.down': 'Move down',
   'adminVenues.move.up': 'Move up',
-  'adminVenues.noWayBack': 'An owner or admin can bring it back from the bin.',
   'adminVenues.none':
     'The league has no venues yet. Add the gym you play in, then its courts, so every game can say where it is.',
+  'adminVenues.noneReadOnly': 'The league has no venues yet.',
   'adminVenues.problem.changed-since-read':
     'Someone else changed this just now. The screen shows it as it is now: try again.',
   'adminVenues.problem.court-has-games-to-come':
@@ -84,6 +84,8 @@ export const enAdminVenues = {
     'That venue is not there any more. The screen shows the venues as they are now.',
   'adminVenues.putBack.label': 'Put {name} back',
   'adminVenues.putBack.submit': 'Put it back',
+  'adminVenues.readOnly':
+    'Where the league’s games are played. Venues are shared by the whole league, so only someone who manages them for the whole league changes them.',
   'adminVenues.remove.body': 'It goes to the bin, where it is kept for 30 days.',
   'adminVenues.remove.confirm': 'Yes, remove {name}',
   'adminVenues.remove.label': 'Remove {name}',

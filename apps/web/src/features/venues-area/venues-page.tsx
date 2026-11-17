@@ -8,7 +8,7 @@
 // to come is not removed (the screen says how many and points to Schedule, with no button
 // that could only be refused, A-17 as changed); games already played keep its name. A
 // venue goes once it has no courts. Removing asks first (a tick) and is answered "Removed:
-// Court 2." with "Put it back" for those who may bring things back from the bin (A-5).
+// Court 2." with "Put it back" for whoever removed it (A-5).
 //
 // The venues and their games are read through the scheduling module's own commands
 // (listVenues, countPlaceGames), in the league of the session. Every form is a plain post
@@ -77,9 +77,38 @@ export async function VenuesPage({ league }: { readonly league: string }) {
     ...more,
     [requestTokenField]: randomUUID(),
   });
-  const mayPutBack = holder !== undefined && allows(holder, 'bin.restore', { type: 'league' });
+  // Venues are the league's, not a program's: only someone who may manage them league-wide
+  // changes them, and may bring one back (A-5). Anyone else who opens Schedule (a scheduler
+  // of one program) is shown them as they are, with no form that could only be refused.
+  const mayPutBack = holder !== undefined && allows(holder, 'venues.manage', { type: 'league' });
   const venues = listed.ok ? listed.value : [];
   const games = counted.ok ? counted.value : [];
+  if (!mayPutBack) {
+    return (
+      <main className="admin-schedule admin-venues">
+        <StaffTrail
+          steps={[{ href: schedule, label: t('admin.area.schedule') }]}
+          here={t('adminVenues.title')}
+        />
+        <PageHead title={t('adminVenues.title')} sub={t('adminVenues.readOnly')} />
+        {venues.length === 0 ? (
+          <EmptyPanel text={t('adminVenues.noneReadOnly')} />
+        ) : (
+          venues.map((v) => (
+            <section key={v.id} className="staff-panel admin-venue" data-venue={v.name}>
+              <h2 dir="auto">{v.name}</h2>
+              {v.address === null ? null : (
+                <p className="staff-quiet" dir="auto">
+                  {v.address}
+                </p>
+              )}
+              <p dir="auto">{v.courts.map((c) => c.name).join(' · ')}</p>
+            </section>
+          ))
+        )}
+      </main>
+    );
+  }
   const removedVenue = notice?.said === 'removed' ? notice : undefined;
   return (
     <main className="admin-schedule admin-venues">
@@ -105,9 +134,7 @@ export async function VenuesPage({ league }: { readonly league: string }) {
                 hidden={hidden({ venue: removedVenue.thing })}
                 button={t('adminVenues.putBack.submit')}
               />
-            ) : (
-              <p>{t('adminVenues.noWayBack')}</p>
-            )}
+            ) : null}
           </SaidLine>
         )}
         {!listed.ok ? (
@@ -275,9 +302,7 @@ function VenuePanel({
               hidden={hidden({ court: courtRemoved.courtId })}
               button={t('adminVenues.putBack.submit')}
             />
-          ) : (
-            <p>{t('adminVenues.noWayBack')}</p>
-          )}
+          ) : null}
         </SaidLine>
       )}
       {venue.courts.length === 0 ? (
