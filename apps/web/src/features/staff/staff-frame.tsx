@@ -146,7 +146,7 @@ export async function StaffFrame({
         <div className="staff-body" id="content">
           {children}
         </div>
-        <SiteFooter madeUp={(await webPorts()).madeUpWorld} />
+        <SiteFooter from={path} madeUp={(await webPorts()).madeUpWorld} />
       </div>
     </div>
   );

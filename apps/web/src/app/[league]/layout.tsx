@@ -77,7 +77,7 @@ export default async function LeagueLayout({
       <div className="site-body" id="content">
         {children}
       </div>
-      <SiteFooter name={site.name} madeUp={(await webPorts()).madeUpWorld} />
+      <SiteFooter name={site.name} from={path} madeUp={(await webPorts()).madeUpWorld} />
     </div>
   );
 }

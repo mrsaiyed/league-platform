@@ -502,3 +502,15 @@ describe('right to left (T-188)', () => {
     expect(css).not.toMatch(/text-align:\s*(?:left|right)/);
   });
 });
+
+describe("the league's footer links (step 2.135)", () => {
+  it('opens Terms and Privacy from the page it is on, and our mark leads to our front page', () => {
+    const html = renderToStaticMarkup(createElement(SiteFooter, { from: '/north-valley/teams' }));
+    expect(html).toContain(`href="/terms?from=%2Fnorth-valley%2Fteams"`);
+    expect(html).toContain(`href="/privacy?from=%2Fnorth-valley%2Fteams"`);
+    expect(html).toContain(`<a class="powered-by" href="/">${en['site.poweredBy']}</a>`);
+    const plain = renderToStaticMarkup(createElement(SiteFooter));
+    expect(plain).toContain('href="/terms"');
+    expect(plain).toContain('href="/privacy"');
+  });
+});
