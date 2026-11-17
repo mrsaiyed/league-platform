@@ -21,6 +21,11 @@ export type SavedNotice = {
   /** What was done to it, as the last part of a message key: `final`, `reopen`… */
   readonly said: string;
   /**
+   * Other things the notice names, by id: the games that took a game's place since it was
+   * called off, when it is put back (step 2.158). Ids only, never anything typed.
+   */
+  readonly about?: readonly string[];
+  /**
    * The thing's name as stored, for a thing the screen no longer lists (a division or court
    * just moved to the bin, step 2.49): never anything typed.
    */
@@ -69,6 +74,7 @@ export function savedNotices(options: {
         screen: found.screen,
         thing: found.thing,
         said: found.said,
+        ...(found.about === undefined ? {} : { about: found.about }),
         ...(found.name === undefined ? {} : { name: found.name }),
       };
     },

@@ -54,6 +54,16 @@ describe('recordFinalScoreWithin', () => {
     expect(refused.result).toMatchObject({ ok: false, error: { code: 'tie-not-allowed' } });
     expect(refused.s.lines).toEqual([lineOf(1)]);
 
+    // A postponed game (step 2.158, S-75): an imported score waits, nothing changes.
+    const postponed = await record({
+      games: [game(1, { status: 'postponed', captureMode: 'box' })],
+      lines: [lineOf(1)],
+    });
+    expect(postponed.result).toEqual({ ok: false, error: { code: 'game-postponed' } });
+    expect(postponed.s.games[0]).toMatchObject({ status: 'postponed', homeScore: null });
+    expect(postponed.s.lines).toEqual([lineOf(1)]);
+    expect(postponed.events).toEqual([]);
+
     const live = await record({ games: [game(1, { captureMode: 'live' })], lines: [lineOf(1)] });
     expect(live.result).toMatchObject({ ok: true });
     expect(live.s.games[0]?.captureMode).toBe('live');
