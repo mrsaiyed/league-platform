@@ -18,6 +18,7 @@ import {
   listAccess,
   listActivity,
   myAccess,
+  readInvitation,
   renameShortName,
   resendInvitation,
   revokeGrant,
@@ -605,4 +606,9 @@ registerCommandCase(listActivity, harnessTx, {
 registerCommandCase(myAccess, harnessTx, {
   name: "read the run account's own access",
   input: () => ({}),
+});
+
+registerCommandCase(readInvitation, harnessTx, {
+  name: "read what the target's invitation link offers",
+  input: (target) => ({ token: target.invitationToken }),
 });

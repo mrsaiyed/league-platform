@@ -13,6 +13,11 @@ export { listAccess, type AccessList } from './queries/list-access.ts';
 export { listActivity } from './queries/list-activity.ts';
 export { myAccess, type MyAccess } from './queries/my-access.ts';
 export {
+  readInvitation,
+  type InvitationOffer,
+  type ReadInvitationError,
+} from './queries/read-invitation.ts';
+export {
   activityPageLimit,
   invitationLifetimeDays,
   invitationStatuses,

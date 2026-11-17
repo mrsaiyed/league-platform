@@ -10,6 +10,7 @@ import {
   issueInvitationLink,
   listAccess,
   listActivity,
+  readInvitation,
   resendInvitation,
   revokeGrant,
   setLeagueName,
@@ -124,6 +125,16 @@ describe('invitations on the database', () => {
     const another = await newAccount(pglite);
     expect(await acceptInvitation(as(league.leagueId, another), { token }, deps)).toMatchObject({
       error: { code: 'invitation-closed' },
+    });
+    // Opened again (step 2.97): the account that accepted it is told it is done; anyone
+    // else, only that the link does not work.
+    expect(await readInvitation(as(league.leagueId, helper), { token }, deps)).toEqual({
+      ok: true,
+      value: { kind: 'accepted', role: 'admin', scope: { type: 'league' } },
+    });
+    expect(await readInvitation(as(league.leagueId, another), { token }, deps)).toEqual({
+      ok: false,
+      error: { code: 'invitation-not-usable' },
     });
   });
 

@@ -11,7 +11,7 @@ import { issueInvitationLink } from './invitation-link.ts';
 import type { AccessTx, ActivityEntry, Grant, Invitation } from './ports.ts';
 import { sameScope, type Scope } from './scopes.ts';
 
-type StoredInvitation = Omit<Invitation, 'status'> & {
+type StoredInvitation = Omit<Invitation, 'status' | 'acceptedByAccountId'> & {
   tokenHash: string;
   acceptedBy: string | null;
   cancelled: boolean;
@@ -52,6 +52,7 @@ const view = (i: StoredInvitation): Invitation => ({
   status: statusOf(i),
   invitedByAccountId: i.invitedByAccountId,
   expiresAt: i.expiresAt,
+  acceptedByAccountId: i.acceptedBy,
 });
 
 let ids = 0;

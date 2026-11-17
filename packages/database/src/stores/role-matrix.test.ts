@@ -101,6 +101,7 @@ import {
   publishSchedule,
   publishSiteDesign,
   putBackOnRoster,
+  readInvitation,
   readReopenOffer,
   readTrackerRosters,
   readTrackerState,
@@ -2254,6 +2255,18 @@ const rows: readonly Row[] = [
     needs: 'signed-in',
     prepare: async () => ({ input: {} }),
     run: (c, i) => myAccess(c, i, accessDeps),
+  },
+  // What a link offers, read before accepting it (step 2.97): anyone signed in who holds it.
+  {
+    command: 'access.read_invitation',
+    name: 'read what an invitation link offers',
+    needs: 'signed-in',
+    prepare: async (league) => {
+      const token = 'b'.repeat(22) + randomUUID().replace(/-/g, '').slice(0, 21);
+      await invitationIn(league, { token });
+      return { input: { token } };
+    },
+    run: (c, i) => readInvitation(c, i, accessDeps),
   },
 ];
 
