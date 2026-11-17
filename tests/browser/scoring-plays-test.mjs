@@ -25,10 +25,34 @@
 //   Redo are 44 x 44 or more, 8 or more from what is beside them, and lie over no option.
 // - At all five sizes, in both faces, the row under the scoreboard holds its four things
 //   whole: Start or Pause, the timeouts, Undo with a basket's play uncut, and Redo.
+//
+// Then the game is ended, still by touch (thing 3 of step 2.37, part 1):
+// - End game at a level score is refused on the device at once, with the network off,
+//   in words that say to play overtime (S-73); nothing is asked.
+// - End game from More in the middle of the second half asks first: the score, that time
+//   is still on the clock, and what ending does. Two fast taps on End game ask once.
+// - Ended with the network off, the final panel says who won and that the result is not
+//   sent yet; a tile or Undo tapped says the game is final; "Take back End game" makes it
+//   live again on the device alone, the clock stopped (S-72), and it is scored on.
+// - Ended with the network on, the panel says it is saved and offers "Reopen game" with
+//   the time left; a visitor's browser finds the public game page final with the score
+//   and the win and the loss in the standings.
+// - Reopen, after its question with the reason filled in, carries on in place with no
+//   reload; the public page is live again and the standings no longer count the game; the
+//   next basket is saved; End again, and the standings count it once.
+// - Once (the short phone), the game waits the half minute until the league tells the
+//   device the game is over: the screen stays with its final panel, and reopens from it.
+// - The try-out night, on a world of its own: a basket, Mark not started refused in
+//   words that say to undo it first, Undo, Mark not started, and the lineups again on the
+//   same screen, with a visitor seeing the game scheduled.
+// - Every panel (the questions, the final panel not sent and saved, End game offered in
+//   the pad at 0:00) at all five sizes in both faces: nothing scrolls, both fives whole,
+//   the answers 44 x 44 or more in the pad's lowest band, nothing it says cut.
 import {
   addPlayers,
   court,
   drawIn,
+  league,
   lettersHere,
   scorekeeper,
   sizes,
@@ -46,6 +70,10 @@ import {
   waitFor,
   whatWentWrong,
 } from './web-browser-kit.mjs';
+
+// A made-up world of its own for each game: up to a dozen servers in turn, each of which
+// is told when this run ends (web-browser-kit.mjs). Node warns past ten such listeners.
+process.setMaxListeners(32);
 
 const failures = [];
 const checked = [];
@@ -215,11 +243,149 @@ async function accessible(page, label) {
   note(`accessibility: ${label}`, problems.length === 0, problems.join('; '));
 }
 
+/** What a part of the screen says, on one line. */
+const words = (text) => text.replace(/\s+/g, ' ').trim();
+
+/** A team's record in the standings ("3-1") with a win more, or a loss more. */
+const won = (record) => record.replace(/^(\d+)-/, (_, wins) => `${Number(wins) + 1}-`);
+const lost = (record) => record.replace(/-(\d+)$/, (_, losses) => `-${Number(losses) + 1}`);
+
+/**
+ * What a visitor sees of the game and in the standings, in a browser of its own, signed
+ * in as nobody: the public game page's state and its two scores (the away team first, as
+ * the page's board has them), and each team's wins and losses.
+ */
+async function publicResult(browser, origin, watch) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(30_000);
+    await page.goto(watch);
+    const game = page.locator('[data-live-status]').first();
+    await game.waitFor();
+    const status = await game.getAttribute('data-live-status');
+    const scores = (
+      await page.locator('.ui-scoreboard .ui-scoreboard-score').allTextContents()
+    ).map((score) => score.trim());
+    await page.goto(`${origin}/${league}/standings`);
+    const record = async (team) => {
+      const table = page.locator('table.ui-standings', { hasText: team }).first();
+      const heads = (await table.locator('thead th').allInnerTexts()).map((cell) => cell.trim());
+      const cells = (
+        await table.locator('tbody tr', { hasText: team }).first().locator('th, td').allInnerTexts()
+      ).map((cell) => cell.trim());
+      return `${cells[heads.indexOf('W')]}-${cells[heads.indexOf('L')]}`;
+    };
+    return {
+      status,
+      scores: scores.join('–'),
+      hawks: await record('Hawks'),
+      bears: await record('Bears'),
+    };
+  } finally {
+    await context.close();
+  }
+}
+
+/**
+ * A panel of the pad about ending the game (a question, the final panel) fits (DESIGN.md
+ * section 7, lines 6 and 8): its answers are in the pad's lowest band, each 44 x 44 or
+ * more, 8 or more apart and whole; nothing it says is cut, hidden or under the answers;
+ * the pad itself has nothing to scroll to; and a field is 16 or larger, so no phone
+ * zooms into it, and 44 high.
+ */
+async function panelFits(page, label) {
+  await twoFrames(page);
+  const seen = await page.evaluate(() => {
+    const pad = document.querySelector('[data-pad]');
+    const box = pad.getBoundingClientRect();
+    const band = pad.querySelector('[data-ask-answers], [data-final-actions]');
+    if (band === null) return null;
+    const bandBox = band.getBoundingClientRect();
+    const inside = (r, o) =>
+      r.left >= o.left - 0.5 &&
+      r.right <= o.right + 0.5 &&
+      r.top >= o.top - 0.5 &&
+      r.bottom <= o.bottom + 0.5;
+    const buttons = [...band.querySelectorAll('button, a')].map((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        says: el.textContent.trim(),
+        left: r.left,
+        right: r.right,
+        width: r.width,
+        height: r.height,
+        cut: el.scrollWidth > el.clientWidth + 0.5 || el.scrollHeight > el.clientHeight + 0.5,
+        outside: !inside(r, box),
+      };
+    });
+    const said = [
+      ...pad.querySelectorAll(
+        '.court-ask-title, .court-ask-text > *, .court-final-result > *, .court-final-state > *, .court-ask-field-label',
+      ),
+    ];
+    const notWhole = said
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        return (
+          r.width === 0 ||
+          !inside(r, el.parentElement.getBoundingClientRect()) ||
+          !inside(r, box) ||
+          r.bottom > bandBox.top + 0.5 ||
+          el.scrollWidth > el.clientWidth + 0.5
+        );
+      })
+      .map((el) => el.textContent.trim().slice(0, 50));
+    const field = pad.querySelector('.court-input');
+    return {
+      padScrolls: pad.scrollHeight - pad.clientHeight,
+      bandFromBottom: box.bottom - bandBox.bottom,
+      buttons,
+      notWhole,
+      field:
+        field === null
+          ? null
+          : {
+              size: Number.parseFloat(getComputedStyle(field).fontSize),
+              height: field.getBoundingClientRect().height,
+              outside: !inside(field.getBoundingClientRect(), box),
+            },
+    };
+  });
+  if (seen === null) {
+    note(`${label}: fits in the pad`, false, 'the pad holds no such panel');
+    return;
+  }
+  const gaps = seen.buttons.slice(1).map((button, i) => button.left - seen.buttons[i].right);
+  note(
+    `${label}: its answers are in the pad’s lowest band, each 44 x 44 or more, 8 or more apart and whole`,
+    seen.buttons.length >= 1 &&
+      seen.bandFromBottom >= 0 &&
+      seen.bandFromBottom <= 24 &&
+      seen.buttons.every((b) => b.width >= 44 && b.height >= 44 && !b.cut && !b.outside) &&
+      gaps.every((gap) => gap >= 7.5),
+    JSON.stringify({ fromBottom: seen.bandFromBottom, gaps, buttons: seen.buttons }),
+  );
+  note(
+    `${label}: everything it says is whole, over its answers, and the pad has nothing to scroll to`,
+    seen.notWhole.length === 0 && seen.padScrolls <= 0,
+    JSON.stringify({ notWhole: seen.notWhole, padScrolls: seen.padScrolls }),
+  );
+  if (seen.field !== null) {
+    note(
+      `${label}: its field is 16 or larger (no phone zooms into it), 44 high, and in the pad`,
+      seen.field.size >= 16 && seen.field.height >= 44 && !seen.field.outside,
+      JSON.stringify(seen.field),
+    );
+  }
+}
+
 /**
  * One short game by touch, at `size` in the letters of `face`, on a made-up world of its
- * own (a server started for it and stopped after it).
+ * own (a server started for it and stopped after it). `afterRenewal`: the game then waits
+ * about half a minute, until the league has told the device that the game is over.
  */
-async function shortGame(browser, size, face) {
+async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
   const at = `${size.width} x ${size.height}${face.letters}`;
   const origin = `http://localhost:${await freePort()}`;
   const server = startNext(['start', '--port', new URL(origin).port], {
@@ -555,11 +721,613 @@ async function shortGame(browser, size, face) {
       await still(page, `${at}, the log closed`);
     });
 
+    // --- Ending the game (thing 3 of step 2.37, part 1). ---
+    /** More opened and one of its buttons tapped, by touch: More closes with the tap. */
+    const fromMore = async (which) => {
+      await c.more.tap();
+      await c.sheet.waitFor();
+      await c.sheet.locator(`[data-${which}]`).tap();
+      await c.sheet.waitFor({ state: 'detached' });
+    };
+    const online = async (on) => {
+      await context.setOffline(!on);
+      if (on) await page.evaluate(() => window.dispatchEvent(new Event('online')));
+      else await c.banner.filter({ hasText: /No connection/ }).waitFor();
+    };
+    const playsNow = async () => Number(await c.root.getAttribute('data-plays'));
+    const padMode = () => c.root.getAttribute('data-pad-mode');
+    /** The league's public page of this game, and the standings before any End. */
+    let watch = '';
+    let before = null;
+    const visitor = () => publicResult(browser, origin, watch);
+
+    await step(`${at}: End game at a level score, with no connection`, async () => {
+      await quiet();
+      await c.more.tap();
+      await c.sheet.waitFor();
+      const items = await c.sheet
+        .locator('.court-sheet-item')
+        .evaluateAll((els) => els.map((el) => el.querySelector('button, a').textContent.trim()));
+      note(
+        `${at}: behind More, End game comes first and Mark not started is there while the game is live`,
+        items[0] === 'End game' && items.includes('Mark not started'),
+        items.join(' | '),
+      );
+      watch = new URL(await c.sheet.locator('a[target="_blank"]').getAttribute('href'), origin)
+        .href;
+      await c.sheet.locator('.court-close').tap();
+      await c.sheet.waitFor({ state: 'detached' });
+      before = await visitor();
+      note(
+        `${at}: before the End a visitor sees the game live`,
+        before.status === 'live',
+        JSON.stringify(before),
+      );
+      await play('away', 3, 'p3');
+      await play('away', 3, 'p1');
+      await c.saved();
+      note(`${at}: the score is level`, JSON.stringify(await c.score()) === '{"home":7,"away":7}');
+      await quiet();
+      await online(false);
+      const plays = await playsNow();
+      await fromMore('more-end');
+      await c.endRefused.waitFor();
+      const says = words(await c.endRefused.innerText());
+      note(
+        `${at}: End game at a level score is refused on the device at once, with no connection, in words that say to play overtime; nothing is asked`,
+        says ===
+          'The score is level Hawks 7, Bears 7 This season allows no ties, so a level game cannot end. Play overtime until a team is ahead. Keep playing' &&
+          (await c.pad.locator('[data-answer="yes"]').count()) === 0 &&
+          (await playsNow()) === plays &&
+          (await c.finalPanel.count()) === 0,
+        says,
+      );
+      await panelFits(page, `${at}, End game refused at a level score`);
+      await still(page, `${at}, End game refused at a level score`);
+      await accessible(page, `${at}, End game refused at a level score`);
+      await c.answer('no').tap();
+      await c.pad.locator('[data-rest]').waitFor();
+      await online(true);
+      await c.saved();
+    });
+
+    await step(`${at}: End game in the middle of the second half asks first`, async () => {
+      await play('home', 5, 'p2');
+      await c.pickPeriod(2);
+      await c.root.locator('[data-clock-toggle][data-state="start"]:not([data-resting])').tap();
+      await c.root.locator('[data-clock-toggle][data-state="pause"]').waitFor();
+      await c.saved();
+      const plays = await playsNow();
+      // Two fast taps on End game, as a scorekeeper double-taps: asked once, and the
+      // second tap is taken nowhere (under the button lie the clock and a team's chips).
+      await c.more.tap();
+      await c.sheet.waitFor();
+      const button = await rectOf(c.sheet.locator('[data-more-end]'));
+      const middle = { x: (button.left + button.right) / 2, y: (button.top + button.bottom) / 2 };
+      await page.touchscreen.tap(middle.x, middle.y);
+      await page.touchscreen.tap(middle.x, middle.y);
+      await c.endAsk.waitFor();
+      await page.waitForTimeout(500);
+      note(
+        `${at}: two fast taps on End game ask once: the question stands, and nothing that lay under the button was opened`,
+        (await padMode()) === 'end' &&
+          (await c.endAsk.isVisible()) &&
+          !(await c.clockSheet.isVisible()) &&
+          !(await c.sheet.isVisible()),
+        `the pad shows ${await padMode()}`,
+      );
+      const asks = words(await c.endAsk.innerText());
+      note(
+        `${at}: the question says the score, that time is still on the clock and in which period, and what ending does`,
+        /^End the game\? Hawks 9, Bears 7 H2 still has (19|20):\d\d on the clock\. This becomes the final score and goes into the standings\. A game ended by mistake can be reopened\. Keep playing End game$/.test(
+          asks,
+        ),
+        asks,
+      );
+      // The clock is not stopped by asking: the time in the question ticks with it.
+      const first = await c.endAsk.locator('[data-clock-now]').textContent();
+      await page.waitForTimeout(1200);
+      const [second, board] = [
+        await c.endAsk.locator('[data-clock-now]').textContent(),
+        await c.clockText(),
+      ];
+      note(
+        `${at}: the time in the question ticks with the game clock`,
+        first !== second && second === board,
+        `${first} then ${second}, the clock ${board}`,
+      );
+      await panelFits(page, `${at}, the End game question`);
+      await still(page, `${at}, the End game question`);
+      await accessible(page, `${at}, the End game question`);
+      await c.answer('no').tap();
+      await c.pad.locator('[data-rest]').waitFor();
+      note(
+        `${at}: “Keep playing” ends nothing: the game is live with every play`,
+        (await playsNow()) === plays && (await c.toggle.getAttribute('data-state')) === 'pause',
+      );
+    });
+
+    await step(`${at}: End game with the network off, then “Take back End game”`, async () => {
+      await online(false);
+      await fromMore('more-end');
+      await c.endAsk.waitFor();
+      await c.answer('yes').tap();
+      await c.pad.locator('[data-final="not-sent"]').waitFor();
+      const panel = words(await c.finalPanel.innerText());
+      note(
+        `${at}: ended with no connection, the final panel says who won with the score, and that the result is not sent yet`,
+        /^final Hawks won, 9–7 Not sent yet\. The league gets the result once the connection is back\. Until then End game can be taken back here\. Take back End game Back to the games$/i.test(
+          panel,
+        ),
+        panel,
+      );
+      const banner = (await c.banner.innerText()).trim().replace(/\s*\n\s*/g, ' · ');
+      note(
+        `${at}: the banner says there is no connection and that a play waits`,
+        size.width < 700
+          ? banner === 'No connection · 1 to send'
+          : banner === 'No connection: plays are kept on this device · 1 play waiting to send',
+        banner,
+      );
+      // A final game takes no play: a tile and Undo each say so (checklist D12, J4).
+      await c.tile('home', 5).tap();
+      await said(/^This game is final\. Reopen it to make changes\.$/);
+      note(
+        `${at}: a player tapped on a final game says it is final, and the final panel stays`,
+        (await padMode()) === 'final' && (await c.pad.locator('[data-options]').count()) === 0,
+      );
+      await quiet();
+      await finger(page, c.undoButton);
+      await said(/^This game is final\. Reopen it to make changes\.$/);
+      note(
+        `${at}: on a final game the clock, Start and the timeouts are switched off, and Undo and Redo are greyed`,
+        (await c.clock.isDisabled()) &&
+          (await c.toggle.isDisabled()) &&
+          (await c.timeoutsButton.isDisabled()) &&
+          (await c.undoButton.getAttribute('aria-disabled')) === 'true' &&
+          (await c.redoButton.getAttribute('aria-disabled')) === 'true',
+      );
+      await quiet();
+      await panelFits(page, `${at}, the final panel not sent`);
+      await still(page, `${at}, the final panel not sent`);
+      await accessible(page, `${at}, the final panel not sent`);
+      // Taken back on the device alone: no reason asked, no signal needed.
+      await c.finalButton('take-back').tap();
+      await said(/^End game taken back\. The game is live; the clock is stopped\.$/);
+      await c.pad.locator('[data-rest]').waitFor();
+      note(
+        `${at}: “Take back End game” with the network off: the game is live again with its score, the clock stopped where the End found it`,
+        (await c.finalPanel.count()) === 0 &&
+          (await c.toggle.getAttribute('data-state')) === 'start' &&
+          JSON.stringify(await c.score()) === '{"home":9,"away":7}' &&
+          (await c.undoButton.getAttribute('aria-disabled')) === null,
+        JSON.stringify(await c.score()),
+      );
+      await still(page, `${at}, the End taken back`);
+      // And it is scored on, still with no connection.
+      await quiet();
+      await play('home', 7, 'p2');
+      await online(true);
+      await c.saved();
+      const seen = await visitor();
+      note(
+        `${at}: the End that was taken back never reached the league: a visitor sees the game live at 11 to 7, and the standings as before`,
+        seen.status === 'live' &&
+          seen.scores === '7–11' &&
+          seen.hawks === before.hawks &&
+          seen.bears === before.bears,
+        JSON.stringify(seen),
+      );
+    });
+
+    await step(
+      `${at}: End game, saved: the final panel, the public page and the standings`,
+      async () => {
+        await quiet();
+        await fromMore('more-end');
+        await c.endAsk.waitFor();
+        await c.answer('yes').tap();
+        await c.pad.locator('[data-final="saved"]').waitFor();
+        await c.pad
+          .locator('[data-reopen-line]')
+          .filter({ hasText: /minute/ })
+          .waitFor();
+        const panel = words(await c.finalPanel.innerText());
+        note(
+          `${at}: the final panel says who won with the score, that it is saved, and “Reopen game” with the time left`,
+          /^final Hawks won, 11–7 Saved\. It counts in the standings\. You can reopen it for (30|29) more minutes\. Reopen game Back to the games$/i.test(
+            panel,
+          ),
+          panel,
+        );
+        await c.saved();
+        await panelFits(page, `${at}, the final panel saved`);
+        await still(page, `${at}, the final panel saved`);
+        await accessible(page, `${at}, the final panel saved`);
+        const seen = await visitor();
+        note(
+          `${at}: after the End the game’s public page says final, 11 to 7`,
+          seen.status === 'final' && seen.scores === '7–11',
+          JSON.stringify(seen),
+        );
+        note(
+          `${at}: after the End the standings count it: a win for the Hawks, a loss for the Bears`,
+          seen.hawks === won(before.hawks) && seen.bears === lost(before.bears),
+          `before ${JSON.stringify(before)}, after ${JSON.stringify(seen)}`,
+        );
+      },
+    );
+
+    await step(`${at}: Reopen carries on in place, and End again`, async () => {
+      await page.evaluate(() => {
+        window.sameScreenAsBefore = true;
+      });
+      await c.finalButton('reopen').tap();
+      await c.reopenAsk.waitFor();
+      const asks = words(await c.reopenAsk.innerText());
+      const reason = c.reopenAsk.locator('[data-reopen-reason]');
+      note(
+        `${at}: the Reopen question says what reopening does, with the reason already filled in`,
+        asks ===
+          'Reopen this game? It goes back to live with every play as it was, and stops counting in the standings until it is ended again. Why (kept with the game, never shown publicly) Keep it final Reopen the game' &&
+          (await reason.inputValue()) === 'End game tapped by mistake',
+        `${asks} / ${await reason.inputValue()}`,
+      );
+      await panelFits(page, `${at}, the Reopen question`);
+      await still(page, `${at}, the Reopen question`);
+      await accessible(page, `${at}, the Reopen question`);
+      await c.answer('yes').tap();
+      await said(/^The game is live again\. Carry on scoring\.$/);
+      await c.pad.locator('[data-rest]').waitFor();
+      note(
+        `${at}: reopened, the same screen carries on with no reload: live, its score kept, the clock stopped`,
+        (await page.evaluate(() => window.sameScreenAsBefore === true)) &&
+          (await c.finalPanel.count()) === 0 &&
+          (await c.toggle.getAttribute('data-state')) === 'start' &&
+          JSON.stringify(await c.score()) === '{"home":11,"away":7}',
+        JSON.stringify(await c.score()),
+      );
+      await still(page, `${at}, reopened`);
+      const live = await visitor();
+      note(
+        `${at}: reopened, a visitor sees it live again and the standings no longer count it`,
+        live.status === 'live' && live.hawks === before.hawks && live.bears === before.bears,
+        JSON.stringify(live),
+      );
+      // The next basket is taken and saved.
+      await quiet();
+      await play('home', 9, 'p2');
+      await c.saved();
+      note(
+        `${at}: and the next basket is saved`,
+        JSON.stringify(await c.score()) === '{"home":13,"away":7}',
+      );
+      await quiet();
+      await fromMore('more-end');
+      await c.endAsk.waitFor();
+      await c.answer('yes').tap();
+      await c.pad.locator('[data-final="saved"]').waitFor();
+      await c.saved();
+      const again = await visitor();
+      note(
+        `${at}: ended again, the public page says final at 13 to 7 and the standings count it once`,
+        again.status === 'final' &&
+          again.scores === '7–13' &&
+          again.hawks === won(before.hawks) &&
+          again.bears === lost(before.bears),
+        JSON.stringify(again),
+      );
+      const more = await (async () => {
+        await c.more.tap();
+        await c.sheet.waitFor();
+        const items = await c.sheet
+          .locator('.court-sheet-item')
+          .evaluateAll((els) => els.map((el) => el.querySelector('button, a').textContent.trim()));
+        await c.sheet.locator('.court-close').tap();
+        await c.sheet.waitFor({ state: 'detached' });
+        return items;
+      })();
+      note(
+        `${at}: on a final game More offers neither End game nor Mark not started`,
+        !more.includes('End game') && !more.includes('Mark not started'),
+        more.join(' | '),
+      );
+    });
+
+    if (afterRenewal) {
+      await step(`${at}: the screen stays once the league says the game is over`, async () => {
+        // About half a minute after an End is saved the device renews its hold on the
+        // game and is told the game is over: the page used to swap the scoring screen
+        // for a card that says so.
+        await page.waitForResponse(
+          (response) =>
+            response.url().endsWith('/session') && response.request().method() === 'POST',
+          { timeout: 90_000 },
+        );
+        await page.waitForTimeout(1500);
+        const panel = words(await c.finalPanel.innerText());
+        note(
+          `${at}: after the device is told the game is over the scoring screen stays, with its final panel and no notice above it`,
+          /^final Hawks won, 13–7 Saved\./i.test(panel) &&
+            (await c.root.locator('.court-notices').count()) === 0 &&
+            (await page.locator('.court-opening').count()) === 0,
+          panel,
+        );
+        await still(page, `${at}, the final panel after the league’s word`);
+        await c.tile('away', 3).tap();
+        await said(/^This game is final\. Reopen it to make changes\.$/);
+        // Reopened from there, it scores again with no reload.
+        await quiet();
+        await c.finalButton('reopen').tap();
+        await c.reopenAsk.waitFor();
+        await c.answer('yes').tap();
+        await said(/^The game is live again\. Carry on scoring\.$/);
+        await quiet();
+        await play('away', 5, 'p2');
+        await c.saved();
+        note(
+          `${at}: reopened after that, the same screen scores again and the basket is saved`,
+          (await page.evaluate(() => window.sameScreenAsBefore === true)) &&
+            JSON.stringify(await c.score()) === '{"home":13,"away":9}',
+          JSON.stringify(await c.score()),
+        );
+      });
+    }
+
     note(`${at}: nothing broke on the page`, errors.length === 0, errors.join('; '));
   } finally {
     await context?.close();
     server.child.kill();
   }
+}
+
+/** A made-up world of its own: a server started for it, players added, stopped after `run`. */
+async function onItsOwnWorld(browser, viewport, run, { hasTouch = false, family = '' } = {}) {
+  const origin = `http://localhost:${await freePort()}`;
+  const server = startNext(['start', '--port', new URL(origin).port], {
+    APP_ENV: 'test',
+    PUBLIC_BASE_URL: origin,
+  });
+  let context;
+  try {
+    await waitFor(`${origin}/`, server);
+    await addPlayers(origin);
+    context = await browser.newContext({ viewport, hasTouch });
+    await context.addCookies([{ ...scorekeeper, url: origin }]);
+    if (family !== '') {
+      await context.addInitScript((face) => {
+        document.addEventListener('DOMContentLoaded', () => {
+          const style = document.createElement('style');
+          style.setAttribute('data-drawn-in', '');
+          style.textContent = `.court, .court * { font-family: ${face}, sans-serif !important; }`;
+          document.head.append(style);
+        });
+      }, family);
+    }
+    const page = await context.newPage();
+    page.setDefaultTimeout(30_000);
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(`${origin}${trackerPath()}`);
+    const c = court(page);
+    await c.open();
+    await run({ origin, context, page, c, errors });
+  } finally {
+    await context?.close();
+    server.child.kill();
+  }
+}
+
+/**
+ * The try-out night by touch (the review of the two doors): a game started only to try
+ * the tracker, a basket, Mark not started refused in words that say to undo it first,
+ * Undo, Mark not started, and the lineups picked again on the same screen. On the made-up
+ * league's own format, since a game marked not started has its season's rules again.
+ */
+async function tryOut(browser, size, face) {
+  const at = `${size.width} x ${size.height}${face.letters}, the try-out`;
+  await onItsOwnWorld(
+    browser,
+    { width: size.width, height: size.height },
+    async ({ origin, page, c, errors }) => {
+      const said = (text) => c.said.filter({ hasText: text }).waitFor();
+      const quiet = () => c.said.filter({ hasText: /./ }).waitFor({ state: 'hidden' });
+      const fromMore = async (which) => {
+        await c.more.tap();
+        await c.sheet.waitFor();
+        await c.sheet.locator(`[data-${which}]`).tap();
+        await c.sheet.waitFor({ state: 'detached' });
+      };
+      const tipOff = async () => {
+        for (const jersey of starters) await c.tile('home', jersey).tap();
+        for (const jersey of starters) await c.tile('away', jersey).tap();
+        await page.locator('[data-scoring][data-stage="play"]').waitFor();
+        await c.root.locator('[data-clock-toggle][data-state="start"]:not([data-resting])').tap();
+        await c.root.locator('[data-clock-toggle][data-state="pause"]').waitFor();
+      };
+      const basket = async () => {
+        await c.tile('home', 5).tap();
+        await c.recorded(() => c.pad.locator('[data-options] [data-act="p2"]').tap());
+        await c.pad.locator('[data-rest]').waitFor();
+      };
+      await tipOff();
+      await basket();
+      await c.saved();
+      await c.more.tap();
+      await c.sheet.waitFor();
+      const watch = new URL(
+        await c.sheet.locator('a[target="_blank"]').getAttribute('href'),
+        origin,
+      ).href;
+      await c.sheet.locator('[data-more-not-started]').tap();
+      await c.notStartedAsk.waitFor();
+      const refused = words(await c.notStartedAsk.innerText());
+      note(
+        `${at}: with a basket standing, Mark not started tells the scorekeeper to undo it first, and offers no “yes”`,
+        refused ===
+          'Mark this game as not started? 1 basket, foul or turnover is recorded. Undo it first, then mark the game not started. Keep scoring' &&
+          (await c.pad.locator('[data-answer="yes"]').count()) === 0,
+        refused,
+      );
+      await panelFits(page, `${at}, undo first`);
+      await still(page, `${at}, undo first`);
+      await accessible(page, `${at}, undo first`);
+      await c.answer('no').tap();
+      await c.pad.locator('[data-rest]').waitFor();
+      await c.recorded(() => c.root.locator('[data-undo]:not([data-resting])').tap());
+      await said(/^Undone: #5 Ned Hawkins \+2\.$/);
+      await c.saved();
+      await quiet();
+      await page.evaluate(() => {
+        window.sameScreenAsBefore = true;
+      });
+      await fromMore('more-not-started');
+      await c.notStartedAsk.waitFor();
+      const asks = words(await c.notStartedAsk.innerText());
+      note(
+        `${at}: the basket undone, Mark not started asks first and says what it clears`,
+        asks ===
+          'Mark this game as not started? Its score and every stat recorded for it are cleared, here and on the live page. It shows as scheduled again. Keep scoring Yes, mark not started',
+        asks,
+      );
+      await panelFits(page, `${at}, the Mark not started question`);
+      await still(page, `${at}, the Mark not started question`);
+      await accessible(page, `${at}, the Mark not started question`);
+      const live = await publicResult(browser, origin, watch);
+      await c.answer('yes').tap();
+      await said(/^The game is scheduled again\. Nothing recorded in it counts\.$/);
+      await page.locator('[data-scoring][data-stage="lineups"]').waitFor();
+      const cleared = await publicResult(browser, origin, watch);
+      note(
+        `${at}: marked not started, the same screen asks for the lineups again with no reload, and a visitor sees the game scheduled`,
+        (await page.evaluate(() => window.sameScreenAsBefore === true)) &&
+          Number(await c.root.getAttribute('data-plays')) === 0 &&
+          live.status === 'live' &&
+          cleared.status === 'scheduled',
+        JSON.stringify({ live: live.status, cleared: cleared.status }),
+      );
+      // The game is then played for real: lineups, tip-off, and a basket that is saved.
+      await quiet();
+      await tipOff();
+      await basket();
+      await c.saved();
+      note(
+        `${at}: and the game is then scored from its start: lineups again, a basket saved`,
+        JSON.stringify(await c.score()) === '{"home":2,"away":0}',
+        JSON.stringify(await c.score()),
+      );
+      note(`${at}: nothing broke on the page`, errors.length === 0, errors.join('; '));
+    },
+    { hasTouch: true, family: face.family },
+  );
+}
+
+/**
+ * Every panel about ending a game at all five sizes, in both faces: on one game, brought
+ * to each state in turn and drawn in each face at each size. Nothing scrolls, both fives
+ * are whole, and the panel fits its pad.
+ */
+async function endAtEverySize(browser, faces) {
+  await onItsOwnWorld(browser, { width: 390, height: 844 }, async ({ context, page, c }) => {
+    const everywhere = async (state) => {
+      for (const face of faces) {
+        for (const size of sizes) {
+          await page.setViewportSize({ width: size.width, height: size.height });
+          await drawIn(page, face.family);
+          const label = `${size.width} x ${size.height}${face.letters}, ${state}`;
+          await panelFits(page, label);
+          await still(page, label);
+        }
+      }
+      await drawIn(page, '');
+      await page.setViewportSize({ width: 390, height: 844 });
+    };
+    await c.pick('home', starters);
+    await c.pick('away', starters);
+    await c.startClock();
+    await c.play('home', 11, 'p3');
+    await c.saved();
+    await c.fromMore('more-not-started');
+    await c.notStartedAsk.waitFor();
+    await everywhere('Mark not started, undo first');
+    await c.answer('no').click();
+    await c.play('away', 3, 'p3');
+    await c.saved();
+    await c.fromMore('more-end');
+    await c.endRefused.waitFor();
+    await everywhere('End game refused at a level score');
+    await c.answer('no').click();
+    await c.play('home', 5, 'p2');
+    await c.fromMore('more-end');
+    await c.endAsk.waitFor();
+    await everywhere('the End game question, time still on the clock');
+    await context.setOffline(true);
+    await c.banner.filter({ hasText: /No connection/ }).waitFor();
+    await c.answer('yes').click();
+    await c.pad.locator('[data-final="not-sent"]').waitFor();
+    await everywhere('the final panel not sent');
+    await context.setOffline(false);
+    await page.evaluate(() => window.dispatchEvent(new Event('online')));
+    await c.pad.locator('[data-final="saved"]').waitFor();
+    await c.pad
+      .locator('[data-reopen-line]')
+      .filter({ hasText: /minute/ })
+      .waitFor();
+    await everywhere('the final panel saved');
+    await c.finalButton('reopen').click();
+    await c.reopenAsk.waitFor();
+    await everywhere('the Reopen question');
+    await c.answer('yes').click();
+    await c.said.filter({ hasText: /live again/ }).waitFor();
+    // The last period run out with a team ahead: End game offered in the pad.
+    await c.pickPeriod(2);
+    await c.setClock('1');
+    await c.startClock().catch(() => undefined);
+    await c.endOffer.waitFor();
+    const offer = words(await c.pad.locator('[data-end-offer]').innerText());
+    note(
+      'at 0:00 of the last period with a team ahead the pad offers End game, and says who leads',
+      offer === 'End game H2 is over. Hawks lead 5–3: end the game once the score is right.',
+      offer,
+    );
+    for (const face of faces) {
+      for (const size of sizes) {
+        await page.setViewportSize({ width: size.width, height: size.height });
+        await drawIn(page, face.family);
+        const label = `${size.width} x ${size.height}${face.letters}, End game offered in the pad`;
+        const fits = await c.pad.locator('[data-end-offer]').evaluate((bar) => {
+          const pad = bar.closest('[data-pad]').getBoundingClientRect();
+          const button = bar.querySelector('[data-end-game]');
+          const why = bar.querySelector('.court-start-why');
+          const [b, w] = [button.getBoundingClientRect(), why.getBoundingClientRect()];
+          return {
+            height: b.height,
+            width: b.width,
+            buttonCut: button.scrollWidth > button.clientWidth + 0.5,
+            whyInPad: w.bottom <= pad.bottom + 0.5 && w.right <= pad.right + 0.5,
+          };
+        });
+        note(
+          `${label}: the button is 44 or more high and whole, and the line that says who leads is in the pad`,
+          fits.height >= 44 && fits.width >= 44 && !fits.buttonCut && fits.whyInPad,
+          JSON.stringify(fits),
+        );
+        await still(page, label);
+      }
+    }
+    await drawIn(page, '');
+    await page.setViewportSize({ width: 390, height: 844 });
+    // Offered, never done by itself: the tap asks.
+    await c.endOffer.click();
+    await c.endAsk.waitFor();
+    const asks = words(await c.endAsk.innerText());
+    note(
+      'End game tapped in the pad asks first, and with the last period run out says nothing of time left',
+      asks ===
+        'End the game? Hawks 5, Bears 3 This becomes the final score and goes into the standings. A game ended by mistake can be reopened. Keep playing End game',
+      asks,
+    );
+  });
 }
 
 /**
@@ -641,12 +1409,19 @@ if (browser) {
   });
   for (const face of faces) {
     for (const size of [phoneInBrowser, tabletLying]) {
+      // Once, at the phone a scorekeeper holds, the game waits until the league has told
+      // the device that the game is over (about half a minute): the screen must stay.
+      const afterRenewal = face === faces[0] && size === phoneInBrowser;
       await step(`${size.width} x ${size.height}${face.letters}: the short game`, () =>
-        shortGame(browser, size, face),
+        shortGame(browser, size, face, { afterRenewal }),
+      );
+      await step(`${size.width} x ${size.height}${face.letters}: the try-out night`, () =>
+        tryOut(browser, size, face),
       );
     }
   }
   await step('the row under the scoreboard at every size', () => rowAtEverySize(browser, faces));
+  await step('ending a game at every size', () => endAtEverySize(browser, faces));
 }
 
 await browser?.close();
