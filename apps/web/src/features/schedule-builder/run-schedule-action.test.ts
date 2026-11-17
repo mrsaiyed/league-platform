@@ -238,12 +238,12 @@ describe('schedule grid', () => {
       );
       expect(after).toEqual(before);
       // Tapped again (a reload): it is back, said so, and nothing is added twice.
-      const entries = (await read()).draft?.changeCount;
+      const entries = (await read()).draft?.savedEdits;
       expect(await press('put-back-game', { gameId: id })).toEqual({
         kind: 'saved',
         detail: { what: 'game-put-back', gameId: id },
       });
-      expect((await read()).draft?.changeCount).toBe(entries);
+      expect((await read()).draft?.savedEdits).toBe(entries);
     }
     // Put back as it was, the published game is no change at all to publish.
     const view = await read();
@@ -253,7 +253,7 @@ describe('schedule grid', () => {
     expect(view.summary.gamesAdded).toEqual([gameId(30)]);
     // The grid's count says what publishing would change: the one new game, not the five
     // entries the draft holds (an add, two removes, two put backs).
-    expect(view.draft?.changeCount).toBe(5);
+    expect(view.draft?.savedEdits).toBe(5);
     expect(publishChangeCount(view.summary)).toBe(1);
     expect(view.published.games.some((g) => g.id === published.id)).toBe(true);
   });

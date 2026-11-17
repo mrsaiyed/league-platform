@@ -5,7 +5,6 @@ import {
   leagueUrl,
   listVenues,
   previewSchedulePublish,
-  publishChangeCount,
   type ScheduleGame,
   type ScheduleRound,
   type VenueWithCourts,
@@ -219,10 +218,10 @@ export async function ScheduleBuilderPage({
     draft.draft === null
       ? undefined
       : await previewSchedulePublish(context, { seasonId: season.id }, deps);
-  // The same summary the publish box shows, where the viewer may see it; else the draft's own.
-  const toPublish = publishChangeCount(
-    preview !== undefined && preview.ok ? preview.value.summary : draft.summary,
-  );
+  // What publishing would change, counted once by core (publishChangeCount) from the reading
+  // the publish box shows, where the viewer may see it; else the draft's own, counted alike.
+  // The draft's line and the box both say this one number (step 2.185).
+  const toPublish = preview !== undefined && preview.ok ? preview.value.toPublish : draft.toPublish;
   const saidBeside = basis.canEdit && (besideRound !== undefined || besideAdd !== undefined);
   const roundName = (r: GridRound) =>
     t('schedule.admin.round', { number: r.number, label: r.label });

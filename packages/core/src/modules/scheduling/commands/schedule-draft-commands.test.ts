@@ -14,11 +14,13 @@ import {
   type MemoryScheduling,
 } from '../memory-scheduling.test-helper.ts';
 import type { ScheduleGame } from '../rules/schedule-types.ts';
+import { publishChangeCount } from '../rules/summarize-publish.ts';
 import { addDraftGame } from './add-draft-game.ts';
 import { changeDraftRoundDate } from './change-draft-round-date.ts';
 import { discardScheduleDraft } from './discard-schedule-draft.ts';
 import { getScheduleDraft } from './get-schedule-draft.ts';
 import { moveDraftGame } from './move-draft-game.ts';
+import { previewSchedulePublish } from './preview-schedule-publish.ts';
 import { removeDraftGame } from './remove-draft-game.ts';
 import { renameDraftRound } from './rename-draft-round.ts';
 import { setDraftRecording } from './set-draft-recording.ts';
@@ -156,7 +158,7 @@ describe('schedule draft commands', () => {
 
     const view = await getScheduleDraft(as(ownerId), { seasonId }, deps);
     if (!view.ok) throw new Error('refused');
-    expect(view.value.draft).toMatchObject({ version: 5, changeCount: 5, outOfDate: false });
+    expect(view.value.draft).toMatchObject({ version: 5, savedEdits: 5, outOfDate: false });
     expect(view.value.result.games.map((g) => g.id).sort()).toEqual(
       [gameUuid(2), gameUuid(9)].sort(),
     );
@@ -433,5 +435,58 @@ describe('schedule draft commands', () => {
       ok: false,
       error: { code: 'season-not-found' },
     });
+  });
+});
+
+describe("the draft's count of what publishing would change (step 2.185)", () => {
+  /** The draft view's count and the publish preview's, read as the grid reads them. */
+  const counts = async (w: ReturnType<typeof world>) => {
+    const view = await getScheduleDraft(w.as(ownerId), { seasonId }, w.deps);
+    const preview = await previewSchedulePublish(w.as(ownerId), { seasonId }, w.deps);
+    if (!view.ok) throw new Error('refused');
+    return {
+      view: view.value.toPublish,
+      preview: preview.ok ? preview.value.toPublish : undefined,
+      summary: publishChangeCount(view.value.summary),
+    };
+  };
+
+  it('is zero after a remove and a put back, and the same as the publish summary at every step', async () => {
+    const w = world();
+    expect(await counts(w)).toEqual({ view: 0, preview: undefined, summary: 0 });
+    expect(
+      await removeDraftGame(w.as(ownerId), { ...basis(), gameId: gameUuid(1) }, w.deps),
+    ).toMatchObject({ ok: true });
+    expect(await counts(w)).toEqual({ view: 1, preview: 1, summary: 1 });
+    // Two other games moved: three changes, wherever they are counted.
+    expect(
+      await moveDraftGame(w.as(ownerId), { ...basis(1), gameId: gameUuid(2), ...slot }, w.deps),
+    ).toMatchObject({ ok: true });
+    expect(await counts(w)).toEqual({ view: 2, preview: 2, summary: 2 });
+    // "Put it back": the game as the draft last held it, with its own id.
+    const { id, status: _status, ...was } = game(1);
+    expect(
+      await addDraftGame(w.as(ownerId), { ...basis(2), ...was, gameId: id }, w.deps),
+    ).toMatchObject({ ok: true });
+    expect(await counts(w)).toEqual({ view: 1, preview: 1, summary: 1 });
+    // The move undone by hand: the draft holds four edits and changes nothing.
+    expect(
+      await moveDraftGame(
+        w.as(ownerId),
+        {
+          ...basis(3),
+          gameId: gameUuid(2),
+          roundId: roundUuid(1),
+          date: '2026-10-04',
+          time: '18:00',
+          venueId: venueUuid(1),
+          court: 'Court 2',
+        },
+        w.deps,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(await counts(w)).toEqual({ view: 0, preview: 0, summary: 0 });
+    const view = await getScheduleDraft(w.as(ownerId), { seasonId }, w.deps);
+    expect(view).toMatchObject({ ok: true, value: { draft: { savedEdits: 4 }, toPublish: 0 } });
   });
 });
