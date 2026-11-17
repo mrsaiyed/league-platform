@@ -6,8 +6,17 @@ export { isAllowedReturnAddress, type ReturnAddressRules } from './return-addres
 export { signInDefaults, type SignInSettings } from './sign-in-settings.ts';
 export { createSupabaseSignIn, type SupabaseSignInOptions } from './supabase/supabase-sign-in.ts';
 export { SupabaseAuthUnexpected, type FetchLike } from './supabase/gotrue-client.ts';
+// The adapter's own client and its address check, for the sign-in service check
+// (scripts/check-sign-in-service.mjs, step 2.206), which asks every call the adapter makes.
+export {
+  checkProjectUrl,
+  createGoTrueClient,
+  SupabaseAuthTimedOut,
+  type GoTrueClient,
+} from './supabase/gotrue-client.ts';
 export {
   createSupabaseEmailConfirmation,
+  emailConfirmationOf,
   type SupabaseEmailConfirmationOptions,
 } from './supabase/email-confirmation.ts';
 export type * from './supabase/sign-in-store.ts';
