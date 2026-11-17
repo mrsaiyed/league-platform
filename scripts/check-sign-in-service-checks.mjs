@@ -277,6 +277,9 @@ export async function runChecks({
   const state = {};
   const measured = {};
   let userId;
+  // Whether the first sign-up code was asked for and not refused: a refusal should
+  // make no user, but the clean-up still looks for one.
+  let mayExist = false;
 
   // ---- The project's settings -------------------------------------------------------
   group(words.groups.settings);
@@ -316,10 +319,10 @@ export async function runChecks({
     group(words.groups.codes);
     let firstCode;
     await check(words.checks.signUpCode, async () => {
-      firstCode = accepted(
-        'generate_link',
-        await ask('generate_link', () => client.generateCode('magiclink', email)),
-      );
+      mayExist = true;
+      const answer = await ask('generate_link', () => client.generateCode('magiclink', email));
+      if (!answer.ok) mayExist = false;
+      firstCode = accepted('generate_link', answer);
       userId = firstCode.user.id;
       keep(firstCode.code, userId);
     });
@@ -639,15 +642,18 @@ export async function runChecks({
     // ---- Clean-up: whatever happened above --------------------------------------------
     group(words.groups.cleanUp);
     let removed = false;
-    try {
-      if (userId === undefined) {
-        // The first code's answer could not be read: the user may exist all the same.
+    if (userId === undefined) {
+      // The first code's answer could not be read, or was refused: look for the user all
+      // the same. Not found, or never asked for and not findable, is nothing left behind.
+      try {
         const found = await client.generateCode('recovery', email);
-        if (found.ok) userId = found.value.user.id;
-        else removed = found.refusal.status === 404;
+        if (found.ok) {
+          keep(found.value.code);
+          userId = found.value.user.id;
+        } else removed = found.refusal.status === 404 || !mayExist;
+      } catch {
+        removed = !mayExist;
       }
-    } catch {
-      // Not found out; said below.
     }
     if (userId !== undefined) {
       // Never stopped by Ctrl+C: this is what a stop waits for.

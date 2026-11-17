@@ -164,7 +164,7 @@ export const stoppedTwice = [
   'Stopped at once, at the second Ctrl+C: the made-up user may not have been removed.',
   ...notRemoved,
 ];
-export const stopping = 'Stopping after this call; the made-up user is removed next.';
+export const stopping = 'Stopping after the check in hand; the made-up user is removed next.';
 export const unexpected =
   'The check stopped on a fault of its own; nothing it printed names the service.';
 

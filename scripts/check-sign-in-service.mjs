@@ -27,7 +27,7 @@ if ('problems' in chosen) {
 
 const { projectUrl, secretKey, local } = chosen.settings;
 const stop = new AbortController();
-// The first Ctrl+C stops after the call in hand and still removes the made-up user;
+// The first Ctrl+C stops after the check in hand and still removes the made-up user;
 // a second stops at once.
 process.on('SIGINT', () => {
   if (stop.signal.aborted) {

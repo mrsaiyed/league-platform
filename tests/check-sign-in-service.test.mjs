@@ -30,15 +30,17 @@ function movingClock() {
 /**
  * The fake, set as record 018 says the project is (reuse interval 0, leaked-password
  * protection on), answering over HTTP on 127.0.0.1. `reshape(call, response)` may
- * answer a call another way after the fake has done its work.
+ * answer a call another way after the fake has done its work; `setUp(fake)` may set
+ * the fake's own overrides, which answer before it does any.
  */
-async function serveFake({ reshape } = {}) {
+async function serveFake({ reshape, setUp } = {}) {
   const fake = createFakeSupabaseAuth({
     now: movingClock(),
     secretKey,
     reuseSeconds: 0,
     leakedPasswords: [leaked],
   });
+  setUp?.(fake);
   const seen = [];
   const server = createServer(async (request, reply) => {
     const chunks = [];
@@ -272,6 +274,57 @@ test('the made-up user is removed even when the first answer could not be read',
     assertNothingSecret(output, served);
     // A user left behind fails the run even with every line as expected.
     assert.equal(exitCodeFor({ differed: 0, removed: false }), 1);
+  } finally {
+    await served.close();
+  }
+});
+
+test('a refused first code made no user, so nothing is said to be left behind', async () => {
+  const served = await serveFake({
+    // The key is refused for every admin call, before the fake makes anything.
+    setUp: (fake) =>
+      fake.override('POST', '/admin/generate_link', () =>
+        Response.json({ code: 'not_admin', message: 'User not allowed' }, { status: 403 }),
+      ),
+  });
+  try {
+    const { outcome, lines } = await runAgainst(served);
+    assert.equal(
+      lineFor(lines, words.checks.signUpCode),
+      words.line(
+        words.differed,
+        words.checks.signUpCode,
+        words.refusedWith('generate_link', 403, 'not_admin'),
+      ),
+    );
+    assert.equal(outcome.removed, true);
+    for (const text of words.notRemoved) assert.ok(!lines.includes(text));
+    assert.equal(served.seen.filter((call) => call.method === 'DELETE').length, 0);
+    assert.equal(served.fake.hasUser(madeAddress(served)), false);
+  } finally {
+    await served.close();
+  }
+});
+
+test('a user made behind a refusal is still found and removed', async () => {
+  let first = true;
+  const served = await serveFake({
+    reshape: (call) => {
+      if (call.path !== '/auth/v1/admin/generate_link' || !first) return undefined;
+      first = false;
+      // The fake has made the user, yet the answer is a refusal.
+      return Response.json({ code: 'unexpected_failure' }, { status: 422 });
+    },
+  });
+  try {
+    const { outcome, lines } = await runAgainst(served);
+    assert.ok(lineFor(lines, words.checks.signUpCode).startsWith(`  ${words.differed}`));
+    assert.equal(
+      lineFor(lines, words.checks.removed),
+      words.line(words.asExpected, words.checks.removed),
+    );
+    assert.equal(outcome.removed, true);
+    assert.equal(served.fake.hasUser(madeAddress(served)), false);
   } finally {
     await served.close();
   }

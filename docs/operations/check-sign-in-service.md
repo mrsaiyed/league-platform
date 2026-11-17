@@ -46,7 +46,7 @@ It exits 0 when every line is as expected and the made-up user is gone, 1 otherw
 4. **Make the person's checks** from the last block, in the dashboard, and say each one aloud. For "Confirm email", switch it off, run the tool again and see its "Confirm email" line differ, then switch it back on.
 5. **Write the result into the stage report:** every line as printed, the times, and the person's checks with what was seen.
 
-Ctrl+C stops it after the call in hand and still removes the made-up user. A second Ctrl+C stops at once: the made-up user may then be left, and the tool says how to remove it by hand (Authentication, Users: the one made today whose address starts `check-sign-in-` and ends `.test`).
+Ctrl+C stops it after the check in hand and still removes the made-up user. A second Ctrl+C stops at once: the made-up user may then be left, and the tool says how to remove it by hand (Authentication, Users: the one made today whose address starts `check-sign-in-` and ends `.test`).
 
 ## On this computer
 
