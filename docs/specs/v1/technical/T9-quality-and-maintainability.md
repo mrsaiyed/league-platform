@@ -92,6 +92,7 @@ Technical choices that are not obvious are written as a page each in `docs/archi
 
 - **T-191: few and mainstream.** Each new dependency needs a reason written in the change that adds it.
 - Versions are pinned. Updates are proposed automatically each week and merged when checks pass.
+- **T-283:** a pinned release that an advisory names as vulnerable is left at once for the newest patch release of its line, without the usual two-week wait, changed by hand with the lockfile made again, never by a framework's own upgrade command or by what a tool's output suggests ([record 079](../../../architecture/decisions/079-next-js-off-a-release-with-a-known-hole.md)).
 - Major versions of the framework are adopted within about six months of release, so we are never stranded on something unsupported.
 
 ## 10. Keeping the code healthy
