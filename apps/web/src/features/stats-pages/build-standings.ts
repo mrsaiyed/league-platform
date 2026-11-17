@@ -28,6 +28,17 @@ const percent = new Intl.NumberFormat(locale, {
 });
 const signed = new Intl.NumberFormat(locale, { signDisplay: 'exceptZero' });
 const whole = new Intl.NumberFormat(locale);
+
+/**
+ * A win percentage as a note writes it, the way a basketball table does: .500 and 1.000,
+ * never 0.500 (the step's own line; the column's 0.500 is the audit's L3, step N7's).
+ */
+const percentInNote = (value: number): string =>
+  percent
+    .formatToParts(value)
+    .filter((part, n) => !(n === 0 && part.type === 'integer' && part.value === '0'))
+    .map((part) => part.value)
+    .join('');
 const names = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' });
 
 const tiebreakerNames = {
@@ -107,7 +118,7 @@ function levelNote(
       ? t('standings.level.points', { teams, value: whole.format(first?.points ?? 0) })
       : t('standings.level.winPercentage', {
           teams,
-          value: percent.format(first?.winPercentage ?? 0),
+          value: percentInNote(first?.winPercentage ?? 0),
         });
   const join = t('standings.level.sentenceJoin');
   const by = first?.orderedBy ?? '';

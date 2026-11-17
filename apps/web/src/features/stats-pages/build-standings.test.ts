@@ -172,7 +172,7 @@ describe('the note beside each team of the standings', () => {
     const made = await tableAfter(['Ravens', 'Wolves'], [game1, game2]);
     expect(order(made)).toEqual(['Wolves', 'Ravens']);
     const note =
-      'Wolves and Ravens are level on win percentage (0.500). Point difference puts Wolves ahead: +4 against -4.';
+      'Wolves and Ravens are level on win percentage (.500). Point difference puts Wolves ahead: +4 against -4.';
     expect(levelNoteBeside(made, 'Ravens')).toBe(note);
     expect(levelNoteBeside(made, 'Wolves')).toBe(note);
     // One note for the group, marked beside both.
@@ -186,7 +186,7 @@ describe('the note beside each team of the standings', () => {
     const made = await tableAfter(['Ravens', 'Wolves', 'Hawks'], [game1]);
     expect(order(made)).toEqual(['Ravens', 'Hawks', 'Wolves']);
     const note =
-      'Hawks and Wolves are level on win percentage (0.000). Point difference puts Hawks ahead: 0 against -1.';
+      'Hawks and Wolves are level on win percentage (.000). Point difference puts Hawks ahead: 0 against -1.';
     expect(levelNoteBeside(made, 'Wolves')).toBe(note);
     expect(levelNoteBeside(made, 'Hawks')).toBe(note);
     expect(notesBeside(made, 'Ravens')).toEqual([]);
@@ -206,7 +206,7 @@ describe('the note beside each team of the standings', () => {
     const winners =
       'Cedar and Ash are level on win percentage (1.000). Point difference puts Cedar ahead: +10 against +5.';
     const losers =
-      'Birch and Dogwood are level on win percentage (0.000). Point difference puts Birch ahead: -5 against -10.';
+      'Birch and Dogwood are level on win percentage (.000). Point difference puts Birch ahead: -5 against -10.';
     expect(levelNoteBeside(made, 'Cedar')).toBe(winners);
     expect(levelNoteBeside(made, 'Ash')).toBe(winners);
     expect(levelNoteBeside(made, 'Birch')).toBe(losers);
@@ -258,7 +258,7 @@ describe('the note beside each team of the standings', () => {
     );
     expect(order(made)).toEqual(['Birch', 'Ash', 'Cedar']);
     const note =
-      'Birch, Ash, and Cedar are level on win percentage (0.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
+      'Birch, Ash, and Cedar are level on win percentage (.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
     for (const team of ['Birch', 'Ash', 'Cedar']) expect(levelNoteBeside(made, team)).toBe(note);
     expect(made.view.footnotes).toHaveLength(1);
     drawnBeside(made, 'Cedar', note);
@@ -269,7 +269,7 @@ describe('the note beside each team of the standings', () => {
     const made = await tableAfter(['Ash', 'Birch', 'Cedar'], [['Ash', 60, 'Birch', 50]]);
     expect(order(made)).toEqual(['Ash', 'Cedar', 'Birch']);
     const note =
-      'Cedar and Birch are level on win percentage (0.000). Point difference puts Cedar ahead: 0 against -10.';
+      'Cedar and Birch are level on win percentage (.000). Point difference puts Cedar ahead: 0 against -10.';
     expect(levelNoteBeside(made, 'Birch')).toBe(note);
     expect(levelNoteBeside(made, 'Cedar')).toBe(note);
     nothingPlacedAbove(made);
@@ -290,7 +290,7 @@ describe('the note beside each team of the standings', () => {
     );
     expect(order(made).slice(1, 3)).toEqual(['Owls', 'Falcons']);
     const note =
-      'Owls and Falcons are level on win percentage (0.500). The games between them put Owls ahead.';
+      'Owls and Falcons are level on win percentage (.500). The games between them put Owls ahead.';
     expect(levelNoteBeside(made, 'Falcons')).toBe(note);
     nothingPlacedAbove(made);
   });
@@ -324,7 +324,7 @@ describe('the note beside each team of the standings', () => {
     );
     expect(order(flipped)).toEqual(['Comets', 'Rockets', 'Meteors']);
     expect(levelNoteBeside(flipped, 'Meteors')).toBe(
-      'Rockets and Meteors are level on win percentage (0.000). A coin flip puts Rockets ahead.',
+      'Rockets and Meteors are level on win percentage (.000). A coin flip puts Rockets ahead.',
     );
     for (const made of [scored, allowed, flipped]) nothingPlacedAbove(made);
   });
@@ -358,7 +358,7 @@ describe('the note beside each team of the standings', () => {
     );
     expect(order(made)).toEqual(['Wren', 'Ash', 'Birch', 'Cedar', 'Zed']);
     const note =
-      'Ash, Birch, and Cedar are level on win percentage (0.500). The season’s tiebreakers set their order as far as they can: head-to-head, then point difference, then points scored. Birch and Cedar are still level after all of them, so they are shown in a fixed order.';
+      'Ash, Birch, and Cedar are level on win percentage (.500). The season’s tiebreakers set their order as far as they can: head-to-head, then point difference, then points scored. Birch and Cedar are still level after all of them, so they are shown in a fixed order.';
     for (const team of ['Ash', 'Birch', 'Cedar']) expect(levelNoteBeside(made, team)).toBe(note);
     nothingPlacedAbove(made);
   });

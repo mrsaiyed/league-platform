@@ -78,12 +78,12 @@ describe('standings page', () => {
       );
     expect(east?.rows.map((row) => row.team)).toEqual(['Owls', 'Falcons', 'Herons']);
     const eastNote =
-      'Owls and Falcons are level on win percentage (0.667). The game between them puts Owls ahead.';
+      'Owls and Falcons are level on win percentage (.667). The game between them puts Owls ahead.';
     expect(beside(east, 'Falcons')).toEqual([eastNote]);
     expect(beside(east, 'Owls')).toEqual([eastNote]);
     expect(beside(east, 'Herons')).toEqual([]);
     const westNote =
-      'Lions, Tigers, Hawks, and Bears are level on win percentage (0.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
+      'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
     for (const team of ['Lions', 'Tigers', 'Hawks', 'Bears']) {
       expect(beside(west, team)).toEqual([westNote]);
     }

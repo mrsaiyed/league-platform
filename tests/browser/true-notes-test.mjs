@@ -30,7 +30,7 @@ const note = (label, ok, detail = '') => {
 const countsSentence =
   'Statistics count the games that were scored live or entered as a box score. A game with only a final score counts in the standings, not here.';
 const eastNote =
-  'Owls and Falcons are level on win percentage (0.667). The game between them puts Owls ahead.';
+  'Owls and Falcons are level on win percentage (.667). The game between them puts Owls ahead.';
 const stillTied =
   'Level with another team: nothing in the rules separates them yet, so they are shown in a fixed order.';
 
@@ -87,9 +87,10 @@ function checkNotes(label, tables) {
       note(`${where} is a note this step writes`, two !== null || several !== null);
       // The number they are level on is each marked team's own (PCT, or PTS by points).
       const column = on === 'points' ? 'PTS' : 'PCT';
+      // By value: a note writes .500 where the column still writes 0.500 (the audit's L3).
       note(
         `${where} gives each team's own ${column}`,
-        level.every((other) => other.cell[column] === value),
+        value !== undefined && level.every((other) => Number(other.cell[column]) === Number(value)),
         level.map((other) => `${other.team} ${other.cell[column]}`).join(', '),
       );
       if (two === null) continue;
