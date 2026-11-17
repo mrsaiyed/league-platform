@@ -33,6 +33,11 @@ export type GameView = {
    */
   readonly finalText?: string;
   readonly finalSaid?: string;
+  /**
+   * The regulation periods of the rules it is played under, 2 or 4: a card open while the
+   * game is played works out its overtime from the live channel's last period when it ends.
+   */
+  readonly periods: 2 | 4;
   readonly whenText: string;
   /**
    * The same line as it reads beside the state's pill, where that is shorter: a scoreboard
@@ -171,6 +176,7 @@ export function gameView(
     status,
     ...(finalText === undefined ? {} : { finalText }),
     ...(finalSaid === undefined ? {} : { finalSaid }),
+    periods: game.periods,
     whenText: whenOf(game, clock),
     // Beside a pill that says "Postponed" the old day is still never written bare.
     ...(status === 'postponed' && day !== null
@@ -184,6 +190,27 @@ export function gameView(
     detailsHref: leagueUrl(league, 'game', { game: game.id, season: seasonSlug }),
     teamSlugs: [game.homeTeam.slug, game.awayTeam.slug],
     ...(awaiting ? { awaiting: true } : {}),
+  };
+}
+
+/**
+ * A final game's pill and link words for each count of overtime periods, written by the
+ * server in the league's language (`pill[2]` is "Final, 2OT"): what a card open while the
+ * game ends says, as its page drawn afresh would. Index 0 is regulation: nothing more.
+ */
+export type OvertimeWords = {
+  readonly pill: readonly string[];
+  readonly said: readonly string[];
+};
+
+/** The most overtime periods a game has: the engine's last period, 20, less 2 halves. */
+const mostOvertimes = 18;
+
+export function overtimeWords(): OvertimeWords {
+  const counts = Array.from({ length: mostOvertimes + 1 }, (_, count) => count);
+  return {
+    pill: counts.map((count) => finalPillText(t, count) ?? ''),
+    said: counts.map((count) => finalLinkState(t, count) ?? ''),
   };
 }
 

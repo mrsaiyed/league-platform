@@ -14,6 +14,7 @@ function game(localDate: string | null): PublicGame {
     homeScore: null,
     awayScore: null,
     overtimePeriods: null,
+    periods: 2,
     divisionName: null,
     venue: null,
     courtName: null,

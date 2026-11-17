@@ -4,7 +4,8 @@
 // every person, league and game is made up (apps/web/src/server/stand-in-world-seed.ts).
 //
 // Case 44 of the audit, through the tracker's own endpoints: Tigers at Lions (tonight's game
-// 1) level after both halves, End refused, then won by the Lions in the first overtime. Then,
+// 1) level after both halves, End refused, then won by the Lions in the first overtime, while
+// a phone is already on the schedule: its card turns to "Final, OT" with no reload. Then,
 // as each person would meet the result:
 // - a visitor: the game's own page (its big board), its card on the schedule, on the home
 //   page's recent results and on the Lions' page all say "Final, OT", and the card's link
@@ -189,7 +190,46 @@ if (browser !== undefined) {
       (error) => String(error.message),
     );
     note('End is refused while the score is level after regulation', refused.includes('refused'));
-    await send(...next(3), score('home', lions[2], 2), { type: 'end' });
+    // A phone already on the schedule while the game is played: its card turns to "Final,
+    // OT" when the game ends, with no reload (from the live channel's last period).
+    const watching = await open(widths[0]);
+    try {
+      await watching.page.goto(`${origin}${league}/schedule`);
+      const pill = () => cardOf(watching.page, overtimeGame).then((card) => card?.pill ?? null);
+      note('an open page shows the game live before it ends', (await pill()) === null);
+      // Its card listens to the league's live channel before the game ends.
+      await watching.page.waitForTimeout(1500);
+      await send(...next(3), score('home', lions[2], 2), { type: 'end' });
+      const turned = await watching.page
+        .waitForFunction(
+          (id) => {
+            const link = [...document.querySelectorAll('main a')].find((a) =>
+              (a.getAttribute('href') ?? '').includes(`/games/${id}`),
+            );
+            const state = link?.closest('.ui-game-card')?.querySelector('.ui-game-state');
+            return state?.textContent === 'Final, OT';
+          },
+          overtimeGame,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        );
+      note(
+        'a page open while the game ends in overtime says "Final, OT" without a reload',
+        turned,
+        String(await pill()),
+      );
+      const card = await cardOf(watching.page, overtimeGame);
+      note(
+        'its link then tells a screen reader "final after overtime"',
+        (card?.link ?? '').includes('final after overtime, 5 to 7'),
+        card?.link,
+      );
+    } finally {
+      await watching.context.close();
+    }
   });
 
   for (const width of widths) {

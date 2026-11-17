@@ -48,6 +48,12 @@ export type PublicGame = {
    * and for every game that is not final.
    */
   readonly overtimePeriods: number | null;
+  /**
+   * The regulation periods of the rules it is played under (its own once fixed, else its
+   * season's): 2 halves or 4 quarters. A card open while the game is played works out its
+   * overtime from the live channel's period when it ends (step 2.200).
+   */
+  readonly periods: 2 | 4;
   readonly divisionName: string | null;
   /** A venue is public: where to turn up. */
   readonly venue: {

@@ -13,6 +13,7 @@ import {
   buildScheduleView,
   comingOrder,
   gameView,
+  overtimeWords,
   parseRound,
 } from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
@@ -459,6 +460,57 @@ describe('a card’s overtime mark and the live channel (step 2.200)', () => {
       expect(plain.finalText).toBeUndefined();
       expect(gameLinkText(plain, gameLinkWords())).toContain(', final, ');
     }
+  });
+
+  it('a card drawn live says "Final, OT" when the game ends in overtime, and "Final" in regulation', async () => {
+    const { clock, schedule } = await load(adult);
+    const live = schedule.rounds.flatMap((r) => r.games).find((g) => g.status === 'live');
+    if (live === undefined) throw new Error('no live game');
+    const words = overtimeWords();
+    expect([words.pill[0], words.pill[1], words.pill[2]]).toEqual(['', 'Final, OT', 'Final, 2OT']);
+    // A game of halves, drawn while it was played.
+    const drawn = gameView({ ...live, periods: 2 }, clock, addressee, 'fall-2026');
+    expect(drawn).toMatchObject({ status: 'live', periods: 2 });
+    expect(drawn.finalText).toBeUndefined();
+    const end = (sequence: number, period: number, leftFinal?: boolean) =>
+      applyUpdate(
+        drawn,
+        {
+          sequence,
+          status: 'final',
+          home: 52,
+          away: 50,
+          period,
+          ...(leftFinal === undefined ? {} : { leftFinal }),
+        },
+        words,
+      );
+    // Ended in period 3 of a game of halves: the first overtime.
+    const overtime = end(20, 3, true);
+    expect(overtime).toMatchObject({
+      status: 'final',
+      finalText: 'Final, OT',
+      finalSaid: 'final after overtime',
+    });
+    expect(gameLinkText(overtime, gameLinkWords())).toContain('final after overtime, 50 to 52');
+    expect(end(21, 4, true).finalText).toBe('Final, 2OT');
+    // Reopened (live, no mark) and ended again in regulation: "Final" alone.
+    const reopened = applyUpdate(
+      overtime,
+      { sequence: 22, status: 'live', home: 52, away: 50, period: 3, leftFinal: true },
+      words,
+    );
+    expect(reopened.finalText).toBeUndefined();
+    const regulation = end(23, 2, true);
+    expect(regulation.status).toBe('final');
+    expect(regulation.finalText).toBeUndefined();
+    expect(regulation.finalSaid).toBeUndefined();
+    expect(gameLinkText(regulation, gameLinkWords())).toContain(', final, 50 to 52');
+    // A game of quarters ends its regulation in period 4: no mark; period 5 is one overtime.
+    const quarters = gameView({ ...live, periods: 4 }, clock, addressee, 'fall-2026');
+    const update = { sequence: 30, status: 'final' as const, home: 52, away: 50 };
+    expect(applyUpdate(quarters, { ...update, period: 4 }, words).finalText).toBeUndefined();
+    expect(applyUpdate(quarters, { ...update, period: 5 }, words).finalText).toBe('Final, OT');
   });
 });
 

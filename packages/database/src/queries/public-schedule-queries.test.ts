@@ -317,6 +317,9 @@ describe('schedule', () => {
       ['scheduled', null],
       ['scheduled', null],
     ]);
+    // Each game's regulation periods, from its season's rules (the starting set: halves),
+    // for a card open while it ends (step 2.200).
+    expect(mine.map((g) => g.periods)).toEqual([2, 2, 2]);
     expect(await inLeague((scope) => listPublicGames(scope, draftSeasonId))).toEqual([]);
   });
 });
