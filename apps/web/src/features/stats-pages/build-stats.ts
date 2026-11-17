@@ -55,6 +55,48 @@ const whole = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
 const shown = (value: number, by: StatsBy): string =>
   by === 'average' ? average.format(value) : whole.format(value);
 
+/** The most decimals a leader's number is ever given beyond the usual one. */
+const mostMore = 5;
+
+/** A number written with `more` decimals beyond the usual: 7.33 for 7.3 with one more. */
+const shownWithMore = (value: number, by: StatsBy, more: number): string =>
+  more === 0
+    ? shown(value, by)
+    : new Intl.NumberFormat(locale, {
+        minimumFractionDigits: by === 'average' ? 1 + more : 0,
+        maximumFractionDigits: 1 + more,
+      }).format(value);
+
+/**
+ * A board's numbers as the page writes them (step 2.199). Two players next to each other
+ * who are not level but whose numbers would read the same (22 points in 3 games, 7.33, and
+ * 29 in 4, 7.25: both "7.3") are both written with as many more decimals as tell them
+ * apart, one almost always, so the page shows why one is ahead. Level players read the
+ * same and share a place. Only the players this viewer sees are on the board (S-22), so a
+ * number never gains a decimal because of a player who is not shown.
+ */
+export function leaderValues(
+  leaders: readonly { readonly rank: number; readonly value: number }[],
+  by: StatsBy,
+): string[] {
+  const more = leaders.map(() => 0);
+  for (let index = 1; index < leaders.length; index += 1) {
+    const above = leaders[index - 1];
+    const here = leaders[index];
+    if (above === undefined || here === undefined || above.rank === here.rank) continue;
+    let extra = 0;
+    while (
+      extra < mostMore &&
+      shownWithMore(above.value, by, extra) === shownWithMore(here.value, by, extra)
+    ) {
+      extra += 1;
+    }
+    more[index - 1] = Math.max(more[index - 1] ?? 0, extra);
+    more[index] = Math.max(more[index] ?? 0, extra);
+  }
+  return leaders.map((leader, index) => shownWithMore(leader.value, by, more[index] ?? 0));
+}
+
 export type LeaderBoard = {
   readonly key: string;
   readonly title: string;
@@ -62,8 +104,9 @@ export type LeaderBoard = {
   readonly rows: readonly StatRow[];
   /**
    * Who leads, for the number card that opens the page: the name as the league's name
-   * setting shows it, the number, the games played, and the player's team when they have
-   * one team only. None while nobody is ranked.
+   * setting shows it, the number as the board's first line writes it, the games the
+   * statistic was recorded in (what the number is over), and the player's team when they
+   * have one team only. None while nobody is ranked.
    */
   readonly first?:
     | undefined
@@ -102,6 +145,7 @@ export type StatsPageData = {
 
 export type StatsFailure = { readonly code: 'season-not-found' | 'invalid-input' };
 
+/** The places a board shows; everyone level with the last of them is shown too (core). */
 const leaderLimit = 5;
 
 /**
@@ -179,18 +223,20 @@ function pageData(
       }),
     );
 
+  // A board's games are the games its statistic was recorded in: what its minimum counts
+  // and its average is over (S-63, step 2.199), not always the games played.
   const leaderColumns: StatsColumn[] = [
     { key: 'player', label: t('stats.col.player') },
     { key: 'team', label: t('stats.col.team') },
     {
       key: 'games',
       label: t('stats.col.games'),
-      fullName: t('stats.col.gamesFull'),
+      fullName: t('stats.col.leaderGamesFull'),
       numeric: true,
     },
     { key: 'value', label: t('stats.col.value'), numeric: true },
   ];
-  const firstOf = (board: StatLeaders): LeaderBoard['first'] => {
+  const firstOf = (board: StatLeaders, values: readonly string[]): LeaderBoard['first'] => {
     const leader = board.leaders[0];
     if (leader === undefined) return undefined;
     const only = leader.teamIds.length === 1 ? (leader.teamIds[0] ?? '') : '';
@@ -199,31 +245,34 @@ function pageData(
       // The key of the board's first row (below): a place, never the person's id.
       id: 'leader-0',
       name: playerName(leader.name),
-      value: shown(leader.value, board.by),
-      games: leader.gamesPlayed,
+      value: values[0] ?? shown(leader.value, board.by),
+      games: leader.gamesRecorded,
       teams: teamsOf(leader.teamIds),
       team: name === undefined ? undefined : { name, color: teamColor.get(only) ?? null },
       tied: board.leaders[1]?.rank === leader.rank,
     };
   };
-  const leaders: LeaderBoard[] = boards.map((board) => ({
-    key: board.measure,
-    title: statLabel(board.measure).full,
-    first: firstOf(board),
-    columns: leaderColumns,
-    rows: board.leaders.map(
-      (leader: StatLeader, index): StatRow => ({
-        // A place in this board, for this page only: never the person's id.
-        id: `leader-${index}`,
-        cells: {
-          player: t('stats.leaderName', { rank: leader.rank, name: playerName(leader.name) }),
-          team: teamsOf(leader.teamIds),
-          games: leader.gamesPlayed,
-          value: shown(leader.value, board.by),
-        },
-      }),
-    ),
-  }));
+  const leaders: LeaderBoard[] = boards.map((board) => {
+    const values = leaderValues(board.leaders, board.by);
+    return {
+      key: board.measure,
+      title: statLabel(board.measure).full,
+      first: firstOf(board, values),
+      columns: leaderColumns,
+      rows: board.leaders.map(
+        (leader: StatLeader, index): StatRow => ({
+          // A place in this board, for this page only: never the person's id.
+          id: `leader-${index}`,
+          cells: {
+            player: t('stats.leaderName', { rank: leader.rank, name: playerName(leader.name) }),
+            team: teamsOf(leader.teamIds),
+            games: leader.gamesRecorded,
+            value: values[index] ?? shown(leader.value, board.by),
+          },
+        }),
+      ),
+    };
+  });
 
   const statColumns: StatsColumn[] = table.statKeys.map((key) => ({
     key,
@@ -253,8 +302,10 @@ function pageData(
     },
     chips: { team: colorOf(player.teamIds) },
     sortValues: numbersOf(player.stats),
-    // Listed, not ranked: too few games for the league's leaders (the same rule core's
-    // leaders query applies). The games played are drawn quieter and say so.
+    // Listed, not ranked: too few games for the league's leaders. Core's leaders query
+    // counts, for each board, the games its statistic was recorded in, never more than
+    // the games played, so a player marked here is on no board. The games played are drawn
+    // quieter and say so.
     ...(player.gamesPlayed < settings.minimumGames
       ? { quiet: { games: t('stats.notRankedYet') } }
       : {}),

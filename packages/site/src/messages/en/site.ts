@@ -218,6 +218,8 @@ export const enSite = {
   'stats.by.total': 'Season totals',
   'stats.col.games': 'GP',
   'stats.col.gamesFull': 'Games played',
+  // A leaders board's games: those its statistic was recorded in (S-63; step 2.199).
+  'stats.col.leaderGamesFull': 'Games with this statistic recorded',
   'stats.col.player': 'Player',
   'stats.col.team': 'Team',
   // The teams' table: how many games a team's numbers come from (P7 §8; step 2.195).
@@ -245,8 +247,12 @@ export const enSite = {
   'stats.listedNotRanked_one': 'Every player is listed. Fewer than {count} game: not ranked yet.',
   'stats.listedNotRanked_other':
     'Every player is listed. Fewer than {count} games: not ranked yet.',
-  'stats.minimumGames_one': 'A player needs at least {count} game to be ranked.',
-  'stats.minimumGames_other': 'A player needs at least {count} games to be ranked.',
+  // Under "Leaders": the minimum counts, for each statistic, the games it was recorded in,
+  // the games each board's "N games" shows (S-63; step 2.199).
+  'stats.minimumGames_one':
+    'To be ranked in a statistic, a player needs it recorded in at least {count} game.',
+  'stats.minimumGames_other':
+    'To be ranked in a statistic, a player needs it recorded in at least {count} games.',
   'stats.noSeason': 'There is no season to show yet.',
   'stats.notRankedYet': 'not ranked yet',
   // Between two sentences of one note under a title.
