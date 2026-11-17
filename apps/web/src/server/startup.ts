@@ -237,6 +237,7 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
     db,
     signIn: signIn.signIn,
     signInMail: signIn.signInMail,
+    botCheck: signIn.botCheck,
     log: options.log,
     warn: (message, fields) => deps.warn?.(message, fields),
     // The kept emails, and the seed leagues' people to sign in as by a code (step 2.96).

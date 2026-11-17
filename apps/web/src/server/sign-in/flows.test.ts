@@ -3,17 +3,24 @@
 // T-225), the session cookie (T-69), new-device and password-changed emails (T-70,
 // T-85), and "sign out everywhere" (T-71).
 import type { EmailSender } from '@srleagues/core';
-import { captureEmail, createLocalSignInStandIn } from '@srleagues/providers';
+import {
+  captureEmail,
+  createLocalBotCheck,
+  createLocalSignInStandIn,
+  localBotCheckField,
+  localBotCheckPassingAnswer,
+  type BotCheck,
+} from '@srleagues/providers';
 import { describe, expect, it, vi } from 'vitest';
 import { cookieNames, type CookieJar, type CookieOptions } from './cookies.ts';
 import { networkAddressOf, type Visit } from './device.ts';
 import {
-  askForCode,
+  askForCode as askForCodeWith,
   choosePassword,
   confirmPassword,
   enterCode,
   finishGoogle,
-  signInWithPassword,
+  signInWithPassword as signInWithPasswordWith,
   signOut,
   signOutEverywhere,
   startGoogle,
@@ -29,6 +36,20 @@ import { createSignInMail } from './sign-in-mail.ts';
 
 const origin = 'http://localhost:3000';
 const password = 'correct horse battery';
+
+/**
+ * A form as a person's browser sends it: with the answer the page's bot check put in it
+ * (the stand-in's, record 081). The tests of the bot check itself call the flows with
+ * forms that lack it (askForCodeWith, signInWithPasswordWith).
+ */
+const drawn = (fields: Readonly<Record<string, string | undefined>>) => ({
+  [localBotCheckField]: localBotCheckPassingAnswer,
+  ...fields,
+});
+const askForCode: typeof askForCodeWith = (purpose, fields, visit, deps) =>
+  askForCodeWith(purpose, drawn(fields), visit, deps);
+const signInWithPassword: typeof signInWithPasswordWith = (fields, visit, deps) =>
+  signInWithPasswordWith(drawn(fields), visit, deps);
 
 /** `sender` wraps the capture's own sending, to make it slow or fail. */
 function setup(sender?: (outbox: EmailSender) => EmailSender) {
@@ -53,6 +74,7 @@ function setup(sender?: (outbox: EmailSender) => EmailSender) {
   const deps: FlowDeps = {
     signIn: standIn.service,
     mail,
+    botCheck: createLocalBotCheck({ appEnv: 'test' }),
     secureCookies: false,
     siteOrigin: origin,
     now,
@@ -71,6 +93,7 @@ function setup(sender?: (outbox: EmailSender) => EmailSender) {
 }
 
 type Env = ReturnType<typeof setup>;
+type Browser = ReturnType<typeof browser>;
 
 /** A browser: its cookies, with what was set on each, and where it comes from. */
 function browser(networkAddress = '192.0.2.10', userAgent = firefoxOnWindows) {
@@ -315,6 +338,139 @@ describe('attempt limits (T-85, T-225)', () => {
     expect(last).toEqual({ to: '/signup/code?problem=codeUsedUp' });
     expect(await enterCode({ code: env.codeFor('new@example.test') }, b.visit, env.deps)).toEqual({
       to: '/signup/code?problem=codeUsedUp',
+    });
+  });
+});
+
+describe('the bot check in front of signing in and asking for a code (T4 §6, record 081)', () => {
+  const forms = [
+    [
+      'signing in',
+      '/signin',
+      (fields: Record<string, string>, b: Browser, env: Env) =>
+        signInWithPasswordWith(
+          { email: 'taken@example.test', password, ...fields },
+          b.visit,
+          env.deps,
+        ),
+    ],
+    [
+      'signing up',
+      '/signup',
+      (fields: Record<string, string>, b: Browser, env: Env) =>
+        askForCodeWith('sign-up', { email: 'new@example.test', ...fields }, b.visit, env.deps),
+    ],
+    [
+      'a forgotten password',
+      '/signin/forgot',
+      (fields: Record<string, string>, b: Browser, env: Env) =>
+        askForCodeWith('reset', { email: 'taken@example.test', ...fields }, b.visit, env.deps),
+    ],
+  ] as const;
+
+  it.each(forms)(
+    'refuses %s with no answer or a wrong one, before the service hears of it',
+    async (_, screen, send) => {
+      const env = setup();
+      await signUp(env, browser(), 'taken@example.test');
+      const sentBefore = env.outbox.messages().length;
+      const service = vi.spyOn(env.deps.signIn, 'signIn');
+      const startSignUp = vi.spyOn(env.deps.signIn, 'startSignUp');
+      const startReset = vi.spyOn(env.deps.signIn, 'startReset');
+      for (const fields of [
+        {},
+        { [localBotCheckField]: '' },
+        { [localBotCheckField]: 'a made-up wrong answer' },
+      ]) {
+        const b = browser();
+        expect(await send({ ...fields, next: '/north-valley' }, b, env)).toEqual({
+          to: `${screen}?problem=botCheckFailed&next=%2Fnorth-valley`,
+        });
+        // Nothing set in the browser, nothing sent, nothing asked of the sign-in service.
+        expect(b.names()).toEqual([]);
+      }
+      expect(env.outbox.messages()).toHaveLength(sentBefore);
+      expect(service).not.toHaveBeenCalled();
+      expect(startSignUp).not.toHaveBeenCalled();
+      expect(startReset).not.toHaveBeenCalled();
+      // The same form with the answer the page drew goes through.
+      const passed = await send(
+        { [localBotCheckField]: localBotCheckPassingAnswer },
+        browser(),
+        env,
+      );
+      expect(passed.to).not.toMatch(/botCheck/);
+    },
+  );
+
+  it('says so when the check cannot be asked, and lets nothing through', async () => {
+    const env = setup();
+    const unavailable: BotCheck = createLocalBotCheck({
+      appEnv: 'test',
+      refuseEverything: 'unavailable',
+    });
+    const deps = { ...env.deps, botCheck: unavailable };
+    const b = browser();
+    expect(
+      await signInWithPasswordWith(drawn({ email: 'a@example.test', password }), b.visit, deps),
+    ).toEqual({ to: '/signin?problem=botCheckUnavailable' });
+    expect(
+      await askForCodeWith('sign-up', drawn({ email: 'a@example.test' }), b.visit, deps),
+    ).toEqual({
+      to: '/signup?problem=botCheckUnavailable',
+    });
+    expect(b.names()).toEqual([]);
+  });
+
+  it('answers alike for an address with an account and one without (T-68)', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'taken@example.test');
+    for (const purpose of ['sign-up', 'reset'] as const) {
+      const a = await askForCodeWith(
+        purpose,
+        { email: 'taken@example.test' },
+        browser().visit,
+        env.deps,
+      );
+      const b = await askForCodeWith(
+        purpose,
+        { email: 'nobody@example.test' },
+        browser().visit,
+        env.deps,
+      );
+      expect(a).toEqual(b);
+    }
+    const a = await signInWithPasswordWith(
+      { email: 'taken@example.test', password },
+      browser().visit,
+      env.deps,
+    );
+    const b = await signInWithPasswordWith(
+      { email: 'nobody@example.test', password },
+      browser().visit,
+      env.deps,
+    );
+    expect(a).toEqual(b);
+  });
+
+  it('a refused form counts no guess, so it cannot be used to lock an address out', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'taken@example.test');
+    for (let i = 0; i < 20; i++) {
+      await signInWithPasswordWith(
+        { email: 'taken@example.test', password: 'wrong' },
+        browser().visit,
+        env.deps,
+      );
+    }
+    expect(
+      await signInWithPassword(
+        { email: 'taken@example.test', password },
+        browser().visit,
+        env.deps,
+      ),
+    ).toEqual({
+      to: '/account',
     });
   });
 });

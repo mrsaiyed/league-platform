@@ -41,7 +41,11 @@ import {
   type CommandContext,
 } from '@srleagues/core';
 import * as database from '@srleagues/database';
-import type { SessionIdentity, SignInService } from '@srleagues/providers';
+import {
+  createLocalBotCheck,
+  type SessionIdentity,
+  type SignInService,
+} from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databasePorts } from './database-ports.ts';
@@ -108,6 +112,7 @@ beforeAll(async () => {
       },
     } as unknown as SignInService,
     signInMail: {} as SignInMail,
+    botCheck: createLocalBotCheck({ appEnv: 'test' }),
     log: () => {},
     warn: () => {},
   });

@@ -35,6 +35,7 @@ import {
 } from '@srleagues/core';
 import {
   captureEmail,
+  createLocalBotCheck,
   createLocalLiveHub,
   createLocalSignInStandIn,
   type SessionIdentity,
@@ -271,7 +272,10 @@ export type StandInPorts = WebPorts & {
 };
 
 /** The sign-in stand-in and its emails, for the stand-in and for the made-up database. */
-export type StandInSignIn = Pick<StandInPorts, 'signIn' | 'signInMail' | 'signUpMadeUpMember'> & {
+export type StandInSignIn = Pick<
+  StandInPorts,
+  'botCheck' | 'signIn' | 'signInMail' | 'signUpMadeUpMember'
+> & {
   /** Gives one made-up address an account with this password, through the service's steps. */
   readonly signUpMadeUp: (email: string, password: string) => Promise<void>;
   /** The newest kept emails in the folder, newest first (the kept emails' page). */
@@ -382,6 +386,8 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
     await signIn.signOut({ accessToken: set.value.session.accessToken });
   };
   return {
+    // The bot check's stand-in (record 081): it too refuses anything but local work and tests.
+    botCheck: createLocalBotCheck({ appEnv: options.appEnv }),
     signIn,
     signInMail,
     signUpMadeUp,
@@ -394,7 +400,7 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
 
 export function standInPorts(options: StandInOptions): StandInPorts {
   const made = standInSignIn(options);
-  const { signIn, signInMail, signUpMadeUpMember, signUpMadeUp } = made;
+  const { botCheck, signIn, signInMail, signUpMadeUpMember, signUpMadeUp } = made;
   const people: readonly MadeUpPerson[] = Object.values(standInPeople);
   const now = () => new Date();
   const deps: CommandDeps<AccessTx> = {
@@ -491,6 +497,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     identify,
     signIn,
     signInMail,
+    botCheck,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf,
     leaguesOfAccount: leaguesOf,

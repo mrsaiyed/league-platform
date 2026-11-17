@@ -1046,6 +1046,8 @@ for (const appEnv of ['staging', 'production']) {
     PLATFORM_DATABASE_URL: 'postgres://made-up:made-up-password@localhost:1/nowhere',
     SUPABASE_URL: 'http://localhost:54321',
     SUPABASE_SECRET_KEY: 'made-up-supabase-secret-key',
+    TURNSTILE_SITE_KEY: 'made-up-turnstile-site-key',
+    TURNSTILE_SECRET_KEY: 'made-up-turnstile-secret-key',
     ...(appEnv === 'production' ? { RESEND_API_KEY: 'made-up-resend-key' } : {}),
   });
   const code = await new Promise((resolve) => {
@@ -1070,6 +1072,8 @@ for (const appEnv of ['staging', 'production']) {
     failures.push(`the ${appEnv} refusal printed SUPABASE_SECRET_KEY`);
   } else if (deployed.output().includes('made-up-resend-key')) {
     failures.push(`the ${appEnv} refusal printed RESEND_API_KEY`);
+  } else if (deployed.output().includes('made-up-turnstile-secret-key')) {
+    failures.push(`the ${appEnv} refusal printed TURNSTILE_SECRET_KEY`);
   }
 }
 
@@ -1718,18 +1722,33 @@ function connects(address, port) {
  */
 async function checkSignIn(origin) {
   const problems = [];
-  /** Posts the `index`th form of `page`, as Next.js's no-script form post does. */
+  /**
+   * Posts the `index`th form of `page`, as Next.js's no-script form post does: with every
+   * hidden field the page drew in that form (the bot check's stand-in answer among them,
+   * record 081), then `fields`; a field given as null is left out, as a bot posting the
+   * form itself would leave it.
+   */
   async function post(page, index, fields, from = origin) {
     const html = await (await fetch(origin + page)).text();
-    const ids = [...html.matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1]);
-    const id = ids[index];
+    const form = html.split('<form').slice(1)[index]?.split('</form>')[0];
+    const id = form === undefined ? undefined : /name="(\$ACTION_ID_[^"]+)"/.exec(form)?.[1];
     if (id === undefined) {
       problems.push(`${page}: no form ${index}`);
       return undefined;
     }
     const body = new FormData();
     body.set(id, '');
-    for (const [name, value] of Object.entries(fields)) body.set(name, value);
+    for (const [input] of form.matchAll(/<input\b[^>]*>/g)) {
+      const attribute = (name) => new RegExp(`\\b${name}="([^"]*)"`).exec(input)?.[1];
+      const name = attribute('name');
+      if (attribute('type') === 'hidden' && name !== undefined && name !== id) {
+        body.set(name, (attribute('value') ?? '').replaceAll('&amp;', '&'));
+      }
+    }
+    for (const [name, value] of Object.entries(fields)) {
+      if (value === null) body.delete(name);
+      else body.set(name, value);
+    }
     return fetch(origin + page, {
       method: 'POST',
       body,
@@ -1784,6 +1803,25 @@ async function checkSignIn(origin) {
     }
     if (JSON.stringify(answers[0]) !== JSON.stringify(answers[1])) {
       problems.push(`${page} answers differently for an address with an account and one without`);
+    }
+  }
+  // The bot check's stand-in refuses a form that comes without its answer, or with another,
+  // at sign-in, sign-up and the forgotten password (T4 §6, record 081): the screen again
+  // with its problem, and nothing set in the browser.
+  const answerField = 'cf-turnstile-response';
+  for (const [page, fields] of forms) {
+    for (const answer of [null, 'a made-up wrong answer']) {
+      const response = await post(page, 0, { ...fields(member), [answerField]: answer });
+      if (response === undefined) return problems;
+      const expected = `${page}?problem=botCheckFailed`;
+      if (response.status !== 303 || where(response) !== expected) {
+        problems.push(
+          `${page} with ${answer === null ? 'no' : 'a wrong'} bot check answer: ${response.status} to ${where(response)}, not ${expected}`,
+        );
+      }
+      if (response.headers.getSetCookie().length > 0) {
+        problems.push(`${page} refused by the bot check still set ${cookieNamesOf(response)}`);
+      }
     }
   }
   // The member's account is real: the right password signs in.

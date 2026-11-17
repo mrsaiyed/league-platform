@@ -22,6 +22,8 @@ const valid: Record<ConfigName, string> = {
   SESSION_SECRET: longValue('SESSION_SECRET'),
   SUPABASE_URL: 'http://localhost:54321',
   SUPABASE_SECRET_KEY: longValue('SUPABASE_SECRET_KEY'),
+  TURNSTILE_SITE_KEY: '0x4AAAAAAAmadeUpSiteKey',
+  TURNSTILE_SECRET_KEY: longValue('TURNSTILE_SECRET_KEY'),
   RESEND_API_KEY: longValue('RESEND_API_KEY'),
   EMAIL_FROM: 'hello@example.test',
   STRIPE_SECRET_KEY: longValue('STRIPE_SECRET_KEY'),
@@ -40,6 +42,8 @@ const requiredWhereUsed: Readonly<Partial<Record<ConfigName, readonly string[]>>
   PLATFORM_DATABASE_URL: ['staging', 'production'],
   SUPABASE_URL: ['staging', 'production'],
   SUPABASE_SECRET_KEY: ['staging', 'production'],
+  TURNSTILE_SITE_KEY: ['staging', 'production'],
+  TURNSTILE_SECRET_KEY: ['staging', 'production'],
   RESEND_API_KEY: ['production'],
 };
 /** What local work needs: no database, no sign-in service, no keys. */
@@ -57,6 +61,8 @@ const production = {
   PLATFORM_DATABASE_URL: valid.PLATFORM_DATABASE_URL,
   SUPABASE_URL: 'https://made-up-project.supabase.example.test',
   SUPABASE_SECRET_KEY: valid.SUPABASE_SECRET_KEY,
+  TURNSTILE_SITE_KEY: valid.TURNSTILE_SITE_KEY,
+  TURNSTILE_SECRET_KEY: valid.TURNSTILE_SECRET_KEY,
   RESEND_API_KEY: valid.RESEND_API_KEY,
 };
 

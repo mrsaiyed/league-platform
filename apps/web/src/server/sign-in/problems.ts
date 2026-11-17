@@ -8,6 +8,10 @@ import type { TextKey } from '../messages.ts';
 
 /** Every problem a sign-in screen can show, by name: its words. */
 export const problems = {
+  /** The bot check refused the form (T4 §6, record 081). */
+  botCheckFailed: 'problem.botCheckFailed',
+  /** The bot check could not be asked just now. */
+  botCheckUnavailable: 'problem.botCheckUnavailable',
   invalidEmail: 'problem.invalidEmail',
   codeUsedUp: 'problem.codeUsedUp',
   codeNotSent: 'problem.codeNotSent',

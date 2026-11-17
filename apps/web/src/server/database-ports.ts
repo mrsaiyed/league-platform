@@ -31,7 +31,7 @@ import {
 } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
-import type { SignInService } from '@srleagues/providers';
+import type { BotCheck, SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
 import type { AccountRefusal } from './context.ts';
@@ -87,6 +87,8 @@ export type DatabasePortsOptions = {
   /** The sign-in service: its `accountId` is the service's own user id (record 052). */
   readonly signIn: SignInService;
   readonly signInMail: SignInMail;
+  /** The bot check in front of sign-in and sign-up (record 081). */
+  readonly botCheck: BotCheck;
   /** Where the access module's T-196 lines go. */
   readonly log: CommandDeps<AccessTx>['log'];
   /**
@@ -238,6 +240,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     identify,
     signIn,
     signInMail: options.signInMail,
+    botCheck: options.botCheck,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf,
     // The one read across leagues (record 066): in a transaction set to the session's

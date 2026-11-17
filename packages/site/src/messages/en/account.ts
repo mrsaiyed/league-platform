@@ -91,6 +91,11 @@ export const enAccount = {
   'password.rules': 'At least 8 characters. Passwords that have leaked are refused.',
   'password.submit': 'Save and sign in',
   'password.title': 'Choose your password',
+  // The bot check in front of sign-in and sign-up (T4 §6, record 081).
+  'problem.botCheckFailed':
+    'We could not check that you are a person. Please try again, with scripts turned on in your browser.',
+  'problem.botCheckUnavailable':
+    'We could not check that you are a person just now. Please try again in a minute.',
   'problem.codeExpired': 'That code has run out. Ask for a new one.',
   'problem.codeNotSent': 'We could not send the email just now. Please try again in a minute.',
   'problem.codeUsedUp': 'Too many tries with this code. Ask for a new one.',
@@ -122,6 +127,8 @@ export const enAccount = {
   'role.scheduler': 'Scheduler',
   'role.scorekeeper': 'Scorekeeper',
   'signIn.backTo': 'Back to {league}',
+  'signIn.botCheckNeedsScripts':
+    'Signing in checks that you are a person, and the check needs scripts: please turn them on for this site.',
   'signIn.createAccount': 'New here? Create an account',
   // The sign-in screens (step 1.14, P6 §2 and §5). The same words whether or not an
   // account exists (T-68).

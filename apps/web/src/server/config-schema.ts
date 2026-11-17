@@ -32,6 +32,8 @@ export const fields = {
   SESSION_SECRET: { secret: true },
   SUPABASE_URL: { secret: false },
   SUPABASE_SECRET_KEY: { secret: true },
+  TURNSTILE_SITE_KEY: { secret: false },
+  TURNSTILE_SECRET_KEY: { secret: true },
   RESEND_API_KEY: { secret: true },
   EMAIL_FROM: { secret: false },
   STRIPE_SECRET_KEY: { secret: true },
@@ -88,6 +90,15 @@ const schema = z.object({
   // tests sign in on the stand-in.
   SUPABASE_URL: webUrl.optional(),
   SUPABASE_SECRET_KEY: secretText(16).optional(),
+  // The bot check in front of sign-in and sign-up (T4 §6, record 081): Cloudflare
+  // Turnstile's public site key and its secret key, staging and production only; local
+  // work and tests use the stand-in whatever is given.
+  TURNSTILE_SITE_KEY: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{8,100}$/, 'must be a Turnstile site key')
+    .optional(),
+  TURNSTILE_SECRET_KEY: secretText(16).optional(),
   // Only production sends email (T-140); elsewhere every email is captured.
   RESEND_API_KEY: secretText(8).optional(),
   EMAIL_FROM: text.regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'must be an email address'),
@@ -108,6 +119,8 @@ const optional: readonly ConfigName[] = [
   'STRIPE_WEBHOOK_SECRET',
   'SUPABASE_URL',
   'SUPABASE_SECRET_KEY',
+  'TURNSTILE_SITE_KEY',
+  'TURNSTILE_SECRET_KEY',
   'RESEND_API_KEY',
 ];
 
@@ -121,6 +134,8 @@ const requiredIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   PLATFORM_DATABASE_URL: ['staging', 'production'],
   SUPABASE_URL: ['staging', 'production'],
   SUPABASE_SECRET_KEY: ['staging', 'production'],
+  TURNSTILE_SITE_KEY: ['staging', 'production'],
+  TURNSTILE_SECRET_KEY: ['staging', 'production'],
   RESEND_API_KEY: ['production'],
 };
 

@@ -11,7 +11,11 @@ import {
   publicViewer,
 } from '@srleagues/core';
 import * as database from '@srleagues/database';
-import type { SessionIdentity, SignInService } from '@srleagues/providers';
+import {
+  createLocalBotCheck,
+  type SessionIdentity,
+  type SignInService,
+} from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databasePorts, NotOnTheDatabaseYet } from './database-ports.ts';
@@ -73,6 +77,7 @@ beforeAll(async () => {
     db,
     signIn,
     signInMail: {} as SignInMail,
+    botCheck: createLocalBotCheck({ appEnv: 'test' }),
     log: () => {},
     warn: (message, fields) => warnings.push({ message, fields }),
     now: () => clock,
@@ -185,6 +190,7 @@ describe('databasePorts (record 055)', () => {
         },
       } as unknown as SignInService,
       signInMail: {} as SignInMail,
+      botCheck: createLocalBotCheck({ appEnv: 'test' }),
       log: () => {},
       warn: () => {},
     });
@@ -324,6 +330,7 @@ describe('databasePorts (record 055)', () => {
           },
         } as unknown as SignInService,
         signInMail: {} as SignInMail,
+        botCheck: createLocalBotCheck({ appEnv: 'test' }),
         log: () => {},
         warn: () => {},
       });
@@ -501,6 +508,7 @@ describe('databasePorts (record 055)', () => {
       db,
       signIn: {} as SignInService,
       signInMail: {} as SignInMail,
+      botCheck: createLocalBotCheck({ appEnv: 'test' }),
       log: () => {},
       warn: () => {},
       now: () => clock,
@@ -553,6 +561,7 @@ describe('databasePorts with the local tools (step 2.96)', () => {
       db,
       signIn: {} as SignInService,
       signInMail: {} as SignInMail,
+      botCheck: createLocalBotCheck({ appEnv: 'test' }),
       log: () => {},
       warn: () => {},
       localTools,

@@ -1,5 +1,6 @@
 // The flows' view of a Next.js request (flows.ts): its cookies, where it comes from,
 // and the ports. Used by the server actions and Google's return.
+import type { BotCheckWidget } from '@srleagues/providers';
 import { cookies, headers } from 'next/headers';
 import { getConfig } from '../config.ts';
 import { webPorts } from '../container.ts';
@@ -24,6 +25,11 @@ export async function nextVisit(): Promise<Visit> {
   };
 }
 
+/** The bot check's widget, for a sign-in form to draw (T4 §6, record 081). */
+export async function botCheckWidget(): Promise<BotCheckWidget> {
+  return (await webPorts()).botCheck.widget;
+}
+
 /** Whether the site is on HTTPS, so its cookies are Secure (T-69). */
 export function secureCookies(): boolean {
   return new URL(getConfig().PUBLIC_BASE_URL).protocol === 'https:';
@@ -34,6 +40,7 @@ export async function flowDeps(): Promise<FlowDeps> {
   return {
     signIn: ports.signIn,
     mail: ports.signInMail,
+    botCheck: ports.botCheck,
     secureCookies: secureCookies(),
     siteOrigin: getConfig().PUBLIC_BASE_URL,
     now: () => new Date(),

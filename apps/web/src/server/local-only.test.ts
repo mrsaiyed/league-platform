@@ -34,6 +34,8 @@ const settings = {
   PLATFORM_DATABASE_URL: 'postgres://app:made-up-password@localhost:5432/league_local',
   SUPABASE_URL: 'https://made-up-project.supabase.example.test',
   SUPABASE_SECRET_KEY: 'made-up-supabase-key',
+  TURNSTILE_SITE_KEY: 'made-up-turnstile-site-key',
+  TURNSTILE_SECRET_KEY: 'made-up-turnstile-secret-key',
   RESEND_API_KEY: 'made-up-resend-key',
   EMAIL_FROM: 'hello@example.test',
   TRUSTED_PROXY: 'one',

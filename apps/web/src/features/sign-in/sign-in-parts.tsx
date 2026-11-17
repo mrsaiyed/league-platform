@@ -1,6 +1,7 @@
 // The pieces every sign-in screen is made of (step 1.14). Words come from the
 // message files (T-187); a problem is shown from its name in the address
 // (problems.ts), never from anything the person typed.
+import type { BotCheckAction, BotCheckWidget } from '@srleagues/providers';
 import type { ReactNode } from 'react';
 import { t, type TextKey } from '../../server/messages.ts';
 import { problemOf, problems } from '../../server/sign-in/problems.ts';
@@ -70,6 +71,40 @@ export function PasswordField({ fresh = false }: { readonly fresh?: boolean }) {
         />
       </label>
     </p>
+  );
+}
+
+/**
+ * The bot check's widget, inside its form (T4 §6, record 081). The stand-in's is a hidden
+ * field holding its passing answer; Turnstile's is its own box, which its script (from its
+ * own origin, carrying this answer's nonce) fills, and which writes its answer into the
+ * form. With scripts off Turnstile cannot run, and the form is refused: the page says so.
+ */
+export function BotCheckField({
+  widget,
+  action,
+  nonce,
+}: {
+  readonly widget: BotCheckWidget;
+  readonly action: BotCheckAction;
+  readonly nonce?: string | undefined;
+}) {
+  if (widget.kind === 'stand-in') {
+    return <input type="hidden" name={widget.field} value={widget.passingAnswer} />;
+  }
+  return (
+    <>
+      <script src={widget.scriptUrl} async defer nonce={nonce} />
+      <div
+        className="cf-turnstile"
+        data-sitekey={widget.siteKey}
+        data-action={action}
+        data-response-field-name={widget.field}
+      />
+      <noscript>
+        <p>{t('signIn.botCheckNeedsScripts')}</p>
+      </noscript>
+    </>
   );
 }
 
