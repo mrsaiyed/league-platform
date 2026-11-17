@@ -53,8 +53,12 @@ export type MemoryScheduling = {
   /** Rounds publishing created and removed, in order. */
   roundsAdded: NewRound[];
   roundsRemoved: string[];
-  /** Games outside the published schedule (in the bin, undated) and the round each is in. */
+  /** Games outside the published schedule and the bin (no date yet) and the round each is in. */
   gamesInOtherRounds: GameInRound[];
+  /** Games in the bin and the round each is in: they do not hold it (S-60). */
+  binnedInRounds: GameInRound[];
+  /** Games in the bin that lost their round when publishing removed it, in order. */
+  roundsCleared: string[];
   revisions: NewScheduleRevision[];
   /** Makes every round update find no such round, to test the refusal. */
   roundsMissing?: boolean;
@@ -135,6 +139,8 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
     roundsAdded: [],
     roundsRemoved: [],
     gamesInOtherRounds: [],
+    binnedInRounds: [],
+    roundsCleared: [],
     revisions: [],
     ...state,
   });
@@ -220,19 +226,29 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           return fresh.length;
         },
         deleteRounds: async (_season, ids) => {
-          // A game publishing moved is in its new round; one it binned stays in its own.
+          // As delete-rounds.ts: a game publishing moved is in its new round; one in the bin
+          // (binned by this publication or before) does not hold its round, and loses it.
           const roundNow = (g: { id: string; roundId: string | null }) =>
             s.updated.findLast((u) => u.gameId === g.id && u.change.slot !== undefined)?.change.slot
               ?.roundId ?? g.roundId;
           const named = new Set([
-            ...s.schedule.games.map(roundNow),
+            ...s.schedule.games.filter((g) => !s.binned.includes(g.id)).map(roundNow),
             ...s.inserted.map((g) => g.roundId),
             ...s.gamesInOtherRounds.map((g) => g.roundId),
           ]);
           const gone = ids.filter((id) => !named.has(id));
+          const inBin = [
+            ...s.schedule.games.filter((g) => s.binned.includes(g.id)),
+            ...s.binnedInRounds,
+          ];
+          const cleared = inBin
+            .filter((g) => g.roundId !== null && gone.includes(g.roundId))
+            .map((g) => g.id);
+          s.roundsCleared.push(...cleared);
           s.roundsRemoved.push(...gone);
-          return gone.length;
+          return { roundIds: [...gone].sort(), gameIds: [...cleared].sort() };
         },
+        // As list-games-in-rounds.ts: games not in the bin, dated or not.
         gamesInRounds: async (_season, ids) => [
           ...s.schedule.games
             .filter((g) => g.roundId !== null && ids.includes(g.roundId))

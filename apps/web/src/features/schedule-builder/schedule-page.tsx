@@ -7,6 +7,7 @@ import {
   previewSchedulePublish,
   publishChangeCount,
   type ScheduleGame,
+  type ScheduleRound,
   type VenueWithCourts,
 } from '@srleagues/core';
 import { Emblem, EmptyPanel, PageHead } from '@srleagues/ui';
@@ -57,6 +58,7 @@ import type { SavedDetail } from './run-schedule-action.ts';
 import { importLinkOf } from './import-link.ts';
 import { addRoundProblemOf, noticeOf, whyNotSaved } from './notice.ts';
 import { publishedNotice } from './published-notice.ts';
+import { RoundFacts, RoundRemoval, roundIsEmpty } from './round-parts.tsx';
 import { ScheduleHeading } from './schedule-heading.tsx';
 import { seasonControls } from './season-controls.ts';
 
@@ -229,6 +231,7 @@ export async function ScheduleBuilderPage({
     teams,
     published: new Set(draft.published.games.map((g) => g.id)),
     removed: draft.removed,
+    removedRounds: draft.result.removedRounds ?? [],
   });
   const top = saidBeside || here !== undefined ? null : plainNotice;
   const noRounds = grid.rounds.length === 0;
@@ -490,14 +493,7 @@ function RoundSection({
         <h2 id={headingId}>
           {t('schedule.admin.round', { number: round.number, label: round.label })}
         </h2>
-        <p className="admin-round-facts">
-          <span>
-            {round.date === null
-              ? t('schedule.admin.roundNoDate')
-              : t('schedule.admin.roundDate', { date: dayText(round.date) })}
-          </span>{' '}
-          <StaffPill>{t.plural('schedule.admin.roundGames', round.games.length)}</StaffPill>
-        </p>
+        <RoundFacts round={round} />
       </div>
       {saved}
       {problem === undefined ? null : (
@@ -534,32 +530,21 @@ function RoundSection({
                 </button>
               </p>
             </form>
-            {/* Removing is apart from the two saves, and looks like neither. */}
-            {round.games.length === 0 ? (
-              <form
-                action={removeRoundAction}
-                data-remove-round={round.id}
-                className="staff-form admin-round-remove"
-              >
-                <BasisFields basis={basis} />
-                <input type="hidden" name="roundId" value={round.id} />
-                <input type="hidden" name="afterRoundId" value={previousRoundId ?? ''} />
-                <p className="ui-field-help">{t('schedule.admin.removeRoundNote')}</p>
-                <p className="staff-buttons">
-                  <button type="submit" className="ui-button" data-kind="danger">
-                    {t('schedule.admin.removeRound')}
-                  </button>
-                </p>
-              </form>
-            ) : (
-              <p className="ui-field-help admin-round-remove" data-remove-round-blocked={round.id}>
-                {t.plural('schedule.admin.removeRoundBlocked', round.games.length)}
-              </p>
-            )}
+            <RoundRemoval
+              round={round}
+              action={removeRoundAction}
+              fields={
+                <>
+                  <BasisFields basis={basis} />
+                  <input type="hidden" name="roundId" value={round.id} />
+                  <input type="hidden" name="afterRoundId" value={previousRoundId ?? ''} />
+                </>
+              }
+            />
           </div>
         </details>
       ) : null}
-      {round.games.length === 0 ? (
+      {roundIsEmpty(round) ? (
         <p className="staff-quiet">{t('schedule.admin.noGamesInRound')}</p>
       ) : null}
       <GameList
@@ -1032,6 +1017,8 @@ function savedHere(
     readonly published: ReadonlySet<string>;
     /** The games the draft removes, each as it was just before (the draft's own record). */
     readonly removed: readonly ScheduleGame[];
+    /** The rounds the draft removes: a game put back after its round went has no round (S-60). */
+    readonly removedRounds: readonly ScheduleRound[];
   },
 ): { readonly place: SavedPlace; readonly node: ReactNode; readonly asks?: true } | undefined {
   if (saved === undefined) return undefined;
@@ -1070,9 +1057,20 @@ function savedHere(
       // Already back (a reload after "Put it back"): said at the game, truthfully.
       const back = grid.allGames.find((g) => g.id === saved.gameId);
       if (back !== undefined) {
+        const goneFrom =
+          back.roundId === null
+            ? season.removedRounds.find((r) => r.id === saved.roundId)
+            : undefined;
         return {
           place: { game: back.id },
-          node: said(t('schedule.admin.savedGamePutBack', { game: gameName(back) })),
+          node: said(
+            goneFrom === undefined
+              ? t('schedule.admin.savedGamePutBack', { game: gameName(back) })
+              : t('schedule.admin.savedGamePutBackNoRound', {
+                  game: gameName(back),
+                  round: goneFrom.label,
+                }),
+          ),
         };
       }
       // What it was is the draft's own record of it, never the address (step 2.161).
@@ -1094,18 +1092,32 @@ function savedHere(
         };
       }
       const game = t('schedule.admin.gameVs', { away, home });
+      // Its round removed from the draft since (step 2.181): "Put it back" brings it back
+      // under "Games with no round", and says so before the tap.
+      const gone = season.removedRounds.find(
+        (r) => r.id === removed.roundId && roundOf(r.id) === undefined,
+      );
+      const headline =
+        gone !== undefined
+          ? t('schedule.admin.savedGameRemovedRoundGone', { game, round: gone.label })
+          : roundShown === undefined
+            ? t('schedule.admin.savedGameRemovedNoRound', { game })
+            : t('schedule.admin.savedGameRemovedNamed', { game, round: roundShown.label });
+      const published = season.published.has(removed.id);
+      const way =
+        gone !== undefined
+          ? published
+            ? 'schedule.admin.removedPublishedNoRound'
+            : 'schedule.admin.removedDraftOnlyNoRound'
+          : published
+            ? 'schedule.admin.removedPublished'
+            : 'schedule.admin.removedDraftOnly';
       return {
         place: { round },
         node: said(
-          roundShown === undefined
-            ? t('schedule.admin.savedGameRemovedNoRound', { game })
-            : t('schedule.admin.savedGameRemovedNamed', { game, round: roundShown.label }),
+          headline,
           <div data-put-back={removed.id}>
-            <p>
-              {season.published.has(removed.id)
-                ? t('schedule.admin.removedPublished')
-                : t('schedule.admin.removedDraftOnly')}
-            </p>
+            <p>{t(way)}</p>
             <PutBack gameId={removed.id} basis={basis} />
           </div>,
           'removed',
@@ -1115,9 +1127,20 @@ function savedHere(
     case 'game-put-back': {
       const game = grid.allGames.find((g) => g.id === saved.gameId);
       if (game === undefined) return undefined;
+      const gone =
+        game.roundId === null
+          ? season.removedRounds.find((r) => r.id === saved.fromRoundId)
+          : undefined;
       return {
         place: { game: game.id },
-        node: said(t('schedule.admin.savedGamePutBack', { game: gameName(game) })),
+        node: said(
+          gone === undefined
+            ? t('schedule.admin.savedGamePutBack', { game: gameName(game) })
+            : t('schedule.admin.savedGamePutBackNoRound', {
+                game: gameName(game),
+                round: gone.label,
+              }),
+        ),
       };
     }
     case 'game-saved':
