@@ -209,18 +209,25 @@ function standingsReadOver(s: ReadWorld | undefined): StandingsReadStore {
     // Each team's total of each stat over its final games, from its players' lines that
     // entered the game (list-team-stat-totals.ts).
     teamStatTotals: async (seasonId) => {
-      const finals = new Set(
-        decidedGames(seasonId)
-          .filter((g) => g.status === 'final')
-          .map((g) => g.id),
-      );
+      const finalGames = decidedGames(seasonId).filter((g) => g.status === 'final');
+      const finals = new Set(finalGames.map((g) => g.id));
+      /** The team's final score in the game, or null when it has none. */
+      const scoreOf = (gameId: string, teamId: string): number | null => {
+        const g = finalGames.find((x) => x.id === gameId);
+        if (g === undefined) return null;
+        if (g.homeTeamId === teamId) return g.homeScore;
+        return g.awayTeamId === teamId ? g.awayScore : null;
+      };
       const sums = new Map<string, { total: number; games: Set<string> }>();
       for (const line of at()?.lines ?? []) {
         if (!finals.has(line.gameId) || !line.played) continue;
         for (const [key, value] of Object.entries(line.stats)) {
           if (!Number.isInteger(value) || value < 0) continue;
           const sum = sums.get(`${line.teamId}|${key}`) ?? { total: 0, games: new Set<string>() };
-          sum.total += value;
+          // A team's points are its final scores, over the same games (as
+          // list-team-stat-totals.ts: S-26 as changed by step 2.196); added once a game.
+          if (key !== 'points' || scoreOf(line.gameId, line.teamId) === null) sum.total += value;
+          else if (!sum.games.has(line.gameId)) sum.total += scoreOf(line.gameId, line.teamId) ?? 0;
           sum.games.add(line.gameId);
           sums.set(`${line.teamId}|${key}`, sum);
         }
