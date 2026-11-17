@@ -9,3 +9,8 @@ export {
 } from './made-up-database.ts';
 export { seedLeagues, seedStaff, type SeedLeague } from './seed-data.ts';
 export { seedLeaguesInto, type SeededLeague } from './seed-leagues.ts';
+export {
+  serveMadeUpDatabase,
+  type MadeUpDatabaseServer,
+  type MadeUpDatabaseServerOptions,
+} from './serve-made-up-database.ts';

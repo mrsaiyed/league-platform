@@ -11,6 +11,12 @@ export {
   type SupabaseEmailConfirmationOptions,
 } from './supabase/email-confirmation.ts';
 export type * from './supabase/sign-in-store.ts';
+// Tests only: a fake of Supabase Auth served on this computer (step 2.93's last part).
+export {
+  serveFakeSupabaseAuth,
+  type FakeSupabaseAuthServer,
+  type FakeSupabaseAuthServerOptions,
+} from './supabase/serve-fake-supabase-auth.ts';
 export {
   createMemorySignInStore,
   type MemorySignInStoreOptions,
