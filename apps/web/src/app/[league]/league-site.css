@@ -670,7 +670,7 @@ html {
   color: var(--color-text);
   text-decoration: underline;
 }
-.powered-by {
+.site-footer .powered-by {
   display: inline-flex;
   align-items: center;
   min-block-size: var(--tap);
@@ -680,7 +680,7 @@ html {
   text-decoration: none;
 }
 /* Our mark leads to our front page (U-8, step 2.135), like the footer's other links. */
-.powered-by:hover {
+.site-footer .powered-by:hover {
   color: var(--color-text);
   text-decoration: underline;
 }
