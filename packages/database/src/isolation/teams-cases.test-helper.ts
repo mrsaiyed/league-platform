@@ -20,6 +20,7 @@ import {
   insertRosterEntry,
   insertTeam,
   listRoster,
+  listStaffSeasonTeams,
   setTeamBinned,
   updateRosterEntry,
   updateTeam,
@@ -125,6 +126,12 @@ registerIsolationCase({
   subject: listRoster,
   name: "list the target team's roster",
   run: (scope, target) => listRoster(scope, target.teamId),
+});
+
+registerIsolationCase({
+  subject: listStaffSeasonTeams,
+  name: "list the teams of the target's season, as Admin → Teams lists them",
+  run: (scope, target) => listStaffSeasonTeams(scope, target.seasonId),
 });
 
 registerIsolationCase({

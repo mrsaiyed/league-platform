@@ -9,6 +9,7 @@ import {
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { Audience } from '../leagues/index.ts';
 import type { PeopleTx, PersonRecord, PersonSensitiveFields } from './ports.ts';
+import { isMinorOn } from './rules/minor-by-age.ts';
 
 /** A stored person: the record, and the sensitive fields kept beside it. */
 export type StoredPerson = Omit<PersonRecord, 'sensitive'> & {
@@ -27,6 +28,8 @@ export type MemoryPeople = {
   activity: ActivityEntry[];
   /** Every read made with `sensitive: true`, so a test can see what was asked for. */
   sensitiveReads: number;
+  /** The league's today (yyyy-mm-dd), which a birth date is read against (R-28). */
+  today: string;
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -72,6 +75,7 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
     grants: [],
     activity: [],
     sensitiveReads: 0,
+    today: '2026-11-16',
     ...state,
   });
   const transaction = memoryTransaction(db, (s, jobs): PeopleTx => {
@@ -170,6 +174,11 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
         },
         isOnRoster: async (id) => s.people.find((p) => p.id === id)?.onRoster === true,
         leagueAudience: async () => s.audience,
+        // R-28 on the league's today: as the database works it out in SQL.
+        isMinor: async (id) => {
+          const p = s.people.find((x) => x.id === id);
+          return p === undefined ? true : isMinorOn(p.sensitiveFields, s.today);
+        },
         leagueSettingRows: async (key) =>
           Object.hasOwn(s.settings, key)
             ? [{ level: 'league', document: { version: 1, value: s.settings[key] }, version: 1 }]
