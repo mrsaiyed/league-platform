@@ -375,6 +375,14 @@ const adminPages = [
   // league's venues with their courts; the answers are taken by divisionVenueSteps' taps.
   { name: 'admin-divisions', at: '/admin/season/divisions' },
   { name: 'admin-venues', at: '/admin/schedule/venues' },
+  ...['divisions-refused', 'divisions-removed', 'venues-refused', 'venues-court-removed'].map(
+    (what) => ({
+      name: `admin-${what}`,
+      at: what.startsWith('divisions') ? '/admin/season/divisions' : '/admin/schedule/venues',
+      league: 'north-valley',
+      steps: (page) => divisionVenueSteps(page, what),
+    }),
+  ),
   // Step 2.182, Season settings' first panel: the first league's season not public yet; the
   // question before showing it and before hiding the current one; the answer after the
   // owner really shows it (winterSteps taps Show and Yes); and the schedule's "published"
@@ -953,6 +961,43 @@ async function scoreTrackedGames(origin) {
  * picture, at each width, starts from no rounds. Nothing is published.
  */
 /** The owner's taps for step 2.161's pictures (see adminPages). Scripts are off. */
+/**
+ * Step 2.49's answers, by the owner's own taps on the divisions and venues screens: a
+ * division name already taken, refused beside its box; a division removed, with "Put it
+ * back"; a venue's map link that is not https, refused beside its box; a court removed.
+ * Each sets its own scene, so the picture at the other width finds it again.
+ */
+async function divisionVenueSteps(page, what) {
+  if (what === 'divisions-refused' || what === 'venues-refused') {
+    const venues = what === 'venues-refused';
+    const form = page.locator(venues ? 'form[data-form="add-venue"]' : 'form[data-form="add"]');
+    await form.getByLabel('Name').fill(venues ? 'Lakeview Gym' : 'east');
+    if (venues) await form.getByLabel('Map link (if you like)').fill('http://maps.example.test');
+    await form.getByRole('button', { name: venues ? 'Add the venue' : 'Add the division' }).click();
+    await form.getByRole('alert').waitFor();
+    return;
+  }
+  const venues = what === 'venues-court-removed';
+  const scope = venues
+    ? page.locator('section[data-venue="Riverside Hall"]')
+    : page.locator('main');
+  const name = venues ? 'Court B' : 'Spare';
+  const holder = venues
+    ? scope.locator(`[data-court="${name}"]`)
+    : page.locator(`section[data-division="${name}"]`);
+  if ((await holder.count()) === 0) {
+    const form = scope.locator(venues ? 'form[data-form="add-court"]' : 'form[data-form="add"]');
+    await form.getByLabel(venues ? 'Court name' : 'Name').fill(name);
+    await form.getByRole('button', { name: venues ? 'Add the court' : 'Add the division' }).click();
+    await holder.getByRole('status').waitFor();
+  }
+  await holder.getByLabel(`Yes, remove ${name}`).check();
+  await holder
+    .getByRole('button', { name: venues ? 'Remove the court' : 'Remove the division' })
+    .click();
+  await page.locator('[data-said="removed"]').waitFor();
+}
+
 async function undoSteps(page, what) {
   const tapTo = async (locator, url) => {
     await Promise.all([page.waitForEvent('load'), locator.click()]);
