@@ -40,6 +40,23 @@ import {
 import type { ClockSheet, CourtClock } from './clock-parts.tsx';
 import { createClockTicker } from './clock-ticker.ts';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
+import {
+  endOfferText,
+  endQuestion,
+  notStartedQuestion,
+  reopenLineText,
+  reopenOffered,
+  wonText,
+} from './end-game.ts';
+import {
+  EndAsk,
+  EndOffer,
+  FinalPanel,
+  MoreEnd,
+  MoreNotStarted,
+  NotStartedAsk,
+  ReopenAsk,
+} from './end-parts.tsx';
 import { findPlayer, periodText, playerLabel, refusalText } from './engine-words.ts';
 import {
   clockEntry,
@@ -57,7 +74,7 @@ import {
 } from './game-clock.ts';
 import type { OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, LineupPicks } from './opened-game-storage.ts';
-import { playLog, redoTarget, redoneText, undoTarget, undoneText } from './play-log.ts';
+import { endOffered, playLog, redoTarget, redoneText, undoTarget, undoneText } from './play-log.ts';
 import {
   LatestPlays,
   MoreLog,
@@ -104,6 +121,7 @@ import {
 import { createTileDrag, type TileDrag } from './tile-drag.ts';
 import { createTileMarks, type MarkKind, type TileMark, type TileMarks } from './tile-marks.ts';
 import type { TapInput, TapResult, TrackerControllerStatus } from './tracker-controller.ts';
+import { useEndGame } from './use-end-game.ts';
 
 export type ScoringScreenProps = {
   readonly game: OpenedTrackerGame;
@@ -126,6 +144,13 @@ export type ScoringScreenProps = {
    * about to be replaced, so the page that replaces it says so.
    */
   readonly onNotRecorded?: () => void;
+  /**
+   * The account may correct games, not only score them: a hint for what the Mark not
+   * started question says (S-40). The league stays the judge. Left out: a scorekeeper.
+   */
+  readonly mayCorrect?: boolean;
+  /** The device knows it has no connection (queue-banner.ts): an End just tapped waits. */
+  readonly offline?: boolean;
 };
 
 /** How long the latest sentence stays (checklist I5). */
@@ -204,6 +229,16 @@ const restingPlaces = {
    */
   undo: '[data-undo]',
   redo: '[data-redo]',
+  /**
+   * The answers to a question about ending the game (End game, Reopen, Mark not
+   * started), after it is asked: the double of the tap that asked is not an answer.
+   */
+  asked: '[data-pad] [data-ask-answers]',
+  /**
+   * The final panel's own buttons, after End game is answered, for as long as −: "Back
+   * to the games" lies where "End game" was, and a slow double tap must not leave.
+   */
+  final: '[data-pad] [data-final-actions]',
 } as const;
 type RestingPlace = keyof typeof restingPlaces;
 const restingNames = Object.keys(restingPlaces) as RestingPlace[];
@@ -436,7 +471,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
         // screen itself says when each has nothing to act on (`aria-disabled`), and a
         // key, which is how a screen reader presses, is always taken.
         if (name === 'undo' || name === 'redo') continue;
-        const buttons = place.matches('button') ? [place] : place.querySelectorAll('button');
+        const buttons = place.matches('button') ? [place] : place.querySelectorAll('button, a');
         for (const button of buttons) drawRest(button, resting);
       }
     }
@@ -448,6 +483,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
     answers: createTapRest(restTimers, drawRests),
     undo: createTapRest(restTimers, drawRests, takeBackRestMs),
     redo: createTapRest(restTimers, drawRests, takeBackRestMs),
+    asked: createTapRest(restTimers, drawRests),
+    final: createTapRest(restTimers, drawRests, takeBackRestMs),
   };
   const resting = rests.current;
   // After every drawing: a control drawn anew while it rests is marked as well.
@@ -485,6 +522,12 @@ export function ScoringScreen(props: ScoringScreenProps) {
     > => {
       const result = await controller.tap(input);
       if (result.ok) return { ...result, game: controller.status().game };
+      // A final game the league has (the device no longer scores it, and this screen
+      // stays with its final panel): nothing is recorded, and the screen says why (D12).
+      if (result.reason === 'not-scoring' && controller.status().game?.status === 'final') {
+        say(t('tracker.refusal.gameFinal'));
+        return { ok: false };
+      }
       // The device stopped scoring as the tap was made: this screen is about to be
       // taken away, so the page that replaces it is told, and says so there.
       if (result.reason === 'not-scoring') onNotRecorded?.();
@@ -668,8 +711,15 @@ export function ScoringScreen(props: ScoringScreenProps) {
   /** A click with no pointer behind it is Enter or Space (checklist S4). */
   const byKeyboard = (event: MouseEvent) => event.detail === 0;
 
+  /** A final game takes no play: a tap on a player or a team's chip says so (D12). */
+  const finalSays = (): boolean => {
+    if (view.status !== 'final') return false;
+    say(t('tracker.refusal.gameFinal'));
+    return true;
+  };
   const on: CourtHandlers = {
     tile(playerId, event) {
+      if (finalSays()) return;
       const tapped = tapTile(view, picks, padFor(view, wanted.current), playerId);
       if (tapped === null) return;
       if (tapped.kind === 'pick') {
@@ -775,6 +825,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       if (open !== null) focusNext.current = { tile: open };
     },
     turnovers(side) {
+      if (finalSays()) return;
       const now = wanted.current;
       setSaid(null);
       showPad(
@@ -782,6 +833,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       );
     },
     bench(side, forId) {
+      if (finalSays()) return;
       const now = wanted.current;
       const open = now.kind === 'bench' && now.side === side && now.forId === forId;
       setSaid(null);
@@ -1008,6 +1060,91 @@ export function ScoringScreen(props: ScoringScreenProps) {
       setLogOpen(open);
     },
   };
+
+  // --- Ending the game (step 2.37; checklist J1 to J5): End game and its question, the
+  // final panel, taking the End back, Reopen and Mark not started. What is asked and the
+  // taps are use-end-game.ts's; the pad draws them (end-parts.tsx). ---
+  const names = { home: view.teams.home.name, away: view.teams.away.name };
+  const end = useEndGame({
+    controller,
+    status,
+    state,
+    names,
+    allowTies: rosters.allowTies,
+    mayCorrect: props.mayCorrect ?? false,
+    offline: props.offline ?? false,
+    t,
+    reading: () => readClock(controller.status().game ?? state, status.now()),
+    wanted,
+    showPad,
+    say,
+    quiet: () => setSaid(null),
+    tap,
+    closeMore: () => setMoreOpen(false),
+    focus: (selector) => {
+      focusNext.current = { selector };
+    },
+    rests: resting,
+    leave: props.leave,
+    back: props.links.back,
+  });
+  // The pad's own first line offers End game when the last period has run out with a
+  // team ahead (S-65): offered, never done by itself.
+  const endIsOffered = endOffered(state, reading.over);
+  const padPanel = (() => {
+    if (pad.kind === 'end') {
+      return (
+        <EndAsk
+          t={t}
+          question={endQuestion(state, names, rosters.allowTies, reading, t)}
+          refused={pad.refused}
+          working={end.working}
+          on={end.on}
+        />
+      );
+    }
+    if (pad.kind === 'final' && end.ended !== null) {
+      return (
+        <FinalPanel
+          t={t}
+          won={wonText(state, names, t)}
+          ended={end.ended}
+          reopenLine={reopenLineText(end.reopenLine, t)}
+          reopenOffered={reopenOffered(end.reopenLine)}
+          problem={end.problemOn('final')}
+          working={end.working}
+          back={props.links.back}
+          on={end.on}
+        />
+      );
+    }
+    if (pad.kind === 'reopen') {
+      return (
+        <ReopenAsk
+          t={t}
+          reason={end.reopenReason}
+          problem={end.problemOn('reopen')}
+          working={end.working}
+          on={end.on}
+        />
+      );
+    }
+    if (pad.kind === 'not-started') {
+      const question = notStartedQuestion(state, names, props.mayCorrect ?? false, t);
+      return (
+        <NotStartedAsk
+          t={t}
+          question={question}
+          askReason={question.kind === 'clears' || end.reasonAsked}
+          reason={end.clearReason}
+          problem={end.problemOn('not-started')}
+          working={end.working}
+          on={end.on}
+        />
+      );
+    }
+    return null;
+  })();
 
   // --- More, the clock's form and the play log: each opened as a dialog; Escape closes
   // it, and the keyboard stays inside it. The keyboard returns to the button that opened
@@ -1327,9 +1464,26 @@ export function ScoringScreen(props: ScoringScreenProps) {
         playLog: logHasPanel ? (
           <PlayLogPanel t={t} log={{ ...log, rows: log.rows.slice(0, panelRows) }} on={plays} />
         ) : null,
+        // The last period has run out with a team ahead: the pad's first line is End game.
+        padStart: endIsOffered ? (
+          <EndOffer t={t} text={endOfferText(state, names, t)} on={end.on} />
+        ) : null,
+        padPanel,
+        // Behind More: End game first, until the game is final; Mark not started while
+        // it is live (a game that is or ever was final is never cleared: S-40).
+        moreStart:
+          state.status === 'final' ? (
+            props.slots?.moreStart
+          ) : (
+            <>
+              <MoreEnd t={t} on={end.on} />
+              {props.slots?.moreStart}
+            </>
+          ),
         more: (
           <>
             <MoreLog t={t} log={log} on={plays} />
+            {state.status === 'live' ? <MoreNotStarted t={t} on={end.on} /> : null}
             {props.slots?.more}
           </>
         ),

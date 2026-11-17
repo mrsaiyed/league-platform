@@ -2108,6 +2108,179 @@
 .court-timeout-answers .court-opt {
   font-size: 15px;
 }
+/* Ending a game (step 2.37; checklist J1 to J5): the End game question, the final panel,
+   and the Reopen and Mark not started questions, all in the pad, whose place never moves.
+   Each is a title, what it says, and its answers in the pad's lowest band, as the
+   timeout question's are: away from whatever was tapped to ask, the answer that keeps
+   things as they are at the start, the one that acts at the end.
+
+   What a panel says never ends in a cut line. Where the pad has no room for all of it
+   (a long team name, wider letters) it leaves off whole sentences, the last first, as
+   the hint does: the least needed sentence is written last. */
+.court-ask,
+.court-final {
+  gap: 6px;
+  padding-inline: 6px;
+  padding-block-start: 2px;
+}
+.court-ask-title {
+  flex: none;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.court-ask-text,
+.court-final-state {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px 12px;
+  min-block-size: 0;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.3;
+}
+.court-ask-text > *,
+.court-final-state > * {
+  inline-size: 100%;
+}
+/* The score the question is about: the heaviest thing it says. */
+.court-ask-score {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+/* Ended early: time is still on the clock. A thing to check before answering, in the
+   amber of things that wait, and in words. */
+.court-ask-warn {
+  color: var(--court-amber);
+  font-weight: 700;
+}
+.court-ask-more {
+  color: var(--court-muted);
+  font-size: 13px;
+  line-height: 1.25;
+}
+/* Why the thing asked for did not happen: a statement, as the tracker's notices are. */
+.court-ask-problem {
+  padding-block: 4px;
+  padding-inline: 8px;
+  border-inline-start: 4px solid var(--court-red-line);
+  border-radius: 4px;
+  background: var(--court-tile);
+  font-size: 13px;
+  line-height: 1.25;
+}
+.court-ask-answers {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--court-gap);
+  block-size: var(--court-acts-height);
+}
+.court-ask-answers .court-opt {
+  font-size: 15px;
+}
+.court a.court-opt {
+  color: var(--court-text);
+  text-decoration: none;
+}
+/* The answer that takes the next step: gold, the one filled button (line 2). */
+.court-opt-next,
+.court a.court-opt-next {
+  border-color: var(--court-gold);
+  background: var(--court-gold);
+  color: var(--court-gold-ink);
+}
+/* While what was asked for is under way its button waits, and says so in its words. */
+.court-ask-answers .court-opt[aria-disabled='true']:not([data-rest-disabled]) {
+  opacity: 0.4;
+}
+/* The reason: a field of the pad's own, 16 or more so that no phone zooms into it. */
+.court-ask-field {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.court-ask-field-label {
+  color: var(--court-muted);
+  font-size: 12px;
+  line-height: 1.2;
+}
+.court-input {
+  inline-size: 100%;
+  block-size: 44px;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 10px;
+  border: 2px solid var(--court-dark-edge);
+  border-radius: var(--court-radius);
+  background: var(--court-page);
+  color: var(--court-text);
+  color-scheme: dark;
+  font: inherit;
+  font-size: 16px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* The final panel (J4): "Final", who won and the score, large; whether the league has
+   the result; and the way back in the lowest band. */
+.court-final-result {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.court-final-won {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.court-final-state {
+  font-size: 14px;
+}
+/* Where the pad is as wide as the screen (a tablet upright) there is room to say it
+   larger: the pad is read from further off there. */
+@media (min-width: 700px) and (max-width: 879px) and (min-height: 521px) {
+  .court-ask,
+  .court-final {
+    gap: 10px;
+    padding-inline: 10px;
+  }
+  .court-ask-title {
+    font-size: 22px;
+  }
+  .court-ask-text {
+    font-size: 18px;
+  }
+  .court-ask-score {
+    font-size: 24px;
+  }
+  .court-ask-more,
+  .court-ask-problem {
+    font-size: 16px;
+  }
+  .court-ask-field-label {
+    font-size: 14px;
+  }
+  .court-ask-answers .court-opt {
+    font-size: 18px;
+  }
+  .court-final-won {
+    font-size: 36px;
+  }
+  .court-final-state {
+    font-size: 17px;
+  }
+}
+/* "Not sent yet": in the amber of plays that wait, and in words. */
+.court-final-unsent {
+  color: var(--court-amber);
+  font-weight: 700;
+}
 /* A team's timeouts left, beside its name: only where the heading has room (a tablet). */
 .court-timeouts-chip {
   display: none;
@@ -2282,10 +2455,13 @@
   font-size: 18px;
   font-weight: 700;
 }
+/* Since step 2.37 More holds six things on a game in play (End game and Mark not started
+   came): set a little closer, so all six and the line under them are on a short phone's
+   screen with nothing to scroll to. */
 .court-sheet-items {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 11px;
 }
 .court-sheet-item {
   display: flex;
