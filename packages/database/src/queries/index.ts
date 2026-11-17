@@ -9,6 +9,7 @@ export { hasRecordedChild } from './has-recorded-child.ts';
 export { findCourt } from './find-court.ts';
 export { findDivision } from './find-division.ts';
 export { findPerson } from './find-person.ts';
+export { findPersonIsMinor } from './find-person-is-minor.ts';
 export { insertPerson, type NewPersonRow } from './insert-person.ts';
 export { isPersonOnRoster } from './is-person-on-roster.ts';
 export { listPeople, type PeopleSearchRow } from './list-people.ts';

@@ -9,6 +9,7 @@ import {
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import type { Audience } from '../leagues/index.ts';
 import type { PeopleTx, PersonRecord, PersonSensitiveFields } from './ports.ts';
+import { isMinorOn } from './rules/minor-by-age.ts';
 
 /** A stored person: the record, and the sensitive fields kept beside it. */
 export type StoredPerson = Omit<PersonRecord, 'sensitive'> & {
@@ -173,7 +174,11 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
         },
         isOnRoster: async (id) => s.people.find((p) => p.id === id)?.onRoster === true,
         leagueAudience: async () => s.audience,
-        leagueToday: async () => s.today,
+        // R-28 on the league's today: as the database works it out in SQL.
+        isMinor: async (id) => {
+          const p = s.people.find((x) => x.id === id);
+          return p === undefined ? true : isMinorOn(p.sensitiveFields, s.today);
+        },
         leagueSettingRows: async (key) =>
           Object.hasOwn(s.settings, key)
             ? [{ level: 'league', document: { version: 1, value: s.settings[key] }, version: 1 }]

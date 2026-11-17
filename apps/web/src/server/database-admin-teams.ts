@@ -13,10 +13,10 @@
 // is staff's (loadLeaguePage), they name no person, and what anyone may change is the
 // commands' to decide. An id that cannot be a row's is no row, asked of no database.
 //
-// Whether a person is a child (R-28) is read through core's one rule inside the people
-// commands, and in SQL by the database's own reads, so a birth date never leaves the
-// database unless a command hands it to someone allowed to see it (people.read_sensitive,
-// T-76).
+// Whether a person is a child (R-28) is worked out in SQL, by the database's own reads and
+// by the people store's answer to the commands (record 080), so a birth date never leaves
+// the database unless a command hands it to someone allowed to see it
+// (people.read_sensitive, T-76).
 //
 // Core's event handlers (standings follow every result, T-24) run in each command's
 // transaction, which therefore holds the standings and games stores they read and write
