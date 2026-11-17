@@ -514,6 +514,7 @@ describe('statistics page', () => {
         })),
       playerTeams: async () => players.map(([personId, teamId]) => ({ personId, teamId })),
       decidedGamesOf: async () => [],
+      decidedGames: async () => [],
       // Summed from game 1's lines: the typed game 2 has none.
       teamStatTotals: async () => [
         { teamId: ravens, statKey: 'points', ...entry(7) },

@@ -92,6 +92,7 @@ export function worldStandingsRead(read: () => Promise<ReadWorld | undefined>): 
     playerTeams: async (seasonId) => (await over()).playerTeams(seasonId),
     decidedGamesOf: async (seasonId, personIds) =>
       (await over()).decidedGamesOf(seasonId, personIds),
+    decidedGames: async (seasonId) => (await over()).decidedGames(seasonId),
     teamStatTotals: async (seasonId) => (await over()).teamStatTotals(seasonId),
     people: async (personIds) => (await over()).people(personIds),
   };
@@ -205,6 +206,13 @@ function standingsReadOver(s: ReadWorld | undefined): StandingsReadStore {
           })),
       }));
     },
+    decidedGames: async (seasonId) =>
+      decidedGames(seasonId).map((game) => ({
+        gameId: game.id,
+        status: game.status,
+        homeTeamId: game.homeTeamId,
+        awayTeamId: game.awayTeamId,
+      })),
     // Each team's total of each stat over its final games, from its players' lines that
     // entered the game (list-team-stat-totals.ts).
     teamStatTotals: async (seasonId) => {

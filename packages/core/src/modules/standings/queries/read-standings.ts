@@ -5,7 +5,7 @@
 import { SeasonRules } from '@srleagues/contracts';
 import { fail, ok, type Result } from '../../../command/index.ts';
 import type {
-  DecidedGameLines,
+  DecidedGameRecord,
   SeasonDivisionRow,
   SeasonTeamRow,
   StandingsAdjustmentWithReason,
@@ -63,10 +63,13 @@ export type StandingsLine = {
 export type LevelGroup = {
   /** Two or more teams, in the table's order. */
   readonly teamIds: readonly string[];
+  /** Those of them that have not played a game: level only because none counts as 0. */
+  readonly notPlayed: readonly string[];
   readonly on: 'win-percentage' | 'points';
   /**
-   * For two teams that head-to-head separated: how many counted games they played against
-   * each other. Null otherwise.
+   * When exactly two of them have played and head-to-head is the stored reason of both:
+   * how many decided games those two played against each other (0 when they never met,
+   * as when the team they were compared through is in the bin). Null otherwise.
    */
   readonly gamesBetween: number | null;
 };
@@ -132,7 +135,12 @@ function measureOf(row: StandingsRowRecord, rankBy: Standings['rankBy']): Measur
 
 const sameMeasure = (a: Measure, b: Measure): boolean => a.on === b.on && a.n * b.d === b.n * a.d;
 
-/** The groups of two or more rows level on the table's measure, each in the table's order. */
+/**
+ * The groups of two or more rows level on the table's measure, each in the table's order.
+ * A group the engine never compared is left out: rows from different stored tables (a
+ * removed division's rows fall into the table without a name, beside teams of no
+ * division), or a row whose record alone placed it, have no reason to give about the others.
+ */
 function levelGroupsOf(
   rows: readonly StandingsRowRecord[],
   rankBy: Standings['rankBy'],
@@ -146,13 +154,19 @@ function levelGroupsOf(
     const members = rows.filter((other) => sameMeasure(measureOf(other, rankBy), measure));
     for (const member of members) grouped.add(member.teamId);
     if (members.length < 2) continue;
-    const [first, second] = members;
+    const compared = members.every(
+      (member) => member.decidedBy !== null && member.divisionId === row.divisionId,
+    );
+    if (!compared) continue;
+    const played = members.filter((member) => member.gamesPlayed > 0);
+    const [first, second] = played;
     const byHeadToHead =
-      members.length === 2 &&
+      played.length === 2 &&
       first?.decidedBy === 'head-to-head' &&
       second?.decidedBy === 'head-to-head';
     groups.push({
       teamIds: members.map((member) => member.teamId),
+      notPlayed: members.filter((member) => member.gamesPlayed === 0).map((m) => m.teamId),
       on: measure.on,
       gamesBetween: byHeadToHead ? gamesBetween(first.teamId, second.teamId) : null,
     });
@@ -161,7 +175,7 @@ function levelGroupsOf(
 }
 
 /** How many of the season's decided games two teams played against each other. */
-function meetingsIn(games: readonly DecidedGameLines[]): (a: string, b: string) => number {
+function meetingsIn(games: readonly DecidedGameRecord[]): (a: string, b: string) => number {
   return (a, b) =>
     games.filter(
       (game) =>
@@ -256,7 +270,7 @@ export async function readStandings(
   const { rankBy, tiebreakers } = rulesOf(season.rules);
   // The games between two level teams are read only when head-to-head separated some.
   const gamesBetween = needsMeetings(rows)
-    ? meetingsIn(await store.decidedGamesOf(season.id, []))
+    ? meetingsIn(await store.decidedGames(season.id))
     : () => 0;
   const teams = new Map(teamRows.map((team) => [team.id, team]));
   const divisions = new Map(divisionRows.map((division) => [division.id, division]));

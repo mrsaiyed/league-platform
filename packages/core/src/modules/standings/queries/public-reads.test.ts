@@ -70,7 +70,11 @@ describe('readStandings', () => {
       rank: number,
       record: { wins: number; losses: number; ties?: number },
       decidedBy: string | null,
-    ) => ({ ...first, teamId, rank, seed: rank, ties: 0, ...record, decidedBy });
+    ) => {
+      const ties = record.ties ?? 0;
+      const gamesPlayed = record.wins + record.losses + ties;
+      return { ...first, teamId, rank, seed: rank, ...record, ties, gamesPlayed, decidedBy };
+    };
     // 2–1 and 667–333 both read 0.667, and are not level; 1–2 and 2–4 are, exactly; a
     // team with no games is level with one that lost its only game (both 0, as ranked).
     const store: StandingsReadStore = {
@@ -85,22 +89,24 @@ describe('readStandings', () => {
         row('f', 6, { wins: 0, losses: 1 }, 'point-difference'),
       ],
       adjustments: async () => [],
-      decidedGamesOf: async () =>
+      // Read only for the teams' ids: no box score line is asked for (decidedGamesOf).
+      decidedGamesOf: async () => {
+        throw new Error('the standings read no box score line');
+      },
+      decidedGames: async () =>
         ['g1', 'g2'].map((gameId) => ({
           gameId,
           status: 'final',
-          captureMode: 'final',
           homeTeamId: 'c',
           awayTeamId: 'd',
-          lines: [],
         })),
     };
     const result = await readStandings(store, { seasonId });
     if (!result.ok) throw new Error('expected a table');
     expect(result.value.tiebreakers).toEqual(['head-to-head', 'point-difference', 'points-scored']);
     expect(result.value.tables[0]?.levelGroups).toEqual([
-      { teamIds: ['c', 'd'], on: 'win-percentage', gamesBetween: 2 },
-      { teamIds: ['e', 'f'], on: 'win-percentage', gamesBetween: null },
+      { teamIds: ['c', 'd'], notPlayed: [], on: 'win-percentage', gamesBetween: 2 },
+      { teamIds: ['e', 'f'], notPlayed: ['e'], on: 'win-percentage', gamesBetween: null },
     ]);
     // In a table ranked by points, teams are level on their points alone.
     const byPoints: StandingsReadStore = {
@@ -128,8 +134,69 @@ describe('readStandings', () => {
     };
     const points = await readStandings(byPoints, { seasonId });
     expect(points.ok && points.value.tables[0]?.levelGroups).toEqual([
-      { teamIds: ['a', 'b'], on: 'points', gamesBetween: null },
+      { teamIds: ['a', 'b'], notPlayed: [], on: 'points', gamesBetween: null },
     ]);
+  });
+
+  // The numbers audit's review of step 2.195 (finding 4): a removed division's rows fall
+  // into the table without a name, beside teams of no division. Level there, they were
+  // never compared by the engine, so no note says anything about them as a group.
+  it('writes no level group for teams the engine never compared', async () => {
+    const base = memoryStandingsRead();
+    const [first] = await base.standingsRows(seasonId);
+    if (first === undefined) throw new Error('expected a row');
+    const removed = '01900000-0000-7000-8000-0000000000d9';
+    const row = (teamId: string, division: string | null, rank: number, wins: number) => ({
+      ...first,
+      teamId,
+      divisionId: division,
+      rank,
+      seed: rank,
+      wins,
+      losses: 1 - wins,
+      ties: 0,
+      gamesPlayed: 1,
+      decidedBy: null,
+    });
+    const store: StandingsReadStore = {
+      ...base,
+      teams: async () =>
+        ['a', 'b', 'c', 'd'].map((id) => ({
+          id,
+          name: id.toUpperCase(),
+          slug: id,
+          color: null,
+          divisionId: null,
+          statsVisibility: 'everyone',
+        })),
+      divisions: async () => [],
+      // a beat b in the removed division; c beat d with no division: each alone at its rank
+      // in its own table, so nothing stored says how a compares with c.
+      standingsRows: async () => [
+        row('a', removed, 1, 1),
+        row('b', removed, 2, 0),
+        row('c', null, 1, 1),
+        row('d', null, 2, 0),
+      ],
+      adjustments: async () => [],
+    };
+    const result = await readStandings(store, { seasonId });
+    if (!result.ok) throw new Error('expected a table');
+    expect(result.value.tables).toHaveLength(1);
+    expect(result.value.tables[0]?.lines.map((l) => l.team.id)).toEqual(['a', 'c', 'b', 'd']);
+    expect(result.value.tables[0]?.levelGroups).toEqual([]);
+    // Level in their own stored tables but not with each other's: none either.
+    const reasons: StandingsReadStore = {
+      ...store,
+      standingsRows: async () => [
+        { ...row('a', removed, 1, 1), decidedBy: 'point-difference' },
+        { ...row('b', removed, 2, 1), decidedBy: 'point-difference' },
+        { ...row('c', null, 1, 1), decidedBy: 'point-difference' },
+        { ...row('d', null, 2, 1), decidedBy: 'point-difference' },
+      ],
+    };
+    const mixed = await readStandings(reasons, { seasonId });
+    expect(mixed.ok && mixed.value.tables[0]?.levelGroups).toEqual([]);
   });
 
   it('says when the season is not in the league', async () => {

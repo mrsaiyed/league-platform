@@ -19,9 +19,14 @@ type Game = readonly [string, number, string, number];
 
 type Made = { readonly view: StandingsTableView; readonly html: string };
 
+/** A stored row as the database gives it back. */
+type StoredRow = Awaited<ReturnType<StandingsReadStore['standingsRows']>>[number];
+
 /**
  * One table of made-up teams (their names are their ids) after these games, as the page
- * draws it: the engine's rows, stored and read back as the database gives them.
+ * draws it: the engine's rows, stored and read back as the database gives them. `binned`
+ * teams are in the bin since the table was worked out (their rows stay, as they do until
+ * the standings are rebuilt); `stored` changes the stored rows by hand.
  */
 async function tableAfter(
   teams: readonly string[],
@@ -30,6 +35,8 @@ async function tableAfter(
     readonly rules?: SeasonRules;
     readonly adjustments?: readonly StandingsAdjustment[];
     readonly coinFlips?: readonly CoinFlip[];
+    readonly binned?: readonly string[];
+    readonly stored?: (rows: StoredRow[]) => StoredRow[];
   } = {},
 ): Promise<Made> {
   const rules = options.rules ?? defaultSeasonRules();
@@ -57,32 +64,36 @@ async function tableAfter(
     findSeason: async (id) => (id === seasonId ? { id, name: 'Fall', rules } : undefined),
     seasonStatKeys: async () => [],
     teams: async () =>
-      teams.map((name) => ({
-        id: name,
-        name,
-        slug: name.toLowerCase(),
-        color: null,
-        divisionId: null,
-        statsVisibility: 'everyone',
-      })),
+      teams
+        .filter((name) => !(options.binned ?? []).includes(name))
+        .map((name) => ({
+          id: name,
+          name,
+          slug: name.toLowerCase(),
+          color: null,
+          divisionId: null,
+          statsVisibility: 'everyone',
+        })),
     divisions: async () => [],
     standingsRows: async () =>
-      rows.map((row) => ({
-        teamId: row.teamId,
-        divisionId: row.divisionId,
-        rank: row.rank,
-        seed: row.seed,
-        gamesPlayed: row.gamesPlayed,
-        wins: row.wins,
-        losses: row.losses,
-        ties: row.ties,
-        pointsFor: row.pointsFor,
-        pointsAgainst: row.pointsAgainst,
-        standingsPoints: row.points,
-        streakResult: row.streak?.result ?? null,
-        streakLength: row.streak?.length ?? null,
-        decidedBy: row.decidedBy,
-      })),
+      (options.stored ?? ((stored: StoredRow[]) => stored))(
+        rows.map((row) => ({
+          teamId: row.teamId,
+          divisionId: row.divisionId,
+          rank: row.rank,
+          seed: row.seed,
+          gamesPlayed: row.gamesPlayed,
+          wins: row.wins,
+          losses: row.losses,
+          ties: row.ties,
+          pointsFor: row.pointsFor,
+          pointsAgainst: row.pointsAgainst,
+          standingsPoints: row.points,
+          streakResult: row.streak?.result ?? null,
+          streakLength: row.streak?.length ?? null,
+          decidedBy: row.decidedBy,
+        })),
+      ),
     adjustments: async () =>
       (options.adjustments ?? []).map((a) => ({
         id: a.adjustmentId,
@@ -95,14 +106,16 @@ async function tableAfter(
       })),
     playerTotals: async () => [],
     playerTeams: async () => [],
-    decidedGamesOf: async () =>
+    // The standings read no box score line: only the games' teams, to count meetings.
+    decidedGamesOf: async () => {
+      throw new Error('the standings read no box score line');
+    },
+    decidedGames: async () =>
       decided.map((game) => ({
         gameId: game.gameId,
         status: game.status,
-        captureMode: 'final',
         homeTeamId: game.homeTeamId,
         awayTeamId: game.awayTeamId,
-        lines: [],
       })),
     teamStatTotals: async () => [],
     people: async () => [],
@@ -182,15 +195,17 @@ describe('the note beside each team of the standings', () => {
     nothingPlacedAbove(made);
   });
 
-  it('three teams and one game: the Wolves, last at 0–1, are level with the idle team at 0–0', async () => {
+  // The Wolves, last at 0–1, are level at .000 with the Hawks, who have not played: the
+  // Hawks are told that, and the Wolves are in no note about teams level with them (the
+  // lead's review of step 2.195, item 8).
+  it('three teams and one game: the idle team is told it has not played, the Wolves nothing false', async () => {
     const made = await tableAfter(['Ravens', 'Wolves', 'Hawks'], [game1]);
     expect(order(made)).toEqual(['Ravens', 'Hawks', 'Wolves']);
-    const note =
-      'Hawks and Wolves are level on win percentage (.000). Point difference puts Hawks ahead: 0 against -1.';
-    expect(levelNoteBeside(made, 'Wolves')).toBe(note);
+    const note = 'Hawks have not played yet.';
     expect(levelNoteBeside(made, 'Hawks')).toBe(note);
+    expect(notesBeside(made, 'Wolves')).toEqual([]);
     expect(notesBeside(made, 'Ravens')).toEqual([]);
-    drawnBeside(made, 'Wolves', note);
+    drawnBeside(made, 'Hawks', note);
     nothingPlacedAbove(made);
   });
 
@@ -265,14 +280,91 @@ describe('the note beside each team of the standings', () => {
     nothingPlacedAbove(made);
   });
 
-  it('a team with no games (case 34): Birch at 0–1 is level with Cedar at 0–0, never "on record"', async () => {
+  it('a team with no games (case 34): Cedar at 0–0 has not played; Birch at 0–1 carries no level note', async () => {
     const made = await tableAfter(['Ash', 'Birch', 'Cedar'], [['Ash', 60, 'Birch', 50]]);
     expect(order(made)).toEqual(['Ash', 'Cedar', 'Birch']);
-    const note =
-      'Cedar and Birch are level on win percentage (.000). Point difference puts Cedar ahead: 0 against -10.';
-    expect(levelNoteBeside(made, 'Birch')).toBe(note);
-    expect(levelNoteBeside(made, 'Cedar')).toBe(note);
+    expect(levelNoteBeside(made, 'Cedar')).toBe('Cedar have not played yet.');
+    expect(notesBeside(made, 'Birch')).toEqual([]);
     nothingPlacedAbove(made);
+  });
+
+  it('a level note stands only among teams that have played; idle ones are told so together', async () => {
+    // Birch and Dogwood both lost; Cedar and Elm have not played: four level at .000.
+    const made = await tableAfter(
+      ['Ash', 'Birch', 'Cedar', 'Dogwood', 'Elm'],
+      [
+        ['Ash', 60, 'Birch', 50],
+        ['Ash', 60, 'Dogwood', 40],
+      ],
+    );
+    expect(order(made)).toEqual(['Ash', 'Cedar', 'Elm', 'Birch', 'Dogwood']);
+    for (const team of ['Cedar', 'Elm']) {
+      expect(levelNoteBeside(made, team)).toBe('Cedar and Elm have not played yet.');
+    }
+    const note =
+      'Birch and Dogwood are level on win percentage (.000). Point difference puts Birch ahead: -10 against -20.';
+    expect(levelNoteBeside(made, 'Birch')).toBe(note);
+    expect(levelNoteBeside(made, 'Dogwood')).toBe(note);
+    nothingPlacedAbove(made);
+  });
+
+  // The independent review's run (item 1): A, B and C level at .500, A beat C and C beat B,
+  // A and B never met. With C in the bin its row is not shown, and A and B look like a pair
+  // head-to-head separated: they never played, so the note may not say it was the games
+  // between them.
+  it('never says the games between two teams that never met put one ahead', async () => {
+    const games: readonly Game[] = [
+      ['Ash', 50, 'Cedar', 40],
+      ['Cedar', 50, 'Birch', 40],
+      ['Xeno', 50, 'Ash', 40],
+      ['Birch', 50, 'Yew', 40],
+    ];
+    const teams = ['Ash', 'Birch', 'Cedar', 'Xeno', 'Yew'];
+    const whole = await tableAfter(teams, games);
+    expect(order(whole)).toEqual(['Xeno', 'Ash', 'Cedar', 'Birch', 'Yew']);
+    const made = await tableAfter(teams, games, { binned: ['Cedar'] });
+    expect(order(made)).toEqual(['Xeno', 'Ash', 'Birch', 'Yew']);
+    const note =
+      'Ash and Birch are level on win percentage (.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
+    expect(levelNoteBeside(made, 'Birch')).toBe(note);
+    expect(levelNoteBeside(made, 'Ash')).toBe(note);
+    expect(made.html).not.toContain('between them');
+  });
+
+  // Item 5: four teams at 1–1; head-to-head puts two above two, and nothing separates
+  // either pair. They are not all in one place, so not "level with another team" alone.
+  it('four level whom head-to-head split two above two, each pair still level', async () => {
+    const made = await tableAfter(
+      ['Ash', 'Birch', 'Cedar', 'Dogwood', 'Xeno', 'Yew'],
+      [
+        ['Ash', 50, 'Cedar', 40],
+        ['Birch', 50, 'Dogwood', 40],
+        ['Xeno', 50, 'Ash', 40],
+        ['Xeno', 50, 'Birch', 40],
+        ['Cedar', 50, 'Yew', 40],
+        ['Dogwood', 50, 'Yew', 40],
+      ],
+    );
+    expect(order(made)).toEqual(['Xeno', 'Ash', 'Birch', 'Cedar', 'Dogwood', 'Yew']);
+    const note =
+      'Ash, Birch, Cedar, and Dogwood are level on win percentage (.500). The season’s tiebreakers set their order as far as they can: head-to-head, then point difference, then points scored. Ash and Birch are still level after all of them, so they are shown in a fixed order. Cedar and Dogwood are still level after all of them, so they are shown in a fixed order.';
+    for (const team of ['Ash', 'Birch', 'Cedar', 'Dogwood']) {
+      expect(levelNoteBeside(made, team)).toBe(note);
+    }
+    expect(made.view.footnotes.map((f) => f.id)).not.toContain('order-still-tied');
+  });
+
+  // Item 9: two level teams whose stored reasons differ (a row not of the engine's
+  // making): no two-team reason is claimed, only what both rows can bear.
+  it('claims no reason for two level teams whose stored reasons differ', async () => {
+    const made = await tableAfter(['Ravens', 'Wolves'], [game1, game2], {
+      stored: (rows) =>
+        rows.map((row) => (row.teamId === 'Ravens' ? { ...row, decidedBy: 'points-scored' } : row)),
+    });
+    const note =
+      'Wolves and Ravens are level on win percentage (.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
+    expect(levelNoteBeside(made, 'Ravens')).toBe(note);
+    expect(levelNoteBeside(made, 'Wolves')).toBe(note);
   });
 
   it('says "games" when the two met more than once', async () => {

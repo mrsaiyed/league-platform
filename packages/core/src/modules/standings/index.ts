@@ -49,6 +49,7 @@ export {
 } from './queries/read-team-records.ts';
 export type {
   DecidedGameLines,
+  DecidedGameRecord,
   PersonDisplayRecord,
   PlayerTeamLink,
   PlayerTotalsRecord,

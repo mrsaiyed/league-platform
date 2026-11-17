@@ -180,6 +180,8 @@ export const enSite = {
   'standings.level.by.point-difference':
     'Point difference puts {team} ahead: {ahead} against {behind}.',
   'standings.level.by.points-scored': 'Points scored puts {team} ahead: {ahead} against {behind}.',
+  // Beside a team level with others only because it has no games yet (0 counts as 0).
+  'standings.level.notPlayed': '{teams} have not played yet.',
   'standings.level.points': '{teams} are level on points ({value}).',
   'standings.level.sentenceJoin': ' ',
   'standings.level.stillLevel':

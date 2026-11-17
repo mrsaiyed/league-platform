@@ -30,10 +30,10 @@ const signed = new Intl.NumberFormat(locale, { signDisplay: 'exceptZero' });
 const whole = new Intl.NumberFormat(locale);
 
 /**
- * A win percentage as a note writes it, the way a basketball table does: .500 and 1.000,
- * never 0.500 (the step's own line; the column's 0.500 is the audit's L3, step N7's).
+ * A win percentage the way a basketball table writes it: .500, .667, 1.000 and .000, never
+ * 0.500 (the numbers audit's L3). One way everywhere, the PCT column and the notes alike.
  */
-const percentInNote = (value: number): string =>
+const winPercentText = (value: number): string =>
   percent
     .formatToParts(value)
     .filter((part, n) => !(n === 0 && part.type === 'integer' && part.value === '0'))
@@ -92,25 +92,28 @@ function twoTeamReason(
     case 'coin-flip':
       return t('standings.level.by.coin-flip', { team });
     case 'head-to-head':
-      // "The game between them" only when they met once; never a count we do not have.
+      // Only for two teams that met (levelNote): "the game" once, "the games" more often.
       return t.plural('standings.level.by.head-to-head', gamesBetween === 1 ? 1 : 2, { team });
   }
 }
 
+/** The shared note for teams nothing in the rules separates: true of each, however many. */
+const stillTiedNote = () => ({ id: stillTiedId, text: t('standings.order.still-tied') });
+
 /**
- * The note of one group of level teams, or the shared "nothing separates them" note when
- * nothing does. Written only from the stored rows: what they are level on, with its number,
- * then for two teams what put the first ahead, and for three or more the season's
- * tiebreakers (which one placed which team is not stored; step 2.198).
+ * The note of the teams of one level group that have played, or the shared "nothing
+ * separates them" note when nothing does and they share one place. Written only from the
+ * stored rows: what they are level on, with its number, then for two teams what put the
+ * first ahead, and otherwise the season's tiebreakers (which one placed which team is not
+ * stored; step 2.198).
  */
 function levelNote(
   group: LevelGroup,
   members: readonly StandingsLine[],
   tiebreakers: readonly string[],
 ): { readonly id: string | null; readonly text: string } {
-  if (members.every((line) => line.orderedBy === 'still-tied')) {
-    return { id: stillTiedId, text: t('standings.order.still-tied') };
-  }
+  const stillTied = members.every((line) => line.orderedBy === 'still-tied');
+  if (stillTied && new Set(members.map((line) => line.rank)).size === 1) return stillTiedNote();
   const [first, second] = members;
   const teams = names.format(members.map((line) => line.team.name));
   const level =
@@ -118,16 +121,20 @@ function levelNote(
       ? t('standings.level.points', { teams, value: whole.format(first?.points ?? 0) })
       : t('standings.level.winPercentage', {
           teams,
-          value: percentInNote(first?.winPercentage ?? 0),
+          value: winPercentText(first?.winPercentage ?? 0),
         });
   const join = t('standings.level.sentenceJoin');
   const by = first?.orderedBy ?? '';
+  // Head-to-head between two teams that never met (the team they were compared through is
+  // in the bin, so its row is not shown) is not what put one ahead: the general sentence.
+  const met = by !== 'head-to-head' || (group.gamesBetween ?? 0) > 0;
   if (
     first !== undefined &&
     second !== undefined &&
     members.length === 2 &&
     second.orderedBy === by &&
-    isTiebreaker(by)
+    isTiebreaker(by) &&
+    met
   ) {
     return {
       id: null,
@@ -215,14 +222,36 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
     id: `adjustment-${f.number}`,
     text: adjustmentText(f, standings.rankBy),
   }));
-  // Each group's note, in the table's order, and the notes each team carries.
+  // Each group's notes, in the table's order, and the note each team carries.
   const levelNotes = new Map<string, string>();
+  const mark = (lines: readonly StandingsLine[], note: { id: string; text: string }) => {
+    if (lines.length === 0) return;
+    if (!footnotes.some((f) => f.id === note.id)) footnotes.push(note);
+    for (const line of lines) levelNotes.set(line.team.id, note.id);
+  };
   table.levelGroups.forEach((group, n) => {
     const members = group.teamIds.flatMap((id) => table.lines.filter((l) => l.team.id === id));
-    const note = levelNote(group, members, standings.tiebreakers);
-    const id = note.id ?? `level-${n + 1}`;
-    if (!footnotes.some((f) => f.id === id)) footnotes.push({ id, text: note.text });
-    for (const line of members) levelNotes.set(line.team.id, id);
+    // A team that has not played is level only because none counts as 0: it is told so,
+    // and is in no note about the teams that have played.
+    const idle = members.filter((line) => group.notPlayed.includes(line.team.id));
+    const played = members.filter((line) => !group.notPlayed.includes(line.team.id));
+    if (idle.length > 0) {
+      mark(idle, {
+        id: `not-played-${n + 1}`,
+        text: t('standings.level.notPlayed', { teams: names.format(idle.map((l) => l.team.name)) }),
+      });
+    }
+    if (played.length >= 2) {
+      const note = levelNote(group, played, standings.tiebreakers);
+      mark(played, { id: note.id ?? `level-${n + 1}`, text: note.text });
+    } else {
+      // One team that has played, level with idle ones only: nothing to compare it with,
+      // unless nothing in the rules separated it from them.
+      mark(
+        played.filter((line) => line.orderedBy === 'still-tied'),
+        stillTiedNote(),
+      );
+    }
   });
   const rows = table.lines.map((line): StandingsRow => {
     const level = levelNotes.get(line.team.id);
