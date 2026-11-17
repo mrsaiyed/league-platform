@@ -154,7 +154,13 @@ export async function enterCode(fields: Fields, visit: Visit, deps: FlowDeps): P
     const problem: Problem = error.code === 'code-wrong' ? 'codeWrong' : 'codeExpired';
     return goTo(screenUrl('enterCode', { problem }));
   }
-  writeFlow(visit.jar, { ...flow, proof: checked.value.proof }, deps.secureCookies);
+  // Whether the address already had an account is known only now, to whoever holds the
+  // mailbox (R-31): the password screen says what saving will do.
+  writeFlow(
+    visit.jar,
+    { ...flow, proof: checked.value.proof, existing: checked.value.accountExists },
+    deps.secureCookies,
+  );
   return goTo(platformUrl('choosePassword'));
 }
 

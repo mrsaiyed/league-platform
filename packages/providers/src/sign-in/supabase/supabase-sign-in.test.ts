@@ -130,6 +130,42 @@ describe('sign-up with an emailed code', () => {
     ).toBe(done.accountId);
   });
 
+  it('says whether the address had an account after a right code, and nothing before (R-31, T-68)', async () => {
+    const env = setup();
+    await signUp(env, 'ana@example.test');
+    for (const purpose of ['sign-up', 'reset'] as const) {
+      const ask = purpose === 'sign-up' ? env.sign.startSignUp : env.sign.startReset;
+      const asked = [
+        await ask({ email: 'ana@example.test', networkAddress: here }),
+        await ask({ email: 'bo@example.test', networkAddress: here }),
+      ];
+      // Before a right code: the same answers for both.
+      expect(asked[0]).toEqual(asked[1]);
+      const wrong = (email: string) =>
+        env.sign.verifyCode({ email, code: '000000', networkAddress: here });
+      expect(await wrong('ana@example.test')).toEqual(await wrong('bo@example.test'));
+      // After a right code: the holder of the mailbox is told.
+      const known = value(
+        await env.sign.verifyCode({
+          email: 'ana@example.test',
+          code: codeFor(env, 'ana@example.test'),
+          networkAddress: here,
+        }),
+      );
+      expect(known.accountExists).toBe(true);
+      if (purpose === 'sign-up') {
+        const unknown = value(
+          await env.sign.verifyCode({
+            email: 'bo@example.test',
+            code: codeFor(env, 'bo@example.test'),
+            networkAddress: here,
+          }),
+        );
+        expect(unknown.accountExists).toBe(false);
+      }
+    }
+  });
+
   it('accepts the code with spaces typed between the digits', async () => {
     const env = setup();
     await env.sign.startSignUp({ email: 'ana@example.test', networkAddress: here });

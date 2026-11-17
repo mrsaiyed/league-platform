@@ -778,6 +778,26 @@ describe('the screens say what is happening (step 2.163)', () => {
     });
   });
 
+  it('after a right code, and only then, the flow knows the address had an account (R-31)', async () => {
+    for (const purpose of ['sign-up', 'reset'] as const) {
+      const env = setup();
+      await signUp(env, browser(), 'taken@example.test');
+      const known = browser();
+      const unknown = browser();
+      await askForCode(purpose, { email: 'taken@example.test' }, known.visit, env.deps);
+      await askForCode(purpose, { email: 'nobody@example.test' }, unknown.visit, env.deps);
+      // Before the code: nothing in the flow says it (T-68).
+      expect(readFlow(known.jar)?.existing).toBeUndefined();
+      expect(readFlow(unknown.jar)?.existing).toBeUndefined();
+      await enterCode({ code: env.codeFor('taken@example.test') }, known.visit, env.deps);
+      expect(readFlow(known.jar)?.existing).toBe(true);
+      if (purpose === 'sign-up') {
+        await enterCode({ code: env.codeFor('nobody@example.test') }, unknown.visit, env.deps);
+        expect(readFlow(unknown.jar)?.existing).toBe(false);
+      }
+    }
+  });
+
   it('"Send a new code" keeps to the limits there are and says so on the code screen', async () => {
     const env = setup();
     const b = browser();

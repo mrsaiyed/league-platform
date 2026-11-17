@@ -11,8 +11,9 @@
 //   every renewal, so a device in use stays signed in.
 // - device: the device's own id, apart from any session, so a sign-in on a device
 //   the account has not used before can be told apart (T-70).
-// - flow: the address being proved and, after the right code, the proof, between
-//   the screens of sign-up and forgotten password. Fifteen minutes.
+// - flow: the address being proved and, after the right code, the proof and whether the
+//   address already had an account, between the screens of sign-up and forgotten
+//   password. Fifteen minutes.
 // - google: what Google's return needs (the verifier and where to go next). Ten minutes.
 // - typed: the address typed into a sign-in that was refused, so the screen fills it in
 //   again (step 2.163, M28) without it ever riding in the address bar. Set on every
@@ -86,6 +87,11 @@ const flowShape = z.strictObject({
   minutes: z.number().int().positive().max(120),
   next: returnPathShape.nullable(),
   proof: z.string().max(4096).optional(),
+  /**
+   * After a right code only: whether the address already had an account, so the password
+   * screen can say saving changes its password (R-31). Never set before the code (T-68).
+   */
+  existing: z.boolean().optional(),
 });
 export type Flow = z.infer<typeof flowShape>;
 

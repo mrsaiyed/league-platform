@@ -1,10 +1,10 @@
 # 091 — What the sign-in screens say, and where it comes from
 
-Date: 2026-11-17. Step 2.163 (the using-it audit, findings M24, M26 to M30, L9 and L10; R-30, R-31). Serves T-67, T-68, T-69, T-71 and T-85; follows record 031 (the sign-in screens) and record 067 (a form's answer never rides in the address). Decided by the step's builder (technical, T-291).
+Date: 2026-11-17. Step 2.163 (the using-it audit, findings M24, M26 to M30, L9 and L10; R-30, R-31). Serves T-67, T-68, T-69, T-71 and T-85; follows record 031 (the sign-in screens) and record 067 (a form's answer never rides in the address). Decided by the step's builder (technical, T-291); the one change to the sign-in interface was agreed by the lead on 2026-11-17.
 
 ## Problem
 
-The sign-in screens worked but said too little: the code screen did not say where the code went, "Send a new code" went back to an empty first screen, a lock-out said "900 seconds", a refused sign-in emptied the email box, signing out ended on a bare form, the device list gave times in UTC, and "Continue with Google" was drawn where Google could only fail. Saying more meant the screens had to know things they did not: the address typed, where the person was, whether Google is set up,. Each had to be learned without telling a stranger whether an address has an account (T-68) and without putting anything personal in an address bar.
+The sign-in screens worked but said too little: the code screen did not say where the code went, "Send a new code" went back to an empty first screen, a lock-out said "900 seconds", a refused sign-in emptied the email box, signing out ended on a bare form, the device list gave times in UTC, and "Continue with Google" was drawn where Google could only fail. Saying more meant the screens had to know things they did not: the address typed, where the person was, whether Google is set up, and (after the code) whether the address already had an account. Each had to be learned without telling a stranger whether an address has an account (T-68) and without putting anything personal in an address bar.
 
 ## What
 
@@ -16,12 +16,14 @@ The sign-in screens worked but said too little: the code screen did not say wher
 - **Times in the reader's own time.** The server does not know a person's time zone, so the device list is drawn in UTC, said as such, and the browser puts each time into its own ("today at 8:41 PM") as soon as the page's script runs (`local-time.tsx`).
 - **Google is drawn only where it is set up: `GOOGLE_SIGN_IN` (`on` or `off`, `off` unless set).** The sign-in service cannot tell us cheaply whether Google is configured on it, so the setting says so; with it off no screen draws the button and a hand-sent post is answered as a failed try without asking the service.
 - **"Show" on every password field** is drawn once the page's script runs; with scripts off it could do nothing, so it is not drawn. Its name is "Show" or "Hide", never "Show password": the field keeps the only label that says "Password".
+- **After a right code, the screens may know whether the address had an account (R-31).** `CodeProof` carries `accountExists`, filled by both adapters at the moment the code is proved right. It is known only to whoever holds the mailbox, which the email itself already tells (`SignInCodeMessage.accountExists`), so it tells a stranger nothing; before the code nothing differs (T-68).
 
 ## What else was considered
 
 - **The typed address in the address bar.** Refused: an address bar is kept in history and shared in links.
 - **React's form state for a refused sign-in (record 067).** It would answer a refused post with a page, not a redirect: the web shell check's T-68 lines, which compare redirects and cookies for an address with an account and one without, would no longer hold unchanged.
 - **A cookie to carry "You are signed out." once.** A league page cannot clear a cookie while it draws, and a page drawn in the answer to a post does not reliably see a cookie that post set (record 067); the name in the address is true for as long as it shows.
+- **Knowing R-31 without changing the interface**, by an encrypted note in the flow cookie with a key in the server's memory: lost on every restart. Refused for the one additive field.
 - **Asking the sign-in service whether Google is set up.** Possible on Supabase's settings answer, but a change to the adapter that step 2.93 owns; the setting is plain and the admin of the deployment sets it once.
 
 ## Revisit if

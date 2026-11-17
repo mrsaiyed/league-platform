@@ -16,7 +16,9 @@ import { signedInPerson } from '../../../../server/signed-in-leagues.ts';
 // password" on the forgotten-password route (step 2.163). Only after a right code: with
 // none (Back after the account was made, L10; an old tab) a signed-in person goes to
 // their account, anyone else starts again, rather than being shown a form whose saving
-// can only answer "That took too long".
+// can only answer "That took too long". After a right code for an address that already
+// has an account, it says that saving changes its password and signs out the account's
+// other devices (R-31): a family sharing one address is not signed out unawares (M29).
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const flow = await flowOfThisRequest();
@@ -32,6 +34,7 @@ export default async function Page({ searchParams }: SearchProps) {
       intro={t('password.rules')}
       search={search}
     >
+      {flow.existing === true ? <p data-account-exists="">{t('password.existing')}</p> : null}
       <form action={choosePasswordAction}>
         <PasswordField fresh />
         <SubmitButton words="password.submit" />

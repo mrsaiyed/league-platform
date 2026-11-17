@@ -10,7 +10,8 @@
 // - Every password field has "Show" with scripts on (L9), and none is drawn with them off.
 // - Ten wrong passwords show "15 minutes" and the hint, with the address kept in its box
 //   after every wrong try, and "Forgot your password?" gets the person in, on a screen
-//   titled "Choose a new password" (M28). Walked at the same time for an address with an
+//   titled "Choose a new password" that says saving changes the account's password and
+//   signs out its other devices (M28, M29, R-31). Walked at the same time for an address with an
 //   account and one without, whose screens must read the same, word for word, but for the
 //   address (T-68).
 // - Before the code, an address with an account and one without see the same screens:
@@ -405,6 +406,14 @@ async function lockOutWalk(email, getsIn) {
     const { code } = await keptCodesAtLeast(context, email, 3);
     secrets.add(code);
     await enterCode(page, code);
+    note(
+      'after the code, an address with an account is told what saving does (R-31, M29)',
+      (await said(
+        page,
+        'You already have an account. This changes its password and signs out your other devices.',
+      ).count()) === 1,
+      await mainText(page),
+    );
     note(
       'after the code, the password screen is "Choose a new password"',
       (await page.getByRole('heading', { level: 1, name: 'Choose a new password' }).count()) === 1,
