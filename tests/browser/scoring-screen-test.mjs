@@ -32,6 +32,12 @@
 //   hundred plays is measured and judged; the figures are printed, with how long the
 //   options and the count take to follow. And the tile counts a play only after the
 //   device's own store has finished writing it (T-114): the store's writes are timed.
+//   A hundred plays tapped are a hundred plays recorded, said by the game itself (its
+//   count of plays, the tile's points) and not only by the watches that time each tap:
+//   a lost play is the worst thing this screen can do. The watch of a tap's mark looks
+//   for a NEW mark, also when the mark of the play before is still on the tile with the
+//   same words (a store that answers late): until step 2.37 it then saw no mark and a
+//   run counted 99 of a hundred plays that were all recorded (GitHub's run 43986010617).
 //   The clock runs through those hundred plays (step 2.36), and for three seconds after
 //   them its ticking is seen to change the clock's own place and nothing of any tile.
 // - Then the clock, periods, team fouls and timeouts of step 2.36, on the same game:
@@ -2048,11 +2054,20 @@ if (browser) {
             };
             let touched = 0;
             let waiting = null;
+            // A tap that landed on neither a player's tile nor an option: the option's tap
+            // made before the options were drawn (this run's pace is fixed, and a machine
+            // starved of its processor can fall behind it). Such a run cannot say whether
+            // a play was lost, and says so.
+            times.elsewhere = [];
             document.addEventListener(
               'click',
               (event) => {
                 touched = event.timeStamp;
-                waiting = event.target.closest('[data-act]') ? 'option' : 'tile';
+                const onOption = event.target.closest('[data-act]') !== null;
+                waiting = onOption ? 'option' : 'tile';
+                if (!onOption && event.target.closest('[data-teams] [data-player]') === null) {
+                  times.elsewhere.push(String(event.target.className || event.target.tagName));
+                }
               },
               true,
             );
@@ -2066,31 +2081,46 @@ if (browser) {
             }).observe(pad, { childList: true, subtree: true });
             // The tile is ringed the moment it is tapped; an option tapped marks it with
             // what was tapped, before that is saved; then the tile counts it.
-            let marked = 0;
+            // When each option was tapped whose play the tile has not counted yet, oldest
+            // first: plays are counted in the order they were tapped, so a play counted
+            // late (the store slow) is still timed from its own tap, not the next one's.
+            // (Kept with the times, so it is emptied with them before the hundred plays.)
+            const marked = [];
+            times.uncounted = marked;
             new MutationObserver((changes) => {
               for (const change of changes) {
-                const set = tile.hasAttribute(change.attributeName);
                 const ringed = tile.getAttribute('data-tapped') === 'on';
                 if (change.attributeName === 'data-tapped' && ringed && waiting === 'tile') {
                   waiting = null;
                   opening = touched;
                   painted(touched, times.ringed);
-                } else if (change.attributeName === 'data-mark' && set && waiting === 'option') {
+                } else if (
+                  // A new mark: its text is written, or, when the mark of the play before
+                  // is still on the tile and says the same ("+2" again), only the name of
+                  // its fade, which every new mark changes (tile-marks.ts: the two names
+                  // are taken in turn). Until step 2.37 only the text was watched, so a
+                  // play whose mark followed one still showing was not seen at all: on a
+                  // machine whose store answered late GitHub counted 99 of a hundred
+                  // plays that were all recorded (run 43986010617).
+                  (change.attributeName === 'data-mark' ||
+                    change.attributeName === 'data-mark-turn') &&
+                  tile.hasAttribute('data-mark') &&
+                  waiting === 'option'
+                ) {
                   waiting = null;
-                  marked = touched;
+                  marked.push(touched);
                   painted(touched, times.marked);
-                } else if (change.attributeName === 'data-points' && marked !== 0) {
-                  painted(marked, times.counted);
+                } else if (change.attributeName === 'data-points' && marked.length > 0) {
+                  const since = marked.shift();
+                  painted(since, times.counted);
                   // The tile counts the play now. The store's first write begun since the
                   // tap, and when it finished: after now, if the count was shown first.
                   const now = performance.now();
-                  const since = marked;
                   const write = writes.find((one) => one.began >= since);
                   times.stored.push({
                     wrote: write === undefined ? null : write.done - since,
                     counted: now - since,
                   });
-                  marked = 0;
                 }
               }
             }).observe(tile, { attributes: true, subtree: true });
@@ -2118,19 +2148,39 @@ if (browser) {
         // the player, the next play a little later. Each tap lasts as long as a finger's
         // does (60 ms down); a tap with no length at all is a test's, not a hand's.
         const finger = { delay: 60 };
+        const standing = async () => ({
+          plays: Number(await c.root.getAttribute('data-plays')),
+          points: Number(await home.locator('[data-points]').getAttribute('data-points')),
+        });
         const hundredPlays = async () => {
           await pause(1500);
           await page.evaluate(() => {
             for (const list of Object.values(window.tapTimes)) list.length = 0;
           });
+          const before = await standing();
           for (let i = 0; i < 100; i += 1) {
             await page.mouse.click(...tileAt, finger);
             await pause(300);
             await page.mouse.click(...optionAt, finger);
             await pause(600);
           }
+          // Nothing is read before every play tapped is on the screen: on a machine
+          // starved of its processor the last counts come late. A play that never comes
+          // is waited for half a minute, and the run then says how many came.
+          await page
+            .waitForFunction(
+              (want) => Number(document.querySelector('[data-scoring]').dataset.plays) >= want,
+              before.plays + 100,
+              { timeout: 30_000 },
+            )
+            .catch(() => undefined);
           await pause(1500);
+          const after = await standing();
           const measured = await page.evaluate(() => window.tapTimes);
+          measured.gained = {
+            plays: after.plays - before.plays,
+            points: after.points - before.points,
+          };
           console.log('Tap to paint, 500 taps waiting, processor slowed 4 times (finding M6):');
           console.log(`  ${line('a player tapped, the tile ringed', measured.ringed)}`);
           console.log(`  ${line('…and its options drawn in the pad', measured.opened)}`);
@@ -2239,6 +2289,22 @@ if (browser) {
           'every tap opened its options and its play was counted on the tile',
           times.opened.length === 100 && times.counted.length === 100,
           `${times.opened.length} opened, ${times.counted.length} counted`,
+        );
+        // And said by the game itself, not by the watches above: a hundred plays more
+        // stand, the tile counts two hundred points more, and every tap landed on a
+        // player or an option. A lost play is the worst thing this screen can do, so it
+        // is counted where it cannot be missed or miscounted. (An option's tap that
+        // landed before the options were drawn is this run falling behind its own fixed
+        // pace: it fails too, and says which it was.)
+        const early = [...new Set(times.elsewhere)];
+        note(
+          'a hundred plays tapped are a hundred plays recorded: none lost, none twice',
+          times.gained.plays === 100 && times.gained.points === 200 && early.length === 0,
+          `${times.gained.plays} plays and ${times.gained.points} points gained${
+            early.length === 0
+              ? ''
+              : `; ${times.elsewhere.length} taps were made before their option was drawn and landed on ${early.join(', ')}: the page fell behind the run’s fixed pace`
+          }`,
         );
         // Write before show (T-114): for every play, the device's store had finished a
         // write after the tap and before the tile counted it. A screen that counted
