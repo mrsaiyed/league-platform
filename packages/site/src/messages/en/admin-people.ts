@@ -20,6 +20,8 @@ export const enAdminPeople = {
   'adminPeople.field.child.adult': 'An adult (18 or over)',
   'adminPeople.field.child.child': 'A child (under 18)',
   'adminPeople.field.child.unknown': 'Not recorded',
+  'adminPeople.field.childByDate':
+    'The date of birth makes them a child, so they are treated as a child until their 18th birthday, whatever this choice says.',
   'adminPeople.field.childByTick':
     'The date of birth makes them an adult, but they are marked as a child, so they are treated as a child: shown with less on public pages. To show more, change this to “An adult”.',
   'adminPeople.field.childHelp': 'Children are shown with less on the league’s public pages.',

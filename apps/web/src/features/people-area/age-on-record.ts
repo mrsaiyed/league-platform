@@ -1,12 +1,14 @@
-// What a person's record says about their age, for the People screens only (step 2.50;
-// R-28 as the lead changed it on 2026-11-17: a person counts as a child if their birth
-// date says so OR the "minor" tick is on; a date that says adult does not untick anyone).
+// What a person's record says about their age, for the People screens (step 2.50).
 //
-// TO BE REPLACED at the merge of the build branch once step 2.93 part 5 has landed: the
-// product's one rule is then `isMinorOn` (packages/core, people/rules/minor-by-age.ts), and
-// this file keeps only what the screen asks that the rule does not answer (how old a date
-// makes someone, for the check before an unlikely date is saved). Nothing else on the
-// page, and no query, works out whether someone is a child.
+// Who counts as a child is core's one rule, isMinorOn (R-28 as changed on 2026-11-17: a
+// child if their date of birth says so OR the "minor" tick is on; a date that says adult
+// unticks no one), always on the league's own today. This file never works that out
+// itself: it only asks the rule, once with the date alone, to tell the admin when the
+// date and the choice on the form disagree and which one wins.
+//
+// What is this screen's own: how old a date makes someone, for the question before an
+// unlikely date of birth is saved (a question, never a refusal; the lead, 2026-11-17).
+import { isMinorOn } from '@srleagues/core';
 
 /** Whole years from `birthDate` to `today`, both `YYYY-MM-DD`; undefined for a date that is not one. */
 export function yearsOld(birthDate: string, today: string): number | undefined {
@@ -24,16 +26,25 @@ export function yearsOld(birthDate: string, today: string): number | undefined {
 }
 
 /**
- * The tick says a child while the birth date says an adult (R-28): the tick wins, so the
- * person is treated as a child until an admin takes it off, and the screen says so.
+ * When the date of birth and the child-or-adult choice disagree, which one wins (R-28):
+ * - `tick-keeps-child`: marked as a child while the date says adult; the tick wins, so
+ *   they are treated as a child until an admin changes the choice;
+ * - `date-makes-child`: marked as an adult while the date says child; the date wins, so
+ *   they are treated as a child until their 18th birthday.
+ * Undefined when they do not disagree, or there is no date.
  */
-export function tickKeepsAChild(
+export type ChildDisagreement = 'tick-keeps-child' | 'date-makes-child';
+
+export function childDisagreement(
   details: { readonly birthDate: string; readonly child: '' | 'child' | 'adult' },
+  /** The league's own today, yyyy-mm-dd. */
   today: string,
-): boolean {
-  if (details.child !== 'child') return false;
-  const years = yearsOld(details.birthDate, today);
-  return years !== undefined && years >= 18;
+): ChildDisagreement | undefined {
+  if (details.birthDate === '') return undefined;
+  const byDate = isMinorOn({ birthDate: details.birthDate, isMinor: null }, today);
+  if (details.child === 'child' && byDate === false) return 'tick-keeps-child';
+  if (details.child === 'adult' && byDate === true) return 'date-makes-child';
+  return undefined;
 }
 
 /** Younger than this, or this old and older, a date of birth is shown back before it is saved. */

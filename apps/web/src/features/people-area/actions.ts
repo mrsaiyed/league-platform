@@ -43,7 +43,6 @@ import {
 } from '../games-area/form-state.ts';
 import { unlikelyYears } from './age-on-record.ts';
 import { detailsAnchor } from './anchors.ts';
-import { todayForBirthDates } from './form-words.ts';
 import { newPersonInput, personChangeInput, wrongBoxes, type PersonBox } from './person-input.ts';
 
 type Outcome =
@@ -60,10 +59,12 @@ async function peopleOf(fields: TypedFields) {
   const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'people');
   const league = view.context.league;
   const context: CommandContext = commandContextOf(view.context);
-  const { adminPeople } = await webPorts();
+  const { adminPeople, publicSchedule } = await webPorts();
   return {
     context,
     deps: adminPeople.deps,
+    /** The league's own today, from the ports' one clock (the age a date makes is on it). */
+    leagueToday: async () => (await publicSchedule.clockOf(league.id)).today,
     list: leagueUrl(league, 'admin-area', { area: 'people' }),
     record: (personId: string) =>
       leagueUrl(league, 'admin-area', { area: 'people', subpath: [personId] }),
@@ -115,12 +116,16 @@ async function showSaved(to: string): Promise<void> {
  * against). Nothing is saved; the box keeps the date, the sentence says the age it makes,
  * and a tick under it lets the admin save it as it is. Undefined when there is nothing to ask.
  */
-function askAboutBirthDate(fields: TypedFields, storedBirthDate?: string): Refused | undefined {
+function askAboutBirthDate(
+  fields: TypedFields,
+  leagueToday: string,
+  storedBirthDate?: string,
+): Refused | undefined {
   const typed = (fields['birthDate'] ?? '').trim();
   if (typed === '' || typed === storedBirthDate || fields['birthDateChecked'] === 'on') {
     return undefined;
   }
-  const years = unlikelyYears(typed, todayForBirthDates());
+  const years = unlikelyYears(typed, leagueToday);
   if (years === undefined) return undefined;
   return {
     kind: 'refused',
@@ -134,10 +139,10 @@ function askAboutBirthDate(fields: TypedFields, storedBirthDate?: string): Refus
 /** "Add a person": saved, the browser goes to their own new page, which says so. */
 export async function addPersonAction(_state: FormState, form: FormData): Promise<FormState> {
   const fields = typedOf(form);
-  const { context, deps, record } = await peopleOf(fields);
+  const { context, deps, record, leagueToday } = await peopleOf(fields);
   const wrong = wrongBoxes(fields);
   if (wrong.length > 0) return refused('create_person', 'invalid-input', fields, wrong);
-  const ask = askAboutBirthDate(fields);
+  const ask = askAboutBirthDate(fields, await leagueToday());
   if (ask !== undefined) return ask;
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const made = await createPerson(context, newPersonInput(fields), deps);
@@ -153,7 +158,7 @@ export async function addPersonAction(_state: FormState, form: FormData): Promis
 /** "Save details" on a person's page: saved, the page says so beside the details. */
 export async function savePersonAction(_state: FormState, form: FormData): Promise<FormState> {
   const fields = typedOf(form);
-  const { context, deps, list, record } = await peopleOf(fields);
+  const { context, deps, list, record, leagueToday } = await peopleOf(fields);
   const personId = (fields['personId'] ?? '').trim().toLowerCase();
   const wrong = wrongBoxes(fields);
   if (wrong.length > 0) return refused('update_person', 'invalid-input', fields, wrong);
@@ -162,6 +167,7 @@ export async function savePersonAction(_state: FormState, form: FormData): Promi
     const stored = await getPerson(context, { personId }, deps);
     const ask = askAboutBirthDate(
       fields,
+      await leagueToday(),
       stored.ok ? (stored.value.sensitive?.birthDate ?? undefined) : undefined,
     );
     if (ask !== undefined) return ask;

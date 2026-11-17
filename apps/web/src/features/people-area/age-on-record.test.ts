@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { tickKeepsAChild, unlikelyYears, yearsOld } from './age-on-record.ts';
+import { childDisagreement, unlikelyYears, yearsOld } from './age-on-record.ts';
 
 describe('yearsOld', () => {
   it('counts whole years, a birthday not yet come this year counting one fewer', () => {
@@ -13,16 +13,27 @@ describe('yearsOld', () => {
   });
 });
 
-describe('tickKeepsAChild (R-28 as changed on 2026-11-17)', () => {
+describe("childDisagreement (core's isMinorOn, R-28 as changed on 2026-11-17)", () => {
   const today = '2026-11-17';
-  it('is true when the tick says a child and the date says an adult: the tick wins', () => {
-    expect(tickKeepsAChild({ birthDate: '1990-01-01', child: 'child' }, today)).toBe(true);
+  it('says the tick keeps a child when the date says adult', () => {
+    expect(childDisagreement({ birthDate: '1990-01-01', child: 'child' }, today)).toBe(
+      'tick-keeps-child',
+    );
   });
-  it('is false whenever they do not disagree that way', () => {
-    expect(tickKeepsAChild({ birthDate: '2015-01-01', child: 'child' }, today)).toBe(false);
-    expect(tickKeepsAChild({ birthDate: '', child: 'child' }, today)).toBe(false);
-    expect(tickKeepsAChild({ birthDate: '1990-01-01', child: 'adult' }, today)).toBe(false);
-    expect(tickKeepsAChild({ birthDate: '1990-01-01', child: '' }, today)).toBe(false);
+  it('says the date makes a child when they are marked as an adult', () => {
+    expect(childDisagreement({ birthDate: '2015-01-01', child: 'adult' }, today)).toBe(
+      'date-makes-child',
+    );
+    // The day before their 18th birthday, on the league's today, they are still a child.
+    expect(childDisagreement({ birthDate: '2008-11-18', child: 'adult' }, today)).toBe(
+      'date-makes-child',
+    );
+  });
+  it('says nothing when the date and the choice agree, or there is no date or no choice', () => {
+    expect(childDisagreement({ birthDate: '2015-01-01', child: 'child' }, today)).toBeUndefined();
+    expect(childDisagreement({ birthDate: '2008-11-17', child: 'adult' }, today)).toBeUndefined();
+    expect(childDisagreement({ birthDate: '', child: 'child' }, today)).toBeUndefined();
+    expect(childDisagreement({ birthDate: '1990-01-01', child: '' }, today)).toBeUndefined();
   });
 });
 

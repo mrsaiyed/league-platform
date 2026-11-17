@@ -292,7 +292,7 @@ if (built) {
     await details.getByLabel('Child or adult').selectOption('child');
     await details.getByRole('button', { name: 'Save details' }).click();
     // "Saved" from the save before is still on screen: wait for what this save brings.
-    const byTick = details.locator('[data-child-by-tick]');
+    const byTick = details.locator('[data-child-note]');
     await byTick.waitFor();
     note(
       'the record says beside the tick that they are treated as a child until it is changed',
@@ -303,6 +303,22 @@ if (built) {
     await details.getByRole('button', { name: 'Save details' }).click();
     await byTick.waitFor({ state: 'detached' });
     note('and says nothing once they are marked as an adult', (await byTick.count()) === 0);
+    note(
+      'after a save the choice shows what was saved, so the next save sends it again',
+      (await details.getByLabel('Child or adult').inputValue()) === 'adult',
+    );
+    // The other way round: marked as an adult, with a date that makes them ten. The date
+    // wins (core's isMinorOn), and the record says so.
+    await details
+      .getByLabel('Date of birth (optional)')
+      .fill(`${new Date().getUTCFullYear() - 10}-01-15`);
+    await details.getByRole('button', { name: 'Save details' }).click();
+    await byTick.waitFor();
+    note(
+      'marked as an adult with a date that makes them a child: the record says the date wins',
+      (await byTick.innerText()).includes('treated as a child until their 18th birthday'),
+      await byTick.innerText(),
+    );
 
     at = "a child's name on a youth team's public roster is put right";
     await page.goto(`${origin}/harbor-city`);

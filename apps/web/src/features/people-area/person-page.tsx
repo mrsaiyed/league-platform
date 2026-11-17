@@ -19,10 +19,10 @@ import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { SavedLine } from '../games-area/saved-line.tsx';
 import { StaffTrail } from '../staff/index.ts';
 import { removePersonAction, savePersonAction } from './actions.ts';
-import { tickKeepsAChild } from './age-on-record.ts';
+import { childDisagreement } from './age-on-record.ts';
 import { detailsAnchor, removeAnchor } from './anchors.ts';
 import { personFormWords, todayForBirthDates } from './form-words.ts';
-import { readPerson } from './people-view.ts';
+import { readPerson, type PersonView } from './people-view.ts';
 import { PersonForm } from './person-form.tsx';
 import { RemoveForm } from './remove-form.tsx';
 
@@ -60,6 +60,8 @@ export async function PersonPage({
         : notice.said === 'saved'
           ? t('adminPeople.saved', { name: person.name })
           : undefined;
+  // The league's own today (the ports' one clock): who is a child is measured on it (R-28).
+  const leagueToday = (await (await webPorts()).publicSchedule.clockOf(here.id)).today;
   const listUrl = leagueUrl(here, 'admin-area', { area });
   const pageUrl = leagueUrl(here, 'admin-area', { area, subpath: [person.id] });
 
@@ -82,11 +84,7 @@ export async function PersonPage({
           }}
           values={{ firstName: person.firstName, lastName: person.lastName }}
           privateDetails={person.private}
-          childNote={
-            person.private !== undefined && tickKeepsAChild(person.private, todayForBirthDates())
-              ? t('adminPeople.field.childByTick')
-              : undefined
-          }
+          childNote={childNoteOf(person.private, leagueToday)}
           today={todayForBirthDates()}
           words={personFormWords(t('adminPeople.save.submit'))}
           main
@@ -110,4 +108,12 @@ export async function PersonPage({
       </section>
     </main>
   );
+}
+
+/** Said beside the child-or-adult choice when the date of birth and the choice disagree (R-28). */
+function childNoteOf(details: PersonView['private'], leagueToday: string): string | undefined {
+  const disagreement = details === undefined ? undefined : childDisagreement(details, leagueToday);
+  if (disagreement === 'tick-keeps-child') return t('adminPeople.field.childByTick');
+  if (disagreement === 'date-makes-child') return t('adminPeople.field.childByDate');
+  return undefined;
 }

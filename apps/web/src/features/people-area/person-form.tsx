@@ -72,8 +72,14 @@ export function PersonForm({
   const onSubmit = useOneSubmit(pending, state);
   const id = useId();
   const refused = state.kind === 'refused' ? state : undefined;
-  // Drawn afresh after each refusal, so every box shows what was posted.
-  const drawn = refused === undefined ? 'stored' : JSON.stringify(refused.typed);
+  // Drawn afresh after each refusal, so every box shows what was posted; and after each
+  // save, from what is stored now. React resets a form once its action has worked, and a
+  // select goes back to the choice it was first drawn with, not the one saved: a second
+  // save would then send that old choice (it cleared "An adult" to "Not recorded").
+  const drawn =
+    refused === undefined
+      ? `stored:${JSON.stringify([values, privateDetails ?? null])}`
+      : `typed:${JSON.stringify(refused.typed)}`;
   const typed = (name: string, stored: string): string => refused?.typed[name] ?? stored;
   const wrong = (name: PersonBox) => refused?.wrong.includes(name) === true;
   const general = refused !== undefined && refused.wrong.length === 0;
@@ -183,7 +189,7 @@ export function PersonForm({
               </select>
               {child.after}
               {childNote === undefined ? null : (
-                <small className="ui-field-help" data-child-by-tick="true">
+                <small className="ui-field-help" data-child-note="true">
                   {childNote}
                 </small>
               )}
