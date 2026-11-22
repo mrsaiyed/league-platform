@@ -6,6 +6,7 @@ import {
   DesignStyle,
   headerSeason,
   LeagueNotice,
+  MyTeamEntry,
   signInHrefFrom,
   SiteFooter,
   SiteHeader,
@@ -16,12 +17,29 @@ import { myTeamsOf } from '../../features/team-pages/index.ts';
 import { isTrackerAddress } from '../../features/tracker/index.ts';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
+import type { LeagueView } from '../../server/league-gate.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { siteOfThisRequest } from '../../server/league-site.ts';
 import { leagueView, signedInEmail } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { pathHeader } from '../../server/request-facts-header.ts';
 import './league-site.css';
+
+/** "My team" in the account menu, once the person's teams of the season have been read. */
+async function MyTeamOfPerson({
+  view,
+  email,
+  path,
+  teams,
+}: {
+  readonly view: LeagueView;
+  readonly email: string | null;
+  readonly path: string;
+  readonly teams: Promise<number>;
+}) {
+  const menu = accountMenuOf(view, email, path, await teams);
+  return <MyTeamEntry entry={menu === null ? null : menu.myTeam} />;
+}
 
 /**
  * Every page of one league. Each page refuses the league to those who may not see
@@ -65,16 +83,19 @@ export default async function LeagueLayout({
     current === null ? null : headerSeason(league, path, await seasonsOfLeague(league.id));
   const account = view.context.account;
   const ports = await webPorts();
+  const email = await signedInEmail();
+  // The person's teams are read while the header is drawn, not before it: waiting for them
+  // here, for a signed-in person only, would let the page under the header be drawn first
+  // for them and not for a visitor, and the page's own picker would then be numbered
+  // differently (React's useId), so the page served would differ by who asked.
   const teams =
     account === null
-      ? 0
-      : (
-          await myTeamsOf(ports, {
-            leagueId: league.id,
-            accountId: account.accountId,
-            holder: () => ports.accessOf(commandContextOf(view.context)),
-          })
-        ).teams.length;
+      ? null
+      : myTeamsOf(ports, {
+          leagueId: league.id,
+          accountId: account.accountId,
+          holder: () => ports.accessOf(commandContextOf(view.context)),
+        }).then((mine) => mine.teams.length);
   return (
     <div className="league-site ui-root">
       <DesignStyle design={site.design} />
@@ -84,7 +105,12 @@ export default async function LeagueLayout({
       <SiteHeader
         league={league}
         name={site.name}
-        account={accountMenuOf(view, await signedInEmail(), path, teams)}
+        account={accountMenuOf(view, email, path)}
+        myTeam={
+          teams === null ? undefined : (
+            <MyTeamOfPerson view={view} email={email} path={path} teams={teams} />
+          )
+        }
         signInHref={signInHrefFrom(path)}
         current={current}
         season={season}

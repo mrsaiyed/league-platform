@@ -1,6 +1,7 @@
 import { leagueUrl, type LeagueAddressee } from '@srleagues/core';
 import { displayLabels } from '@srleagues/site';
 import { Emblem, FilterToolbar, SeasonPicker } from '@srleagues/ui';
+import type { ReactNode } from 'react';
 import { t } from '../../server/messages.ts';
 import { signOutAction } from '../../server/sign-in/actions.ts';
 import { leagueHomeStayUrl } from '../team-pages/index.ts';
@@ -42,6 +43,19 @@ function MenuLinks({
 }
 
 /**
+ * "My team" in the account menu (step 2.168), for someone with a team of the season; nothing
+ * for anyone else.
+ */
+export function MyTeamEntry({ entry }: { readonly entry: AccountMenu['myTeam'] }) {
+  if (entry === null) return null;
+  return (
+    <li>
+      <a href={entry.href}>{t(entry.several ? 'account.menu.myTeams' : 'account.menu.myTeam')}</a>
+    </li>
+  );
+}
+
+/**
  * What the account button holds for a signed-in person (U-8): who they are signed in as,
  * then their team (step 2.168), the admin, their games, their account, and signing out. Drawn twice, as the menu
  * and sign-in are: in the phone menu's panel and in the account button of the first row;
@@ -51,18 +65,18 @@ function MenuLinks({
  * when plays are waiting to be sent, releases the scoring session, and with scripts off is
  * a link to the account page (tracker-sign-out.ts).
  */
-function AccountEntries({ account }: { readonly account: AccountMenu }) {
+function AccountEntries({
+  account,
+  myTeam,
+}: {
+  readonly account: AccountMenu;
+  readonly myTeam?: ReactNode;
+}) {
   return (
     <>
       <p className="site-account-who">{t('account.signedInAs', { email: account.email })}</p>
       <ul>
-        {account.myTeam === null ? null : (
-          <li>
-            <a href={account.myTeam.href}>
-              {t(account.myTeam.several ? 'account.menu.myTeams' : 'account.menu.myTeam')}
-            </a>
-          </li>
-        )}
+        {myTeam ?? <MyTeamEntry entry={account.myTeam} />}
         {account.adminHref === null ? null : (
           <li>
             <a href={account.adminHref}>{t('account.menu.admin')}</a>
@@ -103,7 +117,14 @@ function AccountEntries({ account }: { readonly account: AccountMenu }) {
  * first row of a league's header, and in the scoring screen's own frame (step 2.35;
  * DESIGN.md section 7, line 11), which draws it in its own look.
  */
-export function AccountButton({ account }: { readonly account: AccountMenu }) {
+export function AccountButton({
+  account,
+  myTeam,
+}: {
+  readonly account: AccountMenu;
+  /** "My team" drawn in place of the account's own (SiteHeader's `myTeam`). */
+  readonly myTeam?: ReactNode;
+}) {
   return (
     <details className="site-account" data-account="">
       <summary>
@@ -113,7 +134,7 @@ export function AccountButton({ account }: { readonly account: AccountMenu }) {
         <span className="ui-visually-hidden">{t('account.menu')}</span>
       </summary>
       <nav className="site-account-panel" aria-label={t('account.menu')}>
-        <AccountEntries account={account} />
+        <AccountEntries account={account} myTeam={myTeam} />
       </nav>
     </details>
   );
@@ -140,6 +161,7 @@ export function SiteHeader({
   signInHref,
   current = null,
   season = null,
+  myTeam,
 }: {
   readonly league: LeagueAddressee;
   readonly name: string;
@@ -151,6 +173,12 @@ export function SiteHeader({
   readonly current?: MenuPage | null;
   /** The season picker, on a page that has one (header-season.ts). */
   readonly season?: HeaderSeason | null;
+  /**
+   * "My team" drawn in place of the account's own (`account.myTeam`): the layout gives it as
+   * a part that reads the person's teams itself, so the header is drawn without waiting for
+   * that read and the page under it is served the same to everyone (step 2.168).
+   */
+  readonly myTeam?: ReactNode;
 }) {
   const words = displayLabels(t);
   return (
@@ -175,7 +203,7 @@ export function SiteHeader({
               </a>
             ) : (
               <div className="site-menu-account">
-                <AccountEntries account={account} />
+                <AccountEntries account={account} myTeam={myTeam} />
               </div>
             )}
           </nav>
@@ -200,7 +228,7 @@ export function SiteHeader({
             {t('account.signInOrCreate')}
           </a>
         ) : (
-          <AccountButton account={account} />
+          <AccountButton account={account} myTeam={myTeam} />
         )}
       </div>
       <nav className="site-tabs" aria-label={t('nav.menu')}>
