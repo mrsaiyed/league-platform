@@ -216,7 +216,17 @@ npm run simulate
 
 **What the report says.** The first lines say how big the league is and how many games were called off or changed. Then each check, `ok` or `FAIL`: as many wins as losses; each division's points for equal its points against; every team played the games it was given, less those called off or still waiting; in every tracked game the players' points add up to the score; every called-off game ended as planned (a forfeit at the league's forfeit score, the corrected game counted once, at its corrected score); the overtime game is counted as overtime; and the standings the product shows match a second, simple working-out from the results. Then the final tables, `All 7 checks hold.` when all is well, and a last line saying how long each part took. If any check fails, the command says which one and ends with an error.
 
-**Seeing the league in the browser: not yet.** The league is kept in the folder `.local/simulate-db`, made fresh on every run. The web app cannot open that folder: when it runs on the made-up database (`LOCAL_DATA=made-up-database` in `.env`), it builds a new one in its memory each time it starts, with the made-up leagues and, with `LOCAL_DEMO_LEAGUE=on`, the 24-school demo league at `http://localhost:3000/larkvale` after `npm run dev:web`. To show the simulated league instead, the app would need one more setting that asks it to play a simulated league of a chosen size when it starts (the made-up database can already hold one), or to open the simulator's folder. Until then, a test reads the simulated league's pages the way the app does (`apps/web/src/server/simulated-league-pages.test.ts`).
+**Seeing the league in your browser.** Start the web app with the size you want, written the same way as above, in one line:
+
+```sh
+LOCAL_DATA=made-up-database LOCAL_SIMULATED_LEAGUE="--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7" npm run dev:web
+```
+
+(`LOCAL_SIMULATED_LEAGUE=on` gives a small league: 8 teams, one division, 7 weeks, 2 games scored play by play. You can also put the two settings in `.env` instead of typing them each time, and add `LOCAL_DEMO_LEAGUE=on` to have the demo league as well.)
+
+While it starts, the window you typed in prints two lines: first `Playing a simulated league at start: 24 teams in 4 division(s), …`, and when it is done `Simulated league ready: Simulated Made-up League, 120 games, all 7 checks hold, at http://localhost:3000/simulated (start took … s)`. Then open **http://localhost:3000/simulated** in your browser: the home page, schedule, standings, statistics, every team and every game are there. To see it as the league's owner, open **http://localhost:3000/signin/made-up-people** and press **Open Simulated Made-up League as Sim Owner**; the first time, it asks you to choose a password (any made-up one of 8 letters or more), then takes you to the league's admin.
+
+Two things to know. The league is made fresh every time the app starts, so nothing you change in it is kept after you stop the app. And above 30 teams the start takes about a minute (the first line says so); the page answers once the second line has printed. If the size cannot be played (for example 3 teams in 2 divisions), the app does not start and says in one sentence what was wrong, with an example that works.
 
 ## Make a league
 
