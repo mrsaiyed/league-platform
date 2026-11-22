@@ -59,21 +59,21 @@ export const enTrackerStates = {
   'tracker.notStarted.working': 'Clearing…',
   'tracker.notStarted.yes': 'Yes, mark not started',
   'tracker.readOnly.expired':
-    'This device was away too long and another device has had the game since. This one is now read-only.',
+    'This device was away too long and another device has had the game since. This device can no longer score it.',
   'tracker.readOnly.game-not-live':
     'This game cannot be scored now: it is over, cancelled or postponed.',
   'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
   'tracker.readOnly.not-held': 'This device is no longer the one scoring this game.',
   'tracker.readOnly.released':
-    'This device has left the game. It is read-only until you open it again.',
+    'This device has left the game. Open it again to keep scoring.',
   'tracker.readOnly.request-refused':
     'Something went wrong opening the game. Tap Open the game again.',
   'tracker.readOnly.signed-in-as-other':
-    'You signed in again, but this game is no longer being scored on this device: someone else is signed in here now, or another device took the game over while you were signed out. This one is now read-only.',
+    'You signed in again, but this game is no longer being scored on this device: someone else is signed in here now, or another device took the game over while you were signed out. This device can no longer score it.',
   'tracker.readOnly.signed-out':
     'You are signed out. Sign in again to keep scoring. What you entered on this device is kept and sent once you are back, so do not enter it again.',
   'tracker.readOnly.storage-failed':
-    'This device could not read what it has saved, so it is read-only. Open the game again to try once more.',
+    'This device could not read what it has saved, so it cannot score now. Open the game again to try once more.',
   // What the tracker says about holding the game and refused taps (T6 §5, T-113),
   // chosen from the controller's status by apps/web/src/features/tracker/tracker-notice.ts.
   'tracker.readOnly.taken-over':

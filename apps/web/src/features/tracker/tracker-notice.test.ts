@@ -137,3 +137,11 @@ describe('tracker notices (T6 §5, T-113)', () => {
     }
   });
 });
+
+describe('the words of a device that can no longer score (step 2.37, part 2)', () => {
+  it('never say "read-only": they say what the device can no longer do', () => {
+    for (const reason of reasons) {
+      expect(trackerNoticeText({ key: `tracker.readOnly.${reason}` }, t)).not.toMatch(/read-only/i);
+    }
+  });
+});

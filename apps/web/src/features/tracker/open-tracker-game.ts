@@ -103,9 +103,17 @@ export type OpenTrackerGameOptions = {
   /** Passed on to the controller (tests). */
   readonly controller?: Pick<
     TrackerControllerOptions,
-    'clock' | 'newCommandId' | 'random' | 'retry' | 'queue'
+    'clock' | 'newCommandId' | 'random' | 'retry' | 'queue' | 'renewEveryMs'
   >;
 };
+
+/**
+ * How often the scoring screen renews its hold on the game (step 2.37, part 2; T-295):
+ * every few seconds, not every half minute, so a device that has lost the game to
+ * another says so within a few seconds even when no tap is being sent. The renewal is
+ * the one request that finds this out; the lease it extends is unchanged.
+ */
+export const holdCheckMs = 5_000;
 
 export type OpenedTrackerGame = {
   readonly controller: TrackerController;
@@ -155,6 +163,7 @@ export async function openTrackerGame(
   }
   const { games } = storage;
   const controller = createTrackerController({
+    renewEveryMs: holdCheckMs,
     ...options.controller,
     gameId,
     deviceId,
