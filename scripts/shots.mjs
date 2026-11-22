@@ -717,6 +717,33 @@ const scorekeeperPages = [
   // The games list as a scorekeeper sees it: a final game says who can reopen it (2.154).
   { name: 'scorekeeper-games-list', at: '/admin/games' },
 ];
+// What a coach finds (step 2.168): "My team" in the account menu, and their team marked as
+// theirs, after the page, on its page, the Teams list and the league home. The made-up coach
+// is on North Valley's Herons and Harbor City's Rockets, and Harbor City opens on a member's
+// team. A visitor whose device chose a team sees it marked; someone on no team who opens
+// `/my` is told so (the made-up stranger, signed in, holds nothing anywhere).
+const coach = { name: 'srl_session', value: 'local-coach-token' };
+const stranger = { name: 'srl_session', value: 'local-stranger-token' };
+const chosenComets = { name: `srl_my_team_${hexId('0000', 2)}`, value: 'comets' };
+/** The marks are read after the page: the picture waits for the first one. */
+const yoursDrawn = (page) =>
+  page
+    .locator('main :is([data-yours], [data-your-team])')
+    .first()
+    .waitFor({ state: 'attached', timeout: 60_000 });
+const coachPages = [
+  { name: 'coach-menu-open', at: '', opens: true },
+  { name: 'coach-league-home', at: '', steps: yoursDrawn },
+  { name: 'coach-team', at: '/teams/herons', steps: yoursDrawn },
+  { name: 'coach-team-opens-here', league: 'harbor-city', at: '/teams/rockets', steps: yoursDrawn },
+  { name: 'coach-teams', league: 'harbor-city', at: '/teams', steps: yoursDrawn },
+  { name: 'coach-home', league: 'harbor-city', at: '?start=league', steps: yoursDrawn },
+];
+const chosenTeamPages = [
+  { name: 'visitor-chose-teams', at: '/teams', steps: yoursDrawn },
+  { name: 'visitor-chose-home', at: '?start=league', steps: yoursDrawn },
+];
+const noTeamPages = [{ name: 'my-no-team', at: '/my' }];
 // A game won in overtime (step 2.200, `--only=overtime`): Lions v Tigers, the first league's
 // game 1, played level through regulation and won in the first overtime by this script's
 // own taps (scoreOvertimeGame), after every other picture is taken, so none of them
@@ -1657,6 +1684,12 @@ try {
     await keeper.addCookies([{ ...scorekeeper, url: origin }]);
     const planner = await browser.newContext({ viewport: width.viewport });
     await planner.addCookies([{ ...scheduler, url: origin }]);
+    const coaching = await browser.newContext({ viewport: width.viewport });
+    await coaching.addCookies([{ ...coach, url: origin }]);
+    const choosing = await browser.newContext({ viewport: width.viewport });
+    await choosing.addCookies([{ ...chosenComets, url: origin }]);
+    const teamless = await browser.newContext({ viewport: width.viewport });
+    await teamless.addCookies([{ ...stranger, url: origin }]);
     // One browser for each person a refusal is pictured for (step 2.157).
     const refused = new Map();
     for (const page of design === '' ? refusalPages.filter((p) => wanted(p.name)) : []) {
@@ -1724,6 +1757,24 @@ try {
         name: `${page.league ?? leagues[0]}-${page.name}`,
         context: keeper,
         base: `/${page.league ?? leagues[0]}`,
+      })),
+      ...(design === '' ? coachPages : []).map((page) => ({
+        ...page,
+        name: `${page.league ?? leagues[0]}-${page.name}`,
+        context: coaching,
+        base: `/${page.league ?? leagues[0]}`,
+      })),
+      ...(design === '' ? chosenTeamPages : []).map((page) => ({
+        ...page,
+        name: `${leagues[1]}-${page.name}`,
+        context: choosing,
+        base: `/${leagues[1]}`,
+      })),
+      ...(design === '' ? noTeamPages : []).map((page) => ({
+        ...page,
+        name: `${leagues[0]}-${page.name}`,
+        context: teamless,
+        base: `/${leagues[0]}`,
       })),
       ...(design === '' ? schedulerPages : []).map((page) => ({
         ...page,
@@ -1841,6 +1892,9 @@ try {
     await staffTapping.close();
     await keeper.close();
     await planner.close();
+    await coaching.close();
+    await choosing.close();
+    await teamless.close();
     for (const context of refused.values()) await context.close();
   }
   // A game won in overtime (`--only=overtime`): scored now, after every other picture.

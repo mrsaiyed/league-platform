@@ -9,5 +9,9 @@ export {
   loadTeamStats,
   type TeamCard,
 } from './build-team.ts';
+export { MyPage } from './my-page.tsx';
+export { YourTeamLine } from './my-team-marks.tsx';
+export { myTeamReply, type MyTeamReply } from './my-team-read.ts';
+export { chosenTeamOf, myTeamsOf, type MyTeam, type MyTeams } from './my-teams.ts';
 export { startPageRedirect } from './start-redirect.ts';
 export { leagueHomeStayUrl, stayAtHome } from './start-page.ts';

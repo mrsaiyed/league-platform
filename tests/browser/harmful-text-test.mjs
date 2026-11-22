@@ -227,6 +227,8 @@ let browser;
 const origin = `http://localhost:${await freePort()}`;
 const owner = 'local-owner-token';
 const keeper = 'local-scorekeeper-token';
+const coach = 'local-coach-token';
+const stranger = 'local-stranger-token';
 
 if (built) {
   server = startNext(['start', '--port', new URL(origin).port], {
@@ -401,6 +403,17 @@ if (browser) {
       found.made.length === 0 && found.ran === null,
       found.made.join(' | '),
     );
+  });
+
+  // Step 2.168: the made-up coach (Amal Nasser, the coach token's person) is put on the attack
+  // team's roster too, so the coach's own "my teams" read (/my-team) answers with its name.
+  await step("the coach is put on the attack team's roster", async () => {
+    await page.goto(origin + teamAdmin);
+    const form = page.locator('form', {
+      has: page.getByRole('button', { name: 'Add to the roster', exact: true }),
+    });
+    await form.getByLabel('Person').selectOption({ label: 'Amal Nasser' });
+    await tap(form.getByRole('button', { name: 'Add to the roster', exact: true }), /done=added/);
   });
 
   await step('a round is renamed with the attack', async () => {
@@ -619,9 +632,9 @@ if (browser) {
 const ROLES = [
   ['the owner', owner],
   ['a scheduler (an admin with a narrower grant)', 'local-scheduler-token'],
-  ['a coach', 'local-coach-token'],
+  ['a coach', coach],
   ['the scorekeeper', keeper],
-  ['a signed-in person with no role', 'local-stranger-token'],
+  ['a signed-in person with no role', stranger],
   ['a visitor', null],
 ];
 const asWho = (who) => (who === null ? {} : { cookie: `srl_session=${who}` });
@@ -693,6 +706,9 @@ const ANSWERS = {
   '/api/v1/leagues/[leagueId]/games/[game]/snapshot': [keeper, owner],
   '/api/v1/leagues/[leagueId]/games/[game]/state': [keeper, owner],
   '/api/v1/leagues/[leagueId]/scoring': [keeper, owner],
+  // A person's own teams (step 2.168): the coach's carry the attack team's name, a person with
+  // no team and a visitor are answered nothing to mark.
+  '/api/v1/leagues/[leagueId]/my-team': [null, coach, stranger],
   '/display.css': [null],
   // A fixed text (step 2.93: "do not index" outside production): nothing typed reaches it.
   '/robots.txt': [null],
@@ -1049,6 +1065,18 @@ async function walkEveryRoute() {
               body.slice(0, 80),
             );
             carried ||= body.includes(JSON.stringify(typed.table).slice(1, -1));
+            if (route.endsWith('/my-team')) {
+              const names = (parsed?.marked ?? []).map((team) => team.name);
+              note(
+                who === coach
+                  ? `${label}: the coach's own teams carry the attack team's name as data`
+                  : `${label}: someone with no team of their own is marked no team`,
+                who === coach ? names.includes(typed.team) : names.length === 0,
+                JSON.stringify(names).slice(0, 120),
+              );
+            }
+          } else if (route.endsWith('/my-team')) {
+            note(`${label}: the answer is JSON`, false, type || 'untyped');
           } else if (type.includes('html')) {
             const raw = unescapedIn(body);
             note(
