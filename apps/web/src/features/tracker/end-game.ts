@@ -101,7 +101,10 @@ export function endQuestion(
   const { period } = basketball.derive(game);
   const now = periodText(period, periods, t);
   /** What is still to play, in the sentences given: null once the last period has run out. */
-  const early = (timeLeft: string, notLast: string): EarlyEnd | null => {
+  const early = (
+    timeLeft: 'tracker.end.ask.timeLeft' | 'tracker.end.levelTimeLeft',
+    notLast: 'tracker.end.ask.notLast' | 'tracker.end.levelNotLast',
+  ): EarlyEnd | null => {
     if (!clock.over) {
       const [before = '', after = ''] = t(timeLeft, { period: now, clock: clockPlace }).split(
         clockPlace,
