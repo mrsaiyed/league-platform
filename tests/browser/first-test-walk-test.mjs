@@ -301,7 +301,8 @@ if (built) {
       '10. the Wolves\' chip reads "1 turnover"',
       (await chip.innerText()).trim() === '1 turnover',
     );
-    await scoring.keyboard.press('Escape');
+    // Closed as a phone closes it: the same button again.
+    await chip.tap();
     await c.pad.locator('[data-rest]').waitFor();
 
     at = 'step 11: a wrong basket, taken back with Undo';

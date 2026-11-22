@@ -115,7 +115,8 @@ To try the whole job from an empty league: sign in as the made-up owner, open St
 Season", and nothing in it yet). Add the teams and their people in Admin → Teams; add rounds
 and games in Admin → Schedule and publish the schedule; show the season to the public in
 the season's settings; then score a game in Admin → Games (or with the tracker) and look at
-the final table on the standings. It starts empty again every time the app restarts.
+the final table on the standings. It starts empty again every time the app restarts. The
+whole walk, step by step with what each screen says, is [the first test](first-test.md).
 
 ### Signing in as the made-up people
 
