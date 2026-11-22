@@ -6,7 +6,11 @@
 //   node scripts/land-lane.mjs lane/2.50-people-screens --step 2.50 \
 //     --title "the People screens" --log "Step 2.50 landed (...): ..." \
 //     [--part "PART 1 LANDED ..."] [--polish "one line"] [--tests "path path"] \
-//     [--twin lane/2.50-again] [--replace-agreed U-15] [--dry-run]
+//     [--twin lane/2.50-again] [--replace-agreed U-15] [--keep-folder] [--dry-run]
+//
+// NEVER land a lane while a helper is still working in its folder: step 6 removes the folder,
+// git-ignored files and all (it took a reader's pictures with it on 2026-11-22). If someone
+// is in it, wait for their report, or pass --keep-folder and remove the folder afterwards.
 //
 // 1. the main folder is on the build branch with nothing uncommitted;
 // 2. GitHub has PASSED the lane's newest commit on the lane AND on its twin;
@@ -166,10 +170,13 @@ if (pushed.status !== 0)
     `landed here (${git('rev-parse', '--short=7', 'HEAD')}) but the push failed: ${pushed.stderr.trim().split('\n').pop()}`,
   );
 const folder = `.local/lanes/${lane.slice(5)}`;
-const cleared = existsSync(`${root}${folder}`)
-  ? run('git', ['worktree', 'remove', folder]).status === 0
-  : true;
-run('git', ['branch', '-D', lane]);
+const keep = args.includes('--keep-folder');
+const cleared = keep
+  ? false
+  : existsSync(`${root}${folder}`)
+    ? run('git', ['worktree', 'remove', folder]).status === 0
+    : true;
+if (!keep) run('git', ['branch', '-D', lane]);
 console.log(
   `LANDED step ${step}${part ? ' (a part; the plan line stays open, rewrite its STATUS row)' : ''}: ${lane} at ${head}.`,
 );
