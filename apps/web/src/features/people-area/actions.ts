@@ -66,6 +66,8 @@ async function peopleOf(fields: TypedFields) {
     /** The league's own today, from the ports' one clock (the age a date makes is on it). */
     leagueToday: async () => (await publicSchedule.clockOf(league.id)).today,
     list: leagueUrl(league, 'admin-area', { area: 'people' }),
+    searched: (name: string) =>
+      leagueUrl(league, 'admin-area', { area: 'people', query: { q: name } }),
     record: (personId: string) =>
       leagueUrl(league, 'admin-area', { area: 'people', subpath: [personId] }),
   };
@@ -135,6 +137,24 @@ function askAboutBirthDate(
     wrong: ['birthDate'],
     said: t.plural('adminPeople.birthDate.check', years),
   };
+}
+
+/**
+ * The list's search. It is posted, not put in the address, so what was typed is only put
+ * in one once it is known to be a name: an email address (never searched, and never to
+ * ride in an address) sends the browser to the list's clean address, which then says so
+ * under the box, once.
+ */
+export async function searchPeopleAction(form: FormData): Promise<void> {
+  const fields = typedOf(form);
+  const { context, list, searched } = await peopleOf(fields);
+  // A curly apostrophe (as a phone types "o’neill") is a plain one, as core's search reads it.
+  const typed = (fields['q'] ?? '').trim().slice(0, 100).replace(/[\u2018\u2019]/g, "'");
+  if (typed.includes('@')) {
+    leaveNotice(context, 'people', '', 'email-not-searched');
+    redirect(list);
+  }
+  redirect(typed === '' ? list : searched(typed));
 }
 
 /** "Add a person": saved, the browser goes to their own new page, which says so. */

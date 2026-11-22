@@ -117,9 +117,8 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
                 needle === undefined ||
                 `${p.firstName} ${p.lastName} ${p.publicName ?? ''}`
                   .toLowerCase()
-                  .includes(needle) ||
-                (sensitive &&
-                  (p.sensitiveFields.contactEmail ?? '').toLowerCase().includes(needle)),
+                  .replace(/[\u2018\u2019]/g, "'")
+                  .includes(needle),
             )
             .sort(
               (a, b) =>

@@ -176,9 +176,21 @@ if (built) {
     );
     await page.getByLabel('Search by name').fill('jon@example.test');
     await page.getByRole('button', { name: 'Search', exact: true }).click();
+    const noEmail = page.getByText('An email address is not searched here', { exact: false });
+    await noEmail.waitFor();
     note(
-      'an email address typed in the search is not sent: it would ride in the address',
-      !page.url().includes('example.test'),
+      'an email address typed in the search gets its sentence under the box, and the browser is on the clean address',
+      (await noEmail.isVisible()) &&
+        !page.url().includes('example.test') &&
+        !page.url().includes('q='),
+      page.url(),
+    );
+    await page.getByLabel('Search by name').fill('o’neill');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.waitForURL(/q=o/);
+    note(
+      'a curly apostrophe is searched as a plain one',
+      page.url().includes("q=o'neill") || page.url().includes('q=o%27neill'),
       page.url(),
     );
 

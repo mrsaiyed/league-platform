@@ -10,6 +10,7 @@
 // child are on their own page, and only for a role that may see them (R-16).
 import { allows, leagueScope, leagueUrl, type AdminArea } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
+import { redirect } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -17,7 +18,7 @@ import { t } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffField, StaffNotice } from '../staff/index.ts';
-import { addPersonAction } from './actions.ts';
+import { addPersonAction, searchPeopleAction } from './actions.ts';
 import { addPersonAnchor } from './anchors.ts';
 import { personFormWords } from './form-words.ts';
 import { peopleAskOf, peoplePageSize, readPeopleList, type PeopleAsk } from './people-view.ts';
@@ -50,6 +51,20 @@ export async function PeoplePage({
   const notice =
     noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'people');
   const listUrl = leagueUrl(here, 'admin-area', { area });
+  // An address that holds an email (typed in by hand) is sent on to the clean one, which
+  // says why under the box; so is a search the action turned away.
+  if (ask.emailRefused) {
+    if (noticeHolder !== undefined) {
+      savedNoticesHere().leave(noticeHolder, {
+        screen: 'people',
+        thing: '',
+        said: 'email-not-searched',
+      });
+    }
+    redirect(listUrl);
+  }
+  const emailRefused = notice?.said === 'email-not-searched';
+  const noEmailId = 'people-search-no-email';
   const pageUrl = (page: number) =>
     leagueUrl(here, 'admin-area', {
       area,
@@ -71,18 +86,18 @@ export async function PeoplePage({
       ) : null}
 
       <section className="staff-panel admin-team-part">
-        <form method="get" action={listUrl} role="search" className="staff-form">
+        {/* Posted, so an email address typed here never rides in an address: the action
+            sends a name on to the list's address, and an email to its clean one. */}
+        <form action={searchPeopleAction} role="search" className="staff-form">
+          <input type="hidden" name="league" value={here.slug} />
           <StaffField label={t('adminPeople.search.label')}>
             <input
               name="q"
               type="search"
               maxLength={100}
-              // An email address is not sent: the browser stops it before it would ride
-              // in the address, with scripts off too; the server refuses one anyway.
-              pattern="[^@]*"
-              title={t('adminPeople.search.noEmail')}
               autoComplete="off"
               defaultValue={ask.search ?? ''}
+              {...(emailRefused ? { 'aria-describedby': noEmailId } : {})}
             />
           </StaffField>
           <p className="staff-buttons">
@@ -96,8 +111,8 @@ export async function PeoplePage({
             )}
           </p>
         </form>
-        {ask.emailRefused ? (
-          <p className="ui-notice" role="status">
+        {emailRefused ? (
+          <p id={noEmailId} className="ui-notice" role="status">
             {t('adminPeople.search.noEmail')}
           </p>
         ) : null}

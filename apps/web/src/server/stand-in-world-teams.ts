@@ -212,8 +212,10 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
         .filter(
           (p) =>
             needle === undefined ||
-            `${p.firstName} ${p.lastName}`.toLowerCase().includes(needle) ||
-            (p.publicName ?? '').toLowerCase().includes(needle),
+            `${p.firstName} ${p.lastName}\n${p.publicName ?? ''}`
+              .toLowerCase()
+              .replace(/[\u2018\u2019]/g, "'")
+              .includes(needle),
         )
         .sort(
           (a, b) =>

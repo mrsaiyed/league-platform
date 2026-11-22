@@ -53,7 +53,7 @@ export type PersonChange = {
 };
 
 export type PeopleSearch = {
-  /** Part of a name (and, when `sensitive`, of a contact email), in any capitals. */
+  /** Part of a name, in any capitals; never part of an email, whoever asks. */
   readonly search?: string;
   readonly limit: number;
   readonly offset: number;

@@ -22,6 +22,9 @@ export type PeopleSearchRow = {
 /** Makes `%`, `_` and `\` in what someone typed match themselves. */
 const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
+const curly = '\u2018\u2019';
+const plain = "''";
+
 export async function listPeople(
   scope: LeagueScope,
   { search, limit, offset, sensitive }: PeopleSearchRow,
@@ -35,10 +38,11 @@ export async function listPeople(
     .$if(pattern !== undefined, (q) =>
       q.where((eb) =>
         eb.or([
-          sql<boolean>`(first_name || ' ' || last_name) ilike ${pattern}`,
-          sql<boolean>`(last_name || ' ' || first_name) ilike ${pattern}`,
-          sql<boolean>`coalesce(public_name, '') ilike ${pattern}`,
-          ...(sensitive ? [sql<boolean>`coalesce(contact_email, '') ilike ${pattern}`] : []),
+          // Names only, for every role (never part of an email), with a curly apostrophe
+          // stored in a name read as a plain one, as the search's own is (core's command).
+          sql<boolean>`translate(first_name || ' ' || last_name, ${curly}, ${plain}) ilike ${pattern}`,
+          sql<boolean>`translate(last_name || ' ' || first_name, ${curly}, ${plain}) ilike ${pattern}`,
+          sql<boolean>`translate(coalesce(public_name, ''), ${curly}, ${plain}) ilike ${pattern}`,
         ]),
       ),
     )
