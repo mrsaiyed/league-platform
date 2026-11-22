@@ -16,6 +16,7 @@ import {
   TeamFouls,
   TimeoutsChip,
   TimeoutsPad,
+  clockSetSaid,
   latestTimeouts,
   teamBoardLabel,
   timeoutRuleText,
@@ -444,13 +445,15 @@ describe('timeouts (G3 to G7)', () => {
 });
 
 describe('the form that sets the clock and picks the period (T5, T6)', () => {
+  /** A set that takes back no earlier change. */
+  const none = { takenBack: null, rest: null } as const;
   const sheetOf = (
     digits: string,
-    minutesBack: ClockSheet['minutesBack'] = null,
+    effect: ClockSheet['effect'] = null,
     period = 1,
   ): ClockSheet => ({
     entry: clockEntry(digits, basketball.periodMs(basketball.QUARTERS, period)),
-    minutesBack,
+    effect,
     periodLength: basketball.formatClock(basketball.periodMs(basketball.QUARTERS, period)),
     periods: periodChoices(basketball.QUARTERS, period),
   });
@@ -481,14 +484,79 @@ describe('the form that sets the clock and picks the period (T5, T6)', () => {
   });
 
   it('says what comes off the minutes before time goes back on the clock, and that setting a running clock stops it', () => {
-    expect(words(form(sheetOf('800', { back: '0:30', wholePeriod: false })))).toContain(
-      'This takes 0:30 off the minutes of the players on the court.',
-    );
+    expect(
+      words(form(sheetOf('800', { kind: 'back', time: '0:30', wholePeriod: false, ...none }))),
+    ).toContain('This takes 0:30 off the minutes of the players on the court.');
     // All the period has run comes off: the form says so (the area 4 review, M4).
-    expect(words(form(sheetOf('800', { back: '3:05', wholePeriod: true })))).toContain(
-      'This takes 3:05 off the players’ minutes: all they have played this period.',
-    );
+    expect(
+      words(form(sheetOf('800', { kind: 'back', time: '3:05', wholePeriod: true, ...none }))),
+    ).toContain('This takes 3:05 off the players’ minutes: all they have played this period.');
     expect(words(form(sheetOf(''), running))).toContain('Setting the clock stops it.');
+  });
+
+  it('says what is added when time comes off the clock, and where a period not yet run starts (S-71)', () => {
+    expect(words(form(sheetOf('500', { kind: 'added', time: '2:30', ...none })))).toContain(
+      'This adds 2:30 to the minutes of the players on the court.',
+    );
+    expect(words(form(sheetOf('700', { kind: 'start', clock: '7:00' })))).toContain(
+      'The period will start at 7:00. Nobody’s minutes change.',
+    );
+  });
+
+  it('says once set what truly came off or was added, in one line too, or only the time', () => {
+    expect(clockSetSaid(t, '12:00', { kind: 'added', time: '4:55', even: true, ...none })).toEqual({
+      text: 'Clock set to 12:00. 4:55 was added to the minutes of the players on the court.',
+      short: 'Clock 12:00 · 4:55 added',
+    });
+    expect(clockSetSaid(t, '16:55', { kind: 'back', time: '4:55', even: true, ...none })).toEqual({
+      text: 'Clock set to 16:55. 4:55 came off the minutes of the players on the court.',
+      short: 'Clock 16:55 · 4:55 off',
+    });
+    // A player moved by less than the figure: the short form promises no amount.
+    expect(clockSetSaid(t, '8:00', { kind: 'back', time: '1:30', even: false, ...none })).toEqual({
+      text: 'Clock set to 8:00. 1:30 came off the minutes of the players on the court.',
+      short: 'Clock set to 8:00.',
+    });
+    expect(clockSetSaid(t, '7:00', null)).toBe('Clock set to 7:00.');
+  });
+
+  it('says a set takes back an earlier change to the period’s clock, and what is left over', () => {
+    const takes = { kind: 'added', time: '1:50', takenBack: '1:50', rest: null } as const;
+    expect(words(form(sheetOf('550', takes)))).toContain(
+      'This takes back 1:50 of an earlier change to this period’s clock. Minutes and play times go back as they were.',
+    );
+    expect(
+      words(form(sheetOf('400', { kind: 'added', time: '3:40', takenBack: '1:50', rest: '1:50' }))),
+    ).toContain(
+      'This takes back 1:50 of an earlier change to this period’s clock. Minutes and play times go back as they were. This adds 1:50 to the minutes of the players on the court.',
+    );
+    const putBack = {
+      kind: 'back',
+      time: '1:00',
+      wholePeriod: false,
+      takenBack: '0:40',
+      rest: '0:20',
+    } as const;
+    expect(words(form(sheetOf('800', putBack)))).toContain(
+      'This takes back 0:40 of an earlier change to this period’s clock. Minutes and play times go back as they were. This takes 0:20 off the minutes of the players on the court.',
+    );
+    expect(clockSetSaid(t, '5:50', { ...takes, even: false })).toEqual({
+      text: 'Clock set to 5:50. 1:50 of an earlier change to this period’s clock was taken back: minutes and play times are as they were.',
+      short: 'Clock 5:50 · 1:50 taken back',
+    });
+    // Something left over: the short form says only the time.
+    expect(
+      clockSetSaid(t, '4:00', {
+        kind: 'added',
+        time: '3:40',
+        takenBack: '1:50',
+        rest: '1:50',
+        even: false,
+      }),
+    ).toEqual({
+      text: 'Clock set to 4:00. 1:50 of an earlier change to this period’s clock was taken back, and 1:50 was added to the minutes of the players on the court.',
+      short: 'Clock set to 4:00.',
+    });
   });
 
   it('says what is wrong with a time the clock does not take, and does not set it', () => {

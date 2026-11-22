@@ -82,6 +82,8 @@ describe('listMyGames', () => {
       scorable: true,
       hasPlays: false,
       version: 1,
+      // The starting rules' forfeit score (step 2.158: the forfeit's question says it).
+      forfeitScore: { winner: 20, loser: 0 },
     });
     // The final game keeps its overtime periods for its card (step 2.200).
     expect(result.ok && result.value.games[0]).toMatchObject({

@@ -92,6 +92,9 @@ const people = [
       player: 'Morgan Example',
       number: '4',
       points: 10,
+      // Its final score in its one game with a box score: a team's points are its final
+      // scores (S-26 as changed by step 2.196), where its players' add to less.
+      totalPoints: 52,
     },
     homeLeaders: ['Robin Placeholder', 'Quinn S.'],
     // The adult league's child, on their own team: by first name and last initial (R-14).
@@ -112,7 +115,14 @@ const people = [
       { shown: 'Jordan I.', points: 10 },
       { shown: 'Casey F.', points: 14 },
     ],
-    team: { slug: 'comets', name: 'Maple Comets', player: 'Jordan I.', number: '4', points: 10 },
+    team: {
+      slug: 'comets',
+      name: 'Maple Comets',
+      player: 'Jordan I.',
+      number: '4',
+      points: 10,
+      totalPoints: 52,
+    },
     homeLeaders: ['Casey F.', 'Jordan I.'],
     neverShown: ['Imaginary', 'Fictional', 'jordan.parent@maple', '2013-06-02'],
   },
@@ -401,9 +411,18 @@ if (browser) {
         })),
       );
       note(
-        `${slug}: ${league.team.name}'s totals show its ${league.team.points} points`,
-        totals.find((stat) => /^Points$/.test(stat.label))?.value === String(league.team.points),
+        `${slug}: ${league.team.name}'s totals show its ${league.team.totalPoints} points, its final score`,
+        totals.find((stat) => /^Points$/.test(stat.label))?.value ===
+          String(league.team.totalPoints),
         JSON.stringify(totals.length > 0 ? totals : tables),
+      );
+      // Its player's 10 beside the team's 52: the page says why (step 2.196).
+      note(
+        `${slug}: ${league.team.name}'s page says its totals can differ from its players' numbers`,
+        has(
+          await page.locator('main').innerText(),
+          "A team's totals count what was charged to the team and the final scores as entered",
+        ),
       );
       await nothingPrivate(`${league.team.name}'s page`);
       await noPersonIds(`${league.team.name}'s page`);

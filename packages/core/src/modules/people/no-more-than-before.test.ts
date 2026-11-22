@@ -14,9 +14,9 @@
 // it is compared with full names plus the confirmation now; how such a row reads without
 // the new setting (less for children, record 065) is pinned on its own below.
 //
-// R-28 (a birth date decides who is a child) is not built yet (step 2.146): the age here
-// is the record's "minor" tick, true, false or not known. When R-28 is built, a birth
-// date on either side of 18 joins the ages below.
+// R-28 (a child if the birth date says so or the tick is on; isMinorOn, step 2.93 part 5)
+// is decided before showName is asked, and answers true, false or not known: the three
+// ages below, so a birth date adds no age here (minor-by-age.test.ts holds its cases).
 import { describe, expect, it } from 'vitest';
 import { audiences, type Audience, type StoredSettingRow } from '../leagues/index.ts';
 import { nameRequests, type NameRequest } from './rules/name-policy.ts';

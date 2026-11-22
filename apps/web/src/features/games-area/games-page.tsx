@@ -14,11 +14,13 @@ import {
   listEarlierGames,
   listGamesNeedingResult,
   listMyGames,
+  listPostponedGames,
   needsResultLimit,
   type CommandContext,
   type CommandDeps,
   type LeagueAddressee,
   type MyGame,
+  type PostponedGame,
   type TrackerTx,
 } from '@srleagues/core';
 import { displayLabels, finalPillOf } from '@srleagues/site';
@@ -31,13 +33,10 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { noticeHolderOf, savedNoticesHere, type SavedNotice } from '../../server/saved-notice.ts';
 import { ActionForm } from './action-form.tsx';
-import {
-  cancelGameAction,
-  finalScoreAction,
-  postponeGameAction,
-  recordForfeitAction,
-} from './actions.ts';
+import { callOffAction, finalScoreAction, putBackAction } from './actions.ts';
 import { buildGameRows, type GameRowView } from './build-games-view.ts';
+import { CallOffForms } from './call-off-forms.tsx';
+import { callOffTexts, putBackChoice, restoreTexts } from './call-off-texts.ts';
 import { earlyWhen, nowOf } from './early-when.ts';
 import { FinalScoreBoxes, type FinalScoreTexts } from './final-score-boxes.tsx';
 import { earlierEmptyText, needsResultEmptyText } from './empty-list-text.ts';
@@ -46,6 +45,7 @@ import { gamesSections } from './games-sections.ts';
 import { readReopenViews } from './read-reopen-views.ts';
 import { ReopenLine } from './reopen-line.tsx';
 import { SavedLine } from './saved-line.tsx';
+import { waitingListAnchor as waitingAnchor } from './waiting-anchor.ts';
 
 /** What the words of a saved notice read of the game it names. */
 type NamedGame = Pick<
@@ -67,14 +67,41 @@ function resultText(game: NamedGame, homeScore: number | string, awayScore: numb
 const gameText = (game: NamedGame) =>
   t('admin.games.game', { away: game.awayName, home: game.homeName });
 
-const savedKeys = ['forfeit', 'postpone', 'cancel'] as const;
+const savedKeys = ['postpone', 'cancel', 'putBack', 'putBackDate', 'putBackPostponed'] as const;
+
+/**
+ * "Saved: Falcons forfeited Herons at Falcons. Herons win 20–0." (step 2.158): who
+ * forfeited is the side the forfeit score left behind.
+ */
+function forfeitText(game: NamedGame): string | undefined {
+  if (game.homeScore === null || game.awayScore === null) return undefined;
+  const homeLost = game.homeScore < game.awayScore;
+  return t('admin.games.saved.forfeit', {
+    team: homeLost ? game.homeName : game.awayName,
+    winner: homeLost ? game.awayName : game.homeName,
+    game: gameText(game),
+    winnerScore: String(Math.max(game.homeScore, game.awayScore)),
+    loserScore: String(Math.min(game.homeScore, game.awayScore)),
+  });
+}
 
 /**
  * What was just saved, as words, naming the game, read from the game as it is now: a
- * final score names its score too ("Saved: Tigers 47, Lions 51 is final.").
+ * final score names its score too ("Saved: Tigers 47, Lions 51 is final."); a game put back
+ * over games that took its place since names them at once (`others`, step 2.158).
  */
-function noticeText(notice: SavedNotice, game: NamedGame | undefined): string {
+function noticeText(
+  notice: SavedNotice,
+  game: NamedGame | undefined,
+  others: readonly string[] = [],
+): string {
   const said = notice.said;
+  const clash =
+    others.length === 0 ? '' : ` ${t('admin.games.saved.clash', { others: others.join(', ') })}`;
+  return savedWords(said, game) + clash;
+}
+
+function savedWords(said: string, game: NamedGame | undefined): string {
   if (said === 'reopen') {
     return t(
       game?.hasPlays === true ? 'admin.games.done.reopenTracked' : 'admin.games.done.reopen',
@@ -86,6 +113,9 @@ function noticeText(notice: SavedNotice, game: NamedGame | undefined): string {
       'admin.games.done.forfeit',
       'admin.games.done.postpone',
       'admin.games.done.cancel',
+      'admin.games.done.putBack',
+      'admin.games.done.putBackDate',
+      'admin.games.done.putBackPostponed',
     ];
     return t(doneKeys.find((k) => k === `admin.games.done.${said}`) ?? 'admin.games.done.final');
   }
@@ -94,6 +124,7 @@ function noticeText(notice: SavedNotice, game: NamedGame | undefined): string {
       result: resultText(game, game.homeScore, game.awayScore),
     });
   }
+  if (said === 'forfeit') return forfeitText(game) ?? t('admin.games.done.forfeit');
   const kind = savedKeys.find((k) => k === said);
   return kind === undefined
     ? t('admin.games.done.final')
@@ -143,10 +174,13 @@ function Controls({
   times,
   now,
   round,
+  waitingHref,
 }: {
   readonly league: string;
   readonly here: LeagueAddressee;
   readonly game: GameRowView;
+  /** "Waiting for a new date" on this page, when it is shown to this person. */
+  readonly waitingHref: string | undefined;
   /** The game was just reopened to correct it: its boxes start open. */
   readonly reopened: boolean;
   readonly times: LeagueTimes;
@@ -211,44 +245,51 @@ function Controls({
         </p>
       ) : null}
       <ReopenLine view={game.reopen} href={gameHref} times={times} />
-      {game.canForfeit ? (
-        <details className="admin-game-other">
-          <summary>{t('admin.games.otherActions')}</summary>
-          <ActionForm
-            action={recordForfeitAction}
-            permalink={permalink}
-            hidden={hiddenOf(league, game)}
-            choice={{
-              name: 'forfeitingTeamId',
-              label: t('admin.games.forfeitBy'),
-              options: [
-                { value: game.homeTeamId, label: game.homeName },
-                { value: game.awayTeamId, label: game.awayName },
-              ],
-            }}
-            button={t('admin.games.recordForfeit')}
-            refusal={refusal}
-          />
-          {game.canCallOff ? (
-            <>
-              <ActionForm
-                action={postponeGameAction}
-                permalink={permalink}
-                hidden={hiddenOf(league, game)}
-                button={t('admin.games.postpone')}
-                refusal={refusal}
-              />
-              <ActionForm
-                action={cancelGameAction}
-                permalink={permalink}
-                hidden={hiddenOf(league, game)}
-                button={t('admin.games.cancel')}
-                refusal={refusal}
-                kind="danger"
-              />
-            </>
-          ) : null}
-        </details>
+      {game.status === 'postponed' ? (
+        // Where it waits for its new date (step 2.158): the list on this page, when shown.
+        <>
+          <p>{t('admin.games.postponedWaits')}</p>
+          {waitingHref === undefined ? null : (
+            <p>
+              <a className="ui-more" href={waitingHref}>
+                {t('admin.games.waiting.link')}
+              </a>
+            </p>
+          )}
+        </>
+      ) : null}
+      {game.canRestore ? (
+        // A postponement made by mistake, put back on its old date (S-75): asks first.
+        <CallOffForms
+          action={callOffAction}
+          permalink={permalink}
+          hidden={hiddenOf(league, game)}
+          summaryButton
+          texts={restoreTexts(game, gameWhenText(game.startsAt, times))}
+        />
+      ) : null}
+      {game.canForfeit || game.canPostpone || game.canCancel ? (
+        <CallOffForms
+          action={callOffAction}
+          permalink={permalink}
+          hidden={hiddenOf(league, game)}
+          texts={callOffTexts(game, {
+            forfeit: game.canForfeit,
+            postpone: game.canPostpone,
+            cancel: game.canCancel,
+          })}
+        />
+      ) : null}
+      {game.canPutBack ? (
+        <ActionForm
+          action={putBackAction}
+          permalink={permalink}
+          hidden={hiddenOf(league, game)}
+          summary={t('admin.games.putBack')}
+          choice={putBackChoice()}
+          button={t('admin.games.putBack.save')}
+          refusal={refusal}
+        />
       ) : null}
     </div>
   );
@@ -264,6 +305,8 @@ type ListScene = {
   /** The game a notice is about, and its words, when it is on the page. */
   readonly saved: { readonly row: GameRowView; readonly text: string } | undefined;
   readonly reopenedId: string | undefined;
+  /** "Waiting for a new date" on this page, when it is shown to this person. */
+  readonly waitingHref: string | undefined;
 };
 
 /** One list of games, each with who scores it and what this person may do to it. */
@@ -315,6 +358,7 @@ function GameList({
               times={times}
               now={now}
               round={round}
+              waitingHref={scene.waitingHref}
             />
           </div>
         </li>
@@ -334,6 +378,42 @@ function Part({
   readonly scene: ListScene;
 }) {
   return rows.length === 0 ? <EmptyPanel text={empty} /> : <GameList rows={rows} scene={scene} />;
+}
+
+/**
+ * "Waiting for a new date" (step 2.158): every postponed game, soonest first, as its card
+ * (the Postponed pill and the date it was to be played). Cancelling it is offered on its
+ * card where it is listed by its day or its earlier round; giving it a new date from here
+ * is step 2.53's, and the part's note says it is not ready yet.
+ */
+function WaitingList({
+  games,
+  scene,
+  names,
+}: {
+  readonly games: readonly PostponedGame[];
+  readonly scene: ListScene;
+  readonly names: GameNames;
+}) {
+  if (games.length === 0) return <EmptyPanel text={t('admin.games.waiting.empty')} />;
+  return (
+    <ul className="admin-game-list ui-list" data-waiting-list="">
+      {games.map((game) => (
+        <li key={game.id} className="admin-game" data-waiting-game={game.id}>
+          <div className="admin-game-panel">
+            <GameCard
+              marks="emblem"
+              home={{ name: names.teams[game.homeTeamId] ?? '', score: null }}
+              away={{ name: names.teams[game.awayTeamId] ?? '', score: null }}
+              status="postponed"
+              whenText={gameWhenText(game.startsAt, scene.times)}
+              labels={scene.labels}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /**
@@ -363,6 +443,9 @@ export async function GamesPage({
     round === undefined ? {} : { round },
     ports.games.deps,
   );
+  // Every postponed game, until it gets a new date (P7 §4 "Also", step 2.158): for whoever
+  // may read the schedule (the command's own rule); for anyone else the part is not drawn.
+  const postponed = await listPostponedGames(context, {}, ports.games.deps);
   const ok = needs.ok && listed.ok && earlier.ok;
   const today = listed.ok ? listed.value.today : '';
   const sections = gamesSections(
@@ -396,7 +479,13 @@ export async function GamesPage({
     notice === undefined || aboutRow !== undefined
       ? undefined
       : await gameNamedOff(notice.thing, context, names, ports.games.deps);
-  const saved = notice === undefined ? undefined : noticeText(notice, aboutRow ?? offPage);
+  // The games a game put back now shares its place with, named from their records.
+  const others: string[] = [];
+  for (const other of notice?.about ?? []) {
+    const named = await gameNamedOff(other, context, names, ports.games.deps);
+    if (named !== undefined) others.push(gameText(named));
+  }
+  const saved = notice === undefined ? undefined : noticeText(notice, aboutRow ?? offPage, others);
   const scene: ListScene = {
     league,
     here: addressee,
@@ -406,6 +495,9 @@ export async function GamesPage({
     saved:
       aboutRow === undefined || saved === undefined ? undefined : { row: aboutRow, text: saved },
     reopenedId: notice?.said === 'reopen' ? notice.thing : undefined,
+    waitingHref: postponed.ok
+      ? `${leagueUrl(addressee, 'admin-area', { area: 'games' })}#${waitingAnchor}`
+      : undefined,
   };
   // The same row object for a game wherever it is drawn, so its notice is beside it.
   const rows = (of: readonly MyGame[]) =>
@@ -466,6 +558,13 @@ export async function GamesPage({
               </div>
             )}
           </Section>
+          {postponed.ok ? (
+            <div id={waitingAnchor}>
+              <Section title={t('admin.games.waiting.title')} note={t('admin.games.waiting.note')}>
+                <WaitingList games={postponed.value} scene={scene} names={names} />
+              </Section>
+            </div>
+          ) : null}
           <div id="earlier">
             <Section title={t('admin.games.earlier.title')} note={t('admin.games.earlier.note')}>
               {roundOptions.length === 0 ? (

@@ -37,24 +37,32 @@ export function standInPublicStats(
   return {
     seasonsOf: async (leagueId) => worldPublicSeasons(await world.read(leagueId)),
     settingsOf,
-    readStoreOf: (leagueId) => worldStandingsRead(() => world.read(leagueId)),
+    readStoreOf: (leagueId) => worldStandingsRead(() => world.read(leagueId), world.now),
     // The world runs one transaction at a time: its reads and its settings agree already.
     // A roster's names follow the same settings the statistics are shown by.
+    // One page read has one "today" (R-28): the statistics and the roster read who is a
+    // child on the same day, as the database's one snapshot transaction does.
     statisticsOf: async (leagueId, work) => {
       const settings = await settingsOf(leagueId);
+      const moment = world.now();
       return work({
-        store: worldStandingsRead(() => world.read(leagueId)),
+        store: worldStandingsRead(
+          () => world.read(leagueId),
+          () => moment,
+        ),
         settings,
         rosterOf: async (teamId, viewer) =>
-          worldPublicRoster(await world.read(leagueId), teamId, {
-            viewer,
-            policy: settings.namePolicy,
-          }),
+          worldPublicRoster(
+            await world.read(leagueId),
+            teamId,
+            { viewer, policy: settings.namePolicy },
+            moment,
+          ),
       });
     },
     standingsOf: (leagueId, seasonId) =>
       readStandings(
-        worldStandingsRead(() => world.read(leagueId)),
+        worldStandingsRead(() => world.read(leagueId), world.now),
         { seasonId },
       ),
   };

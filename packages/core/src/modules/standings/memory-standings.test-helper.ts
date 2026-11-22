@@ -232,6 +232,9 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
       markNotStarted: async () => undefined,
       addCorrection: async (correction) => void s.corrections.push(correction),
       listPostponed: async () => [],
+      statusBeforeCancelled: async () => undefined,
+      partInBin: async () => false,
+      clashesOf: async () => [],
       ...boxScoreStores(s),
       ...standingsStores(s, options).games,
       // Scorekeeper assignments play no part in standings: the league keeps the

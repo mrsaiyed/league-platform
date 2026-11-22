@@ -248,8 +248,12 @@ export function buildScheduleView(
   const everyGame = [...schedule.rounds.flatMap((r) => r.games), ...schedule.unplacedGames];
   const teams = new Map<string, string>();
   for (const g of everyGame) {
-    teams.set(g.homeTeam.slug, g.homeTeam.name);
-    teams.set(g.awayTeam.slug, g.awayTeam.name);
+    // A team in the bin is offered only while it has a game here that was not cancelled
+    // (A-17): one whose games are all cancelled has nothing left to pick it for.
+    for (const team of [g.homeTeam, g.awayTeam]) {
+      if (team.removed === true && g.status === 'cancelled') continue;
+      teams.set(team.slug, team.name);
+    }
   }
   const keep = (g: PublicGame) =>
     choices.team === undefined ||

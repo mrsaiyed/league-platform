@@ -25,6 +25,8 @@ export type PublicGameTeam = {
   readonly slug: string;
   readonly name: string;
   readonly color: string | null;
+  /** In the bin (A-17): named in its games, never offered as a team to pick. */
+  readonly removed?: boolean;
 };
 
 /** A published game, as the schedule and team pages show it. */

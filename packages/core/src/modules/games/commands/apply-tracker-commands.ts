@@ -53,7 +53,7 @@ import {
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
-import { engineRulesOf, withoutMercyOrLastMinutes } from '../engine-rules.ts';
+import { engineRulesOf, trackerEngineRulesOf, withoutMercyOrLastMinutes } from '../engine-rules.ts';
 import {
   changedLines,
   linesOf,
@@ -215,12 +215,14 @@ export const applyTrackerCommands = defineCommand({
     // A game brought over from a tracker that had neither rule is played without them,
     // and fixed so when it goes live, so its rules say how it was played (record 062).
     const rules = playedWithout === true ? withoutMercyOrLastMinutes(asSet) : asSet;
+    // Such a game also keeps the tracker's way of counting minutes when the clock is set,
+    // so its numbers are the tracker's (S-71, record 077); every other game counts them
+    // on the game clock.
+    const engine = playedWithout === true ? trackerEngineRulesOf(asSet) : engineRulesOf(asSet);
     // Made at time 0, as the Al-Hadi tracker makes its games, so taps queued offline
     // before this batch arrived still run the clock from when they happened.
     let state =
-      before === undefined
-        ? basketball.newGame(engineRulesOf(rules), 0)
-        : withCurrentRules(before, engineRulesOf(rules));
+      before === undefined ? basketball.newGame(engine, 0) : withCurrentRules(before, engine);
     const roster = rosterOf(await tx.liveGames.players(gameId));
     // The rosters as the batch found them, for the lines it started with.
     const rosterAtStart = new Map(roster);

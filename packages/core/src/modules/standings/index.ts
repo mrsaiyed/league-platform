@@ -21,6 +21,7 @@ export type {
 export {
   readStandings,
   winPercentageOf,
+  type LevelGroup,
   type ReadStandingsError,
   type Standings,
   type StandingsFootnote,
@@ -48,6 +49,7 @@ export {
 } from './queries/read-team-records.ts';
 export type {
   DecidedGameLines,
+  DecidedGameRecord,
   PersonDisplayRecord,
   PlayerTeamLink,
   PlayerTotalsRecord,
@@ -58,6 +60,7 @@ export type {
   StandingsRowRecord,
   StandingsSeasonRecord,
   TeamStatTotalRecord,
+  TeamOwnTurnoversRecord,
 } from './read-ports.ts';
 export type {
   PlayerName,

@@ -298,7 +298,7 @@ describe('recording the scores of an applied import', () => {
     const none = await recordImportedScores(world.as(ownerId), { importId }, world.deps);
     expect(none).toEqual({
       ok: true,
-      value: { recorded: 0, waiting: 3, refused: 0, leftAlone: 0 },
+      value: { recorded: 0, waiting: 3, refused: 0, leftAlone: 0, postponed: 0 },
     });
 
     // Two of the three games are published.
@@ -308,7 +308,7 @@ describe('recording the scores of an applied import', () => {
     const some = await recordImportedScores(world.as(ownerId), { importId }, world.deps);
     expect(some).toEqual({
       ok: true,
-      value: { recorded: 2, waiting: 1, refused: 0, leftAlone: 0 },
+      value: { recorded: 2, waiting: 1, refused: 0, leftAlone: 0, postponed: 0 },
     });
     // A score an import carried says nothing of overtime: no count (step 2.200).
     expect(
@@ -323,7 +323,7 @@ describe('recording the scores of an applied import', () => {
     const again = await recordImportedScores(world.as(ownerId), { importId }, world.deps);
     expect(again).toEqual({
       ok: true,
-      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 0 },
+      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 0, postponed: 0 },
     });
     expect(world.events).toHaveLength(2);
   });
@@ -343,9 +343,30 @@ describe('recording the scores of an applied import', () => {
     const result = await recordImportedScores(world.as(ownerId), { importId }, world.deps);
     expect(result).toEqual({
       ok: true,
-      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 1 },
+      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 1, postponed: 0 },
     });
     expect(world.db.state.games[0]).toMatchObject({ homeScore: 1, awayScore: 0 });
+  });
+
+  it('leaves the score of a postponed game waiting, and says why (step 2.158, S-75)', async () => {
+    const world = memoryImports();
+    const { importId, view } = await uploaded(world, fixturesCsv(2, { scoreEvery: 1 }));
+    await applyFixtureImport(world.as(ownerId), { importId, version: view.version }, world.deps);
+    const created = parseCreatedFixtures(world.db.state.imports[0]?.created);
+    const first = created?.scores[0];
+    if (first === undefined) throw new Error('no score');
+    world.db.state.games.push(game(first.gameId, { status: 'postponed' }));
+    const result = await recordImportedScores(world.as(ownerId), { importId }, world.deps);
+    expect(result).toEqual({
+      ok: true,
+      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 0, postponed: 1 },
+    });
+    expect(world.db.state.games[0]).toMatchObject({ status: 'postponed', homeScore: null });
+    expect(world.events).toEqual([]);
+    // Played on a new date (scheduled again), the same import records it.
+    world.db.state.games[0] = game(first.gameId);
+    const later = await recordImportedScores(world.as(ownerId), { importId }, world.deps);
+    expect(later).toMatchObject({ ok: true, value: { recorded: 1, postponed: 0 } });
   });
 
   it('leaves a game alone that the live tracker has recorded plays of (S-46)', async () => {
@@ -360,7 +381,7 @@ describe('recording the scores of an applied import', () => {
     const result = await recordImportedScores(world.as(ownerId), { importId }, world.deps);
     expect(result).toEqual({
       ok: true,
-      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 1 },
+      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 1, postponed: 0 },
     });
     // The game stays live, for the tracker to end; nothing was announced.
     expect(world.db.state.games[0]).toMatchObject({ status: 'live', homeScore: null });
