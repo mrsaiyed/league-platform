@@ -11,6 +11,8 @@ import {
   buildStandingsViews,
   chooseSeason,
   firstValue,
+  fitHomeLeaders,
+  homeAcrossRoom,
   homeLeadersOf,
   type SearchParams,
   type StandingsTableView,
@@ -100,6 +102,9 @@ export async function HomePage({
     seasonId: season.id,
   });
   const leadersPlace = homeLeadersPlace(empty ? 0 : results.length, tableHeights, leaders.length);
+  // A whole place at a time: a shared place the room cannot hold is left to one line.
+  const leadersBeside = fitHomeLeaders(leaders, leadersPlace.beside);
+  const leadersAcross = fitHomeLeaders(leaders, Math.min(leadersPlace.across, homeAcrossRoom));
   const statsHref = leagueUrl(addressee, 'stats', { season: askedSeason });
   const teamCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
   const scheduleHref = leagueUrl(addressee, 'schedule', { season: askedSeason });
@@ -217,14 +222,16 @@ export async function HomePage({
             {/* A short column of standings is filled out with the season's leaders, each
                 one short row, so the two columns end about level. */}
             <HomeLeaders
-              leaders={leaders.slice(0, leadersPlace.beside)}
+              leaders={leadersBeside.leaders}
+              levelCut={leadersBeside.levelCut}
               placing="beside"
               statsHref={statsHref}
             />
           </Section>
         </div>
         <HomeLeaders
-          leaders={leaders.slice(0, leadersPlace.across)}
+          leaders={leadersAcross.leaders}
+          levelCut={leadersAcross.levelCut}
           placing="across"
           statsHref={statsHref}
         />

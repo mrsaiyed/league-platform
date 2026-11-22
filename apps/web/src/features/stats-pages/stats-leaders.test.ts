@@ -348,4 +348,23 @@ describe("the home page's leaders write what the statistics page writes", () => 
       ['02 / Points', 'Ben Player', '7.25', 'Birch · 4 games'],
     ]);
   });
+
+  it('brings everyone level with the third place, not the three with the lowest ids (M2)', async () => {
+    const home = await loadHomeLeaders(
+      season([
+        { name: 'Ada', played: [ash], games: 3, stats: points(50, 3) },
+        { name: 'Ben', played: [birch], games: 3, stats: points(40, 3) },
+        { name: 'Cy', played: [ash], games: 3, stats: points(30, 3) },
+        { name: 'Dee', played: [birch], games: 3, stats: points(30, 3) },
+      ]),
+      { audience: 'adult', namePolicy: defaultNamePolicy, minimumGames: 0 },
+      { leagueId, seasonId },
+    );
+    expect(home.map((leader) => [leader.label, leader.name, leader.value])).toEqual([
+      ['01 / Points', 'Ada Player', '16.7'],
+      ['02 / Points', 'Ben Player', '13.3'],
+      ['03 / Points', 'Cy Player', '10.0'],
+      ['03 / Points', 'Dee Player', '10.0'],
+    ]);
+  });
 });

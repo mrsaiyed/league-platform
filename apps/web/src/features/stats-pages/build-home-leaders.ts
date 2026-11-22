@@ -9,11 +9,19 @@ import { t } from '../../server/messages.ts';
 import type { PublicStatsPorts, PublicStatsSettings } from '../../server/public-stats.ts';
 import { leaderValues, noLeaderCard, statLabel } from './build-stats.ts';
 
-/** How many leaders the home page can show at most. */
+/**
+ * How many places the home page asks for. Players level with the last of them come too
+ * (S-63: a board cut to a number of places shows everyone level with the last place).
+ */
 export const homeLeaderLimit = 3;
+
+/** How many leaders' cards the section across the page draws at most: two rows of three. */
+export const homeAcrossRoom = 6;
 
 export type HomeLeader = {
   readonly id: string;
+  /** The leader's place on the statistics page's board: level players share one. */
+  readonly rank: number;
   /** A tiny label: the leader's place and what is led, "01 / Points". */
   readonly label: string;
   /** The number, written for the reader: "17.0". */
@@ -118,13 +126,13 @@ async function readHomeLeaders(
     result.value.leaders
       // A leader with nothing to their name yet is no leader.
       .filter((leader) => leader.value > 0)
-      .slice(0, homeLeaderLimit)
       .map((leader, index, shown) => {
         const theirs = leader.teamIds.flatMap((id) => teams.get(id) ?? []);
         const only = theirs.length === 1 ? theirs[0] : undefined;
         return {
           // A place on this page only: a person's id does not go into the page.
           id: `leader-${index}`,
+          rank: leader.rank,
           // The leader's rank, as the statistics page gives it: players who are level
           // share a place (01, 01, 03), they are not numbered by where they happen to stand.
           label: t('home.leaders.label', { place: String(leader.rank).padStart(2, '0'), stat }),
@@ -142,4 +150,37 @@ async function readHomeLeaders(
         };
       })
   );
+}
+
+/** The leaders a part of the home page draws, in the room it has. */
+export type HomeLeadersShown = {
+  readonly leaders: readonly HomeLeader[];
+  /**
+   * A shared place the room could not hold all of: none of its players is drawn, and one
+   * line says how many are level there and leads to the statistics page.
+   */
+  readonly levelCut?: { readonly place: number; readonly count: number } | undefined;
+};
+
+/**
+ * Fits the leaders into room for `room` cards, a whole place at a time: everyone level
+ * with the last place drawn is drawn, and a place that does not fit whole is not drawn at
+ * all, so a page never keeps one of two level players and drops the other.
+ */
+export function fitHomeLeaders(leaders: readonly HomeLeader[], room: number): HomeLeadersShown {
+  const shown: HomeLeader[] = [];
+  let index = 0;
+  while (index < leaders.length) {
+    const rank = leaders[index]?.rank;
+    const place = leaders.filter((leader) => leader.rank === rank);
+    if (shown.length + place.length > room) {
+      if (place.length > 1 && shown.length < room && rank !== undefined) {
+        return { leaders: shown, levelCut: { place: rank, count: place.length } };
+      }
+      break;
+    }
+    shown.push(...place);
+    index += place.length;
+  }
+  return { leaders: shown };
 }

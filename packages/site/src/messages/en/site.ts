@@ -73,6 +73,10 @@ export const enSite = {
   'home.leaders.all': 'All player stats',
   'home.leaders.kicker': 'The players to watch',
   'home.leaders.label': '{place} / {stat}',
+  // A shared place the home page has no room for: none of its players is drawn.
+  'home.leaders.levelCut': '{count} players are level in place {place}.',
+  // A shared first place: no one card leads.
+  'home.leaders.levelFirst': '{count} players are level for first.',
   'home.leaders.perGame': 'per game',
   // The look of the home page (step 2.85): a live game under its own heading, and the
   // season in four numbers.
