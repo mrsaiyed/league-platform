@@ -37,7 +37,10 @@ export type StandingsStore = {
    * saved at once are worked out one after the other, the second seeing the first.
    */
   readonly lockSeason: (seasonId: string) => Promise<void>;
-  /** The season's teams not in the bin, in id order. */
+  /**
+   * The season's teams not in the bin, and any in the bin with a final or forfeited result
+   * in a game not in the bin (its opponents keep those results, A-17), in id order.
+   */
   readonly listTeams: (seasonId: string) => Promise<readonly TableTeam[]>;
   /** The season's adjustments not in the bin, in id order. */
   readonly listAdjustments: (seasonId: string) => Promise<readonly SeasonAdjustment[]>;

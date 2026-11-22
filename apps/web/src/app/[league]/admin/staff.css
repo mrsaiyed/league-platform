@@ -546,8 +546,18 @@ html:has(.staff) {
   text-decoration: underline;
 }
 .staff .site-footer .powered-by {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap);
+  color: var(--color-muted);
   font-size: var(--text-12);
   letter-spacing: 0.04em;
+  text-decoration: none;
+}
+/* Our mark leads to our front page (U-8, step 2.135), like the footer's other links. */
+.staff .site-footer .powered-by:hover {
+  color: var(--color-text);
+  text-decoration: underline;
 }
 .staff .site-footer-made-up {
   flex: 1 1 100%;
@@ -623,8 +633,11 @@ html:has(.staff) {
   text-decoration: underline;
 }
 .staff-trail [aria-current] {
+  min-inline-size: 0;
   color: var(--color-text);
   font-weight: 600;
+  /* A 60-letter one-word name breaks, as the title does, rather than push the page wide. */
+  overflow-wrap: anywhere;
 }
 
 /* A small uppercase label over a group of things. */
@@ -1089,6 +1102,8 @@ html:has(.staff) {
   color: var(--color-text);
   font-weight: 600;
   text-decoration: none;
+  /* A long one-word name breaks inside the row, as the title does, never past its edge. */
+  overflow-wrap: anywhere;
 }
 .staff-row-link::after {
   content: '';

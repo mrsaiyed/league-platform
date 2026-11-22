@@ -56,6 +56,110 @@
 .admin-schedule > .admin-add-round {
   margin-block-end: var(--step-4);
 }
+/* ---------- Season settings' parts (step 2.47) ---------- */
+
+.admin-season > .staff-quiet {
+  margin-block: 0 var(--step-4);
+}
+/* What a part is set to: each name above its value, in two columns where there is room. */
+.staff .admin-season-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: var(--step-3) var(--step-5);
+  margin: 0;
+}
+.staff .admin-season-facts > div {
+  display: grid;
+  gap: var(--step-1);
+  min-inline-size: 0;
+}
+.staff .admin-season-facts dt {
+  color: var(--color-muted);
+  font-size: var(--text-12);
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+}
+.staff .admin-season-facts dd {
+  margin: 0;
+  font-size: var(--text-16);
+}
+/* A part's form: its groups under a fine line each, the presets above them. */
+.admin-season-edit {
+  display: grid;
+  gap: var(--step-5);
+}
+.staff .admin-season-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--step-4);
+  min-inline-size: 0;
+  margin: 0;
+  padding: var(--step-4) 0 0;
+  border: 0;
+  border-block-start: 1px solid var(--color-line);
+}
+.staff .admin-season-form > input + .admin-season-group {
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+/* A group's heading: its legend, or the legend of the choice it opens with. */
+.staff .admin-season-group > legend {
+  float: inline-start;
+  inline-size: 100%;
+  margin: 0;
+  padding: 0;
+}
+.staff .admin-season-group > .settings-choice:first-child > legend,
+.staff .admin-season-group > legend {
+  font-size: var(--text-18);
+  font-weight: 700;
+}
+.staff .admin-season-group > legend + * {
+  clear: both;
+}
+.staff .admin-season-form .ui-field-help,
+.staff .admin-season-tick > .ui-field-help {
+  color: var(--color-muted);
+  font-size: var(--text-14);
+  font-weight: 400;
+}
+.staff .admin-season-tick {
+  display: grid;
+  gap: var(--step-1);
+}
+.staff .admin-season-form .settings-choice[data-wrong] {
+  padding-inline-start: var(--step-3);
+  border-inline-start: var(--line-heavy) solid var(--color-danger);
+}
+.staff .admin-season-presets {
+  display: grid;
+  gap: var(--step-3);
+  padding-block-end: var(--step-4);
+  border-block-end: 1px solid var(--color-line);
+}
+.staff .admin-season-presets > :is(h2, p, ul) {
+  margin: 0;
+}
+.staff .admin-season-presets > h2 {
+  font-size: var(--text-18);
+}
+.staff :is(.admin-season-preset-list, .admin-season-moves) {
+  display: grid;
+  gap: var(--step-1);
+  margin: 0;
+  padding-inline-start: var(--step-5);
+  font-size: var(--text-14);
+}
+.staff .admin-season-preset-list {
+  padding-inline-start: 0;
+  color: var(--color-muted);
+  list-style: none;
+}
+.staff .ui-notice > .admin-season-moves {
+  margin-block-end: var(--step-3);
+}
+
 .staff .admin-clashes > p {
   margin: 0;
 }
@@ -593,9 +697,26 @@
 .box-score-grid {
   max-inline-size: 100%;
   overflow-x: auto;
+  container-type: inline-size;
+  /* Every count's column has one width (its box and its two paddings), and the name column
+     takes at least 7rem and what is left over after the whole count columns that fit beside
+     it: so on a phone the columns in view at rest are whole, the first one to scroll to
+     starts at the box's edge, and a box wide enough for them all shows them all. */
+  --box-count-col: calc(var(--step-7) + var(--step-2) + 2 * var(--step-1));
+  --box-name-least: 7rem;
 }
 .box-score-grid table {
   border-collapse: collapse;
+}
+.box-score-grid td {
+  box-sizing: border-box;
+  inline-size: var(--box-count-col);
+  min-inline-size: var(--box-count-col);
+}
+.box-score-grid thead th:not(:first-child) {
+  box-sizing: border-box;
+  inline-size: var(--box-count-col);
+  min-inline-size: var(--box-count-col);
 }
 .box-score-grid th,
 .box-score-grid td {
@@ -620,13 +741,21 @@
   position: sticky;
   inset-inline-start: 0;
   z-index: 1;
-  max-inline-size: 9.5rem;
+  /* A long name wraps under itself, whole, instead of being cut short with "…"; the column's
+     width is the box's leftover (above), so no count column stands half in view at rest. */
+  box-sizing: border-box;
+  --box-name-col: calc(
+    var(--box-name-least) + mod(100cqi - var(--box-name-least), var(--box-count-col))
+  );
+  inline-size: var(--box-name-col);
+  min-inline-size: var(--box-name-col);
+  max-inline-size: var(--box-name-col);
   padding-inline: 0 var(--step-3);
-  overflow: hidden;
   background: var(--color-panel);
   font-size: var(--text-14);
   text-align: start;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 /* A count's box: a text box asking for number keys (box-score-sheet-form.tsx says why). */
 .staff .box-score-grid input[inputmode='numeric'] {

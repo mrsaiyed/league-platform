@@ -12,18 +12,23 @@ type Tables = Extract<NonNullable<GameNumbersView['boxScores']>['body'], { kind:
 function BoxScoreTables({ body }: { readonly body: Tables }) {
   return (
     <div className="game-tables">
-      {body.tables.map((table) => (
-        <BoxScoreTable
-          key={table.side}
-          teamName={table.teamName}
-          columns={table.columns}
-          players={table.players}
-          totals={table.totals}
-          hiddenNotice={body.hiddenNotice}
-          labels={body.labels}
-          nameRoom={body.nameRoom}
-        />
-      ))}
+      {body.tables.map((table) =>
+        table.nothingRecorded !== null ? (
+          <EmptyPanel key={table.side} title={table.teamName} text={table.nothingRecorded} />
+        ) : (
+          <BoxScoreTable
+            key={table.side}
+            teamName={table.teamName}
+            columns={table.columns}
+            players={table.players}
+            totals={table.totals}
+            hiddenNotice={body.hiddenNotice}
+            notes={table.notes}
+            labels={body.labels}
+            nameRoom={body.nameRoom}
+          />
+        ),
+      )}
     </div>
   );
 }

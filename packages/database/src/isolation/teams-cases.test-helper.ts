@@ -3,6 +3,7 @@
 import {
   addToRoster,
   changeRosterEntry,
+  countTeamGames,
   createTeam,
   listRoster as listRosterCommand,
   markLeft,
@@ -17,15 +18,17 @@ import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
   findRosterEntry,
   findTeam,
+  findTeamGames,
   insertRosterEntry,
   insertTeam,
   listRoster,
+  listScheduleTeams,
   listStaffSeasonTeams,
   setTeamBinned,
   updateRosterEntry,
   updateTeam,
 } from '../queries/index.ts';
-import { harnessTx, registerCommandCase } from './command-cases.test-helper.ts';
+import { harnessTx, registerCommandCase, runAsApp } from './command-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 
 // A case that writes needs a season of the scope's own league: a refusal naming the
@@ -63,6 +66,18 @@ registerIsolationCase({
   subject: findTeam,
   name: "find the target's team",
   run: (scope, target) => findTeam(scope, target.teamId),
+});
+
+registerIsolationCase({
+  subject: findTeamGames,
+  name: "count the target team's games",
+  run: (scope, target) => findTeamGames(scope, target.teamId),
+});
+
+registerIsolationCase({
+  subject: listScheduleTeams,
+  name: "name the target's season's teams for the schedule grid, those in the bin too",
+  run: (scope, target) => listScheduleTeams(scope, target.seasonId),
 });
 
 registerIsolationCase({
@@ -106,9 +121,35 @@ registerCommandCase(updateTeamCommand, harnessTx, {
   input: (target) => ({ teamId: target.teamId, version: 1, name: 'Harness renamed' }),
 });
 
-registerCommandCase(removeTeam, harnessTx, {
-  name: "move the target's team to the bin",
+registerCommandCase(countTeamGames, harnessTx, {
+  name: "count the target team's games",
   input: (target) => ({ teamId: target.teamId }),
+});
+
+// A team with games stays out of the bin (A-17), and the target's team has some: in the
+// scope's own league its games and its season's draft are emptied first, so the control
+// run reaches the team (in another league the fence leaves the target's rows as they are).
+registerIsolationCase({
+  subject: removeTeam,
+  name: "move the target's team to the bin once it has no games",
+  run: async (scope, target) => {
+    const trx = transactionOf(scope);
+    // Cancelled games hold no team; a scored game cannot go to the bin, but it can be cancelled.
+    await trx
+      .updateTable('games')
+      .set({ status: 'cancelled', home_score: null, away_score: null, finalized_at: null })
+      .where('league_id', '=', scope.leagueId)
+      .where((eb) =>
+        eb.or([eb('home_team_id', '=', target.teamId), eb('away_team_id', '=', target.teamId)]),
+      )
+      .execute();
+    await trx
+      .updateTable('schedule_drafts')
+      .set({ changes: { version: 1, changes: [] } })
+      .where('league_id', '=', scope.leagueId)
+      .execute();
+    return runAsApp(removeTeam, harnessTx, scope, { teamId: target.teamId });
+  },
 });
 
 registerCommandCase(setTeamStatsVisibility, harnessTx, {

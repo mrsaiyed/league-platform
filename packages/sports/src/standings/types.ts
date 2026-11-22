@@ -91,6 +91,56 @@ export interface StandingsInput {
  */
 export type DecidedBy = Tiebreaker | 'still-tied' | null;
 
+/** One team in one step of separating level teams: where that tiebreaker put it, and why. */
+export interface TiebreakPlace {
+  readonly teamId: string;
+  /**
+   * 1 for the first; teams the tiebreaker left level with each other share a number, so
+   * every team has 1 when it left them all level or could not apply.
+   */
+  readonly place: number;
+  /**
+   * The team's figure under the tiebreaker: its point difference, points scored or points
+   * allowed (fewer is better). Null for head-to-head and a coin flip.
+   */
+  readonly value: number | null;
+  /**
+   * Head-to-head only: the team's wins, losses and ties in the games among the teams of
+   * this step, also when head-to-head could not apply. Null for the other tiebreakers.
+   */
+  readonly record: {
+    readonly wins: number;
+    readonly losses: number;
+    readonly ties: number;
+  } | null;
+}
+
+/** One of the season's tiebreakers, tried on a set of teams level with each other. */
+export interface TiebreakStep {
+  readonly tiebreaker: Tiebreaker;
+  /**
+   * False when it could not apply to these teams and was passed over: head-to-head when one
+   * of them has played none of the others, a coin flip when none recorded covers them all.
+   */
+  readonly applied: boolean;
+  /** The teams it was tried on, best first as it left them. */
+  readonly teams: readonly TiebreakPlace[];
+}
+
+/**
+ * The teams a team was level with on the table's measure, and how the season's
+ * tiebreakers ordered them (P7 §1, S-74), told the same way on each of their rows.
+ * `steps` are in the order they were tried: on all of them first, tiebreaker after
+ * tiebreaker, until one puts some ahead of others; teams it leaves level with each other
+ * then start the list again among themselves only, and their steps follow, for each such
+ * set in the table's order. It is added to the order and never changes it.
+ */
+export interface LevelTeams {
+  /** Two or more teams, this one among them, in the table's order. */
+  readonly teamIds: readonly string[];
+  readonly steps: readonly TiebreakStep[];
+}
+
 export interface Streak {
   readonly result: 'won' | 'lost' | 'tied';
   readonly length: number;
@@ -119,6 +169,8 @@ export interface StandingsRow {
   /** From counted games only, latest first; null before any game. */
   readonly streak: Streak | null;
   readonly decidedBy: DecidedBy;
+  /** The teams it is level with and how they were ordered; null when its record alone placed it. */
+  readonly level: LevelTeams | null;
   /** Adjustments that changed this row, for the footnote under the table (S-10). */
   readonly adjustments: readonly { readonly adjustmentId: string; readonly reason: string }[];
 }

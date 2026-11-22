@@ -19,6 +19,12 @@ export type GameRecord = {
   readonly captureMode: string;
   readonly homeScore: number | null;
   readonly awayScore: number | null;
+  /**
+   * How many overtime periods a final game had (P7 §5.6): 0 when the tracker ended it in
+   * regulation. Null when it is not known: a score typed in, a box score, a forfeit, a
+   * game not final, a game final before the count was kept (migration 0021).
+   */
+  readonly overtimePeriods: number | null;
   /** The rules the game is played under; null while it follows its season's. */
   readonly format: unknown;
   readonly finalizedAt: string | null;
@@ -36,6 +42,12 @@ export type GameResultChange = {
   readonly homeScore: number | null;
   readonly awayScore: number | null;
   readonly decided: boolean;
+  /**
+   * The overtime periods of the result (P7 §5.6), written with every change of it: the
+   * count the engine gives when the tracker ends the game, else null (not known, or not
+   * final), so a game reopened, or decided again by hand, never keeps an old count.
+   */
+  readonly overtimePeriods: number | null;
   /** Set only if the game has none; a game that has rules keeps them. */
   readonly format?: SeasonRules;
   /** How the game is now recorded (final, box or live), when that changes with the result. */
@@ -311,8 +323,17 @@ export type ScoringSessionsStore = {
    * the transaction stays usable to read who won.
    */
   readonly start: (session: NewScoringSession) => Promise<ScoringSession | undefined>;
-  /** Moves the lease of the game's session `sessionId` on to `heldUntil`: false if it is gone. */
-  readonly extend: (gameId: string, sessionId: string, heldUntil: number) => Promise<boolean>;
+  /**
+   * Moves the lease of the game's session `sessionId` on to `heldUntil`, in one write and
+   * only if the lease runs out before `dueBefore` (T-295): false if nothing moved, because
+   * the session is gone or its lease still runs past `dueBefore`.
+   */
+  readonly extend: (
+    gameId: string,
+    sessionId: string,
+    heldUntil: number,
+    dueBefore: number,
+  ) => Promise<boolean>;
   /**
    * Ends the game's session `sessionId`. With `lapsedBy`, only if its lease had run out
    * by then, so a session renewed a moment ago is kept. False if nothing was ended.

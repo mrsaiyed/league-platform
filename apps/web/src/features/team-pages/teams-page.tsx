@@ -1,4 +1,4 @@
-import { leagueUrl } from '@srleagues/core';
+import { leagueApiUrl, leagueUrl } from '@srleagues/core';
 import { CallBand, EmptyPanel, PageHead, TeamCard as TeamCardPiece } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -7,14 +7,23 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { loadTeamCards, type TeamCard } from './build-team.ts';
+import { TeamMark } from './my-team-marks.tsx';
 import { leagueHomeStayUrl } from './start-page.ts';
 
 /**
  * The season's teams as cards, each one link to its team's page: the emblem and name, the
  * record as the card's one figure, then seed and, where the league has divisions, division.
- * Nothing here reads anything.
+ * Nothing here reads anything. Given `marks`, the private read's address, each card is
+ * marked "Your team" once that read says it is the person's own or the one this device chose
+ * (step 2.168); the cards as they arrive are the same for everyone.
  */
-export function TeamCards({ cards }: { readonly cards: readonly TeamCard[] }) {
+export function TeamCards({
+  cards,
+  marks,
+}: {
+  readonly cards: readonly TeamCard[];
+  readonly marks?: string | undefined;
+}) {
   // A league with no divisions says nothing about divisions; one that has them says which
   // team has none.
   const hasDivisions = cards.some((card) => card.divisionName !== null);
@@ -45,6 +54,7 @@ export function TeamCards({ cards }: { readonly cards: readonly TeamCard[] }) {
                 : []),
             ]}
             way={t('team.roster')}
+            mark={marks === undefined ? undefined : <TeamMark address={marks} slug={card.slug} />}
           />
         </li>
       ))}
@@ -116,7 +126,12 @@ export async function TeamsPage({
             />
           ) : (
             <>
-              <TeamCards cards={cards} />
+              {/* The current season's cards only: a person's own team is one of this
+                  season's (my-team-endpoint.ts). */}
+              <TeamCards
+                cards={cards}
+                marks={season.isCurrent ? leagueApiUrl(addressee, ['my-team']) : undefined}
+              />
               {/* The page closes as the home page does: one band, one way on. */}
               <CallBand
                 title={t('teams.call.title')}

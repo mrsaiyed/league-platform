@@ -142,10 +142,18 @@ export function statsTablesView(
     players: {
       title: t('stats.allPlayers'),
       // Said where the eye is: the table lists everyone and opens sorted by points, so its
-      // first row may be a player with too few games to lead a card above.
-      note: data.playerRows.some((row) => row.quiet !== undefined)
-        ? t.plural('stats.listedNotRanked', data.minimumGames)
-        : null,
+      // first row may be a player with too few games to lead a card above. A player can also
+      // have played enough games and a statistic recorded in fewer: then that column's top
+      // may be on no board, and the table says why.
+      note:
+        [
+          data.playerRows.some((row) => row.quiet !== undefined)
+            ? t.plural('stats.listedNotRanked', data.minimumGames)
+            : undefined,
+          data.recordedInFewer ? t.plural('stats.recordedNotRanked', data.minimumGames) : undefined,
+        ]
+          .filter((sentence) => sentence !== undefined)
+          .join(t('stats.noteJoin')) || null,
       columns: data.playerColumns,
       rows: data.playerRows,
       initialSort: data.openingSort,

@@ -8,6 +8,7 @@ export {
   type NamePolicy,
   type NameRequest,
 } from './rules/name-policy.ts';
+export { personFieldNames, wrongPersonFields, type PersonFieldName } from './person-fields.ts';
 export {
   findPrivateFields,
   privateValuesOf,
@@ -30,6 +31,7 @@ export {
 } from './rules/stats-shown.ts';
 export { publicViewer, signedInViewer, type Viewer } from './rules/viewer.ts';
 export { createPerson, type CreatePersonError } from './commands/create-person.ts';
+export { getPerson, type GetPersonError } from './commands/get-person.ts';
 export { listPeople } from './commands/list-people.ts';
 export { removePerson, type RemovePersonError } from './commands/remove-person.ts';
 export {

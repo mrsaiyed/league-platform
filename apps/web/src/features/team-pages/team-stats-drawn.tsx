@@ -32,6 +32,7 @@ export function TeamStatsDrawn({ view }: { readonly view: TeamStatsDrawnView }) 
           {view.totalsOnlyNote === null ? null : (
             <p className="ui-section-note">{view.totalsOnlyNote}</p>
           )}
+          {view.totalsNote === null ? null : <p className="ui-section-note">{view.totalsNote}</p>}
         </div>
       )}
       {players}

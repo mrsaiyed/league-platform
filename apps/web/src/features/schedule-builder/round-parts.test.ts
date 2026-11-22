@@ -33,6 +33,7 @@ const round = (games: number, undated: number): GridRound => ({
   date: '2026-11-30',
   games: Array.from({ length: games }, (_, i) => game(i + 1)),
   undated,
+  removed: [],
 });
 const action = async (): Promise<never> => {
   throw new Error('not posted in a test');
@@ -75,5 +76,27 @@ describe("a round's count and its removal (step 2.181)", () => {
     expect(html).toContain('It has no games, so it can be removed from the draft.');
     expect(html).toContain('data-kind="danger">Remove this round</button>');
     expect(html).toContain(`data-remove-round="${roundId}"`);
+  });
+});
+
+describe('a round with games the draft removes (step 2.185)', () => {
+  const struck = (games: number, removed: number): GridRound => ({
+    ...round(games, 0),
+    removed: Array.from({ length: removed }, (_, i) => ({
+      ...game(i + 5),
+      roundGone: null,
+      teamInBin: false,
+    })),
+  });
+
+  it('says its games and the struck ones apart', () => {
+    expect(facts(struck(7, 3))).toContain('>7 games, 3 removed in this draft</span>');
+    expect(facts(struck(1, 1))).toContain('>1 game, 1 removed in this draft</span>');
+  });
+
+  it('can be removed when only struck games are in it (S-60)', () => {
+    const html = removal(struck(0, 2));
+    expect(facts(struck(0, 2))).toContain('>0 games, 2 removed in this draft</span>');
+    expect(html).toContain('data-kind="danger">Remove this round</button>');
   });
 });

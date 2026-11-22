@@ -194,6 +194,11 @@ export type TeamStatsView = {
   readonly totalsColumns: readonly StatsColumn[];
   readonly totalsRows: readonly StatRow[];
   readonly hasNumbers: boolean;
+  /**
+   * Said under the totals when one of them is not the players' numbers added up (step
+   * 2.196: the team's own turnovers, its final scores as entered); null otherwise.
+   */
+  readonly totalsNote: string | null;
 };
 
 const whole = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
@@ -291,7 +296,19 @@ export async function loadTeamStats(
     totalsRows.some((row) =>
       Object.entries(row.cells).some(([key, value]) => key !== 'team' && value !== null),
     );
-  return { playerLinesShown, playerColumns, playerRows, totalsColumns, totalsRows, hasNumbers };
+  const totalsNote =
+    team !== undefined && team.countsMoreThanPlayers.length > 0
+      ? t('stats.teamTotalsCountTeam')
+      : null;
+  return {
+    playerLinesShown,
+    playerColumns,
+    playerRows,
+    totalsColumns,
+    totalsRows,
+    hasNumbers,
+    totalsNote,
+  };
 }
 
 export type TeamPageData = {

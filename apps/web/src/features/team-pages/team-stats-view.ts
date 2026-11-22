@@ -22,6 +22,8 @@ export type TeamStatsDrawnView =
       }[];
       /** Said under the totals of a team whose players this viewer does not see. */
       readonly totalsOnlyNote: string | null;
+      /** Said when the team's totals count more than its players' numbers (step 2.196). */
+      readonly totalsNote: string | null;
       readonly beside: boolean;
       readonly players: {
         readonly caption: string;
@@ -71,6 +73,7 @@ export function teamStatsView(stats: TeamStatsView): TeamStatsDrawnView {
     totalsLabel: t('team.statsTotals'),
     totals,
     totalsOnlyNote: stats.playerLinesShown ? null : t('team.statsTotalsOnly'),
+    totalsNote: stats.totalsNote,
     beside: totals.length > 0 && stats.totalsColumns.length - 1 <= besideLimit,
     players,
     labels: displayLabels(t).stats,

@@ -7,8 +7,20 @@ export const enTrackerStates = {
   // Marking a game not started (step 2.121, S-40): the Al-Hadi tracker's question
   // (checklist J5), the reason asked for once a basket, foul or turnover stands, and
   // each refusal of POST …/not-started by its code (NotStartedReply). Step 2.37 draws them.
+  // What the question says before the tap (step 2.37): to someone who may clear plays,
+  // how many and what score; to a scorekeeper, that the plays are undone first.
+  'tracker.notStarted.askClears_one':
+    '{count} play and the score, {home} {homeScore}, {away} {awayScore}, will be cleared.',
+  'tracker.notStarted.askClears_other':
+    '{count} plays and the score, {home} {homeScore}, {away} {awayScore}, will be cleared.',
+  'tracker.notStarted.askUndoFirst_one':
+    '{count} basket, foul or turnover is recorded. Undo it first, then mark the game not started.',
+  'tracker.notStarted.askUndoFirst_other':
+    '{count} baskets, fouls or turnovers are recorded. Undo them first, then mark the game not started.',
   'tracker.notStarted.button': 'Mark not started',
   'tracker.notStarted.done': 'The game is scheduled again. Nothing recorded in it counts.',
+  'tracker.notStarted.help':
+    'For a game started by mistake, or only to try the tracker. You are asked first.',
   'tracker.notStarted.no': 'Keep scoring',
   'tracker.notStarted.question': 'Mark this game as not started?',
   'tracker.notStarted.questionDetail':
@@ -44,30 +56,33 @@ export const enTrackerStates = {
   'tracker.notStarted.refused.unknown-game': 'This game could not be found.',
   'tracker.notStarted.refused.was-decided':
     'This game was final once, so it was played and cannot be marked not started. Correct its plays instead.',
+  'tracker.notStarted.working': 'Clearing…',
   'tracker.notStarted.yes': 'Yes, mark not started',
   'tracker.readOnly.expired':
-    'This device was away too long and another device has had the game since. This one is now read-only.',
+    'This device was away too long and another device has had the game since. This device can no longer score it.',
   'tracker.readOnly.game-not-live':
     'This game cannot be scored now: it is over, cancelled or postponed.',
   'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
   'tracker.readOnly.not-held': 'This device is no longer the one scoring this game.',
-  'tracker.readOnly.released':
-    'This device has left the game. It is read-only until you open it again.',
+  'tracker.readOnly.released': 'This device has left the game. Open it again to keep scoring.',
+  // "Update needed" (step 2.37, part 2): an installed app has no browser reload button,
+  // and opening the game again would be refused again.
+  'tracker.readOnly.reload': 'Reload',
   'tracker.readOnly.request-refused':
     'Something went wrong opening the game. Tap Open the game again.',
   'tracker.readOnly.signed-in-as-other':
-    'You signed in again, but this game is no longer being scored on this device: someone else is signed in here now, or another device took the game over while you were signed out. This one is now read-only.',
+    'You signed in again, but this game is no longer being scored on this device: someone else is signed in here now, or another device took the game over while you were signed out. This device can no longer score it.',
   'tracker.readOnly.signed-out':
     'You are signed out. Sign in again to keep scoring. What you entered on this device is kept and sent once you are back, so do not enter it again.',
   'tracker.readOnly.storage-failed':
-    'This device could not read what it has saved, so it is read-only. Open the game again to try once more.',
+    'This device could not read what it has saved, so it cannot score now. Open the game again to try once more.',
   // What the tracker says about holding the game and refused taps (T6 §5, T-113),
   // chosen from the controller's status by apps/web/src/features/tracker/tracker-notice.ts.
   'tracker.readOnly.taken-over':
     'Someone else is now scoring this game on another device. This device can no longer score it.',
   'tracker.readOnly.unknown-game': 'This game could not be found.',
   'tracker.readOnly.update-needed':
-    'This tracker needs an update. Reload the page to keep scoring.',
+    'This tracker needs an update. Tap Reload to keep scoring. Your plays are kept on this device.',
   'tracker.refusal.alreadyRunningClock': 'The clock already runs through fouls.',
   'tracker.refusal.alreadyStopClock': 'The clock already stops on fouls.',
   'tracker.refusal.alreadyThatPeriod': 'The game is already in that period.',
@@ -127,12 +142,53 @@ export const enTrackerStates = {
   'tracker.reopen.cancel': 'Keep it final',
   'tracker.reopen.confirm': 'Reopen the game',
   'tracker.reopen.done': 'The game is live again. Carry on scoring.',
+  // Reopened from a device that does not hold the game: said before who is scoring (M3).
+  'tracker.reopen.doneElsewhere': 'The game is open again: it is live, no longer final.',
+  // "Keep it final" came after the league had already reopened the game (fix round B, M4).
+  'tracker.reopen.doneThoughKept':
+    'The league had already reopened the game before you chose to keep it final. It is live again: end it again if it should stay final.',
   'tracker.reopen.noConnection':
     'No connection. The game reopens as soon as the connection is back.',
-  'tracker.reopen.question':
-    'Reopen this game? It goes back to live with every play as it was, and it stops counting in the standings until you end it again.',
-  'tracker.reopen.reasonLabel':
-    'Why it is being reopened (kept in the game’s corrections, never shown publicly)',
+  // Why a door (Reopen, Mark not started) did not open when the league did not say
+  // (step 2.37): the controller's own reasons.
+  'tracker.reopen.problem.not-offered': 'That is not offered on this device now.',
+  'tracker.reopen.problem.plays-waiting':
+    'Plays are still waiting to send. Try again once the top line says All saved.',
+  'tracker.reopen.problem.rejected': 'The league turned that away. A league admin can help.',
+  'tracker.reopen.problem.signed-out': 'You are signed out. Sign in again, then try once more.',
+  // A Reopen with no connection, asked again by itself (the review of the two doors, point 7).
+  'tracker.reopen.problem.trying':
+    'No connection. The game is still final: this device keeps asking the league to reopen it, and says so once it has.',
+  'tracker.reopen.problem.unanswered': 'No connection. Try again when it is back.',
+  // The question in the pad (step 2.37): its title, what reopening does, and the reason,
+  // in words short enough for a phone's pad. The field starts empty; the usual reason is
+  // one tap beside it ("By mistake" fills it in), so nothing is typed over (fix round, F6).
+  'tracker.reopen.question': 'Reopen this game?',
+  'tracker.reopen.questionDetail':
+    'It goes back to live with every play as it was, and stops counting in the standings until it is ended again.',
+  'tracker.reopen.reasonLabel': 'Why (kept with the game, never shown publicly)',
+  'tracker.reopen.reasonMistake': 'By mistake',
+  'tracker.reopen.reasonMistakeFill': 'Fill in the reason: {reason}',
   'tracker.reopen.reasonReady': 'End game tapped by mistake',
+  // Each refusal of POST …/reopen by its code (ReopenReply), in the tracker's words.
+  'tracker.reopen.refused.changed-since-read':
+    'This game changed since this screen last read it. Look again, then reopen it if it still needs it.',
+  'tracker.reopen.refused.game-not-decided':
+    'This game is not over, so there is nothing to reopen.',
+  'tracker.reopen.refused.game-not-found': 'This game could not be found.',
+  'tracker.reopen.refused.not-allowed':
+    'You cannot score this game, so you cannot reopen it. A league admin can reopen it.',
+  'tracker.reopen.refused.not-ended-by-tracker':
+    'This game was not ended from the tracker, so it cannot be reopened here. A league admin can reopen it.',
+  'tracker.reopen.refused.not-ended-by-you':
+    'Only the scorekeeper who ended this game can reopen it here. A league admin can reopen it.',
+  'tracker.reopen.refused.not-ended-by-youNamed':
+    '{name} ended this game, so only they can reopen it here. A league admin can reopen it.',
+  'tracker.reopen.refused.reason-needed': 'Say in a few words why the game is being reopened.',
+  'tracker.reopen.refused.reopen-time-over':
+    'It is too long since this game ended to reopen it here. A league admin can reopen it.',
+  'tracker.reopen.refused.scorekeepers-may-not-reopen':
+    'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
   'tracker.reopen.until': 'You can reopen this game until {time}.',
+  'tracker.reopen.working': 'Reopening…',
 } as const;

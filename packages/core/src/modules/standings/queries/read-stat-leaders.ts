@@ -1,6 +1,12 @@
 // Stat leaders with the league's minimum-games rule (P7 §6). Players whose numbers this
 // viewer may not see are taken out before ranking (S-22, T-87), so a rank never hints
 // at them. Level players share a rank and the next is skipped (1, 2, 2, 4).
+//
+// Three rules make a board nobody can argue with (step 2.199). The minimum counts the
+// games where the board's statistic was recorded, the games its average is over (S-63:
+// one or two games should not put a player at the top). A player at 0 leads nothing and
+// is not listed. A board cut to a number of places keeps everyone level with the last
+// place it shows: two players level in fifth are both listed, never one chosen by an id.
 import { z } from 'zod';
 import { fail, ok, type Result } from '../../../command/index.ts';
 import type { StandingsReadStore } from '../read-ports.ts';
@@ -11,8 +17,9 @@ export const statLeadersInput = z.object({
   /** A stat key, or 'seconds' for time on court. */
   measure: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,39}$/),
   by: z.enum(['total', 'average']).default('total'),
-  /** The league's minimum games, counted as games the player entered. */
+  /** The league's minimum games, counted as the games where this statistic was recorded (S-63). */
   minimumGames: z.number().int().min(0).max(1000).default(0),
+  /** How many places to show; everyone level with the last of them is shown too. */
   limit: z.number().int().min(1).max(500).optional(),
 });
 
@@ -23,6 +30,7 @@ export type StatLeader = {
   readonly teamIds: readonly string[];
   readonly value: number;
   readonly gamesPlayed: number;
+  /** The games this statistic was recorded in: what the minimum counts and the average is over. */
   readonly gamesRecorded: number;
 };
 
@@ -48,8 +56,11 @@ export async function readStatLeaders(
   const rows = source.players.flatMap((player) => {
     const entry = measure === 'seconds' ? player.seconds : player.stats[measure];
     if (entry === undefined || entry.gamesRecorded === 0) return [];
-    if (player.gamesPlayed < minimumGames) return [];
-    return [{ player, value: by === 'total' ? entry.total : entry.average, entry }];
+    if (entry.gamesRecorded < minimumGames) return [];
+    const value = by === 'total' ? entry.total : entry.average;
+    // Nothing to their name in this statistic: no leader, and not listed below one.
+    if (!(value > 0)) return [];
+    return [{ player, value, entry }];
   });
   rows.sort((a, b) => b.value - a.value || a.player.personId.localeCompare(b.player.personId));
   const ranked: StatLeader[] = [];
@@ -65,10 +76,12 @@ export async function readStatLeaders(
       gamesRecorded: row.entry.gamesRecorded,
     });
   });
+  // The last place shown, and everyone who shares it.
+  const lastShown = limit === undefined ? undefined : ranked[limit - 1]?.rank;
   return ok({
     seasonId: source.seasonId,
     measure,
     by,
-    leaders: limit === undefined ? ranked : ranked.slice(0, limit),
+    leaders: lastShown === undefined ? ranked : ranked.filter((row) => row.rank <= lastShown),
   });
 }

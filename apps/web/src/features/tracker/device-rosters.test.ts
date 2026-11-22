@@ -33,6 +33,7 @@ const rostersOf = (players: TrackerRosters['players'], uniqueJerseys = false): T
   recording: 'live',
   status: 'scheduled',
   uniqueJerseys,
+  allowTies: false,
   players,
 });
 const kept = ({ teamId, ...p }: TrackerRosters['players'][number]) => p;
@@ -51,7 +52,14 @@ describe('the rosters as the device keeps them', () => {
       },
       away: { teamId: away, name: 'Made-up Away', players: [kept(player(away, 1))] },
       uniqueJerseys: false,
+      allowTies: false,
     });
+  });
+
+  it('keeps whether a level score may end the game, so End game is refused on the device at once (S-73)', () => {
+    const told = { ...rostersOf([player(home, 2)]), allowTies: true };
+    expect(deviceRosters(told, {}).allowTies).toBe(true);
+    expect(deviceRosters(rostersOf([player(home, 2)]), {}).allowTies).toBe(false);
   });
 
   it('keeps what the Players panel needs: unique numbers, and who was added at a table to review (record 058)', () => {

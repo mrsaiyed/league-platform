@@ -24,6 +24,13 @@ export type EmailMessage = {
    * send a second email, whose link ends the first.
    */
   readonly idempotencyKey: string;
+  /**
+   * What the email hands its reader to use: a code to type (a sign-in or sign-up code) or
+   * a link to follow (an invitation, a notice). Never sent; the test copy's kept emails
+   * keep it, so scripts/read-kept-emails.mjs prints the right one (step 2.204). An email
+   * that does not say is kept as a link.
+   */
+  readonly carries?: 'code' | 'link';
 };
 
 /** The email service's id for a message it accepted. */

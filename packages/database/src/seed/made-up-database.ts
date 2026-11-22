@@ -1,7 +1,8 @@
 // A database of made-up data, in memory, for running the apps on one computer and for
 // their tests (T-195, T-201): every migration applied, the made-up seed leagues loaded,
-// and then logged in as a login role fit for the app (T-60): a member of app_user that
-// is not a superuser and owns nothing, as a hosted login is meant to be. So the app's
+// and then logged in as a login role fit for the app (T-60): a member of app_user (and of
+// sign_in_store, record 052) that is not a superuser and owns nothing, as a hosted login
+// is meant to be. So the app's
 // start-up check (checkLoginRole) passes here for the same reasons it must pass on a
 // hosted database, and the app's queries run as that login, not as the superuser.
 // That shows the app needs no more than the login's powers; it is not a wall. The
@@ -17,6 +18,11 @@ import { applyMigrations } from '../migrations/apply-migrations.ts';
 import { pgliteDriver } from '../migrations/pglite-driver.ts';
 import { seedLeaguesInto } from './seed-leagues.ts';
 import { putSeedSeasonsUnderWay } from './seed-season-under-way.ts';
+import { seedDemoLeagueInto } from './seed-demo-league.ts';
+import { addSeedTrackedGames } from './seed-tracked-games.ts';
+import type { SimulationOptions } from './simulate-league-plan.ts';
+import { checkSimulatedLeague, type SimulationReport } from './simulate-league-check.ts';
+import { simulateLeagueInto, type PlayedLeague } from './simulate-league.ts';
 
 /** The login role a made-up database is used as. */
 export const madeUpLoginRole = 'made_up_app_login';
@@ -32,6 +38,10 @@ export type MadeUpDatabase = {
   readonly source: DatabaseSource;
   /** The seed leagues it holds. */
   readonly leagues: readonly MadeUpLeague[];
+  /** The simulated league, when `simulate` asked for one. */
+  readonly simulated?: PlayedLeague;
+  /** The simulated league's self-check (the command's seven checks), run once it is played. */
+  readonly simulatedReport?: SimulationReport;
   /** Ends it; everything in it is gone. */
   readonly close: () => Promise<void>;
 };
@@ -50,6 +60,24 @@ export type MadeUpOptions = {
    * have something to show. Off by default: the seeded season is still being set up.
    */
   readonly underWay?: boolean;
+  /**
+   * With `underWay`: each seed league's venue and one game scored live through the
+   * tracker as well (seed-tracked-games.ts), as `npm run seed` loads them and the web app
+   * runs on them. Off by default: the database tests here start from the season under way
+   * alone.
+   */
+  readonly tracked?: boolean;
+  /**
+   * The seed's demo-shaped league as well (seed-demo-league.ts): a large league's one
+   * program, its districts and teams, every game final, one team's tracked. Off by
+   * default: it takes some seconds to load.
+   */
+  readonly demo?: boolean;
+  /**
+   * A simulated league of that size as well, its season played to the end
+   * (simulate-league.ts, step 2.236): for reading its pages through the web app's ports.
+   */
+  readonly simulate?: SimulationOptions;
 };
 
 /** Opens a new made-up database in memory. Close it when done. */
@@ -60,6 +88,15 @@ export async function madeUpDatabase(options: MadeUpOptions = {}): Promise<MadeU
     if (!run.ok) throw new Error(`The made-up database could not be built: ${run.error.code}.`);
     await seedLeaguesInto(pglite);
     if (options.underWay === true) await putSeedSeasonsUnderWay(pglite);
+    if (options.underWay === true && options.tracked === true) await addSeedTrackedGames(pglite);
+    if (options.demo === true) await seedDemoLeagueInto(pglite);
+    const simulated =
+      options.simulate === undefined
+        ? undefined
+        : await simulateLeagueInto(pglite, options.simulate);
+    // Checked as the command checks it, while the session may still read every row.
+    const simulatedReport =
+      simulated === undefined ? undefined : await checkSimulatedLeague(pglite, simulated);
     for (const [slug, audience] of Object.entries(options.audiences ?? {})) {
       const told = await pglite.query('update leagues set audience = $2 where slug = $1', [
         slug,
@@ -87,11 +124,14 @@ export async function madeUpDatabase(options: MadeUpOptions = {}): Promise<MadeU
     await pglite.exec(`
       create role ${madeUpLoginRole} login nosuperuser nocreatedb nocreaterole nobypassrls;
       grant app_user to ${madeUpLoginRole};
+      grant sign_in_store to ${madeUpLoginRole};
       set session authorization ${madeUpLoginRole};
     `);
     return {
       source: { kind: 'pglite', pglite },
       leagues: Object.freeze(rows.map((row) => Object.freeze({ ...row }))),
+      ...(simulated === undefined ? {} : { simulated }),
+      ...(simulatedReport === undefined ? {} : { simulatedReport }),
       close: () => pglite.close(),
     };
   } catch (error) {

@@ -7,6 +7,8 @@
 // settings rows, the one place every area reads what League settings saved.
 import {
   leagueStatuses,
+  rulesOfGame,
+  levelDocument,
   type AccessReader,
   type DivisionsStore,
   type LeaguesStore,
@@ -23,13 +25,41 @@ import type { Frozen, ReadWorld } from './stand-in-world.ts';
 const decided = (status: string) => status === 'final' || status === 'forfeit';
 const byId = <T extends { readonly id: string }>(a: T, b: T) => a.id.localeCompare(b.id);
 
+type GameOfTeams = {
+  readonly seasonId: string;
+  readonly binned: boolean;
+  readonly status: string;
+  readonly homeTeamId: string;
+  readonly awayTeamId: string;
+};
+
+/**
+ * Whether a team is in its season's standings, as queries/list-table-teams.ts and
+ * list-season-teams.ts read it: not in the bin, or in the bin with a final or forfeited
+ * result in a game not in the bin, so its opponents keep those results (A-5, A-17).
+ */
+const inStandings = (
+  games: readonly GameOfTeams[],
+  team: { readonly id: string; readonly seasonId: string; readonly binned: boolean },
+): boolean =>
+  !team.binned ||
+  games.some(
+    (g) =>
+      g.seasonId === team.seasonId &&
+      !g.binned &&
+      decided(g.status) &&
+      (g.homeTeamId === team.id || g.awayTeamId === team.id),
+  );
+
 export function worldStandingsStore(s: LeagueWorld): StandingsStore {
   return {
     // The world runs one transaction at a time (stand-in-world.ts): nothing to hold.
     lockSeason: async () => undefined,
+    // As queries/list-table-teams.ts: a team in the bin with a result in a game not in the
+    // bin is still counted, so its opponents keep those wins and losses (A-5, A-17).
     listTeams: async (seasonId) =>
       s.teams
-        .filter((t) => t.seasonId === seasonId && !t.binned)
+        .filter((t) => t.seasonId === seasonId && inStandings(s.games, t))
         .sort(byId)
         .map((t) => ({ teamId: t.id, divisionId: t.divisionId })),
     listAdjustments: async (seasonId) =>
@@ -99,6 +129,7 @@ export function worldStandingsRead(
       (await over()).decidedGamesOf(seasonId, personIds),
     decidedGames: async (seasonId) => (await over()).decidedGames(seasonId),
     teamStatTotals: async (seasonId) => (await over()).teamStatTotals(seasonId),
+    teamTurnoverGames: async (seasonId) => (await over()).teamTurnoverGames(seasonId),
     people: async (personIds) => (await over()).people(personIds),
   };
 }
@@ -127,8 +158,9 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
     teams: async (seasonId) => {
       const season = at()?.seasons.find((x) => x.id === seasonId);
       if (season === undefined || season.status === 'draft') return [];
+      // As queries/list-season-teams.ts: a team in the bin with a result stays, marked.
       return (at()?.teams ?? [])
-        .filter((t) => t.seasonId === seasonId && !t.binned)
+        .filter((t) => t.seasonId === seasonId && inStandings(at()?.games ?? [], t))
         .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
         .map((t) => ({
           id: t.id,
@@ -137,6 +169,7 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
           color: t.color,
           divisionId: t.divisionId,
           statsVisibility: t.statsVisibility,
+          removed: t.binned,
         }));
     },
     divisions: async (seasonId) =>
@@ -160,6 +193,8 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
         streakResult: row.streak?.result ?? null,
         streakLength: row.streak?.length ?? null,
         decidedBy: row.decidedBy,
+        // As the database keeps it (migration 0022): the one stored document.
+        level: levelDocument(row.level),
       })),
     adjustments: async (seasonId) =>
       (at()?.adjustments ?? [])
@@ -221,18 +256,30 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
     // Each team's total of each stat over its final games, from its players' lines that
     // entered the game (list-team-stat-totals.ts).
     teamStatTotals: async (seasonId) => {
-      const finals = new Set(
-        decidedGames(seasonId)
-          .filter((g) => g.status === 'final')
-          .map((g) => g.id),
-      );
-      const sums = new Map<string, { total: number; games: Set<string> }>();
+      const finalGames = decidedGames(seasonId).filter((g) => g.status === 'final');
+      const finals = new Set(finalGames.map((g) => g.id));
+      /** The team's final score in the game, or null when it has none. */
+      const scoreOf = (gameId: string, teamId: string): number | null => {
+        const g = finalGames.find((x) => x.id === gameId);
+        if (g === undefined) return null;
+        if (g.homeTeamId === teamId) return g.homeScore;
+        return g.awayTeamId === teamId ? g.awayScore : null;
+      };
+      const sums = new Map<string, { total: number; lines: number; games: Set<string> }>();
       for (const line of at()?.lines ?? []) {
         if (!finals.has(line.gameId) || !line.played) continue;
         for (const [key, value] of Object.entries(line.stats)) {
           if (!Number.isInteger(value) || value < 0) continue;
-          const sum = sums.get(`${line.teamId}|${key}`) ?? { total: 0, games: new Set<string>() };
-          sum.total += value;
+          const sum = sums.get(`${line.teamId}|${key}`) ?? {
+            total: 0,
+            lines: 0,
+            games: new Set<string>(),
+          };
+          // A team's points are its final scores, over the same games (as
+          // list-team-stat-totals.ts: S-26 as changed by step 2.196); added once a game.
+          if (key !== 'points' || scoreOf(line.gameId, line.teamId) === null) sum.total += value;
+          else if (!sum.games.has(line.gameId)) sum.total += scoreOf(line.gameId, line.teamId) ?? 0;
+          sum.lines += value;
           sum.games.add(line.gameId);
           sums.set(`${line.teamId}|${key}`, sum);
         }
@@ -241,8 +288,51 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([at, sum]) => {
           const [teamId = '', statKey = ''] = at.split('|');
-          return { teamId, statKey, total: sum.total, gamesRecorded: sum.games.size };
+          return {
+            teamId,
+            statKey,
+            total: sum.total,
+            linesTotal: sum.lines,
+            gamesRecorded: sum.games.size,
+          };
         });
+    },
+    // As list-team-turnover-games.ts counts them: in each final game, per side, the team
+    // turnovers in the saved plays less those taken back, and whether a played line of
+    // the team carries turnovers.
+    teamTurnoverGames: async (seasonId) => {
+      const finals = decidedGames(seasonId).filter((g) => g.status === 'final');
+      const rows = finals.flatMap((g) => {
+        const state = at()?.states.find((x) => x.gameId === g.id)?.state;
+        const plays: unknown =
+          typeof state === 'object' && state !== null
+            ? (state as { plays?: unknown }).plays
+            : undefined;
+        if (!Array.isArray(plays)) return [];
+        return (['home', 'away'] as const).flatMap((side) => {
+          const teamId = side === 'home' ? g.homeTeamId : g.awayTeamId;
+          const count = (type: string) =>
+            plays.filter(
+              (play: unknown) =>
+                typeof play === 'object' &&
+                play !== null &&
+                (play as { type?: unknown }).type === type &&
+                (play as { side?: unknown }).side === side,
+            ).length;
+          const turnovers = count('team-turnover') - count('team-unturnover');
+          const countedByLines = (at()?.lines ?? []).some(
+            (l) =>
+              l.gameId === g.id &&
+              l.teamId === teamId &&
+              l.played &&
+              typeof l.stats['turnovers'] === 'number',
+          );
+          return turnovers > 0 ? [{ gameId: g.id, teamId, turnovers, countedByLines }] : [];
+        });
+      });
+      return rows.sort(
+        (a, b) => a.gameId.localeCompare(b.gameId) || a.teamId.localeCompare(b.teamId),
+      );
     },
     people: async (personIds) =>
       (at()?.people ?? [])
@@ -270,18 +360,38 @@ const notYet = (name: string) => async (): Promise<never> => {
 const samePlace = (a: SettingPlace, b: SettingPlace) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
+ * Whether a team of the season has a number worn by two players still on it, those waiting
+ * for review left out: what the database checks when the unique-jersey rule is switched
+ * on (check_season_unique_jerseys, 0015).
+ */
+function numberWornTwice(s: LeagueWorld, seasonId: string): boolean {
+  const teams = new Set(s.teams.filter((t) => t.seasonId === seasonId).map((t) => t.id));
+  const worn = new Set<string>();
+  for (const r of s.roster) {
+    if (!teams.has(r.teamId) || r.jerseyNumber === null || r.leftOn !== null || r.needsReview) {
+      continue;
+    }
+    const key = `${r.teamId}|${r.jerseyNumber}`;
+    if (worn.has(key)) return true;
+    worn.add(key);
+  }
+  return false;
+}
+
+/**
  * The leagues module's stores over one league's world, as far as League settings and
  * Season settings use them: who the league is, its seasons' programs, its stored settings,
  * and a season read and changed (getSeason, updateSeason: step 2.182 shows and hides a
- * season through them) as the database's seasons table does it: the version is checked
- * and raised, and making a season current takes the mark from its program's other current
- * season, raising that one's version too. So the setCurrentSeason command, which changes
- * a season through updateSeason, works here. Creating leagues, seasons and divisions,
- * changing a league's name, address or state and saving a season's rules have no screen
- * on the stand-in yet: those parts fail by name (createLeague, setLeagueName,
- * renameShortName, setLeagueStatus, createSeason, setSeasonRules, setSeasonRosterSettings,
- * the store's own setCurrentSeason, which only createLeague calls, and every division
- * command). Publishing a site design has no screen yet either: the stand-in's made-up
+ * season through them; step 2.47 saves its name, dates and rules) as the database's
+ * seasons table does it: the version is checked and raised, switching the unique-jersey
+ * rule on is refused while a number is worn twice, and making a season current takes the
+ * mark from its program's other current season, raising that one's version too. So the
+ * setCurrentSeason, setSeasonRules and setSeasonRosterSettings commands, which change a
+ * season through updateSeason, work here. Creating leagues, seasons and divisions and
+ * changing a league's name, address or state have no screen on the stand-in yet: those
+ * parts fail by name (createLeague, setLeagueName, renameShortName, setLeagueStatus,
+ * createSeason, the store's own setCurrentSeason, which only createLeague calls, and every
+ * division command). Publishing a site design has no screen yet either: the stand-in's made-up
  * leagues keep their designs as data (stand-in-league-sites.ts), so its two site parts fail
  * by name.
  */
@@ -333,12 +443,20 @@ export function worldLeaguesStores(
     // The world's leagues have one program each, named on their seasons.
     programCount: async () => new Set(s.seasons.map((x) => x.programId)).size,
     updateSeason: async (seasonId, change, version) => {
-      // Saving rules is step 2.47's, with its preview: not on the stand-in yet.
-      if (change.rules !== undefined) return notYet('leagues.updateSeason rules')();
       const at = s.seasons.findIndex((x) => x.id === seasonId);
       const found = s.seasons[at];
       if (found === undefined || found.version !== version) return undefined;
-      const { isCurrent, rules: _rules, ...fields } = change;
+      // Saving rules (step 2.47): as the database (0008, 0015), switching the unique-jersey
+      // rule on is refused while a team of the season has a number worn twice by players
+      // still on it, leaving out those waiting for review (S-44).
+      if (
+        change.rules?.rosters.uniqueJerseys === true &&
+        !rulesOfGame(null, found.rules).rosters.uniqueJerseys &&
+        numberWornTwice(s, seasonId)
+      ) {
+        return 'unique-jerseys-clash';
+      }
+      const { isCurrent, ...fields } = change;
       if (isCurrent === true) {
         // As the database: the mark leaves the other current season of the same program,
         // whose row is changed and so gets a new version too (0002). The world keeps one

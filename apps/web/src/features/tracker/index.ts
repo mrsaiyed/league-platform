@@ -35,4 +35,4 @@ export {
   type WaitingQuestion,
   type TrackerSignOutHold,
 } from './tracker-sign-out.ts';
-export { TrackerPage } from './tracker-page.tsx';
+export { TrackerGameNotFound, TrackerPage } from './tracker-page.tsx';

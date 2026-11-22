@@ -22,7 +22,10 @@ export const listPeople = defineCommand({
   run: async ({ context, input, tx }): Promise<Result<readonly PersonRecord[], never>> =>
     ok(
       await tx.people.list({
-        ...(input.search === undefined ? {} : { search: input.search }),
+        // Names only; a curly apostrophe (as a phone types "o’neill") is a plain one.
+        ...(input.search === undefined
+          ? {}
+          : { search: input.search.replace(/[\u2018\u2019]/g, "'") }),
         limit: input.limit,
         offset: input.offset,
         sensitive: input.privateFields && (await maySeeSensitive(context, tx)),

@@ -264,8 +264,11 @@ function signedInAccount(identity: SessionIdentity): SignedInAccount {
   };
 }
 
-/** Whether `host` is our site's host, port included; a missing default port is the same. */
-function isOurHost(host: string, siteOrigin: string): boolean {
+/**
+ * Whether `host` is our site's host, port included; a missing default port is the same.
+ * The proxy asks it too, of a page's data drawn for another host (other-host-render.ts).
+ */
+export function isOurHost(host: string, siteOrigin: string): boolean {
   const ours = new URL(siteOrigin);
   if (host === '' || /[\s/\\?#@]/.test(host)) return false;
   let given: URL;

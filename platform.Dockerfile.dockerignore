@@ -1,0 +1,22 @@
+# What platform.Dockerfile may read (step 2.95, record 101): nothing but the paths let
+# back in below. Docker reads this file instead of .dockerignore (the tracker's) because
+# it sits beside platform.Dockerfile with its name. The last rule that matches a path wins.
+*
+!package.json
+!package-lock.json
+!tsconfig.base.json
+!apps/web
+!apps/worker
+!packages
+!scripts/web.mjs
+!scripts/web-listen.mjs
+!supabase/site.json
+!supabase/migrations
+# Never, even inside the paths above: installed packages, a local build, tests, and any
+# settings file.
+**/node_modules
+**/.next
+**/*.test.ts
+**/*.test.tsx
+**/.env
+**/.env.*

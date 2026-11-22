@@ -26,3 +26,21 @@ describe('page titles are never streamed (T-275)', () => {
     }
   });
 });
+
+describe('the files the proxy never sees are marked "do not index" (record 082)', () => {
+  it('in every mode, as they are files and never pages', async () => {
+    const rules = (await config.headers?.()) ?? [];
+    const marked = rules
+      .filter((rule) =>
+        rule.headers.some((header) => header.key === 'X-Robots-Tag' && header.value === 'noindex'),
+      )
+      .map((rule) => rule.source);
+    expect(marked).toEqual([
+      '/_next/static/:path*',
+      '/_next/image',
+      '/favicon.ico',
+      '/display.css',
+      '/standalone.css',
+    ]);
+  });
+});

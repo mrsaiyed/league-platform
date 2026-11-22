@@ -5,7 +5,8 @@
 // The imports, and each area's ports below (adminSettings to tracker), are in alphabetical
 // order: a new area's go in their place, never at the end (step 2.188, record 072).
 import type { AccessHolder, AccountLeagueRow, CommandContext, Result } from '@srleagues/core';
-import type { SessionIdentity, SignInService } from '@srleagues/providers';
+import type { BotCheck, SessionIdentity, SignInService } from '@srleagues/providers';
+import type { AdminPeoplePorts } from './admin-people.ts';
 import type { AdminSettingsPorts } from './admin-settings.ts';
 import type { AdminTeamsPorts } from './admin-teams.ts';
 import type { ContextDeps, IdentifyError } from './context.ts';
@@ -33,6 +34,11 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly signIn: SignInService;
   /** The sign-in emails, through our own email service (T4 §3). */
   readonly signInMail: SignInMail;
+  /**
+   * The bot check in front of sign-in and sign-up (T4 §6, record 081): the local stand-in
+   * on made-up data, Cloudflare Turnstile in staging and production (botCheckFor).
+   */
+  readonly botCheck: BotCheck;
   /** The service's renew, shared for requests sent at once (renew-session.ts). */
   readonly renewSession: Renew;
   /**
@@ -48,6 +54,13 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * myLeagues may turn them into a list, in its one caller (signed-in-leagues.ts).
    */
   readonly leaguesOfAccount: (accountId: string) => Promise<readonly AccountLeagueRow[]>;
+  /**
+   * Whether the database answers right now, for the health check (health.ts): true or
+   * false, never an error. Null on the made-up stand-in, which has no database.
+   */
+  readonly databaseCheck: (() => Promise<boolean>) | null;
+  /** What the admin's People screens run on (step 2.50). */
+  readonly adminPeople: AdminPeoplePorts;
   /** What the admin's League settings screen runs on (step 2.48). */
   readonly adminSettings: AdminSettingsPorts;
   /** What the admin's Teams screens read and run (step 2.51). */
@@ -85,6 +98,13 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * pages say so, and it answers only requests made on this computer (step 2.152).
    */
   readonly madeUpWorld: boolean;
+  /**
+   * Whether this is the test copy (APP_ENV staging, step 2.205): a real database that holds
+   * only made-up data. Its pages say so in one line, and sign-up and a password reset take
+   * only a made-up address (isMadeUpAddress), refused before the sign-in service is asked.
+   * Production and local work: false.
+   */
+  readonly testCopy: boolean;
   /**
    * Whether a request with these headers may be answered at all. The made-up world, and any
    * ports that carry the local tools (the made-up database's), answer only one addressed to

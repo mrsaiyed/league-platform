@@ -39,10 +39,15 @@ export const standInPeople = {
   /** The admin of another league, a draft too, and nothing in the others. */
   otherAdmin: { accountId: id(0xab), token: 'local-other-admin-token' },
   /**
+   * A scheduler of the first league only, signed in with a long address (52 letters), for
+   * the refusal's pictures and browser test (step 2.157).
+   */
+  longAddress: { accountId: id(0xad), token: 'local-scheduler-with-long-address-token' },
+  /**
    * The coach of the live league's Owls, a team whose players' numbers are staff only, by
    * a coach role on that team alone (step 2.46): sees those numbers, and no other team's.
    */
-  teamCoach: { accountId: id(0xad), token: 'local-team-coach-token' },
+  teamCoach: { accountId: id(0xae), token: 'local-team-coach-token' },
 } as const satisfies Record<string, MadeUpPerson>;
 
 function league(
@@ -57,9 +62,10 @@ function league(
 }
 
 /**
- * The made-up leagues, one in each state, all owned by the made-up owner, and a
- * second draft league with an admin of its own who holds nothing elsewhere, to show
- * that one draft's staff do not see another's.
+ * The made-up leagues, one in each state, all owned by the made-up owner; the empty
+ * league to walk the whole job from, with an admin of its own who holds nothing
+ * elsewhere; and a second draft league that no other league's staff hold, to show that
+ * one league's staff do not see another's draft.
  */
 export const standInLeagues = {
   live: league(1, 'north-valley', 'live', ['north-vale'], 'North Valley League'),
@@ -69,7 +75,11 @@ export const standInLeagues = {
   archived: league(4, 'old-meadow', 'archived', [], 'Old Meadow League'),
   suspended: league(5, 'closed-gate', 'suspended', [], 'Closed Gate League'),
   inBin: { ...league(6, 'binned-league', 'live', [], 'Binned League'), inBin: true },
-  otherDraft: league(7, 'still-waters', 'draft', [], 'Still Waters League'),
+  // The empty league starts live, so a visitor can read its pages in the first test's
+  // walk (step 2.194): the screen that publishes a league (step 2.125, part 2) is not
+  // built yet. Made-up data only: a real new league still starts as a draft.
+  empty: league(7, 'still-waters', 'live', [], 'Still Waters League'),
+  otherDraft: league(8, 'reed-marsh', 'draft', [], 'Reed Marsh League'),
 } as const satisfies Record<string, MadeUpLeague>;
 
 /** The draft league's one program: a made-up scheduler is given that program only. */
@@ -88,10 +98,10 @@ export const standInSeedCast: SeedCast = {
   draftProgramId: standInDraftProgramId,
   // The archived league has a long season behind it: 300 games, all played (step 2.156).
   historyLeague: standInLeagues.archived,
-  // A draft league with a current season and nothing else, to start the whole job from
+  // A league with a current season and nothing else, to start the whole job from
   // (step 2.192); its admin holds nothing elsewhere.
-  emptyLeague: standInLeagues.otherDraft,
-  otherLeagues: [standInLeagues.suspended, standInLeagues.inBin],
+  emptyLeague: standInLeagues.empty,
+  otherLeagues: [standInLeagues.suspended, standInLeagues.inBin, standInLeagues.otherDraft],
   // The made-up coach has a roster place on a team of each league.
   memberAccountId: standInPeople.coach.accountId,
   assignees: [standInPeople.scorekeeper.accountId, standInPeople.owner.accountId],
