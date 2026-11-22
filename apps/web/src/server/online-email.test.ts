@@ -3,7 +3,6 @@
 // written as the app's role, and its words give the script's answer; production keeps
 // nothing; no code, address or word reaches a log line. And the whole walk: a sign-up code
 // read back as the tables' owner, typed into the real sign-in flow, makes the account.
-import { PGlite } from '@electric-sql/pglite';
 import * as database from '@srleagues/database';
 import { createSupabaseSignIn, keptEmailAnswer, serveFakeSupabaseAuth } from '@srleagues/providers';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -79,13 +78,13 @@ describe('onlineEmailSender', () => {
     // The real sign-in flow on this computer: the real adapter speaking to the fake
     // Supabase Auth over http on 127.0.0.1, the sign-in store in a made-up database, and
     // staging's code email kept there as the app's role. Made-up keys only (T-201). Its
-    // own database, built here: madeUpDatabase() hands its session to the app's login
-    // for good, so its tables' owner could not read it afterwards.
+    // own copy of the made-up database: madeUpDatabase() hands its session to the app's
+    // login for good, and a copy (PGlite's clone) starts again as the tables' owner.
     const secretKey = 'sb_secret_fake_for_tests_only';
-    const pglite = new PGlite();
+    if (made.source.kind !== 'pglite') throw new Error('expected a PGlite database');
+    // clone() is typed as the interface; what it gives is a PGlite like the one cloned.
+    const pglite = (await made.source.pglite.clone()) as typeof made.source.pglite;
     const owner = database.pgliteDriver(pglite);
-    const migrated = await database.applyMigrations(owner);
-    if (!migrated.ok) expect.fail(`not migrated: ${migrated.error.code}`);
     const appDb = database.createDatabase({ kind: 'pglite', pglite });
     const auth = await serveFakeSupabaseAuth({ secretKey });
     try {

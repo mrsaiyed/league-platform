@@ -24,7 +24,12 @@ afterAll(() => db.close());
 describe('kept emails, as app_login', () => {
   it('keeps one to a made-up address, which the script’s path reads as the owner', async () => {
     const to = `owner-${fresh()}@example.test`;
-    await keepEmail(db, { to, subject: 'Your sign-up code', text: 'Your code is 482913.' });
+    await keepEmail(db, {
+      to,
+      kind: 'code',
+      subject: 'Your sign-up code',
+      text: 'Your code is 482913.',
+    });
     const opened = await openLeagueMakingTarget({
       kind: 'hosted',
       migration: { url: server.ownerUrl, ca },
