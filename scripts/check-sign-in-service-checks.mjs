@@ -64,7 +64,10 @@ export function settingsFor({ argv, env, terminal, trackerProject }) {
   if (!values.hosted && !standIn) {
     return { problems: [words.hostedNeeded, '', ...words.usage], exitCode: 2 };
   }
-  if (!terminal) return { problems: [words.needsTerminal], exitCode: 2 };
+  // A terminal is not enough: a pseudo-terminal under CI still has no person watching.
+  const unattended =
+    !terminal || given(env['CI']) !== undefined || given(env['GITHUB_ACTIONS']) !== undefined;
+  if (unattended) return { problems: [words.needsTerminal], exitCode: 2 };
 
   const problems = [];
   const secretKey = given(env[keySetting]);

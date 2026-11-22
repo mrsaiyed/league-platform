@@ -24,7 +24,7 @@ export const usage = [
 export const hostedNeeded =
   'It asks a real sign-in service, so it runs only when told so with --hosted.';
 export const needsTerminal =
-  'It runs only at a terminal, with a person watching: nothing was asked, nothing was made.';
+  'It runs only at a terminal, with a person watching, never under CI: nothing was asked, nothing was made.';
 export const settingMissing = (name) => `${name} is not set for this command.`;
 export const keyTooShort = 'SUPABASE_SECRET_KEY is too short to be a secret key.';
 export const hostedAddressForm =

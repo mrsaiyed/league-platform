@@ -440,6 +440,14 @@ test('it runs only with --hosted, at a terminal, and opens nothing otherwise', (
   assert.equal(choose({ argv: [] }).exitCode, 2);
   assert.equal(choose({ argv: [] }).problems[0], words.hostedNeeded);
   assert.deepEqual(choose({ terminal: false }), { problems: [words.needsTerminal], exitCode: 2 });
+  // A pseudo-terminal under CI is still no person watching.
+  for (const name of ['CI', 'GITHUB_ACTIONS']) {
+    assert.deepEqual(choose({ env: { ...ready, [name]: 'true' } }), {
+      problems: [words.needsTerminal],
+      exitCode: 2,
+    });
+  }
+  assert.ok('settings' in choose({ env: { ...ready, CI: '' } }));
   assert.equal(choose({ argv: ['--hosted', '--other'] }).exitCode, 2);
   assert.equal(choose({ argv: ['--help'] }).exitCode, 0);
 });
