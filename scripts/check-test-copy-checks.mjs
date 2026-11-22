@@ -75,6 +75,7 @@ export function settingsFor({ argv, readFile = (file) => readFileSync(file, 'utf
       options: {
         'action-id': { type: 'string' },
         manifest: { type: 'string' },
+        'without-action': { type: 'boolean' },
         league: { type: 'string' },
         help: { type: 'boolean' },
       },
@@ -99,6 +100,10 @@ export function settingsFor({ argv, readFile = (file) => readFileSync(file, 'utf
   if (values['action-id'] !== undefined && values.manifest !== undefined) {
     return { problems: [words.bothGiven], exitCode: 2 };
   }
+  const withoutAction = values['without-action'] === true;
+  if (withoutAction && (values['action-id'] !== undefined || values.manifest !== undefined)) {
+    return { problems: [words.withoutActionAndId], exitCode: 2 };
+  }
   let actionId = values['action-id'];
   if (actionId !== undefined && !actionIdForm(actionId)) {
     return { problems: [words.actionIdForm], exitCode: 2 };
@@ -113,7 +118,7 @@ export function settingsFor({ argv, readFile = (file) => readFileSync(file, 'utf
       return { problems: [words.manifestUnread], exitCode: 2 };
     }
   }
-  return { settings: { origin, actionId, leagueAddress } };
+  return { settings: { origin, actionId, leagueAddress, withoutAction } };
 }
 
 /** A request that could not be made or read: `seen` says why, in fixed words. */
@@ -124,14 +129,16 @@ class Unanswered extends Error {
   }
 }
 
-/** The exit code: 0 only when every check passed. */
+/** The exit code: 0 only when no check failed (a line not checked by choice is no failure). */
 export const exitCodeFor = ({ failed }) => (failed.length === 0 ? 0 : 1);
 
 /**
- * Runs every check and prints its line, then the result. Returns `{ total, failed }`, the
- * labels of the checks that failed.
+ * Runs every check and prints its line, then the result. Returns `{ total, failed,
+ * notChecked }`, the labels of the checks that failed and of those not checked.
  *
- * - `origin`, `actionId`, `leagueAddress`: from settingsFor.
+ * - `origin`, `actionId`, `leagueAddress`, `withoutAction`: from settingsFor. With
+ *   `withoutAction`, the "be this person" line is NOT CHECKED, with its reason, and is no
+ *   failure (T-302); without it and without an id, that line fails.
  * - `fetch`: the fetch to ask with (globalThis.fetch).
  * - `print`: prints one line.
  * - `timeoutMs`: how long each answer may take (answerMs; tests pass less).
@@ -140,6 +147,7 @@ export async function runChecks({
   origin,
   actionId,
   leagueAddress,
+  withoutAction = false,
   fetch,
   print,
   timeoutMs = answerMs,
@@ -178,13 +186,14 @@ export async function runChecks({
   const check = async (label, run) => {
     let seen;
     let ok = false;
+    let skipped = false;
     try {
-      ({ ok, seen } = await run());
+      ({ ok, seen, skipped = false } = await run());
     } catch (error) {
       seen = error instanceof Unanswered ? error.seen : words.notReadable;
     }
-    results.push({ label, ok });
-    print(words.line(ok ? words.passed : words.failed, label, seen));
+    results.push({ label, ok, skipped });
+    print(words.line(skipped ? words.notChecked : ok ? words.passed : words.failed, label, seen));
   };
 
   print(words.title);
@@ -246,6 +255,7 @@ export async function runChecks({
   await check(words.checks.keptEmails, () => same(platformUrl('keptEmails')));
   await check(words.checks.madeUpPeople, () => same(platformUrl('madeUpPeople')));
   await check(words.checks.beThisPerson, async () => {
+    if (withoutAction) return { ok: false, skipped: true, seen: words.withoutActionReason };
     if (actionId === undefined) return { ok: false, seen: words.noActionId };
     // As the page's own form posts it with no script (tests/browser/test-copy-test.mjs).
     const body = () => {
@@ -268,14 +278,20 @@ export async function runChecks({
     };
   });
 
-  const failed = results.filter((result) => !result.ok).map((result) => result.label);
+  const failed = results.filter((r) => !r.ok && !r.skipped).map((r) => r.label);
+  const notChecked = results.filter((r) => r.skipped).map((r) => r.label);
   print('');
-  if (failed.length === 0) print(words.allPassed(results.length));
+  if (failed.length === 0 && notChecked.length === 0) print(words.allPassed(results.length));
+  else if (failed.length === 0) print(words.passedBut(results.length - notChecked.length));
   else {
     print(words.someFailed(failed.length, results.length));
     for (const label of failed) print(words.failedItem(label));
   }
-  return { total: results.length, failed };
+  if (notChecked.length > 0) {
+    print(words.notCheckedSummary(notChecked.length));
+    for (const label of notChecked) print(words.notCheckedItem(label));
+  }
+  return { total: results.length, failed, notChecked };
 }
 
 /** A header's value when short and plain, to be repeated; anything else as "(other)". */

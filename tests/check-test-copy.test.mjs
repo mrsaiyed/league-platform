@@ -217,6 +217,33 @@ test('a posted "be this person" form answered otherwise fails; without the actio
   assert.ok(without.seen.every((request) => request.method === 'GET'));
 });
 
+test('with --without-action the "be this person" line is NOT CHECKED, says why, here and in the summary, and fails nothing', async () => {
+  const run = await checkCopy(undefined, { actionId: undefined, withoutAction: true });
+  assert.deepEqual(run.outcome.failed, [], run.output);
+  assert.deepEqual(run.outcome.notChecked, [words.checks.beThisPerson]);
+  assert.equal(exitCodeFor(run.outcome), 0);
+  assert.equal(
+    lineOf(run.lines, words.checks.beThisPerson),
+    words.line(words.notChecked, words.checks.beThisPerson, words.withoutActionReason),
+  );
+  assert.ok(run.lines.includes(words.passedBut(run.outcome.total - 1)), run.output);
+  assert.ok(run.lines.includes(words.notCheckedSummary(1)));
+  assert.ok(run.lines.includes(words.notCheckedItem(words.checks.beThisPerson)));
+  assert.ok(run.seen.every((request) => request.method === 'GET'));
+  // Another failure still fails the run.
+  const planted = await checkCopy('no-header', { actionId: undefined, withoutAction: true });
+  assert.equal(exitCodeFor(planted.outcome), 1);
+  // The flag is read, and refused beside an id.
+  const flag = settingsFor({ argv: ['https://a.example.test', '--without-action'] });
+  assert.equal(flag.settings.withoutAction, true);
+  assert.equal(
+    settingsFor({
+      argv: ['https://a.example.test', '--without-action', '--action-id', actionId],
+    }).problems[0],
+    words.withoutActionAndId,
+  );
+});
+
 test('a health answer that did not ask the database fails', async () => {
   const { outcome, lines } = await checkCopy('no-database');
   failedOnly(outcome, [words.checks.health]);
@@ -309,7 +336,12 @@ test('the action’s id is read from a build’s manifest, or given', () => {
     readFile: () => manifest,
   });
   assert.deepEqual(read, {
-    settings: { origin: 'http://127.0.0.1:3000', actionId, leagueAddress: `/${defaultLeague}` },
+    settings: {
+      origin: 'http://127.0.0.1:3000',
+      actionId,
+      leagueAddress: `/${defaultLeague}`,
+      withoutAction: false,
+    },
   });
   assert.equal(
     settingsFor({ argv: ['http://127.0.0.1:3000', '--manifest', 'x'], readFile: () => '{}' })

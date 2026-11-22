@@ -9,7 +9,7 @@ export const usage = [
   'page and robots.txt say “do not index”; the local-only pages and the “be this person”',
   'action answer exactly as an address that does not exist; the test-copy line is shown.',
   '',
-  'node scripts/check-test-copy.mjs <address> [--action-id <id> | --manifest <file>] [--league <short name>]',
+  'node scripts/check-test-copy.mjs <address> [--action-id <id> | --manifest <file> | --without-action] [--league <short name>]',
   '',
   '<address>      https://<the test copy’s host>, or http://localhost:<port> or',
   '               http://127.0.0.1:<port> for a copy on this computer. Nothing after it.',
@@ -18,6 +18,9 @@ export const usage = [
   '               whose exportedName is beMadeUpPersonAction. A new id is made at every',
   '               build, so without it that one line cannot be checked and fails.',
   '--manifest     that file itself, when the build is on this computer.',
+  '--without-action  against a hosted copy, whose action id nobody outside can know: that one',
+  '               line is then NOT CHECKED, says why, and is no failure. The rehearsal on this',
+  '               computer (npm run rehearse:test-copy), on the same code, proves that action.',
   '--league       a made-up league’s short name to read (by default one no copy has).',
   '',
   'It needs no key and reads none. It sends GET requests, and one POST of the “be this',
@@ -32,6 +35,8 @@ export const addressForm =
 export const actionIdForm =
   '--action-id must be the action’s id as the build’s manifest writes it: letters a to f and digits only. Nothing was asked.';
 export const bothGiven = 'Give --action-id or --manifest, not both. Nothing was asked.';
+export const withoutActionAndId =
+  'Give --without-action or the action’s id (--action-id, --manifest), not both. Nothing was asked.';
 export const manifestUnread =
   '--manifest: the file could not be read as a build’s server-reference-manifest.json, or holds no beMadeUpPersonAction. Nothing was asked.';
 export const leagueForm =
@@ -61,8 +66,10 @@ export const checks = {
 
 export const passed = 'passed';
 export const failed = 'FAILED';
+export const notChecked = 'NOT CHECKED';
+const column = (verdict) => `${verdict} `.padEnd(8);
 export const line = (verdict, label, seen) =>
-  seen === undefined ? `  ${verdict.padEnd(8)}${label}` : `  ${verdict.padEnd(8)}${label}: ${seen}`;
+  seen === undefined ? `  ${column(verdict)}${label}` : `  ${column(verdict)}${label}: ${seen}`;
 
 // What was seen, in a few words.
 export const healthSeen = (status, database) =>
@@ -79,6 +86,8 @@ export const lineSeen = (where) => `missing on ${where.join(' and ')}`;
 export const pageNames = { frontPage: 'the front page', signIn: 'the sign-in page' };
 export const noActionId =
   'not checked: give --action-id or --manifest for the build being checked (node scripts/check-test-copy.mjs --help)';
+export const withoutActionReason =
+  'not checked (--without-action): the action’s id changes with every build and nobody outside a hosted copy can know it; npm run rehearse:test-copy, on this computer and the same code, proves this line';
 export const noAnswerInTime = 'no answer within 10 seconds';
 export const noConnection = 'could not reach the address';
 export const otherHost = 'redirected to another host (not followed)';
@@ -88,3 +97,7 @@ export const notReadable = 'answered in a shape this check does not read';
 export const allPassed = (count) => `All ${count} checks passed.`;
 export const someFailed = (count, total) => `${count} of ${total} checks FAILED:`;
 export const failedItem = (label) => `  - ${label}`;
+export const passedBut = (count) => `All ${count} checks that were made passed.`;
+export const notCheckedSummary = (count) =>
+  `${count} NOT CHECKED, by --without-action (no failure; the rehearsal on this computer proves ${count === 1 ? 'it' : 'them'}):`;
+export const notCheckedItem = (label) => `  - ${label}`;

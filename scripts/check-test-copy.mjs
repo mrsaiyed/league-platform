@@ -5,6 +5,12 @@
 // the test-copy line is shown. Run by the lead against the real test copy in the session
 // and after every release (2.105 audit, M14), and by the rehearsal on this computer.
 //
+// The "be this person" action's id changes with every build, and nobody outside a hosted
+// copy can know it: against the real test copy the lead runs it with `--without-action`,
+// and that one line is printed NOT CHECKED, with the reason, and is no failure. What proves
+// that action is the rehearsal (`npm run rehearse:test-copy`), which runs this check on the
+// same code with the build's own manifest (`--manifest`). Without either, the line fails.
+//
 // Read-only and with no secret: it reads no environment, holds no key and changes nothing
 // (decision T-302). A thin command: the address it takes and the checks are in
 // check-test-copy-checks.mjs, its words in check-test-copy.messages.mjs. Exit code 0 when
