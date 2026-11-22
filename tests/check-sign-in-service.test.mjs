@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import * as providers from '@srleagues/providers';
 import { trackerProjectFor } from '@srleagues/providers';
 import { createGoTrueClient } from '../packages/providers/src/sign-in/for-operations.ts';
-import { createFakeSupabaseAuth } from '../packages/providers/src/sign-in/supabase/fake-supabase-auth.test-helper.ts';
+import { createFakeSupabaseAuth } from '../packages/providers/src/sign-in/supabase/fake-supabase-auth.ts';
 import { exitCodeFor, runChecks, settingsFor } from '../scripts/check-sign-in-service-checks.mjs';
 import * as words from '../scripts/check-sign-in-service.messages.mjs';
 
