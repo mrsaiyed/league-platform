@@ -274,9 +274,11 @@ if (browser !== null) {
           page.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/),
           add.getByRole('button', { name: 'Add to the league' }).click(),
         ]);
+        // Read back from the list (the new record's own page is not checked here).
+        await page.goto(`${origin}/lakeside/admin/people`);
         note(
           'People: a made-up contact email is saved',
-          (await page.getByRole('heading', { level: 1, name: 'Nadia Testcopy' }).count()) === 1,
+          (await page.getByRole('link', { name: 'Nadia Testcopy', exact: true }).count()) === 1,
         );
         // A game's scoring address is drawn in the tracker's own frame, whatever it answers.
         await page.goto(`${origin}/lakeside/score/no-such-game`);
