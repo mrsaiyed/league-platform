@@ -405,8 +405,17 @@ function firstDifference(a, b) {
   return `at ${at}: "${a.slice(at, at + 80)}" / "${b.slice(at, at + 80)}"`;
 }
 
+/** Stops a web app and waits until it has ended, its connections with it. */
+function stopped(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise((resolve) => {
+    child.once('exit', resolve);
+    child.kill();
+  });
+}
+
 await browser?.close();
-server?.child.kill();
+if (server) await stopped(server.child);
 
 if (server !== null) {
   const output = server.output();
@@ -459,7 +468,7 @@ if (built) {
         `${answer.status} ${answer.headers.get('location')}`,
       );
     } finally {
-      made.child.kill();
+      await stopped(made.child);
     }
   });
 
@@ -501,6 +510,7 @@ if (built) {
   );
 }
 
+// Every web app has ended by now; the fakes close last.
 await auth.close();
 await served.close();
 

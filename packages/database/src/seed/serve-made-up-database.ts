@@ -49,6 +49,31 @@ async function loginAs(pglite: PGlite, login: MadeUpDatabaseServerOptions['login
   }
 }
 
+/**
+ * The database as the socket server sees it: once closing has begun it starts nothing more
+ * on PGlite. The socket server tidies a connection up without waiting (a client that
+ * leaves mid-transaction is rolled back later, on its own), so that tidying can reach
+ * PGlite after it is closed and fail where nothing can catch it, which ends the process.
+ * After closing begins, it is told there is no transaction to roll back (the database is
+ * being thrown away), and any statement is refused with an error the socket server
+ * handles. Work already started finishes before PGlite closes.
+ */
+function startsNothingOnceClosing(pglite: PGlite, closing: () => boolean): PGlite {
+  const refused = new Set<PropertyKey>(['exec', 'query', 'runExclusive', 'execProtocolRawStream']);
+  return new Proxy(pglite, {
+    get(target, key) {
+      if (key === 'isInTransaction') return () => !closing() && target.isInTransaction();
+      const value: unknown = Reflect.get(target, key, target);
+      if (typeof value !== 'function') return value;
+      const method = value as (...args: unknown[]) => unknown;
+      return (...args: unknown[]) =>
+        refused.has(key) && closing()
+          ? Promise.reject(new Error('The made-up database is closed.'))
+          : Reflect.apply(method, target, args);
+    },
+  });
+}
+
 /** Starts a made-up database served on 127.0.0.1. Close it when done. */
 export async function serveMadeUpDatabase(
   options: MadeUpDatabaseServerOptions = {},
@@ -60,8 +85,9 @@ export async function serveMadeUpDatabase(
     await loginAs(pglite, options.login);
     const { PGLiteSocketServer } = await import('@electric-sql/pglite-socket');
     // A pool's worth of connections; one statement runs at a time all the same.
+    let closing = false;
     const server = new PGLiteSocketServer({
-      db: pglite,
+      db: startsNothingOnceClosing(pglite, () => closing),
       host: '127.0.0.1',
       port: 0,
       maxConnections: 32,
@@ -72,6 +98,9 @@ export async function serveMadeUpDatabase(
       url: `postgres://${madeUpLoginRole}@localhost:${port}/postgres`,
       leagues: made.leagues,
       close: async () => {
+        // In this order: nothing new reaches PGlite, the connections end, then PGlite closes
+        // (after the statements already queued on it).
+        closing = true;
         await server.stop();
         await made.close();
       },
