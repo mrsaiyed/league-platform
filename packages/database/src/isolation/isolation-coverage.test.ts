@@ -163,6 +163,18 @@ const reachNoLeagueData = new Map<unknown, string>([
     'tests only: madeUpDatabase served as a PostgreSQL server on 127.0.0.1 (record 082); takes nothing and reads no league for anyone',
   ],
   [
+    databasePackage.keepEmail,
+    'the test copy’s kept emails (step 2.204, record 098): a platform table outside public, no league; it only runs public.keep_email, which adds a row and returns nothing (schema/kept-emails.test.ts)',
+  ],
+  [
+    databasePackage.keepFailureOf,
+    'tells keepEmail’s refusals from faults, by an error already thrown; runs no SQL',
+  ],
+  [
+    databasePackage.newestKeptEmail,
+    'the test copy’s kept emails (step 2.204, record 098): a platform table, no league; read as the tables’ owner by scripts/read-kept-emails.mjs only, which the app’s role cannot run (no grant on kept_emails)',
+  ],
+  [
     databasePackage.createDatabaseSignInStore,
     'the sign-in store (record 052): runs as sign_in_store, which reaches only schema sign_in and no league table (schema/app-role.test.ts)',
   ],

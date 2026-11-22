@@ -12,6 +12,7 @@ import {
   type BotCheck,
   type SignInService,
 } from '@srleagues/providers';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { cookieNames, type CookieJar, type CookieOptions } from './cookies.ts';
 import { networkAddressOf, type Visit } from './device.ts';
@@ -1239,6 +1240,35 @@ describe('the test copy takes only made-up addresses for a code (step 2.205, T-1
     expect(b.jar.get(cookieNames.google)).toBeUndefined();
     expect(b.jar.get(cookieNames.session)).toBeUndefined();
     expect(asked).toEqual([]);
+  });
+
+  // Steps 2.204 and 2.205 met here: the gate, isMadeUpAddress and migration 0023's SQL
+  // rule answer the one shared list of spellings alike (packages/providers holds it).
+  it('lets past exactly the addresses the shared list calls made-up, and no other', async () => {
+    const cases = JSON.parse(
+      readFileSync(
+        new URL(
+          '../../../../../packages/providers/src/email/made-up-address-cases.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ) as readonly { readonly address: string; readonly madeUp: boolean }[];
+    expect(cases.length).toBeGreaterThan(40);
+    const env = setup();
+    const { asked, deps } = untouchable(env);
+    const passed: [string, boolean][] = [];
+    for (const c of cases) {
+      asked.length = 0;
+      try {
+        await askForCode('sign-up', { email: c.address }, browser().visit, deps);
+      } catch {
+        // The untouchable bot check throws once asked: the address got past the gate.
+      }
+      passed.push([c.address, asked.length > 0]);
+    }
+    expect(passed).toEqual(cases.map((c) => [c.address, c.madeUp]));
+    expect(env.outbox.messages()).toEqual([]);
   });
 
   it('refuses nothing where it is not the test copy (production and local work)', async () => {
