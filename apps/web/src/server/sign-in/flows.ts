@@ -26,13 +26,14 @@
 //   Google is off there too (googleOff): its account would bring a real Gmail address.
 import { signInEmail } from '@srleagues/contracts';
 import { platformUrl } from '@srleagues/core';
-import type {
-  BotCheck,
-  BotCheckAction,
-  BotCheckRefusal,
-  BotCheckWidget,
-  SessionTokens,
-  SignInService,
+import {
+  isMadeUpAddress,
+  type BotCheck,
+  type BotCheckAction,
+  type BotCheckRefusal,
+  type BotCheckWidget,
+  type SessionTokens,
+  type SignInService,
 } from '@srleagues/providers';
 import {
   clearSessionCookies,
@@ -44,7 +45,6 @@ import {
   writeGoogleFlow,
   type CookieJar,
 } from './cookies.ts';
-import { isMadeUpAddress } from '../kept-emails.ts';
 import { deviceOf, safeReturnPath, type Visit } from './device.ts';
 import { screenUrl, type Problem } from './problems.ts';
 import type { SignInMail } from './sign-in-mail.ts';
@@ -143,16 +143,15 @@ export async function askForCode(
  * The test copy's rule (step 2.205, T-13, T-201): it takes only an address on a name kept
  * for made-up mail (isMadeUpAddress), judged by the address's form alone, before the bot
  * check or the sign-in service is asked, so a stranger's address is never sent or stored
- * there. The address is read as the service would read it first (signInEmail), and the
- * name it is read on is the one tested: one that is not an address is today's
- * invalidEmail, asked of no one. The refusal is the same whether or not an account exists
- * (T-68). Undefined where the address is taken, and always off the test copy.
+ * there. isMadeUpAddress takes only an address in the form the service reads
+ * (signInEmail), tested as typed, so the gate is exactly the one rule the kept emails and
+ * migration 0023 share (made-up-address-cases.json). A refused one that is not an address
+ * is today's invalidEmail, asked of no one. The refusal is the same whether or not an
+ * account exists (T-68). Undefined where the address is taken, and always off the test copy.
  */
 function notTakenHere(address: string, deps: FlowDeps): Problem | undefined {
-  if (!deps.testCopy) return undefined;
-  const parsed = signInEmail.safeParse(address);
-  if (!parsed.success) return 'invalidEmail';
-  return isMadeUpAddress(parsed.data) ? undefined : 'onlyMadeUpAddresses';
+  if (!deps.testCopy || isMadeUpAddress(address)) return undefined;
+  return signInEmail.safeParse(address).success ? 'onlyMadeUpAddresses' : 'invalidEmail';
 }
 
 /**

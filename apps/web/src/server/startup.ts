@@ -26,7 +26,6 @@ import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
 import {
   botCheckFor,
-  emailSenderFor,
   type BotCheck,
   type EmailConfirmation,
   type EmailConfirmationQuestion,
@@ -41,6 +40,7 @@ import { databasePorts, type DatabaseQueries } from './database-ports.ts';
 import { madeUpDatabaseTools, type SeedLeagueFacts } from './made-up-database-people.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
 import type { WebPorts } from './ports.ts';
+import { onlineEmailSender } from './online-email.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
 import {
   standInMember,
@@ -96,6 +96,8 @@ export type DatabasePackage = Pick<
   | 'checkSignInStoreLogin'
   | 'createDatabaseSignInStore'
   | 'demoLeague'
+  | 'keepEmail'
+  | 'keepFailureOf'
   | 'madeUpDatabase'
   | 'seedLeagues'
   | 'simulatedOwner'
@@ -238,11 +240,16 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       );
     }
     const now = () => new Date();
-    // Outside production every email is captured, never sent (T-140): staging's sign-in
-    // codes stay in this server's memory (record 075 says how they are to be read).
+    // Outside production every email is captured, never sent (T-140): staging's are kept
+    // in its own database too, made-up addresses only, for scripts/read-kept-emails.mjs
+    // (step 2.204, record 098). Production sends and keeps nothing.
     const signInMail = createSignInMail({
-      sender: emailSenderFor({ appEnv: config.APP_ENV, resendApiKey: config.RESEND_API_KEY })
-        .sender,
+      sender: onlineEmailSender(
+        { appEnv: config.APP_ENV, resendApiKey: config.RESEND_API_KEY },
+        database,
+        db,
+        (kind) => deps.warn?.('email not kept', { kind }),
+      ),
       fromAddress: config.EMAIL_FROM,
       siteOrigin: config.PUBLIC_BASE_URL,
       onNoticeFailed: (kind) => deps.warn?.('sign-in email not sent', { kind }),

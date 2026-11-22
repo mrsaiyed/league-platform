@@ -354,7 +354,7 @@ describe('what stops the test copy from starting, each in a plain sentence', () 
       'postgres may create roles: alter role postgres nocreaterole; ' +
       'postgres may create databases: alter role postgres nocreatedb; ' +
       'postgres may start replication: alter role postgres noreplication; ' +
-      'postgres owns tables (migration_log.applied and COUNT more), so it could switch their fence off: ' +
+      'postgres owns tables (kept_emails.emails and COUNT more), so it could switch their fence off: ' +
       'the app must log in as a role of its own (as app_login is), not as the tables’ owner.';
     const [before, after] = expected
       .split('COUNT')
