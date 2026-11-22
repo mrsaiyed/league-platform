@@ -94,6 +94,11 @@ export type RemovedGridGame = GridGame & {
    * under "Games with no round", and "Put it back" brings it back there (S-60).
    */
   readonly roundGone: string | null;
+  /**
+   * One of its teams is in the bin ("Badgers (removed) at Herons"): put back, it would make
+   * a draft that cannot be published, so it is not offered; the row says why (step 2.185).
+   */
+  readonly teamInBin: boolean;
 };
 
 export type GridClash = { readonly key: string; readonly text: string };
@@ -240,6 +245,9 @@ export function buildGrid(
         g.roundId === null || roundIds.has(g.roundId)
           ? null
           : (removedRounds.find((r) => r.id === g.roundId)?.label ?? null),
+      teamInBin: teams.some(
+        (team) => team.removed === true && (team.id === g.homeTeamId || team.id === g.awayTeamId),
+      ),
     }))
     .sort(byWhen);
   const gameText = (id: string) => {

@@ -219,6 +219,10 @@ export const enScheduleAdmin = {
     'Removed in this draft, and postponed since: publishing still removes it. Putting it back in the draft keeps it in the schedule, still waiting in Games for a new date.',
   // A team in the bin, named in a game it played or was to play (A-17, step 2.180).
   'schedule.admin.removedTeam': '{name} (removed)',
+  // A removed game one of whose teams is in the bin: put back, the draft could not be
+  // published, so no "Put it back" is offered (step 2.185).
+  'schedule.admin.removedTeamInBin':
+    'Removed in this draft, and one of its teams is in the bin, so this game stays removed. The team is kept for 30 days; the screen to bring it back is not ready yet.',
   'schedule.admin.renameRound': 'Round name',
   'schedule.admin.renameRoundSubmit': 'Rename round',
   'schedule.admin.reviewPublish': 'Review and publish',

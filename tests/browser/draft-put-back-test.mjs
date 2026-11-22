@@ -564,6 +564,65 @@ if (built) {
   }
 }
 
+// A game whose team is in the bin (the Otters, LOCAL_BINNED_TEAM, as team-bin-test makes
+// them): removed, it stays struck through, but with no "Put it back", which could only
+// give a draft that cannot be published; the row says why, in the Teams area's words.
+if (built) {
+  const origin = `http://localhost:${await freePort()}`;
+  const port = new URL(origin).port;
+  const server = startNext(dev ? ['dev', '--port', port] : ['start', '--port', port], {
+    APP_ENV: 'test',
+    PUBLIC_BASE_URL: origin,
+    LOCAL_BINNED_TEAM: 'otters',
+  });
+  let browser;
+  let at = 'starting with the Otters in the bin';
+  try {
+    await waitFor(`${origin}/`, server);
+    browser = await launch();
+    const context = await browser.newContext({ javaScriptEnabled: false, viewport: screen });
+    await context.addCookies([{ name: 'srl_session', value: 'local-owner-token', url: origin }]);
+    const page = await context.newPage();
+    page.setDefaultTimeout(dev ? 120_000 : 60_000);
+    at = 'a game of the Otters, in the bin, is removed';
+    await page.goto(`${origin}/north-valley/admin/schedule`);
+    // Its own line names the Otters (the forms' lists of other games name them too).
+    const theirs = page
+      .locator('li[data-game]', { has: page.locator('summary', { hasText: 'Edit this game' }) })
+      .filter({ has: page.locator('p.admin-slot-line strong', { hasText: 'Otters (removed)' }) });
+    const gameId = await theirs.first().getAttribute('data-game');
+    if (gameId === null) throw new Error('no game of the Otters to remove');
+    await theirs.first().locator('summary', { hasText: 'Edit this game' }).click();
+    const struck = page.locator(`li[data-removed-game="${gameId}"]`);
+    await Promise.all([
+      page.waitForEvent('load'),
+      theirs.first().getByRole('button', { name: 'Remove game' }).click(),
+    ]);
+    await struck.waitFor({ state: 'attached' });
+    const binnedWords =
+      'one of its teams is in the bin, so this game stays removed. The team is kept for 30 days; the screen to bring it back is not ready yet.';
+    note(
+      'a removed game of a team in the bin says why it stays removed, with no "Put it back"',
+      (await struck.innerText()).includes(binnedWords) &&
+        (await struck.getByRole('button', { name: /Put it back/ }).count()) === 0,
+      await struck.innerText(),
+    );
+    await page.goto(`${origin}/north-valley/admin/schedule`);
+    note(
+      'drawn again, the struck row still says why and offers no "Put it back"',
+      (await struck.innerText()).includes(binnedWords) &&
+        (await struck.getByRole('button', { name: /Put it back/ }).count()) === 0,
+      await struck.innerText(),
+    );
+    await context.close();
+  } catch (error) {
+    failures.push(`${at}: ${whatWentWrong(error)}`);
+  } finally {
+    await browser?.close();
+    server.child.kill();
+  }
+}
+
 if (failures.length > 0) {
   console.error(`Draft put-back browser test failed:\n  ${failures.join('\n  ')}`);
   process.exit(1);

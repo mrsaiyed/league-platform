@@ -750,8 +750,9 @@ function RemovedGameItem({
         <div className="ui-notice" data-kind="removed" data-put-back={game.id}>
           <div className="staff-buttons">
             <span>{removedLineOf(game)}</span>
-            {/* Dropping a removal is always allowed: it gives the draft the game back. */}
-            {basis.canEdit ? (
+            {/* Dropping a removal gives the draft the game back; not for a game whose team
+                is in the bin, which the draft could then not publish (step 2.185). */}
+            {basis.canEdit && !game.teamInBin ? (
               <PutBack
                 gameId={game.id}
                 game={t('schedule.admin.gameVs', { away: game.awayName, home: game.homeName })}
@@ -773,6 +774,7 @@ function RemovedGameItem({
  * (played, started, postponed, cancelled), or that its round was removed too (S-60).
  */
 function removedLineOf(game: RemovedGridGame): string {
+  if (game.teamInBin) return t('schedule.admin.removedTeamInBin');
   if (game.status !== 'scheduled') return t(`schedule.admin.removedSince.${game.status}`);
   return game.roundGone === null
     ? t('schedule.admin.removedInDraft')
@@ -1280,11 +1282,15 @@ function savedHere(
             : t('schedule.admin.savedGameRemovedNamed', { game, round: roundShown.label });
       // A game of the published schedule stays in the grid, struck through (step 2.185): the
       // answer stands at it. One only ever in the draft is gone: it is said in its round.
-      const stays = [...grid.rounds.flatMap((r) => r.removed), ...grid.looseRemoved].some(
+      const struck = [...grid.rounds.flatMap((r) => r.removed), ...grid.looseRemoved].find(
         (g) => g.id === removed.id,
       );
-      const way =
-        gone !== undefined
+      const stays = struck !== undefined;
+      // One of its teams is in the bin: putting it back could only fail, so it is not offered.
+      const binned = struck?.teamInBin === true;
+      const way = binned
+        ? 'schedule.admin.removedTeamInBin'
+        : gone !== undefined
           ? stays
             ? 'schedule.admin.removedPublishedNoRound'
             : 'schedule.admin.removedDraftOnlyNoRound'
@@ -1297,7 +1303,7 @@ function savedHere(
           headline,
           <div data-put-back={removed.id}>
             <p>{t(way)}</p>
-            <PutBack gameId={removed.id} game={game} basis={basis} main />
+            {binned ? null : <PutBack gameId={removed.id} game={game} basis={basis} main />}
           </div>,
           'removed',
         ),

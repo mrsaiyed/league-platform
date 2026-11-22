@@ -241,7 +241,13 @@ describe('schedule grid', () => {
       if (id === published.id) {
         const { roundGone, ...was } = stays[0] ?? { roundGone: 'missing' };
         expect(roundGone).toBeNull();
-        expect(was).toEqual({ ...before, clashed: false, offRoundDate: null, outsideRound: false });
+        expect(was).toEqual({
+          ...before,
+          clashed: false,
+          offRoundDate: null,
+          outsideRound: false,
+          teamInBin: false,
+        });
         expect(shown.rounds.find((r) => r.id === before.roundId)?.removed).toHaveLength(1);
       }
       expect(shown.allGames.some((g) => g.id === id)).toBe(false);

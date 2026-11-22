@@ -82,7 +82,11 @@ describe("a round's count and its removal (step 2.181)", () => {
 describe('a round with games the draft removes (step 2.185)', () => {
   const struck = (games: number, removed: number): GridRound => ({
     ...round(games, 0),
-    removed: Array.from({ length: removed }, (_, i) => ({ ...game(i + 5), roundGone: null })),
+    removed: Array.from({ length: removed }, (_, i) => ({
+      ...game(i + 5),
+      roundGone: null,
+      teamInBin: false,
+    })),
   });
 
   it('says its games and the struck ones apart', () => {
