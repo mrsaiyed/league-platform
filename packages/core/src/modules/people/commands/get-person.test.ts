@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type * as Access from '../../access/index.ts';
 import {
   memoryPeople,
   ownerId,
@@ -10,6 +11,18 @@ import {
   scorekeeperId,
 } from '../memory-people.test-helper.ts';
 import { getPerson } from './get-person.ts';
+
+// No role holds `people.read` without `people.read_sensitive` (roles are a fixed table),
+// so a test that needs such access denies the one permission here.
+const denied = vi.hoisted(() => new Set<string>());
+vi.mock('../../access/index.ts', async (importOriginal) => {
+  const real = await importOriginal<typeof Access>();
+  const hasPermission: typeof real.hasPermission = (context, tx, permission, ...scope) =>
+    denied.has(permission)
+      ? Promise.resolve(false)
+      : real.hasPermission(context, tx, permission, ...scope);
+  return { ...real, hasPermission };
+});
 
 const setUp = (extra: object = {}) =>
   memoryPeople({
@@ -69,5 +82,18 @@ describe('getPerson', () => {
       ok: false,
       error: { code: 'invalid-input' },
     });
+  });
+
+  it('reads no private field for access that holds people.read but not people.read_sensitive', async () => {
+    const { db, deps, as } = setUp();
+    denied.add('people.read_sensitive');
+    try {
+      const result = await getPerson(as(registrarId), { personId: personUuid(1) }, deps);
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(Object.hasOwn(result.value, 'sensitive')).toBe(false);
+      expect(db.state.sensitiveReads).toBe(0);
+    } finally {
+      denied.clear();
+    }
   });
 });
