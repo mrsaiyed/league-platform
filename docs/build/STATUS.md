@@ -37,7 +37,6 @@ Every lane's work is on GitHub. All sessions stopped on 2026-11-17 at about 03:0
 | 2.46-staff-numbers (record 085, T-287)       | 8 commits              | finish, review, land                                   |
 | 2.97-invitations (record 086, T-288)         | 5 commits; 2 conflicts | finish, review, land                                   |
 | 2.140-nothing-unfinished (record 087, T-289) | 5 commits              | finish, review, land                                   |
-| 2.49-divisions-venues (record 089)           | 6 commits              | finish, review, land                                   |
 | 2.163-sign-in-says (record 091, T-291)       | 6 commits              | finish, review, land                                   |
 | 2.220-pilot-libraries                        | 3 commits              | finish, review, land; then the founder's short session |
 | 2.221, 2.56, 2.224                           | opened, nothing pushed | start again from their briefs when their turn comes    |
