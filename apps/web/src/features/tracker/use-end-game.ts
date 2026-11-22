@@ -22,9 +22,8 @@ import {
   notStartedProblemText,
   notStartedQuestion,
   notStartedReasonReady,
-  reopenKeepsTrying,
+  reopenAnswered,
   reopenLine,
-  reopenMayRetry,
   reopenOffered,
   reopenProblemText,
   takeBackProblemText,
@@ -223,19 +222,40 @@ export function useEndGame(args: EndGameArgs): EndGame {
     // once for each refused End, not again with every drawing.
   }, [refusedId, refusedMessage, controller, t]);
 
+  /**
+   * How many times "Keep it final" was tapped: a Reopen asked before the last of them is
+   * answered as kept (the code review's M4), so the person's last answer holds.
+   */
+  const keptCount = useRef(0);
+  /** Asks the league to reopen, and takes its answer as things stand when it comes. */
+  const askReopen = async (reason: string): Promise<void> => {
+    const asked = keptCount.current;
+    const result = await controller.reopen(reason);
+    latestAfterReopen.current(result, reason, keptCount.current !== asked);
+  };
+
   /** What the league answered a Reopen: carried on, asked again by itself, or why not. */
-  const afterReopen = (result: ReopenResult, reason: string): void => {
+  const afterReopen = (result: ReopenResult, reason: string, kept: boolean): void => {
+    const answered = reopenAnswered(result, kept);
+    // Kept final since, and not reopened: the last answer stands, nothing more is said.
+    if (answered === 'kept') return;
     if (result.ok) {
       setReopenRetry(null);
       setProblem(null);
       setReopenReason('');
       setOffer(null);
       showPad(padAtRest);
-      return say(t('tracker.reopen.done'));
+      return say(
+        t(
+          answered === 'reopened-though-kept'
+            ? 'tracker.reopen.doneThoughKept'
+            : 'tracker.reopen.done',
+        ),
+      );
     }
     // No connection: the question stays, says the game is still final, and the same
     // request goes again by itself until the league answers (point 7).
-    if (reopenKeepsTrying(result)) {
+    if (answered === 'keep-trying') {
       setReopenRetry(reason);
       return setProblem({ on: 'reopen', text: t('tracker.reopen.problem.trying') });
     }
@@ -244,7 +264,7 @@ export function useEndGame(args: EndGameArgs): EndGame {
     // Worth asking again as it stands (plays still going out, signed out): the question
     // stays, with the reason typed. Otherwise the league has answered: the final panel
     // says why, and asks the league again what it offers now.
-    if (reopenMayRetry(result)) return setProblem({ on: 'reopen', text });
+    if (answered === 'ask-again') return setProblem({ on: 'reopen', text });
     setProblem({ on: 'final', text });
     showPad(padAtRest);
     void askOffer();
@@ -259,9 +279,7 @@ export function useEndGame(args: EndGameArgs): EndGame {
     if (!retryStands) return setReopenRetry(null);
     const timer = window.setInterval(() => {
       if (wanted.current.kind !== 'reopen') return setReopenRetry(null);
-      void during(async () => {
-        latestAfterReopen.current(await controller.reopen(reopenRetry), reopenRetry);
-      });
+      void during(() => askReopen(reopenRetry));
     }, reopenAgainMs);
     return () => window.clearInterval(timer);
     // `wanted` and `during` are the screen's own for its whole life.
@@ -338,6 +356,8 @@ export function useEndGame(args: EndGameArgs): EndGame {
       if (wanted.current.kind !== 'reopen') return;
       if (event !== null && !tapTaken(rests.asked, tapOf(event))) return;
       if (!reopen) {
+        // A Reopen still waiting for its answer is answered as kept final (M4).
+        keptCount.current += 1;
         setReopenRetry(null);
         setProblem(null);
         // "Reopen game" lies where "Keep it final" was: the final panel rests from this
@@ -349,9 +369,7 @@ export function useEndGame(args: EndGameArgs): EndGame {
       if (reason === '') {
         return setProblem({ on: 'reopen', text: t('tracker.reopen.refused.reason-needed') });
       }
-      void during(async () => {
-        afterReopen(await controller.reopen(reason), reason);
-      });
+      void during(() => askReopen(reason));
     },
     reopenReason: setReopenReason,
     notStartedAsk(event) {

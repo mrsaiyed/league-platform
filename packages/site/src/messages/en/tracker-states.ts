@@ -142,6 +142,9 @@ export const enTrackerStates = {
   'tracker.reopen.cancel': 'Keep it final',
   'tracker.reopen.confirm': 'Reopen the game',
   'tracker.reopen.done': 'The game is live again. Carry on scoring.',
+  // "Keep it final" came after the league had already reopened the game (fix round B, M4).
+  'tracker.reopen.doneThoughKept':
+    'The league had already reopened the game before you chose to keep it final. It is live again: end it again if it should stay final.',
   'tracker.reopen.noConnection':
     'No connection. The game reopens as soon as the connection is back.',
   // Why a door (Reopen, Mark not started) did not open when the league did not say
@@ -151,10 +154,10 @@ export const enTrackerStates = {
     'Plays are still waiting to send. Try again once the top line says All saved.',
   'tracker.reopen.problem.rejected': 'The league turned that away. A league admin can help.',
   'tracker.reopen.problem.signed-out': 'You are signed out. Sign in again, then try once more.',
-  'tracker.reopen.problem.unanswered': 'No connection. Try again when it is back.',
   // A Reopen with no connection, asked again by itself (the review of the two doors, point 7).
   'tracker.reopen.problem.trying':
     'No connection. The game is still final: this device keeps asking the league to reopen it, and says so once it has.',
+  'tracker.reopen.problem.unanswered': 'No connection. Try again when it is back.',
   // The question in the pad (step 2.37): its title, what reopening does, and the reason,
   // in words short enough for a phone's pad. The field starts empty; the usual reason is
   // one tap beside it ("By mistake" fills it in), so nothing is typed over (fix round, F6).

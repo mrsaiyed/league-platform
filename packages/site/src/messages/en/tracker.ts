@@ -193,10 +193,10 @@ export const enTracker = {
   // play now; elsewhere the list is for reading out to whoever holds it.
   'tracker.keptList.again': 'Enter again',
   'tracker.keptList.againLabel': 'Enter again: {play}',
-  'tracker.keptList.againRefused':
-    'That play was not entered again: the game as it stands now does not take it. Enter it by hand if it is still needed.',
   'tracker.keptList.againNotTakenOff':
     'That play was entered again, but it could not be taken off this list. Tapping Enter again once more will not enter it twice.',
+  'tracker.keptList.againRefused':
+    'That play was not entered again: the game as it stands now does not take it. Enter it by hand if it is still needed.',
   // Cleared only by this deliberate tap: the scorekeeper has seen the list.
   'tracker.keptList.clear': 'I have seen these: clear the list',
   'tracker.keptList.readAloud':
@@ -246,11 +246,6 @@ export const enTracker = {
   'tracker.matchup': '{away} at {home}',
   'tracker.noStorage':
     'This browser window cannot save the game on this device, so scoring is off. If this is a private window, open the tracker in a normal one.',
-  // Several minutes with no connection and plays waiting (T6 §4, step 2.37 part 2).
-  'tracker.offlineLong_one':
-    'No connection for several minutes. {count} play is only on this device until the connection comes back. Keep this page open and the device switched on: it is sent by itself.',
-  'tracker.offlineLong_other':
-    'No connection for several minutes. {count} plays are only on this device until the connection comes back. Keep this page open and the device switched on: they are sent by themselves.',
   // No longer allowed to score, with plays still on the device (finding M2).
   'tracker.notAllowedKept_one':
     'You are no longer allowed to score this game. {count} play is still on this device and is not saved. If an admin gives the game back to you, open it again here and it is sent.',
@@ -272,6 +267,11 @@ export const enTracker = {
     '{count} play on this device was not saved. Enter it again if it is needed.',
   'tracker.notSaved_other':
     '{count} plays on this device were not saved. Enter them again if they are needed.',
+  // Several minutes with no connection and plays waiting (T6 §4, step 2.37 part 2).
+  'tracker.offlineLong_one':
+    'No connection for several minutes. {count} play is only on this device until the connection comes back. Keep this page open and the device switched on: it is sent by itself.',
+  'tracker.offlineLong_other':
+    'No connection for several minutes. {count} plays are only on this device until the connection comes back. Keep this page open and the device switched on: they are sent by themselves.',
   'tracker.openAgain': 'Open the game again',
   'tracker.opening': 'Opening the game…',
   'tracker.openingSlow': 'No answer yet. Check the connection; this keeps trying.',

@@ -280,6 +280,28 @@ export const reopenMayRetry = (result: Extract<ReopenResult, { ok: false }>): bo
   result.reason === 'signed-out' ||
   (result.reason === 'refused' && result.code === 'reason-needed');
 
+/** What the screen does with a Reopen's answer (`reopenAnswered`). */
+export type ReopenAnswered =
+  | 'reopened'
+  | 'keep-trying'
+  | 'ask-again'
+  | 'refused'
+  | 'kept'
+  | 'reopened-though-kept';
+
+/**
+ * What a Reopen's answer does on the screen. `kept`: "Keep it final" was tapped after
+ * this Reopen was asked (the code review's M4). The person's last answer holds: nothing
+ * is asked again and no problem is shown. Only if the league had already reopened the
+ * game is it live, and that is said plainly, never left unsaid.
+ */
+export function reopenAnswered(result: ReopenResult, kept: boolean): ReopenAnswered {
+  if (result.ok) return kept ? 'reopened-though-kept' : 'reopened';
+  if (kept) return 'kept';
+  if (reopenKeepsTrying(result)) return 'keep-trying';
+  return reopenMayRetry(result) ? 'ask-again' : 'refused';
+}
+
 /**
  * What the Mark not started question says (S-40; the review of the two doors, point 6).
  * A play undone is nothing recorded, so with none standing anyone who scores the game
