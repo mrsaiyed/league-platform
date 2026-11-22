@@ -19,9 +19,7 @@ Every lane's work is on GitHub. All sessions stopped on 2026-11-17 at about 03:0
 | ------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | 2.37-plays-undo-end (TEST 1)                     | part 1 built; GitHub passed cb840d7 twice                           | review (code; and by use), one fix round, land (S-72, S-73, T-282, record 078) |
 | 2.185-draft-put-back                             | both reviews in; most of the fix round done                         | the part that waits for 2.180 (D1, D2), then land                              |
-| 2.157-refusal                                    | both reviews in; fix round sent (U-15's change)                     | fix round, land                                                                |
 | 2.50-people-screens                              | both reviews in; fix round sent (a stale tab unmarks a child: High) | fix round, a confirming look at the High, land                                 |
-| 2.59-seed-leagues                                | both reviews in; fix round sent                                     | fix round (the realism items may be a part of their own), land; then 2.236     |
 | 2.98-safety (record 081, T-285, U-16)            | both reviews in; fix round sent                                     | fix round, land                                                                |
 | 2.93-last-part (TEST 2; record 082, T-286)       | being built when cut off; 7 commits                                 | finish, review, land                                                           |
 | 2.198-level-teams (migration 0022, S-74)         | built; waits for 2.200                                              | the home page's short note, merge after 2.200, review, land                    |
