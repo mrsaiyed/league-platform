@@ -222,7 +222,24 @@ export async function walkFirstTest(o) {
 
     at = 'step 6: the season is shown';
     await staffLink(page, 'Season settings', /\/admin\/season/);
-    const shown = await page.locator('#who-can-see').innerText();
+    let shown = await page.locator('#who-can-see').innerText();
+    // A league made by `league:make` starts with its season hidden: shown here, as its
+    // owner would, by "Show this season to visitors" and "Yes" to its question.
+    if (
+      !new RegExp(
+        `Everyone can see ${escaped(seasonName)}\\.|${escaped(seasonName)} is shown`,
+      ).test(shown)
+    ) {
+      await tap(page, page.getByRole('button', { name: /^Show this season/ }));
+      await tap(page, page.getByRole('button', { name: /^Yes/ }));
+      shown = await page.locator('#who-can-see').innerText();
+      note(
+        `6. "Show this season to visitors", then "Yes": ${seasonName} is shown`,
+        shown.includes(`${seasonName} is shown`) ||
+          shown.includes(`Everyone can see ${seasonName}.`),
+        shown,
+      );
+    }
     say(6, shown);
     await picture(page, 6);
     // Nothing to tap: the stand-in's league starts live with its season shown; a draft
@@ -259,7 +276,11 @@ export async function walkFirstTest(o) {
       name: 'Score this game: Wolves against Ravens',
       exact: true,
     });
-    await offer.waitFor();
+    await offer.waitFor().catch(async (error) => {
+      const said = (await mainText(scoring).catch(() => '')).replace(/\s+/g, ' ').slice(0, 700);
+      const why = error.message.split('\n')[0];
+      throw new Error(`no "Score this game" link (${why}); the home says: ${said}`);
+    });
     say(7, await mainText(scoring));
     await offer.scrollIntoViewIfNeeded();
     await shot(scoring, '07-home');

@@ -28,7 +28,21 @@ export const doing = {
   league: 'Step 8.1: making a league with npm run league:make, as the page links to.',
   signUp:
     'Step 8.1: its owner signs up in a browser, with the code read by the kept-emails script.',
+  walk: 'Step 8.1: the first test’s walk (step 2.194) to the final table, a second browser watching signed out.',
+  checkCopy:
+    'Steps 8.2 and 8.3: npm run check:test-copy against the rehearsed site, with the build’s manifest.',
 };
+
+export const walked = (checks) =>
+  `the walk, steps 1 to 18, ${checks} checks passed: the owner signed in on the sign-in page and scored game 1 to the final table; the league is a draft, so the owner read steps 16 to 18 and the visitor, signed out in a browser of its own, saw each of those pages hidden (404)`;
+
+export const refusedHere = (sentence) => `  refused, as asked: “${sentence}”`;
+export const refusedPassed = (setting, sentence) =>
+  [
+    `PASSED: with ${setting}, the website refused to start, in its own words:`,
+    `  “${sentence}”`,
+    'That is the expected result; nothing after the start was rehearsed.',
+  ].join('\n');
 
 export const done = (detail) => `  done: ${detail}`;
 
@@ -48,9 +62,10 @@ export const leftInGit = (paths) =>
   `FAILED: the rehearsal left these in git’s view: ${paths.join(', ')}.`;
 
 export const passed = [
-  'PASSED: the procedure was followed on this computer up to its step 8.1: the owner signed up',
-  'and is signed in as the league’s owner. Not yet rehearsed: the walk, the second browser and',
-  'the checks of steps 6 and 8.2 to 8.5 (step 2.207 part 2).',
+  'PASSED: the procedure was followed on this computer through its steps 8.1 to 8.3: the owner',
+  'signed up, the first test’s walk reached the final table with a visitor watching signed out,',
+  'and the test copy check passed every line. Left for the supervised session: step 6’s checks,',
+  'steps 8.4 and 8.5, and what a rehearsal cannot show (the page’s list at its top).',
 ].join('\n');
 
 export const reasons = {
@@ -66,4 +81,11 @@ export const reasons = {
   health: (status, body) => `the health address answered ${status}: ${body}`,
   noCode: 'the kept-emails script printed no 6-digit code.',
   notOwner: (status) => `the owner could not open the league’s admin area (it answered ${status}).`,
+  unknownRefusal: (kinds) =>
+    `--expect-refusal takes one of: ${kinds.join(', ')}. Nothing was started.`,
+  notRefused: (setting) =>
+    `with ${setting}, the website was expected to refuse to start, and it did not.`,
+  walkStopped: (at, why) => `the walk stopped at ${at}: ${why}`,
+  walkChecks: (count, total) =>
+    `${count} of the walk’s ${total} checks did not answer as first-test.md says (listed below).`,
 };

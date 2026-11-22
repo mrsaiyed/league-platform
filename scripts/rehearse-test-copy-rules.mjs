@@ -19,7 +19,32 @@ export const pageSteps = {
   health: { step: '8.1', heading: '## 8. The first checks on the copy' },
   league: { step: '8.1', heading: '## 8. The first checks on the copy' },
   signUp: { step: '8.1', heading: '## 8. The first checks on the copy' },
+  walk: { step: '8.1', heading: '## 8. The first checks on the copy' },
+  checkCopy: { step: '8.2 and 8.3', heading: '## 8. The first checks on the copy' },
 };
+
+/**
+ * The two failures the rehearsal can be asked to see (`--expect-refusal=<kind>`): what is
+ * taken out, and the website's own sentence when it refuses to start (startup.ts).
+ */
+export const refusals = {
+  certificate: {
+    setting: 'PLATFORM_DATABASE_CA taken out of the website’s settings',
+    sentence:
+      /The web app cannot start: the database’s certificate was not accepted.*?start the app again\./,
+  },
+  'confirm-email': {
+    setting: 'the sign-in service saying "Confirm email" is off',
+    sentence:
+      /The web app cannot start: the sign-in service does not confirm email addresses.*?start the app again\./,
+  },
+};
+
+/** The website's refusal sentence of that kind in what it printed (a log line's \" read as "), or null. */
+export function refusalIn(output, kind) {
+  const found = refusals[kind].sentence.exec(output.replace(/\\"/g, '"'));
+  return found === null ? null : found[0];
+}
 
 /**
  * Where a step is in the page: its number, its heading without the #s, and the line the

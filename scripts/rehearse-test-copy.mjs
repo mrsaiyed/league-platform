@@ -12,7 +12,17 @@
 // - step 7, the website built as the image builds it and started in staging mode with
 //   exactly the settings the Render page lists, pointed at this computer;
 // - step 8.1, a league made with `npm run league:make -- --hosted`, and its owner signed up
-//   in a browser with the code read by `node scripts/read-kept-emails.mjs --hosted`.
+//   in a browser with the code read by `node scripts/read-kept-emails.mjs --hosted`; then
+//   step 2.194's walk (tests/browser/first-test-walk.mjs, the same code as its browser
+//   test) to the final table, the owner signing in on the sign-in page, a second browser
+//   watching signed out (the league is a draft: it sees every page hidden);
+// - steps 8.2 and 8.3, `npm run check:test-copy` against the rehearsed site with the build's
+//   own manifest, so that the posted "be this person" line is checked too.
+//
+// `--expect-refusal=certificate` (PLATFORM_DATABASE_CA taken out of the website's settings)
+// and `--expect-refusal=confirm-email` (the fake saying "Confirm email" is off) rehearse the
+// two failures instead: the run passes only when the website refuses to start with the
+// product's own plain sentence, which it shows (the plan's done test).
 //
 // The tools are meant for a person at a terminal and are not changed: each is run under
 // util-linux `script`, which gives it a pseudo-terminal, and the rehearsal types its answers
@@ -26,6 +36,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serveFakeSupabaseAuth } from '../packages/providers/index.ts';
 import { leagueUrl } from '@srleagues/core';
+import { signInWithPassword, walkFirstTest } from '../tests/browser/first-test-walk.mjs';
 import { freePort, launch } from '../tests/browser/web-browser-kit.mjs';
 import * as words from './rehearse-test-copy.messages.mjs';
 import {
@@ -34,9 +45,19 @@ import {
   codeIn,
   hidden,
   leftBehind,
+  refusalIn,
+  refusals,
   splitAddress,
   whereInPage,
 } from './rehearse-test-copy-rules.mjs';
+
+const refusal = process.argv
+  .find((a) => a.startsWith('--expect-refusal='))
+  ?.slice('--expect-refusal='.length);
+if (refusal !== undefined && !(refusal in refusals)) {
+  console.error(words.reasons.unknownRefusal(Object.keys(refusals)));
+  process.exit(2);
+}
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pageText = readFileSync(path.join(root, words.page), 'utf8');
@@ -47,12 +68,20 @@ const madeUp = (n = 18) =>
     .toString('base64')
     .replace(/[^A-Za-z0-9]/g, 'x');
 const secrets = [];
-const started = { db: false, fake: null, web: null, browser: null };
+const started = { db: false, fake: null, web: null, browser: null, visitor: null };
 
 class StepFailed extends Error {
   constructor(reason, output = '') {
     super(reason);
     this.output = output;
+  }
+}
+
+/** The refusal `--expect-refusal` asked for came, in the product's own sentence. */
+class RefusedAsExpected extends Error {
+  constructor(sentence) {
+    super(sentence);
+    this.sentence = sentence;
   }
 }
 
@@ -133,6 +162,10 @@ async function step(id, work) {
     const detail = await work();
     if (detail) console.log(words.done(detail));
   } catch (error) {
+    if (error instanceof RefusedAsExpected) {
+      console.log(words.refusedHere(error.sentence));
+      throw error;
+    }
     const reason = error instanceof StepFailed ? error.message : String(error?.message ?? error);
     console.error(words.failed({ ...whereInPage(pageText, id), reason }));
     if (error instanceof StepFailed && error.output) {
@@ -153,6 +186,7 @@ function stopAll() {
 async function stopEverything() {
   console.log(words.stopping);
   await started.browser?.close().catch(() => {});
+  await started.visitor?.close().catch(() => {});
   if (started.web !== null && started.web.exitCode === null) {
     started.web.kill('SIGTERM');
     await new Promise((r) => setTimeout(r, 1500));
@@ -185,6 +219,10 @@ async function rehearse() {
   const secretKey = `made-up-supabase-secret-key-${run}`;
   const shortName = `rehearsal-${run}`;
   const ownerEmail = `owner-${run}@example.test`;
+  const leagueName = 'Made-up Rehearsal League';
+  const seasonName = 'Season one';
+  const chosenPassword = `a made-up chosen password ${run}`;
+  secrets.push(chosenPassword);
   let auth = null;
 
   if (existsSync(path.join(root, '.env'))) {
@@ -221,9 +259,12 @@ async function rehearse() {
   });
 
   await step('confirmEmail', async () => {
-    auth = await serveFakeSupabaseAuth({ secretKey });
+    const off = refusal === 'confirm-email';
+    auth = await serveFakeSupabaseAuth({ secretKey, ...(off ? { mailerAutoconfirm: true } : {}) });
     started.fake = auth;
-    return `the sign-in fake answers on ${auth.url}, "Confirm email" on (its default)`;
+    return off
+      ? `the sign-in fake answers on ${auth.url}, "Confirm email" OFF (--expect-refusal=confirm-email)`
+      : `the sign-in fake answers on ${auth.url}, "Confirm email" on (its default)`;
   });
 
   const owner = splitAddress(ownerUrl);
@@ -301,7 +342,8 @@ async function rehearse() {
   });
   await step(
     'realChecks',
-    async () => 'left for the session, after step 8.1 (part 2 of step 2.207)',
+    async () =>
+      'left for the session: they are step 2.93’s lists for real PostgreSQL, run after step 8.1',
   );
 
   await step('build', async () => {
@@ -332,6 +374,7 @@ async function rehearse() {
       SUPABASE_SECRET_KEY: secretKey,
       LOG_LEVEL: 'info',
     };
+    if (refusal === 'certificate') delete settings.PLATFORM_DATABASE_CA;
     let output = '';
     const web = spawn(process.execPath, ['scripts/web.mjs', 'start', '--port', String(port)], {
       cwd: root,
@@ -343,6 +386,8 @@ async function rehearse() {
     web.stderr.on('data', (c) => (output += c));
     const until = Date.now() + 90_000;
     for (;;) {
+      const sentence = refusal === undefined ? null : refusalIn(output, refusal);
+      if (sentence !== null) throw new RefusedAsExpected(sentence);
       if (web.exitCode !== null) throw new StepFailed(words.reasons.notReady('it stopped'), output);
       if (Date.now() > until)
         throw new StepFailed(words.reasons.notReady('no answer in 90 seconds'), output);
@@ -351,6 +396,8 @@ async function rehearse() {
           signal: AbortSignal.timeout(10_000),
         });
         await answer.text();
+        if (answer.status === 200 && refusal !== undefined)
+          throw new StepFailed(words.reasons.notRefused(refusals[refusal].setting), output);
         if (answer.status === 200) break;
       } catch {
         // not yet
@@ -378,7 +425,7 @@ async function rehearse() {
   });
   await step('league', async () => {
     const flags = [
-      `--name 'Made-up Rehearsal League'`,
+      `--name '${leagueName}'`,
       `--short-name ${shortName}`,
       '--sport basketball',
       '--who-plays adults',
@@ -386,7 +433,7 @@ async function rehearse() {
       '--time-zone America/Chicago',
       '--contact-email hello@example.test',
       `--owner-email ${ownerEmail}`,
-      `--season 'Season one'`,
+      `--season '${seasonName}'`,
       '--season-starts 2026-12-01',
       '--season-ends 2027-03-31',
       '--as staff@example.test',
@@ -425,7 +472,7 @@ async function rehearse() {
       page.waitForURL((url) => url.pathname === '/signup/password'),
       page.getByRole('button', { name: 'Continue' }).click(),
     ]);
-    await page.getByLabel('Password').fill(`a made-up chosen password ${run}`);
+    await page.getByLabel('Password').fill(chosenPassword);
     await Promise.all([
       page.waitForURL((url) => url.pathname !== '/signup/password'),
       page.getByRole('button', { name: 'Save and sign in' }).click(),
@@ -433,6 +480,69 @@ async function rehearse() {
     const admin = await page.goto(`${origin}${leagueUrl({ slug: shortName }, 'admin')}`);
     if (admin?.status() !== 200) throw new StepFailed(words.reasons.notOwner(admin?.status()));
     return "signed up with the code the kept-emails script read; the league's admin area opens (200)";
+  });
+
+  await step('walk', async () => {
+    started.visitor = await launch();
+    const zone = 'America/Chicago'; // the league's, as made above
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(new Date());
+    const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const failures = [];
+    const met = [];
+    let checks = 0;
+    const nothing = async () => {};
+    try {
+      await walkFirstTest({
+        origin,
+        browser: started.browser,
+        visitorBrowser: started.visitor,
+        league: { slug: shortName, name: leagueName, season: seasonName, draft: true },
+        today,
+        yesterday,
+        signIn: signInWithPassword({ email: ownerEmail, password: chosenPassword }),
+        note: (label, ok, detail = '') => {
+          checks += 1;
+          if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ''}`);
+        },
+        say: () => {},
+        shot: nothing,
+        picture: nothing,
+        // What the tracker's page met on the way, shown if the walk fails.
+        watchErrors: (on, where) => {
+          on.on('pageerror', (e) => met.push(`(${where}) page error: ${e.message}`));
+          on.on('response', (r) => {
+            if (r.status() >= 400) met.push(`(${where}) answered ${r.status()}: ${r.url()}`);
+          });
+        },
+      });
+    } catch (error) {
+      const stoppedAt = error?.at ?? 'starting';
+      throw new StepFailed(
+        words.reasons.walkStopped(stoppedAt, String(error?.message ?? error).split('\n')[0]),
+        [...failures, ...met].join('\n'),
+      );
+    }
+    if (failures.length > 0)
+      throw new StepFailed(
+        words.reasons.walkChecks(failures.length, checks),
+        [...failures, ...met].join('\n'),
+      );
+    return words.walked(checks);
+  });
+
+  await step('checkCopy', async () => {
+    const manifest = 'apps/web/.next/server/server-reference-manifest.json';
+    const out = plainly(
+      'npm run check:test-copy',
+      'npm',
+      ['run', '--silent', 'check:test-copy', '--', origin, '--manifest', manifest],
+      baseEnv(),
+    );
+    const all = /All \d+ checks passed\./.exec(out);
+    if (all === null) throw new StepFailed(words.reasons.notSeen('every line passed'), out);
+    return `${all[0]} (the posted "be this person" form included, by the build's manifest)`;
   });
 }
 
@@ -445,11 +555,15 @@ for (const signal of ['SIGINT', 'SIGTERM'])
 console.log(words.opening);
 const before = gitStatus();
 let ok = false;
+let refused = null;
 try {
   await rehearse();
-  ok = true;
-} catch {
-  ok = false;
+  // Asked to see a refusal and none came: that is a failure.
+  ok = refusal === undefined;
+  if (!ok) console.error(words.reasons.notRefused(refusals[refusal].setting));
+} catch (error) {
+  refused = error instanceof RefusedAsExpected ? error.sentence : null;
+  ok = refused !== null;
 } finally {
   await stopAll();
 }
@@ -458,6 +572,7 @@ if (left.length > 0) {
   console.error(words.leftInGit(left));
   ok = false;
 } else console.log(words.stoppedClean);
-if (ok) console.log(words.passed);
+if (ok && refused !== null) console.log(words.refusedPassed(refusals[refusal].setting, refused));
+else if (ok) console.log(words.passed);
 // The browser's and the fetches' handles would keep Node waiting: everything is stopped.
 process.exit(ok ? 0 : 1);

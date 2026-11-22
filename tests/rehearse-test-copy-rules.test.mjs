@@ -11,12 +11,30 @@ import {
   hidden,
   leftBehind,
   pageSteps,
+  refusalIn,
+  refusals,
   splitAddress,
   whereInPage,
 } from '../scripts/rehearse-test-copy-rules.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const procedure = readFileSync(path.join(root, 'docs/operations/new-test-copy.md'), 'utf8');
+const startup = readFileSync(path.join(root, 'apps/web/src/server/startup.ts'), 'utf8');
+
+test('the two refusals are read in the website’s own sentences, from a log line too', () => {
+  const certificate =
+    'The web app cannot start: the database’s certificate was not accepted: set PLATFORM_DATABASE_CA to the database’s own certificate (its PEM text, or the path of a file holding it; for Supabase, the one on the project’s database settings page), then start the app again.';
+  assert.equal(refusalIn(`x\n${certificate}\ny`, 'certificate'), certificate);
+  assert.equal(refusalIn(certificate, 'confirm-email'), null);
+  const logged = JSON.stringify({
+    msg: 'The web app cannot start: the sign-in service does not confirm email addresses, so anyone could take over: turn on "Confirm email" in the dashboard, then start the app again.',
+  });
+  assert.match(refusalIn(logged, 'confirm-email') ?? '', /turn on "Confirm email".*again\.$/);
+  // The sentences are the product's: each one's start is in startup.ts as written.
+  assert.ok(startup.includes('the database’s certificate was not accepted'));
+  assert.ok(startup.includes('the sign-in service does not confirm email addresses'));
+  assert.deepEqual(Object.keys(refusals), ['certificate', 'confirm-email']);
+});
 
 test('every step the rehearsal names is a heading of the procedure, so a failure names its line', () => {
   for (const id of Object.keys(pageSteps)) {
