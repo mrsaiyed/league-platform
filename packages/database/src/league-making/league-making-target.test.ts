@@ -238,5 +238,8 @@ describe('what a connection says about itself', () => {
     expect(connectCauseOf(failure('ERR_TLS_CERT_ALTNAME_INVALID'))).toBe('certificate');
     expect(connectCauseOf(new Error('The server does not support SSL connections'))).toBe('ssl');
     expect(connectCauseOf(new Error('something else'))).toBe('unknown');
+    // By the code alone (step 2.203): words that speak of a certificate are not enough.
+    expect(connectCauseOf(new Error('a certificate, in words only'))).toBe('unknown');
+    expect(connectCauseOf(failure('UNABLE_TO_GET_ISSUER_CERT_LOCALLY'))).toBe('certificate');
   });
 });

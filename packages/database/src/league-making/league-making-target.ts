@@ -183,14 +183,17 @@ export function connectCauseOf(error: unknown): ConnectCause {
   if (['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH', 'ENETUNREACH'].includes(code)) {
     return 'network';
   }
+  // Every refusal of a certificate by Node's TLS has a code (SELF_SIGNED_CERT_IN_CHAIN,
+  // UNABLE_TO_GET_ISSUER_CERT_LOCALLY, ERR_TLS_CERT_ALTNAME_INVALID...): told by it alone,
+  // never by the words, which could repeat what the server or the address said (2.203).
   if (
     code.startsWith('ERR_TLS') ||
     code.includes('CERT') ||
-    code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
-    message.includes('certificate')
+    code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
   ) {
     return 'certificate';
   }
+  // pg's own fixed sentences, which carry no code: a server without SSL, and its timeout.
   if (message.includes('ssl')) return 'ssl';
   if (message.includes('timeout') || message.includes('timed out')) return 'timeout';
   return 'unknown';
