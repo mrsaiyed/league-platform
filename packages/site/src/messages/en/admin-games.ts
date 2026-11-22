@@ -32,6 +32,9 @@ export const enAdminGames = {
   'admin.boxScore.locked.cancelled': 'This game was cancelled, so it has no box score.',
   'admin.boxScore.locked.decided':
     'This game is final. To correct it, reopen it with a reason; then enter its result again.',
+  // Step 2.158 (M32): a postponed game's own page offers no score entry.
+  'admin.boxScore.locked.postponed':
+    'This game is postponed, so it has no score yet. It is scored once it is played on its new date.',
   'admin.boxScore.locked.tracked':
     'This game was scored with the live tracker. Correct it in the tracker, so its list of plays still explains the numbers.',
   'admin.boxScore.minutes': 'Minutes',
@@ -57,8 +60,36 @@ export const enAdminGames = {
     'Check {team}: the score you typed is {score}, but its players’ points add up to {points}. It will be saved as {score} unless you change it.',
   'admin.boxScore.teamShown': 'Team shown',
   'admin.boxScore.title': 'Box score: {away} at {home}',
+  // A postponed or cancelled game's own page, which has no box score (step 2.158).
+  'admin.boxScore.titleCalledOff': '{away} at {home}',
   // The box score grid (step 2.64).
   'admin.games.boxScore': 'Box score',
+  // Step 2.158 (H9; A-5): "Forfeit, postpone or cancel" asks once, naming the game, and only
+  // its "Yes" changes it. A scheduled game whose line-ups a scorer's table already set keeps
+  // them (its question says so).
+  'admin.games.callOff.ask.cancel':
+    'Cancel {game}? Everyone will see it as cancelled, and it will count for nothing. You can put it back afterwards.',
+  'admin.games.callOff.ask.cancelLineups':
+    'Cancel {game}? Everyone will see it as cancelled, and it will count for nothing. You can put it back afterwards. The players already set for it at the scorer’s table are kept.',
+  'admin.games.callOff.ask.forfeit':
+    'Record a forfeit by {team} in {game}? {winner} win {winnerScore}–{loserScore}, the league’s forfeit score, and it counts in the standings.',
+  'admin.games.callOff.ask.postpone':
+    'Postpone {game}? Everyone will see it as postponed. It waits for a new date, and counts for nothing until it is played.',
+  'admin.games.callOff.ask.postponeLineups':
+    'Postpone {game}? Everyone will see it as postponed. It waits for a new date, and counts for nothing until it is played. The players already set for it at the scorer’s table are kept.',
+  // A postponement made by mistake put back on its old date (S-75).
+  'admin.games.callOff.ask.restore':
+    'Put {game} back on its date, {when}? Everyone will see it as scheduled again.',
+  'admin.games.callOff.chooseTeam': 'Choose a team',
+  'admin.games.callOff.no.cancel': 'No, keep the game',
+  'admin.games.callOff.no.forfeit': 'No, keep the game as it is',
+  'admin.games.callOff.no.postpone': 'No, keep it on its date',
+  'admin.games.callOff.no.restore': 'No, keep it postponed',
+  'admin.games.callOff.restore': 'Put it back',
+  'admin.games.callOff.yes.cancel': 'Yes, cancel it',
+  'admin.games.callOff.yes.forfeit': 'Yes, record the forfeit',
+  'admin.games.callOff.yes.postpone': 'Yes, postpone it',
+  'admin.games.callOff.yes.restore': 'Yes, put it back on its date',
   'admin.games.cancel': 'Cancel the game',
   'admin.games.confirm.ask': '{result}. Make this final?',
   'admin.games.confirm.early': '{result}. This game is set for {when}. Make it final now?',
@@ -70,7 +101,12 @@ export const enAdminGames = {
   'admin.games.done.cancel': 'The game is cancelled.',
   'admin.games.done.final': 'The final score is saved.',
   'admin.games.done.forfeit': 'The forfeit is recorded.',
-  'admin.games.done.postpone': 'The game is postponed.',
+  'admin.games.done.postpone':
+    'The game is postponed. It waits for a new date under “Waiting for a new date”.',
+  'admin.games.done.putBack': 'The game is back on the schedule.',
+  'admin.games.done.putBackDate': 'The game is back on its date.',
+  'admin.games.done.putBackPostponed':
+    'The game is back as it was: postponed, waiting for a new date.',
   'admin.games.done.reopen': 'The game is reopened. Enter the right result.',
   'admin.games.done.reopenTracked':
     'The game is live again. Correct it in the tracker, then end it again.',
@@ -96,14 +132,26 @@ export const enAdminGames = {
   'admin.games.enterFinal': 'Enter the final score',
   'admin.games.error.changed-since-read':
     'Someone changed this game since you opened the page. It is shown again as it is now.',
+  'admin.games.error.choose-reason': 'Choose why the game is put back.',
+  'admin.games.error.choose-team': 'Choose the team that forfeits.',
   'admin.games.error.game-already-decided':
     'That game already has a final result. It can only be changed by reopening it.',
   'admin.games.error.game-cancelled': 'That game was cancelled, so it cannot be scored.',
   'admin.games.error.game-is-tracked':
     'Plays are being recorded for this game in the tracker, so it cannot be ended here. End it in the tracker.',
+  'admin.games.error.game-not-called-off':
+    'That game is not cancelled or postponed, so there is nothing to put back.',
   'admin.games.error.game-not-cancellable': 'Only a game that has not started can be cancelled.',
   'admin.games.error.game-not-found': 'That game is not there.',
   'admin.games.error.game-not-postponable': 'Only a game that has not started can be postponed.',
+  'admin.games.error.game-now-cancelled':
+    'Someone cancelled this game meanwhile, so nothing else was changed. It is shown again as it is now.',
+  'admin.games.error.game-now-postponed':
+    'Someone postponed this game meanwhile, so nothing else was changed. It is shown again as it is now.',
+  'admin.games.error.game-part-in-bin':
+    'One of this game’s teams, or its venue or court, is in the bin, and the screen to bring it back is not ready yet. So this game cannot be put back for now.',
+  'admin.games.error.game-postponed':
+    'That game is postponed, so it cannot have a score yet. Enter its score once it is played on its new date.',
   'admin.games.error.invalid-input': 'Enter the score as two whole numbers from 0 to 999.',
   'admin.games.error.not-allowed': 'You are not allowed to do that to this game.',
   'admin.games.error.team-not-in-game': 'That team is not in this game.',
@@ -132,7 +180,29 @@ export const enAdminGames = {
   'admin.games.notScorable': 'This league is archived or suspended, so games cannot be changed.',
   'admin.games.openTracker': 'Open the tracker',
   'admin.games.otherActions': 'Forfeit, postpone or cancel',
+  // A postponed game's panel: a forfeit or cancelling (step 2.158, S-75).
+  'admin.games.otherActionsPostponed': 'Forfeit or cancel instead',
   'admin.games.postpone': 'Postpone',
+  // On a postponed game's card: where it waits for its new date (step 2.158).
+  'admin.games.postponedWaits': 'This game waits for a new date.',
+  // A cancelled game put back (step 2.158, S-51), for whoever may cancel it, with why from
+  // a fixed list (the activity log keeps fixed words only).
+  'admin.games.putBack': 'Put this game back',
+  'admin.games.putBack.choose': 'Choose why',
+  // A postponement made by mistake put back on its old date (S-75): the same fixed list,
+  // said of a postponement.
+  'admin.games.putBack.date': 'Put it back on its date',
+  'admin.games.putBack.reason':
+    'Why are you putting it back? (Kept in the activity log, not shown to the public.)',
+  'admin.games.putBack.reasons.cancelledByMistake': 'Cancelled by mistake',
+  'admin.games.putBack.reasons.other': 'Another reason',
+  'admin.games.putBack.reasons.willBePlayed': 'The game will be played after all',
+  'admin.games.putBack.reasons.wrongGame': 'The wrong game was cancelled',
+  'admin.games.putBack.reasonsDate.cancelledByMistake': 'Postponed by mistake',
+  'admin.games.putBack.reasonsDate.other': 'Another reason',
+  'admin.games.putBack.reasonsDate.willBePlayed': 'The game will be played on its date after all',
+  'admin.games.putBack.reasonsDate.wrongGame': 'The wrong game was postponed',
+  'admin.games.putBack.save': 'Put it back on the schedule',
   'admin.games.recordForfeit': 'Record forfeit',
   // A refused score said beside the boxes, naming the box or the score (step 2.155; A-4).
   'admin.games.refused.score': 'Enter the score for {team} as a whole number from 0 to 999.',
@@ -146,10 +216,20 @@ export const enAdminGames = {
     'Your time to reopen this game is over. Only a league admin or a scheduler can reopen it now.',
   'admin.games.result': '{away} {awayScore}, {home} {homeScore}',
   'admin.games.saveScore': 'Save final score',
-  'admin.games.saved.cancel': 'Saved: {game} is cancelled.',
+  'admin.games.saved.cancel': 'Saved: {game} is cancelled. “Put this game back” undoes it.',
+  // Said at once after a game is put back over another game that took its place since
+  // (step 2.158): the admin decides, and the publish preview lists the clash too.
+  'admin.games.saved.clash':
+    'Check its place: {others} also has one of its teams or its court at that time.',
   'admin.games.saved.final': 'Saved: {result} is final.',
-  'admin.games.saved.forfeit': 'Saved: {game} is recorded as a forfeit.',
-  'admin.games.saved.postpone': 'Saved: {game} is postponed.',
+  'admin.games.saved.forfeit':
+    'Saved: {team} forfeited {game}. {winner} win {winnerScore}–{loserScore}.',
+  'admin.games.saved.postpone':
+    'Saved: {game} is postponed. It waits for a new date under “Waiting for a new date”.',
+  'admin.games.saved.putBack': 'Saved: {game} is back on the schedule as a scheduled game.',
+  'admin.games.saved.putBackDate': 'Saved: {game} is back on its date as a scheduled game.',
+  'admin.games.saved.putBackPostponed':
+    'Saved: {game} is back as it was before it was cancelled: postponed, waiting for a new date.',
   'admin.games.scoreGame': 'Score this game',
   'admin.games.scoreOf': 'Score for {team}',
   'admin.games.scorekeeper': 'Scorekeeper: {names}',
@@ -161,6 +241,13 @@ export const enAdminGames = {
   // A game the live tracker has recorded plays of is ended there (S-46).
   'admin.games.tracked':
     'Plays are being recorded for this game in the tracker, so it is ended there, not by typing a score.',
+  // Postponed games, each until it is given a new date (P7 §4 "Also", step 2.158). Giving
+  // the new date from the list is step 2.53's, and is said not to be ready until then.
+  'admin.games.waiting.empty': 'No game is waiting for a new date.',
+  'admin.games.waiting.link': 'See the games waiting for a new date',
+  'admin.games.waiting.note':
+    'Postponed games, oldest first. Each waits here until it is given a new date; giving one from this list is not ready yet.',
+  'admin.games.waiting.title': 'Waiting for a new date',
   'admin.games.weekEmpty': 'No more games in the next six days.',
   'admin.games.weekTitle': 'This week',
   'admin.games.when': '{day}, {time}',

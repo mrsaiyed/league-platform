@@ -60,6 +60,7 @@ import {
   removeDraftRound,
   reopenGame,
   setBoxScore,
+  setSeasonRules,
   systemClock,
   updateSeason,
   type AccessReader,
@@ -93,8 +94,10 @@ import {
   type DatabaseHandle,
   type LeagueScope,
 } from '@srleagues/database';
+import { defaultSeasonRules } from '@srleagues/contracts';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { buildBoxScores } from '../features/live-game/build-game.ts';
 import { startingNamePolicy } from './name-policy-of.ts';
 import { addDays, dayIn } from './stand-in-world-clock.ts';
 import {
@@ -177,6 +180,14 @@ beforeAll(async () => {
     databaseDeps,
   );
   if (!active.ok) throw new Error(`season active: ${active.error.code}`);
+  // The season keeps the full set of statistics, turnovers among them (S-25), so the
+  // box score's Total of turnovers shows on both sides (step 2.196).
+  const fullSet = await setSeasonRules(
+    as,
+    { seasonId, version: 2, rules: { ...defaultSeasonRules(), statistics: 'full' } },
+    databaseDeps,
+  );
+  if (!fullSet.ok) throw new Error(`season rules: ${fullSet.error.code}`);
   const divisionIds: string[] = [];
   for (const name of ['North', 'South']) {
     const division = await createDivision(as, { seasonId, name }, databaseDeps);
@@ -213,8 +224,8 @@ beforeAll(async () => {
             rules: (await read((scope) => gamesStore(scope).findSeason(seasonId)))?.rules,
             // A season made by createSeason keeps no statistics of its own yet (0003).
             statKeys: [],
-            // Made active and current on the database above: its second version.
-            version: 2,
+            // Made active and current, then given the full set, on the database above.
+            version: fullSet.value.version,
           },
         ],
         divisions: divisionIds.map((id, sort) => ({
@@ -296,6 +307,8 @@ const gameIds = {
   postponed: randomUUID(),
   cancelled: randomUUID(),
   tracked: randomUUID(),
+  /** A box score typed in with a final score its players' points do not add up to. */
+  typed: randomUUID(),
 };
 
 /** Runs the whole season on one side, by the product's own commands. */
@@ -371,6 +384,7 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
     [gameIds.postponed, 'Foxes', 'Pines', 3, '18:00', 'final'],
     [gameIds.cancelled, 'Otters', 'Gulls', 4, '18:00', 'final'],
     [gameIds.tracked, 'Herons', 'Kestrels', 0, '00:00', 'live'],
+    [gameIds.typed, 'Herons', 'Gulls', -1, '18:00', 'box'],
   ];
   // The season's rounds, made in the draft (step 2.160): two kept, one added and removed.
   const rounds = [
@@ -508,6 +522,23 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
       deps,
     ),
   );
+  // The numbers audit's case 40 (S-26): typed as 50, the players' points add to 48.
+  ok(
+    'typed box score',
+    await setBoxScore(
+      as,
+      {
+        gameId: gameIds.typed,
+        version: await versionOf(gameIds.typed),
+        homeScore: 50,
+        awayScore: 45,
+        lines: of('Herons')
+          .slice(0, 3)
+          .map((id, i) => line('Herons', id, [20, 16, 12][i] ?? 0)),
+      },
+      deps,
+    ),
+  );
   // A forfeit, a postponement and a cancellation.
   ok(
     'forfeit',
@@ -537,7 +568,8 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
       deps,
     ),
   );
-  // A tracked game, played and ended on the tracker.
+  // A tracked game, played and ended on the tracker: level after regulation and won in
+  // the first overtime, so its result keeps one overtime period (step 2.200).
   const session = ok(
     'session',
     await openScoringSession(as, { gameId: gameIds.tracked, deviceId: 'agree-tablet' }, deps),
@@ -563,7 +595,17 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
         tap({ type: 'start' }),
         tap({ type: 'score', side: 'home', playerId: herons[0], points: 2 }),
         tap({ type: 'score', side: 'away', playerId: kestrels[1], points: 3 }),
+        tap({ type: 'pause' }),
+        tap({ type: 'period', period: 2 }),
+        tap({ type: 'start' }),
+        tap({ type: 'score', side: 'home', playerId: herons[2], points: 1 }),
+        tap({ type: 'pause' }),
+        tap({ type: 'period', period: 3 }),
+        tap({ type: 'start' }),
         tap({ type: 'score', side: 'home', playerId: herons[2], points: 2 }),
+        // The numbers audit's case 18: one turnover charged to the team, one to a player.
+        tap({ type: 'team-turnover', side: 'away' }),
+        tap({ type: 'turnover', side: 'away', playerId: kestrels[1] }),
         tap({ type: 'end' }),
       ],
     },
@@ -641,6 +683,8 @@ describe('the one world and the database, the same season by the same commands',
   it('read the same published schedule', async () => {
     const [a, b] = await both(async (side) => side.schedule(await seasonOfSide(side), today));
     expect(b).toEqual(a);
+    // The tracked game's card has its overtime period on both (step 2.200).
+    expect(JSON.stringify(a)).toContain('"overtimePeriods":1');
   });
 
   it('read the same game pages: the box score, the tracked game, the corrected one', async () => {
@@ -650,12 +694,109 @@ describe('the one world and the database, the same season by the same commands',
       gameIds.final,
       gameIds.forfeit,
       gameIds.postponed,
+      gameIds.typed,
     ]) {
       const [a, b] = await both((side) =>
         side.games((store) => readGamePage(store, { gameId }, viewing(side))),
       );
       expect(b, gameId).toEqual(a);
+      // The tracked game's page keeps its overtime period on both (step 2.200).
+      const overtime = (a as { value?: { game?: { overtimePeriods?: unknown } } }).value?.game;
+      expect(overtime?.overtimePeriods, gameId).toBe(gameId === gameIds.tracked ? 1 : null);
     }
+  });
+
+  it('agree on each game’s overtime count: 1 for the tracked game, none for the rest (step 2.200)', async () => {
+    const [a, b] = await both(async (side) =>
+      side.deps.transaction(side.as, async (tx) => {
+        const counts: Record<string, number | null | undefined> = {};
+        for (const [name, gameId] of Object.entries(gameIds)) {
+          counts[name] = (await tx.games.find(gameId))?.overtimePeriods;
+        }
+        return counts;
+      }),
+    );
+    expect(b).toEqual(a);
+    expect(a).toMatchObject({
+      tracked: 1,
+      box: null,
+      final: null,
+      forfeit: null,
+      postponed: null,
+      cancelled: null,
+      typed: null,
+    });
+  });
+
+  it("agree on each box score's Total and the season's team totals (step 2.196: cases 18 and 40)", async () => {
+    const totalsOf = async (side: Side) => {
+      const page = (gameId: string) =>
+        side.games(async (store) => {
+          const read = await readGamePage(store, { gameId }, viewing(side));
+          if (!read.ok) throw new Error(`${side.name}: no page for ${gameId}`);
+          return buildBoxScores(read.value);
+        });
+      const seasonId = await seasonOfSide(side);
+      const statistics = await side.standings((store) =>
+        readStatisticsTable(store, { seasonId, viewing: viewing(side) }),
+      );
+      if (!statistics.ok) throw new Error(`${side.name}: no statistics`);
+      return {
+        tracked: await page(gameIds.tracked),
+        typed: await page(gameIds.typed),
+        teams: statistics.value.teams.map((team) => ({
+          team: team.teamId,
+          turnovers: team.stats['turnovers'],
+          points: team.stats['points'],
+        })),
+      };
+    };
+    const [a, b] = await both(totalsOf);
+    expect(b).toEqual(a);
+    // And they are the right numbers, read off the database's side.
+    const [database] = sides ?? [];
+    if (database === undefined) throw new Error('no sides');
+    const read = await totalsOf(database);
+    const tableOf = (built: typeof read.tracked, side: 'home' | 'away') => {
+      if (built.kind !== 'tables') throw new Error(built.kind);
+      const table = built.tables.find((x) => x.side === side);
+      if (table === undefined) throw new Error(side);
+      return table;
+    };
+    // Case 18: the Kestrels (away) were charged one turnover as a team and one by a player.
+    const kestrels = tableOf(read.tracked, 'away');
+    expect(kestrels.columns.map((c) => c.key)).toContain('turnovers');
+    expect(kestrels.totals['turnovers']).toBe(2);
+    expect(
+      (kestrels.players ?? []).reduce((n, p) => n + Number(p.cells['turnovers'] ?? 0), 0),
+    ).toBe(1);
+    expect(kestrels.notes).toEqual([
+      'The Total includes 1 turnover charged to the team, not to a player.',
+    ]);
+    // The season's team totals count the same 2 (the Kestrels' only game with turnovers).
+    const kestrelsId = [...database.names].find(([, name]) => name === 'team:Kestrels')?.[0];
+    expect(read.teams.find((t) => t.team === kestrelsId)?.turnovers).toMatchObject({ total: 2 });
+    // Case 40: the Herons' Total is the 50 typed, with the sentence; the players add to 48.
+    const herons = tableOf(read.typed, 'home');
+    expect(herons.totals['points']).toBe(50);
+    expect((herons.players ?? []).reduce((n, p) => n + Number(p.cells['points'] ?? 0), 0)).toBe(48);
+    // The season's points for the Herons are their final scores where their players'
+    // points were recorded: 50 typed and 5 tracked (the tracked game is levelled in the
+    // second half and won in overtime, step 2.200), as their two Totals and the
+    // standings say, not the 48 and 5 their players add to (S-26 as changed).
+    const heronsId = [...database.names].find(([, name]) => name === 'team:Herons')?.[0];
+    expect(read.teams.find((t) => t.team === heronsId)?.points).toMatchObject({
+      total: 55,
+      gamesRecorded: 2,
+    });
+    expect(tableOf(read.tracked, 'home').totals['points']).toBe(5);
+    expect(herons.notes).toEqual([
+      "The players' points add to 48. The final score was entered as 50.",
+    ]);
+    // Nothing was entered for the Gulls: one sentence in place of a table of dashes.
+    expect(tableOf(read.typed, 'away').nothingRecorded).toBe(
+      'No player numbers were recorded for this team.',
+    );
   });
 
   it('agree on putting back a player marked as left, and on a team in the bin (step 2.161)', async () => {
@@ -771,5 +912,51 @@ describe('the one world and the database, the same season by the same commands',
       return side.roster(kestrels);
     });
     expect(b).toEqual(a);
+  });
+
+  // Last: it changes the season's rules, which the reads above rest on. On the database
+  // only: the made-up world does not save a season's rules yet (step 2.47's screen); the
+  // world's own case is in features/live-game/game-content.test.ts.
+  it("give an earlier game's page the columns of the statistics page when the season's statistics change mid-season (step 2.196)", async () => {
+    const [database] = sides ?? [];
+    if (database === undefined) throw new Error('no sides');
+    /** The season switched to `statistics`; the tracked game's columns and the page's. */
+    const columnsWith = async (statistics: 'standard' | 'full') =>
+      (async (side: Side) => {
+        const seasonId = await seasonOfSide(side);
+        const version = await side.deps.transaction(
+          side.as,
+          async (tx) => (await tx.leagues.findSeason(seasonId))?.version ?? 0,
+        );
+        ok(
+          `${side.name}: rules`,
+          await setSeasonRules(
+            side.as,
+            { seasonId, version, rules: { ...defaultSeasonRules(), statistics } },
+            side.deps,
+          ),
+        );
+        const page = await side.games((store) =>
+          readGamePage(store, { gameId: gameIds.tracked }, viewing(side)),
+        );
+        if (!page.ok) throw new Error(`${side.name}: no page`);
+        const built = buildBoxScores(page.value);
+        const table = await side.standings((store) =>
+          readStatisticsTable(store, { seasonId, viewing: viewing(side) }),
+        );
+        if (built.kind !== 'tables' || !table.ok) throw new Error(`${side.name}: no tables`);
+        return {
+          game: built.tables[0]?.columns.map((c) => c.key),
+          statistics: table.value.statKeys,
+        };
+      })(database);
+    // The tracked game was played while the season kept the full set: its own rules (S-1).
+    expect(await columnsWith('standard')).toEqual({
+      game: ['points', 'fg3', 'fg1', 'fouls'],
+      statistics: ['points', 'fg3', 'fg1', 'fouls'],
+    });
+    const full = await columnsWith('full');
+    expect(full.game).toEqual(['points', 'fg3', 'fg1', 'fouls', 'turnovers']);
+    expect(full.statistics).toContain('turnovers');
   });
 });

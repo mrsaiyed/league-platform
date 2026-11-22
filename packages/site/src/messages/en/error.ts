@@ -106,7 +106,7 @@ export const enError = {
     'A game that was played cannot be restored. Correct it instead.',
   'error.leagues.restore_game.game-number-taken': 'Another game now has this game number.',
   'error.leagues.restore_game.game-part-in-bin':
-    'A team, division, venue or court of this game is in the bin. Bring it back first.',
+    'A team, division, venue or court of this game is in the bin, and the screen to bring it back is not ready yet. So this game cannot be put back for now.',
   'error.leagues.restore_game.game-reference-taken': 'Another game now has this outside reference.',
   'error.leagues.restore_person.person-not-found': 'That person is not there.',
   'error.leagues.restore_person.person-profile-taken':
@@ -139,6 +139,9 @@ export const enError = {
   'error.leagues.update_season.season-not-found': 'That season is not there.',
   'error.not-allowed': 'You are not allowed to do that.',
   'error.not-confirmed': 'Tick the box to confirm first. Nothing was changed.',
+  // Step 2.157: someone whose role may not add a person to the league (a club admin).
+  'error.people.create_person.not-allowed':
+    "Your role in this league does not include adding people to its list. If it should, ask the league's owner or an admin.",
   'error.people.create_person.sensitive-fields-not-allowed':
     'You are not allowed to enter those details.',
   'error.people.remove_person.person-not-found': 'That person is not in the league list.',
@@ -190,6 +193,11 @@ export const enError = {
   'error.teams.put_back_on_roster.person-not-found':
     'This person has been taken off the league list, so they cannot be put back on the roster.',
   'error.teams.put_back_on_roster.roster-entry-not-found': 'That roster entry is not there.',
+  // A-17: the team's own page says what is true now instead (adminTeams.remove.cannot, notYet).
+  'error.teams.remove_team.team-has-games-to-play':
+    'This team still has games without a result. Remove them from the schedule, or cancel them, first. Do not record them as forfeited: a forfeit is a result, and a team with a result cannot be removed.',
+  'error.teams.remove_team.team-has-results':
+    'This team cannot be removed this season: its results are part of other teams’ records.',
   'error.teams.remove_team.team-not-found': 'That team is not there.',
   'error.teams.reorder_roster.roster-entry-not-found':
     'Someone on that list is not on this roster.',

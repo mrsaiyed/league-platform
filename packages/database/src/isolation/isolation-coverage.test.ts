@@ -72,6 +72,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.seedLeaguesInto,
     'development-only bootstrap: takes a PGlite, not a scope; runs the scoped commands (own cases) per league and writes accounts and role grants directly',
   ],
+  [
+    databasePackage.seedAllLeaguesInto,
+    'development-only bootstrap (`npm run seed`): takes a PGlite, not a scope; seedLeaguesInto, then per league the scoped commands (own cases), the fixture import, the rounds and the tracker transfer, each in its league; like seedLeaguesInto, the demo-shaped league also writes its accounts directly and its role grants through the access store, without a command',
+  ],
   [rosterEntrySummary, 'turns a row already read into the returned shape; runs no SQL'],
   [databasePackage.binStore, 'binds the bin queries (own cases) to a scope'],
   [databasePackage.teamsStore, 'binds the team queries, each with its own cases, to a scope'],
@@ -162,6 +166,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     'reads a copy of a tracker backup folder on disk with its own embedded database; no league, no platform tables (step 2.57)',
   ],
   [databasePackage.TrackerBackupError, 'the reader error class; runs nothing'],
+  [
+    databasePackage.SeedPartlyLoaded,
+    "the seed's error class for a partly loaded league; runs nothing",
+  ],
   [
     databasePackage.transferTrackerGames,
     'development tool (step 2.58): takes a PGlite, not a scope; finds one league, season and account by name, then reaches that one league only through stores fenced to it (each transaction sets its league) and its commands (own cases)',

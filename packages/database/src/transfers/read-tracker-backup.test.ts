@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { copyFolder } from './copy-folder.ts';
-import { controlFileState, writeDataFolder } from './data-folder.test-helper.ts';
+import { controlFileState, writeDataFolder } from './data-folder.ts';
 import type { TrackerBackup } from './index.ts';
 import { TrackerBackupError, readTrackerBackup } from './index.ts';
 import { readTrackerBackupWith } from './read-tracker-backup.ts';

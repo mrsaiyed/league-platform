@@ -15,7 +15,7 @@ import { isStaffAddress } from '../../features/staff/index.ts';
 import { isTrackerAddress } from '../../features/tracker/index.ts';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
-import { leagueSites, siteOf } from '../../server/league-site.ts';
+import { siteOfThisRequest } from '../../server/league-site.ts';
 import { leagueView, signedInEmail } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { pathHeader } from '../../server/request-facts-header.ts';
@@ -41,7 +41,7 @@ export default async function LeagueLayout({
   const routeLeague = (await params).league;
   const view = await leagueView(routeLeague, 'site');
   if (view === null) return children;
-  const site = await siteOf(view.context.league, await leagueSites());
+  const site = await siteOfThisRequest(view.context.league.id, view.context.league.slug);
   const path = (await headers()).get(pathHeader) ?? '';
   const league = view.context.league;
   // The tracker has a frame of its own (step 2.35; docs/build/DESIGN.md section 7, line

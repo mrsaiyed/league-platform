@@ -25,13 +25,26 @@ describe('recordForfeit', () => {
       seasons: [{ id: seasonId, programId: 'p1', rules: rules((r) => (r.forfeit = forfeit)) }],
     });
     expect(await recordForfeit(as(ownerId), input, deps)).toMatchObject({ ok: true });
-    expect(db.state.games[0]).toMatchObject({ status: 'forfeit', homeScore: 2, awayScore: 15 });
+    // A forfeit was not played: it has no overtime count (step 2.200).
+    expect(db.state.games[0]).toMatchObject({
+      status: 'forfeit',
+      homeScore: 2,
+      awayScore: 15,
+      overtimePeriods: null,
+    });
     expect(events.map((e) => e.type)).toEqual(['games.finalized']);
     expect(db.state.activity.map((a) => a.action)).toEqual(['games.record_forfeit']);
 
     const away = memoryGames({ games: [game(1)] });
     await recordForfeit(away.as(ownerId), { ...input, forfeitingTeamId: awayTeamId }, away.deps);
     expect(away.db.state.games[0]).toMatchObject({ homeScore: 20, awayScore: 0 });
+  });
+
+  it('records a forfeit of a postponed game: the one decision it takes (step 2.158, S-75)', async () => {
+    const { db, deps, as, events } = memoryGames({ games: [game(1, { status: 'postponed' })] });
+    expect(await recordForfeit(as(ownerId), input, deps)).toMatchObject({ ok: true });
+    expect(db.state.games[0]).toMatchObject({ status: 'forfeit', homeScore: 0, awayScore: 20 });
+    expect(events.map((e) => e.type)).toEqual(['games.finalized']);
   });
 
   it("uses the game's own forfeit score, not the season's", async () => {

@@ -113,11 +113,18 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       const at = s.games.findIndex((g) => g.id === gameId);
       const found = s.games[at];
       if (found === undefined || found.binned || found.version !== version) return undefined;
+      // As 0021 refuses it: only a final game has an overtime count, of 0 to 18.
+      const overtime = change.overtimePeriods;
+      if (overtime !== null && (change.status !== 'final' || overtime < 0 || overtime > 18)) {
+        throw new Error('The database refuses an overtime count on a game that is not final.');
+      }
       s.games = replacedAt(s.games, at, {
         ...found,
         status: change.status,
         homeScore: change.homeScore,
         awayScore: change.awayScore,
+        // Written with every change of a result, as the database's update does.
+        overtimePeriods: overtime,
         finalizedAt: change.decided ? now().toISOString() : null,
         format: found.format ?? change.format ?? null,
         captureMode: change.captureMode ?? found.captureMode,
@@ -155,6 +162,43 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
         )
         .sort((a, b) => (a.startsAt ?? '~').localeCompare(b.startsAt ?? '~'))
         .map(gameRecordOf),
+    // Step 2.158, as packages/database's queries read the same tables.
+    statusBeforeCancelled: async (gameId) => {
+      const entry = s.activity
+        .filter((a) => a.action === 'games.cancel_game' && a.targetId === gameId)
+        .at(-1);
+      const was = entry?.details['was'];
+      return typeof was === 'string' ? was : undefined;
+    },
+    partInBin: async (gameId) => {
+      const game = s.games.find((g) => g.id === gameId);
+      if (game === undefined) return false;
+      return (
+        s.teams.some((t) => t.binned && (t.id === game.homeTeamId || t.id === game.awayTeamId)) ||
+        s.divisions.some((d) => d.binned && d.id === game.divisionId) ||
+        s.venues.some((v) => v.binned && v.id === game.venueId) ||
+        s.courts.some((c) => c.binned && c.id === game.courtId)
+      );
+    },
+    clashesOf: async (gameId) => {
+      const of = s.games.find((g) => g.id === gameId);
+      if (of === undefined || of.startsAt === null) return [];
+      const teams = [of.homeTeamId, of.awayTeamId];
+      return s.games
+        .filter(
+          (g) =>
+            g.id !== gameId &&
+            !g.binned &&
+            g.status !== 'postponed' &&
+            g.status !== 'cancelled' &&
+            g.startsAt === of.startsAt &&
+            (teams.includes(g.homeTeamId) ||
+              teams.includes(g.awayTeamId) ||
+              (of.courtId !== null && g.courtId === of.courtId)),
+        )
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((g) => ({ id: g.id, homeTeamId: g.homeTeamId, awayTeamId: g.awayTeamId }));
+    },
     listDecided: async (seasonId) => decidedOf(seasonId).map(gameRecordOf),
     listDecidedLines: async (seasonId) => {
       const ids = new Set(decidedOf(seasonId).map((g) => g.id));

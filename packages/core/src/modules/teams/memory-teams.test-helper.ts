@@ -19,6 +19,10 @@ export type MemoryTeams = {
   /** People of the league (not merged away), in or out of the bin. */
   people: { id: string; firstName: string; lastName: string; binned: boolean }[];
   roster: RosterEntryRecord[];
+  /** Games of the league's teams (A-17): who plays, their state, and whether in the bin. */
+  games: MemoryGame[];
+  /** Each season's schedule draft as stored, by season id. */
+  drafts: Record<string, unknown>;
   /** The season asks for unique jersey numbers in a team (0008). */
   uniqueJerseys: boolean;
   /** The league's today in its own time zone (yyyy-mm-dd). */
@@ -30,6 +34,33 @@ export type MemoryTeams = {
   settings: Record<string, StoredSetting[]>;
   activity: ActivityEntry[];
 };
+
+export type MemoryGame = {
+  id: string;
+  homeTeamId: string;
+  awayTeamId: string;
+  status: string;
+  binned: boolean;
+  /** Its day (yyyy-mm-dd) and round's number, or null. */
+  date: string | null;
+  round: number | null;
+};
+
+export const gameUuid = (n: number) =>
+  `01900000-0000-7000-8000-0000000c${String(n).padStart(4, '0')}`;
+
+/** Game n between two of the numbered teams, in a state; not in the bin unless asked. */
+export function game(n: number, home: number, away: number, status: string, binned = false) {
+  return {
+    id: gameUuid(n),
+    homeTeamId: teamUuid(home),
+    awayTeamId: teamUuid(away),
+    status,
+    binned,
+    date: `2026-12-${String(n).padStart(2, '0')}`,
+    round: n,
+  };
+}
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const ownerId = '01900000-0000-7000-8000-0000000000a1';
@@ -118,6 +149,8 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
     teams: [],
     people: [],
     roster: [],
+    games: [],
+    drafts: {},
     uniqueJerseys: false,
     today: '2026-11-15',
     waitingForReview: [],
@@ -181,6 +214,20 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
           if (found === undefined) return false;
           s.teams[at] = { ...found, binned, version: found.version + 1 };
           return true;
+        },
+        // As queries/find-team-games.ts: its games not in the bin, and its season's draft.
+        games: async (teamId, seasonId) => {
+          const mine = s.games.filter(
+            (g) => !g.binned && (g.homeTeamId === teamId || g.awayTeamId === teamId),
+          );
+          return {
+            played: mine.filter((g) => g.status === 'final' || g.status === 'forfeit').length,
+            toPlay: mine
+              .filter((g) => ['scheduled', 'postponed', 'live'].includes(g.status))
+              .map((g) => ({ id: g.id, date: g.date, round: g.round }))
+              .sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999')),
+            draftChanges: s.drafts[seasonId] ?? null,
+          };
         },
         findPerson: async (id) => s.people.find((p) => p.id === id),
         findRosterEntry: async (id) => s.roster.find((e) => e.id === id),

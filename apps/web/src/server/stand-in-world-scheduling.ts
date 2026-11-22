@@ -143,6 +143,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
           captureMode: g.captureMode,
           homeScore: null,
           awayScore: null,
+          overtimePeriods: null,
           format: null,
           finalizedAt: null,
           binned: false,

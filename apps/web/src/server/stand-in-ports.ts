@@ -78,6 +78,7 @@ import {
 } from './stand-in-sign-ins.ts';
 import { madeUpLeagues } from './stand-in-world-seed.ts';
 import { madeUpWorld } from './stand-in-world.ts';
+import { binTeamOfFirstLeague } from './stand-in-world-binned-team.ts';
 import { answersOnlyHere, isLocalOrTestHost } from './this-computer.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
@@ -129,6 +130,8 @@ const grants = [
   // A scorekeeper still holding the role in an archived league is told it is archived,
   // not "no access" (step 2.33).
   grantOf(13, scorekeeper.accountId, 'scorekeeper', standInLeagues.archived.id),
+  // A scheduler with a long address, in the first league only (step 2.157).
+  grantOf(14, standInPeople.longAddress.accountId, 'scheduler', standInLeagues.live.id),
 ];
 
 const leagues: readonly (typeof standInLeagues)[keyof typeof standInLeagues][] =
@@ -210,6 +213,11 @@ export type StandInOptions = {
    * Only the world reads it; sign-in and sessions keep this computer's clock.
    */
   readonly worldStartsAt?: string;
+  /**
+   * LOCAL_BINNED_TEAM (step 2.180): the short name of a team of the first made-up league's
+   * current season, put in the bin as the world is made, with its games and results.
+   */
+  readonly binnedTeam?: string;
   /**
    * The working folder's `.local/captured-email` (kept-emails.ts, step 2.96): once the app
    * has started, a copy of each email to a made-up address is written there for the kept
@@ -423,8 +431,10 @@ export function standInPorts(options: StandInOptions): StandInPorts {
   // The one made-up world: every area below reads and writes the same rows (step 2.152).
   const clock =
     options.worldStartsAt === undefined ? systemClock : clockStartingAt(options.worldStartsAt);
+  const worldLeagues = madeUpLeagues(standInSeedCast, new Date(clock.now()));
+  if (options.binnedTeam !== undefined) binTeamOfFirstLeague(worldLeagues, options.binnedTeam);
   const world = madeUpWorld({
-    leagues: madeUpLeagues(standInSeedCast, new Date(clock.now())),
+    leagues: worldLeagues,
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
     clock,

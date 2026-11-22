@@ -12,10 +12,11 @@
 // play has no stats and no minutes (P7 §5.6). A game the tracker has recorded plays
 // for is corrected in the tracker's own grid (T-122, step 2.65), never here, so its
 // event log always explains its numbers. A decided game is corrected by reopening it
-// with a reason first (S-7), then entering the sheet again.
+// with a reason first (S-7), then entering the sheet again. A postponed game is refused
+// (`game-postponed`, step 2.158): it has not been played yet.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
-import { decideGame, openGameByHand, type DecideGameError } from '../decide-game.ts';
+import { decideGame, openGameToScore, type DecideGameError } from '../decide-game.ts';
 import { gameScore, gameVersion } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GameRosterPlayer, GamesTx, NewGameLine } from '../ports.ts';
@@ -65,7 +66,8 @@ export const setBoxScore = defineCommand({
   }): Promise<Result<{ version: number }, SetBoxScoreError>> => {
     // A game with plays is refused by openGameByHand; one under way with none yet is too:
     // a sheet is copied afterwards.
-    const open = await openGameByHand(tx, input.gameId, input.version);
+    // A postponed game is refused there too (step 2.158, S-75): its sheet waits for its date.
+    const open = await openGameToScore(tx, input.gameId, input.version);
     if (!open.ok) return open;
     const game = open.value;
     if (game.status === 'live') return fail({ code: 'game-is-tracked' });

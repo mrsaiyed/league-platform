@@ -6,6 +6,8 @@ The session that reads this is the **lead**. The lead plans, delegates, checks e
 
 **The lead does not build one thing at a time.** The founder asked for this on 2026-11-12: everything that does not have to wait for something else is built at the same time. The lead keeps several builders working at once, each in its own lane, and spends its own time briefing, checking and landing finished work. A lead that is waiting on one sub-agent while lanes stand empty is doing it wrong.
 
+> **Since 2026-11-22 [USAGE.md](USAGE.md) overrules this runbook wherever the two differ:** which model does what, how many lanes run at once (three), how long a helper's session is, what it reads and runs, who decides what, how many reviews a lane gets. Read it first.
+
 ## 1. Start of a run
 
 **Who is in charge (the founder through the chat lead, 2026-11-15).** There are two lead sessions: one on the strongest model (Fable) and a standby on Opus. Line 1 of `.local/fable-lead.txt` is the id of the lead IN CHARGE; line 2 is the time that lead last woke; then a line `fable <id>` and a line `opus <id>`. Whoever writes line 2 keeps all four lines. **Every lead reads line 1 first, every turn.** If it is not your id, you are not in charge: change nothing in the main folder or the plans, pass what you have just learned (a helper's report) to the lead in charge in one message (`mcp__ccd_session_mgmt__send_message` to the id on line 1), and end your turn. A lead that finds itself in charge again after being out reads `STATUS.md` from the top before anything else.

@@ -19,6 +19,12 @@ export type GameRecord = {
   readonly captureMode: string;
   readonly homeScore: number | null;
   readonly awayScore: number | null;
+  /**
+   * How many overtime periods a final game had (P7 §5.6): 0 when the tracker ended it in
+   * regulation. Null when it is not known: a score typed in, a box score, a forfeit, a
+   * game not final, a game final before the count was kept (migration 0021).
+   */
+  readonly overtimePeriods: number | null;
   /** The rules the game is played under; null while it follows its season's. */
   readonly format: unknown;
   readonly finalizedAt: string | null;
@@ -36,6 +42,12 @@ export type GameResultChange = {
   readonly homeScore: number | null;
   readonly awayScore: number | null;
   readonly decided: boolean;
+  /**
+   * The overtime periods of the result (P7 §5.6), written with every change of it: the
+   * count the engine gives when the tracker ends the game, else null (not known, or not
+   * final), so a game reopened, or decided again by hand, never keeps an old count.
+   */
+  readonly overtimePeriods: number | null;
   /** Set only if the game has none; a game that has rules keeps them. */
   readonly format?: SeasonRules;
   /** How the game is now recorded (final, box or live), when that changes with the result. */
@@ -87,6 +99,13 @@ export type NewGameCorrection = {
   readonly reason: string;
   readonly before: GameResultDocument;
   readonly after: GameResultDocument;
+};
+
+/** Another game at the same time as one, with a team or the court in common (step 2.158). */
+export type GameAtSameTime = {
+  readonly id: string;
+  readonly homeTeamId: string;
+  readonly awayTeamId: string;
 };
 
 /** A game of the coming days, as the scorekeeper's list reads it (P4 §4). */
@@ -173,6 +192,21 @@ export type GamesStore = {
   readonly addCorrection: (correction: NewGameCorrection) => Promise<void>;
   /** Postponed games not in the bin, soonest first, of one season or all. */
   readonly listPostponed: (seasonId?: string) => Promise<readonly GameRecord[]>;
+  /**
+   * What the game was when it was last cancelled ("scheduled" or "postponed"), as its newest
+   * `games.cancel_game` activity entry keeps it (step 2.158); undefined if none says.
+   */
+  readonly statusBeforeCancelled: (gameId: string) => Promise<string | undefined>;
+  /**
+   * Whether the game names a team, division, venue or court that is in the bin (the bin's
+   * own rule, has-binned-game-part): it cannot be put back on the schedule before that is.
+   */
+  readonly partInBin: (gameId: string) => Promise<boolean>;
+  /**
+   * The games that hold the game's place now (the schedule's clash rule): not in the bin,
+   * not postponed or cancelled, at exactly its start, with one of its teams or on its court.
+   */
+  readonly clashesOf: (gameId: string) => Promise<readonly GameAtSameTime[]>;
   /** A season's decided games (final or forfeit) not in the bin, in id order. */
   readonly listDecided: (seasonId: string) => Promise<readonly GameRecord[]>;
   /** The box score lines of a season's decided games not in the bin, by game and person. */

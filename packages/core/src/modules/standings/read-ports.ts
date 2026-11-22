@@ -3,7 +3,11 @@
 // (T-28). Every shape is a row of words and numbers: no contact field, birth date or
 // account id can be in one (T-29, T-81).
 
-/** A team of a season, not in the bin, with who may see its players' numbers (S-22). */
+/**
+ * A team of a season with who may see its players' numbers (S-22): one not in the bin, or
+ * one in the bin with a final or forfeited result in a game not in the bin, `removed` (A-17):
+ * its row stays in the standings, so its opponents' records add up, but it has no page.
+ */
 export type SeasonTeamRow = {
   readonly id: string;
   readonly name: string;
@@ -12,6 +16,8 @@ export type SeasonTeamRow = {
   readonly divisionId: string | null;
   /** As stored; statsShown reads anything it does not know as "totals only". */
   readonly statsVisibility: string;
+  /** In the bin, kept for its results: listed in the standings only, never linked. */
+  readonly removed: boolean;
 };
 
 /** A division of a season, not in the bin. */
@@ -101,8 +107,25 @@ export type TeamStatTotalRecord = {
   readonly teamId: string;
   readonly statKey: string;
   readonly total: number;
+  /** What the players' lines add to, where it is not `total` (a team's points are its
+   * final scores, step 2.196); left out, the same as `total`. */
+  readonly linesTotal?: number | undefined;
   /** Final games in which any of the team's players had this stat recorded. */
   readonly gamesRecorded: number;
+};
+
+/**
+ * The turnovers charged to a team rather than a player in one final game (step 2.196),
+ * as they stand in its saved plays: the engine's count, the one the game's page shows.
+ */
+export type TeamOwnTurnoversRecord = {
+  readonly gameId: string;
+  readonly teamId: string;
+  /** More than 0: a team charged none in a game has no record. */
+  readonly turnovers: number;
+  /** A line of one of the team's players who came on carries turnovers: the game is
+   * counted already among the games the team's turnovers were recorded in. */
+  readonly countedByLines: boolean;
 };
 
 /** What the name function (T-81) needs to know about a person, and nothing more. */
@@ -141,5 +164,7 @@ export type StandingsReadStore = {
   /** The season's decided games (not in the bin), their teams only, no box score line. */
   readonly decidedGames: (seasonId: string) => Promise<readonly DecidedGameRecord[]>;
   readonly teamStatTotals: (seasonId: string) => Promise<readonly TeamStatTotalRecord[]>;
+  /** Each team's own turnovers in each of the season's final games, not in the bin. */
+  readonly teamTurnoverGames: (seasonId: string) => Promise<readonly TeamOwnTurnoversRecord[]>;
   readonly people: (personIds: readonly string[]) => Promise<readonly PersonDisplayRecord[]>;
 };

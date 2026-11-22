@@ -61,6 +61,7 @@ export type {
   StandingsRowRecord,
   StandingsSeasonRecord,
   TeamStatTotalRecord,
+  TeamOwnTurnoversRecord,
 } from './read-ports.ts';
 export type {
   PlayerName,

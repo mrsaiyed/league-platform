@@ -3,6 +3,7 @@
 // as having left (R-17: they stay in the team's history), and put back when that was a
 // mistake (step 2.161). Every change is a plain form.
 import {
+  countTeamGames,
   leagueUrl,
   listPeople,
   listRoster,
@@ -14,11 +15,20 @@ import { PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
-import { loadLeaguePage } from '../../server/load-league-page.ts';
+import { holdsHere, loadLeaguePage } from '../../server/load-league-page.ts';
 import { StaffField, StaffNotice, StaffTrail } from '../staff/index.ts';
 import { leagueDayText } from '../../server/game-when.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
-import { doneAtOf, entryAnchor, leavingAtOf, problemKey } from './answer.ts';
+import {
+  doneAtOf,
+  entryAnchor,
+  leavingAtOf,
+  problemKey,
+  removeRefusalOf,
+  removeTeamAnchor,
+} from './answer.ts';
+import { removePanel, tapRefusal, type RemoveWayOn } from './remove-team-words.ts';
+import { backToTeamParam, publishAnchor } from '../schedule-builder/index.ts';
 import { putBackOffer } from './put-back-offer.ts';
 import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
@@ -101,8 +111,15 @@ export async function TeamPage({
   const leagueList = people.ok
     ? { ids: new Set(everyone.map((person) => person.id)), complete: everyone.length < peopleShown }
     : undefined;
-  // A read that fails is shown as such, never as an empty roster or list.
-  const readFailed = !roster.ok || !people.ok;
+  // A role that may not read the league's list of people (a club admin) is told so, in
+  // calm words; a read that fails is shown as such, never as an empty roster or list.
+  const peopleNotAllowed = !people.ok && people.error.code === 'not-allowed';
+  // No form that could only be refused (step 2.157): someone whose role may not add a
+  // person to the league (a club admin) is not offered "Someone not in the list yet", and
+  // when they can neither choose nor add anyone, the head's "Add a player" is not drawn.
+  const mayAddPeople = await holdsHere('people.manage');
+  const mayAddPlayer = mayAddPeople || !peopleNotAllowed;
+  const readFailed = !roster.ok || (!people.ok && !peopleNotAllowed);
   const onRoster = new Set(open.map((line) => line.personId));
   const available = everyone.filter((person) => !onRoster.has(person.id));
   const listUrl = leagueUrl(here, 'admin-area', { area: 'teams' });
@@ -112,6 +129,14 @@ export async function TeamPage({
   const leavingProblem = besideEntry === undefined ? undefined : problemKey(query);
   // What went well on one line is said on that line, naming the player (step 2.161).
   const onLine = saidOnLine(doneAtOf(query), lines, team.name);
+  // What the team has of games, and why "Remove this team" was refused, said in its panel (A-17).
+  const counted = await countTeamGames(context, { teamId: team.id }, ports.deps);
+  const games = counted.ok ? counted.value : undefined;
+  const panel = removePanel(team.name, games);
+  // A tap's refusal from the address is said only where the panel does not already say
+  // what is true now (a box not ticked, a team gone): never a refusal outliving its cause.
+  const removeCode = removeRefusalOf(query);
+  const tapRefused = removeCode === undefined ? undefined : tapRefusal(removeCode);
   const saidHere = (entryId: string) =>
     onLine?.entry !== entryId ? null : (
       <StaffNotice kind="saved" data={{ 'data-said-on': entryId }}>
@@ -125,11 +150,18 @@ export async function TeamPage({
           the page is for, and its main action at the top right (step 2.103). */}
       <StaffTrail steps={[{ href: listUrl, label: t('admin.area.teams') }]} here={team.name} />
       <PageHead title={team.name} sub={t('adminTeams.team.sub')} lead={<Swatch team={team} />}>
-        <a className="ui-button" data-kind="main" data-icon="plus" href={`#${addPlayerAnchor}`}>
-          {t('adminTeams.add.title')}
-        </a>
+        {mayAddPlayer ? (
+          <a className="ui-button" data-kind="main" data-icon="plus" href={`#${addPlayerAnchor}`}>
+            {t('adminTeams.add.title')}
+          </a>
+        ) : null}
       </PageHead>
-      <Notice query={query} saidBeside={leavingProblem !== undefined || onLine !== undefined} />
+      <Notice
+        query={query}
+        saidBeside={
+          leavingProblem !== undefined || onLine !== undefined || removeCode !== undefined
+        }
+      />
 
       <Section title={t('adminTeams.edit.title')}>
         <form action={saveTeamAction} className="staff-form">
@@ -299,6 +331,8 @@ export async function TeamPage({
       <Section title={t('adminTeams.add.title')} id={addPlayerAnchor}>
         {readFailed ? (
           <StaffNotice kind="refused">{t('adminTeams.add.readFailed')}</StaffNotice>
+        ) : peopleNotAllowed ? (
+          <p className="staff-quiet">{t('adminTeams.add.notAllowed')}</p>
         ) : available.length === 0 ? (
           <p className="staff-quiet">{t('adminTeams.add.noOne')}</p>
         ) : (
@@ -329,34 +363,40 @@ export async function TeamPage({
         )}
       </Section>
 
-      <Section title={t('adminTeams.newPerson.title')}>
-        <form action={addNewPersonAction} className="staff-form">
-          <LeagueField league={here.slug} />
-          <input type="hidden" name="team" value={team.id} />
-          <TextField
-            name="firstName"
-            label={t('adminTeams.newPerson.firstName')}
-            required
-            maxLength={100}
-          />
-          <TextField
-            name="lastName"
-            label={t('adminTeams.newPerson.lastName')}
-            required
-            maxLength={100}
-          />
-          <NumberAndRole />
-          <p className="staff-buttons">
-            <button type="submit" className="ui-button">
-              {t('adminTeams.newPerson.submit')}
-            </button>
-          </p>
-        </form>
-      </Section>
+      {mayAddPeople ? (
+        <Section title={t('adminTeams.newPerson.title')}>
+          <form action={addNewPersonAction} className="staff-form">
+            <LeagueField league={here.slug} />
+            <input type="hidden" name="team" value={team.id} />
+            <TextField
+              name="firstName"
+              label={t('adminTeams.newPerson.firstName')}
+              required
+              maxLength={100}
+            />
+            <TextField
+              name="lastName"
+              label={t('adminTeams.newPerson.lastName')}
+              required
+              maxLength={100}
+            />
+            <NumberAndRole />
+            <p className="staff-buttons">
+              <button type="submit" className="ui-button">
+                {t('adminTeams.newPerson.submit')}
+              </button>
+            </p>
+          </form>
+        </Section>
+      ) : null}
 
       <Section title={t('adminTeams.people.title')}>
-        <p className="staff-quiet">{t('adminTeams.people.body')}</p>
-        {people.ok ? null : (
+        {peopleNotAllowed ? (
+          <p className="staff-quiet">{t('adminTeams.people.notAllowed')}</p>
+        ) : (
+          <p className="staff-quiet">{t('adminTeams.people.body')}</p>
+        )}
+        {people.ok || peopleNotAllowed ? null : (
           <StaffNotice kind="refused">{t('adminTeams.people.readFailed')}</StaffNotice>
         )}
         <ul className="staff-rows admin-people">
@@ -379,9 +419,40 @@ export async function TeamPage({
         </ul>
       </Section>
 
-      <Section title={t('adminTeams.remove.title')} kind="danger">
+      <Section title={t('adminTeams.remove.title')} kind="danger" id={removeTeamAnchor}>
         <p className="staff-quiet">{t('adminTeams.remove.body')}</p>
-        {/* How many people the bin would take with the team, said before it is confirmed. */}
+        {panel.kind === 'held' ? (
+          // A team with games cannot go to the bin (A-17): said up front, with what it has
+          // and the way on, and no tick or button that could only be refused.
+          <div className="ui-notice" data-remove-held={games?.played === 0 ? 'yet' : 'season'}>
+            <p>{panel.why}</p>
+            {panel.lines.map((line) => (
+              <p key={line}>{line}</p>
+            ))}
+            {panel.ways.length === 0 ? null : (
+              <p className="staff-buttons">
+                {panel.ways.map((way) => (
+                  <a
+                    key={way.label}
+                    className="ui-button"
+                    href={wayOnHref(here, way, team.id)}
+                    data-way-on={way.anchor ?? way.area}
+                  >
+                    {t(way.label)}
+                  </a>
+                ))}
+              </p>
+            )}
+          </div>
+        ) : (
+          // What the team has of games, and how many people the bin would take with it,
+          // said before anything is confirmed.
+          panel.lines.map((line) => (
+            <p key={line} className="staff-quiet" data-remove-games="">
+              {line}
+            </p>
+          ))
+        )}
         <p className="staff-quiet" data-remove-roster-count={open.length}>
           {!roster.ok
             ? t('adminTeams.remove.rosterUnknown')
@@ -389,18 +460,41 @@ export async function TeamPage({
               ? t('adminTeams.remove.rosterNone')
               : t.plural('adminTeams.remove.roster', open.length)}
         </p>
-        <form action={removeTeamAction} className="staff-form">
-          <LeagueField league={here.slug} />
-          <input type="hidden" name="team" value={team.id} />
-          <ConfirmBox />
-          <p className="staff-buttons">
-            <button type="submit" className="ui-button" data-kind="danger">
-              {t('adminTeams.remove.submit')}
-            </button>
-          </p>
-        </form>
+        {tapRefused === undefined ? null : (
+          <StaffNotice kind="refused" data={{ 'data-remove-refused': removeCode ?? '' }}>
+            <p>{tapRefused}</p>
+          </StaffNotice>
+        )}
+        {panel.kind === 'held' ? null : <RemoveForm league={here.slug} teamId={team.id} />}
       </Section>
     </main>
+  );
+}
+
+/** Where a way on from "Remove this team" leads, with the team to come back to (Schedule). */
+function wayOnHref(
+  league: Parameters<typeof leagueUrl>[0],
+  way: RemoveWayOn,
+  teamId: string,
+): string {
+  const address = leagueUrl(league, 'admin-area', { area: way.area });
+  if (way.area !== 'schedule') return address;
+  return `${address}?${backToTeamParam}=${teamId}${way.anchor === 'publish' ? `#${publishAnchor}` : ''}`;
+}
+
+/** The tick and "Move the team to the bin", for a team with no games (or none read). */
+function RemoveForm({ league, teamId }: { readonly league: string; readonly teamId: string }) {
+  return (
+    <form action={removeTeamAction} className="staff-form">
+      <LeagueField league={league} />
+      <input type="hidden" name="team" value={teamId} />
+      <ConfirmBox />
+      <p className="staff-buttons">
+        <button type="submit" className="ui-button" data-kind="danger">
+          {t('adminTeams.remove.submit')}
+        </button>
+      </p>
+    </form>
   );
 }
 
