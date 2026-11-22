@@ -15,7 +15,8 @@
 // and local work shows no line (made-up-world-test and the unit tests of SiteFooter).
 // "Continue with Google" is not on the test copy's sign-in and sign-up (an account made
 // with Google would hold a real address), and is on them in local work (APP_ENV test on the
-// stand-in, started after the test copy is stopped).
+// stand-in, started after the test copy is stopped). An admin adding a person on the test
+// copy is refused a real contact email at that box, nothing saved; a made-up one is saved.
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -243,6 +244,40 @@ if (browser !== null) {
         const admin = await page.goto(`${origin}/lakeside/admin`);
         note('the seed owner opens the admin', admin?.status() === 200, String(admin?.status()));
         await lineOn(page, 'an admin page', 'admin');
+        // People: a contact email an admin types must be made up too, at that box.
+        await page.goto(`${origin}/lakeside/admin/people`);
+        await page.getByRole('link', { name: 'Add a person' }).first().click();
+        const add = page.locator('#add-person');
+        await add.getByLabel('First name').fill('Nadia');
+        await add.getByLabel('Last name').fill('Testcopy');
+        await add.getByLabel('Email (optional)').fill(stranger);
+        await add.getByRole('button', { name: 'Add to the league' }).click();
+        const said = add.locator('[data-wrong="contactEmail"]');
+        await said.waitFor();
+        note(
+          "People: a real contact email is refused at its box in the message file's words",
+          (await said.innerText()).trim() === en['problem.onlyMadeUpAddresses'] &&
+            (await add.getByLabel('Email (optional)').getAttribute('aria-invalid')) === 'true',
+          await said.innerText(),
+        );
+        note(
+          'People: nothing saved, and the other boxes keep what was typed',
+          !/\/admin\/people\/[0-9a-f-]{36}/.test(page.url()) &&
+            (await add.getByLabel('First name').inputValue()) === 'Nadia' &&
+            (await add.getByLabel('Last name').inputValue()) === 'Testcopy' &&
+            (await add.getByLabel('Email (optional)').inputValue()) === stranger,
+          page.url(),
+        );
+        // The control: a made-up email is saved.
+        await add.getByLabel('Email (optional)').fill('nadia@example.test');
+        await Promise.all([
+          page.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/),
+          add.getByRole('button', { name: 'Add to the league' }).click(),
+        ]);
+        note(
+          'People: a made-up contact email is saved',
+          (await page.getByRole('heading', { level: 1, name: 'Nadia Testcopy' }).count()) === 1,
+        );
         // A game's scoring address is drawn in the tracker's own frame, whatever it answers.
         await page.goto(`${origin}/lakeside/score/no-such-game`);
         note(
