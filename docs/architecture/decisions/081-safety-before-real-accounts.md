@@ -60,7 +60,7 @@ React writes every value as text, and nothing in the product takes HTML from any
 
 ## The starter list of offensive short names (U-16)
 
-A product answer, decided for the founder to review (U-16, a pending decision file): 43 English words in `offensiveShortNames`, refused as the whole short name or as any word of it between hyphens, in any capitals; our own words stay refused only as the whole name. The script that makes a league says "that word is not allowed (one of ours, or offensive). Choose another." (`tests/make-league-words.test.mjs` runs the script itself).
+A product answer, decided for the founder to review (U-16, a pending decision file): 81 English words in `offensiveShortNames` (a starter list the lead approved on 2026-11-22, with the plurals and the anti-Muslim slurs the review found taken; joined words and swapped letters left for later), refused as the whole short name or as any word of it between hyphens, in any capitals; our own words stay refused only as the whole name. The script that makes a league says which it was: "that word is one of ours (the site uses it for its own pages)" or "that word is not allowed (it is on our list of offensive words)", then "Choose another." (the plan's problem is `blocked` or `offensive`). (`tests/make-league-words.test.mjs` runs the script itself).
 
 ## Not done here, and where it goes
 

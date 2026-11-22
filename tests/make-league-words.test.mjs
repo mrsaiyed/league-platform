@@ -110,7 +110,8 @@ test('after making it, it prints what the database holds, read back, and that no
 });
 
 // U-16: a short name on the starter list of offensive words, or holding one as a word, is
-// refused in plain words by the script itself, before any database is opened or made.
+// refused in plain words by the script itself, before any database is opened or made; it
+// says which it was: one of our own words, or an offensive one.
 test('a short name with a word from the offensive starter list is refused in plain words', () => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const folder = mkdtempSync(path.join(os.tmpdir(), 'make-league-words-'));
@@ -119,7 +120,16 @@ test('a short name with a word from the offensive starter list is refused in pla
     Object.entries(process.env).filter(([name]) => !/DATABASE|^PG/i.test(name)),
   );
   try {
-    for (const shortName of ['shit-hoops', 'Fuck']) {
+    const offensive =
+      'Short name: that word is not allowed (it is on our list of offensive words). Choose another.';
+    const ours =
+      'Short name: that word is one of ours (the site uses it for its own pages). Choose another.';
+    for (const [shortName, said] of [
+      ['shit-hoops', offensive],
+      ['Fuck', offensive],
+      ['ragheads', offensive],
+      ['admin', ours],
+    ]) {
       const run = spawnSync(
         process.execPath,
         [
@@ -133,11 +143,7 @@ test('a short name with a word from the offensive starter list is refused in pla
         { cwd: root, encoding: 'utf8', input: '', env: withoutDatabases },
       );
       assert.equal(run.status, 2, `${shortName}: ${run.stderr}`);
-      assert.equal(
-        run.stderr.trim(),
-        'Short name: that word is not allowed (one of ours, or offensive). Choose another.',
-        shortName,
-      );
+      assert.equal(run.stderr.trim(), said, shortName);
       assert.ok(!existsSync(path.join(folder, 'db')), 'no database was made');
     }
   } finally {

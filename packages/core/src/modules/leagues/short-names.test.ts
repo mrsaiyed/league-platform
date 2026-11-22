@@ -59,6 +59,20 @@ describe('short names (U-7)', () => {
     }
   });
 
+  it('refuses the plurals and the anti-Muslim slurs the 2.98 review found taken (U-16)', () => {
+    for (const name of [
+      'fuckers',
+      'niggers-hoops',
+      'nazis',
+      'rapists-league',
+      'raghead',
+      'towelheads-ball',
+      'sandnigger',
+    ]) {
+      expect(isBlockedShortName(name)).toBe(true);
+    }
+  });
+
   it('takes a name that only holds an offensive word inside one of its words, and our words in a name', () => {
     // "grape", "assassins", "scrapers", "shitake": an offensive word inside another word is not refused.
     for (const name of [
