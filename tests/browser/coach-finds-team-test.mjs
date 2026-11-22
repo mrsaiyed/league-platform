@@ -475,9 +475,9 @@ if (browser) {
   // From the audit of each league's data (finding D-H1): the "Make this my team" and "stop"
   // buttons go through the league's gate. Posted as a page with no script posts them, with a
   // draft, a suspended, a binned and a missing league's short name, each answers exactly as
-  // the others (status, where it forwards to, and no cookie) for a visitor, a signed-in
-  // stranger and another league's admin; the draft league's own staff still set and clear
-  // their team.
+  // the others (status, where it forwards to, no cookie, and the same body) for a visitor,
+  // a signed-in stranger and another league's admin; the draft league's own staff still set
+  // and clear their team.
   await step(
     'the my-team buttons answer a hidden league exactly as one that is not there',
     async () => {
@@ -498,7 +498,12 @@ if (browser) {
           ([, name, value]) => [name, value ?? ''],
         );
       };
-      /** The button's form posted to `path`, with the form's league and team changed. */
+      /**
+       * The button's form posted to `path`, with the form's league and team changed. The
+       * answer is the whole of it: status, where it forwards to, any cookie, and its body,
+       * with the per-request nonce taken out and the address's own short name, which the
+       * page repeats, written the same way for every league.
+       */
       const post = async (fields, path, league, team, token) => {
         const body = new FormData();
         for (const [name, value] of fields) {
@@ -510,12 +515,22 @@ if (browser) {
           headers: { origin, ...(token === null ? {} : { cookie: `srl_session=${token}` }) },
           redirect: 'manual',
         });
-        await answer.arrayBuffer();
+        const text = await answer.text();
         return {
           status: answer.status,
           location: answer.headers.get('location'),
           setCookie: answer.headers.get('set-cookie'),
+          body: text
+            .replace(/(nonce(?:\\*")?[:=]\\*")[^"\\]*/g, '$1')
+            .split(league)
+            .join('{league}'),
         };
+      };
+      /** Where two bodies first part, a little of each from there. */
+      const whereDiffer = (one, other) => {
+        let at = 0;
+        while (at < one.length && one[at] === other[at]) at += 1;
+        return `at ${at}: ${JSON.stringify(one.slice(at, at + 60))} / ${JSON.stringify(other.slice(at, at + 60))}`;
       };
       const choose = await formOf('/harbor-city/teams/comets', 'Make this my team');
       const stop = await formOf(
@@ -554,7 +569,10 @@ if (browser) {
             note(
               `"${button}" answers ${who} for a ${kind} league as for a draft one`,
               JSON.stringify(answer) === JSON.stringify(first),
-              `${JSON.stringify(answer)} / ${JSON.stringify(first)}`,
+              JSON.stringify({ ...answer, body: undefined }) ===
+                JSON.stringify({ ...first, body: undefined })
+                ? `the bodies differ: ${whereDiffer(answer.body, first.body)}`
+                : `${JSON.stringify({ ...answer, body: undefined })} / ${JSON.stringify({ ...first, body: undefined })}`,
             );
           }
         }
