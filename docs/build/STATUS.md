@@ -44,7 +44,7 @@ Every lane's work is on GitHub. All sessions stopped on 2026-11-17 at about 03:0
 | 2.221, 2.56, 2.224                                            | opened, nothing pushed                                                                                                                                                                                                                                                                                                  | start again from their briefs when their turn comes                                                                                                                                                                                                                         |
 | 2.191-ci-parallel                                             | parked                                                                                                                                                                                                                                                                                                                  | after the first test is in the founder's hands                                                                                                                                                                                                                              |
 
-Next free: STEP 2.239, migration 0024, record 099, T-297, S-80. Numbers already given out stand with their lanes (in each lane's note).
+Next free: STEP 2.240, migration 0024, record 100, T-299, S-81. Numbers already given out stand with their lanes (in each lane's note).
 
 ## Needs the founder
 
