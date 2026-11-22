@@ -5,6 +5,9 @@
 // that followed it in the one file there was.
 export const enAdminTeams = {
   'adminTeams.add.choose': 'Choose a person',
+  // The heading of the form that puts someone already in the league on this roster; the
+  // form for a new player comes first (step 2.194's walk).
+  'adminTeams.add.fromLeague': 'Someone already in the league',
   'adminTeams.add.noOne': 'Everyone in the league list is already on this roster.',
   // Step 2.157: for a role that may not read the league's list of people (a club admin).
   'adminTeams.add.notAllowed':
@@ -50,7 +53,7 @@ export const enAdminTeams = {
   'adminTeams.newPerson.firstName': 'First name',
   'adminTeams.newPerson.lastName': 'Last name',
   'adminTeams.newPerson.submit': 'Add the person and put them on the roster',
-  'adminTeams.newPerson.title': 'Someone not in the list yet',
+  'adminTeams.newPerson.title': 'A new player, not in the league yet',
   'adminTeams.noDivision': 'No division',
   'adminTeams.noName': 'No name yet',
   // The admin's Teams screens (step 2.51, P4 §3, P7 §2).

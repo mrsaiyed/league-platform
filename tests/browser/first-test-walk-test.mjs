@@ -56,6 +56,31 @@ const shots = process.argv.find((a) => a.startsWith('--shots='))?.slice('--shots
 const shot = async (on, name) => {
   if (shots !== undefined) await on.screenshot({ path: `${shots}/${name}.png` });
 };
+/**
+ * `WALK_PICTURES=<folder>`: one picture of every step, full page, at the phone's size
+ * (390 wide, device scale 1), as `step-01.png` to `step-18.png`, taken by this same walk so
+ * the pictures and the test are one thing (for the lead to look over the founder's walk).
+ */
+const pictures = process.env.WALK_PICTURES;
+if (pictures !== undefined) (await import('node:fs')).mkdirSync(pictures, { recursive: true });
+const picture = async (on, step) => {
+  if (pictures === undefined) return;
+  await on.screenshot({
+    path: `${pictures}/step-${String(step).padStart(2, '0')}.png`,
+    fullPage: true,
+  });
+};
+/** What went wrong in the browser on the pages with scripts on, printed at the end. */
+const browserErrors = [];
+const watchErrors = (on, where) => {
+  on.on('pageerror', (error) => browserErrors.push(`${where}: ${error.message}`));
+  on.on('console', (m) => {
+    if (m.type() === 'error') browserErrors.push(`${where}: ${m.text()}`);
+  });
+};
+/** The form that follows a heading the person reads ("A new player, not in the league yet"). */
+const formUnder = (on, heading) =>
+  on.getByRole('heading', { name: heading, exact: true }).locator('xpath=following::form[1]');
 
 let built = true;
 if (!process.argv.includes('--no-build')) {
@@ -63,7 +88,12 @@ if (!process.argv.includes('--no-build')) {
   if (!built) failures.push('next build failed or took over 10 minutes');
 }
 
-const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };
+const phone = {
+  viewport: { width: 390, height: 844 },
+  deviceScaleFactor: 1,
+  hasTouch: true,
+  isMobile: true,
+};
 const league = 'still-waters';
 const owner = { email: 'owner@example.test', password: 'made-up owner password' };
 const firstNames = ['Ann', 'Ben', 'Cal', 'Dee', 'Eli'];
@@ -96,7 +126,9 @@ if (built) {
     const scoring = await live.newPage();
     scoring.setDefaultTimeout(60_000);
     const mainText = (on) => on.locator('main').innerText();
+    // Each step's page is pictured where its fit is checked, and again where a step ends.
     const fits = async (on, label) =>
+      (await picture(on, Number.parseInt(label, 10))) ??
       note(
         `${label}: no sideways scrolling at a phone's width`,
         await on.evaluate(
@@ -126,29 +158,39 @@ if (built) {
     ]);
     note('1. signing in leaves the sign-in page', !scoring.url().endsWith('/signin'));
     say(1, `${scoring.url()}\n${await scoring.locator('body').innerText()}`);
+    watchErrors(scoring, 'tracker phone');
     const offline = await browser.newContext({ ...phone, javaScriptEnabled: false });
     await offline.addCookies(await live.cookies());
     const page = await offline.newPage();
     page.setDefaultTimeout(60_000);
+    await page.goto(`${origin}/account`);
+    const account = await mainText(page);
+    note(
+      '1. the account page: "Your account", and Still Waters League with Owner under "Your leagues"',
+      account.includes('Your account') &&
+        account.includes('Your leagues') &&
+        /Still Waters League\s*Owner/.test(account),
+      account.slice(0, 400),
+    );
+    await picture(page, 1);
 
     at = "step 2: the owner opens Still Waters' admin";
-    // The account page lists the leagues the owner runs; Still Waters is one.
-    await page.goto(`${origin}/account`);
-    const toLeague = page.getByRole('link', { name: /Still Waters/ }).first();
-    if ((await toLeague.count()) === 1) {
-      await tap(page, toLeague);
-      note('2. the account page leads to Still Waters', true);
-    } else {
-      note(
-        '2. the account page leads to Still Waters (known: it does not; the address is typed)',
-        true,
-      );
-    }
-    if (!new URL(page.url()).pathname.startsWith(`/${league}/admin`)) {
-      await page.goto(`${origin}/${league}/admin`);
-    }
-    say(2, `${page.url()}\n${await mainText(page)}`);
+    // By the words on the screen: "Admin" beside "Still Waters League" (not the name,
+    // which opens the league's public home).
+    const entry = page
+      .locator('li')
+      .filter({ has: page.getByRole('link', { name: 'Still Waters League', exact: true }) });
+    await tap(page, entry.getByRole('link', { name: 'Admin', exact: true }), /\/admin$/);
+    const welcome = await mainText(page);
+    say(2, `${page.url()}\n${welcome}`);
+    note(
+      '2. "Admin" beside Still Waters League opens its admin: "Welcome back."',
+      welcome.includes('Welcome back.') &&
+        welcome.includes('Everything you run for Still Waters League is here.'),
+      welcome.slice(0, 300),
+    );
     await fits(page, "2. Still Waters' admin");
+    await picture(page, 2);
 
     at = 'step 3: three teams, five players each for two of them';
     for (const [name, from] of [
@@ -161,11 +203,21 @@ if (built) {
       await tap(page, page.getByRole('button', { name: 'Add team' }), /done=created/);
       if (name === 'Ravens') say(3, await mainText(page));
       if (from === null) continue;
+      const headings = await page.locator('main h2').allInnerTexts();
+      const newFirst = headings.indexOf('A new player, not in the league yet');
+      note(
+        `3. on the ${name}' page the new player's form comes first, under its own heading`,
+        newFirst >= 0 &&
+          (headings.indexOf('Someone already in the league') < 0 ||
+            newFirst < headings.indexOf('Someone already in the league')),
+        headings.join(' | '),
+      );
       for (const [n, first] of firstNames.entries()) {
-        const form = page.locator('form', { has: page.locator('input[name=firstName]') });
-        await form.locator('input[name=firstName]').fill(first);
-        await form.locator('input[name=lastName]').fill(name);
-        await form.locator('input[name=jerseyNumber]').fill(String(from + n));
+        // By the words the person reads: the heading, then the boxes' own labels.
+        const form = formUnder(page, 'A new player, not in the league yet');
+        await form.getByLabel('First name').fill(first);
+        await form.getByLabel('Last name').fill(name);
+        await form.getByLabel('Jersey number (0 to 99, or 00)').fill(String(from + n));
         await tap(
           page,
           form.getByRole('button', { name: 'Add the person and put them on the roster' }),
@@ -178,6 +230,7 @@ if (built) {
         firstNames.every((first) => roster.includes(`${first} ${name}`)),
         roster.slice(0, 400),
       );
+      if (name === 'Wolves') await picture(page, 3);
     }
     await staffLink(page, 'Teams', /\/admin\/teams$/);
     const teams = await mainText(page);
@@ -191,18 +244,23 @@ if (built) {
     await staffLink(page, 'Schedule', /\/admin\/schedule$/);
     say(4, await mainText(page));
     const first = page.locator('[data-no-rounds] form');
-    await first.locator('input[name=label]').fill('Week 1');
+    await first.getByLabel('Round name').fill('Week 1');
     await first.locator('input[name=date]').fill(today);
     await tap(page, first.getByRole('button', { name: 'Add round' }), /saved=round-added/);
+    // Two times earlier than now (the made-up world's clock is at noon).
     for (const [home, away, time] of [
       ['Ravens', 'Wolves', '10:00'],
       ['Wolves', 'Ravens', '11:00'],
     ]) {
-      const add = page.locator('section[data-round] details[data-add-game]').first();
-      await add.locator('summary').tap();
-      await add.locator('select[name=homeTeamId]').selectOption({ label: home });
-      await add.locator('select[name=awayTeamId]').selectOption({ label: away });
-      await add.locator('input[name=time]').fill(time);
+      // "Add a game" inside Week 1, not the one under "Games with no round".
+      const add = page
+        .locator('section[data-round]', { hasText: 'Week 1' })
+        .locator('details[data-add-game]')
+        .first();
+      await add.getByText('Add a game', { exact: true }).tap();
+      await add.getByLabel('Home team').selectOption({ label: home });
+      await add.getByLabel('Away team').selectOption({ label: away });
+      await add.getByLabel('Time').fill(time);
       const place = add.locator('select[name=place]');
       note(
         `4. a game's place starts as "No venue yet" (${home} v ${away})`,
@@ -218,17 +276,20 @@ if (built) {
       drafted.slice(0, 600),
     );
     await fits(page, '4. Schedule, the draft');
+    await picture(page, 4);
 
     at = 'step 5: publishing the schedule';
     await tap(page, page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
     const published = await page.locator('[data-published]').innerText();
     say(5, published);
     note('5. the schedule is published', /published/i.test(published), published);
+    await picture(page, 5);
 
     at = 'step 6: the season is shown';
     await staffLink(page, 'Season settings', /\/admin\/season/);
     const shown = await page.locator('#who-can-see').innerText();
     say(6, shown);
+    await picture(page, 6);
     // Already shown (the made-up league starts so, and starts live): nothing to tap.
     note(
       '6. Season settings says everyone can see First Season',
@@ -259,6 +320,7 @@ if (built) {
       /\/score\/[0-9a-f-]{36}$/.test(scoring.url()),
     );
     await fits(scoring, '7. the tracker');
+    await picture(scoring, 7);
 
     at = 'step 8: the fives';
     await c.pick('home', [1, 2, 3, 4, 5]);
@@ -275,6 +337,7 @@ if (built) {
       .catch(() => false);
     note('8. both fives are on the court', tenOnCourt);
     await shot(scoring, '08-fives');
+    await picture(scoring, 8);
 
     at = 'step 9: the clock, baskets and a foul';
     await c.startClock();
@@ -287,6 +350,7 @@ if (built) {
       JSON.stringify(await c.score()) === '{"home":2,"away":4}',
     );
     note('9. the foul is on Ben Ravens (2)', (await c.fouls('home', 2)) === 1);
+    await picture(scoring, 9);
 
     at = 'step 10: one team turnover for the Wolves';
     const chip = c.turnoversChip('away');
@@ -304,6 +368,7 @@ if (built) {
       '10. the Wolves\' chip reads "1 turnover"',
       (await chip.innerText()).trim() === '1 turnover',
     );
+    await picture(scoring, 10);
     // Closed as a phone closes it: the same button again.
     await chip.tap();
     await c.pad.locator('[data-rest]').waitFor();
@@ -319,18 +384,59 @@ if (built) {
       JSON.stringify(await c.score()) === '{"home":2,"away":4}',
     );
     note('11. Ann Ravens (1) has 2 points again', (await c.points('home', 1)) === 2);
+    say(11, `after Undo: ${await c.said.allInnerTexts()}`);
+    await picture(scoring, 11);
 
     at = 'step 12: more baskets, then the clock set wrongly and right again';
     await c.play('home', 4, 'p2');
     await c.play('away', 13, 'p2');
     await c.pauseClock();
     const before = (await c.clockText()).trim();
-    await c.setClock('1200');
+    // By the words: the clock is the button "Set the clock or change the period"; the
+    // form is "Clock and period"; its button starts "Set clock".
+    const clockButton = scoring.getByRole('button', { name: /Set the clock or change the period/ });
+    const setTo = async (digits) => {
+      await clockButton.tap();
+      const sheet = scoring.getByRole('dialog', { name: 'Clock and period' });
+      await sheet.waitFor();
+      for (const digit of digits) {
+        await sheet.getByRole('button', { name: digit, exact: true }).tap();
+      }
+      const setButton = sheet.getByRole('button', { name: /^Set clock/ });
+      say(12, `typed ${digits}: the form says ${(await sheet.innerText()).replace(/\s+/g, ' ')}`);
+      await setButton.tap();
+      await sheet.waitFor({ state: 'detached' });
+    };
+    await setTo('1200');
+    await scoring.waitForFunction(
+      () => document.querySelector('[data-clock-time]')?.textContent === '12:00',
+    );
     note('12. the clock shows the wrong 12:00', (await c.clockText()).trim() === '12:00');
-    say(12, `set to 12:00: ${await c.said.allInnerTexts()}`);
-    await c.setClock(before.replace(':', ''));
+    const wrongSaid = (await c.said.allInnerTexts()).join(' ');
+    say(12, `set to 12:00: ${wrongSaid}`);
+    note(
+      '12. it says "Clock set to 12:00." and what was added to the minutes',
+      /Clock set to 12:00\. .+ was added to the minutes of the players on the court\./.test(
+        wrongSaid,
+      ),
+      wrongSaid,
+    );
+    await setTo(before.replace(':', ''));
+    await scoring.waitForFunction(
+      (time) => document.querySelector('[data-clock-time]')?.textContent === time,
+      before,
+    );
     note(`12. the clock is right again (${before})`, (await c.clockText()).trim() === before);
-    say(12, `set back to ${before}: ${await c.said.allInnerTexts()}`);
+    const rightSaid = (await c.said.allInnerTexts()).join(' ');
+    say(12, `set back to ${before}: ${rightSaid}`);
+    note(
+      '12. it says the earlier change was taken back',
+      rightSaid.includes(
+        'of an earlier change to this period’s clock was taken back: minutes and play times are as they were.',
+      ),
+      rightSaid,
+    );
+    await picture(scoring, 12);
 
     at = 'step 13: the second half, then End game from More';
     await c.clock.tap();
@@ -353,6 +459,7 @@ if (built) {
     await c.answer('yes').tap();
     await c.pad.locator('[data-final="saved"]').waitFor();
     say(13, await c.finalPanel.innerText());
+    await picture(scoring, 13);
     note(
       '13. the game is final and saved: Ravens 7, Wolves 6',
       JSON.stringify(await c.score()) === '{"home":7,"away":6}',
@@ -378,6 +485,8 @@ if (built) {
       '14. Games says "Saved" beside game 2',
       /^Saved: /.test((await question.getByRole('status').textContent()) ?? ''),
     );
+    say(14, `after Yes: ${await question.innerText()}`);
+    await picture(page, 14);
 
     at = "step 15: League settings' minimum games for the leaders";
     await staffLink(page, 'League settings', /\/admin\/settings/);
@@ -393,6 +502,8 @@ if (built) {
       saved.includes('Now: set for this league.'),
       saved,
     );
+    say(15, `after Save: ${saved}`);
+    await picture(page, 15);
 
     // Steps 16 to 18: a visitor, signed out, reads the public pages: a fresh browser with
     // no cookies, at the same phone size. Each page is read again by address to be sure it
@@ -512,6 +623,9 @@ if (built) {
 }
 
 const seconds = Math.round((Date.now() - started) / 1000);
+if (browserErrors.length > 0) {
+  console.log(`What the browser reported as errors on the way:\n  ${browserErrors.join('\n  ')}`);
+}
 if (failures.length > 0) {
   console.error(`First test walk browser test failed:\n  ${failures.join('\n  ')}`);
   process.exit(1);

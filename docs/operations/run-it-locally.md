@@ -101,7 +101,7 @@ To try it as a league's admin:
    back to North Valley; tap the account button (your initial at the top right, or the menu
    button on a phone) and choose the admin.
 3. Teams: under "Add a team" type a name and tap "Add team". On the team's page, under
-   "Someone not in the list yet", type a first and last name and a number and tap "Add the
+   "A new player, not in the league yet", type a first and last name and a number and tap "Add the
    person and put them on the roster"; do it again for a second player.
 4. Schedule: in this week's round open "Add a game", choose the new team and another, a time
    and a court, and tap "Add game"; then tap "Publish this schedule".
