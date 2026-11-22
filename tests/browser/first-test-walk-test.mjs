@@ -500,6 +500,14 @@ if (built) {
       stats.slice(0, 500),
     );
     note('18. "No leaders yet" is not said: the minimum is 1', !stats.includes('No leaders yet.'));
+    // Step 2.199: nobody is listed under a leader card for a statistic they have none of
+    // (the founder read "2. Ann Ravens 0" there). The free throws list is the two level at 1.
+    const listed = await away.locator('.ui-leader-list .ui-leader-value').allInnerTexts();
+    note(
+      '18. the leaders lists name nobody at 0',
+      listed.length > 0 && listed.every((value) => Number(value.trim()) > 0),
+      listed.join(', '),
+    );
     await fits(away, '18. the statistics');
     await answers('18. the statistics');
     await visitor.close();

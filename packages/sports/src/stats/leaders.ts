@@ -11,10 +11,10 @@ export type LeaderBoardOptions = {
   /** The league's minimum games: a whole number, 0 or more. */
   minimumGames: number;
   /**
-   * What the minimum counts. `played` (the default, P7 §6 wording) counts games the
+   * What the minimum counts. `played` (the default) counts games the
    * player entered. `recorded` counts only games where the ranked measure was
-   * recorded, so a recorded-once average cannot lead. Which one a league wants is
-   * for the founder to confirm.
+   * recorded, so a recorded-once average cannot lead. A league's pages count as
+   * `recorded` does: the games a board's average is over (S-63, step 2.199).
    */
   minimumGamesBasis?: 'played' | 'recorded';
   /** A whole number, 0 or more. */
