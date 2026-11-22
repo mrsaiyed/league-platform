@@ -31,9 +31,13 @@ export function readArguments(args) {
   let folder = defaultFolder;
   let port = defaultPort;
   const files = [];
+  let bare = false;
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
-    if (arg === '--folder' || arg === '--port') {
+    // `start --bare` (step 2.207): the tables' owner and its empty database only, as a
+    // new Supabase project is, for the rehearsal of the new-test-copy procedure.
+    if (arg === '--bare' && command === 'start') bare = true;
+    else if (arg === '--folder' || arg === '--port') {
       const value = rest[i + 1];
       if (value === undefined || value.startsWith('--')) return { problem: 'value', option: arg };
       i += 1;
@@ -47,7 +51,7 @@ export function readArguments(args) {
     else if (command === 'test') files.push(arg);
     else return { problem: 'extra', value: arg };
   }
-  return { command, folder, port, files };
+  return bare ? { command, folder, port, files, bare } : { command, folder, port, files };
 }
 
 /**

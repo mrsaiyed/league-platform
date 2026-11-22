@@ -107,6 +107,7 @@ async function as<T>(
 export async function prepareRealPostgres(
   server: RealPostgresServer,
   passwords: { readonly superuser: string; readonly owner: string; readonly app: string },
+  options: { readonly bare?: boolean } = {},
 ): Promise<PreparedRealPostgres> {
   const names = realPostgresNames;
   const owner = checkedPassword(passwords.owner);
@@ -130,6 +131,9 @@ export async function prepareRealPostgres(
   } catch (error) {
     return { ok: false, step: 'owner', reason: codeOf(error) };
   }
+  // Bare (step 2.207's rehearsal): the owner and an empty database, as a new Supabase
+  // project is; the release command and the procedure do the rest.
+  if (options.bare === true) return { ok: true, applied: 0 };
 
   let applied = 0;
   try {

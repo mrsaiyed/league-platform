@@ -237,7 +237,7 @@ function removeFolder(paths) {
 }
 
 /** Starts a fresh server in the folder. Returns true when it runs, ready for tests. */
-async function start(tools, paths, port) {
+async function start(tools, paths, port, bare = false) {
   if (runningPid(paths) !== null) {
     console.log(words.alreadyRunning(shown(paths.folder)));
     return true;
@@ -340,7 +340,7 @@ async function start(tools, paths, port) {
   if (begun.status !== 0 || runningPid(paths) === null) return stopAndClean('start');
 
   const ca = fs.readFileSync(authority, 'utf8');
-  const prepared = await prepareRealPostgres({ port, ca }, passwords);
+  const prepared = await prepareRealPostgres({ port, ca }, passwords, { bare });
   if (!prepared.ok) {
     console.error(words.prepareFailed(prepared.step, prepared.reason));
     await stop(tools, paths, { quiet: true });
@@ -368,6 +368,7 @@ async function start(tools, paths, port) {
       port,
       where: shown(paths.folder),
       applied: prepared.applied,
+      bare,
     }),
   );
   return true;
@@ -456,7 +457,7 @@ async function main(args) {
   if (tools === null) return;
   if (asked.command === 'stop') await stop(tools, paths);
   else if (asked.command === 'start') {
-    if (!(await start(tools, paths, asked.port))) process.exitCode = 1;
+    if (!(await start(tools, paths, asked.port, asked.bare === true))) process.exitCode = 1;
   } else await test(tools, paths, asked.port, asked.files);
 }
 
