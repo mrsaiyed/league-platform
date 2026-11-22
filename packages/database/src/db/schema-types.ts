@@ -514,6 +514,7 @@ export interface StandingsRowsTable {
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  level: ColumnType<JsonValue | null, JsonObject | null, JsonObject | null>;
 }
 
 export interface SupportAccessLogTable {

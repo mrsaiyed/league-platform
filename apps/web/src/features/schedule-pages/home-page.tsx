@@ -24,10 +24,18 @@ import { GameList } from './schedule-views.tsx';
 /** The columns the home page's compact standings keep. */
 const compactColumns: readonly string[] = ['played', 'wins', 'losses', 'winPercentage'];
 
-/** A division's table cut down to the few columns that fit beside the games. */
+/**
+ * A division's table cut down to the few columns that fit beside the games, with each
+ * level-teams note cut to its first sentence where it was made (step 2.198): who is level
+ * and on what; "See the full standings" leads to the reasons.
+ */
 export function compactStandings(table: StandingsTableView): StandingsTableView {
   const kept = new Set(compactColumns);
-  return { ...table, columns: table.columns.filter((c) => kept.has(c.key)) };
+  return {
+    ...table,
+    columns: table.columns.filter((c) => kept.has(c.key)),
+    footnotes: table.briefFootnotes,
+  };
 }
 
 /**
@@ -98,6 +106,10 @@ export async function HomePage({
   const standingsHref = leagueUrl(addressee, 'standings', { season: askedSeason });
   const teamsHref = leagueUrl(addressee, 'teams', { season: askedSeason });
   const manyTables = tables.length > 2;
+  // A level-teams note the home page shortened: the whole of it is on the standings page.
+  const shortened = tables.some((table) =>
+    table.briefFootnotes.some((note, n) => note.text !== table.footnotes[n]?.text),
+  );
   return (
     <main className="site-wide">
       <Hero
@@ -172,23 +184,30 @@ export async function HomePage({
             more={{ href: standingsHref, label: t('home.fullStandings') }}
           >
             {hasStandings ? (
-              <div className="home-tables">
-                {tables.map((raw) => {
-                  const table = compactStandings(raw);
-                  return (
-                    <StandingsTable
-                      key={table.key}
-                      caption={table.caption}
-                      idPrefix={`home-${table.key}`}
-                      columns={table.columns}
-                      rows={table.rows}
-                      footnotes={table.footnotes}
-                      labels={labels.standings}
-                      emblems
-                    />
-                  );
-                })}
-              </div>
+              <>
+                <div className="home-tables">
+                  {tables.map((raw) => {
+                    const table = compactStandings(raw);
+                    return (
+                      <StandingsTable
+                        key={table.key}
+                        caption={table.caption}
+                        idPrefix={`home-${table.key}`}
+                        columns={table.columns}
+                        rows={table.rows}
+                        footnotes={table.footnotes}
+                        labels={labels.standings}
+                        emblems
+                      />
+                    );
+                  })}
+                </div>
+                {shortened ? (
+                  <p className="home-notes-more">
+                    <a href={standingsHref}>{t('home.whyThisOrder')}</a>
+                  </p>
+                ) : null}
+              </>
             ) : (
               <EmptyPanel
                 text={t('home.standingsEmpty')}
