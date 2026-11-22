@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-22 12:30 UTC — Step 2.168 landed (5a90d03, record 090, S-78 decided for you): a coach finds their team; the hidden-league leak D-H1 from the data audit is closed. One independent review: may land; three Lows fixed. Merged with the build branch after 2.205 (one file, both meanings kept). GitHub passed it twice.
+
 - 2026-11-22 11:52 UTC — Step 2.239 landed (1f9386f, T-298): on a hosted copy every form saved and then showed 'Page not found', because Next.js fetches the next page from itself at its own listening address; cured without widening the host check. One independent review at effort high: may land, four Lows. GitHub passed it twice.
 
 - 2026-11-22 11:32 UTC — Step 2.205 landed (20f48ca; T-297): on the test copy one line says everything is made up; sign-up, reset, a new code, Google sign-in and an admin's typed contact email all refuse an address that is not made up, before the bot check or the sign-in service is asked; production and local unchanged; one independent review at effort high with use in a browser (two Mediums: Google and the People email, both closed in the step); GitHub passed twice.
