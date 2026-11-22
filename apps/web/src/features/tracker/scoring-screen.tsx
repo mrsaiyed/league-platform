@@ -1103,6 +1103,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
       if (wanted.current.kind === 'leave') return;
       // The answers rest from this tap: its double is not an answer.
       resting.asked.begin(event.timeStamp);
+      // Asked from More, the question is in the pad under it: More closes, as it does for
+      // each of its other buttons, so the question is seen (step 2.37, part 2).
+      quietUntil.current = event.timeStamp + restMs;
+      setMoreOpen(false);
       setSaid(null);
       showPad({ kind: 'leave', to });
       if (event.detail === 0) focusNext.current = { selector: '[data-pad] [data-answer="no"]' };
