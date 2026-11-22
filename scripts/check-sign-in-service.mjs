@@ -30,15 +30,20 @@ if ('problems' in chosen) {
 const { projectUrl, secretKey, local } = chosen.settings;
 const stop = new AbortController();
 // The first Ctrl+C stops after the check in hand and still removes the made-up user;
-// a second stops at once.
-process.on('SIGINT', () => {
+// a second stops at once. Closing the window (SIGHUP) or being asked to end (SIGTERM)
+// does the same, as far as the platform allows: Windows gives a closing window a few
+// seconds, and with the window gone there is nowhere to print, so a failed write must
+// not stop the clean-up (review L5).
+for (const stream of [process.stdout, process.stderr]) stream.on('error', () => {});
+const stopOn = () => {
   if (stop.signal.aborted) {
     for (const text of words.stoppedTwice) console.error(text);
     process.exit(130);
   }
   console.log(words.stopping);
   stop.abort();
-});
+};
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, stopOn);
 
 console.log(words.title);
 console.log(local ? words.whereLocal : words.whereHosted);
