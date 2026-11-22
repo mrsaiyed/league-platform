@@ -94,14 +94,26 @@ export const heldByOther = (session: ScoringSession, now: number): ScoringSessio
 });
 
 /**
- * The lease is written again only once less than half of it is left (T-295): the
- * tracker asks every few seconds whether it still holds the game, so that a takeover is
- * learnt at once, and most answers are a read.
+ * The least time the hold has to spare before another device may open the game without
+ * the takeover question (T-295, the code review's M2): never less than before T-295,
+ * when the lease was written again every half minute, so a phone locked for a minute or
+ * a minute with no signal does not let the game go.
  */
-export const renewWhenLeftMs = leaseMs / 2;
+export const holdSpareMs = 90_000;
+
+/** How often the tracker asks whether it still holds the game (`holdCheckMs`, T-295). */
+const trackerCheckMs = 5_000;
 
 /**
- * Renews a session its own device is still holding: while more than half the lease is
+ * The lease is written again only once less than the spare time and one check of the
+ * tracker's are left (T-295): the tracker asks every few seconds whether it still holds
+ * the game, so that a takeover is learnt at once, and most answers are a read. With
+ * the lease at two minutes that is a write about every half minute, as before.
+ */
+export const renewWhenLeftMs = Math.min(leaseMs, holdSpareMs + trackerCheckMs);
+
+/**
+ * Renews a session its own device is still holding: while more than `renewWhenLeftMs` is
  * left nothing is written and the lease stands; otherwise it runs again from now, in one
  * write that matches only this session. If it was ended a moment ago by another
  * request, says who holds the game instead.
