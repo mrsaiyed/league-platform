@@ -144,6 +144,8 @@ export const enSite = {
   'shell.archivedNotice': 'This league is archived. Everything here is kept as it was.',
   'shell.backToLeague': 'Back to the league home',
   'shell.draftNotice': 'This league is not published. Only the people who run it can see it.',
+  // On a draft's staff pages, for those who may publish it (step 2.240).
+  'shell.draftNoticePublish': 'Publish it in League settings',
   'shell.notBuilt': 'This page is not built yet.',
   // The web app's shell (step 1.17). Pages not built yet say so plainly.
   'shell.siteName': 'SR Leagues',

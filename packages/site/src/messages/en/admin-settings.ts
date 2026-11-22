@@ -16,6 +16,7 @@ export const enAdminSettings = {
   'adminSettings.default': 'Default: {value}',
   'adminSettings.defaultMark': '{choice} (the default)',
   'adminSettings.done.cleared': 'The setting is back to its default.',
+  'adminSettings.done.published': 'The league is published. Visitors can see it now.',
   'adminSettings.done.saved': 'The setting was saved.',
   'adminSettings.field.value': 'Value',
   'adminSettings.groups': 'Groups of settings',
@@ -57,6 +58,27 @@ export const enAdminSettings = {
   'adminSettings.privacy.now.initial': 'Now: everyone is shown by first name and last initial.',
   'adminSettings.privacy.unknownAge':
     'In this league, anyone whose record does not say whether they are a child or an adult is shown as a child, coaches too.',
+  // The Publish part at the top of League settings (step 2.240, U-9, P3 §3): what a draft
+  // means, the "Must fix" list with each item met or not, and the button that asks once.
+  'adminSettings.publish.ask': 'Publish this league? Visitors will be able to see it.',
+  'adminSettings.publish.button': 'Publish',
+  'adminSettings.publish.cancel': 'Not now',
+  'adminSettings.publish.check.contactEmail': 'A contact email for the league',
+  'adminSettings.publish.check.contactEmail.cure':
+    'The contact email is given when the league is made. Write to us and we will add it.',
+  'adminSettings.publish.check.privacyChosen':
+    'Your privacy choice for young players: how names show on public pages',
+  'adminSettings.publish.check.privacyChosen.cure':
+    'Choose and save "Names on public pages" under Privacy, even to keep how it starts.',
+  'adminSettings.publish.cureLink': 'Go to Privacy',
+  'adminSettings.publish.draft':
+    'This league is a draft. Only the people who run it can see it: anyone else who opens its pages is told they were not found.',
+  'adminSettings.publish.live': 'This league is published. Anyone can see its public pages.',
+  'adminSettings.publish.met': 'Done',
+  'adminSettings.publish.mustFix': 'Must fix before publishing',
+  'adminSettings.publish.notMet': 'Not done yet',
+  'adminSettings.publish.notReady': 'Put the items above right first, then publish.',
+  'adminSettings.publish.title': 'Publishing',
   'adminSettings.save': 'Save',
   'adminSettings.usingDefault': 'Now: the default.',
   'adminSettings.usingOwn': 'Now: set for this league.',

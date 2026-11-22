@@ -32,3 +32,8 @@ export function setStandInStatus(
   changed.set(leagueId, { status, version: next });
   return next;
 }
+
+/** Back to the cast's states: for a test that publishes a made-up league more than once. */
+export function forgetStandInStatuses(): void {
+  changed.clear();
+}
