@@ -14,9 +14,16 @@ The test copy needs one image for the web app and the worker, and a way to apply
 - **`platform.Dockerfile`** has two stages: a build, then the image. It copies named paths only, runs as `node`, and starts with `node scripts/web.mjs start --hostname 0.0.0.0`. The worker's command is written at the top of the file. `platform.Dockerfile.dockerignore` (BuildKit reads it in place of the tracker's `.dockerignore`) starts with `*`, lets in only those paths, and ends by shutting out `**/.env` and `**/.env.*`. `tests/platform-image.test.mjs` holds both files to this, and checks that each workspace declares what its code imports.
 - **ci.yml, job "image"**: it builds the image, checks that the staging start-up refuses in its own words without its settings, asks the health address for a 200 in the made-up stand-in mode, and loads the worker's code. Nothing is published and no permission or secret is added.
 
-## Not done here (part 2)
+## Part 2
 
-The T-158 count of live games, going back to the previous version (T-156), the Render checklist, the `docs/operations/` procedures, and the corrections to the hosted-database notes. The lane's note lists them.
+- **Live games (T-158).** Before anything is applied, the release counts the games marked live in every league (`countLiveGames`, as the migration login, one number only) and stops with exit code 3 above `mostLiveGames` unless given `--go-ahead`. The limit is 0: until an open tracker is proved to keep working across a release (T-127), any live game stops it. Raising it is one constant in `scripts/release-run.mjs`.
+- **Going back (T-156).** Running the previous commit's website against today's database: the release command run from that commit applies nothing, says the database is ahead and names it; it is then deployed by hand. Safe because of the drop-and-rename rule (T-183); the procedure says what a person never does (undo, delete or edit anything in the database by hand).
+- **The host, written down as a checklist** (`docs/operations/render-test-copy.md`), not a `render.yaml` blueprint: a blueprint lets a file in the repository create and change services on Render on every push, while here each setting is typed by the founder and checked by eye. To be looked at again for production, with the worker and Cloudflare.
+- **Procedures** in `docs/operations/`: releasing and going back, a new test copy, rotating a secret, restoring the database (the test copy is made again; the full restore is step 2.210's). Each says at its top that it is not yet followed.
+
+## Not done here
+
+The health answer does not name the running version: Render's Events list shows it for now.
 
 ## Why not
 
