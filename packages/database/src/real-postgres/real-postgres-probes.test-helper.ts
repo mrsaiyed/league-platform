@@ -223,3 +223,104 @@ export async function serverFacts(session: SqlSession): Promise<{
     version: Number(row.version),
   };
 }
+
+/** A fault in what app_login is or may become, as the tables' owner can plant it. */
+export type LoginFault =
+  | 'may-become-bypass'
+  | 'may-become-bypass-deeper'
+  | 'may-act-as-platform-owner'
+  | 'may-create-roles';
+
+const plantWord = /^[a-z0-9]{1,16}$/;
+
+/** The statements that plant each fault, and those that take it away again. */
+function loginFaultSteps(fault: LoginFault, word: string) {
+  const bypass = `p_byp_${word}`;
+  const middle = `p_mid_${word}`;
+  const owner = `p_own_${word}`;
+  switch (fault) {
+    case 'may-become-bypass':
+      // The reviewer's plant (step 2.202's review): app_user reached through the bypass role.
+      return {
+        roles: [bypass],
+        plant: [
+          `create role ${bypass} nologin bypassrls`,
+          `grant app_user to ${bypass}`,
+          `grant ${bypass} to app_login`,
+        ],
+        undo: [`drop role if exists ${bypass}`],
+      };
+    case 'may-become-bypass-deeper':
+      return {
+        roles: [bypass, middle],
+        plant: [
+          `create role ${bypass} nologin bypassrls`,
+          `create role ${middle} nologin`,
+          `grant ${bypass} to ${middle}`,
+          `grant ${middle} to app_login`,
+        ],
+        undo: [`drop role if exists ${middle}`, `drop role if exists ${bypass}`],
+      };
+    case 'may-act-as-platform-owner':
+      // A role that owns a table in `platform` (migration 0017), which app_login inherits.
+      return {
+        roles: [owner],
+        plant: [
+          `set createrole_self_grant to 'set'`,
+          `create role ${owner} nologin`,
+          'reset createrole_self_grant',
+          `grant create on schema platform to ${owner}`,
+          `create table platform.${owner}_kept (id int)`,
+          `alter table platform.${owner}_kept owner to ${owner}`,
+          `grant ${owner} to app_login with set false`,
+        ],
+        undo: [
+          'reset createrole_self_grant',
+          `drop table if exists platform.${owner}_kept`,
+          `revoke create on schema platform from ${owner}`,
+          `drop role if exists ${owner}`,
+        ],
+      };
+    case 'may-create-roles':
+      return {
+        roles: [],
+        plant: ['alter role app_login createrole'],
+        undo: ['alter role app_login nocreaterole'],
+      };
+  }
+}
+
+/**
+ * As the tables' owner: plants one fault in app_login's roles, made up and named with
+ * `word`. Returns what takes it away again, which the caller runs in a `finally`; that
+ * runs every step it can and throws if a planted role is left.
+ */
+export async function plantLoginFault(
+  owner: SqlSession,
+  fault: LoginFault,
+  word: string,
+): Promise<() => Promise<void>> {
+  if (!plantWord.test(word)) throw new TypeError(`Not a plain word: ${word}`);
+  const steps = loginFaultSteps(fault, word);
+  const undo = async () => {
+    for (const statement of steps.undo) {
+      try {
+        await owner.exec(statement);
+      } catch {
+        // Not planted that far; what is left is checked below.
+      }
+    }
+    const { rows } = await owner.query<{ left: number }>(
+      `select count(*)::int as left from pg_catalog.pg_roles where rolname = any($1::text[])`,
+      [steps.roles],
+    );
+    if ((rows[0]?.left ?? 0) > 0) throw new Error(`A planted role is left: ${steps.roles}`);
+  };
+  try {
+    for (const statement of steps.plant) await owner.exec(statement);
+  } catch (error) {
+    await undo();
+    throw error;
+  }
+  return undo;
+}

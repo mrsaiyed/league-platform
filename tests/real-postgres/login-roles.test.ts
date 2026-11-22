@@ -4,12 +4,14 @@
 import { checkLoginRole, withTransaction } from '@srleagues/database';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  plantLoginFault,
   roleFacts,
   sessionFacts,
   setRoleAppUser,
+  type LoginFault,
   type RoleFacts,
 } from '../../packages/database/src/real-postgres/real-postgres.test-helper.ts';
-import { appDatabase, ownerDatabase, ownerSession } from './server.ts';
+import { appDatabase, fresh, ownerDatabase, ownerSession } from './server.ts';
 
 let owner: RoleFacts;
 let app: RoleFacts;
@@ -75,9 +77,12 @@ describe('the tables’ owner, made as Supabase’s postgres is', () => {
     const db = ownerDatabase();
     try {
       expect(await checkLoginRole(db)).toEqual([
-        'it bypasses row-level security',
-        'it owns tables in public, or can act as their owner',
-        'it is a member of app_user but may not switch to it (set role)',
+        'postgres bypasses row-level security: alter role postgres nobypassrls',
+        'postgres may create roles: alter role postgres nocreaterole',
+        expect.stringMatching(
+          /^postgres owns tables \(\S+ and \d+ more\), so it could switch their fence off: the app must log in as a role of its own \(as app_login is\), not as the tables’ owner$/,
+        ),
+        'postgres is a member of app_user but may not switch to it (set role): grant app_user to postgres with set true',
       ]);
     } finally {
       await db.close();
@@ -85,6 +90,8 @@ describe('the tables’ owner, made as Supabase’s postgres is', () => {
   });
 
   it('cannot set role app_user', async () => {
+    // Its ADMIN-only memberships in app_login, app_user and sign_in_store are reached, but
+    // none of those has a power or a table, so none is reported above.
     const session = await ownerSession();
     try {
       // 42501: permission denied to set role "app_user".
@@ -104,4 +111,51 @@ describe('the tables’ owner, made as Supabase’s postgres is', () => {
       await db.close();
     }
   });
+});
+
+// Step 2.202's fix round: the faults an independent review planted, or that it found the
+// check did not look for. Each is planted by the tables' owner, the check must name it
+// with the statement that takes it away, and once taken away app_login passes again.
+describe('a fault planted in what app_login may become', () => {
+  const planted: [LoginFault, (word: string) => string[]][] = [
+    [
+      'may-become-bypass',
+      (w) => [
+        `app_login may become p_byp_${w}, which bypasses row-level security: revoke p_byp_${w} from app_login`,
+      ],
+    ],
+    [
+      'may-become-bypass-deeper',
+      (w) => [
+        `app_login may become p_byp_${w} through p_mid_${w}, which bypasses row-level security: revoke p_byp_${w} from p_mid_${w}`,
+      ],
+    ],
+    [
+      'may-act-as-platform-owner',
+      (w) => [
+        `app_login may act as p_own_${w}, which owns a table (platform.p_own_${w}_kept): revoke p_own_${w} from app_login`,
+      ],
+    ],
+    ['may-create-roles', () => ['app_login may create roles: alter role app_login nocreaterole']],
+  ];
+
+  for (const [fault, said] of planted) {
+    it(`${fault}: refused, naming it; then passes again`, async () => {
+      const word = fresh();
+      const owner = await ownerSession();
+      const db = appDatabase(1);
+      try {
+        const undo = await plantLoginFault(owner, fault, word);
+        try {
+          expect(await checkLoginRole(db)).toEqual(said(word));
+        } finally {
+          await undo();
+        }
+        expect(await checkLoginRole(db)).toEqual([]);
+      } finally {
+        await db.close();
+        await owner.close();
+      }
+    });
+  }
 });
