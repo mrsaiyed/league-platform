@@ -7,6 +7,7 @@
 // (database-ports.ts, step 2.50).
 import type { BinTx, CommandDeps, PeopleTx } from '@srleagues/core';
 import type { AdminTeamsTx } from './admin-teams.ts';
+import { coreEventHandlers } from './database-event-handlers.ts';
 
 export type AdminPeoplePorts = {
   /** Runs the people commands and reads; the context comes from the session (T-23). */
@@ -21,19 +22,10 @@ export type AdminPeoplePorts = {
 /**
  * Admin → Teams' commands' dependencies, for the people commands: the same transaction
  * (its people store, access, activity log, and the stores core's event handlers need) and
- * the same handlers. A handler is given the whole transaction it was made for; were it
- * ever handed less, it refuses rather than run without its stores.
+ * core's handlers, from the one place every database port takes them
+ * (database-event-handlers.ts, step 2.93's last part), never a list made here. A handler
+ * handed a transaction without the stores it uses refuses rather than run without them.
  */
 export function peopleDepsOf(teams: CommandDeps<AdminTeamsTx>): CommandDeps<PeopleTx> {
-  const isTeamsTx = (tx: PeopleTx): tx is AdminTeamsTx => 'teams' in tx;
-  return {
-    ...teams,
-    events: teams.events.map((handler) => ({
-      type: handler.type,
-      handle: async (event, tx) => {
-        if (!isTeamsTx(tx)) throw new Error('A people transaction without its teams stores.');
-        await handler.handle(event, tx);
-      },
-    })),
-  };
+  return { ...teams, events: coreEventHandlers<PeopleTx>() };
 }

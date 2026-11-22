@@ -48,34 +48,68 @@ type AnyDeps = {
   ) => Promise<T>;
 };
 
-/** Every area of the ports that runs commands (has `deps`), by its name. */
-function portsWithCommands(): { moved: Map<string, AnyDeps>; notMoved: string[] } {
+/** A command's dependencies: a transaction to run in and the events it hands on. */
+const isCommandDeps = (value: unknown): value is AnyDeps =>
+  typeof value === 'object' && value !== null && 'events' in value && 'transaction' in value;
+
+/**
+ * Every area of the ports that runs commands, by its name: an area's `deps`, and any other
+ * command dependencies it holds (`adminPeople.putBack`, the bin's), named `area.field`.
+ * `withoutCommands` is every other area that is an object, so a port added later is either
+ * walked or must be named below with the reason it runs no command.
+ */
+function portsWithCommands(): {
+  moved: Map<string, AnyDeps>;
+  notMoved: string[];
+  withoutCommands: string[];
+} {
   const moved = new Map<string, AnyDeps>();
   const notMoved: string[] = [];
+  const withoutCommands: string[] = [];
   for (const [name, area] of Object.entries(ports)) {
     if (typeof area !== 'object' || area === null) continue;
-    let deps: unknown;
+    let fields: [string, unknown][];
     try {
-      deps = (area as { deps?: unknown }).deps;
+      void (area as { deps?: unknown }).deps;
+      fields = Object.entries(area as Record<string, unknown>);
     } catch (error) {
       // An area not on the database yet refuses the moment it is reached.
       if (!(error instanceof NotOnTheDatabaseYet)) throw error;
       notMoved.push(name);
       continue;
     }
-    if (typeof deps === 'object' && deps !== null && 'events' in deps) {
-      moved.set(name, deps as AnyDeps);
+    let found = false;
+    for (const [field, value] of fields) {
+      if (!isCommandDeps(value)) continue;
+      moved.set(field === 'deps' ? name : `${name}.${field}`, value);
+      found = true;
     }
+    if (!found) withoutCommands.push(name);
   }
-  return { moved, notMoved };
+  return { moved, notMoved, withoutCommands };
 }
+
+/**
+ * The areas that are objects and run no command, each with the reason: none of them can
+ * raise an event, so none needs core's handlers. A new area lands here only with its own
+ * reason, and one that starts running commands moves to the list above.
+ */
+const runNoCommand: Record<string, string> = {
+  botCheck: 'asks the bot-check service about one form; it reads and writes nothing of ours',
+  publicSchedule: 'the public schedule pages only read published games',
+  publicStats: 'the public stats pages only read the published tables and leaders',
+  publicTeams: 'the public team pages only read published teams and rosters',
+  signIn: 'the sign-in service is outside: our account is linked by accessOf’s own query',
+  signInMail: 'sends the sign-in emails; it reads and writes no table',
+};
 
 describe('core’s event handlers on the database', () => {
   it('every database port that runs commands is given them, from the one place', () => {
-    const { moved, notMoved } = portsWithCommands();
+    const { moved, notMoved, withoutCommands } = portsWithCommands();
     // Today's: a port that runs commands and is not here is still a stand-in's refusal.
     expect([...moved.keys()].sort()).toEqual([
       'adminPeople',
+      'adminPeople.putBack',
       'adminSettings',
       'adminTeams',
       'games',
@@ -83,6 +117,7 @@ describe('core’s event handlers on the database', () => {
       'tracker',
     ]);
     expect(notMoved).toEqual(['fixtureImport']);
+    expect(withoutCommands.sort()).toEqual(Object.keys(runNoCommand).sort());
     for (const [name, deps] of moved) {
       expect(deps.events.length, name).toBeGreaterThan(0);
       expect(isCoreEventHandlers(deps.events), name).toBe(true);
