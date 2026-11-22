@@ -9,8 +9,10 @@ export const usage = [
   '  npm run release                       the local test database in .local/seed-db',
   '  npm run release -- --db <folder>      a PGlite folder on this computer',
   '  npm run release -- --hosted           a hosted database, at a terminal only, with',
-  '    MIGRATION_DATABASE_URL  the migration login, given for this one command only',
-  '                            (never in .env, never a setting on the host)',
+  '    MIGRATION_DATABASE_URL  the migration login’s address WITHOUT its password, given',
+  '                            for this one command only (never in .env, never a setting',
+  '                            on the host); the release asks for the password itself,',
+  '                            with the typing hidden',
   '    PLATFORM_DATABASE_CA    the server’s certificate: its PEM text or a file’s path',
   '                            (for Supabase, the one on the project’s database settings page)',
   '  --go-ahead                            release even while games are being scored',
@@ -30,7 +32,17 @@ export const hostedNeedsTerminal =
 export const loginInEnvFile = (name) =>
   `${name} is in the .env file: the migration login is given for this one command only, never kept in a file. Remove it from .env. Nothing was opened.`;
 export const settingMissing = (name) =>
-  `${name} is not set: give the migration login’s address for this one command. Nothing was opened.`;
+  `${name} is not set: give the migration login’s address, without its password, for this one command. Nothing was opened.`;
+
+/** T-300: one fixed sentence, for an address in a setting or an argument; it repeats none of it. */
+export const passwordInAddress =
+  'That address carries a password, so nothing was opened and none of it is shown: give the address without its password (the release asks for the password itself, with the typing hidden), and clear that line from your terminal’s history.';
+export const passwordQuestion =
+  'The migration login’s password (from your password vault; what you type is not shown): ';
+export const noPasswordTyped =
+  'No password was typed, and a database not on this computer needs one. Nothing was opened.';
+export const notUnderstood =
+  'That was not understood, so nothing was opened (what was typed is not repeated).';
 export const notPostgres = (name) => `${name}: invalid, must be a postgres:// address.`;
 export const queryStringRefused = (name) =>
   `${name}: nothing may follow "?" in the address; SSL is set by PLATFORM_DATABASE_CA. Nothing was opened.`;
@@ -54,7 +66,7 @@ const cannotConnect = {
     'the database’s certificate was not accepted: set PLATFORM_DATABASE_CA to the database’s own certificate (its PEM text, or the path of a file holding it; for Supabase, the one on the project’s database settings page), then run the release again.',
   ssl: 'the database would not take an encrypted connection: check that MIGRATION_DATABASE_URL is the hosted database’s address, then run the release again.',
   login:
-    'the database refused the password or login: check the migration login and its password in MIGRATION_DATABASE_URL, then run the release again.',
+    'the database refused the password or login: check the migration login’s name in MIGRATION_DATABASE_URL and the password you typed, then run the release again.',
   database:
     'the database named at the end of MIGRATION_DATABASE_URL does not exist there: check its name in the address, then run the release again.',
   host: 'the database could not be reached: its host in MIGRATION_DATABASE_URL was not found; check the address, then run the release again.',

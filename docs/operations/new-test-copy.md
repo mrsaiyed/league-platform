@@ -20,7 +20,7 @@ Without it, the first person to sign up with an owner's address would take that 
 
 ## 3. Apply the database changes
 
-At your terminal, run the release command against the new copy, as the tables' owner, the certificate checked: section 1 of [releasing and going back](releasing-and-going-back.md). See every change listed as applied, up to the newest. Run it again: nothing applied.
+At your terminal, run the release command against the new copy, as the tables' owner, the certificate checked: section 1 of [releasing and going back](releasing-and-going-back.md). The address you type has no password in it; paste the owner's password from your vault when the command asks (nothing shows while you do). See every change listed as applied, up to the newest. Run it again: nothing applied.
 
 This makes the tables and the two roles the website needs, `app_user` and `sign_in_store`. Neither can sign in by itself.
 

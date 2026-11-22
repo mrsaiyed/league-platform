@@ -21,16 +21,25 @@ Nothing does this by itself. Render's automatic deploys are off ([the test copy 
 - **No game being scored.** The release command counts the games marked live in every league and stops if there are any (T-158). Release after games are final. Do not release around a game.
 - **Your checkout is that commit.** In your copy of the repository: `git fetch` then `git checkout <the commit>`. Change nothing in `supabase/migrations`: the command refuses if anything there differs from the commit.
 - **Two things at hand, never in a file in the repository:**
-  - the **migration login's** address (the tables' owner, `postgres`, the Session pooler's address, port 5432: see [new test copy](new-test-copy.md), "Where each password lives"). It is typed for this one command only. It is never put in `.env` (the command refuses it there) and never put in Render's settings, because that login sees every league's data.
+  - the **migration login's** address, **without its password** (the tables' owner, `postgres`, on the Session pooler, port 5432: see [new test copy](new-test-copy.md), "Where each password lives"). It is typed for this one command only. It is never put in `.env` (the command refuses it there) and never put in Render's settings, because that login sees every league's data.
+  - that login's **password**, in your password vault only. You paste it when the command asks for it, never in the command itself.
   - the database's **certificate** file, downloaded from the test copy's Supabase dashboard (Database settings, SSL), saved in the folder, for example `staging-ca.crt`.
 
 ## 1. The database: run the release command
 
-In a terminal, in the repository folder, type (on one line, with your own address in place of the dots):
+In a terminal, in the repository folder, type this on one line, with the test copy's project reference in place of `<reference>` and the pooler's host in place of `<pooler host>` (both are in the Supabase dashboard's **Connect** panel, under Session pooler; to confirm on the day). There is **no password** in it:
 
 ```bash
-MIGRATION_DATABASE_URL='postgres://…' PLATFORM_DATABASE_CA=./staging-ca.crt npm run release -- --hosted
+MIGRATION_DATABASE_URL='postgres://postgres.<reference>@<pooler host>:5432/postgres' PLATFORM_DATABASE_CA=./staging-ca.crt npm run release -- --hosted
 ```
+
+It then asks for **the migration login's password**. Copy it from your password vault, paste it and press Enter. **Nothing appears while you paste or type**: that is on purpose. This way the password is never on the screen, never in the terminal's history (the list of commands it remembers), and never in terminal text you copy into a chat.
+
+**Never put the password in the command.** The address Supabase shows may have `[YOUR-PASSWORD]`, or the password itself, between a `:` and the `@`: take that part out, the `:` with it. If an address you give has a password in it, the command stops at once with: "That address carries a password, so nothing was opened and none of it is shown: give the address without its password (the release asks for the password itself, with the typing hidden), and clear that line from your terminal’s history." Then:
+
+1. Close that terminal window, open a new one, and delete the line from the terminal's history file in a text editor: on a Mac, the hidden file `.zsh_history` in your home folder; on Linux, `.bash_history` (to confirm on your computer).
+2. If that terminal text was copied anywhere (a chat, a note), change the password: [rotating a secret](rotating-a-secret.md), "The tables' owner".
+3. Run the command again, as above, without the password.
 
 What you see, in order:
 

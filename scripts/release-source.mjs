@@ -4,8 +4,10 @@
 // - With no --hosted it uses a PGlite folder on this computer, --db <folder>, or the
 //   local test database in .local/seed-db. Hosted settings in the environment are not read.
 // - --hosted needs a person at a terminal (with none it opens nothing), and the migration
-//   login given for this one command, MIGRATION_DATABASE_URL, never kept in .env and never
-//   a setting on the host: it owns the tables and sees past every league's fence (T-48).
+//   login's address given for this one command, MIGRATION_DATABASE_URL, never kept in .env
+//   and never a setting on the host: it owns the tables and sees past every league's fence
+//   (T-48). The address carries no password: release.mjs asks for it with the typing
+//   hidden (`askPassword`), and an address that carries one is refused (T-300).
 //   The address passes the tracker's database guard (packages/providers, record 055, the
 //   same one the web app, the worker and the league-making tool run), and a database not
 //   on this computer has its certificate checked: PLATFORM_DATABASE_CA, read as the web
@@ -22,6 +24,7 @@ import {
   platformDatabaseProblem,
   trackerProjectProblem,
 } from '@srleagues/providers';
+import { addressCarriesPassword } from './release-password.mjs';
 import * as words from './release.messages.mjs';
 
 /** The migration login's address, and the server's certificate, by their settings' names. */
@@ -71,6 +74,12 @@ export function releaseSourceFor({
         : {}),
     };
   }
+  // T-300: the address comes without its password, which is asked for at the terminal
+  // with the typing hidden. One that carries one is refused before anything else, in a
+  // sentence that repeats none of it.
+  if (addressCarriesPassword(env[migrationSetting])) {
+    return { problems: [words.passwordInAddress] };
+  }
   if (db !== undefined) return { problems: [words.hostedAndFolder] };
   if (!terminal) return { problems: [words.hostedNeedsTerminal] };
 
@@ -111,6 +120,12 @@ export function releaseSourceFor({
   }
 
   if (problems.length > 0) return { problems };
+  // 'off' (no encryption) only for a database on this computer: anywhere else a missing
+  // certificate was refused above.
   const options = ca !== undefined ? { ssl: 'verify', ca } : { ssl: 'off' };
-  return { source: { kind: 'migration-login', migration: { url: address, ...options } } };
+  return {
+    source: { kind: 'migration-login', migration: { url: address, ...options } },
+    askPassword: true,
+    local,
+  };
 }

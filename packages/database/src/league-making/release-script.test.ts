@@ -154,12 +154,31 @@ describe('scripts/release.mjs on a PGlite folder', () => {
     const envFile = path.join(root, 'made-up.env');
     await writeFile(
       envFile,
-      `MIGRATION_DATABASE_URL=postgres://made-up:${secret}@db.example.test:5432/league\n`,
+      `MIGRATION_DATABASE_URL=postgres://made-up@db.example.test:5432/league\n`,
     );
     const hosted = await release(['--hosted'], envFile);
     expect(hosted.code).toBe(2);
     expect(hosted.err).toContain('needs a person at a terminal');
-    expect(hosted.out + hosted.err).not.toContain(secret);
+
+    // T-300: a password in the setting or in an argument is refused, and never repeated.
+    const refusal =
+      'That address carries a password, so nothing was opened and none of it is shown';
+    const withSecret = path.join(root, 'made-up-with-password.env');
+    await writeFile(
+      withSecret,
+      `MIGRATION_DATABASE_URL=postgres://made-up:${secret}@db.example.test:5432/league\n`,
+    );
+    for (const [args, file] of [
+      [['--hosted'], withSecret],
+      [[`postgres://made-up:${secret}@db.example.test:5432/league`], undefined],
+      [['--hosted', `--db=postgres://made-up:${secret}@db.example.test/league`], undefined],
+      [['--hosted', '--made-up-option', secret], undefined],
+    ] as const) {
+      const ran = await release(args, file);
+      expect(ran.code).toBe(2);
+      expect(ran.out + ran.err).not.toContain(secret);
+      if (args.length !== 3) expect(ran.err).toContain(refusal);
+    }
 
     const missing = await release(['--db', path.join(root, 'not-made')]);
     expect(missing.code).toBe(1);

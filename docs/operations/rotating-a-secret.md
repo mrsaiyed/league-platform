@@ -12,7 +12,7 @@ This is the strongest login: it owns every table and sees every league. It is ne
 
 1. Supabase dashboard, the test copy's project, **Database settings**: **Reset database password**. Paste the new one from your password manager.
 2. Update it wherever you keep it for the release command (your password manager; your git-ignored `.env.staging`, if you keep it there).
-3. Check: run the release command once ([releasing and going back](releasing-and-going-back.md), section 1) and see "Already applied" with nothing new. The old password must be refused.
+3. Check: run the release command once ([releasing and going back](releasing-and-going-back.md), section 1), paste the **new** password when it asks, and see "Already applied" with nothing new. Run it once more and paste the **old** one: it must be refused ("the database refused the password or login"). The password is never part of the command you type.
 
 The owner's password once pasted into a chat is still to be changed this way (`STATUS.md`, "Needs the founder").
 

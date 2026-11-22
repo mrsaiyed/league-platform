@@ -79,7 +79,7 @@ describe('the release command on a real PostgreSQL', () => {
     expect(ran.code).toBe(1);
     const said = [...ran.out, ...ran.err].join('\n');
     expect(said).toContain(
-      'the database refused the password or login: check the migration login and its password in MIGRATION_DATABASE_URL',
+      'the database refused the password or login: check the migration login’s name in MIGRATION_DATABASE_URL and the password you typed',
     );
     expect(said).not.toContain(password);
     expect(said).not.toContain(address.host);
