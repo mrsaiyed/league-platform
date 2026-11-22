@@ -1,12 +1,12 @@
 # Setting up a new test copy
 
-> **Not yet followed.** This procedure counts as written only once it has been followed in the supervised session the founder starts with the lead beside them (T8 §11, T-165; it is the audit 2.110's section 10, steps 3 to 13, as the lead corrected it). Until then it is **not verified**. When it has been followed, the lead writes "Followed on (date)" here.
+> **Not yet followed.** This procedure counts as written only once it has been followed in the supervised session the founder starts with the lead beside them (T8 §11, T-165; it is the audit 2.110's section 10, steps 3 to 13, as the lead corrected it). Until then it is **not verified**. When it has been followed, the lead writes "Followed on (date)" here. On this computer, `npm run rehearse:test-copy` follows it with made-up data up to step 8.1 (step 2.207; a throw-away PostgreSQL with a certificate, the sign-in service's stand-in, the website in staging mode).
 
 A **test copy** is the whole platform online with made-up data only: its own Supabase project (database and sign-in), and the website on Render. Never the Al-Hadi tracker's project, the one named in `supabase/site.json`.
 
 **Who does what.** The founder, at their own computer, types every address, password and key, in the Supabase and Render dashboards and at their terminal. The lead reads the screen with them and never holds a password. If what you see at a step is not what it says here, stop there and do not go on.
 
-The order matters: steps 1 to 6 are all done **before the website is started** (step 7).
+The order matters: steps 1 to 5 are all done **before the website is started** (step 7). Step 6 needs a league, so it is done after step 8's first check.
 
 ## 1. Check it is the right project
 
@@ -19,6 +19,8 @@ In the test copy's dashboard: **Authentication**, then **Sign In / Providers**, 
 Without it, the first person to sign up with an owner's address would take that league. The website checks this itself and refuses to start while it is off (step 2.115), and says what to turn on and where.
 
 ## 3. Apply the database changes
+
+First download the test copy's database certificate (Supabase dashboard, **Database** settings, **SSL**; to confirm on the day) into the repository folder as `staging-ca.crt`: every command below and the Render setting `PLATFORM_DATABASE_CA` use that one file. Git ignores it (`*.crt`), so it is never committed.
 
 At your terminal, run the release command against the new copy, as the tables' owner, the certificate checked: section 1 of [releasing and going back](releasing-and-going-back.md). The address you type has no password in it; paste the owner's password from your vault when the command asks (nothing shows while you do). See every change listed as applied, up to the newest. Run it again: nothing applied.
 
@@ -48,7 +50,7 @@ The website never signs in as the tables' owner. It has its own login, which can
 
 ## 5. Give it the sign-in store, once
 
-Still in the SQL editor, run once:
+Back in the dashboard's **SQL editor** (step 4's `psql` was left with `\q`), run once:
 
 ```sql
 grant sign_in_store to app_login;
@@ -58,7 +60,7 @@ See "Success" (or that it is already granted). The website refuses to start unti
 
 ## 6. The checks on the real database
 
-The lead and you run the checks on real PostgreSQL from step 2.93's line together (or by hand, as the lead reads them out). Every one must answer as its line says; any other answer stops the session.
+**Not here: after step 8's first check.** The checks on real PostgreSQL are the lists headed "FOR THE SUPERVISED SESSION ON REAL POSTGRESQL" in step 2.93's line of `docs/build/STAGE-2.md`. They need a league, its season and its owner signed in, so on a new, empty copy they can only be run once step 8.1 has made them. The lead and you run them then, together (or by hand, as the lead reads them out). Every one must answer as its line says; any other answer stops the session. Before that, the website's own start (step 7) is the check of `app_login`: it refuses a login that owns tables, bypasses the fence or lacks the sign-in store.
 
 ## 7. Start the website on Render
 
@@ -74,7 +76,7 @@ Then deploy the commit the release command named, and read the log together: sec
 
 ## 8. The first checks on the copy
 
-1. **Save one form** (step 2.239). This is the first check, before anything else: once a league and its owner exist ([make a league](make-a-league.md)), sign in as the owner, change one thing in a form, save, and see the page it leads to, with the change. Until a league exists, the health address is the only check: `https://<name>.onrender.com/api/v1/health` answers `"status":"ok"` with its database check.
+1. **Save one form** (step 2.239). This is the first check, before anything else: once a league and its owner exist ([make a league](make-a-league.md)), the owner signs up on the copy's `/signup` page with the owner's made-up address, and the code they are sent is read at your terminal with `node scripts/read-kept-emails.mjs --hosted --to <the owner's address>` ([reading the test copy's codes](reading-test-copy-codes.md): the test copy sends no real email). Then, signed in as the owner, change one thing in a form, save, and see the page it leads to, with the change. Until a league exists, the health address is the only check: `https://<name>.onrender.com/api/v1/health` answers `"status":"ok"` with its database check.
 2. **From a phone, signed out:** any page shows the test-copy notice; the page's headers say `noindex`, and so does `/robots.txt`.
 3. **From a phone:** `/signin/kept-emails`, `/signin/made-up-people` and `/signin/no-such-page` give the same "not found" page.
 4. **From a phone:** signing up with a real-looking address that is not made up is refused in plain words.
