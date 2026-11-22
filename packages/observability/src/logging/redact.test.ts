@@ -21,6 +21,13 @@ describe('redact: sensitive keys', () => {
       tokenId: 't',
       firstname: 'a',
       authorization: 'Basic abcdefgh',
+      birthDate: '2012-09-03',
+      birth_date: '2012-09-03',
+      dateOfBirth: '2012-09-03',
+      BirthDate: '2012-09-03',
+      isMinor: true,
+      is_minor: true,
+      visibility: 'initials',
     }) as Record<string, unknown>;
     for (const [key, value] of Object.entries(out)) expect(value, key).toBe('[redacted]');
   });

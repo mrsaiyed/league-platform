@@ -623,8 +623,11 @@ html:has(.staff) {
   text-decoration: underline;
 }
 .staff-trail [aria-current] {
+  min-inline-size: 0;
   color: var(--color-text);
   font-weight: 600;
+  /* A 60-letter one-word name breaks, as the title does, rather than push the page wide. */
+  overflow-wrap: anywhere;
 }
 
 /* A small uppercase label over a group of things. */
@@ -1089,6 +1092,8 @@ html:has(.staff) {
   color: var(--color-text);
   font-weight: 600;
   text-decoration: none;
+  /* A long one-word name breaks inside the row, as the title does, never past its edge. */
+  overflow-wrap: anywhere;
 }
 .staff-row-link::after {
   content: '';

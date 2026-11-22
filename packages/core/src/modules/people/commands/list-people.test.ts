@@ -69,4 +69,25 @@ describe('listPeople', () => {
       expect(JSON.stringify(p)).not.toMatch(/birth|email|isMinor|sensitive/i);
     }
   });
+
+  it('searches names only: never part of an email, even for a role that may see emails', async () => {
+    const { deps, as } = setUp();
+    // person(1)'s contact email is p1@example.test.
+    expect(await listPeople(as(registrarId), { search: 'p1@exa' }, deps)).toEqual({
+      ok: true,
+      value: [],
+    });
+    expect(await listPeople(as(ownerId), { search: 'example' }, deps)).toEqual({
+      ok: true,
+      value: [],
+    });
+  });
+
+  it('reads a curly apostrophe in the search as a plain one (a phone types "o’neill")', async () => {
+    const { deps, as } = setUp({
+      people: [person(4, { firstName: 'Liam', lastName: "O'Neill" })],
+    });
+    const found = await listPeople(as(ownerId), { search: 'o’neill' }, deps);
+    expect(found.ok && found.value.map((p) => p.lastName)).toEqual(["O'Neill"]);
+  });
 });

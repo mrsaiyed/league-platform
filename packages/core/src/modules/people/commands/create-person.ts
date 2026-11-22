@@ -5,11 +5,19 @@
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
-import { personBirthDate, personEmail, personName, personPublicName } from '../person-fields.ts';
+import {
+  birthDateAfter,
+  personBirthDate,
+  personEmail,
+  personName,
+  personPublicName,
+} from '../person-fields.ts';
 import { mayChangePeople, maySeeSensitive } from '../policy.ts';
 import type { PeopleTx } from '../ports.ts';
 
-export type CreatePersonError = { readonly code: 'sensitive-fields-not-allowed' };
+export type CreatePersonError = {
+  readonly code: 'sensitive-fields-not-allowed' | 'invalid-input';
+};
 
 export const createPerson = defineCommand({
   name: 'people.create_person',
@@ -30,6 +38,13 @@ export const createPerson = defineCommand({
       input.isMinor !== undefined;
     if (hasSensitive && !(await maySeeSensitive(context, tx))) {
       return fail({ code: 'sensitive-fields-not-allowed' });
+    }
+    // Never after the league's own today (person-fields.ts).
+    if (
+      input.birthDate !== undefined &&
+      birthDateAfter(input.birthDate, await tx.people.leagueToday())
+    ) {
+      return fail({ code: 'invalid-input' });
     }
     const personId = await tx.people.create({
       firstName: input.firstName,

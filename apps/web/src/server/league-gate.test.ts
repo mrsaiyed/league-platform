@@ -77,6 +77,34 @@ describe('a live league', () => {
     expect(asOwner.kind === 'show' && asOwner.view.runsTheLeague).toBe(true);
   });
 
+  it('does not offer People to a registrar for one program, whose grant cannot read it', async () => {
+    const session = await ports.identify(standInPeople.registrar.token);
+    const resolved = await resolveLeagueRequest(
+      { host: 'localhost:3000', path: '/quiet-pines/admin/people', session },
+      deps,
+    );
+    if (resolved.kind !== 'league' || resolved.holder === undefined) throw new Error('no league');
+    const holder = resolved.holder;
+    const forOneProgram = {
+      ...resolved,
+      holder: {
+        ...holder,
+        grants: holder.grants.map((g) => ({
+          ...g,
+          scope: { type: 'program' as const, id: '01900000-0000-7000-8000-0000000000c1' },
+        })),
+      },
+    };
+    const people: LeagueWant = { page: 'admin', area: 'people' };
+    // League-wide, People opens; for one program it is "you do not have access", not a
+    // list that "could not be read just now" and records that are "not found".
+    expect(kind(leaguePageOutcome(resolved, people))).toBe('show');
+    const outcome = leaguePageOutcome(forOneProgram, people);
+    expect(outcome.kind).toBe('no-access');
+    const home = leaguePageOutcome(forOneProgram, adminHome);
+    expect(home.kind === 'show' ? home.view.areas : []).not.toContain('people');
+  });
+
   it('opens the tracker only to those who may score', async () => {
     expect(kind(await ask('scheduler', '/north-valley/score/game-1', score))).toBe('show');
     expect(kind(await ask('coach', '/north-valley/score/game-1', score))).toBe('no-access');
