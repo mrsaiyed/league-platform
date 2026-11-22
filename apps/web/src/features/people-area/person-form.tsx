@@ -18,7 +18,13 @@ import { untouched, type FormState } from '../games-area/form-state.ts';
 import { SavedLine } from '../games-area/saved-line.tsx';
 import { useOneSubmit } from '../games-area/use-one-submit.ts';
 import type { PrivateDetails } from './people-view.ts';
-import { changedBox, sameNameKey, wasField, type PersonBox } from './person-input.ts';
+import {
+  changedBox,
+  onlyMadeUpEmailCode,
+  sameNameKey,
+  wasField,
+  type PersonBox,
+} from './person-input.ts';
 
 export type PersonFormWords = {
   readonly firstName: string;
@@ -34,6 +40,8 @@ export type PersonFormWords = {
   readonly childChoices: Readonly<Record<'' | 'child' | 'adult', string>>;
   /** Each box's sentence when it is wrong. */
   readonly wrong: Readonly<Record<PersonBox, string>>;
+  /** The email box's sentence on the test copy, for an email that is not made up (2.205). */
+  readonly onlyMadeUpEmail: string;
   readonly submit: string;
   /** The tick under an unlikely date of birth shown back before saving (R-28). */
   readonly birthDateChecked: string;
@@ -160,7 +168,9 @@ export function PersonForm({
         <>
           {wrong(name) ? (
             <small id={errorId} className="ui-field-error" role="alert" data-wrong={name}>
-              {words.wrong[name]}
+              {name === 'contactEmail' && refused?.code === onlyMadeUpEmailCode
+                ? words.onlyMadeUpEmail
+                : words.wrong[name]}
             </small>
           ) : null}
           {meanwhile === undefined ? null : (

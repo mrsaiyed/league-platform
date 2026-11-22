@@ -3,9 +3,10 @@
 // (problems.ts), never from anything the person typed.
 import { botCheckDidNotLoad, type BotCheckAction, type BotCheckWidget } from '@srleagues/providers';
 import type { ReactNode } from 'react';
+import { webPorts } from '../../server/container.ts';
 import { t, type TextKey } from '../../server/messages.ts';
 import { problemOf, problems } from '../../server/sign-in/problems.ts';
-import { StandalonePage } from '../shell/index.ts';
+import { StandalonePage, TestCopyLine } from '../shell/index.ts';
 import { BotCheckBox } from './bot-check-box.tsx';
 
 /** With scripts off, what each form says of its check (record 081, F5). */
@@ -23,7 +24,7 @@ export type SearchProps = {
   readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
 };
 
-export function SignInScreen({
+export async function SignInScreen({
   title,
   intro,
   search,
@@ -35,6 +36,7 @@ export function SignInScreen({
   readonly children: ReactNode;
 }) {
   const problem = problemOf(search);
+  const { testCopy } = await webPorts();
   // In the frame of our own pages, on the neutral design, so every field and button is 44
   // high (step 2.127). Their real look is step 2.102's.
   return (
@@ -42,6 +44,8 @@ export function SignInScreen({
       <main className="ui-message sign-in">
         <h1>{t(title)}</h1>
         {intro === undefined ? null : <p>{intro}</p>}
+        {/* Above the form, on the test copy only (step 2.205). */}
+        <TestCopyLine shown={testCopy} />
         {problem === undefined ? null : (
           <p className="ui-refusal" role="alert">
             {problem.name === 'tooManyAttempts'

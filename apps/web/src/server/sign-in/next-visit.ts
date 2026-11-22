@@ -46,6 +46,7 @@ export async function flowDeps(): Promise<FlowDeps> {
     botCheck: ports.botCheck,
     secureCookies: secureCookies(),
     siteOrigin: getConfig().PUBLIC_BASE_URL,
+    testCopy: ports.testCopy,
     now: () => new Date(),
   };
 }

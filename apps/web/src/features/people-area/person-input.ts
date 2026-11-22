@@ -48,6 +48,12 @@ export function newPersonInput(fields: PersonFields): Record<string, unknown> {
   };
 }
 
+/**
+ * The test copy's refusal of a contact email that is not made up (step 2.205): the form
+ * reads it to say the test copy's sentence at the email box (test-copy-email.ts judges it).
+ */
+export const onlyMadeUpEmailCode = 'only-made-up-email';
+
 /** The hidden field that holds what a box held when the form was drawn. */
 export const wasField = (box: PersonBox): string => `was.${box}`;
 
