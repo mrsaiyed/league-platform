@@ -1205,6 +1205,8 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
         await quiet();
         await c.finalButton('reopen').tap();
         await c.reopenAsk.waitFor();
+        // The reason starts empty: "By mistake" gives it in one tap (the fix round, F6).
+        await c.reopenAsk.locator('[data-reopen-mistake]').tap();
         await c.answer('yes').tap();
         await said(/^The game is live again\. Carry on scoring\.$/);
         await quiet();
@@ -1430,6 +1432,8 @@ async function endAtEverySize(browser, faces) {
     await c.finalButton('reopen').click();
     await c.reopenAsk.waitFor();
     await everywhere('the Reopen question');
+    // The reason starts empty: "By mistake" gives it in one tap (the fix round, F6).
+    await c.reopenAsk.locator('[data-reopen-mistake]').click();
     await c.answer('yes').click();
     await c.said.filter({ hasText: /live again/ }).waitFor();
     // The last period run out with a team ahead: End game offered in the pad.
