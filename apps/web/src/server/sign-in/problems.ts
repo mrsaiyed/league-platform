@@ -17,6 +17,8 @@ export const problems = {
   /** Our server could not reach the check's service: asking for a code waits (Q2). */
   botCheckUnreachable: 'problem.botCheckUnreachable',
   invalidEmail: 'problem.invalidEmail',
+  /** The test copy takes only a made-up address for a code (step 2.205). */
+  onlyMadeUpAddresses: 'problem.onlyMadeUpAddresses',
   codeUsedUp: 'problem.codeUsedUp',
   codeNotSent: 'problem.codeNotSent',
   codeWrong: 'problem.codeWrong',

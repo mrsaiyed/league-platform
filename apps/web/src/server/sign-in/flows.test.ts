@@ -10,6 +10,7 @@ import {
   localBotCheckField,
   localBotCheckPassingAnswer,
   type BotCheck,
+  type SignInService,
 } from '@srleagues/providers';
 import { describe, expect, it, vi } from 'vitest';
 import { cookieNames, type CookieJar, type CookieOptions } from './cookies.ts';
@@ -78,6 +79,7 @@ function setup(sender?: (outbox: EmailSender) => EmailSender) {
     botCheck: createLocalBotCheck({ appEnv: 'test' }),
     secureCookies: false,
     siteOrigin: origin,
+    testCopy: false,
     now,
   };
   const advanceSeconds = (seconds: number) => {
@@ -1082,5 +1084,116 @@ describe('after review', () => {
     await renew(token(limit));
     expect(calls).toBe(limit + 2);
     expect(sharedRenewalLimit).toBeLessThanOrEqual(10_000);
+  });
+});
+
+describe('the test copy takes only made-up addresses for a code (step 2.205, T-13, T-201)', () => {
+  /**
+   * The test copy's deps, with a sign-in service and a bot check that fail the test if they
+   * are asked anything at all: each call is written down, then thrown.
+   */
+  function untouchable(env: Env) {
+    const asked: string[] = [];
+    const signIn = new Proxy(env.deps.signIn, {
+      get: (target, name, receiver) => {
+        const real: unknown = Reflect.get(target, name, receiver);
+        if (typeof real !== 'function') return real;
+        return () => {
+          asked.push(`signIn.${String(name)}`);
+          throw new Error(`the sign-in service was asked ${String(name)}`);
+        };
+      },
+    }) satisfies SignInService;
+    const botCheck: BotCheck = {
+      widget: env.deps.botCheck.widget,
+      verify: () => {
+        asked.push('botCheck.verify');
+        throw new Error('the bot check was asked');
+      },
+    };
+    return { asked, deps: { ...env.deps, signIn, botCheck, testCopy: true } };
+  }
+
+  const strangers = ['someone@gmail.com', 'SOMEONE@GMAIL.COM', 'a@example.test.gmail.com', 'x', ''];
+
+  it('refuses a real address at sign-up and reset before the sign-in service or the bot check is asked', async () => {
+    const env = setup();
+    const { asked, deps } = untouchable(env);
+    for (const email of strangers) {
+      const b = browser();
+      expect(await askForCode('sign-up', { email, next: '/a/b' }, b.visit, deps)).toEqual({
+        to: '/signup?problem=onlyMadeUpAddresses&next=%2Fa%2Fb',
+      });
+      expect(await askForCode('reset', { email }, b.visit, deps)).toEqual({
+        to: '/signin/forgot?problem=onlyMadeUpAddresses',
+      });
+      // Nothing set, nothing sent: the address went nowhere.
+      expect(b.names(), email).toEqual([]);
+    }
+    expect(asked).toEqual([]);
+    expect(env.outbox.messages()).toEqual([]);
+  });
+
+  it('answers the same for an address with an account and one without (T-68)', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'someone@gmail.com');
+    const { asked, deps } = untouchable(env);
+    const answers = [];
+    for (const email of ['someone@gmail.com', 'nobody@gmail.com']) {
+      answers.push(await askForCode('reset', { email }, browser().visit, deps));
+    }
+    expect(answers[0]).toEqual(answers[1]);
+    expect(asked).toEqual([]);
+  });
+
+  it('takes a made-up address at sign-up and reset, as anywhere else', async () => {
+    const env = setup();
+    const deps = { ...env.deps, testCopy: true };
+    await signUp(env, browser(), 'taken@league.test');
+    for (const [purpose, email] of [
+      ['sign-up', 'owner@league.test'],
+      ['reset', 'taken@league.test'],
+    ] as const) {
+      const b = browser();
+      expect(await askForCode(purpose, { email }, b.visit, deps)).toEqual({ to: '/signup/code' });
+      expect(await enterCode({ code: env.codeFor(email) }, b.visit, deps)).toEqual({
+        to: '/signup/password',
+      });
+    }
+  });
+
+  it('asks again on "Send a new code", so a flow begun elsewhere sends nothing here', async () => {
+    const env = setup();
+    const b = browser();
+    // Begun where any address is taken (production or local work).
+    await askForCode('sign-up', { email: 'someone@gmail.com' }, b.visit, env.deps);
+    const sent = env.outbox.messages().length;
+    const { asked, deps } = untouchable(env);
+    expect(await resendCode(drawn({}), b.visit, deps)).toEqual({
+      to: '/signup/code?problem=onlyMadeUpAddresses',
+    });
+    expect(asked).toEqual([]);
+    expect(env.outbox.messages()).toHaveLength(sent);
+  });
+
+  it('leaves signing in with a password untouched', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'someone@gmail.com');
+    const deps = { ...env.deps, testCopy: true };
+    const b = browser();
+    expect(
+      await signInWithPassword({ email: 'someone@gmail.com', password }, b.visit, deps),
+    ).toEqual({ to: '/account' });
+    expect(b.names()).toContain(cookieNames.session);
+  });
+
+  it('refuses nothing where it is not the test copy (production and local work)', async () => {
+    const env = setup();
+    expect(env.deps.testCopy).toBe(false);
+    for (const purpose of ['sign-up', 'reset'] as const) {
+      expect(
+        await askForCode(purpose, { email: 'someone@gmail.com' }, browser().visit, env.deps),
+      ).toEqual({ to: '/signup/code' });
+    }
   });
 });

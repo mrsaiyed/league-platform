@@ -68,6 +68,7 @@ const flowDepsOf = (made: Pick<FlowDeps, 'signIn' | 'mail'>): FlowDeps => ({
   botCheck: createLocalBotCheck({ appEnv: 'test' }),
   secureCookies: false,
   siteOrigin: origin,
+  testCopy: false,
   now: () => new Date(),
 });
 

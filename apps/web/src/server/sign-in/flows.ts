@@ -20,6 +20,9 @@
 //   on the attempt limits alone (record 081, Q2: a game night must not hang on an outside
 //   service; the check's own error-level line says so). Asking for a code stays closed
 //   then, because it emails any address typed.
+// - Step 2.205: on the test copy only, asking for a code (sign-up, the forgotten password,
+//   a new code) takes only a made-up address, refused by its form before the bot check and
+//   the sign-in service are asked (notTakenHere). Signing in with a password is untouched.
 import { signInEmail } from '@srleagues/contracts';
 import { platformUrl } from '@srleagues/core';
 import type {
@@ -40,6 +43,7 @@ import {
   writeGoogleFlow,
   type CookieJar,
 } from './cookies.ts';
+import { isMadeUpAddress } from '../kept-emails.ts';
 import { deviceOf, safeReturnPath, type Visit } from './device.ts';
 import { screenUrl, type Problem } from './problems.ts';
 import type { SignInMail } from './sign-in-mail.ts';
@@ -53,6 +57,11 @@ export type FlowDeps = {
   readonly secureCookies: boolean;
   /** PUBLIC_BASE_URL, for Google's return address. */
   readonly siteOrigin: string;
+  /**
+   * Whether this is the test copy (the ports' `testCopy`, step 2.205): asking for a code
+   * then takes only a made-up address, and refuses any other before anything is asked.
+   */
+  readonly testCopy: boolean;
   readonly now: () => Date;
 };
 
@@ -121,10 +130,23 @@ export async function askForCode(
 ): Promise<FlowAnswer> {
   const page = purpose === 'sign-up' ? 'signup' : 'forgotPassword';
   const next = safeReturnPath(fields['next']);
+  const address = fields['email'] ?? '';
+  if (notTakenHere(address, deps)) {
+    return goTo(screenUrl(page, { problem: 'onlyMadeUpAddresses', next }));
+  }
   const refused = await botCheckProblem(purpose, fields, visit, deps);
   if (refused !== undefined) return goTo(screenUrl(page, { problem: refused, next }));
-  return sendCode(purpose, fields['email'] ?? '', next, page, visit, deps);
+  return sendCode(purpose, address, next, page, visit, deps);
 }
+
+/**
+ * The test copy's rule (step 2.205, T-13, T-201): it takes only an address on a name kept
+ * for made-up mail (isMadeUpAddress), judged by the address's form alone, before the bot
+ * check or the sign-in service is asked, so a stranger's address is never sent or stored
+ * there. The refusal is the same whether or not an account exists (T-68). Elsewhere, never.
+ */
+const notTakenHere = (address: string, deps: FlowDeps): boolean =>
+  deps.testCopy && !isMadeUpAddress(address);
 
 /**
  * "Send a new code" on the code screen (T-67): a new code to the address being proved, for
@@ -138,6 +160,10 @@ export async function resendCode(
 ): Promise<FlowAnswer> {
   const flow = readFlow(visit.jar);
   if (flow === undefined) return goTo(screenUrl('signup', { problem: 'codeExpired' }));
+  // The flow's address was taken once; asked again, so no cookie can carry another past it.
+  if (notTakenHere(flow.email, deps)) {
+    return goTo(screenUrl('enterCode', { problem: 'onlyMadeUpAddresses' }));
+  }
   const refused = await botCheckProblem(flow.purpose, fields, visit, deps);
   if (refused !== undefined) return goTo(screenUrl('enterCode', { problem: refused }));
   return sendCode(flow.purpose, flow.email, flow.next, 'enterCode', visit, deps);
