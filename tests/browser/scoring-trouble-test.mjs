@@ -316,19 +316,120 @@ async function oneGame(browser, size) {
         () => document.documentElement.scrollWidth - window.innerWidth,
       );
       note(`${at}: after the takeover nothing scrolls sideways`, sideways <= 0, String(sideways));
+      // Not holding the game, the list is for reading out, with no button (S-77).
+      note(
+        `${at}: on a device that lost the game the list says it is for reading out, with no Enter again`,
+        (await page.locator('[data-kept-list] [data-read-aloud]').count()) === 1 &&
+          (await page.locator('[data-enter-again]').count()) === 0,
+      );
       await page.unroute(isCommands);
-      await page.getByRole('button', { name: 'I have seen these: clear the list' }).tap();
-      await page.locator('[data-kept-list]').waitFor({ state: 'detached' });
-      note(`${at}: the list goes only by the tap that clears it`, true);
       await session(origin, { type: 'release', sessionId: taken.sessionId });
       await page.getByRole('button', { name: 'See who is scoring' }).tap();
       await c.open();
+      // Holding the game again, each kept play can be entered again, as a new play now.
+      const again = c.pad.locator('[data-kept-list] [data-enter-again]');
+      await again.first().waitFor();
       note(
-        `${at}: opened again, the plays the other device took away are not on the score`,
-        JSON.stringify(await c.score()) === '{"home":8,"away":4}',
+        `${at}: holding the game again, each kept play offers Enter again, in the pad`,
+        (await again.count()) === 2 &&
+          (await page.locator('[data-kept-list] [data-read-aloud]').count()) === 0,
+        String(await again.count()),
+      );
+      await still(page, `${at}, the kept plays listed in the pad`);
+      await again.first().tap();
+      await page.locator('[data-kept-list] [data-kept-play]').nth(1).waitFor({ state: 'detached' });
+      await c.saved();
+      note(
+        `${at}: Enter again records the play as a new one and takes it off the list`,
+        JSON.stringify(await c.score()) === '{"home":10,"away":4}' &&
+          (await page.locator('[data-kept-list] [data-kept-play]').count()) === 1,
+        JSON.stringify(await c.score()),
+      );
+      await page.getByRole('button', { name: 'I have seen these: clear the list' }).tap();
+      await page.locator('[data-kept-list]').waitFor({ state: 'detached' });
+      note(`${at}: the list goes only by the tap that clears it`, true);
+      await c.saved();
+      note(
+        `${at}: the play the other device took away and was not entered again is not on the score`,
+        JSON.stringify(await c.score()) === '{"home":10,"away":4}',
         JSON.stringify(await c.score()),
       );
     });
+
+    await step(
+      `${at}: plays the league refuses are listed, and a long list scrolls in the pad`,
+      async () => {
+        // The league refuses every play (made up here: the answer a rule refusal gets).
+        await page.route(isCommands, async (route) => {
+          const batch = JSON.parse(route.request().postData() ?? '{}');
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              protocolVersion: batch.protocolVersion,
+              sequence: 0,
+              results: batch.commands.map((command) => ({
+                commandId: command.commandId,
+                status: 'refused',
+                reason: { code: 'rule', message: 'made up for the test' },
+              })),
+            }),
+          });
+        });
+        const refused = 10;
+        const rows = page.locator('[data-not-applied-list] [data-not-applied-play]');
+        // Each refused tap is shown, then taken off the score: the list is waited for instead.
+        for (let n = 0; n < refused; n += 1) {
+          await c.tile(n % 2 === 0 ? 'home' : 'away', 5).tap();
+          await c.option('p2').tap();
+          await rows.nth(n).waitFor();
+        }
+        await rows.nth(refused - 1).waitFor({ timeout: 30_000 });
+        await page.getByText(`${refused} plays were not applied.`, { exact: false }).waitFor();
+        note(
+          `${at}: each refused play is listed under its notice, in the tracker's words`,
+          (await rows.count()) === refused &&
+            (await rows.allInnerTexts()).every((row) => /\+2/.test(row)),
+          JSON.stringify(await rows.allInnerTexts()),
+        );
+        await still(page, `${at}, ten plays not applied`);
+        const box = await page.evaluate(() => {
+          const notices = document.querySelector('[data-pad] [data-pad-notices]');
+          const rest = document.querySelector('[data-pad] [data-rest]').getBoundingClientRect();
+          const r = notices?.getBoundingClientRect();
+          return {
+            inPad: notices !== null && notices !== undefined,
+            scrollsInside: notices !== null && notices.scrollHeight > notices.clientHeight,
+            withinPad: r !== undefined && r.bottom <= rest.bottom + 0.5 && r.top >= rest.top - 0.5,
+          };
+        });
+        note(
+          `${at}: the long list scrolls inside the pad, the pad keeps its place`,
+          box.inPad && box.scrollsInside && box.withinPad,
+          JSON.stringify(box),
+        );
+        await picture(page, `trouble-not-applied-${size.width}x${size.height}`);
+        await page.unroute(isCommands);
+        const last = page.locator('[data-not-applied-list] [data-enter-again]').last();
+        await last.scrollIntoViewIfNeeded();
+        await last.tap();
+        await rows.nth(refused - 1).waitFor({ state: 'detached' });
+        // The banner says "not applied" until the list is cleared, so it is cleared first.
+        const left = await rows.count();
+        await page.getByRole('button', { name: 'I have seen these: clear the list' }).tap();
+        await page.locator('[data-not-applied-list]').waitFor({ state: 'detached' });
+        await c.saved().catch(async () => {
+          const pad = (await c.pad.innerText()).replace(/\s+/g, ' ').slice(0, 300);
+          throw new Error(`not saved: the banner says “${await bannerSays()}”; the pad: ${pad}`);
+        });
+        note(
+          `${at}: a refused play entered again is saved and leaves the list`,
+          JSON.stringify(await c.score()) === '{"home":10,"away":6}' && left === refused - 1,
+          JSON.stringify({ score: await c.score(), left }),
+        );
+        await still(page, `${at}, the not-applied list cleared`);
+      },
+    );
 
     await step(`${at}: “update needed” offers Reload, and the plays are kept`, async () => {
       await page.route(isCommands, (route) =>
@@ -358,7 +459,7 @@ async function oneGame(browser, size) {
       await c.saved();
       note(
         `${at}: reloaded, the kept play is sent`,
-        JSON.stringify(await c.score()) === '{"home":10,"away":4}',
+        JSON.stringify(await c.score()) === '{"home":12,"away":6}',
         JSON.stringify(await c.score()),
       );
       await c.leave();
