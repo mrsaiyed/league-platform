@@ -139,6 +139,9 @@ export const enError = {
   'error.leagues.update_season.season-not-found': 'That season is not there.',
   'error.not-allowed': 'You are not allowed to do that.',
   'error.not-confirmed': 'Tick the box to confirm first. Nothing was changed.',
+  // Step 2.157: someone whose role may not add a person to the league (a club admin).
+  'error.people.create_person.not-allowed':
+    "Your role in this league does not include adding people to its list. If it should, ask the league's owner or an admin.",
   'error.people.create_person.sensitive-fields-not-allowed':
     'You are not allowed to enter those details.',
   'error.people.remove_person.person-not-found': 'That person is not in the league list.',
