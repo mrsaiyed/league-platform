@@ -233,6 +233,10 @@ const reachNoLeagueData = new Map<unknown, string>([
   ],
   [databasePackage.isDatabaseAddress, 'tells an address from a folder name; runs nothing'],
   [
+    databasePackage.connectCauseOf,
+    'reads a failed connection’s error code (record 082); runs nothing and reads no row',
+  ],
+  [
     databasePackage.openLeagueMakingTarget,
     'staff tool (step 2.125, record 057): opens a PGlite folder, or the migration login and the app login of a hosted database; each reads the catalog only (live_stats, current_database, the server start time); no league rows',
   ],
