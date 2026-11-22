@@ -60,6 +60,7 @@ import {
   changeRosterEntry,
   clearSettingFor,
   commands,
+  countTeamGames,
   createCourt,
   createDivision,
   createLeague,
@@ -494,6 +495,12 @@ const teamCommandRows: readonly Row[] = [
       name: 'Renamed',
     }),
     (c, i) => updateTeam(c, i, teamsDeps),
+  ),
+  ...teamRows(
+    'teams.count_team_games',
+    "count a team's games before removing it",
+    async (league, program) => ({ teamId: await teamIn(league, program) }),
+    (c, i) => countTeamGames(c, i, teamsDeps),
   ),
   ...teamRows(
     'teams.remove_team',

@@ -17,6 +17,8 @@ export const enScheduleAdmin = {
   'schedule.admin.addRoundSubmit': 'Add round',
   'schedule.admin.askToShow': "Ask the league's owner or an admin to show it.",
   'schedule.admin.away': 'Away team',
+  // The way back to the team whose "Remove this team" led here (step 2.180).
+  'schedule.admin.backToTeam': 'Back to {name}',
   'schedule.admin.blocker.change-no-longer-fits':
     'A change in the draft no longer fits the schedule.',
   'schedule.admin.blocker.draft-unreadable': 'The saved draft cannot be read.',
@@ -215,6 +217,8 @@ export const enScheduleAdmin = {
     'Removed in this draft, but it has started since. Put it back in the draft to publish.',
   'schedule.admin.removedSince.postponed':
     'Removed in this draft, and postponed since: publishing still removes it. Putting it back in the draft keeps it in the schedule, still waiting in Games for a new date.',
+  // A team in the bin, named in a game it played or was to play (A-17, step 2.180).
+  'schedule.admin.removedTeam': '{name} (removed)',
   'schedule.admin.renameRound': 'Round name',
   'schedule.admin.renameRoundSubmit': 'Rename round',
   'schedule.admin.reviewPublish': 'Review and publish',
@@ -264,6 +268,8 @@ export const enScheduleAdmin = {
   'schedule.admin.title': 'Schedule',
   'schedule.admin.toPutBack': 'Put it back from its page in Games',
   'schedule.admin.toWaiting': 'See the games waiting for a new date',
+  // A game's team the season's list does not hold: words, never its id (step 2.180).
+  'schedule.admin.unknownTeam': 'Team not in this season',
   'schedule.admin.venueCourt': '{venue}: {court}',
   'schedule.admin.venueOnly': '{venue} (any court)',
 } as const;

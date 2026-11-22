@@ -80,9 +80,9 @@ export type LeagueRecords = MadeLeague & {
   /** A game still to play, with the member assigned to score it. */
   upcomingGameId: string;
   gameAssignmentId: string;
-  /** The final game's two events, its state, the player's line in it, and a session scoring the upcoming game. */
+  /** The final game's three events (a basket, a turnover charged to the away team, the end), its state, the player's line in it, and a session scoring the upcoming game. */
   gameEventIds: string[];
-  /** The command ids of those two events, as the tracker sent them. */
+  /** The command ids of those events, as the tracker sent them. */
   gameCommandIds: string[];
   gameStateId: string;
   playerGameStatsId: string;
@@ -433,6 +433,9 @@ async function seededLeague(
   let trackedState = basketball.newGame();
   const taps: readonly basketball.Command[] = [
     { type: 'score', side: 'home', playerId: personId, points: 2 },
+    // A turnover charged to the away team itself (step 2.196): a season's team totals
+    // count it, so each league has one the other must never reach.
+    { type: 'team-turnover', side: 'away' },
     { type: 'end' },
   ];
   for (const [i, command] of taps.entries()) {
@@ -452,8 +455,8 @@ async function seededLeague(
   }
   const gameStateId = await id(
     pglite,
-    'insert into game_states (league_id, game_id, seq, state) values ($1, $2, 2, $3)',
-    [leagueId, gameId, JSON.stringify(trackedState)],
+    'insert into game_states (league_id, game_id, seq, state) values ($1, $2, $3, $4)',
+    [leagueId, gameId, taps.length, JSON.stringify(trackedState)],
   );
   const playerGameStatsId = await id(
     pglite,

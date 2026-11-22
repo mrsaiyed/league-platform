@@ -25,8 +25,11 @@ type StoredRow = Awaited<ReturnType<StandingsReadStore['standingsRows']>>[number
 /**
  * One table of made-up teams (their names are their ids) after these games, as the page
  * draws it: the engine's rows, stored and read back as the database gives them. `binned`
- * teams are in the bin since the table was worked out (their rows stay, as they do until
- * the standings are rebuilt); `stored` changes the stored rows by hand.
+ * teams are in the bin since the table was worked out and left out of the season's teams
+ * (their rows stay, as they do until the standings are rebuilt); `kept` teams are in the
+ * bin but kept for their results, marked `removed`, as the season's teams list one with a
+ * result in a game not in the bin (A-17, step 2.180); `stored` changes the stored rows by
+ * hand.
  */
 async function tableAfter(
   teams: readonly string[],
@@ -36,6 +39,7 @@ async function tableAfter(
     readonly adjustments?: readonly StandingsAdjustment[];
     readonly coinFlips?: readonly CoinFlip[];
     readonly binned?: readonly string[];
+    readonly kept?: readonly string[];
     readonly stored?: (rows: StoredRow[]) => StoredRow[];
   } = {},
 ): Promise<Made> {
@@ -73,6 +77,7 @@ async function tableAfter(
           color: null,
           divisionId: null,
           statsVisibility: 'everyone',
+          removed: (options.kept ?? []).includes(name),
         })),
     divisions: async () => [],
     standingsRows: async () =>
@@ -118,6 +123,7 @@ async function tableAfter(
         awayTeamId: game.awayTeamId,
       })),
     teamStatTotals: async () => [],
+    teamTurnoverGames: async () => [],
     people: async () => [],
   };
   const read = await readStandings(store, { seasonId });
@@ -143,7 +149,9 @@ function notesBeside({ view }: Made, team: string): string[] {
 /** The note about level teams beside a team: there is one at most. */
 function levelNoteBeside(made: Made, team: string): string | undefined {
   const row = made.view.rows.find((r) => r.team === team);
-  const ids = (row?.notes ?? []).filter((id) => !id.startsWith('adjustment-'));
+  const ids = (row?.notes ?? []).filter(
+    (id) => !id.startsWith('adjustment-') && id !== 'removed-team',
+  );
   expect(ids.length).toBeLessThanOrEqual(1);
   return made.view.footnotes.find((f) => f.id === ids[0])?.text;
 }
@@ -331,7 +339,8 @@ describe('the note beside each team of the standings', () => {
   });
 
   // The independent review's run (item 1): A, B and C level at .500, A beat C and C beat B,
-  // A and B never met. With C in the bin its row is not shown, and A and B look like a pair
+  // A and B never met. With C in the bin and left out of the season's teams (the next test
+  // has it kept for its results, A-17) its row is not shown, and A and B look like a pair
   // head-to-head separated: they never played, so the note may not say it was the games
   // between them.
   it('never says the games between two teams that never met put one ahead', async () => {
@@ -351,6 +360,33 @@ describe('the note beside each team of the standings', () => {
     expect(levelNoteBeside(made, 'Birch')).toBe(note);
     expect(levelNoteBeside(made, 'Ash')).toBe(note);
     expect(made.html).not.toContain('between them');
+  });
+
+  // Step 2.180 (A-17): a team in the bin with results kept is shown, marked, and its row
+  // holds its place. So it is one of the level teams: the note counts and names it, as it
+  // names only teams the reader can see, and it carries the bin's note besides.
+  it('counts and names a team in the bin kept for its results, shown with its mark', async () => {
+    const games: readonly Game[] = [
+      ['Ash', 50, 'Cedar', 40],
+      ['Cedar', 50, 'Birch', 40],
+      ['Xeno', 50, 'Ash', 40],
+      ['Birch', 50, 'Yew', 40],
+    ];
+    const teams = ['Ash', 'Birch', 'Cedar', 'Xeno', 'Yew'];
+    const whole = await tableAfter(teams, games);
+    const made = await tableAfter(teams, games, { kept: ['Cedar'] });
+    expect(order(made)).toEqual(['Xeno', 'Ash', 'Cedar', 'Birch', 'Yew']);
+    expect(made.view.rows.map((r) => r.seed)).toEqual(whole.view.rows.map((r) => r.seed));
+    const note = levelNoteBeside(made, 'Cedar');
+    expect(note).toBe(levelNoteBeside(whole, 'Cedar'));
+    expect(note).toMatch(/^Ash, Cedar,? and Birch are level/);
+    expect(levelNoteBeside(made, 'Ash')).toBe(note);
+    expect(levelNoteBeside(made, 'Birch')).toBe(note);
+    const removedNote = made.view.footnotes.find((f) => f.id === 'removed-team')?.text;
+    expect(removedNote).toBeDefined();
+    expect(notesBeside(made, 'Cedar')).toContain(removedNote);
+    expect(notesBeside(made, 'Ash')).not.toContain(removedNote);
+    nothingPlacedAbove(made);
   });
 
   // Item 5: four teams at 1–1; head-to-head puts two above two, and nothing separates

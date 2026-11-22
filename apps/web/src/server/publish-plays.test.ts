@@ -34,6 +34,10 @@ function world(publisher: LivePublisher) {
             rules: null,
           }
         : undefined,
+    // Publishing plays never draws a box score's columns (step 2.196).
+    seasonStatistics: async () => {
+      throw new Error('Publishing plays read the season’s statistics, which it never shows.');
+    },
     teams: async () => [
       { id: home, name: 'Home', slug: 'h', color: null, statsVisibility: 'everyone' },
       { id: away, name: 'Away', slug: 'a', color: null, statsVisibility: 'everyone' },
