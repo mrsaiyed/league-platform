@@ -173,7 +173,11 @@ describe('tracker controller: offline and reconnecting (T6 §4)', () => {
     network.mode = 'down';
     await tapAll(controller, [basket('home', hawks[0] ?? ''), basket('away', bears[1] ?? '', 3)]);
     expect(scoreOf(controller.status().game)).toEqual({ home: 2, away: 3 });
-    await clock.advance(5 * minute);
+    // Several minutes with no answer and plays waiting: said plainly (T6 §4), not before.
+    await clock.advance(4 * minute);
+    expect(controller.status().offlineLong).toBe(false);
+    await clock.advance(1.5 * minute);
+    expect(controller.status().offlineLong).toBe(true);
     expect(controller.status().queue.waiting).toBe(2);
     expect(controller.status().queue.unansweredSince).not.toBeNull();
     expect(controller.status().mode).toEqual({ kind: 'scoring' });
@@ -190,6 +194,7 @@ describe('tracker controller: offline and reconnecting (T6 §4)', () => {
     await controller.idle();
     expect(controller.status().queue.waiting).toBe(0);
     expect(controller.status().queue.unansweredSince).toBeNull();
+    expect(controller.status().offlineLong).toBe(false);
     const server = await serverGame(network);
     expect(server.sequence).toBe(4);
     expect(scoreOf(server.state)).toEqual({ home: 2, away: 3 });

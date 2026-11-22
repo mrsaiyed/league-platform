@@ -20,7 +20,8 @@ export type TrackerNotice =
         | 'tracker.notApplied'
         | 'tracker.notSaved'
         | 'tracker.signedOutKept'
-        | 'tracker.notAllowedKept';
+        | 'tracker.notAllowedKept'
+        | 'tracker.offlineLong';
       readonly count: number;
     };
 
@@ -43,7 +44,7 @@ const isEnd = (refused: TrackerControllerStatus['notApplied'][number]): boolean 
 export function trackerNotices(
   status: Pick<
     TrackerControllerStatus,
-    'mode' | 'game' | 'notApplied' | 'notSaved' | 'signedOut' | 'waiting'
+    'mode' | 'game' | 'notApplied' | 'notSaved' | 'signedOut' | 'waiting' | 'offlineLong'
   >,
 ): readonly TrackerNotice[] {
   const notices: TrackerNotice[] = [];
@@ -66,6 +67,8 @@ export function trackerNotices(
       kept > 0 ? { key: 'tracker.signedOutKept', count: kept } : { key: 'tracker.signedOut' },
     );
   }
+  // Several minutes with no connection and plays waiting (T6 §4): they are only here.
+  if (status.offlineLong && kept > 0) notices.push({ key: 'tracker.offlineLong', count: kept });
   if (status.notSaved.length > 0) {
     notices.push({ key: 'tracker.notSaved', count: status.notSaved.length });
   }

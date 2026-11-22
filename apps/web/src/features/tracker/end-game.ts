@@ -262,6 +262,14 @@ export const reopenProblemText = (
     : doorProblemText(result.reason, t);
 
 /**
+ * Whether a reopen that failed is asked again by itself (the review of the two doors,
+ * point 7): with no connection it keeps trying, under the same request id, and the game
+ * is said to be final still until the league answers.
+ */
+export const reopenKeepsTrying = (result: Extract<ReopenResult, { ok: false }>): boolean =>
+  result.reason === 'unanswered';
+
+/**
  * Whether a reopen that failed can simply be asked again from the question (no
  * connection, plays still going out, signed out), or the league has answered for good
  * and the panel says so in the question's place.

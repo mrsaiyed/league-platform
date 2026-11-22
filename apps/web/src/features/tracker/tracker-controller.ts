@@ -162,6 +162,11 @@ export type TrackerControllerStatus = {
   readonly signedOut: boolean;
   /** True while the server's state is being reloaded after a refusal. */
   readonly reloading: boolean;
+  /**
+   * Plays have waited with no answer for `offlineLongMs` (T6 §4, step 2.37 part 2): the
+   * screen says plainly that they are only on this device. False once an answer comes.
+   */
+  readonly offlineLong: boolean;
   readonly queue: QueueStatus;
   /**
    * The server's time now, in milliseconds (T-121, finding M1). The clock is painted
@@ -375,6 +380,12 @@ const reasonOfHalt = (halt: QueueHalt): ReadOnlyReason | 'check-session' => {
   }
 };
 
+/**
+ * How long plays wait with no answer before the screen says they are only on this
+ * device (T6 §4: "after several minutes offline"; S-77 in step 2.37, part 2).
+ */
+export const offlineLongMs = 5 * 60_000;
+
 /** The reasons that mean another device may be scoring the game now. */
 const lostTheGame: ReadonlySet<ReadOnlyReason> = new Set([
   'taken-over',
@@ -545,6 +556,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     lastSavedAt: null,
     signedOut: false,
     reloading: false,
+    offlineLong: false,
     queue: queue.status(),
     now: serverNow,
     clockErrorMs: null,
@@ -1071,7 +1083,27 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     });
   };
 
+  // --- Several minutes offline with plays waiting (T6 §4): said once, plainly. ---
+  let offlineFrom: number | null = null;
+  let cancelOfflineLong: (() => void) | null = null;
+  const watchOffline = (status: QueueStatus): void => {
+    const since = status.waiting > 0 ? status.unansweredSince : null;
+    if (since === offlineFrom) return;
+    offlineFrom = since;
+    cancelOfflineLong?.();
+    cancelOfflineLong = null;
+    const left = since === null ? null : since + offlineLongMs - clock.now();
+    if (left !== null && left <= 0) return update({ offlineLong: true });
+    if (current.offlineLong) update({ offlineLong: false });
+    if (left === null || stopped) return;
+    cancelOfflineLong = clock.after(left, () => {
+      cancelOfflineLong = null;
+      if (!stopped) update({ offlineLong: true });
+    });
+  };
+
   queue.subscribe((status) => {
+    watchOffline(status);
     // The time of the last save, on the server's clock (L1).
     const saved =
       status.savedAt !== null && status.savedAt !== seenSavedAt
@@ -1502,6 +1534,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       clearTimer();
       cancelRenew?.();
       cancelRenew = null;
+      cancelOfflineLong?.();
+      cancelOfflineLong = null;
       const held = sessionId;
       sessionId = null;
       queue.stop();

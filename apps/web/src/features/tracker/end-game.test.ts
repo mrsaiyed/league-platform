@@ -14,6 +14,7 @@ import {
   notStartedQuestion,
   reopenLine,
   reopenLineText,
+  reopenKeepsTrying,
   reopenMayRetry,
   reopenOffered,
   reopenProblemText,
@@ -246,6 +247,10 @@ describe('Reopen on the final panel (S-36)', () => {
     const noSignal = { ok: false, reason: 'unanswered' } as const;
     expect(reopenProblemText(noSignal, t)).toBe('No connection. Try again when it is back.');
     expect(reopenMayRetry(noSignal)).toBe(true);
+    // With no connection it is asked again by itself (point 7); plays going out are not.
+    expect(reopenKeepsTrying(noSignal)).toBe(true);
+    expect(reopenKeepsTrying({ ok: false, reason: 'plays-waiting' })).toBe(false);
+    expect(reopenKeepsTrying({ ok: false, reason: 'signed-out' })).toBe(false);
     expect(reopenMayRetry({ ok: false, reason: 'plays-waiting' })).toBe(true);
     const late = {
       ok: false,

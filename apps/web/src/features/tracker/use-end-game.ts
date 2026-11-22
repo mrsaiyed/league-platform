@@ -22,6 +22,7 @@ import {
   notStartedProblemText,
   notStartedQuestion,
   notStartedReasonReady,
+  reopenKeepsTrying,
   reopenLine,
   reopenMayRetry,
   reopenOffered,
@@ -34,7 +35,12 @@ import type { ClockReading } from './game-clock.ts';
 import { endState, refusedEnd } from './play-log.ts';
 import { padAtRest, type PadMode } from './scoring-moves.ts';
 import { tapTaken, type Tap, type TapRest } from './tap-rest.ts';
-import type { TapInput, TrackerController, TrackerControllerStatus } from './tracker-controller.ts';
+import type {
+  ReopenResult,
+  TapInput,
+  TrackerController,
+  TrackerControllerStatus,
+} from './tracker-controller.ts';
 
 /**
  * How long a fresh End reads "Sending the result…" before it reads "Not sent yet": with
@@ -43,6 +49,8 @@ import type { TapInput, TrackerController, TrackerControllerStatus } from './tra
 export const sendingForMs = 1500;
 /** How often the league is asked again about reopening while it has not answered. */
 const offerAgainMs = 15_000;
+/** How often a Reopen that met no connection is asked again by itself (point 7). */
+const reopenAgainMs = 5_000;
 /** How often the minutes left to reopen are counted again. */
 const minutesEveryMs = 20_000;
 
@@ -110,6 +118,8 @@ export function useEndGame(args: EndGameArgs): EndGame {
   const [clearReason, setClearReason] = useState<NotStartedReason>(notStartedReasonReady);
   const [reasonAsked, setReasonAsked] = useState(false);
   const [working, setWorking] = useState(false);
+  /** The reason of a Reopen being asked again by itself, with no connection; or null. */
+  const [reopenRetry, setReopenRetry] = useState<string | null>(null);
   // What `working` will be once drawn: read here, so a second tap before the next
   // drawing cannot make the same request twice.
   const busy = useRef(false);
@@ -213,6 +223,50 @@ export function useEndGame(args: EndGameArgs): EndGame {
     // once for each refused End, not again with every drawing.
   }, [refusedId, refusedMessage, controller, t]);
 
+  /** What the league answered a Reopen: carried on, asked again by itself, or why not. */
+  const afterReopen = (result: ReopenResult, reason: string): void => {
+    if (result.ok) {
+      setReopenRetry(null);
+      setProblem(null);
+      setReopenReason('');
+      setOffer(null);
+      showPad(padAtRest);
+      return say(t('tracker.reopen.done'));
+    }
+    // No connection: the question stays, says the game is still final, and the same
+    // request goes again by itself until the league answers (point 7).
+    if (reopenKeepsTrying(result)) {
+      setReopenRetry(reason);
+      return setProblem({ on: 'reopen', text: t('tracker.reopen.problem.trying') });
+    }
+    setReopenRetry(null);
+    const text = reopenProblemText(result, t);
+    // Worth asking again as it stands (plays still going out, signed out): the question
+    // stays, with the reason typed. Otherwise the league has answered: the final panel
+    // says why, and asks the league again what it offers now.
+    if (reopenMayRetry(result)) return setProblem({ on: 'reopen', text });
+    setProblem({ on: 'final', text });
+    showPad(padAtRest);
+    void askOffer();
+  };
+  const latestAfterReopen = useRef(afterReopen);
+  latestAfterReopen.current = afterReopen;
+  // The reason changed, or the question was put away: it is no longer asked by itself.
+  const retryStands =
+    reopenRetry !== null && reopenRetry === reopenReason.trim() && wanted.current.kind === 'reopen';
+  useEffect(() => {
+    if (reopenRetry === null) return;
+    if (!retryStands) return setReopenRetry(null);
+    const timer = window.setInterval(() => {
+      if (wanted.current.kind !== 'reopen') return setReopenRetry(null);
+      void during(async () => {
+        latestAfterReopen.current(await controller.reopen(reopenRetry), reopenRetry);
+      });
+    }, reopenAgainMs);
+    return () => window.clearInterval(timer);
+    // `wanted` and `during` are the screen's own for its whole life.
+  }, [reopenRetry, retryStands, controller]);
+
   const on: EndHandlers = {
     endAsk(event) {
       args.closeMore(event.timeStamp);
@@ -284,6 +338,7 @@ export function useEndGame(args: EndGameArgs): EndGame {
       if (wanted.current.kind !== 'reopen') return;
       if (event !== null && !tapTaken(rests.asked, tapOf(event))) return;
       if (!reopen) {
+        setReopenRetry(null);
         setProblem(null);
         // "Reopen game" lies where "Keep it final" was: the final panel rests from this
         // tap, so its double does not ask the question again.
@@ -295,22 +350,7 @@ export function useEndGame(args: EndGameArgs): EndGame {
         return setProblem({ on: 'reopen', text: t('tracker.reopen.refused.reason-needed') });
       }
       void during(async () => {
-        const result = await controller.reopen(reason);
-        if (result.ok) {
-          setProblem(null);
-          setReopenReason('');
-          setOffer(null);
-          showPad(padAtRest);
-          return say(t('tracker.reopen.done'));
-        }
-        const text = reopenProblemText(result, t);
-        // Worth asking again as it stands (no connection, plays still going out): the
-        // question stays, with the reason typed. Otherwise the league has answered: the
-        // final panel says why, and asks the league again what it offers now.
-        if (reopenMayRetry(result)) return setProblem({ on: 'reopen', text });
-        setProblem({ on: 'final', text });
-        showPad(padAtRest);
-        void askOffer();
+        afterReopen(await controller.reopen(reason), reason);
       });
     },
     reopenReason: setReopenReason,

@@ -23,7 +23,14 @@ const reasons: readonly ReadOnlyReason[] = [
   'request-refused',
   'storage-failed',
 ];
-const calm = { game: null, notApplied: [], notSaved: [], signedOut: false, waiting: [] };
+const calm = {
+  game: null,
+  notApplied: [],
+  notSaved: [],
+  signedOut: false,
+  waiting: [],
+  offlineLong: false,
+};
 const texts = (status: Parameters<typeof trackerNotices>[0]) =>
   trackerNotices(status).map((notice) => trackerNoticeText(notice, t));
 
@@ -32,6 +39,15 @@ describe('tracker notices (T6 §5, T-113)', () => {
     expect(texts({ ...calm, mode: { kind: 'scoring' } })).toEqual([]);
     // Taps waiting to send while signed in are the banner's to count, not a notice.
     expect(texts({ ...calm, mode: { kind: 'scoring' }, waiting: [kept(1)] })).toEqual([]);
+  });
+
+  it('says plainly after several minutes offline that the plays are only on this device (T6 §4)', () => {
+    const scoring = { ...calm, mode: { kind: 'scoring' }, offlineLong: true } as const;
+    expect(texts({ ...scoring, waiting: [kept(1), kept(2)] })).toEqual([
+      'No connection for several minutes. 2 plays are only on this device until the connection comes back. Keep this page open and the device switched on: they are sent by themselves.',
+    ]);
+    // Nothing waiting: nothing at risk, nothing said.
+    expect(texts(scoring)).toEqual([]);
   });
 
   it('says why the device is read-only, in words, for every reason', () => {

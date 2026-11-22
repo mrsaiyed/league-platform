@@ -152,6 +152,9 @@ export const enTrackerStates = {
   'tracker.reopen.problem.rejected': 'The league turned that away. A league admin can help.',
   'tracker.reopen.problem.signed-out': 'You are signed out. Sign in again, then try once more.',
   'tracker.reopen.problem.unanswered': 'No connection. Try again when it is back.',
+  // A Reopen with no connection, asked again by itself (the review of the two doors, point 7).
+  'tracker.reopen.problem.trying':
+    'No connection. The game is still final: this device keeps asking the league to reopen it, and says so once it has.',
   // The question in the pad (step 2.37): its title, what reopening does, and the reason,
   // in words short enough for a phone's pad. The field starts empty; the usual reason is
   // one tap beside it ("By mistake" fills it in), so nothing is typed over (fix round, F6).

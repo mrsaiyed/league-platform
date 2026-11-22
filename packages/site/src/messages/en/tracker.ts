@@ -244,6 +244,11 @@ export const enTracker = {
   'tracker.matchup': '{away} at {home}',
   'tracker.noStorage':
     'This browser window cannot save the game on this device, so scoring is off. If this is a private window, open the tracker in a normal one.',
+  // Several minutes with no connection and plays waiting (T6 §4, step 2.37 part 2).
+  'tracker.offlineLong_one':
+    'No connection for several minutes. {count} play is only on this device until the connection comes back. Keep this page open and the device switched on: it is sent by itself.',
+  'tracker.offlineLong_other':
+    'No connection for several minutes. {count} plays are only on this device until the connection comes back. Keep this page open and the device switched on: they are sent by themselves.',
   // No longer allowed to score, with plays still on the device (finding M2).
   'tracker.notAllowedKept_one':
     'You are no longer allowed to score this game. {count} play is still on this device and is not saved. If an admin gives the game back to you, open it again here and it is sent.',
