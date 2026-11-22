@@ -42,3 +42,4 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.203: the worker uses one 'not reached' sentence for host not found, timeout and unknown where the web app has one each; a tunnel to localhost gets around the localhost-only limit of PLATFORM_DATABASE_SSL=off (older behaviour)
 - 2.37 part 2: when the 15-second look at a final game finds it live and nobody holds it, the device quietly becomes the scorer, as at first opening: decide whether it should ask
 - 2.37 part 2: a device showing '<name> is scoring' never learns by itself that the game has ended
+- 2.135: when step 2.91 runs the nightly deletion, the Privacy note may say again that someone never on a team's list is deleted for good after 30 days

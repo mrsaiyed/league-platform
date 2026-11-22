@@ -42,6 +42,7 @@ const valid: Record<ConfigName, string> = {
   TURNSTILE_SECRET_KEY: longValue('TURNSTILE_SECRET_KEY'),
   RESEND_API_KEY: longValue('RESEND_API_KEY'),
   EMAIL_FROM: 'hello@example.test',
+  CONTACT_EMAIL: 'contact@example.test',
   STRIPE_SECRET_KEY: longValue('STRIPE_SECRET_KEY'),
   STRIPE_WEBHOOK_SECRET: longValue('STRIPE_WEBHOOK_SECRET'),
 };
@@ -644,5 +645,18 @@ describe('web addresses', () => {
     const error = failure({ ...valid, LOG_LEVEL: 'loud' });
     expect(error.missing).toEqual([]);
     expect(error.invalid.join()).toContain('LOG_LEVEL');
+  });
+});
+
+describe('CONTACT_EMAIL (step 2.135)', () => {
+  it('is optional everywhere, and checked as an email address when given', () => {
+    expect(loadConfig(localOnly).CONTACT_EMAIL).toBeUndefined();
+    expect(loadConfig(production).CONTACT_EMAIL).toBeUndefined();
+    expect(loadConfig({ ...production, CONTACT_EMAIL: 'contact@example.test' }).CONTACT_EMAIL).toBe(
+      'contact@example.test',
+    );
+    expect(failure({ ...valid, CONTACT_EMAIL: 'not an address' }).invalid.join()).toContain(
+      'CONTACT_EMAIL',
+    );
   });
 });

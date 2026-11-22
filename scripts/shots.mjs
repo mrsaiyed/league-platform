@@ -77,6 +77,8 @@ const madeUp = {
   APP_ENV: 'test',
   LOG_LEVEL: 'warn',
   EMAIL_FROM: 'hello@example.test',
+  // The made-up address the Terms and Privacy pages give (step 2.135).
+  CONTACT_EMAIL: 'contact@example.test',
 };
 // The stand-in's two live leagues, and its made-up owner, who is known by this cookie alone
 // (apps/web/src/server/stand-in-ports.ts).
@@ -775,6 +777,8 @@ const platformPages = [
   { name: 'platform-find', at: '/find' },
   { name: 'platform-start', at: '/start' },
   { name: 'platform-help', at: '/help' },
+  { name: 'platform-terms', at: '/terms?from=%2Fnorth-valley' },
+  { name: 'platform-privacy', at: '/privacy?from=%2Fnorth-valley' },
 ];
 
 // Long names, at the two narrowest phones: a team's wherever a team is named (the column of

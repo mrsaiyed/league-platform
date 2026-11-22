@@ -15,6 +15,7 @@
 //   error.ts: error
 //   error-scheduling.ts: error.scheduling
 //   game.ts: game, stat
+//   legal.ts: legal
 //   schedule.ts: schedule
 //   schedule-admin.ts: schedule.admin
 //   site.ts: common, display, footer, front, home, nav, page, shell, site, standIn, standings,
@@ -33,6 +34,7 @@ import { enAdminTeams } from './en/admin-teams.ts';
 import { enError } from './en/error.ts';
 import { enErrorScheduling } from './en/error-scheduling.ts';
 import { enGame } from './en/game.ts';
+import { enLegal } from './en/legal.ts';
 import { enSchedule } from './en/schedule.ts';
 import { enScheduleAdmin } from './en/schedule-admin.ts';
 import { enSite } from './en/site.ts';
@@ -51,6 +53,7 @@ export const en = {
   ...enError,
   ...enErrorScheduling,
   ...enGame,
+  ...enLegal,
   ...enSchedule,
   ...enScheduleAdmin,
   ...enSite,
