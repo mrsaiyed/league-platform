@@ -7,8 +7,9 @@
 // - neither footer link leads to "This page is not built yet": each page has its title,
 //   says at the top that it is the short version and when it last changed, names the
 //   league's admin first and the site's address second, and leads back to the league;
-// - the pages are open signed out, work with scripts off, and carry no mark that keeps
-//   them out of search engines (neither in the page nor in the answer's headers);
+// - the pages are open signed out, work with scripts off, and carry no mark of their own
+//   that keeps them out of search engines (neither in the page nor in the answer's
+//   headers): they are marked exactly as a league's own pages are on this copy;
 // - "Create your account" links both, and they lead back to the league the person came
 //   from;
 // - "Powered by SR Leagues" leads to our front page.
@@ -122,6 +123,24 @@ async function keptOutOfSearch(page, response) {
   const header = (await response?.allHeaders())?.['x-robots-tag'] ?? '';
   return meta > 0 || /noindex/i.test(header);
 }
+// Outside production every page of a copy is kept out of search engines (do-not-index.ts,
+// record 082), so a note is checked against a league's own home page: it carries the
+// site's marking and no mark of its own, kept out where the site is and nowhere else.
+let siteMarking;
+async function siteKeptOut() {
+  if (siteMarking === undefined) {
+    const { context, page } = await fresh();
+    try {
+      siteMarking = await keptOutOfSearch(page, await page.goto(`${origin}/${leagues[0].slug}`));
+    } finally {
+      await context.close();
+    }
+  }
+  return siteMarking;
+}
+/** Whether the note is marked for search engines exactly as the league's pages are. */
+const markedLikeTheSite = async (page, response) =>
+  (await keptOutOfSearch(page, response)) === (await siteKeptOut());
 /** The checks every note passes, wherever it was opened from. */
 async function aNote(page, response, which, league, label) {
   await page.getByRole('heading', { level: 1, name: which.title, exact: true }).waitFor();
@@ -160,7 +179,10 @@ async function aNote(page, response, which, league, label) {
     `${label}: leads back to ${league.name}`,
     (await link(page, `Back to ${league.name}`).getAttribute('href')) === `/${league.slug}`,
   );
-  note(`${label}: is not kept out of search engines`, !(await keptOutOfSearch(page, response)));
+  note(
+    `${label}: is marked for search engines as the league's pages are, no more`,
+    await markedLikeTheSite(page, response),
+  );
   await accessible(page, label);
   await noSidewaysScroll(page, label);
   await tallEnough(page, 'main', label);
@@ -223,8 +245,8 @@ if (browser) {
             `/${league.slug}/schedule`,
         );
         note(
-          `scripts off, ${which.title}: is not kept out of search engines`,
-          !(await keptOutOfSearch(page, response)),
+          `scripts off, ${which.title}: is marked for search engines as the league's pages are, no more`,
+          await markedLikeTheSite(page, response),
         );
       }
     } finally {
