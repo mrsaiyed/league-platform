@@ -110,7 +110,10 @@ const safe = async (label, fn) => {
 };
 
 if (mode === 'sheets') {
-  const manifest = JSON.parse(readFileSync(path.join(out, 'manifest.json'), 'utf8'));
+  // Every picture the other two modes took, in the order of their file names.
+  const manifest = ['sim', 'score']
+    .flatMap((m) => JSON.parse(readFileSync(path.join(out, `shots-${m}.json`), 'utf8')).shots)
+    .sort((a, b) => a.file.localeCompare(b.file));
   const browser = await launch();
   const page = await browser.newPage({ viewport: { width: 1800, height: 800 } });
   for (let i = 0; i < manifest.length; i += 6) {
@@ -159,10 +162,7 @@ try {
       PUBLIC_BASE_URL: origin,
     });
     await waitFor(`${origin}/`, server, [{ address: `/${slug}/standings` }]);
-    writeFileSync(
-      '/home/user/league-platform/.local/lanes/2.236-simulate/.local/look-work/server-output.txt',
-      server.output(),
-    );
+    writeFileSync(path.join(out, 'server-output.txt'), server.output());
     browser = await launch();
     // The games the schedule links to, with their text.
     const schedule = await (await fetch(`${origin}/${slug}/schedule`)).text();
