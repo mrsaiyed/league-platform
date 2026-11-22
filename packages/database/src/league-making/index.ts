@@ -4,12 +4,17 @@ export {
   // Also the web app's start-up's (record 082): why the database refused it, by kind.
   connectCauseOf,
   openLeagueMakingTarget,
+  // The release command's (step 2.95, record 101): the migration login alone, the same checks.
+  openMigrationTarget,
   serverCodeOf,
   type ConnectCause,
   type LeagueMakingPlace,
   type LeagueMakingSource,
   type LeagueMakingTarget,
   type Login,
+  type MigrationTarget,
+  type MigrationTargetResult,
+  type MigrationTargetSource,
   type OpenTargetProblem,
   type OpenTargetResult,
   type PostgresAddress,

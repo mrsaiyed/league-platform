@@ -257,6 +257,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     'staff tool (step 2.125, record 057): opens a PGlite folder, or the migration login and the app login of a hosted database; each reads the catalog only (live_stats, current_database, the server start time); no league rows',
   ],
   [
+    databasePackage.openMigrationTarget,
+    'release command (step 2.95, record 101): opens a PGlite folder, or the migration login alone of a hosted database; reads the catalog only (live_stats, current_database, the server start time); no league rows',
+  ],
+  [
     databasePackage.previewNewLeague,
     'staff tool (step 2.125): asks each login what it may do (catalog only), then as the migration login reads the migration log, whether one short name is held (find_league_by_slug) and whether two emails have accounts; no league rows',
   ],

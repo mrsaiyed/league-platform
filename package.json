@@ -19,6 +19,7 @@
     "stats:copy": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning apps/live-stats/copy.ts",
     "transfer:tracker": "node --disable-warning=ExperimentalWarning scripts/transfer-tracker-games.mjs",
     "league:make": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/make-league.mjs",
+    "release": "node --disable-warning=ExperimentalWarning scripts/release.mjs",
     "league:remove": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/remove-league.mjs",
     "build:demo": "node scripts/build-demo.mjs",
     "build:pages": "node scripts/build-pages.mjs",
