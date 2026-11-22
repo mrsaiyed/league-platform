@@ -18,7 +18,7 @@ import { untouched, type FormState } from '../games-area/form-state.ts';
 import { SavedLine } from '../games-area/saved-line.tsx';
 import { useOneSubmit } from '../games-area/use-one-submit.ts';
 import type { PrivateDetails } from './people-view.ts';
-import { changedBox, wasField, type PersonBox } from './person-input.ts';
+import { changedBox, sameNameKey, wasField, type PersonBox } from './person-input.ts';
 
 export type PersonFormWords = {
   readonly firstName: string;
@@ -37,6 +37,8 @@ export type PersonFormWords = {
   readonly submit: string;
   /** The tick under an unlikely date of birth shown back before saving (R-28). */
   readonly birthDateChecked: string;
+  /** The tick under "There is already a … Add another?" (adding someone of a name taken). */
+  readonly sameNameChecked: string;
   /** Beside the button when a box is marked: the sentence is up there, by the box. */
   readonly checkMarked: string;
   /** Beside a box this person changed that someone saved meanwhile: holds `{value}`. */
@@ -120,7 +122,14 @@ export function PersonForm({
     return words.meanwhile.replace('{value}', shown);
   };
   const wrong = (name: PersonBox) => refused?.wrong.includes(name) === true;
-  const general = refused !== undefined && refused.wrong.length === 0;
+  // A question before saving (an unlikely date of birth, a name someone else has) is not
+  // an error: no red, no "invalid", its sentence with its tick under it.
+  const question =
+    refused?.code === 'birth-date-check' || refused?.code === 'same-name-check'
+      ? refused
+      : undefined;
+  const questionId = `${id}-question`;
+  const general = refused !== undefined && refused.wrong.length === 0 && question === undefined;
   // A refusal about a box is also said beside the button, where the person is looking
   // when they tap it at the foot of the form; the box's own sentence is beside the box.
   const marked = refused !== undefined && refused.wrong.length > 0;
@@ -129,8 +138,12 @@ export function PersonForm({
     const helpId = `${id}-${name}-help`;
     const meanwhileId = `${id}-${name}-meanwhile`;
     const meanwhile = meanwhileOf(name);
+    const asked =
+      (question?.code === 'birth-date-check' && name === 'birthDate') ||
+      (question?.code === 'same-name-check' && (name === 'firstName' || name === 'lastName'));
     const describedBy = [
       wrong(name) ? errorId : '',
+      asked ? questionId : '',
       meanwhile === undefined ? '' : meanwhileId,
       help === undefined ? '' : helpId,
     ]
@@ -147,9 +160,7 @@ export function PersonForm({
         <>
           {wrong(name) ? (
             <small id={errorId} className="ui-field-error" role="alert" data-wrong={name}>
-              {name === 'birthDate' && refused?.code === 'birth-date-check'
-                ? refused.said
-                : words.wrong[name]}
+              {words.wrong[name]}
             </small>
           ) : null}
           {meanwhile === undefined ? null : (
@@ -256,14 +267,35 @@ export function PersonForm({
               )}
             </label>
           </div>
-          {refused?.code === 'birth-date-check' ? (
-            <p>
-              <label className="staff-check">
-                <input type="checkbox" name="birthDateChecked" /> {words.birthDateChecked}
-              </label>
-            </p>
-          ) : null}
         </>
+      )}
+      {question === undefined ? null : (
+        // The tick carries what it was given for (the date, or the name), so a tick given
+        // for one date or name never lets a different one typed with it through.
+        <div id={questionId} className="ui-notice" role="status" data-question={question.code}>
+          <p>{question.said}</p>
+          <label className="staff-check">
+            {question.code === 'birth-date-check' ? (
+              <>
+                <input
+                  type="checkbox"
+                  name="birthDateChecked"
+                  value={(question.typed['birthDate'] ?? '').trim()}
+                />{' '}
+                {words.birthDateChecked}
+              </>
+            ) : (
+              <>
+                <input
+                  type="checkbox"
+                  name="sameNameChecked"
+                  value={sameNameKey(question.typed['firstName'], question.typed['lastName'])}
+                />{' '}
+                {words.sameNameChecked}
+              </>
+            )}
+          </label>
+        </div>
       )}
       {general ? (
         <p id={generalId} className="ui-field-error" role="alert">

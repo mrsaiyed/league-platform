@@ -20,6 +20,7 @@ import {
   createPerson,
   getPerson,
   leagueUrl,
+  listPeople,
   removePerson,
   restorePerson,
   updatePerson,
@@ -45,7 +46,14 @@ import {
 import { rosterName } from '../teams-area/index.ts';
 import { unlikelyYears } from './age-on-record.ts';
 import { detailsAnchor } from './anchors.ts';
-import { newPersonInput, personChangeInput, wrongBoxes, type PersonBox } from './person-input.ts';
+import {
+  newPersonInput,
+  personChangeInput,
+  sameNameKey,
+  wrongBoxes,
+  type PersonBox,
+} from './person-input.ts';
+import { currentTeamsByPerson } from './teams-of-people.ts';
 
 type Outcome =
   | { readonly ok: true; readonly personId: string }
@@ -141,17 +149,60 @@ function askAboutBirthDate(
   storedBirthDate?: string,
 ): Refused | undefined {
   const typed = (fields['birthDate'] ?? '').trim();
-  if (typed === '' || typed === storedBirthDate || fields['birthDateChecked'] === 'on') {
+  // The tick holds the date it was given for: it never lets a different date through.
+  if (typed === '' || typed === storedBirthDate || fields['birthDateChecked'] === typed) {
     return undefined;
   }
   const years = unlikelyYears(typed, leagueToday);
   if (years === undefined) return undefined;
+  // A question, not a wrong box: nothing is marked invalid (the form draws it as one).
   return {
     kind: 'refused',
     code: 'birth-date-check',
     typed: fields,
-    wrong: ['birthDate'],
+    wrong: [],
     said: t.plural('adminPeople.birthDate.check', years),
+  };
+}
+
+/**
+ * Adding someone whose first and last name someone in the league already has (in any
+ * capitals) is asked first, naming where the other is, so a second record is made only on
+ * purpose (people of the same name are told apart by their teams). The tick holds the name
+ * it was given for. Undefined when there is nothing to ask.
+ */
+async function askAboutSameName(
+  context: CommandContext,
+  deps: Awaited<ReturnType<typeof peopleOf>>['deps'],
+  fields: TypedFields,
+): Promise<Refused | undefined> {
+  const key = sameNameKey(fields['firstName'], fields['lastName']);
+  if (fields['sameNameChecked'] === key) return undefined;
+  const found = await listPeople(context, { search: key, limit: 20, offset: 0 }, deps);
+  if (!found.ok) return undefined;
+  const same = found.value.filter((p) => sameNameKey(p.firstName, p.lastName) === key);
+  const first = same[0];
+  if (first === undefined) return undefined;
+  const teams = await currentTeamsByPerson(context);
+  const where = same.map((p) => {
+    const held = teams.get(p.id) ?? [];
+    return held.length === 0
+      ? t('adminPeople.sameName.noTeam')
+      : t('adminPeople.sameName.onTeams', { teams: held.map((team) => team.name).join(', ') });
+  });
+  return {
+    kind: 'refused',
+    code: 'same-name-check',
+    typed: fields,
+    wrong: [],
+    said:
+      same.length === 1
+        ? t('adminPeople.sameName.one', { name: rosterName(first), where: where.join('') })
+        : t('adminPeople.sameName.several', {
+            number: String(same.length),
+            name: rosterName(first),
+            where: where.join('; '),
+          }),
   };
 }
 
@@ -183,7 +234,7 @@ export async function addPersonAction(_state: FormState, form: FormData): Promis
   const today = await leagueToday();
   const wrong = wrongBoxes(fields, today);
   if (wrong.length > 0) return refused('create_person', 'invalid-input', fields, wrong);
-  const ask = askAboutBirthDate(fields, today);
+  const ask = askAboutBirthDate(fields, today) ?? (await askAboutSameName(context, deps, fields));
   if (ask !== undefined) return ask;
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const made = await createPerson(context, newPersonInput(fields), deps);
@@ -205,7 +256,8 @@ export async function savePersonAction(_state: FormState, form: FormData): Promi
   const wrong = wrongBoxes(fields, today);
   if (wrong.length > 0) return refused('update_person', 'invalid-input', fields, wrong);
   // Asked only about a date that is changed: one already saved is not asked about again.
-  if ((fields['birthDate'] ?? '').trim() !== '' && fields['birthDateChecked'] !== 'on') {
+  const typedDate = (fields['birthDate'] ?? '').trim();
+  if (typedDate !== '' && fields['birthDateChecked'] !== typedDate) {
     const stored = await getPerson(context, { personId }, deps);
     const ask = askAboutBirthDate(
       fields,

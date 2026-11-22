@@ -23,6 +23,7 @@ import { addPersonAnchor } from './anchors.ts';
 import { personFormWords } from './form-words.ts';
 import { peopleAskOf, peoplePageSize, readPeopleList, type PeopleAsk } from './people-view.ts';
 import { PersonForm } from './person-form.tsx';
+import { currentTeamsByPerson, type TeamsByPerson } from './teams-of-people.ts';
 
 const area: AdminArea = 'people';
 
@@ -39,9 +40,10 @@ export async function PeoplePage({
   const context = commandContextOf(view.context);
   const ports = await webPorts();
   const ask = peopleAskOf(query);
-  const [list, holder] = await Promise.all([
+  const [list, holder, teamsByPerson] = await Promise.all([
     readPeopleList(context, ask, ports.adminPeople.deps),
     ports.accessOf(context),
+    currentTeamsByPerson(context),
   ]);
   // The private boxes of the add form only for a role that may set them: the same rule the
   // people commands use (league-wide people.read_sensitive, R-16).
@@ -143,7 +145,7 @@ export async function PeoplePage({
         ) : null}
       </section>
 
-      <List ask={ask} list={list} league={here} pageUrl={pageUrl} />
+      <List ask={ask} list={list} league={here} pageUrl={pageUrl} teamsByPerson={teamsByPerson} />
 
       <div id={addPersonAnchor} className="admin-add-team">
         <section className="staff-panel admin-team-part">
@@ -171,11 +173,14 @@ function List({
   list,
   league,
   pageUrl,
+  teamsByPerson,
 }: {
   readonly ask: PeopleAsk;
   readonly list: Awaited<ReturnType<typeof readPeopleList>>;
   readonly league: { readonly id: string; readonly slug: string };
   readonly pageUrl: (page: number) => string;
+  /** Each person's teams this season, written beside the name: two Jon Smiths told apart. */
+  readonly teamsByPerson: TeamsByPerson;
 }) {
   // A read that fails is said as such, never drawn as an empty league.
   if (!list.ok) return <StaffNotice kind="refused">{t('adminPeople.readFailed')}</StaffNotice>;
@@ -203,6 +208,9 @@ function List({
               >
                 {person.name}
               </a>
+              <span className="staff-quiet" data-teams-of={person.id}>
+                {teamsLineOf(teamsByPerson.get(person.id))}
+              </span>
             </span>
           </li>
         ))}
@@ -223,4 +231,11 @@ function List({
       )}
     </>
   );
+}
+
+/** "Falcons, Herons" or "No team this season", beside a name. */
+export function teamsLineOf(teams: readonly { readonly name: string }[] | undefined): string {
+  return teams === undefined || teams.length === 0
+    ? t('adminPeople.list.noTeam')
+    : teams.map((team) => team.name).join(', ');
 }

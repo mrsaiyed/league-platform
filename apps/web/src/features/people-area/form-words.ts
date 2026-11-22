@@ -30,6 +30,7 @@ export function personFormWords(submit: string): PersonFormWords {
     },
     submit,
     birthDateChecked: t('adminPeople.birthDate.checked'),
+    sameNameChecked: t('adminPeople.sameName.checked'),
     meanwhile: t('adminPeople.meanwhile', { value: '{value}' }),
     meanwhileEmpty: t('adminPeople.meanwhile.empty'),
   };

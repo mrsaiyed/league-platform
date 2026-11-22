@@ -344,10 +344,12 @@ if (built) {
       page.locator('#remove').getByRole('button', { name: 'Remove from the league list' }).click(),
     ]);
     const removedNotice = page.locator('[data-removed]');
+    await removedNotice.getByRole('button', { name: 'Put them back' }).waitFor();
     note(
       'the removed notice names her and offers "Put them back"',
       (await removedNotice.innerText()).includes('Removed from the league list: Ada Lovell.') &&
         (await removedNotice.getByRole('button', { name: 'Put them back' }).count()) === 1,
+      await removedNotice.innerText(),
     );
     note(
       'and she is off the list',
@@ -368,13 +370,63 @@ if (built) {
       'and she is on the list again',
       (await main().getByRole('link', { name: 'Ada Lovell', exact: true }).count()) === 1,
     );
+
+    at = 'people of the same name are told apart, and a second is added only on purpose';
+    await page.goto(`${origin}/north-valley/admin/people?q=smithson`);
+    note(
+      'the search writes each person’s team beside the name',
+      (
+        await main().locator('.staff-rows li', { hasText: 'Jonathan Smithson' }).innerText()
+      ).includes('Falcons'),
+    );
+    await page.goto(`${origin}/north-valley/admin/people?q=fischer`);
+    note(
+      'and one on no team says so',
+      (await main().locator('.staff-rows li', { hasText: 'Leo Fischer' }).innerText()).includes(
+        'No team this season',
+      ),
+    );
+    const addLeo = page.locator('#add-person');
+    await addLeo.getByLabel('First name').fill('leo');
+    await addLeo.getByLabel('Last name').fill('FISCHER');
+    await addLeo.getByRole('button', { name: 'Add to the league' }).click();
+    const sameName = addLeo.locator('[data-question="same-name-check"]');
+    await sameName.waitFor();
+    note(
+      'adding a name someone has (in other capitals) asks first, saying where the other is',
+      (await sameName.innerText()).includes(
+        'There is already a Leo Fischer, on no team. Add another?',
+      ),
+      await sameName.innerText(),
+    );
+    // A tick for one name never lets a different one through.
+    await sameName.getByLabel('Yes, add another person of this name').check();
+    await addLeo.getByLabel('First name').fill('Ada');
+    await addLeo.getByLabel('Last name').fill('Lovell');
+    await addLeo.getByRole('button', { name: 'Add to the league' }).click();
+    await sameName.getByText('There is already a Ada Lovell', { exact: false }).waitFor();
+    note('a tick given for one name asks again about another', true);
+    await addLeo.getByLabel('First name').fill('Leo');
+    await addLeo.getByLabel('Last name').fill('Fischer');
+    await addLeo.getByRole('button', { name: 'Add to the league' }).click();
+    await sameName.getByText('There is already a Leo Fischer', { exact: false }).waitFor();
+    await sameName.getByLabel('Yes, add another person of this name').check();
+    await Promise.all([
+      page.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/),
+      addLeo.getByRole('button', { name: 'Add to the league' }).click(),
+    ]);
+    await page.goto(`${origin}/north-valley/admin/people?q=fischer`);
+    note(
+      'ticked, the second is added, and the list holds two of the name',
+      (await main().getByRole('link', { name: 'Leo Fischer', exact: true }).count()) === 2,
+    );
     await page.goto(jonAddress);
 
     at = 'an unlikely date of birth is shown back before it is saved (R-28)';
     const twoYearsAgo = `${new Date().getUTCFullYear() - 2}-01-15`;
     await details.getByLabel('Date of birth (optional)').fill(twoYearsAgo);
     await details.getByRole('button', { name: 'Save details' }).click();
-    const ask = details.locator('[data-wrong="birthDate"]');
+    const ask = details.locator('[data-question="birth-date-check"]');
     await ask.waitFor();
     note(
       'a date making a player very young is said back with the age, and not saved',
@@ -382,6 +434,26 @@ if (built) {
         (await details.getByLabel('Date of birth (optional)').inputValue()) === twoYearsAgo,
       await ask.innerText(),
     );
+    note(
+      'it is a question, not an error: the date box is not marked invalid, and the tick stands under the sentence',
+      (await details.getByLabel('Date of birth (optional)').getAttribute('aria-invalid')) ===
+        null &&
+        (await ask.getByLabel('Yes, this date of birth is right').count()) === 1 &&
+        (await details.locator('[data-wrong]').count()) === 0,
+    );
+    // A tick given for one unlikely date never lets a different one typed with it through.
+    const threeYearsAgo = `${new Date().getUTCFullYear() - 3}-01-15`;
+    await ask.getByLabel('Yes, this date of birth is right').check();
+    await details.getByLabel('Date of birth (optional)').fill(threeYearsAgo);
+    await details.getByRole('button', { name: 'Save details' }).click();
+    await ask.getByText('makes them 3 years old', { exact: false }).waitFor();
+    note(
+      'a tick for one date, with a different date typed, asks again about the new one',
+      (await details.getByText('Saved: Jonathan Smithson.').count()) === 0,
+    );
+    await details.getByLabel('Date of birth (optional)').fill(twoYearsAgo);
+    await details.getByRole('button', { name: 'Save details' }).click();
+    await ask.getByText(/makes them [12] years? old/).waitFor();
     await details.getByLabel('Yes, this date of birth is right').check();
     await details.getByRole('button', { name: 'Save details' }).click();
     await ask.waitFor({ state: 'detached' });
@@ -397,8 +469,9 @@ if (built) {
     await details.getByLabel('Child or adult').selectOption('child');
     await details.getByRole('button', { name: 'Save details' }).click();
     // "Saved" from the save before is still on screen: wait for what this save brings.
+    // The line is there in every state now: wait for the words this save brings.
     const byTick = details.locator('[data-child-note]');
-    await byTick.waitFor();
+    await byTick.getByText('The date of birth makes them an adult', { exact: false }).waitFor();
     note(
       'the record says beside the tick that they are treated as a child until it is changed',
       (await byTick.count()) === 1 &&
@@ -428,7 +501,7 @@ if (built) {
       .getByLabel('Date of birth (optional)')
       .fill(`${new Date().getUTCFullYear() - 10}-01-15`);
     await details.getByRole('button', { name: 'Save details' }).click();
-    await byTick.waitFor();
+    await byTick.getByText('until their 18th birthday', { exact: false }).waitFor();
     note(
       'marked as an adult with a date that makes them a child: the record says the date wins',
       (await byTick.innerText()).includes('treated as a child until their 18th birthday'),

@@ -55,6 +55,18 @@ export const wasField = (box: PersonBox): string => `was.${box}`;
  * Whether this person changed a box: it was posted and differs from what it held when the
  * form was drawn. A form that did not say what a box held counts it as changed.
  */
+/**
+ * A name as two people of it are compared: first and last, trimmed, with no regard to
+ * capitals or a curly apostrophe. The "Add another?" tick carries it, so a tick given for
+ * one name never lets a different name typed with it through.
+ */
+export function sameNameKey(firstName: string | undefined, lastName: string | undefined): string {
+  return `${(firstName ?? '').trim()} ${(lastName ?? '').trim()}`
+    .replace(/\s+/g, ' ')
+    .replace(/[‘’]/g, "'")
+    .toLowerCase();
+}
+
 export function changedBox(fields: PersonFields, box: PersonBox): boolean {
   if (!has(fields, box)) return false;
   const was = fields[wasField(box)];

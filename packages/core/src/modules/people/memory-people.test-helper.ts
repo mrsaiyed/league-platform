@@ -122,7 +122,8 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
             )
             .sort(
               (a, b) =>
-                a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName),
+                a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase()) ||
+                a.firstName.toLowerCase().localeCompare(b.firstName.toLowerCase()),
             )
             .slice(offset, offset + limit)
             .map((p) => view(p, sensitive));

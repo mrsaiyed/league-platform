@@ -219,8 +219,9 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
         )
         .sort(
           (a, b) =>
-            a.lastName.localeCompare(b.lastName) ||
-            a.firstName.localeCompare(b.firstName) ||
+            // Without regard to capitals, as the database's lower() order.
+            a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase()) ||
+            a.firstName.toLowerCase().localeCompare(b.firstName.toLowerCase()) ||
             a.id.localeCompare(b.id),
         )
         .slice(offset, offset + limit)

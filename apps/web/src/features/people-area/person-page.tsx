@@ -9,15 +9,12 @@
 // other role they are not read, so they are neither drawn nor in the page's data.
 import {
   leagueUrl,
-  listRoster,
   nameRequests,
   publicViewer,
   showName,
   type AdminArea,
   type Audience,
-  type CommandContext,
   type NamePolicy,
-  type TeamRecord,
 } from '@srleagues/core';
 import { PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
@@ -35,6 +32,7 @@ import { personFormWords } from './form-words.ts';
 import { readPerson, type PersonView } from './people-view.ts';
 import { PersonForm } from './person-form.tsx';
 import { RemoveForm } from './remove-form.tsx';
+import { currentTeamsByPerson } from './teams-of-people.ts';
 
 const area: AdminArea = 'people';
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -74,7 +72,7 @@ export async function PersonPage({
             : undefined;
   // The league's own today (the ports' one clock): who is a child is measured on it (R-28).
   const leagueToday = (await (await webPorts()).publicSchedule.clockOf(here.id)).today;
-  const teams = await teamsOf(context, person.id);
+  const teams = (await currentTeamsByPerson(context)).get(person.id) ?? [];
   // Who plays in the league and how it shows names: what its public pages are drawn with.
   const shownBy = await (await webPorts()).publicStats.settingsOf(here.id);
   const listUrl = leagueUrl(here, 'admin-area', { area });
@@ -167,25 +165,6 @@ export async function PersonPage({
       </section>
     </main>
   );
-}
-
-/**
- * The teams of this season whose roster holds the person now (no leaving date), read as
- * Admin → Teams reads them. A team whose roster this role may not read is left out: the
- * remove command still refuses while they are on it.
- */
-async function teamsOf(context: CommandContext, personId: string): Promise<readonly TeamRecord[]> {
-  const ports = (await webPorts()).adminTeams;
-  const season = await ports.currentSeason(context);
-  if (season === undefined) return [];
-  const teams = await ports.teams(context, season.id);
-  const holding = await Promise.all(
-    teams.map(async (team) => {
-      const roster = await listRoster(context, { teamId: team.id }, ports.deps);
-      return roster.ok && roster.value.some((l) => l.personId === personId && l.leftOn === null);
-    }),
-  );
-  return teams.filter((_team, at) => holding[at] === true);
 }
 
 const treatedText: Readonly<Record<Treatment, () => string>> = {

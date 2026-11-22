@@ -31,6 +31,7 @@ export const enAdminPeople = {
   'adminPeople.field.lastName': 'Last name',
   'adminPeople.list.label': 'Everyone in the league',
   'adminPeople.list.next': 'Next {count}',
+  'adminPeople.list.noTeam': 'No team this season',
   'adminPeople.list.previous': 'Previous {count}',
   'adminPeople.meanwhile':
     'Someone else saved meanwhile: {value}. Saving again puts what you typed in its place.',
@@ -72,6 +73,12 @@ export const enAdminPeople = {
     'Shown to the public as: initials only, as they or their guardian asked.',
   'adminPeople.request.removed':
     'Shown to the public as: not at all, as they or their guardian asked to be taken off public pages.',
+  'adminPeople.sameName.checked': 'Yes, add another person of this name',
+  'adminPeople.sameName.noTeam': 'on no team',
+  'adminPeople.sameName.onTeams': 'on the {teams}',
+  'adminPeople.sameName.one': 'There is already a {name}, {where}. Add another?',
+  'adminPeople.sameName.several':
+    'There are already {number} people called {name}: {where}. Add another?',
   'adminPeople.save.submit': 'Save details',
   'adminPeople.saved': 'Saved: {name}.',
   'adminPeople.search.clear': 'Show everyone',

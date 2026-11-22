@@ -46,8 +46,9 @@ export async function listPeople(
         ]),
       ),
     )
-    .orderBy('last_name')
-    .orderBy('first_name')
+    // Without regard to capitals: "de Vries" among the Ds, not after every capital Z.
+    .orderBy(sql`lower(last_name)`)
+    .orderBy(sql`lower(first_name)`)
     .orderBy('id')
     .limit(limit)
     .offset(offset);
