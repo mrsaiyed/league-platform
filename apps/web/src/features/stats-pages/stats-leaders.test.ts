@@ -254,6 +254,24 @@ describe('a board says the games its numbers are over (case 41, S-63)', () => {
     // Neither player is under two games played: no row of the full table is marked.
     expect(data.playerRows.every((row) => row.quiet === undefined)).toBe(true);
   });
+
+  it('says why the top of the table is on no board: points recorded in 1 of 3 games (L2)', async () => {
+    const { data, text } = await page(
+      [
+        { name: 'Ada', played: [ash], games: 3, stats: { points: [40, 1] } },
+        { name: 'Ben', played: [birch], games: 3, stats: points(30, 3) },
+      ],
+      3,
+    );
+    expect(linesOf(data, 'points').map((line) => line[0])).toEqual(['1. Ben Player']);
+    expect(data.recordedInFewer).toBe(true);
+    expect(text).toContain(
+      '<p class="ui-section-note">A statistic recorded in fewer than 3 games is not ranked yet, so a column may be topped by a player on no leaders board.</p>',
+    );
+    const even = await page([{ name: 'Ben', played: [birch], games: 3, stats: points(30, 3) }], 3);
+    expect(even.data.recordedInFewer).toBe(false);
+    expect(even.text).not.toContain('is not ranked yet');
+  });
 });
 
 describe('everyone level with the last place shown is shown', () => {

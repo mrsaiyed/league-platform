@@ -346,6 +346,12 @@ export const enSite = {
   'stats.notRankedYet': 'not ranked yet',
   // Between two sentences of one note under a title.
   'stats.noteJoin': ' ',
+  // Under the full table: a player who played the games has a statistic recorded in
+  // fewer, so that column's top may be on no leaders board (S-63).
+  'stats.recordedNotRanked_one':
+    'A statistic recorded in fewer than {count} game is not ranked yet, so a column may be topped by a player on no leaders board.',
+  'stats.recordedNotRanked_other':
+    'A statistic recorded in fewer than {count} games is not ranked yet, so a column may be topped by a player on no leaders board.',
   'stats.showBy': 'Show',
   // With the tables, when a team's total is not its players' numbers added up (step 2.196).
   'stats.teamTotalsCountTeam':

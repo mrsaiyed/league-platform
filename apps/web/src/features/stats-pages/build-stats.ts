@@ -149,7 +149,11 @@ export type StatsPageData = {
   /** How both tables are sorted when the page opens; nothing while the sport has no statistic. */
   readonly openingSort: Sort | null;
   /** Sentences said once, above both tables, of what their numbers count. */
-  readonly tableNotes: readonly string[];
+  readonly tableNotes: readonly string[] /**
+   * A player who has played the games to be ranked has a statistic recorded in fewer of
+   * them, so that column's top may be on no leaders board: the table says so.
+   */;
+  readonly recordedInFewer: boolean;
 };
 
 export type StatsFailure = { readonly code: 'season-not-found' | 'invalid-input' };
@@ -365,10 +369,21 @@ function pageData(
     by === 'average' &&
     (table.players.some((player) => keptInFewer(player.gamesPlayed, player.stats)) ||
       table.teams.some((team) => keptInFewer(gamesWithStatistics(team.stats), team.stats)));
+  // Ranked by games played, but a statistic recorded in fewer than the minimum: the
+  // table's first row may then be on no board (step 2.199, fix round L2).
+  const recordedInFewer = table.players.some(
+    (player) =>
+      player.gamesPlayed >= settings.minimumGames &&
+      Object.values(player.stats).some(
+        (entry) =>
+          entry !== undefined && entry.total > 0 && entry.gamesRecorded < settings.minimumGames,
+      ),
+  );
   return {
     by,
     minimumGames: settings.minimumGames,
     leaders,
+    recordedInFewer,
     playerColumns,
     playerRows,
     teamColumns,
