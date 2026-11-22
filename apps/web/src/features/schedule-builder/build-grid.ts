@@ -26,10 +26,13 @@ export const pickableTeams = (teams: readonly GridTeam[]): readonly GridTeam[] =
 /**
  * What Admin → Schedule draws from the season's teams (the page's one wiring of them): the
  * grid, which names every team of the season, those in the bin as "Badgers (removed)", and
- * the teams its forms offer for a game, those not in the bin.
+ * the teams its forms offer for a game, those not in the bin. It takes all of the draft
+ * `buildGrid` reads, none of it optional: without `removed` and `published`, every game the
+ * draft removes from the published schedule would vanish from the screen instead of staying
+ * struck through with "Put it back" (step 2.185).
  */
 export function pageGrid(
-  view: Pick<ScheduleDraftView, 'result' | 'clashes'> & Partial<Pick<ScheduleDraftView, 'undated'>>,
+  view: Pick<ScheduleDraftView, 'result' | 'clashes' | 'undated' | 'removed' | 'published'>,
   seasonTeams: readonly GridTeam[],
   venues: readonly VenueWithCourts[],
 ): { readonly grid: Grid; readonly teams: readonly GridTeam[] } {

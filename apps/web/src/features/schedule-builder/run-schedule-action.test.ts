@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import { standInSchedule } from '../../server/stand-in-schedule.ts';
 import { adultTeams } from '../../server/stand-in-world-seed.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
-import { buildGrid, parsePlace, placeValue } from './build-grid.ts';
+import { buildGrid, pageGrid, parsePlace, placeValue } from './build-grid.ts';
 import { answerParams, noticeOfAnswer, savedDetailOf, savedDetailOfNotice } from './grid-answer.ts';
 import { runScheduleAction, type ScheduleActionKind } from './run-schedule-action.ts';
 
@@ -324,6 +324,26 @@ describe('schedule grid', () => {
     const after = await read();
     expect(after.draft).toBeNull();
     expect(after.result.games.some((g) => g.id === game.id)).toBe(false);
+  });
+
+  it("keeps a removed published game struck through in the page's own grid (pageGrid, step 2.185)", async () => {
+    const { read, press } = setup();
+    const first = await read();
+    const game = first.published.games.find((g) => g.status === 'scheduled');
+    if (game === undefined) throw new Error('no published game');
+    const wasSlot = [game.roundId ?? '', game.date, game.time ?? '', ''].join('~');
+    expect(await press('remove-game', { gameId: game.id, wasSlot })).toMatchObject({
+      kind: 'saved',
+    });
+    const view = await read();
+    const { grid } = pageGrid(view, teams, []);
+    const struck = [...grid.rounds.flatMap((r) => r.removed), ...grid.looseRemoved];
+    expect(struck.map((g) => g.id)).toEqual([game.id]);
+    expect(grid.allGames.some((g) => g.id === game.id)).toBe(false);
+    // The page's wiring cannot leave out what keeps a struck game in sight: without the
+    // draft's removed games and the published schedule, every struck game would vanish.
+    // @ts-expect-error -- pageGrid must require `removed` and `published` (and `undated`).
+    pageGrid({ result: view.result, clashes: view.clashes }, teams, []);
   });
 
   it('says nothing is to put back once someone else discarded the draft, not "already back" (step 2.185)', async () => {
