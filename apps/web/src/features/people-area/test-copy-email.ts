@@ -2,8 +2,8 @@
 // copy that is not production holds no real person's details, so on it a person's contact
 // email must be made up (isMadeUpAddress), as at sign-up. Whether this is the test copy
 // comes from the ports (`testCopy`), never from the form. Server only: the form itself is
-// drawn in the browser, and this reads the kept-email rules of the server.
-import { isMadeUpAddress } from '../../server/kept-emails.ts';
+// drawn in the browser, and this reads the kept-email rule of packages/providers.
+import { isMadeUpAddress } from '@srleagues/providers';
 import { changedBox, type PersonFields } from './person-input.ts';
 
 /**

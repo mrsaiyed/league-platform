@@ -47,10 +47,12 @@ describe('keepEmail and newestKeptEmail', () => {
     expect(await newestKeptEmail(pgliteDriver(pglite), 'c@example.test')).toBeNull();
   });
 
-  it('keeps an address in the form the check sees, so its final dot or spaces never hide it', async () => {
+  // An address with a final dot is not one the sign-in service takes, so it is refused
+  // (made-up-address-cases.json, since step 2.205); asked with one, it is still found.
+  it('keeps an address in the form the check sees, so its capitals or spaces never hide it', async () => {
     await keepEmail(db, {
       kind: 'code',
-      to: '\tDot@X.test. ',
+      to: '\tDot@X.test ',
       subject: 'dot',
       text: 'code 444444',
     });

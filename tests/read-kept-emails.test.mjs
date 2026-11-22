@@ -92,7 +92,7 @@ test('on a PGlite folder prints the newest code for the address, and nothing els
     });
     await keepEmail(db, {
       kind: 'code',
-      to: 'Dotted@example.test.',
+      to: 'Dotted@Example.TEST',
       subject: 'd',
       text: 'Code 515151.',
     });
@@ -119,10 +119,11 @@ test('on a PGlite folder prints the newest code for the address, and nothing els
     const link = runScript(['--db', folder, '--to', 'invited@example.test']);
     assert.equal(link.stdout, 'https://staging.example.test/invite/made-up-token\n');
 
-    // Kept with a final dot, asked for without one (and the other way): the same address.
+    // Kept in capitals, asked for in small letters (and the other way): the same address.
+    // (A final dot is no made-up address since step 2.205 met step 2.204: not kept, not asked.)
     const dotted = runScript(['--db', folder, '--to', 'dotted@example.test']);
     assert.equal(dotted.stdout, '515151\n');
-    const asked = runScript(['--db', folder, '--to', 'Other@Example.test.']);
+    const asked = runScript(['--db', folder, '--to', 'Other@Example.TEST']);
     assert.equal(asked.stdout, '222222\n');
 
     const none = runScript(['--db', folder, '--to', 'nobody@example.test']);

@@ -57,29 +57,28 @@ revoke all on function kept_emails.trimmed(text) from public;
 
 -- Record 075's list, the same rule as isMadeUpAddress (packages/providers), held to the
 -- same answers by one shared list of spellings (made-up-address-cases.json): the address
--- trimmed, no whitespace left inside; the part after its last "@", which must not be its
--- first character, one final dot dropped; A to Z, digits, dots and hyphens only, tested
--- before lowercasing (lowercased A to Z only, whatever the database's locale).
+-- trimmed, no whitespace left inside, at most 254 characters, in the form the sign-in
+-- service takes (signInEmail's email check, the same text as isMadeUpAddress's, matched
+-- before lowercasing); then the part after its "@", A to Z lowercased (whatever the
+-- database's locale), on a kept name.
 create function kept_emails.is_made_up_address(address text) returns boolean
 language sql
 immutable
 set search_path = pg_catalog, pg_temp
 as $$
   select coalesce((
-    select d ~ '^[A-Za-z0-9.-]+$'
-      and (
-        n ~ '\.(test|example|invalid|localhost)$'
+    select n ~ '\.(test|example|invalid|localhost)$'
         or n in ('example.com', 'example.net', 'example.org')
         or n ~ '\.example\.(com|net|org)$'
-      )
     from (
-      select d, translate(d, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') as n
-      from (
-        select regexp_replace(substr(w, length(w) - strpos(reverse(w), '@') + 2), '\.$', '') as d
+        select translate(
+          substr(w, strpos(w, '@') + 1),
+          'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'
+        ) as n
         from (select kept_emails.trimmed(address) as w) as whole
         where w !~ '[\u0009-\u000d    -     　﻿]'
-          and strpos(reverse(w), '@') between 1 and length(w) - 1
-      ) as found
+          and length(w) <= 254
+          and w ~ '^(?:[A-Za-z0-9_''+-]+\.)*[A-Za-z0-9_''+-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$'
     ) as domain
   ), false)
 $$;
