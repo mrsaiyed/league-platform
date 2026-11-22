@@ -291,6 +291,22 @@ if (built) {
       (await details.getByLabel('Email (optional)').inputValue()) === 'guardian@example.test',
     );
 
+    at = 'his record names his team, and removing says to take him off its roster first';
+    const teamsPart = page.locator('[data-person-teams]');
+    note(
+      'his record lists the Falcons, with their admin page and their public page',
+      (await teamsPart.getByRole('link', { name: 'Falcons in Teams' }).count()) === 1 &&
+        (await teamsPart.getByRole('link', { name: 'its public page' }).getAttribute('href')) ===
+          '/north-valley/teams/falcons',
+    );
+    const removePart = page.locator('#remove');
+    note(
+      'while he is on a roster the remove panel says so, names the team, and has no button',
+      (await removePart.locator('[data-on-roster]').innerText()).includes('roster first') &&
+        (await removePart.getByRole('link', { name: 'Falcons' }).count()) === 1 &&
+        (await removePart.getByRole('button').count()) === 0,
+    );
+
     at = 'an unlikely date of birth is shown back before it is saved (R-28)';
     const twoYearsAgo = `${new Date().getUTCFullYear() - 2}-01-15`;
     await details.getByLabel('Date of birth (optional)').fill(twoYearsAgo);

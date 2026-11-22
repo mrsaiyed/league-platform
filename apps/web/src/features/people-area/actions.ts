@@ -74,11 +74,12 @@ async function peopleOf(fields: TypedFields) {
 /** The sentence for a refusal: the command's own when the message file has one. */
 function problemText(command: string, code: string): string {
   const english = catalogs['en'] ?? {};
+  // "Not saved" is never the word for a removal.
+  const lead = command === 'remove_person' ? 'adminPeople.notRemoved' : 'adminPeople.refused';
   for (const key of [`error.people.${command}.${code}`, `error.${code}`]) {
-    if (Object.hasOwn(english, key))
-      return t('adminPeople.refused', { problem: t(key as TextKey) });
+    if (Object.hasOwn(english, key)) return t(lead, { problem: t(key as TextKey) });
   }
-  return t('adminPeople.refused', { problem: t('error.unknown') });
+  return t(lead, { problem: t('error.unknown') });
 }
 
 /**

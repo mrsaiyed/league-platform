@@ -38,6 +38,7 @@ export const enAdminPeople = {
     'Someone else emptied this meanwhile. Saving again puts what you typed in its place.',
   'adminPeople.noMatch':
     'No one in the league matches that search. Check the spelling, or add them.',
+  'adminPeople.notRemoved': 'Not removed. {problem}',
   'adminPeople.person.sub':
     'Their details as the league keeps them. A change shows on every page of the league at once.',
   'adminPeople.private.body':
@@ -47,12 +48,14 @@ export const enAdminPeople = {
     'The league list could not be read just now. Reload the page to try again.',
   'adminPeople.refused': 'Not saved. {problem}',
   'adminPeople.remove.body':
-    'They come off the league list; the games they played and their numbers stay in the league’s history. The person is kept for 30 days; the screen to bring them back is not ready yet.',
+    'They come off the league list. Someone who never played on a team is deleted for good after 30 days. Someone who has played stays in the league’s bin, and the games they played keep their numbers.',
   'adminPeople.remove.confirm': 'Yes, I am sure',
+  'adminPeople.remove.onRoster':
+    'They are on a team’s roster, so they cannot be taken off the league list yet. Take them off the roster first, on the team’s page:',
   'adminPeople.remove.submit': 'Remove from the league list',
   'adminPeople.remove.title': 'Remove from the league list',
   'adminPeople.removed':
-    'Removed from the league list. The person is kept for 30 days; the screen to bring them back is not ready yet.',
+    'Removed from the league list. If they never played on a team they are deleted for good after 30 days; if they have played they stay in the league’s bin, and their games keep their numbers.',
   'adminPeople.save.submit': 'Save details',
   'adminPeople.saved': 'Saved: {name}.',
   'adminPeople.search.clear': 'Show everyone',
@@ -62,6 +65,10 @@ export const enAdminPeople = {
   'adminPeople.search.submit': 'Search',
   'adminPeople.sub':
     'Everyone in the league, on a team or not. Find someone, fix their details or add someone new.',
+  'adminPeople.teams.admin': '{team} in Teams',
+  'adminPeople.teams.none': 'On no team’s roster this season.',
+  'adminPeople.teams.public': 'its public page',
+  'adminPeople.teams.title': 'Teams',
   'adminPeople.wrong.birthDate': 'Type a real date of birth: not after today, and not before 1900.',
   'adminPeople.wrong.contactEmail': 'Type a whole email address, such as name@example.com.',
   'adminPeople.wrong.firstName': 'Type a first name, up to 100 letters.',

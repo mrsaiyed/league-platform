@@ -7,7 +7,13 @@
 // The private details (contact email, date of birth, child or adult) are read only for a
 // role that may see them (people.get_person selects them only then, R-16, T-76): for any
 // other role they are not read, so they are neither drawn nor in the page's data.
-import { leagueUrl, type AdminArea } from '@srleagues/core';
+import {
+  leagueUrl,
+  listRoster,
+  type AdminArea,
+  type CommandContext,
+  type TeamRecord,
+} from '@srleagues/core';
 import { PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -62,6 +68,7 @@ export async function PersonPage({
           : undefined;
   // The league's own today (the ports' one clock): who is a child is measured on it (R-28).
   const leagueToday = (await (await webPorts()).publicSchedule.clockOf(here.id)).today;
+  const teams = await teamsOf(context, person.id);
   const listUrl = leagueUrl(here, 'admin-area', { area });
   const pageUrl = leagueUrl(here, 'admin-area', { area, subpath: [person.id] });
 
@@ -91,23 +98,81 @@ export async function PersonPage({
         />
       </section>
 
+      <section className="staff-panel admin-team-part" data-person-teams="true">
+        <h2>{t('adminPeople.teams.title')}</h2>
+        {teams.length === 0 ? (
+          <p className="staff-quiet">{t('adminPeople.teams.none')}</p>
+        ) : (
+          <ul>
+            {teams.map((team) => (
+              <li key={team.id}>
+                <a href={leagueUrl(here, 'admin-area', { area: 'teams', subpath: [team.id] })}>
+                  {t('adminPeople.teams.admin', { team: team.name })}
+                </a>{' '}
+                (
+                <a href={leagueUrl(here, 'team', { team: team.slug })}>
+                  {t('adminPeople.teams.public')}
+                </a>
+                )
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section id={removeAnchor} className="staff-panel admin-team-part" data-kind="danger">
         <h2>{t('adminPeople.remove.title')}</h2>
         <p className="staff-quiet">{t('adminPeople.remove.body')}</p>
-        <RemoveForm
-          action={removePersonAction}
-          permalink={`${pageUrl}#${removeAnchor}`}
-          hidden={{
-            league: here.slug,
-            personId: person.id,
-            [requestTokenField]: crypto.randomUUID(),
-          }}
-          confirm={t('adminPeople.remove.confirm')}
-          submit={t('adminPeople.remove.submit')}
-        />
+        {teams.length > 0 ? (
+          // While they are on a roster the command refuses: say so, and where to go, in
+          // place of a tick and a button that could only be refused.
+          <div data-on-roster="true">
+            <p>{t('adminPeople.remove.onRoster')}</p>
+            <ul>
+              {teams.map((team) => (
+                <li key={team.id}>
+                  <a href={leagueUrl(here, 'admin-area', { area: 'teams', subpath: [team.id] })}>
+                    {team.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <RemoveForm
+            action={removePersonAction}
+            permalink={`${pageUrl}#${removeAnchor}`}
+            hidden={{
+              league: here.slug,
+              personId: person.id,
+              [requestTokenField]: crypto.randomUUID(),
+            }}
+            confirm={t('adminPeople.remove.confirm')}
+            submit={t('adminPeople.remove.submit')}
+          />
+        )}
       </section>
     </main>
   );
+}
+
+/**
+ * The teams of this season whose roster holds the person now (no leaving date), read as
+ * Admin → Teams reads them. A team whose roster this role may not read is left out: the
+ * remove command still refuses while they are on it.
+ */
+async function teamsOf(context: CommandContext, personId: string): Promise<readonly TeamRecord[]> {
+  const ports = (await webPorts()).adminTeams;
+  const season = await ports.currentSeason(context);
+  if (season === undefined) return [];
+  const teams = await ports.teams(context, season.id);
+  const holding = await Promise.all(
+    teams.map(async (team) => {
+      const roster = await listRoster(context, { teamId: team.id }, ports.deps);
+      return roster.ok && roster.value.some((l) => l.personId === personId && l.leftOn === null);
+    }),
+  );
+  return teams.filter((_team, at) => holding[at] === true);
 }
 
 /** Said beside the child-or-adult choice when the date of birth and the choice disagree (R-28). */
