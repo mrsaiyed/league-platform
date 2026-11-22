@@ -452,6 +452,25 @@ describe('tracker controller: Reopen (step 2.120; the review of the two doors, p
     expect(scoreOf(status.game)).toEqual({ home: 4, away: 0 });
   });
 
+  it('the device that ended the game looks again in 15 seconds too: reopened elsewhere at once, it shows the game live (T-295, fix round B)', async () => {
+    const network = endpointNetwork();
+    const tablet = await ended(network);
+    // Still scoring: its own hold check has not yet found the game over.
+    expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
+    const phone = device(network, 'scorekeeper', createMemoryQueueStorage(), 'phone-1');
+    await phone.controller.start();
+    await phone.controller.idle();
+    expect(await phone.controller.reopen('End game tapped by mistake')).toEqual({ ok: true });
+    await tablet.clock.advance(14_000);
+    await tablet.controller.idle();
+    expect(tablet.controller.status().game?.status).toBe('final');
+    await tablet.clock.advance(1_000);
+    await tablet.controller.idle();
+    const status = tablet.controller.status();
+    expect(status.game?.status).toBe('live');
+    expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
+  });
+
   it('a device showing the game final shows the new final score, and asks at once when shown again (T-295)', async () => {
     const network = endpointNetwork();
     const tablet = await ended(network);

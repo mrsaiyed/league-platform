@@ -1176,6 +1176,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       if (settling) settleAgain = true;
       else void track(settle());
     }
+    // The server has this device's End: the final game's look starts now (fix round B).
+    if (cancelFinalCheck === null && !checkingFinal && endedHere()) scheduleFinalCheck();
     if (status.halted !== null && !checkingHalt && current.mode.kind === 'scoring') {
       checkingHalt = true;
       void track(onHalt(status.halted).finally(() => (checkingHalt = false)));
@@ -1189,7 +1191,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     askAgainNow();
     if (sessionId !== null) void track(renew());
     // Shown final: is it still? Asked now, not at the next look (T-295).
-    if (showsFinal()) void track(checkFinal());
+    if (looksFinal()) void track(checkFinal());
   };
 
   /** True once the queue has read what the device holds. */
@@ -1264,6 +1266,17 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    */
   const showsFinal = (): boolean =>
     current.mode.kind === 'read-only' && current.mode.reason === 'game-not-live';
+  /**
+   * This device ended the game and the server has every tap of it, End included, but
+   * the device still scores until its hold check finds the game over (fix round B):
+   * looked at like a game shown final, so a reopen elsewhere meanwhile is not missed.
+   */
+  const endedHere = (): boolean =>
+    current.mode.kind === 'scoring' &&
+    current.game?.status === 'final' &&
+    !throughDoor &&
+    queue.status().waiting === 0;
+  const looksFinal = (): boolean => showsFinal() || endedHere();
   let cancelFinalCheck: (() => void) | null = null;
   let checkingFinal = false;
 
@@ -1271,7 +1284,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   const scheduleFinalCheck = (): void => {
     cancelFinalCheck?.();
     cancelFinalCheck = null;
-    if (stopped || pageHidden || !showsFinal()) return;
+    if (stopped || pageHidden || !looksFinal()) return;
     cancelFinalCheck = clock.after(finalCheckMs, () => {
       cancelFinalCheck = null;
       void track(checkFinal());
@@ -1285,15 +1298,17 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * the game does. No answer: the screen stays and the next look asks again.
    */
   const checkFinal = async (): Promise<void> => {
-    if (stopped || checkingFinal || !showsFinal()) return;
+    if (stopped || checkingFinal || !looksFinal()) return;
     checkingFinal = true;
     try {
       const loaded = await ask((signal) => server.loadState(signal));
-      if (loaded.kind !== 'answer' || stopped || !showsFinal()) return;
+      if (loaded.kind !== 'answer' || stopped || !looksFinal()) return;
       if (loaded.value.state.status === 'live') {
         await carryOn();
         return;
       }
+      // Still scoring the game it ended: its own taps are shown until the hold check.
+      if (!showsFinal()) return;
       if (base === null || loaded.value.sequence !== base.sequence) {
         base = loaded.value;
         made = [];
