@@ -172,6 +172,15 @@ export const enTracker = {
   // over, signed out, no longer allowed) in the very moment a tap was made.
   'tracker.lastTapNotRecorded':
     'Your last tap was made as this device stopped scoring, so it was not recorded. Enter it again once the game is being scored.',
+  // A way off the scoring screen tapped while plays wait (lane 2.37, fix round, F1): what
+  // waits is sent only from this screen, so the screen asks first.
+  'tracker.leave.anyway': 'Leave anyway',
+  'tracker.leave.kept':
+    'If you leave, it stays on this device and is sent only when this game’s scoring screen is opened on it again.',
+  'tracker.leave.plays': 'Some plays are not sent yet. Stay on this screen until it says “Saved”.',
+  'tracker.leave.result': 'The result is not sent yet. Stay on this screen until it says “Saved”.',
+  'tracker.leave.stay': 'Stay here',
+  'tracker.leave.title': 'Not sent yet',
   'tracker.lineup.noPlayers': 'No {team} players yet.',
   'tracker.lineup.pick': 'Pick the starting {size}: tap players below.',
   'tracker.lineup.picked': '{count} of {size} picked.',

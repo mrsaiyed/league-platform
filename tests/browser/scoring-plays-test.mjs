@@ -988,6 +988,29 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
       await panelFits(page, `${at}, the final panel not sent`);
       await still(page, `${at}, the final panel not sent`);
       await accessible(page, `${at}, the final panel not sent`);
+      // Leaving while the result waits asks first (the fix round's F1): what waits is sent
+      // only from this screen. "Stay here" keeps it.
+      const address = page.url();
+      await c.finalButton('final-back').tap();
+      const leaveAsk = c.pad.locator('[data-leave-ask]');
+      await leaveAsk.waitFor();
+      const asked = words(await leaveAsk.innerText());
+      note(
+        `${at}: “Back to the games” with the result not sent asks first, in plain words, and does not leave`,
+        asked ===
+          'Not sent yet The result is not sent yet. Stay on this screen until it says “Saved”. If you leave, it stays on this device and is sent only when this game’s scoring screen is opened on it again. Leave anyway Stay here' &&
+          page.url() === address,
+        asked,
+      );
+      await panelFits(page, `${at}, the question before leaving`);
+      await still(page, `${at}, the question before leaving`);
+      await accessible(page, `${at}, the question before leaving`);
+      await c.answer('no').tap();
+      await c.pad.locator('[data-final="not-sent"]').waitFor();
+      note(
+        `${at}: “Stay here” keeps the scoring screen, with the final panel`,
+        page.url() === address && (await padMode()) === 'final',
+      );
       // Taken back on the device alone: no reason asked, no signal needed.
       await c.finalButton('take-back').tap();
       await said(/^End game taken back\. The game is live; the clock is stopped\.$/);

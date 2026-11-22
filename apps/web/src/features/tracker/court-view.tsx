@@ -596,7 +596,8 @@ function Pad(props: CourtViewProps) {
     pad.kind === 'end' ||
     pad.kind === 'final' ||
     pad.kind === 'reopen' ||
-    pad.kind === 'not-started';
+    pad.kind === 'not-started' ||
+    pad.kind === 'leave';
   // Nobody picked and nothing open: a player no longer shown leaves the pad at rest too.
   const atRest =
     tile === undefined &&

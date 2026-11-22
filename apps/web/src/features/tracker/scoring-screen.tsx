@@ -52,6 +52,7 @@ import {
   EndAsk,
   EndOffer,
   FinalPanel,
+  LeaveAsk,
   MoreEnd,
   MoreNotStarted,
   NotStartedAsk,
@@ -974,7 +975,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
         );
       });
     },
-    leave: props.leave,
+    leave: leaveAsking,
   };
 
   /** Records a timeout; the list closes and the screen says it, and that the clock stopped (G6). */
@@ -1085,9 +1086,44 @@ export function ScoringScreen(props: ScoringScreenProps) {
       focusNext.current = { selector };
     },
     rests: resting,
-    leave: props.leave,
+    leave: leaveAsking,
     back: props.links.back,
   });
+
+  /**
+   * A way off the screen (the header's links, the final panel's "Back to the games"):
+   * while anything waits to be sent it asks first, in the pad (lane 2.37, fix round,
+   * F1), since what waits is sent only while this screen is open. The browser's own
+   * leaving asks in its own words (tracker-opening.tsx, "beforeunload").
+   */
+  function leaveAsking(to: string) {
+    return (event: MouseEvent<HTMLAnchorElement>) => {
+      if (controller.status().waiting.length === 0) return props.leave(to)(event);
+      event.preventDefault();
+      if (wanted.current.kind === 'leave') return;
+      // The answers rest from this tap: its double is not an answer.
+      resting.asked.begin(event.timeStamp);
+      setSaid(null);
+      showPad({ kind: 'leave', to });
+      if (event.detail === 0) focusNext.current = { selector: '[data-pad] [data-answer="no"]' };
+    };
+  }
+  const leaveAnswers = {
+    stay(event: MouseEvent<HTMLElement>) {
+      if (wanted.current.kind !== 'leave' || !tapTaken(resting.asked, tapOf(event))) return;
+      // The final panel's buttons rest from this tap too: under "Stay here" lay "Back to
+      // the games", and a slow double tap must not leave.
+      resting.final.begin(event.timeStamp);
+      showPad(padAtRest);
+    },
+    leave(event: MouseEvent<HTMLAnchorElement>) {
+      const now = wanted.current;
+      if (now.kind !== 'leave' || !tapTaken(resting.asked, tapOf(event))) {
+        return event.preventDefault();
+      }
+      props.leave(now.to)(event);
+    },
+  };
   // The pad's own first line offers End game when the last period has run out with a
   // team ahead (S-65): offered, never done by itself.
   const endIsOffered = endOffered(state, reading.over);
@@ -1117,6 +1153,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
           on={end.on}
         />
       );
+    }
+    if (pad.kind === 'leave') {
+      return <LeaveAsk t={t} final={state.status === 'final'} to={pad.to} on={leaveAnswers} />;
     }
     if (pad.kind === 'reopen') {
       return (

@@ -242,6 +242,58 @@ export function EndAsk(props: {
   );
 }
 
+/**
+ * "Not sent yet" (lane 2.37, fix round, F1): a way off the screen was tapped while plays,
+ * or the result, wait on this device. What waits is sent only while this screen is open,
+ * so the answer that acts is to stay; leaving is offered, quietly, and loses nothing the
+ * device holds. "Stay here" lies where "Back to the games" was: a double tap stays.
+ */
+export function LeaveAsk(props: {
+  readonly t: Translate;
+  /** The game is final: what waits is its result. */
+  readonly final: boolean;
+  readonly to: string;
+  readonly on: {
+    readonly stay: (event: MouseEvent<HTMLElement>) => void;
+    readonly leave: (event: MouseEvent<HTMLAnchorElement>) => void;
+  };
+}) {
+  const { t, on } = props;
+  return (
+    <Ask
+      name="leave-ask"
+      title={t('tracker.leave.title')}
+      answers={
+        <>
+          <a
+            className="court-opt"
+            data-answer="leave"
+            aria-describedby={askTextId}
+            href={props.to}
+            onClick={on.leave}
+          >
+            {t('tracker.leave.anyway')}
+          </a>
+          <button
+            type="button"
+            className="court-opt court-opt-next"
+            data-answer="no"
+            aria-describedby={askTextId}
+            onClick={on.stay}
+          >
+            {t('tracker.leave.stay')}
+          </button>
+        </>
+      }
+    >
+      <div className="court-ask-text" id={askTextId} role="alert">
+        <p data-leave-why="">{t(props.final ? 'tracker.leave.result' : 'tracker.leave.plays')}</p>
+        <p className="court-ask-more">{t('tracker.leave.kept')}</p>
+      </div>
+    </Ask>
+  );
+}
+
 /** Where the End stands with the league, as the final panel draws it. */
 export type FinalState =
   /** The End was tapped a moment ago and is on its way: nothing to worry about yet. */

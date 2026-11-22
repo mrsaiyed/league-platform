@@ -35,7 +35,12 @@ export type PadMode =
   /** "Reopen game" was tapped on the final panel: its question, with the reason. */
   | { readonly kind: 'reopen' }
   /** "Mark not started" was tapped in More: its question. */
-  | { readonly kind: 'not-started' };
+  | { readonly kind: 'not-started' }
+  /**
+   * A way off the screen was tapped while plays wait to be sent: asked first, since what
+   * waits is sent only from this screen (lane 2.37, fix round, F1). `to` is where to go.
+   */
+  | { readonly kind: 'leave'; readonly to: string };
 
 /** A timeout to record: whose, and how long. */
 export type TimeoutCall = { readonly side: Side; readonly seconds: 60 | 30 };
@@ -178,9 +183,11 @@ export const swapColorsTap = (game: basketball.GameState): TapInput => ({
  */
 export function padFor(view: ScoringView, pad: PadMode): PadMode {
   // A final game shows the final panel in the pad's place, whatever was open (step 2.37):
-  // only the Reopen question stands in its place. And nothing about a final game is left
-  // open once the game is live again (the End taken back, the game reopened).
-  if (view.status === 'final') return pad.kind === 'reopen' ? pad : padFinal;
+  // only the Reopen question, and the question before leaving, stand in its place. And
+  // nothing about a final game is left open once the game is live again (the End taken
+  // back, the game reopened).
+  if (view.status === 'final')
+    return pad.kind === 'reopen' || pad.kind === 'leave' ? pad : padFinal;
   if (pad.kind === 'final' || pad.kind === 'reopen') return padAtRest;
   // A game that is not live has nothing to mark not started.
   if (pad.kind === 'not-started') return view.status === 'live' ? pad : padAtRest;

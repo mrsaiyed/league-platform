@@ -133,6 +133,15 @@ export function TrackerOpening({
     const visible = () => {
       if (document.visibilityState === 'visible') opened.current?.controller.awake();
     };
+    // Leaving by the browser's own ways (back, reload, the tab closed) while plays wait:
+    // the browser asks in its own words, as far as it allows (lane 2.37, fix round, F1).
+    // What waits is sent only while the scoring screen is open. The screen's own links
+    // ask in the pad first, and do not ask twice.
+    const unload = (event: BeforeUnloadEvent) => {
+      if (leaving.current) return;
+      if ((opened.current?.controller.status().queue.waiting ?? 0) > 0) event.preventDefault();
+    };
+    window.addEventListener('beforeunload', unload);
     window.addEventListener('pagehide', hidden);
     window.addEventListener('pageshow', shown);
     document.addEventListener('visibilitychange', visible);
@@ -174,6 +183,7 @@ export function TrackerOpening({
       gone = true;
       unsubscribe();
       window.removeEventListener('online', online);
+      window.removeEventListener('beforeunload', unload);
       window.removeEventListener('pagehide', hidden);
       window.removeEventListener('pageshow', shown);
       document.removeEventListener('visibilitychange', visible);
