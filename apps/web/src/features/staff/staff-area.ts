@@ -43,6 +43,7 @@ export function staffPlaceAt(
  * listed at all is steps 2.140 and 2.171's to decide.
  */
 export const readyAreas: readonly AdminArea[] = [
+  'people',
   'teams',
   'schedule',
   'games',

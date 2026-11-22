@@ -560,7 +560,27 @@ const cases = [
   ['scheduler', '/harbor-city/admin/teams', 403, [noAccess], ['Admin areas', 'Back to the admin']],
   // An area with no screen yet is the placeholder, in the words the checks around this
   // one look for to prove a real screen has replaced it (scripts/admin-placeholder.mjs).
-  ['owner', '/north-valley/admin/people', 200, [adminPlaceholder, 'Back to the admin']],
+  ['owner', '/north-valley/admin/registration', 200, [adminPlaceholder, 'Back to the admin']],
+  // Admin → People (step 2.50): everyone in the league, searched by name, with the form to
+  // add someone; each name leads to their record. A scorekeeper is refused it.
+  [
+    'owner',
+    '/north-valley/admin/people',
+    200,
+    [
+      'Everyone in the league, on a team or not.',
+      'Search by name',
+      'Add a person',
+      'Dana Whitfield',
+      'Leo Fischer',
+      staffFrameAt('/north-valley/admin/people'),
+      oneHeading,
+    ],
+    [adminPlaceholder],
+  ],
+  ['owner', '/north-valley/admin/people?q=fisch', 200, ['Leo Fischer'], ['Dana Whitfield']],
+  ['scorekeeper', '/north-valley/admin/people', 403, [noAccess], ['Dana Whitfield']],
+  ['owner', '/north-valley/admin/people/not-a-person', 404, [notFound]],
   // Admin → Teams (step 2.51): the season's teams and the form to add one.
   [
     'owner',
@@ -851,6 +871,14 @@ const cases = [
     [adminLink('quiet-pines', 'games'), adminLink('quiet-pines', 'settings')],
   ],
   ['registrar', '/quiet-pines/admin/schedule', 403, [noAccess]],
+  // A registrar runs People (P4 §4) and may enter a person's private details (R-16).
+  [
+    'registrar',
+    '/quiet-pines/admin/people',
+    200,
+    ['Add a person', 'Private details', 'Date of birth (optional)'],
+    [adminPlaceholder],
+  ],
   ['editor', '/quiet-pines', 200, ['This league is not published.']],
   [
     'editor',

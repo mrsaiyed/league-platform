@@ -11,12 +11,12 @@
 // same-request.ts, behind a port both servers share.
 
 /** The screens that say "Saved" from a notice. */
-export const noticeScreens = ['games', 'box-score', 'schedule'] as const;
+export const noticeScreens = ['games', 'box-score', 'schedule', 'people', 'person'] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 
 export type SavedNotice = {
   readonly screen: NoticeScreen;
-  /** The id of the thing saved: a game. */
+  /** The id of the thing saved: a game, or a person (step 2.50). */
   readonly thing: string;
   /** What was done to it, as the last part of a message key: `final`, `reopen`… */
   readonly said: string;
@@ -26,6 +26,12 @@ export type SavedNotice = {
    * removed from (step 2.185). Ids only, never anything typed.
    */
   readonly about?: readonly string[];
+  /**
+   * The name of the person it is about as the admin's screens write it, read from the
+   * store when it was done, never from the form: someone just put in the bin cannot be
+   * read again to be named in "Removed …" (step 2.50). Held here for one look, as the rest.
+   */
+  readonly name?: string;
 };
 
 export type SavedNotices = {
@@ -71,6 +77,7 @@ export function savedNotices(options: {
         thing: found.thing,
         said: found.said,
         ...(found.about === undefined ? {} : { about: found.about }),
+        ...(found.name === undefined ? {} : { name: found.name }),
       };
     },
   };

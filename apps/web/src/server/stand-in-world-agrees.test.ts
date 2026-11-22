@@ -73,6 +73,7 @@ import {
 import {
   accessStore,
   activityLogStore,
+  binStore,
   commandTransaction,
   createDatabase,
   divisionsStore,
@@ -157,6 +158,7 @@ beforeAll(async () => {
       imports: importsStore(scope),
       leagues: leaguesStore(scope),
       divisions: divisionsStore(scope),
+      bin: binStore(scope),
     })),
     events: eventHandlers,
     log: () => {},

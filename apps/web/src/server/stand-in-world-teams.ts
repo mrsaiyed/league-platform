@@ -212,13 +212,16 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
         .filter(
           (p) =>
             needle === undefined ||
-            `${p.firstName} ${p.lastName}`.toLowerCase().includes(needle) ||
-            (p.publicName ?? '').toLowerCase().includes(needle),
+            `${p.firstName} ${p.lastName}\n${p.publicName ?? ''}`
+              .toLowerCase()
+              .replace(/[\u2018\u2019]/g, "'")
+              .includes(needle),
         )
         .sort(
           (a, b) =>
-            a.lastName.localeCompare(b.lastName) ||
-            a.firstName.localeCompare(b.firstName) ||
+            // Without regard to capitals, as the database's lower() order.
+            a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase()) ||
+            a.firstName.toLowerCase().localeCompare(b.firstName.toLowerCase()) ||
             a.id.localeCompare(b.id),
         )
         .slice(offset, offset + limit)
@@ -280,6 +283,8 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
       const p = s.people.find((x) => x.id === personId);
       return p === undefined ? true : minorAt(p, s.timeZone, now());
     },
+    // The league's today in its own zone, by the world's one clock (as the teams store's).
+    leagueToday: async () => dayIn(now(), s.timeZone),
     leagueSettingRows: async (key) =>
       s.settings
         .filter((r) => r.key === key && r.place.level === 'league')

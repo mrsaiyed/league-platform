@@ -56,6 +56,11 @@ describe('openAdminAreas (P4 §3–4)', () => {
     expect(openAdminAreas(holding(grant('scheduler', program)))).toEqual(['schedule', 'games']);
   });
 
+  it('does not open People to a registrar for one program: people are read league-wide', () => {
+    expect(openAdminAreas(holding(grant('registrar', program)))).not.toContain('people');
+    expect(openAdminAreas(holding(grant('registrar')))).toContain('people');
+  });
+
   it('ignores ended grants and grants of another account', () => {
     const ended = { ...grant('admin'), revokedAt: '2026-11-13T00:00:00Z' };
     const someoneElse = { ...grant('admin'), accountId: '01900000-0000-7000-8000-0000000000a2' };

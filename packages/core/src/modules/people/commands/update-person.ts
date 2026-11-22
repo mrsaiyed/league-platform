@@ -5,12 +5,22 @@
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
-import { personBirthDate, personEmail, personName, personPublicName } from '../person-fields.ts';
+import {
+  birthDateAfter,
+  personBirthDate,
+  personEmail,
+  personName,
+  personPublicName,
+} from '../person-fields.ts';
 import { mayChangePeople, maySeeSensitive } from '../policy.ts';
 import type { PeopleTx, PersonChange } from '../ports.ts';
 
 export type UpdatePersonError = {
-  readonly code: 'person-not-found' | 'changed-since-read' | 'sensitive-fields-not-allowed';
+  readonly code:
+    | 'person-not-found'
+    | 'changed-since-read'
+    | 'sensitive-fields-not-allowed'
+    | 'invalid-input';
 };
 
 export const updatePerson = defineCommand({
@@ -45,6 +55,13 @@ export const updatePerson = defineCommand({
       input.birthDate !== undefined ||
       input.isMinor !== undefined;
     if (touchesSensitive && !sensitive) return fail({ code: 'sensitive-fields-not-allowed' });
+    // Never after the league's own today (person-fields.ts).
+    if (
+      typeof input.birthDate === 'string' &&
+      birthDateAfter(input.birthDate, await tx.people.leagueToday())
+    ) {
+      return fail({ code: 'invalid-input' });
+    }
     const person = await tx.people.find(input.personId, sensitive);
     if (person === undefined || person.binned) return fail({ code: 'person-not-found' });
     if (person.version !== input.version) return fail({ code: 'changed-since-read' });
