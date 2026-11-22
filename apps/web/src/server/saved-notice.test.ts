@@ -19,6 +19,20 @@ describe('the one-time "Saved" notice (T-271)', () => {
     expect(notices.take('p', 'games')).toBeUndefined();
   });
 
+  it("keeps the schedule's second id, the round a game was removed from (step 2.185)", () => {
+    const notices = savedNotices({ keepMs: 60_000, most: 10 });
+    const removed: SavedNotice = {
+      screen: 'schedule',
+      thing: game,
+      said: 'game-removed',
+      about: [leagueId],
+    };
+    notices.leave('p', removed);
+    expect(notices.take('p', 'games')).toBeUndefined();
+    expect(notices.take('p', 'schedule')).toEqual(removed);
+    expect(notices.take('p', 'schedule')).toBeUndefined();
+  });
+
   it('is for one person in one league, and one screen', () => {
     const notices = savedNotices({ keepMs: 60_000, most: 10 });
     const holder = noticeHolderOf({ leagueId, accountId: owner }) ?? '';

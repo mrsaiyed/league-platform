@@ -127,6 +127,10 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
     insertPublishedGames: async (seasonId, games) => {
       const added: WorldGame[] = [];
       for (const g of games) {
+        // A game id a game of this league's world has already is not made a second time.
+        // This world holds one league only, so it cannot meet the database's case of an id
+        // another league's game has (schedule-publish-commands.test.ts covers that).
+        if (s.games.some((x) => x.id === g.id)) continue;
         const home = s.teams.find((t) => t.id === g.homeTeamId && t.seasonId === seasonId);
         const away = s.teams.find((t) => t.id === g.awayTeamId && t.seasonId === seasonId);
         if (home === undefined || away === undefined) {
@@ -157,6 +161,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
         });
       }
       s.games = [...s.games, ...added];
+      return added.length;
     },
     updatePublishedGame: async (seasonId, gameId, change) => {
       const at = s.games.findIndex((g) => g.id === gameId && g.seasonId === seasonId);
