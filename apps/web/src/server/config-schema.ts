@@ -20,6 +20,16 @@ const text = z.string().trim().min(1);
 const secretText = (minLength: number) =>
   z.string().trim().min(minLength, `must be at least ${minLength} characters`);
 
+/**
+ * LOCAL_SIMULATED_LEAGUE's shape: `on`, `off` (none, as left out), or `--name <number>`
+ * pairs as the command takes them.
+ */
+const simulatedLeagueWords =
+  /^(on|off|(--(teams|divisions|rounds|tracked|seed)\s+\d+)(\s+--(teams|divisions|rounds|tracked|seed)\s+\d+)*)$/;
+/** The right example every refusal of LOCAL_SIMULATED_LEAGUE shows. */
+export const simulatedLeagueExample =
+  'LOCAL_SIMULATED_LEAGUE="--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7"';
+
 /** Every variable, with whether it is secret. `.env.example` lists the same names. */
 export const fields = {
   APP_ENV: { secret: false },
@@ -29,12 +39,18 @@ export const fields = {
   PLATFORM_DATABASE_URL: { secret: true },
   PLATFORM_DATABASE_SSL: { secret: false },
   PLATFORM_DATABASE_CA: { secret: false },
+  LOCAL_BINNED_TEAM: { secret: false },
+  LOCAL_BOT_CHECK: { secret: false },
   LOCAL_DATA: { secret: false },
+  LOCAL_DEMO_LEAGUE: { secret: false },
+  LOCAL_SIMULATED_LEAGUE: { secret: false },
   LOCAL_DESIGN: { secret: false },
   LOCAL_NOW: { secret: false },
   SESSION_SECRET: { secret: true },
   SUPABASE_URL: { secret: false },
   SUPABASE_SECRET_KEY: { secret: true },
+  TURNSTILE_SITE_KEY: { secret: false },
+  TURNSTILE_SECRET_KEY: { secret: true },
   RESEND_API_KEY: { secret: true },
   EMAIL_FROM: { secret: false },
   STRIPE_SECRET_KEY: { secret: true },
@@ -51,12 +67,15 @@ const schema = z.object({
   APP_ENV: z.enum(appEnvs),
   PUBLIC_BASE_URL: webUrl,
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  // Whether X-Forwarded-For is believed for the sign-in attempt limits (record 031):
-  // 'none' never; 'one' when exactly one proxy of the host appends the address it
-  // was reached from. The default 'none' is for local and test only: in staging and
-  // production it must be set (mustBeExplicit), because with 'none' every visitor
-  // shares one address and one person's wrong guesses lock out everyone.
-  TRUSTED_PROXY: z.enum(['none', 'one']).default('none'),
+  // Whose word is taken for a visitor's address in the sign-in attempt limits (records
+  // 031 and 081, device.ts): 'none' nobody's; 'one' when exactly one proxy of the host
+  // appends the address it was reached from; 'cloudflare' when Cloudflare stands in
+  // front of that proxy, its CF-Connecting-IP believed only on a request that reached
+  // the host from one of Cloudflare's addresses. The default 'none' is for local and
+  // test only: in staging and production it must be set (mustBeExplicit), because with
+  // 'none' every visitor shares one address and one person's wrong guesses lock out
+  // everyone.
+  TRUSTED_PROXY: z.enum(['none', 'one', 'cloudflare']).default('none'),
   // The platform's own database (R8): not DATABASE_URL, which the Al-Hadi tracker
   // reads, so a settings file made for the tracker can never point the web app at the
   // tracker's database. Local work and tests never open an address (T-201), so it is
@@ -66,7 +85,7 @@ const schema = z.object({
     .trim()
     .regex(/^postgres(?:ql)?:\/\//, 'must be a postgres:// address')
     .optional(),
-  // How the connection to PLATFORM_DATABASE_URL is encrypted (record 081): 'verify', the
+  // How the connection to PLATFORM_DATABASE_URL is encrypted (record 082): 'verify', the
   // default, is SSL with the server's certificate checked, against PLATFORM_DATABASE_CA when
   // it is given, else the system's certificate authorities; 'off' is no SSL, allowed only
   // for a database on this computer (its address names localhost), where no network lies
@@ -85,10 +104,40 @@ const schema = z.object({
       'must be the server’s certificate as PEM text, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----',
     )
     .optional(),
+  // A team's short name in the first made-up league's current season, put in the bin as
+  // the stand-in's world is made, with its games and results, as a team could be before
+  // A-17 held such a team (step 2.180): so a browser test and the pictures can see how
+  // every screen shows it. Only the stand-in's world reads it; only local and test.
+  LOCAL_BINNED_TEAM: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a short name')
+    .optional(),
   // What local work and tests run on (record 055): 'stand-in', the made-up leagues in
   // this process's memory (the default), or 'made-up-database', the made-up seed
   // leagues in a database in memory with every migration. Only local and test read it.
+  // Which bot check local work and tests draw (record 081): the hidden-field stand-in, or a
+  // made-up Turnstile drawn as the real box is, whose script a browser test serves itself.
+  LOCAL_BOT_CHECK: z.enum(['stand-in', 'made-up-turnstile']).default('stand-in'),
   LOCAL_DATA: z.enum(['stand-in', 'made-up-database']).default('stand-in'),
+  // 'on' loads the seed's demo-shaped league into the made-up database too (step 2.59): a
+  // large league with a whole season, which takes some seconds at start. Off by default, so
+  // a test that does not look at it starts as fast as before. Only with LOCAL_DATA=
+  // made-up-database, and only local and test: a choice of the made-up data, no setting of
+  // the product.
+  LOCAL_DEMO_LEAGUE: z.enum(['on', 'off']).default('off'),
+  // A simulated league played from empty to its final tables at start (step 2.236), its
+  // size in the simulate command's own words ("--teams 24 --divisions 4 --rounds 10
+  // --tracked 6 --seed 7"), or 'on' for a small one; the numbers themselves are checked at
+  // start, by the command's own reader. Only with LOCAL_DATA=made-up-database, and only
+  // local and test: a choice of the made-up data, no setting of the product.
+  LOCAL_SIMULATED_LEAGUE: z
+    .string()
+    .trim()
+    .regex(
+      simulatedLeagueWords,
+      `must be on, or the size in the simulate command's words, for example ${simulatedLeagueExample}`,
+    )
+    .optional(),
   // The design the first made-up league of the stand-in is drawn under, so that every
   // page can be pictured in every color set (scripts/shots.mjs --design, step 2.147): a
   // starting design, or a made-up one kept for pictures. Only local and test read it.
@@ -107,6 +156,16 @@ const schema = z.object({
   // tests sign in on the stand-in.
   SUPABASE_URL: webUrl.optional(),
   SUPABASE_SECRET_KEY: secretText(16).optional(),
+  // The bot check in front of sign-in and sign-up (T4 §6, record 081): Cloudflare
+  // Turnstile's public site key and its secret key. Production needs both; staging takes
+  // both or neither (neither switches the check off, T-270); local work and tests use the
+  // stand-in whatever is given.
+  TURNSTILE_SITE_KEY: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{8,100}$/, 'must be a Turnstile site key')
+    .optional(),
+  TURNSTILE_SECRET_KEY: secretText(16).optional(),
   // Only production sends email (T-140); elsewhere every email is captured.
   RESEND_API_KEY: secretText(8).optional(),
   EMAIL_FROM: text.regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'must be an email address'),
@@ -121,7 +180,11 @@ const optional: readonly ConfigName[] = [
   'PLATFORM_DATABASE_URL',
   'PLATFORM_DATABASE_SSL',
   'PLATFORM_DATABASE_CA',
+  'LOCAL_BINNED_TEAM',
+  'LOCAL_BOT_CHECK',
   'LOCAL_DATA',
+  'LOCAL_DEMO_LEAGUE',
+  'LOCAL_SIMULATED_LEAGUE',
   'LOCAL_DESIGN',
   'LOCAL_NOW',
   'SESSION_SECRET',
@@ -129,6 +192,8 @@ const optional: readonly ConfigName[] = [
   'STRIPE_WEBHOOK_SECRET',
   'SUPABASE_URL',
   'SUPABASE_SECRET_KEY',
+  'TURNSTILE_SITE_KEY',
+  'TURNSTILE_SECRET_KEY',
   'RESEND_API_KEY',
 ];
 
@@ -142,12 +207,20 @@ const requiredIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   PLATFORM_DATABASE_URL: ['staging', 'production'],
   SUPABASE_URL: ['staging', 'production'],
   SUPABASE_SECRET_KEY: ['staging', 'production'],
+  // Staging may leave out both, switching the bot check off (T-270, record 081); one
+  // without the other is refused below.
+  TURNSTILE_SITE_KEY: ['production'],
+  TURNSTILE_SECRET_KEY: ['production'],
   RESEND_API_KEY: ['production'],
 };
 
 /** Read only in local work and tests; set anywhere else, it is a mistake. */
 const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
+  LOCAL_BINNED_TEAM: ['local', 'test'],
+  LOCAL_BOT_CHECK: ['local', 'test'],
   LOCAL_DATA: ['local', 'test'],
+  LOCAL_DEMO_LEAGUE: ['local', 'test'],
+  LOCAL_SIMULATED_LEAGUE: ['local', 'test'],
   LOCAL_DESIGN: ['local', 'test'],
   LOCAL_NOW: ['local', 'test'],
 };
@@ -218,6 +291,24 @@ export function loadConfig(
       invalid.set(name, `${name}: missing, must be set when APP_ENV is ${appEnv}`);
     }
   }
+  // Turnstile's two keys go together (record 081): staging without either switches the bot
+  // check off, but one without the other is a mistake, named here.
+  if (appEnv === 'staging') {
+    const site = given['TURNSTILE_SITE_KEY'];
+    const secret = given['TURNSTILE_SECRET_KEY'];
+    if (site !== undefined && secret === undefined) {
+      invalid.set(
+        'TURNSTILE_SECRET_KEY',
+        'TURNSTILE_SECRET_KEY: missing, must be set with TURNSTILE_SITE_KEY (or leave out both to switch the bot check off)',
+      );
+    }
+    if (secret !== undefined && site === undefined) {
+      invalid.set(
+        'TURNSTILE_SITE_KEY',
+        'TURNSTILE_SITE_KEY: missing, must be set with TURNSTILE_SECRET_KEY (or leave out both to switch the bot check off)',
+      );
+    }
+  }
   // The tracker's database guard (packages/providers, shared with the worker).
   const facts: TrackerGuardFacts = { env, appEnv, trackerProject: guard?.trackerProject };
   const database = given['PLATFORM_DATABASE_URL'];
@@ -226,7 +317,7 @@ export function loadConfig(
       ? undefined
       : platformDatabaseProblem('PLATFORM_DATABASE_URL', database, facts);
   if (databaseProblem !== undefined) invalid.set('PLATFORM_DATABASE_URL', databaseProblem);
-  // No SSL only where no network lies between: a database on this computer (record 081).
+  // No SSL only where no network lies between: a database on this computer (record 082).
   if (
     given['PLATFORM_DATABASE_SSL'] === 'off' &&
     (database === undefined || addressOnThisComputer(database) !== true)
@@ -265,6 +356,30 @@ export function loadConfig(
     invalid.set(
       'LOCAL_NOW',
       'LOCAL_NOW: invalid, the made-up database keeps this computer’s clock, so it may not be set with LOCAL_DATA=made-up-database',
+    );
+  }
+  // The demo-shaped league is loaded into the made-up database only: without it the
+  // setting would silently do nothing.
+  if (
+    given['LOCAL_DEMO_LEAGUE'] === 'on' &&
+    given['LOCAL_DATA'] !== 'made-up-database' &&
+    !invalid.has('LOCAL_DEMO_LEAGUE')
+  ) {
+    invalid.set(
+      'LOCAL_DEMO_LEAGUE',
+      'LOCAL_DEMO_LEAGUE: invalid, the demo-shaped league is loaded into the made-up database only, so it may be on only with LOCAL_DATA=made-up-database',
+    );
+  }
+  // The simulated league is played into the made-up database only, as the demo league is.
+  if (
+    given['LOCAL_SIMULATED_LEAGUE'] !== undefined &&
+    given['LOCAL_SIMULATED_LEAGUE'].trim() !== 'off' &&
+    given['LOCAL_DATA'] !== 'made-up-database' &&
+    !invalid.has('LOCAL_SIMULATED_LEAGUE')
+  ) {
+    invalid.set(
+      'LOCAL_SIMULATED_LEAGUE',
+      'LOCAL_SIMULATED_LEAGUE: invalid, the simulated league is played into the made-up database only, so it may be set only with LOCAL_DATA=made-up-database',
     );
   }
   const result = schema.safeParse(given);

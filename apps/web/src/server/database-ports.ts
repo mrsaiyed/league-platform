@@ -27,14 +27,16 @@ import {
   isLeagueIdFormat,
   ok,
   type AccessTx,
+  type BinTx,
   type CommandDeps,
   type Result,
 } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
-import type { SignInService } from '@srleagues/providers';
+import type { BotCheck, SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
+import { peopleDepsOf } from './admin-people.ts';
 import type { AccountRefusal } from './context.ts';
 import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
 import { databaseAdminTeams, type AdminTeamsQueries } from './database-admin-teams.ts';
@@ -75,6 +77,7 @@ export type DatabaseQueries = Pick<
   | 'accessStore'
   | 'activityLogStore'
   | 'jobsStore'
+  | 'binStore'
 > &
   AdminSettingsQueries &
   AdminTeamsQueries &
@@ -92,6 +95,8 @@ export type DatabasePortsOptions = {
   /** The sign-in service: its `accountId` is the service's own user id (record 052). */
   readonly signIn: SignInService;
   readonly signInMail: SignInMail;
+  /** The bot check in front of sign-in and sign-up (record 081). */
+  readonly botCheck: BotCheck;
   /** Where the access module's T-196 lines go. */
   readonly log: CommandDeps<AccessTx>['log'];
   /**
@@ -228,6 +233,10 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
   // The games commands' one transaction, the tracker's too (database-games.ts).
   const clock = { now: () => now().getTime() };
   const gamesDeps = databaseGamesDeps(database, db, { log: options.log, clock });
+  // Admin → Teams' transaction, whose people store Admin → People's commands run on too
+  // (step 2.50): one people store, so a person added on People is the one Teams puts on
+  // a roster; with the same event handlers.
+  const adminTeams = databaseAdminTeams(database, db, options.log, accessOf);
 
   return {
     findLeague: (shortName) =>
@@ -246,6 +255,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     identify,
     signIn,
     signInMail: options.signInMail,
+    botCheck: options.botCheck,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf,
     // The one read across leagues (record 066): in a transaction set to the session's
@@ -265,8 +275,31 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // league it lists (part 4).
     scheduleAdmin: databaseScheduleAdmin(database, db, options.log, accessOf),
     publicTeams: databasePublicTeams(database, db),
+    // The people commands and reads, on Admin → Teams' own transaction (step 2.50): every
+    // one is a league transaction set to the session's league and account (T-23, T-28),
+    // and a person's private fields are read only for people.read_sensitive (T-76).
+    // Putting a removed person back (A-5): the bin's command on the bin's own store, as
+    // the worker's purge has it; restoring a person sets off no handler.
+    adminPeople: {
+      deps: peopleDepsOf(adminTeams.deps),
+      putBack: {
+        transaction: database.commandTransaction(db, (scope) => ({
+          jobs: database.jobsStore(scope),
+          bin: database.binStore(scope),
+          access: database.accessStore(scope),
+          activity: database.activityLogStore(scope),
+          // The stores core's handlers use, so the port is given them from the one place
+          // (database-event-handlers.ts) though restoring a person sets none of them off.
+          standings: database.standingsStore(scope),
+          games: database.gamesStore(scope),
+        })),
+        events: coreEventHandlers<BinTx>(),
+        log: options.log,
+        now: () => performance.now(),
+      },
+    },
     // Its commands run with core's event handlers, never an empty list (part 5).
-    adminTeams: databaseAdminTeams(database, db, options.log, accessOf),
+    adminTeams,
     adminSettings: databaseAdminSettings(database, db, options.log),
     tracker: databaseTracker(database, db, gamesDeps, clock),
     // No live service on the database yet (steps 2.124 and 2.116): nothing listens, so a

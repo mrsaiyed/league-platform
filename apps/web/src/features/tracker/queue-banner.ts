@@ -1,22 +1,42 @@
-// The banner that always tells the truth (T6 §4): "All saved", or how many taps are
-// still waiting to send and how many the server refused (not saved), both at once.
+// The banner that always tells the truth (T6 §4): "All saved", or how many plays are
+// still waiting to send and how many the server refused (not saved), both at once, and
+// that there is no connection whenever the device knows it (step 2.37).
 // A device whose storage is failing says that, not that it is offline (record 024).
 // The words are in the message files (T-187); this only picks which and the counts.
 import type { Translate } from '@srleagues/site';
 import type { QueueStatus } from './tracker-queue.ts';
 
 export type SavedBannerLine =
-  | { readonly key: 'tracker.queue.allSaved' | 'tracker.queue.storageFailed' }
+  | {
+      readonly key:
+        | 'tracker.queue.allSaved'
+        | 'tracker.queue.storageFailed'
+        | 'tracker.queue.offline';
+    }
   | { readonly key: 'tracker.queue.waiting' | 'tracker.queue.notSaved'; readonly count: number };
 
 /** The banner's lines, most urgent first; never empty. */
 export type SavedBanner = readonly [SavedBannerLine, ...SavedBannerLine[]];
 
+/**
+ * Whether the device knows it has no connection (step 2.37): the browser says so, or
+ * what the queue sends is going unanswered. Either is enough: the banner then says "No
+ * connection" and never "All saved", whether or not plays are waiting.
+ */
+export function isOffline(
+  queue: Pick<QueueStatus, 'unansweredSince'>,
+  browserOnline: boolean,
+): boolean {
+  return !browserOnline || queue.unansweredSince !== null;
+}
+
 export function savedBanner(
   status: Pick<QueueStatus, 'waiting' | 'refused' | 'storageFailure'>,
+  offline = false,
 ): SavedBanner {
   const lines: SavedBannerLine[] = [];
   if (status.storageFailure !== null) lines.push({ key: 'tracker.queue.storageFailed' });
+  if (offline) lines.push({ key: 'tracker.queue.offline' });
   if (status.waiting > 0) lines.push({ key: 'tracker.queue.waiting', count: status.waiting });
   if (status.refused.length > 0) {
     lines.push({ key: 'tracker.queue.notSaved', count: status.refused.length });
@@ -46,6 +66,8 @@ export function savedBannerShortLines(banner: SavedBanner, t: Translate): readon
         return t('tracker.queue.allSaved');
       case 'tracker.queue.storageFailed':
         return t('tracker.queue.storageFailedShort');
+      case 'tracker.queue.offline':
+        return t('tracker.queue.offlineShort');
       case 'tracker.queue.waiting':
         return t.plural('tracker.queue.waitingShort', line.count);
       case 'tracker.queue.notSaved':

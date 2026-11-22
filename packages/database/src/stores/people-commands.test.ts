@@ -147,7 +147,7 @@ describe('the people commands on the database', () => {
     ).toMatchObject({ error: { code: 'person-not-found' } });
   });
 
-  it('searches by name, public name and (for those who may see it) email, and pages', async () => {
+  it('searches by name and public name, never by email, and pages', async () => {
     const l = await league();
     for (const [first, last, email] of [
       ['Ann', 'Baker', 'ann@example.test'],
@@ -169,9 +169,29 @@ describe('the people commands on the database', () => {
     expect(await names(l.ownerId, { search: 'baker ann' })).toEqual(['Baker']);
     expect(await names(l.ownerId, { search: 'ann baker' })).toEqual(['Baker']);
     expect(await names(l.ownerId, { search: 'ADAMS' })).toEqual(['Adams']);
-    expect(await names(l.ownerId, { search: 'bo@example' })).toEqual(['Adams']);
+    // Names only, whoever asks (P6, part 1 of the fix round): an email finds no one.
+    expect(await names(l.ownerId, { search: 'bo@example' })).toEqual([]);
     expect(await names(l.ownerId, { search: '%' })).toEqual(['Percent%']);
     expect(await names(l.ownerId, { limit: 1, offset: 1 })).toEqual(['Baker']);
+  });
+
+  it('sorts names without regard to capitals', async () => {
+    const l = await league();
+    for (const [first, last] of [
+      ['Zed', 'Zimmer'],
+      ['ann', 'de Vries'],
+      ['Bea', 'Adams'],
+      ['al', 'adams'],
+    ] as const) {
+      await createPerson(l.as(l.ownerId), { firstName: first, lastName: last }, deps);
+    }
+    const listed = await listPeople(l.as(l.ownerId), {}, deps);
+    expect(listed.ok ? listed.value.map((p) => `${p.firstName} ${p.lastName}`) : listed).toEqual([
+      'al adams',
+      'Bea Adams',
+      'ann de Vries',
+      'Zed Zimmer',
+    ]);
   });
 
   it('refuses removing a person who is on a roster, until they leave it', async () => {
@@ -275,7 +295,7 @@ describe('the people commands on the database', () => {
         ['binned', 'firstName', 'id', 'lastName', 'publicName', 'version', 'visibility'].sort(),
       );
       expect(JSON.stringify(listed.value)).not.toMatch(sensitiveText);
-      // An email finds nothing for this reader, though it finds the person for one who may see it.
+      // An email finds nothing for this reader, nor for anyone (P6).
       expect(await listPeople(l.as(reader), { search: 'test@example' }, deps)).toEqual({
         ok: true,
         value: [],
@@ -305,8 +325,9 @@ describe('the people commands on the database', () => {
       [personId],
     );
     expect(stored.contact_email).toBe('test@example.test');
+    // Not for the owner either: the search is by name only, whoever asks (P6).
     const withEmail = await listPeople(l.as(l.ownerId), { search: 'test@example' }, deps);
-    expect(withEmail).toMatchObject({ value: [{ id: personId }] });
+    expect(withEmail).toEqual({ ok: true, value: [] });
   });
 
   it('treats a person merged into another as not found, in find, update and remove', async () => {

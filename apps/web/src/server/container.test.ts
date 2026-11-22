@@ -247,7 +247,7 @@ describe('container.ts in staging, wired for real', () => {
 });
 
 describe('container.ts in production, wired for real', () => {
-  it('stops after every check has passed, in its plain sentence (record 081)', async () => {
+  it('stops after every check has passed, in its plain sentence (record 082)', async () => {
     const { auth, settings } = await world();
     const message = await refusal({
       ...settings,
@@ -255,9 +255,12 @@ describe('container.ts in production, wired for real', () => {
       PUBLIC_BASE_URL: 'https://leagues.example.test',
       TRUSTED_PROXY: 'one',
       RESEND_API_KEY: 'made-up-resend-key-never-used',
+      // Production needs both of the bot check's keys (step 2.98); made up, never used.
+      TURNSTILE_SITE_KEY: 'made-up-site-key',
+      TURNSTILE_SECRET_KEY: 'made-up-turnstile-secret-never-used',
     });
     expect(message).toBe(
-      'The web app cannot start: every check passed, but "production" does not serve anyone yet: only the test copy ("staging") is opened in this stage (record 081), because fixture import does not run on the database yet and youth leagues’ pages are not yet marked "do not index" there (step 2.60).',
+      'The web app cannot start: every check passed, but "production" does not serve anyone yet: only the test copy ("staging") is opened in this stage (record 082), because fixture import does not run on the database yet and youth leagues’ pages are not yet marked "do not index" there (step 2.60).',
     );
     // It got that far: the service was asked, as in staging.
     expect(auth.callsTo('GET', '/settings')).toBe(1);

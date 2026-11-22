@@ -9,6 +9,7 @@ import {
   choosePassword,
   confirmPassword,
   enterCode,
+  resendCode,
   signInWithPassword,
   signOut,
   signOutEverywhere,
@@ -26,6 +27,10 @@ export async function forgotPasswordAction(form: FormData): Promise<never> {
 
 export async function enterCodeAction(form: FormData): Promise<never> {
   redirect((await enterCode(fieldsOf(form), await nextVisit(), await flowDeps())).to);
+}
+
+export async function resendCodeAction(form: FormData): Promise<never> {
+  redirect((await resendCode(fieldsOf(form), await nextVisit(), await flowDeps())).to);
 }
 
 export async function choosePasswordAction(form: FormData): Promise<never> {

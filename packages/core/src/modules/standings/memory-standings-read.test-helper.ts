@@ -24,6 +24,7 @@ export function memoryStandingsRead(): StandingsReadStore {
         color: '#111111',
         divisionId,
         statsVisibility: 'everyone',
+        removed: false,
       },
       {
         id: staffTeam,
@@ -32,6 +33,7 @@ export function memoryStandingsRead(): StandingsReadStore {
         color: null,
         divisionId,
         statsVisibility: 'staff',
+        removed: false,
       },
     ],
     divisions: async () => [{ id: divisionId, name: 'North', color: null, sort: 0 }],
@@ -51,6 +53,7 @@ export function memoryStandingsRead(): StandingsReadStore {
         streakResult: 'won',
         streakLength: 2,
         decidedBy: 'head-to-head',
+        level: null,
       },
       {
         teamId: openTeam,
@@ -67,6 +70,7 @@ export function memoryStandingsRead(): StandingsReadStore {
         streakResult: 'lost',
         streakLength: 2,
         decidedBy: null,
+        level: null,
       },
     ],
     adjustments: async () => [
@@ -107,6 +111,7 @@ export function memoryStandingsRead(): StandingsReadStore {
       { teamId: openTeam, statKey: 'points', total: 80, gamesRecorded: 2 },
       { teamId: staffTeam, statKey: 'points', total: 100, gamesRecorded: 2 },
     ],
+    teamTurnoverGames: async () => [],
     people: async (ids) =>
       ids.map((id) => ({
         id,

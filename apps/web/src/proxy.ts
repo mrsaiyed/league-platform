@@ -12,17 +12,23 @@
 // only (scripts/web-listen.mjs); this check keeps out what can still arrive here.
 //
 // Outside production every answer it passes on, and its own plain page, carries
-// `X-Robots-Tag: noindex` (do-not-index.ts, record 081): pages, API answers and error pages
+// `X-Robots-Tag: noindex` (do-not-index.ts, record 082): pages, API answers and error pages
 // alike, since the header is set here, whatever the route then answers.
 //
 // It also keeps a session going (T-69, T-70): when the browser sends the renewing
 // token and no session cookie (it ran out), the session is renewed here, the page
 // sees the new token, and the browser is given the new cookies (renew-session.ts).
 import { NextResponse, type NextRequest } from 'next/server';
+import { isDevelopmentServer } from './server/config.ts';
 import { webPorts } from './server/container.ts';
 import { doNotIndex, doNotIndexHeader } from './server/do-not-index.ts';
 import { t } from './server/messages.ts';
 import { pathHeader } from './server/request-facts-header.ts';
+import {
+  contentSecurityPolicy,
+  fixedContentSecurityPolicy,
+  newNonce,
+} from './server/security-headers.ts';
 import { cookieNames, type CookieJar, type CookieOptions } from './server/sign-in/cookies.ts';
 import { secureCookies } from './server/sign-in/next-visit.ts';
 import { renewIfDue } from './server/sign-in/renew-session.ts';
@@ -45,7 +51,12 @@ function notAnswered(): NextResponse {
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title></head><body><main><h1>${title}</h1><p>${body}</p></main></body></html>`,
     {
       status: 421,
-      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'cache-control': 'no-store',
+        // No script on this page, so none may run (record 081).
+        'content-security-policy': fixedContentSecurityPolicy,
+      },
     },
   );
 }
@@ -59,7 +70,7 @@ async function portsIfStarted() {
   }
 }
 
-/** The answer, marked "do not index" outside production (record 081). */
+/** The answer, marked "do not index" outside production (record 082). */
 function marked(response: NextResponse): NextResponse {
   if (doNotIndex()) response.headers.set(doNotIndexHeader.name, doNotIndexHeader.value);
   return response;
@@ -96,12 +107,26 @@ async function answer(request: NextRequest): Promise<NextResponse> {
 
   const headers = new Headers(request.headers);
   headers.set(pathHeader, url.pathname + url.search);
+  // This answer's script policy, with a nonce made for it alone (T-79, record 081). The nonce
+  // Next.js stamps on its scripts (and the bot check's widget, nonceOf) is always the ANSWER's
+  // policy: Next 16 copies every header the proxy puts on its answer into the request as well,
+  // after the request's own (resolve-routes.js: `resHeaders[key] = value; req.headers[key] =
+  // value;`). Writing the policy into the request too, over any the browser sent, is therefore
+  // not what makes it work; it is harmless and kept as a guard should the framework change.
+  const widget = ports?.botCheck.widget;
+  const policy = contentSecurityPolicy({
+    nonce: newNonce(),
+    botCheckOrigin: widget?.kind === 'turnstile' ? widget.origin : undefined,
+    development: isDevelopmentServer(),
+  });
+  headers.set('content-security-policy', policy);
   if (changes.length > 0) {
     const cookie = request.cookies.toString();
     if (cookie === '') headers.delete('cookie');
     else headers.set('cookie', cookie);
   }
   const response = NextResponse.next({ request: { headers } });
+  response.headers.set('Content-Security-Policy', policy);
   // An answer that sets cookies is never kept by a shared cache (the snapshot endpoint
   // also answers private to any request carrying a sign-in cookie).
   if (changes.length > 0) response.headers.set('Cache-Control', 'private, no-store');

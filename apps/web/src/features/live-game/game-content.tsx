@@ -191,18 +191,27 @@ export function GameContent({ view }: { readonly view: GameView }) {
             <EmptyPanel text={t('game.noStats')} />
           ) : (
             <div className="game-tables">
-              {view.boxScores.tables.map((table) => (
-                <BoxScoreTable
-                  key={table.side}
-                  teamName={table.teamName}
-                  columns={table.columns}
-                  players={table.players}
-                  totals={table.totals}
-                  hiddenNotice={t('game.playersHidden')}
-                  labels={labels.boxScore}
-                  nameRoom={nameRoom}
-                />
-              ))}
+              {view.boxScores.tables.map((table) =>
+                table.nothingRecorded !== null ? (
+                  <EmptyPanel
+                    key={table.side}
+                    title={table.teamName}
+                    text={table.nothingRecorded}
+                  />
+                ) : (
+                  <BoxScoreTable
+                    key={table.side}
+                    teamName={table.teamName}
+                    columns={table.columns}
+                    players={table.players}
+                    totals={table.totals}
+                    hiddenNotice={t('game.playersHidden')}
+                    notes={table.notes}
+                    labels={labels.boxScore}
+                    nameRoom={nameRoom}
+                  />
+                ),
+              )}
             </div>
           )}
         </section>

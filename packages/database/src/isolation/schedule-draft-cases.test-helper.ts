@@ -11,6 +11,7 @@ import {
   moveDraftGame,
   previewSchedulePublish,
   publishSchedule,
+  putBackDraftGame,
   removeDraftGame,
   removeDraftRound,
   renameDraftRound,
@@ -169,6 +170,25 @@ registerCommandCase(swapDraftGames, harnessTx, {
 registerCommandCase(removeDraftGame, harnessTx, {
   name: "remove the target's upcoming game in its draft",
   input: (target) => ({ ...basis(target), gameId: target.upcomingGameId }),
+});
+
+// The seeded draft removes nothing, so the case first removes the upcoming game in it (a
+// run in another league finds no such draft and changes nothing), then puts it back.
+registerIsolationCase({
+  subject: putBackDraftGame,
+  name: "put the target's upcoming game back in its draft",
+  run: async (scope, target) => {
+    const removal: DraftDocument = {
+      version: 1,
+      changes: [{ kind: 'remove-game', gameId: target.upcomingGameId }],
+    };
+    await updateScheduleDraft(scope, target.seasonId, target.scheduleDraftId, removal, 1);
+    return runAsApp(putBackDraftGame, harnessTx, scope, {
+      ...basis(target),
+      version: 2,
+      gameId: target.upcomingGameId,
+    });
+  },
 });
 
 registerCommandCase(renameDraftRound, harnessTx, {

@@ -410,7 +410,13 @@ describe('the box score grid', () => {
     const liveGame = standInGameId(2);
     const ended = await ports.deps.transaction(as(owner), async (tx) => {
       const game = await tx.games.find(liveGame);
-      const change = { status: 'final', homeScore: 40, awayScore: 38, decided: true };
+      const change = {
+        status: 'final',
+        homeScore: 40,
+        awayScore: 38,
+        decided: true,
+        overtimePeriods: null,
+      };
       return tx.games.setResult(liveGame, change, game?.version ?? 0);
     });
     expect(ended).toBeDefined();

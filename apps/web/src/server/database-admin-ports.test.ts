@@ -41,7 +41,11 @@ import {
   type CommandContext,
 } from '@srleagues/core';
 import * as database from '@srleagues/database';
-import type { SessionIdentity, SignInService } from '@srleagues/providers';
+import {
+  createLocalBotCheck,
+  type SessionIdentity,
+  type SignInService,
+} from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databasePorts } from './database-ports.ts';
@@ -108,6 +112,7 @@ beforeAll(async () => {
       },
     } as unknown as SignInService,
     signInMail: {} as SignInMail,
+    botCheck: createLocalBotCheck({ appEnv: 'test' }),
     log: () => {},
     warn: () => {},
   });
@@ -671,9 +676,30 @@ describe('Admin → Schedule on the database ports, role by role', () => {
       'Lakeside Owls',
       'Lakeside Pines',
     ]);
+    expect(named.every((t) => !t.removed)).toBe(true);
     expect(await ports.scheduleAdmin.teamsOf(leagueId, campSeasonId)).toEqual([]);
     expect(await ports.scheduleAdmin.teamsOf(otherLeagueId, winterId)).toEqual([]);
     expect(await ports.scheduleAdmin.teamsOf(leagueId, 'not-an-id')).toEqual([]);
+  });
+
+  it('names a team in the bin too, marked removed, so the grid never shows its id (A-17)', async () => {
+    const asOwner = { leagueId, accountId: accountOf.get('owner') ?? '', requestId: randomUUID() };
+    const kept = await database.withTransaction(db, asOwner, async (scope) => {
+      const id = await database.insertTeam(scope, {
+        seasonId: campSeasonId,
+        divisionId: null,
+        slug: 'binned-wrens',
+        name: 'Binned Wrens',
+        color: null,
+        statsVisibility: 'everyone',
+      });
+      if (typeof id !== 'string' || id.endsWith('-taken')) throw new Error(`no team: ${id}`);
+      await database.setTeamBinned(scope, id, true);
+      return id;
+    });
+    expect(await ports.scheduleAdmin.teamsOf(leagueId, campSeasonId)).toEqual([
+      { id: kept, name: 'Binned Wrens', removed: true },
+    ]);
   });
 
   it.each(actors)('runs each command of the grid only for those it is for: %s', async (actor) => {
@@ -842,7 +868,7 @@ describe('Admin → Schedule on the database ports, role by role', () => {
     );
     expect(done).toMatchObject({ ok: true });
     const after = await campView();
-    expect(after.draft?.changeCount).toBe((before.draft?.changeCount ?? 0) + 1);
+    expect(after.draft?.savedEdits).toBe((before.draft?.savedEdits ?? 0) + 1);
     expect(after.result.rounds.map((r) => r.label)).toContain('Camp week 1');
   });
 

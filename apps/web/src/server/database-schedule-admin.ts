@@ -40,7 +40,7 @@ export type ScheduleAdminQueries = Pick<
   | 'standingsStore'
   | 'gamesStore'
   | 'listLeagueSeasons'
-  | 'listSeasonNames'
+  | 'listScheduleTeams'
 >;
 
 export function databaseScheduleAdmin(
@@ -67,15 +67,13 @@ export function databaseScheduleAdmin(
       log,
       now: () => performance.now(),
     },
-    // The season's teams not in the bin, by name: the names a fixtures file may use
-    // (listSeasonNames, step 2.10's reader), its venues left aside.
+    // The season's teams by name, those in the bin too, marked: a game of a team moved to
+    // the bin before A-17 is named, never shown by its id (step 2.180).
     teamsOf: async (leagueId, seasonId) =>
       isDatabaseId(seasonId)
-        ? (
-            await database.withTransaction(db, { leagueId }, (scope) =>
-              database.listSeasonNames(scope, seasonId),
-            )
-          ).teams
+        ? await database.withTransaction(db, { leagueId }, (scope) =>
+            database.listScheduleTeams(scope, seasonId),
+          )
         : [],
     seasonsOf: async (leagueId, given) => {
       // Only the account is taken from what the caller hands in: what it holds is read

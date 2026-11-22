@@ -27,7 +27,7 @@ describe('page titles are never streamed (T-275)', () => {
   });
 });
 
-describe('the files the proxy never sees are marked "do not index" (record 081)', () => {
+describe('the files the proxy never sees are marked "do not index" (record 082)', () => {
   it('in every mode, as they are files and never pages', async () => {
     const rules = (await config.headers?.()) ?? [];
     const marked = rules

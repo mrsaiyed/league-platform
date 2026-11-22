@@ -1,6 +1,6 @@
-# 081 — How the test copy starts, and what it refuses
+# 082 — How the test copy starts, and what it refuses
 
-Date: 2026-11-17. Step 2.93, the last part (T-285). Carries out T-270 (the first online test copy), T-30, T-60, T-140, T-201 and step 2.115's check as the start of the real sign-in; finishes what records [018](018-the-supabase-sign-in-adapter.md), [052](052-accounts-on-the-real-database.md), [055](055-the-web-app-on-the-database.md) and [075](075-reading-kept-emails.md) left to this part. Decided by the builder of the last part for the lead (technical), to be confirmed when the step lands.
+Date: 2026-11-17. Step 2.93, the last part (T-286). Carries out T-270 (the first online test copy), T-30, T-60, T-140, T-201 and step 2.115's check as the start of the real sign-in; finishes what records [018](018-the-supabase-sign-in-adapter.md), [052](052-accounts-on-the-real-database.md), [055](055-the-web-app-on-the-database.md) and [075](075-reading-kept-emails.md) left to this part. Decided by the builder of the last part for the lead (technical), to be confirmed when the step lands.
 
 **Not verified against the real service or a real PostgreSQL server.** Everything below runs on this computer against the made-up seed database served as a PostgreSQL server on 127.0.0.1 and a fake of Supabase Auth served over HTTP, with made-up keys (T-201). What only the real test copy can show is the list at the end, for the founder's supervised session.
 
@@ -21,7 +21,7 @@ Each problem stops the start before the app serves anyone, in one plain sentence
 5. **The real sign-in service**: Supabase's adapter (`createSupabaseSignIn`, record 018) is made with the store in our own database (`createDatabaseSignInStore`, record 052), our own email service for its codes (T4 §3), our own origin as the one place Google may send a browser back to, and plain http only to a service on this computer (a fake in a test). A fault in its settings is said in fixed words, as before.
 6. **Email confirmation** (step 2.115), unchanged and asked of that very adapter before anyone is signed in through it: `off` and `unknown` stop it, each in its sentence; `unknown` says which kind.
 7. **Staging serves** on the database ports (`databasePorts`) with no local tools, so both local pages answer "not found" and every request is answered. Every email is captured, never sent (T-140): in staging, in the server's memory, the newest 1,000.
-8. **Production stops here**, after every check has passed: "every check passed, but "production" does not serve anyone yet: only the test copy ("staging") is opened in this stage (record 081), because fixture import does not run on the database yet and youth leagues' pages are not yet marked "do not index" there (step 2.60)." Step 2.93's line opens staging only; opening production is a release of its own.
+8. **Production stops here**, after every check has passed: "every check passed, but "production" does not serve anyone yet: only the test copy ("staging") is opened in this stage (record 082), because fixture import does not run on the database yet and youth leagues' pages are not yet marked "do not index" there (step 2.60)." Step 2.93's line opens staging only; opening production is a release of its own.
 
 The database connection stays open for as long as the server runs; on any refusal it is closed. A connection the pool loses while idle is replaced, and said in the log by its kind only.
 

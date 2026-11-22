@@ -21,12 +21,18 @@ const valid: Record<ConfigName, string> = {
   PLATFORM_DATABASE_URL: 'postgres://app:hunter2-made-up@localhost:5432/x',
   PLATFORM_DATABASE_SSL: 'verify',
   PLATFORM_DATABASE_CA: madeUpCertificate,
+  LOCAL_BINNED_TEAM: 'badgers',
+  LOCAL_BOT_CHECK: 'stand-in',
   LOCAL_DATA: 'stand-in',
+  LOCAL_DEMO_LEAGUE: 'off',
+  LOCAL_SIMULATED_LEAGUE: 'off',
   LOCAL_DESIGN: 'crest-light',
   LOCAL_NOW: '2026-11-15T20:01:00Z',
   SESSION_SECRET: longValue('SESSION_SECRET'),
   SUPABASE_URL: 'http://localhost:54321',
   SUPABASE_SECRET_KEY: longValue('SUPABASE_SECRET_KEY'),
+  TURNSTILE_SITE_KEY: '0x4AAAAAAAmadeUpSiteKey',
+  TURNSTILE_SECRET_KEY: longValue('TURNSTILE_SECRET_KEY'),
   RESEND_API_KEY: longValue('RESEND_API_KEY'),
   EMAIL_FROM: 'hello@example.test',
   STRIPE_SECRET_KEY: longValue('STRIPE_SECRET_KEY'),
@@ -34,10 +40,19 @@ const valid: Record<ConfigName, string> = {
 };
 const names = Object.keys(fields) as ConfigName[];
 /**
- * Every setting, for staging and production: LOCAL_DATA, LOCAL_DESIGN and LOCAL_NOW are
- * for local work and tests only.
+ * Every setting, for staging and production: LOCAL_BINNED_TEAM, LOCAL_BOT_CHECK, LOCAL_DATA,
+ * LOCAL_DEMO_LEAGUE, LOCAL_DESIGN and LOCAL_NOW are for local work and tests only.
  */
-const hosted = { ...valid, LOCAL_DATA: undefined, LOCAL_DESIGN: undefined, LOCAL_NOW: undefined };
+const hosted = {
+  ...valid,
+  LOCAL_BINNED_TEAM: undefined,
+  LOCAL_BOT_CHECK: undefined,
+  LOCAL_DATA: undefined,
+  LOCAL_DEMO_LEAGUE: undefined,
+  LOCAL_SIMULATED_LEAGUE: undefined,
+  LOCAL_DESIGN: undefined,
+  LOCAL_NOW: undefined,
+};
 /** Required in every environment. */
 const required: readonly ConfigName[] = ['APP_ENV', 'PUBLIC_BASE_URL', 'EMAIL_FROM'];
 /** Where something uses it (R8): only those environments require it. */
@@ -45,6 +60,8 @@ const requiredWhereUsed: Readonly<Partial<Record<ConfigName, readonly string[]>>
   PLATFORM_DATABASE_URL: ['staging', 'production'],
   SUPABASE_URL: ['staging', 'production'],
   SUPABASE_SECRET_KEY: ['staging', 'production'],
+  TURNSTILE_SITE_KEY: ['production'],
+  TURNSTILE_SECRET_KEY: ['production'],
   RESEND_API_KEY: ['production'],
 };
 /** What local work needs: no database, no sign-in service, no keys. */
@@ -62,6 +79,8 @@ const production = {
   PLATFORM_DATABASE_URL: valid.PLATFORM_DATABASE_URL,
   SUPABASE_URL: 'https://made-up-project.supabase.example.test',
   SUPABASE_SECRET_KEY: valid.SUPABASE_SECRET_KEY,
+  TURNSTILE_SITE_KEY: valid.TURNSTILE_SITE_KEY,
+  TURNSTILE_SECRET_KEY: valid.TURNSTILE_SECRET_KEY,
   RESEND_API_KEY: valid.RESEND_API_KEY,
 };
 
@@ -109,11 +128,40 @@ describe('loadConfig', () => {
           `TRUSTED_PROXY: missing, must be set explicitly when APP_ENV is ${appEnv}`,
         ]);
       }
-      for (const set of ['none', 'one'] as const) {
+      for (const set of ['none', 'one', 'cloudflare'] as const) {
         expect(loadConfig({ ...hosted, APP_ENV: appEnv, TRUSTED_PROXY: set }).TRUSTED_PROXY).toBe(
           set,
         );
       }
+    }
+  });
+
+  it("takes Turnstile's two keys together: production needs both, staging both or neither", () => {
+    const staging = { ...production, APP_ENV: 'staging', RESEND_API_KEY: undefined };
+    const none = { TURNSTILE_SITE_KEY: undefined, TURNSTILE_SECRET_KEY: undefined };
+    // Staging with neither: starts, the bot check off (T-270).
+    expect(loadConfig({ ...staging, ...none }).TURNSTILE_SITE_KEY).toBeUndefined();
+    // Staging with both: starts, with Turnstile.
+    expect(loadConfig(staging).TURNSTILE_SITE_KEY).toBe(valid.TURNSTILE_SITE_KEY);
+    // Staging with one: refused, naming the one missing and no value.
+    const onlySite = failure({ ...staging, TURNSTILE_SECRET_KEY: undefined });
+    expect(onlySite.invalid).toEqual([
+      'TURNSTILE_SECRET_KEY: missing, must be set with TURNSTILE_SITE_KEY (or leave out both to switch the bot check off)',
+    ]);
+    const onlySecret = failure({ ...staging, TURNSTILE_SITE_KEY: ' ' });
+    expect(onlySecret.invalid).toEqual([
+      'TURNSTILE_SITE_KEY: missing, must be set with TURNSTILE_SECRET_KEY (or leave out both to switch the bot check off)',
+    ]);
+    expect(onlySecret.message).not.toContain(valid.TURNSTILE_SECRET_KEY);
+    // Production with neither, or one: refused.
+    for (const missing of [
+      none,
+      { TURNSTILE_SITE_KEY: undefined },
+      { TURNSTILE_SECRET_KEY: undefined },
+    ]) {
+      expect(failure({ ...production, ...missing }).invalid.join()).toMatch(
+        /TURNSTILE_(SITE|SECRET)_KEY: missing, must be set when APP_ENV is production/,
+      );
     }
   });
 
@@ -122,6 +170,7 @@ describe('loadConfig', () => {
       ...valid,
       APP_ENV: 'production',
       TRUSTED_PROXY: undefined,
+      LOCAL_BINNED_TEAM: undefined,
       LOCAL_DATA: undefined,
       LOCAL_DESIGN: undefined,
       LOCAL_NOW: undefined,
@@ -178,7 +227,7 @@ describe('loadConfig', () => {
     expect(Object.values(loadConfig({ ...valid, DATABASE_URL: tracker }))).not.toContain(tracker);
   });
 
-  it('reaches the database over SSL with its certificate checked unless it is on this computer (record 081)', () => {
+  it('reaches the database over SSL with its certificate checked unless it is on this computer (record 082)', () => {
     expect(loadConfig(production).PLATFORM_DATABASE_SSL).toBe('verify');
     const remote = 'postgres://app:hunter2-made-up@db.made-up.example.test:5432/x';
     // No SSL only for a database on this computer.
@@ -324,6 +373,62 @@ describe('loadConfig', () => {
     }
   });
 
+  it('takes LOCAL_DEMO_LEAGUE in local work and tests only, with the made-up database (step 2.59)', () => {
+    expect(loadConfig(localOnly).LOCAL_DEMO_LEAGUE).toBe('off');
+    expect(
+      loadConfig({ ...localOnly, LOCAL_DATA: 'made-up-database', LOCAL_DEMO_LEAGUE: 'on' })
+        .LOCAL_DEMO_LEAGUE,
+    ).toBe('on');
+    expect(failure({ ...localOnly, LOCAL_DEMO_LEAGUE: 'on' }).invalid).toEqual([
+      'LOCAL_DEMO_LEAGUE: invalid, the demo-shaped league is loaded into the made-up database only, so it may be on only with LOCAL_DATA=made-up-database',
+    ]);
+    expect(
+      failure({
+        ...localOnly,
+        LOCAL_DATA: 'made-up-database',
+        LOCAL_DEMO_LEAGUE: 'yes',
+      }).invalid.join(),
+    ).toContain('LOCAL_DEMO_LEAGUE');
+    for (const appEnv of ['staging', 'production']) {
+      expect(failure({ ...production, APP_ENV: appEnv, LOCAL_DEMO_LEAGUE: 'off' }).invalid).toEqual(
+        ['LOCAL_DEMO_LEAGUE: invalid, may be set only when APP_ENV is local or test'],
+      );
+    }
+  });
+
+  it('takes LOCAL_SIMULATED_LEAGUE in local work and tests only, with the made-up database (step 2.236)', () => {
+    const onDatabase = { ...localOnly, LOCAL_DATA: 'made-up-database' };
+    expect(loadConfig(onDatabase).LOCAL_SIMULATED_LEAGUE).toBeUndefined();
+    const size = '--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7';
+    expect(loadConfig({ ...localOnly, LOCAL_SIMULATED_LEAGUE: 'off' }).LOCAL_SIMULATED_LEAGUE).toBe(
+      'off',
+    );
+    for (const value of ['on', size, '--teams 12', `  ${size} `]) {
+      expect(
+        loadConfig({ ...onDatabase, APP_ENV: 'test', LOCAL_SIMULATED_LEAGUE: value })
+          .LOCAL_SIMULATED_LEAGUE,
+      ).toBe(value.trim());
+    }
+    // With the demo-shaped league too: both leagues are made.
+    expect(
+      loadConfig({ ...onDatabase, LOCAL_DEMO_LEAGUE: 'on', LOCAL_SIMULATED_LEAGUE: 'on' }),
+    ).toMatchObject({ LOCAL_DEMO_LEAGUE: 'on', LOCAL_SIMULATED_LEAGUE: 'on' });
+    // A value that cannot be read: one sentence, with a right example.
+    for (const value of ['yes', '24 teams', '--teams', '--players 5', '--teams twelve']) {
+      expect(failure({ ...onDatabase, LOCAL_SIMULATED_LEAGUE: value }).invalid).toEqual([
+        'LOCAL_SIMULATED_LEAGUE: invalid, must be on, or the size in the simulate command\'s words, for example LOCAL_SIMULATED_LEAGUE="--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7"',
+      ]);
+    }
+    expect(failure({ ...localOnly, LOCAL_SIMULATED_LEAGUE: 'on' }).invalid).toEqual([
+      'LOCAL_SIMULATED_LEAGUE: invalid, the simulated league is played into the made-up database only, so it may be set only with LOCAL_DATA=made-up-database',
+    ]);
+    for (const appEnv of ['staging', 'production']) {
+      expect(
+        failure({ ...production, APP_ENV: appEnv, LOCAL_SIMULATED_LEAGUE: 'on' }).invalid,
+      ).toEqual(['LOCAL_SIMULATED_LEAGUE: invalid, may be set only when APP_ENV is local or test']);
+    }
+  });
+
   it('takes LOCAL_DESIGN in local work and tests only, and only a design it knows (step 2.147)', () => {
     expect(loadConfig(localOnly).LOCAL_DESIGN).toBeUndefined();
     for (const name of ['crest', 'crest-light', 'midnight-gold', 'clean-court', 'pine']) {
@@ -339,6 +444,21 @@ describe('loadConfig', () => {
       expect(failure({ ...production, APP_ENV: appEnv, LOCAL_DESIGN: 'crest' }).invalid).toEqual([
         'LOCAL_DESIGN: invalid, may be set only when APP_ENV is local or test',
       ]);
+    }
+  });
+
+  it('takes LOCAL_BINNED_TEAM in local work and tests only, and only a short name (step 2.180)', () => {
+    expect(loadConfig(localOnly).LOCAL_BINNED_TEAM).toBeUndefined();
+    expect(loadConfig({ ...localOnly, LOCAL_BINNED_TEAM: 'badgers' }).LOCAL_BINNED_TEAM).toBe(
+      'badgers',
+    );
+    expect(failure({ ...localOnly, LOCAL_BINNED_TEAM: 'Bad Gers' }).invalid.join()).toContain(
+      'LOCAL_BINNED_TEAM',
+    );
+    for (const appEnv of ['staging', 'production']) {
+      expect(
+        failure({ ...production, APP_ENV: appEnv, LOCAL_BINNED_TEAM: 'badgers' }).invalid,
+      ).toEqual(['LOCAL_BINNED_TEAM: invalid, may be set only when APP_ENV is local or test']);
     }
   });
 

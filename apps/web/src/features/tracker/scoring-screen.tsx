@@ -25,6 +25,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
@@ -39,6 +40,24 @@ import {
 import { clockSetSaid, type ClockSheet, type CourtClock } from './clock-parts.tsx';
 import { createClockTicker } from './clock-ticker.ts';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
+import {
+  endOfferText,
+  endQuestion,
+  notStartedQuestion,
+  reopenLineText,
+  reopenOffered,
+  wonText,
+} from './end-game.ts';
+import {
+  EndAsk,
+  EndOffer,
+  FinalPanel,
+  LeaveAsk,
+  MoreEnd,
+  MoreNotStarted,
+  NotStartedAsk,
+  ReopenAsk,
+} from './end-parts.tsx';
 import { findPlayer, periodText, playerLabel, refusalText } from './engine-words.ts';
 import {
   clockEntry,
@@ -57,6 +76,15 @@ import {
 } from './game-clock.ts';
 import type { OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, LineupPicks } from './opened-game-storage.ts';
+import { endOffered, playLog, redoTarget, redoneText, undoTarget, undoneText } from './play-log.ts';
+import {
+  LatestPlays,
+  MoreLog,
+  PlayLogPanel,
+  PlayLogSheet,
+  UndoRedo,
+  type PlaysHandlers,
+} from './plays-parts.tsx';
 import {
   dropOn,
   padAtRest,
@@ -84,6 +112,7 @@ import {
   clockToggleTap,
   createTapRest,
   drawRest,
+  restMs,
   startBarTap,
   takeBackRestMs,
   takeBackTimeoutTap,
@@ -95,6 +124,7 @@ import {
 import { createTileDrag, type TileDrag } from './tile-drag.ts';
 import { createTileMarks, type MarkKind, type TileMark, type TileMarks } from './tile-marks.ts';
 import type { TapInput, TapResult, TrackerControllerStatus } from './tracker-controller.ts';
+import { useEndGame } from './use-end-game.ts';
 
 export type ScoringScreenProps = {
   readonly game: OpenedTrackerGame;
@@ -117,10 +147,52 @@ export type ScoringScreenProps = {
    * about to be replaced, so the page that replaces it says so.
    */
   readonly onNotRecorded?: () => void;
+  /**
+   * The account may correct games, not only score them: a hint for what the Mark not
+   * started question says (S-40). The league stays the judge. Left out: a scorekeeper.
+   */
+  readonly mayCorrect?: boolean;
+  /** The device knows it has no connection (queue-banner.ts): an End just tapped waits. */
+  readonly offline?: boolean;
 };
 
 /** How long the latest sentence stays (checklist I5). */
 const saidForMs = 3200;
+
+/**
+ * How many of the newest plays are worded while the whole log is shut: what the log's
+ * own panel shows on a tablet lying down, with the way to the rest under them.
+ */
+const panelRows = 30;
+/** How many of them the pad lists at rest where it has the room (a tablet upright). */
+const latestRows = 4;
+/**
+ * Where the play log has its own panel under the pad: a tablet lying down with its
+ * height to spare. The same words as the stylesheet's own (court.css), which draws the
+ * panel there; the screen reads them so that a phone, which has no such panel, does not
+ * word and draw thirty lines nobody sees with every tap (finding M6).
+ */
+const logPanelWhere = '(min-width: 880px) and (min-height: 760px)';
+
+/** Whether the screen is one where `query` holds now; drawn again when that changes. */
+function useScreenIs(query: string): boolean {
+  const subscribe = useCallback(
+    (changed: () => void) => {
+      const media = window.matchMedia(query);
+      media.addEventListener('change', changed);
+      return () => media.removeEventListener('change', changed);
+    },
+    [query],
+  );
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
+}
+
+/** What the keyboard can stop on in a dialog: its buttons and links, and a list that scrolls. */
+const dialogStops = 'button:not(:disabled), a[href], [tabindex="0"]';
 
 /** The tile of a player, in the teams' panels (not the pad's buttons). */
 const tileElement = (root: HTMLElement | null, playerId: string): HTMLElement | null =>
@@ -154,6 +226,22 @@ const restingPlaces = {
   minus: '[data-pad] [data-act="untimeout"]',
   /** The answers to "Record it anyway?", after the question is asked. */
   answers: '[data-pad] [data-timeout-answers]',
+  /**
+   * Undo and Redo, after each tap taken, for as long as − (step 2.37): each tap takes
+   * one play back or brings one back, so a double tap, fast or slow, must act on one.
+   */
+  undo: '[data-undo]',
+  redo: '[data-redo]',
+  /**
+   * The answers to a question about ending the game (End game, Reopen, Mark not
+   * started), after it is asked: the double of the tap that asked is not an answer.
+   */
+  asked: '[data-pad] [data-ask-answers]',
+  /**
+   * The final panel's own buttons, after End game is answered, for as long as −: "Back
+   * to the games" lies where "End game" was, and a slow double tap must not leave.
+   */
+  final: '[data-pad] [data-final-actions]',
 } as const;
 type RestingPlace = keyof typeof restingPlaces;
 const restingNames = Object.keys(restingPlaces) as RestingPlace[];
@@ -330,6 +418,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const [padMode, setPadMode] = useState<PadMode>(padAtRest);
   const [said, setSaid] = useState<ReturnType<typeof clockSetSaid> | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  /** The whole play log, open over the screen (step 2.37). */
+  const [logOpen, setLogOpen] = useState(false);
   const [dragging, setDragging] = useState<string | null>(null);
   // The marks of the tiles (tile-marks.ts): kept by player, so a tile drawn anew (a
   // substitution moves two players between floor and bench) is given its player's mark.
@@ -380,8 +470,11 @@ export function ScoringScreen(props: ScoringScreenProps) {
       const resting = !all[name].ready();
       for (const place of screen.querySelectorAll(restingPlaces[name])) {
         place.toggleAttribute('data-resting', resting);
-        // And a screen reader is told, on each button of it.
-        const buttons = place.matches('button') ? [place] : place.querySelectorAll('button');
+        // And a screen reader is told, on each button of it. Not on Undo and Redo: the
+        // screen itself says when each has nothing to act on (`aria-disabled`), and a
+        // key, which is how a screen reader presses, is always taken.
+        if (name === 'undo' || name === 'redo') continue;
+        const buttons = place.matches('button') ? [place] : place.querySelectorAll('button, a');
         for (const button of buttons) drawRest(button, resting);
       }
     }
@@ -391,6 +484,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
     toggle: createTapRest(restTimers, drawRests),
     minus: createTapRest(restTimers, drawRests, takeBackRestMs),
     answers: createTapRest(restTimers, drawRests),
+    undo: createTapRest(restTimers, drawRests, takeBackRestMs),
+    redo: createTapRest(restTimers, drawRests, takeBackRestMs),
+    asked: createTapRest(restTimers, drawRests),
+    final: createTapRest(restTimers, drawRests, takeBackRestMs),
   };
   const resting = rests.current;
   // After every drawing: a control drawn anew while it rests is marked as well.
@@ -428,6 +525,12 @@ export function ScoringScreen(props: ScoringScreenProps) {
     > => {
       const result = await controller.tap(input);
       if (result.ok) return { ...result, game: controller.status().game };
+      // A final game the league has (the device no longer scores it, and this screen
+      // stays with its final panel): nothing is recorded, and the screen says why (D12).
+      if (result.reason === 'not-scoring' && controller.status().game?.status === 'final') {
+        say(t('tracker.refusal.gameFinal'));
+        return { ok: false };
+      }
       // The device stopped scoring as the tap was made: this screen is about to be
       // taken away, so the page that replaces it is told, and says so there.
       if (result.reason === 'not-scoring') onNotRecorded?.();
@@ -607,8 +710,15 @@ export function ScoringScreen(props: ScoringScreenProps) {
   /** A click with no pointer behind it is Enter or Space (checklist S4). */
   const byKeyboard = (event: MouseEvent) => event.detail === 0;
 
+  /** A final game takes no play: a tap on a player or a team's chip says so (D12). */
+  const finalSays = (): boolean => {
+    if (view.status !== 'final') return false;
+    say(t('tracker.refusal.gameFinal'));
+    return true;
+  };
   const on: CourtHandlers = {
     tile(playerId, event) {
+      if (finalSays()) return;
       const tapped = tapTile(view, picks, padFor(view, wanted.current), playerId);
       if (tapped === null) return;
       if (tapped.kind === 'pick') {
@@ -714,6 +824,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       if (open !== null) focusNext.current = { tile: open };
     },
     turnovers(side) {
+      if (finalSays()) return;
       const now = wanted.current;
       setSaid(null);
       showPad(
@@ -721,6 +832,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       );
     },
     bench(side, forId) {
+      if (finalSays()) return;
       const now = wanted.current;
       const open = now.kind === 'bench' && now.side === side && now.forId === forId;
       setSaid(null);
@@ -863,7 +975,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
         );
       });
     },
-    leave: props.leave,
+    leave: leaveAsking,
   };
 
   /** Records a timeout; the list closes and the screen says it, and that the clock stopped (G6). */
@@ -886,20 +998,219 @@ export function ScoringScreen(props: ScoringScreenProps) {
     ];
   }
 
-  // --- More, and the clock's form: each opened as a dialog; Escape closes it, and the
-  // keyboard stays inside it. The keyboard returns to the button that opened it. ---
+  // --- Undo, Redo and the play log (step 2.37; checklist I1 to I5). ---
+  // What Undo and Redo will act on, named on the buttons; and the newest plays, worded
+  // only as far as the screen shows them while the whole log is shut, so a tap in a long
+  // game does not wait for every line of it (finding M6).
+  const undoPlay = useMemo(() => undoTarget(state, rosters, t), [state, rosters, t]);
+  const redoPlay = useMemo(() => redoTarget(state, rosters, t), [state, rosters, t]);
+  const { waiting } = status;
+  const logHasPanel = useScreenIs(logPanelWhere);
+  const rowsShown = logOpen ? undefined : logHasPanel ? panelRows : latestRows;
+  const log = useMemo(
+    () => playLog(state, rosters, waiting, t, rowsShown),
+    [state, rosters, waiting, t, rowsShown],
+  );
+  /** What had the keyboard when the log was opened: it goes back there. */
+  const logOpener = useRef<Element | null>(null);
+  /**
+   * Undo or Redo tapped. Greyed, it still says why (I6). Each rests from a tap taken, as
+   * − on the timeouts does: one double tap takes one play back, never two. The sentence
+   * says what happened, with what the scorekeeper would not see by itself (I2).
+   */
+  const turn = (kind: 'undo' | 'redo', event: MouseEvent<HTMLButtonElement>) => {
+    const before = controller.status().game ?? state;
+    if (before.status === 'final') return say(t('tracker.refusal.gameFinal'));
+    const none = kind === 'undo' ? before.plays.length === 0 : before.redo.length === 0;
+    if (none) {
+      return say(
+        t(kind === 'undo' ? 'tracker.refusal.nothingToUndo' : 'tracker.refusal.nothingToRedo'),
+      );
+    }
+    if (!tapTaken(resting[kind], tapOf(event))) return;
+    resting[kind].begin(event.timeStamp);
+    // A foul brought back may bring the bonus horn: made ready in this tap (F4).
+    if (kind === 'redo') bonusHorn.ready();
+    void tap({ type: kind })
+      .then((result) => {
+        if (!result.ok) return;
+        say(
+          kind === 'redo'
+            ? redoneText(before, rosters, t)
+            : undoneText(before, result.game ?? before, rosters, t),
+        );
+      })
+      .finally(taken(event.currentTarget));
+  };
+  const plays: PlaysHandlers = {
+    undo: (event) => turn('undo', event),
+    redo: (event) => turn('redo', event),
+    playLog(open) {
+      if (open) logOpener.current = document.activeElement;
+      setMoreOpen(false);
+      setLogOpen(open);
+    },
+  };
+
+  // --- Ending the game (step 2.37; checklist J1 to J5): End game and its question, the
+  // final panel, taking the End back, Reopen and Mark not started. What is asked and the
+  // taps are use-end-game.ts's; the pad draws them (end-parts.tsx). ---
+  const names = { home: view.teams.home.name, away: view.teams.away.name };
+  /**
+   * End game and Mark not started close More and ask in the pad. The second tap of a
+   * double tap on either would land on whatever lay under the button (the clock, a
+   * team's turnovers) and put that in the question's place: so for a third of a second
+   * from the tap that closed More, a finger's tap anywhere on the screen is not taken.
+   */
+  const quietUntil = useRef(Number.NEGATIVE_INFINITY);
+  const end = useEndGame({
+    controller,
+    status,
+    state,
+    names,
+    allowTies: rosters.allowTies,
+    mayCorrect: props.mayCorrect ?? false,
+    offline: props.offline ?? false,
+    t,
+    reading: () => readClock(controller.status().game ?? state, status.now()),
+    wanted,
+    showPad,
+    say,
+    quiet: () => setSaid(null),
+    tap,
+    closeMore: (at) => {
+      quietUntil.current = at + restMs;
+      setMoreOpen(false);
+    },
+    focus: (selector) => {
+      focusNext.current = { selector };
+    },
+    rests: resting,
+    leave: leaveAsking,
+    back: props.links.back,
+  });
+
+  /**
+   * A way off the screen (the header's links, the final panel's "Back to the games"):
+   * while anything waits to be sent it asks first, in the pad (lane 2.37, fix round,
+   * F1), since what waits is sent only while this screen is open. The browser's own
+   * leaving asks in its own words (tracker-opening.tsx, "beforeunload").
+   */
+  function leaveAsking(to: string) {
+    return (event: MouseEvent<HTMLAnchorElement>) => {
+      if (controller.status().waiting.length === 0) return props.leave(to)(event);
+      event.preventDefault();
+      if (wanted.current.kind === 'leave') return;
+      // The answers rest from this tap: its double is not an answer.
+      resting.asked.begin(event.timeStamp);
+      setSaid(null);
+      showPad({ kind: 'leave', to });
+      if (event.detail === 0) focusNext.current = { selector: '[data-pad] [data-answer="no"]' };
+    };
+  }
+  const leaveAnswers = {
+    stay(event: MouseEvent<HTMLElement>) {
+      if (wanted.current.kind !== 'leave' || !tapTaken(resting.asked, tapOf(event))) return;
+      // The final panel's buttons rest from this tap too: under "Stay here" lay "Back to
+      // the games", and a slow double tap must not leave.
+      resting.final.begin(event.timeStamp);
+      showPad(padAtRest);
+    },
+    leave(event: MouseEvent<HTMLAnchorElement>) {
+      const now = wanted.current;
+      if (now.kind !== 'leave' || !tapTaken(resting.asked, tapOf(event))) {
+        return event.preventDefault();
+      }
+      props.leave(now.to)(event);
+    },
+  };
+  // The pad's own first line offers End game when the last period has run out with a
+  // team ahead (S-65): offered, never done by itself.
+  const endIsOffered = endOffered(state, reading.over);
+  const padPanel = (() => {
+    if (pad.kind === 'end') {
+      return (
+        <EndAsk
+          t={t}
+          question={endQuestion(state, names, rosters.allowTies, reading, t)}
+          refused={pad.refused}
+          working={end.working}
+          on={end.on}
+        />
+      );
+    }
+    if (pad.kind === 'final' && end.ended !== null) {
+      return (
+        <FinalPanel
+          t={t}
+          won={wonText(state, names, t)}
+          ended={end.ended}
+          reopenLine={reopenLineText(end.reopenLine, t)}
+          reopenOffered={reopenOffered(end.reopenLine)}
+          problem={end.problemOn('final')}
+          working={end.working}
+          back={props.links.back}
+          on={end.on}
+        />
+      );
+    }
+    if (pad.kind === 'leave') {
+      return <LeaveAsk t={t} final={state.status === 'final'} to={pad.to} on={leaveAnswers} />;
+    }
+    if (pad.kind === 'reopen') {
+      return (
+        <ReopenAsk
+          t={t}
+          reason={end.reopenReason}
+          problem={end.problemOn('reopen')}
+          working={end.working}
+          on={end.on}
+        />
+      );
+    }
+    if (pad.kind === 'not-started') {
+      const question = notStartedQuestion(state, names, props.mayCorrect ?? false, t);
+      return (
+        <NotStartedAsk
+          t={t}
+          question={question}
+          askReason={question.kind === 'clears' || end.reasonAsked}
+          reason={end.clearReason}
+          problem={end.problemOn('not-started')}
+          working={end.working}
+          on={end.on}
+        />
+      );
+    }
+    return null;
+  })();
+
+  // --- More, the clock's form and the play log: each opened as a dialog; Escape closes
+  // it, and the keyboard stays inside it. The keyboard returns to the button that opened
+  // it: the play log has three (the pad's line, its own panel, More), so it goes back to
+  // whichever had the keyboard, or to More when that one is gone with More's sheet. ---
   const dialog = clockOpen
     ? { sheet: '[data-clock-sheet] [role="dialog"]', opener: '[data-clock]' }
-    : moreOpen
-      ? { sheet: '[data-more] [role="dialog"]', opener: '.court-more-button' }
-      : null;
+    : logOpen
+      ? { sheet: '[data-play-log] [role="dialog"]', opener: '.court-more-button' }
+      : moreOpen
+        ? { sheet: '[data-more] [role="dialog"]', opener: '.court-more-button' }
+        : null;
   const [dialogSheet, dialogOpener] = [dialog?.sheet ?? null, dialog?.opener ?? null];
   useEffect(() => {
     if (dialogSheet === null || dialogOpener === null) return;
     const screen = root.current;
     const sheet = screen?.querySelector<HTMLElement>(dialogSheet);
     sheet?.querySelector<HTMLElement>('button:not(:disabled), a[href]')?.focus();
-    return () => screen?.querySelector<HTMLElement>(dialogOpener)?.focus();
+    const isLog = dialogSheet.startsWith('[data-play-log]');
+    return () => {
+      const opener = isLog ? logOpener.current : null;
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
+      // A finger opened it (nothing had the keyboard): nothing is given it now.
+      else if (!isLog || opener instanceof HTMLElement) {
+        screen?.querySelector<HTMLElement>(dialogOpener)?.focus();
+      }
+    };
   }, [dialogSheet, dialogOpener]);
 
   // --- The keyboard: Escape closes the clock's form or More, then the open options,
@@ -911,9 +1222,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Tab' && dialogSheet !== null) {
         const sheet = root.current?.querySelector<HTMLElement>(dialogSheet);
-        const stops = [
-          ...(sheet?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]') ?? []),
-        ];
+        const stops = [...(sheet?.querySelectorAll<HTMLElement>(dialogStops) ?? [])];
         const [first, last] = [stops[0], stops.at(-1)];
         if (first === undefined || last === undefined) return;
         const at = document.activeElement;
@@ -944,6 +1253,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
         setClockOpen(false);
         return;
       }
+      if (logOpen) {
+        setLogOpen(false);
+        return;
+      }
       if (moreOpen) {
         setMoreOpen(false);
         return;
@@ -969,7 +1282,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [moreOpen, clockOpen, dialogSheet, padMode, startBarShown, hideStartFor]);
+  }, [moreOpen, logOpen, clockOpen, dialogSheet, padMode, startBarShown, hideStartFor]);
 
   // --- Dragging a bench player onto a floor player (checklist E2, E3). ---
   // One press is followed at a time (tile-drag.ts): a second finger on another tile is
@@ -1075,7 +1388,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
       if (pressed.cancel(event.pointerId)) endDrag();
     },
     onClickCapture(event: MouseEvent<HTMLElement>) {
-      if (!swallowClick.current) return;
+      // The double of a tap that closed More for a question (see `quietUntil`).
+      const double = event.detail !== 0 && event.timeStamp < quietUntil.current;
+      if (!double && !swallowClick.current) return;
       swallowClick.current = false;
       event.stopPropagation();
       event.preventDefault();
@@ -1083,7 +1398,11 @@ export function ScoringScreen(props: ScoringScreenProps) {
     /** A tap anywhere else closes a player's options (checklist D4). */
     onClick(event: MouseEvent<HTMLElement>) {
       if (wanted.current.kind !== 'player' || !(event.target instanceof Element)) return;
-      if (event.target.closest('button, a, [data-pad], [data-more], [data-account]') !== null)
+      if (
+        event.target.closest(
+          'button, a, [data-pad], [data-more], [data-play-log], [data-account]',
+        ) !== null
+      )
         return;
       showPad(padAtRest);
     },
@@ -1162,9 +1481,57 @@ export function ScoringScreen(props: ScoringScreenProps) {
       links={props.links}
       on={{ ...on, tile: tileTap }}
       drag={dragHandlers}
-      {...(props.slots === undefined ? {} : { slots: props.slots })}
+      slots={{
+        ...props.slots,
+        // After Start or Pause and the timeouts: Undo and Redo.
+        controls: (
+          <>
+            <UndoRedo t={t} undo={undoPlay} redo={redoPlay} on={plays} />
+            {props.slots?.controls}
+          </>
+        ),
+        // The latest play, once the game is under way: before that the pad says what to
+        // do before tip-off, and Undo itself names what it would take back (a lineup).
+        padRest:
+          state.status === 'live' && log.rows.length > 0 ? (
+            <LatestPlays
+              t={t}
+              log={{ ...log, rows: log.rows.slice(0, latestRows) }}
+              open={logOpen}
+              on={plays}
+            />
+          ) : null,
+        // The log's own panel, only where the stylesheet draws it.
+        playLog: logHasPanel ? (
+          <PlayLogPanel t={t} log={{ ...log, rows: log.rows.slice(0, panelRows) }} on={plays} />
+        ) : null,
+        // The last period has run out with a team ahead: the pad's first line is End game.
+        padStart: endIsOffered ? (
+          <EndOffer t={t} text={endOfferText(state, names, t)} on={end.on} />
+        ) : null,
+        padPanel,
+        // Behind More: End game first, until the game is final; Mark not started while
+        // it is live (a game that is or ever was final is never cleared: S-40).
+        moreStart:
+          state.status === 'final' ? (
+            props.slots?.moreStart
+          ) : (
+            <>
+              <MoreEnd t={t} on={end.on} />
+              {props.slots?.moreStart}
+            </>
+          ),
+        more: (
+          <>
+            <MoreLog t={t} log={log} on={plays} />
+            {state.status === 'live' ? <MoreNotStarted t={t} on={end.on} /> : null}
+            {props.slots?.more}
+          </>
+        ),
+      }}
       account={props.account ?? null}
     >
+      {logOpen ? <PlayLogSheet t={t} log={log} on={plays} /> : null}
       {draggedTile === undefined ? null : (
         <div
           className="court-ghost"

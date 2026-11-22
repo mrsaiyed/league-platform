@@ -7,7 +7,7 @@
 // hand (an empty one above all) fails even in a port no walk reaches.
 import { eventHandlers } from '@srleagues/core';
 import * as database from '@srleagues/database';
-import type { SignInService } from '@srleagues/providers';
+import { createLocalBotCheck, type SignInService } from '@srleagues/providers';
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,6 +29,7 @@ beforeAll(async () => {
     db,
     signIn: {} as SignInService,
     signInMail: {} as SignInMail,
+    botCheck: createLocalBotCheck({ appEnv: 'test' }),
     log: () => {},
     warn: () => {},
   });
@@ -74,6 +75,7 @@ describe('core’s event handlers on the database', () => {
     const { moved, notMoved } = portsWithCommands();
     // Today's: a port that runs commands and is not here is still a stand-in's refusal.
     expect([...moved.keys()].sort()).toEqual([
+      'adminPeople',
       'adminSettings',
       'adminTeams',
       'games',

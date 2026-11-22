@@ -1,11 +1,13 @@
 // Standings from final games and the season's rules (S-9, S-10, S-11; T3 §9): one
 // table per division, each with rank, seed, record, points for and against,
-// streak and which tiebreaker decided each place. Pure: the same games give the
+// streak and which tiebreaker decided each place, and for teams level with others how the
+// tiebreakers ordered them (step 2.198). Pure: the same games give the
 // same tables whatever order they arrive in, so a rebuild equals the running total.
 import { countGames } from './count-games.ts';
-import { orderTeams } from './order-teams.ts';
+import { orderTable } from './order-teams.ts';
 import { teamRecord, type TeamRecord } from './team-records.ts';
 import type {
+  LevelTeams,
   StandingsAdjustment,
   StandingsInput,
   StandingsProblem,
@@ -46,7 +48,7 @@ function repeated<T>(items: readonly T[], id: (item: T) => string): Set<string> 
 function row(
   record: TeamRecord,
   divisionId: string | null,
-): Omit<StandingsRow, 'rank' | 'seed' | 'decidedBy'> {
+): Omit<StandingsRow, 'rank' | 'seed' | 'decidedBy' | 'level'> {
   const decided = record.wins + record.losses + record.ties;
   return {
     teamId: record.teamId,
@@ -123,13 +125,22 @@ export function calculateStandings(input: StandingsInput): StandingsResult {
   const tables: StandingsTable[] = [...divisions.keys()].sort(byDivision).map((divisionId) => {
     const rows: StandingsRow[] = [];
     let seed = 0;
-    for (const place of orderTeams(divisions.get(divisionId) ?? [], context)) {
+    const { places, levels } = orderTable(divisions.get(divisionId) ?? [], context);
+    const levelOf = new Map<string, LevelTeams>();
+    for (const level of levels) for (const teamId of level.teamIds) levelOf.set(teamId, level);
+    for (const place of places) {
       const rank = seed + 1;
       for (const teamId of place.teamIds) {
         seed++;
         const record = records.get(teamId);
         if (!record) continue;
-        rows.push({ ...row(record, divisionId), rank, seed, decidedBy: place.decidedBy });
+        rows.push({
+          ...row(record, divisionId),
+          rank,
+          seed,
+          decidedBy: place.decidedBy,
+          level: levelOf.get(teamId) ?? null,
+        });
       }
     }
     return { divisionId, rows };

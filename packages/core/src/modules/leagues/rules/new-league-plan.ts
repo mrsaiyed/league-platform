@@ -15,7 +15,7 @@ import {
   type StartingDesignKey,
 } from '@srleagues/contracts';
 import { z } from 'zod';
-import { isBlockedShortName, shortNameSchema } from '../short-names.ts';
+import { isBlockedShortName, isSystemShortName, shortNameSchema } from '../short-names.ts';
 import { namedTimeZone } from '../time-zone.ts';
 import {
   listedByDefault,
@@ -87,7 +87,8 @@ export type NewLeagueField = (typeof newLeagueFields)[number];
 /** Why one answer cannot be used. */
 export type NewLeagueProblem = {
   readonly field: NewLeagueField;
-  readonly problem: 'missing' | 'invalid' | 'blocked' | 'before-start';
+  /** 'blocked': one of our own words; 'offensive': on the list of offensive words (U-16). */
+  readonly problem: 'missing' | 'invalid' | 'blocked' | 'offensive' | 'before-start';
 };
 
 /** A league ready to make, with its first season. */
@@ -200,10 +201,12 @@ const text = (value: string | undefined) => {
 };
 
 /** Why `read` could not use an answer: an object, so no answer can be mistaken for it. */
-type Refusal = { readonly refused: 'invalid' | 'blocked' };
+type Refusal = { readonly refused: 'invalid' | 'blocked' | 'offensive' };
 const invalid: Refusal = { refused: 'invalid' };
 const blocked: Refusal = { refused: 'blocked' };
-const isRefusal = (value: unknown): value is Refusal => value === invalid || value === blocked;
+const offensive: Refusal = { refused: 'offensive' };
+const isRefusal = (value: unknown): value is Refusal =>
+  value === invalid || value === blocked || value === offensive;
 
 /** Checks every answer at once, so all the problems are told together. */
 export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
@@ -244,7 +247,9 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
   const name = need('name', text(answers.name), parsed(leagueName));
   const slug = need('shortName', text(answers.shortName)?.toLowerCase(), (value) => {
     if (!shortNameSchema.safeParse(value).success) return invalid;
-    return isBlockedShortName(value) ? blocked : value;
+    // Which of the two it was is said: one of our words, or an offensive one.
+    if (isSystemShortName(value)) return blocked;
+    return isBlockedShortName(value) ? offensive : value;
   });
   const sportKey = need(
     'sport',

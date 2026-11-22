@@ -4,6 +4,7 @@ export type {
   CoinFlip,
   DecidedBy,
   GameStatus,
+  LevelTeams,
   StandingsAdjustment,
   StandingsGame,
   StandingsInput,
@@ -16,4 +17,6 @@ export type {
   StandingsTeam,
   Streak,
   Tiebreaker,
+  TiebreakPlace,
+  TiebreakStep,
 } from './types.ts';

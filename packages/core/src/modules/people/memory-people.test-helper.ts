@@ -117,13 +117,13 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
                 needle === undefined ||
                 `${p.firstName} ${p.lastName} ${p.publicName ?? ''}`
                   .toLowerCase()
-                  .includes(needle) ||
-                (sensitive &&
-                  (p.sensitiveFields.contactEmail ?? '').toLowerCase().includes(needle)),
+                  .replace(/[\u2018\u2019]/g, "'")
+                  .includes(needle),
             )
             .sort(
               (a, b) =>
-                a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName),
+                a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase()) ||
+                a.firstName.toLowerCase().localeCompare(b.firstName.toLowerCase()),
             )
             .slice(offset, offset + limit)
             .map((p) => view(p, sensitive));
@@ -179,6 +179,7 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
           const p = s.people.find((x) => x.id === id);
           return p === undefined ? true : isMinorOn(p.sensitiveFields, s.today);
         },
+        leagueToday: async () => s.today,
         leagueSettingRows: async (key) =>
           Object.hasOwn(s.settings, key)
             ? [{ level: 'league', document: { version: 1, value: s.settings[key] }, version: 1 }]

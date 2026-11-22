@@ -32,7 +32,7 @@ export function buildHomeNumbers(
     { key: 'played', label: t('home.number.played'), value: written.format(count(played)) },
     left === 0 && scored > 0
       ? { key: 'scored', label: t('home.number.scored'), value: written.format(scored) }
-      : { key: 'toPlay', label: t('home.number.toPlay'), value: written.format(left) },
+      : { key: 'toPlay', label: t.plural('home.number.toPlay', left), value: written.format(left) },
     {
       key: 'rounds',
       label: t('home.number.rounds'),

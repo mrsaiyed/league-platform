@@ -8,13 +8,25 @@
 // The database package is loaded by Node.js itself when the app starts on a
 // database (staging and production), not bundled by Next.js: it runs TypeScript
 // directly as the tracker does, and its migration runner finds its folder on disk.
-import { consoleSink, createLogger } from '@srleagues/observability';
+import { consoleSink, createLogger, type Logger } from '@srleagues/observability';
 import { createSupabaseSignIn } from '@srleagues/providers';
 import { getConfig } from './config.ts';
 import { keptEmailsFolderFrom } from './kept-emails.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
 import type { WebPorts } from './ports.ts';
-import { startWebApp } from './startup.ts';
+import { startWebApp, type StartupDeps } from './startup.ts';
+
+/**
+ * Where the app's own lines go: commands at info, warnings at warn, and the one alarm (the
+ * bot check our server could not ask, startup.ts) at error level, so an alarm can be set on it.
+ */
+export function logLinesFor(logger: Logger): Required<Pick<StartupDeps, 'log' | 'warn' | 'alarm'>> {
+  return {
+    log: (line) => logger.info('command', line),
+    warn: (message, fields) => logger.warn(message, fields),
+    alarm: (message, fields) => logger.error(message, fields),
+  };
+}
 
 const key = '__srleaguesWebPorts';
 type Holder = { [key]?: Promise<WebPorts> };
@@ -36,10 +48,12 @@ function start(): Promise<WebPorts> {
     // whether it confirms email addresses before anyone is signed in through it (step 2.115).
     realSignIn: (wiring) =>
       createSupabaseSignIn({ ...wiring, fetch: (url, init) => fetch(url, init) }),
-    log: (line) => logger.info('command', line),
-    warn: (message, fields) => logger.warn(message, fields),
+    // Commands at info, warnings at warn, the bot check's alarm at error (logLinesFor).
+    ...logLinesFor(logger),
     // Read only on made-up data (local work and tests): where the kept emails are written,
     // the working folder found from where the server runs (kept-emails.ts, step 2.96).
     keptEmailsFolder: runsOnMadeUpData(config.APP_ENV) ? keptEmailsFolderFrom(process.cwd()) : null,
+    // A line for the person at the terminal (the simulated league's, local and tests only).
+    say: (line) => console.log(line),
   });
 }

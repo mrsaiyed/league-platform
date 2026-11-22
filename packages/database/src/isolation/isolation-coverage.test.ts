@@ -72,6 +72,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.seedLeaguesInto,
     'development-only bootstrap: takes a PGlite, not a scope; runs the scoped commands (own cases) per league and writes accounts and role grants directly',
   ],
+  [
+    databasePackage.seedAllLeaguesInto,
+    'development-only bootstrap (`npm run seed`): takes a PGlite, not a scope; seedLeaguesInto, then per league the scoped commands (own cases), the fixture import, the rounds and the tracker transfer, each in its league; like seedLeaguesInto, the demo-shaped league also writes its accounts directly and its role grants through the access store, without a command',
+  ],
   [rosterEntrySummary, 'turns a row already read into the returned shape; runs no SQL'],
   [databasePackage.binStore, 'binds the bin queries (own cases) to a scope'],
   [databasePackage.teamsStore, 'binds the team queries, each with its own cases, to a scope'],
@@ -156,7 +160,7 @@ const reachNoLeagueData = new Map<unknown, string>([
   ],
   [
     databasePackage.serveMadeUpDatabase,
-    'tests only: madeUpDatabase served as a PostgreSQL server on 127.0.0.1 (record 081); takes nothing and reads no league for anyone',
+    'tests only: madeUpDatabase served as a PostgreSQL server on 127.0.0.1 (record 082); takes nothing and reads no league for anyone',
   ],
   [
     databasePackage.createDatabaseSignInStore,
@@ -174,6 +178,51 @@ const reachNoLeagueData = new Map<unknown, string>([
     'reads a copy of a tracker backup folder on disk with its own embedded database; no league, no platform tables (step 2.57)',
   ],
   [databasePackage.TrackerBackupError, 'the reader error class; runs nothing'],
+  [
+    databasePackage.SeedPartlyLoaded,
+    "the seed's error class for a partly loaded league; runs nothing",
+  ],
+  [
+    databasePackage.simulateLeagueInto,
+    'development-only (`npm run simulate`, and a local start with LOCAL_SIMULATED_LEAGUE): takes a PGlite, not a scope; makes its one made-up league with createLeague and from then on calls only the scoped commands (own cases) as that league’s owner; like seedLeaguesInto it writes its made-up accounts directly',
+  ],
+  [
+    databasePackage.rebuildSimulatedStandings,
+    'development-only, for the simulator’s tests: runs the standings rebuild (own case) as the simulated league’s owner, in that league',
+  ],
+  [
+    databasePackage.checkSimulatedLeague,
+    'development-only: reads the one simulated league’s numbers (the scoped queries and stores, own cases, and that league’s stored rows, every statement fenced by its league id) to compare them with the plan; changes nothing',
+  ],
+  [
+    databasePackage.simulationReportLines,
+    'turns the checks’ results into lines of text; runs no SQL',
+  ],
+  [
+    databasePackage.expectedTables,
+    'works a simulated league’s expected tables out from its plan alone; runs no SQL',
+  ],
+  [
+    databasePackage.expectedGame,
+    'works one game’s expected state and score out from the plan alone; runs no SQL',
+  ],
+  [
+    databasePackage.expectedBoxScore,
+    'works a tracked game’s expected box score out from the plan’s plays; runs no SQL',
+  ],
+  [
+    databasePackage.expectedPlayerTotals,
+    'adds up players’ expected totals from the plan’s plays; runs no SQL',
+  ],
+  [
+    databasePackage.planSimulation,
+    'makes the seeded plan of a simulated league; pure, runs no SQL',
+  ],
+  [databasePackage.simulationOptionsFrom, 'reads the simulate command’s options; runs no SQL'],
+  [
+    databasePackage.simulationProblem,
+    'says what is wrong with a simulation’s options; runs no SQL',
+  ],
   [
     databasePackage.transferTrackerGames,
     'development tool (step 2.58): takes a PGlite, not a scope; finds one league, season and account by name, then reaches that one league only through stores fenced to it (each transaction sets its league) and its commands (own cases)',
