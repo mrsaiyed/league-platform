@@ -136,6 +136,12 @@ export type CourtViewProps = {
   readonly banner: CourtBanner;
   /** What the tracker has to tell about holding the game; nothing most of the time. */
   readonly notices?: ReactNode;
+  /**
+   * Where the notices are drawn: under the scoreboard (the default), or in the pad at
+   * rest in place of the hint, where an upright phone has no room above the teams for
+   * them: nothing above the teams' block grows, so no five is cut (step 2.37).
+   */
+  readonly noticesIn?: 'top' | 'pad';
   readonly pad: PadMode;
   /**
    * The latest thing the screen said, or null; with a short form where a phone is short
@@ -244,7 +250,9 @@ export function CourtView(props: CourtViewProps) {
           />
           <Score t={t} team={view.teams.away} />
         </div>
-        {props.notices === undefined || props.notices === null ? null : (
+        {props.notices === undefined ||
+        props.notices === null ||
+        props.noticesIn === 'pad' ? null : (
           <div className="court-notices">{props.notices}</div>
         )}
       </header>
@@ -677,19 +685,25 @@ function Pad(props: CourtViewProps) {
               {slots.pregame}
             </div>
           ) : null}
-          <div className="court-hint" data-hint="">
-            <h2 className="court-label">{t('tracker.hint.title')}</h2>
-            <p>{t('tracker.hint.players')}</p>
-            {/* The hint says only what this size offers: where the bench is folded away
+          {props.noticesIn === 'pad' && props.notices !== undefined && props.notices !== null ? (
+            <div className="court-notices court-notices-pad" data-pad-notices="">
+              {props.notices}
+            </div>
+          ) : (
+            <div className="court-hint" data-hint="">
+              <h2 className="court-label">{t('tracker.hint.title')}</h2>
+              <p>{t('tracker.hint.players')}</p>
+              {/* The hint says only what this size offers: where the bench is folded away
                 (a short phone) there is no bench tile to tap or drag, and the stylesheet
                 shows the second wording in place of the first. */}
-            <p>
-              <span className="court-hint-bench">{t('tracker.hint.subs')}</span>
-              <span className="court-hint-folded">{t('tracker.hint.subsFolded')}</span>
-            </p>
-            <p>{t('tracker.hint.turnovers')}</p>
-            <p>{t('tracker.hint.saved')}</p>
-          </div>
+              <p>
+                <span className="court-hint-bench">{t('tracker.hint.subs')}</span>
+                <span className="court-hint-folded">{t('tracker.hint.subsFolded')}</span>
+              </p>
+              <p>{t('tracker.hint.turnovers')}</p>
+              <p>{t('tracker.hint.saved')}</p>
+            </div>
+          )}
         </div>
       ) : null}
     </section>

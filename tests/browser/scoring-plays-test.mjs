@@ -456,6 +456,10 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
     PUBLIC_BASE_URL: origin,
   });
   let context;
+  // Every renewal of the hold once the last End is about to be tapped (`afterRenewal`).
+  const renewals = [];
+  const isRenewal = (request) => request.url().endsWith('/session') && request.method() === 'POST';
+  let endSavedAt = Number.POSITIVE_INFINITY;
   try {
     await waitFor(`${origin}/`, server);
     await addPlayers(origin);
@@ -1148,10 +1152,19 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
         JSON.stringify(await c.score()) === '{"home":13,"away":7}',
       );
       await quiet();
+      // Every renewal of the hold is noted from here: since T-295 the first one after the
+      // End is saved comes within five seconds, and may be gone before the step that
+      // waits for it begins (the screen then stops renewing, the game being over).
+      if (afterRenewal) {
+        page.on('request', (request) => {
+          if (isRenewal(request)) renewals.push({ request, at: Date.now() });
+        });
+      }
       await fromMore('more-end');
       await c.endAsk.waitFor();
       await c.answer('yes').tap();
       await c.pad.locator('[data-final="saved"]').waitFor();
+      endSavedAt = Date.now();
       await c.saved();
       const again = await visitor();
       note(
@@ -1181,14 +1194,12 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
 
     if (afterRenewal) {
       await step(`${at}: the screen stays once the league says the game is over`, async () => {
-        // About half a minute after an End is saved the device renews its hold on the
-        // game and is told the game is over: the page used to swap the scoring screen
+        // Within five seconds of an End being saved (T-295) the device renews its hold on
+        // the game and is told the game is over: the page used to swap the scoring screen
         // for a card that says so.
-        await page.waitForResponse(
-          (response) =>
-            response.url().endsWith('/session') && response.request().method() === 'POST',
-          { timeout: 90_000 },
-        );
+        const sent = renewals.find((renewal) => renewal.at >= endSavedAt)?.request;
+        const told = sent ?? (await page.waitForRequest(isRenewal, { timeout: 90_000 }));
+        await told.response();
         await page.waitForTimeout(1500);
         const panel = words(await c.finalPanel.innerText());
         note(

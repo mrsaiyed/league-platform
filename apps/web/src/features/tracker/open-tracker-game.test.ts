@@ -15,10 +15,11 @@ import { createFetchGameDoors } from './fetch-game-doors.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { createMemoryOpenedGameStorage } from './memory-opened-game-storage.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
-import { openTrackerGame, screenOf } from './open-tracker-game.ts';
+import { holdCheckMs, openTrackerGame, screenOf } from './open-tracker-game.ts';
 import { madeUpRosters } from './opened-game-storage-contract.test-helper.ts';
 import { formatOf, openedGameKeepMs, type OpenedGameStorage } from './opened-game-storage.ts';
 import { QueueError, type QueueStorage } from './queue-storage.ts';
+import type { QueueClock } from './tracker-queue.ts';
 
 const gameId = games.hawksBears;
 
@@ -32,7 +33,12 @@ const newDevice = (): Device => ({
 const accountOf = (as: Person) => `account-${as}`;
 
 let deviceNumber = 0;
-async function open(network: EndpointNetwork, as: Person, device: Device = newDevice()) {
+async function open(
+  network: EndpointNetwork,
+  as: Person,
+  device: Device = newDevice(),
+  clock?: QueueClock,
+) {
   const fetch = network.fetchAs(as);
   const opened = await openTrackerGame({
     gameId,
@@ -44,7 +50,7 @@ async function open(network: EndpointNetwork, as: Person, device: Device = newDe
     server: createFetchTrackerServer({ leagueId: liveLeagueId, gameId, fetch }),
     newDeviceId: () => `device-${(deviceNumber += 1)}`,
     now: () => 1_000,
-    controller: { random: () => 1 },
+    controller: { random: () => 1, ...(clock === undefined ? {} : { clock }) },
   });
   if (!opened.ok) throw new Error(opened.code);
   await opened.game.controller.start();
@@ -166,6 +172,35 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     await second.controller.idle();
     expect(screen(second).kind).toBe('confirm-format');
     expect((await second.device.games.find(gameId))?.state).not.toBeNull();
+    await first.controller.leave();
+    await second.controller.leave();
+  });
+
+  it('a device whose game is taken over says so at its next renewal, a few seconds on (T-295)', async () => {
+    const network = endpointNetwork();
+    // The first device's timers, run by hand: only its renewals are waited for here.
+    const timers: { readonly ms: number; readonly run: () => void }[] = [];
+    const clock: QueueClock = {
+      now: () => 1_000,
+      after: (ms, run) => {
+        const timer = { ms, run };
+        timers.push(timer);
+        return () => void timers.splice(timers.indexOf(timer), 1);
+      },
+    };
+    const first = await open(network, 'scorekeeper', newDevice(), clock);
+    const renewal = timers.find((timer) => timer.ms === holdCheckMs);
+    expect(holdCheckMs).toBeLessThanOrEqual(5_000);
+    expect(renewal).toBeDefined();
+    const second = await open(network, 'owner');
+    expect(await second.controller.takeOver()).toEqual({ ok: true });
+    expect(first.controller.status().mode.kind).toBe('scoring');
+    renewal?.run();
+    await first.controller.idle();
+    expect(first.controller.status().mode).toMatchObject({
+      kind: 'read-only',
+      reason: 'taken-over',
+    });
     await first.controller.leave();
     await second.controller.leave();
   });

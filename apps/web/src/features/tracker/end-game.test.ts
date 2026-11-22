@@ -12,8 +12,10 @@ import {
   endRefusedText,
   notStartedProblemText,
   notStartedQuestion,
+  reopenAnswered,
   reopenLine,
   reopenLineText,
+  reopenKeepsTrying,
   reopenMayRetry,
   reopenOffered,
   reopenProblemText,
@@ -246,6 +248,10 @@ describe('Reopen on the final panel (S-36)', () => {
     const noSignal = { ok: false, reason: 'unanswered' } as const;
     expect(reopenProblemText(noSignal, t)).toBe('No connection. Try again when it is back.');
     expect(reopenMayRetry(noSignal)).toBe(true);
+    // With no connection it is asked again by itself (point 7); plays going out are not.
+    expect(reopenKeepsTrying(noSignal)).toBe(true);
+    expect(reopenKeepsTrying({ ok: false, reason: 'plays-waiting' })).toBe(false);
+    expect(reopenKeepsTrying({ ok: false, reason: 'signed-out' })).toBe(false);
     expect(reopenMayRetry({ ok: false, reason: 'plays-waiting' })).toBe(true);
     const late = {
       ok: false,
@@ -262,6 +268,21 @@ describe('Reopen on the final panel (S-36)', () => {
       endedBy: 'Sam Scorekeeper',
     } as const;
     expect(reopenProblemText(other, t)).toContain('Sam Scorekeeper ended this game');
+  });
+
+  it('"Keep it final" tapped while a Reopen waits for its answer wins; a reopen already made is said (code review M4)', () => {
+    // Not kept: the answer is taken as it comes.
+    expect(reopenAnswered({ ok: true }, false)).toBe('reopened');
+    expect(reopenAnswered({ ok: false, reason: 'unanswered' }, false)).toBe('keep-trying');
+    expect(reopenAnswered({ ok: false, reason: 'plays-waiting' }, false)).toBe('ask-again');
+    const late = { ok: false, reason: 'refused', code: 'reopen-time-over', endedBy: null } as const;
+    expect(reopenAnswered(late, false)).toBe('refused');
+    // Kept final since: nothing is asked again and nothing said, unless the league had
+    // already reopened it; then the game is live, and that is said plainly.
+    expect(reopenAnswered({ ok: false, reason: 'unanswered' }, true)).toBe('kept');
+    expect(reopenAnswered(late, true)).toBe('kept');
+    expect(reopenAnswered({ ok: true }, true)).toBe('reopened-though-kept');
+    expect(t('tracker.reopen.doneThoughKept')).toContain('already');
   });
 });
 

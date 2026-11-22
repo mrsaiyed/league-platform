@@ -14,13 +14,14 @@ import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controll
 export type TrackerNotice =
   | { readonly key: `tracker.readOnly.${ReadOnlyReason}` }
   | { readonly key: 'tracker.heldByOther'; readonly name: string }
-  | { readonly key: 'tracker.signedOut' }
+  | { readonly key: 'tracker.signedOut' | 'tracker.reopen.doneElsewhere' }
   | {
       readonly key:
         | 'tracker.notApplied'
         | 'tracker.notSaved'
         | 'tracker.signedOutKept'
-        | 'tracker.notAllowedKept';
+        | 'tracker.notAllowedKept'
+        | 'tracker.offlineLong';
       readonly count: number;
     };
 
@@ -43,7 +44,7 @@ const isEnd = (refused: TrackerControllerStatus['notApplied'][number]): boolean 
 export function trackerNotices(
   status: Pick<
     TrackerControllerStatus,
-    'mode' | 'game' | 'notApplied' | 'notSaved' | 'signedOut' | 'waiting'
+    'mode' | 'game' | 'notApplied' | 'notSaved' | 'signedOut' | 'waiting' | 'offlineLong'
   >,
 ): readonly TrackerNotice[] {
   const notices: TrackerNotice[] = [];
@@ -59,6 +60,8 @@ export function trackerNotices(
     }
   }
   if (mode.kind === 'held-by-other') {
+    // Reopened from here: said first, in place of a final panel no longer shown (M3).
+    if (mode.reopened === true) notices.push({ key: 'tracker.reopen.doneElsewhere' });
     notices.push({ key: 'tracker.heldByOther', name: mode.holder.displayName });
   }
   if (mode.kind === 'scoring' && status.signedOut) {
@@ -66,6 +69,8 @@ export function trackerNotices(
       kept > 0 ? { key: 'tracker.signedOutKept', count: kept } : { key: 'tracker.signedOut' },
     );
   }
+  // Several minutes with no connection and plays waiting (T6 §4): they are only here.
+  if (status.offlineLong && kept > 0) notices.push({ key: 'tracker.offlineLong', count: kept });
   if (status.notSaved.length > 0) {
     notices.push({ key: 'tracker.notSaved', count: status.notSaved.length });
   }

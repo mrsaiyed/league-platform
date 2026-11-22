@@ -265,6 +265,8 @@ export function LeaveAsk(props: {
   readonly t: Translate;
   /** The game is final: what waits is its result. */
   readonly final: boolean;
+  /** How many plays wait on this device (step 2.37, part 2): the question says how many. */
+  readonly waiting: number;
   readonly to: string;
   readonly on: {
     readonly stay: (event: MouseEvent<HTMLElement>) => void;
@@ -272,6 +274,9 @@ export function LeaveAsk(props: {
   };
 }) {
   const { t, on } = props;
+  const why = props.final
+    ? t('tracker.leave.result')
+    : t.plural('tracker.leave.plays', Math.max(1, props.waiting));
   return (
     <Ask
       name="leave-ask"
@@ -300,7 +305,7 @@ export function LeaveAsk(props: {
       }
     >
       <div className="court-ask-text" id={askTextId} role="alert">
-        <p data-leave-why="">{t(props.final ? 'tracker.leave.result' : 'tracker.leave.plays')}</p>
+        <p data-leave-why="">{why}</p>
         <p className="court-ask-more">{t('tracker.leave.kept')}</p>
       </div>
     </Ask>

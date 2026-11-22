@@ -366,10 +366,10 @@ export function worldScoringSessions(s: LeagueWorld): ScoringSessionsStore {
       s.sessions = [...s.sessions, started];
       return started;
     },
-    extend: async (gameId, sessionId, heldUntil) => {
+    extend: async (gameId, sessionId, heldUntil, dueBefore) => {
       const at = s.sessions.findIndex((x) => x.gameId === gameId && x.id === sessionId);
       const found = s.sessions[at];
-      if (found === undefined) return false;
+      if (found === undefined || found.heldUntil >= dueBefore) return false;
       s.sessions = replacedAt(s.sessions, at, { ...found, heldUntil });
       return true;
     },

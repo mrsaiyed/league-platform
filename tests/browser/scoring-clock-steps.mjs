@@ -1214,13 +1214,32 @@ export async function clockSteps(kit) {
                 return under || r.top < 0 || r.bottom > window.innerHeight;
               },
             ).length,
+            // A tall phone keeps its two bench strips: the lower one went under the pad
+            // with the longest banner and a name of two lines (step 2.36's landing).
+            // The strip is measured, not its tiles: a line of bench players clips those
+            // it has no room for and says how many more in words.
+            benchUnderThePad: [...document.querySelectorAll('[data-bench]')].filter((el) => {
+              const r = el.getBoundingClientRect();
+              const under =
+                r.bottom > pad.top + 0.5 &&
+                r.top < pad.bottom &&
+                r.right > pad.left &&
+                r.left < pad.right;
+              return r.height > 0 && (under || r.top < 0 || r.bottom > window.innerHeight);
+            }).length,
             hintCutBy: rest === null ? null : rest.scrollHeight - rest.clientHeight,
           };
         });
       // On both phones that are short of room: lying down (the banner sits beside the
       // scoreboard there and takes its width from the names), and upright in a browser
-      // (where a name of two lines and a banner of two lines push the players down).
-      for (const { size, letters, family } of await fits(page, [phoneLying, phoneInBrowser])) {
+      // (where a name of two lines and a banner of two lines push the players down); and
+      // upright with the browser's bars tucked away, where the two bench strips stay
+      // (step 2.37, part 2: one rule for both upright heights).
+      for (const { size, letters, family } of await fits(page, [
+        phoneLying,
+        phoneInBrowser,
+        phone,
+      ])) {
         await drawIn(page, family);
         await page.setViewportSize({ width: size.width, height: size.height });
         await twoFrames(page);
@@ -1361,6 +1380,7 @@ export async function clockSteps(kit) {
             atItsFullest.tilesCutByTheirBlock === 0 &&
             atItsFullest.panels.every((over) => over <= 0) &&
             atItsFullest.tilesUnderThePad === 0 &&
+            atItsFullest.benchUnderThePad === 0 &&
             atItsFullest.hintCutBy !== null &&
             atItsFullest.hintCutBy <= 0,
           JSON.stringify(atItsFullest),
