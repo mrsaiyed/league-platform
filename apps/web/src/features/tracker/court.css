@@ -2222,16 +2222,30 @@
   opacity: 0.4;
 }
 /* The reason: a field of the pad's own, 16 or more so that no phone zooms into it. */
+/* Its label stands clear of the field (the fix round, F6), and the field stands 8 above
+   the answers, as every answer stands 8 from the next (line 5). */
 .court-ask-field {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  margin-block-end: calc(var(--court-gap) - 6px);
 }
 .court-ask-field-label {
   color: var(--court-muted);
   font-size: 12px;
-  line-height: 1.2;
+  line-height: 1.35;
+}
+/* The field, and beside it the usual reason, one tap. */
+.court-ask-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--court-gap);
+}
+.court-ask-field-row .court-opt {
+  min-block-size: 44px;
+  padding-inline: 12px;
+  font-size: 15px;
 }
 .court-input {
   inline-size: 100%;

@@ -272,8 +272,8 @@ export function useEndGame(args: EndGameArgs): EndGame {
           return setProblem({ on: 'final', text: t('tracker.reopen.problem.unanswered') });
         }
         if (!reopenOffered(reopenLine(answer, status.now()))) return setProblem(null);
+        // The reason starts empty, or as it was typed: the usual one is a tap beside it (F6).
         setProblem(null);
-        setReopenReason((typed) => (typed === '' ? t('tracker.reopen.reasonReady') : typed));
         rests.asked.begin(at);
         args.quiet();
         showPad({ kind: 'reopen' });

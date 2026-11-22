@@ -265,7 +265,7 @@ describe('the Reopen question (S-36)', () => {
     renderToStaticMarkup(
       createElement(ReopenAsk, {
         t,
-        reason: t('tracker.reopen.reasonReady'),
+        reason: '',
         problem: null,
         working: false,
         on,
@@ -273,18 +273,30 @@ describe('the Reopen question (S-36)', () => {
       }),
     );
 
-  it('says what reopening does, with the reason already filled in and editable', () => {
+  // Before the fix round (F6) the field came filled in with the usual reason, to be
+  // typed over; it now starts empty, with that reason one tap beside it.
+  it('says what reopening does, with an empty reason field and the usual reason one tap beside it', () => {
     const html = ask({});
     expect(words(html)).toBe(
-      'Reopen this game? It goes back to live with every play as it was, and stops counting in the standings until it is ended again. Why (kept with the game, never shown publicly) Keep it final Reopen the game',
+      'Reopen this game? It goes back to live with every play as it was, and stops counting in the standings until it is ended again. Why (kept with the game, never shown publicly) By mistake Keep it final Reopen the game',
     );
     expect(html).toMatch(
-      /<input type="text" class="court-input" data-reopen-reason=""[^>]*value="End game tapped by mistake"/,
+      /<input type="text" id="court-reopen-reason" class="court-input" data-reopen-reason=""[^>]*value=""/,
     );
     expect(html).toContain('maxLength="1000"');
     // The field is named by the words over it.
-    expect(html).toMatch(/<label class="court-ask-field"><span[^>]*>Why \(kept/);
+    expect(html).toMatch(
+      /<label class="court-ask-field-label" for="court-reopen-reason">Why \(kept/,
+    );
+    expect(html).toMatch(
+      /<button type="button" class="court-opt" data-reopen-mistake="" aria-label="Fill in the reason: End game tapped by mistake">By mistake<\/button>/,
+    );
     expect(answer(html, 'yes')).toContain('court-opt-next');
+  });
+
+  it('a reason typed or picked stays in the field', () => {
+    const html = ask({ reason: t('tracker.reopen.reasonReady') });
+    expect(html).toMatch(/data-reopen-reason=""[^>]*value="End game tapped by mistake"/);
   });
 
   it('a problem stands where the explanation stood, and the question stays to be answered again', () => {

@@ -19,7 +19,8 @@
 //   won in words, whether the league has the result, and under them the way back: "Take
 //   back End game" while the End has not reached the league, "Reopen game" with the time
 //   left once it has.
-// - The Reopen question, with its reason already filled in; the Mark not started
+// - The Reopen question, its reason field empty with the usual reason one tap beside it;
+//   the question before leaving while plays wait (LeaveAsk); the Mark not started
 //   question, which tells a scorekeeper to undo the plays first.
 import {
   notStartedReasons,
@@ -426,9 +427,13 @@ export function FinalPanel(props: {
   );
 }
 
+/** The Reopen reason's field, named by its label. */
+const reasonId = 'court-reopen-reason';
+
 /**
  * "Reopen this game?" (S-36; the review of the two doors, points 5 and 6): what it does,
- * and the reason already filled in, one tap from done and still editable.
+ * and the reason: an empty field with the usual reason one tap beside it ("By mistake"),
+ * so nothing has to be typed over (the fix round, F6).
  */
 export function ReopenAsk(props: {
   readonly t: Translate;
@@ -438,6 +443,7 @@ export function ReopenAsk(props: {
   readonly on: Pick<EndHandlers, 'reopenAnswer' | 'reopenReason'>;
 }) {
   const { t, on } = props;
+  const mistake = t('tracker.reopen.reasonReady');
   return (
     <Ask
       name="reopen-ask"
@@ -474,24 +480,40 @@ export function ReopenAsk(props: {
           <p className="court-ask-more">{t('tracker.reopen.questionDetail')}</p>
         )}
       </div>
-      <label className="court-ask-field">
-        <span className="court-ask-field-label">{t('tracker.reopen.reasonLabel')}</span>
-        <input
-          type="text"
-          className="court-input"
-          data-reopen-reason=""
-          value={props.reason}
-          maxLength={reopenReasonMaxLength}
-          autoComplete="off"
-          enterKeyHint="done"
-          onChange={(event) => on.reopenReason(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return;
-            event.preventDefault();
-            on.reopenAnswer(true, null);
-          }}
-        />
-      </label>
+      <div className="court-ask-field">
+        <label className="court-ask-field-label" htmlFor={reasonId}>
+          {t('tracker.reopen.reasonLabel')}
+        </label>
+        {/* The field starts empty: nothing to type over. The usual reason is one tap
+            beside it (the fix round, F6), and can still be changed. */}
+        <div className="court-ask-field-row">
+          <input
+            type="text"
+            id={reasonId}
+            className="court-input"
+            data-reopen-reason=""
+            value={props.reason}
+            maxLength={reopenReasonMaxLength}
+            autoComplete="off"
+            enterKeyHint="done"
+            onChange={(event) => on.reopenReason(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return;
+              event.preventDefault();
+              on.reopenAnswer(true, null);
+            }}
+          />
+          <button
+            type="button"
+            className="court-opt"
+            data-reopen-mistake=""
+            aria-label={t('tracker.reopen.reasonMistakeFill', { reason: mistake })}
+            onClick={() => on.reopenReason(mistake)}
+          >
+            {t('tracker.reopen.reasonMistake')}
+          </button>
+        </div>
+      </div>
     </Ask>
   );
 }

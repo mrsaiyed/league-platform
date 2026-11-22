@@ -151,11 +151,14 @@ export const enTrackerStates = {
   'tracker.reopen.problem.signed-out': 'You are signed out. Sign in again, then try once more.',
   'tracker.reopen.problem.unanswered': 'No connection. Try again when it is back.',
   // The question in the pad (step 2.37): its title, what reopening does, and the reason,
-  // already filled in and editable, in words short enough for a phone's pad.
+  // in words short enough for a phone's pad. The field starts empty; the usual reason is
+  // one tap beside it ("By mistake" fills it in), so nothing is typed over (fix round, F6).
   'tracker.reopen.question': 'Reopen this game?',
   'tracker.reopen.questionDetail':
     'It goes back to live with every play as it was, and stops counting in the standings until it is ended again.',
   'tracker.reopen.reasonLabel': 'Why (kept with the game, never shown publicly)',
+  'tracker.reopen.reasonMistake': 'By mistake',
+  'tracker.reopen.reasonMistakeFill': 'Fill in the reason: {reason}',
   'tracker.reopen.reasonReady': 'End game tapped by mistake',
   // Each refusal of POST …/reopen by its code (ReopenReply), in the tracker's words.
   'tracker.reopen.refused.changed-since-read':

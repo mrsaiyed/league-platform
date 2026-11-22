@@ -1088,12 +1088,35 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
       await c.reopenAsk.waitFor();
       const asks = words(await c.reopenAsk.innerText());
       const reason = c.reopenAsk.locator('[data-reopen-reason]');
+      // The field starts empty, with the usual reason one tap beside it (the fix round, F6).
       note(
-        `${at}: the Reopen question says what reopening does, with the reason already filled in`,
+        `${at}: the Reopen question says what reopening does, with an empty reason field and “By mistake” beside it`,
         asks ===
-          'Reopen this game? It goes back to live with every play as it was, and stops counting in the standings until it is ended again. Why (kept with the game, never shown publicly) Keep it final Reopen the game' &&
-          (await reason.inputValue()) === 'End game tapped by mistake',
+          'Reopen this game? It goes back to live with every play as it was, and stops counting in the standings until it is ended again. Why (kept with the game, never shown publicly) By mistake Keep it final Reopen the game' &&
+          (await reason.inputValue()) === '',
         `${asks} / ${await reason.inputValue()}`,
+      );
+      await c.reopenAsk.locator('[data-reopen-mistake]').tap();
+      note(
+        `${at}: “By mistake” fills in the reason in one tap`,
+        (await reason.inputValue()) === 'End game tapped by mistake',
+        await reason.inputValue(),
+      );
+      // Its label is whole above the field, and the field stands 8 or more above the answers.
+      const [label, field, chip, answers] = [
+        await rectOf(c.reopenAsk.locator('.court-ask-field-label')),
+        await rectOf(reason),
+        await rectOf(c.reopenAsk.locator('[data-reopen-mistake]')),
+        await rectOf(c.reopenAsk.locator('[data-ask-answers]')),
+      ];
+      note(
+        `${at}: the reason's label is not cut by its field, the field and “By mistake” are 44 high, 8 apart and 8 or more above the answers`,
+        label.bottom <= field.top &&
+          field.bottom - field.top >= 44 &&
+          chip.bottom - chip.top >= 44 &&
+          chip.left - field.right >= 8 &&
+          answers.top - field.bottom >= 8,
+        JSON.stringify({ label, field, chip, answers }),
       );
       await panelFits(page, `${at}, the Reopen question`);
       await still(page, `${at}, the Reopen question`);
