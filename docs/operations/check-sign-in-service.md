@@ -29,7 +29,9 @@ It exits 0 when every line is as expected and the made-up user is gone, 1 otherw
    In **Git Bash**:
 
    ```sh
-   read -rs SUPABASE_URL; echo; read -rs SUPABASE_SECRET_KEY; echo
+   # Nothing shows as you type either value; press Enter after each.
+   read -rsp 'Project address: ' SUPABASE_URL; echo
+   read -rsp 'Secret key: ' SUPABASE_SECRET_KEY; echo
    SUPABASE_URL="$SUPABASE_URL" SUPABASE_SECRET_KEY="$SUPABASE_SECRET_KEY" node scripts/check-sign-in-service.mjs --hosted
    unset SUPABASE_URL SUPABASE_SECRET_KEY
    ```
