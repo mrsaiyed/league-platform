@@ -100,6 +100,22 @@ const FIELDS = {
     lastName: 'a person is added',
     jerseyNumber: 'a person is added',
   },
+  // People: the search box (a plain question, shown back) and the add-a-person form, each
+  // posted the attack by hand; what is kept is read back by the walk below.
+  '/[league]/admin/people': {
+    q: POSTED,
+    firstName: POSTED,
+    lastName: POSTED,
+    contactEmail: POSTED,
+  },
+  // A person's record in People: each box is posted the attack by hand (the other boxes kept
+  // as they were), and the browser walk after the posts reads the person back wherever the
+  // name and email are shown: the People list, the record, a team's roster, a public roster.
+  '/[league]/admin/people/[person]': {
+    firstName: POSTED,
+    lastName: POSTED,
+    contactEmail: POSTED,
+  },
   '/[league]/admin/schedule': { label: 'a round is renamed' },
   '/[league]/admin/games/[game]': {
     reason: 'a result is reopened',
@@ -392,8 +408,14 @@ if (browser) {
     await page
       .goto(`${origin}/north-valley/admin/schedule`)
       .catch(() => page.goto(`${origin}/north-valley/admin/schedule`));
-    // The rename form is inside the round's "Change or remove this round", shut at first.
-    await page.getByText('Change or remove this round').first().click();
+    // The rename form is inside the round's "Change or remove this round", shut at first. Once
+    // it timed out after the merge of the People screens (the page was replaced by the refused
+    // post's own late answer): opened afresh once if so.
+    const roundEdit = page.getByText('Change or remove this round').first();
+    await roundEdit.click({ timeout: 10_000 }).catch(async () => {
+      await page.goto(`${origin}/north-valley/admin/schedule`);
+      await roundEdit.click();
+    });
     const form = page
       .locator('form', { has: page.locator('button', { hasText: 'Rename round' }) })
       .first();
@@ -901,6 +923,12 @@ async function walkEveryRoute() {
   // C. Every route again, in a browser as each role, with the script policy off: whatever was
   // kept from the posts above is shown as text, and the questions too.
   at = await addressesFound();
+  // The names posted into People (the add-a-person form and a person's record) are kept, and
+  // are read back as text where People shows them.
+  await step('the names posted into People are shown as text', async () => {
+    await looked(owner, '/north-valley/admin/people', ['posted']);
+    await looked(owner, at.person, ['posted']);
+  });
   await step('every route, as each role, holds the attack only as text in a browser', async () => {
     const opened = await Promise.all(
       ROLES.map(async ([role, who]) => {
