@@ -20,6 +20,7 @@ import {
   confirmPassword,
   enterCode,
   finishGoogle,
+  resendCode,
   signInWithPassword as signInWithPasswordWith,
   signOut,
   signOutEverywhere,
@@ -420,6 +421,101 @@ describe('the bot check in front of signing in and asking for a code (T4 §6, re
       to: '/signup?problem=botCheckUnavailable',
     });
     expect(b.names()).toEqual([]);
+  });
+
+  it('lets password sign-in through when our server cannot reach the check, on the attempt limits alone, and asks for no code (Q2)', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'taken@example.test');
+    const deps = {
+      ...env.deps,
+      botCheck: createLocalBotCheck({ appEnv: 'test', refuseEverything: 'unreachable' }),
+    };
+    const startSignUp = vi.spyOn(env.deps.signIn, 'startSignUp');
+    const startReset = vi.spyOn(env.deps.signIn, 'startReset');
+    // Sign-in goes on: the right password signs in, a wrong one is the service's to judge.
+    const signedIn = await signInWithPasswordWith(
+      { email: 'taken@example.test', password },
+      browser().visit,
+      deps,
+    );
+    expect(signedIn.to).not.toMatch(/problem=/);
+    const wrong = await signInWithPasswordWith(
+      { email: 'taken@example.test', password: 'not the password' },
+      browser().visit,
+      deps,
+    );
+    expect(wrong).toEqual({ to: '/signin?problem=wrongEmailOrPassword' });
+    // (A sign-in on a new device is told to the account by email: that is not a code.)
+    const sentBefore = env.outbox.messages().length;
+    // Asking for a code stays closed, with its own words, and nothing is set or sent.
+    for (const [purpose, screen] of [
+      ['sign-up', '/signup'],
+      ['reset', '/signin/forgot'],
+    ] as const) {
+      const b = browser();
+      expect(await askForCodeWith(purpose, { email: 'taken@example.test' }, b.visit, deps)).toEqual(
+        { to: `${screen}?problem=botCheckUnreachable` },
+      );
+      expect(b.names()).toEqual([]);
+    }
+    expect(startSignUp).not.toHaveBeenCalled();
+    expect(startReset).not.toHaveBeenCalled();
+    expect(env.outbox.messages()).toHaveLength(sentBefore);
+  });
+
+  it.each([
+    ['failed', 'botCheckFailed'],
+    ['missing', 'botCheckFailed'],
+    ['did-not-load', 'botCheckDidNotLoad'],
+  ] as const)(
+    'refuses an answer the check calls %s at all three forms, sign-in too',
+    async (refusal, problem) => {
+      const env = setup();
+      const deps = {
+        ...env.deps,
+        botCheck: createLocalBotCheck({ appEnv: 'test', refuseEverything: refusal }),
+      };
+      const service = vi.spyOn(env.deps.signIn, 'signIn');
+      const b = browser();
+      expect(
+        await signInWithPasswordWith({ email: 'a@example.test', password }, b.visit, deps),
+      ).toEqual({ to: `/signin?problem=${problem}` });
+      for (const [purpose, screen] of [
+        ['sign-up', '/signup'],
+        ['reset', '/signin/forgot'],
+      ] as const) {
+        expect(await askForCodeWith(purpose, { email: 'a@example.test' }, b.visit, deps)).toEqual({
+          to: `${screen}?problem=${problem}`,
+        });
+      }
+      expect(service).not.toHaveBeenCalled();
+      expect(b.names()).toEqual([]);
+    },
+  );
+
+  it('stands "Send a new code" behind the same check, and sends it to the same address', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'taken@example.test');
+    for (const [purpose, email] of [
+      ['sign-up', 'new@example.test'],
+      ['reset', 'taken@example.test'],
+    ] as const) {
+      const b = browser();
+      await askForCode(purpose, { email }, b.visit, env.deps);
+      const sent = env.outbox.messages().length;
+      for (const fields of [{}, { [localBotCheckField]: 'a made-up wrong answer' }]) {
+        expect(await resendCode(fields, b.visit, env.deps)).toEqual({
+          to: '/signup/code?problem=botCheckFailed',
+        });
+      }
+      expect(env.outbox.messages()).toHaveLength(sent);
+      expect(await resendCode(drawn({}), b.visit, env.deps)).toEqual({ to: '/signup/code' });
+      expect(env.outbox.messages()).toHaveLength(sent + 1);
+    }
+    // With no code asked for, sign-up starts again.
+    expect(await resendCode(drawn({}), browser().visit, env.deps)).toEqual({
+      to: '/signup?problem=codeExpired',
+    });
   });
 
   it('answers alike for an address with an account and one without (T-68)', async () => {

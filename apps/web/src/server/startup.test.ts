@@ -5,6 +5,7 @@ import type { DatabaseHandle } from '@srleagues/database';
 import type { EmailConfirmation, EmailConfirmationQuestion } from '@srleagues/providers';
 import { loadConfig } from './config-schema.ts';
 import {
+  botCheckAlarmLine,
   botCheckOffLine,
   hostedBotCheck,
   requireEmailConfirmation,
@@ -229,6 +230,28 @@ describe("staging's bot check (record 081, T-270)", () => {
   it('with both keys uses Turnstile and says nothing', async () => {
     expect(await warnedIn({})).toEqual([]);
     expect(hostedBotCheck(configFor('staging'), {}).widget.kind).toBe('turnstile');
+  });
+
+  it('reports a check it could not ask in one error-level line of a fixed shape (Q2)', async () => {
+    const alarmed: [string, Readonly<Record<string, string>>][] = [];
+    const warned: unknown[] = [];
+    const check = hostedBotCheck(
+      configFor('production'),
+      {
+        alarm: (message, fields) => void alarmed.push([message, fields]),
+        warn: (m) => void warned.push(m),
+      },
+      async () => {
+        throw new TypeError('fetch failed: 192.0.2.10');
+      },
+    );
+    expect(await check.verify({ answer: 'made-up-widget-answer', action: 'sign-in' })).toEqual({
+      passed: false,
+      refusal: 'unreachable',
+    });
+    expect(alarmed).toEqual([[botCheckAlarmLine, { kind: 'no-answer' }]]);
+    expect(JSON.stringify(alarmed)).not.toMatch(/192\.0\.2|made-up-widget-answer/);
+    expect(warned).toEqual([]);
   });
 
   it('with one key refuses to start, naming the missing one', () => {

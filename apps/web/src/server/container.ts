@@ -37,6 +37,7 @@ function start(): Promise<WebPorts> {
       createSupabaseEmailConfirmation({ ...service, fetch: (url, init) => fetch(url, init) }),
     log: (line) => logger.info('command', line),
     warn: (message, fields) => logger.warn(message, fields),
+    alarm: (message, fields) => logger.error(message, fields),
     // Read only on made-up data (local work and tests): where the kept emails are written,
     // the working folder found from where the server runs (kept-emails.ts, step 2.96).
     keptEmailsFolder: runsOnMadeUpData(config.APP_ENV) ? keptEmailsFolderFrom(process.cwd()) : null,

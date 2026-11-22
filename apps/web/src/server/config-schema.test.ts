@@ -17,6 +17,7 @@ const valid: Record<ConfigName, string> = {
   TRUSTED_PROXY: 'one',
   PLATFORM_DATABASE_URL: 'postgres://app:hunter2-made-up@localhost:5432/x',
   LOCAL_BINNED_TEAM: 'badgers',
+  LOCAL_BOT_CHECK: 'stand-in',
   LOCAL_DATA: 'stand-in',
   LOCAL_DEMO_LEAGUE: 'off',
   LOCAL_DESIGN: 'crest-light',
@@ -33,12 +34,13 @@ const valid: Record<ConfigName, string> = {
 };
 const names = Object.keys(fields) as ConfigName[];
 /**
- * Every setting, for staging and production: LOCAL_BINNED_TEAM, LOCAL_DATA,
+ * Every setting, for staging and production: LOCAL_BINNED_TEAM, LOCAL_BOT_CHECK, LOCAL_DATA,
  * LOCAL_DEMO_LEAGUE, LOCAL_DESIGN and LOCAL_NOW are for local work and tests only.
  */
 const hosted = {
   ...valid,
   LOCAL_BINNED_TEAM: undefined,
+  LOCAL_BOT_CHECK: undefined,
   LOCAL_DATA: undefined,
   LOCAL_DEMO_LEAGUE: undefined,
   LOCAL_DESIGN: undefined,

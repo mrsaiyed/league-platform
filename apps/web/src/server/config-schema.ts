@@ -27,6 +27,7 @@ export const fields = {
   TRUSTED_PROXY: { secret: false },
   PLATFORM_DATABASE_URL: { secret: true },
   LOCAL_BINNED_TEAM: { secret: false },
+  LOCAL_BOT_CHECK: { secret: false },
   LOCAL_DATA: { secret: false },
   LOCAL_DEMO_LEAGUE: { secret: false },
   LOCAL_DESIGN: { secret: false },
@@ -81,6 +82,9 @@ const schema = z.object({
   // What local work and tests run on (record 055): 'stand-in', the made-up leagues in
   // this process's memory (the default), or 'made-up-database', the made-up seed
   // leagues in a database in memory with every migration. Only local and test read it.
+  // Which bot check local work and tests draw (record 081): the hidden-field stand-in, or a
+  // made-up Turnstile drawn as the real box is, whose script a browser test serves itself.
+  LOCAL_BOT_CHECK: z.enum(['stand-in', 'made-up-turnstile']).default('stand-in'),
   LOCAL_DATA: z.enum(['stand-in', 'made-up-database']).default('stand-in'),
   // 'on' loads the seed's demo-shaped league into the made-up database too (step 2.59): a
   // large league with a whole season, which takes some seconds at start. Off by default, so
@@ -129,6 +133,7 @@ const optional: readonly ConfigName[] = [
   'TRUSTED_PROXY',
   'PLATFORM_DATABASE_URL',
   'LOCAL_BINNED_TEAM',
+  'LOCAL_BOT_CHECK',
   'LOCAL_DATA',
   'LOCAL_DEMO_LEAGUE',
   'LOCAL_DESIGN',
@@ -163,6 +168,7 @@ const requiredIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
 /** Read only in local work and tests; set anywhere else, it is a mistake. */
 const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   LOCAL_BINNED_TEAM: ['local', 'test'],
+  LOCAL_BOT_CHECK: ['local', 'test'],
   LOCAL_DATA: ['local', 'test'],
   LOCAL_DEMO_LEAGUE: ['local', 'test'],
   LOCAL_DESIGN: ['local', 'test'],

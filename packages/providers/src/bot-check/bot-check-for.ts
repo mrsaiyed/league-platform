@@ -5,6 +5,7 @@
 import { createBotCheckOff } from './bot-check-off.ts';
 import type { BotCheck } from './bot-check.ts';
 import { createLocalBotCheck } from './local-bot-check.ts';
+import { createMadeUpTurnstileBotCheck } from './made-up-turnstile-bot-check.ts';
 import { createTurnstileBotCheck, type TurnstileProblem } from './turnstile-bot-check.ts';
 
 export type BotCheckSettings = {
@@ -15,6 +16,14 @@ export type BotCheckSettings = {
   readonly turnstileSiteKey?: string | undefined;
   readonly turnstileSecretKey?: string | undefined;
   readonly onProblem?: (problem: TurnstileProblem) => void;
+  /** Stand-in for tests; the real fetch otherwise. */
+  readonly fetch?: typeof fetch;
+  /**
+   * Local work and tests only (LOCAL_BOT_CHECK): the hidden-field stand-in (the default), or
+   * the made-up Turnstile whose box the page draws as the real one's (a browser test serves
+   * its script).
+   */
+  readonly localBotCheck?: 'made-up-turnstile' | 'stand-in' | undefined;
 };
 
 /** Why botCheckFor refused, in fixed words naming settings only, never a value. */
@@ -27,7 +36,9 @@ export class BotCheckSettingsError extends Error {
 
 export function botCheckFor(settings: BotCheckSettings): BotCheck {
   if (settings.appEnv === 'local' || settings.appEnv === 'test') {
-    return createLocalBotCheck({ appEnv: settings.appEnv });
+    return settings.localBotCheck === 'made-up-turnstile'
+      ? createMadeUpTurnstileBotCheck({ appEnv: settings.appEnv })
+      : createLocalBotCheck({ appEnv: settings.appEnv });
   }
   const siteKey = settings.turnstileSiteKey?.trim() ?? '';
   const secretKey = settings.turnstileSecretKey?.trim() ?? '';
@@ -51,5 +62,6 @@ export function botCheckFor(settings: BotCheckSettings): BotCheck {
     secretKey,
     siteHostname: settings.siteHostname,
     ...(settings.onProblem === undefined ? {} : { onProblem: settings.onProblem }),
+    ...(settings.fetch === undefined ? {} : { fetch: settings.fetch }),
   });
 }

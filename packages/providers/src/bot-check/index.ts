@@ -1,6 +1,13 @@
 // The bot check (T4 §6, record 081): the interface, the local stand-in, Cloudflare
 // Turnstile and which one an environment gets. Used only through the package's index.ts.
 export type * from './bot-check.ts';
+export { botCheckDidNotLoad } from './bot-check.ts';
+export {
+  createMadeUpTurnstileBotCheck,
+  madeUpTurnstileAnswer,
+  madeUpTurnstileOrigin,
+  madeUpTurnstileSiteKey,
+} from './made-up-turnstile-bot-check.ts';
 export { createBotCheckOff } from './bot-check-off.ts';
 export { BotCheckSettingsError, botCheckFor, type BotCheckSettings } from './bot-check-for.ts';
 export {

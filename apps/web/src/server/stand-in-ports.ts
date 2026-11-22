@@ -36,6 +36,7 @@ import {
 import {
   captureEmail,
   createLocalBotCheck,
+  createMadeUpTurnstileBotCheck,
   createLocalLiveHub,
   createLocalSignInStandIn,
   type SessionIdentity,
@@ -208,6 +209,8 @@ export type StandInOptions = {
    * design, so every page can be pictured in every color set (scripts/shots.mjs).
    */
   readonly localDesign?: PicturedDesignKey | undefined;
+  /** LOCAL_BOT_CHECK: the hidden-field stand-in (the default), or the made-up Turnstile. */
+  readonly localBotCheck?: 'made-up-turnstile' | 'stand-in' | undefined;
   /**
    * LOCAL_NOW: the moment the one made-up world's clock starts at (step 2.179), so a test
    * runs as if at that hour; the world is seeded then and its clock runs on from there.
@@ -395,7 +398,10 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
   };
   return {
     // The bot check's stand-in (record 081): it too refuses anything but local work and tests.
-    botCheck: createLocalBotCheck({ appEnv: options.appEnv }),
+    botCheck:
+      options.localBotCheck === 'made-up-turnstile'
+        ? createMadeUpTurnstileBotCheck({ appEnv: options.appEnv })
+        : createLocalBotCheck({ appEnv: options.appEnv }),
     signIn,
     signInMail,
     signUpMadeUp,

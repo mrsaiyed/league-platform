@@ -409,6 +409,35 @@ export const layoutCss = String.raw`
 .ui-message .ui-message-also .ui-button {
   margin-block-start: 0;
 }
+/* A sign-in screen's refusal (record 081, F4): drawn as refused, a warning mark and the
+   danger color (DESIGN.md line 22), not like the screen's own words. */
+.ui-message .ui-refusal {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--step-2);
+  inline-size: 100%;
+  padding: var(--step-3);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 45%, transparent);
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-panel));
+  color: var(--color-danger);
+  font-weight: 600;
+  text-align: start;
+}
+.ui-message .ui-refusal::before {
+  content: '!';
+  content: '!' / '';
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 1.5em;
+  block-size: 1.5em;
+  border-radius: 50%;
+  background: var(--color-danger);
+  color: var(--color-panel);
+  font-weight: 700;
+  line-height: 1;
+}
 .ui-message-mark {
   inline-size: var(--step-7);
   block-size: var(--line-heavy);

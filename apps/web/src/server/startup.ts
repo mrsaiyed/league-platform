@@ -77,6 +77,12 @@ export type StartupDeps = {
    */
   readonly warn?: (message: string, fields: Readonly<Record<string, string>>) => void;
   /**
+   * Where a problem that wants someone told at once is reported, at error level: today the
+   * bot check that could not be asked (botCheckAlarmLine). The same rule as warn: no address,
+   * no token, no secret.
+   */
+  readonly alarm?: (message: string, fields: Readonly<Record<string, string>>) => void;
+  /**
    * Local work and tests only: the working folder's `.local/captured-email`, where a copy
    * of each email to a made-up address is written once the app has started (step 2.96,
    * kept-emails.ts). Left out, nothing is written.
@@ -93,6 +99,7 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       ...(deps.warn === undefined ? {} : { warn: deps.warn }),
       emailFrom: config.EMAIL_FROM,
       localDesign: config.LOCAL_DESIGN,
+      localBotCheck: config.LOCAL_BOT_CHECK,
       ...(config.LOCAL_NOW === undefined ? {} : { worldStartsAt: config.LOCAL_NOW }),
       ...(config.LOCAL_BINNED_TEAM === undefined ? {} : { binnedTeam: config.LOCAL_BINNED_TEAM }),
       keptEmailsFolder: deps.keptEmailsFolder ?? null,
@@ -154,11 +161,25 @@ export const botCheckOffLine =
   'The bot check is off: TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY are not set, so sign-in and sign-up are not checked for bots (staging only: production refuses to start without them).';
 
 /**
+ * The one error-level line, of a fixed shape, when the bot check could not be asked or
+ * refused our key (record 081, Q2): its fields are `kind` only (key-refused, no-answer,
+ * unexpected-answer), never an address, an answer or a key, so an alarm can be set on it. With
+ * no-answer, password sign-in has gone on on the attempt limits alone and asking for a code
+ * was refused.
+ */
+export const botCheckAlarmLine = 'bot check not asked';
+
+/**
  * Staging's and production's bot check (botCheckFor): Turnstile, or in staging with neither
  * key the check switched off, said in one plain line. A problem Turnstile reports is warned
  * of by its kind only. The settings check has already refused one key without the other.
  */
-export function hostedBotCheck(config: Config, deps: Pick<StartupDeps, 'warn'>): BotCheck {
+export function hostedBotCheck(
+  config: Config,
+  deps: Pick<StartupDeps, 'alarm' | 'warn'>,
+  /** Tests only: a stand-in for the network. */
+  fetch?: typeof globalThis.fetch,
+): BotCheck {
   let check: BotCheck;
   try {
     check = botCheckFor({
@@ -166,7 +187,8 @@ export function hostedBotCheck(config: Config, deps: Pick<StartupDeps, 'warn'>):
       siteHostname: new URL(config.PUBLIC_BASE_URL).hostname,
       turnstileSiteKey: config.TURNSTILE_SITE_KEY,
       turnstileSecretKey: config.TURNSTILE_SECRET_KEY,
-      onProblem: (kind) => deps.warn?.('bot check not asked', { kind }),
+      onProblem: (kind) => deps.alarm?.(botCheckAlarmLine, { kind }),
+      ...(fetch === undefined ? {} : { fetch }),
     });
   } catch (error) {
     // botCheckFor's words name settings only, never a value.

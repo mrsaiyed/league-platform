@@ -31,7 +31,9 @@ export default async function Page({ searchParams }: SearchProps) {
         <SubmitButton words="signIn.google" />
       </form>
       <p>
-        <a href={screenUrl('signin', { next })}>{t('signIn.haveAccount')}</a>
+        <a className="ui-button" data-kind="quiet" href={screenUrl('signin', { next })}>
+          {t('signIn.haveAccount')}
+        </a>
       </p>
     </SignInScreen>
   );

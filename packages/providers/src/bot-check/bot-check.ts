@@ -41,10 +41,23 @@ export type BotCheckWidget =
 /**
  * Why a check did not pass, in fixed words: `missing` (no answer came with the form: no
  * script ran, or a bot posted the form itself), `failed` (an answer that is wrong, made for
- * another form or another site, used already or too old), `unavailable` (the check itself
- * could not be asked, or refused our key). Every one refuses the request.
+ * another form or another site, used already or too old), `did-not-load` (the person's
+ * browser could not load the check, and the form says so with botCheckDidNotLoad),
+ * `unreachable` (our server could not reach the check's service: no connection, no answer
+ * in time, or the service's own fault), `unavailable` (the service refused our key, or
+ * answered in a way we do not understand). Every one is a refusal of the check; only the web
+ * app decides that password sign-in goes on without it when the service is `unreachable`
+ * (record 081, Q2).
  */
-export type BotCheckRefusal = 'failed' | 'missing' | 'unavailable';
+export type BotCheckRefusal = 'did-not-load' | 'failed' | 'missing' | 'unavailable' | 'unreachable';
+
+/**
+ * The fixed word the page's box writes into the answer's field when the person's browser
+ * cannot load the check (a network that filters it, an incident at the service). It only
+ * lets the server say what happened: it is refused like any wrong answer, since a bot could
+ * send it too.
+ */
+export const botCheckDidNotLoad = 'did-not-load';
 
 export type BotCheckVerdict =
   | { readonly passed: true }
@@ -54,8 +67,7 @@ export type BotCheckInput = {
   /** What the widget answered: the form's `widget.field`, '' when none came. */
   readonly answer: string;
   readonly action: BotCheckAction;
-  /** The visitor's network (networkAddressOf), passed on only when it is a real address. */
-  readonly networkAddress: string;
+  // No visitor's address: the service is never told it (record 081, C8).
 };
 
 export type BotCheck = {

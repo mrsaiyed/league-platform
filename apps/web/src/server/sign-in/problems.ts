@@ -10,8 +10,12 @@ import type { TextKey } from '../messages.ts';
 export const problems = {
   /** The bot check refused the form (T4 §6, record 081). */
   botCheckFailed: 'problem.botCheckFailed',
-  /** The bot check could not be asked just now. */
+  /** The bot check could not be asked just now, or refused our key. */
   botCheckUnavailable: 'problem.botCheckUnavailable',
+  /** The person's browser could not load the check (its box wrote botCheckDidNotLoad). */
+  botCheckDidNotLoad: 'problem.botCheckDidNotLoad',
+  /** Our server could not reach the check's service: asking for a code waits (Q2). */
+  botCheckUnreachable: 'problem.botCheckUnreachable',
   invalidEmail: 'problem.invalidEmail',
   codeUsedUp: 'problem.codeUsedUp',
   codeNotSent: 'problem.codeNotSent',

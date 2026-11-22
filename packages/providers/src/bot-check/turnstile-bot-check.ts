@@ -10,10 +10,22 @@
 // an answer used twice or older than five minutes. A refusal carries a fixed word, never
 // Turnstile's own text, the answer, the address or the key (T-86); a problem that is ours to
 // fix (our key refused, no answer from Turnstile) is also reported, in a fixed word.
-import type { BotCheck, BotCheckRefusal, BotCheckVerdict } from './bot-check.ts';
+//
+// Turnstile is told only the answer and our secret key: never the visitor's address, which
+// its API takes as optional `remoteip` (record 081, C8). The wait for it is 4 seconds: a
+// game night must not hang on an outside service (Q2).
+import {
+  botCheckDidNotLoad,
+  type BotCheck,
+  type BotCheckRefusal,
+  type BotCheckVerdict,
+} from './bot-check.ts';
 
 /** What the web app is told about a check that is ours to put right: its kind only. */
 export type TurnstileProblem = 'key-refused' | 'no-answer' | 'unexpected-answer';
+
+/** How long our server waits for Turnstile's answer by default: 4 seconds (Q2). */
+export const turnstileWaitMs = 4_000;
 
 export type TurnstileBotCheckOptions = {
   /** The widget's public key, drawn into the page. */
@@ -25,7 +37,7 @@ export type TurnstileBotCheckOptions = {
   /** Stand-in for tests; the real fetch otherwise. */
   readonly fetch?: typeof fetch;
   readonly verifyUrl?: string;
-  /** How long to wait for Turnstile. Default 10 seconds. */
+  /** How long to wait for Turnstile. Default turnstileWaitMs. */
   readonly timeoutMs?: number;
   readonly onProblem?: (problem: TurnstileProblem) => void;
 };
@@ -38,9 +50,6 @@ export const turnstileField = 'cf-turnstile-response';
 
 /** Turnstile's answers are at most this long; anything longer is not one. */
 const longestAnswer = 2048;
-
-/** The network Turnstile is told of: only a real address, never the shared unknown key. */
-const unknownNetwork = '0.0.0.0';
 
 export function createTurnstileBotCheck(options: TurnstileBotCheckOptions): BotCheck {
   const send = options.fetch ?? fetch;
@@ -55,30 +64,28 @@ export function createTurnstileBotCheck(options: TurnstileBotCheckOptions): BotC
       kind: 'turnstile',
       field: turnstileField,
       siteKey: options.siteKey,
-      scriptUrl: `${turnstileOrigin}/turnstile/v0/api.js`,
+      // Explicit mode: the page's box (bot-check-box.tsx) draws itself when its form appears.
+      scriptUrl: `${turnstileOrigin}/turnstile/v0/api.js?render=explicit`,
       origin: turnstileOrigin,
     },
-    verify: async ({ answer, action, networkAddress }) => {
+    verify: async ({ answer, action }) => {
       if (answer === '') return refuse('missing');
+      if (answer === botCheckDidNotLoad) return refuse('did-not-load');
       if (answer.length > longestAnswer) return refuse('failed');
       let response: Response;
       try {
         response = await send(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            secret: options.secretKey,
-            response: answer,
-            ...(networkAddress === unknownNetwork || networkAddress === ''
-              ? {}
-              : { remoteip: networkAddress }),
-          }),
-          signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
+          body: JSON.stringify({ secret: options.secretKey, response: answer }),
+          signal: AbortSignal.timeout(options.timeoutMs ?? turnstileWaitMs),
         });
       } catch {
         // Unreachable, or no answer in time. Its own error may name the address.
-        return refuse('unavailable', 'no-answer');
+        return refuse('unreachable', 'no-answer');
       }
+      // The service's own fault (5xx) is its being out of reach; anything else is not ours.
+      if (response.status >= 500) return refuse('unreachable', 'no-answer');
       if (!response.ok) return refuse('unavailable', 'unexpected-answer');
       const body: unknown = await response.json().catch(() => undefined);
       if (typeof body !== 'object' || body === null) {
@@ -101,7 +108,7 @@ export function createTurnstileBotCheck(options: TurnstileBotCheckOptions): BotC
       if (codes.includes('missing-input-secret') || codes.includes('invalid-input-secret')) {
         return refuse('unavailable', 'key-refused');
       }
-      if (codes.includes('internal-error')) return refuse('unavailable', 'no-answer');
+      if (codes.includes('internal-error')) return refuse('unreachable', 'no-answer');
       return refuse('failed');
     },
   };

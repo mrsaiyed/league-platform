@@ -3,7 +3,7 @@
 // as a real widget is, so a person's browser (or a browser test) passes it by sending the
 // form as it was drawn, and a form posted without the field, or with any other answer, is
 // refused as the real check would refuse it. It keeps nothing about anyone.
-import type { BotCheck, BotCheckRefusal } from './bot-check.ts';
+import { botCheckDidNotLoad, type BotCheck, type BotCheckRefusal } from './bot-check.ts';
 
 /** The field the stand-in's answer comes back in: Turnstile's own name, so forms are alike. */
 export const localBotCheckField = 'cf-turnstile-response';
@@ -36,6 +36,7 @@ export function createLocalBotCheck(options: LocalBotCheckOptions): BotCheck {
         return { passed: false, refusal: options.refuseEverything };
       }
       if (answer === '') return { passed: false, refusal: 'missing' };
+      if (answer === botCheckDidNotLoad) return { passed: false, refusal: 'did-not-load' };
       if (answer !== localBotCheckPassingAnswer) return { passed: false, refusal: 'failed' };
       return { passed: true };
     },
