@@ -3,9 +3,11 @@
 // so tests can hand it any set of values. config.ts reads the real environment once.
 import {
   addressOnThisComputer,
+  databaseCertificateFrom,
   platformDatabaseProblem,
   platformServiceProblem,
   trackerProjectProblem,
+  type CertificateFileReader,
   type TrackerGuardFacts,
 } from '@srleagues/providers';
 import { z } from 'zod';
@@ -92,18 +94,12 @@ const schema = z.object({
   // between. There is no way to use SSL without checking the certificate. The address
   // itself cannot change this: its ssl settings are taken out (create-database.ts).
   PLATFORM_DATABASE_SSL: z.enum(['verify', 'off']).default('verify'),
-  // The database server's certificate authority, as PEM text (Supabase's is not one the
-  // system knows: it is downloaded from the project's database settings, as for
-  // MIGRATION_DATABASE_CA). Public, not a secret; a value that is not a certificate is
-  // refused.
-  PLATFORM_DATABASE_CA: z
-    .string()
-    .trim()
-    .regex(
-      /^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$/,
-      'must be the server’s certificate as PEM text, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----',
-    )
-    .optional(),
+  // The database server's certificate authority (Supabase's is not one the system knows:
+  // it is downloaded from the project's database settings, as for MIGRATION_DATABASE_CA):
+  // its PEM text, or the path of a file holding it (step 2.203, T-299), read once here and
+  // checked by databaseCertificateFrom before this schema sees it; by then it is the PEM
+  // text. Public, not a secret; a value that is not a certificate is refused by name.
+  PLATFORM_DATABASE_CA: z.string().optional(),
   // A team's short name in the first made-up league's current season, put in the bin as
   // the stand-in's world is made, with its games and results, as a team could be before
   // A-17 held such a team (step 2.180): so a browser test and the pictures can see how
@@ -238,6 +234,11 @@ export type ConfigGuard = {
    * platform never uses it.
    */
   readonly trackerProject: string | null;
+  /**
+   * Reads the file PLATFORM_DATABASE_CA names, when it names one (config.ts hands the
+   * real one). Without it, only the certificate's own text is taken.
+   */
+  readonly readFile?: CertificateFileReader;
 };
 
 export class ConfigError extends Error {
@@ -262,6 +263,19 @@ export class ConfigError extends Error {
 const thisComputerHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /** Whether `value` is an http address of a host other than this computer. */
+/** Whether an address has a path, a query, a fragment or a login beyond its origin. */
+function hasMoreThanOrigin(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false; // the schema reports it
+  }
+  return (
+    url.pathname !== '/' || url.search !== '' || url.hash !== '' || !!url.username || !!url.password
+  );
+}
+
 function httpAwayFromThisComputer(value: string): boolean {
   let url: URL;
   try {
@@ -338,6 +352,27 @@ export function loadConfig(
       'PUBLIC_BASE_URL',
       `PUBLIC_BASE_URL: invalid, must start with https:// when APP_ENV is ${appEnv}, or the sign-in cookie could be read on the way; set it to the site’s https address (http is allowed only for localhost)`,
     );
+  }
+  // Online, the public address is only a scheme and host (step 2.203, the 2.110 audit's
+  // M2): every address is built from the origin alone (T-34), so a path would be dropped
+  // from links without a word. As the worker takes it, which refuses a path everywhere.
+  if (
+    (appEnv === 'staging' || appEnv === 'production') &&
+    baseUrl !== undefined &&
+    !invalid.has('PUBLIC_BASE_URL') &&
+    hasMoreThanOrigin(baseUrl)
+  ) {
+    invalid.set(
+      'PUBLIC_BASE_URL',
+      `PUBLIC_BASE_URL: invalid, must be only a scheme and host, like https://site, when APP_ENV is ${appEnv}: the site has no base path`,
+    );
+  }
+  // The server's certificate: its text, or a file's, read once (step 2.203, T-299).
+  const certificate = given['PLATFORM_DATABASE_CA'];
+  if (certificate !== undefined && !invalid.has('PLATFORM_DATABASE_CA')) {
+    const read = databaseCertificateFrom('PLATFORM_DATABASE_CA', certificate, guard?.readFile);
+    given['PLATFORM_DATABASE_CA'] = read.ok ? read.pem : undefined;
+    if (!read.ok) invalid.set('PLATFORM_DATABASE_CA', read.problem);
   }
   // The tracker's database guard (packages/providers, shared with the worker).
   const facts: TrackerGuardFacts = { env, appEnv, trackerProject: guard?.trackerProject };
@@ -427,7 +462,13 @@ export function loadConfig(
 // messages (those starting with "must") are written above and contain no values.
 function reason(issue: z.core.$ZodIssue): string {
   if (issue.message.startsWith('must')) return issue.message;
-  if (issue.code === 'invalid_value') return 'not one of the allowed values';
+  if (issue.code === 'invalid_value') return `not one of the allowed values (${allowed(issue)})`;
   if (issue.code === 'too_small') return 'too short';
   return 'wrong format';
+}
+
+/** The values an enum allows, which are ours and never secret (step 2.203, L1). */
+function allowed(issue: z.core.$ZodIssue): string {
+  const values = 'values' in issue && Array.isArray(issue.values) ? issue.values : [];
+  return values.map(String).join(', ');
 }

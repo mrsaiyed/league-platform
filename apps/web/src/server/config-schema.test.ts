@@ -10,9 +10,16 @@ import {
 } from './config-schema.ts';
 
 const longValue = (name: string) => `value-of-${name.toLowerCase()}-0123456789-abcdefghij`;
-/** A made-up certificate's shape: what the setting checks, not a real one. */
-const madeUpCertificate =
-  '-----BEGIN CERTIFICATE-----\nMADEUPmadeup0123\n-----END CERTIFICATE-----';
+/** A made-up authority's certificate (packages/providers' fixture), never a real one. */
+const madeUpCertificate = readFileSync(
+  new URL(
+    '../../../../packages/providers/src/platform-database/fixtures/made-up-database-ca.pem',
+    import.meta.url,
+  ),
+  'utf8',
+);
+/** A certificate's shape with nothing in it that is one. */
+const notACertificate = '-----BEGIN CERTIFICATE-----\nMADEUPmadeup0123\n-----END CERTIFICATE-----';
 const valid: Record<ConfigName, string> = {
   APP_ENV: 'test',
   PUBLIC_BASE_URL: 'http://localhost:3000',
@@ -245,16 +252,38 @@ describe('loadConfig', () => {
     expect(offRemote.message).not.toContain('hunter2-made-up');
     // Never SSL without the check: the only other word is refused.
     expect(failure({ ...production, PLATFORM_DATABASE_SSL: 'no-verify' }).invalid.join()).toContain(
-      'PLATFORM_DATABASE_SSL: invalid, not one of the allowed values',
+      'PLATFORM_DATABASE_SSL: invalid, not one of the allowed values (verify, off)',
     );
     // The certificate is a certificate, and only where SSL is on.
     const certificate = { ...production, PLATFORM_DATABASE_URL: remote };
     expect(
       loadConfig({ ...certificate, PLATFORM_DATABASE_CA: madeUpCertificate }).PLATFORM_DATABASE_CA,
-    ).toBe(madeUpCertificate);
-    expect(failure({ ...certificate, PLATFORM_DATABASE_CA: 'not a certificate' }).invalid).toEqual([
-      'PLATFORM_DATABASE_CA: invalid, must be the server’s certificate as PEM text, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----',
+    ).toBe(`${madeUpCertificate.trim()}\n`);
+    const notOne = failure({ ...certificate, PLATFORM_DATABASE_CA: notACertificate });
+    expect(notOne.invalid).toEqual([
+      'PLATFORM_DATABASE_CA: invalid, must be the server’s certificate: its PEM text, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----, or the path of a file holding it',
     ]);
+    expect(notOne.message).not.toContain('MADEUP');
+    // Or the path of a file, read once by the reader config.ts hands (step 2.203).
+    const read: string[] = [];
+    const guard = {
+      trackerProject: 'madeupprojectref0001',
+      readFile: (path: string) => {
+        read.push(path);
+        if (path !== './made-up-ca.pem') throw new Error(`ENOENT ${path}`);
+        return madeUpCertificate;
+      },
+    };
+    expect(
+      loadConfig({ ...certificate, PLATFORM_DATABASE_CA: './made-up-ca.pem' }, guard)
+        .PLATFORM_DATABASE_CA,
+    ).toBe(`${madeUpCertificate.trim()}\n`);
+    expect(read).toEqual(['./made-up-ca.pem']);
+    const unread = failure({ ...certificate, PLATFORM_DATABASE_CA: '/made-up/hidden.pem' }, guard);
+    expect(unread.invalid).toEqual([
+      'PLATFORM_DATABASE_CA: invalid, it names a file that cannot be read; give the path of a file this program can read, or the certificate’s own PEM text',
+    ]);
+    expect(unread.message).not.toContain('hidden');
     expect(
       failure({
         ...production,
@@ -264,6 +293,20 @@ describe('loadConfig', () => {
     ).toEqual([
       'PLATFORM_DATABASE_CA: invalid, a certificate is checked only over SSL, and PLATFORM_DATABASE_SSL is "off"',
     ]);
+  });
+
+  it('refuses a public address with a path online, as the worker does (step 2.203)', () => {
+    for (const appEnv of ['staging', 'production']) {
+      for (const extra of ['/leagues', '/?made-up=1', '/#top']) {
+        const url = `${production.PUBLIC_BASE_URL.replace(/\/$/, '')}${extra}`;
+        expect(failure({ ...production, APP_ENV: appEnv, PUBLIC_BASE_URL: url }).invalid).toEqual([
+          `PUBLIC_BASE_URL: invalid, must be only a scheme and host, like https://site, when APP_ENV is ${appEnv}: the site has no base path`,
+        ]);
+      }
+    }
+    expect(
+      loadConfig({ ...valid, PUBLIC_BASE_URL: 'http://localhost:3000/made-up' }).PUBLIC_BASE_URL,
+    ).toBe('http://localhost:3000/made-up');
   });
 
   it('refuses a platform address that is the tracker’s DATABASE_URL, before connecting', () => {
@@ -437,9 +480,12 @@ describe('loadConfig', () => {
         name,
       );
     }
-    expect(failure({ ...localOnly, LOCAL_DESIGN: 'no-such-design' }).invalid).toEqual([
-      'LOCAL_DESIGN: invalid, not one of the allowed values',
-    ]);
+    const design = failure({ ...localOnly, LOCAL_DESIGN: 'no-such-design' }).invalid;
+    expect(design).toHaveLength(1);
+    // The allowed values are named (step 2.203, L1); the value given is not.
+    expect(design[0]).toMatch(/^LOCAL_DESIGN: invalid, not one of the allowed values \(.+\)$/);
+    expect(design[0]).toContain('crest');
+    expect(design[0]).not.toContain('no-such-design');
     for (const appEnv of ['staging', 'production']) {
       expect(failure({ ...production, APP_ENV: appEnv, LOCAL_DESIGN: 'crest' }).invalid).toEqual([
         'LOCAL_DESIGN: invalid, may be set only when APP_ENV is local or test',

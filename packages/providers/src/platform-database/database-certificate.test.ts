@@ -33,7 +33,9 @@ describe('databaseCertificateFrom', () => {
       const found = databaseCertificateFrom(name, value);
       expect(found.ok).toBe(false);
       if (found.ok) continue;
-      expect(found.problem).toMatch(/^PLATFORM_DATABASE_CA: invalid, must be the server’s certificate/);
+      expect(found.problem).toMatch(
+        /^PLATFORM_DATABASE_CA: invalid, must be the server’s certificate/,
+      );
       expect(found.problem).not.toContain('MADEUP');
       expect(found.problem).not.toContain(pem.split('\n')[1]);
     }
@@ -53,8 +55,7 @@ describe('databaseCertificateFrom', () => {
   });
 
   it('refuses a private key, and never repeats it', () => {
-    const key =
-      '-----BEGIN PRIVATE KEY-----\nMADEUPkeykeykey\n-----END PRIVATE KEY-----\n' + pem;
+    const key = '-----BEGIN PRIVATE KEY-----\nMADEUPkeykeykey\n-----END PRIVATE KEY-----\n' + pem;
     const found = databaseCertificateFrom(name, key);
     expect(found.ok).toBe(false);
     if (!found.ok) {

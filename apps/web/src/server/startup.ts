@@ -70,7 +70,7 @@ type ConnectCause = ReturnType<typeof DatabaseModule.connectCauseOf>;
  */
 const databaseRefusals: Readonly<Record<ConnectCause, string>> = {
   certificate:
-    'the database’s certificate could not be checked: set PLATFORM_DATABASE_CA to the database’s own certificate (the PEM text from its settings page), then start the app again.',
+    'the database’s certificate was not accepted: set PLATFORM_DATABASE_CA to the database’s own certificate (its PEM text, or the path of a file holding it; for Supabase, the one on the project’s database settings page), then start the app again.',
   ssl: 'the database would not take an encrypted connection: check that PLATFORM_DATABASE_URL is the hosted database’s address (PLATFORM_DATABASE_SSL=off is allowed only for a database on this computer), then start the app again.',
   login:
     'the database refused the password or login: check the app’s own login and its password in PLATFORM_DATABASE_URL, then start the app again.',
