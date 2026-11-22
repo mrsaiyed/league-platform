@@ -230,6 +230,28 @@ describe('box score table', () => {
     expect(html).toContain('Player numbers are not shown.');
     expect(html).toContain('61');
   });
+  it('says under the table why a Total is not its column added up, one sentence a line', () => {
+    const notes = ['The players’ points add to 48.', 'One turnover was the team’s own.'];
+    const html = render(
+      createElement(BoxScoreTable, {
+        teamName: 'Hawks',
+        columns,
+        players: [{ id: 'p', jersey: '7', name: 'Pia', cells: { pts: 48 } }],
+        totals: { pts: 50 },
+        notes,
+        labels,
+      }),
+    );
+    for (const note of notes) {
+      expect(html).toContain(`<p class="ui-table-notice" dir="auto">${note}</p>`);
+    }
+    // After the table, inside its frame, so it stays put while the table scrolls.
+    expect(html.indexOf('</table>')).toBeLessThan(html.indexOf(notes[0] ?? ''));
+    const without = render(
+      createElement(BoxScoreTable, { teamName: 'Hawks', columns, players: [], totals: {}, labels }),
+    );
+    expect(without).not.toContain('ui-table-notice');
+  });
 });
 
 describe('sortable statistics table', () => {

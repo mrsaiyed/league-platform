@@ -50,6 +50,52 @@ describe('the browser clock (finding M3)', () => {
 });
 
 describe('tracker queue: storing taps (T-114)', () => {
+  it('shows a stored tap waiting at once, before the read of every waiting tap ends (step 2.37, part 2)', async () => {
+    const memory = createMemoryQueueStorage();
+    let readsHeld = false;
+    const reads: (() => void)[] = [];
+    const storage: QueueStorage = {
+      ...memory,
+      list: async (gameId) => {
+        if (readsHeld) await new Promise<void>((go) => reads.push(go));
+        return memory.list(gameId);
+      },
+    };
+    const { queue, server } = setup({}, { storage, clock: createManualClock() });
+    server.mode = 'down';
+    await queue.start();
+    readsHeld = true;
+    const counts: number[] = [];
+    queue.subscribe((status) => counts.push(status.waiting));
+    const storing = queue.enqueue(tap(1));
+    while (reads.length === 0) await Promise.resolve();
+    // The read after the write has not ended: the count is up already, from memory.
+    expect(queue.status().waiting).toBe(1);
+    expect(queue.status().waitingTaps.map((t) => t.command.commandId)).toEqual([commandId(1)]);
+    readsHeld = false;
+    for (const go of reads.splice(0)) go();
+    await storing;
+    expect(queue.status().waiting).toBe(1);
+    // Never shown fewer than are held on the way.
+    expect(counts.every((n) => n >= 1)).toBe(true);
+  });
+
+  it('is no longer offline once the server answers another request with nothing left to send (the review by use, M2)', async () => {
+    const { queue, server } = setup();
+    server.mode = 'down';
+    await queue.start();
+    await queue.enqueue(tap(1));
+    await queue.idle();
+    expect(queue.status().unansweredSince).not.toBeNull();
+    // The session was answered, but a tap still waits: only its own send can say.
+    queue.heard();
+    expect(queue.status().unansweredSince).not.toBeNull();
+    // The game was lost and taken back: the tap is listed as not saved, nothing waits.
+    await queue.setAside([commandId(1)]);
+    queue.heard();
+    expect(queue.status().unansweredSince).toBeNull();
+  });
+
   it('has stored a tap by the time enqueue resolves, with no network at all', async () => {
     const { queue, server, storage } = setup();
     server.mode = 'down';

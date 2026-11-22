@@ -310,9 +310,12 @@ describe('recording the scores of an applied import', () => {
       ok: true,
       value: { recorded: 2, waiting: 1, refused: 0, leftAlone: 0, postponed: 0 },
     });
-    expect(world.db.state.games.map((g) => [g.status, g.homeScore, g.awayScore])).toEqual([
-      ['final', a.home, a.away],
-      ['final', b.home, b.away],
+    // A score an import carried says nothing of overtime: no count (step 2.200).
+    expect(
+      world.db.state.games.map((g) => [g.status, g.homeScore, g.awayScore, g.overtimePeriods]),
+    ).toEqual([
+      ['final', a.home, a.away, null],
+      ['final', b.home, b.away, null],
     ]);
     expect(world.events.map((e) => e.type)).toEqual(['games.finalized', 'games.finalized']);
 

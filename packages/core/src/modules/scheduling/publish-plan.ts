@@ -26,7 +26,10 @@ export type PublishBlocker =
         | 'game-already-started'
         /** The draft removes a game the tracker has recorded something for. */
         | 'game-cannot-be-removed'
-        /** A game the draft adds has the id of a game that exists already (in the bin, or with no date). */
+        /**
+         * A game the draft adds has the id of a game that exists already (in the bin, or with
+         * no date; or in another league, which only publishing itself finds).
+         */
         | 'game-id-taken'
         | 'game-without-time'
         | 'unknown-team'

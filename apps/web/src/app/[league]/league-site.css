@@ -670,9 +670,19 @@ html {
   color: var(--color-text);
   text-decoration: underline;
 }
-.powered-by {
+.site-footer .powered-by {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--tap);
+  color: var(--color-muted);
   font-size: var(--text-12);
   letter-spacing: 0.04em;
+  text-decoration: none;
+}
+/* Our mark leads to our front page (U-8, step 2.135), like the footer's other links. */
+.site-footer .powered-by:hover {
+  color: var(--color-text);
+  text-decoration: underline;
 }
 /* The made-up world's one quiet line (step 2.152): a line of its own, under the rest. */
 .site-footer-made-up {
@@ -750,6 +760,10 @@ html {
    every player's numbers, then each leader as one short row. */
 .home-leaders-beside {
   margin-block-start: var(--space-section);
+}
+/* "2 players are level for first.": the line a shared place gets instead of one card. */
+.home-leaders-level {
+  margin-block: var(--step-1) var(--step-3);
 }
 .home-leaders-head {
   display: flex;
@@ -938,6 +952,57 @@ html {
   margin: 0;
   color: var(--color-muted);
   font-size: var(--text-14);
+}
+/* Until the page's private read of "my teams" has answered, the device's choice is in the
+   page but not shown where scripts run, so a coach never sees "Make this my team" flash on
+   their own team's page (TeamMine); with scripts off it shows as it always did. */
+.team-mine-wait {
+  display: contents;
+}
+@media (scripting: enabled) {
+  .team-mine-wait {
+    display: none;
+  }
+}
+/* "This is your team." says something of the team rather than offering an action, so it
+   stands on a line of its own under the team's head at every width (step 2.168), never
+   beside the title where the head's actions go on a laptop. */
+.league-site .ui-page-head-row > .team-mine[data-yours] {
+  flex-basis: 100%;
+}
+/* The league home's "Your team" line (step 2.168), drawn after the page: the badge, then the
+   team's shield and name as one link, as tall as anything tapped. */
+.league-site .site-column > .team-mine[data-your-team] {
+  margin-block: var(--step-5) var(--step-3);
+}
+.league-site .team-mine-way {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--step-2);
+  min-block-size: var(--tap);
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+.league-site .team-mine-way:hover > span {
+  text-decoration: underline;
+}
+/* "Your team" on a team's card (step 2.168): under its facts while the card is one row; in
+   the top corner of an upright card, so the foot lines of a row of cards stay level. */
+@media (min-width: 48rem) {
+  /* The shield keeps the first row, which the mark shares at its end. */
+  .league-site .ui-card-grid[data-layout='teams'] .ui-team-card > .ui-emblem {
+    grid-row: 1;
+  }
+  .league-site .ui-card-grid[data-layout='teams'] [data-your-team] {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+    justify-self: end;
+  }
+}
+.team-mine-way > .ui-emblem {
+  block-size: var(--step-6);
 }
 
 /* A game's page opens with its board: the two teams, their shields and the score. The

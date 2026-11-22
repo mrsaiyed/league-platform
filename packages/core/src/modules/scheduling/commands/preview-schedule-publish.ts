@@ -8,7 +8,7 @@ import { mayPreviewPublish } from '../policy.ts';
 import { planPublication, type PublishBlocker } from '../publish-plan.ts';
 import type { SchedulingTx } from '../ports.ts';
 import type { Clash } from '../rules/schedule-types.ts';
-import type { PublishSummary } from '../rules/summarize-publish.ts';
+import { publishChangeCount, type PublishSummary } from '../rules/summarize-publish.ts';
 
 export type SchedulePublishPreview = {
   /** What the draft names as its basis: the admin passes these back to publish. */
@@ -16,6 +16,8 @@ export type SchedulePublishPreview = {
   readonly version: number;
   readonly basedOnRevision: number | null;
   readonly summary: PublishSummary;
+  /** How many things publishing would change: the grid's draft line says the same (step 2.185). */
+  readonly toPublish: number;
   readonly teamCount: number;
   readonly peopleCount: number;
   readonly clashes: readonly Clash[];
@@ -47,6 +49,7 @@ export const previewSchedulePublish = defineCommand({
       version: plan.draft.version,
       basedOnRevision: plan.draft.basedOnRevision,
       summary: plan.summary,
+      toPublish: publishChangeCount(plan.summary),
       teamCount: plan.summary.teamsAffected.length,
       peopleCount: plan.peopleAffected,
       clashes: plan.clashes,

@@ -697,9 +697,26 @@
 .box-score-grid {
   max-inline-size: 100%;
   overflow-x: auto;
+  container-type: inline-size;
+  /* Every count's column has one width (its box and its two paddings), and the name column
+     takes at least 7rem and what is left over after the whole count columns that fit beside
+     it: so on a phone the columns in view at rest are whole, the first one to scroll to
+     starts at the box's edge, and a box wide enough for them all shows them all. */
+  --box-count-col: calc(var(--step-7) + var(--step-2) + 2 * var(--step-1));
+  --box-name-least: 7rem;
 }
 .box-score-grid table {
   border-collapse: collapse;
+}
+.box-score-grid td {
+  box-sizing: border-box;
+  inline-size: var(--box-count-col);
+  min-inline-size: var(--box-count-col);
+}
+.box-score-grid thead th:not(:first-child) {
+  box-sizing: border-box;
+  inline-size: var(--box-count-col);
+  min-inline-size: var(--box-count-col);
 }
 .box-score-grid th,
 .box-score-grid td {
@@ -724,13 +741,21 @@
   position: sticky;
   inset-inline-start: 0;
   z-index: 1;
-  max-inline-size: 9.5rem;
+  /* A long name wraps under itself, whole, instead of being cut short with "…"; the column's
+     width is the box's leftover (above), so no count column stands half in view at rest. */
+  box-sizing: border-box;
+  --box-name-col: calc(
+    var(--box-name-least) + mod(100cqi - var(--box-name-least), var(--box-count-col))
+  );
+  inline-size: var(--box-name-col);
+  min-inline-size: var(--box-name-col);
+  max-inline-size: var(--box-name-col);
   padding-inline: 0 var(--step-3);
-  overflow: hidden;
   background: var(--color-panel);
   font-size: var(--text-14);
   text-align: start;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 /* A count's box: a text box asking for number keys (box-score-sheet-form.tsx says why). */
 .staff .box-score-grid input[inputmode='numeric'] {

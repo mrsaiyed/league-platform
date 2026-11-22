@@ -13,6 +13,8 @@ function game(localDate: string | null): PublicGame {
     awayTeam: team,
     homeScore: null,
     awayScore: null,
+    overtimePeriods: null,
+    periods: 2,
     divisionName: null,
     venue: null,
     courtName: null,

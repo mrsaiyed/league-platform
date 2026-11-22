@@ -5,7 +5,9 @@
 // 1. The settings were read and checked before this is called (config.ts).
 // 2. Local work and tests (APP_ENV local or test) run on a made-up database in
 //    memory and never open an address (T-201); staging and production open
-//    PLATFORM_DATABASE_URL.
+//    PLATFORM_DATABASE_URL, with the server's certificate always checked, against
+//    PLATFORM_DATABASE_CA when it is given (step 2.203). A connection that fails is told
+//    in fixed words by the driver's code: the certificate, the login, or not reached.
 // 3. The login role is checked (checkLoginRole, T-60): a superuser, a role that
 //    bypasses row-level security, or the tables' owner stops the start.
 // 4. With pg-boss on a hosted database, its schema is checked (checkQueueSchema,
@@ -22,6 +24,8 @@ import type { Server } from 'node:http';
 import {
   checkLoginRole,
   checkQueueSchema,
+  connectCauseOf,
+  serverCodeOf,
   madeUpDatabase,
   type DatabaseHandle,
   type DatabaseSource,
@@ -65,6 +69,45 @@ export type RunningWorker = {
 
 const kindOf = (error: unknown) => (error instanceof Error ? error.name : typeof error);
 
+type ConnectCause = ReturnType<typeof connectCauseOf>;
+
+const notReached =
+  'the database could not be reached: check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the worker again.';
+
+/**
+ * Why the database could not be used, in fixed words naming what to set (step 2.203, the
+ * same three cases as the web app's, record 082): the certificate was not accepted, the
+ * login was refused, or the server was not reached. Told by the driver's error code only
+ * (connectCauseOf); never its message, which may hold the address and its password.
+ */
+const databaseRefusals: Readonly<Record<ConnectCause, string>> = {
+  certificate:
+    'the database’s certificate was not accepted: set PLATFORM_DATABASE_CA to the database’s own certificate (its PEM text, or the path of a file holding it; for Supabase, the one on the project’s database settings page), then start the worker again.',
+  ssl: 'the database would not take an encrypted connection: check that PLATFORM_DATABASE_URL is the hosted database’s address, then start the worker again.',
+  login:
+    'the database refused the login: check the worker’s own login and its password in PLATFORM_DATABASE_URL, then start the worker again.',
+  database:
+    'the database named at the end of PLATFORM_DATABASE_URL does not exist there: check its name in the address, then start the worker again.',
+  host: notReached,
+  network: notReached,
+  timeout: notReached,
+  refused:
+    'the database answered but refused the start: check the login name and the database name in PLATFORM_DATABASE_URL, then start the worker again.',
+  unknown: notReached,
+};
+
+/**
+ * The sentence for a database that refused the worker's start, by the error's code; when
+ * the server answered, with its 5-character code (not a secret), never its words.
+ */
+export const workerDatabaseRefusal = (error: unknown): string => {
+  const cause = connectCauseOf(error);
+  const code = serverCodeOf(error);
+  return cause === 'refused' && code !== null
+    ? databaseRefusals[cause].replace(': check', ` (code ${code}): check`)
+    : databaseRefusals[cause];
+};
+
 export async function startWorker(
   config: WorkerConfig,
   deps: StartWorkerDeps,
@@ -94,7 +137,13 @@ export async function startWorker(
           `PLATFORM_DATABASE_URL is needed when APP_ENV is ${config.APP_ENV}.`,
         );
       }
-      source = { kind: 'postgres', url: config.PLATFORM_DATABASE_URL };
+      source = {
+        kind: 'postgres',
+        url: config.PLATFORM_DATABASE_URL,
+        // Handed to both connections, the database's and pg-boss's (wire-worker.ts);
+        // left out, the computer's own certificate authorities are used.
+        ...(config.PLATFORM_DATABASE_CA === undefined ? {} : { ca: config.PLATFORM_DATABASE_CA }),
+      };
     }
 
     const heartbeat = createHeartbeat({
@@ -135,10 +184,11 @@ export async function startWorker(
       }
     } catch (error) {
       // The driver's message may hold the address; it is not repeated here.
-      deps.logger.error('worker.database_unreachable', { kind: kindOf(error) });
-      throw new WorkerStartError(
-        'the database could not be reached to check its login role and queue schema.',
-      );
+      deps.logger.error('worker.database_unreachable', {
+        kind: kindOf(error),
+        cause: connectCauseOf(error),
+      });
+      throw new WorkerStartError(workerDatabaseRefusal(error));
     }
     if (problems.length > 0) {
       throw new WorkerStartError(
@@ -161,7 +211,12 @@ export async function startWorker(
       await wired.queue.start(wired.handlers);
     } catch (error) {
       deps.logger.error('worker.queue_failed', { kind: kindOf(error) });
-      throw new WorkerStartError('the queue could not start.');
+      // pg-boss opens its own connections, with the same certificate: a refusal of those
+      // is told as the database's; anything else is the queue's own.
+      const cause = connectCauseOf(error);
+      throw new WorkerStartError(
+        cause === 'unknown' ? 'the queue could not start.' : workerDatabaseRefusal(error),
+      );
     }
 
     deps.logger.info('worker.started', {

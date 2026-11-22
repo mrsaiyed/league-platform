@@ -5,6 +5,43 @@ import { safeColor } from '../team-color.ts';
 
 export type GameStatus = 'scheduled' | 'live' | 'final' | 'forfeit' | 'postponed' | 'cancelled';
 
+/**
+ * A final game's pill in more words than "Final", already written by the page (P7 §5.6):
+ * what is drawn ("Final, OT") and what a screen reader is told in its place ("Final after
+ * overtime"), so nobody hears bare letters.
+ */
+export type FinalPill = { readonly text: string; readonly said: string };
+
+/** The pill's words: drawn for the eye, said in full to a screen reader. */
+export function FinalPillWords({ pill }: { readonly pill: FinalPill }) {
+  return (
+    <>
+      <span aria-hidden="true">{pill.text}</span>
+      <span className="ui-visually-hidden">{pill.said}</span>
+    </>
+  );
+}
+
+/**
+ * A final game's state by itself, outside a card: the same quiet pill as on its card,
+ * "Final", or "Final, OT" for a game won in overtime (P7 §5.6). For a page about one game
+ * that draws no card or board, such as its box score sheet.
+ */
+export function FinalStatePill({
+  label,
+  finalPill,
+}: {
+  /** "Final". */
+  readonly label: string;
+  readonly finalPill?: FinalPill | undefined;
+}) {
+  return (
+    <span className="ui-game-state" data-kind="quiet">
+      {finalPill ? <FinalPillWords pill={finalPill} /> : label}
+    </span>
+  );
+}
+
 export type GameCardTeam = {
   readonly name: string;
   /** Null until the team has a score to show. */
@@ -29,6 +66,12 @@ export type GameCardProps = {
   readonly home: GameCardTeam;
   readonly away: GameCardTeam;
   readonly status: GameStatus;
+  /**
+   * What a final game's pill says in place of "Final": "Final, OT" for a game won in
+   * overtime (P7 §5.6), "Final after overtime" to a screen reader. Drawn exactly as
+   * "Final" is, and only while the game is final.
+   */
+  readonly finalPill?: FinalPill | undefined;
   /** The date and time, already written for the reader by the page. */
   readonly whenText: string;
   /** Where it is played, already written by the page; drawn on a line of its own. */
@@ -254,6 +297,7 @@ export function GameCard({
   home,
   away,
   status,
+  finalPill,
   whenText,
   placeText,
   numberText,
@@ -271,7 +315,15 @@ export function GameCard({
   let state: ReactNode = null;
   if (status === 'live') state = <LiveMarker label={labels.live} />;
   else if (status !== 'scheduled')
-    state = <span className="ui-game-state">{labels[statusKey[status]]}</span>;
+    state = (
+      <span className="ui-game-state">
+        {status === 'final' && finalPill ? (
+          <FinalPillWords pill={finalPill} />
+        ) : (
+          labels[statusKey[status]]
+        )}
+      </span>
+    );
   else if (note)
     state = (
       <span className="ui-game-state" data-kind="quiet">

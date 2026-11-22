@@ -15,8 +15,8 @@ export function scoringSessionsStore(scope: LeagueScope): ScoringSessionsStore {
     lockGame: (gameId) => lockLiveGame(scope, gameId),
     findForGame: (gameId) => findScoringSession(scope, gameId),
     start: (session) => insertScoringSession(scope, session),
-    extend: (gameId, sessionId, heldUntil) =>
-      extendScoringSession(scope, gameId, sessionId, heldUntil),
+    extend: (gameId, sessionId, heldUntil, dueBefore) =>
+      extendScoringSession(scope, gameId, sessionId, heldUntil, dueBefore),
     end: (gameId, sessionId, lapsedBy) => deleteScoringSession(scope, gameId, sessionId, lapsedBy),
   };
 }

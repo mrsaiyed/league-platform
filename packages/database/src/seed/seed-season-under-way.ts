@@ -187,17 +187,23 @@ function boxScoreLine(player: Rostered): BoxScoreLineInput {
   };
 }
 
-/** Opens every seed league's current season and plays the start of it (above). */
+/**
+ * Opens every seed league's current season and plays the start of it (above): every
+ * league with a current season, or only those of the short names given.
+ */
 export async function putSeedSeasonsUnderWay(
   pglite: PGlite,
   now: Date = new Date(),
+  slugs?: readonly string[],
 ): Promise<void> {
   const { rows: leagues } = await pglite.query<LeagueRow>(
     `select leagues.id, leagues.owner_account_id, leagues.time_zone,
        seasons.id as season_id, seasons.version as season_version
      from leagues join seasons on seasons.league_id = leagues.id and seasons.is_current
      where leagues.deleted_at is null and seasons.deleted_at is null
+       and ($1::text[] is null or leagues.slug = any($1::text[]))
      order by leagues.slug`,
+    [slugs === undefined ? null : [...slugs]],
   );
   const db = createDatabase({ kind: 'pglite', pglite });
   try {

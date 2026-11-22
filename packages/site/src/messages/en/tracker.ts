@@ -87,6 +87,68 @@ export const enTracker = {
   'tracker.court.teamScore': '{team}: {score}',
   'tracker.court.watch': 'Open the public game page',
   'tracker.court.watchHelp': 'Opens in a new tab. This screen stays open.',
+  // End game (step 2.37; checklist J1 to J3): the question says the score and what ending
+  // does, and, when the game is ended early, that time is still on the clock and in which
+  // period. The device is told whether the season allows ties (S-73): at a level score
+  // the question says the game ends as a tie, or End game is refused at once in words
+  // that say to play overtime.
+  'tracker.end.ask.does':
+    'This becomes the final score and goes into the standings. A game ended by mistake can be reopened.',
+  'tracker.end.ask.level': 'The score is level, so the game ends as a tie.',
+  'tracker.end.ask.notLast': '{period} is over, and {next} has not been played.',
+  'tracker.end.ask.timeLeft': '{period} still has {clock} on the clock.',
+  'tracker.end.ask.title': 'End the game?',
+  'tracker.end.button': 'End game',
+  'tracker.end.ending': 'Ending…',
+  'tracker.end.help': 'Makes the game final. You are asked first.',
+  'tracker.end.keep': 'Keep playing',
+  'tracker.end.level':
+    'This season allows no ties, so a level game cannot end. Play overtime until a team is ahead.',
+  // Level with time still to play (lane 2.37, fix round, F3): overtime is only for a
+  // game still level once the last period has run out.
+  'tracker.end.levelNotLast':
+    'This season allows no ties, so a level game cannot end. {period} is over, and {next} is still to play.',
+  'tracker.end.levelTimeLeft':
+    'This season allows no ties, so a level game cannot end. {period} still has {clock} to play.',
+  'tracker.end.levelTitle': 'The score is level',
+  // In the pad when the last period's clock has run out with a team ahead: offered,
+  // never done by itself (S-65).
+  // "Take back End game" when the End was sent and its answer lost (lane 2.37, fix round,
+  // F2): the league may have it, so it is kept, and the panel says so until it answers.
+  'tracker.end.maybeSaved':
+    'It was sent as the connection dropped, so the league may have it, and it cannot be taken back here. This says “Saved” once the league answers; then Reopen is the way back.',
+  'tracker.end.offer':
+    '{period} is over. {team} lead {high}–{low}: end the game once the score is right.',
+  // The league did not take an End tap this device made (an older page, a rule changed
+  // mid-game): the game is live again, and the pad says why.
+  'tracker.end.refused': 'The league did not take End game: {why}',
+  'tracker.end.refusedLevel':
+    'The league did not take End game: the score is level and this season allows no ties. Play overtime until a team is ahead.',
+  'tracker.end.refusedTitle': 'The game is still live',
+  'tracker.end.savedMeanwhile':
+    'The league already has the end of this game, so it cannot be taken back here. Reopen it instead.',
+  'tracker.end.takeBack': 'Take back End game',
+  'tracker.end.takeBackFailed': 'This device could not take End game back. Try again.',
+  'tracker.end.takenBack': 'End game taken back. The game is live; the clock is stopped.',
+  // The final panel, in the pad's place once the game is ended (checklist J4).
+  'tracker.final.back': 'Back to the games',
+  'tracker.final.checking': 'Checking whether this game can be reopened here…',
+  'tracker.final.checkingSaved': 'Checking whether the result was saved…',
+  // What a tile, a team's turnovers or its bench says when tapped on a final game (D12)
+  // is `tracker.refusal.gameFinal`. The panel's own name, for a screen reader:
+  'tracker.final.label': 'The game is final',
+  'tracker.final.notSent':
+    'The league gets the result once the connection is back. Until then End game can be taken back here.',
+  'tracker.final.notSentLead': 'Not sent yet.',
+  'tracker.final.reopenAlways': 'You can reopen it at any time.',
+  'tracker.final.reopenLeft_one': 'You can reopen it for {count} more minute.',
+  'tracker.final.reopenLeft_other': 'You can reopen it for {count} more minutes.',
+  'tracker.final.saved': 'Saved. It counts in the standings.',
+  'tracker.final.score': '{home} {homeScore}, {away} {awayScore}',
+  'tracker.final.sending': 'Sending the result to the league…',
+  'tracker.final.tied': 'A tie, {high}–{low}',
+  'tracker.final.title': 'Final',
+  'tracker.final.won': '{team} won, {high}–{low}',
   'tracker.floor.title': 'On court',
   'tracker.format.clock.running': 'Running clock: the clock keeps going through fouls and timeouts',
   'tracker.format.clock.stop': 'Stop clock: fouls and timeouts stop the clock',
@@ -117,14 +179,67 @@ export const enTracker = {
   'tracker.hint.title': 'How to score',
   'tracker.hint.turnovers':
     'Tap a team’s turnovers to see each player’s, take one back, or add a team turnover.',
+  // The "not saved" list play by play (step 2.37, part 2): a tap that is a play is said
+  // as the play log says it; these are the others.
+  'tracker.kept.colors': 'Colors swapped',
+  'tracker.kept.end': 'End game',
+  'tracker.kept.pause': 'Clock paused',
+  'tracker.kept.players': 'A change to a team’s players',
+  'tracker.kept.redo': 'Redo',
+  'tracker.kept.setClock': 'Clock set to {clock}',
+  'tracker.kept.start': 'Clock started',
+  'tracker.kept.undo': 'Undo',
+  // "Enter again" on a kept play (S-77): only while this device holds the game, a new
+  // play now; elsewhere the list is for reading out to whoever holds it.
+  'tracker.keptList.again': 'Enter again',
+  'tracker.keptList.againLabel': 'Enter again: {play}',
+  'tracker.keptList.againNotTakenOff':
+    'That play was entered again, but it could not be taken off this list. Tapping Enter again once more will not enter it twice.',
+  'tracker.keptList.againRefused':
+    'That play was not entered again: the game as it stands now does not take it. Enter it by hand if it is still needed.',
+  // Cleared only by this deliberate tap: the scorekeeper has seen the list.
+  'tracker.keptList.clear': 'I have seen these: clear the list',
+  'tracker.keptList.readAloud':
+    'Only the device scoring the game can enter these again. Read them out to whoever is scoring it now.',
+  'tracker.keptList.title': 'Not saved',
   // On the page that replaces the scoring screen when the device stops scoring (taken
   // over, signed out, no longer allowed) in the very moment a tap was made.
   'tracker.lastTapNotRecorded':
     'Your last tap was made as this device stopped scoring, so it was not recorded. Enter it again once the game is being scored.',
+  // A way off the scoring screen tapped while plays wait (lane 2.37, fix round, F1): what
+  // waits is sent only from this screen, so the screen asks first.
+  'tracker.leave.anyway': 'Leave anyway',
+  'tracker.leave.kept':
+    'If you leave, it stays on this device and is sent only when this game’s scoring screen is opened on it again.',
+  'tracker.leave.plays_one':
+    '{count} play is not sent yet. Stay on this screen until it says “Saved”.',
+  'tracker.leave.plays_other':
+    '{count} plays are not sent yet. Stay on this screen until it says “Saved”.',
+  'tracker.leave.result': 'The result is not sent yet. Stay on this screen until it says “Saved”.',
+  'tracker.leave.stay': 'Stay here',
+  'tracker.leave.title': 'Not sent yet',
   'tracker.lineup.noPlayers': 'No {team} players yet.',
   'tracker.lineup.pick': 'Pick the starting {size}: tap players below.',
   'tracker.lineup.picked': '{count} of {size} picked.',
   'tracker.lineup.startWith': 'Start with {count}',
+  // The play log (step 2.37; checklist I4): every play, newest first, with its period
+  // and game clock. A play the league does not have yet is dimmed and says so.
+  'tracker.log.close': 'Close the play log',
+  'tracker.log.count_one': '{count} play',
+  'tracker.log.count_other': '{count} plays',
+  'tracker.log.empty': 'No plays yet.',
+  // The pad's line at rest: the latest play, which is the one Undo takes back, and the
+  // way to all of them.
+  'tracker.log.latest': 'Latest',
+  'tracker.log.notSent': 'Not sent yet',
+  'tracker.log.open': 'Open the play log: {count}',
+  'tracker.log.row': '{period} {clock}',
+  'tracker.log.score': '{home}–{away}',
+  'tracker.log.title': 'Play log',
+  'tracker.log.unsent_one': '{count} not sent yet',
+  'tracker.log.unsent_other': '{count} not sent yet',
+  // Under the newest plays, where a panel shows only those: the way to every play.
+  'tracker.log.whole': 'See all {count} plays',
   'tracker.mark.off': 'Off',
   // On a tile for a moment, for the two players of a substitution.
   'tracker.mark.on': 'On',
@@ -136,9 +251,11 @@ export const enTracker = {
     'You are no longer allowed to score this game. {count} play is still on this device and is not saved. If an admin gives the game back to you, open it again here and it is sent.',
   'tracker.notAllowedKept_other':
     'You are no longer allowed to score this game. {count} plays are still on this device and are not saved. If an admin gives the game back to you, open it again here and they are sent.',
-  'tracker.notApplied_one': '{count} action was not applied. The game now shows what was saved.',
-  'tracker.notApplied_other':
-    '{count} actions were not applied. The game now shows what was saved.',
+  // The plays the league refused, play by play, cleared only by a tap (step 2.37, part 2).
+  'tracker.notAppliedList.clear': 'I have seen these: clear the list',
+  'tracker.notAppliedList.title': 'Not applied',
+  'tracker.notApplied_one': '{count} play was not applied. The game now shows what was saved.',
+  'tracker.notApplied_other': '{count} plays were not applied. The game now shows what was saved.',
   'tracker.notAssigned':
     'You are not assigned to score this game. Ask a league admin to assign it to you.',
   'tracker.notLive.box-score':
@@ -147,9 +264,14 @@ export const enTracker = {
   'tracker.notLive.final-score':
     'This game is set to final score only, so there is no live scoring. Enter its score in Games.',
   'tracker.notSaved_one':
-    '{count} action on this device was not saved. Enter it again if it is needed.',
+    '{count} play on this device was not saved. Enter it again if it is needed.',
   'tracker.notSaved_other':
-    '{count} actions on this device were not saved. Enter them again if they are needed.',
+    '{count} plays on this device were not saved. Enter them again if they are needed.',
+  // Several minutes with no connection and plays waiting (T6 §4, step 2.37 part 2).
+  'tracker.offlineLong_one':
+    'No connection for several minutes. {count} play is only on this device until the connection comes back. Keep this page open and the device switched on: it is sent by itself.',
+  'tracker.offlineLong_other':
+    'No connection for several minutes. {count} plays are only on this device until the connection comes back. Keep this page open and the device switched on: they are sent by themselves.',
   'tracker.openAgain': 'Open the game again',
   'tracker.opening': 'Opening the game…',
   'tracker.openingSlow': 'No answer yet. Check the connection; this keeps trying.',
@@ -195,6 +317,25 @@ export const enTracker = {
   // A play in the tracker's words, for the play log, Undo and the "not saved" lists
   // (finding M3): one for each kind of play the engine has, matched by engine-words.ts.
   'tracker.play.score': '{player} +{points}',
+  // The same plays said shortest, for the Undo button under the scoreboard, where a
+  // phone has room for a few words: what it was first, then who ("+2 #4 Jordan"), so
+  // where the line is cut it is the name that is cut, never what happened or the number.
+  // A turnover is the one long word among them: it is said after the player ("#4 Jordan
+  // turnover"), since "Turnover #4…" lost the number in a phone's narrowest row.
+  'tracker.play.short.clock-mode.running': 'Running clock',
+  'tracker.play.short.clock-mode.stop': 'Stop clock',
+  'tracker.play.short.foul': 'Foul {who}',
+  'tracker.play.short.lineup': 'Starters {team}',
+  'tracker.play.short.period': 'Start {period}',
+  'tracker.play.short.score': '+{points} {who}',
+  'tracker.play.short.sub': 'Sub {who}',
+  'tracker.play.short.team-turnover': 'Team turnover',
+  'tracker.play.short.team-unturnover': '−Team turnover',
+  'tracker.play.short.timeout': 'Timeout {team}',
+  'tracker.play.short.turnover': '{who} turnover',
+  'tracker.play.short.unfoul': '−Foul {who}',
+  'tracker.play.short.untimeout': '−Timeout {team}',
+  'tracker.play.short.unturnover': '{who} −turnover',
   'tracker.play.sub': 'Sub: {in} in for {out}',
   'tracker.play.team-turnover': 'Team turnover: {team}',
   'tracker.play.team-unturnover': 'Team turnover taken back: {team}',
@@ -219,10 +360,20 @@ export const enTracker = {
   // The tracker's saved banner (T6 §4), chosen from the queue's status by
   // apps/web/src/features/tracker/queue-banner.ts.
   'tracker.queue.allSaved': 'All saved',
+  // Signed out or no longer allowed to score (step 2.37, part 2): nothing is on its way,
+  // so the plays are kept, never "waiting to send".
+  'tracker.queue.keptShort_one': '{count} kept',
+  'tracker.queue.keptShort_other': '{count} kept',
+  'tracker.queue.kept_one': '{count} play kept on this device',
+  'tracker.queue.kept_other': '{count} plays kept on this device',
   'tracker.queue.notSavedShort_one': '{count} not saved',
   'tracker.queue.notSavedShort_other': '{count} not saved',
-  'tracker.queue.notSaved_one': '{count} action not saved',
-  'tracker.queue.notSaved_other': '{count} actions not saved',
+  'tracker.queue.notSaved_one': '{count} play not saved',
+  'tracker.queue.notSaved_other': '{count} plays not saved',
+  // No connection (step 2.37): said whenever the device knows it has none, with or
+  // without plays waiting, so the banner never says "All saved" with the network off.
+  'tracker.queue.offline': 'No connection: plays are kept on this device',
+  'tracker.queue.offlineShort': 'No connection',
   'tracker.queue.separator': ' · ',
   'tracker.queue.storageFailed': 'This device could not save to its storage',
   'tracker.queue.storageFailedShort': 'Storage failed',
@@ -232,8 +383,13 @@ export const enTracker = {
   // players under the pad). "All saved" is said the same.
   'tracker.queue.waitingShort_one': '{count} to send',
   'tracker.queue.waitingShort_other': '{count} to send',
-  'tracker.queue.waiting_one': '{count} action waiting to send',
-  'tracker.queue.waiting_other': '{count} actions waiting to send',
+  'tracker.queue.waiting_one': '{count} play waiting to send',
+  'tracker.queue.waiting_other': '{count} plays waiting to send',
+  // Redo, beside Undo. Its name for a screen reader says the play it brings back.
+  'tracker.redo.button': 'Redo',
+  'tracker.redo.done': 'Brought back: {play}.',
+  'tracker.redo.label': 'Redo {play}',
+  'tracker.redo.nothing': 'Redo: nothing to bring back',
   // The bonus horn's sentence: a muted tablet is the normal case in a gym.
   'tracker.say.bonus.1': 'Bonus: {team}.',
   'tracker.say.bonus.2': 'Double bonus: {team}.',
@@ -376,6 +532,20 @@ export const enTracker = {
   'tracker.turnovers.takeBackTeam': 'Take back one team turnover from {team}',
   'tracker.turnovers.team': 'Team',
   'tracker.turnovers.title': '{team} turnovers',
+  // Undo (step 2.37; checklist I1 to I3): the button names the play it takes back, and
+  // the screen then says what happened in a sentence.
+  'tracker.undo.button': 'Undo',
+  'tracker.undo.done': 'Undone: {play}.',
+  'tracker.undo.doneClock': 'Undone: {play}. The clock is back at {clock}, stopped.',
+  'tracker.undo.doneStopped':
+    'Undone: {play}. The clock stays stopped: start it when play goes on.',
+  // The two long ones said shorter where a phone is short of room (as the sentence after
+  // a set clock, step 2.189): the play and the players in their shortest words.
+  'tracker.undo.doneStoppedShort': '{play} undone · clock stopped',
+  'tracker.undo.doneSub': 'Undone: {out} is back on the court and {in} is on the bench.',
+  'tracker.undo.doneSubShort': '{out} back on · {in} off',
+  'tracker.undo.label': 'Undo {play}',
+  'tracker.undo.nothing': 'Undo: nothing to take back',
   'tracker.unknownGame': 'We could not find that game.',
   'tracker.where.bench': 'bench',
   'tracker.where.floor': 'on court',

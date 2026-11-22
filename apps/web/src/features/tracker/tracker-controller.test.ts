@@ -173,7 +173,11 @@ describe('tracker controller: offline and reconnecting (T6 §4)', () => {
     network.mode = 'down';
     await tapAll(controller, [basket('home', hawks[0] ?? ''), basket('away', bears[1] ?? '', 3)]);
     expect(scoreOf(controller.status().game)).toEqual({ home: 2, away: 3 });
-    await clock.advance(5 * minute);
+    // Several minutes with no answer and plays waiting: said plainly (T6 §4), not before.
+    await clock.advance(4 * minute);
+    expect(controller.status().offlineLong).toBe(false);
+    await clock.advance(1.5 * minute);
+    expect(controller.status().offlineLong).toBe(true);
     expect(controller.status().queue.waiting).toBe(2);
     expect(controller.status().queue.unansweredSince).not.toBeNull();
     expect(controller.status().mode).toEqual({ kind: 'scoring' });
@@ -190,6 +194,7 @@ describe('tracker controller: offline and reconnecting (T6 §4)', () => {
     await controller.idle();
     expect(controller.status().queue.waiting).toBe(0);
     expect(controller.status().queue.unansweredSince).toBeNull();
+    expect(controller.status().offlineLong).toBe(false);
     const server = await serverGame(network);
     expect(server.sequence).toBe(4);
     expect(scoreOf(server.state)).toEqual({ home: 2, away: 3 });
@@ -379,6 +384,121 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 3 });
   });
 
+  it('a kept play entered again whose taking off the list fails is never recorded twice, and says so (review M1)', async () => {
+    const network = endpointNetwork();
+    const memory = createMemoryQueueStorage();
+    let failRemoving: string | null = null;
+    const storage: QueueStorage = {
+      ...memory,
+      add: (...args) => memory.add(...args),
+      list: (...args) => memory.list(...args),
+      settle: (game, settlement) =>
+        failRemoving !== null && (settlement.remove ?? []).includes(failRemoving)
+          ? Promise.reject(new Error('storage full'))
+          : memory.settle(game, settlement),
+    };
+    const tablet = device(network, { storage });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, [...tipOff]);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet.controller, [basket('home', hawks[2] ?? '')]);
+    network.mode = 'up';
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    tablet.controller.online();
+    await tablet.controller.idle();
+    await laptop.controller.leave();
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    if (tablet.controller.status().mode.kind === 'held-by-other') {
+      await tablet.controller.takeOver();
+      await tablet.controller.idle();
+    }
+    const keptId = tablet.controller.status().notSaved[0]?.command.commandId ?? '';
+    expect(keptId).not.toBe('');
+    failRemoving = keptId;
+    // Entered, but still on the list: the scorekeeper is told something failed.
+    expect((await tablet.controller.enterAgain(keptId)).ok).toBe(false);
+    expect(tablet.controller.status().notSaved).toHaveLength(1);
+    await tablet.controller.idle();
+    // A second tap does not record it again.
+    expect((await tablet.controller.enterAgain(keptId)).ok).toBe(false);
+    await tablet.controller.idle();
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
+    expect(scoreOf(tablet.controller.status().game)).toEqual({ home: 2, away: 0 });
+    // Once the storage works, the next tap only takes it off the list.
+    failRemoving = null;
+    expect((await tablet.controller.enterAgain(keptId)).ok).toBe(true);
+    await tablet.controller.idle();
+    expect(tablet.controller.status().notSaved).toEqual([]);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
+  });
+
+  it('enters a kept play again only once it holds the game again, as a new play (S-77)', async () => {
+    const network = endpointNetwork();
+    const tablet = device(network);
+    await tablet.controller.start();
+    await tapAll(tablet.controller, [...tipOff]);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet.controller, [
+      basket('home', hawks[2] ?? ''),
+      basket('away', bears[0] ?? '', 3),
+    ]);
+    network.mode = 'up';
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    tablet.controller.online();
+    await tablet.controller.idle();
+    const [first, second] = tablet.controller.status().notSaved;
+    const firstId = first?.command.commandId ?? '';
+
+    // Not holding the game, the list is for reading out: nothing is entered.
+    expect(await tablet.controller.enterAgain(firstId)).toEqual({
+      ok: false,
+      reason: 'not-scoring',
+    });
+    expect(tablet.controller.status().notSaved).toHaveLength(2);
+
+    // The laptop lets go; the tablet takes the game back and enters one of them again.
+    await laptop.controller.leave();
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    if (tablet.controller.status().mode.kind === 'held-by-other') {
+      await tablet.controller.takeOver();
+      await tablet.controller.idle();
+    }
+    expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
+    expect(await tablet.controller.enterAgain('no-such-play')).toEqual({
+      ok: false,
+      reason: 'not-kept',
+    });
+    const again = await tablet.controller.enterAgain(firstId);
+    expect(again.ok).toBe(true);
+    // A new play, with an id of its own; it leaves the list, the other stays.
+    expect(again.ok && again.commandId !== firstId).toBe(true);
+    expect(tablet.controller.status().notSaved.map((t) => t.command.commandId)).toEqual([
+      second?.command.commandId,
+    ]);
+    await tablet.controller.idle();
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
+    expect((await tablet.storage.list(gameId)).map((t) => t.command.commandId)).toEqual([
+      second?.command.commandId,
+    ]);
+
+    // Undo takes it back as it takes back any tap.
+    await tapAll(tablet.controller, [{ type: 'undo' }]);
+    await tablet.controller.idle();
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 0 });
+  });
+
   it('learns of a takeover from its renewal, with nothing waiting', async () => {
     const network = endpointNetwork();
     const tablet = device(network);
@@ -400,6 +520,38 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     await tablet.controller.idle();
     expect(tablet.controller.status().mode).toMatchObject({ kind: 'held-by-other' });
     await tablet.controller.takeOver();
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
+  });
+
+  it('hidden, it stops checking its hold; shown again it checks at once and learns of a takeover (T-295)', async () => {
+    const network = endpointNetwork();
+    const tablet = device(network);
+    await tablet.controller.start();
+    await tablet.controller.idle();
+    tablet.controller.hidden();
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    // Ten minutes hidden: no check, so nothing is learnt.
+    await tablet.clock.advance(600_000);
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
+    tablet.controller.awake();
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'taken-over' });
+  });
+
+  it('shown again after a sleep with nobody else in, it carries on holding the game (T-295)', async () => {
+    const network = endpointNetwork();
+    const tablet = device(network);
+    await tablet.controller.start();
+    await tablet.controller.idle();
+    tablet.controller.hidden();
+    await tablet.clock.advance(600_000);
+    tablet.controller.awake();
     await tablet.controller.idle();
     expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
   });
@@ -940,11 +1092,13 @@ describe('tracker controller: a game it may not score', () => {
       await controller.start();
       await controller.idle();
       expect(controller.status().mode).toEqual({ kind: 'read-only', reason });
-      expect(controller.status().game).toBeNull();
+      // A game that is over is loaded, to show its final panel (step 2.37, part 2).
+      expect(controller.status().game !== null).toBe(reason === 'game-not-live');
     }
-    expect(network.reached.filter((r) => r.endsWith('commands') || r.endsWith('state'))).toEqual(
-      [],
-    );
+    // Nothing is sent, and only the game that is over is read, once.
+    expect(network.reached.filter((r) => r.endsWith('commands') || r.endsWith('state'))).toEqual([
+      'GET state',
+    ]);
   });
 });
 
