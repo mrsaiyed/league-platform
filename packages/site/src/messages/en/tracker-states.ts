@@ -64,8 +64,10 @@ export const enTrackerStates = {
     'This game cannot be scored now: it is over, cancelled or postponed.',
   'tracker.readOnly.not-allowed': 'You do not have access to score this game.',
   'tracker.readOnly.not-held': 'This device is no longer the one scoring this game.',
-  'tracker.readOnly.released':
-    'This device has left the game. Open it again to keep scoring.',
+  'tracker.readOnly.released': 'This device has left the game. Open it again to keep scoring.',
+  // "Update needed" (step 2.37, part 2): an installed app has no browser reload button,
+  // and opening the game again would be refused again.
+  'tracker.readOnly.reload': 'Reload',
   'tracker.readOnly.request-refused':
     'Something went wrong opening the game. Tap Open the game again.',
   'tracker.readOnly.signed-in-as-other':
@@ -80,7 +82,7 @@ export const enTrackerStates = {
     'Someone else is now scoring this game on another device. This device can no longer score it.',
   'tracker.readOnly.unknown-game': 'This game could not be found.',
   'tracker.readOnly.update-needed':
-    'This tracker needs an update. Reload the page to keep scoring.',
+    'This tracker needs an update. Tap Reload to keep scoring. Your plays are kept on this device.',
   'tracker.refusal.alreadyRunningClock': 'The clock already runs through fouls.',
   'tracker.refusal.alreadyStopClock': 'The clock already stops on fouls.',
   'tracker.refusal.alreadyThatPeriod': 'The game is already in that period.',

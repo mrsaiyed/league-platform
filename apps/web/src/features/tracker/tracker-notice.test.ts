@@ -145,3 +145,11 @@ describe('the words of a device that can no longer score (step 2.37, part 2)', (
     }
   });
 });
+
+describe('"update needed" (step 2.37, part 2)', () => {
+  it('says to tap Reload, and that the plays are kept on this device', () => {
+    const text = trackerNoticeText({ key: 'tracker.readOnly.update-needed' }, t);
+    expect(text).toContain('Tap Reload');
+    expect(text).toContain('Your plays are kept on this device.');
+  });
+});

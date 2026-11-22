@@ -481,7 +481,13 @@ function useSlowAfter(active: boolean, afterMs: number): boolean {
  * sent to a game that is not there, who would only be turned away again.
  */
 const mayOpenAgain = (reason: ReadOnlyReason): boolean =>
-  reason !== 'signed-out' && reason !== 'not-allowed' && reason !== 'unknown-game';
+  reason !== 'signed-out' &&
+  reason !== 'not-allowed' &&
+  reason !== 'unknown-game' &&
+  // A game that is over is not opened again (step 2.37, part 2), and a tracker that
+  // needs an update is reloaded instead: the server would refuse it again.
+  reason !== 'game-not-live' &&
+  reason !== 'update-needed';
 
 function OpenGame({
   phase,
@@ -604,6 +610,19 @@ function OpenGame({
           <button type="button" className="court-button" onClick={onOpenAgain} disabled={busy}>
             {/* Taken over: opening again shows who has the game, and offers it back. */}
             {t(screen.reason === 'taken-over' ? 'tracker.seeWhoIsScoring' : 'tracker.openAgain')}
+          </button>
+        </p>
+      ) : null}
+      {screen.kind === 'read-only' && screen.reason === 'update-needed' ? (
+        <p>
+          <button
+            type="button"
+            className="court-button"
+            data-kind="main"
+            data-reload=""
+            onClick={() => window.location.reload()}
+          >
+            {t('tracker.readOnly.reload')}
           </button>
         </p>
       ) : null}
