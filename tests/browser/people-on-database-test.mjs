@@ -189,7 +189,9 @@ if (browser !== null) {
     );
 
     await toTeam(page, 'Lakeside Herons');
-    const adding = page.locator('#add-player');
+    // The form that puts someone already in the league on the roster, found by what it is:
+    // the one form with a "Person" list (the new-player form comes first, step 2.194).
+    const adding = page.locator('form').filter({ has: page.getByLabel('Person') });
     await adding.getByLabel('Person').selectOption({ label: 'Jon Smiht' });
     await Promise.all([
       page.waitForURL(/done=added/),
