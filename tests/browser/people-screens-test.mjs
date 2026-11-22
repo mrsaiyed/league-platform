@@ -420,6 +420,24 @@ if (built) {
       'ticked, the second is added, and the list holds two of the name',
       (await main().getByRole('link', { name: 'Leo Fischer', exact: true }).count()) === 2,
     );
+
+    at = 'a 60-letter one-word last name pushes nothing wide at 390';
+    const longName = 'Abcdefghij'.repeat(6);
+    const addLong = page.locator('#add-person');
+    await addLong.getByLabel('First name').fill('Ana');
+    await addLong.getByLabel('Last name').fill(longName);
+    await Promise.all([
+      page.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/),
+      addLong.getByRole('button', { name: 'Add to the league' }).click(),
+    ]);
+    const pageWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
+    note(
+      'her record is no wider than the screen',
+      (await pageWidth()) <= 390,
+      String(await pageWidth()),
+    );
+    await page.goto(`${origin}/north-valley/admin/people?q=abcdefghij`);
+    note('nor is the list that holds her', (await pageWidth()) <= 390, String(await pageWidth()));
     await page.goto(jonAddress);
 
     at = 'an unlikely date of birth is shown back before it is saved (R-28)';
