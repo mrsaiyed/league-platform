@@ -843,6 +843,21 @@
   align-items: center;
   gap: 4px 8px;
 }
+/* The first kept (or not applied) play and its "Enter again" are whole under the notice
+   with no scrolling, on a short phone too (the review by use, M1; measured at 360 x 640
+   and 390 x 844). The notice and the list are set closer, and while a notice is in the
+   pad the Start clock button stands without the sentence under it: the button stays,
+   whole, and the sentence is still read with it (`aria-describedby`). */
+.court-notices-pad .court-stack {
+  gap: 6px;
+}
+.court-notices-pad .court-stack > h2,
+.court-notices-pad .court-kept-list {
+  margin-block: 0;
+}
+.court-pad:has(.court-notices-pad) .court-start-why {
+  display: none;
+}
 .court-notices-pad .court-notice {
   padding-block: 6px;
   padding-inline: 10px;
