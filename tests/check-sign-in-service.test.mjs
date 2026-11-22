@@ -218,6 +218,35 @@ test('a project without leaked-password protection is NOTED, not a difference; a
   }
 });
 
+test('the token’s life allows five minutes for this computer’s clock, and no more', async () => {
+  // The verify answers' expires_at moved, as a clock that is off would see it.
+  const moved = (seconds) => async (call, response) => {
+    if (call.path !== '/auth/v1/verify' || response.status !== 200) return undefined;
+    const body = await response.json();
+    body.expires_at += seconds;
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  for (const [seconds, verdict] of [
+    [-120, words.asExpected],
+    [240, words.asExpected],
+    [-420, words.differed],
+    [420, words.differed],
+  ]) {
+    const served = await serveFake({ reshape: moved(seconds) });
+    try {
+      const { lines, output } = await runAgainst(served, { userCalls: 1, timingTries: 1 });
+      const tokenLine = lineFor(lines, words.checks.tokenLife);
+      assert.ok(tokenLine?.startsWith(`  ${verdict}`), `${seconds} s: ${tokenLine}`);
+      if (verdict === words.differed) assert.ok(tokenLine.includes('verify answered'), output);
+    } finally {
+      await served.close();
+    }
+  }
+});
+
 test('with the fake answering one call in another shape, that line names the call and the run fails', async () => {
   // A renewal answered 200 without its tokens: the adapter cannot read it.
   const served = await serveFake({

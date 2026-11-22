@@ -195,6 +195,8 @@ export const exitCodeFor = ({ differed, removed }) => (differed === 0 && removed
 export const floorRoomMs = 250;
 /** Record 018's settings: a project JWT expiry of 3600 seconds. */
 const tokenSeconds = 3600;
+/** How far this computer's clock may be from the service's when the token's life is judged. */
+const clockRoomSeconds = 300;
 /** A password Supabase's leaked-password check knows. */
 const leakedPassword = 'password1234';
 
@@ -394,10 +396,12 @@ export async function runChecks({
       );
     });
     await check(words.checks.tokenLife, async () => {
+      // The service's expires_at against this computer's clock: five minutes are allowed,
+      // so a clock off by a minute or two gives no false difference.
       const seconds = Math.round(
         (needed(state.first).accessExpiresAt.getTime() - Date.now()) / 1000,
       );
-      if (seconds < tokenSeconds - 120 || seconds > tokenSeconds + 60) {
+      if (Math.abs(seconds - tokenSeconds) > clockRoomSeconds) {
         throw new Differed(words.tokenLifeWas(seconds));
       }
     });

@@ -67,7 +67,8 @@ export const checks = {
   rightCode: 'The right code, after a wrong one, gives a session in the shape we read (018 #1)',
   confirmedCode:
     'A code for that address, now confirmed, is to be checked as magiclink and gives a session (018 #3)',
-  tokenLife: 'An access token lasts 3600 seconds (018’s settings)',
+  tokenLife:
+    'An access token lasts 3600 seconds, five minutes allowed for this computer’s clock (018’s settings)',
   user: 'The user call answers the session’s user, its address confirmed (018 #1)',
   madeUpToken: 'A made-up access token is refused as bad_jwt (018 #1)',
   shortPassword: 'A 7-character password is refused as weak_password, length (018 #1)',
@@ -129,7 +130,8 @@ export const ourOwnFault = (call) => `${call}: the check itself failed, not the 
 export const otherCode = 'another error code';
 export const wrongVerifyType = (type) => `generate_link answered verification_type ${type}`;
 export const codeNotSixDigits = 'generate_link answered a code that is not 6 digits';
-export const tokenLifeWas = (seconds) => `refresh answered an access token lasting ${seconds} s`;
+export const tokenLifeWas = (seconds) =>
+  `verify answered an access token lasting ${seconds} s by this computer’s clock, more than five minutes off 3600`;
 export const otherUser = 'user answered another user than the session’s';
 export const notConfirmed = 'user answered the address as not confirmed';
 export const otherSession = 'refresh answered a token of another session';
