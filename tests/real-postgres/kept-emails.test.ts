@@ -5,13 +5,16 @@
 // (openLeagueMakingTarget's migration login, newestKeptEmail, keptEmailAnswer).
 import {
   connectPostgresDriver,
+  createDatabaseSignInStore,
   keepEmail,
   keepFailureOf,
   newestKeptEmail,
   openLeagueMakingTarget,
 } from '@srleagues/database';
-import { keptEmailAnswer } from '@srleagues/providers';
-import { afterAll, describe, expect, it } from 'vitest';
+import { createSupabaseSignIn, keptEmailAnswer, serveFakeSupabaseAuth } from '@srleagues/providers';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import { onlineEmailSender } from '../../apps/web/src/server/online-email.ts';
+import { createSignInMail } from '../../apps/web/src/server/sign-in/sign-in-mail.ts';
 import { appDatabase, ca, fresh, ownerSession, server } from './server.ts';
 
 const db = appDatabase(2);
@@ -32,6 +35,64 @@ describe('kept emails, as app_login', () => {
       expect(keptEmailAnswer(kept?.text ?? '')).toEqual({ kind: 'code', value: '482913' });
     } finally {
       await opened.target.close();
+    }
+  });
+
+  it('a sign-up code the app kept, read by the owner and typed back in, finishes the sign-up', async () => {
+    // The real sign-in flow: the adapter speaking to the fake Supabase Auth on 127.0.0.1,
+    // the sign-in store and staging's code email both written as app_login.
+    const secretKey = 'sb_secret_fake_for_tests_only';
+    const auth = await serveFakeSupabaseAuth({ secretKey });
+    const notKept: string[] = [];
+    try {
+      const mail = createSignInMail({
+        sender: onlineEmailSender({ appEnv: 'staging' }, { keepEmail, keepFailureOf }, db, (kind) =>
+          notKept.push(kind),
+        ),
+        fromAddress: 'hello@example.test',
+        siteOrigin: 'https://staging.example.test',
+        onNoticeFailed: () => {},
+        now: () => new Date(),
+      });
+      const signIn = createSupabaseSignIn({
+        projectUrl: auth.url,
+        secretKey,
+        fetch: (url, init) => fetch(url, init),
+        store: createDatabaseSignInStore({ db }),
+        codeSender: mail.codeSender,
+        returnOrigins: ['https://staging.example.test'],
+        allowLocalHttp: true,
+      });
+      const email = `founder-${fresh()}@example.test`;
+      const networkAddress = '192.0.2.10';
+      expect((await signIn.startSignUp({ email, networkAddress })).ok).toBe(true);
+      const owner = await ownerSession();
+      let answer: ReturnType<typeof keptEmailAnswer> = null;
+      try {
+        // The code email is handed over without waiting (T-68): read once it is kept.
+        await vi.waitFor(async () => {
+          const kept = await newestKeptEmail(owner, email);
+          answer = keptEmailAnswer(kept?.text ?? '');
+          expect(answer).not.toBeNull();
+        });
+      } finally {
+        await owner.close();
+      }
+      const code = (answer as ReturnType<typeof keptEmailAnswer>)?.value ?? '';
+      expect(code).toBe(auth.codeFor(email));
+      const proved = await signIn.verifyCode({ email, code, networkAddress });
+      if (!proved.ok) expect.fail(`the code was not taken: ${proved.error.code}`);
+      const done = await signIn.setPassword({
+        proof: proved.value.proof,
+        password: 'correct horse battery',
+        device: { deviceId: 'device-laptop-0000000001', label: 'Firefox', networkAddress },
+      });
+      if (!done.ok) expect.fail(`the sign-up did not finish: ${done.error.code}`);
+      expect(done.value.outcome).toBe('account-created');
+      expect(done.value.session.accessToken).toMatch(/\S/);
+      expect(notKept).toEqual([]);
+    } finally {
+      await auth.close();
     }
   });
 
