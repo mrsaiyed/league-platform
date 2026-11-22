@@ -431,8 +431,10 @@ export const tableCss = String.raw`
     min-inline-size: var(--ui-num-col);
   }
   .ui-stats .ui-team-cell {
-    --ui-name-col: calc(
-      var(--ui-name-least) + mod(100cqi - var(--ui-name-least), var(--ui-num-col))
+    /* A table whose columns all fit beside the name gives the name the rest, and fits. */
+    --ui-name-col: max(
+      calc(var(--ui-name-least) + mod(100cqi - var(--ui-name-least), var(--ui-num-col))),
+      calc(100cqi - var(--ui-cols, 0) * var(--ui-num-col))
     );
     inline-size: var(--ui-name-col);
     min-inline-size: var(--ui-name-col);
