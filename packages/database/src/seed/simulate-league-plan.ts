@@ -146,6 +146,30 @@ export function simulationProblem(o: SimulationOptions): string | null {
   return null;
 }
 
+/** The size's names, as the command takes them: `--teams 24 --divisions 4 …`. */
+export const simulationOptionNames = ['teams', 'divisions', 'rounds', 'tracked', 'seed'] as const;
+
+/**
+ * The size in the simulate command's own words (`--teams 24 --divisions 4 --rounds 10
+ * --tracked 6 --seed 7`), each number optional, over `base`; or one plain sentence on what
+ * could not be read. The command and the web app's LOCAL_SIMULATED_LEAGUE both read it here.
+ */
+export function simulationOptionsFrom(
+  args: readonly string[],
+  base: SimulationOptions = simulationDefaults,
+): SimulationOptions | string {
+  const options: Record<(typeof simulationOptionNames)[number], number> = { ...base };
+  for (let k = 0; k < args.length; k += 2) {
+    const name = simulationOptionNames.find((n) => `--${n}` === args[k]);
+    const value = Number(args[k + 1]);
+    if (name === undefined || args[k + 1] === undefined || !Number.isFinite(value)) {
+      return `Not understood: ${args.slice(k, k + 2).join(' ')}. Use ${simulationOptionNames.map((n) => `--${n} <number>`).join(' ')}.`;
+    }
+    options[name] = value;
+  }
+  return simulationProblem(options) ?? options;
+}
+
 /** A small seeded generator (mulberry32): the same seed, the same numbers. */
 function generator(seed: number): () => number {
   let state = (seed * 2654435761) >>> 0;

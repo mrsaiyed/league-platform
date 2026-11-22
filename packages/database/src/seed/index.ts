@@ -21,8 +21,10 @@ export {
 export {
   planSimulation,
   simulationDefaults,
+  simulationOptionNames,
+  simulationOptionsFrom,
   simulationProblem,
   type SimulationOptions,
   type SimulationPlan,
 } from './simulate-league-plan.ts';
-export { simulateLeagueInto, type PlayedLeague } from './simulate-league.ts';
+export { simulateLeagueInto, simulatedOwner, type PlayedLeague } from './simulate-league.ts';

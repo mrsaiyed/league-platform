@@ -13,30 +13,14 @@ import { applyMigrations, pgliteDriver } from '../src/migrations/index.ts';
 import {
   checkSimulatedLeague,
   simulateLeagueInto,
-  simulationDefaults,
-  simulationProblem,
+  simulationOptionsFrom,
   simulationReportLines,
-  type SimulationOptions,
 } from '../src/seed/index.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const folder = path.join(root, '.local', 'simulate-db');
-const names = ['teams', 'divisions', 'rounds', 'tracked', 'seed'] as const;
 
-function optionsFrom(args: readonly string[]): SimulationOptions | string {
-  const options: Record<(typeof names)[number], number> = { ...simulationDefaults };
-  for (let k = 0; k < args.length; k += 2) {
-    const name = names.find((n) => `--${n}` === args[k]);
-    const value = Number(args[k + 1]);
-    if (name === undefined || args[k + 1] === undefined || !Number.isFinite(value)) {
-      return `Not understood: ${args.slice(k, k + 2).join(' ')}. Use ${names.map((n) => `--${n} <number>`).join(' ')}.`;
-    }
-    options[name] = value;
-  }
-  return simulationProblem(options) ?? options;
-}
-
-const options = optionsFrom(process.argv.slice(2));
+const options = simulationOptionsFrom(process.argv.slice(2));
 if (typeof options === 'string') {
   console.error(options);
   process.exit(1);

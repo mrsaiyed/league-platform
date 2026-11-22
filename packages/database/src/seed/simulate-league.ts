@@ -129,6 +129,15 @@ export type PlayedLeague = {
   readonly moves: { readonly count: number; readonly firstMs: number; readonly lastMs: number };
 };
 
+/**
+ * The made-up person who owns the simulated league and acts for it: publishes its schedule,
+ * types its scores, scores its tracked games. Locally, "Be a made-up person" signs in as them.
+ */
+export const simulatedOwner = {
+  email: 'owner@simulated.example.test',
+  displayName: 'Sim Owner',
+} as const;
+
 /** The device the simulation scores on, as a scoring session names it. */
 const simulatorDevice = 'simulator-tracker';
 
@@ -257,7 +266,7 @@ export async function simulateLeagueInto(
       .at(-1) ?? '2025-11-07';
   const at = Date.parse(`${lastDay}T18:00:00Z`) + 86_400_000;
   const staffId = await accountId(pglite, seedStaff.email, seedStaff.displayName);
-  const ownerId = await accountId(pglite, 'owner@simulated.example.test', 'Sim Owner');
+  const ownerId = await accountId(pglite, simulatedOwner.email, simulatedOwner.displayName);
   const leagueId = (await pglite.query<{ id: string }>('select uuid_v7() as id')).rows[0]!.id;
   const db = createDatabase({ kind: 'pglite', pglite });
   try {
