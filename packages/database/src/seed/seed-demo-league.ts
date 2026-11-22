@@ -396,14 +396,15 @@ export async function seedDemoLeagueInto(
 /**
  * The file's weeks as the schedule's rounds: one round for each, on its day, and every game
  * moved into its week, each a change to the schedule draft, as the schedule builder makes
- * them (the import itself keeps no round yet, step 2.166).
+ * them (the import itself keeps no round yet, step 2.166). The simulated league
+ * (simulate-league.ts, step 2.236) puts its games in rounds the same way.
  */
-async function putInRounds(
+export async function putInRounds<Tx extends SchedulingTx>(
   pglite: PGlite,
   as: CommandContext,
   seasonId: string,
   fixtures: readonly DraftFixture[],
-  deps: CommandDeps<DemoTx>,
+  deps: CommandDeps<Tx>,
 ): Promise<void> {
   const teamIds = new Map(
     (

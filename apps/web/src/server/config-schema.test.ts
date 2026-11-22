@@ -19,6 +19,7 @@ const valid: Record<ConfigName, string> = {
   LOCAL_BINNED_TEAM: 'badgers',
   LOCAL_DATA: 'stand-in',
   LOCAL_DEMO_LEAGUE: 'off',
+  LOCAL_SIMULATED_LEAGUE: 'off',
   LOCAL_DESIGN: 'crest-light',
   LOCAL_NOW: '2026-11-15T20:01:00Z',
   SESSION_SECRET: longValue('SESSION_SECRET'),
@@ -39,6 +40,7 @@ const hosted = {
   LOCAL_BINNED_TEAM: undefined,
   LOCAL_DATA: undefined,
   LOCAL_DEMO_LEAGUE: undefined,
+  LOCAL_SIMULATED_LEAGUE: undefined,
   LOCAL_DESIGN: undefined,
   LOCAL_NOW: undefined,
 };
@@ -310,6 +312,39 @@ describe('loadConfig', () => {
       expect(failure({ ...production, APP_ENV: appEnv, LOCAL_DEMO_LEAGUE: 'off' }).invalid).toEqual(
         ['LOCAL_DEMO_LEAGUE: invalid, may be set only when APP_ENV is local or test'],
       );
+    }
+  });
+
+  it('takes LOCAL_SIMULATED_LEAGUE in local work and tests only, with the made-up database (step 2.236)', () => {
+    const onDatabase = { ...localOnly, LOCAL_DATA: 'made-up-database' };
+    expect(loadConfig(onDatabase).LOCAL_SIMULATED_LEAGUE).toBeUndefined();
+    const size = '--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7';
+    expect(loadConfig({ ...localOnly, LOCAL_SIMULATED_LEAGUE: 'off' }).LOCAL_SIMULATED_LEAGUE).toBe(
+      'off',
+    );
+    for (const value of ['on', size, '--teams 12', `  ${size} `]) {
+      expect(
+        loadConfig({ ...onDatabase, APP_ENV: 'test', LOCAL_SIMULATED_LEAGUE: value })
+          .LOCAL_SIMULATED_LEAGUE,
+      ).toBe(value.trim());
+    }
+    // With the demo-shaped league too: both leagues are made.
+    expect(
+      loadConfig({ ...onDatabase, LOCAL_DEMO_LEAGUE: 'on', LOCAL_SIMULATED_LEAGUE: 'on' }),
+    ).toMatchObject({ LOCAL_DEMO_LEAGUE: 'on', LOCAL_SIMULATED_LEAGUE: 'on' });
+    // A value that cannot be read: one sentence, with a right example.
+    for (const value of ['yes', '24 teams', '--teams', '--players 5', '--teams twelve']) {
+      expect(failure({ ...onDatabase, LOCAL_SIMULATED_LEAGUE: value }).invalid).toEqual([
+        'LOCAL_SIMULATED_LEAGUE: invalid, must be on, or the size in the simulate command\'s words, for example LOCAL_SIMULATED_LEAGUE="--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7"',
+      ]);
+    }
+    expect(failure({ ...localOnly, LOCAL_SIMULATED_LEAGUE: 'on' }).invalid).toEqual([
+      'LOCAL_SIMULATED_LEAGUE: invalid, the simulated league is played into the made-up database only, so it may be set only with LOCAL_DATA=made-up-database',
+    ]);
+    for (const appEnv of ['staging', 'production']) {
+      expect(
+        failure({ ...production, APP_ENV: appEnv, LOCAL_SIMULATED_LEAGUE: 'on' }).invalid,
+      ).toEqual(['LOCAL_SIMULATED_LEAGUE: invalid, may be set only when APP_ENV is local or test']);
     }
   });
 

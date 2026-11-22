@@ -86,7 +86,10 @@ export const enSite = {
   // In place of "Games to play" once a season has none left.
   'home.number.scored': 'Points scored',
   'home.number.teams': 'Teams',
-  'home.number.toPlay': 'Games to play',
+  // Under the number of games still to play: "1" over "Game to play", "12" over "Games to
+  // play". For translators: the number is drawn above the words, so neither form has {count}.
+  'home.number.toPlay_one': 'Game to play',
+  'home.number.toPlay_other': 'Games to play',
   'home.numbers': 'The season in numbers',
   'home.recentResults': 'Recent results',
   // Over "Recent results": the list opens with decided games and may end with one whose
@@ -98,6 +101,9 @@ export const enSite = {
   'home.standingsEmpty': 'The standings appear here once games have been played.',
   'home.upcoming': 'The next matchups',
   'home.upcoming.kicker': 'On the schedule',
+  // In place of "The next matchups" when every game the section lists is postponed (a season
+  // whose other games are all played): they are waiting for a new date, not coming up.
+  'home.upcoming.postponed': 'Waiting for a new date',
   // Under the home page's tables when a note there is shortened (step 2.198, fix round).
   'home.whyThisOrder': 'Why this order? See the full standings',
   'nav.home': 'Home',

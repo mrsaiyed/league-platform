@@ -22,7 +22,11 @@ const origin = 'http://127.0.0.1:3000';
 /** The scratch folders this file made in the system's temp folder: removed after each test. */
 const made: string[] = [];
 afterEach(() => {
-  for (const folder of made.splice(0)) rmSync(folder, { recursive: true, force: true });
+  // An email still being kept as the test ends can leave the folder not yet empty on a busy
+  // machine (GitHub, 2026-11-22): the removal tries again instead of failing the test.
+  for (const folder of made.splice(0)) {
+    rmSync(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
 });
 const options = (log: (line: unknown) => void = () => {}) => {
   const folder = mkdtempSync(path.join(os.tmpdir(), 'be-made-up-'));

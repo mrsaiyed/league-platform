@@ -6,4 +6,11 @@ export { GameList, scoringAddressOf } from './schedule-views.tsx';
 export { GameOffer } from './score-game-button.tsx';
 export { offersAskedAtOnce, type ScoringOfferReply } from './scoring-offers.ts';
 export { LatestResults } from './latest-results.tsx';
-export { comingOrder, gameView, placeOf, type GameView } from './build-schedule.ts';
+export {
+  buildHomeGames,
+  buildScheduleView,
+  comingOrder,
+  gameView,
+  placeOf,
+  type GameView,
+} from './build-schedule.ts';
