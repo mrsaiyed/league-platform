@@ -430,6 +430,50 @@ describe('tracker controller: Reopen (step 2.120; the review of the two doors, p
     expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 2 });
   });
 
+  it('a device showing the game final keeps asking: reopened and scored elsewhere, it shows the game live and who is scoring (T-295)', async () => {
+    const network = endpointNetwork();
+    const tablet = await ended(network);
+    const phone = device(network, 'scorekeeper', createMemoryQueueStorage(), 'phone-1');
+    await phone.controller.start();
+    await phone.controller.idle();
+    expect(phone.controller.status().game?.status).toBe('final');
+    expect(await tablet.controller.reopen('End game tapped by mistake')).toEqual({ ok: true });
+    await tapAll(tablet, [basket('home')]);
+    await tablet.controller.idle();
+    // Not yet asked: the phone still shows what it read.
+    await phone.clock.advance(14_000);
+    await phone.controller.idle();
+    expect(phone.controller.status().game?.status).toBe('final');
+    await phone.clock.advance(1_000);
+    await phone.controller.idle();
+    const status = phone.controller.status();
+    expect(status.mode.kind).toBe('held-by-other');
+    expect(status.game?.status).toBe('live');
+    expect(scoreOf(status.game)).toEqual({ home: 4, away: 0 });
+  });
+
+  it('a device showing the game final shows the new final score, and asks at once when shown again (T-295)', async () => {
+    const network = endpointNetwork();
+    const tablet = await ended(network);
+    const phone = device(network, 'scorekeeper', createMemoryQueueStorage(), 'phone-1');
+    await phone.controller.start();
+    await phone.controller.idle();
+    phone.controller.hidden();
+    expect(await tablet.controller.reopen('End game tapped by mistake')).toEqual({ ok: true });
+    await tapAll(tablet, [basket('home', 3), { type: 'end' }]);
+    await tablet.controller.idle();
+    // Hidden, it does not ask.
+    await phone.clock.advance(30_000);
+    await phone.controller.idle();
+    expect(scoreOf(phone.controller.status().game)).toEqual({ home: 2, away: 0 });
+    phone.controller.awake();
+    await phone.controller.idle();
+    const status = phone.controller.status();
+    expect(status.mode).toEqual({ kind: 'read-only', reason: 'game-not-live' });
+    expect(status.game?.status).toBe('final');
+    expect(scoreOf(status.game)).toEqual({ home: 5, away: 0 });
+  });
+
   it('reopened after the device was told the game is over, it scores again with no reload', async () => {
     const network = endpointNetwork();
     const tablet = await ended(network);

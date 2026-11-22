@@ -386,6 +386,12 @@ const reasonOfHalt = (halt: QueueHalt): ReadOnlyReason | 'check-session' => {
  */
 export const offlineLongMs = 5 * 60_000;
 
+/**
+ * How often a device showing a final game asks whether it still is, while its page is
+ * shown (T-295): another device may have reopened it and scored, or ended it again.
+ */
+export const finalCheckMs = 15_000;
+
 /** The reasons that mean another device may be scoring the game now. */
 const lostTheGame: ReadonlySet<ReadOnlyReason> = new Set([
   'taken-over',
@@ -731,6 +737,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     stopScoring();
     update({ mode: { kind: 'read-only', reason }, signedOut: false });
     if (gameWasLost || losesTheGame(reason, hadGame)) await lost();
+    // Shown final: asked about again, as another device may reopen it (T-295).
+    scheduleFinalCheck();
   };
 
   /** Signed out while scoring (finding M4): keep scoring, hold the taps, keep the session. */
@@ -1156,6 +1164,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // Waiting to ask again: ask now.
     askAgainNow();
     if (sessionId !== null) void track(renew());
+    // Shown final: is it still? Asked now, not at the next look (T-295).
+    if (showsFinal()) void track(checkFinal());
   };
 
   /** True once the queue has read what the device holds. */
@@ -1220,6 +1230,55 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const reply = opened.value;
     if (reply.status !== 'held-by-you') return notHeld(reply);
     return hold(reply.sessionId);
+  };
+
+  // --- A game shown final is asked about again (T-295, the review by use's H1). ---
+
+  /**
+   * Shows the game as over: read-only because the server has it decided. Another device
+   * may reopen it and score, or end it again with another score, so the device asks.
+   */
+  const showsFinal = (): boolean =>
+    current.mode.kind === 'read-only' && current.mode.reason === 'game-not-live';
+  let cancelFinalCheck: (() => void) | null = null;
+  let checkingFinal = false;
+
+  /** The next look in `finalCheckMs`, while the game is shown final and the page is shown. */
+  const scheduleFinalCheck = (): void => {
+    cancelFinalCheck?.();
+    cancelFinalCheck = null;
+    if (stopped || pageHidden || !showsFinal()) return;
+    cancelFinalCheck = clock.after(finalCheckMs, () => {
+      cancelFinalCheck = null;
+      void track(checkFinal());
+    });
+  };
+
+  /**
+   * Reads the game as the server has it (a plain read: no session is asked for, no row
+   * is held). Still final: the score shown is the server's. Live again: the device does
+   * what opening it does, so it shows who is scoring, as a device that does not hold
+   * the game does. No answer: the screen stays and the next look asks again.
+   */
+  const checkFinal = async (): Promise<void> => {
+    if (stopped || checkingFinal || !showsFinal()) return;
+    checkingFinal = true;
+    try {
+      const loaded = await ask((signal) => server.loadState(signal));
+      if (loaded.kind !== 'answer' || stopped || !showsFinal()) return;
+      if (loaded.value.state.status === 'live') {
+        await carryOn();
+        return;
+      }
+      if (base === null || loaded.value.sequence !== base.sequence) {
+        base = loaded.value;
+        made = [];
+        showGame();
+      }
+    } finally {
+      checkingFinal = false;
+      scheduleFinalCheck();
+    }
   };
 
   /** Goes through a door: one at a time, with no tap taken meanwhile. */
@@ -1393,6 +1452,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       pageHidden = true;
       cancelRenew?.();
       cancelRenew = null;
+      cancelFinalCheck?.();
+      cancelFinalCheck = null;
     },
 
     takeBackEnd() {
@@ -1536,6 +1597,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       cancelRenew = null;
       cancelOfflineLong?.();
       cancelOfflineLong = null;
+      cancelFinalCheck?.();
+      cancelFinalCheck = null;
       const held = sessionId;
       sessionId = null;
       queue.stop();
