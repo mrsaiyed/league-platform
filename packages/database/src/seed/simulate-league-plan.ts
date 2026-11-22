@@ -146,6 +146,15 @@ export function simulationProblem(o: SimulationOptions): string | null {
   return null;
 }
 
+/**
+ * The made-up person who owns the simulated league and acts for it: publishes its schedule,
+ * types its scores, scores its tracked games. Locally, "Be a made-up person" signs in as them.
+ */
+export const simulatedOwner = {
+  email: 'owner@simulated.example.test',
+  displayName: 'Sim Owner',
+} as const;
+
 /** The size's names, as the command takes them: `--teams 24 --divisions 4 …`. */
 export const simulationOptionNames = ['teams', 'divisions', 'rounds', 'tracked', 'seed'] as const;
 

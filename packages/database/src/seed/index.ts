@@ -20,6 +20,7 @@ export {
 } from './simulate-league-check.ts';
 export {
   planSimulation,
+  simulatedOwner,
   simulationDefaults,
   simulationOptionNames,
   simulationOptionsFrom,
@@ -27,4 +28,4 @@ export {
   type SimulationOptions,
   type SimulationPlan,
 } from './simulate-league-plan.ts';
-export { simulateLeagueInto, simulatedOwner, type PlayedLeague } from './simulate-league.ts';
+export { simulateLeagueInto, type PlayedLeague } from './simulate-league.ts';
