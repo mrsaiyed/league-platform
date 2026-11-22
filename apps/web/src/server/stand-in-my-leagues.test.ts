@@ -30,9 +30,7 @@ describe('the stand-in leagues of an account', () => {
   });
 
   it('gives each person only their own leagues (account A never sees account B’s)', async () => {
-    expect(await slugsOf(standInPeople.otherAdmin.accountId)).toEqual([
-      standInLeagues.otherDraft.slug,
-    ]);
+    expect(await slugsOf(standInPeople.otherAdmin.accountId)).toEqual([standInLeagues.empty.slug]);
     expect(await slugsOf(standInPeople.stranger.accountId)).toEqual([]);
     // The coach holds a role in two leagues, and is the person on a team of each seeded
     // league in the one world's rows (step 2.152): Harbor City by that roster place alone.

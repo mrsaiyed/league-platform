@@ -6,6 +6,9 @@
 export const enAdminTeams = {
   'adminTeams.add.choose': 'Choose a person',
   'adminTeams.add.noOne': 'Everyone in the league list is already on this roster.',
+  // Step 2.157: for a role that may not read the league's list of people (a club admin).
+  'adminTeams.add.notAllowed':
+    "Your role in this league does not include its list of people, so no one can be chosen from it here. If it should, ask the league's owner or an admin.",
   'adminTeams.add.number': 'Jersey number (0 to 99, or 00)',
   'adminTeams.add.person': 'Person',
   'adminTeams.add.readFailed':
@@ -57,6 +60,9 @@ export const enAdminTeams = {
   'adminTeams.ownColors': "The league's own colors",
   'adminTeams.people.body':
     'Taking someone off the list is refused while they are on a roster: mark them as having left first. A place on a team that was moved to the bin does not count.',
+  // Step 2.157: for a role that may not read the league's list of people (a club admin).
+  'adminTeams.people.notAllowed':
+    'Your role in this league does not include its list of people, so it is not shown here.',
   'adminTeams.people.readFailed':
     'The league list could not be read just now, so it is not shown. Reload the page to try again.',
   'adminTeams.people.remove': 'Remove from the league list',
@@ -64,8 +70,35 @@ export const enAdminTeams = {
   // A person's name as the Teams screens show it; a language may put the parts the other way.
   'adminTeams.personName': '{firstName} {lastName}',
   // Until step 2.77 gives the bin a screen, nothing here promises a way back (step 2.161).
+  // A-17: only a team with no games, played or without a result, goes to the bin. The team
+  // is "it" throughout the panel, as in step 2.161's "its roster".
   'adminTeams.remove.body':
-    'The team is moved to the bin. Its games and numbers are kept. It is kept for 30 days; the screen to bring it back is not ready yet.',
+    'A team with no games, played or waiting for a result, can be moved to the bin. It is kept for 30 days; the screen to bring it back is not ready yet.',
+  'adminTeams.remove.cannot':
+    '{name} cannot be removed this season: its results are part of other teams’ records.',
+  'adminTeams.remove.gamesUnknown':
+    'How many games the team has could not be read just now. Reload the page to try again.',
+  // Published games the draft removes: they hold the team until the draft is published.
+  'adminTeams.remove.inDraft_one':
+    '{count} of them is removed in the draft, which is not published yet: publish the schedule to finish.',
+  'adminTeams.remove.inDraft_other':
+    '{count} of them are removed in the draft, which is not published yet: publish the schedule to finish.',
+  // Advice for a team with results that has left: never a way to remove it.
+  'adminTeams.remove.leftAdvice':
+    'If the team has left the league, record this week’s games as forfeited in Games, and remove its later games from the schedule in Schedule. Either way the team stays, with the games it played.',
+  'adminTeams.remove.noDay': 'no day yet',
+  'adminTeams.remove.notYet': '{name} cannot be removed yet: it has games without a result.',
+  'adminTeams.remove.notYetWay':
+    'Remove them from the schedule in Schedule, or cancel this week’s in Games. Do not record them as forfeited: a forfeit is a result, and a team with a result cannot be removed.',
+  'adminTeams.remove.openNone': 'It has no game without a result.',
+  // "{which}": up to three games, each adminTeams.remove.roundDay, joined by "; ".
+  'adminTeams.remove.openWhich_one': 'It has {count} game without a result yet: {which}.',
+  'adminTeams.remove.openWhich_other': 'It has {count} games without a result yet: {which}.',
+  'adminTeams.remove.open_one': 'It has {count} game without a result yet.',
+  'adminTeams.remove.open_other': 'It has {count} games without a result yet.',
+  'adminTeams.remove.playedNone': 'This team has played no games.',
+  'adminTeams.remove.played_one': 'This team has played {count} game.',
+  'adminTeams.remove.played_other': 'This team has played {count} games.',
   'adminTeams.remove.rosterNone': 'Nobody is on its roster now.',
   'adminTeams.remove.rosterUnknown':
     'The roster could not be read just now, so how many people are on it is not shown.',
@@ -73,8 +106,12 @@ export const enAdminTeams = {
     '{count} person is on its roster now. Once the team is removed, they can be taken off the league list.',
   'adminTeams.remove.roster_other':
     '{count} people are on its roster now. Once the team is removed, they can be taken off the league list.',
+  'adminTeams.remove.roundDay': 'Round {round}, {day}',
   'adminTeams.remove.submit': 'Move the team to the bin',
   'adminTeams.remove.title': 'Remove this team',
+  'adminTeams.remove.toGames': 'Go to Games',
+  'adminTeams.remove.toPublish': 'Go to publishing',
+  'adminTeams.remove.toSchedule': 'Go to Schedule',
   'adminTeams.roster.backAlready':
     'They are on this roster again, so there is nothing to put back.',
   'adminTeams.roster.leftLine': '{name}, left on {date}',

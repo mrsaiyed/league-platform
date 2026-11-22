@@ -1,7 +1,8 @@
 // Adds a game to the season's schedule draft (P7 §4.3). The game's id is the caller's, so
 // a retried request cannot add it twice; a game added by hand is scheduled and follows the
 // season's rules for how it is recorded unless the edit says otherwise. Clashes it causes
-// are flagged in the result, not refused.
+// are flagged in the result, not refused. The id of a published game is refused: that game
+// comes back by putBackDraftGame.
 import { z } from 'zod';
 import { defineCommand, type Result } from '../../../command/index.ts';
 import { gameRecording } from '../draft-document.ts';
@@ -54,7 +55,13 @@ export const addDraftGame = defineCommand({
           status: 'scheduled',
         },
       },
-      check: async () => {
+      check: async (_sofar, published) => {
+        // A game of the published schedule comes back only by "Put it back" (step 2.185):
+        // under its own id with other teams, the draft would count a change publishing
+        // never makes (publishing moves a game, it never changes its teams).
+        if (published.games.some((g) => g.id === input.gameId)) {
+          return { code: 'change-refused', reason: { code: 'game-exists', gameId: input.gameId } };
+        }
         const wanted = new Set([input.homeTeamId, input.awayTeamId]);
         const found = await tx.scheduling.teamsOfSeason(input.seasonId, [...wanted]);
         if (found.length !== wanted.size) return { code: 'unknown-team' };

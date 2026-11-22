@@ -194,7 +194,7 @@ describe('the empty league to start from (step 2.192)', () => {
       courts: 1,
       audience: 'youth',
     });
-    for (const slug of ['closed-gate', 'binned-league']) {
+    for (const slug of ['closed-gate', 'binned-league', 'reed-marsh']) {
       expect(counts(slug), slug).toEqual({
         ...full(0, false),
         teams: 0,
@@ -217,6 +217,7 @@ describe('the empty league to start from (step 2.192)', () => {
         'still-waters',
         'closed-gate',
         'binned-league',
+        'reed-marsh',
       ].sort(),
     );
   });

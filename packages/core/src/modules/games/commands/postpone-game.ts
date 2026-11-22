@@ -31,7 +31,13 @@ export const postponeGame = defineCommand({
     if (game.status !== 'scheduled') return fail({ code: 'game-not-postponable' });
     const updated = await tx.games.setResult(
       game.id,
-      { status: 'postponed', homeScore: null, awayScore: null, decided: false },
+      {
+        status: 'postponed',
+        homeScore: null,
+        awayScore: null,
+        decided: false,
+        overtimePeriods: null,
+      },
       input.version,
     );
     if (updated === undefined) return fail({ code: 'changed-since-read' });

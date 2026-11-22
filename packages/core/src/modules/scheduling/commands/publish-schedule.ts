@@ -102,7 +102,10 @@ export const publishSchedule = defineCommand({
       if (!updated) return fail({ code: 'round-cannot-be-updated' });
     }
 
-    await store.insertPublishedGames(input.seasonId, plan.newGames);
+    // A game id another league's game has already is found only here (no query reaches
+    // another league): a plain refusal, and everything is rolled back.
+    const made = await store.insertPublishedGames(input.seasonId, plan.newGames);
+    if (made !== plan.newGames.length) return fail({ code: 'game-id-taken' });
 
     for (const id of new Set([...summary.gamesMoved, ...summary.gamesRecordingChanged])) {
       const game = after.get(id);

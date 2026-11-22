@@ -14,6 +14,8 @@ export type GameRowView = {
   readonly awayName: string;
   readonly homeScore: number | null;
   readonly awayScore: number | null;
+  /** A final game's overtime periods (P7 §5.6), for its card's pill; null when none is known. */
+  readonly overtimePeriods: number | null;
   readonly startsAt: string | null;
   readonly scorekeepers: readonly string[];
   /**
@@ -80,6 +82,7 @@ export function buildGameRows(
       awayName: names.teams[game.awayTeamId] ?? '',
       homeScore: game.homeScore,
       awayScore: game.awayScore,
+      overtimePeriods: game.overtimePeriods,
       startsAt: game.startsAt,
       scorekeepers: names.scorekeepers[game.id] ?? [],
       hasPlays: game.hasPlays,

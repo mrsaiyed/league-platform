@@ -83,6 +83,7 @@ import {
 } from './modules/leagues/index.ts';
 import {
   createPerson,
+  getPerson,
   listPeople,
   removePerson,
   setNameRequest,
@@ -100,6 +101,7 @@ import {
   moveDraftGame,
   previewSchedulePublish,
   publishSchedule,
+  putBackDraftGame,
   removeCourt,
   removeDraftGame,
   removeDraftRound,
@@ -116,6 +118,7 @@ import { addAdjustment, rebuildStandings, removeAdjustment } from './modules/sta
 import {
   addToRoster,
   changeRosterEntry,
+  countTeamGames,
   createTeam,
   listRoster,
   markLeft,
@@ -140,6 +143,7 @@ export const commands = commandRegistry([
   changeDraftRoundDate,
   changeRosterEntry,
   clearSetting,
+  countTeamGames,
   createCourt,
   createDivision,
   createLeague,
@@ -152,6 +156,7 @@ export const commands = commandRegistry([
   endTrackedGame,
   getBoxScoreSheet,
   getFixtureImport,
+  getPerson,
   getScheduleDraft,
   getSeason,
   invite,
@@ -177,6 +182,7 @@ export const commands = commandRegistry([
   previewSeasonRules,
   publishSchedule,
   publishSiteDesign,
+  putBackDraftGame,
   putBackOnRoster,
   putGameBack,
   readReopenOffer,

@@ -122,6 +122,7 @@ const rosters: DeviceRosters = {
     players: [player('a12', '12', '', ''), player('a7', '7', 'Sol', 'Bearsley')],
   },
   uniqueJerseys: false,
+  allowTies: false,
 };
 
 describe('the engine’s refusals in the tracker’s words', () => {

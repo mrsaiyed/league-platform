@@ -369,7 +369,7 @@ if (browser) {
       const visitorText = await page.locator('main').innerText();
       note(
         'a visitor sees no league at all, none in draft',
-        !/Quiet Pines|quiet-pines|North Valley|Harbor City|Still Waters|still-waters/.test(
+        !/Quiet Pines|quiet-pines|North Valley|Harbor City|Still Waters|still-waters|Reed Marsh|reed-marsh/.test(
           visitorText,
         ),
         visitorText,

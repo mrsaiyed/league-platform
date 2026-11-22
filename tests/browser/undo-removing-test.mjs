@@ -287,7 +287,7 @@ if (built) {
         (await game.getByRole('button', { name: 'Save game' }).getAttribute('data-kind')) ===
           'main',
     );
-    await tap(remove, /saved=game-removed/);
+    await tap(remove, /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/);
     const removedAddress = page.url();
     const answer = page.locator('#saved');
     const answerText = (await answer.count()) === 1 ? await answer.innerText() : '';
@@ -307,7 +307,7 @@ if (built) {
     await accessible('a game removed from the draft');
 
     at = 'the game is put back in one tap';
-    await tap(putBack, /saved=game-put-back/);
+    await tap(putBack, /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/);
     const again = page.locator(`li[data-game="${gameId}"]`);
     note('the game is back', (await again.count()) === 1);
     note(
@@ -319,7 +319,9 @@ if (built) {
     note(
       'publishing would change nothing for it',
       summaryBefore === ''
-        ? summaryAfter.startsWith('Publishing will add 0, move 0, remove 0, and change how 0')
+        ? // Since step 2.185 the box says it in one sentence, not a row of zeros.
+          summaryAfter ===
+            'The draft is the same as the published schedule, so there is nothing to publish.'
         : summaryAfter === summaryBefore,
       summaryAfter,
     );
@@ -328,7 +330,7 @@ if (built) {
       'the top line counts what publishing would change, as the publish box does',
       summaryBefore !== '' ||
         ((await count1.getAttribute('data-draft-count')) === '0' &&
-          (await count1.innerText()).includes('changes nothing')),
+          (await count1.innerText()).includes('The draft is the same as the published schedule.')),
       await count1.innerText(),
     );
     note(
@@ -338,12 +340,17 @@ if (built) {
     await accessible('a game put back');
 
     at = 'the old address of the removal is opened again';
+    // The answer never rode in the address (step 2.185): it says nothing old, the game is
+    // in its place, and nothing offers to put it back. The address is the one the put back
+    // answered at, so going to it is only a jump to its #saved: it is loaded again.
     await page.goto(removedAddress);
+    await page.reload();
     const reloaded = page.locator('#saved');
     const reloadedText = (await reloaded.count()) === 1 ? await reloaded.innerText() : '';
     note(
-      'an old address says truthfully the game is back, and offers nothing',
-      reloadedText.startsWith(`Put back in the draft: ${name}`) &&
+      'an old address says nothing old, and offers nothing',
+      reloadedText === '' &&
+        (await page.locator(`li[data-game="${gameId}"]`).count()) === 1 &&
         (await page.getByRole('button', { name: 'Put it back' }).count()) === 0,
       reloadedText,
     );

@@ -4,6 +4,7 @@
 // and a division refusing removal while teams are in it. Isolation cases are in ../isolation.
 import type { PGlite } from '@electric-sql/pglite';
 import {
+  countTeamGames,
   createDivision,
   createTeam,
   removeDivision,
@@ -23,7 +24,11 @@ import {
   freshSchema,
   newAccount,
   newLeague,
+  newGame,
+  newRound,
   newSeason,
+  newStage,
+  newTeam,
   one,
 } from '../schema/schema.test-helper.ts';
 import { accessStore } from './access-store.ts';
@@ -180,6 +185,117 @@ describe('teams', () => {
     });
     value(await removeTeam(l.as, { teamId }, deps));
     value(await removeDivision(l.as, { divisionId }, leaguesDeps));
+  });
+});
+
+describe('a team with games stays out of the bin (A-17)', () => {
+  /** A league's two teams and a stage, and a game between them in a state. */
+  async function twoTeams() {
+    const l = await league();
+    const stageId = await newStage(pglite, l.leagueId, l.seasonId);
+    const a = await newTeam(pglite, l.leagueId, l.seasonId, { slug: 'a', name: 'A' });
+    const b = await newTeam(pglite, l.leagueId, l.seasonId, { slug: 'b', name: 'B' });
+    const game = (status: string, home = a, away = b, columns: Record<string, unknown> = {}) =>
+      newGame(pglite, {
+        leagueId: l.leagueId,
+        seasonId: l.seasonId,
+        stageId,
+        homeTeamId: home,
+        awayTeamId: away,
+        columns: {
+          status,
+          ...(status === 'final' || status === 'forfeit'
+            ? { home_score: 50, away_score: 40, finalized_at: new Date().toISOString() }
+            : {}),
+          ...columns,
+        },
+      });
+    return { ...l, a, b, game };
+  }
+  const binned = async (teamId: string) => (await teamRow(teamId)).deleted_at !== null;
+
+  it('counts the games to play and the results, leaving out cancelled ones and the bin', async () => {
+    const l = await twoTeams();
+    const roundId = await newRound(pglite, l.leagueId, l.seasonId, 4);
+    // A day in the league's own zone and the round's number; a game with neither last.
+    await l.game('scheduled', l.a, l.b, { starts_at: '2026-12-06T18:00:00Z', round_id: roundId });
+    await l.game('postponed', l.b, l.a);
+    await l.game('final');
+    await l.game('cancelled');
+    await l.game('scheduled', l.a, l.b, { deleted_at: new Date().toISOString() });
+    expect(await countTeamGames(l.as, { teamId: l.a }, deps)).toEqual({
+      ok: true,
+      value: {
+        played: 1,
+        toPlay: 2,
+        removedInDraft: 0,
+        which: [
+          { date: '2026-12-06', round: 4 },
+          { date: null, round: null },
+        ],
+      },
+    });
+  });
+
+  it('refuses a team with a game still to play, and names how many', async () => {
+    const l = await twoTeams();
+    await l.game('scheduled');
+    await l.game('postponed', l.b, l.a);
+    expect(await removeTeam(l.as, { teamId: l.a }, deps)).toEqual({
+      ok: false,
+      error: { code: 'team-has-games-to-play', toPlay: 2 },
+    });
+    expect(await binned(l.a)).toBe(false);
+  });
+
+  it("refuses a team whose game to come is only in its season's schedule draft", async () => {
+    const l = await twoTeams();
+    const changes = {
+      version: 1,
+      changes: [
+        {
+          kind: 'add-game',
+          game: {
+            id: 'draft-game-1',
+            roundId: null,
+            date: '2026-12-01',
+            time: null,
+            venueId: null,
+            court: null,
+            homeTeamId: l.b,
+            awayTeamId: l.a,
+            status: 'scheduled',
+          },
+        },
+      ],
+    };
+    await pglite.query(
+      'insert into schedule_drafts (league_id, season_id, changes) values ($1, $2, $3)',
+      [l.leagueId, l.seasonId, JSON.stringify(changes)],
+    );
+    expect(await removeTeam(l.as, { teamId: l.a }, deps)).toEqual({
+      ok: false,
+      error: { code: 'team-has-games-to-play', toPlay: 1 },
+    });
+    expect(await binned(l.a)).toBe(false);
+  });
+
+  it('refuses a team with a final or forfeited result', async () => {
+    const l = await twoTeams();
+    await l.game('final');
+    await l.game('forfeit', l.b, l.a);
+    expect(await removeTeam(l.as, { teamId: l.a }, deps)).toEqual({
+      ok: false,
+      error: { code: 'team-has-results', played: 2 },
+    });
+    expect(await binned(l.a)).toBe(false);
+  });
+
+  it('moves a team whose only games are cancelled, as before', async () => {
+    const l = await twoTeams();
+    await l.game('cancelled');
+    value(await removeTeam(l.as, { teamId: l.a }, deps));
+    expect(await binned(l.a)).toBe(true);
   });
 });
 
