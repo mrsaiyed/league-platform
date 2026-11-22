@@ -6,6 +6,7 @@
 // order: a new area's go in their place, never at the end (step 2.188, record 072).
 import type { AccessHolder, AccountLeagueRow, CommandContext, Result } from '@srleagues/core';
 import type { BotCheck, SessionIdentity, SignInService } from '@srleagues/providers';
+import type { AdminPeoplePorts } from './admin-people.ts';
 import type { AdminSettingsPorts } from './admin-settings.ts';
 import type { AdminTeamsPorts } from './admin-teams.ts';
 import type { ContextDeps, IdentifyError } from './context.ts';
@@ -53,6 +54,8 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    * myLeagues may turn them into a list, in its one caller (signed-in-leagues.ts).
    */
   readonly leaguesOfAccount: (accountId: string) => Promise<readonly AccountLeagueRow[]>;
+  /** What the admin's People screens run on (step 2.50). */
+  readonly adminPeople: AdminPeoplePorts;
   /** What the admin's League settings screen runs on (step 2.48). */
   readonly adminSettings: AdminSettingsPorts;
   /** What the admin's Teams screens read and run (step 2.51). */

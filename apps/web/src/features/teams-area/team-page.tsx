@@ -123,6 +123,9 @@ export async function TeamPage({
   const onRoster = new Set(open.map((line) => line.personId));
   const available = everyone.filter((person) => !onRoster.has(person.id));
   const listUrl = leagueUrl(here, 'admin-area', { area: 'teams' });
+  const personUrl = view.areas.includes('people')
+    ? (personId: string) => leagueUrl(here, 'admin-area', { area: 'people', subpath: [personId] })
+    : undefined;
   // A refused leaving date is said beside the line it was typed in, with the date kept.
   const leaving = leavingAtOf(query);
   const besideEntry = open.some((line) => line.id === leaving?.entry) ? leaving : undefined;
@@ -222,7 +225,15 @@ export async function TeamPage({
               <li key={line.id} id={entryAnchor(line.id)}>
                 {/* The player's line: their name, then what needs a look, in its own color. */}
                 <p className="admin-roster-name">
-                  <strong dir="auto">{nameOf(line)}</strong>
+                  {/* The name leads to the person's record in People (step 2.50), where a
+                      misspelt name is put right; only for someone People is open to. */}
+                  <strong dir="auto">
+                    {personUrl === undefined ? (
+                      nameOf(line)
+                    ) : (
+                      <a href={personUrl(line.personId)}>{nameOf(line)}</a>
+                    )}
+                  </strong>
                   {line.needsReview === true ? (
                     <span data-flag="review"> {t('adminTeams.roster.toReview')}</span>
                   ) : null}

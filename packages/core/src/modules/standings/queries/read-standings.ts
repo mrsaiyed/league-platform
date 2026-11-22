@@ -3,7 +3,9 @@
 // they are ordered. Standings are never restricted (S-22), so this takes no viewer.
 // Built field by field (T-29): no account, no contact field.
 import { SeasonRules } from '@srleagues/contracts';
+import type { TiebreakStep } from '@srleagues/sports';
 import { fail, ok, type Result } from '../../../command/index.ts';
+import { readLevel } from '../level-document.ts';
 import type {
   DecidedGameRecord,
   SeasonDivisionRow,
@@ -74,6 +76,13 @@ export type LevelGroup = {
    * as when the team they were compared through is in the bin). Null otherwise.
    */
   readonly gamesBetween: number | null;
+  /**
+   * How the season's tiebreakers ordered them (step 2.198, S-74), in the order tried: on
+   * all of them first, then on the teams a step left level with each other. Given only
+   * when every row of the group keeps the same account of exactly these teams; null for
+   * rows saved before migration 0022, or when one of the teams it names is no longer shown.
+   */
+  readonly steps: readonly TiebreakStep[] | null;
 };
 
 export type StandingsTable = {
@@ -95,6 +104,12 @@ export type Standings = {
   readonly rankBy: 'win-percentage' | 'points' | null;
   /** The season's tiebreakers in its own order; none when its rules cannot be read. */
   readonly tiebreakers: readonly string[];
+  /**
+   * What a win, a tie and a loss are worth in a points table, so a note can give the points
+   * head-to-head compared (step 2.198, fix round); none when the table ranks by win
+   * percentage or its rules cannot be read.
+   */
+  readonly pointsPer: { readonly win: number; readonly tie: number; readonly loss: number } | null;
   readonly tables: readonly StandingsTable[];
 };
 
@@ -114,11 +129,18 @@ function streakOf(row: StandingsRowRecord): StandingsLine['streak'] {
     : { result, length: row.streakLength };
 }
 
-function rulesOf(rules: unknown): Pick<Standings, 'rankBy' | 'tiebreakers'> {
+function rulesOf(rules: unknown): Pick<Standings, 'rankBy' | 'tiebreakers' | 'pointsPer'> {
   const parsed = SeasonRules.safeParse(rules);
-  return parsed.success
-    ? { rankBy: parsed.data.standings.rankBy, tiebreakers: [...parsed.data.tiebreakers] }
-    : { rankBy: null, tiebreakers: [] };
+  if (!parsed.success) return { rankBy: null, tiebreakers: [], pointsPer: null };
+  const s = parsed.data.standings;
+  return {
+    rankBy: s.rankBy,
+    tiebreakers: [...parsed.data.tiebreakers],
+    pointsPer:
+      s.rankBy === 'points'
+        ? { win: s.pointsPerWin, tie: s.pointsPerTie, loss: s.pointsPerLoss }
+        : null,
+  };
 }
 
 /** What a row is ranked on, as a fraction to compare exactly: higher is better. */
@@ -171,9 +193,29 @@ function levelGroupsOf(
       notPlayed: members.filter((member) => member.gamesPlayed === 0).map((m) => m.teamId),
       on: measure.on,
       gamesBetween: byHeadToHead ? gamesBetween(first.teamId, second.teamId) : null,
+      steps: stepsOf(members),
     });
   }
   return groups;
+}
+
+/**
+ * The engine's steps for a group, when each of its rows keeps the same readable account
+ * and that account is of exactly these teams in exactly this order. Anything less (a row
+ * saved before 0022, a team since moved to the bin, rows of two rebuilds) is not known.
+ */
+function stepsOf(members: readonly StandingsRowRecord[]): readonly TiebreakStep[] | null {
+  const [first] = members;
+  if (first === undefined) return null;
+  const level = readLevel(first.level);
+  if (level === null) return null;
+  const ids = members.map((member) => member.teamId);
+  if (level.teamIds.length !== ids.length || level.teamIds.some((id, i) => id !== ids[i])) {
+    return null;
+  }
+  const same = JSON.stringify(level);
+  if (members.some((member) => JSON.stringify(readLevel(member.level)) !== same)) return null;
+  return level.steps;
 }
 
 /** How many of the season's decided games two teams played against each other. */
@@ -275,7 +317,7 @@ export async function readStandings(
     store.standingsRows(season.id),
     store.adjustments(season.id),
   ]);
-  const { rankBy, tiebreakers } = rulesOf(season.rules);
+  const { rankBy, tiebreakers, pointsPer } = rulesOf(season.rules);
   // The games between two level teams are read only when head-to-head separated some.
   const gamesBetween = needsMeetings(rows)
     ? meetingsIn(await store.decidedGames(season.id))
@@ -299,5 +341,12 @@ export async function readStandings(
   const loose = rows.filter((row) => row.divisionId === null || !divisions.has(row.divisionId));
   const looseTable = buildTable(null, loose, teams, adjustments, rankBy, gamesBetween);
   if (looseTable.lines.length > 0) tables.push(looseTable);
-  return ok({ seasonId: season.id, seasonName: season.name, rankBy, tiebreakers, tables });
+  return ok({
+    seasonId: season.id,
+    seasonName: season.name,
+    rankBy,
+    tiebreakers,
+    pointsPer,
+    tables,
+  });
 }

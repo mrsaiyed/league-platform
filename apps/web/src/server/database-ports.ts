@@ -35,6 +35,7 @@ import type { DatabaseHandle } from '@srleagues/database';
 import type { BotCheck, SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { accessOfVia } from './access-of.ts';
+import { peopleDepsOf } from './admin-people.ts';
 import type { AccountRefusal } from './context.ts';
 import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
 import { databaseAdminTeams, type AdminTeamsQueries } from './database-admin-teams.ts';
@@ -73,6 +74,7 @@ export type DatabaseQueries = Pick<
   | 'accessStore'
   | 'activityLogStore'
   | 'jobsStore'
+  | 'binStore'
 > &
   AdminSettingsQueries &
   AdminTeamsQueries &
@@ -225,6 +227,10 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
   // The games commands' one transaction, the tracker's too (database-games.ts).
   const clock = { now: () => now().getTime() };
   const gamesDeps = databaseGamesDeps(database, db, { log: options.log, clock });
+  // Admin → Teams' transaction, whose people store Admin → People's commands run on too
+  // (step 2.50): one people store, so a person added on People is the one Teams puts on
+  // a roster; with the same event handlers.
+  const adminTeams = databaseAdminTeams(database, db, options.log, accessOf);
 
   return {
     findLeague: (shortName) =>
@@ -263,8 +269,27 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // league it lists (part 4).
     scheduleAdmin: databaseScheduleAdmin(database, db, options.log, accessOf),
     publicTeams: databasePublicTeams(database, db),
+    // The people commands and reads, on Admin → Teams' own transaction (step 2.50): every
+    // one is a league transaction set to the session's league and account (T-23, T-28),
+    // and a person's private fields are read only for people.read_sensitive (T-76).
+    // Putting a removed person back (A-5): the bin's command on the bin's own store, as
+    // the worker's purge has it; restoring a person sets off no handler.
+    adminPeople: {
+      deps: peopleDepsOf(adminTeams.deps),
+      putBack: {
+        transaction: database.commandTransaction(db, (scope) => ({
+          jobs: database.jobsStore(scope),
+          bin: database.binStore(scope),
+          access: database.accessStore(scope),
+          activity: database.activityLogStore(scope),
+        })),
+        events: [],
+        log: options.log,
+        now: () => performance.now(),
+      },
+    },
     // Its commands run with core's event handlers, never an empty list (part 5).
-    adminTeams: databaseAdminTeams(database, db, options.log, accessOf),
+    adminTeams,
     adminSettings: databaseAdminSettings(database, db, options.log),
     tracker: databaseTracker(database, db, gamesDeps, clock),
     // No live service on the database yet (steps 2.124 and 2.116): nothing listens, so a

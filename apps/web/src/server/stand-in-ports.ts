@@ -128,7 +128,7 @@ const grants = [
     type: 'program',
     id: standInDraftProgramId,
   }),
-  grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.otherDraft.id),
+  grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.empty.id),
   // A scorekeeper still holding the role in an archived league is told it is archived,
   // not "no access" (step 2.33).
   grantOf(13, scorekeeper.accountId, 'scorekeeper', standInLeagues.archived.id),
@@ -562,6 +562,8 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       },
     },
     publicStats: standInPublicStats(world, namePolicy),
+    // The same made-up world's people, whom Admin → Teams puts on rosters (step 2.50).
+    adminPeople: { deps: world.deps, putBack: world.deps },
     adminTeams: standInAdminTeams(world, accessOf),
     adminSettings,
     publicSchedule: standInPublicSchedule(world),

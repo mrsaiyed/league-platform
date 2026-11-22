@@ -144,12 +144,18 @@ export const enError = {
     "Your role in this league does not include adding people to its list. If it should, ask the league's owner or an admin.",
   'error.people.create_person.sensitive-fields-not-allowed':
     'You are not allowed to enter those details.',
+  'error.people.get_person.person-not-found': 'That person is not in the league list.',
   'error.people.remove_person.person-not-found': 'That person is not in the league list.',
   'error.people.remove_person.person-on-a-roster':
     'That person is still on a roster. Mark them as having left their team first, then take them off the list.',
   'error.people.set_name_request.initials-not-offered':
     'This league does not offer initials for adults, so nothing was changed. You can still choose "removed" to take their name off the public pages.',
   'error.people.set_name_request.person-not-found': 'That person is not in the league list.',
+  'error.people.update_person.changed-since-read':
+    'Someone else changed this person’s details while you were looking. What you typed is still here; check it against theirs and save again.',
+  'error.people.update_person.person-not-found': 'That person is not in the league list.',
+  'error.people.update_person.sensitive-fields-not-allowed':
+    'You are not allowed to change those details.',
   'error.short-name-needed':
     'A short name could not be made from this name. Type a short name: lower-case letters and numbers, with single hyphens.',
   'error.teams.add_new_person.already-on-team':
