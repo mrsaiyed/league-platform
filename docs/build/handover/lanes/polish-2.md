@@ -9,9 +9,11 @@
 - Pictures (git-ignored): .local/shots/polish-2/ in the lane folder (before-standings, after-standings, after-home, after-stats at 390). Admin pages not pictured.
 
 ## Not finished (the lane hit its 80-command limit)
+
 - web-exit-test FAILS: "the sign that a table goes on shows only while columns are out of sight" needs at least one table that fits at 390 on /harbor-city/standings or /harbor-city/stats; now all three go on. Cause: P2's fixed 60-wide number columns (and/or P1's scrolled PF..STRK). Fix to try: in the @container 30rem `.ui-stats` block use a narrower `--ui-num-col` (48) or apply the fixed widths only when `--ui-cols` columns do not fit; or have the standings table drop the fixed widths when it has no scrolled columns. Re-run web-exit-test.
 - Not run because web-exit-test failed first in the chain: true-notes-test, public-pages-on-database-test, demo-league-on-database-test, people-screens-test. Nothing was pushed.
 - Ran and passed: npm run check, format:check, typecheck (before the last uncommitted change), vitest page-pieces, display, game-pieces, build-standings, stats-pages, home-lists, build-home-numbers, stand-in-admin-teams, packages/site/src/messages. Merge of origin/build/stage-1: already up to date.
 
 ## Seen at 390
+
 - /larkvale/standings: the level-teams notes under each table are long paragraphs; readable but heavy.

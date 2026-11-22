@@ -419,8 +419,21 @@ export const tableCss = String.raw`
      cannot work out the leftover (mod) sizes the columns by their contents, and the far
      edge's fade still marks the column cut there. */
   .ui-stats {
-    --ui-num-col: calc(var(--step-7) + var(--step-3));
     --ui-name-least: 40cqi;
+    /* A table whose number columns all fit beside the name's two fifths at no less than a
+       standings number column's width (the table says how many: sortable-stats-table.tsx)
+       shares the room out and fits whole, with nothing to scroll; only a table with more
+       columns than fit gives each one the fixed width. --ui-too-many is 0 when they fit and a
+       great length when they do not, and --ui-few the other way round. */
+    --ui-num-least: calc(var(--step-6) + var(--step-3));
+    --ui-num-wide: calc(var(--step-7) + var(--step-3));
+    --ui-share: calc((100cqi - var(--ui-name-least)) / var(--ui-cols, 99));
+    --ui-too-many: clamp(0px, (var(--ui-num-least) - var(--ui-share)) * 100000, 100000px);
+    --ui-few: clamp(0px, (var(--ui-share) - var(--ui-num-least) + 0.01px) * 100000, 100000px);
+    --ui-num-col: max(
+      min(var(--ui-num-wide), var(--ui-share)),
+      min(var(--ui-too-many), var(--ui-num-wide))
+    );
   }
   .ui-stats th,
   .ui-stats td {
@@ -433,11 +446,19 @@ export const tableCss = String.raw`
   .ui-stats .ui-team-cell {
     /* A table whose columns all fit beside the name gives the name the rest, and fits. */
     --ui-name-col: max(
-      calc(var(--ui-name-least) + mod(100cqi - var(--ui-name-least), var(--ui-num-col))),
-      calc(100cqi - var(--ui-cols, 0) * var(--ui-num-col))
+      calc(
+        var(--ui-name-least) + mod(100cqi - var(--ui-name-least), var(--ui-num-col)) -
+          var(--ui-few)
+      ),
+      calc(100cqi - var(--ui-cols, 99) * var(--ui-num-col))
     );
     inline-size: var(--ui-name-col);
-    min-inline-size: var(--ui-name-col);
+    /* In a table that fits, the name gives up the little a heading needs beyond its share
+       (the sorted one's arrow), so the table is never wider than its box. */
+    min-inline-size: calc(var(--ui-name-col) - var(--ui-few));
+  }
+  .ui-table.ui-stats {
+    inline-size: 100%;
   }
   /* The name's words: the column less its two paddings, the shield and its gap. */
   .ui-table.ui-stats .ui-team-cell > [dir] {
