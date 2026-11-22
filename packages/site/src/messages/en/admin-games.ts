@@ -149,7 +149,7 @@ export const enAdminGames = {
   'admin.games.error.game-now-postponed':
     'Someone postponed this game meanwhile, so nothing else was changed. It is shown again as it is now.',
   'admin.games.error.game-part-in-bin':
-    'One of this game’s teams, or its venue or court, is in the bin. Bring that back first, then put the game back.',
+    'One of this game’s teams, or its venue or court, is in the bin, and the screen to bring it back is not ready yet. So this game cannot be put back for now.',
   'admin.games.error.game-postponed':
     'That game is postponed, so it cannot have a score yet. Enter its score once it is played on its new date.',
   'admin.games.error.invalid-input': 'Enter the score as two whole numbers from 0 to 999.',
