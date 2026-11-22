@@ -4,6 +4,15 @@
 
 **Part 1 is built: things 1, 2 and 3 of section 9.** Read this section first; section 0 (the second lead's) and sections 1 to 9 (the first lead's) still hold except where this one says otherwise. What is left is the reviews, the fix round after them, and part 2 (the list under "Not in part 1" in section 1).
 
+**The fix round after the two reviews (2026-11-22), one commit each:**
+
+- F1: while anything waits to be sent, every way off the screen it can catch asks first. The header's links and the final panel's "Back to the games" go through `leaveAsking` in `scoring-screen.tsx`, which opens the pad's `leave` mode (`LeaveAsk` in `end-parts.tsx`: "Not sent yet. The result is not sent yet. Stay on this screen until it says “Saved”.", "Stay here" filled, "Leave anyway" plain); the browser's own leaving (back, reload, closing the tab) is a `beforeunload` in `tracker-opening.tsx`, skipped once the page itself is leaving. Not built (step 2.38): sending from the games page or in the background. A person who leaves anyway keeps what waits on the device, unsent: the public page shows the game live (its clock running on) and the standings leave it out until that phone opens that game's scoring screen again, which sends it at once.
+- F2: the queue remembers taps sent with no answer back while the device thought it had a network (`unsure` in `tracker-queue.ts`; `reachable` defaults to `navigator.onLine`, so a send made while the browser knows it is offline cannot have reached the league). `withdraw` keeps those and says so (`Withdrawn.unsure`); `takeBackEnd` answers `maybe-saved`; the final panel's state `checking` says "Checking whether the result was saved…" and offers no take back until the next answer (a retry answered `duplicate` is saved).
+- F3: `endQuestion`'s `level` carries `early`: with time left, "H2 still has 19:59 to play." (ticking); a period run out, the next is still to play; overtime only once the last period has run out level.
+- F4: a door's "nothing waiting" check runs inside the controller's one-at-a-time lock (`serially`); the door's work stays outside it, since carrying on loads the game, which takes the lock.
+- F5: `DeviceRosters.allowTies` is optional; missing (an older page's rosters) reads as ties allowed on the device.
+- F6: the Reopen reason starts empty, with "By mistake" beside it filling in "End game tapped by mistake"; its label stands clear of the field and the field 8 above the answers.
+
 **What thing 3 built, and where:**
 
 - `end-game.ts` (with `end-game.test.ts`, 22 tests): what each thing says, no drawing: `endQuestion` (the question, or why the game cannot end: nothing recorded, or a level score with no ties), `endOfferText`, `wonText`, `endRefusedText`, `reopenLine` and `reopenLineText` (minutes left from the SERVER's time), `notStartedQuestion`, and each refusal in a sentence.
@@ -128,15 +137,15 @@ Commit `cb3e7ee0` ("Work in progress"), type-checks, its unit tests pass, browse
 - "actions" is "plays" in the banner and the notices, and in the tests and scripts that quote them.
 - `docs/build/DESIGN.md` section 7, line 5: the banner's example now says "plays", and one clause was added for "No connection". Nothing else in DESIGN.md was changed.
 
-## 4. What is half built
+## 4. What was half built (the first lead's, 2026-11-16; all of it built since, see section 00)
 
 - **The saved banner.** Its words and logic are done and wired, so it is on the screen now. What is NOT done: looking at it. With the network off it now says four things at most (storage failed, no connection, N to send, N not saved), one more than step 2.36 fitted. `tests/browser/scoring-clock-steps.mjs` (about lines 1227 and 1300) was pointed at the new words but I never ran it. Expect the fit checks at 844 x 390 (the banner is a column of 96 beside the scoreboard, a line for each thing) and at 390 x 664 to need a round: either the short form joins "No connection" and "N to send" into one line, or the column takes four lines without the row growing.
 - **`tracker-opening.tsx` does not yet show the final panel after the first renewal.** About half a minute after an End is saved the controller's mode turns `read-only` with reason `game-not-live` (the game is still in `status.game`, final). Today the page then swaps the scoring screen for the opening card. It must keep showing `ScoringScreen` while `status.game?.status === 'final'` in that mode, and leave out the `tracker.readOnly.game-not-live` notice then (the final panel says it).
 - **The controller is not given its doors in the browser.** `openTrackerGame` (`open-tracker-game.ts`) does not pass `doors` to `createTrackerController`; add `doors: createFetchGameDoors({ leagueId, gameId })`, or `reopen` and `markNotStarted` answer `not-offered`.
 
-## 5. What is not started
+## 5. What was not started then (out of date: all of it is built, drawn and in the browser tests now; section 00 says where, and GitHub's whole gate passed the lane at cb840d7)
 
-All drawing: `scoring-screen.tsx`, `court-view.tsx`, `court.css` are untouched. Undo and Redo buttons; the latest-play line; the log sheet and panel; End game in More and in the pad; the question; the final panel; Reopen with its time left and question; Mark not started with its question; "This game is final" on a tile tap. Component tests for them. The browser test's short game. The public page and standings walk. Every picture (only "before" pictures were taken, and they stayed on the old computer: take them again first, `node scripts/heavy.mjs -- node scripts/tracker-shots.mjs`, then add states to `scripts/tracker-shots.mjs`). Nothing was pushed to GitHub's checks before this handover, so GitHub has not passed anything of this lane.
+At that time all drawing: `scoring-screen.tsx`, `court-view.tsx`, `court.css` were untouched. Undo and Redo buttons; the latest-play line; the log sheet and panel; End game in More and in the pad; the question; the final panel; Reopen with its time left and question; Mark not started with its question; "This game is final" on a tile tap. Component tests for them. The browser test's short game. The public page and standings walk. Every picture (only "before" pictures were taken, and they stayed on the old computer: take them again first, `node scripts/heavy.mjs -- node scripts/tracker-shots.mjs`, then add states to `scripts/tracker-shots.mjs`). Nothing was pushed to GitHub's checks before this handover, so GitHub has not passed anything of this lane.
 
 `scoring-screen.tsx` is already about 1200 lines: put the new drawing in a file of its own (I meant `plays-parts.tsx`, as step 2.36 made `clock-parts.tsx`) and keep the screen's new state small.
 
