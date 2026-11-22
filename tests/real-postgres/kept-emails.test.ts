@@ -3,6 +3,7 @@
 // made-up address only, the newest 300 kept; it cannot read, change or remove a row, as
 // itself or as app_user; the tables' owner reads, through the script's own path
 // (openLeagueMakingTarget's migration login, newestKeptEmail, keptEmailAnswer).
+import { readFileSync } from 'node:fs';
 import {
   connectPostgresDriver,
   createDatabaseSignInStore,
@@ -123,6 +124,29 @@ describe('kept emails, as app_login', () => {
       for (const part of [error.message ?? '', error.detail ?? '']) {
         expect(part).not.toMatch(/482913|example\.test|xxxx|aaaa/);
       }
+    }
+  });
+
+  it('the SQL made-up check gives the shared list’s answers here too', async () => {
+    const cases = JSON.parse(
+      readFileSync(
+        new URL('../../packages/providers/src/email/made-up-address-cases.json', import.meta.url),
+        'utf8',
+      ),
+    ) as readonly { readonly address: string; readonly madeUp: boolean }[];
+    const owner = await ownerSession();
+    try {
+      const answers: [string, boolean][] = [];
+      for (const { address } of cases) {
+        const { rows } = await owner.query<{ made_up: boolean }>(
+          'select kept_emails.is_made_up_address($1) as made_up',
+          [address],
+        );
+        answers.push([address, rows[0]?.made_up ?? false]);
+      }
+      expect(answers).toEqual(cases.map((c) => [c.address, c.madeUp]));
+    } finally {
+      await owner.close();
     }
   });
 

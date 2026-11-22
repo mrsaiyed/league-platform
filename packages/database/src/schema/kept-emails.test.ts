@@ -3,6 +3,7 @@
 // public.keep_email, which takes a made-up address only (record 075's list, checked here
 // again) and keeps the newest 300; it cannot read, change or remove a row, nor use the
 // schema. The same on the real PostgreSQL: tests/real-postgres/kept-emails.test.ts.
+import { readFileSync } from 'node:fs';
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { asApp, freshSchema, one, refused } from './schema.test-helper.ts';
@@ -20,42 +21,28 @@ const keep = (to: string, subject = 'Your code', text = 'Your code is 123456.') 
 const count = async () =>
   Number((await one<{ n: string }>(db, 'select count(*) as n from kept_emails.emails')).n);
 
-// Record 075's list, both ways, and spellings around its edges: the first ten are made
-// up, the rest not. packages/providers/src/email/made-up-address.test.ts holds
-// isMadeUpAddress to the same list.
-const addresses = [
-  'new.owner@example.test',
-  'A@Sub.Example.COM',
-  'x@example.net',
-  'x@mail.example.org',
-  'x@site.example',
-  'x@nowhere.invalid',
-  'x@here.localhost',
-  'x@example.test.',
-  ' x@example.test ',
-  'x@y@example.test',
-  'person@gmail.com',
-  'x@example.com.evil.com',
-  'x@notexample.com',
-  'x@test',
-  '@example.test',
-  'example.test',
-  'x@exa mple.test',
-  'x@ex_ample.test',
-  'x@',
-  '',
-];
+// Record 075's list, both ways, and spellings around its edges: the one shared list, which
+// packages/providers/src/email/made-up-address.test.ts holds isMadeUpAddress to as well.
+const cases = JSON.parse(
+  readFileSync(
+    new URL('../../../providers/src/email/made-up-address-cases.json', import.meta.url),
+    'utf8',
+  ),
+) as readonly { readonly address: string; readonly madeUp: boolean }[];
 
 describe('kept_emails.is_made_up_address', () => {
-  it('says what isMadeUpAddress says, for every spelling tried', async () => {
-    for (const address of addresses) {
+  it('says what isMadeUpAddress says, for every spelling on the shared list', async () => {
+    expect(cases.length).toBeGreaterThan(40);
+    const answers: [string, boolean][] = [];
+    for (const { address } of cases) {
       const { made_up } = await one<{ made_up: boolean }>(
         db,
         'select kept_emails.is_made_up_address($1) as made_up',
         [address],
       );
-      expect([address, made_up]).toEqual([address, addresses.indexOf(address) < 10]);
+      answers.push([address, made_up]);
     }
+    expect(answers).toEqual(cases.map((c) => [c.address, c.madeUp]));
   });
 });
 

@@ -35,27 +35,48 @@ revoke all on schema kept_emails from public;
 comment on schema kept_emails is
   'The test copy''s kept emails (record 075 option 5, step 2.204). Only the tables'' owner reads it; the app may only add through public.keep_email.';
 
--- Record 075's list, the same as isMadeUpAddress (packages/providers): the part after the
--- last "@", which must not be the first character, trimmed, in small letters, one final
--- dot dropped; letters, digits, dots and hyphens only.
+-- What JavaScript's trim() removes, and its \s matches: tab to carriage return, the space,
+-- the no-break space, U+1680, U+2000 to U+200A, the line and paragraph separators, U+202F,
+-- U+205F, the full-width space and U+FEFF. The address trimmed of it at both ends.
+create function kept_emails.trimmed(value text) returns text
+language sql
+immutable
+set search_path = pg_catalog, pg_temp
+as $$
+  select regexp_replace(
+    value,
+    '^[\u0009-\u000d    -     　﻿]+|[\u0009-\u000d    -     　﻿]+$',
+    '', 'g'
+  )
+$$;
+
+revoke all on function kept_emails.trimmed(text) from public;
+
+-- Record 075's list, the same rule as isMadeUpAddress (packages/providers), held to the
+-- same answers by one shared list of spellings (made-up-address-cases.json): the address
+-- trimmed, no whitespace left inside; the part after its last "@", which must not be its
+-- first character, one final dot dropped; A to Z, digits, dots and hyphens only, tested
+-- before lowercasing (lowercased A to Z only, whatever the database's locale).
 create function kept_emails.is_made_up_address(address text) returns boolean
 language sql
 immutable
 set search_path = pg_catalog, pg_temp
 as $$
   select coalesce((
-    select d ~ '^[a-z0-9.-]+$'
+    select d ~ '^[A-Za-z0-9.-]+$'
       and (
-        d ~ '\.(test|example|invalid|localhost)$'
-        or d in ('example.com', 'example.net', 'example.org')
-        or d ~ '\.example\.(com|net|org)$'
+        n ~ '\.(test|example|invalid|localhost)$'
+        or n in ('example.com', 'example.net', 'example.org')
+        or n ~ '\.example\.(com|net|org)$'
       )
     from (
-      select regexp_replace(
-        lower(btrim(substr(address, length(address) - strpos(reverse(address), '@') + 2))),
-        '\.$', ''
-      ) as d
-      where strpos(reverse(address), '@') between 1 and length(address) - 1
+      select d, translate(d, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz') as n
+      from (
+        select regexp_replace(substr(w, length(w) - strpos(reverse(w), '@') + 2), '\.$', '') as d
+        from (select kept_emails.trimmed(address) as w) as whole
+        where w !~ '[\u0009-\u000d    -     　﻿]'
+          and strpos(reverse(w), '@') between 1 and length(w) - 1
+      ) as found
     ) as domain
   ), false)
 $$;
