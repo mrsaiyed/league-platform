@@ -15,6 +15,7 @@ import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
 import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.ts';
 import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
+import { keptRows, type KeptRow } from './kept-plays.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
 import {
@@ -386,6 +387,13 @@ export function TrackerOpening({
               signIn={signIn}
               onTakeOver={act((game) => game.controller.takeOver())}
               onOpenAgain={act((game) => game.controller.openAgain())}
+              kept={keptRows(
+                phase.status.notSaved,
+                rosters,
+                phase.status.game?.rules.periods ?? 2,
+                t,
+              )}
+              onClearKept={act((game) => game.controller.dismissNotSaved())}
               onConfirm={(format) => act((game) => game.confirmFormat(format))()}
             />
           ) : null}
@@ -484,6 +492,8 @@ function OpenGame({
   signIn,
   onTakeOver,
   onOpenAgain,
+  kept,
+  onClearKept,
   onConfirm,
 }: {
   readonly phase: Extract<Phase, { kind: 'open' }>;
@@ -496,6 +506,10 @@ function OpenGame({
   readonly signIn: ReactNode;
   readonly onTakeOver: () => void;
   readonly onOpenAgain: () => void;
+  /** The plays this device made that will not be sent, play by play (step 2.37, part 2). */
+  readonly kept: readonly KeptRow[];
+  /** The scorekeeper has seen them: the list goes only by this deliberate tap. */
+  readonly onClearKept: () => void;
   readonly onConfirm: (format: GameFormat) => void;
 }) {
   const { status, confirmed } = phase;
@@ -525,6 +539,24 @@ function OpenGame({
         </p>
       ) : null}
       <Notices status={status} t={t} />
+      {kept.length === 0 ? null : (
+        <section className="court-stack" aria-labelledby="tracker-kept" data-kept-list="">
+          <h2 id="tracker-kept">{t('tracker.keptList.title')}</h2>
+          <ol className="court-stack">
+            {kept.map((row) => (
+              <li key={row.id} data-kept-play="">
+                {row.when === null ? null : <span className="court-quiet">{row.when} </span>}
+                {row.text}
+              </li>
+            ))}
+          </ol>
+          <p>
+            <button type="button" className="court-button" onClick={onClearKept} disabled={busy}>
+              {t('tracker.keptList.clear')}
+            </button>
+          </p>
+        </section>
+      )}
       {signIn}
       {screen.kind === 'opening' ? openingText : null}
       {screen.kind === 'held-by-other' && !askingTakeOver ? (

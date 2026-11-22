@@ -179,6 +179,19 @@ export const enTracker = {
   'tracker.hint.title': 'How to score',
   'tracker.hint.turnovers':
     'Tap a team’s turnovers to see each player’s, take one back, or add a team turnover.',
+  // The "not saved" list play by play (step 2.37, part 2): a tap that is a play is said
+  // as the play log says it; these are the others.
+  'tracker.kept.colors': 'Colors swapped',
+  'tracker.kept.end': 'End game',
+  'tracker.kept.pause': 'Clock paused',
+  'tracker.kept.players': 'A change to a team’s players',
+  'tracker.kept.redo': 'Redo',
+  'tracker.kept.setClock': 'Clock set to {clock}',
+  'tracker.kept.start': 'Clock started',
+  'tracker.kept.undo': 'Undo',
+  // Cleared only by this deliberate tap: the scorekeeper has seen the list.
+  'tracker.keptList.clear': 'I have seen these: clear the list',
+  'tracker.keptList.title': 'Not saved',
   // On the page that replaces the scoring screen when the device stops scoring (taken
   // over, signed out, no longer allowed) in the very moment a tap was made.
   'tracker.lastTapNotRecorded':
