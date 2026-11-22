@@ -255,6 +255,8 @@ async function freeTextFields(address, who) {
 
 let teamAdmin = '';
 let boxScore = '';
+/** Tigers at Lions, with no score yet: made final by hand, then reopened with the attack. */
+const decidedGame = '01900000-0000-7000-8000-006a00000001';
 
 if (browser) {
   const context = await contextFor(owner);
@@ -391,19 +393,35 @@ if (browser) {
   });
 
   await step('a result is reopened with the attack as its reason', async () => {
+    // The made-up world starts with no game decided on the games list's first screen (since
+    // step 2.37 part 1): one is made final by hand first, as a scheduler would, and then
+    // corrected from its own "Correct this result".
     await page.goto(`${origin}/north-valley/admin/games`);
-    const correct = page.getByRole('link', { name: 'Correct this result' }).first();
+    const game = page.locator(`li[id="game-${decidedGame}"]`);
+    await game.getByText('Enter the final score').click();
+    await game.getByLabel('Score for Tigers').fill('47');
+    await game.getByLabel('Score for Lions').fill('51');
+    await game.getByRole('button', { name: 'Save final score' }).click();
+    await game.getByRole('button', { name: 'Yes, make it final' }).click();
+    const correct = game.getByRole('link', { name: 'Correct this result' });
     await correct.waitFor();
-    await tap(correct, /\/north-valley\/admin\/games\/[0-9a-f-]+/);
+    await tap(correct, (url) => url.pathname === `/north-valley/admin/games/${decidedGame}`);
     const reason = page.getByLabel(
       'Why it needs correcting (kept in the log, never shown publicly)',
     );
-    // Kept in the activity log, never drawn on a page: the result is reopened.
     await reason.fill(typed.reason);
     await Promise.all([
       page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
       page.getByRole('button', { name: 'Reopen to correct' }).click(),
     ]);
+    // Reopened: the game has its score boxes again, and the list holds the reason only as text.
+    await game.getByLabel('Score for Tigers').waitFor();
+    const found = await harm(page);
+    note(
+      'the games list, the result reopened with the attack as its reason, made no element',
+      found.made.length === 0 && found.ran === null && found.refused.length === 0,
+      [...found.made, ...found.refused].join(' | '),
+    );
   });
 
   await step('the email boxes refuse the attack as text', async () => {
@@ -458,6 +476,8 @@ if (browser) {
     ['/north-valley/admin/schedule', ['round']],
     ['/north-valley/admin/games', []],
     [boxScore, []],
+    // The reopened game's own page: wherever the reason would be shown, it is text.
+    [`/north-valley/admin/games/${decidedGame}`, []],
     ['/north-valley/teams/harmful-text', ['team', 'first', 'last']],
   ];
   for (const [address, shows] of ownerPages) {
