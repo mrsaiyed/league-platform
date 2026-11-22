@@ -24,10 +24,18 @@ import { GameList } from './schedule-views.tsx';
 /** The columns the home page's compact standings keep. */
 const compactColumns: readonly string[] = ['played', 'wins', 'losses', 'winPercentage'];
 
-/** A division's table cut down to the few columns that fit beside the games. */
+/**
+ * A division's table cut down to the few columns that fit beside the games, with each
+ * level-teams note cut to its first sentence where it was made (step 2.198): who is level
+ * and on what; "See the full standings" leads to the reasons.
+ */
 export function compactStandings(table: StandingsTableView): StandingsTableView {
   const kept = new Set(compactColumns);
-  return { ...table, columns: table.columns.filter((c) => kept.has(c.key)) };
+  return {
+    ...table,
+    columns: table.columns.filter((c) => kept.has(c.key)),
+    footnotes: table.briefFootnotes,
+  };
 }
 
 /**

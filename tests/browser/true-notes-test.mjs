@@ -65,6 +65,8 @@ const readTables = (page) =>
 const twoTeams =
   /^(.+) and (.+) are level on (win percentage|points) \(([^)]+)\)\. (?:(Point difference|Points scored|Fewer points allowed) puts (.+) ahead: (\S+) against (\S+)\.|A coin flip puts (.+) ahead\.|The games? between them puts? (.+) ahead\.)$/;
 const severalTeams = /^(.+) are level on (win percentage|points) \(([^)]+)\)\. (.+)$/;
+/** The home page's form of a level note (step 2.198, the lead's answer (a)): its first sentence only. */
+const levelOnly = /^(.+) are level on (win percentage|points) \(([^)]+)\)\.$/;
 const columnOf = {
   'Point difference': 'DIFF',
   'Points scored': 'PF',
@@ -181,7 +183,7 @@ function checkSteps(where, rest, level) {
 }
 
 /** Checks every note of a page's tables against the rows it is beside. */
-function checkNotes(label, tables) {
+function checkNotes(label, tables, { home = false } = {}) {
   const all = tables.flatMap((table) => table.rows.map((row) => ({ ...row, table })));
   // One number, one way: a win percentage reads .500, .667, 1.000 or .000, never 0.500.
   const pct = all.map((row) => row.cell['PCT']).filter((cell) => cell !== undefined);
@@ -210,11 +212,19 @@ function checkNotes(label, tables) {
         );
         continue;
       }
-      const two = twoTeams.exec(text);
-      const several = severalTeams.exec(text);
-      const on = two?.[3] ?? several?.[2];
-      const value = two?.[4] ?? several?.[3];
-      note(`${where} is a note this step writes`, two !== null || several !== null);
+      // A league's home keeps each level note's first sentence only, who is level and on
+      // what; the reasons are on the standings page, whose notes are read in full below.
+      const brief = home ? levelOnly.exec(text) : null;
+      const two = home ? null : twoTeams.exec(text);
+      const several = home ? null : severalTeams.exec(text);
+      const on = brief?.[2] ?? two?.[3] ?? several?.[2];
+      const value = brief?.[3] ?? two?.[4] ?? several?.[3];
+      note(
+        home
+          ? `${where} is the first sentence only: who is level and on what`
+          : `${where} is a note this step writes`,
+        brief !== null || two !== null || several !== null,
+      );
       // The number they are level on is each marked team's own (PCT, or PTS by points),
       // written the same way in the note and in the column (.500, never 0.500).
       const column = on === 'points' ? 'PTS' : 'PCT';
@@ -310,7 +320,15 @@ if (built) {
 
       await start('north-valley');
       const home = await readTables(page);
-      checkNotes(`North Valley's home at ${width}`, home);
+      checkNotes(`North Valley's home at ${width}`, home, { home: true });
+      // Where the reasons are: the link to the full standings, on show beside the table.
+      note(
+        `North Valley's home at ${width} shows "See the full standings", which leads to the reasons`,
+        await page
+          .getByRole('link', { name: 'See the full standings', exact: true })
+          .first()
+          .isVisible(),
+      );
       note(
         `the home page's small table at ${width} shows no difference column and its notes cite none`,
         home.length > 0 &&
@@ -354,7 +372,7 @@ if (built) {
       await checkStats(page, width);
 
       await start('harbor-city');
-      checkNotes(`Harbor City's home at ${width}`, await readTables(page));
+      checkNotes(`Harbor City's home at ${width}`, await readTables(page), { home: true });
       await tapMenu('Standings', /\/harbor-city\/standings$/);
       const harbor = await readTables(page);
       checkNotes(`Harbor City's standings at ${width}`, harbor);

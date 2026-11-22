@@ -560,14 +560,20 @@ describe('recent results order', () => {
 // The lead's review of step 2.195, item 3: one number, one way. The home page's small
 // table writes a win percentage as the full table and the notes do: .667, never 0.667.
 describe('the home page’s small standings', () => {
-  it('writes PCT as the notes do, and keeps the notes, which carry their own numbers', async () => {
+  it('writes PCT as the notes do, and keeps each level note’s first sentence, with its number', async () => {
     const [season] = await stats.seasonsOf(adult);
     const result = await readStandings(stats.readStoreOf(adult), { seasonId: season?.id ?? '' });
     if (!result.ok) throw new Error('expected standings');
+    const [full] = buildStandingsViews(result.value);
     const [east] = buildStandingsViews(result.value).map(compactStandings);
     expect(east?.columns.map((c) => c.key)).toEqual(['played', 'wins', 'losses', 'winPercentage']);
     expect(east?.rows.map((row) => row.cells['winPercentage'])).toEqual(['.667', '.667', '.000']);
+    // Step 2.198, the lead's answer (a): who is level and on what; the reasons are on the
+    // standings page, which keeps the whole note.
     expect(east?.footnotes.map((f) => f.text)).toEqual([
+      'Owls and Falcons are level on win percentage (.667).',
+    ]);
+    expect(full?.footnotes.map((f) => f.text)).toEqual([
       'Owls and Falcons are level on win percentage (.667). The game between them puts Owls ahead.',
     ]);
   });

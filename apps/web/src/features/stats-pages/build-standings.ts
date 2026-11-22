@@ -22,7 +22,16 @@ export type StandingsTableView = {
   readonly columns: readonly StandingsColumn[];
   readonly rows: readonly StandingsRow[];
   readonly footnotes: readonly StandingsFootnote[];
+  /**
+   * The same notes for the home page's small table (step 2.198, the lead's answer (a)): a
+   * level-teams note keeps only its first sentence, who is level and on what, which is true
+   * beside each of them; the reasons are on the standings page. Every other note is whole.
+   */
+  readonly briefFootnotes: readonly StandingsFootnote[];
 };
+
+/** A note, and its first sentence when the home page shows less of it. */
+type Note = { readonly id: string; readonly text: string; readonly brief?: string };
 
 const percent = new Intl.NumberFormat(locale, {
   minimumFractionDigits: 3,
@@ -307,7 +316,7 @@ function levelNote(
   group: LevelGroup,
   members: readonly StandingsLine[],
   tiebreakers: readonly string[],
-): { readonly id: string | null; readonly text: string } {
+): { readonly id: string | null; readonly text: string; readonly brief?: string } {
   const stillTied = members.every((line) => line.orderedBy === 'still-tied');
   if (stillTied && new Set(members.map((line) => line.rank)).size === 1) return stillTiedNote();
   const [first, second] = members;
@@ -336,11 +345,16 @@ function levelNote(
     return {
       id: null,
       text: [level, twoTeamReason(by, [first, second], group.gamesBetween)].join(join),
+      brief: level,
     };
   }
   // Three or more who have all played, with the engine's own steps: exactly what placed each.
   if (group.steps !== null && members.length >= 3 && members.length === group.teamIds.length) {
-    return { id: null, text: [level, ...stepSentences(group.steps, members)].join(join) };
+    return {
+      id: null,
+      text: [level, ...stepSentences(group.steps, members)].join(join),
+      brief: level,
+    };
   }
   // Otherwise (rows saved before step 2.198, a team in the bin or one that has not played,
   // two whose stored reasons disagree): never which tiebreaker placed whom.
@@ -364,7 +378,7 @@ function levelNote(
       t('standings.level.stillLevel', { teams: names.format(part.map((l) => l.team.name)) }),
     );
   }
-  return { id: null, text: sentences.join(join) };
+  return { id: null, text: sentences.join(join), brief: level };
 }
 
 function columnsOf(table: CoreTable, rankBy: Standings['rankBy']): StandingsColumn[] {
@@ -426,9 +440,14 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
   }));
   // Each group's notes, in the table's order, and the note each team carries.
   const levelNotes = new Map<string, string>();
-  const mark = (lines: readonly StandingsLine[], note: { id: string; text: string }) => {
+  // The first sentence of each level-teams note that has more, by the note's id.
+  const briefs = new Map<string, string>();
+  const mark = (lines: readonly StandingsLine[], note: Note) => {
     if (lines.length === 0) return;
-    if (!footnotes.some((f) => f.id === note.id)) footnotes.push(note);
+    if (!footnotes.some((f) => f.id === note.id)) {
+      footnotes.push({ id: note.id, text: note.text });
+      if (note.brief !== undefined) briefs.set(note.id, note.brief);
+    }
     for (const line of lines) levelNotes.set(line.team.id, note.id);
   };
   table.levelGroups.forEach((group, n) => {
@@ -445,7 +464,11 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
     }
     if (played.length >= 2) {
       const note = levelNote(group, played, standings.tiebreakers);
-      mark(played, { id: note.id ?? `level-${n + 1}`, text: note.text });
+      mark(played, {
+        id: note.id ?? `level-${n + 1}`,
+        text: note.text,
+        ...(note.brief === undefined ? {} : { brief: note.brief }),
+      });
     } else {
       // One team that has played, level with idle ones only: nothing to compare it with,
       // unless nothing in the rules separated it from them.
@@ -481,6 +504,7 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
     columns: columnsOf(table, standings.rankBy),
     rows,
     footnotes,
+    briefFootnotes: footnotes.map((f) => ({ id: f.id, text: briefs.get(f.id) ?? f.text })),
   };
 }
 

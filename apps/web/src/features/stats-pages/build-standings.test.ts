@@ -706,3 +706,111 @@ describe('the note for three or more level teams', () => {
     );
   });
 });
+
+// The lead's answer (a) to step 2.198: the home page's small table keeps each level note's
+// first sentence, who is level and on what; the standings page keeps the whole note.
+describe('the home page’s form of each note', () => {
+  /** The home page's note beside a team, beside its standings-page note. */
+  function bothBeside({ view }: Made, team: string): { brief: string[]; whole: string[] } {
+    const row = view.rows.find((r) => r.team === team);
+    if (row === undefined) throw new Error(`no row for ${team}`);
+    const text = (notes: StandingsTableView['footnotes'], id: string) =>
+      (notes.find((f) => f.id === id)?.text ?? '').replaceAll(joiner, '');
+    return {
+      brief: (row.notes ?? []).map((id) => text(view.briefFootnotes, id)),
+      whole: (row.notes ?? []).map((id) => text(view.footnotes, id)),
+    };
+  }
+
+  /** Every team's home note is its whole note's start and names the team it stands by. */
+  function trueBesideEach(made: Made): void {
+    expect(made.view.briefFootnotes.map((f) => f.id)).toEqual(made.view.footnotes.map((f) => f.id));
+    for (const row of made.view.rows) {
+      const { brief, whole } = bothBeside(made, row.team);
+      brief.forEach((note, n) => {
+        expect(whole[n]?.startsWith(note)).toBe(true);
+        if (note.includes(' level on ')) expect(note).toContain(row.team);
+      });
+    }
+  }
+
+  it('four level (case 46): the home page says who is level and on what; the standings page the whole note', async () => {
+    const made = await tableAfter(
+      ['Otters', 'Badgers', 'Lions', 'Tigers', 'Hawks', 'Bears'],
+      [
+        ['Tigers', 55, 'Hawks', 48],
+        ['Bears', 60, 'Badgers', 52],
+        ['Hawks', 51, 'Tigers', 47],
+        ['Otters', 58, 'Lions', 49],
+        ['Lions', 50, 'Bears', 44],
+      ],
+    );
+    for (const team of ['Lions', 'Tigers', 'Hawks', 'Bears']) {
+      expect(bothBeside(made, team)).toEqual({
+        brief: ['Lions, Tigers, Hawks, and Bears are level on win percentage (.500).'],
+        whole: [
+          'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Point difference puts Tigers ahead of Hawks: +3 against -3.',
+        ],
+      });
+    }
+    trueBesideEach(made);
+  });
+
+  it('two level (case 7): the first sentence on the home page, the reason on the standings page', async () => {
+    const made = await tableAfter(['Ravens', 'Wolves'], [game1, game2]);
+    expect(bothBeside(made, 'Ravens')).toEqual({
+      brief: ['Wolves and Ravens are level on win percentage (.500).'],
+      whole: [
+        'Wolves and Ravens are level on win percentage (.500). Point difference puts Wolves ahead: +4 against -4.',
+      ],
+    });
+    trueBesideEach(made);
+  });
+
+  it('every other case keeps a note true beside each team: in the bin, not played, two still level, points', async () => {
+    const binned = await tableAfter(
+      ['Otters', 'Badgers', 'Lions', 'Tigers', 'Hawks', 'Bears'],
+      [
+        ['Tigers', 55, 'Hawks', 48],
+        ['Bears', 60, 'Badgers', 52],
+        ['Hawks', 51, 'Tigers', 47],
+        ['Otters', 58, 'Lions', 49],
+        ['Lions', 50, 'Bears', 44],
+      ],
+      { binned: ['Bears'] },
+    );
+    expect(bothBeside(binned, 'Hawks').brief).toEqual([
+      'Lions, Tigers, and Hawks are level on win percentage (.500).',
+    ]);
+    trueBesideEach(binned);
+    const reader = await tableAfter(
+      ['A', 'B', 'C', 'D', 'E', 'F'],
+      [
+        ['A', 60, 'B', 55],
+        ['E', 51, 'A', 50],
+        ['D', 45, 'C', 40],
+        ['E', 41, 'D', 40],
+        ['B', 80, 'F', 60],
+        ['C', 50, 'F', 45],
+      ],
+    );
+    trueBesideEach(reader);
+    const idle = await tableAfter(['Wolves', 'Ravens', 'Hawks'], [game1]);
+    trueBesideEach(idle);
+    const points = await tableAfter(
+      ['Ash', 'Birch', 'Cedar'],
+      [
+        ['Ash', 40, 'Cedar', 30],
+        ['Cedar', 50, 'Birch', 45],
+        ['Birch', 45, 'Ash', 44],
+      ],
+      {
+        rules: {
+          ...defaultSeasonRules(),
+          standings: { ...defaultSeasonRules().standings, rankBy: 'points', pointsPerWin: 3 },
+        },
+      },
+    );
+    trueBesideEach(points);
+  });
+});
