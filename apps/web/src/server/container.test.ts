@@ -55,6 +55,7 @@ vi.mock('@srleagues/database', (original) =>
 );
 vi.mock('@srleagues/providers', (original) =>
   throwingFunctions('providers', original as () => Promise<Record<string, unknown>>, [
+    'createLocalBotCheck',
     'createLocalSignInStandIn',
     'createMemorySignInStore',
     'createSignInCodeCapture',
@@ -167,6 +168,20 @@ describe('container.ts in staging, wired for real', () => {
     expect(auth.callsTo('GET', '/settings')).toBe(1);
     // The one area not on the database refuses rather than falling back.
     expect(() => ports.fixtureImport.deps).toThrow(/not on the database yet|database/i);
+    expect(standInsReached).toEqual([]);
+  }, 120_000);
+
+  it('makes the bot check once from its two keys and hands it to the database ports (record 081)', async () => {
+    const { settings } = await world();
+    const ports = await webPortsWith({
+      ...settings,
+      // Made up, never used: no form is posted, so Turnstile is never asked.
+      TURNSTILE_SITE_KEY: 'made-up-site-key',
+      TURNSTILE_SECRET_KEY: 'made-up-turnstile-secret-never-used',
+    });
+    // The started ports carry Turnstile's check: not the local stand-in, not switched off.
+    expect(ports.botCheck.widget.kind).toBe('turnstile');
+    expect(ports.botCheck.widget).toMatchObject({ siteKey: 'made-up-site-key' });
     expect(standInsReached).toEqual([]);
   }, 120_000);
 
