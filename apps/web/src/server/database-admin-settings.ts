@@ -35,6 +35,9 @@ export type AdminSettingsQueries = Pick<
   | 'gamesStore'
 >;
 
+/** What Season settings' commands run in: the leagues' stores and the standings' (step 2.47). */
+type SeasonsTx = LeaguesTx & StandingsTx;
+
 export function databaseAdminSettings(
   database: AdminSettingsQueries,
   db: DatabaseHandle,
@@ -54,6 +57,6 @@ export function databaseAdminSettings(
   const now = () => performance.now();
   return {
     deps: { transaction, events: coreEventHandlers<LeaguesTx>(), log, now },
-    seasons: { transaction, events: [], log, now },
+    seasons: { transaction, events: coreEventHandlers<SeasonsTx>(), log, now },
   };
 }
