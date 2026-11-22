@@ -352,6 +352,19 @@ export function createFakeSupabaseAuth(options: FakeSupabaseAuthOptions) {
       }
     }
 
+    if (call.method === 'DELETE' && path.startsWith('/admin/users/')) {
+      // Only the sign-in service check calls this, to remove its made-up user (step 2.206).
+      if (call.headers['authorization'] !== `Bearer ${options.secretKey}`) {
+        return refuse(403, 'not_admin', 'User not allowed');
+      }
+      const user = users.get(decodeURIComponent(path.slice('/admin/users/'.length)));
+      if (!user) return refuse(404, 'user_not_found', 'User not found');
+      endSessions(user.id);
+      users.delete(user.id);
+      usersByEmail.delete(user.email);
+      return json(200, {});
+    }
+
     if (call.method === 'GET' && path === '/settings') {
       // The public settings any visitor with the project's key may read.
       return json(200, {

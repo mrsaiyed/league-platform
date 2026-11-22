@@ -751,6 +751,10 @@ html {
 .home-leaders-beside {
   margin-block-start: var(--space-section);
 }
+/* "2 players are level for first.": the line a shared place gets instead of one card. */
+.home-leaders-level {
+  margin-block: var(--step-1) var(--step-3);
+}
 .home-leaders-head {
   display: flex;
   flex-wrap: wrap;

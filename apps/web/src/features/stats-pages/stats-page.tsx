@@ -135,9 +135,18 @@ export function StatsTables({
           note={
             // Said where the eye is: the table lists everyone and opens sorted by points, so
             // its first row may be a player with too few games to lead a card above.
-            data.playerRows.some((row) => row.quiet !== undefined)
-              ? t.plural('stats.listedNotRanked', data.minimumGames)
-              : undefined
+            // A player can also have played enough games and a statistic recorded in fewer:
+            // then that column's top may be on no board, and the table says why.
+            [
+              data.playerRows.some((row) => row.quiet !== undefined)
+                ? t.plural('stats.listedNotRanked', data.minimumGames)
+                : undefined,
+              data.recordedInFewer
+                ? t.plural('stats.recordedNotRanked', data.minimumGames)
+                : undefined,
+            ]
+              .filter((sentence) => sentence !== undefined)
+              .join(t('stats.noteJoin')) || undefined
           }
         >
           <SortableStatsTable

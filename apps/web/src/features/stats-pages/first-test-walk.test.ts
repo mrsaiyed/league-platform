@@ -392,6 +392,34 @@ describe("the first test's walk, through core's commands (step 2.194)", async ()
       // Eli Ravens and Ben Wolves made one each: first place is shared, no one card.
       ['Free throws made', 'Eli Ravens', '1', true],
     ]);
+    // The lists under the cards (step 2.199). Nobody is listed for a statistic they have
+    // none of: the founder saw "2. Ann Ravens 0" under the 3-pointers and the free throws.
+    // Points: four players level second on 2 are all shown, and the two on 1 behind them
+    // are past the five places. Players level in a place are in no order a parent reads,
+    // so each list is compared sorted.
+    const lists = statsPage.leaders.map((board) => [
+      board.title,
+      board.rows
+        .map((row) => `${String(row.cells['player'])} ${String(row.cells['value'])}`)
+        .sort(),
+    ]);
+    expect(lists).toEqual([
+      [
+        'Points',
+        [
+          '1. Ann Wolves 3',
+          '2. Ann Ravens 2',
+          '2. Cal Ravens 2',
+          '2. Cal Wolves 2',
+          '2. Dee Ravens 2',
+        ],
+      ],
+      ['3-pointers made', ['1. Ann Wolves 1']],
+      ['Free throws made', ['1. Ben Wolves 1', '1. Eli Ravens 1']],
+    ]);
+    for (const board of statsPage.leaders) {
+      for (const row of board.rows) expect(row.cells['value']).not.toBe('0');
+    }
     expect(
       statsPage.teamRows.map((r) => [r.cells['team'], r.cells['games'], r.cells['points']]),
     ).toEqual([

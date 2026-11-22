@@ -238,6 +238,7 @@ describe('statistics page', () => {
     totalsNoteTeams: [],
     openingSort: null,
     tableNotes: [],
+    recordedInFewer: false,
   });
   // The lists of the page, in order: each one's title, whether it follows a card, and the
   // place its first line shows.
