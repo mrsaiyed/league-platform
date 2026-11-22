@@ -3,9 +3,12 @@
 // 1. the commit to deploy: this checkout's own commit, with nothing changed or added in
 //    supabase/migrations, so the changes applied are exactly that commit's;
 // 2. the target opened, through the league-making tool's own checks (openMigrationTarget);
-// 3. where it will act shown from what was really connected to; the games live now are
-//    counted, and above the limit it stops unless told to go ahead (T-158); on a hosted
-//    database the person then types that database's name to go ahead;
+// 3. where it will act shown from what was really connected to; the login proved to see
+//    every league, then the games live now counted, and above the limit it stops unless
+//    told to go ahead (T-158); on a hosted database the person then types the Supabase
+//    project's reference (for a host that names none, the host's name), read from the
+//    connection itself, to go ahead: a database's name is `postgres` on every project and
+//    tells nothing apart;
 // 4. the changes applied by the one runner (applyMigrations), each file in its own
 //    transaction;
 // 5. only when every file applied (or had been): the commit to deploy is named. A failed
@@ -24,6 +27,15 @@ import * as words from './release.messages.mjs';
  * release (T-127): until then any live game stops it (T-300).
  */
 export const mostLiveGames = 0;
+
+/**
+ * What the person types to go ahead on a hosted database: the project's reference, which
+ * names the project, else the host's name, both from what was really connected to.
+ */
+export function expectedAnswer(place) {
+  if (place.kind !== 'postgres') return undefined;
+  return place.project ?? place.host;
+}
 
 /** A short error code only (SQLSTATE such as 23505, or ECONNRESET), never a message. */
 export function codeOf(error) {
@@ -65,7 +77,12 @@ export async function runRelease({
   const { target } = opened;
   try {
     for (const line of words.whereLines(target.place, named.id)) say(line);
-    const live = await countLiveGames(target.login);
+    const counted = await countLiveGames(target.login);
+    if (!counted.ok) {
+      for (const line of words.fencedLogin) warn(line);
+      return 1;
+    }
+    const { live } = counted;
     if (live > mostLiveGames && !goAhead) {
       for (const line of words.liveGamesRefused(live, mostLiveGames)) warn(line);
       return 3;
@@ -73,8 +90,9 @@ export async function runRelease({
     if (live > 0) say(words.liveGamesGoingAhead(live));
     if (source.kind === 'migration-login') {
       for (const line of words.checkBeforeAnswering(target.place)) say(line);
-      const answer = await ask(words.confirmHosted);
-      if (target.place.kind !== 'postgres' || answer.trim() !== target.place.database) {
+      const expected = expectedAnswer(target.place);
+      const answer = await ask(words.confirmHosted(target.place));
+      if (expected === undefined || answer.trim().toLowerCase() !== expected.toLowerCase()) {
         say(words.notApplied);
         return 1;
       }

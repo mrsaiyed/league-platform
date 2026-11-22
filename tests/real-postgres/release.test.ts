@@ -14,11 +14,13 @@ import { runRelease } from '../../scripts/release-run.mjs';
 import { ca, ownerSession, server } from './server.ts';
 
 const database = new URL(server.ownerUrl).pathname.slice(1);
+// M1: the answer is what names the project; this server's host names none, so its host.
+const host = new URL(server.ownerUrl).hostname;
 const commitId = '0123456789abcdef0123456789abcdef01234567';
 
 type Ran = { code: number; out: string[]; err: string[]; asked: string[] };
 
-async function release(url: string, answer: string = database): Promise<Ran> {
+async function release(url: string, answer: string = host): Promise<Ran> {
   const out: string[] = [];
   const err: string[] = [];
   const asked: string[] = [];
@@ -50,11 +52,17 @@ describe('the release command on a real PostgreSQL', () => {
     }
   });
 
-  it('a wrong answer applies nothing and names no commit', async () => {
-    const ran = await release(server.ownerUrl, 'yes');
-    expect(ran.code).toBe(1);
-    expect(ran.out.join('\n')).not.toContain('Deploy commit');
-    expect(ran.out.at(-1)).toBe('Nothing was applied. Do not deploy.');
+  it('a wrong answer applies nothing and names no commit, the database’s name included', async () => {
+    for (const answer of ['yes', database]) {
+      const ran = await release(server.ownerUrl, answer);
+      expect(ran.code).toBe(1);
+      expect(ran.asked).toEqual([
+        'This is a hosted database. To apply the changes there, type the host’s name shown above: ',
+      ]);
+      expect(ran.out).toContain(`Host: ${host}`);
+      expect(ran.out.join('\n')).not.toContain('Deploy commit');
+      expect(ran.out.at(-1)).toBe('Nothing was applied. Do not deploy.');
+    }
   });
 
   it('refuses a database that holds the tracker’s own schema', async () => {

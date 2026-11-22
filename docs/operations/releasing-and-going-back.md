@@ -44,8 +44,8 @@ It then asks for **the migration login's password**. Copy it from your password 
 What you see, in order:
 
 1. **Where.** A "Where" line naming the database, its host and the Supabase project, and saying "NOT on this computer: a hosted database". Read the project's reference aloud and compare it with the test copy's project in the Supabase dashboard. It must **not** be the one in `supabase/site.json` (the tracker's). If anything is not what you expect, press Ctrl+C: nothing is changed.
-2. **Live games.** If any game is being scored, it says how many and stops: "Nothing was applied. Do not deploy." Wait until they are final and run it again. Only for an urgent fix, with the lead, add `--go-ahead` at the end of the command.
-3. **The question.** It asks you to type the database's name shown above. Type it exactly (on Supabase it is `postgres`). Anything else stops it with nothing applied.
+2. **Live games.** It first checks that the login sees every league's games; if it does not, it says so and stops ("That login does not see every league … Nothing was applied"): use the tables' owner, as above. If any game is being scored, it says how many and stops: "Nothing was applied. Do not deploy." Wait until they are final and run it again. Only for an urgent fix, with the lead, add `--go-ahead` at the end of the command.
+3. **The question.** It shows "Supabase project:" and the project's reference again, and asks you to type that reference. Type it yourself, from the test copy's dashboard (the short code in its address), not copied from the screen: that is the check that you are where you mean to be. Anything else stops it with nothing applied. (For a database whose host names no Supabase project, it shows "Host:" and asks for the host's name instead.)
 4. **The changes.** "Applied now:" lists the changes added this time ("none" if there were none), then "Already applied: N files".
 5. **The commit.** Last line: "The database is ready. Deploy commit `<id>` now, by hand on the host." Check that id is the one in `STATUS.md`.
 

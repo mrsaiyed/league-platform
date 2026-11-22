@@ -134,7 +134,15 @@ export const checkBeforeAnswering = (place) => [
         `Supabase project: ${place.project}`,
         'Check that reference against the test copy’s project in the Supabase dashboard, and that it is not the one in supabase/site.json, before you answer.',
       ]
-    : ['Check that this is the database you mean before you answer.']),
+    : place.kind === 'postgres'
+      ? [`Host: ${place.host}`, 'Check that this is the database you mean before you answer.']
+      : ['Check that this is the database you mean before you answer.']),
+];
+
+/** M2: the count is right only for a login that row-level security does not fence. */
+export const fencedLogin = [
+  'That login does not see every league (row-level security still fences it), so it cannot count the games being scored, and a count of 0 from it would mean nothing. Nothing was applied. Do not deploy.',
+  'Use the migration login, the one that owns the tables (on Supabase, postgres), and run the release again.',
 ];
 
 const games = (count) => `${count} game${count === 1 ? '' : 's'}`;
@@ -147,9 +155,14 @@ export const liveGamesRefused = (live, most) => [
 export const liveGamesGoingAhead = (live) =>
   `${games(live)} being scored right now: going ahead, as asked (--go-ahead or within the limit).`;
 
-/** On a hosted database the question is answered by typing the database's own name. */
-export const confirmHosted =
-  'This is a hosted database. To apply the changes there, type the database’s name shown above: ';
+/**
+ * On a hosted database the question is answered by typing what names the project, read
+ * from the connection: the Supabase project's reference, else the host's name (M1).
+ */
+export const confirmHosted = (place) =>
+  place.kind === 'postgres' && place.project !== null
+    ? 'This is a hosted database. To apply the changes there, type the Supabase project’s reference shown above: '
+    : 'This is a hosted database. To apply the changes there, type the host’s name shown above: ';
 export const notApplied = 'Nothing was applied. Do not deploy.';
 export const stopped = 'Stopped. Nothing was applied. Do not deploy.';
 export const unexpected = (code) =>
