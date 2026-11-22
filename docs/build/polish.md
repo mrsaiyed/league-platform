@@ -13,3 +13,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.50 (the confirming look, 2026-11-22): on a person's record the line under "Child or adult" ends with two full stops when the name is shortened ("Public pages show: Marcus O.."); after "someone else changed this person's details", a box the person did not touch quietly takes the stored value with no mark that it changed meanwhile.
 
 - Home page at 390 wide (seen on the simulated league, `/simulated`, 2026-11-22): the small standings card cuts off the win-percentage column at the right edge ("1.00"); the page is no wider than the screen, so the width check does not see it. After a season has ended "The next matchups" shows only a postponed game and the count reads "1 games to play".
+
+- Seen by the first-test walk (2026-11-22): with a season's default statistics the scoring pad offers Team turnover, which shows in the play-by-play and in no total, and no screen switches a season to the full set of statistics; under each leader card the list ranks players who have 0 (step 2.199 may already cover it).
