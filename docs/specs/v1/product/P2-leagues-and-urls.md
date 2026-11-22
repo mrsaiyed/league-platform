@@ -90,7 +90,7 @@ The same five words describe a 6-team rec league and a state association. Small 
 | `/{league}/{page}`                                  | Any page the admin created (About, Rules, and so on)                          |
 | `/{league}/clubs/{club}`                            | A member school's page, in leagues that use clubs                             |
 
-Until the members' own tools are built (stage 4), `/{league}/my` is the way to a member's team (step 2.168): a member with one team of the season is taken to its page, a member with several is shown them, a member with none is told so in a sentence with the way to the teams, and someone signed out is sent to sign in and brought back. The account menu's "My team" leads there, for anyone with a team.
+Until the members' own tools are built (stage 4), `/{league}/my` is the way to a member's team (step 2.168): a member with one team of the season is taken to its page, a member with several is shown them, a member with none is told so in a sentence with the way to the teams, and someone signed out is sent to sign in and brought back. The account menu's "My team" leads there, for anyone with a team, and says "My teams" to a member with more than one, who sees all of them there (S-78). A signed-in member with a team of their own in the league is not offered "Make this my team" on any team's page, since their own team already opens the league for them; a parent with no team of their own keeps that choice on their device (S-78).
 
 In a league with several programs, the sports pages move one level down: `/tcsaal/varsity-boys-basketball/schedule`. League-wide pages (home, news, register, clubs, custom pages) stay at the top.
 
