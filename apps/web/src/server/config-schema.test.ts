@@ -17,6 +17,7 @@ const valid: Record<ConfigName, string> = {
   TRUSTED_PROXY: 'one',
   PLATFORM_DATABASE_URL: 'postgres://app:hunter2-made-up@localhost:5432/x',
   LOCAL_BINNED_TEAM: 'badgers',
+  LOCAL_BOT_CHECK: 'stand-in',
   LOCAL_DATA: 'stand-in',
   LOCAL_DEMO_LEAGUE: 'off',
   LOCAL_SIMULATED_LEAGUE: 'off',
@@ -25,6 +26,8 @@ const valid: Record<ConfigName, string> = {
   SESSION_SECRET: longValue('SESSION_SECRET'),
   SUPABASE_URL: 'http://localhost:54321',
   SUPABASE_SECRET_KEY: longValue('SUPABASE_SECRET_KEY'),
+  TURNSTILE_SITE_KEY: '0x4AAAAAAAmadeUpSiteKey',
+  TURNSTILE_SECRET_KEY: longValue('TURNSTILE_SECRET_KEY'),
   RESEND_API_KEY: longValue('RESEND_API_KEY'),
   EMAIL_FROM: 'hello@example.test',
   STRIPE_SECRET_KEY: longValue('STRIPE_SECRET_KEY'),
@@ -32,12 +35,13 @@ const valid: Record<ConfigName, string> = {
 };
 const names = Object.keys(fields) as ConfigName[];
 /**
- * Every setting, for staging and production: LOCAL_BINNED_TEAM, LOCAL_DATA,
+ * Every setting, for staging and production: LOCAL_BINNED_TEAM, LOCAL_BOT_CHECK, LOCAL_DATA,
  * LOCAL_DEMO_LEAGUE, LOCAL_DESIGN and LOCAL_NOW are for local work and tests only.
  */
 const hosted = {
   ...valid,
   LOCAL_BINNED_TEAM: undefined,
+  LOCAL_BOT_CHECK: undefined,
   LOCAL_DATA: undefined,
   LOCAL_DEMO_LEAGUE: undefined,
   LOCAL_SIMULATED_LEAGUE: undefined,
@@ -51,6 +55,8 @@ const requiredWhereUsed: Readonly<Partial<Record<ConfigName, readonly string[]>>
   PLATFORM_DATABASE_URL: ['staging', 'production'],
   SUPABASE_URL: ['staging', 'production'],
   SUPABASE_SECRET_KEY: ['staging', 'production'],
+  TURNSTILE_SITE_KEY: ['production'],
+  TURNSTILE_SECRET_KEY: ['production'],
   RESEND_API_KEY: ['production'],
 };
 /** What local work needs: no database, no sign-in service, no keys. */
@@ -68,6 +74,8 @@ const production = {
   PLATFORM_DATABASE_URL: valid.PLATFORM_DATABASE_URL,
   SUPABASE_URL: 'https://made-up-project.supabase.example.test',
   SUPABASE_SECRET_KEY: valid.SUPABASE_SECRET_KEY,
+  TURNSTILE_SITE_KEY: valid.TURNSTILE_SITE_KEY,
+  TURNSTILE_SECRET_KEY: valid.TURNSTILE_SECRET_KEY,
   RESEND_API_KEY: valid.RESEND_API_KEY,
 };
 
@@ -115,11 +123,40 @@ describe('loadConfig', () => {
           `TRUSTED_PROXY: missing, must be set explicitly when APP_ENV is ${appEnv}`,
         ]);
       }
-      for (const set of ['none', 'one'] as const) {
+      for (const set of ['none', 'one', 'cloudflare'] as const) {
         expect(loadConfig({ ...hosted, APP_ENV: appEnv, TRUSTED_PROXY: set }).TRUSTED_PROXY).toBe(
           set,
         );
       }
+    }
+  });
+
+  it("takes Turnstile's two keys together: production needs both, staging both or neither", () => {
+    const staging = { ...production, APP_ENV: 'staging', RESEND_API_KEY: undefined };
+    const none = { TURNSTILE_SITE_KEY: undefined, TURNSTILE_SECRET_KEY: undefined };
+    // Staging with neither: starts, the bot check off (T-270).
+    expect(loadConfig({ ...staging, ...none }).TURNSTILE_SITE_KEY).toBeUndefined();
+    // Staging with both: starts, with Turnstile.
+    expect(loadConfig(staging).TURNSTILE_SITE_KEY).toBe(valid.TURNSTILE_SITE_KEY);
+    // Staging with one: refused, naming the one missing and no value.
+    const onlySite = failure({ ...staging, TURNSTILE_SECRET_KEY: undefined });
+    expect(onlySite.invalid).toEqual([
+      'TURNSTILE_SECRET_KEY: missing, must be set with TURNSTILE_SITE_KEY (or leave out both to switch the bot check off)',
+    ]);
+    const onlySecret = failure({ ...staging, TURNSTILE_SITE_KEY: ' ' });
+    expect(onlySecret.invalid).toEqual([
+      'TURNSTILE_SITE_KEY: missing, must be set with TURNSTILE_SECRET_KEY (or leave out both to switch the bot check off)',
+    ]);
+    expect(onlySecret.message).not.toContain(valid.TURNSTILE_SECRET_KEY);
+    // Production with neither, or one: refused.
+    for (const missing of [
+      none,
+      { TURNSTILE_SITE_KEY: undefined },
+      { TURNSTILE_SECRET_KEY: undefined },
+    ]) {
+      expect(failure({ ...production, ...missing }).invalid.join()).toMatch(
+        /TURNSTILE_(SITE|SECRET)_KEY: missing, must be set when APP_ENV is production/,
+      );
     }
   });
 
