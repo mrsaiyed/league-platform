@@ -339,7 +339,40 @@ export async function TeamPage({
         )}
       </Section>
 
-      <Section title={t('adminTeams.add.title')} id={addPlayerAnchor}>
+      {/* A new player first: it is what an admin with an empty league does first (step
+          2.194's walk). Each form under its own heading, so a number typed in one is never
+          meant for the other. The "Add a player" button at the top leads to the first. */}
+      {mayAddPeople ? (
+        <Section title={t('adminTeams.newPerson.title')} id={addPlayerAnchor}>
+          <form action={addNewPersonAction} className="staff-form">
+            <LeagueField league={here.slug} />
+            <input type="hidden" name="team" value={team.id} />
+            <TextField
+              name="firstName"
+              label={t('adminTeams.newPerson.firstName')}
+              required
+              maxLength={100}
+            />
+            <TextField
+              name="lastName"
+              label={t('adminTeams.newPerson.lastName')}
+              required
+              maxLength={100}
+            />
+            <NumberAndRole />
+            <p className="staff-buttons">
+              <button type="submit" className="ui-button" data-kind="main">
+                {t('adminTeams.newPerson.submit')}
+              </button>
+            </p>
+          </form>
+        </Section>
+      ) : null}
+
+      <Section
+        title={t('adminTeams.add.fromLeague')}
+        {...(mayAddPeople ? {} : { id: addPlayerAnchor })}
+      >
         {readFailed ? (
           <StaffNotice kind="refused">{t('adminTeams.add.readFailed')}</StaffNotice>
         ) : peopleNotAllowed ? (
@@ -368,40 +401,13 @@ export async function TeamPage({
             </p>
             <NumberAndRole />
             <p className="staff-buttons">
-              <button type="submit" className="ui-button" data-kind="main">
+              <button type="submit" className="ui-button">
                 {t('adminTeams.add.submit')}
               </button>
             </p>
           </form>
         )}
       </Section>
-
-      {mayAddPeople ? (
-        <Section title={t('adminTeams.newPerson.title')}>
-          <form action={addNewPersonAction} className="staff-form">
-            <LeagueField league={here.slug} />
-            <input type="hidden" name="team" value={team.id} />
-            <TextField
-              name="firstName"
-              label={t('adminTeams.newPerson.firstName')}
-              required
-              maxLength={100}
-            />
-            <TextField
-              name="lastName"
-              label={t('adminTeams.newPerson.lastName')}
-              required
-              maxLength={100}
-            />
-            <NumberAndRole />
-            <p className="staff-buttons">
-              <button type="submit" className="ui-button">
-                {t('adminTeams.newPerson.submit')}
-              </button>
-            </p>
-          </form>
-        </Section>
-      ) : null}
 
       <Section title={t('adminTeams.people.title')}>
         {peopleNotAllowed ? (

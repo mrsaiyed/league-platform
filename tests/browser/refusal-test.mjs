@@ -446,8 +446,10 @@ if (browser) {
       note('nothing tells them to reload the page', !text.includes('could not be read just now'));
       // No form that could only be refused (the lead's rule since step 2.180).
       note(
-        'the club admin is not offered "Someone not in the list yet"',
-        (await page.getByRole('heading', { name: 'Someone not in the list yet' }).count()) === 0,
+        'the club admin is not offered "A new player, not in the league yet"',
+        (await page
+          .getByRole('heading', { name: 'A new player, not in the league yet' })
+          .count()) === 0,
       );
       note(
         'the club admin is not offered the head’s "Add a player", which could lead nowhere',
@@ -459,14 +461,14 @@ if (browser) {
   });
 
   await step(
-    'an admin is offered "Someone not in the list yet"; a post by hand is refused plainly',
+    'an admin is offered "A new player, not in the league yet"; a post by hand is refused plainly',
     async () => {
       const { context, page } = await asToken('local-admin-token');
       try {
         await page.goto(`${origin}/quiet-pines/admin/teams/${draftTeam}`);
-        const heading = page.getByRole('heading', { name: 'Someone not in the list yet' });
+        const heading = page.getByRole('heading', { name: 'A new player, not in the league yet' });
         await heading.waitFor();
-        note('the draft league’s admin is offered "Someone not in the list yet"', true);
+        note('the draft league’s admin is offered "A new player, not in the league yet"', true);
         note(
           'the admin has the head’s "Add a player"',
           (await page.locator('main a[href="#add-player"]').count()) === 1,

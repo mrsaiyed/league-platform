@@ -35,6 +35,8 @@ export const enAccount = {
   'access.noAccess.youAre': 'You are {roles} in this league.',
   'account.devices': 'Signed-in devices',
   'account.lastActive': 'Last active {when}',
+  // Beside a league the person helps run, on their own lists: the way to its admin.
+  'account.leagueAdmin': 'Admin',
   'account.leagues': 'Your leagues',
   'account.leaguesEmpty':
     'The leagues you belong to will be listed here, with your role in each, once a league adds you.',

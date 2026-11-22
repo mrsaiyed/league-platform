@@ -1641,10 +1641,26 @@ async function checkTeams(origin) {
   const problems = [];
   const as = (who) => ({ cookie: `srl_session=${tokens[who]}` });
   const pageOf = async (who, page) => (await fetch(origin + page, { headers: as(who) })).text();
-  /** Posts the `index`th form of `page` with the fields given. */
+  /**
+   * Posts a form of `page` with the fields given: the `index`th form when `index` is a
+   * number, or, when it is a field's name, the one form that has that field (so a form is
+   * found by what it is, wherever the page puts it).
+   */
   async function post(who, page, index, fields, formPage = page) {
     const html = await pageOf('owner', formPage);
-    const id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
+    const actionOf = (form) => /name="(\$ACTION_ID_[^"]+)"/.exec(form)?.[1];
+    let id;
+    if (typeof index === 'number') {
+      id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
+    } else {
+      const having = pageForms(html)
+        .split('<form')
+        .slice(1)
+        .map((form) => form.slice(0, form.indexOf('</form>')))
+        .filter((form) => form.includes(`name="${index}"`) && actionOf(form) !== undefined);
+      if (having.length > 1) problems.push(`${page}: ${having.length} forms have ${index}`);
+      id = having.length === 1 ? actionOf(having[0]) : undefined;
+    }
     if (id === undefined) {
       problems.push(`${page}: no form ${index}`);
       return undefined;
@@ -1676,9 +1692,10 @@ async function checkTeams(origin) {
     return problems;
   }
   const page = `${list}/${team}`;
-  // Forms of a team with no one on it yet: details, who sees, putting one of the league's
-  // people on the roster (the league has people, step 2.152), then someone new.
-  const player = await post('owner', page, 3, {
+  // A team with no one on it yet has two ways to add a player: someone new (first, step
+  // 2.194) and one of the league's people (the league has people, step 2.152). The new
+  // player's form is the one with a first name.
+  const player = await post('owner', page, 'firstName', {
     league: 'harbor-city',
     team,
     firstName: 'Casey',
@@ -1697,8 +1714,8 @@ async function checkTeams(origin) {
   const entry = /name="entry" value="([^"]+)"/.exec(withPlayer)?.[1];
   const version = /name="version" value="([^"]+)"[^>]*\/><p><label>Number/.exec(withPlayer)?.[1];
   const forms = [...pageForms(withPlayer).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].length;
-  // Forms in order: details, who sees, [number and role, mark as left] for the player, ...
-  const gone = await post('owner', page, 3, {
+  // The one player's "mark as left" form is the one with a day they left.
+  const gone = await post('owner', page, 'leftOn', {
     league: 'harbor-city',
     team,
     entry,
