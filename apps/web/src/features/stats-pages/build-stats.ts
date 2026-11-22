@@ -72,18 +72,26 @@ const shownWithMore = (value: number, by: StatsBy, more: number): string =>
  * who are not level but whose numbers would read the same (22 points in 3 games, 7.33, and
  * 29 in 4, 7.25: both "7.3") are both written with as many more decimals as tell them
  * apart, one almost always, so the page shows why one is ahead. Level players read the
- * same and share a place. Only the players this viewer sees are on the board (S-22), so a
- * number never gains a decimal because of a player who is not shown.
+ * same and share a place. The decimals are worked out once for each PLACE and every player
+ * of that place is written with them, so two players shown the same number are always
+ * level and two shown different numbers never are. Only the players this viewer sees are
+ * on the board (S-22), so a number never gains a decimal because of a player who is not
+ * shown.
  */
 export function leaderValues(
   leaders: readonly { readonly rank: number; readonly value: number }[],
   by: StatsBy,
 ): string[] {
-  const more = leaders.map(() => 0);
-  for (let index = 1; index < leaders.length; index += 1) {
-    const above = leaders[index - 1];
-    const here = leaders[index];
-    if (above === undefined || here === undefined || above.rank === here.rank) continue;
+  const places: { readonly rank: number; readonly value: number }[] = [];
+  for (const leader of leaders) {
+    const last = places[places.length - 1];
+    if (last === undefined || last.rank !== leader.rank) places.push(leader);
+  }
+  const more = places.map(() => 0);
+  for (let index = 1; index < places.length; index += 1) {
+    const above = places[index - 1];
+    const here = places[index];
+    if (above === undefined || here === undefined) continue;
     let extra = 0;
     while (
       extra < mostMore &&
@@ -94,7 +102,8 @@ export function leaderValues(
     more[index - 1] = Math.max(more[index - 1] ?? 0, extra);
     more[index] = Math.max(more[index] ?? 0, extra);
   }
-  return leaders.map((leader, index) => shownWithMore(leader.value, by, more[index] ?? 0));
+  const moreByRank = new Map(places.map((place, index) => [place.rank, more[index] ?? 0]));
+  return leaders.map((leader) => shownWithMore(leader.value, by, moreByRank.get(leader.rank) ?? 0));
 }
 
 export type LeaderBoard = {

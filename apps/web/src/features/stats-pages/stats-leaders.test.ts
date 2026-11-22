@@ -162,6 +162,29 @@ describe('two numbers that would read the same are written apart (case 39)', () 
     ]);
   });
 
+  it('writes every player of one place with the same number (the review, M1)', async () => {
+    const level = await page([
+      { name: 'Ada', played: [ash], games: 3, stats: points(22, 3) },
+      { name: 'Ben', played: [birch], games: 4, stats: points(29, 4) },
+      { name: 'Cy', played: [ash], games: 4, stats: points(29, 4) },
+    ]);
+    expect(linesOf(level.data, 'points').map((line) => [line[0], line[3]])).toEqual([
+      ['1. Ada Player', '7.33'],
+      ['2. Ben Player', '7.25'],
+      ['2. Cy Player', '7.25'],
+    ]);
+    const reverse = await page([
+      { name: 'Ada', played: [ash], games: 3, stats: points(22, 3) },
+      { name: 'Ben', played: [birch], games: 3, stats: points(22, 3) },
+      { name: 'Cy', played: [ash], games: 4, stats: points(29, 4) },
+    ]);
+    expect(linesOf(reverse.data, 'points').map((line) => [line[0], line[3]])).toEqual([
+      ['1. Ada Player', '7.33'],
+      ['1. Ben Player', '7.33'],
+      ['3. Cy Player', '7.25'],
+    ]);
+  });
+
   it('gives no number a decimal because of a player this visitor does not see (S-22)', async () => {
     // A staff-only team's player at 7.25 stands between 7.33 and 7.0: the visitor's board
     // is 7.3 and 7.0, as if the player were not there.
