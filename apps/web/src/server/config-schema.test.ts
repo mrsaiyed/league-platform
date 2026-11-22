@@ -13,7 +13,7 @@ const longValue = (name: string) => `value-of-${name.toLowerCase()}-0123456789-a
 /** A made-up authority's certificate (packages/providers' fixture), never a real one. */
 const madeUpCertificate = readFileSync(
   new URL(
-    '../../../../packages/providers/src/platform-database/fixtures/made-up-database-ca.pem',
+    '../../../../packages/providers/src/platform-database/fixtures/made-up-database-ca.certificate.txt',
     import.meta.url,
   ),
   'utf8',

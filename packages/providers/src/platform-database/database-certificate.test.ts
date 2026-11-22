@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { databaseCertificateFrom } from './database-certificate.ts';
 
-const fixture = new URL('./fixtures/made-up-database-ca.pem', import.meta.url);
+const fixture = new URL('./fixtures/made-up-database-ca.certificate.txt', import.meta.url);
 const pem = readFileSync(fixture, 'utf8');
 const name = 'PLATFORM_DATABASE_CA';
 const reader = (files: Record<string, string>) => (path: string) => {

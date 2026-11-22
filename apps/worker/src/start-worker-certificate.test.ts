@@ -32,7 +32,7 @@ afterEach(() => {
 
 const madeUpCa = readFileSync(
   new URL(
-    '../../../packages/providers/src/platform-database/fixtures/made-up-database-ca.pem',
+    '../../../packages/providers/src/platform-database/fixtures/made-up-database-ca.certificate.txt',
     import.meta.url,
   ),
   'utf8',
