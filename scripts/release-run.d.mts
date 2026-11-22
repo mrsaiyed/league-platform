@@ -17,7 +17,7 @@ export type ReleaseRun = {
 };
 
 /** T-158: the most live games, in all leagues, for a release without --go-ahead. */
-export const mostLiveGames: number;
+export declare const mostLiveGames: number;
 
 /** A short error code only (SQLSTATE or Node's), never a message. */
 export function codeOf(error: unknown): string | undefined;
