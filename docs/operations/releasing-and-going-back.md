@@ -72,6 +72,8 @@ What you see:
 
 After every deploy, before anything else: sign in as the made-up league's owner, change one thing in a form (for example the league's description) and **save**. See the page it leads to, with the change on it (step 2.239). If the page is an error, a blank page or the form again without the change, go back (section 4) and tell the lead.
 
+Then, after every release to the test copy, the lead first opens `https://<the service>.onrender.com/api/v1/health` in a browser and waits until it says "ok" (a free instance that has gone to sleep takes longer to wake than the check's 10 seconds for each answer), and then runs at their own terminal `npm run check:test-copy -- https://<the service>.onrender.com --without-action` (read-only, no secret): every line `passed`, the posted "be this person" line `NOT CHECKED` with its reason ([new test copy](new-test-copy.md), step 8.3). Run `npm run rehearse:test-copy` on the same commit first: it is what proves that one line. Any `FAILED` line: go back (section 4) and tell the founder in plain words.
+
 ## 4. Going back to the previous version (T-156)
 
 Going back means **running the previous commit's website against today's database**. The database is never taken back: there are no "undo" files, by design.

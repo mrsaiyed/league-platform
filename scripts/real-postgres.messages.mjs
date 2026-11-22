@@ -13,6 +13,8 @@ export const usage = [
   '',
   '  --port <number>    the port it answers on (default 54329)',
   '  --folder <folder>  where its files live, inside .local (default .local/pg)',
+  '  --bare             (start only) the tables’ owner and an empty database, nothing more,',
+  '                     as a new Supabase project is (the rehearsal, step 2.207)',
   '  REAL_POSTGRES_BIN  the folder holding initdb, pg_ctl and postgres, when they are not',
   '                     in /usr/lib/postgresql/<version>/bin or on PATH',
 ].join('\n');
@@ -79,15 +81,22 @@ export const prepareFailed = (step, reason) =>
     }[step]
   } (${reason}). It was stopped and its files removed.`;
 
-export const started = ({ version, port, where, applied }) =>
+export const started = ({ version, port, where, applied, bare = false }) =>
   [
     `Started a throw-away PostgreSQL ${version} for tests, on this computer only (localhost, port ${port}).`,
     `  Its files: ${where} (made-up data only; "stop" removes them).`,
     '  Encrypted: required, with a certificate signed by a made-up authority made just now.',
-    `  Migrations: ${applied} applied by the repository's own runner, the certificate checked.`,
-    '  Logins: the tables’ owner, made as Supabase’s "postgres" is (not a superuser; may create',
-    '  roles; bypasses the fence), and app_login, made as on 2026-11-13.',
-    '  A test gets the two addresses and the authority’s file from the test helper.',
+    ...(bare
+      ? [
+          '  Bare: the tables’ owner, made as Supabase’s "postgres" is, and its empty database,',
+          '  as a new Supabase project is. No migration applied and no app_login made.',
+        ]
+      : [
+          `  Migrations: ${applied} applied by the repository's own runner, the certificate checked.`,
+          '  Logins: the tables’ owner, made as Supabase’s "postgres" is (not a superuser; may create',
+          '  roles; bypasses the fence), and app_login, made as on 2026-11-13.',
+          '  A test gets the two addresses and the authority’s file from the test helper.',
+        ]),
     'Stop it with: node scripts/real-postgres.mjs stop',
   ].join('\n');
 

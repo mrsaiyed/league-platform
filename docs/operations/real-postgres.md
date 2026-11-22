@@ -28,7 +28,7 @@ FAILED: no PostgreSQL was found on this computer, so nothing was started and no 
 | `node scripts/real-postgres.mjs status` | Says whether one is running, its version, port and process. Never a password or an address.                                                                                    |
 | `node scripts/real-postgres.mjs stop`   | Stops it, checks no process of it is left, and removes its folder.                                                                                                             |
 
-Options: `--port <number>` (default 54329, not 5432, which a computer's own PostgreSQL may use) and `--folder <folder>`, which must be a folder of its own inside `.local` (default `.local/pg`), because `stop` removes it whole.
+Options: `--bare`, with `start` only (step 2.207): the tables' owner and its empty database and nothing more, no migration and no `app_login`, as a new Supabase project is, for `npm run rehearse:test-copy`, which then follows [the new test copy procedure](new-test-copy.md) on it (`connection.json` still holds an `app_login` password, made at the start, for the procedure to give); `--port <number>` (default 54329, not 5432, which a computer's own PostgreSQL may use) and `--folder <folder>`, which must be a folder of its own inside `.local` (default `.local/pg`), because `stop` removes it whole.
 
 One test file on a running server: `npx vitest run --config tests/real-postgres/vitest.config.ts tests/real-postgres/league-fence.test.ts`, or `npm run test:real-postgres -- tests/real-postgres/league-fence.test.ts`.
 

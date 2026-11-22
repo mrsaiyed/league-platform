@@ -14,6 +14,8 @@ playwright-report/
 *.zip
 *.bundle
 *.pem
+# A database's certificate downloaded into the checkout (staging-ca.crt, new-test-copy.md step 3).
+*.crt
 *.key
 docs/build/.lock
 docs/build/dashboard.html
