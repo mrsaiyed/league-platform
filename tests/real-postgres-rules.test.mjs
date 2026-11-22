@@ -14,6 +14,7 @@ import {
   defaultPort,
   findPostgres,
   folderInside,
+  foldersOnTheWay,
   majorVersion,
   pidOf,
   processState,
@@ -64,6 +65,15 @@ test('its files live only in a folder of their own inside .local', () => {
   for (const outside of ['.local', '.', 'docs', '..', '.local/../docs', '/tmp/pg', '.localpg']) {
     assert.equal(folderInside(root, outside), null, outside);
   }
+});
+
+test('the folders on the way to its own are those inside .local, from .local down', () => {
+  const local = path.join(root, '.local');
+  assert.deepEqual(foldersOnTheWay(root, path.join(local, 'pg')), [local]);
+  assert.deepEqual(foldersOnTheWay(root, path.join(local, 'a', 'b')), [
+    local,
+    path.join(local, 'a'),
+  ]);
 });
 
 test('it finds PostgreSQL in REAL_POSTGRES_BIN only when that is set', () => {

@@ -37,6 +37,7 @@ import {
   findOnPath,
   findPostgres,
   folderInside,
+  foldersOnTheWay,
   majorVersion,
   oldestMajor,
   pidOf,
@@ -197,6 +198,13 @@ async function start(tools, paths, port) {
   fs.mkdirSync(paths.tls, { recursive: true, mode: 0o700 });
   fs.chmodSync(paths.folder, 0o700);
   giveTo(tools, paths.folder);
+  // mkdir made `.local` (and any folder on the way) for this session's account alone:
+  // the server's own account may pass through them, without reading what else is there.
+  if (tools.runAs) {
+    for (const folder of foldersOnTheWay(root, paths.folder)) {
+      fs.chmodSync(folder, fs.statSync(folder).mode | 0o011);
+    }
+  }
 
   const stopAndClean = (step) => {
     console.error(words.startFailed(step, shown(paths.log)));

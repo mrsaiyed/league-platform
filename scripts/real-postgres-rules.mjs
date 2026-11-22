@@ -63,6 +63,24 @@ export function folderInside(root, folder) {
   return full;
 }
 
+/**
+ * The folders inside the repository's `.local` that lead to the server's folder, from
+ * `.local` down, not the server's folder itself. When the server runs as its own account
+ * (the session is root), that account must be able to pass through them, or initdb cannot
+ * even read its password file; `start` makes them passable (never readable) for others.
+ */
+export function foldersOnTheWay(root, full) {
+  const local = path.resolve(root, '.local');
+  const onTheWay = [];
+  for (let folder = path.dirname(full); ; folder = path.dirname(folder)) {
+    const relative = path.relative(local, folder);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) break;
+    onTheWay.unshift(folder);
+    if (relative === '') break;
+  }
+  return onTheWay;
+}
+
 /** A program's file name on this platform. */
 export const programFile = (name, platform) => (platform === 'win32' ? `${name}.exe` : name);
 
