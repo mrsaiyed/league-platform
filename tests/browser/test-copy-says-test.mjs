@@ -13,6 +13,9 @@
 // the line are written to .local/test-copy-shots/ (git-ignored), for the design review.
 // Production refuses to start before anything is drawn (test-copy-test.mjs proves it),
 // and local work shows no line (made-up-world-test and the unit tests of SiteFooter).
+// "Continue with Google" is not on the test copy's sign-in and sign-up (an account made
+// with Google would hold a real address), and is on them in local work (APP_ENV test on the
+// stand-in, started after the test copy is stopped).
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -133,6 +136,9 @@ async function askForCode(page, screen, address) {
   ]);
 }
 
+/** How many "Continue with Google" buttons `page` shows. */
+const googleButtons = (page) => page.getByRole('button', { name: en['signIn.google'] }).count();
+
 if (browser !== null) {
   await step('the line on the public pages and the sign-in screens', async () => {
     const context = await browser.newContext({ viewport: phone });
@@ -161,6 +167,13 @@ if (browser !== null) {
       );
       await page.goto(`${origin}/signup`);
       await lineOn(page, 'sign-up', 'signup');
+      for (const screen of ['/signin', '/signup']) {
+        await page.goto(`${origin}${screen}`);
+        note(
+          `${screen} on the test copy has no "${en['signIn.google']}"`,
+          (await googleButtons(page)) === 0,
+        );
+      }
     } finally {
       await context.close();
     }
@@ -243,14 +256,49 @@ if (browser !== null) {
   );
 }
 
-await browser?.close();
-// Stopped and waited for, its connections with it, before the fakes close.
-if (server !== null && server.child.exitCode === null && server.child.signalCode === null) {
-  await new Promise((resolve) => {
-    server.child.once('exit', resolve);
-    server.child.kill();
+/** Stops a started server and waits for it, its connections with it. */
+async function stop(started) {
+  if (started !== null && started.child.exitCode === null && started.child.signalCode === null) {
+    await new Promise((resolve) => {
+      started.child.once('exit', resolve);
+      started.child.kill();
+    });
+  }
+}
+// Before the fakes close.
+await stop(server);
+
+if (browser !== null) {
+  await step('local work still offers Google on sign-in and sign-up', async () => {
+    const localPort = await freePort();
+    const local = `http://localhost:${localPort}`;
+    const localServer = startNext(['start', '--port', String(localPort)], {
+      APP_ENV: 'test',
+      PUBLIC_BASE_URL: local,
+    });
+    const context = await browser.newContext({ viewport: phone });
+    try {
+      await waitFor(`${local}/signin`, localServer, [{ address: '/signup' }]);
+      const page = await context.newPage();
+      for (const screen of ['/signin', '/signup']) {
+        await page.goto(`${local}${screen}`);
+        note(
+          `${screen} in local work has "${en['signIn.google']}"`,
+          (await googleButtons(page)) === 1,
+        );
+        note(
+          `${screen} in local work has no test copy line`,
+          (await page.locator('[data-test-copy]').count()) === 0,
+        );
+      }
+    } finally {
+      await context.close();
+      await stop(localServer);
+    }
   });
 }
+
+await browser?.close();
 await auth.close();
 await served.close();
 

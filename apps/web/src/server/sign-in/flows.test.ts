@@ -1187,9 +1187,41 @@ describe('the test copy takes only made-up addresses for a code (step 2.205, T-1
     expect(b.names()).toContain(cookieNames.session);
   });
 
+  it('does not start a Google sign-in, before the sign-in service is asked', async () => {
+    const env = setup();
+    const { asked, deps } = untouchable(env);
+    const b = browser();
+    expect(await startGoogle({ next: '/a/b' }, b.visit, deps)).toEqual({
+      to: '/signin?problem=googleOff&next=%2Fa%2Fb',
+    });
+    expect(b.names()).toEqual([]);
+    expect(asked).toEqual([]);
+  });
+
+  it('takes no Google return, even of a sign-in begun elsewhere, so no account is made', async () => {
+    const env = setup();
+    const b = browser();
+    // Begun where Google is on (production or local work), and approved by Google.
+    const out = new URL((await startGoogle({}, b.visit, env.deps)).to);
+    const verifier = JSON.parse(
+      Buffer.from(b.jar.get(cookieNames.google) ?? '', 'base64url').toString('utf8'),
+    ).verifier;
+    env.standIn.approveExternalSignIn({ verifier, email: 'someone@gmail.com' });
+    const { asked, deps } = untouchable(env);
+    expect(await finishGoogle(out.searchParams.get('code') ?? '', b.visit, deps)).toEqual({
+      to: '/signin?problem=googleOff',
+    });
+    expect(b.jar.get(cookieNames.google)).toBeUndefined();
+    expect(b.jar.get(cookieNames.session)).toBeUndefined();
+    expect(asked).toEqual([]);
+  });
+
   it('refuses nothing where it is not the test copy (production and local work)', async () => {
     const env = setup();
     expect(env.deps.testCopy).toBe(false);
+    expect(new URL((await startGoogle({}, browser().visit, env.deps)).to).pathname).toBe(
+      '/signin/google',
+    );
     for (const purpose of ['sign-up', 'reset'] as const) {
       expect(
         await askForCode(purpose, { email: 'someone@gmail.com' }, browser().visit, env.deps),

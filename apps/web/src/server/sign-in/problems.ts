@@ -30,6 +30,8 @@ export const problems = {
   wrongEmailOrPassword: 'problem.wrongEmailOrPassword',
   wrongPassword: 'problem.wrongPassword',
   googleFailed: 'problem.googleFailed',
+  /** The test copy does not sign in with Google (step 2.205). */
+  googleOff: 'problem.googleOff',
   signInAgain: 'problem.signInAgain',
   /** Sent from the tracker's address with no session (step 2.33). */
   signInToScore: 'problem.signInToScore',

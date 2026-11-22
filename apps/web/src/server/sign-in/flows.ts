@@ -23,6 +23,7 @@
 // - Step 2.205: on the test copy only, asking for a code (sign-up, the forgotten password,
 //   a new code) takes only a made-up address, refused by its form before the bot check and
 //   the sign-in service are asked (notTakenHere). Signing in with a password is untouched.
+//   Google is off there too (googleOff): its account would bring a real Gmail address.
 import { signInEmail } from '@srleagues/contracts';
 import { platformUrl } from '@srleagues/core';
 import type {
@@ -300,13 +301,19 @@ export async function signInWithPassword(
   return afterSignIn(next);
 }
 
-/** "Continue with Google": off to Google, which sends the browser back to googleReturn. */
+/**
+ * "Continue with Google": off to Google, which sends the browser back to googleReturn. Not
+ * on the test copy (step 2.205, T-13, T-201): an account made there would hold a real
+ * Gmail address, so it is refused before the sign-in service is asked (its screens do not
+ * show the button there either).
+ */
 export async function startGoogle(
   fields: Fields,
   visit: Visit,
   deps: FlowDeps,
 ): Promise<FlowAnswer> {
   const next = safeReturnPath(fields['next']);
+  if (deps.testCopy) return goTo(screenUrl('signin', { problem: 'googleOff', next }));
   const started = await deps.signIn.startExternalSignIn({
     provider: 'google',
     returnAddress: deps.siteOrigin + platformUrl('googleReturn'),
@@ -316,7 +323,7 @@ export async function startGoogle(
   return goTo(started.value.redirectTo);
 }
 
-/** Google sent the browser back with a code. */
+/** Google sent the browser back with a code. On the test copy, never taken (startGoogle). */
 export async function finishGoogle(
   code: string,
   visit: Visit,
@@ -324,6 +331,7 @@ export async function finishGoogle(
 ): Promise<FlowAnswer> {
   const flow = readGoogleFlow(visit.jar);
   visit.jar.delete(cookieNames.google);
+  if (deps.testCopy) return goTo(screenUrl('signin', { problem: 'googleOff' }));
   if (flow === undefined || code === '') {
     return goTo(screenUrl('signin', { problem: 'googleFailed' }));
   }
