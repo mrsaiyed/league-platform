@@ -390,8 +390,13 @@ const lostTheGame: ReadonlySet<ReadOnlyReason> = new Set([
  */
 const gameGone: ReadonlySet<ReadOnlyReason> = new Set(['game-not-live', 'unknown-game']);
 
+/**
+ * A game that is over is loaded whether or not this device had it (step 2.37, part 2):
+ * a device that did not end it shows the final panel too (the score, who won, Reopen
+ * for as long as the league allows; the review of the two doors, point 3).
+ */
 const losesTheGame = (reason: ReadOnlyReason, hadGame: boolean): boolean =>
-  lostTheGame.has(reason) || (gameGone.has(reason) && hadGame);
+  lostTheGame.has(reason) || reason === 'game-not-live' || (gameGone.has(reason) && hadGame);
 
 /** `more` added to the end of `list`, leaving out any already in it. */
 const withTaps = (list: readonly KeptTap[], more: readonly KeptTap[]): KeptTap[] => {

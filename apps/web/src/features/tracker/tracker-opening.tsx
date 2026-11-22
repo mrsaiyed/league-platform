@@ -592,12 +592,13 @@ function useSlowAfter(active: boolean, afterMs: number): boolean {
 }
 
 /**
- * Whether opening the game again can help: not for someone signed out, refused or
- * sent to a game that is not there, who would only be turned away again.
+ * Whether opening the game again can help: not for someone signed out (the way to sign
+ * in comes back to this game) or sent to a game that is not there. No longer allowed to
+ * score, it can: an admin may give the game back, and the plays kept here are then sent
+ * (step 2.37, part 2; the notice says "open it again here").
  */
 const mayOpenAgain = (reason: ReadOnlyReason): boolean =>
   reason !== 'signed-out' &&
-  reason !== 'not-allowed' &&
   reason !== 'unknown-game' &&
   // A game that is over is not opened again (step 2.37, part 2), and a tracker that
   // needs an update is reloaded instead: the server would refuse it again.

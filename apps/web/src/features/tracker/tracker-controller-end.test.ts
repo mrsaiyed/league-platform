@@ -36,13 +36,14 @@ function device(
   network: EndpointNetwork,
   as: Person = 'scorekeeper',
   storage: QueueStorage = createMemoryQueueStorage(),
+  deviceId = 'tablet-1',
 ) {
   const clock = createManualClock();
   const fetch = network.fetchAs(as);
   const at = { leagueId: liveLeagueId, gameId, fetch };
   const controller = createTrackerController({
     gameId,
-    deviceId: 'tablet-1',
+    deviceId,
     storage,
     clock,
     wallClock: clock.now,
@@ -406,6 +407,29 @@ describe('tracker controller: Reopen (step 2.120; the review of the two doors, p
     expect(tablet.controller.status().queue.waiting).toBe(0);
   });
 
+  it('a device that did not end the game loads it final, and can reopen it (point 3)', async () => {
+    const network = endpointNetwork();
+    await ended(network);
+    const phone = device(network, 'scorekeeper', createMemoryQueueStorage(), 'phone-1');
+    await phone.controller.start();
+    await phone.controller.idle();
+    let status = phone.controller.status();
+    expect(status.mode).toEqual({ kind: 'read-only', reason: 'game-not-live' });
+    expect(status.game?.status).toBe('final');
+    expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
+    expect(status.notSaved).toEqual([]);
+    expect(await phone.controller.reopen('End game tapped by mistake')).toEqual({ ok: true });
+    // Live again, and the device that ended it still holds the game: it is offered.
+    status = phone.controller.status();
+    expect(status.mode.kind).toBe('held-by-other');
+    expect(status.game?.status).toBe('live');
+    expect(await phone.controller.takeOver()).toEqual({ ok: true });
+    expect(phone.controller.status().mode).toEqual({ kind: 'scoring' });
+    await tapAll(phone, [basket('away')]);
+    await phone.controller.idle();
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 2 });
+  });
+
   it('reopened after the device was told the game is over, it scores again with no reload', async () => {
     const network = endpointNetwork();
     const tablet = await ended(network);
@@ -466,18 +490,16 @@ describe('tracker controller: Reopen (step 2.120; the review of the two doors, p
     ).toBe(false);
   });
 
-  it('another scorekeeper is refused in the server’s own code, with who ended it', async () => {
+  it('the owner, who did not end it, is always offered Reopen, and it goes through', async () => {
     const network = endpointNetwork();
     await ended(network);
     // The owner did not end it, but may correct games: always offered. A device that
-    // never scored the game has no game loaded, and offers nothing (part 2 loads it).
+    // never scored the game loads it final (step 2.37, part 2), so Reopen goes.
     const other = device(network, 'owner');
     await other.controller.start();
+    await other.controller.idle();
     expect((await other.controller.reopenOffer())?.reopen).toEqual({ when: 'always' });
-    expect(await other.controller.reopen('By mistake')).toEqual({
-      ok: false,
-      reason: 'not-offered',
-    });
+    expect(await other.controller.reopen('By mistake')).toEqual({ ok: true });
   });
 });
 

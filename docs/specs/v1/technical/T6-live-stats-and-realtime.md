@@ -120,6 +120,8 @@ Either all of that happens or none of it does.
 
 **T-250 (record 038):** the tracker's own End game tap ends the game in the batch that carries it, and `games.end_tracked_game` ends it from anywhere else; both do the same steps. A level score is refused unless the season allows ties (the device, told with its rosters, refuses it first: T-282). An End that has not reached the server is taken back on the device alone: the waiting tap is withdrawn from the queue and, if the clock was running when it was made, a pause timed at that moment takes its place, so the clock stays stopped where the End found it (S-72). Settling the lines gives everyone on either team's current roster who never entered a "did not play" line, which never counts as a game played.
 
+**Step 2.37, part 2:** a device that did not end the game, opening it once it is over, loads it and shows the same final panel: the score, who won, and Reopen for as long as the league allows (point 3 of the review of the two doors). Reopened from there, the device that ended it may still hold the game, and is offered the takeover as at any other time.
+
 ## 8. Corrections
 
 - Reopening requires the `games.correct` permission and a reason, and writes a `game_corrections` row.

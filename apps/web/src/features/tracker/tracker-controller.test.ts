@@ -1033,11 +1033,13 @@ describe('tracker controller: a game it may not score', () => {
       await controller.start();
       await controller.idle();
       expect(controller.status().mode).toEqual({ kind: 'read-only', reason });
-      expect(controller.status().game).toBeNull();
+      // A game that is over is loaded, to show its final panel (step 2.37, part 2).
+      expect(controller.status().game !== null).toBe(reason === 'game-not-live');
     }
-    expect(network.reached.filter((r) => r.endsWith('commands') || r.endsWith('state'))).toEqual(
-      [],
-    );
+    // Nothing is sent, and only the game that is over is read, once.
+    expect(network.reached.filter((r) => r.endsWith('commands') || r.endsWith('state'))).toEqual([
+      'GET state',
+    ]);
   });
 });
 
