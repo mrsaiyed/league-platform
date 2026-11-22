@@ -653,6 +653,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   const session = (request: SessionRequest) => {
     const sent = clock.now();
     return ask((signal) => server.session(request, signal)).then((outcome) => {
+      // Answered: the banner no longer says "No connection" for sends of long ago (M2).
+      if (outcome.kind !== 'unanswered') queue.heard();
       if (outcome.kind === 'answer') timeServer(sent, clock.now(), outcome.value.sentAt);
       return outcome;
     });

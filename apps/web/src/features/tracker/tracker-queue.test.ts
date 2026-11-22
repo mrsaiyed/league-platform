@@ -80,6 +80,22 @@ describe('tracker queue: storing taps (T-114)', () => {
     expect(counts.every((n) => n >= 1)).toBe(true);
   });
 
+  it('is no longer offline once the server answers another request with nothing left to send (the review by use, M2)', async () => {
+    const { queue, server } = setup();
+    server.mode = 'down';
+    await queue.start();
+    await queue.enqueue(tap(1));
+    await queue.idle();
+    expect(queue.status().unansweredSince).not.toBeNull();
+    // The session was answered, but a tap still waits: only its own send can say.
+    queue.heard();
+    expect(queue.status().unansweredSince).not.toBeNull();
+    // The game was lost and taken back: the tap is listed as not saved, nothing waits.
+    await queue.setAside([commandId(1)]);
+    queue.heard();
+    expect(queue.status().unansweredSince).toBeNull();
+  });
+
   it('has stored a tap by the time enqueue resolves, with no network at all', async () => {
     const { queue, server, storage } = setup();
     server.mode = 'down';
