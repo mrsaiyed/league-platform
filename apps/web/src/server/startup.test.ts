@@ -1,7 +1,7 @@
 // T-30 and T-60 at startup: the stand-in for local work, and the login check that
 // stops staging and production on a database role that could see past the fence.
 import { describe, expect, it, vi } from 'vitest';
-import type { DatabaseHandle } from '@srleagues/database';
+import { connectCauseOf, type DatabaseHandle } from '@srleagues/database';
 import type {
   EmailConfirmation,
   EmailConfirmationQuestion,
@@ -67,6 +67,8 @@ function deps(
   });
   const createDatabaseSignInStore = vi.fn(() => ({}));
   const known: Record<string, unknown> = {
+    // The package's own reading of a failed connection, by its code (record 082).
+    connectCauseOf,
     createDatabase,
     checkLoginRole,
     checkSignInStoreLogin,
@@ -305,6 +307,45 @@ describe('startWebApp', () => {
     expect(d.close).toHaveBeenCalledOnce();
   });
 
+  it('tells apart a certificate not checked, a login refused and a database not reached (record 082)', async () => {
+    // What the driver throws for each, with the address and its password in the message.
+    const failed = (code: string) =>
+      Object.assign(new Error('failed for postgres://app:made-up-password@db.example.test'), {
+        code,
+      });
+    const said = {
+      certificate:
+        'The web app cannot start: the database’s certificate could not be checked: set PLATFORM_DATABASE_CA to the database’s own certificate (the PEM text from its settings page), then start the app again.',
+      login:
+        'The web app cannot start: the database refused the password or login: check the app’s own login and its password in PLATFORM_DATABASE_URL, then start the app again.',
+      unreached:
+        'The web app cannot start: the database could not be reached: check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
+    };
+    const cases: [string, Error | string[], string][] = [
+      ['SELF_SIGNED_CERT_IN_CHAIN', failed('SELF_SIGNED_CERT_IN_CHAIN'), said.certificate],
+      [
+        'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+        failed('UNABLE_TO_VERIFY_LEAF_SIGNATURE'),
+        said.certificate,
+      ],
+      ['ERR_TLS_CERT_ALTNAME_INVALID', failed('ERR_TLS_CERT_ALTNAME_INVALID'), said.certificate],
+      ['28P01', failed('28P01'), said.login],
+      ['28000', failed('28000'), said.login],
+      ['ECONNREFUSED', failed('ECONNREFUSED'), said.unreached],
+    ];
+    for (const appEnv of ['staging', 'production']) {
+      for (const [code, problem, sentence] of cases) {
+        // Whether the first check meets it or the second.
+        for (const d of [deps(problem), deps([], 'on', problem)]) {
+          const failure = await startWebApp(configFor(appEnv), d.given).catch((e: unknown) => e);
+          expect(String(failure), code).toBe(`StartupError: ${sentence}`);
+          expect(String(failure), code).not.toMatch(/made-up-password|example\.test/);
+          expect(d.close, code).toHaveBeenCalledOnce();
+        }
+      }
+    }
+  });
+
   it('stops when the login cannot reach the sign-in store, in a plain sentence (record 052)', async () => {
     for (const appEnv of ['staging', 'production']) {
       const d = deps([], 'on', ['it is not a member of sign_in_store']);
@@ -322,7 +363,9 @@ describe('startWebApp', () => {
     const failure = await startWebApp(configFor('staging'), unreached.given).catch(
       (e: unknown) => e,
     );
-    expect(String(failure)).toMatch(/could not be reached to check the sign-in store/);
+    expect(String(failure)).toMatch(
+      /the database could not be reached: check PLATFORM_DATABASE_URL/,
+    );
     expect(String(failure)).not.toMatch(/made-up-password/);
   });
 

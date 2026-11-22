@@ -60,9 +60,38 @@ export class StartupError extends Error {
  * What startup uses of packages/database: opening it (or the made-up one), checking
  * its login role, and what the database ports read.
  */
+type ConnectCause = ReturnType<typeof DatabaseModule.connectCauseOf>;
+
+/**
+ * Why the database could not be used, in one plain sentence each and what to set (record
+ * 082, the lead's correction of 2026-11-17 02:17): the certificate, the login, or the
+ * database not reached. Told by the error's kind only; never its message, which may hold
+ * the address and its password.
+ */
+const databaseRefusals: Readonly<Record<ConnectCause, string>> = {
+  certificate:
+    'the database’s certificate could not be checked: set PLATFORM_DATABASE_CA to the database’s own certificate (the PEM text from its settings page), then start the app again.',
+  ssl: 'the database would not take an encrypted connection: check that PLATFORM_DATABASE_URL is the hosted database’s address (PLATFORM_DATABASE_SSL=off is allowed only for a database on this computer), then start the app again.',
+  login:
+    'the database refused the password or login: check the app’s own login and its password in PLATFORM_DATABASE_URL, then start the app again.',
+  database:
+    'the database named at the end of PLATFORM_DATABASE_URL does not exist there: check its name in the address, then start the app again.',
+  host: 'the database could not be reached: its host in PLATFORM_DATABASE_URL was not found; check the address, then start the app again.',
+  network:
+    'the database could not be reached: check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
+  timeout:
+    'the database could not be reached: it did not answer in time; check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
+  unknown:
+    'the database could not be reached: check PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
+};
+
+/** The sentence for a database that refused the start-up, by its kind. */
+export const databaseRefusal = (cause: ConnectCause): string => databaseRefusals[cause];
+
 export type DatabasePackage = Pick<
   typeof DatabaseModule,
   | 'createDatabase'
+  | 'connectCauseOf'
   | 'checkLoginRole'
   | 'checkSignInStoreLogin'
   | 'createDatabaseSignInStore'
@@ -188,9 +217,9 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
     let problems: string[];
     try {
       problems = await database.checkLoginRole(db);
-    } catch {
-      // The driver's message may hold the address; it is not repeated here.
-      throw new StartupError('the database could not be reached to check its login role.');
+    } catch (error) {
+      // The driver's message may hold the address; only its kind is told (record 082).
+      throw new StartupError(databaseRefusal(database.connectCauseOf(error)));
     }
     if (problems.length > 0) {
       throw new StartupError(
@@ -200,8 +229,8 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
     let storeProblems: string[];
     try {
       storeProblems = await database.checkSignInStoreLogin(db);
-    } catch {
-      throw new StartupError('the database could not be reached to check the sign-in store.');
+    } catch (error) {
+      throw new StartupError(databaseRefusal(database.connectCauseOf(error)));
     }
     if (storeProblems.length > 0) {
       throw new StartupError(

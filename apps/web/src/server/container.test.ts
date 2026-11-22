@@ -11,6 +11,7 @@
 // adapter, their sessions are listed by device, one signs out, the rest everywhere; a
 // restart signs nobody out (the store is in the database). And each start-up refusal is
 // met for real, in its own plain sentence with no key, password or address in it.
+import { createServer } from 'node:net';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 type DatabaseModule = typeof import('@srleagues/database');
@@ -278,7 +279,7 @@ describe('what stops the test copy from starting, each in a plain sentence', () 
       PLATFORM_DATABASE_URL: 'postgres://app:made-up-password@localhost:1/nowhere',
     });
     expect(message).toBe(
-      'The web app cannot start: the database could not be reached to check its login role.',
+      'The web app cannot start: the database could not be reached: check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
     );
   }, 120_000);
 
@@ -286,8 +287,43 @@ describe('what stops the test copy from starting, each in a plain sentence', () 
     const { settings } = await world();
     const message = await refusal({ ...settings, PLATFORM_DATABASE_SSL: undefined });
     expect(message).toBe(
-      'The web app cannot start: the database could not be reached to check its login role.',
+      'The web app cannot start: the database would not take an encrypted connection: check that PLATFORM_DATABASE_URL is the hosted database’s address (PLATFORM_DATABASE_SSL=off is allowed only for a database on this computer), then start the app again.',
     );
+  }, 120_000);
+
+  it('a password or login the database refuses (record 082)', async () => {
+    const { settings } = await world();
+    // A server on this computer that answers every connection as PostgreSQL answers a
+    // wrong password: an ErrorResponse with code 28P01, through the real driver.
+    const field = (kind: string, text: string) => `${kind}${text}\0`;
+    const body = Buffer.from(
+      field('S', 'FATAL') +
+        field('V', 'FATAL') +
+        field('C', '28P01') +
+        field('M', 'password authentication failed for user "app"') +
+        '\0',
+    );
+    const length = Buffer.alloc(4);
+    length.writeInt32BE(body.length + 4);
+    const answer = Buffer.concat([Buffer.from('E'), length, body]);
+    const server = createServer((socket) => {
+      socket.once('data', () => socket.end(answer));
+    });
+    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+    try {
+      const address = server.address();
+      if (address === null || typeof address === 'string') throw new Error('no port');
+      const message = await refusal({
+        ...settings,
+        PLATFORM_DATABASE_URL: `postgres://app:made-up-password@localhost:${address.port}/x`,
+      });
+      expect(message).toBe(
+        'The web app cannot start: the database refused the password or login: check the app’s own login and its password in PLATFORM_DATABASE_URL, then start the app again.',
+      );
+      expect(message).not.toContain('made-up-password');
+    } finally {
+      await new Promise((done) => server.close(done));
+    }
   }, 120_000);
 
   it('a login role that could see past the fence (T-60)', async () => {
