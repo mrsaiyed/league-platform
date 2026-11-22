@@ -492,35 +492,78 @@ function levelNote(
 }
 
 /**
- * The columns of every table of one season: the same in each, so a column stands in the
- * same place in every division (a tie in one division gives every table its column). On a
- * phone the record and what the table is ordered by (W, L, T, and PCT, or the points in a
- * points table) are in view beside the team; games played is left to the wide layout, and
- * the rest are reached by scrolling inside the table's box.
+ * The table's columns by the season's own names (`standings.columns`), with the key each
+ * row's cell has and its heading. "Last five" has no cell: nothing works it out yet, so
+ * Season settings does not offer it, and a season that holds it draws nothing for it.
+ */
+const seasonColumns = {
+  played: { key: 'played', label: 'standings.col.played', narrow: 'left-out' },
+  wins: { key: 'wins', label: 'standings.col.wins', narrow: 'in-view' },
+  losses: { key: 'losses', label: 'standings.col.losses', narrow: 'in-view' },
+  ties: { key: 'ties', label: 'standings.col.ties', narrow: 'in-view' },
+  'win-percentage': {
+    key: 'winPercentage',
+    label: 'standings.col.winPercentage',
+    narrow: 'in-view',
+  },
+  points: { key: 'points', label: 'standings.col.points', narrow: 'in-view' },
+  'points-for': { key: 'pointsFor', label: 'standings.col.pointsFor' },
+  'points-against': { key: 'pointsAgainst', label: 'standings.col.pointsAgainst' },
+  'point-difference': { key: 'pointDifference', label: 'standings.col.pointDifference' },
+  streak: { key: 'streak', label: 'standings.col.streak' },
+} as const;
+type SeasonColumn = keyof typeof seasonColumns;
+const isSeasonColumn = (name: string): name is SeasonColumn => Object.hasOwn(seasonColumns, name);
+
+/** What a season whose rules cannot be read is drawn with: every column with a cell. */
+const everyColumn: readonly SeasonColumn[] = [
+  'played',
+  'wins',
+  'losses',
+  'win-percentage',
+  'points-for',
+  'points-against',
+  'point-difference',
+  'streak',
+];
+
+/**
+ * The columns of every table of one season, as the season chose them, in its order (P7 §1;
+ * step 2.47, the numbers audit's M7): the same in each table, so a column stands in the same
+ * place in every division (a tie in one division gives every table its column). On a phone
+ * the record and what the table is ordered by (W, L, T, and PCT, or the points in a points
+ * table) are in view beside the team; games played is left to the wide layout, and the rest
+ * are reached by scrolling inside the table's box.
+ * The ties column is added when the season left it out and a game of the table was tied
+ * (else W and L do not add up to GP): just after the last column in view on a phone, so
+ * those still come first (the table's own rule). A table ranked by points always holds its
+ * points column: the rules format refuses one without it (T-290).
  */
 function columnsOf(standings: Standings): StandingsColumn[] {
+  const chosen = standings.columns.filter(isSeasonColumn);
+  const names: SeasonColumn[] = [...(chosen.length === 0 ? everyColumn : chosen)];
   const anyTies = standings.tables.some((table) => table.lines.some((line) => line.ties > 0));
   const points = standings.rankBy === 'points';
-  return [
-    { key: 'played', label: t('standings.col.played'), narrow: 'left-out' },
-    { key: 'wins', label: t('standings.col.wins'), narrow: 'in-view' },
-    { key: 'losses', label: t('standings.col.losses'), narrow: 'in-view' },
-    ...(anyTies
-      ? [{ key: 'ties', label: t('standings.col.ties'), narrow: 'in-view' as const }]
-      : []),
-    {
-      key: 'winPercentage',
-      label: t('standings.col.winPercentage'),
-      narrow: points ? 'left-out' : 'in-view',
-    },
-    ...(points
-      ? [{ key: 'points', label: t('standings.col.points'), narrow: 'in-view' as const }]
-      : []),
-    { key: 'pointsFor', label: t('standings.col.pointsFor') },
-    { key: 'pointsAgainst', label: t('standings.col.pointsAgainst') },
-    { key: 'pointDifference', label: t('standings.col.pointDifference') },
-    { key: 'streak', label: t('standings.col.streak') },
-  ];
+  const narrowOf = (name: SeasonColumn): StandingsColumn['narrow'] => {
+    const column = seasonColumns[name];
+    if (name === 'win-percentage' && points) return 'left-out';
+    return 'narrow' in column ? column.narrow : undefined;
+  };
+  if (!names.includes('ties') && anyTies) {
+    const lastInView = names.findLastIndex((name) => narrowOf(name) === 'in-view');
+    const firstScrolled = names.findIndex((name) => narrowOf(name) === undefined);
+    const at =
+      lastInView !== -1 ? lastInView + 1 : firstScrolled === -1 ? names.length : firstScrolled;
+    names.splice(at, 0, 'ties');
+  }
+  return names.map((name): StandingsColumn => {
+    const narrow = narrowOf(name);
+    return {
+      key: seasonColumns[name].key,
+      label: t(seasonColumns[name].label),
+      ...(narrow === undefined ? {} : { narrow }),
+    };
+  });
 }
 
 function cellsOf(line: StandingsLine): Record<string, string | number> {

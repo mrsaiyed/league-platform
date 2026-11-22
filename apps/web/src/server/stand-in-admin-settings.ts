@@ -13,5 +13,5 @@ import type { AdminSettingsPorts } from './admin-settings.ts';
 import type { World } from './stand-in-world.ts';
 
 export function standInAdminSettings(world: World): AdminSettingsPorts {
-  return { deps: world.deps };
+  return { deps: world.deps, seasons: world.deps };
 }

@@ -536,6 +536,106 @@ describe('the note beside each team of the standings', () => {
   });
 });
 
+describe('the columns the season chose (step 2.47; the numbers audit M7)', () => {
+  const games: readonly Game[] = [
+    ['Ash', 50, 'Birch', 40],
+    ['Birch', 45, 'Cedar', 44],
+  ];
+  const withColumns = (columns: SeasonRules['standings']['columns'], more = {}): SeasonRules => ({
+    ...defaultSeasonRules(),
+    ...more,
+    standings: { ...defaultSeasonRules().standings, columns },
+  });
+  const keys = (made: Made) => made.view.columns.map((c) => c.key);
+
+  it('draws the chosen columns in the season’s own order, and no other', async () => {
+    const made = await tableAfter(['Ash', 'Birch', 'Cedar'], games, {
+      rules: withColumns(['wins', 'losses', 'point-difference', 'played', 'streak']),
+    });
+    expect(keys(made)).toEqual(['wins', 'losses', 'pointDifference', 'played', 'streak']);
+    // The headings, and nothing of a column left out.
+    expect(made.html).toContain('>DIFF<');
+    expect(made.html).not.toContain('>PF<');
+    expect(made.html).not.toContain('>PCT<');
+  });
+
+  it('draws the starting columns for a season on the starting rules', async () => {
+    const made = await tableAfter(['Ash', 'Birch', 'Cedar'], games);
+    expect(keys(made)).toEqual(['played', 'wins', 'losses', 'winPercentage', 'pointDifference']);
+  });
+
+  it('draws nothing for "last five", which nothing works out yet', async () => {
+    const made = await tableAfter(['Ash', 'Birch', 'Cedar'], games, {
+      rules: withColumns(['played', 'last-five', 'wins']),
+    });
+    expect(keys(made)).toEqual(['played', 'wins']);
+  });
+
+  it('adds the ties column after the last column in view when a game was tied', async () => {
+    const made = await tableAfter(['Ash', 'Birch'], [['Ash', 40, 'Birch', 40]], {
+      rules: withColumns(['played', 'wins', 'losses', 'win-percentage'], { allowTies: true }),
+    });
+    expect(keys(made)).toEqual(['played', 'wins', 'losses', 'winPercentage', 'ties']);
+  });
+
+  // The table's rule: the columns in view on a phone come first among those drawn there.
+  it('keeps the phone’s columns first, with and without a tie, and in a points table', async () => {
+    const flags = (made: Made) => made.view.columns.map((c) => `${c.key}:${c.narrow ?? 'scroll'}`);
+    const chosen: SeasonRules['standings']['columns'] = [
+      'played',
+      'wins',
+      'losses',
+      'win-percentage',
+      'point-difference',
+      'streak',
+    ];
+    const plain = await tableAfter(['Ash', 'Birch', 'Cedar'], games, {
+      rules: withColumns(chosen, { allowTies: true }),
+    });
+    expect(flags(plain)).toEqual([
+      'played:left-out',
+      'wins:in-view',
+      'losses:in-view',
+      'winPercentage:in-view',
+      'pointDifference:scroll',
+      'streak:scroll',
+    ]);
+    const tied = await tableAfter(['Ash', 'Birch'], [['Ash', 40, 'Birch', 40]], {
+      rules: withColumns(chosen, { allowTies: true }),
+    });
+    expect(flags(tied)).toEqual([
+      'played:left-out',
+      'wins:in-view',
+      'losses:in-view',
+      'winPercentage:in-view',
+      'ties:in-view',
+      'pointDifference:scroll',
+      'streak:scroll',
+    ]);
+    const rules = defaultSeasonRules();
+    const pointsTable = await tableAfter(['Ash', 'Birch'], [['Ash', 40, 'Birch', 40]], {
+      rules: {
+        ...rules,
+        allowTies: true,
+        standings: {
+          ...rules.standings,
+          rankBy: 'points',
+          columns: ['played', 'wins', 'losses', 'points', 'win-percentage', 'point-difference'],
+        },
+      },
+    });
+    expect(flags(pointsTable)).toEqual([
+      'played:left-out',
+      'wins:in-view',
+      'losses:in-view',
+      'points:in-view',
+      'ties:in-view',
+      'winPercentage:left-out',
+      'pointDifference:scroll',
+    ]);
+  });
+});
+
 // Step 2.198 (S-74; the numbers audit's M4 and cases 31 to 33 and 46; the reader's own
 // example): for three or more level teams the note says exactly what placed each of them,
 // from the steps the engine kept: their records in the games among them, then what

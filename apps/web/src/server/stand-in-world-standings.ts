@@ -7,6 +7,7 @@
 // settings rows, the one place every area reads what League settings saved.
 import {
   leagueStatuses,
+  rulesOfGame,
   levelDocument,
   type AccessReader,
   type DivisionsStore,
@@ -359,18 +360,38 @@ const notYet = (name: string) => async (): Promise<never> => {
 const samePlace = (a: SettingPlace, b: SettingPlace) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
+ * Whether a team of the season has a number worn by two players still on it, those waiting
+ * for review left out: what the database checks when the unique-jersey rule is switched
+ * on (check_season_unique_jerseys, 0015).
+ */
+function numberWornTwice(s: LeagueWorld, seasonId: string): boolean {
+  const teams = new Set(s.teams.filter((t) => t.seasonId === seasonId).map((t) => t.id));
+  const worn = new Set<string>();
+  for (const r of s.roster) {
+    if (!teams.has(r.teamId) || r.jerseyNumber === null || r.leftOn !== null || r.needsReview) {
+      continue;
+    }
+    const key = `${r.teamId}|${r.jerseyNumber}`;
+    if (worn.has(key)) return true;
+    worn.add(key);
+  }
+  return false;
+}
+
+/**
  * The leagues module's stores over one league's world, as far as League settings and
  * Season settings use them: who the league is, its seasons' programs, its stored settings,
  * and a season read and changed (getSeason, updateSeason: step 2.182 shows and hides a
- * season through them) as the database's seasons table does it: the version is checked
- * and raised, and making a season current takes the mark from its program's other current
- * season, raising that one's version too. So the setCurrentSeason command, which changes
- * a season through updateSeason, works here. Creating leagues, seasons and divisions,
- * changing a league's name, address or state and saving a season's rules have no screen
- * on the stand-in yet: those parts fail by name (createLeague, setLeagueName,
- * renameShortName, setLeagueStatus, createSeason, setSeasonRules, setSeasonRosterSettings,
- * the store's own setCurrentSeason, which only createLeague calls, and every division
- * command). Publishing a site design has no screen yet either: the stand-in's made-up
+ * season through them; step 2.47 saves its name, dates and rules) as the database's
+ * seasons table does it: the version is checked and raised, switching the unique-jersey
+ * rule on is refused while a number is worn twice, and making a season current takes the
+ * mark from its program's other current season, raising that one's version too. So the
+ * setCurrentSeason, setSeasonRules and setSeasonRosterSettings commands, which change a
+ * season through updateSeason, work here. Creating leagues, seasons and divisions and
+ * changing a league's name, address or state have no screen on the stand-in yet: those
+ * parts fail by name (createLeague, setLeagueName, renameShortName, setLeagueStatus,
+ * createSeason, the store's own setCurrentSeason, which only createLeague calls, and every
+ * division command). Publishing a site design has no screen yet either: the stand-in's made-up
  * leagues keep their designs as data (stand-in-league-sites.ts), so its two site parts fail
  * by name.
  */
@@ -422,12 +443,20 @@ export function worldLeaguesStores(
     // The world's leagues have one program each, named on their seasons.
     programCount: async () => new Set(s.seasons.map((x) => x.programId)).size,
     updateSeason: async (seasonId, change, version) => {
-      // Saving rules is step 2.47's, with its preview: not on the stand-in yet.
-      if (change.rules !== undefined) return notYet('leagues.updateSeason rules')();
       const at = s.seasons.findIndex((x) => x.id === seasonId);
       const found = s.seasons[at];
       if (found === undefined || found.version !== version) return undefined;
-      const { isCurrent, rules: _rules, ...fields } = change;
+      // Saving rules (step 2.47): as the database (0008, 0015), switching the unique-jersey
+      // rule on is refused while a team of the season has a number worn twice by players
+      // still on it, leaving out those waiting for review (S-44).
+      if (
+        change.rules?.rosters.uniqueJerseys === true &&
+        !rulesOfGame(null, found.rules).rosters.uniqueJerseys &&
+        numberWornTwice(s, seasonId)
+      ) {
+        return 'unique-jerseys-clash';
+      }
+      const { isCurrent, ...fields } = change;
       if (isCurrent === true) {
         // As the database: the mark leaves the other current season of the same program,
         // whose row is changed and so gets a new version too (0002). The world keeps one
