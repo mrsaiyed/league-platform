@@ -27,17 +27,11 @@
 //
 // packages/database is handed in, not imported: Node.js loads it when the app starts
 // (container.ts), so Next.js never bundles it.
-import {
-  eventHandlers,
-  type AccessHolder,
-  type CommandContext,
-  type CommandDeps,
-  type EventHandler,
-  type StandingsTx,
-} from '@srleagues/core';
+import type { AccessHolder, CommandContext, CommandDeps } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle, LeagueScope } from '@srleagues/database';
 import { mayListSeasonTeams, type AdminTeamsPorts, type AdminTeamsTx } from './admin-teams.ts';
+import { coreEventHandlers } from './database-event-handlers.ts';
 import { isDatabaseId } from './database-id.ts';
 
 /** What these ports use of packages/database. */
@@ -57,28 +51,6 @@ export type AdminTeamsQueries = Pick<
   | 'listStaffSeasonTeams'
 >;
 
-/** The teams area's transaction with the stores core's event handlers need. */
-type AdminTeamsWholeTx = AdminTeamsTx & StandingsTx;
-
-/** Whether the command's transaction is this file's, the handlers' stores included. */
-const holdsHandlersStores = (tx: AdminTeamsTx): tx is AdminTeamsWholeTx =>
-  'standings' in tx && tx.standings !== undefined && 'games' in tx && tx.games !== undefined;
-
-/**
- * Core's handlers, each given the whole transaction its command runs in. A command hands
- * a handler its own copy of the transaction with a checked job queue (define-command.ts),
- * so every store is still there.
- */
-const adminTeamsEvents: readonly EventHandler<AdminTeamsTx>[] = eventHandlers.map((handler) => ({
-  type: handler.type,
-  handle: async (event, tx) => {
-    if (!holdsHandlersStores(tx)) {
-      throw new Error('A teams transaction without the stores of its event handlers.');
-    }
-    await handler.handle(event, tx);
-  },
-}));
-
 export function databaseAdminTeams(
   database: AdminTeamsQueries,
   db: DatabaseHandle,
@@ -90,19 +62,16 @@ export function databaseAdminTeams(
     deps: {
       // No account is our own staff here, as on the stand-in: staff are not a league
       // role (A-3) and the app names none yet.
-      transaction: database.commandTransaction(
-        db,
-        (scope: LeagueScope): AdminTeamsWholeTx => ({
-          jobs: database.jobsStore(scope),
-          teams: database.teamsStore(scope),
-          people: database.peopleStore(scope),
-          access: database.accessStore(scope),
-          activity: database.activityLogStore(scope),
-          standings: database.standingsStore(scope),
-          games: database.gamesStore(scope),
-        }),
-      ),
-      events: adminTeamsEvents,
+      transaction: database.commandTransaction(db, (scope: LeagueScope) => ({
+        jobs: database.jobsStore(scope),
+        teams: database.teamsStore(scope),
+        people: database.peopleStore(scope),
+        access: database.accessStore(scope),
+        activity: database.activityLogStore(scope),
+        standings: database.standingsStore(scope),
+        games: database.gamesStore(scope),
+      })),
+      events: coreEventHandlers<AdminTeamsTx>(),
       log,
       now: () => performance.now(),
     },

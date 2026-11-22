@@ -26,7 +26,11 @@ import {
   type TeamsTx,
 } from '@srleagues/core';
 import * as database from '@srleagues/database';
-import type { SessionIdentity, SignInService } from '@srleagues/providers';
+import {
+  createLocalBotCheck,
+  type SessionIdentity,
+  type SignInService,
+} from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { databasePorts } from './database-ports.ts';
 import type { WebPorts } from './ports.ts';
@@ -103,6 +107,7 @@ export async function gamesWorld(counts: GamesWorldOptions) {
       },
     } as unknown as SignInService,
     signInMail: {} as SignInMail,
+    botCheck: createLocalBotCheck({ appEnv: 'test' }),
     log: () => {},
     warn: () => {},
     now: () => new Date(clock.at),

@@ -2,8 +2,8 @@
 // the step 2.32 snapshot, both read as a visitor (step 2.45; P7 §5.3; S-7, S-22). Only
 // words and numbers leave here; the page and its live part draw them.
 import type { GamePage, PlayLine } from '@srleagues/core';
-import type { BoxScoreColumn, BoxScorePlayer, PlayRow } from '@srleagues/ui';
-import { displayLabels } from '@srleagues/site';
+import type { BoxScoreColumn, BoxScorePlayer, FinalPill, PlayRow } from '@srleagues/ui';
+import { displayLabels, finalPillOf } from '@srleagues/site';
 import { locale, t } from '../../server/messages.ts';
 import { hasStatLabel, statLabel } from '../stats-pages/index.ts';
 import { formatClock } from './clock.ts';
@@ -181,6 +181,14 @@ export type BoxScoreView = {
   /** Null: this team's players are hidden from visitors (S-22). */
   readonly players: readonly BoxScorePlayer[] | null;
   readonly totals: Readonly<Record<string, number>>;
+  /** Sentences under the table saying why a Total is not its column added up. */
+  readonly notes: readonly string[];
+  /**
+   * Set when nothing at all was recorded for this team (a box score typed for one team
+   * only): the table is left out and this one sentence stands in its place, rather than
+   * a Total of dashes beside a score on the board (step 2.196).
+   */
+  readonly nothingRecorded: string | null;
 };
 
 export type BoxScoresView =
@@ -189,21 +197,44 @@ export type BoxScoresView =
   | { readonly kind: 'tables'; readonly tables: readonly BoxScoreView[] };
 
 /**
- * A finished game's box scores, away team first as on the scoreboard. A statistic the
- * message file has no words for is left out, so no raw key is ever a heading (T-187).
+ * Why a team's Total is not what its column adds up to, where the page shows the column
+ * (step 2.196): its points are the typed final score, not its players' points (S-26), or
+ * its turnovers count some charged to the team itself. Nothing where the players' lines
+ * are hidden: there is no column to add up.
+ */
+function totalNotes(box: GamePage['boxScores'][number], keys: readonly string[]): string[] {
+  if (!box.playerLinesShown) return [];
+  const notes: string[] = [];
+  const score = box.totals['points'];
+  if (
+    keys.includes('points') &&
+    box.playersPoints !== null &&
+    score !== undefined &&
+    score !== box.playersPoints
+  ) {
+    notes.push(t('game.playersPointsDiffer', { players: box.playersPoints, score }));
+  }
+  if (keys.includes('turnovers') && box.teamTurnovers > 0) {
+    notes.push(t.plural('game.teamTurnovers', box.teamTurnovers));
+  }
+  return notes;
+}
+
+/**
+ * A finished game's box scores, away team first as on the scoreboard. The columns are the
+ * statistics the season keeps, in its order, as the statistics page draws them (P7 §1;
+ * the numbers audit's L7), each one this game recorded: a column wholly empty in both
+ * teams' lines was not kept for this game (P7 §5.2). A statistic the message file has no
+ * words for is left out, so no raw key is ever a heading (T-187).
  */
 export function buildBoxScores(page: GamePage): BoxScoresView {
   if (page.game.recording === 'final-score') return { kind: 'final-score-only' };
-  const keys: string[] = [];
-  const add = (stats: Readonly<Record<string, number>>) => {
-    for (const key of Object.keys(stats)) {
-      if (hasStatLabel(key) && !keys.includes(key)) keys.push(key);
-    }
-  };
+  const recorded = new Set<string>();
   for (const box of page.boxScores) {
-    add(box.totals);
-    for (const p of box.players) add(p.stats);
+    for (const key of Object.keys(box.totals)) recorded.add(key);
+    for (const p of box.players) for (const key of Object.keys(p.stats)) recorded.add(key);
   }
+  const keys = page.game.statKeys.filter((key) => hasStatLabel(key) && recorded.has(key));
   if (keys.length === 0) return { kind: 'no-stats' };
   const columns = keys.map(column);
   const ordered = [...page.boxScores].sort((a, b) =>
@@ -224,6 +255,9 @@ export function buildBoxScores(page: GamePage): BoxScoresView {
           }))
         : null,
       totals: box.totals,
+      notes: totalNotes(box, keys),
+      nothingRecorded:
+        Object.keys(box.totals).length === 0 ? t('game.nothingRecordedForTeam') : null,
     })),
   };
 }
@@ -291,7 +325,16 @@ export type GameBoard = {
   readonly when?: { readonly day: string; readonly time?: string } | undefined;
   /** Where it is played: the venue, and the court when it has one. */
   readonly placeText?: string | undefined;
+  /** A final game won in overtime: its pill, "Final, OT", said "Final after overtime" (P7 §5.6). */
+  readonly finalPill?: FinalPill | undefined;
 };
+
+/**
+ * The board's pill for a final game won in overtime, as its result keeps it (P7 §5.6):
+ * "Final, OT", "Final, 2OT". Undefined for any other game, whose pill is as before.
+ */
+export const boardFinalPill = (page: GamePage): FinalPill | undefined =>
+  finalPillOf(t, page.game.overtimePeriods);
 
 /** The two teams' own colors, as the game's page read them. */
 export const boardColors = (page: GamePage): GameBoard['colors'] => ({

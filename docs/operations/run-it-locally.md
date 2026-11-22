@@ -101,7 +101,7 @@ To try it as a league's admin:
    back to North Valley; tap the account button (your initial at the top right, or the menu
    button on a phone) and choose the admin.
 3. Teams: under "Add a team" type a name and tap "Add team". On the team's page, under
-   "Someone not in the list yet", type a first and last name and a number and tap "Add the
+   "A new player, not in the league yet", type a first and last name and a number and tap "Add the
    person and put them on the roster"; do it again for a second player.
 4. Schedule: in this week's round open "Add a game", choose the new team and another, a time
    and a court, and tap "Add game"; then tap "Publish this schedule".
@@ -111,11 +111,13 @@ To try it as a league's admin:
    standings and the statistics.
 
 To try the whole job from an empty league: sign in as the made-up owner, open Still Waters
-(`http://127.0.0.1:3000/still-waters/admin`, a draft league with one current season, "First
-Season", and nothing in it yet). Add the teams and their people in Admin → Teams; add rounds
+(`http://127.0.0.1:3000/still-waters/admin`, a league with one current season, "First
+Season", and nothing in it yet; it starts already public, so a visitor can read its pages:
+the screen that publishes a league is not built yet). Add the teams and their people in Admin → Teams; add rounds
 and games in Admin → Schedule and publish the schedule; show the season to the public in
 the season's settings; then score a game in Admin → Games (or with the tracker) and look at
-the final table on the standings. It starts empty again every time the app restarts.
+the final table on the standings. It starts empty again every time the app restarts. The
+whole walk, step by step with what each screen says, is [the first test](first-test.md).
 
 ### Signing in as the made-up people
 
@@ -145,7 +147,7 @@ No email ever leaves this computer (T-140). Every email the app sends to a made-
 
 Both pages exist only with `APP_ENV` local or test, and only for a request made on this computer. Anywhere else they, and the button's form, answer "not found", as an address that does not exist (they are answered by the same route as one); no page links to them. A browser test signs in as a seed person on the made-up database the same way (`tests/browser/kept-emails-test.mjs`): it asks for a code on `/signup`, reads it from `li[data-kept-email="<address>"] code[data-code]` on `/signin/kept-emails`, types it on `/signup/code` and a password on `/signup/password`.
 
-To run it on the made-up database instead, put `LOCAL_DATA=made-up-database` in `.env` (local and test only). The app then builds a database in memory when it starts, with every migration and the two seed leagues (below), and reads leagues, signed-in people and what they hold from it. Each seed league's season is already under way: in each division one game was played a week ago, with its final score, and one is a week from today, so `/lakeside` and `/maple-street` show a home page, a schedule and standings, read from that database (step 2.93 part 2, record 069). Sign-in still uses the stand-in's screens; the stand-in's made-up people do not exist there. The areas not yet moved onto the database (step 2.93, records 055 and 069) show an error page; Admin → Teams, its teams, rosters and league list of people, has moved (step 2.93 part 5). It too opens no address and is gone when the app stops.
+To run it on the made-up database instead, put `LOCAL_DATA=made-up-database` in `.env` (local and test only). The app then builds a database in memory when it starts, with every migration and the two seed leagues, loaded as `npm run seed` loads them (below), and reads leagues, signed-in people and what they hold from it. To have the demo-shaped league there too (`/larkvale`: its districts, schools, weeks, results and the tracked school's season, step 2.59), also put `LOCAL_DEMO_LEAGUE=on` in `.env`; it adds about 13 seconds at start, so it is off unless asked. Each seed league's season is already under way: in each division one game was played a week ago, with its final score, and one is a week from today, and the first division's two teams played again three days ago at the league's venue, scored live through the tracker, so `/lakeside` and `/maple-street` show a home page, a schedule and standings, read from that database (step 2.93 part 2, record 069). Sign-in still uses the stand-in's screens; the stand-in's made-up people do not exist there. The areas not yet moved onto the database (step 2.93, records 055 and 069) show an error page; Admin → Teams, its teams, rosters and league list of people, has moved (step 2.93 part 5). It too opens no address and is gone when the app stops.
 
 To see the first made-up league (`/north-valley`) under another design, put `LOCAL_DESIGN=<name>` in `.env` (local and test only; the app refuses to start with it anywhere else, and with a name it does not know). The names are the starting designs (`crest`, `crest-light`, `midnight-gold`, `clean-court`) and `pine`, a made-up green league's design kept for pictures and tests. `node scripts/shots.mjs --design=<name>` takes pictures of that league's pages under a design this way (the script's own first lines say how).
 
@@ -164,7 +166,12 @@ npm run start:web
 npm run seed
 ```
 
-This applies every migration (see [applying migrations](apply-migrations.md)) to a local PGlite database in `.local/seed-db`, then loads two made-up leagues: Lakeside Hoops League and Maple Street Rec League. All their email addresses end in `example.test`. The command is safe to run again: a league already there is reported as such. A league that was only half loaded is refused on a rerun, so it is never reported as complete.
+This applies every migration (see [applying migrations](apply-migrations.md)) to a local PGlite database in `.local/seed-db`, then loads three made-up leagues (step 2.59, T-195):
+
+- **Lakeside Hoops League and Maple Street Rec League**, each with its season under way (a game played a week ago in each division, with its box score, and one a week from today), a venue, and one game scored live through the tracker three days ago.
+- **Larkvale Charter Athletic Association** (`/larkvale`), shaped like the demo league (P9 §3): one program, a past 2025–26 season of ten weeks, four districts of six schools, every game final. Its 120 games come from `supabase/seed/demo-league/fixtures.csv` through the fixture import, put into their weeks with the schedule builder's commands, and one school's ten games from a made-up tracker backup through the transfer below, with every line compared. Every other school's players' statistics are for staff only. The file doubles as the template for real results: its `README.md` says how to fill it, and who is listed.
+
+All their email addresses end in `example.test`, and every name in them is made up. It takes some seconds. The command is safe to run again: a league already there is reported as such. A league that was only half loaded is refused on a rerun, so it is never reported as complete; so is a database seeded before step 2.59, which has no tracked games: the command then says, in one sentence, which folder to delete and what to run again.
 
 To keep the database in another folder, pass the folder after `--`:
 
@@ -189,6 +196,53 @@ Without `--run` it only shows the plan and changes nothing: which teams and play
 It is safe to run again: a game already brought over is only compared, and a run that was stopped part-way carries on where it was (a person it had added but not yet put on their team is put on it, not added twice).
 
 It opens a database folder on this computer and refuses anything that reads as a network address (T-201). Use it on made-up backups: a backup of the live tracker holds real people's names, and bringing one over waits for the founder.
+
+## Play a whole made-up season with one command
+
+```sh
+npm run simulate
+```
+
+**What it is for.** It makes a made-up league from nothing and plays its whole season to the final tables, using the product's own buttons behind the scenes, the same ones a league's admin and scorekeepers use: it adds the teams and their players, brings in the schedule, puts the games into weeks, publishes the schedule, types in final scores, scores a few games play by play as the tracker does, and loses some games the way a real season does (postponed and played later, postponed and still waiting, cancelled, cancelled by mistake and put back, forfeited, and one score typed the wrong way round and then corrected). One tracked game is level after four periods and won in overtime. Then it checks its own work and prints a report. It is a way to see that a league of any size works from start to end, without waiting a season. Every name in it is invented, and the same `--seed` number always makes the same league.
+
+**Four ways to run it:**
+
+| What you want                                 | Type this                                                              | About     |
+| --------------------------------------------- | ---------------------------------------------------------------------- | --------- |
+| A small one, to try it                        | `npm run simulate`                                                     | 5 seconds |
+| A league like yours: 8 teams, each plays all  | `npm run simulate -- --teams 8 --rounds 7 --tracked 2`                 | 6 seconds |
+| 24 schools in 4 districts, 10 weeks           | `npm run simulate -- --teams 24 --divisions 4 --rounds 10 --tracked 6` | 15 s      |
+| 60 teams in 6 divisions, 10 weeks (300 games) | `npm run simulate:large`                                               | 65 s      |
+
+`--teams` is how many teams, `--divisions` how many divisions they are split into, `--rounds` how many game weeks, `--tracked` how many games are scored play by play, and `--seed` any number, to get a different made-up league.
+
+**What the report says.** The first lines say how big the league is and how many games were called off or changed. Then eleven checks, each `ok` or `FAIL`. **What they are held against:** the simulator's own plan, what it meant to happen (every game's score, which games were called off and how, every basket and foul of the games scored play by play). The checks work the season out again from that plan with their own plain sums, which use nothing of the product's standings or statistics, and compare the answer with what the product saved and what its pages read. So a product that saved a wrong score, counted a result to the wrong team or put two teams in the wrong order would fail, by name:
+
+- `final-scores`: every game is saved as planned: played or corrected at the planned score, a forfeit at the league's forfeit score against the side that forfeited, a cancelled or still-waiting game with no result. A wrong game is named.
+- `schedule`: every game is saved once, between the planned home and away teams, in its planned week (round), on its planned day and start time and in its planned division, and the public schedule shows it the same way; a postponed game still waiting keeps the day it had, as the product keeps it; a saved game the plan does not have is named too.
+- `standings`: every team's line (games, wins, losses, ties, points for and against; points too in a table ranked by points) and every place in the table, teams level on their record included: those are put in order by the season's own tiebreakers as the spec words them (head-to-head among the level teams, then point difference, then points scored; teams still level after a split start again among themselves). Teams nothing separates may come in either order; the report counts them.
+- `box-scores`: in every game scored play by play, each player's points and fouls.
+- `player-totals`: each player's games and points in the season's statistics.
+- `games-played`, `called-off` (each called-off game ended as planned, the corrected one corrected once) and `overtime` (the overtime game counted as overtime).
+- `wins-equal-losses`, `points-balance` and `tracked-points` only check that the product agrees with itself; they are cheap but prove little alone.
+
+The pages test (`apps/web/src/server/simulated-league-pages.test.ts`) holds what the pages show against the same plan: the standings page row by row, the schedule (every game once, in its week, on its day), five game pages, one team's results, the box scores and the statistics page.
+
+**What the checks do not cover yet:** the leaders' cards and their ranking rules (minimum games, averages), minutes played, streaks, seeds, the "why this team is ahead" notes, coin flips (the simulator records none), ties (its games never end level), standings adjustments, and a table ranked by points (the simulator's league ranks by win percentage, though the check can work out either).
+
+Then the final tables, `All 11 checks hold.` when all is well, and a last line saying how long each part took. If any check fails, the command says which one and ends with an error.
+
+**Seeing the league in your browser.** Start the web app with the size you want, written the same way as above, in one line:
+
+```sh
+LOCAL_DATA=made-up-database LOCAL_SIMULATED_LEAGUE="--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7" PUBLIC_BASE_URL=http://127.0.0.1:3000 npm run dev:web
+```
+
+(`LOCAL_SIMULATED_LEAGUE=on` gives a small league: 8 teams, one division, 7 weeks, 2 games scored play by play. You can also put the two settings in `.env` instead of typing them each time, and add `LOCAL_DEMO_LEAGUE=on` to have the demo league as well.)
+
+While it starts, the window you typed in prints two lines: first `Playing a simulated league at start: 24 teams in 4 division(s), …`, and when it is done `Simulated league ready: Simulated Made-up League, 120 games, all 11 checks hold, at http://127.0.0.1:3000/simulated (start took … s)`. Then open **http://127.0.0.1:3000/simulated** in your browser (the `127.0.0.1` address, as for every made-up league above: the page answers only for the address `PUBLIC_BASE_URL` names, which is why the line above sets it): the home page, schedule, standings, statistics, every team and every game are there. To see it as the league's owner, open **http://127.0.0.1:3000/signin/made-up-people** and press **Open Simulated Made-up League as Sim Owner**; the first time, it asks you to choose a password (any made-up one of 8 letters or more), then takes you to the league's admin.
+
+Two things to know. The league is made fresh every time the app starts, so nothing you change in it is kept after you stop the app. And above 30 teams the start takes about a minute (the first line says so); the page answers once the second line has printed. If the size cannot be played (for example 3 teams in 2 divisions), the app does not start and says in one sentence what was wrong, with an example that works.
 
 ## Make a league
 
@@ -236,6 +290,10 @@ npm run test:web:browser
 
 CI runs them after `npm run verify`.
 
+### The test copy's start, on this computer
+
+`npm run test:web:browser` includes `tests/browser/test-copy-test.mjs`, which starts the built web app exactly as the online test copy starts (`APP_ENV=staging`), with nothing standing in but the world outside: the made-up seed database served as a PostgreSQL server on this computer, and a fake of the sign-in service. It signs a new person up and in, checks the health check and the "do not index" marks, and that production still refuses. To run it alone after a build: `node tests/browser/test-copy-test.mjs --no-build`. It never needs a real key or address, and none should be given ([record 082](../architecture/decisions/082-how-the-test-copy-starts.md)).
+
 ## Schema types
 
 After adding a migration, regenerate the typed description of the schema:
@@ -266,6 +324,7 @@ Open `http://127.0.0.1:4180`. Without `DATABASE_URL`, it saves to embedded Postg
 
 - A `ConfigError` names each missing or invalid setting. Fix that line in `.env`; the message never shows a value.
 - If `npm run dev:web` fails with a stand-in refusal, check that `PUBLIC_BASE_URL` uses `127.0.0.1` (or `localhost`) and that `APP_ENV` is `local`. If a league page answers "not found", check that the address in the browser is exactly the one `PUBLIC_BASE_URL` names.
+- In staging or production, a start-up that cannot use the database says which of three things it is. "The database's certificate was not accepted": set `PLATFORM_DATABASE_CA` to the database's own certificate, as the path of its file or as its text (for Supabase, the file on the project's database settings page). "The database refused the password or login" (the worker: "refused the login"): the user name or password in `PLATFORM_DATABASE_URL` is wrong. "The database could not be reached": the address or port is wrong, or the database is not running. None of them prints the address, the password or the certificate (record 100).
 - If a test fails only on one run, run `npm run test:units` again on its own. Database tests can be slow on a busy machine; they use long timeouts on purpose.
 
 Related: [applying migrations](apply-migrations.md), [verification](verification.md), and the decisions in `docs/architecture/decisions/` (records 041 to 048 cover the stack this guide uses).

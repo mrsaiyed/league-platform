@@ -25,7 +25,13 @@ describe('recordForfeit', () => {
       seasons: [{ id: seasonId, programId: 'p1', rules: rules((r) => (r.forfeit = forfeit)) }],
     });
     expect(await recordForfeit(as(ownerId), input, deps)).toMatchObject({ ok: true });
-    expect(db.state.games[0]).toMatchObject({ status: 'forfeit', homeScore: 2, awayScore: 15 });
+    // A forfeit was not played: it has no overtime count (step 2.200).
+    expect(db.state.games[0]).toMatchObject({
+      status: 'forfeit',
+      homeScore: 2,
+      awayScore: 15,
+      overtimePeriods: null,
+    });
     expect(events.map((e) => e.type)).toEqual(['games.finalized']);
     expect(db.state.activity.map((a) => a.action)).toEqual(['games.record_forfeit']);
 

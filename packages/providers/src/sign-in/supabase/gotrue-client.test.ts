@@ -140,6 +140,7 @@ describe('the Supabase Auth client', () => {
       ['user', () => client.user(accessToken)],
       ['logout', () => client.signOut(accessToken, 'local')],
       ['settings', () => client.settings()],
+      ['delete user', () => client.deleteUser('u-1')],
     ];
     for (const [name, make] of calls) {
       const error = await make().then(
@@ -190,6 +191,26 @@ describe('the Supabase Auth client', () => {
     });
     expect((await answering.user(accessToken)).ok).toBe(true);
     expect(timers[1]).toMatchObject({ ms: 10_000, stopped: true });
+  });
+
+  it('removes a user by its id with the secret key, for the sign-in service check (step 2.206)', async () => {
+    const { client, seen } = clientAnswering(() => Response.json({}));
+    expect(await client.deleteUser('u-1/../x')).toEqual({ ok: true, value: null });
+    expect(seen[0]?.url).toBe(
+      'https://fake-project.supabase.test/auth/v1/admin/users/u-1%2F..%2Fx',
+    );
+    expect(seen[0]?.init).toMatchObject({
+      method: 'DELETE',
+      headers: { apikey: secretKey, authorization: `Bearer ${secretKey}` },
+    });
+    expect(seen[0]?.init.body).toBeUndefined();
+    const gone = clientAnswering(() =>
+      Response.json({ code: 'user_not_found', message: 'User not found' }, { status: 404 }),
+    );
+    expect(await gone.client.deleteUser('u-1')).toMatchObject({
+      ok: false,
+      refusal: { status: 404, code: 'user_not_found' },
+    });
   });
 
   it('reads a generated code in the newer and the older shape', async () => {

@@ -4,8 +4,10 @@
 // through kyselyOf and transactionOf on purpose; nothing outside the package can.
 export { checkLoginRole } from './check-login-role.ts';
 export { checkQueueSchema, queueSchema } from './check-queue-schema.ts';
+export { checkSignInStoreLogin } from './check-sign-in-store-login.ts';
 export { commandTransaction } from './command-transaction.ts';
 export { createDatabase, type DatabaseSource } from './create-database.ts';
+export { databaseAnswers } from './database-answers.ts';
 export type { DatabaseHandle } from './database-handle.ts';
 export type { AppScope, LeagueScope } from './transaction-scope.ts';
 export {

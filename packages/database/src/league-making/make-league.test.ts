@@ -442,18 +442,19 @@ describe('makeLeague when a login may not do its part', () => {
     });
     const accounts = await accountCount();
     const leagues = await leagueCount();
+    const superuser = 'postgres is a superuser: alter role postgres nosuperuser';
     expect(await previewNewLeague(own, plan)).toEqual({
       ready: false,
       problem: {
         kind: 'login',
-        problems: [{ login: 'app', problems: expect.arrayContaining(['it is a superuser']) }],
+        problems: [{ login: 'app', problems: expect.arrayContaining([superuser]) }],
       },
     });
     expect(await makeLeague(own, plan)).toEqual({
       ok: false,
       problem: {
         kind: 'login',
-        problems: [{ login: 'app', problems: expect.arrayContaining(['it is a superuser']) }],
+        problems: [{ login: 'app', problems: expect.arrayContaining([superuser]) }],
       },
       accounts: { removed: [], left: [] },
     });

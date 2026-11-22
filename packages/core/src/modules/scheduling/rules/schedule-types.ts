@@ -64,6 +64,11 @@ export type ScheduleState = {
    * number and id, so neither is given to a round added after.
    */
   removedRounds?: readonly ScheduleRound[];
+  /**
+   * Games the draft has removed, each as it was just before it was removed (step 2.185):
+   * what "Put it back" gives the draft again, whatever has happened to the game since.
+   */
+  removedGames?: readonly ScheduleGame[];
 };
 
 export type DraftChange =
@@ -71,6 +76,12 @@ export type DraftChange =
   | { kind: 'move-game'; gameId: string; to: ScheduleSlot }
   | { kind: 'swap-games'; gameId: string; otherGameId: string }
   | { kind: 'remove-game'; gameId: string }
+  /**
+   * Drops the draft's removal of a game (step 2.185): the game comes back as the draft last
+   * held it, with no round if its round has been removed since (S-60). Always allowed while
+   * the draft removes the game: it only gives the draft the game back.
+   */
+  | { kind: 'put-back-game'; gameId: string }
   | { kind: 'set-recording'; gameId: string; recording: GameRecording }
   | { kind: 'rename-round'; roundId: string; label: string }
   | { kind: 'change-round-date'; roundId: string; date: string }

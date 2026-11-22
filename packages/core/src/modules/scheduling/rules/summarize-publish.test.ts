@@ -144,3 +144,51 @@ describe('summarizePublish (P7 §4.4)', () => {
     expect(summarizePublish(baseState(), draft).roundsDateChanged).toEqual([]);
   });
 });
+
+describe('what the summary counts is what publishing writes (step 2.185)', () => {
+  it('counts no recording change for a draft that names none, as publishing writes none', () => {
+    const published = baseState();
+    const g1 = published.games[0] ?? game('g1');
+    const recorded = { ...published, games: [{ ...g1, recording: 'live' as const }] };
+    // Removed and "put back" with no recording (a crafted post): publishing leaves the
+    // game's recording as it is, so it is no change.
+    const crafted = applyDraft(
+      recorded,
+      [
+        { kind: 'remove-game', gameId: g1.id },
+        { kind: 'add-game', game: { ...g1, recording: null } },
+      ],
+      [],
+    );
+    expect(summarizePublish(recorded, crafted.state).gamesRecordingChanged).toEqual([]);
+    expect(publishChangeCount(summarizePublish(recorded, crafted.state))).toBe(0);
+    // A recording the draft names is a change.
+    const named = applyDraft(
+      recorded,
+      [{ kind: 'set-recording', gameId: g1.id, recording: 'box-score' }],
+      [],
+    );
+    expect(summarizePublish(recorded, named.state).gamesRecordingChanged).toEqual([g1.id]);
+  });
+
+  it('puts a game back as the draft last held it, with what has happened to it since', () => {
+    const published = baseState();
+    const g1 = published.games[0] ?? game('g1');
+    const played = {
+      ...published,
+      games: published.games.map((g) => (g.id === g1.id ? { ...g, status: 'final' as const } : g)),
+    };
+    const back = applyDraft(
+      played,
+      [
+        { kind: 'remove-game', gameId: g1.id },
+        { kind: 'put-back-game', gameId: g1.id },
+      ],
+      [],
+    );
+    expect(back.rejected).toEqual([]);
+    expect(back.removed).toEqual([]);
+    expect(back.state.games.find((g) => g.id === g1.id)?.status).toBe('final');
+    expect(publishChangeCount(summarizePublish(played, back.state))).toBe(0);
+  });
+});

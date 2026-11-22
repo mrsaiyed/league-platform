@@ -72,6 +72,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.seedLeaguesInto,
     'development-only bootstrap: takes a PGlite, not a scope; runs the scoped commands (own cases) per league and writes accounts and role grants directly',
   ],
+  [
+    databasePackage.seedAllLeaguesInto,
+    'development-only bootstrap (`npm run seed`): takes a PGlite, not a scope; seedLeaguesInto, then per league the scoped commands (own cases), the fixture import, the rounds and the tracker transfer, each in its league; like seedLeaguesInto, the demo-shaped league also writes its accounts directly and its role grants through the access store, without a command',
+  ],
   [rosterEntrySummary, 'turns a row already read into the returned shape; runs no SQL'],
   [databasePackage.binStore, 'binds the bin queries (own cases) to a scope'],
   [databasePackage.teamsStore, 'binds the team queries, each with its own cases, to a scope'],
@@ -139,12 +143,36 @@ const reachNoLeagueData = new Map<unknown, string>([
   [databasePackage.createDatabase, 'opens connections; reads no rows'],
   [databasePackage.checkLoginRole, "reads the login role's facts from pg_roles only"],
   [
+    databasePackage.databaseAnswers,
+    'the health check: `select 1` in a transaction with no league and no account set; reads no table',
+  ],
+  [
     databasePackage.checkQueueSchema,
     "reads whether pg-boss's schema exists and the login may make tables in it, from the catalog only",
   ],
   [
+    databasePackage.checkSignInStoreLogin,
+    'reads whether the login is a member of sign_in_store from pg_roles, then opens one empty sign-in store transaction (record 052); no league rows',
+  ],
+  [
     databasePackage.madeUpDatabase,
     'development-only: a new in-memory database built as its owner (migrations, seedLeaguesInto), then used as a member of app_user; takes nothing and reads no league for anyone',
+  ],
+  [
+    databasePackage.serveMadeUpDatabase,
+    'tests only: madeUpDatabase served as a PostgreSQL server on 127.0.0.1 (record 082); takes nothing and reads no league for anyone',
+  ],
+  [
+    databasePackage.keepEmail,
+    'the test copy’s kept emails (step 2.204, record 098): a platform table outside public, no league; it only runs public.keep_email, which adds a row and returns nothing (schema/kept-emails.test.ts)',
+  ],
+  [
+    databasePackage.keepFailureOf,
+    'tells keepEmail’s refusals from faults, by an error already thrown; runs no SQL',
+  ],
+  [
+    databasePackage.newestKeptEmail,
+    'the test copy’s kept emails (step 2.204, record 098): a platform table, no league; read as the tables’ owner by scripts/read-kept-emails.mjs only, which the app’s role cannot run (no grant on kept_emails)',
   ],
   [
     databasePackage.createDatabaseSignInStore,
@@ -163,6 +191,51 @@ const reachNoLeagueData = new Map<unknown, string>([
   ],
   [databasePackage.TrackerBackupError, 'the reader error class; runs nothing'],
   [
+    databasePackage.SeedPartlyLoaded,
+    "the seed's error class for a partly loaded league; runs nothing",
+  ],
+  [
+    databasePackage.simulateLeagueInto,
+    'development-only (`npm run simulate`, and a local start with LOCAL_SIMULATED_LEAGUE): takes a PGlite, not a scope; makes its one made-up league with createLeague and from then on calls only the scoped commands (own cases) as that league’s owner; like seedLeaguesInto it writes its made-up accounts directly',
+  ],
+  [
+    databasePackage.rebuildSimulatedStandings,
+    'development-only, for the simulator’s tests: runs the standings rebuild (own case) as the simulated league’s owner, in that league',
+  ],
+  [
+    databasePackage.checkSimulatedLeague,
+    'development-only: reads the one simulated league’s numbers (the scoped queries and stores, own cases, and that league’s stored rows, every statement fenced by its league id) to compare them with the plan; changes nothing',
+  ],
+  [
+    databasePackage.simulationReportLines,
+    'turns the checks’ results into lines of text; runs no SQL',
+  ],
+  [
+    databasePackage.expectedTables,
+    'works a simulated league’s expected tables out from its plan alone; runs no SQL',
+  ],
+  [
+    databasePackage.expectedGame,
+    'works one game’s expected state and score out from the plan alone; runs no SQL',
+  ],
+  [
+    databasePackage.expectedBoxScore,
+    'works a tracked game’s expected box score out from the plan’s plays; runs no SQL',
+  ],
+  [
+    databasePackage.expectedPlayerTotals,
+    'adds up players’ expected totals from the plan’s plays; runs no SQL',
+  ],
+  [
+    databasePackage.planSimulation,
+    'makes the seeded plan of a simulated league; pure, runs no SQL',
+  ],
+  [databasePackage.simulationOptionsFrom, 'reads the simulate command’s options; runs no SQL'],
+  [
+    databasePackage.simulationProblem,
+    'says what is wrong with a simulation’s options; runs no SQL',
+  ],
+  [
     databasePackage.transferTrackerGames,
     'development tool (step 2.58): takes a PGlite, not a scope; finds one league, season and account by name, then reaches that one league only through stores fenced to it (each transaction sets its league) and its commands (own cases)',
   ],
@@ -172,8 +245,24 @@ const reachNoLeagueData = new Map<unknown, string>([
   ],
   [databasePackage.isDatabaseAddress, 'tells an address from a folder name; runs nothing'],
   [
+    databasePackage.connectCauseOf,
+    'reads a failed connection’s error code (record 082); runs nothing and reads no row',
+  ],
+  [
+    databasePackage.serverCodeOf,
+    'reads the server’s own code from a failed connection (step 2.203); runs nothing and reads no row',
+  ],
+  [
     databasePackage.openLeagueMakingTarget,
     'staff tool (step 2.125, record 057): opens a PGlite folder, or the migration login and the app login of a hosted database; each reads the catalog only (live_stats, current_database, the server start time); no league rows',
+  ],
+  [
+    databasePackage.countLiveGames,
+    'release command (step 2.95, T-158): as the migration login, one count of the games marked live across every league, read before any change is applied; returns a number only, no league, game or person',
+  ],
+  [
+    databasePackage.openMigrationTarget,
+    'release command (step 2.95, record 101): opens a PGlite folder, or the migration login alone of a hosted database; reads the catalog only (live_stats, current_database, the server start time); no league rows',
   ],
   [
     databasePackage.previewNewLeague,

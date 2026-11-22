@@ -10,12 +10,14 @@
 //   admin-divisions.ts: adminDivisions
 //   admin-games.ts: admin.games, admin.boxScore, admin.myGames
 //   admin-import.ts: admin.import
+//   admin-people.ts: adminPeople
 //   admin-settings.ts: adminSettings, seasonSettings, setting
 //   admin-teams.ts: adminTeams
 //   admin-venues.ts: adminVenues
 //   error.ts: error
 //   error-scheduling.ts: error.scheduling
 //   game.ts: game, stat
+//   legal.ts: legal
 //   schedule.ts: schedule
 //   schedule-admin.ts: schedule.admin
 //   site.ts: common, display, footer, front, home, nav, page, shell, site, standIn, standings,
@@ -29,12 +31,14 @@ import { enAdmin } from './en/admin.ts';
 import { enAdminDivisions } from './en/admin-divisions.ts';
 import { enAdminGames } from './en/admin-games.ts';
 import { enAdminImport } from './en/admin-import.ts';
+import { enAdminPeople } from './en/admin-people.ts';
 import { enAdminSettings } from './en/admin-settings.ts';
 import { enAdminTeams } from './en/admin-teams.ts';
 import { enAdminVenues } from './en/admin-venues.ts';
 import { enError } from './en/error.ts';
 import { enErrorScheduling } from './en/error-scheduling.ts';
 import { enGame } from './en/game.ts';
+import { enLegal } from './en/legal.ts';
 import { enSchedule } from './en/schedule.ts';
 import { enScheduleAdmin } from './en/schedule-admin.ts';
 import { enSite } from './en/site.ts';
@@ -48,12 +52,14 @@ export const en = {
   ...enAdminDivisions,
   ...enAdminGames,
   ...enAdminImport,
+  ...enAdminPeople,
   ...enAdminSettings,
   ...enAdminTeams,
   ...enAdminVenues,
   ...enError,
   ...enErrorScheduling,
   ...enGame,
+  ...enLegal,
   ...enSchedule,
   ...enScheduleAdmin,
   ...enSite,

@@ -107,7 +107,12 @@ export const problemWords = {
     highlightColor: 'Highlight color: a color written #rrggbb, such as #d3b780.',
   },
   blocked: {
-    shortName: 'Short name: that word is not allowed (one of ours, or offensive). Choose another.',
+    shortName:
+      'Short name: that word is one of ours (the site uses it for its own pages). Choose another.',
+  },
+  offensive: {
+    shortName:
+      'Short name: that word is not allowed (it is on our list of offensive words). Choose another.',
   },
   'before-start': {
     seasonEndsOn: 'First season ends: before it starts.',
@@ -267,6 +272,8 @@ const causeWords = {
     'the server’s certificate could not be checked (the file in MIGRATION_DATABASE_CA, or the host name)',
   ssl: 'the connection’s SSL setting (MIGRATION_DATABASE_SSL) does not suit that server',
   timeout: 'nothing answered within 15 seconds (the host, the port, or a firewall)',
+  refused:
+    'the database answered but refused the start (check the login name and the database name in the address)',
   unknown: 'no particular cause could be told',
 };
 const usualCauses =
@@ -295,7 +302,7 @@ export const targetProblemLines = (problem) => {
   }
   if (problem.kind === 'cannot-connect') {
     return [
-      `Could not connect through ${loginWords[problem.login]}: ${causeWords[problem.cause]}. Nothing was made.`,
+      `Could not connect through ${loginWords[problem.login]}: ${causeWords[problem.cause]}${problem.cause === 'refused' && problem.code ? `, code ${problem.code}` : ''}. Nothing was made.`,
       usualCauses,
     ];
   }

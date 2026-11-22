@@ -1201,7 +1201,11 @@ function leagueOf(
   let entries = 0;
   for (const spec of seasons) {
     const { rules, ...rest } = spec.season;
-    s.seasons.push({ ...rest, rules, statKeys: [...statKeys], version: 1 });
+    // The empty league's season keeps what a season made today keeps: no statistics of its
+    // own, so its rules' set is shown (step 2.194: its pages showed rebounds, which no game
+    // there can record, and left 3-pointers and free throws out of its box scores).
+    const keeps = spec.season.id === standInSeasonIds.empty ? [] : [...statKeys];
+    s.seasons.push({ ...rest, rules, statKeys: keeps, version: 1 });
     spec.divisions.forEach((d, sort) =>
       s.divisions.push({
         id: d.id,
@@ -1296,6 +1300,8 @@ function leagueOf(
         captureMode: g.capture,
         homeScore: g.score?.[0] ?? null,
         awayScore: g.score?.[1] ?? null,
+        // As a game decided before the count was kept (migration 0021): not known.
+        overtimePeriods: null,
         format: decided ? rules : null,
         finalizedAt: decided ? startsAt : null,
         binned: false,

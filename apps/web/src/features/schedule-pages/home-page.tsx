@@ -2,6 +2,7 @@ import { leagueUrl } from '@srleagues/core';
 import { CallBand, EmptyPanel, Hero, Section, StandingsTable, StatStrip } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { leagueSites, siteOf } from '../../server/league-site.ts';
@@ -11,6 +12,8 @@ import {
   buildStandingsViews,
   chooseSeason,
   firstValue,
+  fitHomeLeaders,
+  homeAcrossRoom,
   homeLeadersOf,
   type SearchParams,
   type StandingsTableView,
@@ -18,16 +21,24 @@ import {
 import { buildHomeNumbers } from './build-home-numbers.ts';
 import { buildHomeGames } from './build-schedule.ts';
 import { HomeLeaders } from './home-leaders.tsx';
-import { homeLeadersPlace, homeNextGames, homeResults } from './home-lists.ts';
+import { homeLeadersPlace, homeNextGames, homeNextTitle, homeResults } from './home-lists.ts';
 import { GameList } from './schedule-views.tsx';
 
 /** The columns the home page's compact standings keep. */
 const compactColumns: readonly string[] = ['played', 'wins', 'losses', 'winPercentage'];
 
-/** A division's table cut down to the few columns that fit beside the games. */
+/**
+ * A division's table cut down to the few columns that fit beside the games, with each
+ * level-teams note cut to its first sentence where it was made (step 2.198): who is level
+ * and on what; "See the full standings" leads to the reasons.
+ */
 export function compactStandings(table: StandingsTableView): StandingsTableView {
   const kept = new Set(compactColumns);
-  return { ...table, columns: table.columns.filter((c) => kept.has(c.key)) };
+  return {
+    ...table,
+    columns: table.columns.filter((c) => kept.has(c.key)),
+    footnotes: table.briefFootnotes,
+  };
 }
 
 /**
@@ -40,10 +51,17 @@ export function compactStandings(table: StandingsTableView): StandingsTableView 
 export async function HomePage({
   league,
   search,
+  yourTeam = null,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
   readonly search: SearchParams;
+  /**
+   * The person's own team, or this device's, at the top of the column: drawn by the page's
+   * script after it has arrived (team-pages, YourTeamLine; step 2.168), so nothing here
+   * reads anyone's.
+   */
+  readonly yourTeam?: ReactNode;
 }) {
   const view = await loadLeaguePage(league, 'site');
   const addressee = view.context.league;
@@ -92,12 +110,19 @@ export async function HomePage({
     seasonId: season.id,
   });
   const leadersPlace = homeLeadersPlace(empty ? 0 : results.length, tableHeights, leaders.length);
+  // A whole place at a time: a shared place the room cannot hold is left to one line.
+  const leadersBeside = fitHomeLeaders(leaders, leadersPlace.beside);
+  const leadersAcross = fitHomeLeaders(leaders, Math.min(leadersPlace.across, homeAcrossRoom));
   const statsHref = leagueUrl(addressee, 'stats', { season: askedSeason });
   const teamCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
   const scheduleHref = leagueUrl(addressee, 'schedule', { season: askedSeason });
   const standingsHref = leagueUrl(addressee, 'standings', { season: askedSeason });
   const teamsHref = leagueUrl(addressee, 'teams', { season: askedSeason });
   const manyTables = tables.length > 2;
+  // A level-teams note the home page shortened: the whole of it is on the standings page.
+  const shortened = tables.some((table) =>
+    table.briefFootnotes.some((note, n) => note.text !== table.footnotes[n]?.text),
+  );
   return (
     <main className="site-wide">
       <Hero
@@ -118,6 +143,7 @@ export async function HomePage({
         ) : null}
       </Hero>
       <div className="site-column">
+        {yourTeam}
         <div className="home-numbers">
           <StatStrip label={t('home.numbers')} items={buildHomeNumbers(schedule, teamCount)} />
         </div>
@@ -133,7 +159,7 @@ export async function HomePage({
             latest games and the standings. */}
         {next.length === 0 ? null : (
           <Section
-            title={t('home.upcoming')}
+            title={t(homeNextTitle(next))}
             kicker={t('home.upcoming.kicker')}
             more={{ href: scheduleHref, label: t('home.fullSchedule') }}
           >
@@ -172,23 +198,30 @@ export async function HomePage({
             more={{ href: standingsHref, label: t('home.fullStandings') }}
           >
             {hasStandings ? (
-              <div className="home-tables">
-                {tables.map((raw) => {
-                  const table = compactStandings(raw);
-                  return (
-                    <StandingsTable
-                      key={table.key}
-                      caption={table.caption}
-                      idPrefix={`home-${table.key}`}
-                      columns={table.columns}
-                      rows={table.rows}
-                      footnotes={table.footnotes}
-                      labels={labels.standings}
-                      emblems
-                    />
-                  );
-                })}
-              </div>
+              <>
+                <div className="home-tables">
+                  {tables.map((raw) => {
+                    const table = compactStandings(raw);
+                    return (
+                      <StandingsTable
+                        key={table.key}
+                        caption={table.caption}
+                        idPrefix={`home-${table.key}`}
+                        columns={table.columns}
+                        rows={table.rows}
+                        footnotes={table.footnotes}
+                        labels={labels.standings}
+                        emblems
+                      />
+                    );
+                  })}
+                </div>
+                {shortened ? (
+                  <p className="home-notes-more">
+                    <a href={standingsHref}>{t('home.whyThisOrder')}</a>
+                  </p>
+                ) : null}
+              </>
             ) : (
               <EmptyPanel
                 text={t('home.standingsEmpty')}
@@ -198,14 +231,16 @@ export async function HomePage({
             {/* A short column of standings is filled out with the season's leaders, each
                 one short row, so the two columns end about level. */}
             <HomeLeaders
-              leaders={leaders.slice(0, leadersPlace.beside)}
+              leaders={leadersBeside.leaders}
+              levelCut={leadersBeside.levelCut}
               placing="beside"
               statsHref={statsHref}
             />
           </Section>
         </div>
         <HomeLeaders
-          leaders={leaders.slice(0, leadersPlace.across)}
+          leaders={leadersAcross.leaders}
+          levelCut={leadersAcross.levelCut}
           placing="across"
           statsHref={statsHref}
         />

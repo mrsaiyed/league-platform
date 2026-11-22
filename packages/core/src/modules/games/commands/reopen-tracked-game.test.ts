@@ -49,6 +49,8 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
     const endedAt = await endedOnTablet(t);
     t.clock.at = endedAt + minutes(29);
     const before = t.db.state.games[0];
+    // Ended in regulation: its result keeps 0 overtime periods (step 2.200).
+    expect(before?.overtimePeriods).toBe(0);
     const requestId = requestUuid();
     const result = await reopenTrackedGame(
       t.as(scorekeeperId),
@@ -68,6 +70,8 @@ describe('a scorekeeper reopening a game they ended (S-36)', () => {
       homeScore: 5,
       awayScore: 2,
       finalizedAt: null,
+      // Not final now: no overtime count until it ends again (step 2.200).
+      overtimePeriods: null,
       version: (before?.version ?? 0) + 1,
     });
     expect(s.corrections).toEqual([

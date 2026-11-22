@@ -3,7 +3,14 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { BoxScoreTable, GameCard, PlayTable, Scoreboard, displayCss } from '../index.ts';
+import {
+  BoxScoreTable,
+  FinalStatePill,
+  GameCard,
+  PlayTable,
+  Scoreboard,
+  displayCss,
+} from '../index.ts';
 
 const arabicName = 'نسور الصحراء';
 const render = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el);
@@ -231,6 +238,62 @@ describe('a game card in any state', () => {
       );
       expect(html, status).not.toContain('View box score');
     }
+  });
+  // Step 2.200 (P7 §5.6): a game won in overtime says so in its pill, on both layouts, as
+  // quietly as "Final"; the words are only ever a final game's.
+  it('says a final game went to overtime in its pill, and nothing more for any other', () => {
+    const card = (status: 'final' | 'forfeit' | 'live', layout: 'rows' | 'board') =>
+      render(
+        createElement(GameCard, {
+          home: { name: 'Birch', score: 5 },
+          away: { name: 'Aspen', score: 2 },
+          status,
+          finalPill: { text: 'Final, OT', said: 'Final after overtime' },
+          whenText: 'Sat 9:00',
+          labels: cardLabels,
+          layout,
+        }),
+      );
+    for (const layout of ['rows', 'board'] as const) {
+      const final = card('final', layout);
+      expect(final, layout).toContain('data-status="final"');
+      // The letters for the eye, the words for a screen reader (step 2.200).
+      expect(final, layout).toContain(
+        '<span class="ui-game-state"><span aria-hidden="true">Final, OT</span><span class="ui-visually-hidden">Final after overtime</span></span>',
+      );
+      expect(final, layout).not.toContain('>Final<');
+      expect(card('forfeit', layout), layout).toContain(
+        '<span class="ui-game-state">Forfeit</span>',
+      );
+      expect(card('forfeit', layout), layout).not.toContain('overtime');
+      expect(card('live', layout), layout).not.toContain('overtime');
+    }
+    // Without the words, a final game says "Final" alone.
+    const plain = render(
+      createElement(GameCard, {
+        home: { name: 'Birch', score: 5 },
+        away: { name: 'Aspen', score: 2 },
+        status: 'final',
+        whenText: 'Sat 9:00',
+        labels: cardLabels,
+      }),
+    );
+    expect(plain).toContain('<span class="ui-game-state">Final</span>');
+  });
+  it('stands by itself, as quiet as on a card, on a page that draws no card (step 2.200)', () => {
+    expect(render(createElement(FinalStatePill, { label: 'Final' }))).toBe(
+      '<span class="ui-game-state" data-kind="quiet">Final</span>',
+    );
+    expect(
+      render(
+        createElement(FinalStatePill, {
+          label: 'Final',
+          finalPill: { text: 'Final, OT', said: 'Final after overtime' },
+        }),
+      ),
+    ).toBe(
+      '<span class="ui-game-state" data-kind="quiet"><span aria-hidden="true">Final, OT</span><span class="ui-visually-hidden">Final after overtime</span></span>',
+    );
   });
   // Step 2.153: "Score this game" for one person, never inside the card's link.
   it('draws a second action after the card’s link and outside it, at the foot of the board', () => {

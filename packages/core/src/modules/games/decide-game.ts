@@ -103,6 +103,9 @@ export async function decideGame(args: {
       homeScore: args.homeScore,
       awayScore: args.awayScore,
       decided: true,
+      // Decided by hand (a score typed in, a box score, an import, a forfeit): nothing yet
+      // says whether it went to overtime (step 2.56 lets a typed score say it).
+      overtimePeriods: null,
       ...(game.format === null ? { format: rules } : {}),
       ...(args.captureMode === undefined ? {} : { captureMode: args.captureMode }),
     },

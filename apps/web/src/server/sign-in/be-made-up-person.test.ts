@@ -6,6 +6,7 @@
 import { platformUrl } from '@srleagues/core';
 import { seedLeagues } from '@srleagues/database';
 import { createLogger, memorySink } from '@srleagues/observability';
+import { createLocalBotCheck } from '@srleagues/providers';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,13 +17,23 @@ import { standInPeople, standInMember, standInPorts, standInSignIn } from '../st
 import { beMadeUpPerson } from './be-made-up-person.ts';
 import { cookieNames, type CookieJar } from './cookies.ts';
 import type { Visit } from './device.ts';
-import { askForCode, choosePassword, enterCode, type FlowDeps } from './flows.ts';
+import {
+  askForCode,
+  botCheckFieldsDrawn,
+  choosePassword,
+  enterCode,
+  type FlowDeps,
+} from './flows.ts';
 
 const origin = 'http://127.0.0.1:3000';
 /** The scratch folders this file made in the system's temp folder: removed after each test. */
 const made: string[] = [];
 afterEach(() => {
-  for (const folder of made.splice(0)) rmSync(folder, { recursive: true, force: true });
+  // An email still being kept as the test ends can leave the folder not yet empty on a busy
+  // machine (GitHub, 2026-11-22): the removal tries again instead of failing the test.
+  for (const folder of made.splice(0)) {
+    rmSync(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
 });
 const options = (log: (line: unknown) => void = () => {}) => {
   const folder = mkdtempSync(path.join(os.tmpdir(), 'be-made-up-'));
@@ -54,8 +65,10 @@ function browser() {
 
 const flowDepsOf = (made: Pick<FlowDeps, 'signIn' | 'mail'>): FlowDeps => ({
   ...made,
+  botCheck: createLocalBotCheck({ appEnv: 'test' }),
   secureCookies: false,
   siteOrigin: origin,
+  testCopy: false,
   now: () => new Date(),
 });
 
@@ -295,7 +308,9 @@ describe('no code in a log line (T4 §10)', () => {
     const { visit, cookies } = browser();
     const email = 'brand-new-person@example.test';
 
-    expect(await askForCode('sign-up', { email }, visit, deps)).toEqual({
+    // As the sign-up page's form sends it: with the bot check's stand-in answer it draws.
+    const drawn = botCheckFieldsDrawn(deps.botCheck.widget);
+    expect(await askForCode('sign-up', { ...drawn, email }, visit, deps)).toEqual({
       to: platformUrl('enterCode'),
     });
     await new Promise((resolve) => setTimeout(resolve, 10));

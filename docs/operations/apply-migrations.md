@@ -39,6 +39,12 @@ A release runs the old version of the app and the new schema side by side for a 
 - **Allowed**: a file that does one of these is listed in `migrationDropsAllowed` in `scripts/structure/config.mjs`, by its file name, its checksum and a reason (which release stopped using what it removes). If the file changes afterwards, the entry stops counting. The list is empty today.
 - The safe way is two releases: add the new thing first while the old still works, then remove the old in a later file.
 
+## Migrations after which every server is switched together
+
+Some migrations add nothing the old version breaks on, but add a rule the old version does not know. After one of these, every server of the app is switched to the new version at once, not one by one. Each is listed here with what goes wrong if they are not.
+
+- **0021 (overtime on the result, step 2.200).** A game the new version ends in overtime keeps its count (`games.overtime_periods`), and the database allows a count on a final game only. The old version does not know the column: when it reopens, postpones or otherwise changes the result of such a game, it leaves the count in place, so the database refuses the change (`games_overtime_when_final`). It fails cleanly: the request ends in an error, the whole change is undone and nothing is lost; it works once the server runs the new version. Games the old version ends get no count (no mark), which is right for a game whose overtime is not known.
+
 ## Running it locally
 
 - **Seed database**: `npm run seed` applies every migration to a PGlite database in `.local/seed-db`, then loads made-up leagues. It is the most common local run. See [run it locally](run-it-locally.md).
@@ -49,14 +55,16 @@ PGlite is real PostgreSQL inside Node (record 048), so these runs use the same S
 
 ## Running it against a test copy of the hosted database
 
-The runner can reach any PostgreSQL address through `connectPostgresDriver(url, options)` in `packages/database/src/migrations/postgres-driver.ts`. Its rules:
+**The one way to do it is the release command**, `npm run release -- --hosted`, at a person's own terminal (step 2.95, record 101). How to run it, step by step, is [releasing and going back](releasing-and-going-back.md). It reaches the database through `connectPostgresDriver(url, options)` in `packages/database/src/migrations/postgres-driver.ts`, with these rules:
 
-- **Use the direct connection** (Supabase port 5432, or the Session pooler). A transaction-mode pooler, such as port 6543, hands each statement to a different connection, which breaks the run lock and can split a file's transaction. The driver's header says so.
-- **SSL is verified by default**: the server's certificate must be valid, checked against the system's certificate authorities or a `ca` given in the options. `'no-verify'` is an explicit opt-out for a provider whose certificate cannot be checked; `'off'` is only for a database on this computer.
-- **The address is never the place for SSL settings**: `sslmode` and similar parameters are removed from the address and set by the options, so a copied address behaves the same everywhere.
+- **The migration login, for that one command only.** `MIGRATION_DATABASE_URL` is typed for the one command, without its password, which the release asks for with the typing hidden (T-300); the release refuses it in `.env`, and it is never a setting on the host, because that login owns the tables and sees past the league fence (audit 2.110, M11 and M20).
+- **A session-level connection.** On Supabase that is the direct address (port 5432 on `db.<project>.supabase.co`) or the Session pooler (port 5432 on the pooler's host). The direct address answers over IPv6 only on the free plan, so from a home network without IPv6 use the Session pooler (to confirm on the day). Never the Transaction pooler (port 6543): it hands each statement to a different connection, which breaks the run lock and can split a file's transaction. The driver's header says so.
+- **The certificate is always checked.** The release takes the server's certificate from `PLATFORM_DATABASE_CA` (its PEM text or a file's path, step 2.203) and refuses a hosted database without it. The driver's `'no-verify'` and `'off'` are never used by the release; `'off'` is only for a database on this computer.
+- **Nothing follows `?` in the address.** The release refuses an address with settings after `?`; SSL is set by `PLATFORM_DATABASE_CA`, so a copied address behaves the same everywhere.
+- **It refuses the Al-Hadi tracker's database**, however its address is spelled, and any database holding the tracker's `live_stats` schema, before it changes anything. It shows where it connected and the person types that database's name to go ahead.
 - **Use the test copy only, with made-up data.** Never run this against production. Real people's data exists only in production (T-13, T-201). Connection values are never written into these notes or into the repository.
 
-Honest status: the driver is tested against PGlite over a local socket. **It has not yet been run against a hosted database.** No npm command runs migrations against a hosted database, and the release step that will call the runner (T-48: applied automatically on release) is not in the repository yet. The first real run is the gate named in record 012 and in record 046.
+Honest status: the release and its driver are tested on PGlite and on PostgreSQL 16 on this computer (`packages/database/src/league-making/release-script.test.ts`, `tests/real-postgres/release.test.ts`). **The release command has not yet been run against the hosted test copy**: that is step 6 of the supervised session (audit 2.110, section 10), and until then it is not verified there (records 012 and 046).
 
 ## Where to look
 

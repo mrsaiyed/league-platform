@@ -7,12 +7,18 @@
 // command's context, which comes from the session (T-23, T-28), never the page snapshot
 // of the public pages (record 070).
 //
+// Core's event handlers run in each command's transaction (T-24), which therefore holds
+// the standings and games stores they use besides the leagues module's own. No settings
+// command announces an event today; the list is never empty all the same
+// (database-event-handlers.ts).
+//
 // packages/database is handed in, not imported: Node.js loads it when the app starts
 // (container.ts), so Next.js never bundles it.
 import type { CommandDeps, LeaguesTx } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
 import type { AdminSettingsPorts } from './admin-settings.ts';
+import { coreEventHandlers } from './database-event-handlers.ts';
 
 /** What these ports use of packages/database. */
 export type AdminSettingsQueries = Pick<
@@ -23,6 +29,8 @@ export type AdminSettingsQueries = Pick<
   | 'divisionsStore'
   | 'accessStore'
   | 'activityLogStore'
+  | 'standingsStore'
+  | 'gamesStore'
 >;
 
 export function databaseAdminSettings(
@@ -40,8 +48,10 @@ export function databaseAdminSettings(
         divisions: database.divisionsStore(scope),
         access: database.accessStore(scope),
         activity: database.activityLogStore(scope),
+        standings: database.standingsStore(scope),
+        games: database.gamesStore(scope),
       })),
-      events: [],
+      events: coreEventHandlers<LeaguesTx>(),
       log,
       now: () => performance.now(),
     },

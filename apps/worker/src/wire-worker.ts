@@ -4,7 +4,10 @@
 //
 //   local, test     the table queue (jobs run straight from the jobs table), and
 //                   captured email
-//   staging         the pg-boss queue, as in production, and captured email
+//   staging         the pg-boss queue, as in production, and captured email, each one
+//                   to a made-up address kept in the database's kept emails, in place
+//                   of files on the host (step 2.204, record 098: keptEmailSender;
+//                   EMAIL_CAPTURE_DIR is not used there)
 //   production      the pg-boss queue, and Resend
 //
 // It also makes the job handlers (jobs/job-handlers.ts), each job's transaction
@@ -30,6 +33,8 @@ import {
   createPgBoss,
   importsStore,
   jobsStore,
+  keepEmail,
+  keepFailureOf,
   leaguesStore,
   pgBossQueue,
   schedulingStore,
@@ -39,7 +44,7 @@ import {
   type QueueOptions,
 } from '@srleagues/database';
 import type { Logger } from '@srleagues/observability';
-import { emailSenderFor } from '@srleagues/providers';
+import { emailSenderFor, keptEmailSender } from '@srleagues/providers';
 import {
   checkedInvitationEmailSettings,
   type InvitationEmailTx,
@@ -74,9 +79,22 @@ export type WiredWorker = {
 export function wireWorker(settings: WorkerSettings, logger: Logger): WiredWorker {
   // First, so a missing production key or a setting the emails cannot use throws
   // before anything is opened or any job runs (record 023).
-  const email = emailSenderFor(settings);
+  const staging = settings.appEnv === 'staging';
+  const email = emailSenderFor(staging ? { ...settings, captureDirectory: undefined } : settings);
   checkedInvitationEmailSettings(settings);
   const db = createDatabase(settings.database);
+  // On the test copy each email to a made-up address is kept in its database, for
+  // scripts/read-kept-emails.mjs; one not kept is told by its kind only (T4 §10).
+  const sender: EmailSender =
+    staging && email.kind === 'capture'
+      ? keptEmailSender({
+          appEnv: settings.appEnv,
+          sender: email.sender,
+          keep: (kept) => keepEmail(db, kept),
+          failureOf: keepFailureOf,
+          onNotKept: (kind) => logger.warn('worker.email_not_kept', { kind }),
+        })
+      : email.sender;
   const options: QueueOptions = {
     onError: queueErrorLogger(logger),
     log: jobLogger(logger),
@@ -110,14 +128,14 @@ export function wireWorker(settings: WorkerSettings, logger: Logger): WiredWorke
     bin: { transaction: binTransaction, now: () => new Date() },
     importsTransaction,
     transaction,
-    email: email.sender,
+    email: sender,
     siteOrigin: settings.siteOrigin,
     sendingAddress: settings.sendingAddress,
   });
   return {
     db,
     queue,
-    email: email.sender,
+    email: sender,
     emailKind: email.kind,
     handlers,
     close: async () => {

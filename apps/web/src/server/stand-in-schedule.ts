@@ -14,9 +14,9 @@ export function standInSchedule(world: World): ScheduleAdminPorts {
     deps: world.deps,
     teamsOf: async (leagueId, seasonId) =>
       ((await world.read(leagueId))?.teams ?? [])
-        .filter((t) => t.seasonId === seasonId && !t.binned)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(({ id, name }) => ({ id, name })),
+        .filter((t) => t.seasonId === seasonId)
+        .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+        .map(({ id, name, binned }) => ({ id, name, removed: binned })),
     seasonsOf: async (leagueId, holder) => {
       const s = await world.read(leagueId);
       const all = s?.seasons ?? [];

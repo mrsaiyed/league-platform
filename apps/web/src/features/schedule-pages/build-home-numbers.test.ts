@@ -116,4 +116,29 @@ describe('the home page in numbers', () => {
       'rounds',
     ]);
   });
+
+  it('says "game" for one game still to play and "games" for more', async () => {
+    const season = (await stats.seasonsOf(adult))[0];
+    if (season === undefined) throw new Error('no season');
+    const clock = await schedules.clockOf(adult);
+    const schedule = await schedules.scheduleOf(adult, season.id, clock.today);
+    if (schedule === undefined) throw new Error('no schedule');
+    // Every game played but one, which is postponed; then two of them left.
+    const leaving = (left: number) => ({
+      ...schedule,
+      rounds: schedule.rounds.map((round, r) => ({
+        ...round,
+        games: round.games.map((g, n) =>
+          r === 0 && n < left
+            ? { ...g, status: 'postponed', homeScore: null, awayScore: null }
+            : { ...g, status: 'final', homeScore: 50, awayScore: 40 },
+        ),
+      })),
+      unplacedGames: [],
+    });
+    const toPlay = (left: number) =>
+      buildHomeNumbers(leaving(left), 9).find((n) => n.key === 'toPlay');
+    expect(toPlay(1)).toMatchObject({ value: '1', label: 'Game to play' });
+    expect(toPlay(2)).toMatchObject({ value: '2', label: 'Games to play' });
+  });
 });
