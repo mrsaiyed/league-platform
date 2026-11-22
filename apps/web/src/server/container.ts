@@ -9,7 +9,7 @@
 // database (staging and production), not bundled by Next.js: it runs TypeScript
 // directly as the tracker does, and its migration runner finds its folder on disk.
 import { consoleSink, createLogger, type Logger } from '@srleagues/observability';
-import { createSupabaseEmailConfirmation } from '@srleagues/providers';
+import { createSupabaseSignIn } from '@srleagues/providers';
 import { getConfig } from './config.ts';
 import { keptEmailsFolderFrom } from './kept-emails.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
@@ -43,10 +43,12 @@ function start(): Promise<WebPorts> {
   const logger = createLogger({ sink: consoleSink, level: config.LOG_LEVEL, base: { app: 'web' } });
   return startWebApp(config, {
     database: () => import(/* turbopackIgnore: true */ '@srleagues/database'),
-    // Staging and production only: the real sign-in service, asked at start whether
-    // it confirms email addresses (step 2.115).
-    realSignIn: (service) =>
-      createSupabaseEmailConfirmation({ ...service, fetch: (url, init) => fetch(url, init) }),
+    // Staging and production only: the real sign-in service, Supabase's adapter over its
+    // HTTP API with the store in our own database (records 018 and 052), asked at start
+    // whether it confirms email addresses before anyone is signed in through it (step 2.115).
+    realSignIn: (wiring) =>
+      createSupabaseSignIn({ ...wiring, fetch: (url, init) => fetch(url, init) }),
+    // Commands at info, warnings at warn, the bot check's alarm at error (logLinesFor).
     ...logLinesFor(logger),
     // Read only on made-up data (local work and tests): where the kept emails are written,
     // the working folder found from where the server runs (kept-emails.ts, step 2.96).

@@ -19,16 +19,10 @@
 //
 // packages/database is handed in, not imported: Node.js loads it when the app starts
 // (container.ts), so Next.js never bundles it.
-import {
-  eventHandlers,
-  type Clock,
-  type CommandDeps,
-  type EventHandler,
-  type StandingsTx,
-  type TrackerTx,
-} from '@srleagues/core';
+import type { Clock, CommandDeps, TrackerTx } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle, LeagueScope } from '@srleagues/database';
+import { coreEventHandlers } from './database-event-handlers.ts';
 import type { GameNames, GamesAreaPorts } from './games-area-ports.ts';
 
 /** What these ports use of packages/database. */
@@ -47,26 +41,6 @@ export type GamesQueries = Pick<
   | 'listAccessNames'
 >;
 
-/** The games module's transaction with the standings store its event handlers write to. */
-type GamesAreaTx = TrackerTx & StandingsTx;
-
-/** Whether the command's transaction is this file's, standings store included. */
-const holdsStandings = (tx: TrackerTx): tx is GamesAreaTx =>
-  'standings' in tx && tx.standings !== undefined;
-
-/**
- * Core's handlers (standings and player totals follow every result, T-24), each given the
- * whole transaction its command runs in. The command hands a handler its own copy of the
- * transaction with a checked job queue (define-command.ts), so every store is still there.
- */
-const standingsFollow: readonly EventHandler<TrackerTx>[] = eventHandlers.map((handler) => ({
-  type: handler.type,
-  handle: async (event, tx) => {
-    if (!holdsStandings(tx)) throw new Error('A games transaction without its standings store.');
-    await handler.handle(event, tx);
-  },
-}));
-
 export type DatabaseGamesOptions = {
   readonly log: CommandDeps<TrackerTx>['log'];
   /** The server's clock: the tracker's sessions and the reopening window are timed by it. */
@@ -80,20 +54,18 @@ export function databaseGamesDeps(
   options: DatabaseGamesOptions,
 ): CommandDeps<TrackerTx> {
   return {
-    transaction: database.commandTransaction(
-      db,
-      (scope: LeagueScope): GamesAreaTx => ({
-        jobs: database.jobsStore(scope),
-        games: database.gamesStore(scope),
-        access: database.accessStore(scope),
-        activity: database.activityLogStore(scope),
-        scoringSessions: database.scoringSessionsStore(scope),
-        liveGames: database.liveGamesStore(scope),
-        clock: options.clock,
-        standings: database.standingsStore(scope),
-      }),
-    ),
-    events: standingsFollow,
+    transaction: database.commandTransaction(db, (scope: LeagueScope) => ({
+      jobs: database.jobsStore(scope),
+      games: database.gamesStore(scope),
+      access: database.accessStore(scope),
+      activity: database.activityLogStore(scope),
+      scoringSessions: database.scoringSessionsStore(scope),
+      liveGames: database.liveGamesStore(scope),
+      clock: options.clock,
+      standings: database.standingsStore(scope),
+    })),
+    // Core's handlers, from the one place every database port takes them.
+    events: coreEventHandlers<TrackerTx>(),
     log: options.log,
     now: () => performance.now(),
   };

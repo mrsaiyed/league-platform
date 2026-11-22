@@ -13,6 +13,11 @@ export { seedLeagues, seedStaff, type SeedLeague } from './seed-data.ts';
 export { seedLeaguesInto, type SeededLeague } from './seed-leagues.ts';
 export { SeedPartlyLoaded } from './seed-partly-loaded.ts';
 export {
+  serveMadeUpDatabase,
+  type MadeUpDatabaseServer,
+  type MadeUpDatabaseServerOptions,
+} from './serve-made-up-database.ts';
+export {
   checkSimulatedLeague,
   reportLines as simulationReportLines,
   type Check as SimulationCheck,

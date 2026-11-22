@@ -298,9 +298,17 @@ export function titleInHeadProblem(html) {
  * scripts have not yet taken over (on a busy machine they can still be starting) is the
  * browser's own: it posts the form and loads a new document, whose refusal or heading
  * shows while the rest of it, its styles among it, is still arriving (step 2.175).
+ *
+ * After a form's step that the scripts did take over, the next page is drawn in place: no
+ * new document, so its load event has long passed, and Next.js streams the page's title a
+ * moment after the page itself. So they also give the title a few seconds to arrive; the
+ * check below still fails if none comes.
  */
 export async function accessibilityProblems(page) {
   await page.waitForLoadState('load');
+  await page
+    .waitForFunction(() => document.title.trim() !== '', null, { timeout: 5000 })
+    .catch(() => {});
   return page.evaluate(() => {
     const problems = [];
     if (!document.documentElement.lang) problems.push('the page has no language');

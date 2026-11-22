@@ -2,6 +2,7 @@
 // them. It takes the environment as an argument and never reads process.env itself,
 // so tests can hand it any set of values. config.ts reads the real environment once.
 import {
+  addressOnThisComputer,
   platformDatabaseProblem,
   platformServiceProblem,
   trackerProjectProblem,
@@ -36,6 +37,8 @@ export const fields = {
   LOG_LEVEL: { secret: false },
   TRUSTED_PROXY: { secret: false },
   PLATFORM_DATABASE_URL: { secret: true },
+  PLATFORM_DATABASE_SSL: { secret: false },
+  PLATFORM_DATABASE_CA: { secret: false },
   LOCAL_BINNED_TEAM: { secret: false },
   LOCAL_BOT_CHECK: { secret: false },
   LOCAL_DATA: { secret: false },
@@ -81,6 +84,25 @@ const schema = z.object({
     .string()
     .trim()
     .regex(/^postgres(?:ql)?:\/\//, 'must be a postgres:// address')
+    .optional(),
+  // How the connection to PLATFORM_DATABASE_URL is encrypted (record 082): 'verify', the
+  // default, is SSL with the server's certificate checked, against PLATFORM_DATABASE_CA when
+  // it is given, else the system's certificate authorities; 'off' is no SSL, allowed only
+  // for a database on this computer (its address names localhost), where no network lies
+  // between. There is no way to use SSL without checking the certificate. The address
+  // itself cannot change this: its ssl settings are taken out (create-database.ts).
+  PLATFORM_DATABASE_SSL: z.enum(['verify', 'off']).default('verify'),
+  // The database server's certificate authority, as PEM text (Supabase's is not one the
+  // system knows: it is downloaded from the project's database settings, as for
+  // MIGRATION_DATABASE_CA). Public, not a secret; a value that is not a certificate is
+  // refused.
+  PLATFORM_DATABASE_CA: z
+    .string()
+    .trim()
+    .regex(
+      /^-----BEGIN CERTIFICATE-----[\s\S]+-----END CERTIFICATE-----$/,
+      'must be the server’s certificate as PEM text, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----',
+    )
     .optional(),
   // A team's short name in the first made-up league's current season, put in the bin as
   // the stand-in's world is made, with its games and results, as a team could be before
@@ -156,6 +178,8 @@ const optional: readonly ConfigName[] = [
   'LOG_LEVEL',
   'TRUSTED_PROXY',
   'PLATFORM_DATABASE_URL',
+  'PLATFORM_DATABASE_SSL',
+  'PLATFORM_DATABASE_CA',
   'LOCAL_BINNED_TEAM',
   'LOCAL_BOT_CHECK',
   'LOCAL_DATA',
@@ -234,6 +258,21 @@ export class ConfigError extends Error {
   }
 }
 
+/** The names of this computer an http public address may use online. */
+const thisComputerHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/** Whether `value` is an http address of a host other than this computer. */
+function httpAwayFromThisComputer(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    // Not an address at all: the schema names that.
+    return false;
+  }
+  return url.protocol === 'http:' && !thisComputerHosts.has(url.hostname);
+}
+
 /**
  * Checks `env` against the schema. Returns the settings, or throws one ConfigError
  * naming every missing or invalid variable. Only names and fixed reasons are put in
@@ -285,6 +324,21 @@ export function loadConfig(
       );
     }
   }
+  // Online, the public address is https (the going-online audit's P9, record 082): over
+  // http the session cookie loses "Secure" and would be sent in the clear. An http address
+  // stays allowed on this computer, where no network lies between (a browser test of the
+  // test copy as it starts), and always in local and test.
+  const baseUrl = given['PUBLIC_BASE_URL'];
+  if (
+    (appEnv === 'staging' || appEnv === 'production') &&
+    baseUrl !== undefined &&
+    httpAwayFromThisComputer(baseUrl)
+  ) {
+    invalid.set(
+      'PUBLIC_BASE_URL',
+      `PUBLIC_BASE_URL: invalid, must start with https:// when APP_ENV is ${appEnv}, or the sign-in cookie could be read on the way; set it to the site’s https address (http is allowed only for localhost)`,
+    );
+  }
   // The tracker's database guard (packages/providers, shared with the worker).
   const facts: TrackerGuardFacts = { env, appEnv, trackerProject: guard?.trackerProject };
   const database = given['PLATFORM_DATABASE_URL'];
@@ -293,6 +347,22 @@ export function loadConfig(
       ? undefined
       : platformDatabaseProblem('PLATFORM_DATABASE_URL', database, facts);
   if (databaseProblem !== undefined) invalid.set('PLATFORM_DATABASE_URL', databaseProblem);
+  // No SSL only where no network lies between: a database on this computer (record 082).
+  if (
+    given['PLATFORM_DATABASE_SSL'] === 'off' &&
+    (database === undefined || addressOnThisComputer(database) !== true)
+  ) {
+    invalid.set(
+      'PLATFORM_DATABASE_SSL',
+      'PLATFORM_DATABASE_SSL: invalid, "off" is allowed only for a database on this computer (an address naming localhost); any other is reached over SSL with its certificate checked',
+    );
+  }
+  if (given['PLATFORM_DATABASE_SSL'] === 'off' && given['PLATFORM_DATABASE_CA'] !== undefined) {
+    invalid.set(
+      'PLATFORM_DATABASE_CA',
+      'PLATFORM_DATABASE_CA: invalid, a certificate is checked only over SSL, and PLATFORM_DATABASE_SSL is "off"',
+    );
+  }
   const service = given['SUPABASE_URL'];
   const serviceProblem =
     service === undefined ? undefined : platformServiceProblem('SUPABASE_URL', service, facts);
