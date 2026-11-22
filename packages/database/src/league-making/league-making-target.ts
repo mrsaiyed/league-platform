@@ -96,6 +96,8 @@ export type ConnectCause =
   | 'ssl'
   /** Nothing answered within the time limit. */
   | 'timeout'
+  /** The server answered with a code of its own (SQLSTATE) not sorted above: it was reached. */
+  | 'refused'
   | 'unknown';
 
 export type OpenTargetProblem =
@@ -104,7 +106,13 @@ export type OpenTargetProblem =
   | { readonly kind: 'certificate-not-checked'; readonly login: Login }
   /** A hosted address with anything after "?": nothing may come from a query string. */
   | { readonly kind: 'query-string'; readonly login: Login }
-  | { readonly kind: 'cannot-connect'; readonly login: Login; readonly cause: ConnectCause }
+  | {
+      readonly kind: 'cannot-connect';
+      readonly login: Login;
+      readonly cause: ConnectCause;
+      /** The server's 5-character code (SQLSTATE), when it answered; never its words. */
+      readonly code: string | null;
+    }
   /** The database holds the tracker's own schema, live_stats. */
   | { readonly kind: 'tracker-database'; readonly login: Login }
   | { readonly kind: 'not-the-same-database' };
@@ -172,6 +180,18 @@ export function supabaseProjectOf(host: string, user: string): string | null {
   return pooled === undefined ? null : pooled.toLowerCase();
 }
 
+/**
+ * The server's own 5-character code (SQLSTATE: two characters of class, then three) when
+ * the error carries one, so the server was reached; null for the driver's and Node's own
+ * codes (ECONNREFUSED, ERR_TLS...). A code is not a secret; the server's words are never
+ * read, as they may repeat the address.
+ */
+export function serverCodeOf(error: unknown): string | null {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
+  return /^(?:[0-5][0-9A-Z]|F0|HV|P0|XX)[0-9A-Z]{3}$/.test(code) ? code : null;
+}
+
 /** The cause of a failed connection, from its code alone: a message can repeat the address. */
 export function connectCauseOf(error: unknown): ConnectCause {
   const code =
@@ -179,6 +199,9 @@ export function connectCauseOf(error: unknown): ConnectCause {
   const message = error instanceof Error ? error.message.toLowerCase() : '';
   if (code === '28P01' || code === '28000') return 'login';
   if (code === '3D000') return 'database';
+  // Any other code of the server's own (XX000 "tenant or user not found" from Supabase's
+  // pooler, 53300 too many connections...): reached, and it refused (step 2.203 fix round).
+  if (serverCodeOf(error) !== null) return 'refused';
   if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return 'host';
   if (['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH', 'ENETUNREACH'].includes(code)) {
     return 'network';
@@ -271,7 +294,12 @@ async function hostedTarget(
   try {
     login = await connectPostgresDriver(source.migration.url, options(source.migration));
   } catch (error) {
-    return refuse({ kind: 'cannot-connect', login: 'migration', cause: connectCauseOf(error) });
+    return refuse({
+      kind: 'cannot-connect',
+      login: 'migration',
+      cause: connectCauseOf(error),
+      code: serverCodeOf(error),
+    });
   }
   const closeLogin = () => login.close().catch(() => {});
   let loginFacts: ServerFacts;
@@ -279,7 +307,12 @@ async function hostedTarget(
     loginFacts = await sessionFacts(login);
   } catch (error) {
     await closeLogin();
-    return refuse({ kind: 'cannot-connect', login: 'migration', cause: connectCauseOf(error) });
+    return refuse({
+      kind: 'cannot-connect',
+      login: 'migration',
+      cause: connectCauseOf(error),
+      code: serverCodeOf(error),
+    });
   }
   if (loginFacts.tracker) {
     await closeLogin();
@@ -301,7 +334,12 @@ async function hostedTarget(
     appFacts = await handleFacts(db);
   } catch (error) {
     await closeBoth();
-    return refuse({ kind: 'cannot-connect', login: 'app', cause: connectCauseOf(error) });
+    return refuse({
+      kind: 'cannot-connect',
+      login: 'app',
+      cause: connectCauseOf(error),
+      code: serverCodeOf(error),
+    });
   }
   if (appFacts.tracker) {
     await closeBoth();

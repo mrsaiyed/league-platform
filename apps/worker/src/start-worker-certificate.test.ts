@@ -54,6 +54,8 @@ const certificate =
   'The worker cannot start: the database’s certificate was not accepted: set PLATFORM_DATABASE_CA to the database’s own certificate (its PEM text, or the path of a file holding it; for Supabase, the one on the project’s database settings page), then start the worker again.';
 const login =
   'The worker cannot start: the database refused the login: check the worker’s own login and its password in PLATFORM_DATABASE_URL, then start the worker again.';
+const refused = (code: string) =>
+  `The worker cannot start: the database answered but refused the start (code ${code}): check the login name and the database name in PLATFORM_DATABASE_URL, then start the worker again.`;
 const notReached =
   'The worker cannot start: the database could not be reached: check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the worker again.';
 
@@ -83,7 +85,7 @@ describe('the worker and the database’s certificate', () => {
     expect(opened.pgBoss).toEqual([expect.not.objectContaining({ ca: expect.anything() })]);
   });
 
-  it('says which of three things it is, by the code alone, and prints no value', async () => {
+  it('says which of four things it is, by the code alone, and prints no value', async () => {
     const cases: [string, string][] = [
       ['SELF_SIGNED_CERT_IN_CHAIN', certificate],
       ['UNABLE_TO_GET_ISSUER_CERT_LOCALLY', certificate],
@@ -91,6 +93,9 @@ describe('the worker and the database’s certificate', () => {
       ['28P01', login],
       ['ECONNREFUSED', notReached],
       ['ENOTFOUND', notReached],
+      // The server answered with a code of its own: reached (fix round 2.203).
+      ['XX000', refused('XX000')],
+      ['53300', refused('53300')],
     ];
     for (const [code, sentence] of cases) {
       const { said, logged } = await startFailing(

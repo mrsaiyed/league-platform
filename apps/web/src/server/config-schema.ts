@@ -262,7 +262,6 @@ export class ConfigError extends Error {
 /** The names of this computer an http public address may use online. */
 const thisComputerHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
 
-/** Whether `value` is an http address of a host other than this computer. */
 /** Whether an address has a path, a query, a fragment or a login beyond its origin. */
 function hasMoreThanOrigin(value: string): boolean {
   let url: URL;
@@ -276,6 +275,7 @@ function hasMoreThanOrigin(value: string): boolean {
   );
 }
 
+/** Whether `value` is an http address of a host other than this computer. */
 function httpAwayFromThisComputer(value: string): boolean {
   let url: URL;
   try {

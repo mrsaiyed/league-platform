@@ -25,6 +25,7 @@ import {
   checkLoginRole,
   checkQueueSchema,
   connectCauseOf,
+  serverCodeOf,
   madeUpDatabase,
   type DatabaseHandle,
   type DatabaseSource,
@@ -90,12 +91,22 @@ const databaseRefusals: Readonly<Record<ConnectCause, string>> = {
   host: notReached,
   network: notReached,
   timeout: notReached,
+  refused:
+    'the database answered but refused the start: check the login name and the database name in PLATFORM_DATABASE_URL, then start the worker again.',
   unknown: notReached,
 };
 
-/** The sentence for a database that refused the worker's start, by the error's code. */
-export const workerDatabaseRefusal = (error: unknown): string =>
-  databaseRefusals[connectCauseOf(error)];
+/**
+ * The sentence for a database that refused the worker's start, by the error's code; when
+ * the server answered, with its 5-character code (not a secret), never its words.
+ */
+export const workerDatabaseRefusal = (error: unknown): string => {
+  const cause = connectCauseOf(error);
+  const code = serverCodeOf(error);
+  return cause === 'refused' && code !== null
+    ? databaseRefusals[cause].replace(': check', ` (code ${code}): check`)
+    : databaseRefusals[cause];
+};
 
 export async function startWorker(
   config: WorkerConfig,
@@ -204,7 +215,7 @@ export async function startWorker(
       // is told as the database's; anything else is the queue's own.
       const cause = connectCauseOf(error);
       throw new WorkerStartError(
-        cause === 'unknown' ? 'the queue could not start.' : databaseRefusals[cause],
+        cause === 'unknown' ? 'the queue could not start.' : workerDatabaseRefusal(error),
       );
     }
 

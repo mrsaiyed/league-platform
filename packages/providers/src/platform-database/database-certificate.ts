@@ -37,7 +37,11 @@ export function databaseCertificateFrom(
   value: string,
   readFile?: CertificateFileReader,
 ): DatabaseCertificate {
-  const given = value.trim();
+  // One pair of surrounding quotes, as a settings page or a pasted .env line keeps them,
+  // comes off before deciding whether the value is the certificate or a file's path.
+  const trimmed = value.trim();
+  const quoted = /^(["'])([\s\S]*)\1$/.exec(trimmed);
+  const given = (quoted?.[2] ?? trimmed).trim();
   let text: string;
   if (given.startsWith('-----BEGIN')) {
     text = given;

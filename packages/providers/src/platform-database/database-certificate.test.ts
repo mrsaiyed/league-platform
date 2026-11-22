@@ -21,6 +21,15 @@ describe('databaseCertificateFrom', () => {
     expect(databaseCertificateFrom(name, oneLine)).toEqual({ ok: true, pem: `${pem.trim()}\n` });
   });
 
+  it('takes one pair of surrounding quotes off, double or single, before deciding', () => {
+    const want = { ok: true, pem: `${pem.trim()}\n` };
+    expect(databaseCertificateFrom(name, `"${pem.trim()}"`)).toEqual(want);
+    expect(databaseCertificateFrom(name, `'${pem.trim()}'`)).toEqual(want);
+    expect(databaseCertificateFrom(name, ` "${pem.trim().replace(/\n/g, '\\n')}" `)).toEqual(want);
+    const read = reader({ './made-up-ca.pem': pem });
+    expect(databaseCertificateFrom(name, `'./made-up-ca.pem'`, read)).toEqual(want);
+  });
+
   it('takes several certificates, and reads a file the value names', () => {
     const read = reader({ './made-up-ca.pem': `Made-up bundle\n${pem}\n${pem}` });
     const found = databaseCertificateFrom(name, './made-up-ca.pem', read);
