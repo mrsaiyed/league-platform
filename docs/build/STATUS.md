@@ -15,31 +15,30 @@ The one file that says where the build is. Every run reads it first and updates 
 
 Every lane's work is on GitHub. All sessions stopped on 2026-11-17 at about 03:05 UTC when the allowance ran out. Three at a time are picked up again, in the order of "Next step" above.
 
-| Lane (branch `lane/…`)                           | Where it stands                                                            | What is left                                                                   |
-| ------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| 2.37-plays-undo-end (TEST 1)                     | part 1 built; GitHub passed cb840d7 twice                                  | review (code; and by use), one fix round, land (S-72, S-73, T-282, record 078) |
-| 2.200-overtime (migration 0021)                  | both reviews in; fix list of eight sent; 2 conflicts with the build branch | fix round, merge, land first of the migration lanes                            |
-| 2.185-draft-put-back                             | both reviews in; most of the fix round done                                | the part that waits for 2.180 (D1, D2), then land                              |
-| 2.157-refusal                                    | both reviews in; fix round sent (U-15's change)                            | fix round, land                                                                |
-| 2.50-people-screens                              | both reviews in; fix round sent (a stale tab unmarks a child: High)        | fix round, a confirming look at the High, land                                 |
-| 2.59-seed-leagues                                | both reviews in; fix round sent                                            | fix round (the realism items may be a part of their own), land; then 2.236     |
-| 2.98-safety (record 081, T-285, U-16)            | both reviews in; fix round sent                                            | fix round, land                                                                |
-| 2.93-last-part (TEST 2; record 082, T-286)       | being built when cut off; 7 commits                                        | finish, review, land                                                           |
-| 2.198-level-teams (migration 0022, S-74)         | built; waits for 2.200                                                     | the home page's short note, merge after 2.200, review, land                    |
-| 2.199-leaders                                    | 2 commits                                                                  | finish, review, land                                                           |
-| 2.46-staff-numbers (record 085, T-287)           | 8 commits                                                                  | finish, review, land                                                           |
-| 2.97-invitations (record 086, T-288)             | 5 commits; 2 conflicts                                                     | finish, review, land                                                           |
-| 2.135-terms-privacy                              | 7 commits                                                                  | finish; the lead approves the two texts; the founder reads them                |
-| 2.140-nothing-unfinished (record 087, T-289)     | 5 commits                                                                  | finish, review, land                                                           |
-| 2.47-season-settings (record 088, T-290)         | 4 commits                                                                  | finish, review, land                                                           |
-| 2.49-divisions-venues (record 089)               | 6 commits                                                                  | finish, review, land                                                           |
-| 2.168-coach-finds-team (record 090)              | 6 commits; carries the High from the data audit                            | finish, review, land                                                           |
-| 2.163-sign-in-says (record 091, T-291)           | 6 commits                                                                  | finish, review, land                                                           |
-| 2.202-real-postgres (TEST 2; record 092, T-292)  | 4 commits                                                                  | finish, review, land                                                           |
-| 2.206-check-sign-in-service (TEST 2; record 093) | 3 commits                                                                  | finish, review, land                                                           |
-| 2.220-pilot-libraries                            | 3 commits                                                                  | finish, review, land; then the founder's short session                         |
-| 2.221, 2.56, 2.224                               | opened, nothing pushed                                                     | start again from their briefs when their turn comes                            |
-| 2.191-ci-parallel                                | parked                                                                     | after the first test is in the founder's hands                                 |
+| Lane (branch `lane/…`)                           | Where it stands                                                     | What is left                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| 2.37-plays-undo-end (TEST 1)                     | part 1 built; GitHub passed cb840d7 twice                           | review (code; and by use), one fix round, land (S-72, S-73, T-282, record 078) |
+| 2.185-draft-put-back                             | both reviews in; most of the fix round done                         | the part that waits for 2.180 (D1, D2), then land                              |
+| 2.157-refusal                                    | both reviews in; fix round sent (U-15's change)                     | fix round, land                                                                |
+| 2.50-people-screens                              | both reviews in; fix round sent (a stale tab unmarks a child: High) | fix round, a confirming look at the High, land                                 |
+| 2.59-seed-leagues                                | both reviews in; fix round sent                                     | fix round (the realism items may be a part of their own), land; then 2.236     |
+| 2.98-safety (record 081, T-285, U-16)            | both reviews in; fix round sent                                     | fix round, land                                                                |
+| 2.93-last-part (TEST 2; record 082, T-286)       | being built when cut off; 7 commits                                 | finish, review, land                                                           |
+| 2.198-level-teams (migration 0022, S-74)         | built; waits for 2.200                                              | the home page's short note, merge after 2.200, review, land                    |
+| 2.199-leaders                                    | 2 commits                                                           | finish, review, land                                                           |
+| 2.46-staff-numbers (record 085, T-287)           | 8 commits                                                           | finish, review, land                                                           |
+| 2.97-invitations (record 086, T-288)             | 5 commits; 2 conflicts                                              | finish, review, land                                                           |
+| 2.135-terms-privacy                              | 7 commits                                                           | finish; the lead approves the two texts; the founder reads them                |
+| 2.140-nothing-unfinished (record 087, T-289)     | 5 commits                                                           | finish, review, land                                                           |
+| 2.47-season-settings (record 088, T-290)         | 4 commits                                                           | finish, review, land                                                           |
+| 2.49-divisions-venues (record 089)               | 6 commits                                                           | finish, review, land                                                           |
+| 2.168-coach-finds-team (record 090)              | 6 commits; carries the High from the data audit                     | finish, review, land                                                           |
+| 2.163-sign-in-says (record 091, T-291)           | 6 commits                                                           | finish, review, land                                                           |
+| 2.202-real-postgres (TEST 2; record 092, T-292)  | 4 commits                                                           | finish, review, land                                                           |
+| 2.206-check-sign-in-service (TEST 2; record 093) | 3 commits                                                           | finish, review, land                                                           |
+| 2.220-pilot-libraries                            | 3 commits                                                           | finish, review, land; then the founder's short session                         |
+| 2.221, 2.56, 2.224                               | opened, nothing pushed                                              | start again from their briefs when their turn comes                            |
+| 2.191-ci-parallel                                | parked                                                              | after the first test is in the founder's hands                                 |
 
 Next free: STEP 2.237, migration 0023, record 097, T-295, S-76. Numbers already given out stand with their lanes (in each lane's note).
 
