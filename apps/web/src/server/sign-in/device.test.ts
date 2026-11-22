@@ -1,7 +1,13 @@
 // The device's name, the network a request comes from, the place to go after
 // signing in, and the password-again rule (T-70).
 import { describe, expect, it } from 'vitest';
-import { deviceLabel, networkAddressOf, safeReturnPath, unknownNetwork } from './device.ts';
+import {
+  deviceLabel,
+  networkAddressOf,
+  outsideCloudflareRangesLine,
+  safeReturnPath,
+  unknownNetwork,
+} from './device.ts';
 import { needsPasswordAgain } from './password-again.ts';
 import { problemOf, screenUrl } from './problems.ts';
 
@@ -62,6 +68,20 @@ describe('networkAddressOf', () => {
     // An IPv6 visitor, and Cloudflare's IPv6 server.
     const six = sent('2001:db8:1:2::5, 2606:4700:10::1', '2001:db8:1:2::5');
     expect(networkAddressOf(six, 'cloudflare')).toBe('2001:db8:1:2::5');
+  });
+
+  it('writes one fixed line, with no address, when CF-Connecting-IP comes from outside the ranges', () => {
+    const lines: string[] = [];
+    const warn = (line: string) => lines.push(line);
+    // From outside the listed ranges (a spoof, or a range the list lacks): one fixed line.
+    expect(networkAddressOf(sent('203.0.113.9', visitor), 'cloudflare', warn)).toBe('203.0.113.9');
+    expect(lines).toEqual([outsideCloudflareRangesLine]);
+    expect(outsideCloudflareRangesLine).not.toMatch(/\d+\.\d+|:[0-9a-f]*:/i);
+    // Through Cloudflare, with no such header, or with another setting: nothing is written.
+    networkAddressOf(sent(`${visitor}, ${cloudflareServer}`, visitor), 'cloudflare', warn);
+    networkAddressOf(sent('203.0.113.9'), 'cloudflare', warn);
+    networkAddressOf(sent('203.0.113.9', visitor), 'one', warn);
+    expect(lines).toHaveLength(1);
   });
 
   it('refuses CF-Connecting-IP as a spoof on a request that did not come through Cloudflare', () => {

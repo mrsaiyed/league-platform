@@ -93,13 +93,30 @@ function keyOf(address: string | null | undefined): string {
   return networkAddressShape.safeParse(trimmed).success ? trimmed : unknownNetwork;
 }
 
+/**
+ * The one line written when CF-Connecting-IP arrives from outside the listed Cloudflare
+ * ranges (record 081). A spoof straight to the host's address looks the same, so one now
+ * and then is expected; many, from ordinary visitors, are the sign of a range Cloudflare
+ * added that the list lacks (every visitor through it then shares one key). Fixed words,
+ * no address: the log holds nobody's address.
+ */
+export const outsideCloudflareRangesLine =
+  'sign-in: CF-Connecting-IP came from outside the listed Cloudflare ranges (a spoof, or a range missing from the list)';
+
 /** The network a request came from, for the attempt limits (T-85, T-225). */
-export function networkAddressOf(headers: AddressHeaders, trust: TrustedProxy): string {
+export function networkAddressOf(
+  headers: AddressHeaders,
+  trust: TrustedProxy,
+  warn: (line: string) => void = console.warn,
+): string {
   if (trust === 'none') return unknownNetwork;
   // The host's proxy appends the address it was reached from: the last entry.
   const hostEntry = keyOf(headers.get('x-forwarded-for')?.split(',').at(-1));
   if (trust === 'one' || hostEntry === unknownNetwork) return hostEntry;
-  if (!isCloudflareAddress(hostEntry)) return hostEntry;
+  if (!isCloudflareAddress(hostEntry)) {
+    if (headers.get('cf-connecting-ip') !== null) warn(outsideCloudflareRangesLine);
+    return hostEntry;
+  }
   // Through Cloudflare: one address, as Cloudflare writes it; anything else is not believed.
   return keyOf(headers.get('cf-connecting-ip'));
 }
