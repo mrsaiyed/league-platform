@@ -55,7 +55,7 @@ export type EndGameArgs = {
   readonly state: basketball.GameState;
   readonly names: { readonly home: string; readonly away: string };
   /** A level score may end the game (S-73), as the rosters said when the page was drawn. */
-  readonly allowTies: boolean;
+  readonly allowTies: boolean | undefined;
   /** A hint for the Mark not started question's words only; the league decides (S-40). */
   readonly mayCorrect: boolean;
   /** The device knows it has no connection: a fresh End is said to wait, at once. */

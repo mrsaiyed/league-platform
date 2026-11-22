@@ -83,7 +83,8 @@ const clockPlace = '';
 export function endQuestion(
   game: basketball.GameState,
   names: Names,
-  allowTies: boolean,
+  /** Missing (rosters an older page stored) is ties allowed: the league still decides (F5). */
+  allowTies: boolean | undefined,
   clock: Pick<ClockReading, 'over' | 'text'>,
   t: Translate,
 ): EndQuestion {
@@ -113,7 +114,7 @@ export function endQuestion(
   };
   // Level in a season with no ties: refused, saying what is still to play, and overtime
   // only once the last period has run out level (the fix round's F3).
-  if (tie && !allowTies) {
+  if (tie && allowTies === false) {
     return {
       kind: 'level',
       score,

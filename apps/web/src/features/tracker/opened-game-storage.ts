@@ -46,7 +46,11 @@ export type DeviceRosters = {
   readonly home: DeviceTeam;
   readonly away: DeviceTeam;
   readonly uniqueJerseys: boolean;
-  readonly allowTies: boolean;
+  /**
+   * Missing in rosters an older page stored: read as ties allowed (the fix round, F5),
+   * so the device never refuses an End the league would take. The league still decides.
+   */
+  readonly allowTies?: boolean;
 };
 
 /** The game format the scorekeeper is asked to confirm (P7 §1, §5.1). */

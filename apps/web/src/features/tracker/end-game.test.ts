@@ -111,6 +111,14 @@ describe('the End game question (J1 to J3; S-73)', () => {
     );
   });
 
+  it('rosters an older page stored, with no word on ties, are read as ties allowed: the league still decides (fix round, F5)', () => {
+    const game = secondHalf([basket('h5'), basket('a7')]);
+    expect(endQuestion(game, names, undefined, ranOut, t)).toMatchObject({
+      kind: 'ask',
+      tie: true,
+    });
+  });
+
   it('a level score in a season that allows ties is asked about, and says the game ends as a tie', () => {
     const game = secondHalf([basket('h5'), basket('a7')]);
     expect(endQuestion(game, names, true, ranOut, t)).toMatchObject({ kind: 'ask', tie: true });
