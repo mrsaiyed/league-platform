@@ -17,7 +17,9 @@ afterAll(async () => {
 });
 
 const keep = (to: string, subject = 'Your code', text = 'Your code is 123456.') =>
-  asApp(db, {}, (tx) => tx.query('select public.keep_email($1, $2, $3)', [to, subject, text]));
+  asApp(db, {}, (tx) =>
+    tx.query('select public.keep_email($1, $2, $3, $4)', [to, 'code', subject, text]),
+  );
 const count = async () =>
   Number((await one<{ n: string }>(db, 'select count(*) as n from kept_emails.emails')).n);
 
@@ -109,8 +111,8 @@ describe('public.keep_email, by age', () => {
       ['two days', '2 days'],
     ] as const) {
       await db.query(
-        `insert into kept_emails.emails (to_address, subject, body_text, kept_at)
-         values ('aged@example.test', $1, 'Your code is 482913.', now() - $2::interval)`,
+        `insert into kept_emails.emails (to_address, kind, subject, body_text, kept_at)
+         values ('aged@example.test', 'code', $1, 'Your code is 482913.', now() - $2::interval)`,
         [subject, age],
       );
     }
@@ -126,7 +128,7 @@ describe('what the app cannot do', () => {
   it('cannot read, add, change or remove a row, nor run the check itself', async () => {
     for (const statement of [
       'select * from kept_emails.emails',
-      "insert into kept_emails.emails (to_address, subject, body_text) values ('a@example.test', 's', 't')",
+      "insert into kept_emails.emails (to_address, kind, subject, body_text) values ('a@example.test', 'code', 's', 't')",
       "update kept_emails.emails set subject = 'x'",
       'delete from kept_emails.emails',
       "select kept_emails.is_made_up_address('a@example.test')",
@@ -140,12 +142,12 @@ describe('what the app cannot do', () => {
   it('rows written by the owner still pass the table’s own checks', async () => {
     await expect(
       db.query(
-        "insert into kept_emails.emails (to_address, subject, body_text) values ('real@gmail.com', 's', 't')",
+        "insert into kept_emails.emails (to_address, kind, subject, body_text) values ('real@gmail.com', 'code', 's', 't')",
       ),
     ).rejects.toMatchObject(refused.check);
     await expect(
       db.query(
-        "insert into kept_emails.emails (to_address, subject, body_text) values ('Big@example.test', 's', 't')",
+        "insert into kept_emails.emails (to_address, kind, subject, body_text) values ('Big@example.test', 'code', 's', 't')",
       ),
     ).rejects.toMatchObject(refused.check);
   });

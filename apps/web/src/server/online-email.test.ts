@@ -64,7 +64,10 @@ describe('onlineEmailSender', () => {
     // The code is handed over without waiting (T-68): read once it is kept.
     await vi.waitFor(() => expect(kept).toHaveLength(1));
     expect(kept[0]?.to).toBe('New.Owner@example.test');
-    expect(keptEmailAnswer(kept[0]?.text ?? '')).toEqual({ kind: 'code', value: '482913' });
+    expect(keptEmailAnswer(kept[0] ?? { kind: 'link', text: '' })).toEqual({
+      kind: 'code',
+      value: '482913',
+    });
     expect(told).toEqual([]);
     for (const spy of lines) {
       expect(spy).not.toHaveBeenCalled();
@@ -104,7 +107,7 @@ describe('onlineEmailSender', () => {
       // Read as the script reads it (newestKeptEmail), as the tables' owner: the session
       // that built this database, which the app's own transactions never become.
       const read = await database.newestKeptEmail(owner, 'Founder@Example.test');
-      const answer = keptEmailAnswer(read?.text ?? '');
+      const answer = keptEmailAnswer(read ?? { kind: 'link', text: '' });
       expect(answer?.kind).toBe('code');
       expect(answer?.value).toBe(auth.codeFor(email));
       const proved = await signIn.verifyCode({ email, code: answer?.value ?? '', networkAddress });

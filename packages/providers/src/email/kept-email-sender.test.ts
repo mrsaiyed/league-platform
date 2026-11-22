@@ -10,6 +10,7 @@ const message = (to: string): EmailMessage => ({
   html: '<p>Your code is 482913.</p>',
   text: 'Your code is 482913.',
   idempotencyKey: `key-${to}`,
+  carries: 'code',
 });
 
 function wired(keep: (email: EmailKept) => Promise<void> = async () => {}) {
@@ -49,7 +50,12 @@ describe('keptEmailSender', () => {
     await sender.send(message('new.owner@example.test'));
     expect(capture.messages()).toHaveLength(1);
     expect(kept).toEqual([
-      { to: 'new.owner@example.test', subject: 'Your sign-up code', text: 'Your code is 482913.' },
+      {
+        to: 'new.owner@example.test',
+        kind: 'code',
+        subject: 'Your sign-up code',
+        text: 'Your code is 482913.',
+      },
     ]);
     expect(told).toEqual([]);
   });

@@ -78,14 +78,35 @@ test('on a PGlite folder prints the newest code for the address, and nothing els
     const run = await applyMigrations(pgliteDriver(pglite));
     assert.ok(run.ok);
     const db = createDatabase({ kind: 'pglite', pglite });
-    await keepEmail(db, { to: 'new.owner@example.test', subject: 'old', text: 'Code 111111.' });
-    await keepEmail(db, { to: 'other@example.test', subject: 'x', text: 'Code 222222.' });
-    await keepEmail(db, { to: 'Dotted@example.test.', subject: 'd', text: 'Code 515151.' });
-    await keepEmail(db, { to: 'new.owner@example.test', subject: 'new', text: 'Code 482913.' });
     await keepEmail(db, {
+      kind: 'code',
+      to: 'new.owner@example.test',
+      subject: 'old',
+      text: 'Code 111111.',
+    });
+    await keepEmail(db, {
+      kind: 'code',
+      to: 'other@example.test',
+      subject: 'x',
+      text: 'Code 222222.',
+    });
+    await keepEmail(db, {
+      kind: 'code',
+      to: 'Dotted@example.test.',
+      subject: 'd',
+      text: 'Code 515151.',
+    });
+    await keepEmail(db, {
+      kind: 'code',
+      to: 'new.owner@example.test',
+      subject: 'new',
+      text: 'Code 482913.',
+    });
+    await keepEmail(db, {
+      kind: 'link',
       to: 'invited@example.test',
       subject: 'i',
-      text: 'Join: https://staging.example.test/invite/made-up-token.',
+      text: 'Join Class of 202526: https://staging.example.test/invite/made-up-token.',
     });
     await db.close();
     await pglite.close();

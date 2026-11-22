@@ -6,6 +6,8 @@
 import type { SqlSession } from '../migrations/migration-driver.ts';
 
 export type KeptEmailRead = {
+  /** What it carries: a code to type or a link to follow. */
+  readonly kind: 'code' | 'link';
   readonly subject: string;
   readonly text: string;
   readonly keptAt: Date;
@@ -15,12 +17,22 @@ export async function newestKeptEmail(
   session: SqlSession,
   to: string,
 ): Promise<KeptEmailRead | null> {
-  const { rows } = await session.query<{ subject: string; body_text: string; kept_at: Date }>(
-    `select subject, body_text, kept_at from kept_emails.emails
+  const { rows } = await session.query<{
+    kind: 'code' | 'link';
+    subject: string;
+    body_text: string;
+    kept_at: Date;
+  }>(
+    `select kind, subject, body_text, kept_at from kept_emails.emails
      where to_address = kept_emails.kept_form($1) order by id desc limit 1`,
     [to],
   );
   const row = rows[0];
   if (row === undefined) return null;
-  return { subject: row.subject, text: row.body_text, keptAt: new Date(row.kept_at) };
+  return {
+    kind: row.kind,
+    subject: row.subject,
+    text: row.body_text,
+    keptAt: new Date(row.kept_at),
+  };
 }

@@ -9,14 +9,17 @@
 -- the tables' owner, at a terminal, in a session the founder started.
 --
 --   kept_emails.emails: one row per email kept, newest last (its id): who it was to (in
---     the form the check sees, kept_emails.kept_form), its subject and its plain words (every email has them, T7 §6; the
---     HTML is never kept). Only an address on a name kept for made-up mail (record 075's
---     list: .test, .example, .invalid, .localhost, example.com, .net and .org), checked
---     here again whatever the app checked. At most the newest 300, none older than 3 days.
---   public.keep_email(to, subject, text): the one way in, owner-run. It refuses an email
---     too long for the table (string_data_right_truncation) and an address that is not
---     made up (check_violation), neither error carrying a value, adds the
---     row and removes every row past the newest 300 or older than 3 days. It returns nothing.
+--     the form the check sees, kept_emails.kept_form), what it carries (`code` or `link`,
+--     so the script prints the right one), its subject and its plain words (every email
+--     has them, T7 §6; the HTML is never kept). Only an address on a name kept for
+--     made-up mail (record 075's list: .test, .example, .invalid, .localhost,
+--     example.com, .net and .org), checked here again whatever the app checked. At most
+--     the newest 300, none older than 3 days.
+--   public.keep_email(to, kind, subject, text): the one way in, owner-run. It refuses an
+--     unknown kind (invalid_parameter_value), an email too long for the table
+--     (string_data_right_truncation) and an address that is not made up
+--     (check_violation), none of these errors carrying a value; adds the row and removes
+--     every row past the newest 300 or older than 3 days. It returns nothing.
 --
 -- Who reaches what. The app's login (app_login, acting as app_user) may run keep_email
 -- and nothing else here: it cannot read, change or remove a row, nor use the schema. The
@@ -106,10 +109,12 @@ create table kept_emails.emails (
   id bigint generated always as identity primary key,
   kept_at timestamptz not null default now(),
   to_address text not null,
+  kind text not null,
   subject text not null,
   body_text text not null,
   constraint emails_to_made_up check (kept_emails.is_made_up_address(to_address)),
   constraint emails_to_kept_form check (to_address = kept_emails.kept_form(to_address)),
+  constraint emails_kind check (kind in ('code', 'link')),
   constraint emails_to_size check (length(to_address) <= 320),
   constraint emails_subject_size check (length(subject) <= 1000),
   constraint emails_text_size check (length(body_text) <= 100000)
@@ -127,7 +132,9 @@ revoke all on table kept_emails.emails from public;
 
 -- The one way in. How many of the newest stay, and for how long: a few days of a test
 -- copy's sign-ups and invitations (record 098).
-create function public.keep_email(given_to text, given_subject text, given_text text)
+create function public.keep_email(
+  given_to text, given_kind text, given_subject text, given_text text
+)
 returns void
 language plpgsql
 security definer
@@ -138,9 +145,14 @@ declare
   keep_count constant integer := 300;
   keep_days constant integer := 3;
 begin
-  if given_to is null or given_subject is null or given_text is null then
-    raise exception 'an address, a subject and the plain words are all needed'
+  if given_to is null or given_kind is null or given_subject is null or given_text is null then
+    raise exception 'an address, a kind, a subject and the plain words are all needed'
       using errcode = 'null_value_not_allowed';
+  end if;
+  -- What the email carries, checked here too: a refused row's DETAIL would hold its values.
+  if given_kind not in ('code', 'link') then
+    raise exception 'a kept email carries a code or a link (record 098)'
+      using errcode = 'invalid_parameter_value';
   end if;
   -- The table's size limits, checked before the insert: a refused row would put its
   -- values (a code among them) in the error's DETAIL line, which the server's log keeps.
@@ -154,8 +166,8 @@ begin
     raise exception 'only an email to a made-up address is kept (record 075)'
       using errcode = 'check_violation';
   end if;
-  insert into kept_emails.emails (to_address, subject, body_text)
-  values (kept_emails.kept_form(given_to), given_subject, given_text);
+  insert into kept_emails.emails (to_address, kind, subject, body_text)
+  values (kept_emails.kept_form(given_to), given_kind, given_subject, given_text);
   -- Only the newest 300 stay, and none older than 3 days: codes and invitation links do
   -- not wait at rest for newer emails to push them out.
   delete from kept_emails.emails
@@ -164,10 +176,10 @@ begin
 end
 $$;
 
-revoke all on function public.keep_email(text, text, text) from public;
-grant execute on function public.keep_email(text, text, text) to app_user;
+revoke all on function public.keep_email(text, text, text, text) from public;
+grant execute on function public.keep_email(text, text, text, text) to app_user;
 
-comment on function public.keep_email(text, text, text) is
+comment on function public.keep_email(text, text, text, text) is
   'Keeps one email to a made-up address on the test copy, the newest 300 only, none older than 3 days (step 2.204, record 075). The app''s only way into kept_emails: it cannot read, change or remove a row.';
 
 -- Supabase's API roles get nothing here (T-64), where they exist.
@@ -176,17 +188,17 @@ begin
   if exists (select 1 from pg_roles where rolname = 'anon') then
     revoke all on all tables in schema kept_emails from anon;
     revoke all on schema kept_emails from anon;
-    revoke all on function public.keep_email(text, text, text) from anon;
+    revoke all on function public.keep_email(text, text, text, text) from anon;
   end if;
   if exists (select 1 from pg_roles where rolname = 'authenticated') then
     revoke all on all tables in schema kept_emails from authenticated;
     revoke all on schema kept_emails from authenticated;
-    revoke all on function public.keep_email(text, text, text) from authenticated;
+    revoke all on function public.keep_email(text, text, text, text) from authenticated;
   end if;
   if exists (select 1 from pg_roles where rolname = 'service_role') then
     revoke all on all tables in schema kept_emails from service_role;
     revoke all on schema kept_emails from service_role;
-    revoke all on function public.keep_email(text, text, text) from service_role;
+    revoke all on function public.keep_email(text, text, text, text) from service_role;
   end if;
 end
 $$;

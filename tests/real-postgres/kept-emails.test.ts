@@ -33,7 +33,10 @@ describe('kept emails, as app_login', () => {
     if (!opened.ok) throw new Error(`not opened: ${opened.problem.kind}`);
     try {
       const kept = await newestKeptEmail(opened.target.login, to.toUpperCase());
-      expect(keptEmailAnswer(kept?.text ?? '')).toEqual({ kind: 'code', value: '482913' });
+      expect(keptEmailAnswer(kept ?? { kind: 'link', text: '' })).toEqual({
+        kind: 'code',
+        value: '482913',
+      });
     } finally {
       await opened.target.close();
     }
@@ -73,7 +76,7 @@ describe('kept emails, as app_login', () => {
         // The code email is handed over without waiting (T-68): read once it is kept.
         await vi.waitFor(async () => {
           const kept = await newestKeptEmail(owner, email);
-          answer = keptEmailAnswer(kept?.text ?? '');
+          answer = keptEmailAnswer(kept ?? { kind: 'link', text: '' });
           expect(answer).not.toBeNull();
         });
       } finally {
@@ -99,6 +102,7 @@ describe('kept emails, as app_login', () => {
 
   it('is refused an address that is not made up, and writes nothing', async () => {
     const error = await keepEmail(db, {
+      kind: 'code',
       to: `real-${fresh()}@gmail.com`,
       subject: 's',
       text: 't',
@@ -114,7 +118,7 @@ describe('kept emails, as app_login', () => {
       { to, subject: `Your code is 482913 ${'x'.repeat(1000)}`, text: 't' },
       { to, subject: 's', text: `Your code is 482913 ${'x'.repeat(100000)}` },
     ]) {
-      const error = (await keepEmail(db, email).catch((e: unknown) => e)) as {
+      const error = (await keepEmail(db, { kind: 'code', ...email }).catch((e: unknown) => e)) as {
         code?: string;
         message?: string;
         detail?: string;
@@ -174,7 +178,12 @@ describe('kept emails, as app_login', () => {
   it('keeps only the newest 300', async () => {
     const word = fresh();
     for (let i = 0; i < 305; i += 1) {
-      await keepEmail(db, { to: `trim-${word}@example.test`, subject: `n${i}`, text: 't' });
+      await keepEmail(db, {
+        kind: 'code',
+        to: `trim-${word}@example.test`,
+        subject: `n${i}`,
+        text: 't',
+      });
     }
     const owner = await ownerSession();
     try {

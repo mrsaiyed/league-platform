@@ -46,7 +46,7 @@ export async function readNewestKept(source, to) {
       throw error;
     }
     if (kept === null) return { problem: 'none-kept' };
-    const answer = keptEmailAnswer(kept.text);
+    const answer = keptEmailAnswer(kept);
     return answer === null ? { problem: 'nothing-to-read' } : { answer: answer.value };
   } finally {
     await target.close().catch(() => {});

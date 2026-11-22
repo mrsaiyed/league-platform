@@ -15,8 +15,13 @@ import type { EmailMessage, EmailSender, SentEmail } from '@srleagues/core';
 import type { EmailSettings } from './email-sender-for.ts';
 import { isMadeUpAddress } from './made-up-address.ts';
 
-/** What is kept of an email. */
-export type EmailKept = { readonly to: string; readonly subject: string; readonly text: string };
+/** What is kept of an email: with what it carries, a code or a link (`carries`). */
+export type EmailKept = {
+  readonly to: string;
+  readonly kind: 'code' | 'link';
+  readonly subject: string;
+  readonly text: string;
+};
 
 /** Why an email was not kept, by its kind only. */
 export type NotKeptKind = 'not-made-up' | 'refused' | 'fault';
@@ -47,7 +52,12 @@ export function keptEmailSender(options: KeptEmailSenderOptions): EmailSender {
         return sent;
       }
       try {
-        await options.keep({ to: message.to, subject: message.subject, text: message.text });
+        await options.keep({
+          to: message.to,
+          kind: message.carries ?? 'link',
+          subject: message.subject,
+          text: message.text,
+        });
       } catch (error) {
         options.onNotKept(options.failureOf(error));
       }
