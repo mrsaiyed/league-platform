@@ -105,7 +105,7 @@ A past season is the same address with `?season=fall-2025`. Without it, you get 
 
 **U-6 (agreed): the address shows where you are asking to go; it never proves you are allowed.** Typing `/farajleague/admin` when you are not a Faraj admin shows "you do not have access", whoever you are.
 
-**U-15 (decided for you): a signed-out person who opens a staff page (the admin home, the tracker) is sent to sign in and brought back to where they were going.** U-6 holds once we know who they are: someone without access sees "you do not have access". A league that is hidden is still "not found". Changing it later is a small change in one place.
+**U-15 (decided for you, changed November 17): a signed-out person who opens a staff page (any address of a league's admin, its home and every area, and the tracker) is sent to sign in and brought back to where they were going.** U-6 holds once we know who they are: someone signed in without access sees "you do not have access", and is never sent to sign in. A league that is hidden, suspended, in the bin or not there is still "not found", the same answer as no league at all. Changing it later is a small change in one place.
 
 ## 5. Short names
 

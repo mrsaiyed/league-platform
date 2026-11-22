@@ -3,7 +3,7 @@
 // before anything is ranked, so a rank, a gap in ranks or a count can never show that a
 // hidden player exists. Names come only through the one name function (T-81).
 import { seasonTotals, type CaptureMode, type StatsGame } from '@srleagues/sports';
-import { boxScoreColumns, rulesOfGame } from '../games/index.ts';
+import { statisticsKept } from '../games/index.ts';
 import type { Audience } from '../leagues/index.ts';
 import {
   showName,
@@ -17,6 +17,7 @@ import type {
   PlayerTotalsRecord,
   SeasonTeamRow,
   StandingsReadStore,
+  TeamOwnTurnoversRecord,
   TeamStatTotalRecord,
 } from './read-ports.ts';
 
@@ -59,6 +60,12 @@ export type TeamTotals = {
   /** True when this viewer sees the team's player lines; false means totals only. */
   readonly playerLinesShown: boolean;
   readonly stats: Readonly<Record<string, StatEntry>>;
+  /**
+   * The statistics, of those the season keeps, whose team total is not what the team's
+   * players' lines add to (step 2.196): turnovers charged to the team itself, or points
+   * that are final scores entered as other than its players' points. Empty for most.
+   */
+  readonly countsMoreThanPlayers: readonly string[];
 };
 
 export const entryOf = (total: number, gamesRecorded: number): StatEntry => ({
@@ -162,14 +169,28 @@ async function recompute(
 }
 
 /**
- * The statistics a season's rules keep ("Statistics kept", P7 §1): the columns the box
- * score grid asks for, its rules read as the games module reads them (rules that cannot
- * be read, or none saved, are the starting set), so the page shows what was asked for. A
- * season that names its statistics itself keeps those; one that names none (no command
- * writes the list, record 070) keeps its rules' set.
+ * A team's season total counts everything the team did (step 2.196, the numbers audit's
+ * H1): the turnovers charged to the team itself, which are in no player's line, are
+ * added to its turnovers, counted from each game's saved plays as the game's page counts
+ * them. A game counts once among the games a team's turnovers were recorded in: it is
+ * counted already when a line of one of the team's players carries turnovers (a tracked
+ * game's lines always do), and added when none does.
  */
-function keptByRules(rules: unknown): readonly string[] {
-  return boxScoreColumns(rulesOfGame(null, rules).statistics).statKeys;
+function addTeamTurnovers(
+  totalsByTeam: Map<string, Record<string, StatEntry>>,
+  records: readonly TeamOwnTurnoversRecord[],
+): void {
+  for (const own of records) {
+    if (own.turnovers <= 0) continue;
+    const stats = totalsByTeam.get(own.teamId) ?? {};
+    const before = stats['turnovers'];
+    const counted = own.countedByLines && before !== undefined;
+    stats['turnovers'] = entryOf(
+      (before?.total ?? 0) + own.turnovers,
+      (before?.gamesRecorded ?? 0) + (counted ? 0 : 1),
+    );
+    totalsByTeam.set(own.teamId, stats);
+  }
 }
 
 /** Undefined when the season is not in this league. */
@@ -181,14 +202,21 @@ export async function statisticsSource(
   const season = await store.findSeason(seasonId);
   const named = season === undefined ? undefined : await store.seasonStatKeys(season.id);
   if (season === undefined || named === undefined) return undefined;
-  const keys = named.length > 0 ? named : keptByRules(season.rules);
-  const [teams, totals, links, teamTotalRows] = await Promise.all([
+  // "Statistics kept" (P7 §1): the same answer a game's box score draws its columns from.
+  const keys = statisticsKept(named, season.rules);
+  const [teams, totals, links, teamTotalRows, teamTurnoverGames] = await Promise.all([
     store.teams(season.id),
     store.playerTotals(season.id),
     store.playerTeams(season.id),
     store.teamStatTotals(season.id),
+    store.teamTurnoverGames(season.id),
   ]);
-  const settings = new Map(teams.map((team) => [team.id, teamSetting(viewing.leagueId, team)]));
+  // A team in the bin, kept in the standings for its results (A-17), is not in the statistics.
+  const settings = new Map(
+    teams
+      .filter((team) => !team.removed)
+      .map((team) => [team.id, teamSetting(viewing.leagueId, team)]),
+  );
   const shownTeam = (teamId: string): boolean => {
     const setting = settings.get(teamId);
     return setting !== undefined && statsShown(setting, viewing.viewer) === 'player_lines';
@@ -278,11 +306,20 @@ export async function statisticsSource(
     };
   });
   const totalsByTeam = new Map<string, Record<string, StatEntry>>();
+  /** By team, the statistics whose total is not its players' lines added up. */
+  const notLines = new Map<string, Set<string>>();
+  const differs = (teamId: string, key: string) =>
+    notLines.set(teamId, new Set([...(notLines.get(teamId) ?? []), key]));
   for (const row of teamTotalRows as readonly TeamStatTotalRecord[]) {
     const own = totalsByTeam.get(row.teamId) ?? {};
     own[row.statKey] = entryOf(row.total, row.gamesRecorded);
     totalsByTeam.set(row.teamId, own);
+    if (row.linesTotal !== undefined && row.linesTotal !== row.total) {
+      differs(row.teamId, row.statKey);
+    }
   }
+  addTeamTurnovers(totalsByTeam, teamTurnoverGames);
+  for (const own of teamTurnoverGames) if (own.turnovers > 0) differs(own.teamId, 'turnovers');
   return {
     seasonId: season.id,
     statKeys: keys,
@@ -293,6 +330,10 @@ export async function statisticsSource(
       color: team.color,
       playerLinesShown: shownTeam(team.id),
       stats: totalsByTeam.get(team.id) ?? {},
+      // Said only of a team whose players' numbers this viewer sees: nothing to add up else.
+      countsMoreThanPlayers: shownTeam(team.id)
+        ? keys.filter((key) => notLines.get(team.id)?.has(key) === true)
+        : [],
     })),
   };
 }

@@ -380,6 +380,12 @@ function pageData(
     tableNotes: [
       t('stats.countsGames'),
       ...(averagedOverFewer ? [t('stats.averagedOverOwnGames')] : []),
+      // A team's totals count everything the team did (step 2.196): its own turnovers and
+      // its final scores, so they can differ from its players' numbers. Said only when a
+      // team the viewer sees the players of has such a total in a column shown here.
+      ...(table.teams.some((team) => team.countsMoreThanPlayers.length > 0)
+        ? [t('stats.teamTotalsCountTeam')]
+        : []),
     ],
   };
 }

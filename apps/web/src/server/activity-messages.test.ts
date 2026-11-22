@@ -13,6 +13,7 @@ const reads = new Set([
   'access.my_access',
   'leagues.list_divisions',
   'leagues.list_bin',
+  'people.get_person',
   'people.list_people',
   'games.list_postponed_games',
   'games.list_my_games',
@@ -28,6 +29,8 @@ const reads = new Set([
   'imports.get_fixture_import',
   'scheduling.preview_schedule_publish',
   'teams.list_roster',
+  // What a team has of games, said before it is removed (A-17): a read.
+  'teams.count_team_games',
   'games.get_box_score_sheet',
   // Holding a game to score (T-116): the tracker opens, renews every half minute and
   // leaves, which would flood the log. Only taking over a game from someone is logged.

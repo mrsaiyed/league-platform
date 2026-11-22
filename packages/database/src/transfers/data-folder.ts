@@ -1,4 +1,5 @@
-// Writes a made-up database's data folder for the transfer tests (step 2.149).
+// Writes a made-up database's data folder: for the transfer tests (step 2.149), and for
+// the made-up tracker backup the seed's demo-shaped league is transferred from (step 2.59).
 //
 // Building a database straight into a folder on disk is slow on Windows: PGlite writes
 // each of its thousand-odd files a little at a time, and every write waits on the disk

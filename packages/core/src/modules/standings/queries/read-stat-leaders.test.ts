@@ -90,6 +90,7 @@ function season(players: readonly Player[]): StandingsReadStore {
     color: null,
     divisionId,
     statsVisibility,
+    removed: false,
   });
   return {
     findSeason: async (id) =>
@@ -136,6 +137,7 @@ function season(players: readonly Player[]): StandingsReadStore {
       })),
     decidedGames: async () => games,
     teamStatTotals: async () => [],
+    teamTurnoverGames: async () => [],
     people: async (ids) =>
       ids.flatMap((id) => {
         const person = people.find((p) => p.id === id);

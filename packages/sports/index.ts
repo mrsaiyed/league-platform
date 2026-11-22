@@ -6,6 +6,7 @@ export type {
   CoinFlip,
   DecidedBy,
   GameStatus,
+  LevelTeams,
   StandingsAdjustment,
   StandingsGame,
   StandingsInput,
@@ -18,6 +19,8 @@ export type {
   StandingsTeam,
   Streak,
   Tiebreaker,
+  TiebreakPlace,
+  TiebreakStep,
 } from './src/standings/index.ts';
 export { leaders, seasonTotals, teamTotals } from './src/stats/index.ts';
 export type {

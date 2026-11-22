@@ -36,7 +36,7 @@ Every admin form answered by sending the browser back to its page with the answe
 
 ## Not done here
 
-- Part 2 of step 2.155 (the schedule grid, teams and rosters, league settings) still answers in the address; it takes this record's pieces (`form-state.ts`, `same-request.ts`, `saved-notice.ts`, `use-one-submit.ts`, `saved-line.tsx`), which today live in the games area and the web app's server folder.
+- Part 2 of step 2.155 (the schedule grid, teams and rosters, league settings) still answers in the address; it takes this record's pieces (`form-state.ts`, `same-request.ts`, `saved-notice.ts`, `use-one-submit.ts`, `saved-line.tsx`), which today live in the games area and the web app's server folder. Since step 2.185 the grid's answers to removing a game, putting it back and a second "Put it back" are already one-time notices (`saved-notice.ts`, screen `schedule`; `schedule-builder/perform-action.ts` draws the grid again in place with scripts on when its address holds no older answer, else redirects to the plain address); its other answers and its refusals still ride in the address.
 - The sign-in screens still show a problem by its name in the address (record 031). They are not admin forms and hold no typed data in it; whether they follow this record is for the lead.
 - There is no shared style for a marked field: the wrong box carries `aria-invalid`, and its sentence the shared `ui-field-error` style, but the box itself looks as before (DESIGN.md section 1: the design lead adds the piece).
 - A tie in a season without ties is still found only after "Yes" on the games list (the command knows the season's rules; the list does not). It is now said beside the boxes, which stay open with the tie in them.
