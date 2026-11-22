@@ -32,6 +32,8 @@ Set to match T-225 and T-70 when the project is made (step 1.25): access token (
 
 ## To check on staging (step 1.25)
 
+**Step 2.206 makes these checks a script can make**, as the supervised session's first act: `scripts/check-sign-in-service.mjs --hosted` asks every call above through the adapter's own client, with one made-up `.test` user it removes again (the client's `deleteUser`, which the adapter itself never calls), and prints one line per check, "as expected" or the call, status and error code that differed; the checks only a person can make it lists last ([check the sign-in service](../../operations/check-sign-in-service.md)). "As expected" is what the fake answers, so any difference means the adapter or the fake is wrong.
+
 1. The shapes of `generate_link`, `verify`, `token` (password, refresh, PKCE), `user` and `logout` answers, and the error codes the adapter expects for each call (listed under "What"; any other is thrown, so a code Supabase uses that we did not list would show up here as an error, not as a wrong answer). Among them: what `verify` answers for a made-up `token_hash` (the call made when no code was sent: `otp_expired` expected), and what `generate_link` with `recovery` answers for an address with no user.
 2. That `generate_link` sends no email and is not held back by Supabase's once-a-minute limit per address.
 3. That a magic-link code for a new address must be checked as `signup`.

@@ -6,8 +6,13 @@ export { isAllowedReturnAddress, type ReturnAddressRules } from './return-addres
 export { signInDefaults, type SignInSettings } from './sign-in-settings.ts';
 export { createSupabaseSignIn, type SupabaseSignInOptions } from './supabase/supabase-sign-in.ts';
 export { SupabaseAuthUnexpected, type FetchLike } from './supabase/gotrue-client.ts';
+// The adapter's address check and its time-out error, for the sign-in service check
+// (scripts/check-sign-in-service.mjs, step 2.206). The client itself, which can remove a
+// user, is not here: that script takes it from for-operations.ts, which no app can reach.
+export { checkProjectUrl, SupabaseAuthTimedOut } from './supabase/gotrue-client.ts';
 export {
   createSupabaseEmailConfirmation,
+  emailConfirmationOf,
   type SupabaseEmailConfirmationOptions,
 } from './supabase/email-confirmation.ts';
 export type * from './supabase/sign-in-store.ts';
