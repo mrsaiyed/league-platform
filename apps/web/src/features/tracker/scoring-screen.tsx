@@ -433,6 +433,20 @@ export function ScoringScreen(props: ScoringScreenProps) {
   marks.current ??= createTileMarks(markTimers, (playerId) => tileElement(root.current, playerId));
   const tileMarks = marks.current;
   useLayoutEffect(() => tileMarks.redraw());
+  // A tap the league refused takes its mark off at once, even while it still shows solid
+  // (DESIGN.md §7, line 3): it never reads as a recorded play. The last few are kept.
+  const markedTaps = useRef(new Map<string, TileMark>());
+  const refusedByLeague = props.status.notApplied;
+  useLayoutEffect(() => {
+    const marked = markedTaps.current;
+    for (const refused of refusedByLeague) {
+      marked.get(refused.command.commandId)?.refused();
+      marked.delete(refused.command.commandId);
+    }
+    for (const id of [...marked.keys()].slice(0, Math.max(marked.size - 20, 0))) {
+      marked.delete(id);
+    }
+  }, [refusedByLeague]);
   /**
    * Marks a player's tile with what was tapped, now, as taken: written straight onto the
    * element, so it is painted in this turn whatever else the screen is working on. The
@@ -787,6 +801,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
         if (keyboard) focusNext.current = { tile: tile.id };
         void tap(input).then((result) => {
           answerMarks([mark], result.ok);
+          if (result.ok) markedTaps.current.set(result.commandId, mark);
           if (!result.ok) return;
           if (action === 'turnover') {
             say(t('tracker.say.turnover', { player: name }));
