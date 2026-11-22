@@ -18,6 +18,7 @@ import {
   type CommandLogLine,
 } from '@srleagues/core';
 import * as database from '@srleagues/database';
+import { createLocalBotCheck } from '@srleagues/providers';
 import type { SessionIdentity, SignInService } from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -105,6 +106,7 @@ beforeAll(async () => {
   ports = databasePorts({
     database,
     db,
+    botCheck: createLocalBotCheck({ appEnv: 'test' }),
     signIn: {
       identify: async ({ accessToken }: { accessToken: string }) => {
         const who = sessions.get(accessToken);

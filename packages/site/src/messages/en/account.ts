@@ -114,6 +114,16 @@ export const enAccount = {
   'password.rules': 'At least 8 characters. Passwords that have leaked are refused.',
   'password.submit': 'Save and sign in',
   'password.title': 'Choose your password',
+  // The bot check in front of sign-in and sign-up (T4 §6, record 081).
+  // Refused, though the form keeps the email typed (record 081, F4 and C2).
+  'problem.botCheckDidNotLoad':
+    'The check that you are a person could not load on this connection. Please try again, or try another connection (mobile data instead of this Wi-Fi, for example), or use Continue with Google.',
+  'problem.botCheckFailed':
+    'We could not check that you are a person. Please wait a moment and try again. If it keeps happening, turn on scripts for this site, or use Continue with Google.',
+  'problem.botCheckUnavailable':
+    'We could not check that you are a person just now. Please try again in a few minutes.',
+  'problem.botCheckUnreachable':
+    'We cannot send a code just now, because the check that you are a person is not answering. Please try again in a few minutes.',
   'problem.codeExpired': 'That code has run out. Ask for a new one.',
   'problem.codeNotSent': 'We could not send the email just now. Please try again in a minute.',
   'problem.codeUsedUp': 'Too many tries with this code. Ask for a new one.',
@@ -130,8 +140,9 @@ export const enAccount = {
   'problem.signInToScore': 'Sign in to score this game.',
   'problem.signOutEverywhereFailed':
     'We could not sign out your other devices. This one is signed out: sign in and try again.',
-  'problem.tooManyAttempts_one': 'Too many tries. Please wait {count} second and try again.',
-  'problem.tooManyAttempts_other': 'Too many tries. Please wait {count} seconds and try again.',
+  // The wait in whole minutes, rounded up (record 081).
+  'problem.tooManyAttempts_one': 'Too many tries. Please wait {count} minute and try again.',
+  'problem.tooManyAttempts_other': 'Too many tries. Please wait {count} minutes and try again.',
   'problem.wrongEmailOrPassword': 'Wrong email or password.',
   'problem.wrongPassword': 'Wrong password.',
   'role.admin': 'Admin',
@@ -145,6 +156,15 @@ export const enAccount = {
   'role.scheduler': 'Scheduler',
   'role.scorekeeper': 'Scorekeeper',
   'signIn.backTo': 'Back to {league}',
+  // With scripts off, each form its own words (record 081, F5). Continue with Google is a
+  // plain form that works without scripts and has no check (script-policy-test.mjs proves it).
+  'signIn.botCheckNeedsScripts.reset':
+    'Asking for a code to choose a new password first checks that you are a person, and the check needs scripts: please turn them on for this site.',
+  'signIn.botCheckNeedsScripts.signIn':
+    'Signing in with a password checks that you are a person, and the check needs scripts: please turn them on for this site. Continue with Google works without scripts and has no check.',
+  'signIn.botCheckNeedsScripts.signUp':
+    'Creating an account first checks that you are a person, and the check needs scripts: please turn them on for this site. Continue with Google works without scripts and has no check.',
+  'signIn.botCheckWaiting': 'Checking that you are a person…',
   'signIn.createAccount': 'New here? Create an account',
   // The sign-in screens (step 1.14, P6 §2 and §5). The same words whether or not an
   // account exists (T-68).

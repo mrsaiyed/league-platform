@@ -35,6 +35,8 @@ import {
 } from '@srleagues/core';
 import {
   captureEmail,
+  createLocalBotCheck,
+  createMadeUpTurnstileBotCheck,
   createLocalLiveHub,
   createLocalSignInStandIn,
   type SessionIdentity,
@@ -207,6 +209,8 @@ export type StandInOptions = {
    * design, so every page can be pictured in every color set (scripts/shots.mjs).
    */
   readonly localDesign?: PicturedDesignKey | undefined;
+  /** LOCAL_BOT_CHECK: the hidden-field stand-in (the default), or the made-up Turnstile. */
+  readonly localBotCheck?: 'made-up-turnstile' | 'stand-in' | undefined;
   /**
    * LOCAL_NOW: the moment the one made-up world's clock starts at (step 2.179), so a test
    * runs as if at that hour; the world is seeded then and its clock runs on from there.
@@ -279,7 +283,10 @@ export type StandInPorts = WebPorts & {
 };
 
 /** The sign-in stand-in and its emails, for the stand-in and for the made-up database. */
-export type StandInSignIn = Pick<StandInPorts, 'signIn' | 'signInMail' | 'signUpMadeUpMember'> & {
+export type StandInSignIn = Pick<
+  StandInPorts,
+  'botCheck' | 'signIn' | 'signInMail' | 'signUpMadeUpMember'
+> & {
   /** Gives one made-up address an account with this password, through the service's steps. */
   readonly signUpMadeUp: (email: string, password: string) => Promise<void>;
   /** The newest kept emails in the folder, newest first (the kept emails' page). */
@@ -390,6 +397,11 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
     await signIn.signOut({ accessToken: set.value.session.accessToken });
   };
   return {
+    // The bot check's stand-in (record 081): it too refuses anything but local work and tests.
+    botCheck:
+      options.localBotCheck === 'made-up-turnstile'
+        ? createMadeUpTurnstileBotCheck({ appEnv: options.appEnv })
+        : createLocalBotCheck({ appEnv: options.appEnv }),
     signIn,
     signInMail,
     signUpMadeUp,
@@ -402,7 +414,7 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
 
 export function standInPorts(options: StandInOptions): StandInPorts {
   const made = standInSignIn(options);
-  const { signIn, signInMail, signUpMadeUpMember, signUpMadeUp } = made;
+  const { botCheck, signIn, signInMail, signUpMadeUpMember, signUpMadeUp } = made;
   const people: readonly MadeUpPerson[] = Object.values(standInPeople);
   const now = () => new Date();
   const deps: CommandDeps<AccessTx> = {
@@ -501,6 +513,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     identify,
     signIn,
     signInMail,
+    botCheck,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf,
     leaguesOfAccount: leaguesOf,

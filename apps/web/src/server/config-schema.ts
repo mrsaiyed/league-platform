@@ -37,6 +37,7 @@ export const fields = {
   TRUSTED_PROXY: { secret: false },
   PLATFORM_DATABASE_URL: { secret: true },
   LOCAL_BINNED_TEAM: { secret: false },
+  LOCAL_BOT_CHECK: { secret: false },
   LOCAL_DATA: { secret: false },
   LOCAL_DEMO_LEAGUE: { secret: false },
   LOCAL_SIMULATED_LEAGUE: { secret: false },
@@ -45,6 +46,8 @@ export const fields = {
   SESSION_SECRET: { secret: true },
   SUPABASE_URL: { secret: false },
   SUPABASE_SECRET_KEY: { secret: true },
+  TURNSTILE_SITE_KEY: { secret: false },
+  TURNSTILE_SECRET_KEY: { secret: true },
   RESEND_API_KEY: { secret: true },
   EMAIL_FROM: { secret: false },
   STRIPE_SECRET_KEY: { secret: true },
@@ -61,12 +64,15 @@ const schema = z.object({
   APP_ENV: z.enum(appEnvs),
   PUBLIC_BASE_URL: webUrl,
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  // Whether X-Forwarded-For is believed for the sign-in attempt limits (record 031):
-  // 'none' never; 'one' when exactly one proxy of the host appends the address it
-  // was reached from. The default 'none' is for local and test only: in staging and
-  // production it must be set (mustBeExplicit), because with 'none' every visitor
-  // shares one address and one person's wrong guesses lock out everyone.
-  TRUSTED_PROXY: z.enum(['none', 'one']).default('none'),
+  // Whose word is taken for a visitor's address in the sign-in attempt limits (records
+  // 031 and 081, device.ts): 'none' nobody's; 'one' when exactly one proxy of the host
+  // appends the address it was reached from; 'cloudflare' when Cloudflare stands in
+  // front of that proxy, its CF-Connecting-IP believed only on a request that reached
+  // the host from one of Cloudflare's addresses. The default 'none' is for local and
+  // test only: in staging and production it must be set (mustBeExplicit), because with
+  // 'none' every visitor shares one address and one person's wrong guesses lock out
+  // everyone.
+  TRUSTED_PROXY: z.enum(['none', 'one', 'cloudflare']).default('none'),
   // The platform's own database (R8): not DATABASE_URL, which the Al-Hadi tracker
   // reads, so a settings file made for the tracker can never point the web app at the
   // tracker's database. Local work and tests never open an address (T-201), so it is
@@ -87,6 +93,9 @@ const schema = z.object({
   // What local work and tests run on (record 055): 'stand-in', the made-up leagues in
   // this process's memory (the default), or 'made-up-database', the made-up seed
   // leagues in a database in memory with every migration. Only local and test read it.
+  // Which bot check local work and tests draw (record 081): the hidden-field stand-in, or a
+  // made-up Turnstile drawn as the real box is, whose script a browser test serves itself.
+  LOCAL_BOT_CHECK: z.enum(['stand-in', 'made-up-turnstile']).default('stand-in'),
   LOCAL_DATA: z.enum(['stand-in', 'made-up-database']).default('stand-in'),
   // 'on' loads the seed's demo-shaped league into the made-up database too (step 2.59): a
   // large league with a whole season, which takes some seconds at start. Off by default, so
@@ -125,6 +134,16 @@ const schema = z.object({
   // tests sign in on the stand-in.
   SUPABASE_URL: webUrl.optional(),
   SUPABASE_SECRET_KEY: secretText(16).optional(),
+  // The bot check in front of sign-in and sign-up (T4 §6, record 081): Cloudflare
+  // Turnstile's public site key and its secret key. Production needs both; staging takes
+  // both or neither (neither switches the check off, T-270); local work and tests use the
+  // stand-in whatever is given.
+  TURNSTILE_SITE_KEY: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{8,100}$/, 'must be a Turnstile site key')
+    .optional(),
+  TURNSTILE_SECRET_KEY: secretText(16).optional(),
   // Only production sends email (T-140); elsewhere every email is captured.
   RESEND_API_KEY: secretText(8).optional(),
   EMAIL_FROM: text.regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'must be an email address'),
@@ -138,6 +157,7 @@ const optional: readonly ConfigName[] = [
   'TRUSTED_PROXY',
   'PLATFORM_DATABASE_URL',
   'LOCAL_BINNED_TEAM',
+  'LOCAL_BOT_CHECK',
   'LOCAL_DATA',
   'LOCAL_DEMO_LEAGUE',
   'LOCAL_SIMULATED_LEAGUE',
@@ -148,6 +168,8 @@ const optional: readonly ConfigName[] = [
   'STRIPE_WEBHOOK_SECRET',
   'SUPABASE_URL',
   'SUPABASE_SECRET_KEY',
+  'TURNSTILE_SITE_KEY',
+  'TURNSTILE_SECRET_KEY',
   'RESEND_API_KEY',
 ];
 
@@ -161,12 +183,17 @@ const requiredIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   PLATFORM_DATABASE_URL: ['staging', 'production'],
   SUPABASE_URL: ['staging', 'production'],
   SUPABASE_SECRET_KEY: ['staging', 'production'],
+  // Staging may leave out both, switching the bot check off (T-270, record 081); one
+  // without the other is refused below.
+  TURNSTILE_SITE_KEY: ['production'],
+  TURNSTILE_SECRET_KEY: ['production'],
   RESEND_API_KEY: ['production'],
 };
 
 /** Read only in local work and tests; set anywhere else, it is a mistake. */
 const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   LOCAL_BINNED_TEAM: ['local', 'test'],
+  LOCAL_BOT_CHECK: ['local', 'test'],
   LOCAL_DATA: ['local', 'test'],
   LOCAL_DEMO_LEAGUE: ['local', 'test'],
   LOCAL_SIMULATED_LEAGUE: ['local', 'test'],
@@ -238,6 +265,24 @@ export function loadConfig(
   for (const [name, environments] of Object.entries(requiredIn)) {
     if (given[name] === undefined && appEnv !== undefined && environments.includes(appEnv)) {
       invalid.set(name, `${name}: missing, must be set when APP_ENV is ${appEnv}`);
+    }
+  }
+  // Turnstile's two keys go together (record 081): staging without either switches the bot
+  // check off, but one without the other is a mistake, named here.
+  if (appEnv === 'staging') {
+    const site = given['TURNSTILE_SITE_KEY'];
+    const secret = given['TURNSTILE_SECRET_KEY'];
+    if (site !== undefined && secret === undefined) {
+      invalid.set(
+        'TURNSTILE_SECRET_KEY',
+        'TURNSTILE_SECRET_KEY: missing, must be set with TURNSTILE_SITE_KEY (or leave out both to switch the bot check off)',
+      );
+    }
+    if (secret !== undefined && site === undefined) {
+      invalid.set(
+        'TURNSTILE_SITE_KEY',
+        'TURNSTILE_SITE_KEY: missing, must be set with TURNSTILE_SECRET_KEY (or leave out both to switch the bot check off)',
+      );
     }
   }
   // The tracker's database guard (packages/providers, shared with the worker).

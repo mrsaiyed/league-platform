@@ -3,8 +3,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DatabaseHandle } from '@srleagues/database';
 import type { EmailConfirmation, EmailConfirmationQuestion } from '@srleagues/providers';
+import { createLogger } from '@srleagues/observability';
 import { loadConfig } from './config-schema.ts';
+import { logLinesFor } from './container.ts';
 import {
+  botCheckAlarmLine,
+  botCheckOffLine,
+  hostedBotCheck,
   requireEmailConfirmation,
   simulatedLeagueSize,
   startWebApp,
@@ -18,6 +23,8 @@ const env = {
   PLATFORM_DATABASE_URL: 'postgres://app:made-up-password@localhost:5432/league_local',
   SUPABASE_URL: 'https://made-up-project.supabase.example.test',
   SUPABASE_SECRET_KEY: 'made-up-supabase-key',
+  TURNSTILE_SITE_KEY: 'made-up-turnstile-site-key',
+  TURNSTILE_SECRET_KEY: 'made-up-turnstile-secret-key',
   RESEND_API_KEY: 'made-up-resend-key',
   EMAIL_FROM: 'hello@example.test',
   // Required in staging and production (config-schema.ts).
@@ -256,6 +263,97 @@ describe('startWebApp', () => {
     );
     expect(d.checkLoginRole).toHaveBeenCalledOnce();
     expect(d.realSignIn).toHaveBeenCalledOnce();
+  });
+});
+
+describe("staging's bot check (record 081, T-270)", () => {
+  /** Starts staging as far as it goes today, and gives back what it warned. */
+  async function warnedIn(settings: Record<string, string | undefined>) {
+    const d = deps([]);
+    const warned: unknown[] = [];
+    const config = loadConfig({ ...env, APP_ENV: 'staging', ...settings });
+    await startWebApp(config, { ...d.given, warn: (m, f) => warned.push([m, f]) }).catch(
+      () => undefined,
+    );
+    return warned;
+  }
+
+  it('without either Turnstile key starts with the check off, and says so in one plain line', async () => {
+    const warned = await warnedIn({
+      TURNSTILE_SITE_KEY: undefined,
+      TURNSTILE_SECRET_KEY: undefined,
+    });
+    expect(warned).toEqual([[botCheckOffLine, {}]]);
+    expect(botCheckOffLine).not.toMatch(/made-up/);
+    expect(
+      hostedBotCheck(
+        loadConfig({
+          ...env,
+          APP_ENV: 'staging',
+          TURNSTILE_SITE_KEY: undefined,
+          TURNSTILE_SECRET_KEY: undefined,
+        }),
+        {},
+      ).widget.kind,
+    ).toBe('off');
+  });
+
+  it('with both keys uses Turnstile and says nothing', async () => {
+    expect(await warnedIn({})).toEqual([]);
+    expect(hostedBotCheck(configFor('staging'), {}).widget.kind).toBe('turnstile');
+  });
+
+  it('reports a check it could not ask in one error-level line of a fixed shape (Q2)', async () => {
+    const alarmed: [string, Readonly<Record<string, string>>][] = [];
+    const warned: unknown[] = [];
+    const check = hostedBotCheck(
+      configFor('production'),
+      {
+        alarm: (message, fields) => void alarmed.push([message, fields]),
+        warn: (m) => void warned.push(m),
+      },
+      async () => {
+        throw new TypeError('fetch failed: 192.0.2.10');
+      },
+    );
+    expect(await check.verify({ answer: 'made-up-widget-answer', action: 'sign-in' })).toEqual({
+      passed: false,
+      refusal: 'unreachable',
+    });
+    expect(alarmed).toEqual([[botCheckAlarmLine, { kind: 'no-answer' }]]);
+    expect(JSON.stringify(alarmed)).not.toMatch(/192\.0\.2|made-up-widget-answer/);
+    expect(warned).toEqual([]);
+  });
+
+  it('that line reaches the logger at error level, as the app hooks it up (container.ts)', async () => {
+    const lines: string[] = [];
+    // The app's own threshold may be set as high as error: the line still gets through.
+    const logger = createLogger({ sink: (line) => void lines.push(line), level: 'error' });
+    const check = hostedBotCheck(configFor('production'), logLinesFor(logger), async () => {
+      throw new TypeError('fetch failed: 192.0.2.10 https://challenges.example.test/siteverify');
+    });
+    await check.verify({ answer: 'made-up-widget-answer', action: 'sign-in' });
+    expect(lines).toHaveLength(1);
+    const written = JSON.parse(lines[0] ?? '{}') as Record<string, unknown>;
+    expect(written).toMatchObject({ level: 'error', msg: botCheckAlarmLine, kind: 'no-answer' });
+    expect(lines[0]).not.toMatch(
+      /192\.0\.2|made-up-widget-answer|siteverify|made-up-turnstile-secret-key/,
+    );
+  });
+
+  it('with one key refuses to start, naming the missing one', () => {
+    expect(() =>
+      loadConfig({ ...env, APP_ENV: 'staging', TURNSTILE_SECRET_KEY: undefined }),
+    ).toThrow(/TURNSTILE_SECRET_KEY: missing, must be set with TURNSTILE_SITE_KEY/);
+  });
+
+  it('production without both keys refuses to start, never with the check off', () => {
+    for (const missing of ['TURNSTILE_SITE_KEY', 'TURNSTILE_SECRET_KEY']) {
+      expect(() => loadConfig({ ...env, APP_ENV: 'production', [missing]: undefined })).toThrow(
+        new RegExp(`${missing}: missing, must be set when APP_ENV is production`),
+      );
+    }
+    expect(hostedBotCheck(configFor('production'), {}).widget.kind).toBe('turnstile');
   });
 });
 
