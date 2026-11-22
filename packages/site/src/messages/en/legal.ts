@@ -17,14 +17,16 @@ export const enLegal = {
   'legal.privacy.children.body':
     "A player the league knows to be under 18 is shown on public pages by first name and last initial, such as “Sam K.”, unless the league's admin has confirmed that the parents agreed to full names. In a youth league, a player whose age the league does not know is shown the same way.",
   'legal.privacy.children.less':
-    "The league's admin decides who sees each team's statistics. A parent can ask the admin to show their child by initials only, or to take the name off the public pages and keep only the numbers.",
+    "The league's admin decides who sees each team's statistics, or lets each team decide. A parent can ask the admin to show their child by initials only, or to take the name off the public pages and keep only the numbers.",
   'legal.privacy.children.title': 'Children',
   'legal.privacy.keep.account':
     'For your account: your email address, the leagues you belong to and what you do in each, such as admin or scorekeeper. Your password is held by our sign-in service in a scrambled form that cannot be read back.',
   'legal.privacy.keep.cookies':
-    'Cookies only to keep you signed in and to remember your team if you pick one. No advertising or tracking cookies.',
+    "Cookies and your browser's own storage are used only to keep you signed in, to remember your team if you pick one, and to keep a game being scored safe on the scorekeeper's device. No advertising or tracking cookies.",
   'legal.privacy.keep.devices':
-    'The devices you are signed in on: the browser, the kind of device and when you last used it. Your account page lists them and can sign them all out.',
+    "The devices you are signed in on: the browser, the kind of device and when you last used it. Your account page lists them and can sign them all out. A scorekeeper's phone or computer holds the game being scored until it is saved.",
+  'legal.privacy.keep.invited':
+    'If you are invited to help run a league: your email address and who invited you.',
   'legal.privacy.keep.log':
     "A record of the changes made in each league's admin area, and who made them; and the network address each sign-in attempt comes from, so that someone guessing passwords can be stopped.",
   'legal.privacy.keep.players':
@@ -33,10 +35,10 @@ export const enLegal = {
   'legal.privacy.remove.body':
     'There is no button yet to close your account. To have it closed and what we keep about you deleted, ask us as “Who to write to” says below.',
   'legal.privacy.remove.league':
-    "A league's admin can take a player off the league's list. Someone who never played on a team is then deleted for good after 30 days. Someone who has played stays in the league's records, and the games they played keep their numbers.",
+    "A league's admin can take a player off the league's list, and the player then no longer appears on its pages. Anyone who was ever on a team's list stays in the league's records, and the games they played keep their numbers. To have what a league keeps about you or your child deleted, ask the league's admin or write to us.",
   'legal.privacy.remove.title': 'Taking it off',
   'legal.privacy.sell.body':
-    'We do not sell your information, and the site shows no advertising. Besides your league and us, it goes only to the services the site runs on: its hosting, its database, signing in, checking that sign-ins are made by people, and sending email. If you sign in with Google, Google tells us your email address.',
+    'We do not sell your information, and the site shows no advertising. Besides your league and us, it goes only to the services the site runs on: its hosting, its database, signing in, checking that sign-ins are made by people, and sending email. If you sign in with Google, Google knows that you signed in here and tells us your email address.',
   'legal.privacy.sell.title': 'We do not sell it',
   'legal.privacy.who.admins':
     "Your league's admins can see everything the league keeps about its players. The people who run SR Leagues can see it too, to keep the site working and fix problems.",
@@ -51,7 +53,7 @@ export const enLegal = {
   'legal.readPrivacy': 'Read the privacy note',
   'legal.readTerms': 'Read the terms',
   'legal.shortVersion':
-    'This is the short version, for the first season of our own leagues. A lawyer is writing the full terms and privacy policy, and they will replace this page before anyone outside our own leagues signs up.',
+    'This is the short version, for the first season of our own leagues. Full terms and a privacy policy, checked by a lawyer, will replace this page before anyone outside our own leagues signs up.',
   'legal.terms.account.body':
     "Use your own email address and keep your password to yourself. If you think someone else has used your account, press “Sign out everywhere” on your account page and tell your league's admin.",
   'legal.terms.account.title': 'Your account',

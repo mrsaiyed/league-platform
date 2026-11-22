@@ -25,6 +25,7 @@ const sections: Readonly<Record<LegalPage, readonly Section[]>> = {
         'legal.privacy.keep.account',
         'legal.privacy.keep.devices',
         'legal.privacy.keep.players',
+        'legal.privacy.keep.invited',
         'legal.privacy.keep.log',
         'legal.privacy.keep.cookies',
       ],

@@ -41,3 +41,4 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.204: in tests/read-kept-emails.test.mjs a variable is still called dotted and a comment says a final dot is not asked; PostgreSQL throws on a NUL in an address where TypeScript answers false (both refuse)
 - 2.37 part 2: when the 15-second look at a final game finds it live and nobody holds it, the device quietly becomes the scorer, as at first opening: decide whether it should ask
 - 2.37 part 2: a device showing '<name> is scoring' never learns by itself that the game has ended
+- 2.135: when step 2.91 runs the nightly deletion, the Privacy note may say again that someone never on a team's list is deleted for good after 30 days
