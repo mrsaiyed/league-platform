@@ -18,6 +18,7 @@ import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchGameDoors } from './fetch-game-doors.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
+import type { QueueStorage } from './queue-storage.ts';
 import { createTrackerController, type TapInput } from './tracker-controller.ts';
 import { createManualClock } from './tracker-queue.test-helper.ts';
 
@@ -31,8 +32,11 @@ const newCommandId = () => {
   return `01900000-0000-7000-8000-00e7${commandNumber.toString(16).padStart(8, '0')}`;
 };
 
-function device(network: EndpointNetwork, as: Person = 'scorekeeper') {
-  const storage = createMemoryQueueStorage();
+function device(
+  network: EndpointNetwork,
+  as: Person = 'scorekeeper',
+  storage: QueueStorage = createMemoryQueueStorage(),
+) {
   const clock = createManualClock();
   const fetch = network.fetchAs(as);
   const at = { leagueId: liveLeagueId, gameId, fetch };
@@ -534,6 +538,40 @@ describe('tracker controller: Mark not started (step 2.121; point 1)', () => {
     network.mode = 'down';
     expect(await tablet.controller.markNotStarted()).toEqual({ ok: false, reason: 'unanswered' });
     expect(tablet.controller.status().game?.status).toBe('live');
+  });
+
+  it('a tap still being stored when Mark not started is tapped is counted first: plays are waiting (fix round, F4)', async () => {
+    const network = endpointNetwork();
+    const memory = createMemoryQueueStorage();
+    let holding = false;
+    let reached = (): void => undefined;
+    const arrived = new Promise<void>((resolve) => (reached = resolve));
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const storage: QueueStorage = {
+      ...memory,
+      async add(...args) {
+        if (holding) {
+          reached();
+          await gate;
+        }
+        return memory.add(...args);
+      },
+    };
+    const tablet = device(network, 'scorekeeper', storage);
+    await tablet.controller.start();
+    await tapAll(tablet, tipOff);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    holding = true;
+    const tapping = tablet.controller.tap(basket('home'));
+    await arrived;
+    const marking = tablet.controller.markNotStarted();
+    // Everything Mark not started can do before the tap is stored is done first.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release();
+    expect((await tapping).ok).toBe(true);
+    expect(await marking).toEqual({ ok: false, reason: 'plays-waiting' });
   });
 
   it('no tap is taken while a door is being gone through', async () => {

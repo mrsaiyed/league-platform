@@ -1170,8 +1170,12 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     }
     throughDoor = true;
     try {
-      // Every tap first: the door is judged on the game as the server has it.
-      if (!(await nothingWaiting())) return { ok: false, reason: 'plays-waiting' };
+      // Every tap first: the door is judged on the game as the server has it. The check
+      // runs in the one-at-a-time lock taps run in (the fix round's F4), so a tap already
+      // being stored is stored, and counted, before it; taps after it are refused by
+      // `throughDoor`. The work itself runs outside the lock: carrying on loads the game,
+      // which takes the lock.
+      if (!(await serially(nothingWaiting))) return { ok: false, reason: 'plays-waiting' };
       return await work(doors);
     } finally {
       throughDoor = false;
