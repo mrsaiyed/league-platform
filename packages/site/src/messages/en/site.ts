@@ -60,8 +60,6 @@ export const enSite = {
   'home.call.title': 'Every team has a story.',
   'home.fullSchedule': 'See the full schedule',
   'home.fullStandings': 'See the full standings',
-  // Under the home page's tables when a note there is shortened (step 2.198, fix round).
-  'home.whyThisOrder': 'Why this order? See the full standings',
   'home.hero.schedule': 'See the schedule',
   'home.hero.standings': 'View the standings',
   // The first starting design's home page (step 2.147, C-16): a hero with one sentence and
@@ -100,6 +98,8 @@ export const enSite = {
   'home.standingsEmpty': 'The standings appear here once games have been played.',
   'home.upcoming': 'The next matchups',
   'home.upcoming.kicker': 'On the schedule',
+  // Under the home page's tables when a note there is shortened (step 2.198, fix round).
+  'home.whyThisOrder': 'Why this order? See the full standings',
   'nav.home': 'Home',
   'nav.menu': 'Menu',
   'nav.my': 'My team',
@@ -216,16 +216,6 @@ export const enSite = {
   'standings.level.between': 'In the games between {teams}: {records}.',
   'standings.level.betweenPoints': 'In the games between {teams}, by points per game: {records}.',
   'standings.level.betweenPointsEven': 'In the games between {teams} ({each}): {records}.',
-  'standings.level.gamesEach_one': '{games} game each',
-  'standings.level.gamesEach_other': '{games} games each',
-  // The first team's figure says what the numbers are; the others give the numbers only.
-  'standings.level.pointsFrom': '{points} from {games}',
-  'standings.level.pointsFromGames_one': '{points} from {games} game',
-  'standings.level.pointsFromGames_other': '{points} from {games} games',
-  'standings.level.pointsWord_one': '{points} point',
-  'standings.level.pointsWord_other': '{points} points',
-  // Two teams that started again between themselves and split the games they played.
-  'standings.level.split': '{teams} split their games with each other ({record}).',
   'standings.level.by.coin-flip': 'A coin flip puts {team} ahead.',
   'standings.level.by.fewest-points-allowed':
     'Fewer points allowed puts {team} ahead: {ahead} against {behind}.',
@@ -236,6 +226,8 @@ export const enSite = {
   'standings.level.by.points-scored': 'Points scored puts {team} ahead: {ahead} against {behind}.',
   // A team and its figure in a list: "Lions 1–0", "Tigers +3".
   'standings.level.entry': '{team} {figure}',
+  'standings.level.gamesEach_one': '{games} game each',
+  'standings.level.gamesEach_other': '{games} games each',
   'standings.level.metNoneOfThem':
     'Head-to-head does not count here: none of them has played another.',
   'standings.level.metNone_one':
@@ -258,12 +250,20 @@ export const enSite = {
   'standings.level.order.point-difference': 'By point difference: {values}.',
   'standings.level.order.points-scored': 'By points scored: {values}.',
   'standings.level.points': '{teams} are level on points ({value}).',
+  // The first team's figure says what the numbers are; the others give the numbers only.
+  'standings.level.pointsFrom': '{points} from {games}',
+  'standings.level.pointsFromGames_one': '{points} from {games} game',
+  'standings.level.pointsFromGames_other': '{points} from {games} games',
+  'standings.level.pointsWord_one': '{points} point',
+  'standings.level.pointsWord_other': '{points} points',
   // A record in the games among level teams: wins–losses, and ties when any of them tied.
   // An invisible word joiner (U+2060) on each side of the dash keeps a record on one line
   // on a narrow phone ("0–" then "1" read wrongly at 320 wide).
   'standings.level.record': '{wins}⁠–⁠{losses}',
   'standings.level.recordTies': '{wins}⁠–⁠{losses}⁠–⁠{ties}',
   'standings.level.sentenceJoin': ' ',
+  // Two teams that started again between themselves and split the games they played.
+  'standings.level.split': '{teams} split their games with each other ({record}).',
   'standings.level.stillLevel':
     '{teams} are still level after all of them, so they are shown in a fixed order.',
   'standings.level.tiebreakerJoin': ', then ',
