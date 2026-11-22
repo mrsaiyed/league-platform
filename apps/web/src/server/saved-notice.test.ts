@@ -19,6 +19,13 @@ describe('the one-time "Saved" notice (T-271)', () => {
     expect(notices.take('p', 'games')).toBeUndefined();
   });
 
+  it('keeps the name of someone just removed, so "Removed …" can name them (step 2.50)', () => {
+    const notices = savedNotices({ keepMs: 60_000, most: 10 });
+    const removed: SavedNotice = { screen: 'people', thing: game, said: 'removed', name: 'Ada L' };
+    notices.leave('p', removed);
+    expect(notices.take('p', 'people')).toEqual(removed);
+  });
+
   it('is for one person in one league, and one screen', () => {
     const notices = savedNotices({ keepMs: 60_000, most: 10 });
     const holder = noticeHolderOf({ leagueId, accountId: owner }) ?? '';

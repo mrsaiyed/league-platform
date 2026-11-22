@@ -27,12 +27,13 @@ import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffTrail } from '../staff/index.ts';
 import { removePersonAction, savePersonAction } from './actions.ts';
 import { treatedAsChild, treatmentOf, type Treatment } from './age-on-record.ts';
-import { detailsAnchor, removeAnchor } from './anchors.ts';
+import { addPersonAnchor, detailsAnchor, removeAnchor } from './anchors.ts';
 import { personFormWords } from './form-words.ts';
 import { readPerson, type PersonView } from './people-view.ts';
 import { PersonForm } from './person-form.tsx';
 import { RemoveForm } from './remove-form.tsx';
-import { currentTeamsByPerson } from './teams-of-people.ts';
+import { addToRosterAction } from '../teams-area/index.ts';
+import { currentTeams, currentTeamsByPerson } from './teams-of-people.ts';
 
 const area: AdminArea = 'people';
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -73,6 +74,9 @@ export async function PersonPage({
   // The league's own today (the ports' one clock): who is a child is measured on it (R-28).
   const leagueToday = (await (await webPorts()).publicSchedule.clockOf(here.id)).today;
   const teams = (await currentTeamsByPerson(context)).get(person.id) ?? [];
+  const addable = (await currentTeams(context)).filter(
+    (team) => !teams.some((held) => held.id === team.id),
+  );
   // Who plays in the league and how it shows names: what its public pages are drawn with.
   const shownBy = await (await webPorts()).publicStats.settingsOf(here.id);
   const listUrl = leagueUrl(here, 'admin-area', { area });
@@ -107,6 +111,13 @@ export async function PersonPage({
           words={personFormWords(t('adminPeople.save.submit'))}
           main
         />
+        {notice?.said === 'added' && notice.thing === person.id ? (
+          <p>
+            <a className="ui-button" data-kind="quiet" href={`${listUrl}#${addPersonAnchor}`}>
+              {t('adminPeople.addAnother')}
+            </a>
+          </p>
+        ) : null}
       </section>
 
       <section className="staff-panel admin-team-part" data-person-teams="true">
@@ -128,6 +139,30 @@ export async function PersonPage({
               </li>
             ))}
           </ul>
+        )}
+        {addable.length === 0 ? null : (
+          // Past the team page's picker (it holds the first names only), someone is put on a
+          // team from here: the roster's own command, answered on the team's page.
+          <form action={addToRosterAction} className="staff-form" data-add-to-team="true">
+            <input type="hidden" name="league" value={here.slug} />
+            <input type="hidden" name="personId" value={person.id} />
+            <input type="hidden" name="role" value="player" />
+            <label className="staff-field">
+              <span>{t('adminPeople.teams.addLabel')}</span>
+              <select name="team">
+                {addable.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="staff-buttons">
+              <button type="submit" className="ui-button">
+                {t('adminPeople.teams.add')}
+              </button>
+            </p>
+          </form>
         )}
       </section>
 

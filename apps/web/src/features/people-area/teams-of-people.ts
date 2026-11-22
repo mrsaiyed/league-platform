@@ -29,3 +29,14 @@ export async function currentTeamsByPerson(context: CommandContext): Promise<Tea
   });
   return held;
 }
+
+/**
+ * The current season's teams this person may put people on (none for a role that may not
+ * manage them), by name: the record's "Add to a team" offers those not holding them yet,
+ * so someone past the team page's picker is never made twice (step 2.50).
+ */
+export async function currentTeams(context: CommandContext): Promise<readonly TeamRecord[]> {
+  const ports = (await webPorts()).adminTeams;
+  const season = await ports.currentSeason(context);
+  return season === undefined ? [] : ports.teams(context, season.id);
+}

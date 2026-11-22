@@ -76,6 +76,7 @@ export function savedNotices(options: {
         thing: found.thing,
         said: found.said,
         ...(found.about === undefined ? {} : { about: found.about }),
+        ...(found.name === undefined ? {} : { name: found.name }),
       };
     },
   };
