@@ -1,15 +1,21 @@
 // The migration driver for any PostgreSQL address, through the pg driver: how a
-// hosted database such as Supabase is reached on release (T-48).
+// hosted database such as Supabase is reached on release (T-48). The one caller for a
+// hosted database is `npm run release -- --hosted` (step 2.95, record 101), run at a
+// person's own terminal with the migration login given for that one command; that login
+// is never a setting on the host (docs/operations/apply-migrations.md).
 //
-// It needs a direct, session-level connection: one connection held for the whole
-// run, so the run lock and each transaction's limits stay on it. A pooler in
-// transaction mode (Supabase's port 6543, PgBouncer in transaction mode) hands each
-// statement to whichever connection is free, which breaks the lock and can split a
-// migration's transaction. Use the direct address (Supabase: port 5432, or the
-// pooler in session mode).
+// It needs a session-level connection: one connection held for the whole run, so the
+// run lock and each transaction's limits stay on it. A pooler in transaction mode
+// (Supabase's port 6543, PgBouncer in transaction mode) hands each statement to
+// whichever connection is free, which breaks the lock and can split a migration's
+// transaction. Use the direct address (Supabase: port 5432 on db.<project>.supabase.co,
+// IPv6 only on the free plan) or the pooler in session mode (port 5432 on the pooler's
+// host), which also answers over IPv4 (to confirm on the test copy).
 //
-// Tested here against PGlite over a local socket; not yet run against a hosted
-// database (there are no vendor accounts yet).
+// The release always checks the certificate ('verify', with PLATFORM_DATABASE_CA as
+// `ca`, step 2.203); 'no-verify' and 'off' are never its choice. Tested against PGlite
+// over a local socket and PostgreSQL 16 on this computer (tests/real-postgres); not yet
+// run against the hosted test copy (the supervised session's step 6, audit 2.110).
 import pg from 'pg';
 import type { MigrationDriver, SqlSession } from './migration-driver.ts';
 
