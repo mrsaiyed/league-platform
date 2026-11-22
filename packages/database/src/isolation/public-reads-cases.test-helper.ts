@@ -28,6 +28,7 @@ import {
   listStandingsAdjustments,
   listStandingsRows,
   listTeamStatTotals,
+  listTeamTurnoverGames,
 } from '../queries/index.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { gamesReadStore, standingsReadStore } from '../stores/index.ts';
@@ -80,6 +81,14 @@ registerIsolationCase({
   subject: listTeamStatTotals,
   name: "total the target's season's team statistics",
   run: (scope, target) => listTeamStatTotals(scope, target.seasonId),
+});
+registerIsolationCase({
+  subject: listTeamTurnoverGames,
+  // Every league's seeded final game has a turnover charged to its away team
+  // (two-leagues.test-helper.ts), so the target's is there in every run, not only the
+  // control: only the query's own league filter keeps it out of the code-only run.
+  name: "count the turnovers charged to a team in the target's season's final games",
+  run: (scope, target) => listTeamTurnoverGames(scope, target.seasonId),
 });
 registerIsolationCase({
   subject: listPeopleForDisplay,

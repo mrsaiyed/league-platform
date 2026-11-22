@@ -69,7 +69,7 @@ describe('recording an import’s scores', () => {
     );
     expect(await recordImportedScores(world.as(ownerId), { importId }, world.deps)).toEqual({
       ok: true,
-      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 1 },
+      value: { recorded: 0, waiting: 1, refused: 0, leftAlone: 1, postponed: 0 },
     });
     expect(
       parseCreatedFixtures(world.db.state.imports[0]?.created)?.scores.map((s) => s.recorded),

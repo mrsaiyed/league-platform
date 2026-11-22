@@ -78,6 +78,7 @@ function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
       slug: found?.slug ?? '',
       name: found?.name ?? '',
       color: found?.color ?? null,
+      removed: found?.binned === true,
     };
   };
   const venue = s.venues.find((v) => v.id === game.venueId);
@@ -182,6 +183,13 @@ export function worldGameSnapshot(
       if (season === undefined) return undefined;
       const { format, version: _version, divisionId: _division, ...record } = gameRecordOf(game);
       return { ...record, rules: format ?? season.rules };
+    },
+    // As games-read-store.ts reads it: the list a public season names, and its rules.
+    seasonStatistics: async (seasonId) => {
+      const s = await read();
+      const season = s?.seasons.find((x) => x.id === seasonId);
+      if (season === undefined) return undefined;
+      return { statKeys: publicSeason(s, seasonId)?.statKeys ?? [], rules: season.rules };
     },
     teams: async (teamIds) =>
       ((await read())?.teams ?? [])

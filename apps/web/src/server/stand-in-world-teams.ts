@@ -80,6 +80,26 @@ export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
       s.teams = replacedAt(s.teams, at, { ...found, binned, version: found.version + 1 });
       return true;
     },
+    // As queries/find-team-games.ts and the season's draft (A-17).
+    games: async (teamId, seasonId) => {
+      const mine = s.games
+        .filter((g) => !g.binned && (g.homeTeamId === teamId || g.awayTeamId === teamId))
+        .sort(
+          (a, b) =>
+            (a.startsAt ?? '9999').localeCompare(b.startsAt ?? '9999') || a.id.localeCompare(b.id),
+        );
+      return {
+        played: mine.filter((g) => g.status === 'final' || g.status === 'forfeit').length,
+        toPlay: mine
+          .filter((g) => ['scheduled', 'postponed', 'live'].includes(g.status))
+          .map((g) => ({
+            id: g.id,
+            date: g.localDate,
+            round: s.rounds.find((r) => r.id === g.roundId)?.number ?? null,
+          })),
+        draftChanges: s.drafts.find((d) => d.seasonId === seasonId)?.changes ?? null,
+      };
+    },
     findPerson: async (id) => {
       const p = s.people.find((x) => x.id === id);
       return p === undefined ? undefined : { id: p.id, binned: p.binned };

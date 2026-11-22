@@ -20,6 +20,11 @@ export type SavedNotice = {
   readonly thing: string;
   /** What was done to it, as the last part of a message key: `final`, `reopen`… */
   readonly said: string;
+  /**
+   * Other things the notice names, by id: the games that took a game's place since it was
+   * called off, when it is put back (step 2.158). Ids only, never anything typed.
+   */
+  readonly about?: readonly string[];
 };
 
 export type SavedNotices = {
@@ -60,7 +65,12 @@ export function savedNotices(options: {
       if (found === undefined || found.screen !== screen) return undefined;
       left.delete(holder);
       if (found.at < now() - options.keepMs) return undefined;
-      return { screen: found.screen, thing: found.thing, said: found.said };
+      return {
+        screen: found.screen,
+        thing: found.thing,
+        said: found.said,
+        ...(found.about === undefined ? {} : { about: found.about }),
+      };
     },
   };
 }
