@@ -234,4 +234,37 @@ describe("a person's form", () => {
       personChangeInput({ personId: someone, version: '4', firstName: 'Jon', lastName: 'Smith' }),
     ).toEqual({ personId: someone, version: 4, firstName: 'Jon', lastName: 'Smith' });
   });
+
+  it('sends only the boxes this person changed, so a save sent again clears nothing someone else saved', () => {
+    // Tab B fixed the first name; meanwhile tab A marked him a child and gave an email.
+    // B's form says what each box held when it was drawn (now: what is stored), and only
+    // the first name differs from it.
+    expect(
+      personChangeInput({
+        personId: someone,
+        version: '5',
+        firstName: 'Jonathan',
+        'was.firstName': 'Jon',
+        lastName: 'Smithson',
+        'was.lastName': 'Smithson',
+        contactEmail: 'guardian@example.test',
+        'was.contactEmail': 'guardian@example.test',
+        birthDate: '',
+        'was.birthDate': '',
+        child: 'child',
+        'was.child': 'child',
+      }),
+    ).toEqual({ personId: someone, version: 5, firstName: 'Jonathan' });
+    // Nothing changed: the first name as it stands, which changes nothing.
+    expect(
+      personChangeInput({
+        personId: someone,
+        version: '5',
+        firstName: 'Jon',
+        'was.firstName': 'Jon',
+        child: '',
+        'was.child': '',
+      }),
+    ).toEqual({ personId: someone, version: 5, firstName: 'Jon' });
+  });
 });

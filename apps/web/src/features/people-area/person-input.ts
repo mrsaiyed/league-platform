@@ -48,25 +48,46 @@ export function newPersonInput(fields: PersonFields): Record<string, unknown> {
   };
 }
 
+/** The hidden field that holds what a box held when the form was drawn. */
+export const wasField = (box: PersonBox): string => `was.${box}`;
+
 /**
- * Fixing someone's details: every box the form posted, an emptied email or birth date
- * clearing it and "Not recorded" clearing the choice; what the form did not post is left
- * as it is.
+ * Whether this person changed a box: it was posted and differs from what it held when the
+ * form was drawn. A form that did not say what a box held counts it as changed.
+ */
+export function changedBox(fields: PersonFields, box: PersonBox): boolean {
+  if (!has(fields, box)) return false;
+  const was = fields[wasField(box)];
+  return was === undefined || fields[box] !== was;
+}
+
+/**
+ * Fixing someone's details: every box this person changed, an emptied email or birth date
+ * clearing it and "Not recorded" clearing the choice; a box they did not touch, or did not
+ * post, is left as it is, so a save sent again after a refusal never clears what someone
+ * else saved meanwhile (a child choice, a date, an email). With nothing changed the first
+ * name as it stands is sent, which changes nothing.
  */
 export function personChangeInput(fields: PersonFields): Record<string, unknown> {
   const version = trimmed(fields['version']);
   const minor = minorOf(fields['child']);
+  const sent = (box: PersonBox) => changedBox(fields, box);
   const cleared = (name: string) => {
     const value = trimmed(fields[name]);
     return value === '' ? null : value;
   };
+  const changes = {
+    ...(sent('firstName') ? { firstName: fields['firstName'] } : {}),
+    ...(sent('lastName') ? { lastName: fields['lastName'] } : {}),
+    ...(sent('contactEmail') ? { contactEmail: cleared('contactEmail') } : {}),
+    ...(sent('birthDate') ? { birthDate: cleared('birthDate') } : {}),
+    ...(sent('child') && minor !== 'wrong' ? { isMinor: minor } : {}),
+  };
   return {
     personId: trimmed(fields['personId']),
     version: /^\d{1,9}$/.test(version) ? Number(version) : undefined,
-    ...(has(fields, 'firstName') ? { firstName: fields['firstName'] } : {}),
-    ...(has(fields, 'lastName') ? { lastName: fields['lastName'] } : {}),
-    ...(has(fields, 'contactEmail') ? { contactEmail: cleared('contactEmail') } : {}),
-    ...(has(fields, 'birthDate') ? { birthDate: cleared('birthDate') } : {}),
-    ...(has(fields, 'child') && minor !== 'wrong' ? { isMinor: minor } : {}),
+    ...(Object.keys(changes).length === 0 && has(fields, 'firstName')
+      ? { firstName: fields['firstName'] }
+      : changes),
   };
 }

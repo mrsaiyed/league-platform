@@ -32,6 +32,10 @@ export const enAdminPeople = {
   'adminPeople.list.label': 'Everyone in the league',
   'adminPeople.list.next': 'Next {count}',
   'adminPeople.list.previous': 'Previous {count}',
+  'adminPeople.meanwhile':
+    'Someone else saved meanwhile: {value}. Saving again puts what you typed in its place.',
+  'adminPeople.meanwhile.empty':
+    'Someone else emptied this meanwhile. Saving again puts what you typed in its place.',
   'adminPeople.noMatch':
     'No one in the league matches that search. Check the spelling, or add them.',
   'adminPeople.person.sub':

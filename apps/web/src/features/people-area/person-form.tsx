@@ -17,7 +17,7 @@ import { useActionState, useId } from 'react';
 import { untouched, type FormState } from '../games-area/form-state.ts';
 import { useOneSubmit } from '../games-area/use-one-submit.ts';
 import type { PrivateDetails } from './people-view.ts';
-import type { PersonBox } from './person-input.ts';
+import { changedBox, wasField, type PersonBox } from './person-input.ts';
 
 export type PersonFormWords = {
   readonly firstName: string;
@@ -36,6 +36,10 @@ export type PersonFormWords = {
   readonly submit: string;
   /** The tick under an unlikely date of birth shown back before saving (R-28). */
   readonly birthDateChecked: string;
+  /** Beside a box this person changed that someone saved meanwhile: holds `{value}`. */
+  readonly meanwhile: string;
+  /** The same, when someone emptied the box meanwhile. */
+  readonly meanwhileEmpty: string;
 };
 
 export function PersonForm({
@@ -72,21 +76,52 @@ export function PersonForm({
   const onSubmit = useOneSubmit(pending, state);
   const id = useId();
   const refused = state.kind === 'refused' ? state : undefined;
-  // Drawn afresh after each refusal, so every box shows what was posted; and after each
-  // save, from what is stored now. React resets a form once its action has worked, and a
-  // select goes back to the choice it was first drawn with, not the one saved: a second
-  // save would then send that old choice (it cleared "An adult" to "Not recorded").
-  const drawn =
-    refused === undefined
-      ? `stored:${JSON.stringify([values, privateDetails ?? null])}`
-      : `typed:${JSON.stringify(refused.typed)}`;
-  const typed = (name: string, stored: string): string => refused?.typed[name] ?? stored;
+  // Drawn afresh after each refusal and after each save. React resets a form once its
+  // action has worked, and a select goes back to the choice it was first drawn with, not
+  // the one saved: a second save would then send that old choice (it cleared "An adult"
+  // to "Not recorded").
+  const drawn = `${JSON.stringify([values, privateDetails ?? null])}:${JSON.stringify(refused?.typed ?? null)}`;
+  // What each box holds as stored now; each is posted beside it as what it held when the
+  // form was drawn, so the server sends only what this person changed.
+  const stored: Partial<Record<PersonBox, string>> = {
+    firstName: values.firstName,
+    lastName: values.lastName,
+    ...(privateDetails === undefined
+      ? {}
+      : {
+          contactEmail: privateDetails.contactEmail,
+          birthDate: privateDetails.birthDate,
+          child: privateDetails.child,
+        }),
+  };
+  // After a refusal only the boxes this person changed keep what was typed; every other
+  // box takes what is stored now (someone else may have saved meanwhile: the page is drawn
+  // again as it is now). A box they changed that someone saved meanwhile says so.
+  const changed = (name: PersonBox) => refused !== undefined && changedBox(refused.typed, name);
+  const typed = (name: PersonBox, now: string): string =>
+    changed(name) ? (refused?.typed[name] ?? now) : now;
+  const meanwhileOf = (name: PersonBox): string | undefined => {
+    const started = refused?.typed[wasField(name)];
+    const now = stored[name];
+    if (!changed(name) || started === undefined || now === undefined || now === started) {
+      return undefined;
+    }
+    if (now === '') return words.meanwhileEmpty;
+    const shown = name === 'child' ? words.childChoices[privateDetails?.child ?? ''] : now;
+    return words.meanwhile.replace('{value}', shown);
+  };
   const wrong = (name: PersonBox) => refused?.wrong.includes(name) === true;
   const general = refused !== undefined && refused.wrong.length === 0;
   const box = (name: PersonBox, help?: string) => {
     const errorId = `${id}-${name}-error`;
     const helpId = `${id}-${name}-help`;
-    const describedBy = [wrong(name) ? errorId : '', help === undefined ? '' : helpId]
+    const meanwhileId = `${id}-${name}-meanwhile`;
+    const meanwhile = meanwhileOf(name);
+    const describedBy = [
+      wrong(name) ? errorId : '',
+      meanwhile === undefined ? '' : meanwhileId,
+      help === undefined ? '' : helpId,
+    ]
       .filter((part) => part !== '')
       .join(' ');
     return {
@@ -105,6 +140,11 @@ export function PersonForm({
                 : words.wrong[name]}
             </small>
           ) : null}
+          {meanwhile === undefined ? null : (
+            <small id={meanwhileId} className="ui-field-error" data-meanwhile={name}>
+              {meanwhile}
+            </small>
+          )}
           {help === undefined ? null : (
             <small id={helpId} className="ui-field-help">
               {help}
@@ -124,6 +164,9 @@ export function PersonForm({
     <form action={dispatch} onSubmit={onSubmit} className="staff-form" noValidate key={drawn}>
       {Object.entries(hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
+      ))}
+      {Object.entries(stored).map(([name, value]) => (
+        <input key={`was-${name}`} type="hidden" name={wasField(name as PersonBox)} value={value} />
       ))}
       <div className="staff-fields">
         <label className="staff-field">

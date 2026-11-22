@@ -215,6 +215,40 @@ if (browser !== null) {
       herons.includes('Jon Smith') && !herons.includes('Smiht'),
     );
     await accessible(page, 'a record saved on the database');
+
+    // Two tabs: A, opened after this one, marks him a child and gives a guardian's email;
+    // this tab, opened before, fixes only his first name, is refused, and saves again.
+    const other = await signedIn(browser, origin, 'admin@lakeside.example.test');
+    await other.page.goto(record);
+    const otherDetails = other.page.locator('#details');
+    await otherDetails.getByLabel('Child or adult').selectOption('child');
+    await otherDetails.getByLabel('Email (optional)').fill('guardian@example.test');
+    await otherDetails.getByRole('button', { name: 'Save details' }).click();
+    await otherDetails.getByText('Saved: Jon Smith.').waitFor();
+    await details.getByLabel('First name').fill('Jonathan');
+    await details.getByRole('button', { name: 'Save details' }).click();
+    await details
+      .getByText('Someone else changed this person’s details', { exact: false })
+      .waitFor();
+    note(
+      'refused as overtaken: the box this person changed keeps what was typed, the others show what is stored now',
+      (await details.getByLabel('First name').inputValue()) === 'Jonathan' &&
+        (await details.getByLabel('Child or adult').inputValue()) === 'child' &&
+        (await details.getByLabel('Email (optional)').inputValue()) === 'guardian@example.test',
+    );
+    await details.getByRole('button', { name: 'Save details' }).click();
+    await details.getByText('Saved: Jonathan Smith.').waitFor();
+    const afterRetry = await publicText('/lakeside/teams/herons');
+    note(
+      'after the retry the public Herons page still shows him as a child: first name and initial',
+      afterRetry.includes('Jonathan S.') && !afterRetry.includes('Jonathan Smith'),
+    );
+    await page.reload();
+    note(
+      "and the other admin's email is still on his record in the database",
+      (await details.getByLabel('Email (optional)').inputValue()) === 'guardian@example.test',
+    );
+    await other.context.close();
   });
 
   await step("the youth league's owner puts a child's first name right", async () => {

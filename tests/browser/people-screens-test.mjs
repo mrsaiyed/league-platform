@@ -242,9 +242,15 @@ if (built) {
     const { page: other } = await signedIn(tokens.owner);
     await other.goto(jonAddress);
     await page.reload();
-    await other.locator('#details').getByLabel('Last name').fill('Smithson');
-    await other.locator('#details').getByRole('button', { name: 'Save details' }).click();
-    await other.getByText('Saved: Jon Smithson.').waitFor();
+    // Tab A (opened after B) puts his first and last name differently, marks him a child
+    // and gives a guardian's email; tab B, opened before, fixes only his first name.
+    const otherDetails = other.locator('#details');
+    await otherDetails.getByLabel('First name').fill('Johnny');
+    await otherDetails.getByLabel('Last name').fill('Smithson');
+    await otherDetails.getByLabel('Child or adult').selectOption('child');
+    await otherDetails.getByLabel('Email (optional)').fill('guardian@example.test');
+    await otherDetails.getByRole('button', { name: 'Save details' }).click();
+    await other.getByText('Saved: Johnny Smithson.').waitFor();
     await details.getByLabel('First name').fill('Jonathan');
     await details.getByRole('button', { name: 'Save details' }).click();
     const stale = details.getByText('Someone else changed this person’s details', {
@@ -257,13 +263,33 @@ if (built) {
     );
     note(
       'and the page shows their version',
-      (await page.getByRole('heading', { level: 1, name: 'Jon Smithson' }).count()) === 1,
+      (await page.getByRole('heading', { level: 1, name: 'Johnny Smithson' }).count()) === 1,
     );
-    // Saving again puts what this person typed in place of the other's change: the last
-    // name in their box was still "Smith".
+    note(
+      'beside the box this person changed, what the other saved meanwhile',
+      (await details.locator('[data-meanwhile="firstName"]').innerText()).includes('Johnny'),
+    );
+    note(
+      'every box this person did not change shows what is stored now',
+      (await details.getByLabel('Last name').inputValue()) === 'Smithson' &&
+        (await details.getByLabel('Child or adult').inputValue()) === 'child' &&
+        (await details.getByLabel('Email (optional)').inputValue()) === 'guardian@example.test' &&
+        (await details.locator('[data-meanwhile]').count()) === 1,
+    );
+    // Saving again sends only the first name: the other's child choice, last name and
+    // email stay (the old fault: the stale boxes put "Smith" and "not a child" back).
     await details.getByRole('button', { name: 'Save details' }).click();
-    await details.getByText('Saved: Jonathan Smith.').waitFor();
+    await details.getByText('Saved: Jonathan Smithson.').waitFor();
     note('saving again then works', true);
+    const afterRetry = await publicText('/north-valley/teams/falcons');
+    note(
+      'after the retry the public page still shows him as a child: first name and initial',
+      afterRetry.includes('Jonathan S.') && !afterRetry.includes('Smithson'),
+    );
+    note(
+      "and the other's email is still on his record",
+      (await details.getByLabel('Email (optional)').inputValue()) === 'guardian@example.test',
+    );
 
     at = 'an unlikely date of birth is shown back before it is saved (R-28)';
     const twoYearsAgo = `${new Date().getUTCFullYear() - 2}-01-15`;
@@ -282,7 +308,7 @@ if (built) {
     await ask.waitFor({ state: 'detached' });
     note(
       'once ticked as right, it is saved',
-      (await details.getByText('Saved: Jonathan Smith.').count()) === 1 &&
+      (await details.getByText('Saved: Jonathan Smithson.').count()) === 1 &&
         (await details.getByLabel('Date of birth (optional)').inputValue()) === twoYearsAgo,
     );
     await accessible('an unlikely date of birth asked about');
