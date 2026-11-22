@@ -25,7 +25,11 @@ const scratch = () => {
   return folder;
 };
 afterEach(() => {
-  for (const folder of made.splice(0)) rmSync(folder, { recursive: true, force: true });
+  // An email still being kept as the test ends can leave the folder not yet empty on a busy
+  // machine (GitHub, 2026-11-22): the removal tries again instead of failing the test.
+  for (const folder of made.splice(0)) {
+    rmSync(folder, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
 });
 const message = (to: string, text: string, key = `key-${to}-${text}`) => ({
   from: 'SR Leagues <hello@example.test>',
