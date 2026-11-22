@@ -105,6 +105,11 @@ export type Standings = {
   /** The season's tiebreakers in its own order; none when its rules cannot be read. */
   readonly tiebreakers: readonly string[];
   /**
+   * The columns the season chose for its table, in its order (P7 §1, `standings.columns`;
+   * step 2.47); none when its rules cannot be read.
+   */
+  readonly columns: readonly string[];
+  /**
    * What a win, a tie and a loss are worth in a points table, so a note can give the points
    * head-to-head compared (step 2.198, fix round); none when the table ranks by win
    * percentage or its rules cannot be read.
@@ -129,13 +134,16 @@ function streakOf(row: StandingsRowRecord): StandingsLine['streak'] {
     : { result, length: row.streakLength };
 }
 
-function rulesOf(rules: unknown): Pick<Standings, 'rankBy' | 'tiebreakers' | 'pointsPer'> {
+function rulesOf(
+  rules: unknown,
+): Pick<Standings, 'rankBy' | 'tiebreakers' | 'columns' | 'pointsPer'> {
   const parsed = SeasonRules.safeParse(rules);
-  if (!parsed.success) return { rankBy: null, tiebreakers: [], pointsPer: null };
+  if (!parsed.success) return { rankBy: null, tiebreakers: [], columns: [], pointsPer: null };
   const s = parsed.data.standings;
   return {
     rankBy: s.rankBy,
     tiebreakers: [...parsed.data.tiebreakers],
+    columns: [...s.columns],
     pointsPer:
       s.rankBy === 'points'
         ? { win: s.pointsPerWin, tie: s.pointsPerTie, loss: s.pointsPerLoss }
@@ -317,7 +325,7 @@ export async function readStandings(
     store.standingsRows(season.id),
     store.adjustments(season.id),
   ]);
-  const { rankBy, tiebreakers, pointsPer } = rulesOf(season.rules);
+  const { rankBy, tiebreakers, columns, pointsPer } = rulesOf(season.rules);
   // The games between two level teams are read only when head-to-head separated some.
   const gamesBetween = needsMeetings(rows)
     ? meetingsIn(await store.decidedGames(season.id))
@@ -346,6 +354,7 @@ export async function readStandings(
     seasonName: season.name,
     rankBy,
     tiebreakers,
+    columns,
     pointsPer,
     tables,
   });

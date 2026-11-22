@@ -146,6 +146,10 @@ export const SeasonRules = z
     if (st.rankBy === 'points' && !st.columns.includes('points')) {
       issue(['standings', 'columns'], 'A table ranked by points must show the points column.');
     }
+    // T-290: the points column holds nothing in a table ranked by win percentage.
+    if (st.rankBy !== 'points' && st.columns.includes('points')) {
+      issue(['standings', 'columns'], 'Only a table ranked by points has a points column.');
+    }
     if (!r.allowTies && st.columns.includes('ties')) {
       issue(['standings', 'columns'], 'There is no ties column when ties are not allowed.');
     }

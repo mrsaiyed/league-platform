@@ -111,6 +111,9 @@ describe('core’s event handlers on the database', () => {
       'adminPeople',
       'adminPeople.putBack',
       'adminSettings',
+      // Season settings' own commands (step 2.47) save the season's rules and can raise
+      // the events a standings change raises, so they take core's handlers too.
+      'adminSettings.seasons',
       'adminTeams',
       'games',
       'scheduleAdmin',

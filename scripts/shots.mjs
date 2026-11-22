@@ -591,6 +591,21 @@ const adminPages = [
     league: 'north-valley',
     steps: (page) => winterSteps(page, 'shown'),
   },
+  // Step 2.47, Season settings' parts in the first league's current season (it has
+  // results): each part's form on its own step, the game rules filled from a preset, a
+  // refused save with its marked box, the question before a tiebreaker change that moves
+  // the standings, and "Saved" beside a part. Nothing here saves a change: the save is of
+  // the name and dates as they are, and the question is answered by nobody.
+  ...['name', 'game', 'recording', 'standings', 'rosters'].map((part) => ({
+    name: `admin-season-edit-${part}`,
+    at: `/admin/season?season=fall-2026&edit=${part}#season-${part}`,
+  })),
+  ...['preset', 'refused', 'moves', 'saved'].map((what) => ({
+    name: `admin-season-${what}`,
+    at: '/admin/season?season=fall-2026',
+    league: 'north-valley',
+    steps: (page) => seasonPartSteps(page, what),
+  })),
   {
     name: 'admin-schedule-published-hidden',
     at: '/admin/schedule?season=winter-2027',
@@ -1484,6 +1499,35 @@ async function winterSteps(page, want, then) {
     await tapTo(panel.getByRole('button', { name: yes }), answer);
   }
   if (then !== undefined) await page.goto(`${origin}/north-valley${then}`);
+}
+
+/**
+ * Step 2.47's pictures of a part of Season settings answering, by the owner's own taps
+ * with scripts off: a preset chosen; a tiebreaker chosen twice and refused; points scored
+ * put first among the tiebreakers, which asks before moving teams; the name and dates
+ * saved as they are, which says "Saved" beside them.
+ */
+async function seasonPartSteps(page, what) {
+  const origin = new URL(page.url()).origin;
+  const edit = (part) => `${origin}/north-valley/admin/season?season=fall-2026&edit=${part}`;
+  const tap = (locator) => Promise.all([page.waitForEvent('load'), locator.click()]);
+  if (what === 'preset') {
+    await page.goto(edit('game'));
+    await tap(page.getByRole('button', { name: 'Use High school' }));
+  } else if (what === 'refused' || what === 'moves') {
+    await page.goto(edit('standings'));
+    const box = (n) => page.locator(`select[name=tiebreaker${n}]`);
+    if (what === 'refused') {
+      await box(2).selectOption('head-to-head');
+    } else {
+      await box(1).selectOption('points-scored');
+      await box(3).selectOption('');
+    }
+    await tap(page.getByRole('button', { name: 'Save the standings rules' }));
+  } else {
+    await page.goto(edit('name'));
+    await tap(page.getByRole('button', { name: 'Save the name and dates' }));
+  }
 }
 
 /**

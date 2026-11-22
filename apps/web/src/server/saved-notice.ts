@@ -19,14 +19,15 @@ export const noticeScreens = [
   'person',
   'divisions',
   'venues',
+  'season',
 ] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 
 export type SavedNotice = {
   readonly screen: NoticeScreen;
-  /** The id of the thing saved: a game, a person (step 2.50), a division, a venue or a court (step 2.49). */
+  /** The id of the thing saved: a game, a person (step 2.50), a division, a venue or a court (step 2.49), or a season (Season settings, step 2.47). */
   readonly thing: string;
-  /** What was done to it, as the last part of a message key: `final`, `reopen`… */
+  /** What was done to it, as the last part of a message key: `final`, `reopen`, a part… */
   readonly said: string;
   /**
    * Other things the notice names, by id: the games that took a game's place since it was
