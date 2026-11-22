@@ -431,6 +431,42 @@ async function oneGame(browser, size) {
       },
     );
 
+    await step(`${at}: a game shown final learns of a reopen elsewhere (T-295)`, async () => {
+      await c.fromMore('more-end');
+      await c.endAsk.waitFor();
+      await c.answer('yes').tap();
+      await c.pad.locator('[data-final="saved"]').waitFor();
+      // The next check of the hold finds the game over: the device stops scoring.
+      await page.waitForTimeout(7_000);
+      const reopened = await fetch(
+        `${origin}/api/v1/leagues/${leagueId}/games/${liveGame}/reopen`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie: `${owner.name}=${owner.value}`,
+            origin,
+          },
+          body: JSON.stringify({
+            requestId: crypto.randomUUID(),
+            reason: 'End game tapped by mistake',
+          }),
+        },
+      );
+      if (!reopened.ok) {
+        throw new Error(`/reopen answered ${reopened.status}: ${await reopened.text()}`);
+      }
+      const from = Date.now();
+      await c.finalPanel.waitFor({ state: 'detached', timeout: 25_000 });
+      const learnt = Date.now() - from;
+      console.log(`${at}: the reopen was learnt in ${learnt} ms`);
+      note(
+        `${at}: a game shown final leaves the final panel within about 15 s of a reopen elsewhere`,
+        learnt <= 18_000,
+        `${learnt} ms`,
+      );
+    });
+
     await step(`${at}: “update needed” offers Reload, and the plays are kept`, async () => {
       await page.route(isCommands, (route) =>
         route.fulfill({
