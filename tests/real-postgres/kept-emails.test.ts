@@ -106,6 +106,26 @@ describe('kept emails, as app_login', () => {
     expect((error as { code?: string }).code).toBe('23514');
   });
 
+  it('is refused an email too long for the table, the error holding no part of it', async () => {
+    const to = `long-${fresh()}@example.test`;
+    for (const email of [
+      { to: `${'a'.repeat(320)}@example.test`, subject: 'Your code is 482913', text: 't' },
+      { to, subject: `Your code is 482913 ${'x'.repeat(1000)}`, text: 't' },
+      { to, subject: 's', text: `Your code is 482913 ${'x'.repeat(100000)}` },
+    ]) {
+      const error = (await keepEmail(db, email).catch((e: unknown) => e)) as {
+        code?: string;
+        message?: string;
+        detail?: string;
+      };
+      expect(error.code).toBe('22001');
+      expect(keepFailureOf(error)).toBe('refused');
+      for (const part of [error.message ?? '', error.detail ?? '']) {
+        expect(part).not.toMatch(/482913|example\.test|xxxx|aaaa/);
+      }
+    }
+  });
+
   it('cannot read, change or remove a row, as itself or as app_user', async () => {
     const statements = [
       'select * from kept_emails.emails',

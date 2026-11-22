@@ -82,6 +82,27 @@ describe('public.keep_email, as the app', () => {
     expect(await count()).toBe(before);
   });
 
+  it('refuses an email too long for the table with an error of its own, no value in it', async () => {
+    const before = await count();
+    const long = (n: number) => `Your code is 482913 ${'x'.repeat(n)}`;
+    for (const [to, subject, text] of [
+      [`${'a'.repeat(320)}@example.test`, 'Your code is 482913', 'Your code is 482913'],
+      ['new.owner@example.test', long(1000), 'Your code is 482913'],
+      ['new.owner@example.test', 'Your code is 482913', long(100000)],
+    ] as const) {
+      const error = (await keep(to, subject, text).catch((e: unknown) => e)) as {
+        code?: string;
+        message?: string;
+        detail?: string;
+      };
+      expect(error.code).toBe('22001');
+      for (const part of [error.message ?? '', error.detail ?? '']) {
+        expect(part).not.toMatch(/482913|example\.test|xxxx|aaaa/);
+      }
+    }
+    expect(await count()).toBe(before);
+  });
+
   it('keeps only the newest 300', async () => {
     for (let i = 0; i < 310; i += 1) await keep(`trim-${i}@example.test`, `n${i}`);
     expect(await count()).toBe(300);

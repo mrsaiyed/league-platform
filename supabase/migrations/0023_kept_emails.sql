@@ -13,8 +13,9 @@
 --     HTML is never kept). Only an address on a name kept for made-up mail (record 075's
 --     list: .test, .example, .invalid, .localhost, example.com, .net and .org), checked
 --     here again whatever the app checked. At most the newest 300 stay.
---   public.keep_email(to, subject, text): the one way in, owner-run. It refuses an
---     address that is not made up (check_violation, the address not repeated), adds the
+--   public.keep_email(to, subject, text): the one way in, owner-run. It refuses an email
+--     too long for the table (string_data_right_truncation) and an address that is not
+--     made up (check_violation), neither error carrying a value, adds the
 --     row and removes every row past the newest 300. It returns nothing.
 --
 -- Who reaches what. The app's login (app_login, acting as app_user) may run keep_email
@@ -98,6 +99,13 @@ begin
   if given_to is null or given_subject is null or given_text is null then
     raise exception 'an address, a subject and the plain words are all needed'
       using errcode = 'null_value_not_allowed';
+  end if;
+  -- The table's size limits, checked before the insert: a refused row would put its
+  -- values (a code among them) in the error's DETAIL line, which the server's log keeps.
+  -- This error carries no value.
+  if length(given_to) > 320 or length(given_subject) > 1000 or length(given_text) > 100000 then
+    raise exception 'an email too long to keep (record 098)'
+      using errcode = 'string_data_right_truncation';
   end if;
   -- Checked here again, whatever the app checked; the address is not repeated.
   if not kept_emails.is_made_up_address(given_to) then
