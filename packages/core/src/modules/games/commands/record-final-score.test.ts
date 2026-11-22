@@ -151,6 +151,17 @@ describe('recordFinalScore', () => {
     expect(await code({ awayScore: 1000 })).toBe('invalid-input');
   });
 
+  it('refuses a postponed game: it is scored once it is played on its new date (step 2.158)', async () => {
+    const { db, deps, as, events } = memoryGames({ games: [game(1, { status: 'postponed' })] });
+    expect(await recordFinalScore(as(ownerId), input, deps)).toEqual({
+      ok: false,
+      error: { code: 'game-postponed' },
+    });
+    expect(db.state.games[0]).toMatchObject({ status: 'postponed', homeScore: null });
+    expect(db.state.activity).toEqual([]);
+    expect(events).toEqual([]);
+  });
+
   it('needs games.score: scorekeepers and schedulers may, an editor may not, nor in a read-only league', async () => {
     const state = { games: [game(1)], grants: [scorekeeperGrant, schedulerGrant, editorGrant] };
     const allowed = async (account: string, status = 'published') => {

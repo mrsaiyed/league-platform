@@ -112,6 +112,10 @@ describe('a statistic kept in fewer games than the GP beside it', () => {
     expect(after.tableNotes).toEqual([
       'Statistics count the games that were scored live or entered as a box score. A game with only a final score counts in the standings, not here.',
       averaged,
+      // The seed's box scores were entered with final scores their players' points do not
+      // add to (the Herons' 52 against 10), and a team's points are its final scores
+      // (S-26 as changed by step 2.196): the page says so.
+      "A team's totals count what was charged to the team and the final scores as entered, so they can differ from what its players' numbers add up to.",
     ]);
     // Season totals are not averages: the sentence is not said there.
     const totals = await w.ports.publicStats.statisticsOf(w.leagueId, ({ store, settings }) =>

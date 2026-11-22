@@ -58,6 +58,8 @@ export type MemoryGames = {
   now: string;
   /** The round each game is in, by game id; a game not here is in no round. */
   rounds: Record<string, { id: string; number: number; label: string | null }>;
+  /** Games whose team, division, venue or court is in the bin. */
+  partsInBin: string[];
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -183,6 +185,7 @@ export const emptyGames = (): MemoryGames => ({
   today: '2026-12-06',
   now: '2026-12-06T12:00:00.000Z',
   rounds: {},
+  partsInBin: [],
 });
 
 export function memoryGames(state: Partial<MemoryGames> = {}) {
@@ -260,6 +263,32 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
               (season === undefined || g.seasonId === season),
           )
           .sort((a, b) => (a.startsAt ?? '9').localeCompare(b.startsAt ?? '9')),
+      // The newest cancelling of the game says what it was (step 2.158).
+      statusBeforeCancelled: async (id) => {
+        const entry = s.activity
+          .filter((a) => a.action === 'games.cancel_game' && a.targetId === id)
+          .at(-1);
+        const was = entry?.details['was'];
+        return typeof was === 'string' ? was : undefined;
+      },
+      partInBin: async (id) => s.partsInBin.includes(id),
+      // Here games have no court: the same start with a team in common.
+      clashesOf: async (id) => {
+        const of = s.games.find((g) => g.id === id);
+        if (of === undefined || of.startsAt === null) return [];
+        const teams = [of.homeTeamId, of.awayTeamId];
+        return s.games
+          .filter(
+            (g) =>
+              g.id !== id &&
+              !g.binned &&
+              g.status !== 'postponed' &&
+              g.status !== 'cancelled' &&
+              g.startsAt === of.startsAt &&
+              (teams.includes(g.homeTeamId) || teams.includes(g.awayTeamId)),
+          )
+          .map((g) => ({ id: g.id, homeTeamId: g.homeTeamId, awayTeamId: g.awayTeamId }));
+      },
       listDecided: async (season) => decidedOf(s, season),
       listDecidedLines: async (season) => {
         const ids = new Set(decidedOf(s, season).map((g) => g.id));

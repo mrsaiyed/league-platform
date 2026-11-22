@@ -92,6 +92,7 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       emailFrom: config.EMAIL_FROM,
       localDesign: config.LOCAL_DESIGN,
       ...(config.LOCAL_NOW === undefined ? {} : { worldStartsAt: config.LOCAL_NOW }),
+      ...(config.LOCAL_BINNED_TEAM === undefined ? {} : { binnedTeam: config.LOCAL_BINNED_TEAM }),
       keptEmailsFolder: deps.keptEmailsFolder ?? null,
     };
     if (config.LOCAL_DATA === 'made-up-database') {

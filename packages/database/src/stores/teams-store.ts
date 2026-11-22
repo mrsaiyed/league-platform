@@ -6,8 +6,10 @@ import {
   findLeagueToday,
   findPerson,
   findRosterEntry,
+  findScheduleDraft,
   findSeasonProgramId,
   findTeam,
+  findTeamGames,
   insertRosterEntry,
   insertTeam,
   listRoster,
@@ -30,6 +32,10 @@ export function teamsStore(scope: LeagueScope): TeamsStore {
       if (done === 'lineage-taken') throw new Error('teams_one_per_lineage');
       return done;
     },
+    games: async (teamId, seasonId) => ({
+      ...(await findTeamGames(scope, teamId)),
+      draftChanges: (await findScheduleDraft(scope, seasonId))?.changes ?? null,
+    }),
     findPerson: async (personId) => {
       const person = await findPerson(scope, personId, false);
       return person === undefined ? undefined : { id: person.id, binned: person.binned };

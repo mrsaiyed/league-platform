@@ -52,6 +52,9 @@ const tiebreakerNames = {
 type Tiebreaker = keyof typeof tiebreakerNames;
 const isTiebreaker = (value: string): value is Tiebreaker => Object.hasOwn(tiebreakerNames, value);
 
+/** The note of a team no longer in the league, kept in the table for its results (A-17). */
+const removedNote = 'removed-team';
+
 /** The note shared by every group that nothing in the rules separates. */
 const stillTiedId = 'order-still-tied';
 
@@ -126,7 +129,8 @@ function levelNote(
   const join = t('standings.level.sentenceJoin');
   const by = first?.orderedBy ?? '';
   // Head-to-head between two teams that never met (the team they were compared through is
-  // in the bin, so its row is not shown) is not what put one ahead: the general sentence.
+  // not in the table) is not what put one ahead: the general sentence. A team in the bin
+  // kept for its results is in the table, marked, and named here like any other row.
   const met = by !== 'head-to-head' || (group.gamesBetween ?? 0) > 0;
   if (
     first !== undefined &&
@@ -255,13 +259,22 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
   });
   const rows = table.lines.map((line): StandingsRow => {
     const level = levelNotes.get(line.team.id);
+    // A team in the bin kept for its results (A-17): its row stays, with a quiet note. It is
+    // shown, so it is counted and named in its level group's note like any other row.
+    if (line.team.removed && !footnotes.some((f) => f.id === removedNote)) {
+      footnotes.push({ id: removedNote, text: t('standings.removedTeam') });
+    }
     return {
       id: line.team.id,
       seed: line.seed,
       team: line.team.name,
       color: line.team.color,
       cells: cellsOf(line),
-      notes: [...line.footnotes.map((n) => `adjustment-${n}`), ...(level ? [level] : [])],
+      notes: [
+        ...line.footnotes.map((n) => `adjustment-${n}`),
+        ...(line.team.removed ? [removedNote] : []),
+        ...(level ? [level] : []),
+      ],
     };
   });
   return {

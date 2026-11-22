@@ -18,6 +18,7 @@
 import {
   addToRoster,
   changeRosterEntry,
+  countTeamGames,
   createPerson,
   createTeam,
   eventHandlers,
@@ -451,6 +452,38 @@ describe('Admin → Teams on the database ports, role by role', () => {
     // An id that cannot be a row's is no row, asked of no database.
     expect(await ports.adminTeams.teams(ownerOf(leagueId), 'not-an-id')).toEqual([]);
     expect(await ports.adminTeams.divisions(ownerOf(leagueId), 'not-an-id')).toEqual([]);
+  });
+
+  // Step 2.180 (A-17) on the database: the team page's "Remove this team" panel reads the
+  // team's games through these ports and draws the tick and button only for a team with
+  // none, so it never offers a button that can only refuse; and it says the same count
+  // the command refuses with.
+  it("tells the team's games as the removal refuses them, and keeps a team with games", async () => {
+    const owner = ownerOf(leagueId);
+    const games = must('team games', await countTeamGames(owner, { teamId }, deps()));
+    expect(games.played + games.toPlay).toBeGreaterThan(0);
+    const refused = await removeTeam(owner, { teamId }, deps());
+    expect(refused).toEqual(
+      fail(
+        games.played > 0
+          ? { code: 'team-has-results', played: games.played }
+          : { code: 'team-has-games-to-play', toPlay: games.toPlay },
+      ),
+    );
+    const teams = await ports.adminTeams.teams(owner, seasonId);
+    expect(teams.map((t) => t.id)).toContain(teamId);
+    // A team with no games: nothing to say, so the tick and button are drawn.
+    const fresh = must(
+      'new team',
+      await createTeam(
+        owner,
+        newTeamInput({ name: `No games ${randomUUID().slice(0, 6)}` }, seasonId),
+        deps(),
+      ),
+    );
+    expect(
+      must('no games', await countTeamGames(owner, { teamId: fresh.teamId }, deps())),
+    ).toMatchObject({ played: 0, toPlay: 0 });
   });
 });
 
