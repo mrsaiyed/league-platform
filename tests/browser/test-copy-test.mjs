@@ -262,6 +262,27 @@ if (browser !== null) {
           admin?.status() === 200,
           String(admin?.status()),
         );
+        // A form whose action ends in a redirect (step 2.239): Next.js fetches the new page
+        // from the server's own address, not the site's, and that page was "Page not found"
+        // here though the person was saved. Added in People, their own record opens.
+        await page.goto(`${origin}/lakeside/admin/people`);
+        const add = page.locator('#add-person');
+        await add.getByLabel('First name').fill('Jon');
+        await add.getByLabel('Last name').fill('Smiht');
+        await Promise.all([
+          page.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/),
+          add.getByRole('button', { name: 'Add to the league' }).click(),
+        ]);
+        const said = await page
+          .getByText('Added to the league: Jon Smiht.')
+          .waitFor({ timeout: 20_000 })
+          .then(() => true)
+          .catch(() => false);
+        note(
+          'a person the owner adds on the database opens on their own record, saying so',
+          said && (await page.locator('h1').first().innerText()) === 'Jon Smiht',
+          (await page.locator('h1').first().innerText()).slice(0, 80),
+        );
       } finally {
         await context.close();
       }

@@ -36,3 +36,6 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.37 part 2: a device that lost the game learns that it ended only when "See who is scoring" is tapped (review by use).
 - 2.37 part 2: the banner's "1 not saved" stands beside the notice's "1 play was not applied"; one word for both (review by use).
 - 2.37 part 2: "Enter it again if it is needed" stands beside "Only the device scoring can enter these again" on a device not scoring (review by use).
+- 2.239: the comment at the top of served-person-read-after-add.test.ts blames the database wrongly, and the test is slow and guards nothing the step changed; other-host-render.ts and T-298 should say the empty 404 also answers /signin, /account, /health and /api under a foreign Host; no unit test of the proxy's wiring
+
+- 2.204: in tests/read-kept-emails.test.mjs a variable is still called dotted and a comment says a final dot is not asked; PostgreSQL throws on a NUL in an address where TypeScript answers false (both refuse)

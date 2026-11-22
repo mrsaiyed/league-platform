@@ -1,6 +1,8 @@
 // What the account button at the top right of every league page holds (U-8, step 2.127),
 // worked out from what the league's gate already knows of the person: their admin areas
-// here and whether they may score here. Nothing in it leads to a page not built yet.
+// here and whether they may score here; and, from their own teams of the season
+// (team-pages, myTeamsOf), "My team" for anyone with a team (step 2.168). Nothing in it
+// leads to a page not built yet.
 //
 // It is made for one request and drawn into that request's page only. League pages are
 // drawn per request (they read the session cookie), and an answer that carries the
@@ -23,6 +25,11 @@ export type AccountMenu = {
   readonly adminHref: string | null;
   /** Their games to score, for someone who may score here. */
   readonly gamesHref: string | null;
+  /**
+   * Their team's page by way of `/{league}/my`, for someone with a team of the season here
+   * (step 2.168); `several` when they have more than one, which `/my` then shows them.
+   */
+  readonly myTeam: { readonly href: string; readonly several: boolean } | null;
   readonly accountHref: string;
   /**
    * On the scoring page: "Sign out" leaves the open game first, as the tracker's own way
@@ -36,6 +43,8 @@ export function accountMenuOf(
   view: LeagueView,
   email: string | null,
   path: string,
+  /** How many teams of the season are the person's own here (myTeamsOf). */
+  teams = 0,
 ): AccountMenu | null {
   if (view.context.account === null || email === null) return null;
   const league = view.context.league;
@@ -51,6 +60,7 @@ export function accountMenuOf(
       : onlyScores
         ? leagueUrl(league, 'admin')
         : leagueUrl(league, 'admin-area', { area: 'games' }),
+    myTeam: teams > 0 ? { href: leagueUrl(league, 'my'), several: teams > 1 } : null,
     accountHref: platformUrl('account'),
     onScoringPage: isScoringPage(league, path),
   };

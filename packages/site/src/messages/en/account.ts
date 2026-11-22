@@ -44,6 +44,8 @@ export const enAccount = {
   'account.menu.account': 'Your account',
   'account.menu.admin': 'Admin',
   'account.menu.myGames': 'My games to score',
+  'account.menu.myTeam': 'My team',
+  'account.menu.myTeams': 'My teams',
   'account.problem.addressRefused':
     'You are signed in, but we cannot open an account for this email address. Nothing has been lost, and we have noted it. Please contact us, or sign out and sign in with another email address.',
   'account.problem.linkConflict':

@@ -21,7 +21,7 @@ export { DocumentShown, RefusalFresh } from './refusal-fresh.tsx';
 export { RefusalPage } from './refusal-page.tsx';
 export { refusalScreenOf, type RefusalScreen } from './refusal-screen.ts';
 export { SiteFooter } from './site-footer.tsx';
-export { AccountButton, SiteHeader } from './site-header.tsx';
+export { AccountButton, MyTeamEntry, SiteHeader } from './site-header.tsx';
 export { StandalonePage } from './standalone-page.tsx';
 export { TestCopyLine } from './test-copy-line.tsx';
 
