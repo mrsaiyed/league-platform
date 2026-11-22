@@ -1,0 +1,123 @@
+// Migration 0023 (step 2.204, record 075 option 5): the test copy's kept emails. What the
+// database itself promises, whoever writes: the app's role may only add through
+// public.keep_email, which takes a made-up address only (record 075's list, checked here
+// again) and keeps the newest 300; it cannot read, change or remove a row, nor use the
+// schema. The same on the real PostgreSQL: tests/real-postgres/kept-emails.test.ts.
+import type { PGlite } from '@electric-sql/pglite';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { asApp, freshSchema, one, refused } from './schema.test-helper.ts';
+
+let db: PGlite;
+beforeAll(async () => {
+  db = await freshSchema();
+});
+afterAll(async () => {
+  await db.close();
+});
+
+const keep = (to: string, subject = 'Your code', text = 'Your code is 123456.') =>
+  asApp(db, {}, (tx) => tx.query('select public.keep_email($1, $2, $3)', [to, subject, text]));
+const count = async () =>
+  Number((await one<{ n: string }>(db, 'select count(*) as n from kept_emails.emails')).n);
+
+// Record 075's list, both ways, and spellings around its edges: the first ten are made
+// up, the rest not. packages/providers/src/email/made-up-address.test.ts holds
+// isMadeUpAddress to the same list.
+const addresses = [
+  'new.owner@example.test',
+  'A@Sub.Example.COM',
+  'x@example.net',
+  'x@mail.example.org',
+  'x@site.example',
+  'x@nowhere.invalid',
+  'x@here.localhost',
+  'x@example.test.',
+  ' x@example.test ',
+  'x@y@example.test',
+  'person@gmail.com',
+  'x@example.com.evil.com',
+  'x@notexample.com',
+  'x@test',
+  '@example.test',
+  'example.test',
+  'x@exa mple.test',
+  'x@ex_ample.test',
+  'x@',
+  '',
+];
+
+describe('kept_emails.is_made_up_address', () => {
+  it('says what isMadeUpAddress says, for every spelling tried', async () => {
+    for (const address of addresses) {
+      const { made_up } = await one<{ made_up: boolean }>(
+        db,
+        'select kept_emails.is_made_up_address($1) as made_up',
+        [address],
+      );
+      expect([address, made_up]).toEqual([address, addresses.indexOf(address) < 10]);
+    }
+  });
+});
+
+describe('public.keep_email, as the app', () => {
+  it('keeps an email to a made-up address, in small letters', async () => {
+    await keep(' New.Owner@Example.TEST ', 'Your sign-up code', 'Your code is 654321.');
+    const row = await one<{ to_address: string; subject: string; body_text: string }>(
+      db,
+      'select to_address, subject, body_text from kept_emails.emails order by id desc limit 1',
+    );
+    expect(row).toEqual({
+      to_address: 'new.owner@example.test',
+      subject: 'Your sign-up code',
+      body_text: 'Your code is 654321.',
+    });
+  });
+
+  it('refuses an address that is not made up, and writes nothing', async () => {
+    const before = await count();
+    for (const to of ['person@gmail.com', 'x@example.com.evil.com', 'nobody']) {
+      await expect(keep(to)).rejects.toMatchObject(refused.check);
+    }
+    await expect(keep(null as unknown as string)).rejects.toMatchObject({ code: '22004' });
+    expect(await count()).toBe(before);
+  });
+
+  it('keeps only the newest 300', async () => {
+    for (let i = 0; i < 310; i += 1) await keep(`trim-${i}@example.test`, `n${i}`);
+    expect(await count()).toBe(300);
+    const { oldest } = await one<{ oldest: string }>(
+      db,
+      'select subject as oldest from kept_emails.emails order by id limit 1',
+    );
+    expect(oldest).toBe('n10');
+  });
+});
+
+describe('what the app cannot do', () => {
+  it('cannot read, add, change or remove a row, nor run the check itself', async () => {
+    for (const statement of [
+      'select * from kept_emails.emails',
+      "insert into kept_emails.emails (to_address, subject, body_text) values ('a@example.test', 's', 't')",
+      "update kept_emails.emails set subject = 'x'",
+      'delete from kept_emails.emails',
+      "select kept_emails.is_made_up_address('a@example.test')",
+    ]) {
+      await expect(asApp(db, {}, (tx) => tx.query(statement))).rejects.toMatchObject(
+        refused.privilege,
+      );
+    }
+  });
+
+  it('rows written by the owner still pass the table’s own checks', async () => {
+    await expect(
+      db.query(
+        "insert into kept_emails.emails (to_address, subject, body_text) values ('real@gmail.com', 's', 't')",
+      ),
+    ).rejects.toMatchObject(refused.check);
+    await expect(
+      db.query(
+        "insert into kept_emails.emails (to_address, subject, body_text) values ('Big@example.test', 's', 't')",
+      ),
+    ).rejects.toMatchObject(refused.check);
+  });
+});
