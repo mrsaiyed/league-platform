@@ -38,14 +38,16 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
-  worldAtNoon,
+  worldAtLeagueTime,
 } from './web-browser-kit.mjs';
 
 const failures = [];
 const checked = [];
+/** The made-up world's clock in the league's zone for the walk being done (HH:MM). */
+let clock = '';
 const note = (label, ok, detail = '') => {
   checked.push(label);
-  if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ''}`);
+  if (!ok) failures.push(`[at ${clock}] ${label}${detail ? `: ${detail}` : ''}`);
 };
 const saying = process.argv.includes('--say');
 const say = (step, words) => {
@@ -97,14 +99,23 @@ const phone = {
 const league = 'still-waters';
 const owner = { email: 'owner@example.test', password: 'made-up owner password' };
 const firstNames = ['Ann', 'Ben', 'Cal', 'Dee', 'Eli'];
-const worldNow = worldAtNoon();
-/** The league's today (America/Chicago, as the made-up world's), YYYY-MM-DD. */
-const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(
-  new Date(worldNow),
-);
 const started = Date.now();
 
-if (built) {
+// The walk works at any hour (first-test.md, step 4): it is done whole twice, with the made-up
+// world's clock at midday and at 00:45 at night in the league's zone, when no hour of today
+// has passed yet. `--now=<instant>` does it once, at that instant.
+const clocks = process.argv.some((a) => a.startsWith('--now=')) ? ['--now'] : ['12:00', '00:45'];
+for (const at24 of built ? clocks : []) {
+  clock = at24;
+  const worldNow = worldAtLeagueTime(at24 === '--now' ? '12:00' : at24);
+  /** The league's today (America/Chicago, as the made-up world's), YYYY-MM-DD. */
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(
+    new Date(worldNow),
+  );
+  /** The day before the league's today, as the "Date" box takes it. */
+  const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
   const origin = `http://localhost:${await freePort()}`;
   const server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
@@ -247,10 +258,13 @@ if (built) {
     await first.getByLabel('Round name').fill('Week 1');
     await first.locator('input[name=date]').fill(today);
     await tap(page, first.getByRole('button', { name: 'Add round' }), /saved=round-added/);
-    // Two times earlier than now (the made-up world's clock is at noon).
-    for (const [home, away, time] of [
-      ['Ravens', 'Wolves', '10:00'],
-      ['Wolves', 'Ravens', '11:00'],
+    // As the document says, at any hour: game 1 today (the "Date" box is already filled with
+    // the round's day) at a time still to come at both clocks, since "Score this game" is
+    // offered for any game today; game 2 yesterday, so its time has come and its result can
+    // be typed. "How it is recorded" is left as it is.
+    for (const [home, away, date, time] of [
+      ['Ravens', 'Wolves', today, '20:00'],
+      ['Wolves', 'Ravens', yesterday, '20:00'],
     ]) {
       // "Add a game" inside Week 1, not the one under "Games with no round".
       const add = page
@@ -260,6 +274,12 @@ if (built) {
       await add.getByText('Add a game', { exact: true }).tap();
       await add.getByLabel('Home team').selectOption({ label: home });
       await add.getByLabel('Away team').selectOption({ label: away });
+      const dateBox = add.getByLabel('Date', { exact: true });
+      note(
+        `4. the game's "Date" is already filled with today (${home} v ${away})`,
+        (await dateBox.inputValue()) === today,
+      );
+      if (date !== today) await dateBox.fill(date);
       await add.getByLabel('Time').fill(time);
       const place = add.locator('select[name=place]');
       note(
@@ -309,6 +329,7 @@ if (built) {
       exact: true,
     });
     await offer.waitFor();
+    say(7, await mainText(scoring));
     await offer.scrollIntoViewIfNeeded();
     await shot(scoring, '07-home');
     await Promise.all([scoring.waitForURL(/\/score\//), offer.tap()]);
@@ -481,11 +502,14 @@ if (built) {
       question.getByRole('button', { name: 'Yes, make it final' }),
       /\/admin\/games#game-/,
     );
+    // Game 2, yesterday's, made final, leaves the list of games still to settle: its "Saved"
+    // line is then at the top of the page rather than beside it (step 2.156).
+    const savedLine = page.locator('main [role=status]', { hasText: /^Saved: / }).first();
     note(
-      '14. Games says "Saved" beside game 2',
-      /^Saved: /.test((await question.getByRole('status').textContent()) ?? ''),
+      '14. Games says "Saved" for game 2',
+      /^Saved: /.test((await savedLine.textContent()) ?? ''),
     );
-    say(14, `after Yes: ${await question.innerText()}`);
+    say(14, `after Yes: ${await mainText(page)}`);
     await picture(page, 14);
 
     at = "step 15: League settings' minimum games for the leaders";
@@ -561,19 +585,21 @@ if (built) {
     const wolves = rows.findIndex((r) => r.includes('Wolves'));
     const ravens = rows.findIndex((r) => r.includes('Ravens'));
     note('17. the Wolves are above the Ravens', wolves >= 0 && wolves < ravens, rows.join(' | '));
+    // The streak is of the last game played, game 1 (today; game 2 was yesterday), which the
+    // Ravens won.
     note(
-      '17. the Wolves: .500, 56 for, 52 against, +4, W1',
+      '17. the Wolves: .500, 56 for, 52 against, +4, L1',
       /\.500/.test(rows[wolves] ?? '') &&
         /56/.test(rows[wolves] ?? '') &&
         /\+4/.test(rows[wolves] ?? '') &&
-        /W1/.test(rows[wolves] ?? ''),
+        /L1/.test(rows[wolves] ?? ''),
       rows[wolves],
     );
     note(
-      '17. the Ravens: .500, 52 for, 56 against, -4, L1',
+      '17. the Ravens: .500, 52 for, 56 against, -4, W1',
       /\.500/.test(rows[ravens] ?? '') &&
         /[-−]4/.test(rows[ravens] ?? '') &&
-        /L1/.test(rows[ravens] ?? ''),
+        /W1/.test(rows[ravens] ?? ''),
       rows[ravens],
     );
     note(
@@ -615,7 +641,7 @@ if (built) {
     await answers('18. the statistics');
     await visitor.close();
   } catch (error) {
-    failures.push(`${at}: ${whatWentWrong(error)}`);
+    failures.push(`[at ${clock}] ${at}: ${whatWentWrong(error)}`);
   } finally {
     await browser?.close();
     server.child.kill();

@@ -120,9 +120,14 @@ async function walk() {
     'round',
     await addDraftRound(as, { ...(await basis()), roundId, label: 'Week 1', date: today }, deps),
   );
-  for (const [gameId, home, away, time] of [
-    [games.live, 'Ravens', 'Wolves', '10:00'],
-    [games.typed, 'Wolves', 'Ravens', '11:00'],
+  // As first-test.md says, at any hour: game 1 today, at a time that may be still to come;
+  // game 2 yesterday, so its result can be typed whatever the hour.
+  const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  for (const [gameId, home, away, date, time] of [
+    [games.live, 'Ravens', 'Wolves', today, '20:00'],
+    [games.typed, 'Wolves', 'Ravens', yesterday, '20:00'],
   ] as const) {
     ok(
       `game ${home}`,
@@ -134,7 +139,7 @@ async function walk() {
           homeTeamId: team.get(home) ?? '',
           awayTeamId: team.get(away) ?? '',
           roundId,
-          date: today,
+          date,
           time,
           venueId: null,
           court: null,
@@ -356,8 +361,9 @@ describe("the first test's walk, through core's commands (step 2.194)", async ()
       ];
     };
     expect([row(0), row(1), row(2)]).toEqual([
-      ['Wolves', 2, 1, 1, '.500', 56, 52, '+4', 'W1', ['level-1']],
-      ['Ravens', 2, 1, 1, '.500', 52, 56, '-4', 'L1', ['level-1']],
+      // The streak is of the last game played: game 1, today, which the Ravens won.
+      ['Wolves', 2, 1, 1, '.500', 56, 52, '+4', 'L1', ['level-1']],
+      ['Ravens', 2, 1, 1, '.500', 52, 56, '-4', 'W1', ['level-1']],
       ['Owls', 0, 0, 0, '.000', 0, 0, '0', '', []],
     ]);
     expect(table?.footnotes).toEqual([
