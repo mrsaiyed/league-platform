@@ -186,5 +186,7 @@ console.log(
 console.log(
   cleared
     ? `Lane folder removed.`
-    : `The lane folder ${folder} could not be removed (uncommitted files in it?).`,
+    : keep
+      ? `The lane folder ${folder} and its branch were kept, as asked.`
+      : `The lane folder ${folder} could not be removed (uncommitted files in it?).`,
 );

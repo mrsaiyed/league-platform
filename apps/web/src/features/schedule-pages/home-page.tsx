@@ -20,7 +20,7 @@ import {
 import { buildHomeNumbers } from './build-home-numbers.ts';
 import { buildHomeGames } from './build-schedule.ts';
 import { HomeLeaders } from './home-leaders.tsx';
-import { homeLeadersPlace, homeNextGames, homeResults } from './home-lists.ts';
+import { homeLeadersPlace, homeNextGames, homeNextTitle, homeResults } from './home-lists.ts';
 import { GameList } from './schedule-views.tsx';
 
 /** The columns the home page's compact standings keep. */
@@ -150,7 +150,7 @@ export async function HomePage({
             latest games and the standings. */}
         {next.length === 0 ? null : (
           <Section
-            title={t('home.upcoming')}
+            title={t(homeNextTitle(next))}
             kicker={t('home.upcoming.kicker')}
             more={{ href: scheduleHref, label: t('home.fullSchedule') }}
           >

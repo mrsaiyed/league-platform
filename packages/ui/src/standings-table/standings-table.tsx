@@ -5,6 +5,12 @@ import { safeColor } from '../team-color.ts';
 export type StandingsColumn = {
   readonly key: string;
   readonly label: string;
+  /**
+   * In a phone-wide page: `in-view` columns stand beside the team with nothing to scroll
+   * (they must come first among the columns drawn there), `left-out` ones are left to the
+   * wide layout, and the others are reached by scrolling inside the table's own box.
+   */
+  readonly narrow?: 'in-view' | 'left-out';
 };
 
 export type StandingsRow = {
@@ -59,10 +65,26 @@ export function StandingsTable({
 }: StandingsTableProps) {
   const numberOf = new Map(footnotes.map((n, i) => [n.id, i + 1]));
   const hasSeeds = rows.some((r) => r.seed !== undefined && r.seed !== null);
+  const classOf = (c: StandingsColumn) =>
+    c.narrow === 'left-out' ? 'ui-num ui-left-out' : 'ui-num';
+  // What a phone-wide table gives the team column: the box less the place and the columns
+  // in view beside it, so those show whole and the first column to scroll to starts at the
+  // box's edge, none of it half in view (table-css.ts).
+  // A table whose columns say nothing of a phone keeps the plain sideways scroll there.
+  const inView = columns.filter((c) => c.narrow === 'in-view').length;
+  const narrow =
+    inView === 0
+      ? undefined
+      : ({ '--ui-in-view': inView, '--ui-seed-col': hasSeeds ? 1 : 0 } as CSSProperties);
   return (
     <div className="ui-table-frame">
       <div className="ui-table-wrap" tabIndex={0} role="region" aria-label={regionLabel ?? caption}>
-        <table className="ui-table ui-standings" data-emblems={emblems ? 'true' : undefined}>
+        <table
+          className="ui-table ui-standings"
+          data-emblems={emblems ? 'true' : undefined}
+          data-narrow={narrow === undefined ? undefined : 'fit'}
+          style={narrow}
+        >
           <caption dir="auto">{caption}</caption>
           <thead>
             <tr>
@@ -75,7 +97,7 @@ export function StandingsTable({
                 {labels.team}
               </th>
               {columns.map((c) => (
-                <th key={c.key} scope="col" className="ui-num">
+                <th key={c.key} scope="col" className={classOf(c)}>
                   {c.label}
                 </th>
               ))}
@@ -120,7 +142,7 @@ export function StandingsTable({
                     </span>
                   </th>
                   {columns.map((c) => (
-                    <td key={c.key} className="ui-num">
+                    <td key={c.key} className={classOf(c)}>
                       {row.cells[c.key] ?? ''}
                     </td>
                   ))}

@@ -344,6 +344,8 @@ export async function TeamPage({
           <StaffNotice kind="refused">{t('adminTeams.add.readFailed')}</StaffNotice>
         ) : peopleNotAllowed ? (
           <p className="staff-quiet">{t('adminTeams.add.notAllowed')}</p>
+        ) : everyone.length === 0 ? (
+          <p className="staff-quiet">{t('adminTeams.add.nobody')}</p>
         ) : available.length === 0 ? (
           <p className="staff-quiet">{t('adminTeams.add.noOne')}</p>
         ) : (

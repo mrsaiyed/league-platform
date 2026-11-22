@@ -8,7 +8,7 @@ export {
 export { StatsPage, StatsTables } from './stats-page.tsx';
 export { chooseSeason, firstValue } from './choose-season.ts';
 export { buildStandingsViews, type StandingsTableView } from './build-standings.ts';
-export { hasStatLabel, statLabel } from './build-stats.ts';
+export { hasStatLabel, loadStatsPage, statLabel } from './build-stats.ts';
 export {
   fitHomeLeaders,
   homeAcrossRoom,
