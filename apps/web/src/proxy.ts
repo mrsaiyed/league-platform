@@ -92,9 +92,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const headers = new Headers(request.headers);
   headers.set(pathHeader, url.pathname + url.search);
-  // This answer's script policy, with a nonce made for it alone (T-79, record 081). Written
-  // into the request too, over any the browser sent: Next.js reads the nonce from there and
-  // puts it on every script it draws, and so does the bot check's widget (nonceOf).
+  // This answer's script policy, with a nonce made for it alone (T-79, record 081). The nonce
+  // Next.js stamps on its scripts (and the bot check's widget, nonceOf) is always the ANSWER's
+  // policy: Next 16 copies every header the proxy puts on its answer into the request as well,
+  // after the request's own (resolve-routes.js: `resHeaders[key] = value; req.headers[key] =
+  // value;`). Writing the policy into the request too, over any the browser sent, is therefore
+  // not what makes it work; it is harmless and kept as a guard should the framework change.
   const widget = ports?.botCheck.widget;
   const policy = contentSecurityPolicy({
     nonce: newNonce(),

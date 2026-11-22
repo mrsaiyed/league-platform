@@ -6,8 +6,8 @@
 //
 // The script policy: a script runs only when it comes from our own address or carries
 // the nonce made for this one answer, which only our server knows and writes into the
-// scripts it draws itself (Next.js reads it from the request's own policy header and
-// puts it on every script it writes). So a script that reached a page any other way (a
+// scripts it draws itself (Next.js puts the answer's nonce on every script it writes:
+// it copies the proxy's answer headers into the request; record 081). So a script that reached a page any other way (a
 // name, a post, an address typed into a field that a page drew without escaping) does
 // not run: it has no nonce, and inline code and `javascript:` addresses are refused.
 // Nothing else is restricted here: styles, pictures, fonts and what a page may fetch are
