@@ -412,6 +412,38 @@ export const tableCss = String.raw`
   .ui-stats[data-fold] .ui-team-cell > [dir] {
     max-inline-size: calc(45cqi - var(--step-6) - var(--step-3));
   }
+  /* Every number column has one width, and the name column takes at least two fifths of the
+     box and whatever is left over after the whole columns that fit beside it: so at rest the
+     columns in view are whole (the games played and the column the table opens sorted by
+     among them) and the first one to scroll to starts at the box's edge. A browser that
+     cannot work out the leftover (mod) sizes the columns by their contents, and the far
+     edge's fade still marks the column cut there. */
+  .ui-stats {
+    --ui-num-col: calc(var(--step-7) + var(--step-3));
+    --ui-name-least: 40cqi;
+  }
+  .ui-stats th,
+  .ui-stats td {
+    box-sizing: border-box;
+  }
+  .ui-stats .ui-num {
+    inline-size: var(--ui-num-col);
+    min-inline-size: var(--ui-num-col);
+  }
+  .ui-stats .ui-team-cell {
+    --ui-name-col: calc(
+      var(--ui-name-least) + mod(100cqi - var(--ui-name-least), var(--ui-num-col))
+    );
+    inline-size: var(--ui-name-col);
+    min-inline-size: var(--ui-name-col);
+  }
+  /* The name's words: the column less its two paddings, the shield and its gap. */
+  .ui-table.ui-stats .ui-team-cell > [dir] {
+    max-inline-size: calc(
+      var(--ui-name-col) - var(--step-4) - var(--step-2) - var(--step-5) - var(--step-1) -
+        var(--step-2)
+    );
+  }
 }
 /* A note's number sits beside the name without making its row taller than the others. */
 .ui-note-mark {
@@ -518,5 +550,68 @@ th[aria-sort='ascending'] .ui-sort-button::after {
 th[aria-sort='descending'] .ui-sort-button::after {
   content: '\25BC' / '';
   font-size: 0.7em;
+}
+/* A standings table on a phone-wide page: the place, the team and the columns marked to be
+   in view (the record and what the table is ordered by) fill the box exactly, with nothing
+   to scroll; a column left to the wide layout is not drawn, and any other is reached by
+   scrolling inside the box, starting at its edge, so no column stands half in view at rest.
+   Every number column has one width, and the team column takes what is left (the table
+   says how many columns are in view and whether it has places: standings-table.tsx), so
+   the columns of every division stand under each other. The page's width decides, not the
+   box's, so a laptop's narrow home column keeps its layout. */
+@media (max-width: 30rem) {
+  .ui-standings[data-narrow] {
+    --ui-num-col: calc(var(--step-6) + var(--step-3));
+    --ui-place-col: calc(var(--step-7) + var(--step-3));
+    --ui-name-col: calc(
+      100cqi - var(--ui-seed-col, 0) * var(--ui-place-col) - var(--ui-in-view, 0) *
+        var(--ui-num-col)
+    );
+    /* The name's own words: the column less its two paddings, the shield and its gap. */
+    --ui-name-words: calc(
+      var(--ui-name-col) - 2 * var(--step-2) - var(--step-5) - var(--step-1) - var(--step-2)
+    );
+  }
+  .ui-standings[data-narrow] .ui-left-out {
+    display: none;
+  }
+  .ui-standings[data-narrow] th,
+  .ui-standings[data-narrow] td {
+    box-sizing: border-box;
+  }
+  /* A number column holds three or four figures; its cells stand a step closer still. */
+  .ui-standings[data-narrow] .ui-num,
+  .ui-standings[data-narrow] tr > .ui-num:last-child {
+    inline-size: var(--ui-num-col);
+    min-inline-size: var(--ui-num-col);
+    padding-inline: var(--step-1);
+  }
+  .ui-standings[data-narrow] tr > .ui-num:first-child {
+    inline-size: var(--ui-place-col);
+    min-inline-size: var(--ui-place-col);
+    padding-inline: var(--step-4) var(--step-2);
+  }
+  .ui-table.ui-standings[data-narrow] .ui-team-cell {
+    padding-inline: var(--step-2);
+  }
+  .ui-table.ui-standings[data-narrow] .ui-team-cell,
+  .ui-table.ui-standings[data-narrow][data-emblems='true'] .ui-team-cell {
+    inline-size: var(--ui-name-col);
+    min-inline-size: var(--ui-name-col);
+  }
+  .ui-table.ui-standings[data-narrow] .ui-team-cell > [dir],
+  .ui-table.ui-standings[data-narrow][data-emblems='true'] .ui-team-cell > [dir] {
+    max-inline-size: var(--ui-name-words);
+  }
+  /* There a note's mark takes its own room in the line, after the last word, and no room is
+     kept for it beside the name: the name has the whole width, so a word is not broken. */
+  .ui-table.ui-standings[data-narrow] .ui-team-cell > [dir]:has(> .ui-note-mark),
+  .ui-table.ui-standings[data-narrow][data-emblems='true'] .ui-team-cell > [dir]:has(> .ui-note-mark) {
+    max-inline-size: var(--ui-name-words);
+    padding-inline-end: 0;
+  }
+  .ui-table.ui-standings[data-narrow] .ui-team-cell > [dir]:has(> .ui-note-mark) > .ui-note-mark:last-child a {
+    margin-inline-end: 0;
+  }
 }
 `;

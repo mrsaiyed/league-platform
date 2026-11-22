@@ -491,15 +491,31 @@ function levelNote(
   return { id: null, text: sentences.join(join), brief: level };
 }
 
-function columnsOf(table: CoreTable, rankBy: Standings['rankBy']): StandingsColumn[] {
-  const anyTies = table.lines.some((line) => line.ties > 0);
+/**
+ * The columns of every table of one season: the same in each, so a column stands in the
+ * same place in every division (a tie in one division gives every table its column). On a
+ * phone the record and what the table is ordered by (W, L, T, and PCT, or the points in a
+ * points table) are in view beside the team; games played is left to the wide layout, and
+ * the rest are reached by scrolling inside the table's box.
+ */
+function columnsOf(standings: Standings): StandingsColumn[] {
+  const anyTies = standings.tables.some((table) => table.lines.some((line) => line.ties > 0));
+  const points = standings.rankBy === 'points';
   return [
-    { key: 'played', label: t('standings.col.played') },
-    { key: 'wins', label: t('standings.col.wins') },
-    { key: 'losses', label: t('standings.col.losses') },
-    ...(anyTies ? [{ key: 'ties', label: t('standings.col.ties') }] : []),
-    { key: 'winPercentage', label: t('standings.col.winPercentage') },
-    ...(rankBy === 'points' ? [{ key: 'points', label: t('standings.col.points') }] : []),
+    { key: 'played', label: t('standings.col.played'), narrow: 'left-out' },
+    { key: 'wins', label: t('standings.col.wins'), narrow: 'in-view' },
+    { key: 'losses', label: t('standings.col.losses'), narrow: 'in-view' },
+    ...(anyTies
+      ? [{ key: 'ties', label: t('standings.col.ties'), narrow: 'in-view' as const }]
+      : []),
+    {
+      key: 'winPercentage',
+      label: t('standings.col.winPercentage'),
+      narrow: points ? 'left-out' : 'in-view',
+    },
+    ...(points
+      ? [{ key: 'points', label: t('standings.col.points'), narrow: 'in-view' as const }]
+      : []),
     { key: 'pointsFor', label: t('standings.col.pointsFor') },
     { key: 'pointsAgainst', label: t('standings.col.pointsAgainst') },
     { key: 'pointDifference', label: t('standings.col.pointDifference') },
@@ -611,7 +627,7 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
   return {
     key: table.division?.id ?? `table-${index}`,
     caption: table.division?.name ?? t('standings.allTeams'),
-    columns: columnsOf(table, standings.rankBy),
+    columns: columnsOf(standings),
     rows,
     footnotes,
     briefFootnotes: footnotes.map((f) => ({ id: f.id, text: briefs.get(f.id) ?? f.text })),
