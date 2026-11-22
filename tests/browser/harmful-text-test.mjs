@@ -14,9 +14,20 @@
 // page's own escaping keeps it text, not the policy; with the policy on, the browser had
 // nothing to refuse; and the raw answer never holds it unescaped.
 //
-// "Every text field" stays true: the test opens every admin and public page it knows and fails
-// on a free-text field it does not know (FIELDS below), so a new field must be added here.
-import { addPlayers, liveGame } from './tracker-driver.mjs';
+// Then (the fix round, F3) it walks EVERY page route, read from the app's own folders, as each
+// made-up role that sees a different screen (the owner, a scheduler, a coach, the scorekeeper,
+// a signed-in person with no role, a visitor): a page route it does not know (ROUTES), a
+// free-text field it does not know (FIELDS) or a field kind it does not know (KINDS) fails
+// it. Every field a plain form holds, of every kind (number, date, time, colour and hidden
+// fields too), is posted the attack by hand, as a plain form post with no typing, and the
+// answer must be a refusal or a harmless page; then every route is opened again, as each
+// role and with the attack in its questions, and must hold it only as text. Every answer
+// route (route.ts) is fetched as the right roles: JSON must carry the attack as data, CSS
+// never. What it cannot reach is printed by name at the end (NOT_COVERED).
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { addPlayers, leagueId, liveGame } from './tracker-driver.mjs';
 import {
   buildNext,
   freePort,
@@ -66,26 +77,31 @@ const typed = {
   // A file's name cannot hold a slash: the browser keeps only what follows the last one.
   file: `'><img src=x onerror=__ran='file' data-ran=file>.csv`,
   query: attack('query'),
+  // Posted by hand into every field a plain form holds (the fix round, F3).
+  posted: attack('posted'),
 };
 
 /**
- * Every field that takes free text on the pages opened below, by page and field name, with
- * where its text is typed in this test. A free-text field (a text box or a text area: not a
- * number, date, time, color, file, hidden field, password, choice or tick) on these pages that
- * is not here fails the test. Fields that take only digits or an email are typed into too:
- * what is refused must come back as harmlessly as what is kept.
+ * Every field that takes free text (a text box, a text area, an email, search, phone or web
+ * address box) on any page route, by route and field name ('{id}' for an id in it), with
+ * where its text is typed in this test. One that is not here fails the test; one here that
+ * no page holds any more fails it too. "posted by hand" means only the plain form post of
+ * every field below types into it; every other field kind is posted the attack by hand too
+ * (KINDS). Fields that take only digits or an email are typed into: what is refused must come
+ * back as harmlessly as what is kept.
  */
+const POSTED = 'posted by hand';
 const FIELDS = {
-  '/north-valley/admin/teams': { name: 'a team is added', shortName: 'a team is added' },
-  '/north-valley/admin/teams/{id}': {
+  '/[league]/admin/teams': { name: 'a team is added', shortName: 'a team is added' },
+  '/[league]/admin/teams/[team]': {
     name: "a team's own page",
     shortName: "a team's own page",
     firstName: 'a person is added',
     lastName: 'a person is added',
     jerseyNumber: 'a person is added',
   },
-  '/north-valley/admin/schedule': { label: 'a round is renamed' },
-  '/north-valley/admin/games/{id}': {
+  '/[league]/admin/schedule': { label: 'a round is renamed' },
+  '/[league]/admin/games/[game]': {
     reason: 'a result is reopened',
     awayScore: 'a box score is typed',
     homeScore: 'a box score is typed',
@@ -94,13 +110,93 @@ const FIELDS = {
     'stat.fg3.{id}': 'a box score is typed',
     'stat.fg1.{id}': 'a box score is typed',
     'stat.fouls.{id}': 'a box score is typed',
-    'stat.rebounds.{id}': 'a box score is typed',
   },
   '/signin': { email: 'the email boxes' },
   '/signup': { email: 'the email boxes' },
   '/signin/forgot': { email: 'the email boxes' },
   '/signup/code': { code: 'the email boxes' },
 };
+
+/**
+ * How each kind of field is covered. A kind not here fails the test. 'posted': the attack is
+ * posted into it by hand wherever a plain form holds it (a browser would refuse to type it).
+ */
+const KINDS = {
+  text: 'typed (FIELDS)',
+  textarea: 'typed (FIELDS)',
+  email: 'typed (FIELDS)',
+  search: 'typed (FIELDS)',
+  tel: 'typed (FIELDS)',
+  url: 'typed (FIELDS)',
+  hidden: 'posted',
+  number: 'posted',
+  date: 'posted',
+  time: 'posted',
+  'datetime-local': 'posted',
+  month: 'posted',
+  week: 'posted',
+  color: 'posted',
+  range: 'posted',
+  password: 'posted',
+  select: 'posted',
+  checkbox: 'posted',
+  radio: 'posted',
+  file: 'typed: a file whose name, venue and court are the attack is imported',
+  submit: 'not a field',
+  button: 'not a field',
+  reset: 'not a field',
+  image: 'not a field',
+};
+const TYPED_KINDS = Object.keys(KINDS).filter((kind) => KINDS[kind] === 'typed (FIELDS)');
+
+/** Every page route of the app, as its folders name it ('/[league]/teams/[team]'). */
+const appFolder = fileURLToPath(new URL('../../apps/web/src/app/', import.meta.url));
+function routesIn(fileName) {
+  const found = [];
+  const walk = (folder) => {
+    for (const entry of readdirSync(folder, { withFileTypes: true })) {
+      const at = join(folder, entry.name);
+      if (entry.isDirectory()) walk(at);
+      else if (entry.name === fileName) {
+        const parts = relative(appFolder, folder)
+          .split(/[\\/]/)
+          .filter((part) => part !== '' && !/^\(.*\)$/.test(part));
+        found.push({ route: `/${parts.join('/')}`, source: readFileSync(at, 'utf8') });
+      }
+    }
+  };
+  walk(appFolder);
+  return found.sort((a, b) => a.route.localeCompare(b.route));
+}
+const pageRoutes = routesIn('page.tsx');
+const answerRoutes = routesIn('route.ts');
+
+/** The route a path is served by: the one that fits with the most fixed parts. */
+function routeOf(pathname) {
+  const given = pathname.split('/').filter(Boolean);
+  let best = { route: '(no page)', score: -1 };
+  for (const { route } of pageRoutes) {
+    const parts = route.split('/').filter(Boolean);
+    const rest = parts.at(-1)?.startsWith('[...') ?? false;
+    if (rest ? given.length < parts.length : given.length !== parts.length) continue;
+    let score = 0;
+    const fits = parts.every((part, index) => {
+      if (part.startsWith('[')) return true;
+      score += 1;
+      return part === given[index];
+    });
+    if (fits && score > best.score) best = { route, score };
+  }
+  return best.route;
+}
+
+/** What the test cannot reach, by name and why: printed at the end, never silently. */
+const NOT_COVERED = [
+  "the draft league's own roles (admin, registrar, editor, club admin, a program's scheduler, another league's admin): not covered, because this test fills only the first league (\"north-valley\") with the attack and they hold no role there",
+  "text a script draws only after a tap (beyond the games list's question, the reopen form and the scorer's table): not covered, because the walk opens each page and reads what it draws on arrival, it does not tap every control",
+  'the scorer\'s own Reopen question ("By mistake" beside its reason): not typed into; its reason goes to the reopen answer route, which is posted the attack by hand below',
+  'the walk of every route runs with the script policy off (the stronger proof: the page itself keeps the text); the policy on is checked on the pages that show typed text',
+];
 
 let built = true;
 if (!process.argv.includes('--no-build')) {
@@ -166,11 +262,14 @@ const harm = (page) =>
 /** The raw answer for an address: the attack must never be in it as it was typed. */
 async function rawProblems(address, cookie) {
   const answer = await fetch(origin + address, { headers: cookie ? { cookie } : {} });
-  const body = await answer.text();
-  return Object.entries(typed)
+  return unescapedIn(await answer.text());
+}
+
+/** Which of the attack's texts a page's answer holds unescaped (by where it was typed). */
+const unescapedIn = (body) =>
+  Object.entries(typed)
     .filter(([, text]) => body.includes(text) || body.includes(text.replaceAll("'", '&#x27;')))
     .map(([field]) => field);
-}
 
 /**
  * Opens `address` as `who` and checks it holds the attack only as text; `shows` lists the
@@ -222,41 +321,12 @@ async function looked(who, address, shows = []) {
   note(`${label}: the raw answer holds no attack unescaped`, raw.length === 0, raw.join(', '));
 }
 
-/** Every free-text field on `address`, by name ('{id}' for an id in it). */
-async function freeTextFields(address, who) {
-  const html = await (
-    await fetch(origin + address, { headers: who === null ? {} : { cookie: `srl_session=${who}` } })
-  ).text();
-  const names = new Set();
-  for (const [tag] of html.matchAll(/<(?:input|textarea)\b[^>]*>/g)) {
-    const type =
-      /\btype="([^"]*)"/.exec(tag)?.[1] ?? (tag.startsWith('<textarea') ? 'textarea' : 'text');
-    const skipped = [
-      'hidden',
-      'submit',
-      'button',
-      'checkbox',
-      'radio',
-      'number',
-      'date',
-      'time',
-      'color',
-      'file',
-      'password',
-    ];
-    if (skipped.includes(type)) continue;
-    const name = /\bname="([^"]*)"/.exec(tag)?.[1] ?? '(no name)';
-    names.add(
-      name.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '{id}'),
-    );
-  }
-  return names;
-}
-
 let teamAdmin = '';
 let boxScore = '';
 /** Tigers at Lions, with no score yet: made final by hand, then reopened with the attack. */
 const decidedGame = '01900000-0000-7000-8000-006a00000001';
+/** Fields a step above typed into by their label (the reopen form exists only while decided). */
+const typedInto = new Set();
 
 if (browser) {
   const context = await contextFor(owner);
@@ -318,7 +388,10 @@ if (browser) {
   });
 
   await step('a round is renamed with the attack', async () => {
-    await page.goto(`${origin}/north-valley/admin/schedule`);
+    // The refused person's page may still be finishing its own navigation: once more if so.
+    await page
+      .goto(`${origin}/north-valley/admin/schedule`)
+      .catch(() => page.goto(`${origin}/north-valley/admin/schedule`));
     // The rename form is inside the round's "Change or remove this round", shut at first.
     await page.getByText('Change or remove this round').first().click();
     const form = page
@@ -410,6 +483,7 @@ if (browser) {
       'Why it needs correcting (kept in the log, never shown publicly)',
     );
     await reason.fill(typed.reason);
+    typedInto.add('/[league]/admin/games/[game] reason');
     await Promise.all([
       page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
       page.getByRole('button', { name: 'Reopen to correct' }).click(),
@@ -517,52 +591,484 @@ if (browser) {
     note("the scorer's table name is on a team's admin page", shownOn !== '');
     if (shownOn !== '') await looked(owner, shownOn, ['table']);
   });
+}
 
-  // Every free-text field on these pages is one this test types into.
-  await step('every free-text field is one this test types into', async () => {
-    const pages = [
-      [owner, '/north-valley/admin', null],
-      [owner, '/north-valley/admin/teams', '/north-valley/admin/teams'],
-      [owner, teamAdmin, '/north-valley/admin/teams/{id}'],
-      [owner, '/north-valley/admin/schedule', '/north-valley/admin/schedule'],
-      [owner, '/north-valley/admin/schedule/import', null],
-      [owner, '/north-valley/admin/games', null],
-      [owner, boxScore, '/north-valley/admin/games/{id}'],
-      [owner, '/north-valley/admin/settings', null],
-      [owner, '/north-valley/admin/season', null],
-      [owner, '/account', null],
-      [null, '/signin', '/signin'],
-      [null, '/signup', '/signup'],
-      [null, '/signin/forgot', '/signin/forgot'],
-      [null, '/north-valley', null],
-      [null, '/north-valley/teams/harmful-text', null],
-    ];
-    // Each admin area the menu offers is opened too.
-    const home = await (
-      await fetch(`${origin}/north-valley/admin`, { headers: { cookie: `srl_session=${owner}` } })
-    ).text();
-    for (const [, area] of home.matchAll(/href="(\/north-valley\/admin\/[a-z/-]+)"/g)) {
-      if (!pages.some(([, address]) => address === area)) pages.push([owner, area, null]);
+/** The made-up roles that each see a different screen of the first league. */
+const ROLES = [
+  ['the owner', owner],
+  ['a scheduler (an admin with a narrower grant)', 'local-scheduler-token'],
+  ['a coach', 'local-coach-token'],
+  ['the scorekeeper', keeper],
+  ['a signed-in person with no role', 'local-stranger-token'],
+  ['a visitor', null],
+];
+const asWho = (who) => (who === null ? {} : { cookie: `srl_session=${who}` });
+
+/**
+ * Every page route, by its folders' name, and the address it is opened at ('' when the
+ * address could not be found, which fails). `at` holds the addresses found in the pages.
+ */
+const ROUTES = {
+  '/': () => '/',
+  '/account': () => '/account',
+  '/account/confirm': () => '/account/confirm',
+  '/account/inbox': () => '/account/inbox',
+  '/contact': () => '/contact',
+  '/find': () => '/find',
+  '/help': () => '/help',
+  '/privacy': () => '/privacy',
+  '/signin': () => '/signin',
+  '/signin/forgot': () => '/signin/forgot',
+  '/signup': () => '/signup',
+  '/signup/code': () => '/signup/code',
+  '/signup/password': () => '/signup/password',
+  '/start': () => '/start',
+  '/status': () => '/status',
+  '/terms': () => '/terms',
+  '/[league]': () => '/north-valley',
+  '/[league]/[...missing]': () => `/north-valley/${encodeURIComponent(typed.query)}`,
+  '/[league]/admin': () => '/north-valley/admin',
+  '/[league]/admin/[...missing]': () => `/north-valley/admin/${encodeURIComponent(typed.query)}`,
+  '/[league]/admin/games': () => '/north-valley/admin/games',
+  '/[league]/admin/games/[game]': () => boxScore,
+  '/[league]/admin/messages': () => '/north-valley/admin/messages',
+  '/[league]/admin/people': () => '/north-valley/admin/people',
+  '/[league]/admin/registration': () => '/north-valley/admin/registration',
+  '/[league]/admin/schedule': () => '/north-valley/admin/schedule',
+  '/[league]/admin/schedule/import': () => '/north-valley/admin/schedule/import',
+  '/[league]/admin/season': () => '/north-valley/admin/season',
+  '/[league]/admin/settings': () => '/north-valley/admin/settings',
+  '/[league]/admin/site': () => '/north-valley/admin/site',
+  '/[league]/admin/standings': () => '/north-valley/admin/standings',
+  '/[league]/admin/teams': () => '/north-valley/admin/teams',
+  '/[league]/admin/teams/[team]': () => teamAdmin,
+  '/[league]/games/[game]': () => `/north-valley/games/${liveGame}`,
+  '/[league]/my': () => '/north-valley/my',
+  '/[league]/news': () => '/north-valley/news',
+  // A news post's and a player's pages are still the site's placeholders (any address shows
+  // one): opened with the attack as the address's last part.
+  '/[league]/news/[post]': () => `/north-valley/news/${encodeURIComponent(typed.query)}`,
+  '/[league]/players/[player]': () => `/north-valley/players/${encodeURIComponent(typed.query)}`,
+  '/[league]/register': () => '/north-valley/register',
+  '/[league]/schedule': () => '/north-valley/schedule',
+  '/[league]/score/[game]': () => `/north-valley/score/${liveGame}`,
+  '/[league]/standings': () => '/north-valley/standings',
+  '/[league]/stats': () => '/north-valley/stats',
+  '/[league]/teams': () => '/north-valley/teams',
+  '/[league]/teams/[team]': (at) => at.team,
+};
+
+/** Every answer route (route.ts), at its made-up address, and who fetches it. */
+const ANSWERS = {
+  '/api/v1/health': [null],
+  '/api/v1/live': [null, keeper],
+  '/api/v1/leagues/[leagueId]/games/[game]/commands': [keeper, owner],
+  '/api/v1/leagues/[leagueId]/games/[game]/not-started': [keeper, owner],
+  '/api/v1/leagues/[leagueId]/games/[game]/reopen': [keeper, owner],
+  '/api/v1/leagues/[leagueId]/games/[game]/rosters': [keeper, owner],
+  '/api/v1/leagues/[leagueId]/games/[game]/session': [keeper, owner],
+  '/api/v1/leagues/[leagueId]/games/[game]/snapshot': [keeper, owner],
+  '/api/v1/leagues/[leagueId]/games/[game]/state': [keeper, owner],
+  '/api/v1/leagues/[leagueId]/scoring': [keeper, owner],
+  '/display.css': [null],
+  '/standalone.css': [null],
+  // Its answer sends the browser on to Google: only its first answer is read, never followed.
+  '/signin/google': [null],
+};
+
+/** Decodes the few entities a server's HTML uses in attribute values. */
+const decode = (text) =>
+  text
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#x27;', "'")
+    .replaceAll('&#39;', "'")
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&');
+const attr = (tag, name) => {
+  const value = new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
+  return value === undefined ? null : decode(value);
+};
+const flag = (tag, name) => new RegExp(`\\s${name}(?:[\\s=/>]|$)`).test(tag);
+const plainName = (name) =>
+  name.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '{id}');
+
+/** The fields in a piece of the server's HTML: kind, name, the value it would send. */
+function fieldsIn(html) {
+  const fields = [];
+  for (const [tag] of html.matchAll(/<input\b[^>]*>/g)) {
+    const kind = (attr(tag, 'type') ?? 'text').toLowerCase();
+    const ticked = kind === 'checkbox' || kind === 'radio';
+    fields.push({
+      kind,
+      name: attr(tag, 'name'),
+      value: attr(tag, 'value') ?? (ticked ? 'on' : ''),
+      sent: !ticked || flag(tag, 'checked'),
+    });
+  }
+  for (const [, tag, body] of html.matchAll(/<textarea\b([^>]*)>([\s\S]*?)<\/textarea>/g)) {
+    fields.push({ kind: 'textarea', name: attr(tag, 'name'), value: decode(body), sent: true });
+  }
+  for (const [, tag, body] of html.matchAll(/<select\b([^>]*)>([\s\S]*?)<\/select>/g)) {
+    const options = [...body.matchAll(/<option\b([^>]*)>([\s\S]*?)<\/option>/g)];
+    const chosen = options.find(([, option]) => flag(option, 'selected')) ?? options[0];
+    const value = chosen ? (attr(chosen[1], 'value') ?? decode(chosen[2])) : '';
+    fields.push({ kind: 'select', name: attr(tag, 'name'), value, sent: true });
+  }
+  // The framework's own fields (which action a form calls) are not the product's.
+  return fields.filter((field) => !field.name?.startsWith('$ACTION'));
+}
+
+/** The forms in the server's HTML, with their fields. */
+const formsIn = (html) =>
+  [...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/g)].map(([, tag, body]) => ({
+    method: (attr(tag, 'method') ?? 'get').toLowerCase(),
+    action: attr(tag, 'action') ?? '',
+    fields: fieldsIn(body),
+    body,
+  }));
+
+/** Reads an answer for at most a few seconds (a live answer never ends), never following it. */
+async function readAnswer(url, init = {}) {
+  const answer = await fetch(url, {
+    ...init,
+    redirect: 'manual',
+    signal: AbortSignal.timeout(4000),
+  });
+  let body = '';
+  const decoder = new TextDecoder();
+  try {
+    for await (const chunk of answer.body ?? []) body += decoder.decode(chunk, { stream: true });
+  } catch {
+    // Cut short by the time limit: what arrived is read.
+  }
+  return { answer, body };
+}
+
+/** Posts the attack by hand into one field of a plain form, as `who`; what came back. */
+async function postedByHand(who, page, form, field) {
+  const target = new URL(form.action === '' ? page : form.action, origin + page);
+  const values = [];
+  for (const other of form.fields) {
+    if (other.name === null) continue;
+    if (other === field) values.push([other.name, typed.posted]);
+    else if (other.sent) values.push([other.name, other.value]);
+  }
+  if (!field.sent) values.push([field.name, typed.posted]);
+  const headers = { ...asWho(who), origin };
+  let first;
+  if (form.method === 'get') {
+    for (const [name, value] of values) target.searchParams.append(name, value);
+    first = await readAnswer(target, { headers });
+  } else {
+    const body = new FormData();
+    for (const [name, value] of values) body.append(name, value);
+    // The framework's own fields go back as they were: the form's action is the one called.
+    for (const [tag] of form.body.matchAll(/<input\b[^>]*name="\$ACTION[^"]*"[^>]*>/g)) {
+      body.append(attr(tag, 'name') ?? '', attr(tag, 'value') ?? '');
     }
-    for (const [who, address, key] of pages) {
+    first = await readAnswer(target, { method: 'POST', body, headers });
+  }
+  const bodies = [first.body];
+  const location = first.answer.headers.get('location');
+  if (location !== null) {
+    const next = new URL(location, target);
+    // Only this computer's own answers are followed.
+    if (next.origin === origin) bodies.push((await readAnswer(next, { headers: asWho(who) })).body);
+  }
+  return { status: first.answer.status, location, problems: bodies.flatMap(unescapedIn) };
+}
+
+/** The address of a team's page, found in the teams page as a visitor sees it. */
+async function addressesFound() {
+  const teams = await (await fetch(`${origin}/north-valley/teams`)).text();
+  return { team: /href="(\/north-valley\/teams\/[^"/?#]+)"/.exec(teams)?.[1] ?? '' };
+}
+
+/** The questions a page reads (?season=…), from its own source, and the usual ones. */
+function questionsOf(source) {
+  const names = new Set(['season', 'next', 'problem', 'done', 'email', 'token', 'code', 'q']);
+  for (const [, name] of source.matchAll(/\bsearch(?:Params)?\??\.([a-zA-Z]+)\b/g)) names.add(name);
+  return [...names];
+}
+
+async function walkEveryRoute() {
+  // The routes: every one of the app's folders is known, and every known one is still a page.
+  for (const { route } of pageRoutes) {
+    note(`the page route ${route} is one this test opens`, Object.hasOwn(ROUTES, route));
+  }
+  for (const route of Object.keys(ROUTES)) {
+    note(
+      `the route ${route} this test opens is still a page`,
+      pageRoutes.some((page) => page.route === route),
+    );
+  }
+  for (const { route } of answerRoutes) {
+    note(`the answer route ${route} is one this test fetches`, Object.hasOwn(ANSWERS, route));
+  }
+
+  /** Every field seen, by route and name: its kinds, and whether a plain form holds it. */
+  const inventory = new Map();
+  const saw = (route, field, inForm) => {
+    const key = `${route} ${plainName(field.name ?? '(no name)')}`;
+    const entry = inventory.get(key) ?? { route, kinds: new Set(), inForm: false };
+    entry.kinds.add(field.kind);
+    entry.inForm ||= inForm;
+    inventory.set(key, entry);
+  };
+
+  // A. Every route as each role, from the server's answer: no attack unescaped, every field
+  // written down, every plain form kept to be posted to.
+  let at = await addressesFound();
+  const toPost = new Map();
+  await step('every route, as each role, is read from the server', async () => {
+    for (const { route } of pageRoutes) {
+      const address = ROUTES[route]?.(at) ?? '';
+      if (!Object.hasOwn(ROUTES, route)) continue;
+      note(`${route}: an address to open was found`, address !== '');
       if (address === '') continue;
-      const known = key === null ? {} : (FIELDS[key] ?? {});
-      const found = await freeTextFields(address, who);
-      for (const name of found) {
-        note(
-          `${address}: the free-text field "${name}" is one this test types into`,
-          Object.hasOwn(known, name),
-        );
-      }
-      // The page was read: a page this test types into shows at least one of its fields.
-      if (key !== null) note(`${address}: its fields were found`, found.size > 0);
+      await Promise.all(
+        ROLES.map(async ([role, who]) => {
+          const answer = await fetch(origin + address, { headers: asWho(who) });
+          const html = await answer.text();
+          const landed = new URL(answer.url).pathname;
+          const shown = routeOf(landed);
+          const raw = unescapedIn(html);
+          note(
+            `${role} at ${address}: the raw answer holds no attack unescaped`,
+            raw.length === 0,
+            raw.join(', '),
+          );
+          note(
+            `${role} at ${address}: the answer is not a server failure`,
+            answer.status < 500,
+            String(answer.status),
+          );
+          for (const field of fieldsIn(html)) saw(shown, field, false);
+          for (const form of formsIn(html)) {
+            for (const field of form.fields) {
+              saw(shown, field, true);
+              if (field.name === null || KINDS[field.kind] === 'not a field') continue;
+              if (field.kind === 'file') continue;
+              const key = `${shown} ${plainName(field.name)}`;
+              if (!toPost.has(key)) toPost.set(key, { who, role, page: landed, form, field });
+            }
+          }
+        }),
+      );
     }
   });
+
+  // B. The attack posted by hand into every field a plain form holds, of every kind.
+  await step('every field of a plain form is posted the attack by hand', async () => {
+    const posts = [...toPost.entries()];
+    for (let start = 0; start < posts.length; start += 6) {
+      await Promise.all(
+        posts.slice(start, start + 6).map(async ([key, { who, role, page, form, field }]) => {
+          const label = `${role}, ${key} (${field.kind}) posted the attack by hand`;
+          const back = await postedByHand(who, page, form, field);
+          note(
+            `${label}: the answer is not a server failure`,
+            back.status < 500,
+            String(back.status),
+          );
+          note(
+            `${label}: no answer holds the attack unescaped`,
+            back.problems.length === 0,
+            back.problems.join(', '),
+          );
+        }),
+      );
+    }
+    note(
+      'the walk posted the attack by hand into some fields',
+      posts.length > 0,
+      String(posts.length),
+    );
+    console.log(
+      `The walk: ${pageRoutes.length} page routes as ${ROLES.length} roles, ${posts.length} fields posted by hand, ${answerRoutes.length} answer routes.`,
+    );
+  });
+
+  // C. Every route again, in a browser as each role, with the script policy off: whatever was
+  // kept from the posts above is shown as text, and the questions too.
+  at = await addressesFound();
+  await step('every route, as each role, holds the attack only as text in a browser', async () => {
+    const opened = await Promise.all(
+      ROLES.map(async ([role, who]) => {
+        const context = await contextFor(who, { withoutPolicy: true });
+        // Nothing leaves this computer.
+        await context.route(
+          (url) => url.origin !== origin,
+          (request) => request.abort(),
+        );
+        const page = await context.newPage();
+        page.setDefaultTimeout(15_000);
+        const dialogs = [];
+        page.on('dialog', (dialog) => {
+          dialogs.push(dialog.message());
+          void dialog.dismiss();
+        });
+        return { role, who, context, page, dialogs };
+      }),
+    );
+    const look = async ({ role, page, dialogs }, address) => {
+      const label = `${role} at ${address.slice(0, 90)}`;
+      dialogs.length = 0;
+      await page.goto(origin + address);
+      await page.waitForFunction(() => Array.isArray(self.__next_f)).catch(() => {});
+      await page.waitForTimeout(150);
+      const found = await harm(page);
+      note(
+        `${label}: with the script policy off, nothing of the attack ran or became an element`,
+        found.ran === null &&
+          dialogs.length === 0 &&
+          found.made.length === 0 &&
+          found.scripts === 0,
+        [found.ran ?? '', ...dialogs, ...found.made].join(' | '),
+      );
+      for (const field of await page.evaluate(() =>
+        [...document.querySelectorAll('input, textarea, select')].map((element) => ({
+          kind:
+            element.tagName === 'INPUT'
+              ? (element.getAttribute('type') ?? 'text').toLowerCase()
+              : element.tagName.toLowerCase(),
+          name: element.getAttribute('name') ?? element.getAttribute('aria-label') ?? element.id,
+          inForm: element.closest('form') !== null,
+        })),
+      )) {
+        if (!field.name?.startsWith('$ACTION'))
+          saw(routeOf(new URL(page.url()).pathname), field, field.inForm);
+      }
+    };
+    try {
+      for (const { route, source } of pageRoutes) {
+        const address = ROUTES[route]?.(at) ?? '';
+        if (address === '') continue;
+        await Promise.all(opened.map((one) => look(one, address)));
+        const questions = questionsOf(source)
+          .map((name) => `${name}=${encodeURIComponent(typed.query)}`)
+          .join('&');
+        const asked = `${address}${address.includes('?') ? '&' : '?'}${questions}`;
+        await Promise.all(
+          opened.filter(({ who }) => who === owner || who === null).map((one) => look(one, asked)),
+        );
+        for (const { role, who } of opened.filter(({ who }) => who === owner || who === null)) {
+          const raw = await rawProblems(asked, who === null ? undefined : `srl_session=${who}`);
+          note(
+            `${role} at ${route} with the attack in its questions: the raw answer holds no attack unescaped`,
+            raw.length === 0,
+            raw.join(', '),
+          );
+        }
+      }
+    } finally {
+      await Promise.all(opened.map(({ context }) => context.close()));
+    }
+  });
+
+  // D. Every answer route, as the roles that use it: JSON carries the attack as data, CSS
+  // never holds it, and no answer holds it as markup.
+  await step('every answer route holds the attack only as data', async () => {
+    let carried = false;
+    for (const { route, source } of answerRoutes) {
+      const address = route.replace('[leagueId]', leagueId).replace('[game]', liveGame);
+      const methods = ['GET', 'POST'].filter((method) =>
+        new RegExp(`export\\s+(?:async\\s+function|const)\\s+${method}\\b`).test(source),
+      );
+      for (const who of ANSWERS[route] ?? []) {
+        for (const method of methods) {
+          const label = `${method} ${route} as ${ROLES.find(([, token]) => token === who)?.[0]}`;
+          const { answer, body } = await readAnswer(origin + address, {
+            method,
+            headers: { ...asWho(who), origin, 'content-type': 'application/json' },
+            ...(method === 'POST'
+              ? {
+                  body: JSON.stringify({
+                    reason: typed.posted,
+                    name: typed.posted,
+                    commands: typed.posted,
+                  }),
+                }
+              : {}),
+          });
+          const type = answer.headers.get('content-type') ?? '';
+          note(
+            `${label}: the answer is not a server failure`,
+            answer.status < 500,
+            String(answer.status),
+          );
+          if (type.includes('json')) {
+            let parsed = null;
+            try {
+              parsed = JSON.parse(body);
+            } catch {
+              parsed = null;
+            }
+            note(
+              `${label}: its JSON answer is data`,
+              parsed !== null || body === '',
+              body.slice(0, 80),
+            );
+            carried ||= body.includes(JSON.stringify(typed.table).slice(1, -1));
+          } else if (type.includes('html')) {
+            const raw = unescapedIn(body);
+            note(
+              `${label}: its HTML answer holds no attack unescaped`,
+              raw.length === 0,
+              raw.join(', '),
+            );
+          } else {
+            note(
+              `${label}: its ${type || 'untyped'} answer holds nothing of the attack`,
+              !body.includes('__ran'),
+            );
+          }
+        }
+      }
+    }
+    note("a JSON answer carries the scorer's table name as data", carried);
+  });
+
+  // E. Every field seen is one this test knows: its kind, and a free-text one by name.
+  await step('every field on every route is one this test knows', async () => {
+    const scriptOnly = [];
+    for (const [key, { route, kinds, inForm }] of inventory) {
+      for (const kind of kinds) {
+        note(`${key}: the field kind "${kind}" is one this test knows`, Object.hasOwn(KINDS, kind));
+        if (TYPED_KINDS.includes(kind)) {
+          note(
+            `${key}: the free-text field is one this test types into`,
+            Object.hasOwn(FIELDS[route] ?? {}, key.slice(route.length + 1)),
+          );
+        } else if (KINDS[kind] === 'posted' && !inForm) scriptOnly.push(`${key} (${kind})`);
+      }
+    }
+    for (const [route, fields] of Object.entries(FIELDS)) {
+      for (const name of Object.keys(fields)) {
+        note(
+          `FIELDS names ${route} ${name}, and a page holds it`,
+          inventory.has(`${route} ${name}`) || typedInto.has(`${route} ${name}`),
+        );
+      }
+    }
+    if (process.argv.includes('--list')) {
+      for (const [key, { kinds, inForm }] of inventory) {
+        console.log(`field: ${key} [${[...kinds].join(',')}]${inForm ? ' form' : ''}`);
+      }
+    }
+    NOT_COVERED.push(
+      `fields only a script draws, of a kind posted by hand: not posted, because no plain form holds them: ${scriptOnly.length > 0 ? scriptOnly.join(', ') : 'none found in this run'}`,
+    );
+  });
 }
+
+if (browser) await walkEveryRoute();
 
 await browser?.close();
 server?.child.kill();
 
+console.log(`Not covered, by name:\n- ${NOT_COVERED.join('\n- ')}`);
 if (failures.length > 0) {
   console.error(`Harmful text browser test failed:\n- ${failures.join('\n- ')}`);
   process.exit(1);
