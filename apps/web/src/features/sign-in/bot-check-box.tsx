@@ -112,7 +112,11 @@ export function BotCheckBox({
     let answer = '';
     let widget: string | undefined;
     let gone = false;
+    // Set in the very task of a submit, so a second one in the same instant (a double
+    // click) is ignored instead of sending the same answer again; cleared by a fresh answer.
+    let sending = false;
     const show = (value: string, wait: boolean) => {
+      if (!wait) sending = false;
       answer = value;
       input.value = value;
       for (const button of buttons) button.disabled = wait;
@@ -145,7 +149,17 @@ export function BotCheckBox({
       },
     );
     // After the form's data is taken (the same task as the submit), the answer is spent.
-    const onSubmit = () => {
+    // A second submit before a fresh answer is stopped here, before React's own listener
+    // (on the page's root) sees it. The buttons have no name, so disabling them at once
+    // takes nothing from the form's data.
+    const onSubmit = (event: SubmitEvent) => {
+      if (sending) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      sending = true;
+      for (const button of buttons) button.disabled = true;
       keep.put(email?.value ?? '');
       setTimeout(() => !gone && fresh(), 0);
     };

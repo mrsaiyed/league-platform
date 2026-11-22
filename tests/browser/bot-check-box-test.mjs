@@ -293,6 +293,66 @@ if (browser) {
     });
   }
 
+  /**
+   * A real double click on the form's button, once it no longer waits: the second click is
+   * in the same instant as the first. Gives the number of answers our server was sent.
+   */
+  async function doubleSend(page, form, posts) {
+    const before = posts.length;
+    await page.waitForFunction(
+      (selector) => document.querySelector(selector)?.disabled === false,
+      `${form} button[type="submit"]`,
+    );
+    const answered = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && r.url().startsWith(origin),
+    );
+    answered.catch(() => undefined);
+    await page.locator(`${form} button[type="submit"]`).dblclick();
+    await answered;
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(300);
+    return posts.length - before;
+  }
+
+  await step('a double click sends once', async () => {
+    const twice = `twice-${stamp}@example.test`;
+    for (const [name, address, form] of [
+      ['sign-in', '/signin', signInForm],
+      ['sign-up', '/signup', codeForm],
+      ['forgotten password', '/signin/forgot', codeForm],
+    ]) {
+      const { context, page, posts } = await openPage();
+      try {
+        await page.goto(origin + address);
+        await page.fill(
+          'input[name="email"]',
+          name === 'sign-in' ? twice : `${name.length}-${twice}`,
+        );
+        if (name === 'sign-in') await page.fill('input[name="password"]', 'not the password');
+        const sent = await doubleSend(page, form, posts);
+        note(`${name}: a double click sends one request`, sent === 1, `${sent} sent`);
+        const said = await alertText(page);
+        note(`${name}: a double click is not refused by the check`, !refusedByCheck(said), said);
+        if (name === 'sign-up') {
+          const resent = await doubleSend(page, resendForm, posts);
+          note(
+            '"Send a new code": a double click sends one request',
+            resent === 1,
+            `${resent} sent`,
+          );
+          const again = await alertText(page);
+          note(
+            '"Send a new code": a double click is not refused by the check',
+            !refusedByCheck(again),
+            again,
+          );
+        }
+      } finally {
+        await context.close();
+      }
+    }
+  });
+
   await step('a browser that cannot load the check', async () => {
     const { context, page, answers } = await openPage({ script: 'abort', width: 390 });
     try {
