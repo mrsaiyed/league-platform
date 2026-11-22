@@ -126,7 +126,7 @@ const grants = [
     type: 'program',
     id: standInDraftProgramId,
   }),
-  grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.otherDraft.id),
+  grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.empty.id),
   // A scorekeeper still holding the role in an archived league is told it is archived,
   // not "no access" (step 2.33).
   grantOf(13, scorekeeper.accountId, 'scorekeeper', standInLeagues.archived.id),

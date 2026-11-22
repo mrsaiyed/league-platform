@@ -945,7 +945,9 @@ const cases = [
       'Add the first one here, then add its games.',
     ],
   ],
-  ['scheduler', '/still-waters', 404, [notFound]],
+  ['scheduler', '/reed-marsh', 404, [notFound]],
+  // The empty league starts live (step 2.194), so a visitor reads its home page.
+  ['visitor', '/still-waters', 200, ['Still Waters League']],
   ['registrar', '/closed-gate', 404, [notFound]],
   ['visitor', '/closed-gate', 404, [notFound]],
   ['owner', '/closed-gate/admin', 200, ['This league has been taken down.']],
@@ -1268,13 +1270,14 @@ async function sameAsNoLeague(origin) {
   };
   // Who may not see which (stand-in-ports.ts): the coach holds a coach's place in the
   // draft, which is not an area of its admin; the scheduler holds the draft and the first
-  // league; another league's admin holds the other draft only.
+  // league; another league's admin holds the empty league only; no one but the owner
+  // holds the second draft (Reed Marsh).
   const hiddenFrom = {
-    visitor: ['quiet-pines', 'closed-gate', 'binned-league'],
-    stranger: ['quiet-pines', 'closed-gate', 'binned-league'],
-    coach: ['quiet-pines', 'closed-gate', 'still-waters'],
-    scheduler: ['closed-gate', 'binned-league', 'still-waters'],
-    otherAdmin: ['quiet-pines', 'closed-gate', 'binned-league'],
+    visitor: ['quiet-pines', 'closed-gate', 'binned-league', 'reed-marsh'],
+    stranger: ['quiet-pines', 'closed-gate', 'binned-league', 'reed-marsh'],
+    coach: ['quiet-pines', 'closed-gate', 'reed-marsh'],
+    scheduler: ['closed-gate', 'binned-league', 'reed-marsh'],
+    otherAdmin: ['quiet-pines', 'closed-gate', 'binned-league', 'reed-marsh'],
   };
   const addresses = ['/admin', '/admin/people', '/admin/games', '', `/score/${liveGame}`];
   const found = [];
@@ -1327,14 +1330,16 @@ async function scoringSameAsNoLeague(origin) {
     'in the bin': leagueOf(6),
     draft: leagueOf(3),
     suspended: leagueOf(5),
-    'another draft': leagueOf(7),
+    // Reed Marsh; Still Waters (7), the empty league, starts live (step 2.194).
+    'another draft': leagueOf(8),
   };
-  // Who may not see which: another league's admin holds the other draft; another league's
-  // scorekeeper holds north-valley, the draft and the archived league (stand-in-ports.ts).
+  // Who may not see which: another league's admin holds the empty league only; no one
+  // but the owner holds the other draft; another league's scorekeeper holds north-valley,
+  // the draft and the archived league (stand-in-ports.ts).
   const hiddenFrom = {
-    visitor: ['draft', 'suspended'],
-    stranger: ['draft', 'suspended'],
-    otherAdmin: ['draft', 'suspended'],
+    visitor: ['draft', 'another draft', 'suspended'],
+    stranger: ['draft', 'another draft', 'suspended'],
+    otherAdmin: ['draft', 'another draft', 'suspended'],
     scorekeeper: ['another draft', 'suspended'],
   };
   const ask = async (who, leagueId) => {

@@ -181,11 +181,17 @@ describe('a draft league (U-9, step 2.87)', () => {
   });
 
   it("does not let one league's staff see another league's draft", async () => {
-    expect(kind(await ask('otherAdmin', '/still-waters/admin', adminHome))).toBe('show');
-    for (const who of staffNames.filter((name) => name !== 'owner')) {
-      expect(kind(await ask(who, '/still-waters', site)), who).toBe('not-found');
-      expect(kind(await ask(who, '/still-waters/admin', adminHome)), who).toBe('not-found');
+    // The second draft league (Reed Marsh) is held by no one but its owner.
+    for (const who of [...staffNames.filter((name) => name !== 'owner'), 'otherAdmin'] as const) {
+      expect(kind(await ask(who, '/reed-marsh', site)), who).toBe('not-found');
+      expect(kind(await ask(who, '/reed-marsh/admin', adminHome)), who).toBe('not-found');
     }
+    expect(kind(await ask('visitor', '/reed-marsh', site))).toBe('not-found');
+    expect(kind(await ask('owner', '/reed-marsh/admin', adminHome))).toBe('show');
+    // The empty league starts live (step 2.194): its admin opens its admin area, and a
+    // visitor reads its pages.
+    expect(kind(await ask('otherAdmin', '/still-waters/admin', adminHome))).toBe('show');
+    expect(kind(await ask('visitor', '/still-waters', site))).toBe('show');
     // Their access in the live league opens nothing there either.
     expect(kind(await ask('otherAdmin', '/north-valley/admin', adminHome))).toBe('no-access');
   });
