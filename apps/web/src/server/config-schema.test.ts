@@ -10,12 +10,17 @@ import {
 } from './config-schema.ts';
 
 const longValue = (name: string) => `value-of-${name.toLowerCase()}-0123456789-abcdefghij`;
+/** A made-up certificate's shape: what the setting checks, not a real one. */
+const madeUpCertificate =
+  '-----BEGIN CERTIFICATE-----\nMADEUPmadeup0123\n-----END CERTIFICATE-----';
 const valid: Record<ConfigName, string> = {
   APP_ENV: 'test',
   PUBLIC_BASE_URL: 'http://localhost:3000',
   LOG_LEVEL: 'debug',
   TRUSTED_PROXY: 'one',
   PLATFORM_DATABASE_URL: 'postgres://app:hunter2-made-up@localhost:5432/x',
+  PLATFORM_DATABASE_SSL: 'verify',
+  PLATFORM_DATABASE_CA: madeUpCertificate,
   LOCAL_BINNED_TEAM: 'badgers',
   LOCAL_BOT_CHECK: 'stand-in',
   LOCAL_DATA: 'stand-in',
@@ -220,6 +225,45 @@ describe('loadConfig', () => {
     ]);
     expect(error.message).not.toContain('tracker-made-up');
     expect(Object.values(loadConfig({ ...valid, DATABASE_URL: tracker }))).not.toContain(tracker);
+  });
+
+  it('reaches the database over SSL with its certificate checked unless it is on this computer (record 082)', () => {
+    expect(loadConfig(production).PLATFORM_DATABASE_SSL).toBe('verify');
+    const remote = 'postgres://app:hunter2-made-up@db.made-up.example.test:5432/x';
+    // No SSL only for a database on this computer.
+    expect(loadConfig({ ...production, PLATFORM_DATABASE_SSL: 'off' }).PLATFORM_DATABASE_SSL).toBe(
+      'off',
+    );
+    const offRemote = failure({
+      ...production,
+      PLATFORM_DATABASE_URL: remote,
+      PLATFORM_DATABASE_SSL: 'off',
+    });
+    expect(offRemote.invalid).toEqual([
+      'PLATFORM_DATABASE_SSL: invalid, "off" is allowed only for a database on this computer (an address naming localhost); any other is reached over SSL with its certificate checked',
+    ]);
+    expect(offRemote.message).not.toContain('hunter2-made-up');
+    // Never SSL without the check: the only other word is refused.
+    expect(failure({ ...production, PLATFORM_DATABASE_SSL: 'no-verify' }).invalid.join()).toContain(
+      'PLATFORM_DATABASE_SSL: invalid, not one of the allowed values',
+    );
+    // The certificate is a certificate, and only where SSL is on.
+    const certificate = { ...production, PLATFORM_DATABASE_URL: remote };
+    expect(
+      loadConfig({ ...certificate, PLATFORM_DATABASE_CA: madeUpCertificate }).PLATFORM_DATABASE_CA,
+    ).toBe(madeUpCertificate);
+    expect(failure({ ...certificate, PLATFORM_DATABASE_CA: 'not a certificate' }).invalid).toEqual([
+      'PLATFORM_DATABASE_CA: invalid, must be the server’s certificate as PEM text, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----',
+    ]);
+    expect(
+      failure({
+        ...production,
+        PLATFORM_DATABASE_SSL: 'off',
+        PLATFORM_DATABASE_CA: madeUpCertificate,
+      }).invalid,
+    ).toEqual([
+      'PLATFORM_DATABASE_CA: invalid, a certificate is checked only over SSL, and PLATFORM_DATABASE_SSL is "off"',
+    ]);
   });
 
   it('refuses a platform address that is the tracker’s DATABASE_URL, before connecting', () => {
@@ -520,6 +564,34 @@ describe('web addresses', () => {
       expect(failure({ ...valid, PUBLIC_BASE_URL: bad }).invalid.join()).toContain(
         'PUBLIC_BASE_URL',
       );
+    }
+  });
+  it('online, refuse an http public address in one plain sentence, so the cookie stays secure (audit P9)', () => {
+    for (const appEnv of ['staging', 'production']) {
+      const online = { ...production, APP_ENV: appEnv };
+      for (const http of ['http://leagues.example.test', 'HTTP://leagues.example.test/']) {
+        const error = failure({ ...online, PUBLIC_BASE_URL: http });
+        expect(error.missing).toEqual([]);
+        expect(error.invalid).toEqual([
+          `PUBLIC_BASE_URL: invalid, must start with https:// when APP_ENV is ${appEnv}, or the sign-in cookie could be read on the way; set it to the site’s https address (http is allowed only for localhost)`,
+        ]);
+      }
+      // https is accepted, and so is http on this computer, where no network lies between.
+      expect(loadConfig(online).PUBLIC_BASE_URL).toBe('https://leagues.example.test');
+      for (const here of ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000']) {
+        expect(loadConfig({ ...online, PUBLIC_BASE_URL: here }).PUBLIC_BASE_URL).toBe(here);
+      }
+      // A name that only starts like this computer's is not this computer.
+      expect(
+        failure({ ...online, PUBLIC_BASE_URL: 'http://localhost.example.test' }).invalid.join(),
+      ).toContain('must start with https://');
+    }
+    // Locally and in tests an http address stays as it was.
+    for (const appEnv of ['local', 'test']) {
+      const address = 'http://leagues.example.test';
+      expect(
+        loadConfig({ ...valid, APP_ENV: appEnv, PUBLIC_BASE_URL: address }).PUBLIC_BASE_URL,
+      ).toBe(address);
     }
   });
   it('reports a bad optional value as invalid, not missing', () => {

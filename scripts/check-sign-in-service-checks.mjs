@@ -10,7 +10,7 @@
 // the adapter makes, and prints one line for each of record 018's checks a script can
 // make: "as expected", or the call, the status and the error code that differed. What
 // is "as expected" is what the adapter relies on and what the fake that its tests run
-// against answers (fake-supabase-auth.test-helper.ts): a line that differs means the
+// against answers (fake-supabase-auth.ts): a line that differs means the
 // adapter or the fake is wrong (record 018, "Revisit if"). It uses one made-up user,
 // with an address ending .test, and removes it at the end whatever happened before.
 //

@@ -27,6 +27,7 @@ import {
   isLeagueIdFormat,
   ok,
   type AccessTx,
+  type BinTx,
   type CommandDeps,
   type Result,
 } from '@srleagues/core';
@@ -39,6 +40,7 @@ import { peopleDepsOf } from './admin-people.ts';
 import type { AccountRefusal } from './context.ts';
 import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
 import { databaseAdminTeams, type AdminTeamsQueries } from './database-admin-teams.ts';
+import { coreEventHandlers } from './database-event-handlers.ts';
 import { databaseGames, databaseGamesDeps, type GamesQueries } from './database-games.ts';
 import {
   databaseLeagueSites,
@@ -66,6 +68,7 @@ export type DatabaseQueries = Pick<
   | 'commandTransaction'
   | 'findLeagueByShortName'
   | 'findCurrentLeague'
+  | 'databaseAnswers'
   | 'findAccountOfSignIn'
   | 'accountForSignIn'
   | 'isSignInLinkConflict'
@@ -147,8 +150,11 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
       jobs: database.jobsStore(scope),
       activity: database.activityLogStore(scope),
       access: database.accessStore(scope),
+      standings: database.standingsStore(scope),
+      games: database.gamesStore(scope),
     })),
-    events: [],
+    // Core's handlers, from the one place every database port takes them.
+    events: coreEventHandlers<AccessTx>(),
     log: options.log,
     now: () => performance.now(),
   };
@@ -282,8 +288,12 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
           bin: database.binStore(scope),
           access: database.accessStore(scope),
           activity: database.activityLogStore(scope),
+          // The stores core's handlers use, so the port is given them from the one place
+          // (database-event-handlers.ts) though restoring a person sets none of them off.
+          standings: database.standingsStore(scope),
+          games: database.gamesStore(scope),
         })),
-        events: [],
+        events: coreEventHandlers<BinTx>(),
         log: options.log,
         now: () => performance.now(),
       },
@@ -297,6 +307,8 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     publishPlays: async () => {},
     liveFeed: null,
     madeUpWorld: false,
+    // The health check asks the database itself (health.ts).
+    databaseCheck: () => database.databaseAnswers(db),
     // Carrying the local tools, only requests made on this computer (step 2.96).
     answers:
       options.localTools === undefined || options.localTools === null
