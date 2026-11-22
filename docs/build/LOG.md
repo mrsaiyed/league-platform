@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-22 09:22 UTC — Step 2.194 landed whole (e567af8, lane 2.194-walk-fixes on top of b40857a): the first test's walk works at any hour, the account page links to Admin, the two forms on a team's page are headed; every test that looked under the moved form is corrected, all 37 browser test files passed on the cloud machine, the walk's 110 checks pass after the merge with step 2.199; GitHub passed twice. TEST 1 IS READY (docs/operations/first-test.md).
+
 - 2026-11-22 08:34 UTC — Step 2.202 landed (7563f5e): the database's tests run on a throw-away real PostgreSQL 16 (record 092, T-292); the review's High fixed (the login check at start follows every role the login may become), a second look could not fool it within what it promises (what lies outside is step 2.238); GitHub passed twice.
 
 - 2026-11-22 08:22 UTC — Step 2.199 landed (f04fbf6): the leaders boards count the games a statistic was recorded in, ties share a place and the next is counted as in a race (S-76, S-63 changed: both Decided for you), reviewed with 21 seasons of the reviewer's own, two Mediums fixed; GitHub passed twice.
