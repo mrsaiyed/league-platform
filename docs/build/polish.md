@@ -25,3 +25,14 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - From step 2.93's review (Lows): an http localhost site address is still taken in staging (allow it only when the server listens on this computer alone); the test-only fakes serveFakeSupabaseAuth and serveMadeUpDatabase are exported from the packages' entry files (a test-only entry file); the list of this computer's names is written twice (startup.ts onThisComputer, config-schema.ts thisComputerHosts); comments in bot-check-off.ts and bot-check.ts still say the first online copy has no bot-check keys; three browser tests keep their own wait for a title that the shared check now does.
 
 - From step 2.205: on the test copy the made-up line stands only in the footer of the admin pages, out of sight while an admin types (consider it above the People forms); SignInScreen reads the ports itself (pass the flag in from the page).
+
+- 2.37 part 2: the 5-second Reopen retry in use-end-game.ts has no test of its own and uses window.setInterval directly, not the controller's clock (code review L1).
+- 2.37 part 2: the "not entered again" error (againRefused) stays on screen until the next tap, and its words do not fit the not-scoring case (code review L2).
+- 2.37 part 2: the screen-level test that another scorekeeper is refused Reopen became an owner case (tracker-controller-end.test.ts); the server rule is still tested in core (code review L3).
+- 2.37 part 2: every 5-second hold check still locks the game's row; a plain read would do until a write is due (code review L4).
+- 2.37 part 2: the controller imports mayEnterAgain from a module that holds the play's words, and one test pins holdCheckMs <= 5000 (code review L5).
+- 2.37 part 2: at 360x640 the second team's five is cut off by the pad while a notice shows (review by use).
+- 2.37 part 2: "This game is final. Reopen it to make changes." shows where the panel says only the ender can reopen (review by use).
+- 2.37 part 2: a device that lost the game learns that it ended only when "See who is scoring" is tapped (review by use).
+- 2.37 part 2: the banner's "1 not saved" stands beside the notice's "1 play was not applied"; one word for both (review by use).
+- 2.37 part 2: "Enter it again if it is needed" stands beside "Only the device scoring can enter these again" on a device not scoring (review by use).
