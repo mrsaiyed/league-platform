@@ -1,4 +1,5 @@
-// A season's calculated standings rows (T3 §9), by place then seed.
+// A season's calculated standings rows (T3 §9), by place then seed. `level` is handed on
+// as stored (migration 0022): core reads the document and trusts nothing it cannot read.
 import type { StandingsRowRecord } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
@@ -23,6 +24,7 @@ export async function listStandingsRows(
       'streak_result',
       'streak_length',
       'decided_by',
+      'level',
     ])
     .where('league_id', '=', scope.leagueId)
     .where('season_id', '=', seasonId)
@@ -45,5 +47,6 @@ export async function listStandingsRows(
     streakResult: row.streak_result,
     streakLength: row.streak_length,
     decidedBy: row.decided_by,
+    level: row.level,
   }));
 }

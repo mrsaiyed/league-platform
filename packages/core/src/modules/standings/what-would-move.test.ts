@@ -18,6 +18,7 @@ const row = (teamId: string, rank: number, fields: Partial<StandingsRow> = {}): 
   points: null,
   streak: null,
   decidedBy: null,
+  level: null,
   adjustments: [],
   ...fields,
 });

@@ -586,6 +586,22 @@ const adminPages = [
   },
   { name: 'admin-settings', at: '/admin/settings' },
   { name: 'admin-people', at: '/admin/people' },
+  // Step 2.50, Admin → People: a search by name; one person's record (the first on the
+  // list); and, by the owner's own taps with scripts off (peopleSteps), a child added by hand
+  // with an email and a date of birth, landing on their record that says so; the add form
+  // refused beside its boxes, with what was typed kept; a misspelt name put right, "Saved"
+  // beside the details; and a date of birth that makes a player two years old shown back
+  // before it is saved (R-28). Each taken in the first league only.
+  { name: 'admin-people-search', at: '/admin/people?q=ta' },
+  { name: 'admin-person', at: '/admin/people', first: '/admin/people/' },
+  ...['person-added', 'person-add-refused', 'person-saved', 'person-birth-date-asked'].map(
+    (step) => ({
+      name: `admin-${step}`,
+      at: '/admin/people',
+      league: 'north-valley',
+      steps: (page) => peopleSteps(page, step),
+    }),
+  ),
   { name: 'admin-standings', at: '/admin/standings' },
   // The admin's own frame (step 2.103): its menu, open, as a phone holds it (on a laptop the
   // menu is always at the side, so the picture is the page's first screen); and "not
@@ -1254,6 +1270,50 @@ async function scoreTrackedGames(origin) {
  * 2.160), from the season as the seed has it: any draft is discarded first, so each
  * picture, at each width, starts from no rounds. Nothing is published.
  */
+/** The owner's taps for step 2.50's pictures of People (see adminPages). Scripts are off. */
+async function peopleSteps(page, what) {
+  const add = page.locator('#add-person');
+  const send = async (form, button) => {
+    await Promise.all([
+      page.waitForEvent('load'),
+      form.getByRole('button', { name: button }).click(),
+    ]);
+  };
+  if (what === 'person-add-refused') {
+    await add.getByLabel('First name').fill('Jon');
+    await add.getByLabel('Last name').fill('Smiht');
+    await add.getByLabel('Email (optional)').fill('jon.parent.example.test');
+    await add.getByLabel('Date of birth (optional)').fill('2999-01-01');
+    await send(add, 'Add to the league');
+    await page.locator('#add-person [data-wrong]').first().waitFor();
+    await page.locator('#add-person').scrollIntoViewIfNeeded();
+    return;
+  }
+  await add.getByLabel('First name').fill('Jon');
+  await add.getByLabel('Last name').fill('Smiht');
+  await add.getByLabel('Email (optional)').fill('jon.parent@example.test');
+  await add.getByLabel('Date of birth (optional)').fill('2014-06-01');
+  await add.getByLabel('Child or adult').selectOption('child');
+  await send(add, 'Add to the league');
+  if (!/\/admin\/people\/[0-9a-f-]{36}/.test(page.url())) {
+    throw new Error(`adding a person landed on ${page.url()}`);
+  }
+  if (what === 'person-added') return;
+  const details = page.locator('#details');
+  if (what === 'person-birth-date-asked') {
+    // A date of birth that makes a player two years old is shown back before it is saved
+    // (R-28 as changed on 2026-11-17).
+    const year = new Date().getUTCFullYear() - 2;
+    await details.getByLabel('Date of birth (optional)').fill(`${year}-01-15`);
+    await send(details, 'Save details');
+    await page.locator('#details [data-wrong="birthDate"]').waitFor();
+    return;
+  }
+  await details.getByLabel('Last name').fill('Smith');
+  await send(details, 'Save details');
+  await page.getByText('Saved: Jon Smith.').waitFor();
+}
+
 /** The owner's taps for step 2.161's pictures (see adminPages). Scripts are off. */
 async function undoSteps(page, what) {
   const tapTo = async (locator, url) => {

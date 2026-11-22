@@ -560,7 +560,27 @@ const cases = [
   ['scheduler', '/harbor-city/admin/teams', 403, [noAccess], ['Admin areas', 'Back to the admin']],
   // An area with no screen yet is the placeholder, in the words the checks around this
   // one look for to prove a real screen has replaced it (scripts/admin-placeholder.mjs).
-  ['owner', '/north-valley/admin/people', 200, [adminPlaceholder, 'Back to the admin']],
+  ['owner', '/north-valley/admin/registration', 200, [adminPlaceholder, 'Back to the admin']],
+  // Admin → People (step 2.50): everyone in the league, searched by name, with the form to
+  // add someone; each name leads to their record. A scorekeeper is refused it.
+  [
+    'owner',
+    '/north-valley/admin/people',
+    200,
+    [
+      'Everyone in the league, on a team or not.',
+      'Search by name',
+      'Add a person',
+      'Dana Whitfield',
+      'Leo Fischer',
+      staffFrameAt('/north-valley/admin/people'),
+      oneHeading,
+    ],
+    [adminPlaceholder],
+  ],
+  ['owner', '/north-valley/admin/people?q=fisch', 200, ['Leo Fischer'], ['Dana Whitfield']],
+  ['scorekeeper', '/north-valley/admin/people', 403, [noAccess], ['Dana Whitfield']],
+  ['owner', '/north-valley/admin/people/not-a-person', 404, [notFound]],
   // Admin → Teams (step 2.51): the season's teams and the form to add one.
   [
     'owner',
@@ -851,6 +871,14 @@ const cases = [
     [adminLink('quiet-pines', 'games'), adminLink('quiet-pines', 'settings')],
   ],
   ['registrar', '/quiet-pines/admin/schedule', 403, [noAccess]],
+  // A registrar runs People (P4 §4) and may enter a person's private details (R-16).
+  [
+    'registrar',
+    '/quiet-pines/admin/people',
+    200,
+    ['Add a person', 'Private details', 'Date of birth (optional)'],
+    [adminPlaceholder],
+  ],
   ['editor', '/quiet-pines', 200, ['This league is not published.']],
   [
     'editor',
@@ -945,7 +973,9 @@ const cases = [
       'Add the first one here, then add its games.',
     ],
   ],
-  ['scheduler', '/still-waters', 404, [notFound]],
+  ['scheduler', '/reed-marsh', 404, [notFound]],
+  // The empty league starts live (step 2.194), so a visitor reads its home page.
+  ['visitor', '/still-waters', 200, ['Still Waters League']],
   ['registrar', '/closed-gate', 404, [notFound]],
   ['visitor', '/closed-gate', 404, [notFound]],
   ['owner', '/closed-gate/admin', 200, ['This league has been taken down.']],
@@ -1268,13 +1298,14 @@ async function sameAsNoLeague(origin) {
   };
   // Who may not see which (stand-in-ports.ts): the coach holds a coach's place in the
   // draft, which is not an area of its admin; the scheduler holds the draft and the first
-  // league; another league's admin holds the other draft only.
+  // league; another league's admin holds the empty league only; no one but the owner
+  // holds the second draft (Reed Marsh).
   const hiddenFrom = {
-    visitor: ['quiet-pines', 'closed-gate', 'binned-league'],
-    stranger: ['quiet-pines', 'closed-gate', 'binned-league'],
-    coach: ['quiet-pines', 'closed-gate', 'still-waters'],
-    scheduler: ['closed-gate', 'binned-league', 'still-waters'],
-    otherAdmin: ['quiet-pines', 'closed-gate', 'binned-league'],
+    visitor: ['quiet-pines', 'closed-gate', 'binned-league', 'reed-marsh'],
+    stranger: ['quiet-pines', 'closed-gate', 'binned-league', 'reed-marsh'],
+    coach: ['quiet-pines', 'closed-gate', 'reed-marsh'],
+    scheduler: ['closed-gate', 'binned-league', 'reed-marsh'],
+    otherAdmin: ['quiet-pines', 'closed-gate', 'binned-league', 'reed-marsh'],
   };
   const addresses = ['/admin', '/admin/people', '/admin/games', '', `/score/${liveGame}`];
   const found = [];
@@ -1327,14 +1358,16 @@ async function scoringSameAsNoLeague(origin) {
     'in the bin': leagueOf(6),
     draft: leagueOf(3),
     suspended: leagueOf(5),
-    'another draft': leagueOf(7),
+    // Reed Marsh; Still Waters (7), the empty league, starts live (step 2.194).
+    'another draft': leagueOf(8),
   };
-  // Who may not see which: another league's admin holds the other draft; another league's
-  // scorekeeper holds north-valley, the draft and the archived league (stand-in-ports.ts).
+  // Who may not see which: another league's admin holds the empty league only; no one
+  // but the owner holds the other draft; another league's scorekeeper holds north-valley,
+  // the draft and the archived league (stand-in-ports.ts).
   const hiddenFrom = {
-    visitor: ['draft', 'suspended'],
-    stranger: ['draft', 'suspended'],
-    otherAdmin: ['draft', 'suspended'],
+    visitor: ['draft', 'another draft', 'suspended'],
+    stranger: ['draft', 'another draft', 'suspended'],
+    otherAdmin: ['draft', 'another draft', 'suspended'],
     scorekeeper: ['another draft', 'suspended'],
   };
   const ask = async (who, leagueId) => {

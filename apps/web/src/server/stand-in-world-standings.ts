@@ -7,6 +7,7 @@
 // settings rows, the one place every area reads what League settings saved.
 import {
   leagueStatuses,
+  levelDocument,
   type AccessReader,
   type DivisionsStore,
   type LeaguesStore,
@@ -191,6 +192,8 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
         streakResult: row.streak?.result ?? null,
         streakLength: row.streak?.length ?? null,
         decidedBy: row.decidedBy,
+        // As the database keeps it (migration 0022): the one stored document.
+        level: levelDocument(row.level),
       })),
     adjustments: async (seasonId) =>
       (at()?.adjustments ?? [])

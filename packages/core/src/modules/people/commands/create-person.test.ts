@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   memoryPeople,
   ownerId,
@@ -75,5 +75,33 @@ describe('createPerson', () => {
     expect(await createPerson(archived.as(ownerId), input, archived.deps)).toMatchObject({
       error: { code: 'not-allowed' },
     });
+  });
+
+  it("takes a birth date up to the league's own today, not the server's day in UTC", async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      // East of UTC: the league is on the 23rd while UTC is on the 22nd; a child born today.
+      vi.setSystemTime(new Date('2026-11-22T12:00:00Z'));
+      const east = memoryPeople({ grants: [registrarGrant], today: '2026-11-23' });
+      const born = await createPerson(
+        east.as(registrarId),
+        { firstName: 'Ava', lastName: 'Ng', birthDate: '2026-11-23' },
+        east.deps,
+      );
+      expect(born.ok).toBe(true);
+      expect(east.db.state.people[0]?.sensitiveFields.birthDate).toBe('2026-11-23');
+      // West of UTC: UTC is on the 23rd, the league still on the 22nd: the 23rd is tomorrow.
+      vi.setSystemTime(new Date('2026-11-23T03:00:00Z'));
+      const west = memoryPeople({ grants: [registrarGrant], today: '2026-11-22' });
+      const early = await createPerson(
+        west.as(registrarId),
+        { firstName: 'Ava', lastName: 'Ng', birthDate: '2026-11-23' },
+        west.deps,
+      );
+      expect(early).toMatchObject({ ok: false, error: { code: 'invalid-input' } });
+      expect(west.db.state.people).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
