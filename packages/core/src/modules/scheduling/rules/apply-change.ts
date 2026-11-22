@@ -31,6 +31,15 @@ const isTime = (v: string): boolean => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
 
 const fail = (error: ChangeError): ApplyChangeResult => ({ ok: false, error });
 
+/** The state's record of removed games without this one, if it has a record at all. */
+const withoutRemoved = (
+  state: ScheduleState,
+  gameId: string,
+): Pick<ScheduleState, 'removedGames'> =>
+  state.removedGames === undefined
+    ? {}
+    : { removedGames: state.removedGames.filter((g) => g.id !== gameId) };
+
 /** The highest number a round can have: the database numbers a season's rounds 1 to 1000. */
 export const maxRounds = 1000;
 
@@ -81,7 +90,16 @@ export function applyDraftChange(
       }
       const bad = badSlot(g);
       if (bad) return bad;
-      return done({ ...state, games: [...state.games, { ...g }] }, [g.id]);
+      // A game added with the id of one the draft removed is that game again (how "Put it
+      // back" was saved before step 2.185): the draft no longer removes it.
+      return done(
+        {
+          ...state,
+          games: [...state.games, { ...g }],
+          ...withoutRemoved(state, g.id),
+        },
+        [g.id],
+      );
     }
     case 'move-game': {
       if (!find(change.gameId)) return fail({ code: 'unknown-game', gameId: change.gameId });
@@ -106,8 +124,31 @@ export function applyDraftChange(
       return done({ ...state, games }, [a.id, b.id]);
     }
     case 'remove-game': {
-      if (!find(change.gameId)) return fail({ code: 'unknown-game', gameId: change.gameId });
-      return done({ ...state, games: state.games.filter((g) => g.id !== change.gameId) }, []);
+      const game = find(change.gameId);
+      if (!game) return fail({ code: 'unknown-game', gameId: change.gameId });
+      return done(
+        {
+          ...state,
+          games: state.games.filter((g) => g.id !== change.gameId),
+          removedGames: [...(withoutRemoved(state, game.id).removedGames ?? []), game],
+        },
+        [],
+      );
+    }
+    case 'put-back-game': {
+      if (find(change.gameId)) return fail({ code: 'game-exists', gameId: change.gameId });
+      const was = state.removedGames?.find((g) => g.id === change.gameId);
+      if (!was) return fail({ code: 'unknown-game', gameId: change.gameId });
+      // Its round removed since: it comes back with no round, as from the bin (S-60).
+      const roundId = was.roundId !== null && hasRound(was.roundId) ? was.roundId : null;
+      return done(
+        {
+          ...state,
+          games: [...state.games, { ...was, roundId }],
+          ...withoutRemoved(state, was.id),
+        },
+        [was.id],
+      );
     }
     case 'set-recording': {
       if (!find(change.gameId)) return fail({ code: 'unknown-game', gameId: change.gameId });

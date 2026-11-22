@@ -130,6 +130,8 @@ const grants = [
   // A scorekeeper still holding the role in an archived league is told it is archived,
   // not "no access" (step 2.33).
   grantOf(13, scorekeeper.accountId, 'scorekeeper', standInLeagues.archived.id),
+  // A scheduler with a long address, in the first league only (step 2.157).
+  grantOf(14, standInPeople.longAddress.accountId, 'scheduler', standInLeagues.live.id),
 ];
 
 const leagues: readonly (typeof standInLeagues)[keyof typeof standInLeagues][] =

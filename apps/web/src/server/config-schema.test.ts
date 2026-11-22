@@ -18,6 +18,7 @@ const valid: Record<ConfigName, string> = {
   PLATFORM_DATABASE_URL: 'postgres://app:hunter2-made-up@localhost:5432/x',
   LOCAL_BINNED_TEAM: 'badgers',
   LOCAL_DATA: 'stand-in',
+  LOCAL_DEMO_LEAGUE: 'off',
   LOCAL_DESIGN: 'crest-light',
   LOCAL_NOW: '2026-11-15T20:01:00Z',
   SESSION_SECRET: longValue('SESSION_SECRET'),
@@ -30,13 +31,14 @@ const valid: Record<ConfigName, string> = {
 };
 const names = Object.keys(fields) as ConfigName[];
 /**
- * Every setting, for staging and production: LOCAL_BINNED_TEAM, LOCAL_DATA, LOCAL_DESIGN and
- * LOCAL_NOW are for local work and tests only.
+ * Every setting, for staging and production: LOCAL_BINNED_TEAM, LOCAL_DATA,
+ * LOCAL_DEMO_LEAGUE, LOCAL_DESIGN and LOCAL_NOW are for local work and tests only.
  */
 const hosted = {
   ...valid,
   LOCAL_BINNED_TEAM: undefined,
   LOCAL_DATA: undefined,
+  LOCAL_DEMO_LEAGUE: undefined,
   LOCAL_DESIGN: undefined,
   LOCAL_NOW: undefined,
 };
@@ -285,6 +287,29 @@ describe('loadConfig', () => {
       expect(failure({ ...production, APP_ENV: appEnv, LOCAL_DATA: 'stand-in' }).invalid).toEqual([
         'LOCAL_DATA: invalid, may be set only when APP_ENV is local or test',
       ]);
+    }
+  });
+
+  it('takes LOCAL_DEMO_LEAGUE in local work and tests only, with the made-up database (step 2.59)', () => {
+    expect(loadConfig(localOnly).LOCAL_DEMO_LEAGUE).toBe('off');
+    expect(
+      loadConfig({ ...localOnly, LOCAL_DATA: 'made-up-database', LOCAL_DEMO_LEAGUE: 'on' })
+        .LOCAL_DEMO_LEAGUE,
+    ).toBe('on');
+    expect(failure({ ...localOnly, LOCAL_DEMO_LEAGUE: 'on' }).invalid).toEqual([
+      'LOCAL_DEMO_LEAGUE: invalid, the demo-shaped league is loaded into the made-up database only, so it may be on only with LOCAL_DATA=made-up-database',
+    ]);
+    expect(
+      failure({
+        ...localOnly,
+        LOCAL_DATA: 'made-up-database',
+        LOCAL_DEMO_LEAGUE: 'yes',
+      }).invalid.join(),
+    ).toContain('LOCAL_DEMO_LEAGUE');
+    for (const appEnv of ['staging', 'production']) {
+      expect(failure({ ...production, APP_ENV: appEnv, LOCAL_DEMO_LEAGUE: 'off' }).invalid).toEqual(
+        ['LOCAL_DEMO_LEAGUE: invalid, may be set only when APP_ENV is local or test'],
+      );
     }
   });
 

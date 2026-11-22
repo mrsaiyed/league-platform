@@ -570,7 +570,8 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
       deps,
     ),
   );
-  // A tracked game, played and ended on the tracker.
+  // A tracked game, played and ended on the tracker: level after regulation and won in
+  // the first overtime, so its result keeps one overtime period (step 2.200).
   const session = ok(
     'session',
     await openScoringSession(as, { gameId: gameIds.tracked, deviceId: 'agree-tablet' }, deps),
@@ -596,6 +597,13 @@ async function playTheSeason(side: Side, seasonId: string, divisions: readonly s
         tap({ type: 'start' }),
         tap({ type: 'score', side: 'home', playerId: herons[0], points: 2 }),
         tap({ type: 'score', side: 'away', playerId: kestrels[1], points: 3 }),
+        tap({ type: 'pause' }),
+        tap({ type: 'period', period: 2 }),
+        tap({ type: 'start' }),
+        tap({ type: 'score', side: 'home', playerId: herons[2], points: 1 }),
+        tap({ type: 'pause' }),
+        tap({ type: 'period', period: 3 }),
+        tap({ type: 'start' }),
         tap({ type: 'score', side: 'home', playerId: herons[2], points: 2 }),
         // The numbers audit's case 18: one turnover charged to the team, one to a player.
         tap({ type: 'team-turnover', side: 'away' }),
@@ -677,6 +685,8 @@ describe('the one world and the database, the same season by the same commands',
   it('read the same published schedule', async () => {
     const [a, b] = await both(async (side) => side.schedule(await seasonOfSide(side), today));
     expect(b).toEqual(a);
+    // The tracked game's card has its overtime period on both (step 2.200).
+    expect(JSON.stringify(a)).toContain('"overtimePeriods":1');
   });
 
   it('read the same game pages: the box score, the tracked game, the corrected one', async () => {
@@ -692,7 +702,32 @@ describe('the one world and the database, the same season by the same commands',
         side.games((store) => readGamePage(store, { gameId }, viewing(side))),
       );
       expect(b, gameId).toEqual(a);
+      // The tracked game's page keeps its overtime period on both (step 2.200).
+      const overtime = (a as { value?: { game?: { overtimePeriods?: unknown } } }).value?.game;
+      expect(overtime?.overtimePeriods, gameId).toBe(gameId === gameIds.tracked ? 1 : null);
     }
+  });
+
+  it('agree on each game’s overtime count: 1 for the tracked game, none for the rest (step 2.200)', async () => {
+    const [a, b] = await both(async (side) =>
+      side.deps.transaction(side.as, async (tx) => {
+        const counts: Record<string, number | null | undefined> = {};
+        for (const [name, gameId] of Object.entries(gameIds)) {
+          counts[name] = (await tx.games.find(gameId))?.overtimePeriods;
+        }
+        return counts;
+      }),
+    );
+    expect(b).toEqual(a);
+    expect(a).toMatchObject({
+      tracked: 1,
+      box: null,
+      final: null,
+      forfeit: null,
+      postponed: null,
+      cancelled: null,
+      typed: null,
+    });
   });
 
   it("agree on each box score's Total and the season's team totals (step 2.196: cases 18 and 40)", async () => {
@@ -748,14 +783,15 @@ describe('the one world and the database, the same season by the same commands',
     expect(herons.totals['points']).toBe(50);
     expect((herons.players ?? []).reduce((n, p) => n + Number(p.cells['points'] ?? 0), 0)).toBe(48);
     // The season's points for the Herons are their final scores where their players'
-    // points were recorded: 50 typed and 4 tracked, as their two Totals and the
-    // standings say, not the 48 and 4 their players add to (S-26 as changed).
+    // points were recorded: 50 typed and 5 tracked (the tracked game is levelled in the
+    // second half and won in overtime, step 2.200), as their two Totals and the
+    // standings say, not the 48 and 5 their players add to (S-26 as changed).
     const heronsId = [...database.names].find(([, name]) => name === 'team:Herons')?.[0];
     expect(read.teams.find((t) => t.team === heronsId)?.points).toMatchObject({
-      total: 54,
+      total: 55,
       gamesRecorded: 2,
     });
-    expect(tableOf(read.tracked, 'home').totals['points']).toBe(4);
+    expect(tableOf(read.tracked, 'home').totals['points']).toBe(5);
     expect(herons.notes).toEqual([
       "The players' points add to 48. The final score was entered as 50.",
     ]);

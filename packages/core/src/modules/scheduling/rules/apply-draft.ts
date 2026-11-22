@@ -31,17 +31,13 @@ export function applyDraft(
   // A copy, so the result never is the published object even when nothing changes.
   let state: ScheduleState = { rounds: [...published.rounds], games: [...published.games] };
   const rejected: ApplyDraftResult['rejected'] = [];
-  const removedById = new Map<string, ScheduleGame>();
   changes.forEach((change, index) => {
-    const before =
-      change.kind === 'remove-game' ? state.games.find((g) => g.id === change.gameId) : undefined;
     const result = applyDraftChange(state, change, skippedDates);
-    if (result.ok) {
-      state = result.state;
-      if (before !== undefined) removedById.set(before.id, before);
-    } else rejected.push({ index, error: result.error });
+    if (result.ok) state = result.state;
+    else rejected.push({ index, error: result.error });
   });
-  const removed = [...removedById.values()].filter(
+  // The state keeps each removed game as it was just before (apply-change.ts).
+  const removed = (state.removedGames ?? []).filter(
     (game) => !state.games.some((g) => g.id === game.id),
   );
   return { state, rejected, clashes: findClashes(state.games, skippedDates), removed };

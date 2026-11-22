@@ -42,6 +42,8 @@ export type GamesReadStore = {
         readonly captureMode: string;
         readonly homeScore: number | null;
         readonly awayScore: number | null;
+        /** A final game's overtime periods (P7 §5.6); null when not known or not final. */
+        readonly overtimePeriods: number | null;
         readonly finalizedAt: string | null;
         readonly binned: boolean;
         /** The rules it is played under, as stored: its own once fixed (`format`), else

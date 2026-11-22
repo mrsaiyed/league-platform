@@ -393,9 +393,21 @@ export const layoutCss = String.raw`
 }
 .ui-message p {
   color: var(--color-muted);
+  /* A long word, such as the address someone is signed in with, breaks inside the card
+     instead of running out of it (step 2.157). */
+  overflow-wrap: anywhere;
 }
 .ui-message .ui-button {
   margin-block-start: var(--step-3);
+}
+.ui-message-also {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--step-2);
+}
+.ui-message .ui-message-also .ui-button {
+  margin-block-start: 0;
 }
 .ui-message-mark {
   inline-size: var(--step-7);

@@ -110,6 +110,23 @@ describe('message page', () => {
     expect(html.match(/<a /g)).toHaveLength(1);
     expect(html).toContain('We could not find that page.');
   });
+  it('puts quieter ways on under the clear one, never a second filled button', () => {
+    const html = render(
+      createElement(MessagePage, {
+        title: 'You do not have access',
+        action: { href: '/a', label: 'Back to the admin' },
+        also: [
+          { href: '/b', label: 'Back to the league' },
+          { href: '/c', label: 'Use another account' },
+        ],
+      }),
+    );
+    expect(html.match(/data-kind="main"/g)).toHaveLength(1);
+    expect(html.match(/data-kind="quiet"/g)).toHaveLength(2);
+    expect(html.indexOf('Back to the admin')).toBeLessThan(html.indexOf('Use another account'));
+    expect(html).toContain('<p class="ui-message-also">');
+    expect(render(createElement(MessagePage, { title: 'T', also: [] }))).not.toContain('also');
+  });
   it('keeps a class it is given beside its own', () => {
     expect(render(createElement(MessagePage, { title: 'T', className: 'score-root' }))).toContain(
       'class="ui-message score-root"',

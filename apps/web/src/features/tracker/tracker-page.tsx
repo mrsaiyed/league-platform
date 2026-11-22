@@ -9,7 +9,10 @@
 // - the game's: the staff read of its rosters (games.read_tracker_rosters, T-258) runs
 //   only for whoever may score this game (mayScoreGame, read fresh, T-75), so a
 //   scorekeeper limited to assigned games is refused one not theirs: the tracker's own
-//   refusal, with the way back to their games. So is a game that is not this league's.
+//   refusal, with the way back to their games. A game that is not this league's, another
+//   league's among them, is "Page not found" with status 404 in the same look
+//   (TrackerGameNotFound, app/[league]/score/[game]/not-found.tsx; step 2.157), and says
+//   nothing of the other league.
 //
 // In a league that is archived or suspended nothing is scored (U-9): the page says which,
 // rather than "you do not have access".
@@ -29,14 +32,15 @@
 import { catalogs, en } from '@srleagues/site';
 import { MessagePage } from '@srleagues/ui';
 import { leagueUrl, listMyGames, platformUrl, readTrackerRosters } from '@srleagues/core';
-import { forbidden } from 'next/navigation';
+import { forbidden, notFound } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { AccountButton, accountMenuOf, DesignStyle } from '../shell/index.ts';
 import { webPorts } from '../../server/container.ts';
+import type { LeagueView } from '../../server/league-gate.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { gameWhenText } from '../../server/game-when.ts';
 import { isGameIdFormat } from '../../server/league-api.ts';
-import { leagueSites, siteOf } from '../../server/league-site.ts';
+import { siteOfThisRequest } from '../../server/league-site.ts';
 import { loadLeaguePage, signedInEmail } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { signInFirstUrl } from '../../server/sign-in-first.ts';
@@ -71,7 +75,7 @@ export async function TrackerPage({
   );
   // Only someone who scores in this league is this far, so saying there is no such game
   // gives nothing away.
-  if (!isGameIdFormat(game)) return refusal('tracker.unknownGame');
+  if (!isGameIdFormat(game)) return notFound();
   // The league's gate let only someone who scores here this far; nothing of the game is read.
   const stopped = notScoredBecause(here.status);
   if (stopped !== null) return refusal(`admin.myGames.${stopped}`);
@@ -79,9 +83,8 @@ export async function TrackerPage({
   const context = commandContextOf(view.context);
   const read = await readTrackerRosters(context, { gameId: game }, ports.games.deps);
   if (!read.ok) {
-    return refusal(
-      read.error.code === 'not-allowed' ? 'tracker.notAssigned' : 'tracker.unknownGame',
-    );
+    if (read.error.code !== 'not-allowed') return notFound();
+    return refusal('tracker.notAssigned');
   }
   // Only a signed-in account may score, so the read above already refused a visitor.
   if (context.accountId === null) return forbidden();
@@ -123,6 +126,9 @@ export async function TrackerPage({
       accountHref={platformUrl('account')}
       account={menu === null ? null : <AccountButton account={menu} />}
       signInHref={signInFirstUrl(trackerHref, { problem: 'signInAgain' })}
+      // Whoever works in more areas than scoring may correct games: only the words of
+      // the Mark not started question follow from it. The league stays the judge (S-40).
+      mayCorrect={!scoresOnly(view.areas)}
       locale={locale}
       catalog={trackerCatalog(catalogs[locale] ?? en)}
     />
@@ -141,7 +147,7 @@ async function LeagueLook({
   readonly league: { readonly id: string; readonly slug: string };
   readonly children: ReactNode;
 }) {
-  const site = await siteOf(league, await leagueSites());
+  const site = await siteOfThisRequest(league.id, league.slug);
   return (
     <div className="league-site ui-root">
       <DesignStyle design={site.design} />
@@ -184,5 +190,35 @@ function TrackerRefusal({
         {t('tracker.back')}
       </a>
     </MessagePage>
+  );
+}
+
+/**
+ * "Page not found" at a game's scoring address, for someone who scores in this league
+ * (step 2.157): a game that is not this league's (another league's included) or an
+ * address that is no game's. It is the tracker's own refusal in the league's look, with
+ * the way back to their games, answered with status 404 by Next.js. Nothing of any other
+ * league is read or said.
+ */
+export async function TrackerGameNotFound({ view }: { readonly view: LeagueView }) {
+  const here = view.context.league;
+  const backHref = scoresOnly(view.areas)
+    ? leagueUrl(here, 'admin')
+    : leagueUrl(here, 'admin-area', { area: 'games' });
+  const site = await siteOfThisRequest(here.id, here.slug);
+  // In the league's look, centred on the screen in the same place as SR Leagues' own plain
+  // "Page not found" (ui-standalone), with none of the page body's padding around it.
+  return (
+    <div className="league-site ui-root">
+      <DesignStyle design={site.design} />
+      <div className="ui-standalone">
+        <MessagePage
+          title={t('common.notFoundTitle')}
+          action={{ href: backHref, label: t('tracker.back') }}
+        >
+          <p>{t('tracker.unknownGame')}</p>
+        </MessagePage>
+      </div>
+    </div>
   );
 }

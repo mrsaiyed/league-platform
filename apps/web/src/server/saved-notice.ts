@@ -11,7 +11,7 @@
 // same-request.ts, behind a port both servers share.
 
 /** The screens that say "Saved" from a notice. */
-export const noticeScreens = ['games', 'box-score', 'people', 'person'] as const;
+export const noticeScreens = ['games', 'box-score', 'schedule', 'people', 'person'] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 
 export type SavedNotice = {
@@ -22,7 +22,8 @@ export type SavedNotice = {
   readonly said: string;
   /**
    * Other things the notice names, by id: the games that took a game's place since it was
-   * called off, when it is put back (step 2.158). Ids only, never anything typed.
+   * called off, when it is put back (step 2.158); on the schedule, the round a game was
+   * removed from (step 2.185). Ids only, never anything typed.
    */
   readonly about?: readonly string[];
   /**

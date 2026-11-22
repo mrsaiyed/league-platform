@@ -239,7 +239,16 @@ export async function readGameSnapshot(
   }
 
   const live = game.status === 'live' && view !== undefined;
-  const period = Math.min(20, Math.max(1, Math.round(view?.period ?? 1)));
+  const periods = periodsOf(state, game.rules);
+  // A final game whose result keeps its overtime (P7 §5.6) gives the last period played,
+  // as the result counts it: regulation plus its overtime periods, not the period the
+  // tracker's screen stood on at End. A card open while it ended reads its mark from
+  // this (step 2.200). Otherwise the period the game stands in.
+  const ended =
+    game.status === 'final' && game.overtimePeriods !== null
+      ? periods + game.overtimePeriods
+      : null;
+  const period = Math.min(20, Math.max(1, Math.round(ended ?? view?.period ?? 1)));
   return ok({
     gameId: game.id.toLowerCase(),
     sequence: whole(saved?.seq),
@@ -255,7 +264,7 @@ export async function readGameSnapshot(
       away: whole(view?.teams.away.periodFouls),
     },
     latestPlay,
-    periods: periodsOf(state, game.rules),
+    periods,
     teams: {
       home: { name: short(home.name), statsVisible: shown.home },
       away: { name: short(away.name), statsVisible: shown.away },

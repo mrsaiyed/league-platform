@@ -74,6 +74,9 @@ const leagues = [
  * (full names, no confirmation): Lakeside is an adult league with a child in it, Maple
  * Street a youth league. The season under way puts the league's people, in order, on the
  * teams that played, numbers 4 and on, and records their box scores: 10, 14, 18 points.
+ * Then the first division's two teams play again, scored live through the tracker
+ * (seed-tracked-games.ts, step 2.59): 9 more points for the home side's player, 7 for the
+ * away side's, and a second win for the home team.
  */
 const people = [
   {
@@ -82,8 +85,8 @@ const people = [
     // Its seed design, crest (packages/database/src/seed/seed-data.ts): its main color.
     primary: '#96062d',
     players: [
-      { shown: 'Morgan Example', points: 10 },
-      { shown: 'Quinn S.', points: 14 },
+      { shown: 'Morgan Example', points: 19 },
+      { shown: 'Quinn S.', points: 21 },
       { shown: 'Robin Placeholder', points: 18 },
     ],
     team: {
@@ -91,10 +94,12 @@ const people = [
       name: 'Lakeside Herons',
       player: 'Morgan Example',
       number: '4',
-      points: 10,
-      // Its final score in its one game with a box score: a team's points are its final
-      // scores (S-26 as changed by step 2.196), where its players' add to less.
-      totalPoints: 52,
+      points: 19,
+      record: '2-0',
+      // Its final scores in its two games with a box score (52, and 9 in the tracked game): a
+      // team's points are its final scores (S-26 as changed by step 2.196), where its
+      // players' add to less.
+      totalPoints: 61,
     },
     homeLeaders: ['Robin Placeholder', 'Quinn S.'],
     // The adult league's child, on their own team: by first name and last initial (R-14).
@@ -112,16 +117,17 @@ const people = [
     // Its seed design, midnight-gold: its main color.
     primary: '#c8a84b',
     players: [
-      { shown: 'Jordan I.', points: 10 },
-      { shown: 'Casey F.', points: 14 },
+      { shown: 'Jordan I.', points: 19 },
+      { shown: 'Casey F.', points: 21 },
     ],
     team: {
       slug: 'comets',
       name: 'Maple Comets',
       player: 'Jordan I.',
       number: '4',
-      points: 10,
-      totalPoints: 52,
+      points: 19,
+      record: '2-0',
+      totalPoints: 61,
     },
     homeLeaders: ['Casey F.', 'Jordan I.'],
     neverShown: ['Imaginary', 'Fictional', 'jordan.parent@maple', '2013-06-02'],
@@ -353,7 +359,7 @@ if (browser) {
       );
       note(
         `${slug}: the teams page shows a winner's record`,
-        /\b1-0\b/.test(teams.text),
+        new RegExp(`\\b${league.team.record}\\b`).test(teams.text),
         teams.text.slice(0, 300),
       );
       note(`${slug}: nothing of the stand-in on the teams page`, !standInOnly.test(teams.text));
@@ -392,7 +398,10 @@ if (browser) {
         inRoster?.cells[0] === league.team.number,
         JSON.stringify(inRoster?.cells ?? tables),
       );
-      note(`${slug}: ${league.team.name}'s record is 1-0`, /\b1-0\b/.test(team.text));
+      note(
+        `${slug}: ${league.team.name}'s record is ${league.team.record}`,
+        new RegExp(`\\b${league.team.record}\\b`).test(team.text),
+      );
       const inStats = rowOf(league.team.player).find((row) => row.points !== undefined);
       note(
         `${slug}: ${league.team.name}'s player statistics give ${league.team.player} ${league.team.points} points`,

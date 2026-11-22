@@ -115,6 +115,12 @@ export type GamePage = {
     /** The date a final game was last corrected, never the reason (S-7). */
     readonly correctedOn: string | null;
     /**
+     * How many overtime periods a final game had (P7 §5.6), as its result keeps them: 0 in
+     * regulation; null when not known (a score typed in, a box score, a game final before
+     * the count was kept) and for every game that is not final.
+     */
+    readonly overtimePeriods: number | null;
+    /**
      * "Statistics kept" (P7 §1), in order: what the box score's columns may be. The
      * season's, as it is today, by the same function and from the same reads as the
      * statistics page (statisticsKept), so the two pages agree after a season's
@@ -364,6 +370,7 @@ export async function readGamePage(
       startsAt: game.startsAt,
       finalizedAt: game.finalizedAt,
       correctedOn: correctedOn ?? null,
+      overtimePeriods: game.status === 'final' ? game.overtimePeriods : null,
       statKeys: statisticsKept(season?.statKeys ?? [], season?.rules),
     },
     scoreboard: {
