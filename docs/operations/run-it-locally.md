@@ -195,6 +195,29 @@ It is safe to run again: a game already brought over is only compared, and a run
 
 It opens a database folder on this computer and refuses anything that reads as a network address (T-201). Use it on made-up backups: a backup of the live tracker holds real people's names, and bringing one over waits for the founder.
 
+## Play a whole made-up season with one command
+
+```sh
+npm run simulate
+```
+
+**What it is for.** It makes a made-up league from nothing and plays its whole season to the final tables, using the product's own buttons behind the scenes, the same ones a league's admin and scorekeepers use: it adds the teams and their players, brings in the schedule, puts the games into weeks, publishes the schedule, types in final scores, scores a few games play by play as the tracker does, and loses some games the way a real season does (postponed and played later, postponed and still waiting, cancelled, cancelled by mistake and put back, forfeited, and one score typed the wrong way round and then corrected). One tracked game is level after four periods and won in overtime. Then it checks its own work and prints a report. It is a way to see that a league of any size works from start to end, without waiting a season. Every name in it is invented, and the same `--seed` number always makes the same league.
+
+**Four ways to run it:**
+
+| What you want                                 | Type this                                                              | About     |
+| --------------------------------------------- | ---------------------------------------------------------------------- | --------- |
+| A small one, to try it                        | `npm run simulate`                                                     | 5 seconds |
+| A league like yours: 8 teams, each plays all  | `npm run simulate -- --teams 8 --rounds 7 --tracked 2`                 | 6 seconds |
+| 24 schools in 4 districts, 10 weeks           | `npm run simulate -- --teams 24 --divisions 4 --rounds 10 --tracked 6` | 15 s      |
+| 60 teams in 6 divisions, 10 weeks (300 games) | `npm run simulate:large`                                               | 65 s      |
+
+`--teams` is how many teams, `--divisions` how many divisions they are split into, `--rounds` how many game weeks, `--tracked` how many games are scored play by play, and `--seed` any number, to get a different made-up league.
+
+**What the report says.** The first lines say how big the league is and how many games were called off or changed. Then each check, `ok` or `FAIL`: as many wins as losses; each division's points for equal its points against; every team played the games it was given, less those called off or still waiting; in every tracked game the players' points add up to the score; every called-off game ended as planned (a forfeit at the league's forfeit score, the corrected game counted once, at its corrected score); the overtime game is counted as overtime; and the standings the product shows match a second, simple working-out from the results. Then the final tables, `All 7 checks hold.` when all is well, and a last line saying how long each part took. If any check fails, the command says which one and ends with an error.
+
+**Seeing the league in the browser: not yet.** The league is kept in the folder `.local/simulate-db`, made fresh on every run. The web app cannot open that folder: when it runs on the made-up database (`LOCAL_DATA=made-up-database` in `.env`), it builds a new one in its memory each time it starts, with the made-up leagues and, with `LOCAL_DEMO_LEAGUE=on`, the 24-school demo league at `http://localhost:3000/larkvale` after `npm run dev:web`. To show the simulated league instead, the app would need one more setting that asks it to play a simulated league of a chosen size when it starts (the made-up database can already hold one), or to open the simulator's folder. Until then, a test reads the simulated league's pages the way the app does (`apps/web/src/server/simulated-league-pages.test.ts`).
+
 ## Make a league
 
 ```sh
