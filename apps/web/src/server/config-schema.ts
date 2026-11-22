@@ -258,6 +258,21 @@ export class ConfigError extends Error {
   }
 }
 
+/** The names of this computer an http public address may use online. */
+const thisComputerHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/** Whether `value` is an http address of a host other than this computer. */
+function httpAwayFromThisComputer(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    // Not an address at all: the schema names that.
+    return false;
+  }
+  return url.protocol === 'http:' && !thisComputerHosts.has(url.hostname);
+}
+
 /**
  * Checks `env` against the schema. Returns the settings, or throws one ConfigError
  * naming every missing or invalid variable. Only names and fixed reasons are put in
@@ -308,6 +323,21 @@ export function loadConfig(
         'TURNSTILE_SITE_KEY: missing, must be set with TURNSTILE_SECRET_KEY (or leave out both to switch the bot check off)',
       );
     }
+  }
+  // Online, the public address is https (the going-online audit's P9, record 082): over
+  // http the session cookie loses "Secure" and would be sent in the clear. An http address
+  // stays allowed on this computer, where no network lies between (a browser test of the
+  // test copy as it starts), and always in local and test.
+  const baseUrl = given['PUBLIC_BASE_URL'];
+  if (
+    (appEnv === 'staging' || appEnv === 'production') &&
+    baseUrl !== undefined &&
+    httpAwayFromThisComputer(baseUrl)
+  ) {
+    invalid.set(
+      'PUBLIC_BASE_URL',
+      `PUBLIC_BASE_URL: invalid, must start with https:// when APP_ENV is ${appEnv}, or the sign-in cookie could be read on the way; set it to the site’s https address (http is allowed only for localhost)`,
+    );
   }
   // The tracker's database guard (packages/providers, shared with the worker).
   const facts: TrackerGuardFacts = { env, appEnv, trackerProject: guard?.trackerProject };

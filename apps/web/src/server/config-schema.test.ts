@@ -566,6 +566,34 @@ describe('web addresses', () => {
       );
     }
   });
+  it('online, refuse an http public address in one plain sentence, so the cookie stays secure (audit P9)', () => {
+    for (const appEnv of ['staging', 'production']) {
+      const online = { ...production, APP_ENV: appEnv };
+      for (const http of ['http://leagues.example.test', 'HTTP://leagues.example.test/']) {
+        const error = failure({ ...online, PUBLIC_BASE_URL: http });
+        expect(error.missing).toEqual([]);
+        expect(error.invalid).toEqual([
+          `PUBLIC_BASE_URL: invalid, must start with https:// when APP_ENV is ${appEnv}, or the sign-in cookie could be read on the way; set it to the site’s https address (http is allowed only for localhost)`,
+        ]);
+      }
+      // https is accepted, and so is http on this computer, where no network lies between.
+      expect(loadConfig(online).PUBLIC_BASE_URL).toBe('https://leagues.example.test');
+      for (const here of ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000']) {
+        expect(loadConfig({ ...online, PUBLIC_BASE_URL: here }).PUBLIC_BASE_URL).toBe(here);
+      }
+      // A name that only starts like this computer's is not this computer.
+      expect(
+        failure({ ...online, PUBLIC_BASE_URL: 'http://localhost.example.test' }).invalid.join(),
+      ).toContain('must start with https://');
+    }
+    // Locally and in tests an http address stays as it was.
+    for (const appEnv of ['local', 'test']) {
+      const address = 'http://leagues.example.test';
+      expect(
+        loadConfig({ ...valid, APP_ENV: appEnv, PUBLIC_BASE_URL: address }).PUBLIC_BASE_URL,
+      ).toBe(address);
+    }
+  });
   it('reports a bad optional value as invalid, not missing', () => {
     const error = failure({ ...valid, LOG_LEVEL: 'loud' });
     expect(error.missing).toEqual([]);
