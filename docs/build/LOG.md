@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-22 04:58 UTC — Step 2.185 landed (a removed game stays in the draft with Put it back): a game removed in the schedule draft stays where it was, struck through, with "Put it back in the draft" until the draft is published; the draft's count says what publishing would change; a struck game that was postponed or cancelled since says so truly. After 2.180 landed the lane made sure struck games still reach the grid (D1, D2). GitHub passed 32635d1 on the lane and its twin.
+
 - 2026-11-22 04:54 UTC — Step 2.157 landed (a refusal that says why and what to do next): a signed-out person at any staff address (every admin page, the tracker) is sent to sign in and brought back; someone signed in without access is told so plainly; a long address breaks inside the card; the scoring page's Page not found is centred like the other plain screens. U-15's change folded in (Decided for you). GitHub passed 6d5da02 on the lane and its twin. Step 2.217 (the same pages with scripts off) stays open.
 
 - 2026-11-22 04:54 UTC — Step 2.59 landed (the made-up leagues every screen and test can use): the demo league of 24 schools in 4 districts with a tracked team, loaded only where asked (LOCAL_DEMO_LEAGUE=on), with dates that stay true whenever it is loaded, a partly loaded league refused, and a word-by-word scan that no made-up name is a real one. The five opponents of the tracked team keep made-up people until steps 2.219 and 2.233 land; the eighteen other teams have none. GitHub passed 96206ac on the lane and its twin. Left to other steps: 2.219, 2.232, 2.233, 2.236.
