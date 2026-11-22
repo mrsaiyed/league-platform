@@ -31,20 +31,19 @@ Learned today, not yet rules elsewhere: (a) a lane that moves or renames somethi
 
 Every lane's work is on GitHub. All sessions stopped on 2026-11-17 at about 03:05 UTC when the allowance ran out. Three at a time are picked up again, in the order of "Next step" above, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`)                                        | Where it stands                                                                                    | What is left                                                    |
-| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| 2.37-part-2 (twin `lane/2.37-again`; T-295, S-77)             | PART 1 LANDED 2026-11-22 (a00cded). Part 2, four sessions (f379574): see the Handover part, item 4 | a fifth session, two reviews, fix round, GitHub twice, land     |
-| 2.46-staff-numbers (record 085, T-287)                        | 8 commits                                                                                          | finish, review, land                                            |
-| 2.97-invitations (record 086, T-288)                          | 5 commits; 2 conflicts                                                                             | finish, review, land                                            |
-| 2.135-terms-privacy                                           | 7 commits                                                                                          | finish; the lead approves the two texts; the founder reads them |
-| 2.140-nothing-unfinished (record 087, T-289)                  | 5 commits                                                                                          | finish, review, land                                            |
-| 2.47-season-settings (record 088, T-290)                      | 4 commits                                                                                          | finish, review, land                                            |
-| 2.49-divisions-venues (record 089)                            | 6 commits                                                                                          | finish, review, land                                            |
-| 2.163-sign-in-says (record 091, T-291)                        | 6 commits                                                                                          | finish, review, land                                            |
-| 2.204-kept-emails (TEST 2; migration 0023, record 098, T-296) | 218081b: see the Handover part, item 2                                                             | merge the build branch with 2.205's imports, GitHub twice, land |
-| 2.220-pilot-libraries                                         | 3 commits                                                                                          | finish, review, land; then the founder's short session          |
-| 2.221, 2.56, 2.224                                            | opened, nothing pushed                                                                             | start again from their briefs when their turn comes             |
-| 2.191-ci-parallel                                             | parked                                                                                             | after the first test is in the founder's hands                  |
+| Lane (branch `lane/…`)                            | Where it stands                                                                                    | What is left                                                    |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 2.37-part-2 (twin `lane/2.37-again`; T-295, S-77) | PART 1 LANDED 2026-11-22 (a00cded). Part 2, four sessions (f379574): see the Handover part, item 4 | a fifth session, two reviews, fix round, GitHub twice, land     |
+| 2.46-staff-numbers (record 085, T-287)            | 8 commits                                                                                          | finish, review, land                                            |
+| 2.97-invitations (record 086, T-288)              | 5 commits; 2 conflicts                                                                             | finish, review, land                                            |
+| 2.135-terms-privacy                               | 7 commits                                                                                          | finish; the lead approves the two texts; the founder reads them |
+| 2.140-nothing-unfinished (record 087, T-289)      | 5 commits                                                                                          | finish, review, land                                            |
+| 2.47-season-settings (record 088, T-290)          | 4 commits                                                                                          | finish, review, land                                            |
+| 2.49-divisions-venues (record 089)                | 6 commits                                                                                          | finish, review, land                                            |
+| 2.163-sign-in-says (record 091, T-291)            | 6 commits                                                                                          | finish, review, land                                            |
+| 2.220-pilot-libraries                             | 3 commits                                                                                          | finish, review, land; then the founder's short session          |
+| 2.221, 2.56, 2.224                                | opened, nothing pushed                                                                             | start again from their briefs when their turn comes             |
+| 2.191-ci-parallel                                 | parked                                                                                             | after the first test is in the founder's hands                  |
 
 Next free: STEP 2.240, migration 0024, record 100, T-299, S-81. Numbers already given out stand with their lanes (in each lane's note).
 

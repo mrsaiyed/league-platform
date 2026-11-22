@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-22 12:33 UTC — Step 2.204 landed (253ad9b, migration 0023, record 098, T-296): the test copy keeps its emails in a table instead of sending them, and only made-up addresses may sign up or be written to. Reviewed at effort high (no leak; one Medium and six Lows, all fixed), merged with the build branch after 2.205 (one stricter rule for a made-up address, shared by the TypeScript guard and the SQL guard, one list of 59 cases), a confirming look after the merge with 84 hostile addresses: confirmed. GitHub passed it twice.
+
 - 2026-11-22 12:30 UTC — Step 2.168 landed (5a90d03, record 090, S-78 decided for you): a coach finds their team; the hidden-league leak D-H1 from the data audit is closed. One independent review: may land; three Lows fixed. Merged with the build branch after 2.205 (one file, both meanings kept). GitHub passed it twice.
 
 - 2026-11-22 11:52 UTC — Step 2.239 landed (1f9386f, T-298): on a hosted copy every form saved and then showed 'Page not found', because Next.js fetches the next page from itself at its own listening address; cured without widening the host check. One independent review at effort high: may land, four Lows. GitHub passed it twice.
