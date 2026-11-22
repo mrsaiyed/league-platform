@@ -15,6 +15,8 @@
 // - "Update needed": the screen says the plays are kept and offers Reload, never "Open
 //   the game again"; reloaded, the plays are sent.
 // While the scoring screen shows a notice, nothing scrolls and both fives stay whole.
+// With SCORING_TROUBLE_PICTURES set to a folder, a picture of each such state goes there.
+import path from 'node:path';
 import {
   addPlayers,
   court,
@@ -36,6 +38,11 @@ import {
 } from './web-browser-kit.mjs';
 
 process.setMaxListeners(32);
+
+const pictures = process.env.SCORING_TROUBLE_PICTURES;
+const picture = async (page, name) => {
+  if (pictures) await page.screenshot({ path: path.join(pictures, `${name}.png`) });
+};
 
 const failures = [];
 const checked = [];
@@ -210,15 +217,31 @@ async function oneGame(browser, size) {
             !says.includes('to send'),
           says,
         );
-        // NOT YET MET, so measured and printed rather than checked (lane note 2.37 part 2):
-        // the notice and its sign-in link sit above the two teams on an upright phone and
-        // push the teams' block 93 over, cutting a five. Once the notices move into the
-        // pad, this becomes `await still(page, ...)` like the other states.
-        const pushedBy = await page.evaluate(() => {
-          const teams = document.querySelector('[data-teams]');
-          return teams.scrollHeight - teams.clientHeight;
+        // The notice and its sign-in link once sat above the two teams on an upright phone
+        // and pushed the teams' block 93 over, cutting a five: they are in the pad at rest
+        // now, where the hint was, and nothing above the teams grows (step 2.37).
+        await still(page, `${at}, signed out with the notice and its sign-in link`);
+        await picture(page, `trouble-signed-out-${size.width}x${size.height}`);
+        const placed = await page.evaluate(() => {
+          const pad = document.querySelector('[data-pad]');
+          const box = pad.querySelector('[data-pad-notices]');
+          const link = box?.querySelector('a[href]')?.getBoundingClientRect();
+          const rest = pad.querySelector('[data-rest]').getBoundingClientRect();
+          return {
+            inPad: box !== null && document.querySelector('.court-top .court-notices') === null,
+            linkWhole:
+              link !== undefined &&
+              link.height >= 44 &&
+              link.top >= rest.top - 0.5 &&
+              link.bottom <= rest.bottom + 0.5 &&
+              link.bottom <= window.innerHeight + 0.5,
+          };
         });
-        console.log(`${at}, signed out: the notice pushes the teams' block ${pushedBy} over`);
+        note(
+          `${at}: signed out, the notice is in the pad, not above the teams, and its Sign in is whole`,
+          placed.inPad && placed.linkWhole,
+          JSON.stringify(placed),
+        );
         const link = page.getByRole('link', { name: 'Sign in', exact: true });
         const href = new URL((await link.getAttribute('href')) ?? '', origin);
         note(

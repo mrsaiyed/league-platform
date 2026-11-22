@@ -808,6 +808,35 @@
   user-select: text;
 }
 
+/* On an upright phone the notices are in the pad at rest, where the hint was: the pad's
+   place and height never change (step 2.37). So that a notice and its button (Sign in)
+   are whole under the latest play's line on a short phone, the button stands beside the
+   notice, not under it, and the notice's words are set a little closer. */
+.court-notices-pad {
+  grid-area: auto;
+  flex: 0 1 auto;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-block-size: none;
+  min-block-size: 0;
+  overflow: visible;
+}
+.court-notices-pad > * {
+  flex: 1 1 200px;
+  min-inline-size: 0;
+}
+.court-notices-pad > p:not(.court-notice) {
+  flex: 0 0 auto;
+}
+.court-notices-pad .court-notice {
+  padding-block: 6px;
+  padding-inline: 10px;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
 /* The places left for the steps that follow. An empty one is a faint dashed outline, so
    the pictures show where the clock controls and the play log go. */
 .court-slot:empty {

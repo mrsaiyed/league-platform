@@ -174,6 +174,12 @@ const latestRows = 4;
  */
 const logPanelWhere = '(min-width: 880px) and (min-height: 760px)';
 
+/**
+ * An upright phone, in the stylesheet's own words (court.css): it has no room above the
+ * teams for a notice, so the notices are drawn in the pad at rest (step 2.37).
+ */
+const uprightPhone = '(max-width: 699px) and (orientation: portrait)';
+
 /** Whether the screen is one where `query` holds now; drawn again when that changes. */
 function useScreenIs(query: string): boolean {
   const subscribe = useCallback(
@@ -1006,6 +1012,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const redoPlay = useMemo(() => redoTarget(state, rosters, t), [state, rosters, t]);
   const { waiting } = status;
   const logHasPanel = useScreenIs(logPanelWhere);
+  const noticesInPad = useScreenIs(uprightPhone);
   const rowsShown = logOpen ? undefined : logHasPanel ? panelRows : latestRows;
   const log = useMemo(
     () => playLog(state, rosters, waiting, t, rowsShown),
@@ -1487,6 +1494,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       clockSheet={clockSheet}
       banner={props.banner}
       notices={props.notices}
+      noticesIn={noticesInPad ? 'pad' : 'top'}
       pad={pad}
       said={said}
       moreOpen={moreOpen}
