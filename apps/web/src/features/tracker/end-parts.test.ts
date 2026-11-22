@@ -136,6 +136,15 @@ describe('the End game question (J1 to J3)', () => {
     expect(html).toContain('data-end-refused=""');
   });
 
+  it('at a level score with no ties and time on the clock, says that time is still to play, ticking, and not overtime', () => {
+    const html = ask(level, running);
+    expect(words(html)).toBe(
+      'The score is level Hawks 5, Bears 5 This season allows no ties, so a level game cannot end. H2 still has 12:34 to play. Keep playing',
+    );
+    expect(html).toContain('<span data-clock-now="">12:34</span>');
+    expect(answer(html, 'yes')).toBeNull();
+  });
+
   it('at a level score in a season with ties, says the game ends as a tie', () => {
     const html = ask(level, ranOut, true);
     expect(words(html)).toContain(

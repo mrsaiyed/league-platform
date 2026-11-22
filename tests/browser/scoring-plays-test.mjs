@@ -28,7 +28,8 @@
 //
 // Then the game is ended, still by touch (thing 3 of step 2.37, part 1):
 // - End game at a level score is refused on the device at once, with the network off,
-//   in words that say to play overtime (S-73); nothing is asked.
+//   in words that say what is still to play (S-73; overtime only once the last period
+//   has run out level); nothing is asked.
 // - End game from More in the middle of the second half asks first: the score, that time
 //   is still on the clock, and what ending does. Two fast taps on End game ask once.
 // - Ended with the network off, the final panel says who won and that the result is not
@@ -871,9 +872,10 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
       await c.endRefused.waitFor();
       const says = words(await c.endRefused.innerText());
       note(
-        `${at}: End game at a level score is refused on the device at once, with no connection, in words that say to play overtime; nothing is asked`,
-        says ===
-          'The score is level Hawks 7, Bears 7 This season allows no ties, so a level game cannot end. Play overtime until a team is ahead. Keep playing' &&
+        `${at}: End game at a level score in the first half is refused on the device at once, with no connection, in words that say what is still to play, not overtime (the fix round's F3); nothing is asked`,
+        /^The score is level Hawks 7, Bears 7 This season allows no ties, so a level game cannot end\. (H1 still has \d{1,2}:\d\d to play|H1 is over, and H2 is still to play)\. Keep playing$/.test(
+          says,
+        ) &&
           (await c.pad.locator('[data-answer="yes"]').count()) === 0 &&
           (await playsNow()) === plays &&
           (await c.finalPanel.count()) === 0,

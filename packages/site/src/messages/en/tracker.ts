@@ -104,6 +104,12 @@ export const enTracker = {
   'tracker.end.keep': 'Keep playing',
   'tracker.end.level':
     'This season allows no ties, so a level game cannot end. Play overtime until a team is ahead.',
+  // Level with time still to play (lane 2.37, fix round, F3): overtime is only for a
+  // game still level once the last period has run out.
+  'tracker.end.levelNotLast':
+    'This season allows no ties, so a level game cannot end. {period} is over, and {next} is still to play.',
+  'tracker.end.levelTimeLeft':
+    'This season allows no ties, so a level game cannot end. {period} still has {clock} to play.',
   'tracker.end.levelTitle': 'The score is level',
   // In the pad when the last period's clock has run out with a team ahead: offered,
   // never done by itself (S-65).

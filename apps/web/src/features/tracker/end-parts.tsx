@@ -13,7 +13,8 @@
 //   a team ahead (S-65: offered, never done by itself).
 // - The question says the score, what ending does and, when the game is ended early,
 //   that time is still on the clock. At a level score in a season with no ties there is
-//   no question: the pad says to play overtime (S-73).
+//   no question: the pad says what is still to play, and to play overtime only once the
+//   last period has run out level (S-73).
 // - The final panel, in the pad's place while the game is final: "Final", the score, who
 //   won in words, whether the league has the result, and under them the way back: "Take
 //   back End game" while the End has not reached the league, "Reopen game" with the time
@@ -193,7 +194,18 @@ export function EndAsk(props: {
           <p className="court-ask-score" data-ask-score="">
             {question.score}
           </p>
-          <p data-end-why="">{refused ?? t('tracker.end.level')}</p>
+          {refused !== null || question.kind !== 'level' || question.early === null ? (
+            <p data-end-why="">{refused ?? t('tracker.end.level')}</p>
+          ) : (
+            // Time still to play: said, with the time ticking as in the End question.
+            <p data-end-why="">
+              {question.early.before}
+              {question.early.clock === null ? null : (
+                <span data-clock-now="">{question.early.clock}</span>
+              )}
+              {question.early.after}
+            </p>
+          )}
         </div>
       </Ask>
     );

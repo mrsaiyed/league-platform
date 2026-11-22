@@ -48,7 +48,15 @@ export const scoreText = (game: basketball.GameState, names: Names, t: Translate
  */
 export type EndQuestion =
   | { readonly kind: 'nothing'; readonly text: string }
-  | { readonly kind: 'level'; readonly score: string }
+  | {
+      readonly kind: 'level';
+      readonly score: string;
+      /**
+       * "H2 still has 12:34 to play.", or that a period is still to play; null once the
+       * last period has run out level, when overtime is what is left.
+       */
+      readonly early: EarlyEnd | null;
+    }
   | {
       readonly kind: 'ask';
       readonly score: string;
@@ -88,29 +96,36 @@ export function endQuestion(
   }
   const score = scoreText(game, names, t);
   const tie = finalScore(game).ahead === null;
-  if (tie && !allowTies) return { kind: 'level', score };
   const { periods } = game.rules;
   const { period } = basketball.derive(game);
   const now = periodText(period, periods, t);
-  if (!clock.over) {
-    const [before = '', after = ''] = t('tracker.end.ask.timeLeft', {
-      period: now,
-      clock: clockPlace,
-    }).split(clockPlace);
-    return { kind: 'ask', score, tie, early: { before, clock: clock.text, after } };
+  /** What is still to play, in the sentences given: null once the last period has run out. */
+  const early = (timeLeft: string, notLast: string): EarlyEnd | null => {
+    if (!clock.over) {
+      const [before = '', after = ''] = t(timeLeft, { period: now, clock: clockPlace }).split(
+        clockPlace,
+      );
+      return { before, clock: clock.text, after };
+    }
+    if (period >= periods) return null;
+    const next = periodText(period + 1, periods, t);
+    return { before: t(notLast, { period: now, next }), clock: null, after: '' };
+  };
+  // Level in a season with no ties: refused, saying what is still to play, and overtime
+  // only once the last period has run out level (the fix round's F3).
+  if (tie && !allowTies) {
+    return {
+      kind: 'level',
+      score,
+      early: early('tracker.end.levelTimeLeft', 'tracker.end.levelNotLast'),
+    };
   }
-  const early =
-    period < periods
-      ? {
-          before: t('tracker.end.ask.notLast', {
-            period: now,
-            next: periodText(period + 1, periods, t),
-          }),
-          clock: null,
-          after: '',
-        }
-      : null;
-  return { kind: 'ask', score, tie, early };
+  return {
+    kind: 'ask',
+    score,
+    tie,
+    early: early('tracker.end.ask.timeLeft', 'tracker.end.ask.notLast'),
+  };
 }
 
 /** A game ended early, as one sentence: what a test or a screen reader's line reads. */

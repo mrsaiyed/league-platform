@@ -84,13 +84,31 @@ describe('the End game question (J1 to J3; S-73)', () => {
 
   it('a level score in a season with no ties is refused on the device, with nothing asked', () => {
     const game = secondHalf([basket('h5'), basket('a7')]);
+    // At the end of the last period: overtime is what is left.
     expect(endQuestion(game, names, false, ranOut, t)).toEqual({
       kind: 'level',
       score: 'Hawks 2, Bears 2',
+      early: null,
     });
-    // Whatever the clock says: a level game is not ended early either.
-    expect(endQuestion(game, names, false, running, t).kind).toBe('level');
     expect(t('tracker.end.level')).toContain('Play overtime');
+  });
+
+  it('a level score with time still to play is refused too, saying that time, not overtime (fix round, F3)', () => {
+    const game = secondHalf([basket('h5'), basket('a7')]);
+    // Whatever the clock says: a level game is not ended early either.
+    const question = endQuestion(game, names, false, running, t);
+    if (question.kind !== 'level' || question.early === null) throw new Error('no time said');
+    expect(earlyText(question.early)).toBe(
+      `This season allows no ties, so a level game cannot end. H2 still has ${running.text} to play.`,
+    );
+    expect(earlyText(question.early)).not.toContain('overtime');
+    // The first half run out level: the second is still to play.
+    const first = played([basket('h5'), basket('a7')], tippedOff(basketball.HALVES));
+    const half = endQuestion(first, names, false, ranOut, t);
+    if (half.kind !== 'level' || half.early === null) throw new Error('no period said');
+    expect(earlyText(half.early)).toBe(
+      'This season allows no ties, so a level game cannot end. H1 is over, and H2 is still to play.',
+    );
   });
 
   it('a level score in a season that allows ties is asked about, and says the game ends as a tie', () => {
