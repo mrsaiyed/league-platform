@@ -1100,20 +1100,38 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   // --- Several minutes offline with plays waiting (T6 §4): said once, plainly. ---
   let offlineFrom: number | null = null;
   let cancelOfflineLong: (() => void) | null = null;
-  const watchOffline = (status: QueueStatus): void => {
-    const since = status.waiting > 0 ? status.unansweredSince : null;
-    if (since === offlineFrom) return;
-    offlineFrom = since;
+  /**
+   * `offlineFrom` on the wall clock. The time is counted on both clocks and the longer
+   * taken (the code review's M3): the steady clock stands still while some devices
+   * sleep, so a phone woken after ten minutes asleep has waited ten minutes, not none.
+   */
+  let offlineFromWall: number | null = null;
+  /** Says whether the plays have waited `offlineLongMs`, and looks again when they will have. */
+  const judgeOffline = (): void => {
     cancelOfflineLong?.();
     cancelOfflineLong = null;
-    const left = since === null ? null : since + offlineLongMs - clock.now();
-    if (left !== null && left <= 0) return update({ offlineLong: true });
+    const waited =
+      offlineFrom === null || offlineFromWall === null
+        ? null
+        : Math.max(clock.now() - offlineFrom, wallClock() - offlineFromWall);
+    const left = waited === null ? null : offlineLongMs - waited;
+    if (left !== null && left <= 0) {
+      if (!current.offlineLong) update({ offlineLong: true });
+      return;
+    }
     if (current.offlineLong) update({ offlineLong: false });
     if (left === null || stopped) return;
     cancelOfflineLong = clock.after(left, () => {
       cancelOfflineLong = null;
-      if (!stopped) update({ offlineLong: true });
+      if (!stopped) judgeOffline();
     });
+  };
+  const watchOffline = (status: QueueStatus): void => {
+    const since = status.waiting > 0 ? status.unansweredSince : null;
+    if (since === offlineFrom) return;
+    offlineFrom = since;
+    offlineFromWall = since === null ? null : wallClock() - (clock.now() - since);
+    judgeOffline();
   };
 
   queue.subscribe((status) => {
@@ -1455,6 +1473,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     awake() {
       pageHidden = false;
       noticeSleep();
+      // Plays may have waited long while the device slept (M3): counted on the wall clock.
+      if (!stopped) judgeOffline();
       backOnline();
     },
 
