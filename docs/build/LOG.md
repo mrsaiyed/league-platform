@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-22 13:44 UTC — Step 2.37 landed whole (part 2: 9c92c58, record 097, T-295, S-77 decided for you): takeover, signed out mid-game, plays not saved and not applied, leaving with plays waiting, the final panel on any device, the warning after 5 minutes offline, Reopen that retries with no connection. Five building sessions; two reviews (code, and by use in a browser): one High (a device showing a final game kept an old score as final after another device reopened and scored) and seven Mediums, all cured in two fix rounds, each with a test that failed first; a confirming look in a real browser: confirmed; the short-phone layout fixed again with saved plays and now guarded by a browser check. 'Send these plays' waits for step 2.148. GitHub passed it twice.
+
 - 2026-11-22 12:33 UTC — Step 2.204 landed (253ad9b, migration 0023, record 098, T-296): the test copy keeps its emails in a table instead of sending them, and only made-up addresses may sign up or be written to. Reviewed at effort high (no leak; one Medium and six Lows, all fixed), merged with the build branch after 2.205 (one stricter rule for a made-up address, shared by the TypeScript guard and the SQL guard, one list of 59 cases), a confirming look after the merge with 84 hostile addresses: confirmed. GitHub passed it twice.
 
 - 2026-11-22 12:30 UTC — Step 2.168 landed (5a90d03, record 090, S-78 decided for you): a coach finds their team; the hidden-league leak D-H1 from the data audit is closed. One independent review: may land; three Lows fixed. Merged with the build branch after 2.205 (one file, both meanings kept). GitHub passed it twice.
