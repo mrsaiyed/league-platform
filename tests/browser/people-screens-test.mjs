@@ -365,6 +365,18 @@ if (built) {
       (await page.getByRole('heading', { level: 1, name: 'Ada Lovell' }).count()) === 1 &&
         (await page.locator('[data-person-teams]').innerText()).includes('On no team'),
     );
+    // Past 200 people a team page's picker cannot reach everyone: her record can.
+    const addToTeam = page.locator('[data-add-to-team]');
+    const teamName = await addToTeam.locator('select option').first().innerText();
+    await Promise.all([
+      page.waitForURL(/\/admin\/teams\/[^/]+$/),
+      addToTeam.getByRole('button', { name: 'Add to a team' }).click(),
+    ]);
+    note(
+      '"Add to a team" on her record puts her on that team’s roster',
+      (await main().innerText()).includes('Ada Lovell'),
+      teamName,
+    );
     await toPeople();
     note(
       'and she is on the list again',
@@ -438,6 +450,30 @@ if (built) {
     );
     await page.goto(`${origin}/north-valley/admin/people?q=abcdefghij`);
     note('nor is the list that holds her', (await pageWidth()) <= 390, String(await pageWidth()));
+
+    at = 'the small things on People';
+    note(
+      'People has one filled button',
+      (await page.locator('[data-kind="main"]').count()) === 1,
+      String(await page.locator('[data-kind="main"]').count()),
+    );
+    note(
+      'the list says how many people',
+      /\d+ (person|people)/.test(await main().locator('[data-list-count]').innerText()),
+    );
+    await page.goto(`${origin}/north-valley/admin/people?page=999`);
+    note(
+      'a page past the end offers the way back',
+      (await main().getByRole('link', { name: 'Back to the first page' }).count()) === 1,
+    );
+    await page.goto(`${origin}/north-valley/admin/people?q=Wren%20Quill`);
+    await main().getByRole('link', { name: 'Add Wren Quill' }).click();
+    await page.waitForURL(/add=/);
+    note(
+      '"Add …" under an empty search carries the typed name into the add form',
+      (await page.locator('#add-person').getByLabel('First name').inputValue()) === 'Wren' &&
+        (await page.locator('#add-person').getByLabel('Last name').inputValue()) === 'Quill',
+    );
     await page.goto(jonAddress);
 
     at = 'an unlikely date of birth is shown back before it is saved (R-28)';

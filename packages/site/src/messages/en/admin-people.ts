@@ -4,6 +4,7 @@
 export const enAdminPeople = {
   'adminPeople.add.submit': 'Add to the league',
   'adminPeople.add.title': 'Add a person',
+  'adminPeople.addAnother': 'Add another',
   'adminPeople.added':
     'Added to the league: {name}. They are on no team yet; a team’s page in Teams puts them on its roster.',
   'adminPeople.birthDate.check_one':
@@ -29,16 +30,22 @@ export const enAdminPeople = {
   'adminPeople.field.emailHelp': 'Nothing is sent to it yet.',
   'adminPeople.field.firstName': 'First name',
   'adminPeople.field.lastName': 'Last name',
+  'adminPeople.list.count_one': '{count} person',
+  'adminPeople.list.count_other': '{count} people',
+  'adminPeople.list.first': 'Back to the first page',
   'adminPeople.list.label': 'Everyone in the league',
   'adminPeople.list.next': 'Next {count}',
   'adminPeople.list.noTeam': 'No team this season',
+  'adminPeople.list.pastEnd': 'This page is past the end of the list.',
   'adminPeople.list.previous': 'Previous {count}',
+  'adminPeople.list.range': 'Page {page}: people {from} to {to}',
   'adminPeople.meanwhile':
     'Someone else saved meanwhile: {value}. Saving again puts what you typed in its place.',
   'adminPeople.meanwhile.empty':
     'Someone else emptied this meanwhile. Saving again puts what you typed in its place.',
   'adminPeople.noMatch':
     'No one in the league matches that search. Check the spelling, or add them.',
+  'adminPeople.noMatch.add': 'Add {name}',
   'adminPeople.notRemoved': 'Not removed. {problem}',
   'adminPeople.person.sub':
     'Their details as the league keeps them. A change shows on every page of the league at once.',
@@ -88,6 +95,8 @@ export const enAdminPeople = {
   'adminPeople.search.submit': 'Search',
   'adminPeople.sub':
     'Everyone in the league, on a team or not. Find someone, fix their details or add someone new.',
+  'adminPeople.teams.add': 'Add to a team',
+  'adminPeople.teams.addLabel': 'Team',
   'adminPeople.teams.admin': '{team} in Teams',
   'adminPeople.teams.none': 'On no team’s roster this season.',
   'adminPeople.teams.public': 'its public page',

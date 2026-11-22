@@ -66,6 +66,15 @@ export async function PeoplePage({
     redirect(listUrl);
   }
   const emailRefused = notice?.said === 'email-not-searched';
+  // A name carried from an empty search into the add form: its first word the first name.
+  const typedToAdd = query['add'];
+  const [firstWord = '', ...rest] = (typeof typedToAdd === 'string' ? typedToAdd : '')
+    .trim()
+    .slice(0, 100)
+    .split(/\s+/);
+  const toAdd = firstWord.includes('@')
+    ? { firstName: '', lastName: '' }
+    : { firstName: firstWord, lastName: rest.join(' ') };
   const noEmailId = 'people-search-no-email';
   const pageUrl = (page: number) =>
     leagueUrl(here, 'admin-area', {
@@ -145,7 +154,14 @@ export async function PeoplePage({
         ) : null}
       </section>
 
-      <List ask={ask} list={list} league={here} pageUrl={pageUrl} teamsByPerson={teamsByPerson} />
+      <List
+        ask={ask}
+        list={list}
+        league={here}
+        pageUrl={pageUrl}
+        addUrl={(name) => leagueUrl(here, 'admin-area', { area, query: { add: name } })}
+        teamsByPerson={teamsByPerson}
+      />
 
       <div id={addPersonAnchor} className="admin-add-team">
         <section className="staff-panel admin-team-part">
@@ -154,13 +170,12 @@ export async function PeoplePage({
             action={addPersonAction}
             permalink={`${listUrl}#${addPersonAnchor}`}
             hidden={{ league: here.slug, [requestTokenField]: crypto.randomUUID() }}
-            values={{ firstName: '', lastName: '' }}
+            values={toAdd}
             privateDetails={
               mayEnterPrivate ? { contactEmail: '', birthDate: '', child: '' } : undefined
             }
             today={(await ports.publicSchedule.clockOf(here.id)).today}
             words={personFormWords(t('adminPeople.add.submit'))}
-            main
           />
         </section>
       </div>
@@ -173,8 +188,11 @@ function List({
   list,
   league,
   pageUrl,
+  addUrl,
   teamsByPerson,
 }: {
+  /** The list with the add form holding this name ("or add them" under a search). */
+  readonly addUrl: (name: string) => string;
   readonly ask: PeopleAsk;
   readonly list: Awaited<ReturnType<typeof readPeopleList>>;
   readonly league: { readonly id: string; readonly slug: string };
@@ -190,12 +208,52 @@ function List({
         text={t('adminPeople.empty')}
         action={{ href: `#${addPersonAnchor}`, label: t('adminPeople.add.title') }}
       />
+    ) : ask.page > 1 ? (
+      // Past the end (an old link, ?page=999): the way back to the first page.
+      <EmptyPanel
+        text={t('adminPeople.list.pastEnd')}
+        action={{ href: pageUrl(1), label: t('adminPeople.list.first') }}
+      />
     ) : (
-      <EmptyPanel text={t('adminPeople.noMatch')} />
+      // Nobody of that name: "Add …" carries what was typed into the add form.
+      <EmptyPanel
+        text={t('adminPeople.noMatch')}
+        action={{
+          href: `${addUrl(ask.search ?? '')}#${addPersonAnchor}`,
+          label: t('adminPeople.noMatch.add', { name: ask.search ?? '' }),
+        }}
+      />
     );
   }
+  const from = (ask.page - 1) * peoplePageSize + 1;
+  const pager =
+    ask.page === 1 && !list.more ? null : (
+      <p className="staff-buttons">
+        {ask.page === 1 ? null : (
+          <a className="ui-button" data-kind="quiet" href={pageUrl(ask.page - 1)}>
+            {t('adminPeople.list.previous', { count: peoplePageSize })}
+          </a>
+        )}
+        {list.more ? (
+          <a className="ui-button staff-apart" data-kind="quiet" href={pageUrl(ask.page + 1)}>
+            {t('adminPeople.list.next', { count: peoplePageSize })}
+          </a>
+        ) : null}
+      </p>
+    );
   return (
     <>
+      {/* How many, and which page: the list's own count line, with the pager above it too. */}
+      <p className="staff-quiet" data-list-count="true">
+        {list.more || ask.page > 1
+          ? t('adminPeople.list.range', {
+              page: String(ask.page),
+              from: String(from),
+              to: String(from + list.rows.length - 1),
+            })
+          : t.plural('adminPeople.list.count', list.rows.length)}
+      </p>
+      {pager}
       <ul className="staff-rows" aria-label={t('adminPeople.list.label')}>
         {list.rows.map((person) => (
           // The link is the person's name alone and covers the whole row (staff.css).
@@ -215,20 +273,7 @@ function List({
           </li>
         ))}
       </ul>
-      {ask.page === 1 && !list.more ? null : (
-        <p className="staff-buttons">
-          {ask.page === 1 ? null : (
-            <a className="ui-button" data-kind="quiet" href={pageUrl(ask.page - 1)}>
-              {t('adminPeople.list.previous', { count: peoplePageSize })}
-            </a>
-          )}
-          {list.more ? (
-            <a className="ui-button staff-apart" data-kind="quiet" href={pageUrl(ask.page + 1)}>
-              {t('adminPeople.list.next', { count: peoplePageSize })}
-            </a>
-          ) : null}
-        </p>
-      )}
+      {pager}
     </>
   );
 }
