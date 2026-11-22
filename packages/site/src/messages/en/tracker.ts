@@ -189,8 +189,16 @@ export const enTracker = {
   'tracker.kept.setClock': 'Clock set to {clock}',
   'tracker.kept.start': 'Clock started',
   'tracker.kept.undo': 'Undo',
+  // "Enter again" on a kept play (S-77): only while this device holds the game, a new
+  // play now; elsewhere the list is for reading out to whoever holds it.
+  'tracker.keptList.again': 'Enter again',
+  'tracker.keptList.againLabel': 'Enter again: {play}',
+  'tracker.keptList.againRefused':
+    'That play was not entered again: the game as it stands now does not take it. Enter it by hand if it is still needed.',
   // Cleared only by this deliberate tap: the scorekeeper has seen the list.
   'tracker.keptList.clear': 'I have seen these: clear the list',
+  'tracker.keptList.readAloud':
+    'Only the device scoring the game can enter these again. Read them out to whoever is scoring it now.',
   'tracker.keptList.title': 'Not saved',
   // On the page that replaces the scoring screen when the device stops scoring (taken
   // over, signed out, no longer allowed) in the very moment a tap was made.

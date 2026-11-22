@@ -48,6 +48,23 @@ describe('the "not saved" list, play by play (step 2.37, part 2)', () => {
     ]);
   });
 
+  it('offers "Enter again" on plays only, never on the clock, Undo or End game (S-77)', () => {
+    const rows = keptRows(
+      [
+        kept({ type: 'score', side: 'home', playerId: 'h5', points: 2 }),
+        kept({ type: 'foul', side: 'away', playerId: 'a4' }),
+        kept({ type: 'start' }),
+        kept({ type: 'undo' }),
+        kept({ type: 'redo' }),
+        kept({ type: 'end' }),
+      ],
+      testRosters,
+      2,
+      t,
+    );
+    expect(rows.map((row) => row.again)).toEqual([true, true, false, false, false, false]);
+  });
+
   it('a tap stored before its moment was kept has no time, and is still listed', () => {
     const [row] = keptRows([kept({ type: 'pause' }, null)], testRosters, 2, t);
     expect(row).toMatchObject({ text: 'Clock paused', when: null });

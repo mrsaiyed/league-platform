@@ -18,6 +18,8 @@ export type KeptRow = {
   readonly text: string;
   /** "Q2 7:41"; null for a tap stored before its moment was kept. */
   readonly when: string | null;
+  /** Whether it is a play that "Enter again" makes anew (S-77): not the clock, Undo… */
+  readonly again: boolean;
 };
 
 type Input = KeptTap['command']['input'];
@@ -41,6 +43,13 @@ const playTypes = new Set<basketball.Play['type']>([
 
 const isPlay = (input: Input): input is Input & basketball.Play =>
   (playTypes as ReadonlySet<string>).has(input.type);
+
+/**
+ * Whether a kept tap may be entered again (step 2.37, part 2; S-77): a play, made anew
+ * now by the path of a tap. The clock, Undo, Redo, End game, the colors and changes of a
+ * team's players belong to their moment and are not.
+ */
+export const mayEnterAgain = isPlay;
 
 function tapText(input: Input, rosters: DeviceRosters, periods: 2 | 4, t: Translate): string {
   if (isPlay(input)) return playText(input, rosters, periods, t);
@@ -75,6 +84,7 @@ export function keptRows(
   return taps.map(({ command, moment }) => ({
     id: command.commandId,
     text: tapText(command.input, rosters, periods, t),
+    again: isPlay(command.input),
     when:
       moment === null
         ? null

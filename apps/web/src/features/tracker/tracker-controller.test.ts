@@ -379,6 +379,67 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 3 });
   });
 
+  it('enters a kept play again only once it holds the game again, as a new play (S-77)', async () => {
+    const network = endpointNetwork();
+    const tablet = device(network);
+    await tablet.controller.start();
+    await tapAll(tablet.controller, [...tipOff]);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet.controller, [
+      basket('home', hawks[2] ?? ''),
+      basket('away', bears[0] ?? '', 3),
+    ]);
+    network.mode = 'up';
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    tablet.controller.online();
+    await tablet.controller.idle();
+    const [first, second] = tablet.controller.status().notSaved;
+    const firstId = first?.command.commandId ?? '';
+
+    // Not holding the game, the list is for reading out: nothing is entered.
+    expect(await tablet.controller.enterAgain(firstId)).toEqual({
+      ok: false,
+      reason: 'not-scoring',
+    });
+    expect(tablet.controller.status().notSaved).toHaveLength(2);
+
+    // The laptop lets go; the tablet takes the game back and enters one of them again.
+    await laptop.controller.leave();
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    if (tablet.controller.status().mode.kind === 'held-by-other') {
+      await tablet.controller.takeOver();
+      await tablet.controller.idle();
+    }
+    expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
+    expect(await tablet.controller.enterAgain('no-such-play')).toEqual({
+      ok: false,
+      reason: 'not-kept',
+    });
+    const again = await tablet.controller.enterAgain(firstId);
+    expect(again.ok).toBe(true);
+    // A new play, with an id of its own; it leaves the list, the other stays.
+    expect(again.ok && again.commandId !== firstId).toBe(true);
+    expect(tablet.controller.status().notSaved.map((t) => t.command.commandId)).toEqual([
+      second?.command.commandId,
+    ]);
+    await tablet.controller.idle();
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
+    expect((await tablet.storage.list(gameId)).map((t) => t.command.commandId)).toEqual([
+      second?.command.commandId,
+    ]);
+
+    // Undo takes it back as it takes back any tap.
+    await tapAll(tablet.controller, [{ type: 'undo' }]);
+    await tablet.controller.idle();
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 0 });
+  });
+
   it('learns of a takeover from its renewal, with nothing waiting', async () => {
     const network = endpointNetwork();
     const tablet = device(network);

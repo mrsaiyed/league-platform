@@ -268,6 +268,7 @@ export function TrackerOpening({
     phase.status.game !== null &&
     screenOf(phase.status, phase.confirmed).kind === 'scoring';
   const [lastTapLost, setLastTapLost] = useState(false);
+  const [againRefused, setAgainRefused] = useState(false);
   const wasScoring = useRef(false);
   useEffect(() => {
     if (scoringNow && !wasScoring.current) setLastTapLost(false);
@@ -306,6 +307,22 @@ export function TrackerOpening({
       ? notAppliedRows(phase.status.notApplied, rosters, phase.status.game?.rules.periods ?? 2, t)
       : [];
   const clearNotApplied = act((game) => game.controller.dismissNotApplied());
+  // "Enter again" (S-77): a new play now, by the path of a tap; said when not taken.
+  const lists: KeptLists = {
+    notApplied,
+    onClearNotApplied: clearNotApplied,
+    kept:
+      phase.kind === 'open'
+        ? keptRows(phase.status.notSaved, rosters, phase.status.game?.rules.periods ?? 2, t)
+        : [],
+    onClearKept: act((game) => game.controller.dismissNotSaved()),
+    onEnterAgain: (id) =>
+      void act(async (game) => {
+        const result = await game.controller.enterAgain(id);
+        setAgainRefused(!result.ok);
+      })(),
+    againRefused,
+  };
   const storeFailedNotice = storeFailed ? (
     <p className="court-notice" data-kind="error" role="alert">
       {t('tracker.storeFailed')}
@@ -346,13 +363,7 @@ export function TrackerOpening({
         notices={
           anythingToTell ? (
             <>
-              <Notices
-                status={phase.status}
-                t={t}
-                notApplied={notApplied}
-                onClear={clearNotApplied}
-                busy={busy}
-              />
+              <Notices status={phase.status} t={t} lists={lists} busy={busy} />
               {signIn}
               {storeFailedNotice}
             </>
@@ -401,15 +412,7 @@ export function TrackerOpening({
               signIn={signIn}
               onTakeOver={act((game) => game.controller.takeOver())}
               onOpenAgain={act((game) => game.controller.openAgain())}
-              kept={keptRows(
-                phase.status.notSaved,
-                rosters,
-                phase.status.game?.rules.periods ?? 2,
-                t,
-              )}
-              onClearKept={act((game) => game.controller.dismissNotSaved())}
-              notApplied={notApplied}
-              onClearNotApplied={clearNotApplied}
+              lists={lists}
               onConfirm={(format) => act((game) => game.confirmFormat(format))()}
             />
           ) : null}
@@ -452,25 +455,92 @@ const keptOnly = (status: Pick<TrackerControllerStatus, 'mode' | 'signedOut'>): 
   (status.mode.kind === 'read-only' &&
     (status.mode.reason === 'not-allowed' || status.mode.reason === 'signed-out'));
 
+/** The two lists of kept plays, and what can be done with them (step 2.37, part 2). */
+type KeptLists = {
+  /** The plays the league refused, play by play, and the tap that clears them. */
+  readonly notApplied: readonly KeptRow[];
+  readonly onClearNotApplied: () => void;
+  /** The plays this device made that will not be sent, play by play. */
+  readonly kept: readonly KeptRow[];
+  /** The scorekeeper has seen them: the list goes only by this deliberate tap. */
+  readonly onClearKept: () => void;
+  /** "Enter again" on one play, while this device holds the game (S-77). */
+  readonly onEnterAgain: (id: string) => void;
+  /** The last "Enter again" was not taken: the game as it stands does not take it. */
+  readonly againRefused: boolean;
+};
+
 /**
  * What the tracker tells about holding the game and taps that did not go in; under them
- * the plays the league refused, play by play, cleared only by a deliberate tap (step
- * 2.37, part 2).
+ * the plays the league refused and the plays not saved, play by play, each cleared only
+ * by a deliberate tap (step 2.37, part 2). While this device holds the game each play
+ * can be entered again; on a device that does not, the list is for reading out (S-77).
  */
 function Notices({
   status,
   t,
-  notApplied,
-  onClear,
+  lists,
   busy,
 }: {
   readonly status: TrackerControllerStatus;
   readonly t: ReturnType<typeof createTranslator>;
-  readonly notApplied: readonly KeptRow[];
-  readonly onClear: () => void;
+  readonly lists: KeptLists;
   readonly busy: boolean;
 }) {
   const notices = trackerNotices(status);
+  const holds = status.mode.kind === 'scoring';
+  const list = (
+    name: 'not-applied' | 'kept',
+    rows: readonly KeptRow[],
+    title: string,
+    clear: string,
+    onClear: () => void,
+  ) =>
+    rows.length === 0 ? null : (
+      <section
+        className="court-stack"
+        aria-labelledby={`tracker-${name}`}
+        {...(name === 'kept' ? { 'data-kept-list': '' } : { 'data-not-applied-list': '' })}
+      >
+        <h2 id={`tracker-${name}`}>{title}</h2>
+        {holds ? null : (
+          <p className="court-quiet" data-read-aloud="">
+            {t('tracker.keptList.readAloud')}
+          </p>
+        )}
+        <ol className="court-stack court-kept-list">
+          {rows.map((row) => (
+            <li
+              key={row.id}
+              {...(name === 'kept' ? { 'data-kept-play': '' } : { 'data-not-applied-play': '' })}
+            >
+              {row.when === null ? null : <span className="court-quiet">{row.when} </span>}
+              {row.text}
+              {holds && row.again ? (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    className="court-button"
+                    data-enter-again=""
+                    aria-label={t('tracker.keptList.againLabel', { play: row.text })}
+                    onClick={() => lists.onEnterAgain(row.id)}
+                    disabled={busy}
+                  >
+                    {t('tracker.keptList.again')}
+                  </button>
+                </>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+        <p>
+          <button type="button" className="court-button" onClick={onClear} disabled={busy}>
+            {clear}
+          </button>
+        </p>
+      </section>
+    );
   return notices.length === 0 ? null : (
     <div role="alert" className="court-stack" data-tracker-notices="">
       {notices.map((notice) => (
@@ -478,26 +548,24 @@ function Notices({
           {trackerNoticeText(notice, t)}
         </p>
       ))}
-      {notApplied.length === 0 ? null : (
-        <section
-          className="court-stack"
-          aria-labelledby="tracker-not-applied"
-          data-not-applied-list=""
-        >
-          <h2 id="tracker-not-applied">{t('tracker.notAppliedList.title')}</h2>
-          <ol className="court-stack">
-            {notApplied.map((row) => (
-              <li key={row.id} data-not-applied-play="">
-                {row.text}
-              </li>
-            ))}
-          </ol>
-          <p>
-            <button type="button" className="court-button" onClick={onClear} disabled={busy}>
-              {t('tracker.notAppliedList.clear')}
-            </button>
-          </p>
-        </section>
+      {lists.againRefused ? (
+        <p className="court-notice" data-kind="error" data-again-refused="">
+          {t('tracker.keptList.againRefused')}
+        </p>
+      ) : null}
+      {list(
+        'not-applied',
+        lists.notApplied,
+        t('tracker.notAppliedList.title'),
+        t('tracker.notAppliedList.clear'),
+        lists.onClearNotApplied,
+      )}
+      {list(
+        'kept',
+        lists.kept,
+        t('tracker.keptList.title'),
+        t('tracker.keptList.clear'),
+        lists.onClearKept,
       )}
     </div>
   );
@@ -545,10 +613,7 @@ function OpenGame({
   signIn,
   onTakeOver,
   onOpenAgain,
-  kept,
-  onClearKept,
-  notApplied,
-  onClearNotApplied,
+  lists,
   onConfirm,
 }: {
   readonly phase: Extract<Phase, { kind: 'open' }>;
@@ -561,13 +626,8 @@ function OpenGame({
   readonly signIn: ReactNode;
   readonly onTakeOver: () => void;
   readonly onOpenAgain: () => void;
-  /** The plays this device made that will not be sent, play by play (step 2.37, part 2). */
-  readonly kept: readonly KeptRow[];
-  /** The scorekeeper has seen them: the list goes only by this deliberate tap. */
-  readonly onClearKept: () => void;
-  /** The plays the league refused, play by play, and the tap that clears them. */
-  readonly notApplied: readonly KeptRow[];
-  readonly onClearNotApplied: () => void;
+  /** The plays kept on this device, play by play (step 2.37, part 2). */
+  readonly lists: KeptLists;
   readonly onConfirm: (format: GameFormat) => void;
 }) {
   const { status, confirmed } = phase;
@@ -596,31 +656,7 @@ function OpenGame({
           {savedBannerText(banner, t)}
         </p>
       ) : null}
-      <Notices
-        status={status}
-        t={t}
-        notApplied={notApplied}
-        onClear={onClearNotApplied}
-        busy={busy}
-      />
-      {kept.length === 0 ? null : (
-        <section className="court-stack" aria-labelledby="tracker-kept" data-kept-list="">
-          <h2 id="tracker-kept">{t('tracker.keptList.title')}</h2>
-          <ol className="court-stack">
-            {kept.map((row) => (
-              <li key={row.id} data-kept-play="">
-                {row.when === null ? null : <span className="court-quiet">{row.when} </span>}
-                {row.text}
-              </li>
-            ))}
-          </ol>
-          <p>
-            <button type="button" className="court-button" onClick={onClearKept} disabled={busy}>
-              {t('tracker.keptList.clear')}
-            </button>
-          </p>
-        </section>
-      )}
+      <Notices status={status} t={t} lists={lists} busy={busy} />
       {signIn}
       {screen.kind === 'opening' ? openingText : null}
       {screen.kind === 'held-by-other' && !askingTakeOver ? (

@@ -59,6 +59,7 @@ import {
 import { basketball } from '@srleagues/sports';
 import type { CommandTransport } from './command-transport.ts';
 import type { GameDoors } from './game-doors.ts';
+import { mayEnterAgain } from './kept-plays.ts';
 import {
   QueueError,
   keptTap,
@@ -183,6 +184,11 @@ export type TapResult =
   | { readonly ok: false; readonly reason: 'engine'; readonly message: string }
   /** The tap could not be stored, so it is not shown (T-114). */
   | { readonly ok: false; readonly reason: 'storage'; readonly code: QueueErrorCode };
+
+export type EnterAgainResult =
+  | TapResult
+  /** No such play on either list, or one that is not entered again (the clock, Undo…). */
+  | { readonly ok: false; readonly reason: 'not-kept' };
 
 export type TakeOverResult =
   | { readonly ok: true }
@@ -320,6 +326,13 @@ export type TrackerController = {
   dismissNotApplied(only?: readonly string[]): Promise<void>;
   /** The scorekeeper has seen the taps not saved: they are dropped for good. */
   dismissNotSaved(): Promise<void>;
+  /**
+   * "Enter again" on a kept play, not saved or not applied (step 2.37, part 2; S-77):
+   * only while this device holds the game, it is made again as a new play now, by the
+   * path of `tap` (the same checks, and Undo takes it back), and leaves its list. The
+   * clock, Undo, Redo, End game and changes of players are never entered again.
+   */
+  enterAgain(commandId: string): Promise<EnterAgainResult>;
   /**
    * Leaves the game. The session is released only when nothing is waiting to send;
    * otherwise its lease runs out by itself, and the same device opening the game again
@@ -974,9 +987,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     queue.resume();
   };
 
-  /** Drops the taps listed as not saved: the scorekeeper has seen them. */
-  const forgetNotSaved = async (): Promise<void> => {
-    const shown = current.notSaved;
+  /**
+   * Drops the taps listed as not saved: the scorekeeper has seen them. `only`: just
+   * these (a play entered again), the rest stay listed.
+   */
+  const forgetNotSaved = async (only?: readonly string[]): Promise<void> => {
+    const shown = current.notSaved.filter(
+      (t) => only === undefined || only.includes(t.command.commandId),
+    );
     const ids = shown.map((t) => t.command.commandId);
     // Known as dismissed before the storage is written, so a read of it already under
     // way (a loss being listed, say) cannot bring them back (finding L3).
@@ -1201,7 +1219,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
             : 'rejected',
     }) as const;
 
-  return {
+  const controller: TrackerController = {
     async start() {
       if (stopped) return;
       await track(begin());
@@ -1455,6 +1473,25 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       await track(forgetNotSaved());
     },
 
+    async enterAgain(commandId) {
+      // Only while this device holds the game (S-77): the league's record has one writer.
+      if (current.mode.kind !== 'scoring') return { ok: false, reason: 'not-scoring' };
+      const notSaved = current.notSaved.find((t) => t.command.commandId === commandId);
+      const kept =
+        notSaved?.command ??
+        current.notApplied.find((r) => r.command.commandId === commandId)?.command;
+      if (kept === undefined || !mayEnterAgain(kept.input)) {
+        return { ok: false, reason: 'not-kept' };
+      }
+      // A new play, now, by the same path as a tap: the same checks, and Undo takes it back.
+      const tapped = await controller.tap(kept.input);
+      if (!tapped.ok) return tapped;
+      await track(
+        notSaved === undefined ? queue.forget([commandId]) : forgetNotSaved([commandId]),
+      ).catch(() => undefined);
+      return tapped;
+    },
+
     async leave() {
       stopped = true;
       clearTimer();
@@ -1483,4 +1520,5 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       }
     },
   };
+  return controller;
 }

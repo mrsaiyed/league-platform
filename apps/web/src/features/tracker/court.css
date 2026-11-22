@@ -830,6 +830,19 @@
 .court-notices-pad > p:not(.court-notice) {
   flex: 0 0 auto;
 }
+/* A long list of kept plays scrolls inside the pad, never the page: the pad keeps its
+   place and height, and both fives stay whole (step 2.37, part 2). */
+.court-notices-pad:has(.court-kept-list) {
+  align-items: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.court-kept-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
 .court-notices-pad .court-notice {
   padding-block: 6px;
   padding-inline: 10px;
