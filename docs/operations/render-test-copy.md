@@ -54,6 +54,8 @@ Then its **Environment** settings. You type each value yourself; nothing else go
 
 **Never** set any of these on Render: `MIGRATION_DATABASE_URL` (the migration login: it owns the tables and sees past the league fence; it is typed at your terminal for one release only), `DATABASE_URL` (the tracker's), `RESEND_API_KEY`, any Stripe key, any `TURNSTILE_` key unless the bot check is being tried, anything starting `LOCAL_`. Check the list matches, one by one, before the first deploy.
 
+**The bot check's keys (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`) are not needed for the first sitting.** In staging the website starts without them (only production refuses to start without them; one without the other is refused). Its log then says: "The bot check is off: TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY are not set, so sign-in and sign-up are not checked for bots". What is weaker without them: anyone who finds the `onrender.com` address could try sign-ups and passwords by machine, held back only by the lock on each address after wrong passwords; the copy holds only made-up data, and its pages say "do not index". Getting the keys is a sign-up with Cloudflare, which is the founder's to do; until then, leave both out.
+
 **The pooler and its connections.** The website opens up to **ten** connections to the database (its pool, `maxConnections` 10 in `packages/database`). Supabase's direct address answers over IPv6 only on the free plan, which Render may not reach, so the website uses the Session pooler (to confirm). In the Supabase dashboard, check the pooler's pool size is at least ten plus a few spare for the release command and the SQL editor (to confirm the free plan's number on the day).
 
 ## Deploying

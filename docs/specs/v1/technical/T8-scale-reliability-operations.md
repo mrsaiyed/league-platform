@@ -130,6 +130,8 @@ There are three different kinds of "undo", for three different mistakes.
 
 **T-165:** a procedure counts as written only after someone has followed it start to finish.
 
+A procedure that can be rehearsed with made-up data is rehearsed first by a kept command, so the supervised session meets nothing new but what only the real services can show: the new test copy by `npm run rehearse:test-copy` (step 2.207, T-301), which lists at the procedure's top what it cannot show. A rehearsal does not make a procedure followed.
+
 ## 12. When things outside our control fail
 
 | Failure                            | Effect                                                 | What we have done about it                                                                         |

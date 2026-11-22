@@ -12,7 +12,7 @@ It makes one league in draft. The league's first season is made in the same step
 
 The owner needs no account yet. One is made for their email address, and it becomes theirs the first time they sign in with that address. **The tool sends nothing to anyone.** Tell the owner yourself to sign up with exactly that address.
 
-Nothing can publish the league yet: it stays in draft until part 2 of step 2.125 is built.
+Nothing can publish the league yet: it stays in draft until part 2 of step 2.125 is built. Its first season starts hidden, so even the owner's league home says "There is no season to show yet" until the owner, in Season settings, taps "Show this season to visitors" and "Yes" (found by `npm run rehearse:test-copy`, step 2.207).
 
 Before it makes anything it shows the whole plan, including exactly which database it reached, and asks. Afterwards it reads back what it made from the database and prints it, so nobody has to query the database by hand.
 
