@@ -71,7 +71,7 @@ export const putGameBack = defineCommand({
         : 'scheduled';
     const updated = await tx.games.setResult(
       game.id,
-      { status, homeScore: null, awayScore: null, decided: false },
+      { status, homeScore: null, awayScore: null, decided: false, overtimePeriods: null },
       input.version,
     );
     if (updated === undefined) return fail({ code: 'changed-since-read' });

@@ -21,6 +21,8 @@ export async function updateGameResult(
       status: change.status,
       home_score: change.homeScore,
       away_score: change.awayScore,
+      // Written with every change of a result, so no old count outlives it (0021).
+      overtime_periods: change.overtimePeriods,
       finalized_at: change.decided ? sql<Date>`now()` : null,
       ...(change.captureMode === undefined ? {} : { capture_mode: change.captureMode }),
       ...(change.format === undefined

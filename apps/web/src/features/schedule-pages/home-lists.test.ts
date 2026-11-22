@@ -140,6 +140,7 @@ const card = (id: string, status: GameView['status'], awaiting = false): GameVie
   home: { name: 'Home', score: null, color: null },
   away: { name: 'Away', score: null, color: null },
   status,
+  periods: 2,
   whenText: 'Sat',
   detailsHref: `/x/games/${id}`,
   teamSlugs: [],

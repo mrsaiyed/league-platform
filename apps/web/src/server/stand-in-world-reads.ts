@@ -11,6 +11,7 @@ import {
   minimumGamesToRank,
   placeRounds,
   publicRosterLine,
+  rulesOfGame,
   type GameSnapshotStore,
   type PublicGame,
   type PublicRoster,
@@ -92,6 +93,12 @@ function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
     awayTeam: team(game.awayTeamId),
     homeScore: game.homeScore,
     awayScore: game.awayScore,
+    overtimePeriods: game.overtimePeriods,
+    periods:
+      rulesOfGame(game.format, s.seasons.find((x) => x.id === game.seasonId)?.rules).gameFormat
+        .periods === 2
+        ? 2
+        : 4,
     divisionName: s.divisions.find((d) => d.id === game.divisionId)?.name ?? null,
     venue:
       venue === undefined

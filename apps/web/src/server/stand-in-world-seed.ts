@@ -1287,6 +1287,8 @@ function leagueOf(
         captureMode: g.capture,
         homeScore: g.score?.[0] ?? null,
         awayScore: g.score?.[1] ?? null,
+        // As a game decided before the count was kept (migration 0021): not known.
+        overtimePeriods: null,
         format: decided ? rules : null,
         finalizedAt: decided ? startsAt : null,
         binned: false,

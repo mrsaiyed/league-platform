@@ -23,7 +23,7 @@ import {
   type PostponedGame,
   type TrackerTx,
 } from '@srleagues/core';
-import { displayLabels } from '@srleagues/site';
+import { displayLabels, finalPillOf } from '@srleagues/site';
 import { EmptyPanel, FilterToolbar, GameCard, PageHead, RoundPicker, Section } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
 import type { GameNames } from '../../server/games-area-ports.ts';
@@ -333,6 +333,7 @@ function GameList({
               home={{ name: game.homeName, score: game.homeScore }}
               away={{ name: game.awayName, score: game.awayScore }}
               status={game.status}
+              finalPill={finalPillOf(t, game.overtimePeriods)}
               whenText={gameWhenText(game.startsAt, times)}
               {...(game.status === 'scheduled' &&
               game.startsAt !== null &&

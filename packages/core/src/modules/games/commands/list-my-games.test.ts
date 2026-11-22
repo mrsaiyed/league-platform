@@ -30,7 +30,14 @@ const games = [
   game(6, { startsAt: null }),
   // Of the other season's program.
   game(7, { startsAt: '2026-12-08T18:00:00.000Z', seasonId: otherSeasonId }),
-  game(8, { startsAt: '2026-12-06T12:00:00.000Z', status: 'final' }),
+  // Won in the first overtime (step 2.200).
+  game(8, {
+    startsAt: '2026-12-06T12:00:00.000Z',
+    status: 'final',
+    homeScore: 52,
+    awayScore: 50,
+    overtimePeriods: 1,
+  }),
 ];
 const grants = [scorekeeperGrant, schedulerGrant, editorGrant, programScorekeeperGrant];
 
@@ -69,6 +76,7 @@ describe('listMyGames', () => {
       status: 'scheduled',
       homeScore: null,
       awayScore: null,
+      overtimePeriods: null,
       recording: 'final-score',
       assignedToMe: true,
       scorable: true,
@@ -76,6 +84,11 @@ describe('listMyGames', () => {
       version: 1,
       // The starting rules' forfeit score (step 2.158: the forfeit's question says it).
       forfeitScore: { winner: 20, loser: 0 },
+    });
+    // The final game keeps its overtime periods for its card (step 2.200).
+    expect(result.ok && result.value.games[0]).toMatchObject({
+      status: 'final',
+      overtimePeriods: 1,
     });
     expect(result.ok && result.value.games[3]).toMatchObject({
       day: '2026-12-12',
