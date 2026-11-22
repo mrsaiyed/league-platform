@@ -156,13 +156,65 @@ type Figured = Exclude<Tiebreaker, 'head-to-head' | 'coin-flip'>;
 const figureText = (by: Figured, value: number | null): string =>
   by === 'point-difference' ? signed.format(value ?? 0) : whole.format(value ?? 0);
 
+type StepTeam = TiebreakStep['teams'][number];
+
+/**
+ * In a points table head-to-head compares points per game in the games among the level
+ * teams (the engine's `headToHead`), so the note gives what it compared, worked out from the
+ * step's own records and the season's points: "Lions 3 from 1 game, Tigers 6 from 3". When
+ * every team played as many of those games, the points alone: "Lions 4 points, Tigers 2".
+ */
+function pointsAmong(
+  teams: readonly StepTeam[],
+  pointsPer: NonNullable<Standings['pointsPer']>,
+  nameOf: ReadonlyMap<string, string>,
+): { readonly records: string; readonly even: number | null } {
+  const figures = teams.map((team) => {
+    const wins = team.record?.wins ?? 0;
+    const losses = team.record?.losses ?? 0;
+    const ties = team.record?.ties ?? 0;
+    return {
+      teamId: team.teamId,
+      points: wins * pointsPer.win + ties * pointsPer.tie + losses * pointsPer.loss,
+      games: wins + losses + ties,
+    };
+  });
+  const games = figures[0]?.games ?? 0;
+  const even = figures.every((f) => f.games === games) ? games : null;
+  const records = entries.format(
+    figures.map((f, n) =>
+      t('standings.level.entry', {
+        team: nameOf.get(f.teamId) ?? '',
+        figure:
+          even !== null
+            ? n === 0
+              ? t.plural('standings.level.pointsWord', f.points, {
+                  points: whole.format(f.points),
+                })
+              : whole.format(f.points)
+            : n === 0
+              ? t.plural('standings.level.pointsFromGames', f.games, {
+                  points: whole.format(f.points),
+                  games: whole.format(f.games),
+                })
+              : t('standings.level.pointsFrom', {
+                  points: whole.format(f.points),
+                  games: whole.format(f.games),
+                }),
+      }),
+    ),
+  );
+  return { records, even };
+}
+
 /**
  * The note's sentences after "level on…", from the engine's steps (step 2.198, S-74), so
  * that what placed each team is said, with its numbers:
- * - head-to-head on all of them: each team's record in the games among them, or, when it
+ * - head-to-head on all of them: each team's record in the games among them (in a points
+ *   table, its points and games there, since points per game is what counts), or, when it
  *   could not apply, who has played none of the others; on some of them, their records
- *   only when it put one ahead (when it left them level, the teams' records among all of
- *   them already showed it, and the next sentence says what did separate them);
+ *   when it put one ahead, and when it left them level, that it did (two that split their
+ *   games say so), so the next sentence is plainly why;
  * - another tiebreaker: what it put ahead of what, with the figures, or the figure they
  *   are all level on, so it is plain why the next one was needed;
  * - last, the teams nothing separated.
@@ -171,6 +223,7 @@ const figureText = (by: Figured, value: number | null): string =>
 function stepSentences(
   steps: readonly TiebreakStep[],
   members: readonly StandingsLine[],
+  pointsPer: Standings['pointsPer'],
 ): string[] {
   const nameOf = new Map(members.map((line) => [line.team.id, line.team.name]));
   const position = new Map(members.map((line, n) => [line.team.id, n]));
@@ -198,17 +251,73 @@ function stepSentences(
         );
         continue;
       }
-      if (!onAll && !apart) continue;
       const withTies = teams.some((team) => (team.record?.ties ?? 0) > 0);
+      const recordOf = (team: (typeof teams)[number]) =>
+        t(withTies ? 'standings.level.recordTies' : 'standings.level.record', {
+          wins: whole.format(team.record?.wins ?? 0),
+          losses: whole.format(team.record?.losses ?? 0),
+          ties: whole.format(team.record?.ties ?? 0),
+        });
+      const byPoints = pointsPer === null ? null : pointsAmong(teams, pointsPer, nameOf);
+      if (!onAll && !apart) {
+        // Teams that started again among themselves and are still level after the games
+        // among just them: said, so the tiebreaker that follows is plainly why.
+        const [first] = teams;
+        const split =
+          teams.length === 2 &&
+          first !== undefined &&
+          teams.every((team) => (team.record?.wins ?? 0) === (team.record?.losses ?? 0));
+        sentences.push(
+          split
+            ? t('standings.level.split', { teams: named(teams), record: recordOf(first) })
+            : t('standings.level.amongLevel', {
+                teams: named(teams),
+                records:
+                  byPoints?.records ??
+                  entries.format(
+                    teams.map((team) =>
+                      t('standings.level.entry', {
+                        team: nameOf.get(team.teamId) ?? '',
+                        figure: recordOf(team),
+                      }),
+                    ),
+                  ),
+              }),
+        );
+        continue;
+      }
+      if (byPoints !== null) {
+        const each = byPoints.even;
+        const key =
+          each === null
+            ? onAll
+              ? 'standings.level.amongThesePoints'
+              : teams.length === 2
+                ? 'standings.level.betweenPoints'
+                : 'standings.level.amongPoints'
+            : onAll
+              ? 'standings.level.amongThesePointsEven'
+              : teams.length === 2
+                ? 'standings.level.betweenPointsEven'
+                : 'standings.level.amongPointsEven';
+        sentences.push(
+          t(key, {
+            count: countText(teams.length),
+            teams: named(teams),
+            records: byPoints.records,
+            each:
+              each === null
+                ? ''
+                : t.plural('standings.level.gamesEach', each, { games: whole.format(each) }),
+          }),
+        );
+        continue;
+      }
       const records = entries.format(
         teams.map((team) =>
           t('standings.level.entry', {
             team: nameOf.get(team.teamId) ?? '',
-            figure: t(withTies ? 'standings.level.recordTies' : 'standings.level.record', {
-              wins: whole.format(team.record?.wins ?? 0),
-              losses: whole.format(team.record?.losses ?? 0),
-              ties: whole.format(team.record?.ties ?? 0),
-            }),
+            figure: recordOf(team),
           }),
         ),
       );
@@ -316,6 +425,7 @@ function levelNote(
   group: LevelGroup,
   members: readonly StandingsLine[],
   tiebreakers: readonly string[],
+  pointsPer: Standings['pointsPer'],
 ): { readonly id: string | null; readonly text: string; readonly brief?: string } {
   const stillTied = members.every((line) => line.orderedBy === 'still-tied');
   if (stillTied && new Set(members.map((line) => line.rank)).size === 1) return stillTiedNote();
@@ -352,7 +462,7 @@ function levelNote(
   if (group.steps !== null && members.length >= 3 && members.length === group.teamIds.length) {
     return {
       id: null,
-      text: [level, ...stepSentences(group.steps, members)].join(join),
+      text: [level, ...stepSentences(group.steps, members, pointsPer)].join(join),
       brief: level,
     };
   }
@@ -463,7 +573,7 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
       });
     }
     if (played.length >= 2) {
-      const note = levelNote(group, played, standings.tiebreakers);
+      const note = levelNote(group, played, standings.tiebreakers, standings.pointsPer);
       mark(played, {
         id: note.id ?? `level-${n + 1}`,
         text: note.text,

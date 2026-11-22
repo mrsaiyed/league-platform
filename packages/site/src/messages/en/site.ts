@@ -60,6 +60,8 @@ export const enSite = {
   'home.call.title': 'Every team has a story.',
   'home.fullSchedule': 'See the full schedule',
   'home.fullStandings': 'See the full standings',
+  // Under the home page's tables when a note there is shortened (step 2.198, fix round).
+  'home.whyThisOrder': 'Why this order? See the full standings',
   'home.hero.schedule': 'See the schedule',
   'home.hero.standings': 'View the standings',
   // The first starting design's home page (step 2.147, C-16): a hero with one sentence and
@@ -199,8 +201,31 @@ export const enSite = {
     '{teams} are also level on point difference ({value}).',
   'standings.level.alsoLevel.points-scored': '{teams} are also level on points scored ({value}).',
   'standings.level.among': 'In the games among {teams}: {records}.',
+  // Teams that started the tiebreakers again among themselves and are still level after
+  // the games among just them (step 2.198, fix round).
+  'standings.level.amongLevel': '{teams} are also level in the games among them: {records}.',
+  // A points table: head-to-head compares points per game, so the note gives each team's
+  // points and games in those games, which a parent can check with a pencil. When every team
+  // played as many of those games, points alone give the order.
+  'standings.level.amongPoints': 'In the games among {teams}, by points per game: {records}.',
+  'standings.level.amongPointsEven': 'In the games among {teams} ({each}): {records}.',
   'standings.level.amongThese': 'In the games among these {count}: {records}.',
+  'standings.level.amongThesePoints':
+    'In the games among these {count}, by points per game: {records}.',
+  'standings.level.amongThesePointsEven': 'In the games among these {count} ({each}): {records}.',
   'standings.level.between': 'In the games between {teams}: {records}.',
+  'standings.level.betweenPoints': 'In the games between {teams}, by points per game: {records}.',
+  'standings.level.betweenPointsEven': 'In the games between {teams} ({each}): {records}.',
+  'standings.level.gamesEach_one': '{games} game each',
+  'standings.level.gamesEach_other': '{games} games each',
+  // The first team's figure says what the numbers are; the others give the numbers only.
+  'standings.level.pointsFrom': '{points} from {games}',
+  'standings.level.pointsFromGames_one': '{points} from {games} game',
+  'standings.level.pointsFromGames_other': '{points} from {games} games',
+  'standings.level.pointsWord_one': '{points} point',
+  'standings.level.pointsWord_other': '{points} points',
+  // Two teams that started again between themselves and split the games they played.
+  'standings.level.split': '{teams} split their games with each other ({record}).',
   'standings.level.by.coin-flip': 'A coin flip puts {team} ahead.',
   'standings.level.by.fewest-points-allowed':
     'Fewer points allowed puts {team} ahead: {ahead} against {behind}.',

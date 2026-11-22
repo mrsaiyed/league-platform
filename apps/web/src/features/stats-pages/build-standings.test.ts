@@ -562,7 +562,7 @@ describe('the note for three or more level teams', () => {
     );
     expect(order(made)).toEqual(['Otters', 'Lions', 'Tigers', 'Hawks', 'Bears', 'Badgers']);
     const note =
-      'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Point difference puts Tigers ahead of Hawks: +3 against -3.';
+      'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Tigers and Hawks split their games with each other (1–1). Point difference puts Tigers ahead of Hawks: +3 against -3.';
     expect(sharedNote(made, ['Lions', 'Tigers', 'Hawks', 'Bears'])).toBe(note);
     // On the page each record's dash is held to its numbers, so "0–1" never breaks in two.
     drawnBeside(made, 'Bears', held(note));
@@ -664,7 +664,12 @@ describe('the note for three or more level teams', () => {
     const rules: SeasonRules = {
       ...defaultSeasonRules(),
       // Three points a win, one a tie.
-      standings: { ...defaultSeasonRules().standings, rankBy: 'points', pointsPerWin: 3 },
+      standings: {
+        ...defaultSeasonRules().standings,
+        rankBy: 'points',
+        pointsPerWin: 3,
+        columns: [...defaultSeasonRules().standings.columns, 'points'],
+      },
       allowTies: true,
     };
     const made = await tableAfter(
@@ -681,7 +686,58 @@ describe('the note for three or more level teams', () => {
     );
     expect(order(made)).toEqual(['Cedar', 'Birch', 'Ash', 'Zed']);
     expect(sharedNote(made, ['Cedar', 'Birch', 'Ash'])).toBe(
-      'Cedar, Birch, and Ash are level on points (4). In the games among these three: Cedar 1–0–1, Birch 0–0–2, Ash 0–1–1.',
+      'Cedar, Birch, and Ash are level on points (4). In the games among these three (2 games each): Cedar 4 points, Birch 2, Ash 1.',
+    );
+  });
+
+  it('in a points table gives the points per game head-to-head compared (the fix round’s F1)', async () => {
+    const rules: SeasonRules = {
+      ...defaultSeasonRules(),
+      standings: {
+        ...defaultSeasonRules().standings,
+        rankBy: 'points',
+        pointsPerWin: 3,
+        columns: [...defaultSeasonRules().standings.columns, 'points'],
+      },
+    };
+    const made = await tableAfter(
+      ['A', 'B', 'C', 'X'],
+      [
+        ['A', 50, 'C', 40],
+        ['A', 50, 'C', 40],
+        ['B', 50, 'A', 40],
+        ['B', 50, 'X', 40],
+        ['C', 50, 'X', 40],
+        ['C', 50, 'X', 40],
+      ],
+      { rules },
+    );
+    expect(order(made)).toEqual(['B', 'A', 'C', 'X']);
+    expect(sharedNote(made, ['B', 'A', 'C'])).toBe(
+      'B, A, and C are level on points (6). In the games among these three, by points per game: B 3 from 1 game, A 6 from 3, C 0 from 2.',
+    );
+    // The home page keeps only the first sentence, unchanged.
+    expect(made.view.briefFootnotes.map((note) => note.text)).toContain(
+      'B, A, and C are level on points (6).',
+    );
+  });
+
+  it('says when teams that start again are still level between themselves (the fix round’s F2)', async () => {
+    const made = await tableAfter(
+      ['A', 'B', 'C', 'X', 'Y'],
+      [
+        ['A', 50, 'B', 40],
+        ['A', 50, 'C', 40],
+        ['B', 50, 'C', 40],
+        ['C', 52, 'B', 40],
+        ['X', 50, 'A', 40],
+        ['X', 50, 'A', 40],
+        ['B', 50, 'Y', 30],
+        ['C', 50, 'Y', 40],
+      ],
+    );
+    expect(sharedNote(made, ['A', 'B', 'C'])).toBe(
+      'A, B, and C are level on win percentage (.500). In the games among these three: A 2–0, B 1–2, C 1–2. B and C split their games with each other (1–1). Point difference puts B ahead of C: +8 against +2.',
     );
   });
 
@@ -749,7 +805,7 @@ describe('the home page’s form of each note', () => {
       expect(bothBeside(made, team)).toEqual({
         brief: ['Lions, Tigers, Hawks, and Bears are level on win percentage (.500).'],
         whole: [
-          'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Point difference puts Tigers ahead of Hawks: +3 against -3.',
+          'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Tigers and Hawks split their games with each other (1–1). Point difference puts Tigers ahead of Hawks: +3 against -3.',
         ],
       });
     }
@@ -807,7 +863,12 @@ describe('the home page’s form of each note', () => {
       {
         rules: {
           ...defaultSeasonRules(),
-          standings: { ...defaultSeasonRules().standings, rankBy: 'points', pointsPerWin: 3 },
+          standings: {
+            ...defaultSeasonRules().standings,
+            rankBy: 'points',
+            pointsPerWin: 3,
+            columns: [...defaultSeasonRules().standings.columns, 'points'],
+          },
         },
       },
     );

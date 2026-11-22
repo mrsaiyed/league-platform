@@ -34,7 +34,7 @@ const countsSentence =
 const eastNote =
   'Owls and Falcons are level on win percentage (.667). The game between them puts Owls ahead.';
 const westNote =
-  'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Point difference puts Tigers ahead of Hawks: +3 against -3.';
+  'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Tigers and Hawks split their games with each other (1–1). Point difference puts Tigers ahead of Hawks: +3 against -3.';
 const stillTied =
   'Level with another team: nothing in the rules separates them yet, so they are shown in a fixed order.';
 
@@ -110,7 +110,31 @@ function checkSteps(where, rest, level) {
     ) {
       continue;
     }
-    if ((m = /^In the games among these (\w+): (.+)$/.exec(sentence))) {
+    if (
+      (m =
+        /^In the games (?:between|among) (.+?)(?:, by points per game| \(\d+ games? each\)): (.+)$/.exec(
+          sentence,
+        ))
+    ) {
+      // A points table: each team's points (and games) in the games among them.
+      const teams = m[2]
+        .split(', ')
+        .map((entry) => /^(.+?) \d+(?: points?| from \d+(?: games?)?)?$/.exec(entry)?.[1] ?? '');
+      note(`${said} names teams of the note, in the table's order`, inOrder(teams));
+    } else if (
+      (m = /^(.+) split their games with each other \((\d+)–(\d+)(?:–\d+)?\)$/.exec(sentence))
+    ) {
+      note(
+        `${said} names two teams of the note, in the table's order`,
+        inOrder(m[1].split(' and ')),
+      );
+      note(`${said} gives a split record`, m[2] === m[3]);
+    } else if ((m = /^(.+) are also level in the games among them: (.+)$/.exec(sentence))) {
+      note(
+        `${said} names teams of the note, in the table's order`,
+        inOrder(m[1].split(/, and |, | and /)),
+      );
+    } else if ((m = /^In the games among these (\w+): (.+)$/.exec(sentence))) {
       const entries = entriesOf(m[2]);
       note(
         `${said} gives every team's record, in the table's order`,

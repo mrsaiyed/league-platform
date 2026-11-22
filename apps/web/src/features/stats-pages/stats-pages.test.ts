@@ -86,7 +86,7 @@ describe('standings page', () => {
     expect(beside(east, 'Owls')).toEqual([eastNote]);
     expect(beside(east, 'Herons')).toEqual([]);
     const westNote =
-      'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Point difference puts Tigers ahead of Hawks: +3 against -3.';
+      'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Tigers and Hawks split their games with each other (1–1). Point difference puts Tigers ahead of Hawks: +3 against -3.';
     for (const team of ['Lions', 'Tigers', 'Hawks', 'Bears']) {
       expect(beside(west, team)).toEqual([westNote]);
     }

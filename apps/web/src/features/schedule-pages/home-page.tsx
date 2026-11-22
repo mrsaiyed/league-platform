@@ -106,6 +106,10 @@ export async function HomePage({
   const standingsHref = leagueUrl(addressee, 'standings', { season: askedSeason });
   const teamsHref = leagueUrl(addressee, 'teams', { season: askedSeason });
   const manyTables = tables.length > 2;
+  // A level-teams note the home page shortened: the whole of it is on the standings page.
+  const shortened = tables.some((table) =>
+    table.briefFootnotes.some((note, n) => note.text !== table.footnotes[n]?.text),
+  );
   return (
     <main className="site-wide">
       <Hero
@@ -180,23 +184,30 @@ export async function HomePage({
             more={{ href: standingsHref, label: t('home.fullStandings') }}
           >
             {hasStandings ? (
-              <div className="home-tables">
-                {tables.map((raw) => {
-                  const table = compactStandings(raw);
-                  return (
-                    <StandingsTable
-                      key={table.key}
-                      caption={table.caption}
-                      idPrefix={`home-${table.key}`}
-                      columns={table.columns}
-                      rows={table.rows}
-                      footnotes={table.footnotes}
-                      labels={labels.standings}
-                      emblems
-                    />
-                  );
-                })}
-              </div>
+              <>
+                <div className="home-tables">
+                  {tables.map((raw) => {
+                    const table = compactStandings(raw);
+                    return (
+                      <StandingsTable
+                        key={table.key}
+                        caption={table.caption}
+                        idPrefix={`home-${table.key}`}
+                        columns={table.columns}
+                        rows={table.rows}
+                        footnotes={table.footnotes}
+                        labels={labels.standings}
+                        emblems
+                      />
+                    );
+                  })}
+                </div>
+                {shortened ? (
+                  <p className="home-notes-more">
+                    <a href={standingsHref}>{t('home.whyThisOrder')}</a>
+                  </p>
+                ) : null}
+              </>
             ) : (
               <EmptyPanel
                 text={t('home.standingsEmpty')}
