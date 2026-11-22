@@ -69,3 +69,56 @@ jobs:
         working-directory: apps/varsity-hosted
       - run: npm run build
         working-directory: apps/varsity-hosted
+  # The platform's one image (platform.Dockerfile, step 2.95, record 101), proved on every
+  # push and published nowhere: no registry, no secret, no permission beyond reading the
+  # code; the image stays on this machine and goes with it. The host builds its own copy
+  # from the commit it is told to deploy (2.110, M20). Without a database or a sign-in
+  # service the staging start-up must refuse in its own words; the health address is asked
+  # in the made-up stand-in mode (.env.example), which needs neither.
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the platform's image
+        run: docker build --file platform.Dockerfile --tag srleagues-platform:check .
+      - name: Start it in staging mode, which refuses without its settings
+        shell: bash
+        run: |
+          set +e
+          timeout 120 docker run --rm --env APP_ENV=staging --env PUBLIC_BASE_URL=https://staging.example.test \
+            --env TRUSTED_PROXY=none srleagues-platform:check > staging.txt 2>&1
+          code=$?
+          cat staging.txt
+          set -e
+          test "$code" -ne 0 -a "$code" -ne 124
+          grep -q 'PLATFORM_DATABASE_URL' staging.txt
+          ! grep -qE 'ERR_MODULE_NOT_FOUND|Cannot find module|ERR_UNKNOWN_FILE_EXTENSION' staging.txt
+      - name: Start the web app on made-up data and ask its health address
+        shell: bash
+        run: |
+          docker run --detach --name web --env-file .env.example srleagues-platform:check
+          for attempt in $(seq 1 60); do
+            if docker exec web node -e "fetch('http://127.0.0.1:3000/api/v1/health').then(async (r) => { console.log(r.status, await r.text()); process.exit(r.status === 200 ? 0 : 1); }, () => process.exit(1))" > health.txt 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          docker logs web
+          cat health.txt
+          grep -q '"app":"web"' health.txt
+          grep -q '^200 ' health.txt
+      - name: Load the worker's code from the same image
+        shell: bash
+        run: |
+          set +e
+          timeout 120 docker run --rm --env APP_ENV=staging srleagues-platform:check \
+            node --disable-warning=ExperimentalWarning apps/worker/src/main.ts > worker.txt 2>&1
+          code=$?
+          cat worker.txt
+          set -e
+          test "$code" -ne 124 -a -s worker.txt
+          ! grep -qE 'ERR_MODULE_NOT_FOUND|Cannot find module|ERR_UNKNOWN_FILE_EXTENSION' worker.txt
+      - name: Remove the container
+        if: always()
+        run: docker rm --force web || true
