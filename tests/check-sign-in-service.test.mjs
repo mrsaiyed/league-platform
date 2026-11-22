@@ -151,6 +151,13 @@ test('against the fake over HTTP, every line says "as expected", and the made-up
     assert.ok(lines.includes(words.allAsExpected(made.length)));
     assert.equal(served.fake.hasUser(madeAddress(served)), false);
     assert.match(madeAddress(served), /^check-sign-in-[0-9a-f]{12}@sign-in-check\.test$/);
+    // Both kinds of code are checked as the adapter checks them: signup for a new user,
+    // magiclink once the user is confirmed.
+    const verifyTypes = served.seen
+      .filter((call) => call.path === '/auth/v1/verify')
+      .map((call) => JSON.parse(call.body).type);
+    assert.ok(verifyTypes.includes('signup'), verifyTypes.join(', '));
+    assert.ok(verifyTypes.includes('magiclink'), verifyTypes.join(', '));
     // The burst of M10: 300 user calls on one session.
     const userCalls = served.seen.filter(
       (call) => call.method === 'GET' && call.path === '/auth/v1/user',

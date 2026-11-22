@@ -65,6 +65,8 @@ export const checks = {
   wrongCode: 'A wrong code is refused as otp_expired (018 #1)',
   noCodeSent: 'A check where no code was sent is refused as otp_expired (018 #1)',
   rightCode: 'The right code, after a wrong one, gives a session in the shape we read (018 #1)',
+  confirmedCode:
+    'A code for that address, now confirmed, is to be checked as magiclink and gives a session (018 #3)',
   tokenLife: 'An access token lasts 3600 seconds (018’s settings)',
   user: 'The user call answers the session’s user, its address confirmed (018 #1)',
   madeUpToken: 'A made-up access token is refused as bad_jwt (018 #1)',

@@ -374,6 +374,25 @@ export async function runChecks({
         accepted('verify', await ask('verify', () => client.verifyCode(verifyType, email, code))),
       );
     });
+    await check(words.checks.confirmedCode, async () => {
+      // The user is confirmed now, as when a code was checked and the sign-up never
+      // finished: a code asked for again is to be checked as magiclink, as the adapter does.
+      needed(state.first);
+      const again = accepted(
+        'generate_link',
+        await ask('generate_link', () => client.generateCode('magiclink', email)),
+      );
+      keep(again.code);
+      if (again.verifyType !== 'magiclink') {
+        throw new Differed(words.wrongVerifyType(again.verifyType));
+      }
+      keepSession(
+        accepted(
+          'verify',
+          await ask('verify', () => client.verifyCode('magiclink', email, again.code)),
+        ),
+      );
+    });
     await check(words.checks.tokenLife, async () => {
       const seconds = Math.round(
         (needed(state.first).accessExpiresAt.getTime() - Date.now()) / 1000,
