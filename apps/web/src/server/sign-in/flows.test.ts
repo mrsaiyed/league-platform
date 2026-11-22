@@ -463,6 +463,62 @@ describe('the bot check in front of signing in and asking for a code (T4 §6, re
     expect(env.outbox.messages()).toHaveLength(sentBefore);
   });
 
+  it('with the check unreachable, wrong passwords meet the attempt limits exactly as with it reachable (Q2)', async () => {
+    const run = async (unreachable: boolean) => {
+      const env = setup();
+      await signUp(env, browser(), 'taken@example.test');
+      const deps = unreachable
+        ? {
+            ...env.deps,
+            botCheck: createLocalBotCheck({ appEnv: 'test', refuseEverything: 'unreachable' }),
+          }
+        : env.deps;
+      const b = browser('203.0.113.9');
+      const tries: string[] = [];
+      for (let i = 0; i < 10; i++) {
+        const wrong = { email: 'taken@example.test', password: 'not the password' };
+        tries.push((await signInWithPasswordWith(drawn(wrong), b.visit, deps)).to);
+        env.advanceSeconds(31);
+      }
+      const right = { email: 'taken@example.test', password };
+      const locked = (await signInWithPasswordWith(drawn(right), b.visit, deps)).to;
+      return { tries, locked, session: b.jar.get(cookieNames.session) };
+    };
+    const reachable = await run(false);
+    const unreachable = await run(true);
+    expect(unreachable).toEqual(reachable);
+    expect(unreachable.tries[0]).toBe('/signin?problem=wrongEmailOrPassword');
+    // After the limit's wrong passwords the right one is refused too, for the wait.
+    expect(unreachable.locked).toMatch(/^\/signin\?problem=tooManyAttempts&wait=\d+$/);
+    expect(unreachable.session).toBeUndefined();
+  });
+
+  it('with the check unreachable, "Send a new code" stays closed, sends nothing, and says so (Q2)', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'taken@example.test');
+    const deps = {
+      ...env.deps,
+      botCheck: createLocalBotCheck({ appEnv: 'test', refuseEverything: 'unreachable' }),
+    };
+    for (const [purpose, email] of [
+      ['sign-up', 'new@example.test'],
+      ['reset', 'taken@example.test'],
+    ] as const) {
+      const b = browser();
+      await askForCode(purpose, { email }, b.visit, env.deps);
+      const sent = env.outbox.messages().length;
+      const startSignUp = vi.spyOn(env.deps.signIn, 'startSignUp');
+      const startReset = vi.spyOn(env.deps.signIn, 'startReset');
+      expect(await resendCode(drawn({}), b.visit, deps)).toEqual({
+        to: '/signup/code?problem=botCheckUnreachable',
+      });
+      expect(env.outbox.messages()).toHaveLength(sent);
+      expect(startSignUp).not.toHaveBeenCalled();
+      expect(startReset).not.toHaveBeenCalled();
+      vi.restoreAllMocks();
+    }
+  });
+
   it.each([
     ['failed', 'botCheckFailed'],
     ['missing', 'botCheckFailed'],

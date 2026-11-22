@@ -3,7 +3,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DatabaseHandle } from '@srleagues/database';
 import type { EmailConfirmation, EmailConfirmationQuestion } from '@srleagues/providers';
+import { createLogger } from '@srleagues/observability';
 import { loadConfig } from './config-schema.ts';
+import { logLinesFor } from './container.ts';
 import {
   botCheckAlarmLine,
   botCheckOffLine,
@@ -252,6 +254,22 @@ describe("staging's bot check (record 081, T-270)", () => {
     expect(alarmed).toEqual([[botCheckAlarmLine, { kind: 'no-answer' }]]);
     expect(JSON.stringify(alarmed)).not.toMatch(/192\.0\.2|made-up-widget-answer/);
     expect(warned).toEqual([]);
+  });
+
+  it('that line reaches the logger at error level, as the app hooks it up (container.ts)', async () => {
+    const lines: string[] = [];
+    // The app's own threshold may be set as high as error: the line still gets through.
+    const logger = createLogger({ sink: (line) => void lines.push(line), level: 'error' });
+    const check = hostedBotCheck(configFor('production'), logLinesFor(logger), async () => {
+      throw new TypeError('fetch failed: 192.0.2.10 https://challenges.example.test/siteverify');
+    });
+    await check.verify({ answer: 'made-up-widget-answer', action: 'sign-in' });
+    expect(lines).toHaveLength(1);
+    const written = JSON.parse(lines[0] ?? '{}') as Record<string, unknown>;
+    expect(written).toMatchObject({ level: 'error', msg: botCheckAlarmLine, kind: 'no-answer' });
+    expect(lines[0]).not.toMatch(
+      /192\.0\.2|made-up-widget-answer|siteverify|made-up-turnstile-secret-key/,
+    );
   });
 
   it('with one key refuses to start, naming the missing one', () => {
