@@ -43,3 +43,7 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.37 part 2: when the 15-second look at a final game finds it live and nobody holds it, the device quietly becomes the scorer, as at first opening: decide whether it should ask
 - 2.37 part 2: a device showing '<name> is scoring' never learns by itself that the game has ended
 - 2.135: when step 2.91 runs the nightly deletion, the Privacy note may say again that someone never on a team's list is deleted for good after 30 days
+- 2.95: the release does not refuse the transaction pooler (port 6543), though its run lock needs a session connection; only the pages and the driver's header say so
+- 2.95: `samePlace` in `platform-database-guard.ts` does not match a `DATABASE_URL` written with a trailing dot after its host (the Supabase reference check still covers the tracker)
+- 2.95: `platform.Dockerfile` gives all of `.next` to the node user, not only `.next/cache`, and `node:24-slim` is not pinned to a digest
+- 2.95: the health address does not name the running version (Render's Events list shows it)
