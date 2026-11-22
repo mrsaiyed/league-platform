@@ -23,6 +23,7 @@ try {
   ({ values } = parseArgs({
     options: {
       db: { type: 'string' },
+      'go-ahead': { type: 'boolean', default: false },
       hosted: { type: 'boolean', default: false },
       migrations: { type: 'string' },
       help: { type: 'boolean', default: false },
@@ -105,6 +106,7 @@ try {
     commit,
     ask,
     folder: values.migrations === undefined ? undefined : path.resolve(values.migrations),
+    goAhead: values['go-ahead'],
   });
 } catch (error) {
   if (error === stoppedAtQuestion) {

@@ -13,6 +13,8 @@ export const usage = [
   '                            (never in .env, never a setting on the host)',
   '    PLATFORM_DATABASE_CA    the server’s certificate: its PEM text or a file’s path',
   '                            (for Supabase, the one on the project’s database settings page)',
+  '  --go-ahead                            release even while games are being scored',
+  '                                        (an urgent fix only; T-158)',
   '',
   'Nothing is deployed by it: when every change is applied it names the commit, and that',
   'commit is deployed by hand on the host (docs/operations/).',
@@ -122,6 +124,16 @@ export const checkBeforeAnswering = (place) => [
       ]
     : ['Check that this is the database you mean before you answer.']),
 ];
+
+const games = (count) => `${count} game${count === 1 ? '' : 's'}`;
+
+/** T-158: stopped before anything is applied, because games are being scored now. */
+export const liveGamesRefused = (live, most) => [
+  `${games(live)} ${live === 1 ? 'is' : 'are'} being scored right now (a release goes on by itself with ${most === 0 ? 'none' : `${most} at most`}). Nothing was applied. Do not deploy.`,
+  'Release after those games are final. Only for an urgent fix, run it again with --go-ahead.',
+];
+export const liveGamesGoingAhead = (live) =>
+  `${games(live)} being scored right now: going ahead, as asked (--go-ahead or within the limit).`;
 
 /** On a hosted database the question is answered by typing the database's own name. */
 export const confirmHosted =

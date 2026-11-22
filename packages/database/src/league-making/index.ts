@@ -19,6 +19,8 @@ export {
   type OpenTargetResult,
   type PostgresAddress,
 } from './league-making-target.ts';
+// The release command's (step 2.95, T-158): how many games are live, in every league.
+export { countLiveGames } from './count-live-games.ts';
 export { type LoginProblem, type MigrationLoginGap } from './probe-logins.ts';
 export {
   makeLeague,

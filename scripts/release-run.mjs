@@ -3,8 +3,9 @@
 // 1. the commit to deploy: this checkout's own commit, with nothing changed or added in
 //    supabase/migrations, so the changes applied are exactly that commit's;
 // 2. the target opened, through the league-making tool's own checks (openMigrationTarget);
-// 3. where it will act shown from what was really connected to and, on a hosted database,
-//    the person types that database's name to go ahead;
+// 3. where it will act shown from what was really connected to; the games live now are
+//    counted, and above the limit it stops unless told to go ahead (T-158); on a hosted
+//    database the person then types that database's name to go ahead;
 // 4. the changes applied by the one runner (applyMigrations), each file in its own
 //    transaction;
 // 5. only when every file applied (or had been): the commit to deploy is named. A failed
@@ -14,8 +15,15 @@
 // nothing here holds a host's key. Whatever goes wrong it says what was and was not
 // applied, never an error's message (it can repeat an address with its password), and
 // returns a non-zero exit code.
-import { applyMigrations, openMigrationTarget } from '@srleagues/database';
+import { applyMigrations, countLiveGames, openMigrationTarget } from '@srleagues/database';
 import * as words from './release.messages.mjs';
+
+/**
+ * T-158: the most games that may be live, in all leagues together, for a release to go on
+ * without `--go-ahead`. 0 until a tracker that is open is proved to keep working across a
+ * release (T-127): until then any live game stops it (T-300).
+ */
+export const mostLiveGames = 0;
 
 /** A short error code only (SQLSTATE such as 23505, or ECONNRESET), never a message. */
 export function codeOf(error) {
@@ -30,6 +38,8 @@ export function codeOf(error) {
  * - `commit()`: `{ ok: true, id }` or `{ ok: false, problem: 'not-a-checkout' | 'migrations-changed' }`.
  * - `ask(question)`: the person's answer at a terminal; only asked on a hosted database.
  * - `folder`: the migrations folder (default supabase/migrations); tests give their own.
+ * - `goAhead`: true when the person gave --go-ahead: live games above the limit do not
+ *   stop it (an emergency fix, T-158). Exit code 3 when they do.
  * - `say`, `warn`: where lines go (console.log and console.error).
  */
 export async function runRelease({
@@ -37,6 +47,7 @@ export async function runRelease({
   commit,
   ask,
   folder,
+  goAhead = false,
   say = console.log,
   warn = console.error,
 }) {
@@ -54,6 +65,12 @@ export async function runRelease({
   const { target } = opened;
   try {
     for (const line of words.whereLines(target.place, named.id)) say(line);
+    const live = await countLiveGames(target.login);
+    if (live > mostLiveGames && !goAhead) {
+      for (const line of words.liveGamesRefused(live, mostLiveGames)) warn(line);
+      return 3;
+    }
+    if (live > 0) say(words.liveGamesGoingAhead(live));
     if (source.kind === 'migration-login') {
       for (const line of words.checkBeforeAnswering(target.place)) say(line);
       const answer = await ask(words.confirmHosted);

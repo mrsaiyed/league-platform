@@ -113,6 +113,33 @@ describe('scripts/release.mjs on a PGlite folder', () => {
     expect(ran.out).not.toContain('Deploy commit');
   }, 60_000);
 
+  it('with games live it stops before applying anything, unless told to go ahead (T-158)', async () => {
+    const migrations = path.join(root, 'live-migrations');
+    await mkdir(migrations, { recursive: true });
+    await writeFile(
+      path.join(migrations, '0001_made_up_table.sql'),
+      'create table made_up (id int);\n',
+    );
+    const folder = await emptyFolder(
+      'live',
+      `create table public.games (status text not null);
+       insert into public.games values ('live'), ('final'), ('live');`,
+    );
+
+    const stopped = await release(['--db', folder, '--migrations', migrations]);
+    expect(stopped.code).toBe(3);
+    expect(stopped.err).toContain('2 games are being scored right now');
+    expect(stopped.err).toContain('--go-ahead');
+    expect(stopped.out).not.toContain('Deploy commit');
+    expect(await tableCount(folder)).toBe(1);
+
+    const ahead = await release(['--db', folder, '--migrations', migrations, '--go-ahead']);
+    expect(ahead.code).toBe(0);
+    expect(ahead.out).toContain('2 games being scored right now: going ahead');
+    expect(ahead.out).toContain('Applied now: 0001_made_up_table.sql.');
+    expect(ahead.out).toContain(`Deploy commit ${head} now`);
+  }, 60_000);
+
   it('refuses the tracker’s database, whatever its address, with nothing applied', async () => {
     const folder = await emptyFolder('tracker', 'create schema live_stats;');
     const ran = await release(['--db', folder]);
