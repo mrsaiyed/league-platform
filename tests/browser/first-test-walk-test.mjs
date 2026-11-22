@@ -16,12 +16,13 @@
 // score is typed in Admin → Games, 50 to 45 for the Wolves, so the two teams end level.
 // League settings' minimum games for the leaders is set to 1 (so the statistics page shows
 // leaders after one game: more for the founder to see than "No leaders yet"). Then the
-// game's page, the standings and the statistics, where every number is what was scored.
+// game's page, the standings and the statistics, read by a visitor (signed out, a fresh
+// browser with no cookies), where every number is what was scored.
 //
-// Known until step 2.125, part 2 (publishing a league): Still Waters is a draft league, so
-// a signed-out visitor gets "Page not found" on every page of it. The walk reads the
-// public pages as the owner, who sees them as visitors will, and checks that a visitor is
-// still refused, so the day leagues can be published this test says so.
+// Still Waters starts live (made-up data only): the screen that publishes a league (step
+// 2.125, part 2) is not built yet. A real new league still starts as a draft, and a draft
+// league is still proven hidden from visitors (league-gate.test.ts, check-web-shell.mjs,
+// on Quiet Pines and Reed Marsh).
 //
 // The tracker runs with scripts on (it is a page that needs them); the admin's screens
 // with scripts off, as the other admin tests do, every form a plain post. Both are the one
@@ -228,14 +229,16 @@ if (built) {
     await staffLink(page, 'Season settings', /\/admin\/season/);
     const shown = await page.locator('#who-can-see').innerText();
     say(6, shown);
-    // Already shown (the made-up league starts so): nothing to tap. It says, truly, that
-    // visitors see nothing until the league itself is published (step 2.125, part 2).
+    // Already shown (the made-up league starts so, and starts live): nothing to tap.
     note(
-      '6. Season settings says First Season is shown, but the league is not published',
-      shown.includes(
-        'First Season is shown, but visitors cannot see this league until it is published.',
-      ),
+      '6. Season settings says everyone can see First Season',
+      shown.includes('Everyone can see First Season.') && !/until it is published/.test(shown),
       shown,
+    );
+    note(
+      '5. the schedule says visitors can see it now',
+      published.includes('The schedule is published. Visitors can see it now.'),
+      published,
     );
 
     at = "step 7: 'Score this game' on the league home";
@@ -391,12 +394,27 @@ if (built) {
       saved,
     );
 
+    // Steps 16 to 18: a visitor, signed out, reads the public pages: a fresh browser with
+    // no cookies, at the same phone size. Each page is read again by address to be sure it
+    // answers 200 to someone signed out.
+    at = 'step 16: a visitor opens the league';
+    const visitor = await browser.newContext(phone);
+    const away = await visitor.newPage();
+    const answers = async (label) => {
+      const again = await away.goto(away.url());
+      note(`${label} answers 200 to a visitor`, again?.status() === 200, `${again?.status()}`);
+    };
+    const home = await away.goto(`${origin}/${league}`);
+    note(
+      '16. a visitor, signed out, opens the league home: 200',
+      home?.status() === 200 && (await visitor.cookies()).length === 0,
+      `${home?.status()}`,
+    );
     at = "step 16: game 1's page";
-    await page.goto(`${origin}/${league}`);
-    await tap(page, page.locator(`main a[href*="/games/${gameId}"]`).first(), /\/games\//);
-    const game = await mainText(page);
+    await tap(away, away.locator(`main a[href*="/games/${gameId}"]`).first(), /\/games\//);
+    const game = await mainText(away);
     say(16, game);
-    const tables = await page.$$eval('main table', (all) =>
+    const tables = await away.$$eval('main table', (all) =>
       all.map((table) =>
         [...table.rows].map((r) => [...r.cells].map((cell) => cell.innerText.trim())),
       ),
@@ -414,18 +432,19 @@ if (built) {
       totals.includes('6 1 1 1') && totals.includes('7 0 1 1'),
       JSON.stringify(totals),
     );
-    await fits(page, "16. game 1's page");
+    await fits(away, "16. game 1's page");
+    await answers("16. game 1's page");
 
     at = 'step 17: the standings';
-    await page.locator('.site-header .site-menu summary').tap();
+    await away.locator('.site-header .site-menu summary').tap();
     await tap(
-      page,
-      page.locator('.site-header').getByRole('link', { name: 'Standings', exact: true }).first(),
+      away,
+      away.locator('.site-header').getByRole('link', { name: 'Standings', exact: true }).first(),
       /\/standings/,
     );
-    const standings = await mainText(page);
+    const standings = await mainText(away);
     say(17, standings);
-    const rows = await page.$$eval('main table tbody tr', (all) =>
+    const rows = await away.$$eval('main table tbody tr', (all) =>
       all.map((r) => [...r.cells].map((cell) => cell.innerText.trim()).join(' ')),
     );
     const wolves = rows.findIndex((r) => r.includes('Wolves'));
@@ -456,16 +475,17 @@ if (built) {
         'Wolves and Ravens are level on win percentage (.500). Point difference puts Wolves ahead: +4 against -4.',
       ),
     );
-    await fits(page, '17. the standings');
+    await fits(away, '17. the standings');
+    await answers('17. the standings');
 
     at = 'step 18: the statistics';
-    await page.locator('.site-header .site-menu summary').tap();
+    await away.locator('.site-header .site-menu summary').tap();
     await tap(
-      page,
-      page.locator('.site-header').getByRole('link', { name: 'Stats', exact: true }).first(),
+      away,
+      away.locator('.site-header').getByRole('link', { name: 'Stats', exact: true }).first(),
       /\/stats/,
     );
-    const stats = await mainText(page);
+    const stats = await mainText(away);
     say(18, stats);
     note(
       '18. the statistics say what they count',
@@ -480,17 +500,8 @@ if (built) {
       stats.slice(0, 500),
     );
     note('18. "No leaders yet" is not said: the minimum is 1', !stats.includes('No leaders yet.'));
-    await fits(page, '18. the statistics');
-
-    at = 'step 19: a visitor';
-    const visitor = await browser.newContext(phone);
-    const away = await visitor.newPage();
-    const answer = await away.goto(`${origin}/${league}`);
-    note(
-      '19. a visitor still gets "Page not found" in a draft league (known until step 2.125, part 2)',
-      answer?.status() === 404,
-      `${answer?.status()}`,
-    );
+    await fits(away, '18. the statistics');
+    await answers('18. the statistics');
     await visitor.close();
   } catch (error) {
     failures.push(`${at}: ${whatWentWrong(error)}`);

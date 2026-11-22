@@ -65,12 +65,10 @@ work is there, and `main` is not moved from the cloud machine. More detail is in
    same way: Home team Wolves, Away team Ravens, Time `11:00`. (If it is not yet 11 in
    the morning, choose two times earlier today.) Both games say "no venue yet".
 5. **Publish the schedule.** Tap "Publish this schedule". It says: "The schedule is
-   published, but visitors cannot see this league until it is published." That is true:
-   Still Waters itself is still a draft league, and the screen that publishes a league is
-   not built yet (step 2.125). Until then only you can see its pages (step 19).
+   published. Visitors can see it now."
 6. **The season is shown already.** Tap "Season settings". Under "Who can see this season"
-   it says: "First Season is shown, but visitors cannot see this league until it is
-   published." There is nothing to tap here; do not tap "Hide it again".
+   it says: "Everyone can see First Season." There is nothing to tap here; do not tap
+   "Hide it again".
 7. **Open the tracker where a scorer finds it.** Open the league's home page,
    `…/still-waters`. Both games are there, each with a "Score this game" button. Tap it on
    the 10:00 AM game, the one that shows Wolves and Ravens in that order. The tracker
@@ -120,8 +118,14 @@ work is there, and `main` is not moved from the cloud machine. More detail is in
     needs 3 games to be ranked, so after one game the statistics page would only say "No
     leaders yet." and "A player needs at least 3 games to be ranked." The number is your
     league's to choose.
-16. **The game's page.** Open `…/still-waters` and tap the 10:00 AM game, now final. It
-    says "Wolves at Ravens", Wolves 6, Ravens 7 with "Winner" beside the Ravens. The box
+    Steps 16 to 18 are read as a visitor would read them. Open a private window (or another
+    browser) where you are not signed in, and open `…/still-waters`. You see the league's home
+    page, not "Page not found" and not a sign-in page. In the finished product a new league
+    stays hidden until its owner publishes it; that screen is not built yet, so this practice
+    league starts already public.
+
+16. **The game's page.** In the private window, on `…/still-waters`, tap the 10:00 AM
+    game, now final. It says "Wolves at Ravens", Wolves 6, Ravens 7 with "Winner" beside the Ravens. The box
     scores have PTS (points), 3PM (3-pointers made), FTM (free throws made) and PF (fouls):
     Ann Wolves 3, 1, 0, 1; Ben Wolves 1, 0, 1, 0; Cal Wolves 2, 0, 0, 0; the Wolves' Total
     6, 1, 1, 1. Ann Ravens 2; Ben Ravens 0 with 1 foul; Cal Ravens 2; Dee Ravens 2; Eli
@@ -143,9 +147,5 @@ work is there, and `main` is not moved from the cloud machine. More detail is in
     per game (Per game is shown first; "Season totals" shows 3). Under each leader, the list
     of the next players includes players with 0 (for example under 3-pointers made): that is
     known and reported, not something you broke.
-19. **As a visitor.** Open a private window (or another browser) where you are not signed
-    in, and open `…/still-waters`. It says "Page not found". That is expected for now:
-    Still Waters is a draft league, and visitors will see it once a league can be published
-    (step 2.125). Until then, what you read in steps 16 to 18 is what visitors will see.
 
 That is the whole walk: an empty league to a final table, with one game scored live.
