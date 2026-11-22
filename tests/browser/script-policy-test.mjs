@@ -114,6 +114,9 @@ const reactRan = (page) =>
     ),
   );
 
+/** How long a loaded page's own scripts get to run: they run at once when the nonce is right. */
+const scriptsWait = 5_000;
+
 const nonceShape = /'nonce-([A-Za-z0-9+/]{24})'/;
 
 if (browser) {
@@ -142,13 +145,17 @@ if (browser) {
             'max-age=31536000; includeSubDomains',
         );
         // React's own scripts ran (from our address, with the nonce), and so did Next.js's
-        // inline page data (inline, with the nonce).
+        // inline page data (inline, with the nonce). The page has loaded by now, so its
+        // scripts get 5 seconds, not the 30 a page's arrival gets: with a broken nonce the
+        // test fails in under 2 minutes, not 9 (the 2.98 review, C4).
         await page.waitForFunction(
           () =>
             Array.isArray(self.__next_f) &&
             [...document.body.querySelectorAll('*')].some((element) =>
               Object.keys(element).some((key) => key.startsWith('__reactFiber')),
             ),
+          undefined,
+          { timeout: scriptsWait },
         );
         note(`${address}: the page's own scripts ran`, await reactRan(page));
         const refused = await page.evaluate(() => window.__refused);
@@ -169,7 +176,9 @@ if (browser) {
     page.setDefaultTimeout(30_000);
     try {
       await page.goto(`${origin}/north-valley`);
-      await page.waitForFunction(() => Array.isArray(self.__next_f));
+      await page.waitForFunction(() => Array.isArray(self.__next_f), undefined, {
+        timeout: scriptsWait,
+      });
       const outcome = await page.evaluate(async () => {
         // As an injected name or post would try: an inline script, an inline handler, and
         // a script from another site (an address nothing answers, so nothing could load).
