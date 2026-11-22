@@ -6,6 +6,7 @@ import {
   offersDeviceChoice,
   sharedMyTeam,
   yoursLine,
+  type MyTeamHeard,
   type MyTeamReply,
 } from './my-team-read.ts';
 
@@ -67,27 +68,53 @@ describe('sharedMyTeam', () => {
     stop();
   });
 
-  it('leaves the page as it came when the read fails', async () => {
+  it('says the read failed, once, when it fails, so the page can be left as it came', async () => {
+    let reads = 0;
     const shared = sharedMyTeam(async () => {
+      reads += 1;
       throw new Error('offline');
     });
-    const heard: MyTeamReply[] = [];
+    const heard: MyTeamHeard[] = [];
+    const stop = shared.ask(address, (reply) => heard.push(reply));
+    expect(heard).toEqual([]);
+    await settle();
+    expect(heard).toEqual([null]);
+    // A late mark of the same view is told at once, with no second read.
+    const late: MyTeamHeard[] = [];
+    const stopLate = shared.ask(address, (reply) => late.push(reply));
+    expect(late).toEqual([null]);
+    expect(reads).toBe(1);
+    stop();
+    stopLate();
+  });
+
+  it('says the read gave no answer when the endpoint gave none', async () => {
+    const shared = sharedMyTeam(async () => null);
+    const heard: MyTeamHeard[] = [];
     const stop = shared.ask(address, (reply) => heard.push(reply));
     await settle();
-    expect(heard).toEqual([]);
+    expect(heard).toEqual([null]);
     stop();
   });
 });
 
 describe('what a team page says', () => {
   it('tells a member it is their team, and that the league opens there where it does', () => {
-    expect(yoursLine(coach, 'rockets')).toBe(words.opensHere);
-    expect(yoursLine({ ...coach, startsOn: null }, 'rockets')).toBe(words.yours);
-    expect(yoursLine(coach, 'comets')).toBeNull();
-    expect(yoursLine(nothing, 'rockets')).toBeNull();
+    expect(yoursLine(coach, 'rockets', true)).toBe(words.opensHere);
+    expect(yoursLine({ ...coach, startsOn: null }, 'rockets', true)).toBe(words.yours);
+    expect(yoursLine(coach, 'comets', true)).toBeNull();
+    expect(yoursLine(nothing, 'rockets', true)).toBeNull();
+  });
+
+  it("says nothing of it on a past season's page of a team with the same short name", () => {
+    expect(yoursLine(coach, 'rockets', false)).toBeNull();
+    expect(yoursLine({ ...coach, startsOn: null }, 'rockets', false)).toBeNull();
   });
 
   it("offers the device's choice to everyone but a member with a team here", () => {
+    // Not until the read has answered or failed: a coach never sees it flash.
+    expect(offersDeviceChoice(undefined)).toBe(false);
+    // A failed read leaves the page as it came.
     expect(offersDeviceChoice(null)).toBe(true);
     expect(offersDeviceChoice(nothing)).toBe(true);
     expect(offersDeviceChoice({ ...nothing, marked: coach.marked, words })).toBe(true);

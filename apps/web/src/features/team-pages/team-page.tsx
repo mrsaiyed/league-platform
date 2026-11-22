@@ -269,9 +269,14 @@ export async function TeamPage({
         lead={<Emblem name={head.team.name} color={head.team.color} size="large" />}
       >
         {/* What a signed-in member is told of their own team is read after the page, for
-            them alone (TeamMine, step 2.168): the page is the same for everyone. Until it
-            answers, and for everyone else, the device's choice, where the league offers it. */}
-        <TeamMine address={leagueApiUrl(addressee, ['my-team'])} slug={head.team.slug}>
+            them alone (TeamMine, step 2.168), on the current season's page only: the page is
+            the same for everyone. Once it has answered or failed, and for everyone else, the
+            device's choice, where the league offers it. */}
+        <TeamMine
+          address={leagueApiUrl(addressee, ['my-team'])}
+          slug={head.team.slug}
+          isCurrent={season.isCurrent}
+        >
           {offersMyTeam ? (
             isMine ? (
               <form className="team-mine" action={clearMyTeamAction}>

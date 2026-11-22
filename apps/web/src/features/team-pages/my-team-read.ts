@@ -6,8 +6,8 @@
 // the one shared reader, so a page makes one request however many marks it has. What it
 // read lasts one view of the page only: once the page's last mark has gone, it is dropped,
 // so a page shown again (after Back, after signing out, by its link) asks again for whoever
-// is signed in then. A read that fails leaves the page as it came, with no marks; nothing
-// on it waits for this. With scripts off there are no marks, and the account menu's "My
+// is signed in then. A read that fails leaves the page as it came, with no marks; only a
+// team page's device choice waits for it (TeamMine), so a coach is never shown it first. With scripts off there are no marks, and the account menu's "My
 // team" is the way to the team (step 2.127's menu works without them).
 import { z } from 'zod';
 
@@ -36,17 +36,21 @@ export type MyTeamReply = z.infer<typeof myTeamReply>;
 /** One read of the endpoint at `address`: its answer, or null when it gave none. */
 export type ReadMyTeam = (address: string) => Promise<MyTeamReply | null>;
 
+/** What a mark is handed: the read's answer, or null once the read has failed. */
+export type MyTeamHeard = MyTeamReply | null;
+
 export type SharedMyTeam = {
   /**
    * Hands `listener` the answer for `address` once it is known (at once, when it already
-   * is). Returns the way to stop listening.
+   * is), or null once the read has failed. Returns the way to stop listening.
    */
-  readonly ask: (address: string, listener: (reply: MyTeamReply) => void) => () => void;
+  readonly ask: (address: string, listener: (reply: MyTeamHeard) => void) => () => void;
 };
 
 type Place = {
-  reply: MyTeamReply | undefined;
-  readonly listeners: Set<(reply: MyTeamReply) => void>;
+  /** undefined until the read has answered or failed. */
+  reply: MyTeamHeard | undefined;
+  readonly listeners: Set<(reply: MyTeamHeard) => void>;
 };
 
 /** The page's reader: one per page, shared by its marks. `read` is how one read is made. */
@@ -55,7 +59,7 @@ export function sharedMyTeam(read: ReadMyTeam): SharedMyTeam {
   async function readFor(address: string, place: Place) {
     const reply = await read(address).catch(() => null);
     // Every mark of this view has gone: nobody is left to read for.
-    if (reply === null || places.get(address) !== place) return;
+    if (places.get(address) !== place) return;
     place.reply = reply;
     for (const listener of [...place.listeners]) listener(reply);
   }
@@ -97,17 +101,25 @@ export const browserReadMyTeam: ReadMyTeam = async (address) => {
 /** The page's own: every mark on a page asks through this one. */
 export const pageMyTeam = sharedMyTeam(browserReadMyTeam);
 
-/** What a team's page says to a member about that team, or null when it is not theirs. */
-export function yoursLine(reply: MyTeamReply, slug: string): string | null {
-  if (reply.words === undefined || !reply.teams.includes(slug)) return null;
+/**
+ * What a team's page says to a member about that team, or null when it is not theirs. Only
+ * on the current season's page, as the Teams list marks only the current season's cards:
+ * the read names the member's teams of the current season, so a past season's team of the
+ * same short name is not said to be theirs, nor to be where the league opens for them.
+ */
+export function yoursLine(reply: MyTeamReply, slug: string, isCurrent: boolean): string | null {
+  if (!isCurrent || reply.words === undefined || !reply.teams.includes(slug)) return null;
   return reply.startsOn === slug ? reply.words.opensHere : reply.words.yours;
 }
 
 /**
- * Whether a team's page still offers "Make this my team" (or "Stop using this as my team"):
- * not to a member with a team here, whose own team the league opens on whatever this device
- * chose, so the offer would do nothing for them (start-page.ts).
+ * Whether a team's page offers "Make this my team" (or "Stop using this as my team"), by
+ * what the read said: undefined while it has not answered, null when it failed. Not until
+ * it has answered or failed, so a coach is never shown the offer for a moment on their own
+ * team's page; and not to a member with a team here, whose own team the league opens on
+ * whatever this device chose, so the offer would do nothing for them (start-page.ts, S-78).
  */
-export function offersDeviceChoice(reply: MyTeamReply | null): boolean {
+export function offersDeviceChoice(reply: MyTeamHeard | undefined): boolean {
+  if (reply === undefined) return false;
   return reply === null || reply.teams.length === 0;
 }

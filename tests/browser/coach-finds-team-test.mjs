@@ -15,6 +15,8 @@
 //   list and the league home, and no other;
 // - `/my` signed out leads to sign-in and back, on to the team's page;
 // - a member of no team who opens `/my` is told so in a sentence, with a way on;
+// - while the private read is out, nobody is shown "Make this my team", so a coach never
+//   sees it flash on their own team; a visitor gets it once the read answers or fails;
 // - the team page a coach is served holds no trace of them: the marks are read after it,
 //   privately;
 // - the "Make this my team" and "stop" buttons answer a hidden league exactly as one that is
@@ -376,6 +378,70 @@ if (browser) {
         (await deviceChoiceShown(page)) === 0,
       );
       await pageSteps(page, "the coach's team page, scripts off");
+    } finally {
+      await context.close();
+    }
+  });
+
+  // From the lane's review: until the private read has answered, a coach's own team page
+  // never shows "Make this my team" for a moment. The read is held back here until the page
+  // has drawn, and the offer is looked for meanwhile; then, for a signed-out visitor, it
+  // comes once the read has answered, and once it has failed.
+  await step('the device choice waits for the read, so a coach never sees it flash', async () => {
+    const { context, page } = await fresh();
+    try {
+      /** Holds every read of the marks back until the returned `release` is called. */
+      const holdReads = async (answer) => {
+        let release = () => {};
+        const held = new Promise((resolve) => {
+          release = resolve;
+        });
+        await page.route('**/my-team', async (route) => {
+          await held;
+          await (answer === 'fail' ? route.abort() : route.continue());
+        });
+        return release;
+      };
+      const rockets = `${origin}/harbor-city/teams/rockets`;
+      await page.goto(`${origin}/signin?next=%2Fnorth-valley`);
+      await signIn(page, people.coach);
+      let release = await holdReads('continue');
+      await page.goto(rockets, { waitUntil: 'load' });
+      await page.getByRole('heading', { level: 1, name: 'Rockets' }).waitFor();
+      await page.waitForTimeout(500);
+      note(
+        'while the read is out, the coach is not offered "make this my team"',
+        (await deviceChoiceShown(page)) === 0,
+      );
+      const read = markRead(page);
+      release();
+      await read;
+      await page.getByText(opensHere, { exact: true }).waitFor();
+      note(
+        'once it has answered, still not',
+        (await deviceChoiceShown(page)) === 0 && (await page.getByText(opensHere).count()) === 1,
+      );
+      await page.unrouteAll();
+      // A signed-out visitor: not while the read is out, then the offer once it answers.
+      await context.clearCookies();
+      release = await holdReads('continue');
+      await page.goto(rockets, { waitUntil: 'load' });
+      await page.waitForTimeout(500);
+      note(
+        'while the read is out, a visitor is not shown the offer yet',
+        (await deviceChoiceShown(page)) === 0,
+      );
+      release();
+      await page.getByRole('button', { name: 'Make this my team' }).waitFor();
+      note('once the read has answered, a visitor is offered it', true);
+      await page.unrouteAll();
+      // A read that fails leaves the page as it came: the offer is there.
+      release = await holdReads('fail');
+      await page.goto(rockets, { waitUntil: 'load' });
+      release();
+      await page.getByRole('button', { name: 'Make this my team' }).waitFor();
+      note('once the read has failed, a visitor is offered it', true);
+      await page.unrouteAll();
     } finally {
       await context.close();
     }
