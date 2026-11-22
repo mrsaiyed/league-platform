@@ -67,6 +67,8 @@ const tokens = {
   clubAdmin: 'local-club-admin-token',
   programScheduler: 'local-program-scheduler-token',
   otherAdmin: 'local-other-admin-token',
+  // The Owls' coach, by a coach role on that one team (step 2.46).
+  teamCoach: 'local-team-coach-token',
 };
 
 // The made-up leagues' ids (stand-in-ports.ts), which name the cookie of a device's "my team".
@@ -1214,6 +1216,7 @@ try {
   }
   failures.push(...(await sameAsNoLeague(origin)));
   failures.push(...(await scoringSameAsNoLeague(origin)));
+  failures.push(...(await checkStaffNumbers(origin)));
   failures.push(...(await checkStylesheets(origin)));
   failures.push(...(await checkScriptPolicy(origin)));
   failures.push(...(await checkSignIn(origin)));
@@ -1540,6 +1543,58 @@ async function checkScriptPolicy(origin) {
     (brought.headers.get('content-security-policy') ?? '').includes(chosen)
   ) {
     found.push('a nonce the browser chose was used');
+  }
+  return found;
+}
+
+/**
+ * Step 2.46's signed-in read of the numbers a page keeps from the public (GET
+ * /api/v1/leagues/{leagueId}/staff-numbers, T-287, record 085), as every kind of person.
+ * The Owls keep their players' numbers to their staff. The statistics page and the Owls'
+ * page, as a visitor gets them, each carry the one address to ask (and the Falcons' page,
+ * with nothing kept back, carries none). Asked there, the Owls' coach and the league's owner
+ * get the Owls' players with the note that they are not public; a visitor, a signed-in
+ * stranger, another team's coach, a scheduler and another league's admin all get the one
+ * answer `{"more":null}`, so it never says numbers are kept from them. Every answer is
+ * private and no-store.
+ */
+async function checkStaffNumbers(origin) {
+  const found = [];
+  const addressIn = (html) =>
+    html
+      .replaceAll('\\u0026', '&')
+      .replaceAll('&amp;', '&')
+      .match(/\/api\/v1\/leagues\/[0-9a-f-]{36}\/staff-numbers\?[a-z0-9=&-]+/)?.[0];
+  const pageOf = async (address) => (await fetch(origin + address)).text();
+  const falcons = addressIn(await pageOf('/north-valley/teams/falcons'));
+  if (falcons !== undefined) found.push(`the Falcons' page asks for staff numbers: ${falcons}`);
+  for (const page of ['/north-valley/stats', '/north-valley/teams/owls']) {
+    const address = addressIn(await pageOf(page));
+    if (address === undefined) {
+      found.push(`${page} carries no staff numbers address`);
+      continue;
+    }
+    if (/castellanos|brooks/i.test(address)) found.push(`${page}'s address names a player`);
+    const nothing = ['visitor', 'stranger', 'coach', 'scheduler', 'otherAdmin'];
+    for (const who of [...nothing, 'teamCoach', 'owner']) {
+      const answer = await fetch(origin + address, {
+        headers: who === 'visitor' ? {} : { cookie: `srl_session=${tokens[who]}` },
+      });
+      const body = await answer.text();
+      const label = `${who}'s staff numbers for ${page}`;
+      if (answer.status !== 200) found.push(`${label}: status ${answer.status}`);
+      if (answer.headers.get('cache-control') !== 'private, no-store')
+        found.push(`${label}: cache-control ${answer.headers.get('cache-control')}`);
+      if (nothing.includes(who)) {
+        if (body !== '{"more":null}')
+          found.push(`${label} is not "nothing more": ${body.slice(0, 120)}`);
+      } else if (
+        !body.includes('Jordan Castellanos') ||
+        !body.includes('Not public: shown to you as staff')
+      ) {
+        found.push(`${label} lacks the Owls' players or the note: ${body.slice(0, 120)}`);
+      }
+    }
   }
   return found;
 }
