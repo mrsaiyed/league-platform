@@ -34,6 +34,8 @@ const settings = {
   PLATFORM_DATABASE_URL: 'postgres://app:made-up-password@localhost:5432/league_local',
   SUPABASE_URL: 'https://made-up-project.supabase.example.test',
   SUPABASE_SECRET_KEY: 'made-up-supabase-key',
+  TURNSTILE_SITE_KEY: 'made-up-turnstile-site-key',
+  TURNSTILE_SECRET_KEY: 'made-up-turnstile-secret-key',
   RESEND_API_KEY: 'made-up-resend-key',
   EMAIL_FROM: 'hello@example.test',
   TRUSTED_PROXY: 'one',
@@ -321,6 +323,7 @@ describe.each(['local', 'test'])('in %s', (appEnv) => {
   // gets "not found" from both pages and the action, and no tool is used.
   it('both pages and the action answer "not found" to a request not made on this computer', async () => {
     for (const more of [
+      { 'cf-connecting-ip': '192.168.1.40' },
       { host: '192.168.1.20:3000' },
       { 'x-forwarded-for': '192.168.1.30' },
       { 'x-forwarded-host': 'leagues.example.com' },

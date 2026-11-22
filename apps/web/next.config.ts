@@ -1,13 +1,22 @@
 // Next.js settings for the web app (record 020).
 import type { NextConfig } from 'next';
+import {
+  fixedContentSecurityPolicy,
+  strictTransportSecurity,
+} from './src/server/security-headers.ts';
 
 // Sent with every answer (record 020): no page may be put in another site's frame
 // (against tricking a click), the browser keeps to the type we say, other sites are
 // told only our origin when a link is followed, and the browser features we do not
-// use are switched off.
+// use are switched off. Since step 2.98 (T-79, record 081): scripts run only from our
+// own address (the proxy replaces this policy with one carrying the answer's own nonce
+// on every answer it handles, security-headers.ts), and the browser is told to use
+// HTTPS only, for a year. A browser keeps to that only once it has had it over HTTPS:
+// on this computer's plain http it is ignored.
 const everyAnswer = [
   { key: 'X-Frame-Options', value: 'DENY' },
-  { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+  { key: 'Content-Security-Policy', value: fixedContentSecurityPolicy },
+  { key: 'Strict-Transport-Security', value: strictTransportSecurity },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   {
