@@ -171,6 +171,47 @@ const reachNoLeagueData = new Map<unknown, string>([
     "the seed's error class for a partly loaded league; runs nothing",
   ],
   [
+    databasePackage.simulateLeagueInto,
+    'development-only (`npm run simulate`, and a local start with LOCAL_SIMULATED_LEAGUE): takes a PGlite, not a scope; makes its one made-up league with createLeague and from then on calls only the scoped commands (own cases) as that league’s owner; like seedLeaguesInto it writes its made-up accounts directly',
+  ],
+  [
+    databasePackage.rebuildSimulatedStandings,
+    'development-only, for the simulator’s tests: runs the standings rebuild (own case) as the simulated league’s owner, in that league',
+  ],
+  [
+    databasePackage.checkSimulatedLeague,
+    'development-only: reads the one simulated league’s numbers (the scoped queries and stores, own cases, and that league’s stored rows, every statement fenced by its league id) to compare them with the plan; changes nothing',
+  ],
+  [
+    databasePackage.simulationReportLines,
+    'turns the checks’ results into lines of text; runs no SQL',
+  ],
+  [
+    databasePackage.expectedTables,
+    'works a simulated league’s expected tables out from its plan alone; runs no SQL',
+  ],
+  [
+    databasePackage.expectedGame,
+    'works one game’s expected state and score out from the plan alone; runs no SQL',
+  ],
+  [
+    databasePackage.expectedBoxScore,
+    'works a tracked game’s expected box score out from the plan’s plays; runs no SQL',
+  ],
+  [
+    databasePackage.expectedPlayerTotals,
+    'adds up players’ expected totals from the plan’s plays; runs no SQL',
+  ],
+  [
+    databasePackage.planSimulation,
+    'makes the seeded plan of a simulated league; pure, runs no SQL',
+  ],
+  [databasePackage.simulationOptionsFrom, 'reads the simulate command’s options; runs no SQL'],
+  [
+    databasePackage.simulationProblem,
+    'says what is wrong with a simulation’s options; runs no SQL',
+  ],
+  [
     databasePackage.transferTrackerGames,
     'development tool (step 2.58): takes a PGlite, not a scope; finds one league, season and account by name, then reaches that one league only through stores fenced to it (each transaction sets its league) and its commands (own cases)',
   ],

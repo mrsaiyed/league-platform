@@ -12,3 +12,30 @@ export { seedAllLeaguesInto, type SeedLoad } from './seed-all-leagues.ts';
 export { seedLeagues, seedStaff, type SeedLeague } from './seed-data.ts';
 export { seedLeaguesInto, type SeededLeague } from './seed-leagues.ts';
 export { SeedPartlyLoaded } from './seed-partly-loaded.ts';
+export {
+  checkSimulatedLeague,
+  reportLines as simulationReportLines,
+  type Check as SimulationCheck,
+  type SimulationReport,
+} from './simulate-league-check.ts';
+export {
+  expectedBoxScore,
+  expectedGame,
+  expectedPlayerTotals,
+  expectedTables,
+} from './simulate-league-expected.ts';
+export {
+  planSimulation,
+  simulatedOwner,
+  simulationDefaults,
+  simulationOptionNames,
+  simulationOptionsFrom,
+  simulationProblem,
+  type SimulationOptions,
+  type SimulationPlan,
+} from './simulate-league-plan.ts';
+export {
+  rebuildSimulatedStandings,
+  simulateLeagueInto,
+  type PlayedLeague,
+} from './simulate-league.ts';

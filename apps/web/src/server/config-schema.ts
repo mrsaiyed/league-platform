@@ -19,6 +19,16 @@ const text = z.string().trim().min(1);
 const secretText = (minLength: number) =>
   z.string().trim().min(minLength, `must be at least ${minLength} characters`);
 
+/**
+ * LOCAL_SIMULATED_LEAGUE's shape: `on`, `off` (none, as left out), or `--name <number>`
+ * pairs as the command takes them.
+ */
+const simulatedLeagueWords =
+  /^(on|off|(--(teams|divisions|rounds|tracked|seed)\s+\d+)(\s+--(teams|divisions|rounds|tracked|seed)\s+\d+)*)$/;
+/** The right example every refusal of LOCAL_SIMULATED_LEAGUE shows. */
+export const simulatedLeagueExample =
+  'LOCAL_SIMULATED_LEAGUE="--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7"';
+
 /** Every variable, with whether it is secret. `.env.example` lists the same names. */
 export const fields = {
   APP_ENV: { secret: false },
@@ -29,6 +39,7 @@ export const fields = {
   LOCAL_BINNED_TEAM: { secret: false },
   LOCAL_DATA: { secret: false },
   LOCAL_DEMO_LEAGUE: { secret: false },
+  LOCAL_SIMULATED_LEAGUE: { secret: false },
   LOCAL_DESIGN: { secret: false },
   LOCAL_NOW: { secret: false },
   SESSION_SECRET: { secret: true },
@@ -83,6 +94,19 @@ const schema = z.object({
   // made-up-database, and only local and test: a choice of the made-up data, no setting of
   // the product.
   LOCAL_DEMO_LEAGUE: z.enum(['on', 'off']).default('off'),
+  // A simulated league played from empty to its final tables at start (step 2.236), its
+  // size in the simulate command's own words ("--teams 24 --divisions 4 --rounds 10
+  // --tracked 6 --seed 7"), or 'on' for a small one; the numbers themselves are checked at
+  // start, by the command's own reader. Only with LOCAL_DATA=made-up-database, and only
+  // local and test: a choice of the made-up data, no setting of the product.
+  LOCAL_SIMULATED_LEAGUE: z
+    .string()
+    .trim()
+    .regex(
+      simulatedLeagueWords,
+      `must be on, or the size in the simulate command's words, for example ${simulatedLeagueExample}`,
+    )
+    .optional(),
   // The design the first made-up league of the stand-in is drawn under, so that every
   // page can be pictured in every color set (scripts/shots.mjs --design, step 2.147): a
   // starting design, or a made-up one kept for pictures. Only local and test read it.
@@ -116,6 +140,7 @@ const optional: readonly ConfigName[] = [
   'LOCAL_BINNED_TEAM',
   'LOCAL_DATA',
   'LOCAL_DEMO_LEAGUE',
+  'LOCAL_SIMULATED_LEAGUE',
   'LOCAL_DESIGN',
   'LOCAL_NOW',
   'SESSION_SECRET',
@@ -144,6 +169,7 @@ const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   LOCAL_BINNED_TEAM: ['local', 'test'],
   LOCAL_DATA: ['local', 'test'],
   LOCAL_DEMO_LEAGUE: ['local', 'test'],
+  LOCAL_SIMULATED_LEAGUE: ['local', 'test'],
   LOCAL_DESIGN: ['local', 'test'],
   LOCAL_NOW: ['local', 'test'],
 };
@@ -257,6 +283,18 @@ export function loadConfig(
     invalid.set(
       'LOCAL_DEMO_LEAGUE',
       'LOCAL_DEMO_LEAGUE: invalid, the demo-shaped league is loaded into the made-up database only, so it may be on only with LOCAL_DATA=made-up-database',
+    );
+  }
+  // The simulated league is played into the made-up database only, as the demo league is.
+  if (
+    given['LOCAL_SIMULATED_LEAGUE'] !== undefined &&
+    given['LOCAL_SIMULATED_LEAGUE'].trim() !== 'off' &&
+    given['LOCAL_DATA'] !== 'made-up-database' &&
+    !invalid.has('LOCAL_SIMULATED_LEAGUE')
+  ) {
+    invalid.set(
+      'LOCAL_SIMULATED_LEAGUE',
+      'LOCAL_SIMULATED_LEAGUE: invalid, the simulated league is played into the made-up database only, so it may be set only with LOCAL_DATA=made-up-database',
     );
   }
   const result = schema.safeParse(given);
