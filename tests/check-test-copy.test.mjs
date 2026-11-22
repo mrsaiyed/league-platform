@@ -32,6 +32,8 @@ const keepOut = 'User-agent: *\nDisallow: /\n';
  * pieces in a random order, as Next.js does; the "not found" page repeats the address's
  * last name in its data. `plant` names one fault: 'no-header' (pages without
  * X-Robots-Tag), 'kept-emails-drawn' (/signin/kept-emails answers a page of its own),
+ * 'kept-emails-body' (/signin/kept-emails answers 404, as an unknown address does, but
+ * with a body of its own),
  * 'no-database' (the health answer did not ask the database), 'no-line' (no test-copy
  * line), 'action-runs' (the posted action answers otherwise than an unknown address),
  * 'redirect-away' (the front page sends the browser to another host), 'slow' (the health
@@ -116,6 +118,15 @@ async function serveCopy(plant) {
     }
     if (url.pathname === '/signin/kept-emails' && plant === 'kept-emails-drawn') {
       page(200, '<h1>Kept emails</h1>', ['kept']);
+      return;
+    }
+    if (url.pathname === '/signin/kept-emails' && plant === 'kept-emails-body') {
+      // The same status as an unknown address, and the same data, but one line more.
+      page(404, '<h1>Not found</h1><p>Kept emails</p>', [
+        'missing',
+        url.pathname.split('/').at(-1),
+        'c',
+      ]);
       return;
     }
     notFound();
@@ -203,6 +214,14 @@ test('a copy whose /signin/kept-emails answers otherwise than /signin/no-such-pa
     lineOf(lines, words.checks.keptEmails),
     words.line(words.failed, words.checks.keptEmails, words.statusDiffers(200, 404)),
   );
+});
+
+test('a copy whose /signin/kept-emails answers 404 with a body of its own fails: the bodies are compared, not only the statuses', async () => {
+  const { outcome, lines, output } = await checkCopy('kept-emails-body');
+  failedOnly(outcome, [words.checks.keptEmails]);
+  const line = lineOf(lines, words.checks.keptEmails);
+  assert.ok(line.startsWith(`  ${words.failed}`), output);
+  assert.match(line, /the body differs from character \d+ \(\d+ \/ \d+ characters\)/);
 });
 
 test('a posted "be this person" form answered otherwise fails; without the action’s id it is not checked and fails', async () => {

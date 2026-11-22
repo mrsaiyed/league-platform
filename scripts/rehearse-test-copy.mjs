@@ -205,9 +205,13 @@ async function stopEverything() {
   }
 }
 
-const watched = ['apps', 'packages', 'supabase', 'docs', 'package.json', 'package-lock.json'];
+// The whole tree is watched, except .local, where the rehearsal keeps its made-up
+// database, keys and certificate.
 const gitStatus = () =>
-  execFileSync('git', ['status', '--porcelain', '--', ...watched], { cwd: root, encoding: 'utf8' });
+  execFileSync('git', ['status', '--porcelain', '--', '.', ':(exclude).local'], {
+    cwd: root,
+    encoding: 'utf8',
+  });
 
 async function rehearse() {
   let ownerUrl = '';
@@ -391,17 +395,21 @@ async function rehearse() {
       if (web.exitCode !== null) throw new StepFailed(words.reasons.notReady('it stopped'), output);
       if (Date.now() > until)
         throw new StepFailed(words.reasons.notReady('no answer in 90 seconds'), output);
+      let ready = false;
       try {
         const answer = await fetch(`${origin}/api/v1/health`, {
           signal: AbortSignal.timeout(10_000),
         });
         await answer.text();
-        if (answer.status === 200 && refusal !== undefined)
-          throw new StepFailed(words.reasons.notRefused(refusals[refusal].setting), output);
-        if (answer.status === 200) break;
+        ready = answer.status === 200;
       } catch {
         // not yet
       }
+      // Outside the catch, so a site that starts when it should have refused fails at once,
+      // with its own words, not after 90 seconds as "no answer".
+      if (ready && refusal !== undefined)
+        throw new StepFailed(words.reasons.notRefused(refusals[refusal].setting), output);
+      if (ready) break;
       await new Promise((r) => setTimeout(r, 500));
     }
     if (/cannot start/i.test(output))

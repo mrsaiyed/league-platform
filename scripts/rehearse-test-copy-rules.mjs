@@ -16,10 +16,10 @@ export const pageSteps = {
   realChecks: { step: '6', heading: '## 6. The checks on the real database' },
   build: { step: '7', heading: '## 7. Start the website on Render' },
   start: { step: '7', heading: '## 7. Start the website on Render' },
-  health: { step: '8.1', heading: '## 8. The first checks on the copy' },
-  league: { step: '8.1', heading: '## 8. The first checks on the copy' },
-  signUp: { step: '8.1', heading: '## 8. The first checks on the copy' },
-  walk: { step: '8.1', heading: '## 8. The first checks on the copy' },
+  health: { step: '8.1.1', heading: '## 8. The first checks on the copy' },
+  league: { step: '8.1.2', heading: '## 8. The first checks on the copy' },
+  signUp: { step: '8.1.2', heading: '## 8. The first checks on the copy' },
+  walk: { step: '8.1.3 to 8.1.5', heading: '## 8. The first checks on the copy' },
   checkCopy: { step: '8.2 and 8.3', heading: '## 8. The first checks on the copy' },
 };
 

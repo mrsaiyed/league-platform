@@ -313,7 +313,11 @@ const lastName = (address) => address.split('/').at(-1);
  * 2. the address's own last name (kept-emails, made-up-people, no-such-page), which the
  *    page's data repeats as the route's value: put as <name>;
  * 3. the order of the page's streamed data pieces (`self.__next_f.push`), which follows the
- *    server's timing: the pieces are taken out and their rows compared in order.
+ *    server's timing: the pieces are taken out, joined and split into rows, and the rows are
+ *    sorted before they are compared. They are sorted, not compared in order, because the
+ *    same page sends the same rows in a different order from one answer to the next (which
+ *    rows arrive first depends on which part of the page the server finished first); every
+ *    row is still compared byte for byte, so a row changed, added or missing still differs.
  * Headers are not compared: a host's own proxies add ones of their own to every request
  * (an id, a time), and the one header that matters is checked on its own line above.
  */

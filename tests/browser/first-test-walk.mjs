@@ -606,6 +606,12 @@ export async function walkFirstTest(o) {
     await answers('18. the statistics');
     await visitor.close();
 
+    // A league made by `league:make` is a draft, and nothing in the product can publish one
+    // yet: the command setLeagueStatus is in core, but no screen calls it. So here a visitor,
+    // signed out, gets 404 on every page, and the second sitting (guests on their phones,
+    // signed out) cannot be held (docs/operations/new-test-copy.md, step 8.1.4). The step
+    // that adds the Publish button, the one right after 2.207, must make the rehearsal tap it
+    // here and expect 200 on these pages instead, with the visitor reading the final table.
     if (draft) {
       at = 'steps 16 to 18: the visitor, signed out, cannot see the draft league';
       const watcher = await (o.visitorBrowser ?? browser).newContext(phone);

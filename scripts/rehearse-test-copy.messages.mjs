@@ -24,11 +24,11 @@ export const doing = {
   realChecks: 'Step 6: the checks on the real database need a league; they come after step 8.1.',
   build: 'Step 7: building the website (this takes a few minutes).',
   start: 'Step 7: starting the website in staging mode with exactly the settings the page lists.',
-  health: 'Step 8.1: the health address, before any league exists.',
-  league: 'Step 8.1: making a league with npm run league:make, as the page links to.',
+  health: 'Step 8.1.1: the health address, before any league exists.',
+  league: 'Step 8.1.2: making a league with npm run league:make, as the page links to.',
   signUp:
-    'Step 8.1: its owner signs up in a browser, with the code read by the kept-emails script.',
-  walk: 'Step 8.1: the first test’s walk (step 2.194) to the final table, a second browser watching signed out.',
+    'Step 8.1.2: its owner signs up in a browser, with the code read by the kept-emails script.',
+  walk: 'Steps 8.1.3 to 8.1.5: the first test’s walk (step 2.194) to the final table, a second browser watching signed out.',
   checkCopy:
     'Steps 8.2 and 8.3: npm run check:test-copy against the rehearsed site, with the build’s manifest.',
 };
