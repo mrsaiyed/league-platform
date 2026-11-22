@@ -17,7 +17,6 @@ Every lane's work is on GitHub. All sessions stopped on 2026-11-17 at about 03:0
 
 | Lane (branch `lane/…`)                           | Where it stands                                                            | What is left                                                                   |
 | ------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| 2.180-team-bin                                   | reviews closed; three catch-up merges; GitHub passed 728d07f twice         | a confirming look at what the merges mean, then land (fold A-17's change)      |
 | 2.37-plays-undo-end (TEST 1)                     | part 1 built; GitHub passed cb840d7 twice                                  | review (code; and by use), one fix round, land (S-72, S-73, T-282, record 078) |
 | 2.200-overtime (migration 0021)                  | both reviews in; fix list of eight sent; 2 conflicts with the build branch | fix round, merge, land first of the migration lanes                            |
 | 2.185-draft-put-back                             | both reviews in; most of the fix round done                                | the part that waits for 2.180 (D1, D2), then land                              |
