@@ -571,11 +571,68 @@ describe('the columns the season chose (step 2.47; the numbers audit M7)', () =>
     expect(keys(made)).toEqual(['played', 'wins']);
   });
 
-  it('adds the ties column after the losses when a game was tied, so the record adds up', async () => {
+  it('adds the ties column after the last column in view when a game was tied', async () => {
     const made = await tableAfter(['Ash', 'Birch'], [['Ash', 40, 'Birch', 40]], {
       rules: withColumns(['played', 'wins', 'losses', 'win-percentage'], { allowTies: true }),
     });
-    expect(keys(made)).toEqual(['played', 'wins', 'losses', 'ties', 'winPercentage']);
+    expect(keys(made)).toEqual(['played', 'wins', 'losses', 'winPercentage', 'ties']);
+  });
+
+  // The table's rule: the columns in view on a phone come first among those drawn there.
+  it('keeps the phone’s columns first, with and without a tie, and in a points table', async () => {
+    const flags = (made: Made) => made.view.columns.map((c) => `${c.key}:${c.narrow ?? 'scroll'}`);
+    const chosen: SeasonRules['standings']['columns'] = [
+      'played',
+      'wins',
+      'losses',
+      'win-percentage',
+      'point-difference',
+      'streak',
+    ];
+    const plain = await tableAfter(['Ash', 'Birch', 'Cedar'], games, {
+      rules: withColumns(chosen, { allowTies: true }),
+    });
+    expect(flags(plain)).toEqual([
+      'played:left-out',
+      'wins:in-view',
+      'losses:in-view',
+      'winPercentage:in-view',
+      'pointDifference:scroll',
+      'streak:scroll',
+    ]);
+    const tied = await tableAfter(['Ash', 'Birch'], [['Ash', 40, 'Birch', 40]], {
+      rules: withColumns(chosen, { allowTies: true }),
+    });
+    expect(flags(tied)).toEqual([
+      'played:left-out',
+      'wins:in-view',
+      'losses:in-view',
+      'winPercentage:in-view',
+      'ties:in-view',
+      'pointDifference:scroll',
+      'streak:scroll',
+    ]);
+    const rules = defaultSeasonRules();
+    const pointsTable = await tableAfter(['Ash', 'Birch'], [['Ash', 40, 'Birch', 40]], {
+      rules: {
+        ...rules,
+        allowTies: true,
+        standings: {
+          ...rules.standings,
+          rankBy: 'points',
+          columns: ['played', 'wins', 'losses', 'points', 'win-percentage', 'point-difference'],
+        },
+      },
+    });
+    expect(flags(pointsTable)).toEqual([
+      'played:left-out',
+      'wins:in-view',
+      'losses:in-view',
+      'points:in-view',
+      'ties:in-view',
+      'winPercentage:left-out',
+      'pointDifference:scroll',
+    ]);
   });
 });
 

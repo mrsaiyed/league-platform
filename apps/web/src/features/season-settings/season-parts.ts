@@ -430,7 +430,9 @@ export function contractWrong(
     else if (path === 'standings.pointsPerWin') at('pointsPerWin', 'pointsOrder');
     else if (path === 'clock.stopClockLastSeconds') at('lastMinutes', 'lastMinutesLong');
     else if (path === 'statistics') at('statistics', 'liveNeedsFouls');
-    else if (path === 'standings.columns' && issue.message.includes('points')) {
+    else if (path === 'standings.columns' && issue.message.startsWith('Only a table')) {
+      at('columns', 'pointsColumnUnranked');
+    } else if (path === 'standings.columns' && issue.message.includes('points')) {
       at('columns', 'pointsColumn');
     } else if (path === 'standings.columns' && issue.message.includes('ties')) {
       at('columns', 'tiesColumn');

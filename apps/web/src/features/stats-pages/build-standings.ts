@@ -534,31 +534,33 @@ const everyColumn: readonly SeasonColumn[] = [
  * the record and what the table is ordered by (W, L, T, and PCT, or the points in a points
  * table) are in view beside the team; games played is left to the wide layout, and the rest
  * are reached by scrolling inside the table's box.
- * Two are added when the season left them out, so the table never hides what it stands
- * on: the ties column when a game of the table was tied (else W and L do not add up to
- * GP), after the losses; and the points column in a table ranked by points, at the end.
+ * The ties column is added when the season left it out and a game of the table was tied
+ * (else W and L do not add up to GP): just after the last column in view on a phone, so
+ * those still come first (the table's own rule). A table ranked by points always holds its
+ * points column: the rules format refuses one without it (T-290).
  */
 function columnsOf(standings: Standings): StandingsColumn[] {
   const chosen = standings.columns.filter(isSeasonColumn);
   const names: SeasonColumn[] = [...(chosen.length === 0 ? everyColumn : chosen)];
   const anyTies = standings.tables.some((table) => table.lines.some((line) => line.ties > 0));
   const points = standings.rankBy === 'points';
-  if (!names.includes('ties') && anyTies) {
-    const after = names.indexOf('losses');
-    names.splice(after === -1 ? names.length : after + 1, 0, 'ties');
-  }
-  if (!names.includes('points') && points) names.push('points');
-  return names.map((name): StandingsColumn => {
+  const narrowOf = (name: SeasonColumn): StandingsColumn['narrow'] => {
     const column = seasonColumns[name];
-    const narrow =
-      name === 'win-percentage' && points
-        ? 'left-out'
-        : 'narrow' in column
-          ? column.narrow
-          : undefined;
+    if (name === 'win-percentage' && points) return 'left-out';
+    return 'narrow' in column ? column.narrow : undefined;
+  };
+  if (!names.includes('ties') && anyTies) {
+    const lastInView = names.findLastIndex((name) => narrowOf(name) === 'in-view');
+    const firstScrolled = names.findIndex((name) => narrowOf(name) === undefined);
+    const at =
+      lastInView !== -1 ? lastInView + 1 : firstScrolled === -1 ? names.length : firstScrolled;
+    names.splice(at, 0, 'ties');
+  }
+  return names.map((name): StandingsColumn => {
+    const narrow = narrowOf(name);
     return {
-      key: column.key,
-      label: t(column.label),
+      key: seasonColumns[name].key,
+      label: t(seasonColumns[name].label),
       ...(narrow === undefined ? {} : { narrow }),
     };
   });

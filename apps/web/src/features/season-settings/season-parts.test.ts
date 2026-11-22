@@ -70,6 +70,11 @@ describe('a part changes only its own rules', () => {
   it('draws the columns ticked, and refuses a points table without the points column', () => {
     const fields = { ...rulesFields('standings', base), rankBy: 'points' };
     expect(wrongOf(rulesFromPart('standings', base, fields))).toEqual(['columns:pointsColumn']);
+    // T-290: and the points column in a table ranked by win percentage.
+    const unranked = { ...rulesFields('standings', base), [columnField('points')]: ticked };
+    expect(wrongOf(rulesFromPart('standings', base, unranked))).toEqual([
+      'columns:pointsColumnUnranked',
+    ]);
     const withPoints = { ...fields, [columnField('points')]: ticked };
     expect(saved(rulesFromPart('standings', base, withPoints)).standings.columns).toContain(
       'points',

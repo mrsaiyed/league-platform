@@ -91,7 +91,7 @@ export const enAdminSettings = {
   'seasonSettings.field.clockMode': 'Clock',
   'seasonSettings.field.columns': 'Columns the public table shows',
   'seasonSettings.field.columns.help':
-    'In this order. A table ranked by points always shows the points column.',
+    'In this order. The points column is only for a table ranked by points, and such a table always shows it.',
   'seasonSettings.field.datesHelp': 'Leave a day empty if it is not settled yet.',
   'seasonSettings.field.doubleBonusFouls': 'Double bonus from team foul number',
   'seasonSettings.field.doubleBonusFouls.help': 'Leave it empty for no double bonus.',
@@ -238,7 +238,7 @@ export const enAdminSettings = {
     "This league cannot be changed now, so its seasons' settings are shown as they are.",
   'seasonSettings.refused.boxes': 'Not saved: the marked boxes need a change.',
   'seasonSettings.refused.changed-since-read':
-    'Someone else saved this season while you were changing it. The page now shows the latest; what you typed is still in the boxes: save again to keep it.',
+    'Someone else saved this season while you were changing it. The other parts of the page now show what they saved; the boxes here still hold what you typed. Saving again replaces what they saved with what is in these boxes.',
   'seasonSettings.refused.not-allowed':
     "Only the league's owner or an admin can change Season settings.",
   'seasonSettings.refused.not-hidden':
@@ -353,6 +353,8 @@ export const enAdminSettings = {
     '{label}: a whole number from {min} to {max}, or empty for none.',
   'seasonSettings.wrong.pointsColumn':
     'A table ranked by points shows the points column: tick Points (PTS), or rank by win percentage.',
+  'seasonSettings.wrong.pointsColumnUnranked':
+    'Only a table ranked by points has a points column: untick Points (PTS), or rank by points.',
   'seasonSettings.wrong.pointsOrder':
     'A win must be worth at least a tie, and a tie at least a loss.',
   'seasonSettings.wrong.rules':
