@@ -16,6 +16,7 @@ const valid: Record<ConfigName, string> = {
   LOG_LEVEL: 'debug',
   TRUSTED_PROXY: 'one',
   PLATFORM_DATABASE_URL: 'postgres://app:hunter2-made-up@localhost:5432/x',
+  LOCAL_BINNED_TEAM: 'badgers',
   LOCAL_DATA: 'stand-in',
   LOCAL_DESIGN: 'crest-light',
   LOCAL_NOW: '2026-11-15T20:01:00Z',
@@ -29,10 +30,16 @@ const valid: Record<ConfigName, string> = {
 };
 const names = Object.keys(fields) as ConfigName[];
 /**
- * Every setting, for staging and production: LOCAL_DATA, LOCAL_DESIGN and LOCAL_NOW are
- * for local work and tests only.
+ * Every setting, for staging and production: LOCAL_BINNED_TEAM, LOCAL_DATA, LOCAL_DESIGN and
+ * LOCAL_NOW are for local work and tests only.
  */
-const hosted = { ...valid, LOCAL_DATA: undefined, LOCAL_DESIGN: undefined, LOCAL_NOW: undefined };
+const hosted = {
+  ...valid,
+  LOCAL_BINNED_TEAM: undefined,
+  LOCAL_DATA: undefined,
+  LOCAL_DESIGN: undefined,
+  LOCAL_NOW: undefined,
+};
 /** Required in every environment. */
 const required: readonly ConfigName[] = ['APP_ENV', 'PUBLIC_BASE_URL', 'EMAIL_FROM'];
 /** Where something uses it (R8): only those environments require it. */
@@ -117,6 +124,7 @@ describe('loadConfig', () => {
       ...valid,
       APP_ENV: 'production',
       TRUSTED_PROXY: undefined,
+      LOCAL_BINNED_TEAM: undefined,
       LOCAL_DATA: undefined,
       LOCAL_DESIGN: undefined,
       LOCAL_NOW: undefined,
@@ -295,6 +303,21 @@ describe('loadConfig', () => {
       expect(failure({ ...production, APP_ENV: appEnv, LOCAL_DESIGN: 'crest' }).invalid).toEqual([
         'LOCAL_DESIGN: invalid, may be set only when APP_ENV is local or test',
       ]);
+    }
+  });
+
+  it('takes LOCAL_BINNED_TEAM in local work and tests only, and only a short name (step 2.180)', () => {
+    expect(loadConfig(localOnly).LOCAL_BINNED_TEAM).toBeUndefined();
+    expect(loadConfig({ ...localOnly, LOCAL_BINNED_TEAM: 'badgers' }).LOCAL_BINNED_TEAM).toBe(
+      'badgers',
+    );
+    expect(failure({ ...localOnly, LOCAL_BINNED_TEAM: 'Bad Gers' }).invalid.join()).toContain(
+      'LOCAL_BINNED_TEAM',
+    );
+    for (const appEnv of ['staging', 'production']) {
+      expect(
+        failure({ ...production, APP_ENV: appEnv, LOCAL_BINNED_TEAM: 'badgers' }).invalid,
+      ).toEqual(['LOCAL_BINNED_TEAM: invalid, may be set only when APP_ENV is local or test']);
     }
   });
 

@@ -12,6 +12,7 @@ import {
   listGamePlayerLines,
   listGameTeams,
   listPeopleForDisplay,
+  listSeasonStatKeys,
 } from '../queries/index.ts';
 
 export function gamesReadStore(scope: LeagueScope): GameSnapshotStore {
@@ -21,22 +22,29 @@ export function gamesReadStore(scope: LeagueScope): GameSnapshotStore {
       if (game === undefined) return undefined;
       // A game of a season still being set up (or retired) is not there at all.
       const season = await findSeason(scope, game.seasonId);
-      return season === undefined || !publicSeasonStatuses.includes(season.status)
-        ? undefined
-        : {
-            id: game.id,
-            seasonId: game.seasonId,
-            homeTeamId: game.homeTeamId,
-            awayTeamId: game.awayTeamId,
-            startsAt: game.startsAt,
-            status: game.status,
-            captureMode: game.captureMode,
-            homeScore: game.homeScore,
-            awayScore: game.awayScore,
-            finalizedAt: game.finalizedAt,
-            binned: game.binned,
-            rules: game.format ?? season.rules,
-          };
+      if (season === undefined || !publicSeasonStatuses.includes(season.status)) return undefined;
+      return {
+        id: game.id,
+        seasonId: game.seasonId,
+        homeTeamId: game.homeTeamId,
+        awayTeamId: game.awayTeamId,
+        startsAt: game.startsAt,
+        status: game.status,
+        captureMode: game.captureMode,
+        homeScore: game.homeScore,
+        awayScore: game.awayScore,
+        finalizedAt: game.finalizedAt,
+        binned: game.binned,
+        rules: game.format ?? season.rules,
+      };
+    },
+    // What the season keeps, as the statistics page reads it (standings-read-store.ts):
+    // the list it names (a public season's) and its rules. Only the game's page asks.
+    seasonStatistics: async (seasonId) => {
+      const season = await findSeason(scope, seasonId);
+      if (season === undefined) return undefined;
+      const statKeys = (await listSeasonStatKeys(scope, season.id)) ?? [];
+      return { statKeys, rules: season.rules };
     },
     teams: (teamIds) => listGameTeams(scope, teamIds),
     state: (gameId) => findGameState(scope, gameId),

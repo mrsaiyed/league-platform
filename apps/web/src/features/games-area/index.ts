@@ -4,3 +4,5 @@ export { BoxScoreNotFound, BoxScorePage } from './box-score-page.tsx';
 // Putting a final or forfeited game right (step 2.154), for the scorekeeper's games too.
 export { readReopenViews } from './read-reopen-views.ts';
 export { ReopenLine } from './reopen-line.tsx';
+// Where a postponed game waits for its new date (step 2.158), for the schedule grid's link.
+export { waitingListAnchor } from './waiting-anchor.ts';

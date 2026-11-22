@@ -83,6 +83,7 @@ export function databaseTracker(
         savedState: (gameId) => read((store) => store.savedState(gameId)),
         lines: (gameId) => read((store) => store.lines(gameId)),
         correctedOn: (gameId) => read((store) => store.correctedOn(gameId)),
+        seasonStatistics: (seasonId) => read((store) => store.seasonStatistics(seasonId)),
         people: async () => {
           throw new GameNamesOnlyWithSettings();
         },

@@ -23,7 +23,8 @@ export type DecideGameError = {
     | 'game-cancelled'
     | 'tie-not-allowed'
     | 'team-not-in-game'
-    | 'game-is-tracked';
+    | 'game-is-tracked'
+    | 'game-postponed';
 };
 
 /** A game that can still be decided, or the reason it cannot. */
@@ -60,6 +61,23 @@ export async function openGameByHand(
   const open = openGame(found, version ?? found?.version ?? 0);
   if (!open.ok) return open;
   if (await tx.games.hasPlays(open.value.id)) return fail({ code: 'game-is-tracked' });
+  return open;
+}
+
+/**
+ * A game that can be given a score by hand, or the reason it cannot: openGameByHand's, or
+ * that it is postponed (`game-postponed`, step 2.158, S-75): a postponed game has no score
+ * until it is played on a new date. The one door of every way of typing a score (a final
+ * score, a box score, an imported score); a forfeit is the one decision a postponed game
+ * takes, so record_forfeit opens it through openGameByHand.
+ */
+export async function openGameToScore(
+  tx: GamesTx,
+  gameId: string,
+  version: number | undefined,
+): Promise<Result<GameRecord, DecideGameError>> {
+  const open = await openGameByHand(tx, gameId, version);
+  if (open.ok && open.value.status === 'postponed') return fail({ code: 'game-postponed' });
   return open;
 }
 
