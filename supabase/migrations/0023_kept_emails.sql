@@ -12,11 +12,11 @@
 --     the form the check sees, kept_emails.kept_form), its subject and its plain words (every email has them, T7 §6; the
 --     HTML is never kept). Only an address on a name kept for made-up mail (record 075's
 --     list: .test, .example, .invalid, .localhost, example.com, .net and .org), checked
---     here again whatever the app checked. At most the newest 300 stay.
+--     here again whatever the app checked. At most the newest 300, none older than 3 days.
 --   public.keep_email(to, subject, text): the one way in, owner-run. It refuses an email
 --     too long for the table (string_data_right_truncation) and an address that is not
 --     made up (check_violation), neither error carrying a value, adds the
---     row and removes every row past the newest 300. It returns nothing.
+--     row and removes every row past the newest 300 or older than 3 days. It returns nothing.
 --
 -- Who reaches what. The app's login (app_login, acting as app_user) may run keep_email
 -- and nothing else here: it cannot read, change or remove a row, nor use the schema. The
@@ -118,20 +118,25 @@ create table kept_emails.emails (
 create index emails_by_address on kept_emails.emails (to_address, id desc);
 
 comment on table kept_emails.emails is
-  'One email captured on the test copy to a made-up address, the newest 300 (step 2.204). Written only by public.keep_email; read only by the tables'' owner.';
+  'One email captured on the test copy to a made-up address, the newest 300, none older than 3 days (step 2.204). Written only by public.keep_email; read only by the tables'' owner.';
 
 -- The fence on, with no policy: any role but the owner given a grant here by mistake
 -- still sees and changes nothing.
 alter table kept_emails.emails enable row level security;
 revoke all on table kept_emails.emails from public;
 
--- How many of the newest stay: a few days of a test copy's sign-ups and invitations.
+-- The one way in. How many of the newest stay, and for how long: a few days of a test
+-- copy's sign-ups and invitations (record 098).
 create function public.keep_email(given_to text, given_subject text, given_text text)
 returns void
 language plpgsql
 security definer
 set search_path = pg_catalog, pg_temp
 as $$
+declare
+  -- Record 098: how many of the newest stay, and for how many days at most.
+  keep_count constant integer := 300;
+  keep_days constant integer := 3;
 begin
   if given_to is null or given_subject is null or given_text is null then
     raise exception 'an address, a subject and the plain words are all needed'
@@ -151,9 +156,11 @@ begin
   end if;
   insert into kept_emails.emails (to_address, subject, body_text)
   values (kept_emails.kept_form(given_to), given_subject, given_text);
-  -- Only the newest 300 stay.
+  -- Only the newest 300 stay, and none older than 3 days: codes and invitation links do
+  -- not wait at rest for newer emails to push them out.
   delete from kept_emails.emails
-  where id <= (select e.id from kept_emails.emails e order by e.id desc offset 300 limit 1);
+  where id <= (select e.id from kept_emails.emails e order by e.id desc offset keep_count limit 1)
+     or kept_at < now() - make_interval(days => keep_days);
 end
 $$;
 
@@ -161,7 +168,7 @@ revoke all on function public.keep_email(text, text, text) from public;
 grant execute on function public.keep_email(text, text, text) to app_user;
 
 comment on function public.keep_email(text, text, text) is
-  'Keeps one email to a made-up address on the test copy, the newest 300 only (step 2.204, record 075). The app''s only way into kept_emails: it cannot read, change or remove a row.';
+  'Keeps one email to a made-up address on the test copy, the newest 300 only, none older than 3 days (step 2.204, record 075). The app''s only way into kept_emails: it cannot read, change or remove a row.';
 
 -- Supabase's API roles get nothing here (T-64), where they exist.
 do $$

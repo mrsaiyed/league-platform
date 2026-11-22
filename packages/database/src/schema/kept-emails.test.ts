@@ -101,6 +101,27 @@ describe('public.keep_email, as the app', () => {
   });
 });
 
+describe('public.keep_email, by age', () => {
+  it('removes every email older than 3 days, whatever the count', async () => {
+    for (const [subject, age] of [
+      ['four days', '4 days'],
+      ['three days and a minute', '3 days 1 minute'],
+      ['two days', '2 days'],
+    ] as const) {
+      await db.query(
+        `insert into kept_emails.emails (to_address, subject, body_text, kept_at)
+         values ('aged@example.test', $1, 'Your code is 482913.', now() - $2::interval)`,
+        [subject, age],
+      );
+    }
+    await keep('fresh@example.test', 'now');
+    const { rows } = await db.query<{ subject: string }>(
+      "select subject from kept_emails.emails where to_address = 'aged@example.test' order by id",
+    );
+    expect(rows.map((r) => r.subject)).toEqual(['two days']);
+  });
+});
+
 describe('what the app cannot do', () => {
   it('cannot read, add, change or remove a row, nor run the check itself', async () => {
     for (const statement of [
