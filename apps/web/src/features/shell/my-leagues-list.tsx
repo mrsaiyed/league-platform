@@ -61,7 +61,9 @@ export function MyLeaguesList({ leagues }: { readonly leagues: readonly MyLeague
           </a>
           <span>{membershipsInWords(league.memberships)}</span>
           {runsSomething(league.memberships) ? (
-            <a href={leagueUrl(league, 'admin')}>{t('account.leagueAdmin')}</a>
+            <a className="ui-button" data-kind="quiet" href={leagueUrl(league, 'admin')}>
+              {t('account.leagueAdmin')}
+            </a>
           ) : null}
         </li>
       ))}

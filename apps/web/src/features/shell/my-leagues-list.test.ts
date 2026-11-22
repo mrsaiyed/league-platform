@@ -15,7 +15,8 @@ const leagueOf = (slug: string, memberships: readonly LeagueMembership[]): MyLea
   status: 'live',
   memberships,
 });
-const adminLink = (slug: string) => `<a href="/${slug}/admin">${en['account.leagueAdmin']}</a>`;
+const adminLink = (slug: string) =>
+  `<a class="ui-button" data-kind="quiet" href="/${slug}/admin">${en['account.leagueAdmin']}</a>`;
 
 describe('MyLeaguesList', () => {
   it("links each league's name to its home and, for its staff, Admin to its admin", () => {
