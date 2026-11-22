@@ -46,6 +46,34 @@ export function expectedGame(game: PlannedGame, rules: ExpectedRules): ExpectedG
   return { number: game.number, status: 'final', home: game.homeScore, away: game.awayScore };
 }
 
+/** Where and when the plan puts a game on the schedule, in the league's own time. */
+export type ExpectedPlace = {
+  readonly home: string;
+  readonly away: string;
+  readonly round: number;
+  /** yyyy-mm-dd and hh:mm. */
+  readonly date: string;
+  readonly time: string;
+  readonly division: string;
+};
+
+/**
+ * A game's place on the schedule as the plan gives it. No call-off moves a game: one put back
+ * goes back on its planned date (the plan puts it back the same week), the score correction
+ * changes no team's side, and one postponed and still waiting keeps the date it had until it
+ * is given a new one (the product's postpone command keeps it, shown postponed), so it is held there too.
+ */
+export function expectedPlace(plan: SimulationPlan, game: PlannedGame): ExpectedPlace {
+  return {
+    home: game.home,
+    away: game.away,
+    round: game.round,
+    date: game.date,
+    time: game.time,
+    division: plan.divisions[game.division]?.name ?? 'No division',
+  };
+}
+
 /** One team's line as the plan's results give it. */
 export type ExpectedRow = {
   readonly team: string;

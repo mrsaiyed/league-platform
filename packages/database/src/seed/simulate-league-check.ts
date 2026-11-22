@@ -7,6 +7,9 @@
 // - final-scores: every game's stored state and score is the plan's (played or corrected:
 //   the planned score; forfeited: the season's forfeit score for the planned loser;
 //   cancelled or waiting: no result), named game by game;
+// - schedule: every planned game is stored once, between its planned home and away teams,
+//   in its planned round, on its planned day and start time, in its planned division, and the
+//   product's public read of the schedule shows it the same way; no stored game is unplanned;
 // - wins-equal-losses, points-balance: the product's table agrees with itself (cheap, and
 //   no proof on their own: a wrong score saved still balances);
 // - games-played: every team has played the games the plan gave it, less those called off
@@ -28,11 +31,13 @@ import { createDatabase } from '../db/create-database.ts';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import { withTransaction } from '../db/with-transaction.ts';
 import { findLeagueAudience } from '../queries/find-league-audience.ts';
+import { listPublicSchedule } from '../queries/list-public-schedule.ts';
 import { listSettingValues } from '../queries/list-setting-values.ts';
 import { gamesStore, liveGamesStore, standingsReadStore } from '../stores/index.ts';
 import {
   expectedBoxScore,
   expectedGame,
+  expectedPlace,
   expectedPlayerTotals,
   expectedTables,
 } from './simulate-league-expected.ts';
@@ -41,6 +46,7 @@ import type { PlayedLeague } from './simulate-league.ts';
 
 export type CheckName =
   | 'final-scores'
+  | 'schedule'
   | 'wins-equal-losses'
   | 'points-balance'
   | 'games-played'
@@ -142,6 +148,112 @@ export async function checkSimulatedLeague(
         scoreWrong.length === 0
           ? `all ${plan.games.length} games are stored as planned: state and score`
           : listed(scoreWrong),
+    });
+
+    // Every game's place on the schedule, against the plan: the stored row (its two teams,
+    // round, day and start time in the league's time zone, division), then what the product's
+    // public read of the schedule shows for it; and no stored game the plan does not have.
+    const { rows: placedRows } = await pglite.query<{
+      id: string;
+      home: string | null;
+      away: string | null;
+      round: number | null;
+      date: string | null;
+      time: string | null;
+      division: string | null;
+    }>(
+      `select g.id, h.name as home, a.name as away, r.number as round,
+         to_char(g.starts_at at time zone $3, 'YYYY-MM-DD') as date,
+         to_char(g.starts_at at time zone $3, 'HH24:MI') as time, d.name as division
+       from games g
+       left join teams h on h.league_id = g.league_id and h.id = g.home_team_id
+       left join teams a on a.league_id = g.league_id and a.id = g.away_team_id
+       left join rounds r on r.league_id = g.league_id and r.id = g.round_id
+       left join divisions d on d.league_id = g.league_id and d.id = g.division_id
+       where g.league_id = $1 and g.season_id = $2 and g.deleted_at is null`,
+      [leagueId, seasonId, plan.timeZone],
+    );
+    const placedById = new Map(placedRows.map((row) => [row.id, row]));
+    const publicSchedule = await read((scope) =>
+      listPublicSchedule(scope, seasonId, plan.games[0]?.date ?? '1970-01-01'),
+    );
+    const shownById = new Map(
+      [
+        ...(publicSchedule?.rounds ?? []).flatMap((r) =>
+          r.games.map((g) => ({ g, round: r.number as number | null })),
+        ),
+        ...(publicSchedule?.unplacedGames ?? []).map((g) => ({ g, round: null })),
+      ].map((s) => [s.g.id, s]),
+    );
+    const placeWrong: string[] = [];
+    const plannedIds = new Set<string>();
+    const words = (p: {
+      home: string | null;
+      away: string | null;
+      round: number | null;
+      date: string | null;
+      time?: string | null;
+      division: string | null;
+    }) =>
+      `${p.home ?? 'no team'} v ${p.away ?? 'no team'}, ${p.round === null ? 'no round' : `round ${p.round}`}, ${p.date ?? 'no date'}${p.time === undefined ? '' : ` ${p.time ?? ''}`}, ${p.division ?? 'no division'}`;
+    for (const game of plan.games) {
+      const id = played.gameIds.get(game.number) ?? '';
+      plannedIds.add(id);
+      const want = expectedPlace(plan, game);
+      const named = `game ${game.number} (${game.home} v ${game.away}${game.callOff ? `, ${game.callOff.kind}` : ''})`;
+      const row = placedById.get(id);
+      if (row === undefined) {
+        placeWrong.push(`${named} is not stored`);
+        continue;
+      }
+      if (
+        row.home !== want.home ||
+        row.away !== want.away ||
+        row.round !== want.round ||
+        row.date !== want.date ||
+        row.time !== want.time ||
+        row.division !== want.division
+      ) {
+        placeWrong.push(`${named}: stored ${words(row)}, planned ${words(want)}`);
+      }
+      const shown = shownById.get(id);
+      const seen = shown && {
+        home: shown.g.homeTeam.name,
+        away: shown.g.awayTeam.name,
+        round: shown.round,
+        date: shown.g.localDate,
+        division: shown.g.divisionName,
+      };
+      if (seen === undefined) placeWrong.push(`${named} is not on the public schedule`);
+      else if (
+        seen.home !== want.home ||
+        seen.away !== want.away ||
+        seen.round !== want.round ||
+        seen.date !== want.date ||
+        seen.division !== want.division
+      ) {
+        const plannedDay = {
+          home: want.home,
+          away: want.away,
+          round: want.round,
+          date: want.date,
+          division: want.division,
+        };
+        placeWrong.push(
+          `${named}: the public schedule shows ${words(seen)}, planned ${words(plannedDay)}`,
+        );
+      }
+    }
+    for (const row of placedRows) {
+      if (!plannedIds.has(row.id)) placeWrong.push(`a game the plan does not have: ${words(row)}`);
+    }
+    checks.push({
+      name: 'schedule',
+      ok: placeWrong.length === 0,
+      detail:
+        placeWrong.length === 0
+          ? `all ${plan.games.length} games stored and shown once, between the planned teams, in the planned round, day, start time and division`
+          : listed(placeWrong),
     });
 
     const lines = tables.flatMap((t) => t.lines);
@@ -467,7 +579,7 @@ export function reportLines(played: PlayedLeague, report: SimulationReport): str
     `Simulated league: ${teams} teams in ${options.divisions} division(s), ${options.rounds} rounds, ${games.length} games (${tracked} tracked, ${games.length - tracked} final scores), seed ${options.seed}`,
     'Schedule: brought in through the fixture import, put in rounds in the draft, published',
     `Called off or changed: ${games.filter((g) => g.callOff !== null).length} games (${games.filter((g) => neverPlayed(g.callOff)).length} never played); overtime: ${games.filter((g) => g.overtime).length} tracked game(s)`,
-    'Checks (each against the plan, worked out again without the product’s standings or statistics):',
+    'Checks (wins-equal-losses and points-balance only that the product’s table agrees with itself; every other one against the plan, worked out again without the product’s standings or statistics):',
     ...report.checks.map((c) => `  ${c.ok ? 'ok  ' : 'FAIL'} ${c.name}: ${c.detail}`),
     'Final tables:',
   ];

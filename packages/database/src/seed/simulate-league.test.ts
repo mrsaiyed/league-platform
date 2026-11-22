@@ -81,6 +81,7 @@ describe('simulateLeagueInto', () => {
     try {
       expect(report.checks.map((c) => [c.name, c.ok])).toEqual([
         ['final-scores', true],
+        ['schedule', true],
         ['wins-equal-losses', true],
         ['points-balance', true],
         ['games-played', true],
@@ -185,7 +186,36 @@ describe('simulateLeagueInto', () => {
       expect(failed(reordered)).toEqual(['standings']);
       expect(reordered.checks.find((c) => c.name === 'standings')?.detail).toContain('place');
 
-      // Second, on the other copy: the cancelled game made final, as if it had been played.
+      // Second, on the other copy: one ordinary game moved in the stored rows to another round
+      // and 7 days later. Only the schedule check is needed to catch it, by the game's teams.
+      const moved = second.played.gameIds.get(ordinary.number);
+      const otherRound = ordinary.round === 1 ? 2 : ordinary.round - 1;
+      const move = async (days: number, round: number) => {
+        await second.pglite.exec('set session_replication_role = replica');
+        await second.pglite.query(
+          `update games set starts_at = starts_at + make_interval(days => $2::int),
+             round_id = (select id from rounds where league_id = games.league_id
+                           and season_id = games.season_id and number = $3::int)
+           where id = $1`,
+          [moved, days, round],
+        );
+        await second.pglite.exec('set session_replication_role = origin');
+      };
+      await move(7, otherRound);
+      const rescheduled = await checkSimulatedLeague(second.pglite, second.played);
+      expect(failed(rescheduled)).toEqual(['schedule']);
+      const detail = rescheduled.checks.find((c) => c.name === 'schedule')?.detail ?? '';
+      expect(detail).toContain(`game ${ordinary.number} (${ordinary.home} v ${ordinary.away})`);
+      expect(detail).toContain(`stored ${ordinary.home} v ${ordinary.away}, round ${otherRound}`);
+      expect(detail).toContain(
+        `planned ${ordinary.home} v ${ordinary.away}, round ${ordinary.round}, ${ordinary.date}`,
+      );
+      expect(detail).toContain('the public schedule shows');
+      // Moved back, every check holds again.
+      await move(-7, ordinary.round);
+      expect((await checkSimulatedLeague(second.pglite, second.played)).passed).toBe(true);
+
+      // Then: the cancelled game made final, as if it had been played.
       await second.pglite.exec('set session_replication_role = replica');
       await second.pglite.query(
         `update games set status = 'final', home_score = 50, away_score = 40, finalized_at = now(),
