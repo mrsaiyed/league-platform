@@ -145,6 +145,23 @@ export type TrackerQueueOptions = {
   readonly sendTimeoutMs?: number;
   /** A number from 0 to 1, for spreading the waits. */
   readonly random?: () => number;
+  /**
+   * False when the device knows it has no network (the browser's `navigator.onLine`): a
+   * batch sent then cannot have reached the server. Otherwise a batch with no answer may
+   * have, and `withdraw` will not drop its taps (lane 2.37, fix round, F2).
+   */
+  readonly reachable?: () => boolean;
+};
+
+/** What `withdraw` did with each tap it was asked to take back. */
+export type Withdrawn = {
+  /** Dropped: never sent, or sent only while the device knew it had no network. */
+  readonly dropped: readonly string[];
+  /**
+   * Still waiting, and kept: each was sent and no answer came, so the server may have it.
+   * The next answer settles it (`duplicate` means the server had it).
+   */
+  readonly unsure: readonly string[];
 };
 
 export type TrackerQueue = {
@@ -178,10 +195,11 @@ export type TrackerQueue = {
   /**
    * Takes waiting taps back before they are sent (step 2.37: "Take back End game"). No
    * batch goes out while this runs: it waits for the one on its way, then drops those of
-   * `commandIds` the device still holds waiting. Resolves with the ones dropped; a tap the
-   * server took meanwhile is not among them, and stays taken.
+   * `commandIds` the device still holds waiting and the server cannot have. A tap the
+   * server took meanwhile is in neither list, and stays taken; one sent with no answer
+   * yet is `unsure`, and stays waiting.
    */
-  withdraw(commandIds: readonly string[]): Promise<readonly string[]>;
+  withdraw(commandIds: readonly string[]): Promise<Withdrawn>;
   /** The scorekeeper has seen these notices (record 058): they are dropped. */
   dismissNotices(commandIds: readonly string[]): void;
   status(): QueueStatus;
@@ -209,6 +227,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     retry = defaultRetryTiming,
     sendTimeoutMs = 15_000,
     random = Math.random,
+    reachable = () => globalThis.navigator?.onLine !== false,
   } = options;
   const size = Math.min(Math.max(Math.trunc(batchSize), 1), maxCommandsPerBatch);
 
@@ -238,6 +257,11 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
   let again = false;
   let readsStarted = 0;
   let readsShown = 0;
+  /**
+   * Taps sent with no answer back, while the device did not know it was offline: the
+   * server may have them. Each leaves this set with the server's next word about it.
+   */
+  const unsure = new Set<string>();
 
   const update = (change: Partial<QueueStatus>): void => {
     current = { ...current, ...change };
@@ -403,6 +427,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     let halt: QueueHalt | null = null;
     for (const result of outcome.reply.results) {
       if (!sent.delete(result.commandId)) continue;
+      unsure.delete(result.commandId);
       if (result.status !== 'refused') {
         remove.push(result.commandId);
         // A change of players taken with something to say (S-44): kept for the screen.
@@ -458,7 +483,15 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
           if (current.unansweredSince !== null) update({ unansweredSince: null });
           return;
         }
-        if (!(await apply(batch, await send(batch)))) return;
+        const known = reachable();
+        const outcome = await send(batch);
+        const ids = batch.commands.map((command) => command.commandId);
+        // No answer while the device had a network: the batch may have reached the server.
+        // Any answer about the batch as a whole says it did not take it.
+        if (outcome.kind === 'unanswered') {
+          if (known) for (const id of ids) unsure.add(id);
+        } else if (outcome.kind !== 'reply') for (const id of ids) unsure.delete(id);
+        if (!(await apply(batch, outcome))) return;
       }
     } catch {
       // The storage could not be read or written (`storageFailure` says so). What it
@@ -473,6 +506,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
   /** Drops taps, or keeps them as not saved; either way they are never sent. */
   const putAway = async (remove: readonly string[], notSaved: readonly string[]) => {
     await settle(remove, [], notSaved);
+    for (const id of [...remove, ...notSaved]) unsure.delete(id);
     const list = await refresh();
     // Nothing left for the halt to hold back: the queue is free again.
     if (current.halted !== null && !list.some((entry) => entry.state === 'waiting')) {
@@ -538,9 +572,11 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
         const held = new Set(
           list.flatMap((entry) => (entry.state === 'waiting' ? [entry.command.commandId] : [])),
         );
-        const dropped = commandIds.filter((id) => held.has(id));
+        // A tap sent with no answer yet may be on the server: it is not taken back.
+        const dropped = commandIds.filter((id) => held.has(id) && !unsure.has(id));
+        const kept = commandIds.filter((id) => held.has(id) && unsure.has(id));
         if (dropped.length > 0) await putAway(dropped, []);
-        return dropped;
+        return { dropped, unsure: kept };
       } finally {
         withdrawing -= 1;
         kick();

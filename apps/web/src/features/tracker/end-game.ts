@@ -169,7 +169,13 @@ export const takeBackProblemText = (
   result: Extract<TakeBackEndResult, { ok: false }>,
   t: Translate,
 ): string =>
-  t(result.reason === 'storage' ? 'tracker.end.takeBackFailed' : 'tracker.end.savedMeanwhile');
+  t(
+    result.reason === 'storage'
+      ? 'tracker.end.takeBackFailed'
+      : result.reason === 'maybe-saved'
+        ? 'tracker.end.maybeSaved'
+        : 'tracker.end.savedMeanwhile',
+  );
 
 /**
  * What the final panel says about reopening (S-36; the review of the two doors, point

@@ -300,6 +300,11 @@ export type FinalState =
   | 'sending'
   /** It has not reached the league: it can be taken back here, with no signal. */
   | 'not-sent'
+  /**
+   * It was sent and no answer came back, so the league may have it: it can no longer be
+   * taken back here, and the next answer says whether it was saved (fix round, F2).
+   */
+  | 'checking'
   /** The league has it: Reopen is the way back. */
   | 'saved';
 
@@ -342,6 +347,11 @@ export function FinalPanel(props: {
           <p>{t('tracker.final.saved')}</p>
         ) : ended === 'sending' ? (
           <p>{t('tracker.final.sending')}</p>
+        ) : ended === 'checking' ? (
+          <p>
+            <span className="court-final-unsent">{t('tracker.final.checkingSaved')}</span>{' '}
+            {t('tracker.end.maybeSaved')}
+          </p>
         ) : (
           <p>
             {/* In the amber of plays that wait, and in words. */}
@@ -375,6 +385,9 @@ export function FinalPanel(props: {
             // Its place is kept, so "Back to the games" never moves under a finger.
             <span aria-hidden="true" />
           )
+        ) : ended === 'checking' ? (
+          // The End may be on the league: nothing to take back. The place is kept.
+          <span aria-hidden="true" />
         ) : (
           <button
             type="button"

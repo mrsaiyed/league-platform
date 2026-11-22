@@ -138,14 +138,25 @@ export function useEndGame(args: EndGameArgs): EndGame {
   };
 
   const where = endState(status);
+  /**
+   * "Take back End game" found the End sent with no answer back (lane 2.37, fix round,
+   * F2): the league may have it, so the panel says it is checking until the league's
+   * next answer, and offers no take back meanwhile.
+   */
+  const [checking, setChecking] = useState(false);
+  useEffect(() => {
+    if (where !== 'not-sent') setChecking(false);
+  }, [where]);
   const ended: FinalState | null =
     where === 'live'
       ? null
       : where === 'saved'
         ? 'saved'
-        : fresh && !args.offline
-          ? 'sending'
-          : 'not-sent';
+        : checking
+          ? 'checking'
+          : fresh && !args.offline
+            ? 'sending'
+            : 'not-sent';
 
   // --- What the league says about reopening, once it has the End (S-36). ---
   const saved = where === 'saved';
@@ -238,6 +249,11 @@ export function useEndGame(args: EndGameArgs): EndGame {
       if (!tapTaken(rests.final, tapOf(event))) return;
       void during(async () => {
         const result = await controller.takeBackEnd();
+        if (!result.ok && result.reason === 'maybe-saved') {
+          // Said by the panel itself, in place of "Not sent yet", until the league answers.
+          setProblem(null);
+          return setChecking(true);
+        }
         if (!result.ok) return setProblem({ on: 'final', text: takeBackProblemText(result, t) });
         setProblem(null);
         showPad(padAtRest);

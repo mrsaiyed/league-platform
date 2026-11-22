@@ -79,6 +79,7 @@ import {
   type RefusedCommand,
   type TrackerQueue,
   type TrackerQueueOptions,
+  type Withdrawn,
 } from './tracker-queue.ts';
 
 /** A tap as the screens make it. The rules, reopening and resetting are not taps (record 038). */
@@ -197,6 +198,11 @@ export type TakeBackEndResult =
   | { readonly ok: false; readonly reason: 'not-waiting' }
   /** The server took the End while it was being taken back: the game is final; Reopen is the way. */
   | { readonly ok: false; readonly reason: 'already-saved' }
+  /**
+   * The End was sent and no answer came back: the server may have it, so it is not taken
+   * back. It stays waiting; the next answer says it was saved (lane 2.37, fix round, F2).
+   */
+  | { readonly ok: false; readonly reason: 'maybe-saved' }
   | { readonly ok: false; readonly reason: 'storage' };
 
 /** Why a door (Reopen, Mark not started) did not open, when the server did not say. */
@@ -256,7 +262,7 @@ export type TrackerControllerOptions = {
   /** How often the session is renewed while this device holds it. */
   readonly renewEveryMs?: number;
   /** Passed on to the queue. */
-  readonly queue?: Pick<TrackerQueueOptions, 'batchSize' | 'retry' | 'sendTimeoutMs'>;
+  readonly queue?: Pick<TrackerQueueOptions, 'batchSize' | 'retry' | 'sendTimeoutMs' | 'reachable'>;
 };
 
 export type TrackerController = {
@@ -1322,14 +1328,19 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         if (end === undefined || current.game?.status !== 'final' || base === null) {
           return { ok: false, reason: 'not-waiting' };
         }
-        let dropped: readonly string[];
+        let withdrawn: Withdrawn;
         try {
-          dropped = await queue.withdraw([end.commandId]);
+          withdrawn = await queue.withdraw([end.commandId]);
         } catch {
           return { ok: false, reason: 'storage' };
         }
+        // Sent, and the answer lost: the server may have it. Kept, so the device never
+        // shows a live game the server holds final; the next answer settles it.
+        if (withdrawn.unsure.includes(end.commandId)) return { ok: false, reason: 'maybe-saved' };
         // Not held waiting any more: the server took it. The game is final there.
-        if (!dropped.includes(end.commandId)) return { ok: false, reason: 'already-saved' };
+        if (!withdrawn.dropped.includes(end.commandId)) {
+          return { ok: false, reason: 'already-saved' };
+        }
         made = made.filter((c) => c.commandId !== end.commandId);
         // The End stopped the clock. Taken back, the clock stays stopped where the End
         // found it, as it does after a reopen (step 2.120): the scorekeeper starts it.

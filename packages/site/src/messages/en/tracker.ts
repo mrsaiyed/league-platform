@@ -107,6 +107,10 @@ export const enTracker = {
   'tracker.end.levelTitle': 'The score is level',
   // In the pad when the last period's clock has run out with a team ahead: offered,
   // never done by itself (S-65).
+  // "Take back End game" when the End was sent and its answer lost (lane 2.37, fix round,
+  // F2): the league may have it, so it is kept, and the panel says so until it answers.
+  'tracker.end.maybeSaved':
+    'It was sent as the connection dropped, so the league may have it, and it cannot be taken back here. This says “Saved” once the league answers; then Reopen is the way back.',
   'tracker.end.offer':
     '{period} is over. {team} lead {high}–{low}: end the game once the score is right.',
   // The league did not take an End tap this device made (an older page, a rule changed
@@ -123,6 +127,7 @@ export const enTracker = {
   // The final panel, in the pad's place once the game is ended (checklist J4).
   'tracker.final.back': 'Back to the games',
   'tracker.final.checking': 'Checking whether this game can be reopened here…',
+  'tracker.final.checkingSaved': 'Checking whether the result was saved…',
   // What a tile, a team's turnovers or its bench says when tapped on a final game (D12)
   // is `tracker.refusal.gameFinal`. The panel's own name, for a screen reader:
   'tracker.final.label': 'The game is final',

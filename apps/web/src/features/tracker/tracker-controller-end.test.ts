@@ -47,6 +47,9 @@ function device(network: EndpointNetwork, as: Person = 'scorekeeper') {
     transport: createFetchCommandTransport(at),
     server: createFetchTrackerServer(at),
     doors: createFetchGameDoors(at),
+    // The network down is what the browser knows as offline (`navigator.onLine`); an
+    // answer lost on the way back is not: the device thought it had a network.
+    queue: { reachable: () => network.mode !== 'down' },
   });
   return { controller, storage, clock };
 }
@@ -300,7 +303,9 @@ describe('tracker controller: taking back an End the server does not have', () =
     expect((await serverGame(network)).state.status).toBe('final');
   });
 
-  it('an End the server took while its answer was lost: the device cannot know, and the next play finds the game over, listed as not saved', async () => {
+  // Before the fix round (F2) this case let the End be taken back, and the next plays
+  // were then listed as not saved: the device showed a live game the server held final.
+  it('an End the server took while its answer was lost is not taken back: the device says it may be saved, and the next answer says it was', async () => {
     const network = endpointNetwork();
     const tablet = await scoring(network);
     await tapAll(tablet, [basket('home')]);
@@ -308,24 +313,44 @@ describe('tracker controller: taking back an End the server does not have', () =
     network.mode = 'answers-lost';
     await tapAll(tablet, [{ type: 'end' }]);
     await tablet.controller.idle();
-    // The device still holds its End as waiting, so it lets it be taken back.
-    expect(await tablet.controller.takeBackEnd()).toEqual({ ok: true });
-    network.mode = 'up';
     expect((await serverGame(network)).state.status).toBe('final');
-    // The truth comes with the next play: the server turns it away (the game is over
-    // there), it is listed as a play that did not go in, never lost silently, and the
-    // final game is shown, from where Reopen is offered.
-    await tablet.controller.tap(basket('away'));
+    // Sent, and no answer back: the server may have it, so it is kept.
+    expect(await tablet.controller.takeBackEnd()).toEqual({ ok: false, reason: 'maybe-saved' });
+    expect(tablet.controller.status().game?.status).toBe('final');
+    expect(tablet.controller.status().waiting.map((t) => t.command.input.type)).toEqual(['end']);
+    // More baskets: the device itself says the game is final, so none is lost unsaved.
+    expect((await tablet.controller.tap(basket('away'))).ok).toBe(false);
+    network.mode = 'up';
     tablet.controller.online();
     await tablet.controller.idle();
+    // The End sent again is answered as one the server already had: saved.
     const status = tablet.controller.status();
     expect(status.game?.status).toBe('final');
-    const listed = [
-      ...status.notApplied.map((r) => r.command.input.type),
-      ...status.notSaved.map((t) => t.command.input.type),
-    ];
-    expect(listed).toContain('score');
     expect(status.queue.waiting).toBe(0);
+    expect(status.notApplied).toEqual([]);
+    expect(status.notSaved).toEqual([]);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
+  });
+
+  it('an End never sent is taken back at once, even after an earlier play’s answer was lost', async () => {
+    const network = endpointNetwork();
+    const tablet = await scoring(network);
+    network.mode = 'answers-lost';
+    await tapAll(tablet, [basket('home')]);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet, [{ type: 'end' }]);
+    await tablet.controller.idle();
+    expect(await tablet.controller.takeBackEnd()).toEqual({ ok: true });
+    expect(tablet.controller.status().game?.status).toBe('live');
+    await tapAll(tablet, [basket('away', 3)]);
+    network.mode = 'up';
+    tablet.controller.online();
+    await tablet.controller.idle();
+    const server = await serverGame(network);
+    expect(server.state.status).toBe('live');
+    expect(scoreOf(server.state)).toEqual({ home: 2, away: 3 });
+    expect(tablet.controller.status().queue.waiting).toBe(0);
   });
 
   it('a game that was not ended has nothing to take back', async () => {
