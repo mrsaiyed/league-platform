@@ -49,3 +49,6 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.95: the health address does not name the running version (Render's Events list shows it)
 
 - 2.95: an empty answer at the password prompt for a database on this computer signs in silently with PGPASSWORD or .pgpass (release.mjs about line 111); a permission error while counting live games says 'what was applied is in the migration log' when nothing was applied (about line 152)
+- 2.49: `packages/core/src/modules/scheduling/place-games.ts:59-62`: a draft names a court by its name, so after a rename the draft no longer holds the court, and drafts of old seasons hold a court for good: count only the current season's drafts, or have a rename update the draft
+- 2.49: `apps/web/src/features/venues-area/actions.ts:208-237`: moving a court saves each court on its own (several activity entries, an order half-moved on a failure): one `reorderCourts` command like `reorderDivisions`
+- 2.49: `apps/web/src/features/divisions-area/divisions-page.tsx:104-106`: putting a division back asks for `bin.restore` while A-5 says whoever may remove may restore (no effect today): change it as D-L6 did for venues

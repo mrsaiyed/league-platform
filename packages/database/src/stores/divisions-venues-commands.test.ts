@@ -399,4 +399,41 @@ describe('venues and courts', () => {
     );
     expect(codeOf(await removeCourt(l.as, { courtId: quiet.courtId }, venueDeps))).toBe('ok');
   });
+
+  it("leaves another league's games out of a league's count at its venues and courts", async () => {
+    const mine = await league();
+    const theirs = await league();
+    const place = async (l: Made) => {
+      const venue = value(await createVenue(l.as, { name: 'Main gym' }, venueDeps));
+      const court = value(
+        await createCourt(l.as, { venueId: venue.venueId, name: 'Court 1' }, venueDeps),
+      );
+      const stageId = await newStage(pglite, l.leagueId, l.seasonId);
+      await newGame(pglite, {
+        leagueId: l.leagueId,
+        seasonId: l.seasonId,
+        stageId,
+        homeTeamId: await newTeam(pglite, l.leagueId, l.seasonId),
+        awayTeamId: await newTeam(pglite, l.leagueId, l.seasonId),
+        columns: {
+          venue_id: venue.venueId,
+          court_id: court.courtId,
+          status: 'scheduled',
+          starts_at: '2026-12-06T18:00:00Z',
+        },
+      });
+      return { venueId: venue.venueId, courtId: court.courtId };
+    };
+    const at = await place(mine);
+    await place(theirs);
+    expect(value(await countPlaceGames(mine.as, {}, venueDeps))).toEqual([
+      {
+        venueId: at.venueId,
+        played: 0,
+        toCome: 1,
+        inDraft: 0,
+        courts: { [at.courtId]: { played: 0, toCome: 1, inDraft: 0 } },
+      },
+    ]);
+  });
 });

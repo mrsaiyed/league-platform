@@ -602,6 +602,25 @@ const cases = [
     ['Venues', 'Central Gym', 'Court 2', staffFrameAt('/north-valley/admin/schedule'), oneHeading],
     [adminPlaceholder],
   ],
+  // A scorekeeper is refused both screens; someone signed out is sent to sign in and back.
+  ['scorekeeper', '/north-valley/admin/season/divisions', 403, [noAccess], ['East', 'West']],
+  ['scorekeeper', '/north-valley/admin/schedule/venues', 403, [noAccess], ['Central Gym']],
+  [
+    'visitor',
+    '/north-valley/admin/season/divisions',
+    307,
+    [],
+    ['Admin areas', noAccess],
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fseason%2Fdivisions',
+  ],
+  [
+    'visitor',
+    '/north-valley/admin/schedule/venues',
+    307,
+    [],
+    ['Admin areas', noAccess],
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fschedule%2Fvenues',
+  ],
   [
     'scheduler',
     '/north-valley/admin/games',
