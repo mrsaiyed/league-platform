@@ -62,7 +62,9 @@ describe('serveMadeUpDatabase', () => {
   }, 120_000);
 
   it('can be the superuser that built it, or a login without the sign-in store', async () => {
-    expect((await checksAs('superuser')).role).toContain('it is a superuser');
+    expect((await checksAs('superuser')).role).toContain(
+      'postgres is a superuser: alter role postgres nosuperuser',
+    );
     expect(await checksAs('no-sign-in-store')).toEqual({
       role: [],
       store: ['it is not a member of sign_in_store'],
