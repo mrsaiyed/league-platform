@@ -84,9 +84,11 @@ export {
   type DraftDocument,
 } from './draft-document.ts';
 export type { DraftEditError, DraftEditValue } from './draft-edit.ts';
+export { countPlaceGames } from './commands/count-place-games.ts';
 export { createCourt, type CreateCourtError } from './commands/create-court.ts';
 export { createVenue, type CreateVenueError } from './commands/create-venue.ts';
 export { listVenues } from './commands/list-venues.ts';
+export type { PlaceGames, VenueGames } from './place-games.ts';
 export { removeCourt, type RemoveCourtError } from './commands/remove-court.ts';
 export { removeVenue, type RemoveVenueError } from './commands/remove-venue.ts';
 export { restoreCourt, type RestoreCourtError } from './commands/restore-court.ts';
@@ -99,6 +101,8 @@ export type {
   DraftRecord,
   NewCourt,
   NewVenue,
+  PlaceGamesRecord,
+  PlacePublishedGames,
   SchedulingStore,
   SchedulingTx,
   VenueChange,

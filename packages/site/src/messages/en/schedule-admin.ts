@@ -276,4 +276,5 @@ export const enScheduleAdmin = {
   'schedule.admin.unknownTeam': 'Team not in this season',
   'schedule.admin.venueCourt': '{venue}: {court}',
   'schedule.admin.venueOnly': '{venue} (any court)',
+  'schedule.admin.venuesLink': 'Venues and courts',
 } as const;

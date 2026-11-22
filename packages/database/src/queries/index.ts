@@ -7,6 +7,7 @@ export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts'
 export { findLeagueAudience } from './find-league-audience.ts';
 export { hasRecordedChild } from './has-recorded-child.ts';
 export { findCourt } from './find-court.ts';
+export { findPlaceGames } from './find-place-games.ts';
 export { findDivision } from './find-division.ts';
 export { findPerson } from './find-person.ts';
 export { findPersonIsMinor } from './find-person-is-minor.ts';

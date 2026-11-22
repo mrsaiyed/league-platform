@@ -2,6 +2,9 @@
 // (`court-venue-in-bin`: restore the venue first), and another court of the venue may
 // have taken its name since (`court-name-taken`: rename one of them). Restoring a
 // court that is not in the bin changes nothing.
+// Whoever may remove it may bring it back (A-5): `venues.manage`, so a scheduler who
+// removed it by mistake puts it back (step 2.49; the audit of each league's data, D-L6).
+// Admins and the owner, who hold `bin.restore`, hold this too.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -14,9 +17,9 @@ export type RestoreCourtError = {
 
 export const restoreCourt = defineCommand({
   name: 'scheduling.restore_court',
-  permission: 'bin.restore',
+  permission: 'venues.manage',
   input: z.object({ courtId: z.uuid() }),
-  allowed: (context, _input, tx: SchedulingTx) => mayChangeSchedule(context, tx, 'bin.restore'),
+  allowed: (context, _input, tx: SchedulingTx) => mayChangeSchedule(context, tx, 'venues.manage'),
   run: async ({ context, input, tx }): Promise<Result<{ courtId: string }, RestoreCourtError>> => {
     const court = await tx.scheduling.findCourt(input.courtId);
     if (court === undefined) return fail({ code: 'court-not-found' });
