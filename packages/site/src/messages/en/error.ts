@@ -106,7 +106,7 @@ export const enError = {
     'A game that was played cannot be restored. Correct it instead.',
   'error.leagues.restore_game.game-number-taken': 'Another game now has this game number.',
   'error.leagues.restore_game.game-part-in-bin':
-    'A team, division, venue or court of this game is in the bin. Bring it back first.',
+    'A team, division, venue or court of this game is in the bin, and the screen to bring it back is not ready yet. So this game cannot be put back for now.',
   'error.leagues.restore_game.game-reference-taken': 'Another game now has this outside reference.',
   'error.leagues.restore_person.person-not-found': 'That person is not there.',
   'error.leagues.restore_person.person-profile-taken':
