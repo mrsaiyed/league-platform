@@ -50,6 +50,7 @@ import {
   publishSiteDesign,
   putGameBack,
   readFixtureImport,
+  rebuildStandings,
   readFixtureSheet,
   recordFinalScore,
   recordForfeit,
@@ -150,6 +151,57 @@ async function accountId(pglite: PGlite, email: string, displayName: string): Pr
     [email, displayName],
   );
   return made.rows[0]!.id;
+}
+
+/** The stores every simulation command runs on, at one fixed moment; no event handlers. */
+function simulationDeps(
+  db: ReturnType<typeof createDatabase>,
+  staffId: string,
+  at: number,
+): CommandDeps<SimulationTx> {
+  const transaction = commandTransaction(db, (scope: LeagueScope) => ({
+    jobs: jobsStore(scope),
+    leagues: leaguesStore(scope, { platformStaff: [staffId] }),
+    divisions: divisionsStore(scope),
+    access: accessStore(scope),
+    activity: activityLogStore(scope),
+    teams: teamsStore(scope),
+    people: peopleStore(scope),
+    scheduling: schedulingStore(scope),
+    imports: importsStore(scope),
+    games: gamesStore(scope),
+    scoringSessions: scoringSessionsStore(scope),
+    liveGames: liveGamesStore(scope),
+    clock: { now: () => at },
+    standings: standingsStore(scope),
+  }));
+  return { transaction, events: [], log: () => {}, now: () => at };
+}
+
+/**
+ * The standings worked out again by the product's own command (`rebuildStandings`), as the
+ * league's owner: what the tests do after planting a fault in the stored games, so that the
+ * check meets a table the product rebuilt from them, not a stale one.
+ */
+export async function rebuildSimulatedStandings(
+  pglite: PGlite,
+  played: Pick<PlayedLeague, 'leagueId' | 'seasonId'>,
+): Promise<void> {
+  const staffId = await accountId(pglite, seedStaff.email, seedStaff.displayName);
+  const ownerId = await accountId(pglite, simulatedOwner.email, simulatedOwner.displayName);
+  const db = createDatabase({ kind: 'pglite', pglite });
+  try {
+    must(
+      'rebuilding the standings',
+      await rebuildStandings(
+        { leagueId: played.leagueId, accountId: ownerId, requestId: 'simulate-rebuild' },
+        { seasonId: played.seasonId },
+        simulationDeps(db, staffId, Date.now()),
+      ),
+    );
+  } finally {
+    await db.close();
+  }
 }
 
 /** The game as the product holds it now: its version and its two teams. */
@@ -262,28 +314,7 @@ export async function simulateLeagueInto(
   const leagueId = (await pglite.query<{ id: string }>('select uuid_v7() as id')).rows[0]!.id;
   const db = createDatabase({ kind: 'pglite', pglite });
   try {
-    const transaction = commandTransaction(db, (scope: LeagueScope) => ({
-      jobs: jobsStore(scope),
-      leagues: leaguesStore(scope, { platformStaff: [staffId] }),
-      divisions: divisionsStore(scope),
-      access: accessStore(scope),
-      activity: activityLogStore(scope),
-      teams: teamsStore(scope),
-      people: peopleStore(scope),
-      scheduling: schedulingStore(scope),
-      imports: importsStore(scope),
-      games: gamesStore(scope),
-      scoringSessions: scoringSessionsStore(scope),
-      liveGames: liveGamesStore(scope),
-      clock: { now: () => at },
-      standings: standingsStore(scope),
-    }));
-    const setUp: CommandDeps<SimulationTx> = {
-      transaction,
-      events: [],
-      log: () => {},
-      now: () => at,
-    };
+    const setUp = simulationDeps(db, staffId, at);
     const deps: CommandDeps<SimulationTx> = { ...setUp, events: eventHandlers };
     const as = (actor: string | null): CommandContext => ({
       leagueId,

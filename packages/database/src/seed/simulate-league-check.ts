@@ -1,34 +1,52 @@
 // Development-only (T-195, T-201), step 2.236: the simulated league's check of its own
-// work (simulate-league.ts), returned as data and printed as a short report. It reads the
-// league back from the database, the standings through the product's own read, and holds
-// them against a second, simple working-out written only for this check:
-// - wins-equal-losses: across the league, as many wins as losses;
-// - points-balance: in each division, points for equal points against;
-// - games-played: every team has played the games its schedule gave it, less those called
-//   off or still waiting;
-// - tracked-points: in every tracked game, its players' points add up to its final score;
-// - called-off: every game the plan called off ended as planned (postponed, cancelled, put
-//   back and played, forfeited at the season's forfeit score, corrected once);
+// work (simulate-league.ts), returned as data and printed as a short report. Its only source
+// of truth is the plan: what the simulator meant to happen, worked out again with plain
+// arithmetic in simulate-league-expected.ts (which imports nothing from the product's
+// standings or statistics). It holds that against what the product says: its stored games
+// and box scores, and what its own reads return (the standings, the season's statistics).
+// - final-scores: every game's stored state and score is the plan's (played or corrected:
+//   the planned score; forfeited: the season's forfeit score for the planned loser;
+//   cancelled or waiting: no result), named game by game;
+// - wins-equal-losses, points-balance: the product's table agrees with itself (cheap, and
+//   no proof on their own: a wrong score saved still balances);
+// - games-played: every team has played the games the plan gave it, less those called off
+//   or still waiting;
+// - tracked-points: in every tracked game, the product's player lines add up to its score;
+// - box-scores: in every tracked game, each player's points and fouls are the plan's plays;
+// - player-totals: the season's statistics give each player the plan's games and points;
+// - called-off: every called-off game ended as planned, the corrected one corrected once;
 // - overtime: the product's overtime count on each tracked game is the plan's;
-// - standings: each team's wins, losses, points for and against as the product shows them
-//   equal those worked out again from the games' results, and the order by win percentage
-//   agrees; teams level on win percentage are said to be level, their tiebreak not judged.
-// Each failing check is named, and its detail names the teams it found wrong.
+// - standings: each row's games, wins, losses, ties, points for and against (and points in
+//   a points table) are the plan's, and so is the order, teams level on the table's measure
+//   included (the season's tiebreakers as the spec words them); teams nothing separates may
+//   come in either order, and are counted.
+// Each failing check is named, and its detail names the games, players or teams it found wrong.
 import type { PGlite } from '@electric-sql/pglite';
 import { SeasonRules } from '@srleagues/contracts';
-import { readStandings } from '@srleagues/core';
+import { publicViewer, readNamePolicy, readStandings, readStatisticsTable } from '@srleagues/core';
 import { createDatabase } from '../db/create-database.ts';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import { withTransaction } from '../db/with-transaction.ts';
+import { findLeagueAudience } from '../queries/find-league-audience.ts';
+import { listSettingValues } from '../queries/list-setting-values.ts';
 import { gamesStore, liveGamesStore, standingsReadStore } from '../stores/index.ts';
-import { callOffKinds, neverPlayed } from './simulate-league-plan.ts';
+import {
+  expectedBoxScore,
+  expectedGame,
+  expectedPlayerTotals,
+  expectedTables,
+} from './simulate-league-expected.ts';
+import { callOffKinds, neverPlayed, type PlannedTeam } from './simulate-league-plan.ts';
 import type { PlayedLeague } from './simulate-league.ts';
 
 export type CheckName =
+  | 'final-scores'
   | 'wins-equal-losses'
   | 'points-balance'
   | 'games-played'
   | 'tracked-points'
+  | 'box-scores'
+  | 'player-totals'
   | 'called-off'
   | 'overtime'
   | 'standings';
@@ -51,15 +69,14 @@ export type SimulationReport = {
   readonly passed: boolean;
 };
 
-type TeamRecord = { wins: number; losses: number; pointsFor: number; pointsAgainst: number };
-
-/** a/b against c/d, a team with no games counted as 0. Positive when the first is higher. */
-function comparePercentages(a: TeamRecord, b: TeamRecord): number {
-  const ga = a.wins + a.losses;
-  const gb = b.wins + b.losses;
-  if (ga === 0 || gb === 0) return (ga === 0 ? 0 : a.wins / ga) - (gb === 0 ? 0 : b.wins / gb);
-  return a.wins * gb - b.wins * ga;
+/** The first few of a list of faults, and how many more. */
+function listed(faults: readonly string[], most = 8): string {
+  const shown = faults.slice(0, most).join('; ');
+  return faults.length > most ? `${shown}; and ${faults.length - most} more` : shown;
 }
+
+const score = (home: number | null, away: number | null) =>
+  home === null && away === null ? 'no result' : `${home}-${away}`;
 
 /** Checks the played league (above). */
 export async function checkSimulatedLeague(
@@ -75,59 +92,66 @@ export async function checkSimulatedLeague(
     const standings = await read((scope) => readStandings(standingsReadStore(scope), { seasonId }));
     if (!standings.ok) throw new Error(`The check found no standings: ${standings.error.code}`);
     const tables = standings.value.tables;
-
-    // The second working-out: from the games' results alone. Final and forfeit games count
-    // (packages/sports, count-games.ts); a postponed or cancelled one counts for nothing. A
-    // forfeit is a win and a loss at the season's forfeit score, which is stored on the game,
-    // and its points count for and against only when the season's rules say so.
-    const { rows: games } = await pglite.query<{
-      status: 'final' | 'forfeit';
-      home_team_id: string;
-      away_team_id: string;
-      home_score: number;
-      away_score: number;
-    }>(
-      `select status, home_team_id, away_team_id, home_score, away_score from games
-       where league_id = $1 and season_id = $2 and status in ('final', 'forfeit')
-         and deleted_at is null`,
-      [leagueId, seasonId],
-    );
+    // The season's rules as the admin set them: an input of the working-out, like the plan.
     const rulesRow = await pglite.query<{ rules: unknown }>(
       'select rules from seasons where league_id = $1 and id = $2',
       [leagueId, seasonId],
     );
-    const rules = SeasonRules.safeParse(rulesRow.rows[0]?.rules);
-    if (!rules.success) throw new Error('The check could not read the season’s rules.');
-    const { forfeit } = rules.data;
-    const worked = new Map<string, TeamRecord>();
-    const of = (id: string) => {
-      const found = worked.get(id) ?? { wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0 };
-      worked.set(id, found);
-      return found;
-    };
-    for (const g of games) {
-      const home = of(g.home_team_id);
-      const away = of(g.away_team_id);
-      if (g.status === 'final' || forfeit.countsInPointDifference) {
-        home.pointsFor += g.home_score;
-        home.pointsAgainst += g.away_score;
-        away.pointsFor += g.away_score;
-        away.pointsAgainst += g.home_score;
-      }
-      const winner = g.home_score > g.away_score ? home : away;
-      const loser = winner === home ? away : home;
-      winner.wins += 1;
-      loser.losses += 1;
+    const parsedRules = SeasonRules.safeParse(rulesRow.rows[0]?.rules);
+    if (!parsedRules.success) throw new Error('The check could not read the season’s rules.');
+    const rules = parsedRules.data;
+    const { forfeit } = rules;
+    const checks: Check[] = [];
+
+    // Every game as the product stored it, against the plan, game by game.
+    const { rows: stored } = await pglite.query<{
+      id: string;
+      status: string;
+      home_team_id: string;
+      home_score: number | null;
+      away_score: number | null;
+    }>(
+      `select id, status, home_team_id, home_score, away_score from games
+       where league_id = $1 and season_id = $2 and deleted_at is null`,
+      [leagueId, seasonId],
+    );
+    const storedById = new Map(stored.map((row) => [row.id, row]));
+    const scoreWrong: string[] = [];
+    if (stored.length !== plan.games.length) {
+      scoreWrong.push(`${stored.length} games stored, ${plan.games.length} planned`);
     }
+    for (const game of plan.games) {
+      const want = expectedGame(game, rules);
+      const row = storedById.get(played.gameIds.get(game.number) ?? '');
+      const named = `game ${game.number} (${game.home} v ${game.away}${game.callOff ? `, ${game.callOff.kind}` : ''})`;
+      if (row === undefined) scoreWrong.push(`${named} is not stored`);
+      else if (
+        row.status !== want.status ||
+        row.home_score !== want.home ||
+        row.away_score !== want.away
+      ) {
+        scoreWrong.push(
+          `${named}: stored ${row.status} ${score(row.home_score, row.away_score)}, planned ${want.status} ${score(want.home, want.away)}`,
+        );
+      }
+    }
+    checks.push({
+      name: 'final-scores',
+      ok: scoreWrong.length === 0,
+      detail:
+        scoreWrong.length === 0
+          ? `all ${plan.games.length} games are stored as planned: state and score`
+          : listed(scoreWrong),
+    });
 
     const lines = tables.flatMap((t) => t.lines);
-    const checks: Check[] = [];
+    const decided = plan.games.filter((g) => expectedGame(g, rules).home !== null).length;
     const wins = lines.reduce((s, l) => s + l.wins, 0);
     const losses = lines.reduce((s, l) => s + l.losses, 0);
     checks.push({
       name: 'wins-equal-losses',
-      ok: wins === losses && wins === games.length,
-      detail: `${wins} wins, ${losses} losses, ${games.length} games decided`,
+      ok: wins === losses && wins === decided,
+      detail: `${wins} wins, ${losses} losses, ${decided} games decided in the plan`,
     });
 
     const balance = tables.map((t) => {
@@ -161,25 +185,69 @@ export async function checkSimulatedLeague(
               .join(', ')}`,
     });
 
+    // The players: a plan player is its team's roster place, found by its planned jersey.
+    const teamsByName = new Map<string, PlannedTeam>(
+      plan.divisions.flatMap((d) => d.teams.map((t): [string, PlannedTeam] => [t.name, t])),
+    );
+    const { rows: rosterRows } = await pglite.query<{
+      team: string;
+      jersey: string;
+      person_id: string;
+    }>(
+      `select teams.name as team, roster_entries.jersey_number as jersey, roster_entries.person_id
+       from roster_entries join teams on teams.id = roster_entries.team_id
+       where teams.league_id = $1 and roster_entries.left_on is null`,
+      [leagueId],
+    );
+    const personByJersey = new Map(rosterRows.map((r) => [`${r.team} ${r.jersey}`, r.person_id]));
+    const jerseyOf = (team: string, place: number) =>
+      teamsByName.get(team)?.players[place]?.jersey ?? '?';
+    const personOf = (team: string, place: number) =>
+      personByJersey.get(`${team} ${jerseyOf(team, place)}`);
+
     const trackedGames = plan.games.filter((g) => g.plays !== null);
     const wrongTracked: number[] = [];
+    const lineWrong: string[] = [];
+    let linesChecked = 0;
     for (const game of trackedGames) {
       const gameId = played.gameIds.get(game.number)!;
-      const [gameLines, final] = await Promise.all([
-        read((scope) => liveGamesStore(scope).lines(gameId)),
-        pglite.query<{ home: number; away: number; home_team_id: string; status: string }>(
-          `select home_score as home, away_score as away, home_team_id, status from games
-           where league_id = $1 and id = $2`,
-          [leagueId, gameId],
-        ),
-      ]);
-      const row = final.rows[0];
+      const gameLines = await read((scope) => liveGamesStore(scope).lines(gameId));
+      const row = storedById.get(gameId);
+      // The product against itself: its player lines add up to its stored score.
       const sum = (home: boolean) =>
         gameLines
           .filter((l) => (l.teamId === row?.home_team_id) === home)
           .reduce((s, l) => s + (l.stats['points'] ?? 0), 0);
-      if (row?.status !== 'final' || sum(true) !== row.home || sum(false) !== row.away) {
+      if (
+        row?.status !== 'final' ||
+        sum(true) !== row.home_score ||
+        sum(false) !== row.away_score
+      ) {
         wrongTracked.push(game.number);
+      }
+      // Each player's line against the plan's plays.
+      const want = expectedBoxScore(game);
+      const seen = new Set<string>();
+      for (const [key, line] of want) {
+        const [side, place] = key.split(' ') as ['home' | 'away', string];
+        const team = side === 'home' ? game.home : game.away;
+        const person = personOf(team, Number(place));
+        if (person !== undefined) seen.add(person);
+        const got = gameLines.find((l) => l.personId === person);
+        const points = got?.stats['points'] ?? 0;
+        const fouls = got?.stats['fouls'] ?? 0;
+        linesChecked += 1;
+        if (got === undefined || points !== line.points || fouls !== line.fouls) {
+          lineWrong.push(
+            `game ${game.number}: ${team} #${jerseyOf(team, Number(place))} shows ${got === undefined ? 'no line' : `${points} points, ${fouls} fouls`}, the plays give ${line.points} points, ${line.fouls} fouls`,
+          );
+        }
+      }
+      const strangers = gameLines.filter((l) => !seen.has(l.personId)).length;
+      if (strangers > 0) {
+        lineWrong.push(
+          `game ${game.number}: ${strangers} line(s) for players the plays never name`,
+        );
       }
     }
     checks.push({
@@ -189,6 +257,61 @@ export async function checkSimulatedLeague(
         wrongTracked.length === 0
           ? `${trackedGames.length} tracked games: players' points add up to every final score`
           : `players' points do not add up in game ${wrongTracked.join(', ')}`,
+    });
+    checks.push({
+      name: 'box-scores',
+      ok: lineWrong.length === 0,
+      detail:
+        lineWrong.length === 0
+          ? `${linesChecked} player lines in ${trackedGames.length} tracked games: points and fouls as the plays give them`
+          : listed(lineWrong),
+    });
+
+    // The season's statistics, as the product's own read gives them to the public.
+    const statistics = await read(async (scope) =>
+      readStatisticsTable(standingsReadStore(scope), {
+        seasonId,
+        viewing: {
+          leagueId,
+          viewer: publicViewer(leagueId),
+          audience: await findLeagueAudience(scope),
+          policy: await readNamePolicy({
+            settingRows: (key, places) => listSettingValues(scope, key, places),
+          }),
+        },
+      }),
+    );
+    if (!statistics.ok) throw new Error(`The check found no statistics: ${statistics.error.code}`);
+    const statsOf = new Map(statistics.value.players.map((p) => [p.personId, p]));
+    const totalsWrong: string[] = [];
+    const totals = expectedPlayerTotals(plan);
+    const planned = new Set<string>();
+    for (const want of totals.values()) {
+      const person = personOf(want.team, want.place);
+      if (person !== undefined) planned.add(person);
+      const got = person === undefined ? undefined : statsOf.get(person);
+      const games = got?.gamesPlayed ?? 0;
+      const points = got?.stats['points']?.total ?? 0;
+      if (games !== want.games || points !== want.points) {
+        totalsWrong.push(
+          `${want.team} #${jerseyOf(want.team, want.place)}: ${games} games, ${points} points; the plan: ${want.games}, ${want.points}`,
+        );
+      }
+    }
+    for (const other of statistics.value.players) {
+      if (!planned.has(other.personId) && (other.stats['points']?.total ?? 0) > 0) {
+        totalsWrong.push(
+          `a player who scored in no tracked game has ${other.stats['points']?.total} points`,
+        );
+      }
+    }
+    checks.push({
+      name: 'player-totals',
+      ok: totalsWrong.length === 0,
+      detail:
+        totalsWrong.length === 0
+          ? `${totals.size} players: games and points in the season's statistics as the plan's tracked games give them`
+          : listed(totalsWrong),
     });
 
     // Each game called off ended as the plan says, read back from the product's games.
@@ -251,46 +374,64 @@ export async function checkSimulatedLeague(
           : `the product's overtime count is wrong in game ${overtimeWrong.join(', ')}`,
     });
 
+    // The standings, row by row and place by place, against the plan's working-out.
+    const expected = expectedTables(plan, rules);
+    const tableOf = new Map(
+      expected.flatMap((t) => [...t.rows.keys()].map((team): [string, typeof t] => [team, t])),
+    );
     const wrong: string[] = [];
-    const level: string[] = [];
+    if (tables.length !== plan.divisions.length) {
+      wrong.push(`${tables.length} tables shown, ${plan.divisions.length} divisions planned`);
+    }
+    const byPoints = rules.standings.rankBy === 'points';
+    const place = (teams: readonly string[]) => [...teams].sort().join(' = ');
     for (const table of tables) {
-      for (const line of table.lines) {
-        const w = worked.get(line.team.id) ?? {
-          wins: 0,
-          losses: 0,
-          pointsFor: 0,
-          pointsAgainst: 0,
-        };
-        if (
-          w.wins !== line.wins ||
-          w.losses !== line.losses ||
-          w.pointsFor !== line.pointsFor ||
-          w.pointsAgainst !== line.pointsAgainst
-        ) {
-          wrong.push(
-            `${line.team.name} shows ${line.wins}-${line.losses} ${line.pointsFor}-${line.pointsAgainst}, worked out ${w.wins}-${w.losses} ${w.pointsFor}-${w.pointsAgainst}`,
-          );
-        }
+      const want = tableOf.get(table.lines[0]?.team.name ?? '');
+      const division = table.division?.name ?? 'No division';
+      if (want === undefined) {
+        wrong.push(`${division}: a table of no planned division`);
+        continue;
       }
-      const recs = table.lines.map((l) => ({
-        name: l.team.name,
-        rec: worked.get(l.team.id) ?? { wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0 },
-      }));
-      for (let k = 1; k < recs.length; k += 1) {
-        const order = comparePercentages(recs[k - 1]!.rec, recs[k]!.rec);
-        if (order < 0) wrong.push(`${recs[k]!.name} is shown below ${recs[k - 1]!.name}`);
-        if (order === 0) level.push(`${recs[k - 1]!.name} and ${recs[k]!.name}`);
+      for (const line of table.lines) {
+        const w = want.rows.get(line.team.name);
+        if (w === undefined) {
+          wrong.push(`${division}: ${line.team.name} is in no planned place here`);
+          continue;
+        }
+        const shown = `${line.gamesPlayed} GP ${line.wins}-${line.losses}-${line.ties} ${line.pointsFor}-${line.pointsAgainst}${byPoints ? ` ${line.points} pts` : ''}`;
+        const worked = `${w.gamesPlayed} GP ${w.wins}-${w.losses}-${w.ties} ${w.pointsFor}-${w.pointsAgainst}${byPoints ? ` ${w.points} pts` : ''}`;
+        if (shown !== worked)
+          wrong.push(`${line.team.name} shows ${shown}, the plan gives ${worked}`);
+      }
+      if (table.lines.length !== want.rows.size) {
+        wrong.push(`${division}: ${table.lines.length} teams shown, ${want.rows.size} planned`);
+      }
+      // The places: teams sharing a rank are one place, in any order among themselves.
+      const shownPlaces: string[][] = [];
+      table.lines.forEach((line, k) => {
+        if (k > 0 && table.lines[k - 1]!.rank === line.rank)
+          shownPlaces.at(-1)!.push(line.team.name);
+        else shownPlaces.push([line.team.name]);
+      });
+      const firstOff = want.places.findIndex(
+        (p, k) => shownPlaces[k] === undefined || place(shownPlaces[k]) !== place(p),
+      );
+      if (firstOff !== -1 || shownPlaces.length !== want.places.length) {
+        const k = firstOff === -1 ? want.places.length : firstOff;
+        wrong.push(
+          `${division}, place ${k + 1}: shown ${shownPlaces[k] ? place(shownPlaces[k]) : 'nobody'}, the plan and the tiebreakers give ${want.places[k] ? place(want.places[k]) : 'nobody'}`,
+        );
       }
     }
+    const ordered = expected.reduce((s, t) => s + t.ordered, 0);
+    const unseparated = expected.reduce((s, t) => s + t.unseparated, 0);
     checks.push({
       name: 'standings',
       ok: wrong.length === 0,
       detail:
         wrong.length === 0
-          ? `every team's record and the order by win percentage agree with the results${
-              level.length > 0 ? `; level: ${level.join('; ')}` : ''
-            }`
-          : wrong.join('; '),
+          ? `every row (games, wins, losses, ties, points for and against${byPoints ? ', points' : ''}) and every place as the plan gives them; ${ordered} level group(s) put in order by the tiebreakers (${rules.tiebreakers.join(', ')}), ${unseparated} group(s) nothing separates`
+          : listed(wrong),
     });
 
     return {
@@ -326,7 +467,7 @@ export function reportLines(played: PlayedLeague, report: SimulationReport): str
     `Simulated league: ${teams} teams in ${options.divisions} division(s), ${options.rounds} rounds, ${games.length} games (${tracked} tracked, ${games.length - tracked} final scores), seed ${options.seed}`,
     'Schedule: brought in through the fixture import, put in rounds in the draft, published',
     `Called off or changed: ${games.filter((g) => g.callOff !== null).length} games (${games.filter((g) => neverPlayed(g.callOff)).length} never played); overtime: ${games.filter((g) => g.overtime).length} tracked game(s)`,
-    'Checks:',
+    'Checks (each against the plan, worked out again without the product’s standings or statistics):',
     ...report.checks.map((c) => `  ${c.ok ? 'ok  ' : 'FAIL'} ${c.name}: ${c.detail}`),
     'Final tables:',
   ];

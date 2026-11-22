@@ -1,8 +1,11 @@
 // Step 2.236: a made-up league played from empty to its final tables through the
 // product's own commands checks its own work, at 4 teams and at 12 teams in 2 divisions,
 // with games postponed, cancelled, put back, forfeited and corrected and one in overtime;
-// the same seed gives the same report; a result changed straight in the database after
-// the play makes the standings check fail by name, and so does a cancelled game made final.
+// the same seed gives the same report. Faults planted in the database after the play, the
+// standings then rebuilt by the product's own command, fail checks by name: one game's
+// home and away scores swapped (final-scores, standings); the stored ranks of two teams a
+// tiebreaker put in order swapped (standings); a cancelled game made final (final-scores,
+// games-played, called-off, and standings by the rows' numbers).
 // The 60-team run is its own command, `npm run simulate:large` (part 2).
 import { PGlite } from '@electric-sql/pglite';
 import path from 'node:path';
@@ -10,14 +13,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { applyMigrations, pgliteDriver } from '../migrations/index.ts';
 import { realNames, realNamesIn } from './real-names.test-helper.ts';
-import { checkSimulatedLeague, reportLines } from './simulate-league-check.ts';
 import {
-  callOffKinds,
-  planSimulation,
-  type PlannedGame,
-  type SimulationOptions,
-} from './simulate-league-plan.ts';
-import { simulateLeagueInto } from './simulate-league.ts';
+  checkSimulatedLeague,
+  reportLines,
+  type SimulationReport,
+} from './simulate-league-check.ts';
+import { callOffKinds, planSimulation, type SimulationOptions } from './simulate-league-plan.ts';
+import { rebuildSimulatedStandings, simulateLeagueInto } from './simulate-league.ts';
 
 const repository = fileURLToPath(new URL('../../../../', import.meta.url));
 
@@ -78,10 +80,13 @@ describe('simulateLeagueInto', () => {
     });
     try {
       expect(report.checks.map((c) => [c.name, c.ok])).toEqual([
+        ['final-scores', true],
         ['wins-equal-losses', true],
         ['points-balance', true],
         ['games-played', true],
         ['tracked-points', true],
+        ['box-scores', true],
+        ['player-totals', true],
         ['called-off', true],
         ['overtime', true],
         ['standings', true],
@@ -93,7 +98,7 @@ describe('simulateLeagueInto', () => {
     }
   }, 120_000);
 
-  it('plays 12 teams in 2 divisions the same way twice, and a changed result fails the standings check', async () => {
+  it('plays 12 teams in 2 divisions the same way twice, and faults planted afterwards fail checks by name', async () => {
     const options = { teams: 12, divisions: 2, rounds: 6, tracked: 4, seed: 7 };
     const first = await play(options);
     const second = await play(options);
@@ -112,18 +117,73 @@ describe('simulateLeagueInto', () => {
       );
 
       // The planted faults go round the database's guard (a decided game's score changes
-      // only with a reason), with the table's triggers off for these changes.
-      // First: one final score changed straight in the database, after the play.
-      const idOf = (game: PlannedGame | undefined) => first.played.gameIds.get(game!.number)!;
+      // only with a reason), with the table's triggers off for these changes; then the
+      // product's own command rebuilds the standings from the stored games, so the check
+      // meets a table the product worked out from the fault, not a stale one.
+      const failed = (report: SimulationReport) =>
+        report.checks.filter((c) => !c.ok).map((c) => c.name);
+      const ordinary = games.find((g) => g.plays === null && g.callOff === null)!;
+      const swap = async () => {
+        await first.pglite.exec('set session_replication_role = replica');
+        await first.pglite.query(
+          'update games set home_score = away_score, away_score = home_score where id = $1',
+          [first.played.gameIds.get(ordinary.number)],
+        );
+        await first.pglite.exec('set session_replication_role = origin');
+        await rebuildSimulatedStandings(first.pglite, first.played);
+      };
+      // First: one ordinary game's home and away scores swapped, the standings rebuilt.
+      await swap();
+      const swapped = await checkSimulatedLeague(first.pglite, first.played);
+      expect(failed(swapped)).toEqual(expect.arrayContaining(['final-scores', 'standings']));
+      expect(swapped.checks.find((c) => c.name === 'final-scores')?.detail).toContain(
+        `game ${ordinary.number} (`,
+      );
+      expect(reportLines(first.played, swapped).at(-2)).toContain('final-scores');
+      // Swapped back and rebuilt, every check holds again.
+      await swap();
+      expect((await checkSimulatedLeague(first.pglite, first.played)).passed).toBe(true);
+
+      // Then: the stored ranks of two teams level on their record, but put in order by a
+      // tiebreaker, swapped in the product's table.
+      const { rows } = await first.pglite.query<{
+        team_id: string;
+        division_id: string;
+        rank: number;
+        wins: number;
+        losses: number;
+      }>(
+        `select team_id, division_id, rank, wins, losses from standings_rows
+         where league_id = $1 and season_id = $2 order by division_id, rank`,
+        [first.played.leagueId, first.played.seasonId],
+      );
+      const k = rows.findIndex(
+        (r, i) =>
+          i > 0 &&
+          rows[i - 1]!.division_id === r.division_id &&
+          rows[i - 1]!.wins === r.wins &&
+          rows[i - 1]!.losses === r.losses &&
+          rows[i - 1]!.rank !== r.rank,
+      );
+      expect(k, 'two level teams a tiebreaker put in order').toBeGreaterThan(0);
+      const [above, below] = [rows[k - 1]!, rows[k]!];
       await first.pglite.exec('set session_replication_role = replica');
-      await first.pglite.query('update games set home_score = home_score + 40 where id = $1', [
-        idOf(games.find((g) => g.plays === null && g.callOff === null)),
-      ]);
+      await first.pglite.query(
+        `update standings_rows set rank = case team_id when $1 then $3::int else $4::int end
+         where league_id = $5 and season_id = $6 and team_id in ($1, $2)`,
+        [
+          above.team_id,
+          below.team_id,
+          below.rank,
+          above.rank,
+          first.played.leagueId,
+          first.played.seasonId,
+        ],
+      );
       await first.pglite.exec('set session_replication_role = origin');
-      const after = await checkSimulatedLeague(first.pglite, first.played);
-      expect(after.passed).toBe(false);
-      expect(after.checks.filter((c) => !c.ok).map((c) => c.name)).toContain('standings');
-      expect(reportLines(first.played, after).at(-2)).toContain('standings');
+      const reordered = await checkSimulatedLeague(first.pglite, first.played);
+      expect(failed(reordered)).toEqual(['standings']);
+      expect(reordered.checks.find((c) => c.name === 'standings')?.detail).toContain('place');
 
       // Second, on the other copy: the cancelled game made final, as if it had been played.
       await second.pglite.exec('set session_replication_role = replica');
@@ -139,9 +199,15 @@ describe('simulateLeagueInto', () => {
         ],
       );
       await second.pglite.exec('set session_replication_role = origin');
+      await rebuildSimulatedStandings(second.pglite, second.played);
       const counted = await checkSimulatedLeague(second.pglite, second.played);
-      expect(counted.checks.filter((c) => !c.ok).map((c) => c.name)).toEqual(
-        expect.arrayContaining(['called-off', 'standings']),
+      expect(failed(counted)).toEqual(
+        expect.arrayContaining(['final-scores', 'games-played', 'called-off', 'standings']),
+      );
+      // The standings fail by the rows' numbers, not only by the games played.
+      const cancelled = games.find((g) => g.callOff?.kind === 'cancelled')!;
+      expect(counted.checks.find((c) => c.name === 'standings')?.detail).toContain(
+        `${cancelled.home} shows`,
       );
     } finally {
       await first.pglite.close();

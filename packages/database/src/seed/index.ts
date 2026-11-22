@@ -28,4 +28,8 @@ export {
   type SimulationOptions,
   type SimulationPlan,
 } from './simulate-league-plan.ts';
-export { simulateLeagueInto, type PlayedLeague } from './simulate-league.ts';
+export {
+  rebuildSimulatedStandings,
+  simulateLeagueInto,
+  type PlayedLeague,
+} from './simulate-league.ts';
