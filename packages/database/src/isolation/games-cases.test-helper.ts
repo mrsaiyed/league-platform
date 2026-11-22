@@ -601,6 +601,7 @@ registerIsolationCase({
       target.upcomingGameId,
       target.scoringSessionId,
       harnessNow + 120_000,
+      harnessNow + 240_000,
     ),
 });
 

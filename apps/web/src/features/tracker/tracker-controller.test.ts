@@ -404,6 +404,38 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
   });
 
+  it('hidden, it stops checking its hold; shown again it checks at once and learns of a takeover (T-295)', async () => {
+    const network = endpointNetwork();
+    const tablet = device(network);
+    await tablet.controller.start();
+    await tablet.controller.idle();
+    tablet.controller.hidden();
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    // Ten minutes hidden: no check, so nothing is learnt.
+    await tablet.clock.advance(600_000);
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
+    tablet.controller.awake();
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'taken-over' });
+  });
+
+  it('shown again after a sleep with nobody else in, it carries on holding the game (T-295)', async () => {
+    const network = endpointNetwork();
+    const tablet = device(network);
+    await tablet.controller.start();
+    await tablet.controller.idle();
+    tablet.controller.hidden();
+    await tablet.clock.advance(600_000);
+    tablet.controller.awake();
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode).toEqual({ kind: 'scoring' });
+  });
+
   it('never sends the taps it listed as not saved, even after the page is reloaded', async () => {
     const network = endpointNetwork();
     const storage = createMemoryQueueStorage();

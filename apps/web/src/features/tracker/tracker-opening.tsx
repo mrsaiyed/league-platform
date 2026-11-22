@@ -131,8 +131,10 @@ export function TrackerOpening({
     };
     // The page shown again (the phone woke, the tab came back): the device may have
     // slept, so the controller measures the server's time again, renews and sends.
+    // Hidden, it stops checking its hold on the game until it is shown (T-295).
     const visible = () => {
       if (document.visibilityState === 'visible') opened.current?.controller.awake();
+      else opened.current?.controller.hidden();
     };
     // Leaving by the browser's own ways (back, reload, the tab closed) while plays wait:
     // the browser asks in its own words, as far as it allows (lane 2.37, fix round, F1).

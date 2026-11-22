@@ -282,10 +282,15 @@ export type TrackerController = {
   /**
    * The page is shown again (`visibilitychange` to visible): the device may have slept.
    * The server's time is carried on across the sleep at once, then the session renewed
-   * and what waits sent, as `online` does, so the time is measured again. The tracker
-   * page wires it (step 2.38); this lane has no page.
+   * and what waits sent, as `online` does, so the time is measured again. The checks on
+   * the session, stopped by `hidden`, start again from that renewal (T-295).
    */
   awake(): void;
+  /**
+   * The page is hidden (`visibilitychange` to hidden): the checks on the session stop, so
+   * a tab nobody looks at asks nothing; `awake` asks at once when it is shown (T-295).
+   */
+  hidden(): void;
   /**
    * Takes back an End game tap that has not reached the server (step 2.37): on the device
    * alone, with no reason asked and with no signal. The game shown is live again, as it
@@ -656,10 +661,12 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     });
   };
 
+  /** The page is hidden: the session is not checked until it is shown (T-295). */
+  let pageHidden = false;
   const scheduleRenew = (): void => {
     cancelRenew?.();
     cancelRenew = null;
-    if (stopped || sessionId === null) return;
+    if (stopped || sessionId === null || pageHidden) return;
     cancelRenew = clock.after(renewEveryMs, () => {
       cancelRenew = null;
       void track(renew());
@@ -1322,8 +1329,15 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     online: backOnline,
 
     awake() {
+      pageHidden = false;
       noticeSleep();
       backOnline();
+    },
+
+    hidden() {
+      pageHidden = true;
+      cancelRenew?.();
+      cancelRenew = null;
     },
 
     takeBackEnd() {
