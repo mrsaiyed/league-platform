@@ -262,6 +262,14 @@ export const reopenProblemText = (
     : doorProblemText(result.reason, t);
 
 /**
+ * Whether a reopen that failed is asked again by itself (the review of the two doors,
+ * point 7): with no connection it keeps trying, under the same request id, and the game
+ * is said to be final still until the league answers.
+ */
+export const reopenKeepsTrying = (result: Extract<ReopenResult, { ok: false }>): boolean =>
+  result.reason === 'unanswered';
+
+/**
  * Whether a reopen that failed can simply be asked again from the question (no
  * connection, plays still going out, signed out), or the league has answered for good
  * and the panel says so in the question's place.
@@ -271,6 +279,28 @@ export const reopenMayRetry = (result: Extract<ReopenResult, { ok: false }>): bo
   result.reason === 'plays-waiting' ||
   result.reason === 'signed-out' ||
   (result.reason === 'refused' && result.code === 'reason-needed');
+
+/** What the screen does with a Reopen's answer (`reopenAnswered`). */
+export type ReopenAnswered =
+  | 'reopened'
+  | 'keep-trying'
+  | 'ask-again'
+  | 'refused'
+  | 'kept'
+  | 'reopened-though-kept';
+
+/**
+ * What a Reopen's answer does on the screen. `kept`: "Keep it final" was tapped after
+ * this Reopen was asked (the code review's M4). The person's last answer holds: nothing
+ * is asked again and no problem is shown. Only if the league had already reopened the
+ * game is it live, and that is said plainly, never left unsaid.
+ */
+export function reopenAnswered(result: ReopenResult, kept: boolean): ReopenAnswered {
+  if (result.ok) return kept ? 'reopened-though-kept' : 'reopened';
+  if (kept) return 'kept';
+  if (reopenKeepsTrying(result)) return 'keep-trying';
+  return reopenMayRetry(result) ? 'ask-again' : 'refused';
+}
 
 /**
  * What the Mark not started question says (S-40; the review of the two doors, point 6).

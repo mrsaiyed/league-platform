@@ -23,6 +23,16 @@ describe('saved banner (T6 §4)', () => {
     expect(text(12, 0)).toBe('12 plays waiting to send');
   });
 
+  it('signed out or no longer allowed, never says "waiting to send": the plays are kept (step 2.37, part 2)', () => {
+    const kept = savedBanner(status(3, 1), false, true);
+    expect(savedBannerText(kept, t)).toBe('3 plays kept on this device · 1 play not saved');
+    expect(savedBannerText(kept, t)).not.toMatch(/waiting to send/);
+    expect(savedBannerShortLines(kept, t)).toEqual(['3 kept', '1 not saved']);
+    expect(savedBannerText(savedBanner(status(1, 0), true, true), t)).toBe(
+      'No connection: plays are kept on this device · 1 play kept on this device',
+    );
+  });
+
   it('counts refused taps as not saved', () => {
     expect(text(0, 1)).toBe('1 play not saved');
     expect(text(0, 2)).toBe('2 plays not saved');

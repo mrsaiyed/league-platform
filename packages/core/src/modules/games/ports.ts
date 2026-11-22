@@ -323,8 +323,17 @@ export type ScoringSessionsStore = {
    * the transaction stays usable to read who won.
    */
   readonly start: (session: NewScoringSession) => Promise<ScoringSession | undefined>;
-  /** Moves the lease of the game's session `sessionId` on to `heldUntil`: false if it is gone. */
-  readonly extend: (gameId: string, sessionId: string, heldUntil: number) => Promise<boolean>;
+  /**
+   * Moves the lease of the game's session `sessionId` on to `heldUntil`, in one write and
+   * only if the lease runs out before `dueBefore` (T-295): false if nothing moved, because
+   * the session is gone or its lease still runs past `dueBefore`.
+   */
+  readonly extend: (
+    gameId: string,
+    sessionId: string,
+    heldUntil: number,
+    dueBefore: number,
+  ) => Promise<boolean>;
   /**
    * Ends the game's session `sessionId`. With `lapsedBy`, only if its lease had run out
    * by then, so a session renewed a moment ago is kept. False if nothing was ended.

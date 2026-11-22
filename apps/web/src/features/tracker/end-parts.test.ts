@@ -14,6 +14,7 @@ import {
   EndAsk,
   EndOffer,
   FinalPanel,
+  LeaveAsk,
   MoreEnd,
   MoreNotStarted,
   NotStartedAsk,
@@ -379,6 +380,22 @@ describe('the Mark not started question (J5; S-40)', () => {
     });
     expect(html).toContain('role="alert" data-ask-problem=""');
     expect(words(html)).toContain('Someone else has been scoring this game on another device');
+  });
+});
+
+describe('the question before leaving with plays waiting (step 2.37, part 2)', () => {
+  const leaveOn = { stay: none, leave: none };
+  const ask = (final: boolean, waiting: number) =>
+    words(
+      renderToStaticMarkup(createElement(LeaveAsk, { t, final, waiting, to: '/b', on: leaveOn })),
+    );
+  it('says how many plays are not sent, one or many', () => {
+    expect(ask(false, 1)).toContain('1 play is not sent yet. Stay on this screen');
+    expect(ask(false, 12)).toContain('12 plays are not sent yet. Stay on this screen');
+  });
+  it('on a final game it is the result that waits, and either way leaving loses nothing', () => {
+    expect(ask(true, 3)).toContain('The result is not sent yet.');
+    expect(ask(true, 3)).toContain('If you leave, it stays on this device');
   });
 });
 

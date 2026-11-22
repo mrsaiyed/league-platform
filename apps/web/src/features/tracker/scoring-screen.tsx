@@ -174,6 +174,12 @@ const latestRows = 4;
  */
 const logPanelWhere = '(min-width: 880px) and (min-height: 760px)';
 
+/**
+ * An upright phone, in the stylesheet's own words (court.css): it has no room above the
+ * teams for a notice, so the notices are drawn in the pad at rest (step 2.37).
+ */
+const uprightPhone = '(max-width: 699px) and (orientation: portrait)';
+
 /** Whether the screen is one where `query` holds now; drawn again when that changes. */
 function useScreenIs(query: string): boolean {
   const subscribe = useCallback(
@@ -427,6 +433,20 @@ export function ScoringScreen(props: ScoringScreenProps) {
   marks.current ??= createTileMarks(markTimers, (playerId) => tileElement(root.current, playerId));
   const tileMarks = marks.current;
   useLayoutEffect(() => tileMarks.redraw());
+  // A tap the league refused takes its mark off at once, even while it still shows solid
+  // (DESIGN.md §7, line 3): it never reads as a recorded play. The last few are kept.
+  const markedTaps = useRef(new Map<string, TileMark>());
+  const refusedByLeague = props.status.notApplied;
+  useLayoutEffect(() => {
+    const marked = markedTaps.current;
+    for (const refused of refusedByLeague) {
+      marked.get(refused.command.commandId)?.refused();
+      marked.delete(refused.command.commandId);
+    }
+    for (const id of [...marked.keys()].slice(0, Math.max(marked.size - 20, 0))) {
+      marked.delete(id);
+    }
+  }, [refusedByLeague]);
   /**
    * Marks a player's tile with what was tapped, now, as taken: written straight onto the
    * element, so it is painted in this turn whatever else the screen is working on. The
@@ -781,6 +801,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
         if (keyboard) focusNext.current = { tile: tile.id };
         void tap(input).then((result) => {
           answerMarks([mark], result.ok);
+          if (result.ok) markedTaps.current.set(result.commandId, mark);
           if (!result.ok) return;
           if (action === 'turnover') {
             say(t('tracker.say.turnover', { player: name }));
@@ -1006,6 +1027,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const redoPlay = useMemo(() => redoTarget(state, rosters, t), [state, rosters, t]);
   const { waiting } = status;
   const logHasPanel = useScreenIs(logPanelWhere);
+  const noticesInPad = useScreenIs(uprightPhone);
   const rowsShown = logOpen ? undefined : logHasPanel ? panelRows : latestRows;
   const log = useMemo(
     () => playLog(state, rosters, waiting, t, rowsShown),
@@ -1103,6 +1125,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
       if (wanted.current.kind === 'leave') return;
       // The answers rest from this tap: its double is not an answer.
       resting.asked.begin(event.timeStamp);
+      // Asked from More, the question is in the pad under it: More closes, as it does for
+      // each of its other buttons, so the question is seen (step 2.37, part 2).
+      quietUntil.current = event.timeStamp + restMs;
+      setMoreOpen(false);
       setSaid(null);
       showPad({ kind: 'leave', to });
       if (event.detail === 0) focusNext.current = { selector: '[data-pad] [data-answer="no"]' };
@@ -1155,7 +1181,15 @@ export function ScoringScreen(props: ScoringScreenProps) {
       );
     }
     if (pad.kind === 'leave') {
-      return <LeaveAsk t={t} final={state.status === 'final'} to={pad.to} on={leaveAnswers} />;
+      return (
+        <LeaveAsk
+          t={t}
+          final={state.status === 'final'}
+          waiting={props.status.waiting.length}
+          to={pad.to}
+          on={leaveAnswers}
+        />
+      );
     }
     if (pad.kind === 'reopen') {
       return (
@@ -1475,6 +1509,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       clockSheet={clockSheet}
       banner={props.banner}
       notices={props.notices}
+      noticesIn={noticesInPad ? 'pad' : 'top'}
       pad={pad}
       said={said}
       moreOpen={moreOpen}

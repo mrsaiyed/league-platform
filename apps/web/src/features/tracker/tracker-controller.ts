@@ -57,8 +57,10 @@ import {
   type TrackerCommand,
 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
+import { againCommandId } from './again-command-id.ts';
 import type { CommandTransport } from './command-transport.ts';
 import type { GameDoors } from './game-doors.ts';
+import { mayEnterAgain } from './kept-plays.ts';
 import {
   QueueError,
   keptTap,
@@ -127,6 +129,11 @@ export type ControllerMode =
   | {
       readonly kind: 'held-by-other';
       readonly holder: { readonly displayName: string; readonly since: number };
+      /**
+       * This device has just reopened the game, and another holds it: the screen says
+       * the game is open again before who is scoring it (the review by use, M3).
+       */
+      readonly reopened?: true;
     }
   | { readonly kind: 'scoring' }
   | { readonly kind: 'read-only'; readonly reason: ReadOnlyReason };
@@ -161,6 +168,11 @@ export type TrackerControllerStatus = {
   readonly signedOut: boolean;
   /** True while the server's state is being reloaded after a refusal. */
   readonly reloading: boolean;
+  /**
+   * Plays have waited with no answer for `offlineLongMs` (T6 §4, step 2.37 part 2): the
+   * screen says plainly that they are only on this device. False once an answer comes.
+   */
+  readonly offlineLong: boolean;
   readonly queue: QueueStatus;
   /**
    * The server's time now, in milliseconds (T-121, finding M1). The clock is painted
@@ -183,6 +195,16 @@ export type TapResult =
   | { readonly ok: false; readonly reason: 'engine'; readonly message: string }
   /** The tap could not be stored, so it is not shown (T-114). */
   | { readonly ok: false; readonly reason: 'storage'; readonly code: QueueErrorCode };
+
+export type EnterAgainResult =
+  | TapResult
+  /** No such play on either list, or one that is not entered again (the clock, Undo…). */
+  | { readonly ok: false; readonly reason: 'not-kept' }
+  /**
+   * Entered again, but it could not be taken off its list (the storage failed): it
+   * is still listed, and entering it again once more does not record it twice.
+   */
+  | { readonly ok: false; readonly reason: 'not-taken-off' };
 
 export type TakeOverResult =
   | { readonly ok: true }
@@ -282,10 +304,15 @@ export type TrackerController = {
   /**
    * The page is shown again (`visibilitychange` to visible): the device may have slept.
    * The server's time is carried on across the sleep at once, then the session renewed
-   * and what waits sent, as `online` does, so the time is measured again. The tracker
-   * page wires it (step 2.38); this lane has no page.
+   * and what waits sent, as `online` does, so the time is measured again. The checks on
+   * the session, stopped by `hidden`, start again from that renewal (T-295).
    */
   awake(): void;
+  /**
+   * The page is hidden (`visibilitychange` to hidden): the checks on the session stop, so
+   * a tab nobody looks at asks nothing; `awake` asks at once when it is shown (T-295).
+   */
+  hidden(): void;
   /**
    * Takes back an End game tap that has not reached the server (step 2.37): on the device
    * alone, with no reason asked and with no signal. The game shown is live again, as it
@@ -315,6 +342,13 @@ export type TrackerController = {
   dismissNotApplied(only?: readonly string[]): Promise<void>;
   /** The scorekeeper has seen the taps not saved: they are dropped for good. */
   dismissNotSaved(): Promise<void>;
+  /**
+   * "Enter again" on a kept play, not saved or not applied (step 2.37, part 2; S-77):
+   * only while this device holds the game, it is made again as a new play now, by the
+   * path of `tap` (the same checks, and Undo takes it back), and leaves its list. The
+   * clock, Undo, Redo, End game and changes of players are never entered again.
+   */
+  enterAgain(commandId: string): Promise<EnterAgainResult>;
   /**
    * Leaves the game. The session is released only when nothing is waiting to send;
    * otherwise its lease runs out by itself, and the same device opening the game again
@@ -357,6 +391,18 @@ const reasonOfHalt = (halt: QueueHalt): ReadOnlyReason | 'check-session' => {
   }
 };
 
+/**
+ * How long plays wait with no answer before the screen says they are only on this
+ * device (T6 §4: "after several minutes offline"; S-77 in step 2.37, part 2).
+ */
+export const offlineLongMs = 5 * 60_000;
+
+/**
+ * How often a device showing a final game asks whether it still is, while its page is
+ * shown (T-295): another device may have reopened it and scored, or ended it again.
+ */
+export const finalCheckMs = 15_000;
+
 /** The reasons that mean another device may be scoring the game now. */
 const lostTheGame: ReadonlySet<ReadOnlyReason> = new Set([
   'taken-over',
@@ -372,8 +418,13 @@ const lostTheGame: ReadonlySet<ReadOnlyReason> = new Set([
  */
 const gameGone: ReadonlySet<ReadOnlyReason> = new Set(['game-not-live', 'unknown-game']);
 
+/**
+ * A game that is over is loaded whether or not this device had it (step 2.37, part 2):
+ * a device that did not end it shows the final panel too (the score, who won, Reopen
+ * for as long as the league allows; the review of the two doors, point 3).
+ */
 const losesTheGame = (reason: ReadOnlyReason, hadGame: boolean): boolean =>
-  lostTheGame.has(reason) || (gameGone.has(reason) && hadGame);
+  lostTheGame.has(reason) || reason === 'game-not-live' || (gameGone.has(reason) && hadGame);
 
 /** `more` added to the end of `list`, leaving out any already in it. */
 const withTaps = (list: readonly KeptTap[], more: readonly KeptTap[]): KeptTap[] => {
@@ -522,6 +573,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     lastSavedAt: null,
     signedOut: false,
     reloading: false,
+    offlineLong: false,
     queue: queue.status(),
     now: serverNow,
     clockErrorMs: null,
@@ -606,6 +658,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   const session = (request: SessionRequest) => {
     const sent = clock.now();
     return ask((signal) => server.session(request, signal)).then((outcome) => {
+      // Answered: the banner no longer says "No connection" for sends of long ago (M2).
+      if (outcome.kind !== 'unanswered') queue.heard();
       if (outcome.kind === 'answer') timeServer(sent, clock.now(), outcome.value.sentAt);
       return outcome;
     });
@@ -656,10 +710,12 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     });
   };
 
+  /** The page is hidden: the session is not checked until it is shown (T-295). */
+  let pageHidden = false;
   const scheduleRenew = (): void => {
     cancelRenew?.();
     cancelRenew = null;
-    if (stopped || sessionId === null) return;
+    if (stopped || sessionId === null || pageHidden) return;
     cancelRenew = clock.after(renewEveryMs, () => {
       cancelRenew = null;
       void track(renew());
@@ -694,6 +750,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     stopScoring();
     update({ mode: { kind: 'read-only', reason }, signedOut: false });
     if (gameWasLost || losesTheGame(reason, hadGame)) await lost();
+    // Shown final: asked about again, as another device may reopen it (T-295).
+    scheduleFinalCheck();
   };
 
   /** Signed out while scoring (finding M4): keep scoring, hold the taps, keep the session. */
@@ -793,7 +851,15 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     switch (reply.status) {
       case 'held-by-other': {
         stopScoring();
-        update({ mode: { kind: 'held-by-other', holder: reply.holder } });
+        // Still held by the same device after a reopen from here: that is still said.
+        const was = current.mode;
+        const reopened =
+          was.kind === 'held-by-other' &&
+          was.reopened === true &&
+          was.holder.displayName === reply.holder.displayName
+            ? ({ reopened: true } as const)
+            : {};
+        update({ mode: { kind: 'held-by-other', holder: reply.holder, ...reopened } });
         return lost();
       }
       case 'ended':
@@ -967,9 +1033,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     queue.resume();
   };
 
-  /** Drops the taps listed as not saved: the scorekeeper has seen them. */
-  const forgetNotSaved = async (): Promise<void> => {
-    const shown = current.notSaved;
+  /**
+   * Drops the taps listed as not saved: the scorekeeper has seen them. `only`: just
+   * these (a play entered again), the rest stay listed.
+   */
+  const forgetNotSaved = async (only?: readonly string[]): Promise<void> => {
+    const shown = current.notSaved.filter(
+      (t) => only === undefined || only.includes(t.command.commandId),
+    );
     const ids = shown.map((t) => t.command.commandId);
     // Known as dismissed before the storage is written, so a read of it already under
     // way (a loss being listed, say) cannot bring them back (finding L3).
@@ -1041,7 +1112,45 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     });
   };
 
+  // --- Several minutes offline with plays waiting (T6 §4): said once, plainly. ---
+  let offlineFrom: number | null = null;
+  let cancelOfflineLong: (() => void) | null = null;
+  /**
+   * `offlineFrom` on the wall clock. The time is counted on both clocks and the longer
+   * taken (the code review's M3): the steady clock stands still while some devices
+   * sleep, so a phone woken after ten minutes asleep has waited ten minutes, not none.
+   */
+  let offlineFromWall: number | null = null;
+  /** Says whether the plays have waited `offlineLongMs`, and looks again when they will have. */
+  const judgeOffline = (): void => {
+    cancelOfflineLong?.();
+    cancelOfflineLong = null;
+    const waited =
+      offlineFrom === null || offlineFromWall === null
+        ? null
+        : Math.max(clock.now() - offlineFrom, wallClock() - offlineFromWall);
+    const left = waited === null ? null : offlineLongMs - waited;
+    if (left !== null && left <= 0) {
+      if (!current.offlineLong) update({ offlineLong: true });
+      return;
+    }
+    if (current.offlineLong) update({ offlineLong: false });
+    if (left === null || stopped) return;
+    cancelOfflineLong = clock.after(left, () => {
+      cancelOfflineLong = null;
+      if (!stopped) judgeOffline();
+    });
+  };
+  const watchOffline = (status: QueueStatus): void => {
+    const since = status.waiting > 0 ? status.unansweredSince : null;
+    if (since === offlineFrom) return;
+    offlineFrom = since;
+    offlineFromWall = since === null ? null : wallClock() - (clock.now() - since);
+    judgeOffline();
+  };
+
   queue.subscribe((status) => {
+    watchOffline(status);
     // The time of the last save, on the server's clock (L1).
     const saved =
       status.savedAt !== null && status.savedAt !== seenSavedAt
@@ -1082,6 +1191,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       if (settling) settleAgain = true;
       else void track(settle());
     }
+    // The server has this device's End: the final game's look starts now (fix round B).
+    if (cancelFinalCheck === null && !checkingFinal && endedHere()) scheduleFinalCheck();
     if (status.halted !== null && !checkingHalt && current.mode.kind === 'scoring') {
       checkingHalt = true;
       void track(onHalt(status.halted).finally(() => (checkingHalt = false)));
@@ -1094,6 +1205,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // Waiting to ask again: ask now.
     askAgainNow();
     if (sessionId !== null) void track(renew());
+    // Shown final: is it still? Asked now, not at the next look (T-295).
+    if (looksFinal()) void track(checkFinal());
   };
 
   /** True once the queue has read what the device holds. */
@@ -1160,6 +1273,68 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     return hold(reply.sessionId);
   };
 
+  // --- A game shown final is asked about again (T-295, the review by use's H1). ---
+
+  /**
+   * Shows the game as over: read-only because the server has it decided. Another device
+   * may reopen it and score, or end it again with another score, so the device asks.
+   */
+  const showsFinal = (): boolean =>
+    current.mode.kind === 'read-only' && current.mode.reason === 'game-not-live';
+  /**
+   * This device ended the game and the server has every tap of it, End included, but
+   * the device still scores until its hold check finds the game over (fix round B):
+   * looked at like a game shown final, so a reopen elsewhere meanwhile is not missed.
+   */
+  const endedHere = (): boolean =>
+    current.mode.kind === 'scoring' &&
+    current.game?.status === 'final' &&
+    !throughDoor &&
+    queue.status().waiting === 0;
+  const looksFinal = (): boolean => showsFinal() || endedHere();
+  let cancelFinalCheck: (() => void) | null = null;
+  let checkingFinal = false;
+
+  /** The next look in `finalCheckMs`, while the game is shown final and the page is shown. */
+  const scheduleFinalCheck = (): void => {
+    cancelFinalCheck?.();
+    cancelFinalCheck = null;
+    if (stopped || pageHidden || !looksFinal()) return;
+    cancelFinalCheck = clock.after(finalCheckMs, () => {
+      cancelFinalCheck = null;
+      void track(checkFinal());
+    });
+  };
+
+  /**
+   * Reads the game as the server has it (a plain read: no session is asked for, no row
+   * is held). Still final: the score shown is the server's. Live again: the device does
+   * what opening it does, so it shows who is scoring, as a device that does not hold
+   * the game does. No answer: the screen stays and the next look asks again.
+   */
+  const checkFinal = async (): Promise<void> => {
+    if (stopped || checkingFinal || !looksFinal()) return;
+    checkingFinal = true;
+    try {
+      const loaded = await ask((signal) => server.loadState(signal));
+      if (loaded.kind !== 'answer' || stopped || !looksFinal()) return;
+      if (loaded.value.state.status === 'live') {
+        await carryOn();
+        return;
+      }
+      // Still scoring the game it ended: its own taps are shown until the hold check.
+      if (!showsFinal()) return;
+      if (base === null || loaded.value.sequence !== base.sequence) {
+        base = loaded.value;
+        made = [];
+        showGame();
+      }
+    } finally {
+      checkingFinal = false;
+      scheduleFinalCheck();
+    }
+  };
+
   /** Goes through a door: one at a time, with no tap taken meanwhile. */
   const door = async <T>(
     work: (doors: GameDoors) => Promise<T>,
@@ -1194,79 +1369,83 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
             : 'rejected',
     }) as const;
 
-  return {
+  /** A tap, recorded under `commandId` (a new ID, or a play entered again: `againCommandId`). */
+  const tapWith = (input: TapInput, commandId: string): Promise<TapResult> =>
+    serially(async (): Promise<TapResult> => {
+      const game = current.game;
+      if (current.mode.kind !== 'scoring' || game === null || base === null || throughDoor) {
+        return { ok: false, reason: 'not-scoring' };
+      }
+      const command: TrackerCommand = { commandId, at: serverNow(), input };
+      let next: basketball.GameState;
+      try {
+        next = basketball.apply(game, input, { id: command.commandId, now: command.at });
+      } catch (thrown) {
+        if (thrown instanceof basketball.TrackerError) {
+          return { ok: false, reason: 'engine', message: thrown.message };
+        }
+        throw thrown;
+      }
+      const under = sessionId;
+      // Where in the game it was made, kept beside it (finding I).
+      const moment = momentIn(game, command.at);
+      try {
+        await queue.enqueue(command, moment);
+      } catch (thrown) {
+        const code = thrown instanceof QueueError ? thrown.code : 'storage-write-failed';
+        return { ok: false, reason: 'storage', code };
+      }
+      // The game may have been lost while the tap was being stored: then it is not
+      // shown but listed as not saved and set aside, so it is never lost silently.
+      // (Read-only for a reason that keeps the waiting taps, it is kept like them.)
+      // Read afresh: it may have changed while the tap was stored.
+      const mode = modeNow();
+      const keptLikeTheRest = mode.kind === 'read-only' && !losesTheGame(mode.reason, true);
+      const isListed = () =>
+        current.notSaved.some((t) => t.command.commandId === command.commandId);
+      const moved = mode.kind !== 'scoring' || sessionId !== under;
+      if (isListed() || (moved && !keptLikeTheRest)) {
+        if (!isListed()) {
+          // It may have gone out, and been taken, before the game was lost: wait for
+          // that answer, and list it only if the storage still holds it waiting
+          // (finding L1). If the storage cannot be read, it is listed: never lost silently.
+          await queue.idle();
+          const still = await storage.list(gameId).then(
+            (list) => list.find((e) => e.command.commandId === command.commandId)?.state,
+            () => 'waiting' as const,
+          );
+          // Taken by the server: saved. Shown on the game unless the server's state it
+          // was rebuilt on already has it (the reload after the loss may have gone
+          // unanswered): the game shown is never short of a saved play.
+          if (still === undefined) {
+            const id = command.commandId.toLowerCase();
+            const inBase = base?.state.recent.some((r) => r.toLowerCase() === id) ?? false;
+            if (!inBase && !made.some((c) => c.commandId === command.commandId)) {
+              made.push(command);
+              showGame();
+            }
+            return { ok: true, commandId: command.commandId };
+          }
+          if (still === 'waiting' && !isListed()) {
+            listNotSaved(withTaps(current.notSaved, [{ command, moment }]));
+          }
+        }
+        await queue.setAside([command.commandId]).catch(() => undefined);
+        return { ok: false, reason: 'not-scoring' };
+      }
+      made.push(command);
+      update({ game: next });
+      return { ok: true, commandId: command.commandId };
+    });
+
+  const controller: TrackerController = {
     async start() {
       if (stopped) return;
       await track(begin());
     },
 
     tap(input) {
-      return serially(async (): Promise<TapResult> => {
-        const game = current.game;
-        if (current.mode.kind !== 'scoring' || game === null || base === null || throughDoor) {
-          return { ok: false, reason: 'not-scoring' };
-        }
-        const command: TrackerCommand = { commandId: newCommandId(), at: serverNow(), input };
-        let next: basketball.GameState;
-        try {
-          next = basketball.apply(game, input, { id: command.commandId, now: command.at });
-        } catch (thrown) {
-          if (thrown instanceof basketball.TrackerError) {
-            return { ok: false, reason: 'engine', message: thrown.message };
-          }
-          throw thrown;
-        }
-        const under = sessionId;
-        // Where in the game it was made, kept beside it (finding I).
-        const moment = momentIn(game, command.at);
-        try {
-          await queue.enqueue(command, moment);
-        } catch (thrown) {
-          const code = thrown instanceof QueueError ? thrown.code : 'storage-write-failed';
-          return { ok: false, reason: 'storage', code };
-        }
-        // The game may have been lost while the tap was being stored: then it is not
-        // shown but listed as not saved and set aside, so it is never lost silently.
-        // (Read-only for a reason that keeps the waiting taps, it is kept like them.)
-        // Read afresh: it may have changed while the tap was stored.
-        const mode = modeNow();
-        const keptLikeTheRest = mode.kind === 'read-only' && !losesTheGame(mode.reason, true);
-        const isListed = () =>
-          current.notSaved.some((t) => t.command.commandId === command.commandId);
-        const moved = mode.kind !== 'scoring' || sessionId !== under;
-        if (isListed() || (moved && !keptLikeTheRest)) {
-          if (!isListed()) {
-            // It may have gone out, and been taken, before the game was lost: wait for
-            // that answer, and list it only if the storage still holds it waiting
-            // (finding L1). If the storage cannot be read, it is listed: never lost silently.
-            await queue.idle();
-            const still = await storage.list(gameId).then(
-              (list) => list.find((e) => e.command.commandId === command.commandId)?.state,
-              () => 'waiting' as const,
-            );
-            // Taken by the server: saved. Shown on the game unless the server's state it
-            // was rebuilt on already has it (the reload after the loss may have gone
-            // unanswered): the game shown is never short of a saved play.
-            if (still === undefined) {
-              const id = command.commandId.toLowerCase();
-              const inBase = base?.state.recent.some((r) => r.toLowerCase() === id) ?? false;
-              if (!inBase && !made.some((c) => c.commandId === command.commandId)) {
-                made.push(command);
-                showGame();
-              }
-              return { ok: true, commandId: command.commandId };
-            }
-            if (still === 'waiting' && !isListed()) {
-              listNotSaved(withTaps(current.notSaved, [{ command, moment }]));
-            }
-          }
-          await queue.setAside([command.commandId]).catch(() => undefined);
-          return { ok: false, reason: 'not-scoring' };
-        }
-        made.push(command);
-        update({ game: next });
-        return { ok: true, commandId: command.commandId };
-      });
+      return tapWith(input, newCommandId());
     },
 
     async takeOver() {
@@ -1322,8 +1501,19 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     online: backOnline,
 
     awake() {
+      pageHidden = false;
       noticeSleep();
+      // Plays may have waited long while the device slept (M3): counted on the wall clock.
+      if (!stopped) judgeOffline();
       backOnline();
+    },
+
+    hidden() {
+      pageHidden = true;
+      cancelRenew?.();
+      cancelRenew = null;
+      cancelFinalCheck?.();
+      cancelFinalCheck = null;
     },
 
     takeBackEnd() {
@@ -1405,6 +1595,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
             }
           }
           await carryOn();
+          // Another device holds it: the screen that says so says first it is open again.
+          const mode = current.mode;
+          if (mode.kind === 'held-by-other') update({ mode: { ...mode, reopened: true } });
           return { ok: true };
         }),
       );
@@ -1441,11 +1634,49 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       await track(forgetNotSaved());
     },
 
+    async enterAgain(commandId) {
+      // Only while this device holds the game (S-77): the league's record has one writer.
+      if (current.mode.kind !== 'scoring') return { ok: false, reason: 'not-scoring' };
+      const notSaved = current.notSaved.find((t) => t.command.commandId === commandId);
+      const kept =
+        notSaved?.command ??
+        current.notApplied.find((r) => r.command.commandId === commandId)?.command;
+      if (kept === undefined || !mayEnterAgain(kept.input)) {
+        return { ok: false, reason: 'not-kept' };
+      }
+      // A new play, now, by the same path as a tap: the same checks, and Undo takes it back.
+      // Its ID comes from the kept play's, so it is recorded once however often this is
+      // tapped (review M1): one this device already holds, waiting or saved, is not
+      // entered again, and the server answers a second copy as a duplicate.
+      const againId = againCommandId(commandId);
+      const held =
+        made.some((c) => c.commandId === againId) ||
+        (base?.state.recent ?? []).some((id) => id.toLowerCase() === againId);
+      if (!held) {
+        const tapped = await tapWith(kept.input, againId);
+        if (!tapped.ok) return tapped;
+      }
+      try {
+        await track(
+          notSaved === undefined ? queue.forget([commandId]) : forgetNotSaved([commandId]),
+        );
+      } catch {
+        // Entered, and still listed: the scorekeeper is told; tapping again only tries
+        // to take it off the list once more.
+        return { ok: false, reason: 'not-taken-off' };
+      }
+      return { ok: true, commandId: againId };
+    },
+
     async leave() {
       stopped = true;
       clearTimer();
       cancelRenew?.();
       cancelRenew = null;
+      cancelOfflineLong?.();
+      cancelOfflineLong = null;
+      cancelFinalCheck?.();
+      cancelFinalCheck = null;
       const held = sessionId;
       sessionId = null;
       queue.stop();
@@ -1469,4 +1700,5 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       }
     },
   };
+  return controller;
 }

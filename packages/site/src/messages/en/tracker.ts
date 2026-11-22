@@ -179,6 +179,29 @@ export const enTracker = {
   'tracker.hint.title': 'How to score',
   'tracker.hint.turnovers':
     'Tap a team’s turnovers to see each player’s, take one back, or add a team turnover.',
+  // The "not saved" list play by play (step 2.37, part 2): a tap that is a play is said
+  // as the play log says it; these are the others.
+  'tracker.kept.colors': 'Colors swapped',
+  'tracker.kept.end': 'End game',
+  'tracker.kept.pause': 'Clock paused',
+  'tracker.kept.players': 'A change to a team’s players',
+  'tracker.kept.redo': 'Redo',
+  'tracker.kept.setClock': 'Clock set to {clock}',
+  'tracker.kept.start': 'Clock started',
+  'tracker.kept.undo': 'Undo',
+  // "Enter again" on a kept play (S-77): only while this device holds the game, a new
+  // play now; elsewhere the list is for reading out to whoever holds it.
+  'tracker.keptList.again': 'Enter again',
+  'tracker.keptList.againLabel': 'Enter again: {play}',
+  'tracker.keptList.againNotTakenOff':
+    'That play was entered again, but it could not be taken off this list. Tapping Enter again once more will not enter it twice.',
+  'tracker.keptList.againRefused':
+    'That play was not entered again: the game as it stands now does not take it. Enter it by hand if it is still needed.',
+  // Cleared only by this deliberate tap: the scorekeeper has seen the list.
+  'tracker.keptList.clear': 'I have seen these: clear the list',
+  'tracker.keptList.readAloud':
+    'Only the device scoring the game can enter these again. Read them out to whoever is scoring it now.',
+  'tracker.keptList.title': 'Not saved',
   // On the page that replaces the scoring screen when the device stops scoring (taken
   // over, signed out, no longer allowed) in the very moment a tap was made.
   'tracker.lastTapNotRecorded':
@@ -188,7 +211,10 @@ export const enTracker = {
   'tracker.leave.anyway': 'Leave anyway',
   'tracker.leave.kept':
     'If you leave, it stays on this device and is sent only when this game’s scoring screen is opened on it again.',
-  'tracker.leave.plays': 'Some plays are not sent yet. Stay on this screen until it says “Saved”.',
+  'tracker.leave.plays_one':
+    '{count} play is not sent yet. Stay on this screen until it says “Saved”.',
+  'tracker.leave.plays_other':
+    '{count} plays are not sent yet. Stay on this screen until it says “Saved”.',
   'tracker.leave.result': 'The result is not sent yet. Stay on this screen until it says “Saved”.',
   'tracker.leave.stay': 'Stay here',
   'tracker.leave.title': 'Not sent yet',
@@ -225,6 +251,9 @@ export const enTracker = {
     'You are no longer allowed to score this game. {count} play is still on this device and is not saved. If an admin gives the game back to you, open it again here and it is sent.',
   'tracker.notAllowedKept_other':
     'You are no longer allowed to score this game. {count} plays are still on this device and are not saved. If an admin gives the game back to you, open it again here and they are sent.',
+  // The plays the league refused, play by play, cleared only by a tap (step 2.37, part 2).
+  'tracker.notAppliedList.clear': 'I have seen these: clear the list',
+  'tracker.notAppliedList.title': 'Not applied',
   'tracker.notApplied_one': '{count} play was not applied. The game now shows what was saved.',
   'tracker.notApplied_other': '{count} plays were not applied. The game now shows what was saved.',
   'tracker.notAssigned':
@@ -238,6 +267,11 @@ export const enTracker = {
     '{count} play on this device was not saved. Enter it again if it is needed.',
   'tracker.notSaved_other':
     '{count} plays on this device were not saved. Enter them again if they are needed.',
+  // Several minutes with no connection and plays waiting (T6 §4, step 2.37 part 2).
+  'tracker.offlineLong_one':
+    'No connection for several minutes. {count} play is only on this device until the connection comes back. Keep this page open and the device switched on: it is sent by itself.',
+  'tracker.offlineLong_other':
+    'No connection for several minutes. {count} plays are only on this device until the connection comes back. Keep this page open and the device switched on: they are sent by themselves.',
   'tracker.openAgain': 'Open the game again',
   'tracker.opening': 'Opening the game…',
   'tracker.openingSlow': 'No answer yet. Check the connection; this keeps trying.',
@@ -326,6 +360,12 @@ export const enTracker = {
   // The tracker's saved banner (T6 §4), chosen from the queue's status by
   // apps/web/src/features/tracker/queue-banner.ts.
   'tracker.queue.allSaved': 'All saved',
+  // Signed out or no longer allowed to score (step 2.37, part 2): nothing is on its way,
+  // so the plays are kept, never "waiting to send".
+  'tracker.queue.keptShort_one': '{count} kept',
+  'tracker.queue.keptShort_other': '{count} kept',
+  'tracker.queue.kept_one': '{count} play kept on this device',
+  'tracker.queue.kept_other': '{count} plays kept on this device',
   'tracker.queue.notSavedShort_one': '{count} not saved',
   'tracker.queue.notSavedShort_other': '{count} not saved',
   'tracker.queue.notSaved_one': '{count} play not saved',
