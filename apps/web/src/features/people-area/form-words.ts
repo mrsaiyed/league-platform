@@ -15,6 +15,7 @@ export function personFormWords(submit: string): PersonFormWords {
     birthDateHelp: t('adminPeople.field.birthDateHelp'),
     child: t('adminPeople.field.child'),
     childHelp: t('adminPeople.field.childHelp'),
+    checkMarked: t('adminPeople.refused.marked'),
     childChoices: {
       '': t('adminPeople.field.child.unknown'),
       child: t('adminPeople.field.child.child'),

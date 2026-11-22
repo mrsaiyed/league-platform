@@ -149,7 +149,10 @@ export async function searchPeopleAction(form: FormData): Promise<void> {
   const fields = typedOf(form);
   const { context, list, searched } = await peopleOf(fields);
   // A curly apostrophe (as a phone types "o’neill") is a plain one, as core's search reads it.
-  const typed = (fields['q'] ?? '').trim().slice(0, 100).replace(/[\u2018\u2019]/g, "'");
+  const typed = (fields['q'] ?? '')
+    .trim()
+    .slice(0, 100)
+    .replace(/[\u2018\u2019]/g, "'");
   if (typed.includes('@')) {
     leaveNotice(context, 'people', '', 'email-not-searched');
     redirect(list);

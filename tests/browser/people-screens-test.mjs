@@ -232,6 +232,15 @@ if (built) {
       'and the last name typed is kept',
       (await details.getByLabel('Last name').inputValue()) === 'Smith',
     );
+    note(
+      'the refusal is also said beside the button, where the person tapped',
+      (await details.locator('[data-check-marked]').isVisible()) &&
+        (await details.locator('[data-check-marked]').innerText()).startsWith('Not saved.'),
+    );
+    note(
+      'and no old "Saved" is left above the refusal',
+      (await details.getByText('Saved:', { exact: false }).count()) === 0,
+    );
     await accessible('a save refused beside its box');
     await details.getByLabel('First name').fill('Jon');
     await details.getByRole('button', { name: 'Save details' }).click();

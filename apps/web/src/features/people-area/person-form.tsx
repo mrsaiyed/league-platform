@@ -15,6 +15,7 @@
 // tells what is wrong, in words beside the box, with scripts on or off.
 import { useActionState, useId } from 'react';
 import { untouched, type FormState } from '../games-area/form-state.ts';
+import { SavedLine } from '../games-area/saved-line.tsx';
 import { useOneSubmit } from '../games-area/use-one-submit.ts';
 import type { PrivateDetails } from './people-view.ts';
 import { changedBox, wasField, type PersonBox } from './person-input.ts';
@@ -36,6 +37,8 @@ export type PersonFormWords = {
   readonly submit: string;
   /** The tick under an unlikely date of birth shown back before saving (R-28). */
   readonly birthDateChecked: string;
+  /** Beside the button when a box is marked: the sentence is up there, by the box. */
+  readonly checkMarked: string;
   /** Beside a box this person changed that someone saved meanwhile: holds `{value}`. */
   readonly meanwhile: string;
   /** The same, when someone emptied the box meanwhile. */
@@ -51,6 +54,7 @@ export function PersonForm({
   today,
   words,
   childNote,
+  saved,
   main = false,
 }: {
   readonly action: (state: FormState, form: FormData) => Promise<FormState>;
@@ -69,6 +73,8 @@ export function PersonForm({
    * adult but they are marked as a child, who is then treated as a child (R-28).
    */
   readonly childNote?: string | undefined;
+  /** "Saved: …" from the last save, said once; it goes as soon as the form is sent again. */
+  readonly saved?: string | undefined;
   /** The page's one filled button (DESIGN.md line 22); else outlined. */
   readonly main?: boolean;
 }) {
@@ -112,6 +118,9 @@ export function PersonForm({
   };
   const wrong = (name: PersonBox) => refused?.wrong.includes(name) === true;
   const general = refused !== undefined && refused.wrong.length === 0;
+  // A refusal about a box is also said beside the button, where the person is looking
+  // when they tap it at the foot of the form; the box's own sentence is beside the box.
+  const marked = refused !== undefined && refused.wrong.length > 0;
   const box = (name: PersonBox, help?: string) => {
     const errorId = `${id}-${name}-error`;
     const helpId = `${id}-${name}-help`;
@@ -162,6 +171,7 @@ export function PersonForm({
   const generalId = `${id}-refused`;
   return (
     <form action={dispatch} onSubmit={onSubmit} className="staff-form" noValidate key={drawn}>
+      {saved === undefined || pending || refused !== undefined ? null : <SavedLine text={saved} />}
       {Object.entries(hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
@@ -252,12 +262,17 @@ export function PersonForm({
           {refused.said}
         </p>
       ) : null}
+      {marked ? (
+        <p id={generalId} className="ui-field-error" role="alert" data-check-marked="true">
+          {words.checkMarked}
+        </p>
+      ) : null}
       <p className="staff-buttons">
         <button
           type="submit"
           className="ui-button"
           {...(main ? { 'data-kind': 'main' } : {})}
-          {...(general ? { 'aria-describedby': generalId } : {})}
+          {...(general || marked ? { 'aria-describedby': generalId } : {})}
         >
           {words.submit}
         </button>

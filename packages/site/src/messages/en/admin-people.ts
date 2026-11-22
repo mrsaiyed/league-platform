@@ -47,6 +47,7 @@ export const enAdminPeople = {
   'adminPeople.readFailed':
     'The league list could not be read just now. Reload the page to try again.',
   'adminPeople.refused': 'Not saved. {problem}',
+  'adminPeople.refused.marked': 'Not saved. Check the box marked above: it says what to change.',
   'adminPeople.remove.body':
     'They come off the league list. Someone who never played on a team is deleted for good after 30 days. Someone who has played stays in the league’s bin, and the games they played keep their numbers.',
   'adminPeople.remove.confirm': 'Yes, I am sure',

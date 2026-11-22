@@ -22,7 +22,6 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
-import { SavedLine } from '../games-area/saved-line.tsx';
 import { StaffTrail } from '../staff/index.ts';
 import { removePersonAction, savePersonAction } from './actions.ts';
 import { childDisagreement } from './age-on-record.ts';
@@ -79,7 +78,6 @@ export async function PersonPage({
 
       <section id={detailsAnchor} className="staff-panel admin-team-part">
         <h2>{t('adminPeople.details.title')}</h2>
-        {said === undefined ? null : <SavedLine text={said} />}
         <PersonForm
           action={savePersonAction}
           permalink={`${pageUrl}#${detailsAnchor}`}
@@ -92,6 +90,7 @@ export async function PersonPage({
           values={{ firstName: person.firstName, lastName: person.lastName }}
           privateDetails={person.private}
           childNote={childNoteOf(person.private, leagueToday)}
+          saved={said}
           today={leagueToday}
           words={personFormWords(t('adminPeople.save.submit'))}
           main
