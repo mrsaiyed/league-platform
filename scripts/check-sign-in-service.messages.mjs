@@ -11,8 +11,9 @@ export const usage = [
   '',
   'node scripts/check-sign-in-service.mjs --hosted',
   '',
-  'At a terminal only, with SUPABASE_URL (the project’s https address) and',
-  'SUPABASE_SECRET_KEY (its secret key) in the environment for this one command. It',
+  'At a terminal only, with SUPABASE_URL (exactly https://<project reference>.supabase.co)',
+  'and SUPABASE_SECRET_KEY (its secret key) in the environment for this one command.',
+  'Without --hosted it takes only a stand-in on this computer (http://127.0.0.1:<port>). It',
   'refuses the tracker’s project, like the website. It makes one made-up user, with an',
   'address ending .test, and removes it at the end, even when a check differs or Ctrl+C',
   'stops it. It prints no address, key, token, code or password.',
@@ -26,11 +27,8 @@ export const needsTerminal =
   'It runs only at a terminal, with a person watching: nothing was asked, nothing was made.';
 export const settingMissing = (name) => `${name} is not set for this command.`;
 export const keyTooShort = 'SUPABASE_SECRET_KEY is too short to be a secret key.';
-export const notAnAddress = 'SUPABASE_URL is not an address.';
-export const mustBeHttps =
-  'SUPABASE_URL must use https (plain http only for a service on this computer).';
-export const projectAddressOnly =
-  'SUPABASE_URL must be the project’s address alone: no path, login, query or fragment.';
+export const hostedAddressForm =
+  'With --hosted, SUPABASE_URL must be exactly https://<the project’s 20-character reference>.supabase.co: no other host, and nothing after it (no path, port, login or query).';
 export const nothingAsked = 'Nothing was asked of any service.';
 
 export const title = 'The sign-in service check (step 2.206, record 018)';

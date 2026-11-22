@@ -22,7 +22,6 @@ import { randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { parseArgs } from 'node:util';
 import {
-  checkProjectUrl,
   emailConfirmationOf,
   platformServiceProblem,
   signInDefaults,
@@ -59,11 +58,15 @@ export function settingsFor({ argv, env, terminal, trackerProject }) {
     return { problems: words.usage, exitCode: 2 };
   }
   if (values.help) return { problems: words.usage, exitCode: 0 };
-  if (!values.hosted) return { problems: [words.hostedNeeded, '', ...words.usage], exitCode: 2 };
+  const projectUrl = given(env[urlSetting]);
+  // Without --hosted, only the stand-in on this computer, as the tests serve it.
+  const standIn = projectUrl !== undefined && standInAddress(projectUrl);
+  if (!values.hosted && !standIn) {
+    return { problems: [words.hostedNeeded, '', ...words.usage], exitCode: 2 };
+  }
   if (!terminal) return { problems: [words.needsTerminal], exitCode: 2 };
 
   const problems = [];
-  const projectUrl = given(env[urlSetting]);
   const secretKey = given(env[keySetting]);
   if (projectUrl === undefined) problems.push(words.settingMissing(urlSetting));
   if (secretKey === undefined) problems.push(words.settingMissing(keySetting));
@@ -73,34 +76,24 @@ export function settingsFor({ argv, env, terminal, trackerProject }) {
   const facts = { env, appEnv: undefined, hosted: true, trackerProject };
   const fileProblem = trackerProjectProblem([urlSetting], facts);
   if (fileProblem !== undefined) problems.push(fileProblem);
-  let local = false;
   if (projectUrl !== undefined) {
     const guarded = platformServiceProblem(urlSetting, projectUrl, facts);
     if (guarded !== undefined) problems.push(guarded);
-    else {
-      const addressProblem = projectUrlProblem(projectUrl);
-      if (addressProblem !== undefined) problems.push(addressProblem);
-      else local = new URL(projectUrl).protocol === 'http:';
-    }
+    // The secret key goes as a bearer to this address: with --hosted, a project's own only.
+    else if (values.hosted && !hostedAddress(projectUrl)) problems.push(words.hostedAddressForm);
   }
   if (problems.length > 0) return { problems: [...problems, words.nothingAsked], exitCode: 2 };
-  return { settings: { projectUrl, secretKey, local } };
+  return { settings: { projectUrl, secretKey, local: !values.hosted } };
 }
 
-/** The adapter's own address check (https, or http to this computer), and nothing riding along. */
-function projectUrlProblem(projectUrl) {
-  if (!URL.canParse(projectUrl)) return words.notAnAddress;
-  try {
-    checkProjectUrl(projectUrl, true);
-  } catch {
-    return words.mustBeHttps;
-  }
-  const url = new URL(projectUrl);
-  if (url.pathname !== '/' || url.search || url.hash || url.username || url.password) {
-    return words.projectAddressOnly;
-  }
-  return undefined;
-}
+/**
+ * With --hosted, the one address taken: a Supabase project's own,
+ * https://<its 20-character reference>.supabase.co, exactly, with nothing after it (no
+ * path, port, login, query or fragment), so the key can go to no other host.
+ */
+const hostedAddress = (text) => /^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(text);
+/** Without --hosted, the stand-in on this computer only: plain http to 127.0.0.1 and a port. */
+const standInAddress = (text) => /^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(text);
 
 /** A check's answer differed from what our code expects: `detail` says how, in safe words. */
 class Differed extends Error {

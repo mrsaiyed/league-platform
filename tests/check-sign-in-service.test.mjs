@@ -421,7 +421,7 @@ test('the person’s checks name the dashboard switches, the limits per network 
 
 const ref = 'abcdefghijklmnopqrst';
 const ready = {
-  SUPABASE_URL: 'https://made-up-test-copy.supabase.example.test',
+  SUPABASE_URL: 'https://madeuptestcopyrefabc.supabase.co',
   SUPABASE_SECRET_KEY: secretKey,
 };
 const choose = (overrides = {}) =>
@@ -482,25 +482,62 @@ test('it refuses the tracker’s project by the website’s own guard, and an un
   }
 });
 
-test('it needs both settings, a key of some length, and https unless on this computer', () => {
+test('it needs both settings, a key of some length, and with --hosted a project’s own address exactly', () => {
+  const lookAlikes = [
+    'not an address',
+    // The reviewer's three: any host, an IP address, a misspelling of the service's name.
+    'https://example.test',
+    'https://10.1.2.3',
+    'https://madeuptestcopyrefabc.supabsae.co',
+    // Look-alike hosts.
+    'https://madeuptestcopyrefabc.supabase.co.example.test',
+    'https://madeuptestcopyrefabc.supabase.com',
+    'https://madeuptestcopy.supabase.co',
+    'http://madeuptestcopyrefabc.supabase.co',
+    // Anything after the address.
+    `${ready.SUPABASE_URL}/auth/v1`,
+    `${ready.SUPABASE_URL}/`,
+    `${ready.SUPABASE_URL}:8443`,
+    `${ready.SUPABASE_URL}/?x=1`,
+    'https://someone@madeuptestcopyrefabc.supabase.co',
+    // The stand-in on this computer is for runs without --hosted only.
+    'http://127.0.0.1:54321',
+  ];
   const cases = [
     [{ SUPABASE_SECRET_KEY: secretKey }, words.settingMissing('SUPABASE_URL')],
     [{ SUPABASE_URL: ready.SUPABASE_URL }, words.settingMissing('SUPABASE_SECRET_KEY')],
     [{ ...ready, SUPABASE_SECRET_KEY: 'short' }, words.keyTooShort],
-    [{ ...ready, SUPABASE_URL: 'not an address' }, words.notAnAddress],
-    [{ ...ready, SUPABASE_URL: 'http://made-up.supabase.example.test' }, words.mustBeHttps],
-    [{ ...ready, SUPABASE_URL: `${ready.SUPABASE_URL}/auth/v1` }, words.projectAddressOnly],
-    [{ ...ready, SUPABASE_URL: `${ready.SUPABASE_URL}/?x=1` }, words.projectAddressOnly],
+    ...lookAlikes.map((address) => [{ ...ready, SUPABASE_URL: address }, words.hostedAddressForm]),
   ];
   for (const [env, problem] of cases) {
     const result = choose({ env });
-    assert.equal(result.exitCode, 2, problem);
+    assert.equal(result.exitCode, 2, `${problem} for ${env.SUPABASE_URL}`);
     assert.ok(result.problems.includes(problem), `${problem} in ${result.problems.join(' | ')}`);
-    for (const text of result.problems) assert.ok(!text.includes(secretKey), text);
+    for (const text of result.problems) {
+      assert.ok(!text.includes(secretKey), text);
+      // What was typed is never repeated.
+      if (env.SUPABASE_URL !== undefined) assert.ok(!text.includes(env.SUPABASE_URL), text);
+    }
   }
-  assert.deepEqual(choose({ env: { ...ready, SUPABASE_URL: 'http://127.0.0.1:54321' } }), {
-    settings: { projectUrl: 'http://127.0.0.1:54321', secretKey, local: true },
-  });
+  // The good form, and the stand-in without --hosted.
+  assert.deepEqual(choose().settings, { projectUrl: ready.SUPABASE_URL, secretKey, local: false });
+  assert.deepEqual(
+    choose({ argv: [], env: { ...ready, SUPABASE_URL: 'http://127.0.0.1:54321' } }),
+    {
+      settings: { projectUrl: 'http://127.0.0.1:54321', secretKey, local: true },
+    },
+  );
+  // Without --hosted, nothing but the stand-in is taken.
+  for (const address of [
+    ready.SUPABASE_URL,
+    'https://example.test',
+    'http://localhost:54321',
+    'http://127.0.0.1:54321/auth/v1',
+  ]) {
+    const result = choose({ argv: [], env: { ...ready, SUPABASE_URL: address } });
+    assert.equal(result.exitCode, 2, address);
+    assert.equal(result.problems[0], words.hostedNeeded);
+  }
 });
 
 test('the command itself, not at a terminal, refuses and asks nothing of the service', async () => {
