@@ -11,10 +11,14 @@
 // team's box of the scoreboard, and the pad at rest begins with the large Start clock
 // button.
 //
-// The places left for the steps that follow (their content is handed in as `slots`):
-// Undo and Redo beside the clock's controls (2.37), the play log (2.37), the pad at rest
-// (on a phone 2.37's latest plays), the Players panel's buttons (2.118) and the
-// once-a-game buttons behind More (2.37, 2.118, 2.119).
+// Step 2.37 filled three of the places this frame left (plays-parts.tsx, handed in as
+// `slots` by scoring-screen.tsx): Undo and Redo after the clock's controls, the latest
+// play's line in the pad at rest, and the play log's own panel; the whole log opens over
+// the screen as More does; and, for ending a game (end-parts.tsx): End game behind More
+// and in the pad's first line when it is offered, and the pad's own panels (the question,
+// the final panel, Reopen and Mark not started). The places still left for the steps
+// that follow: the Players panel's buttons (2.118) and the once-a-game buttons behind
+// More (2.118, 2.119).
 import type { Translate } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
 import {
@@ -56,6 +60,19 @@ export type CourtSlots = {
   readonly playLog?: ReactNode;
   /** The pad while nobody is picked, under the Start clock button: the latest plays (2.37). */
   readonly padRest?: ReactNode;
+  /**
+   * In place of the pad's first line at rest (the Start clock button, or at 0:00 the way
+   * to the next period): End game, when the last period has run out with a team ahead
+   * (2.37). Null or left out: the clock's own first line.
+   */
+  readonly padStart?: ReactNode;
+  /**
+   * What the pad holds while it asks about ending the game or shows it final (2.37): the
+   * End game question, the final panel, the Reopen and Mark not started questions.
+   */
+  readonly padPanel?: ReactNode;
+  /** Behind More, before everything else: End game (2.37). */
+  readonly moreStart?: ReactNode;
   /** Beside a team's name, before its own chips. */
   readonly teamHead?: (side: Side) => ReactNode;
   /** In place of the floor of a team with no players: "Add players" (2.118). */
@@ -181,10 +198,25 @@ export function CourtView(props: CourtViewProps) {
       onClick={props.drag?.onClick}
     >
       <header className="court-top">
-        <h1 className="court-title">
-          <span className="court-title-teams">{props.title}</span>
-          {props.when === null ? null : <span className="court-title-when">{props.when}</span>}
-        </h1>
+        {/* The title and the saved line are one place on an upright phone, where the
+            first row is 44 high and never grows (step 2.37): the saved line is always
+            whole, and the title gives way to it when it has much to say. Elsewhere each
+            has its own place in the header (the stylesheet says which). */}
+        <div className="court-top-start">
+          <h1 className="court-title">
+            <span className="court-title-teams">{props.title}</span>
+            {props.when === null ? null : <span className="court-title-when">{props.when}</span>}
+          </h1>
+          <p
+            className="court-banner"
+            role="status"
+            aria-live="polite"
+            data-saved-banner=""
+            data-state={props.banner.state}
+          >
+            <SavedWords t={t} banner={props.banner} />
+          </p>
+        </div>
         <div className="court-top-end">
           {props.account === undefined || props.account === null ? null : (
             <div className="court-account">{props.account}</div>
@@ -212,15 +244,6 @@ export function CourtView(props: CourtViewProps) {
           />
           <Score t={t} team={view.teams.away} />
         </div>
-        <p
-          className="court-banner"
-          role="status"
-          aria-live="polite"
-          data-saved-banner=""
-          data-state={props.banner.state}
-        >
-          <SavedWords t={t} banner={props.banner} />
-        </p>
         {props.notices === undefined || props.notices === null ? null : (
           <div className="court-notices">{props.notices}</div>
         )}
@@ -270,20 +293,31 @@ export function CourtView(props: CourtViewProps) {
 /**
  * What the saved banner says. Where its short form says the same ("All saved") there is
  * one form; otherwise both are drawn and the stylesheet shows one: the long one, or, on a
- * phone whose scoreboard has no room for it, the short one (a line for each thing it
+ * phone whose first row has no room for it, the short one (a line for each thing it
  * says where the banner is a narrow column, joined as the long one is where it is a row).
+ *
+ * In the short form the mark between two things (" · ") is held with the thing before
+ * it, and a line may break only after it: so a line never begins with the dot, and no
+ * thing is broken in two (step 2.37).
  */
 function SavedWords({ t, banner }: { readonly t: Translate; readonly banner: CourtBanner }) {
   const separator = t('tracker.queue.separator');
   if (banner.short.join(separator) === banner.text) return banner.text;
+  const mark = separator.trimEnd();
+  const space = separator.slice(mark.length);
   return (
     <>
       <span className="court-banner-long">{banner.text}</span>
       <span className="court-banner-short">
         {banner.short.map((line, index) => (
           <Fragment key={line}>
-            {index === 0 ? null : <span className="court-banner-dot">{separator}</span>}
-            <span className="court-banner-line">{line}</span>
+            {index === 0 ? null : space}
+            <span className="court-banner-line">
+              {line}
+              {index === banner.short.length - 1 ? null : (
+                <span className="court-banner-dot">{mark}</span>
+              )}
+            </span>
           </Fragment>
         ))}
       </span>
@@ -557,9 +591,17 @@ function TileButton({ t, tile, open, picking = false, onTap }: TileProps) {
 function Pad(props: CourtViewProps) {
   const { t, view, pad, slots = {} } = props;
   const tile = pad.kind === 'player' ? findTile(view, pad.playerId) : undefined;
+  // The End game question, the final panel and the questions after it (step 2.37).
+  const panel =
+    pad.kind === 'end' ||
+    pad.kind === 'final' ||
+    pad.kind === 'reopen' ||
+    pad.kind === 'not-started' ||
+    pad.kind === 'leave';
   // Nobody picked and nothing open: a player no longer shown leaves the pad at rest too.
   const atRest =
     tile === undefined &&
+    !panel &&
     pad.kind !== 'turnovers' &&
     pad.kind !== 'bench' &&
     pad.kind !== 'timeouts';
@@ -586,7 +628,9 @@ function Pad(props: CourtViewProps) {
       {/* At rest the pad begins with the large Start clock button (step 2.36), before
           anything said: so it lies in the band where a picked player's name is shown,
           whatever else the pad holds, and never where +2, Foul or a substitute lie. */}
-      {atRest ? <StartBar t={t} view={view} clock={props.clock} on={props.on} /> : null}
+      {atRest
+        ? (slots.padStart ?? <StartBar t={t} view={view} clock={props.clock} on={props.on} />)
+        : null}
       {/* Always in the page, so a screen reader hears what is said the moment it is. */}
       <p className="court-say" role="status" aria-live="polite" data-say="">
         {props.said === null || typeof props.said === 'string' ? (
@@ -608,6 +652,7 @@ function Pad(props: CourtViewProps) {
       {pad.kind === 'timeouts' ? (
         <TimeoutsPad t={t} view={view} asking={pad.asking} on={props.on} />
       ) : null}
+      {panel ? slots.padPanel : null}
       {atRest ? (
         <div className="court-rest" data-rest="">
           <div className="court-slot-rest" data-slot="pad-rest">
@@ -990,6 +1035,7 @@ function More(props: CourtViewProps) {
           </button>
         </div>
         <div className="court-sheet-items">
+          {slots.moreStart}
           <div className="court-sheet-item">
             <button
               type="button"

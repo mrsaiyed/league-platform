@@ -13,7 +13,7 @@ import type {
   TeamRecord,
   TeamsStore,
 } from '@srleagues/core';
-import { dayIn } from './stand-in-world-clock.ts';
+import { dayIn, minorAt } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { uniqueJerseysOf } from './stand-in-world-games.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
@@ -79,6 +79,26 @@ export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
       }
       s.teams = replacedAt(s.teams, at, { ...found, binned, version: found.version + 1 });
       return true;
+    },
+    // As queries/find-team-games.ts and the season's draft (A-17).
+    games: async (teamId, seasonId) => {
+      const mine = s.games
+        .filter((g) => !g.binned && (g.homeTeamId === teamId || g.awayTeamId === teamId))
+        .sort(
+          (a, b) =>
+            (a.startsAt ?? '9999').localeCompare(b.startsAt ?? '9999') || a.id.localeCompare(b.id),
+        );
+      return {
+        played: mine.filter((g) => g.status === 'final' || g.status === 'forfeit').length,
+        toPlay: mine
+          .filter((g) => ['scheduled', 'postponed', 'live'].includes(g.status))
+          .map((g) => ({
+            id: g.id,
+            date: g.localDate,
+            round: s.rounds.find((r) => r.id === g.roundId)?.number ?? null,
+          })),
+        draftChanges: s.drafts.find((d) => d.seasonId === seasonId)?.changes ?? null,
+      };
     },
     findPerson: async (id) => {
       const p = s.people.find((x) => x.id === id);
@@ -178,7 +198,8 @@ const shown = (p: WorldPerson, sensitive: boolean): PersonRecord => {
   return sensitive ? { ...plain, sensitive: kept } : plain;
 };
 
-export function worldPeopleStore(s: LeagueWorld): PeopleStore {
+/** The people store over one league's world; `now` is the world's one clock (stand-in-world.ts). */
+export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
   return {
     find: async (id, sensitive) => {
       const p = s.people.find((x) => x.id === id);
@@ -254,6 +275,11 @@ export function worldPeopleStore(s: LeagueWorld): PeopleStore {
           s.teams.some((t) => t.id === r.teamId && !t.binned),
       ),
     leagueAudience: async () => s.audience,
+    // R-28 on the league's own today, by the world's one clock (find-person-is-minor.ts).
+    isMinor: async (personId) => {
+      const p = s.people.find((x) => x.id === personId);
+      return p === undefined ? true : minorAt(p, s.timeZone, now());
+    },
     leagueSettingRows: async (key) =>
       s.settings
         .filter((r) => r.key === key && r.place.level === 'league')

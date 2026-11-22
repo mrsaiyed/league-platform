@@ -29,6 +29,14 @@ describe('listPeople', () => {
     expect(result.ok && result.value[0]?.sensitive?.birthDate).toBe('2011-04-05');
   });
 
+  it('reads no private field for a screen that shows names only, even for the owner', async () => {
+    const { db, deps, as } = setUp();
+    const result = await listPeople(as(ownerId), { privateFields: false }, deps);
+    expect(result.ok && result.value.map((p) => p.lastName)).toEqual(['Adams', 'Baker']);
+    expect(result.ok && result.value.some((p) => 'sensitive' in p)).toBe(false);
+    expect(db.state.sensitiveReads).toBe(0);
+  });
+
   it('searches names and the public name in any capitals, and pages', async () => {
     const { deps, as } = setUp();
     const names = async (input: object) => {

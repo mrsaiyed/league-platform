@@ -12,6 +12,18 @@ export const enSite = {
   'display.cancelled': 'Cancelled',
   'display.filters': 'Choose what to show',
   'display.final': 'Final',
+  // What a screen reader is told in place of the pill's letters, "Final, OT" (step 2.200).
+  // For translators: as display.finalOvertime below, "_one" has no {count}.
+  'display.finalOvertimeSaid_one': 'Final after overtime',
+  'display.finalOvertimeSaid_other': 'Final after {count} overtimes',
+  // A final game's pill when it went to overtime (step 2.200, P7 §5.6): one overtime, or
+  // {count} of them. A game ended in regulation says "Final" alone.
+  // For translators: the form is picked by the language's plural rule, and "_one" has no
+  // {count}. In a language whose "one" form also covers other numbers (21, 31...), that
+  // count would be lost: write {count} into the "one" form there, or ask for an exact form
+  // for 1.
+  'display.finalOvertime_one': 'Final, OT',
+  'display.finalOvertime_other': 'Final, {count}OT',
   'display.forfeit': 'Forfeit',
   'display.home': 'Home',
   'display.jersey': 'Number',
@@ -168,33 +180,67 @@ export const enSite = {
   'standings.empty': 'The standings appear here once games have been played.',
   'standings.heading': 'The standings.',
   'standings.lead': 'Where every team stands after each game.',
+  // The one note under the table for each group of teams level with each other (step
+  // 2.195), marked beside each of them, so every word of it is true of each. Two teams: what
+  // they are level on, then what put the first ahead, with its numbers. Three or more: what
+  // they are level on and the season's tiebreakers, never which one placed which team.
+  'standings.level.by.coin-flip': 'A coin flip puts {team} ahead.',
+  'standings.level.by.fewest-points-allowed':
+    'Fewer points allowed puts {team} ahead: {ahead} against {behind}.',
+  'standings.level.by.head-to-head_one': 'The game between them puts {team} ahead.',
+  'standings.level.by.head-to-head_other': 'The games between them put {team} ahead.',
+  'standings.level.by.point-difference':
+    'Point difference puts {team} ahead: {ahead} against {behind}.',
+  'standings.level.by.points-scored': 'Points scored puts {team} ahead: {ahead} against {behind}.',
+  // Beside a team level with others only because it has no games yet (0 counts as 0).
+  'standings.level.notPlayed': '{teams} have not played yet.',
+  'standings.level.points': '{teams} are level on points ({value}).',
+  'standings.level.sentenceJoin': ' ',
+  'standings.level.stillLevel':
+    '{teams} are still level after all of them, so they are shown in a fixed order.',
+  'standings.level.tiebreakerJoin': ', then ',
+  'standings.level.tiebreakers': 'The season’s tiebreakers set their order: {tiebreakers}.',
+  'standings.level.tiebreakersPartly':
+    'The season’s tiebreakers set their order as far as they can: {tiebreakers}.',
+  'standings.level.winPercentage': '{teams} are level on win percentage ({value}).',
   'standings.noSeason': 'There is no season to show yet.',
-  'standings.order.coin-flip': 'Placed above the teams level with it by a coin flip.',
-  'standings.order.fewest-points-allowed':
-    'Placed above the teams level with it by fewest points allowed.',
-  'standings.order.head-to-head':
-    'Placed above the teams level with it by the games they played against each other.',
-  'standings.order.point-difference':
-    'Placed above the teams level with it by the difference between points scored and allowed.',
-  'standings.order.points-scored': 'Placed above the teams level with it by points scored.',
+  // Teams that nothing in the rules separates: true of each of them, however many.
   'standings.order.still-tied':
     'Level with another team: nothing in the rules separates them yet, so they are shown in a fixed order.',
   // What follows the tables on the standings page: the latest decided games, as scoreboards.
+  // A team in the bin with results (A-17): its row stays, unlinked, with this note.
+  'standings.removedTeam':
+    'No longer in the league. Its results stay in the table, as they are part of other teams’ records.',
   'standings.results': 'Latest results',
   'standings.results.kicker': 'How they got here',
   'standings.streak.lost': 'L{length}',
   'standings.streak.tied': 'T{length}',
   'standings.streak.won': 'W{length}',
+  // The season's tiebreakers by name, as a note lists them (P7 §1).
+  'standings.tiebreaker.coin-flip': 'a coin flip',
+  'standings.tiebreaker.fewest-points-allowed': 'fewest points allowed',
+  'standings.tiebreaker.head-to-head': 'head-to-head',
+  'standings.tiebreaker.point-difference': 'point difference',
+  'standings.tiebreaker.points-scored': 'points scored',
   // The standings and statistics pages (step 2.43).
   'standings.title': 'Standings',
   'stats.allPlayers': 'All players',
+  // Said above both tables only where some statistic shown was kept in fewer games than
+  // the GP beside it (P7 §5.2; the review of step 2.195).
+  'stats.averagedOverOwnGames':
+    'A statistic not recorded in every game is averaged over the games where it was.',
   'stats.by.average': 'Per game',
   'stats.by.total': 'Season totals',
   'stats.col.games': 'GP',
   'stats.col.gamesFull': 'Games played',
   'stats.col.player': 'Player',
   'stats.col.team': 'Team',
+  // The teams' table: how many games a team's numbers come from (P7 §8; step 2.195).
+  'stats.col.teamGamesFull': 'Games with statistics',
   'stats.col.value': 'Value',
+  // Said with the tables: the statistics may count fewer games than the standings (P7 §8).
+  'stats.countsGames':
+    'Statistics count the games that were scored live or entered as a box score. A game with only a final score counts in the standings, not here.',
   'stats.empty': 'Statistics appear here once games have been played.',
   'stats.heading': 'By the numbers.',
   'stats.inAll': 'this season',
@@ -218,7 +264,12 @@ export const enSite = {
   'stats.minimumGames_other': 'A player needs at least {count} games to be ranked.',
   'stats.noSeason': 'There is no season to show yet.',
   'stats.notRankedYet': 'not ranked yet',
+  // Between two sentences of one note under a title.
+  'stats.noteJoin': ' ',
   'stats.showBy': 'Show',
+  // With the tables, when a team's total is not its players' numbers added up (step 2.196).
+  'stats.teamTotalsCountTeam':
+    "A team's totals count what was charged to the team and the final scores as entered, so they can differ from what its players' numbers add up to.",
   'stats.teams': 'Teams',
   'stats.teamsJoin': ', ',
   'stats.teamsTotalsOnly': 'Only team totals are shown for {teams}.',

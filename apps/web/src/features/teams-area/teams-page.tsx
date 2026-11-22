@@ -2,9 +2,10 @@
 // Drawn by step 2.103 as a list page: a title, one line of what it is for, and its main
 // action ("Add a team") at the top right, which leads to the form; each team a row with
 // its shield, its division and one way in; an empty list a calm panel with the action.
-import { leagueUrl } from '@srleagues/core';
+import { leagueUrl, type CommandContext } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
+import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { createTeamAction } from './actions.ts';
@@ -32,7 +33,8 @@ export async function TeamsPage({
   const view = await loadLeaguePage(league, 'admin', 'teams');
   const here = view.context.league;
   const ports = (await webPorts()).adminTeams;
-  const season = await ports.currentSeason(here.id);
+  const context = commandContextOf(view.context);
+  const season = await ports.currentSeason(context);
   return (
     <main className="admin-teams">
       <PageHead
@@ -49,7 +51,7 @@ export async function TeamsPage({
       {season === undefined ? (
         <EmptyPanel text={t('adminTeams.noSeason')} />
       ) : (
-        await Body({ league: here, seasonId: season.id })
+        await Body({ league: here, context, seasonId: season.id })
       )}
     </main>
   );
@@ -57,15 +59,18 @@ export async function TeamsPage({
 
 async function Body({
   league,
+  context,
   seasonId,
 }: {
   readonly league: { readonly id: string; readonly slug: string };
+  /** The session's: the reads answer only someone who may manage the season's teams. */
+  readonly context: CommandContext;
   readonly seasonId: string;
 }) {
   const ports = (await webPorts()).adminTeams;
   const [teams, divisions] = await Promise.all([
-    ports.teams(league.id, seasonId),
-    ports.divisions(league.id, seasonId),
+    ports.teams(context, seasonId),
+    ports.divisions(context, seasonId),
   ]);
   const divisionName = (id: string | null) => divisions.find((d) => d.id === id)?.name;
   return (

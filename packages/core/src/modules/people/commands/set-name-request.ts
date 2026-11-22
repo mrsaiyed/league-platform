@@ -77,19 +77,19 @@ export const setNameRequest = defineCommand({
     input,
     tx,
   }): Promise<Result<{ version: number }, SetNameRequestError>> => {
-    // Whether the person is a child decides whether initials take effect (R-25). Only
-    // people.manage reaches here, and every role holding it may also read sensitive
-    // fields (P4 §4), so reading the age tells the caller nothing they may not see.
-    const person = await tx.people.find(input.personId, input.showAs === 'initials');
+    // Whether the person is a child decides whether initials take effect (R-25). It is
+    // asked of the store, which works it out where the birth date is kept (R-28, record
+    // 080): no private field is read here.
+    const person = await tx.people.find(input.personId, false);
     if (person === undefined || person.binned) return fail({ code: 'person-not-found' });
     if (person.version !== input.version) return fail({ code: 'changed-since-read' });
     if (person.visibility === input.showAs) return ok({ version: person.version });
     if (input.showAs === 'initials') {
-      const [audience, policy] = await Promise.all([
+      const [audience, policy, isMinor] = await Promise.all([
         tx.people.leagueAudience(),
         readNamePolicy({ settingRows: (key) => tx.people.leagueSettingRows(key) }),
+        tx.people.isMinor(person.id),
       ]);
-      const isMinor = person.sensitive?.isMinor ?? null;
       if (!mayRecordNameRequest('initials', { isMinor }, audience, policy)) {
         return fail({ code: 'initials-not-offered' });
       }

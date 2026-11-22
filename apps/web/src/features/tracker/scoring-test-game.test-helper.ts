@@ -36,6 +36,7 @@ export const testRosters: DeviceRosters = {
     players: team('a', 'Bearsley', ['Sol', 'Tam', 'Uma', 'Vic', 'Wes', 'Xan', 'Yan', 'Zoe']),
   },
   uniqueJerseys: false,
+  allowTies: false,
 };
 
 export const homeFive = ['h3', 'h5', 'h7', 'h9', 'h11'];

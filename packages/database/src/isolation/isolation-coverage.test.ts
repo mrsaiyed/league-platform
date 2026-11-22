@@ -20,6 +20,7 @@ import { constraintOf } from '../queries/constraint-of.ts';
 import { inSavepoint } from '../queries/in-savepoint.ts';
 import { currentLeague } from '../queries/find-current-league.ts';
 import { leagueStatusOf } from '../queries/league-status-of.ts';
+import { isMinorSql } from '../queries/minor-by-age-sql.ts';
 import { divisionSummary } from '../queries/division-summary.ts';
 import { gameSummary } from '../queries/game-summary.ts';
 import { gameInList, gamesForLists, inReachOf } from '../queries/games-for-lists.ts';
@@ -71,6 +72,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.seedLeaguesInto,
     'development-only bootstrap: takes a PGlite, not a scope; runs the scoped commands (own cases) per league and writes accounts and role grants directly',
   ],
+  [
+    databasePackage.seedAllLeaguesInto,
+    'development-only bootstrap (`npm run seed`): takes a PGlite, not a scope; seedLeaguesInto, then per league the scoped commands (own cases), the fixture import, the rounds and the tracker transfer, each in its league; like seedLeaguesInto, the demo-shaped league also writes its accounts directly and its role grants through the access store, without a command',
+  ],
   [rosterEntrySummary, 'turns a row already read into the returned shape; runs no SQL'],
   [databasePackage.binStore, 'binds the bin queries (own cases) to a scope'],
   [databasePackage.teamsStore, 'binds the team queries, each with its own cases, to a scope'],
@@ -118,6 +123,10 @@ const reachNoLeagueData = new Map<unknown, string>([
   [grantFromRow, 'turns a row already read into the returned shape; runs no SQL'],
   [invitationFromRow, 'turns a row already read into the returned shape; runs no SQL'],
   [invitationStatus, 'builds a column expression for the queries that use it; runs no SQL'],
+  [
+    isMinorSql,
+    "builds R-28's column expression for the queries that use it (own cases); runs no SQL",
+  ],
   [scopeColumns, 'turns a scope into its two column values; runs no SQL'],
   [databasePackage.jobsStore, 'binds insertJob, which has its own case, to a scope'],
   // The worker's one look across leagues, by design (record 012), so no league case
@@ -157,6 +166,10 @@ const reachNoLeagueData = new Map<unknown, string>([
     'reads a copy of a tracker backup folder on disk with its own embedded database; no league, no platform tables (step 2.57)',
   ],
   [databasePackage.TrackerBackupError, 'the reader error class; runs nothing'],
+  [
+    databasePackage.SeedPartlyLoaded,
+    "the seed's error class for a partly loaded league; runs nothing",
+  ],
   [
     databasePackage.transferTrackerGames,
     'development tool (step 2.58): takes a PGlite, not a scope; finds one league, season and account by name, then reaches that one league only through stores fenced to it (each transaction sets its league) and its commands (own cases)',

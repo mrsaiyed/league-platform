@@ -23,7 +23,8 @@ export type DecideGameError = {
     | 'game-cancelled'
     | 'tie-not-allowed'
     | 'team-not-in-game'
-    | 'game-is-tracked';
+    | 'game-is-tracked'
+    | 'game-postponed';
 };
 
 /** A game that can still be decided, or the reason it cannot. */
@@ -63,6 +64,23 @@ export async function openGameByHand(
   return open;
 }
 
+/**
+ * A game that can be given a score by hand, or the reason it cannot: openGameByHand's, or
+ * that it is postponed (`game-postponed`, step 2.158, S-75): a postponed game has no score
+ * until it is played on a new date. The one door of every way of typing a score (a final
+ * score, a box score, an imported score); a forfeit is the one decision a postponed game
+ * takes, so record_forfeit opens it through openGameByHand.
+ */
+export async function openGameToScore(
+  tx: GamesTx,
+  gameId: string,
+  version: number | undefined,
+): Promise<Result<GameRecord, DecideGameError>> {
+  const open = await openGameByHand(tx, gameId, version);
+  if (open.ok && open.value.status === 'postponed') return fail({ code: 'game-postponed' });
+  return open;
+}
+
 export async function decideGame(args: {
   readonly context: CommandContext;
   readonly tx: GamesTx;
@@ -85,6 +103,9 @@ export async function decideGame(args: {
       homeScore: args.homeScore,
       awayScore: args.awayScore,
       decided: true,
+      // Decided by hand (a score typed in, a box score, an import, a forfeit): nothing yet
+      // says whether it went to overtime (step 2.56 lets a typed score say it).
+      overtimePeriods: null,
       ...(game.format === null ? { format: rules } : {}),
       ...(args.captureMode === undefined ? {} : { captureMode: args.captureMode }),
     },

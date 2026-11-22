@@ -26,7 +26,9 @@ export const fields = {
   LOG_LEVEL: { secret: false },
   TRUSTED_PROXY: { secret: false },
   PLATFORM_DATABASE_URL: { secret: true },
+  LOCAL_BINNED_TEAM: { secret: false },
   LOCAL_DATA: { secret: false },
+  LOCAL_DEMO_LEAGUE: { secret: false },
   LOCAL_DESIGN: { secret: false },
   LOCAL_NOW: { secret: false },
   SESSION_SECRET: { secret: true },
@@ -68,10 +70,24 @@ const schema = z.object({
     .trim()
     .regex(/^postgres(?:ql)?:\/\//, 'must be a postgres:// address')
     .optional(),
+  // A team's short name in the first made-up league's current season, put in the bin as
+  // the stand-in's world is made, with its games and results, as a team could be before
+  // A-17 held such a team (step 2.180): so a browser test and the pictures can see how
+  // every screen shows it. Only the stand-in's world reads it; only local and test.
+  LOCAL_BINNED_TEAM: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a short name')
+    .optional(),
   // What local work and tests run on (record 055): 'stand-in', the made-up leagues in
   // this process's memory (the default), or 'made-up-database', the made-up seed
   // leagues in a database in memory with every migration. Only local and test read it.
   LOCAL_DATA: z.enum(['stand-in', 'made-up-database']).default('stand-in'),
+  // 'on' loads the seed's demo-shaped league into the made-up database too (step 2.59): a
+  // large league with a whole season, which takes some seconds at start. Off by default, so
+  // a test that does not look at it starts as fast as before. Only with LOCAL_DATA=
+  // made-up-database, and only local and test: a choice of the made-up data, no setting of
+  // the product.
+  LOCAL_DEMO_LEAGUE: z.enum(['on', 'off']).default('off'),
   // The design the first made-up league of the stand-in is drawn under, so that every
   // page can be pictured in every color set (scripts/shots.mjs --design, step 2.147): a
   // starting design, or a made-up one kept for pictures. Only local and test read it.
@@ -112,7 +128,9 @@ const optional: readonly ConfigName[] = [
   'LOG_LEVEL',
   'TRUSTED_PROXY',
   'PLATFORM_DATABASE_URL',
+  'LOCAL_BINNED_TEAM',
   'LOCAL_DATA',
+  'LOCAL_DEMO_LEAGUE',
   'LOCAL_DESIGN',
   'LOCAL_NOW',
   'SESSION_SECRET',
@@ -144,7 +162,9 @@ const requiredIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
 
 /** Read only in local work and tests; set anywhere else, it is a mistake. */
 const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
+  LOCAL_BINNED_TEAM: ['local', 'test'],
   LOCAL_DATA: ['local', 'test'],
+  LOCAL_DEMO_LEAGUE: ['local', 'test'],
   LOCAL_DESIGN: ['local', 'test'],
   LOCAL_NOW: ['local', 'test'],
 };
@@ -264,6 +284,18 @@ export function loadConfig(
     invalid.set(
       'LOCAL_NOW',
       'LOCAL_NOW: invalid, the made-up database keeps this computer’s clock, so it may not be set with LOCAL_DATA=made-up-database',
+    );
+  }
+  // The demo-shaped league is loaded into the made-up database only: without it the
+  // setting would silently do nothing.
+  if (
+    given['LOCAL_DEMO_LEAGUE'] === 'on' &&
+    given['LOCAL_DATA'] !== 'made-up-database' &&
+    !invalid.has('LOCAL_DEMO_LEAGUE')
+  ) {
+    invalid.set(
+      'LOCAL_DEMO_LEAGUE',
+      'LOCAL_DEMO_LEAGUE: invalid, the demo-shaped league is loaded into the made-up database only, so it may be on only with LOCAL_DATA=made-up-database',
     );
   }
   const result = schema.safeParse(given);

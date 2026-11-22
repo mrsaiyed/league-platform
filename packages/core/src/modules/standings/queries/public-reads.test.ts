@@ -53,6 +53,154 @@ describe('readStandings', () => {
     expect(JSON.stringify(result)).not.toMatch(/account/i);
   });
 
+  it('finds level teams from the whole numbers, never from rounded percentages (step 2.195)', async () => {
+    const base = memoryStandingsRead();
+    const [first] = await base.standingsRows(seasonId);
+    if (first === undefined) throw new Error('expected a row');
+    const team = (id: string, name: string) => ({
+      id,
+      name,
+      slug: name.toLowerCase(),
+      color: null,
+      divisionId,
+      statsVisibility: 'everyone',
+      removed: false,
+    });
+    const row = (
+      teamId: string,
+      rank: number,
+      record: { wins: number; losses: number; ties?: number },
+      decidedBy: string | null,
+    ) => {
+      const ties = record.ties ?? 0;
+      const gamesPlayed = record.wins + record.losses + ties;
+      return { ...first, teamId, rank, seed: rank, ...record, ties, gamesPlayed, decidedBy };
+    };
+    // 2–1 and 667–333 both read 0.667, and are not level; 1–2 and 2–4 are, exactly; a
+    // team with no games is level with one that lost its only game (both 0, as ranked).
+    const store: StandingsReadStore = {
+      ...base,
+      teams: async () => ['a', 'b', 'c', 'd', 'e', 'f'].map((id) => team(id, id.toUpperCase())),
+      standingsRows: async () => [
+        row('a', 1, { wins: 667, losses: 333 }, null),
+        row('b', 2, { wins: 2, losses: 1 }, null),
+        row('c', 3, { wins: 1, losses: 2 }, 'head-to-head'),
+        row('d', 4, { wins: 2, losses: 4 }, 'head-to-head'),
+        row('e', 5, { wins: 0, losses: 0 }, 'point-difference'),
+        row('f', 6, { wins: 0, losses: 1 }, 'point-difference'),
+      ],
+      adjustments: async () => [],
+      // Read only for the teams' ids: no box score line is asked for (decidedGamesOf).
+      decidedGamesOf: async () => {
+        throw new Error('the standings read no box score line');
+      },
+      decidedGames: async () =>
+        ['g1', 'g2'].map((gameId) => ({
+          gameId,
+          status: 'final',
+          homeTeamId: 'c',
+          awayTeamId: 'd',
+        })),
+    };
+    const result = await readStandings(store, { seasonId });
+    if (!result.ok) throw new Error('expected a table');
+    expect(result.value.tiebreakers).toEqual(['head-to-head', 'point-difference', 'points-scored']);
+    expect(result.value.tables[0]?.levelGroups).toEqual([
+      { teamIds: ['c', 'd'], notPlayed: [], on: 'win-percentage', gamesBetween: 2 },
+      { teamIds: ['e', 'f'], notPlayed: ['e'], on: 'win-percentage', gamesBetween: null },
+    ]);
+    // In a table ranked by points, teams are level on their points alone.
+    const byPoints: StandingsReadStore = {
+      ...store,
+      findSeason: async (id) =>
+        id === seasonId
+          ? {
+              id,
+              name: 'Fall',
+              rules: {
+                ...defaultSeasonRules(),
+                standings: {
+                  ...defaultSeasonRules().standings,
+                  rankBy: 'points',
+                  columns: ['played', 'wins', 'losses', 'points'],
+                },
+              },
+            }
+          : undefined,
+      standingsRows: async () => [
+        { ...row('a', 1, { wins: 2, losses: 0 }, 'points-scored'), standingsPoints: 4 },
+        { ...row('b', 2, { wins: 1, losses: 0, ties: 2 }, 'points-scored'), standingsPoints: 4 },
+        { ...row('c', 3, { wins: 0, losses: 1 }, null), standingsPoints: 0 },
+      ],
+    };
+    const points = await readStandings(byPoints, { seasonId });
+    expect(points.ok && points.value.tables[0]?.levelGroups).toEqual([
+      { teamIds: ['a', 'b'], notPlayed: [], on: 'points', gamesBetween: null },
+    ]);
+  });
+
+  // The numbers audit's review of step 2.195 (finding 4): a removed division's rows fall
+  // into the table without a name, beside teams of no division. Level there, they were
+  // never compared by the engine, so no note says anything about them as a group.
+  it('writes no level group for teams the engine never compared', async () => {
+    const base = memoryStandingsRead();
+    const [first] = await base.standingsRows(seasonId);
+    if (first === undefined) throw new Error('expected a row');
+    const removed = '01900000-0000-7000-8000-0000000000d9';
+    const row = (teamId: string, division: string | null, rank: number, wins: number) => ({
+      ...first,
+      teamId,
+      divisionId: division,
+      rank,
+      seed: rank,
+      wins,
+      losses: 1 - wins,
+      ties: 0,
+      gamesPlayed: 1,
+      decidedBy: null,
+    });
+    const store: StandingsReadStore = {
+      ...base,
+      teams: async () =>
+        ['a', 'b', 'c', 'd'].map((id) => ({
+          id,
+          name: id.toUpperCase(),
+          slug: id,
+          color: null,
+          divisionId: null,
+          statsVisibility: 'everyone',
+          removed: false,
+        })),
+      divisions: async () => [],
+      // a beat b in the removed division; c beat d with no division: each alone at its rank
+      // in its own table, so nothing stored says how a compares with c.
+      standingsRows: async () => [
+        row('a', removed, 1, 1),
+        row('b', removed, 2, 0),
+        row('c', null, 1, 1),
+        row('d', null, 2, 0),
+      ],
+      adjustments: async () => [],
+    };
+    const result = await readStandings(store, { seasonId });
+    if (!result.ok) throw new Error('expected a table');
+    expect(result.value.tables).toHaveLength(1);
+    expect(result.value.tables[0]?.lines.map((l) => l.team.id)).toEqual(['a', 'c', 'b', 'd']);
+    expect(result.value.tables[0]?.levelGroups).toEqual([]);
+    // Level in their own stored tables but not with each other's: none either.
+    const reasons: StandingsReadStore = {
+      ...store,
+      standingsRows: async () => [
+        { ...row('a', removed, 1, 1), decidedBy: 'point-difference' },
+        { ...row('b', removed, 2, 1), decidedBy: 'point-difference' },
+        { ...row('c', null, 1, 1), decidedBy: 'point-difference' },
+        { ...row('d', null, 2, 1), decidedBy: 'point-difference' },
+      ],
+    };
+    const mixed = await readStandings(reasons, { seasonId });
+    expect(mixed.ok && mixed.value.tables[0]?.levelGroups).toEqual([]);
+  });
+
   it('says when the season is not in the league', async () => {
     expect(await readStandings(memoryStandingsRead(), { seasonId: 'nope' })).toEqual({
       ok: false,
@@ -201,5 +349,102 @@ describe('the statistics a season keeps (P7 §1, record 070)', () => {
     for (const unreadable of [{ version: 1 }, { version: 99 }, 'not rules']) {
       expect(await keysWith([], unreadable)).toEqual(['points', 'fg3', 'fg1', 'fouls']);
     }
+  });
+});
+
+describe("a team's season totals count what was charged to the team itself (step 2.196, H1)", () => {
+  const full = { ...defaultSeasonRules(), statistics: 'full' as const };
+  const storeWith = (over: Partial<StandingsReadStore>): StandingsReadStore => ({
+    ...memoryStandingsRead(),
+    findSeason: async (id) => (id === seasonId ? { id, name: 'Fall', rules: full } : undefined),
+    seasonStatKeys: async (id) => (id === seasonId ? [] : undefined),
+    ...over,
+  });
+  const turnoversOf = async (store: StandingsReadStore, teamId: string) => {
+    const table = await readStatisticsTable(store, { seasonId, viewing: visitor });
+    if (!table.ok) throw new Error('no table');
+    expect(table.value.statKeys).toContain('turnovers');
+    return table.value.teams.find((team) => team.teamId === teamId)?.stats['turnovers'];
+  };
+
+  it("gives case 18's team 2 turnovers in a season keeping the full set: its player's 1 and its own 1", async () => {
+    const store = storeWith({
+      // The players' lines, summed: the player's one turnover.
+      teamStatTotals: async () => [
+        { teamId: openTeam, statKey: 'turnovers', total: 1, gamesRecorded: 1 },
+        { teamId: staffTeam, statKey: 'turnovers', total: 0, gamesRecorded: 1 },
+      ],
+      // The audit's case 18: one charged to the team, one to its player, who came on.
+      teamTurnoverGames: async () => [
+        { gameId: 'g18', teamId: openTeam, turnovers: 1, countedByLines: true },
+      ],
+    });
+    expect(await turnoversOf(store, openTeam)).toEqual({ total: 2, gamesRecorded: 1, average: 2 });
+    // The other team was charged nothing of its own.
+    expect(await turnoversOf(store, staffTeam)).toEqual({ total: 0, gamesRecorded: 1, average: 0 });
+  });
+
+  it('counts a game where only the team itself was charged, with no player of it on, once', async () => {
+    const store = storeWith({
+      teamStatTotals: async () => [
+        { teamId: openTeam, statKey: 'turnovers', total: 3, gamesRecorded: 2 },
+      ],
+      teamTurnoverGames: async () => [
+        { gameId: 'g9', teamId: openTeam, turnovers: 1, countedByLines: false },
+      ],
+    });
+    expect(await turnoversOf(store, openTeam)).toEqual({
+      total: 4,
+      gamesRecorded: 3,
+      average: 4 / 3,
+    });
+  });
+
+  it("gives a team with no turnover line of its own its team's turnovers, over that game", async () => {
+    const store = storeWith({
+      teamTurnoverGames: async () => [
+        { gameId: 'g1', teamId: staffTeam, turnovers: 2, countedByLines: false },
+        { gameId: 'g2', teamId: staffTeam, turnovers: 1, countedByLines: false },
+      ],
+    });
+    expect(await turnoversOf(store, staffTeam)).toEqual({
+      total: 3,
+      gamesRecorded: 2,
+      average: 1.5,
+    });
+  });
+
+  it("names the statistics whose team total is not its players' numbers, for a team whose players show", async () => {
+    const teamsOf = async (store: StandingsReadStore) => {
+      const table = await readStatisticsTable(store, { seasonId, viewing: visitor });
+      if (!table.ok) throw new Error('no table');
+      return Object.fromEntries(table.value.teams.map((t) => [t.teamId, t.countsMoreThanPlayers]));
+    };
+    // Points typed as 50 where the players add to 48, and a team turnover, for both teams.
+    const store = storeWith({
+      teamStatTotals: async () => [
+        { teamId: openTeam, statKey: 'points', total: 50, linesTotal: 48, gamesRecorded: 1 },
+        { teamId: staffTeam, statKey: 'points', total: 45, linesTotal: 40, gamesRecorded: 1 },
+      ],
+      teamTurnoverGames: async () => [
+        { gameId: 'g', teamId: openTeam, turnovers: 1, countedByLines: true },
+        { gameId: 'g', teamId: staffTeam, turnovers: 1, countedByLines: true },
+      ],
+    });
+    // The staff-only team's players are not shown to a visitor: nothing to add up there.
+    expect(await teamsOf(store)).toEqual({
+      [openTeam]: ['points', 'turnovers'],
+      [staffTeam]: [],
+    });
+    // Points that are what the players add to, and no team turnover: none.
+    expect(
+      await teamsOf(
+        storeWith({
+          teamStatTotals: async () => [
+            { teamId: openTeam, statKey: 'points', total: 48, linesTotal: 48, gamesRecorded: 1 },
+          ],
+        }),
+      ),
+    ).toEqual({ [openTeam]: [], [staffTeam]: [] });
   });
 });

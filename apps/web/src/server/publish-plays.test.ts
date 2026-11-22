@@ -29,11 +29,16 @@ function world(publisher: LivePublisher) {
             captureMode: 'live',
             homeScore: seq.get(id) ?? 0,
             awayScore: 0,
+            overtimePeriods: null,
             finalizedAt: null,
             binned: false,
             rules: null,
           }
         : undefined,
+    // Publishing plays never draws a box score's columns (step 2.196).
+    seasonStatistics: async () => {
+      throw new Error('Publishing plays read the season’s statistics, which it never shows.');
+    },
     teams: async () => [
       { id: home, name: 'Home', slug: 'h', color: null, statsVisibility: 'everyone' },
       { id: away, name: 'Away', slug: 'a', color: null, statsVisibility: 'everyone' },

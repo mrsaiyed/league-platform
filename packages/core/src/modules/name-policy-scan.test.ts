@@ -129,6 +129,7 @@ const statsStore: StandingsReadStore = {
       color: null,
       divisionId: null,
       statsVisibility: 'everyone',
+      removed: false,
     })),
   divisions: async () => [],
   standingsRows: async () => [],
@@ -144,7 +145,9 @@ const statsStore: StandingsReadStore = {
   playerTeams: async () =>
     people.map((p) => ({ personId: p.id, teamId: p.side === 'home' ? home : away })),
   decidedGamesOf: async () => [],
+  decidedGames: async () => [],
   teamStatTotals: async () => [],
+  teamTurnoverGames: async () => [],
   people: async (ids) =>
     people
       .filter((p) => ids.includes(p.id))
@@ -190,11 +193,13 @@ function gameStore(status: 'live' | 'final'): GameSnapshotStore {
             captureMode: 'live',
             homeScore: 10,
             awayScore: 10,
+            overtimePeriods: null,
             finalizedAt: null,
             binned: false,
             rules: null,
           }
         : undefined,
+    seasonStatistics: async () => ({ statKeys: [], rules: null }),
     teams: async () => [
       { id: home, name: 'Home', slug: 'home', color: null, statsVisibility: 'everyone' },
       { id: away, name: 'Away', slug: 'away', color: null, statsVisibility: 'everyone' },

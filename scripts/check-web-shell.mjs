@@ -428,12 +428,20 @@ const cases = [
   ],
   // The standings and statistics pages (step 2.43): real tables, not the placeholder; a
   // team set to staff only shows its totals and none of its players to a visitor (S-22).
+  // Since step 2.195 the note on level teams is true of each team it is beside: it never
+  // tells one it was "placed above".
   [
     'visitor',
     '/north-valley/standings',
     200,
-    ['East', 'West', 'Owls', 'Played an ineligible player in round 3.', 'games they played'],
-    ['This page is not built yet.'],
+    [
+      'East',
+      'West',
+      'Owls',
+      'Played an ineligible player in round 3.',
+      'The game between them puts Owls ahead.',
+    ],
+    ['This page is not built yet.', 'Placed above'],
   ],
   ['visitor', '/north-valley/standings?season=spring-2026', 200, ['Spring 2026', 'All teams']],
   ['visitor', '/north-valley/standings?season=nope', 404, [notFound]],
@@ -459,7 +467,8 @@ const cases = [
   ['visitor', '/harbor-city/standings', 200, ['Level with another team', 'PTS']],
   ['scheduler', '/north-valley/admin', 200, ['Powered by SR Leagues', '--color-primary: #96062d']],
   // Someone not signed in at the admin's home (a scorekeeper's games) is sent to sign in
-  // and brought back (step 2.33); at an admin area they are still refused (U-6).
+  // and brought back (step 2.33), and since step 2.157 at every admin area too (U-15,
+  // changed November 17: this row was 403 "you do not have access" before).
   [
     'visitor',
     '/north-valley/admin',
@@ -468,7 +477,23 @@ const cases = [
     ['Admin areas'],
     '/signin?next=%2Fnorth-valley%2Fadmin',
   ],
-  ['visitor', '/north-valley/admin/teams', 403, [noAccess], ['Admin areas']],
+  [
+    'visitor',
+    '/north-valley/admin/teams',
+    307,
+    [],
+    ['Admin areas', noAccess],
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fteams',
+  ],
+  // A scorekeeper whose phone was signed out, at their own games (finding H3 of the audit).
+  [
+    'visitor',
+    '/north-valley/admin/games',
+    307,
+    [],
+    ['Admin areas', noAccess],
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fgames',
+  ],
   // Someone the admin is not open to at all is refused on the plain screen of SR Leagues'
   // own: nothing of the admin's frame, and no way "back to the admin" (U-9).
   ['stranger', '/north-valley/admin', 403, [noAccess], ['Admin areas', 'Back to the admin']],
@@ -695,21 +720,57 @@ const cases = [
   ],
   ['visitor', '/signin?problem=signInToScore', 200, ['Sign in to score this game.']],
   ['otherAdmin', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
-  // No such game: the tracker's own refusal, with the way back (step 2.33).
+  // No such game: "Page not found" with status 404, in the tracker's own look, with the way
+  // back (step 2.33; status 404 since step 2.157).
   [
     'owner',
     '/north-valley/score/game-1',
-    200,
-    ['We could not find that game.', 'Back to your games'],
-    [notFound],
+    404,
+    [notFound, 'We could not find that game.', 'Back to your games'],
+    [noAccess],
   ],
-  // Another league's game asked for through this league's address is not there.
+  // Another league's game asked for through this league's address is not there: status 404
+  // and nothing of the other league (step 2.157).
   [
     'owner',
     `/harbor-city/score/${liveGame}`,
-    200,
-    ['We could not find that game.'],
-    ['Bears at Hawks'],
+    404,
+    [notFound, 'We could not find that game.'],
+    ['Bears at Hawks', 'North Valley'],
+  ],
+  // The same in the admin's games: the box score of another league's game, "Page not
+  // found" in the box score's own words (step 2.157).
+  [
+    'owner',
+    `/harbor-city/admin/games/${liveGame}`,
+    404,
+    [notFound, 'That game is not there, or you may not score it.', 'Back to the games'],
+    ['Bears at Hawks', 'North Valley', noAccess],
+  ],
+  // Every box score a person cannot open is the same 404, never a page answered 200 (step
+  // 2.157): a game not assigned to a scorekeeper in the draft league, which scores assigned
+  // games only (the same game the tracker refuses them above), a game of
+  // an archived league (nobody scores there), and an address that is no game.
+  [
+    'scorekeeper',
+    `/quiet-pines/admin/games/${liveGame}`,
+    404,
+    [notFound, 'That game is not there, or you may not score it.'],
+    [noAccess],
+  ],
+  [
+    'owner',
+    `/old-meadow/admin/games/${liveGame}`,
+    404,
+    [notFound, 'That game is not there, or you may not score it.'],
+    [noAccess],
+  ],
+  [
+    'owner',
+    `/north-valley/admin/games/${game(99)}`,
+    404,
+    [notFound, 'That game is not there, or you may not score it.'],
+    [noAccess],
   ],
   // A scorekeeper's admin: their games, each with a button to the tracker (P4 §4).
   [
@@ -749,7 +810,8 @@ const cases = [
   ['visitor', '/north-valley/games/not-a-game', 404, [notFound]],
   ['visitor', `/harbor-city/games/${game(2)}`, 404, [notFound]],
   ['visitor', `/quiet-pines/games/${game(2)}`, 404, [notFound]],
-  ['scheduler', '/north-valley/score/game-1', 200, ['Score a game']],
+  // An address that is no game: "Page not found", status 404 (step 2.157).
+  ['scheduler', '/north-valley/score/game-1', 404, [notFound, 'We could not find that game.']],
   ['coach', '/north-valley/score/game-1', 403, [noAccess]],
   ['visitor', '/quiet-pines', 404, [notFound]],
   ['coach', '/quiet-pines', 404, [notFound]],
@@ -1244,15 +1306,19 @@ function firstDifference(a, b) {
 }
 
 /**
- * A draft league is "not found" for someone who may not see it, exactly the answer
- * for a name nobody has (U-9, step 2.87): the same status, headers, markup and page
- * data, once each name is put in the same place. Only the date, the length and how
- * the stream happened to be cut (settle above) may differ.
+ * A league hidden from someone is "not found" for them, exactly the answer for a name
+ * nobody has (U-9, steps 2.87 and 2.157): the same status, headers, markup and page data,
+ * once each name is put in the same place. Only the date, the length and how the stream
+ * happened to be cut (settle above) may differ. Asked by each kind of person, at the
+ * admin's home, two admin areas, the league's home and a game's scoring address, for each
+ * league hidden from them: a draft, a suspended league, a league in the bin, and another
+ * league's draft. The refusal Next.js draws into every page names the person signed in, so
+ * this also proves it says nothing more of a hidden league than of no league at all.
  */
 async function sameAsNoLeague(origin) {
-  const ask = async (name) => {
-    const response = await fetch(`${origin}/${name}/admin`, {
-      headers: { cookie: `srl_session=${tokens.otherAdmin}` },
+  const ask = async (who, name, rest) => {
+    const response = await fetch(`${origin}/${name}${rest}`, {
+      headers: who === 'visitor' ? {} : { cookie: `srl_session=${tokens[who]}` },
       redirect: 'manual',
     });
     const headers = [...response.headers]
@@ -1260,26 +1326,53 @@ async function sameAsNoLeague(origin) {
       .map(([header, value]) => `${header}: ${value.replaceAll(name, '{name}')}`)
       .join('\n');
     const body = (await response.text()).replaceAll(name, '{name}');
-    return { status: response.status, ...oneNonce(headers, body, found, name) };
+    return {
+      status: response.status,
+      ...oneNonce(headers, body, found, `${who} at /${name}${rest}`),
+    };
   };
+  // Who may not see which (stand-in-ports.ts): the coach holds a coach's place in the
+  // draft, which is not an area of its admin; the scheduler holds the draft and the first
+  // league; another league's admin holds the other draft only.
+  const hiddenFrom = {
+    visitor: ['quiet-pines', 'closed-gate', 'binned-league'],
+    stranger: ['quiet-pines', 'closed-gate', 'binned-league'],
+    coach: ['quiet-pines', 'closed-gate', 'still-waters'],
+    scheduler: ['closed-gate', 'binned-league', 'still-waters'],
+    otherAdmin: ['quiet-pines', 'closed-gate', 'binned-league'],
+  };
+  const addresses = ['/admin', '/admin/people', '/admin/games', '', `/score/${liveGame}`];
   const found = [];
-  const draft = await ask('quiet-pines');
-  const nobody = await ask('nobody-has-this');
-  if (draft.status !== 404 || nobody.status !== 404) {
-    found.push(`draft and no league answer ${draft.status} and ${nobody.status}, not 404`);
-  }
-  if (draft.headers !== nobody.headers) {
-    found.push(
-      `a draft's headers differ from no league's:\n${draft.headers}\n---\n${nobody.headers}`,
-    );
-  }
-  const [a, b] = [settle(draft.body), settle(nobody.body)];
-  if (a.rows === '' || b.rows === '') found.push('a not-found page carries no page data');
-  if (a.markup !== b.markup) {
-    found.push(`a draft's markup differs from no league's ${firstDifference(a.markup, b.markup)}`);
-  }
-  if (a.rows !== b.rows) {
-    found.push(`a draft's page data differs from no league's ${firstDifference(a.rows, b.rows)}`);
+  for (const [who, hidden] of Object.entries(hiddenFrom)) {
+    for (const rest of addresses) {
+      const nobody = await ask(who, 'nobody-has-this', rest);
+      const b = settle(nobody.body);
+      for (const name of hidden) {
+        const at = `${who} at /${name}${rest}`;
+        const league = await ask(who, name, rest);
+        if (league.status !== 404 || nobody.status !== 404) {
+          found.push(`${at}: answers ${league.status}, no league ${nobody.status}, not 404`);
+        }
+        if (league.headers !== nobody.headers) {
+          found.push(
+            `${at}: headers differ from no league's:\n${league.headers}\n---\n${nobody.headers}`,
+          );
+        }
+        const a = settle(league.body);
+        if (a.rows === '' || b.rows === '')
+          found.push(`${at}: a not-found page carries no page data`);
+        if (a.markup !== b.markup) {
+          found.push(
+            `${at}: markup differs from no league's ${firstDifference(a.markup, b.markup)}`,
+          );
+        }
+        if (a.rows !== b.rows) {
+          found.push(
+            `${at}: page data differs from no league's ${firstDifference(a.rows, b.rows)}`,
+          );
+        }
+      }
+    }
   }
   return found;
 }

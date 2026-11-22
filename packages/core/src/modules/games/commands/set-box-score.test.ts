@@ -65,6 +65,8 @@ describe('setBoxScore', () => {
       captureMode: 'box',
       homeScore: 30,
       awayScore: 18,
+      // A sheet from paper says nothing of overtime yet: no count, so no mark (step 2.200).
+      overtimePeriods: null,
     });
     expect(db.state.games[0]?.format).toMatchObject({ version: 1 });
     expect(db.state.lines).toEqual(input.lines.map((l) => ({ gameId: gameUuid(1), ...l })));
@@ -136,6 +138,20 @@ describe('setBoxScore', () => {
       ok: false,
       error: { code: 'game-is-tracked' },
     });
+  });
+
+  it('refuses a postponed game, which has not been played (step 2.158, M32)', async () => {
+    const { db, deps, as, events } = memoryGames({
+      games: [game(1, { status: 'postponed' })],
+      roster,
+    });
+    expect(await setBoxScore(as(ownerId), input, deps)).toEqual({
+      ok: false,
+      error: { code: 'game-postponed' },
+    });
+    expect(db.state.games[0]).toMatchObject({ status: 'postponed', homeScore: null });
+    expect(db.state.lines).toEqual([]);
+    expect(events).toEqual([]);
   });
 
   it('refuses a decided game (reopen it first), a moved-on one and a tie', async () => {

@@ -77,6 +77,11 @@ describe('startWebApp', () => {
     expect(database).toHaveBeenCalledOnce();
     expect(await ports.findLeague('lakeside')).toMatchObject({ slug: 'lakeside' });
     expect(await ports.findLeague('north-valley')).toBeUndefined();
+    // The seed's demo-shaped league is loaded only when asked (LOCAL_DEMO_LEAGUE, step 2.59).
+    const { demoLeague } = await import('@srleagues/database');
+    expect(await ports.findLeague(demoLeague.slug)).toBeUndefined();
+    const listed = (await ports.localTools?.madeUpPeople()) ?? [];
+    expect(listed.some((p) => p.email === demoLeague.owner.email)).toBe(false);
     // The made-up member signs in on the sign-in stand-in, as on the stand-in.
     const signedIn = await ports.signIn.signIn({
       email: 'member@example.test',
@@ -107,6 +112,29 @@ describe('startWebApp', () => {
     ).toBe(false);
     // Its sign-in stand-in would pass the check the real service must pass (step 2.115).
     await expect(requireEmailConfirmation(ports.signIn)).resolves.toBeUndefined();
+  }, 120_000);
+
+  it('loads the demo-shaped league too with LOCAL_DEMO_LEAGUE=on (step 2.59)', async () => {
+    const config = loadConfig({
+      ...env,
+      APP_ENV: 'test',
+      LOCAL_DATA: 'made-up-database',
+      LOCAL_DEMO_LEAGUE: 'on',
+    });
+    const database = vi.fn(() => import('@srleagues/database'));
+    const realSignIn = vi.fn((_service: RealSignInSettings) => answering('off'));
+    const ports = await startWebApp(config, { database, realSignIn, log: () => {} });
+    const { demoLeague } = await import('@srleagues/database');
+    expect(await ports.findLeague(demoLeague.slug)).toMatchObject({ slug: demoLeague.slug });
+    expect(await ports.findLeague('lakeside')).toMatchObject({ slug: 'lakeside' });
+    // "Be this made-up person" lists its owner and one scorekeeper, besides the seed's.
+    const listed = (await ports.localTools?.madeUpPeople()) ?? [];
+    const inDemo = listed.filter((p) => p.places.some((place) => place.slug === demoLeague.slug));
+    expect(inDemo.map((p) => [p.email, p.places.flatMap((place) => place.memberships)])).toEqual([
+      [demoLeague.owner.email, ['owner']],
+      [demoLeague.members.find((m) => m.role === 'scorekeeper')?.email, ['scorekeeper']],
+    ]);
+    expect(listed.some((p) => p.email === 'owner@lakeside.example.test')).toBe(true);
   }, 120_000);
 
   it('refuses the made-up database too for a site address that is not local', async () => {

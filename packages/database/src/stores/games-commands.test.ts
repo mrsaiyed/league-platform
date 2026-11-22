@@ -10,6 +10,7 @@ import {
   gameReopened,
   listPostponedGames,
   postponeGame,
+  putGameBack,
   recordFinalScore,
   recordForfeit,
   reopenGame,
@@ -208,6 +209,57 @@ describe('the games commands on the database', () => {
     });
     const after = await listPostponedGames(g.ctx, {}, deps);
     expect(after.ok && after.value).toEqual([]);
+    expect((await rowOf(g.gameId)).status).toBe('cancelled');
+    // Step 2.158: put back, it is what it was when it was cancelled: postponed, waiting.
+    expect(
+      await putGameBack(g.ctx, { gameId: g.gameId, version: 3, reason: 'other' }, deps),
+    ).toEqual({ ok: true, value: { version: 4, status: 'postponed', clashes: [] } });
+    const back = await listPostponedGames(g.ctx, {}, deps);
+    expect(back.ok && back.value.map((x) => x.id)).toEqual([g.gameId]);
+    // And a postponement made by mistake goes back on its old date.
+    expect(
+      await putGameBack(g.ctx, { gameId: g.gameId, version: 4, reason: 'other' }, deps),
+    ).toMatchObject({ ok: true, value: { status: 'scheduled' } });
+    expect((await rowOf(g.gameId)).status).toBe('scheduled');
+  });
+
+  it('puts a cancelled game back over a game that took its place, naming it (step 2.158)', async () => {
+    const at = '2026-12-13T18:00:00Z';
+    const g = await leagueWithGame({ starts_at: at });
+    const { stage_id: stageId } = await one<{ stage_id: string }>(
+      pglite,
+      'select stage_id from games where id = $1',
+      [g.gameId],
+    );
+    const other = await newGame(pglite, {
+      leagueId: g.l.leagueId,
+      seasonId: g.seasonId,
+      stageId,
+      homeTeamId: g.home,
+      awayTeamId: await newTeam(pglite, g.l.leagueId, g.seasonId),
+      columns: { starts_at: at },
+    });
+    expect(await cancelGame(g.ctx, { gameId: g.gameId, version: 1 }, deps)).toMatchObject({
+      ok: true,
+    });
+    const back = await putGameBack(
+      g.ctx,
+      { gameId: g.gameId, version: 2, reason: 'willBePlayed' },
+      deps,
+    );
+    expect(back).toMatchObject({ ok: true, value: { status: 'scheduled' } });
+    expect(back.ok && back.value.clashes.map((c) => c.id)).toEqual([other]);
+  });
+
+  it('refuses to put back a cancelled game whose team is in the bin (step 2.158)', async () => {
+    const g = await leagueWithGame();
+    expect(await cancelGame(g.ctx, { gameId: g.gameId, version: 1 }, deps)).toMatchObject({
+      ok: true,
+    });
+    await pglite.query('update teams set deleted_at = now() where id = $1', [g.away]);
+    expect(
+      await putGameBack(g.ctx, { gameId: g.gameId, version: 2, reason: 'other' }, deps),
+    ).toEqual({ ok: false, error: { code: 'game-part-in-bin' } });
     expect((await rowOf(g.gameId)).status).toBe('cancelled');
   });
 

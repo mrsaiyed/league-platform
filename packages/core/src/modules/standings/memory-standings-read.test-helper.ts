@@ -24,6 +24,7 @@ export function memoryStandingsRead(): StandingsReadStore {
         color: '#111111',
         divisionId,
         statsVisibility: 'everyone',
+        removed: false,
       },
       {
         id: staffTeam,
@@ -32,6 +33,7 @@ export function memoryStandingsRead(): StandingsReadStore {
         color: null,
         divisionId,
         statsVisibility: 'staff',
+        removed: false,
       },
     ],
     divisions: async () => [{ id: divisionId, name: 'North', color: null, sort: 0 }],
@@ -102,10 +104,12 @@ export function memoryStandingsRead(): StandingsReadStore {
       { personId: staffPlayer, teamId: staffTeam },
     ],
     decidedGamesOf: async () => [],
+    decidedGames: async () => [],
     teamStatTotals: async () => [
       { teamId: openTeam, statKey: 'points', total: 80, gamesRecorded: 2 },
       { teamId: staffTeam, statKey: 'points', total: 100, gamesRecorded: 2 },
     ],
+    teamTurnoverGames: async () => [],
     people: async (ids) =>
       ids.map((id) => ({
         id,

@@ -29,7 +29,7 @@ import {
 } from '@srleagues/providers';
 import type { Config } from './config-schema.ts';
 import { databasePorts, type DatabaseQueries } from './database-ports.ts';
-import { madeUpDatabaseTools } from './made-up-database-people.ts';
+import { madeUpDatabaseTools, type SeedLeagueFacts } from './made-up-database-people.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
 import type { WebPorts } from './ports.ts';
 import {
@@ -52,7 +52,7 @@ export class StartupError extends Error {
  */
 export type DatabasePackage = Pick<
   typeof DatabaseModule,
-  'createDatabase' | 'checkLoginRole' | 'madeUpDatabase' | 'seedLeagues'
+  'createDatabase' | 'checkLoginRole' | 'demoLeague' | 'madeUpDatabase' | 'seedLeagues'
 > &
   DatabaseQueries;
 
@@ -94,9 +94,12 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       emailFrom: config.EMAIL_FROM,
       localDesign: config.LOCAL_DESIGN,
       ...(config.LOCAL_NOW === undefined ? {} : { worldStartsAt: config.LOCAL_NOW }),
+      ...(config.LOCAL_BINNED_TEAM === undefined ? {} : { binnedTeam: config.LOCAL_BINNED_TEAM }),
       keptEmailsFolder: deps.keptEmailsFolder ?? null,
     };
-    if (config.LOCAL_DATA === 'made-up-database') return onMadeUpDatabase(options, deps);
+    if (config.LOCAL_DATA === 'made-up-database') {
+      return onMadeUpDatabase(options, deps, config.LOCAL_DEMO_LEAGUE === 'on');
+    }
     const ports = standInPorts(options);
     await ports.signUpMadeUpMember();
     await ports.signUpMadeUpStaff();
@@ -242,13 +245,44 @@ export async function requireEmailConfirmation(signIn: EmailConfirmationQuestion
   throw new StartupError(answer === 'off' ? refusedOff : refusedUnknown(answer));
 }
 
+/**
+ * Whom "be this made-up person" lists on the made-up database (step 2.96): the seed
+ * leagues' owners and staff, and the demo-shaped league's owner and one scorekeeper (step
+ * 2.59), who can score a game of its tracked school.
+ */
+export function madeUpPeopleLeagues(
+  database: Pick<DatabasePackage, 'demoLeague' | 'seedLeagues'>,
+): SeedLeagueFacts[] {
+  const demo = database.demoLeague;
+  const scorer = demo.members.find((member) => member.role === 'scorekeeper');
+  return [
+    ...database.seedLeagues,
+    {
+      slug: demo.slug,
+      name: demo.name,
+      owner: demo.owner,
+      members: scorer === undefined ? [] : [scorer],
+    },
+  ];
+}
+
 /** Local work and tests on the made-up database in memory (record 055). */
-async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Promise<WebPorts> {
+async function onMadeUpDatabase(
+  options: StandInOptions,
+  deps: StartupDeps,
+  demoLeague: boolean,
+): Promise<WebPorts> {
   // The sign-in stand-in first: it refuses a site address that is not local or a test name.
   const signIn = standInSignIn(options);
   const database = await deps.database();
-  // Each seed league's season under way, so the public pages have something to show.
-  const made = await database.madeUpDatabase({ underWay: true });
+  // Each seed league's season under way, with its venue and one game scored live, so the
+  // public pages have something to show; and, with LOCAL_DEMO_LEAGUE=on only, the seed's
+  // demo-shaped league with its whole season played (step 2.59), which takes some seconds.
+  const made = await database.madeUpDatabase({
+    underWay: true,
+    tracked: true,
+    demo: demoLeague,
+  });
   const db = database.createDatabase(made.source);
   try {
     const problems = await database.checkLoginRole(db);
@@ -276,7 +310,11 @@ async function onMadeUpDatabase(options: StandInOptions, deps: StartupDeps): Pro
     // The kept emails, and the seed leagues' people to sign in as by a code (step 2.96).
     // With them the ports answer only requests made on this computer, as the stand-in's.
     localTools: {
-      tools: madeUpDatabaseTools(database.seedLeagues, standInMember, signIn),
+      tools: madeUpDatabaseTools(
+        demoLeague ? madeUpPeopleLeagues(database) : database.seedLeagues,
+        standInMember,
+        signIn,
+      ),
       publicBaseUrl: options.publicBaseUrl,
     },
     reportDesign: (message, fields) => deps.warn?.(message, fields),

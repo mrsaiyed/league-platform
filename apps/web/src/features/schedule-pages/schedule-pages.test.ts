@@ -1,6 +1,7 @@
 // The home and schedule pages' content (step 2.42), on the made-up stand-in schedules:
 // the two leagues differ, past rounds are closed and the current one open, the team and
 // round choices narrow the list, and a live message moves a game without a refresh.
+import { readStandings } from '@srleagues/core';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -8,8 +9,17 @@ import { standInPublicSchedule } from '../../server/stand-in-public-schedule.ts'
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
 import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
-import { buildHomeGames, buildScheduleView, comingOrder, parseRound } from './build-schedule.ts';
+import { buildStandingsViews } from '../stats-pages/index.ts';
+import {
+  buildHomeGames,
+  buildScheduleView,
+  comingOrder,
+  gameView,
+  overtimeWords,
+  parseRound,
+} from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
+import { compactStandings } from './home-page.tsx';
 import { LatestResultsSection, latestResultsCount } from './latest-results.tsx';
 import { applyUpdate } from './live-game-list.tsx';
 import { RoundSections, gameLinkWords } from './schedule-views.tsx';
@@ -424,6 +434,99 @@ describe('live updates', () => {
   });
 });
 
+describe('a card’s overtime mark and the live channel (step 2.200)', () => {
+  it('keeps the mark while the game is the result it was drawn with, and drops it once reopened', async () => {
+    const { clock, schedule } = await load(adult);
+    const final = schedule.rounds.flatMap((r) => r.games).find((g) => g.status === 'final');
+    if (final === undefined || final.homeScore === null || final.awayScore === null) {
+      throw new Error('no final game');
+    }
+    const drawn = gameView({ ...final, overtimePeriods: 1 }, clock, addressee, 'fall-2026');
+    expect(drawn).toMatchObject({
+      finalPill: { text: 'Final, OT', said: 'Final after overtime' },
+      finalSaid: 'final after overtime',
+    });
+    const result = { home: final.homeScore, away: final.awayScore };
+    // A message about the same result (one sent as it ended, arriving late) keeps it.
+    expect(applyUpdate(drawn, { sequence: 9, status: 'final', ...result })).toMatchObject({
+      finalPill: { text: 'Final, OT', said: 'Final after overtime' },
+    });
+    // Reopened: live, no mark; ended again, still none, whatever the score: the channel
+    // does not say a result's overtime, and the page is drawn again with the new one.
+    const live = applyUpdate(drawn, { sequence: 10, status: 'live', ...result, leftFinal: true });
+    expect(live.finalPill).toBeUndefined();
+    const again = applyUpdate(drawn, { sequence: 11, status: 'final', ...result, leftFinal: true });
+    expect(again).toMatchObject({ status: 'final' });
+    expect(again.finalPill).toBeUndefined();
+    expect(again.finalSaid).toBeUndefined();
+    expect(gameLinkText(again, gameLinkWords())).not.toContain('overtime');
+    // A game ended in regulation, or whose overtime is not known, has no mark at all.
+    for (const overtimePeriods of [0, null]) {
+      const plain = gameView({ ...final, overtimePeriods }, clock, addressee, 'fall-2026');
+      expect(plain.finalPill).toBeUndefined();
+      expect(gameLinkText(plain, gameLinkWords())).toContain(', final, ');
+    }
+  });
+
+  it('a card drawn live says "Final, OT" when the game ends in overtime, and "Final" in regulation', async () => {
+    const { clock, schedule } = await load(adult);
+    const live = schedule.rounds.flatMap((r) => r.games).find((g) => g.status === 'live');
+    if (live === undefined) throw new Error('no live game');
+    const words = overtimeWords();
+    expect([words.pill[0], words.pill[1]?.text, words.pill[2]?.text]).toEqual([
+      null,
+      'Final, OT',
+      'Final, 2OT',
+    ]);
+    expect(words.pill[2]?.said).toBe('Final after 2 overtimes');
+    // A game of halves, drawn while it was played.
+    const drawn = gameView({ ...live, periods: 2 }, clock, addressee, 'fall-2026');
+    expect(drawn).toMatchObject({ status: 'live', periods: 2 });
+    expect(drawn.finalPill).toBeUndefined();
+    const end = (sequence: number, period: number, leftFinal?: boolean) =>
+      applyUpdate(
+        drawn,
+        {
+          sequence,
+          status: 'final',
+          home: 52,
+          away: 50,
+          period,
+          ...(leftFinal === undefined ? {} : { leftFinal }),
+        },
+        words,
+      );
+    // Ended in period 3 of a game of halves: the first overtime.
+    const overtime = end(20, 3, true);
+    expect(overtime).toMatchObject({
+      status: 'final',
+      finalPill: { text: 'Final, OT', said: 'Final after overtime' },
+      finalSaid: 'final after overtime',
+    });
+    expect(gameLinkText(overtime, gameLinkWords())).toContain('final after overtime, 50 to 52');
+    expect(end(21, 4, true).finalPill?.text).toBe('Final, 2OT');
+    // Reopened (live, no mark) and ended again in regulation: "Final" alone.
+    const reopened = applyUpdate(
+      overtime,
+      { sequence: 22, status: 'live', home: 52, away: 50, period: 3, leftFinal: true },
+      words,
+    );
+    expect(reopened.finalPill).toBeUndefined();
+    const regulation = end(23, 2, true);
+    expect(regulation.status).toBe('final');
+    expect(regulation.finalPill).toBeUndefined();
+    expect(regulation.finalSaid).toBeUndefined();
+    expect(gameLinkText(regulation, gameLinkWords())).toContain(', final, 50 to 52');
+    // A game of quarters ends its regulation in period 4: no mark; period 5 is one overtime.
+    const quarters = gameView({ ...live, periods: 4 }, clock, addressee, 'fall-2026');
+    const update = { sequence: 30, status: 'final' as const, home: 52, away: 50 };
+    expect(applyUpdate(quarters, { ...update, period: 4 }, words).finalPill).toBeUndefined();
+    expect(applyUpdate(quarters, { ...update, period: 5 }, words).finalPill?.text).toBe(
+      'Final, OT',
+    );
+  });
+});
+
 describe('recent results order', () => {
   it('puts a finished game with no time last, not first', async () => {
     const { clock, schedule } = await load(adult);
@@ -451,5 +554,21 @@ describe('recent results order', () => {
     for (const listed of [...home.recent, ...home.upcoming]) {
       expect(listed.detailsHref, listed.status).toContain(`/games/${listed.id}`);
     }
+  });
+});
+
+// The lead's review of step 2.195, item 3: one number, one way. The home page's small
+// table writes a win percentage as the full table and the notes do: .667, never 0.667.
+describe('the home page’s small standings', () => {
+  it('writes PCT as the notes do, and keeps the notes, which carry their own numbers', async () => {
+    const [season] = await stats.seasonsOf(adult);
+    const result = await readStandings(stats.readStoreOf(adult), { seasonId: season?.id ?? '' });
+    if (!result.ok) throw new Error('expected standings');
+    const [east] = buildStandingsViews(result.value).map(compactStandings);
+    expect(east?.columns.map((c) => c.key)).toEqual(['played', 'wins', 'losses', 'winPercentage']);
+    expect(east?.rows.map((row) => row.cells['winPercentage'])).toEqual(['.667', '.667', '.000']);
+    expect(east?.footnotes.map((f) => f.text)).toEqual([
+      'Owls and Falcons are level on win percentage (.667). The game between them puts Owls ahead.',
+    ]);
   });
 });

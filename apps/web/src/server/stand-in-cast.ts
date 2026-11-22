@@ -38,6 +38,11 @@ export const standInPeople = {
   programScheduler: { accountId: id(0xaa), token: 'local-program-scheduler-token' },
   /** The admin of another league, a draft too, and nothing in the others. */
   otherAdmin: { accountId: id(0xab), token: 'local-other-admin-token' },
+  /**
+   * A scheduler of the first league only, signed in with a long address (52 letters), for
+   * the refusal's pictures and browser test (step 2.157).
+   */
+  longAddress: { accountId: id(0xad), token: 'local-scheduler-with-long-address-token' },
 } as const satisfies Record<string, MadeUpPerson>;
 
 function league(

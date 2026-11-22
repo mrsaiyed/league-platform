@@ -1,7 +1,8 @@
 // The standings and statistics pages' content (step 2.43), on the made-up stand-in data
 // and core's own queries: a staff-only team shows totals only to a visitor, leaders follow
 // the league's minimum games, and standings carry their footnotes.
-import { readStandings } from '@srleagues/core';
+import { defaultSeasonRules } from '@srleagues/contracts';
+import { defaultNamePolicy, readStandings, type StandingsReadStore } from '@srleagues/core';
 import { en } from '@srleagues/site';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -57,9 +58,44 @@ describe('standings page', () => {
     const text = renderToStaticMarkup(createElement(StandingsTables, { tables: views }));
     expect(text).toContain('Played an ineligible player in round 3.');
     expect(text).toContain('Adjusted by -1 win');
-    expect(text).toContain('games they played against each other');
     expect(text).toContain('Owls');
     expect(text).toContain('Seed');
+  });
+
+  // North Valley East (the numbers audit's case 45): Owls and Falcons both 2–1; the Owls won
+  // their one game, so they are first despite the worse difference. The note beside the
+  // Falcons, second, is true of them (step 2.195: it used to tell them they were "placed
+  // above"). West: Lions, Tigers, Hawks and Bears all 1–1, and the note claims no more than
+  // the stored rows can say (step 2.198 says which tiebreaker placed whom).
+  it('writes one note for each group of level teams, true of every team it is beside', async () => {
+    const [season] = await seasonsOf(adult);
+    const result = await readStandings(stats.readStoreOf(adult), { seasonId: season?.id ?? '' });
+    if (!result.ok) throw new Error('expected standings');
+    const [east, west] = buildStandingsViews(result.value);
+    const beside = (table: typeof east, team: string) =>
+      (table?.rows.find((row) => row.team === team)?.notes ?? []).map(
+        (id) => table?.footnotes.find((f) => f.id === id)?.text,
+      );
+    expect(east?.rows.map((row) => row.team)).toEqual(['Owls', 'Falcons', 'Herons']);
+    const eastNote =
+      'Owls and Falcons are level on win percentage (.667). The game between them puts Owls ahead.';
+    expect(beside(east, 'Falcons')).toEqual([eastNote]);
+    expect(beside(east, 'Owls')).toEqual([eastNote]);
+    expect(beside(east, 'Herons')).toEqual([]);
+    const westNote =
+      'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
+    for (const team of ['Lions', 'Tigers', 'Hawks', 'Bears']) {
+      expect(beside(west, team)).toEqual([westNote]);
+    }
+    expect(beside(west, 'Otters')).toEqual([]);
+    expect(beside(west, 'Badgers')).toEqual([
+      'Adjusted by -1 win. Played an ineligible player in round 3.',
+    ]);
+    const text = renderToStaticMarkup(
+      createElement(StandingsTables, { tables: [east, west].flatMap((t) => (t ? [t] : [])) }),
+    );
+    expect(text).not.toMatch(/placed above/i);
+    expect(text).toContain(eastNote);
   });
 
   it('ranks by points for a league that does, and says when teams are still level', async () => {
@@ -198,6 +234,7 @@ describe('statistics page', () => {
     totalsOnlyTeams: [],
     totalsNoteTeams: [],
     openingSort: null,
+    tableNotes: [],
   });
   // The lists of the page, in order: each one's title, whether it follows a card, and the
   // place its first line shows.
@@ -424,6 +461,166 @@ describe('statistics page', () => {
     ).toBe('73');
     expect(parseBy('total')).toBe('total');
     expect(parseBy('anything')).toBe('average');
+  });
+
+  // The first test's walk (the numbers audit's case 8): game 1, Wolves at Ravens, scored
+  // live, 7 to 6; game 2 typed in as a final score only, 50 to 45 for the Wolves. The
+  // standings count both games (Ravens 52 points in 2); the statistics count game 1 only,
+  // and now say so: Ravens 7.0 points a game, from 1 game (step 2.195).
+  it("says which games the statistics count, and each team's number of them (the walk)", async () => {
+    const ravens = 'ravens';
+    const wolves = 'wolves';
+    const season = '01900000-0000-7000-8000-0000000000e1';
+    const entry = (total: number) => ({ total, gamesRecorded: 1 });
+    const players = [
+      ['r1', ravens, 'Rae', { points: 2 }],
+      ['r4', ravens, 'Rio', { points: 2 }],
+      ['r5', ravens, 'Ros', { points: 1, fg1: 1 }],
+      ['r6', ravens, 'Rue', { points: 2 }],
+      ['w1', wolves, 'Wes', { points: 3, fg3: 1, fouls: 1 }],
+      ['w2', wolves, 'Wyn', { points: 1, fg1: 1 }],
+      ['w3', wolves, 'Wil', { points: 2 }],
+    ] as const;
+    const store: StandingsReadStore = {
+      findSeason: async (id) =>
+        id === season ? { id, name: 'Walk', rules: defaultSeasonRules() } : undefined,
+      seasonStatKeys: async () => [],
+      teams: async () =>
+        [ravens, wolves].map((id) => ({
+          id,
+          name: id === ravens ? 'Ravens' : 'Wolves',
+          slug: id,
+          color: null,
+          divisionId: null,
+          statsVisibility: 'everyone',
+          removed: false,
+        })),
+      divisions: async () => [],
+      standingsRows: async () => [],
+      adjustments: async () => [],
+      playerTotals: async () =>
+        players.map(([personId, , , stats]) => ({
+          personId,
+          gamesPlayed: 1,
+          secondsPlayed: 0,
+          secondsGames: 1,
+          stats: {
+            version: 1,
+            stats: Object.fromEntries(
+              ['points', 'fg3', 'fg1', 'fouls'].map((key) => [
+                key,
+                entry((stats as Readonly<Record<string, number>>)[key] ?? 0),
+              ]),
+            ),
+          },
+        })),
+      playerTeams: async () => players.map(([personId, teamId]) => ({ personId, teamId })),
+      decidedGamesOf: async () => [],
+      decidedGames: async () => [],
+      // Summed from game 1's lines: the typed game 2 has none.
+      teamStatTotals: async () => [
+        { teamId: ravens, statKey: 'points', ...entry(7) },
+        { teamId: ravens, statKey: 'fg3', ...entry(0) },
+        { teamId: ravens, statKey: 'fg1', ...entry(1) },
+        { teamId: ravens, statKey: 'fouls', ...entry(1) },
+        { teamId: wolves, statKey: 'points', ...entry(6) },
+        { teamId: wolves, statKey: 'fg3', ...entry(1) },
+        { teamId: wolves, statKey: 'fg1', ...entry(1) },
+        { teamId: wolves, statKey: 'fouls', ...entry(1) },
+      ],
+      teamTurnoverGames: async () => [],
+      people: async (ids) =>
+        ids.map((id) => ({
+          id,
+          firstName: players.find(([personId]) => personId === id)?.[2] ?? '',
+          lastName: 'Made-up',
+          isMinor: false,
+          visibility: 'none',
+        })),
+    };
+    const data = await loadStatsPage(
+      store,
+      { audience: 'adult', namePolicy: defaultNamePolicy, minimumGames: 3 },
+      { leagueId: adult, seasonId: season, by: 'average' },
+    );
+    if ('code' in data) throw new Error(data.code);
+    const row = data.teamRows.find((r) => r.cells['team'] === 'Ravens');
+    expect(row?.cells['points']).toBe('7.0');
+    expect(row?.cells['games']).toBe(1);
+    expect(data.teamRows.find((r) => r.cells['team'] === 'Wolves')?.cells['games']).toBe(1);
+    // The column comes right after the team, short on the page and named in full for
+    // screen readers.
+    expect(data.teamColumns.slice(0, 2)).toEqual([
+      { key: 'team', label: 'Team' },
+      { key: 'games', label: 'GP', fullName: 'Games with statistics', numeric: true },
+    ]);
+    const text = html(data);
+    expect(text).toContain(
+      '</section><p class="ui-section-note">Statistics count the games that were scored live or entered as a box score. A game with only a final score counts in the standings, not here.</p><div class="stats-tables"',
+    );
+    // Once, above both tables, before the players' table (the lead's review, item 7).
+    expect(text.match(/Statistics count the games/g)).toHaveLength(1);
+    expect(text.indexOf('Statistics count the games')).toBeLessThan(
+      text.indexOf('<h2>All players</h2>'),
+    );
+    // Every statistic here was kept in the one game each team has numbers from.
+    expect(text).not.toContain('averaged over the games where it was');
+    // Each team's totals are its players' numbers added up: nothing to say (step 2.196).
+    const teamsCountMore = "A team's totals count what was charged to the team";
+    expect(data.tableNotes.join(' ')).not.toContain(teamsCountMore);
+    const notesWith = async (over: Partial<StandingsReadStore>) => {
+      const read = await loadStatsPage(
+        { ...store, ...over },
+        { audience: 'adult', namePolicy: defaultNamePolicy, minimumGames: 3 },
+        { leagueId: adult, seasonId: season, by: 'average' },
+      );
+      if ('code' in read) throw new Error(read.code);
+      return read.tableNotes;
+    };
+    // A turnover charged to the Ravens, in a season that keeps no turnovers: no column
+    // shows it, so still nothing to say.
+    expect(
+      (
+        await notesWith({
+          teamTurnoverGames: async () => [
+            { gameId: 'g1', teamId: ravens, turnovers: 1, countedByLines: true },
+          ],
+        })
+      ).join(' '),
+    ).not.toContain(teamsCountMore);
+    // The Ravens' points a final score entered as 9 where their players add to 7: said
+    // once, after the page's other sentences.
+    const typed = await notesWith({
+      teamStatTotals: async (id) =>
+        (await store.teamStatTotals(id)).map((row) =>
+          row.teamId === ravens && row.statKey === 'points'
+            ? { ...row, total: 9, linesTotal: 7 }
+            : row,
+        ),
+    });
+    expect(typed.at(-1)).toBe(
+      "A team's totals count what was charged to the team and the final scores as entered, so they can differ from what its players' numbers add up to.",
+    );
+    expect(typed.filter((note) => note.startsWith(teamsCountMore))).toHaveLength(1);
+    expect(text).toContain('<span class="ui-visually-hidden">Games with statistics</span>');
+    // Season totals carry the same count: the totals are over the same one game.
+    const totals = await loadStatsPage(
+      store,
+      { audience: 'adult', namePolicy: defaultNamePolicy, minimumGames: 3 },
+      { leagueId: adult, seasonId: season, by: 'total' },
+    );
+    if ('code' in totals) throw new Error(totals.code);
+    expect(totals.teamRows.find((r) => r.cells['team'] === 'Ravens')?.cells).toMatchObject({
+      games: 1,
+      points: '7',
+    });
+  });
+
+  it('keeps the note about staff-only teams under the teams’ title, alone', async () => {
+    const text = html(await statsFor(adult));
+    expect(text).toContain(
+      '<h2>Teams</h2></div><p class="ui-section-note">Only team totals are shown for Owls.</p>',
+    );
   });
 
   it('names a statistic it has words for, and shows the key of one it has not', () => {
