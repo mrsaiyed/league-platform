@@ -255,6 +255,15 @@ describe('answers in the address', () => {
       expect(t(key)).toContain('kept for 30 days; the screen to bring');
       expect(t(key)).not.toMatch(/can be brought back|restore/i);
     }
+    // Putting back a cancelled game whose team, venue or court is in the bin.
+    for (const key of [
+      'admin.games.error.game-part-in-bin',
+      'error.leagues.restore_game.game-part-in-bin',
+    ] as const) {
+      expect(t(key)).toContain('the screen to bring it back is not ready yet');
+      expect(t(key)).toContain('cannot be put back for now');
+      expect(t(key)).not.toMatch(/back first|can be brought back|restore/i);
+    }
     expect(t.plural('adminTeams.remove.roster', 2)).toBe(
       '2 people are on its roster now. Once the team is removed, they can be taken off the league list.',
     );
