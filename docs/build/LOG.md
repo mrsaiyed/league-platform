@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-22 11:52 UTC — Step 2.239 landed (1f9386f, T-298): on a hosted copy every form saved and then showed 'Page not found', because Next.js fetches the next page from itself at its own listening address; cured without widening the host check. One independent review at effort high: may land, four Lows. GitHub passed it twice.
+
 - 2026-11-22 11:32 UTC — Step 2.205 landed (20f48ca; T-297): on the test copy one line says everything is made up; sign-up, reset, a new code, Google sign-in and an admin's typed contact email all refuse an address that is not made up, before the bot check or the sign-in service is asked; production and local unchanged; one independent review at effort high with use in a browser (two Mediums: Google and the People email, both closed in the step); GitHub passed twice.
 
 - 2026-11-22 10:21 UTC — Step 2.93 landed whole (f7845c5): the website starts on the real database in staging (record 082, T-286): http site address refused, the database's certificate checked, three refusals told apart, the event handlers and the bot check each made in one place with tests that can fail; one independent review at effort high (two Mediums, both in tests, fixed); two faults GitHub showed were cured at their cause (a title check that looked too early; the made-up database server closing under a client just gone); GitHub passed twice.
