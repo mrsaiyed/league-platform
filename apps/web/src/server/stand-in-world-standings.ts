@@ -99,6 +99,7 @@ export function worldStandingsRead(
       (await over()).decidedGamesOf(seasonId, personIds),
     decidedGames: async (seasonId) => (await over()).decidedGames(seasonId),
     teamStatTotals: async (seasonId) => (await over()).teamStatTotals(seasonId),
+    teamTurnoverGames: async (seasonId) => (await over()).teamTurnoverGames(seasonId),
     people: async (personIds) => (await over()).people(personIds),
   };
 }
@@ -221,18 +222,30 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
     // Each team's total of each stat over its final games, from its players' lines that
     // entered the game (list-team-stat-totals.ts).
     teamStatTotals: async (seasonId) => {
-      const finals = new Set(
-        decidedGames(seasonId)
-          .filter((g) => g.status === 'final')
-          .map((g) => g.id),
-      );
-      const sums = new Map<string, { total: number; games: Set<string> }>();
+      const finalGames = decidedGames(seasonId).filter((g) => g.status === 'final');
+      const finals = new Set(finalGames.map((g) => g.id));
+      /** The team's final score in the game, or null when it has none. */
+      const scoreOf = (gameId: string, teamId: string): number | null => {
+        const g = finalGames.find((x) => x.id === gameId);
+        if (g === undefined) return null;
+        if (g.homeTeamId === teamId) return g.homeScore;
+        return g.awayTeamId === teamId ? g.awayScore : null;
+      };
+      const sums = new Map<string, { total: number; lines: number; games: Set<string> }>();
       for (const line of at()?.lines ?? []) {
         if (!finals.has(line.gameId) || !line.played) continue;
         for (const [key, value] of Object.entries(line.stats)) {
           if (!Number.isInteger(value) || value < 0) continue;
-          const sum = sums.get(`${line.teamId}|${key}`) ?? { total: 0, games: new Set<string>() };
-          sum.total += value;
+          const sum = sums.get(`${line.teamId}|${key}`) ?? {
+            total: 0,
+            lines: 0,
+            games: new Set<string>(),
+          };
+          // A team's points are its final scores, over the same games (as
+          // list-team-stat-totals.ts: S-26 as changed by step 2.196); added once a game.
+          if (key !== 'points' || scoreOf(line.gameId, line.teamId) === null) sum.total += value;
+          else if (!sum.games.has(line.gameId)) sum.total += scoreOf(line.gameId, line.teamId) ?? 0;
+          sum.lines += value;
           sum.games.add(line.gameId);
           sums.set(`${line.teamId}|${key}`, sum);
         }
@@ -241,8 +254,51 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([at, sum]) => {
           const [teamId = '', statKey = ''] = at.split('|');
-          return { teamId, statKey, total: sum.total, gamesRecorded: sum.games.size };
+          return {
+            teamId,
+            statKey,
+            total: sum.total,
+            linesTotal: sum.lines,
+            gamesRecorded: sum.games.size,
+          };
         });
+    },
+    // As list-team-turnover-games.ts counts them: in each final game, per side, the team
+    // turnovers in the saved plays less those taken back, and whether a played line of
+    // the team carries turnovers.
+    teamTurnoverGames: async (seasonId) => {
+      const finals = decidedGames(seasonId).filter((g) => g.status === 'final');
+      const rows = finals.flatMap((g) => {
+        const state = at()?.states.find((x) => x.gameId === g.id)?.state;
+        const plays: unknown =
+          typeof state === 'object' && state !== null
+            ? (state as { plays?: unknown }).plays
+            : undefined;
+        if (!Array.isArray(plays)) return [];
+        return (['home', 'away'] as const).flatMap((side) => {
+          const teamId = side === 'home' ? g.homeTeamId : g.awayTeamId;
+          const count = (type: string) =>
+            plays.filter(
+              (play: unknown) =>
+                typeof play === 'object' &&
+                play !== null &&
+                (play as { type?: unknown }).type === type &&
+                (play as { side?: unknown }).side === side,
+            ).length;
+          const turnovers = count('team-turnover') - count('team-unturnover');
+          const countedByLines = (at()?.lines ?? []).some(
+            (l) =>
+              l.gameId === g.id &&
+              l.teamId === teamId &&
+              l.played &&
+              typeof l.stats['turnovers'] === 'number',
+          );
+          return turnovers > 0 ? [{ gameId: g.id, teamId, turnovers, countedByLines }] : [];
+        });
+      });
+      return rows.sort(
+        (a, b) => a.gameId.localeCompare(b.gameId) || a.teamId.localeCompare(b.teamId),
+      );
     },
     people: async (personIds) =>
       (at()?.people ?? [])

@@ -236,12 +236,12 @@ registerCommandCase(reopenGame, harnessTx, {
 // refused or finds no game.
 registerCommandCase(reopenTrackedGame, harnessTx, {
   name: "reopen the target's final game from its tracker",
-  // A set id, so every run sends the same request. Its seeded events are a basket and
-  // the end: the end is the second.
+  // A set id, so every run sends the same request. Its seeded events end with the end:
+  // the end is the last of them.
   input: (target) => ({
     gameId: target.gameId,
     requestId: '01900000-0000-7000-8000-00000000c2a1',
-    sequence: 2,
+    sequence: target.gameEventIds.length,
     reason: 'Harness reopening',
   }),
 });
@@ -652,12 +652,12 @@ registerIsolationCase({
 
 registerIsolationCase({
   subject: insertGameEvents,
-  name: "add a third event to the target's final game",
+  name: "add the next event to the target's final game",
   run: (scope, target) =>
     insertGameEvents(scope, [
       {
         gameId: target.gameId,
-        seq: 3,
+        seq: target.gameEventIds.length + 1,
         commandId: harnessCommandIds[0] ?? '',
         type: 'pause',
         payload: {},

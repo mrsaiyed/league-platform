@@ -107,6 +107,7 @@ export function memoryStandingsRead(): StandingsReadStore {
       { teamId: openTeam, statKey: 'points', total: 80, gamesRecorded: 2 },
       { teamId: staffTeam, statKey: 'points', total: 100, gamesRecorded: 2 },
     ],
+    teamTurnoverGames: async () => [],
     people: async (ids) =>
       ids.map((id) => ({
         id,
