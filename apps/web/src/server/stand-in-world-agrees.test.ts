@@ -781,14 +781,15 @@ describe('the one world and the database, the same season by the same commands',
     expect(herons.totals['points']).toBe(50);
     expect((herons.players ?? []).reduce((n, p) => n + Number(p.cells['points'] ?? 0), 0)).toBe(48);
     // The season's points for the Herons are their final scores where their players'
-    // points were recorded: 50 typed and 4 tracked, as their two Totals and the
-    // standings say, not the 48 and 4 their players add to (S-26 as changed).
+    // points were recorded: 50 typed and 5 tracked (the tracked game is levelled in the
+    // second half and won in overtime, step 2.200), as their two Totals and the
+    // standings say, not the 48 and 5 their players add to (S-26 as changed).
     const heronsId = [...database.names].find(([, name]) => name === 'team:Herons')?.[0];
     expect(read.teams.find((t) => t.team === heronsId)?.points).toMatchObject({
-      total: 54,
+      total: 55,
       gamesRecorded: 2,
     });
-    expect(tableOf(read.tracked, 'home').totals['points']).toBe(4);
+    expect(tableOf(read.tracked, 'home').totals['points']).toBe(5);
     expect(herons.notes).toEqual([
       "The players' points add to 48. The final score was entered as 50.",
     ]);
