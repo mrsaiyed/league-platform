@@ -16,6 +16,7 @@ import {
   folderInside,
   foldersOnTheWay,
   majorVersion,
+  mayRemoveFolder,
   pidOf,
   processState,
   readArguments,
@@ -187,5 +188,53 @@ test('stop and status with nothing running say so, and need no PostgreSQL', () =
     );
     assert.equal(ran.status, 0, ran.stderr);
     assert.match(ran.stdout, /No test PostgreSQL is running in \.local\/pg-never-made\./);
+  }
+});
+
+test('stop removes only a folder it made: empty, or holding one of its own marks', () => {
+  const has = (present) => (mark) => present.includes(mark);
+  const connectionFile = 'connection.json';
+  assert.equal(mayRemoveFolder({ entries: [], has: has([]), connectionFile }), true);
+  for (const mark of ['connection.json', 'modes-on-the-way.json', 'data/PG_VERSION']) {
+    assert.equal(mayRemoveFolder({ entries: ['x'], has: has([mark]), connectionFile }), true, mark);
+  }
+  // `.local/lanes`, say: other folders and files, none of its marks.
+  assert.equal(
+    mayRemoveFolder({
+      entries: ['2.202-real-postgres', 'notes.txt'],
+      has: has([]),
+      connectionFile,
+    }),
+    false,
+  );
+});
+
+test('stop --folder on a folder it did not make refuses in one sentence, and removes nothing', () => {
+  const none = { bin: emptyFolder(), PATH: emptyFolder() };
+  const name = `.local/real-postgres-not-ours-${process.pid}`;
+  const folder = path.join(root, name);
+  fs.mkdirSync(path.join(folder, 'kept'), { recursive: true });
+  fs.writeFileSync(path.join(folder, 'kept', 'work.txt'), 'made-up work');
+  try {
+    const stopIn = () =>
+      spawnSync(process.execPath, ['scripts/real-postgres.mjs', 'stop', '--folder', name], {
+        cwd: root,
+        encoding: 'utf8',
+        env: { ...process.env, REAL_POSTGRES_BIN: none.bin, PATH: none.PATH },
+      });
+    const refused = stopIn();
+    assert.equal(refused.status, 1);
+    assert.match(
+      refused.stderr,
+      /^FAILED: nothing was removed, because \.local\/real-postgres-not-ours-\d+ is not a folder this command made/m,
+    );
+    assert.equal(fs.existsSync(path.join(folder, 'kept', 'work.txt')), true);
+    // With its own mark, what a stopped server left is removed.
+    fs.writeFileSync(path.join(folder, 'connection.json'), '{}');
+    const removed = stopIn();
+    assert.equal(removed.status, 0, removed.stderr);
+    assert.equal(fs.existsSync(folder), false);
+  } finally {
+    fs.rmSync(folder, { recursive: true, force: true });
   }
 });

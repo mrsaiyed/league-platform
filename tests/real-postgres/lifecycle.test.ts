@@ -2,7 +2,16 @@
 // server of its own, in its own folder and on its own port, so the one the other tests
 // use keeps running. `stop` leaves no process of it and git sees nothing changed.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, readlinkSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -12,8 +21,8 @@ const folder = '.local/pg-lifecycle-test';
 const full = path.join(root, folder);
 const options = ['--folder', folder, '--port', '54339'];
 
-const script = (command: string) => {
-  const ran = spawnSync(process.execPath, ['scripts/real-postgres.mjs', command, ...options], {
+const script = (command: string, given: string[] = options) => {
+  const ran = spawnSync(process.execPath, ['scripts/real-postgres.mjs', command, ...given], {
     cwd: root,
     encoding: 'utf8',
   });
@@ -95,6 +104,27 @@ describe('start, status and stop', () => {
     expect(existsSync(full)).toBe(false);
     expect(gitStatus()).toBe(before);
     expect(script('status').said).toContain(`No test PostgreSQL is running in ${folder}`);
+  });
+
+  it('puts back the modes start changed on the folders on the way, when it stops', () => {
+    // Planted: a folder on the way that only its owner may pass through. When the session
+    // is root, start lets the server's own account pass (o+x, g+x); stop must undo that.
+    const parent = path.join(root, '.local', 'pg-modes-test');
+    const inside = ['--folder', '.local/pg-modes-test/pg', '--port', '54338'];
+    mkdirSync(parent, { recursive: true });
+    chmodSync(parent, 0o700);
+    const mode = () => statSync(parent).mode & 0o7777;
+    try {
+      const started = script('start', inside);
+      expect(started.status, started.said).toBe(0);
+      if (process.getuid?.() === 0) expect(mode()).toBe(0o711);
+      const stopped = script('stop', inside);
+      expect(stopped.status, stopped.said).toBe(0);
+      expect(mode()).toBe(0o700);
+    } finally {
+      script('stop', inside);
+      rmSync(parent, { recursive: true, force: true });
+    }
   });
 
   it('refuses a folder that is not inside .local', () => {

@@ -39,6 +39,8 @@ import {
   folderInside,
   foldersOnTheWay,
   majorVersion,
+  mayRemoveFolder,
+  modesFileName,
   oldestMajor,
   pidOf,
   processState,
@@ -185,6 +187,55 @@ const readConnection = (paths) => {
   }
 };
 
+/**
+ * Whether the folder may be removed whole: it is empty, or holds this command's own marks.
+ * Otherwise says so, plainly, and it is left as it is.
+ */
+function mayRemove(paths) {
+  let entries;
+  try {
+    entries = fs.readdirSync(paths.folder);
+  } catch {
+    return true;
+  }
+  const allowed = mayRemoveFolder({
+    entries,
+    has: (mark) => fs.existsSync(path.join(paths.folder, mark)),
+    connectionFile: path.basename(paths.connection),
+  });
+  if (!allowed) {
+    console.error(words.notOurFolder(shown(paths.folder)));
+    process.exitCode = 1;
+  }
+  return allowed;
+}
+
+/** Puts back the modes `start` changed on the folders on the way, as it noted them. */
+function restoreModesOnTheWay(paths) {
+  let noted;
+  try {
+    noted = JSON.parse(fs.readFileSync(path.join(paths.folder, modesFileName), 'utf8'));
+  } catch {
+    return;
+  }
+  const onTheWay = foldersOnTheWay(root, paths.folder);
+  for (const [folder, mode] of Object.entries(noted)) {
+    // Only a folder on the way to this one, whatever the file says.
+    if (!onTheWay.includes(folder) || typeof mode !== 'number') continue;
+    try {
+      fs.chmodSync(folder, mode);
+    } catch {
+      // Gone already.
+    }
+  }
+}
+
+/** Removes the folder whole, the modes on the way to it put back first. */
+function removeFolder(paths) {
+  restoreModesOnTheWay(paths);
+  fs.rmSync(paths.folder, { recursive: true, force: true });
+}
+
 /** Starts a fresh server in the folder. Returns true when it runs, ready for tests. */
 async function start(tools, paths, port) {
   if (runningPid(paths) !== null) {
@@ -192,7 +243,8 @@ async function start(tools, paths, port) {
     return true;
   }
   if (fs.existsSync(paths.folder)) {
-    fs.rmSync(paths.folder, { recursive: true, force: true });
+    if (!mayRemove(paths)) return false;
+    removeFolder(paths);
     console.log(words.leftOver(shown(paths.folder)));
   }
   fs.mkdirSync(paths.tls, { recursive: true, mode: 0o700 });
@@ -200,16 +252,23 @@ async function start(tools, paths, port) {
   giveTo(tools, paths.folder);
   // mkdir made `.local` (and any folder on the way) for this session's account alone:
   // the server's own account may pass through them, without reading what else is there.
+  // Their modes are noted first, and `stop` (or a failed start) puts them back.
   if (tools.runAs) {
-    for (const folder of foldersOnTheWay(root, paths.folder)) {
-      fs.chmodSync(folder, fs.statSync(folder).mode | 0o011);
-    }
+    const onTheWay = foldersOnTheWay(root, paths.folder);
+    const noted = Object.fromEntries(
+      onTheWay.map((folder) => [folder, fs.statSync(folder).mode & 0o7777]),
+    );
+    fs.writeFileSync(path.join(paths.folder, modesFileName), JSON.stringify(noted, null, 2), {
+      mode: 0o600,
+    });
+    for (const folder of onTheWay) fs.chmodSync(folder, noted[folder] | 0o011);
   }
 
   const stopAndClean = (step) => {
     console.error(words.startFailed(step, shown(paths.log)));
     if (runningPid(paths) !== null)
       runProgram(tools, 'pg_ctl', ['-D', paths.data, '-m', 'immediate', '-w', 'stop']);
+    restoreModesOnTheWay(paths);
     return false;
   };
 
@@ -321,6 +380,7 @@ async function stop(tools, paths, { quiet = false } = {}) {
     if (!quiet) console.log(words.notRunning(shown(paths.folder)));
     return true;
   }
+  if (pid === null && !mayRemove(paths)) return false;
   if (pid !== null) {
     if (tools === null) return false;
     runProgram(tools, 'pg_ctl', ['-D', paths.data, '-m', 'fast', '-w', '-t', '60', 'stop']);
@@ -331,7 +391,7 @@ async function stop(tools, paths, { quiet = false } = {}) {
     process.exitCode = 1;
     return false;
   }
-  fs.rmSync(paths.folder, { recursive: true, force: true });
+  removeFolder(paths);
   if (!quiet)
     console.log(
       pid === null ? words.leftOver(shown(paths.folder)) : words.stopped(shown(paths.folder)),

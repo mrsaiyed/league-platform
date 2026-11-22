@@ -81,6 +81,25 @@ export function foldersOnTheWay(root, full) {
   return onTheWay;
 }
 
+/** The file in the server's folder that keeps the modes `start` changed on the way. */
+export const modesFileName = 'modes-on-the-way.json';
+
+/**
+ * The marks only this command leaves in a server's folder: its connection file (named by
+ * the caller), the modes it changed on the way, and a server's data files.
+ */
+export const ownMarks = (connectionFile) => [connectionFile, modesFileName, 'data/PG_VERSION'];
+
+/**
+ * Whether `stop` (or a fresh `start`) may remove the folder whole: only when it is empty
+ * or holds one of this command's own marks, so that naming any other folder inside
+ * `.local` (`.local/lanes`, say) can never remove it. `has` says whether a path inside
+ * the folder exists; `entries` is what the folder holds.
+ */
+export function mayRemoveFolder({ entries, has, connectionFile }) {
+  return entries.length === 0 || ownMarks(connectionFile).some((mark) => has(mark));
+}
+
 /** A program's file name on this platform. */
 export const programFile = (name, platform) => (platform === 'win32' ? `${name}.exe` : name);
 

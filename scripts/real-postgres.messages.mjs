@@ -59,6 +59,10 @@ export const alreadyRunning = (where) =>
   `A test PostgreSQL is already running in ${where}. Nothing was changed; stop it first ` +
   'to start a fresh one.';
 
+export const notOurFolder = (where) =>
+  `FAILED: nothing was removed, because ${where} is not a folder this command made (it ` +
+  'holds no connection.json and no data/PG_VERSION); name the folder of a test PostgreSQL.';
+
 export const leftOver = (where) =>
   `Removed what a test PostgreSQL that is no longer running left in ${where}.`;
 
