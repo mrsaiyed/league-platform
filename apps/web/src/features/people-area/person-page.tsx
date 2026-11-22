@@ -127,15 +127,16 @@ export async function PersonPage({
         ) : (
           <ul>
             {teams.map((team) => (
+              // The team they are on, said plainly, then its two pages, each named for what
+              // it is: so the picker below is never read as one of their teams.
               <li key={team.id}>
+                <span dir="auto">{t('adminPeople.teams.on', { team: team.name })}</span>{' '}
                 <a href={leagueUrl(here, 'admin-area', { area: 'teams', subpath: [team.id] })}>
-                  {t('adminPeople.teams.admin', { team: team.name })}
+                  {t('adminPeople.teams.admin')}
                 </a>{' '}
-                (
                 <a href={leagueUrl(here, 'team', { team: team.slug })}>
                   {t('adminPeople.teams.public')}
                 </a>
-                )
               </li>
             ))}
           </ul>
@@ -148,8 +149,18 @@ export async function PersonPage({
             <input type="hidden" name="personId" value={person.id} />
             <input type="hidden" name="role" value="player" />
             <label className="staff-field">
-              <span>{t('adminPeople.teams.addLabel')}</span>
-              <select name="team">
+              <span>
+                {t(
+                  teams.length === 0
+                    ? 'adminPeople.teams.addLabelFirst'
+                    : 'adminPeople.teams.addLabel',
+                )}
+              </span>
+              {/* It starts on no team, and the form is not sent until one is chosen. */}
+              <select name="team" required defaultValue="">
+                <option value="" disabled>
+                  {t('adminPeople.teams.choose')}
+                </option>
                 {addable.map((team) => (
                   <option key={team.id} value={team.id}>
                     {team.name}
@@ -247,7 +258,9 @@ function treatmentLineOf(
     },
   );
   const showsText = shown.shown
-    ? t('adminPeople.publicShows', { name: shown.text })
+    ? // The sentence ends with its own full stop: a name shortened to an initial ("Marcus O.")
+      // does not bring a second one.
+      t('adminPeople.publicShows', { name: shown.text.replace(/\.$/, '') })
     : shown.why === 'removed'
       ? t('adminPeople.publicShows.removed')
       : shown.why === 'hidden'

@@ -9,7 +9,7 @@ import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildHomeGames, buildScheduleView, gameView, type GameView } from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
-import { homeLeadersPlace, homeNextGames, homeResults } from './home-lists.ts';
+import { homeLeadersPlace, homeNextGames, homeNextTitle, homeResults } from './home-lists.ts';
 import { gameLinkWords } from './schedule-views.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -300,5 +300,18 @@ describe('where the home page’s leaders stand', () => {
         }
       }
     }
+  });
+});
+
+describe('the heading over the coming games', () => {
+  const game = (id: string, status: string) => ({ id, status }) as unknown as GameView;
+  it('says they wait for a new date when every one listed is postponed', () => {
+    expect(homeNextTitle([game('a', 'postponed'), game('b', 'postponed')])).toBe(
+      'home.upcoming.postponed',
+    );
+  });
+  it('stays "The next matchups" while a real game is coming', () => {
+    expect(homeNextTitle([game('a', 'scheduled'), game('b', 'postponed')])).toBe('home.upcoming');
+    expect(homeNextTitle([])).toBe('home.upcoming');
   });
 });
