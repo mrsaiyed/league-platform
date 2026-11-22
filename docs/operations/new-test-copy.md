@@ -28,7 +28,7 @@ This makes the tables and the two roles the website needs, `app_user` and `sign_
 
 The website never signs in as the tables' owner. It has its own login, which can only do what `app_user` may do, inside one league at a time.
 
-1. Make a new, long, random password in your password manager, and save it there under "test copy: app_login".
+1. Make a new, long, random password in your password manager, of letters and digits only (no `@`, `/`, `:`, `#` or `%`: those signs would break the address the password is later written into), and save it there under "test copy: app_login".
 2. In the dashboard's **SQL editor**, make the login **without** a password (a password typed there could be kept in the editor's saved queries or in the database's logs):
 
    ```sql
@@ -38,7 +38,7 @@ The website never signs in as the tables' owner. It has its own login, which can
 
    See "Success". Until step 3 it has no password, so nobody can sign in with it.
 
-3. Give it its password **at your own terminal**, with PostgreSQL's own program `psql` (to confirm it is installed: `psql --version`; on a Mac it comes with `brew install libpq`). Connect as the tables' owner, with no password in the address:
+3. Give it its password **at your own terminal**, with PostgreSQL's own program `psql` (to confirm it is installed: `psql --version`; on a Mac it comes with `brew install libpq`, which does not put `psql` where the terminal finds it: after it, run `brew link --force libpq` once, or call it by its whole path, `$(brew --prefix libpq)/bin/psql`; to confirm on your computer). Connect as the tables' owner, with no password in the address:
 
    ```bash
    psql 'postgresql://postgres.<reference>@<pooler host>:5432/postgres?sslmode=verify-full&sslrootcert=staging-ca.crt'

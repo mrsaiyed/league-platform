@@ -37,7 +37,7 @@ It then asks for **the migration login's password**. Copy it from your password 
 
 **Never put the password in the command.** The address Supabase shows may have `[YOUR-PASSWORD]`, or the password itself, between a `:` and the `@`: take that part out, the `:` with it. If an address you give has a password in it, the command stops at once with: "That address carries a password, so nothing was opened and none of it is shown: give the address without its password (the release asks for the password itself, with the typing hidden), and clear that line from your terminal’s history." Then:
 
-1. Close that terminal window, open a new one, and delete the line from the terminal's history file in a text editor: on a Mac, the hidden file `.zsh_history` in your home folder; on Linux, `.bash_history` (to confirm on your computer).
+1. Close EVERY terminal window first (a window still open writes its remembered commands back when it closes, and would bring the line back), then open one new window and delete the line from the terminal's history file in a text editor: on a Mac, the hidden file `.zsh_history` in your home folder; on Linux, `.bash_history` (to confirm on your computer). A Mac may also keep a copy for each window in the hidden folder `.zsh_sessions` in your home folder: delete the files in it too (to confirm). Then change that password, as `rotating-a-secret.md` says: a password that was once on a command line is treated as seen.
 2. If that terminal text was copied anywhere (a chat, a note), change the password: [rotating a secret](rotating-a-secret.md), "The tables' owner".
 3. Run the command again, as above, without the password.
 
