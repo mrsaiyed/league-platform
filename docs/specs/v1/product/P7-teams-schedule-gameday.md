@@ -110,7 +110,7 @@ How the grid works (built in step 2.64):
 - **Columns follow the season's "Statistics kept" (section 1).** Points only: points. Points and fouls: points, fouls. The standard set: points, 3-pointers, free throws, fouls, and minutes. The full set (**S-25**, decided for you): the standard set plus rebounds, assists, steals, blocks and turnovers.
 - **Each team's roster is listed**, players who have left the team since included (R-17), as they may have played that game.
 - **Empty boxes.** A player who is ticked as played, or has any number filled in, played. A column with at least one number for a team was kept for that team, so its empty boxes are 0. A column left wholly empty was not kept, and does not count in that player's averages. A team score left empty is the total of its players' points, 0 when none has any.
-- **A typed score that differs from the players' points is not refused** (**S-26**, decided for you): the admin may know better than the sheet. The page shows a warning as they type, before saving, and the score saved is the one typed.
+- **A typed score that differs from the players' points is not refused** (**S-26**, decided for you): the admin may know better than the sheet. The page shows a warning as they type, before saving, and the score saved is the one typed. On the game's public page the score stays as typed, in the box score's Total too, and one plain sentence under the box score says what the players' points add to ("The players' points add to 48. The final score was entered as 50."). No "team" row is made up to make the numbers meet, because the difference can go either way (S-26 as changed by step 2.196, decided for you). A team for which nothing was entered has no table of dashes: one sentence stands in its place ("No player numbers were recorded for this team."), and its score is on the board.
 - **A game scored with the live tracker is refused here.** It is corrected in the tracker, so its list of plays still explains its numbers.
 - **A final game is corrected by reopening it** with a reason (S-7), then saving the grid again.
 - **Switching back to a final score only** (**S-27**, decided for you): if a reopened box score game is saved with two numbers only, its old lines are cleared in the same save, so they no longer count in season totals or stat leaders.
@@ -149,7 +149,9 @@ How the grid works (built in step 2.64):
 
 ### 5.3 What fans see
 
-`/{league}/games/{game}` shows the scoreboard and clock, both teams' box scores and the play-by-play, updating within about two seconds of each tap, with no refreshing. **S-33:** until step 2.104 the play-by-play is the list as it stood when the page was opened, with a "Show newer plays" link; the latest play, the score, the team fouls and the clock update live. The league home and schedule show a **Live** marker and the running score.
+`/{league}/games/{game}` shows the scoreboard and clock, both teams' box scores and the play-by-play, updating within about two seconds of each tap, with no refreshing.
+
+**A box score's Total counts everything the team did** (step 2.196; S-26 as changed, decided for you). Its columns are the season's "Statistics kept" (section 1), in that order, as the statistics page shows them, each one the game recorded. A turnover charged to the team rather than a player (the scoring screen offers one in every season) is in the team's Total of turnovers, and a sentence under the box score says so ("The Total includes 1 turnover charged to the team, not to a player."); its points are the game's score. Every Total the page shows is what its column adds up to, or a sentence under the table says why not. **S-33:** until step 2.104 the play-by-play is the list as it stood when the page was opened, with a "Show newer plays" link; the latest play, the score, the team fouls and the clock update live. The league home and schedule show a **Live** marker and the running score.
 
 ### 5.4 When the game ends
 
@@ -172,18 +174,22 @@ How the grid works (built in step 2.64):
 | ------------ | -------------------------------------------------------------------------------- |
 | Forfeit      | Winner and loser recorded with the league's forfeit score. No player statistics. |
 | Cancelled    | Does not count for anything                                                      |
-| Postponed    | Waits for a new date                                                             |
+| Postponed    | Waits for a new date; no score until then, but it can be forfeited (S-75)        |
 | Tie          | Only if the season allows ties                                                   |
 | Overtime     | Added periods; shown on the result                                               |
 | Did not play | A rostered player who never entered gets no "game played"                        |
 
-A cancelled game can be put back, with a reason, by whoever may cancel it; it is a scheduled game again (**S-51**, decided for you).
+A cancelled game can be put back, with a reason, by whoever may cancel it; it is a game again, as it was when it was cancelled (**S-51**, decided for you; **S-75** below).
+
+Forfeiting, postponing and cancelling each ask once, naming the game, before anything changes; the team that forfeits is always chosen, never filled in. The reason a game is put back is chosen from a short list ("cancelled by mistake", "the game will be played after all", "the wrong game was cancelled", "another reason"), because the activity log keeps fixed words only. A game whose line-ups were already set at the scorer's table can still be postponed or cancelled: its line-ups are kept for when it is played (step 2.158).
+
+**S-75 (decided for you, November 17):** a postponed game has no score until it is played on a new date or forfeited. A forfeit is the one result it takes (a team that cannot make any new date), and the screen offers it; a score typed, a box score, the tracker and an imported score are all refused until it has a date again (the import leaves that score waiting and says why). A postponement made by mistake is put back on its old date, with a reason, by whoever may postpone. A cancelled game put back is what it was when it was cancelled: scheduled, or postponed and waiting. Its team, venue or court must not be in the bin; if another game has taken its court or one of its teams at that time since, it is put back all the same and the screen names that game at once.
 
 ## 6. Standings and statistics
 
 - **S-9: standings are always calculated from final games; nobody types them in.** Each division has its own table with seeds. When teams are level, the page can show why one is ahead ("head-to-head").
 - **S-10: an admin can add an adjustment** (a points deduction, a forfeit win awarded by ruling) with a reason. It shows as a footnote under the table.
-- **Statistics**: season totals and per-game averages for every stat the season keeps; leaders with a minimum-games rule the league sets, which starts at 3 games (**S-63**, decided for you); a full sortable table. Fouls and turnovers get no leaders card unless the league switches it on (**S-48**, decided for you); they stay in the tables. The rule is the league setting `statistics.minimumGamesToRank`, set from 0 to 1000 on the league's settings screen; 0 ranks everyone, and a player with fewer games still shows in the full table.
+- **Statistics**: season totals and per-game averages for every stat the season keeps (a team's totals count everything the team did, as its box scores' Totals do: its turnovers include those charged to the team itself, and its points are the final scores of the games the statistics count, as the game pages and the standings have them, while a player's points stay their own lines; step 2.196, S-26 as changed, decided for you); leaders with a minimum-games rule the league sets, which starts at 3 games (**S-63**, decided for you); a full sortable table. Fouls and turnovers get no leaders card unless the league switches it on (**S-48**, decided for you); they stay in the tables. The rule is the league setting `statistics.minimumGamesToRank`, set from 0 to 1000 on the league's settings screen; 0 ranks everyone, and a player with fewer games still shows in the full table.
 - **Minutes** in the box score, the season totals and the averages are counted on the game clock (**S-71**, section 5.2): a player's minutes in a period are the game clock's time while they were on the court, so the five on the court for a whole 8:00 quarter have 8:00 each, whatever the scorekeeper corrected on the clock. A game played on the Al-Hadi tracker or recorded before November 16 keeps the minutes it was recorded with.
 - **Player pages** (if the league shows them): this season, past seasons, and career totals within the league.
 - **S-11: only final games count.** A live game's numbers show on its own page but not in season totals until it ends.

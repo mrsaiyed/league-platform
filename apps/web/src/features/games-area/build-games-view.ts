@@ -32,8 +32,16 @@ export type GameRowView = {
   readonly canScore: boolean;
   /** Forfeit may be recorded. */
   readonly canForfeit: boolean;
-  /** Postpone and cancel are offered (only before the game starts). */
-  readonly canCallOff: boolean;
+  /** Postpone is offered: a scheduled game, before it starts (step 2.158: it asks first). */
+  readonly canPostpone: boolean;
+  /** Cancel is offered: a scheduled or a postponed game (step 2.158: it asks first). */
+  readonly canCancel: boolean;
+  /** "Put this game back" is offered: a cancelled game, to whoever may cancel it (S-51). */
+  readonly canPutBack: boolean;
+  /** "Put it back on its date" is offered: a postponed game, to whoever may postpone (S-75). */
+  readonly canRestore: boolean;
+  /** The score a forfeit would record, winner's and loser's (the forfeit's question says it). */
+  readonly forfeitScore: { readonly winner: number; readonly loser: number };
   /** For a final or forfeited game: how it is put right, or who can (reopen-view.ts). */
   readonly reopen: ReopenView | undefined;
 };
@@ -57,9 +65,9 @@ export function buildGameRows(
 ): readonly GameRowView[] {
   return games.map((game) => {
     const status = statusOf(game.status);
-    // A postponed game waits for a new date (P7 §5.6): it is scored or forfeited only once
-    // the schedule has given it one and it is scheduled again. A game with plays is
-    // ended in the tracker (S-46): no score typed by hand, no forfeit, no paper sheet.
+    // A postponed game waits for a new date (P7 §5.6): it is scored only once it is played
+    // then, but it may be forfeited (S-75, step 2.158). A game with plays is ended in the
+    // tracker (S-46): no score typed by hand, no forfeit, no paper sheet.
     const open = (status === 'scheduled' || status === 'live') && !game.hasPlays;
     const mayChange = mayChangeResult(holder, game.programId);
     return {
@@ -81,8 +89,15 @@ export function buildGameRows(
         game.scorable &&
         ((status === 'scheduled' && !game.hasPlays) ||
           ((status === 'final' || status === 'forfeit') && game.recording === 'box-score')),
-      canForfeit: game.scorable && mayChange && open,
-      canCallOff: game.scorable && mayChange && status === 'scheduled',
+      canForfeit: game.scorable && mayChange && (open || status === 'postponed'),
+      // A scheduled game that holds line-ups from a scorer's table (it has "plays" by the
+      // store's rule, but is not live) may still be postponed or cancelled: its line-ups
+      // are kept, and the question says so (step 2.158).
+      canPostpone: game.scorable && mayChange && status === 'scheduled',
+      canCancel: game.scorable && mayChange && (status === 'scheduled' || status === 'postponed'),
+      canPutBack: game.scorable && mayChange && status === 'cancelled',
+      canRestore: game.scorable && mayChange && status === 'postponed',
+      forfeitScore: game.forfeitScore,
       reopen: game.scorable ? reopens.get(game.id) : undefined,
     };
   });

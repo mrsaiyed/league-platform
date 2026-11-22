@@ -7,6 +7,7 @@
 //   node scripts/shots.mjs --no-build           serves the build that is already here
 //   node scripts/shots.mjs --only=home,admin    only pictures whose name contains one of these
 //   node scripts/shots.mjs --design=pine        the first made-up league under a named design
+//   node scripts/shots.mjs --binned-team=badgers  with that team of the first league in the bin
 //   node scripts/shots.mjs --measure            also measures the contrast of every public page
 //   LOCAL_NOW=<UTC time> node scripts/shots.mjs  the made-up world's clock starts there, as in
 //                                                the browser tests (a game day at noon: worldAtNoon)
@@ -286,6 +287,160 @@ const gamesStates = [
   },
 ];
 
+// Step 2.158: forfeiting, postponing and cancelling ask first, and a game called off is put
+// back. Each state is reached by the owner's own taps on the games list (nothing rides in
+// the address, record 067), on games of the first league's week no other picture uses:
+// Owls at Badgers tonight (asked about, never changed), Lions at Hawks tomorrow (postponed,
+// then asked to go back on its date) and Herons at Falcons (cancelled, then put back). A
+// picture that changes a game finds it already changed at the second width, and starts
+// from there. A "Yes" is tapped once the question has been read: the server takes a "Yes"
+// within its first moments as the second tap of a double tap (call-off-step.ts).
+const callOffGame = (page, away, home) =>
+  page.locator('li.admin-game[id^="game-"]').filter({ hasText: away }).filter({ hasText: home });
+const owlsAtBadgers = (page) => callOffGame(page, 'Owls', 'Badgers');
+const lionsAtHawks = (page) => callOffGame(page, 'Lions', 'Hawks');
+const heronsAtFalcons = (page) => callOffGame(page, 'Herons', 'Falcons');
+const statusOf = (game) => game.locator('.ui-game-card').first().getAttribute('data-status');
+/** A game's panel by its button's words; the last one ("Forfeit, …") when none is named. */
+const panelOf = (game, summary) =>
+  summary === undefined
+    ? game.locator('details[data-call-off]').last()
+    : game.locator('details[data-call-off]').filter({
+        has: game.page().locator('summary', { hasText: summary }),
+      });
+async function openPanel(panel) {
+  if ((await panel.getAttribute('open')) === null) await panel.locator('> summary').click();
+}
+async function askToCallOff(game, button, summary) {
+  await openPanel(panelOf(game, summary));
+  await game.getByRole('button', { name: button, exact: true }).click();
+  await game.locator('[data-call-off-ask]').waitFor();
+}
+async function sayYes(game, name) {
+  await game.page().waitForTimeout(1000);
+  await game.getByRole('button', { name }).click();
+  await game.getByRole('status').filter({ hasText: 'Saved' }).waitFor();
+}
+/** Lions at Hawks postponed through its question, unless it already is. */
+async function postponedLions(page) {
+  const game = lionsAtHawks(page);
+  if ((await statusOf(game)) === 'scheduled') {
+    await askToCallOff(game, 'Postpone');
+    await sayYes(game, 'Yes, postpone it');
+  }
+  return game;
+}
+/** Herons at Falcons cancelled through its question, unless it already is. */
+async function cancelledHerons(page) {
+  const game = heronsAtFalcons(page);
+  if ((await statusOf(game)) !== 'cancelled') {
+    await askToCallOff(game, 'Cancel the game');
+    await sayYes(game, 'Yes, cancel it');
+  }
+  return game;
+}
+const callOffStates = [
+  {
+    // "Forfeit, postpone or cancel" open: its three buttons apart, the destructive one at
+    // the far end of its row.
+    name: 'admin-games-panel-open',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => openPanel(panelOf(owlsAtBadgers(page))),
+  },
+  {
+    // "No" stands where "Postpone" was; the question and its "Yes" come after.
+    name: 'admin-games-postpone-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => askToCallOff(owlsAtBadgers(page), 'Postpone'),
+  },
+  {
+    name: 'admin-games-cancel-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => askToCallOff(owlsAtBadgers(page), 'Cancel the game'),
+  },
+  {
+    // "Team that forfeits" starts empty; a team chosen, the question names both and the score.
+    name: 'admin-games-forfeit-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = owlsAtBadgers(page);
+      await openPanel(panelOf(game));
+      await game.getByLabel('Team that forfeits').selectOption({ label: 'Owls' });
+      await askToCallOff(game, 'Record forfeit');
+    },
+  },
+  {
+    // "Yes, postpone it": "Saved" says where it waits, its card leads to the list of games
+    // waiting for a new date, and the list holds it.
+    name: 'admin-games-postponed',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      await postponedLions(page);
+    },
+  },
+  {
+    // "Put it back on its date": a reason chosen, the question naming its old date.
+    name: 'admin-games-restore-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = await postponedLions(page);
+      const panel = panelOf(game, 'Put it back on its date');
+      await openPanel(panel);
+      await panel.getByLabel(/Why are you putting it back/).selectOption({
+        label: 'Postponed by mistake',
+      });
+      await askToCallOff(game, 'Put it back', 'Put it back on its date');
+    },
+  },
+  {
+    // The postponed game's own page: why it has no score, no grid, the way to its new date.
+    name: 'admin-games-box-postponed',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = await postponedLions(page);
+      const id = ((await game.getAttribute('id')) ?? '').slice('game-'.length);
+      await page.goto(page.url().replace(/\/admin\/games.*$/, `/admin/games/${id}`));
+      await page.locator('main h1').waitFor();
+    },
+  },
+  {
+    // Cancelled through its question, then "Put this game back" opened, a reason to choose.
+    name: 'admin-games-put-back',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      const game = await cancelledHerons(page);
+      await openPanel(game.locator('details[data-action-form]'));
+    },
+  },
+  {
+    // Put back with a reason: a scheduled game again, "Saved" beside it.
+    name: 'admin-games-put-back-saved',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = await cancelledHerons(page);
+      const panel = game.locator('details[data-action-form]');
+      await openPanel(panel);
+      await panel.getByLabel(/Why are you putting it back/).selectOption({
+        label: 'Cancelled by mistake',
+      });
+      await panel.getByRole('button', { name: 'Put it back on the schedule' }).click();
+      await game.getByRole('status').filter({ hasText: 'back on the schedule' }).waitFor();
+    },
+  },
+];
+
 // What the league's owner sees.
 const adminPages = [
   { name: 'admin-home', at: '/admin' },
@@ -303,14 +458,21 @@ const adminPages = [
     job,
     ...(job.light ? [{ ...job, name: `${job.name}-light`, lookOf: leagues[1] }] : []),
   ]),
+  // Step 2.158's questions, the postponed game and the put-back (callOffStates).
+  ...callOffStates.flatMap((job) => [
+    job,
+    ...(job.light ? [{ ...job, name: `${job.name}-light`, lookOf: leagues[1] }] : []),
+  ]),
   { name: 'admin-teams', at: '/admin/teams' },
   { name: 'admin-team', at: '/admin/teams', first: '/admin/teams/' },
   // Step 2.161, in the first made-up league, by the owner's own taps (undoSteps): a leaving
   // date of next year refused beside its field, with the date kept; the Falcons' page,
   // whose "Left the team" line has its put-back button and whose bin says how many people
-  // are on the roster, ticked and ready to confirm; and a game removed from the schedule
-  // draft, answered "Removed: … Put it back".
-  ...['team-leaving-refused', 'team-left-and-bin'].map((step) => ({
+  // are on the roster; and a game removed from the schedule draft, answered "Removed: … Put
+  // it back". Step 2.180: the Badgers, with results and games to come, whose panel says up
+  // front they cannot be removed this season, with no tick or button (A-17); a team with
+  // no games keeps its tick (tests/browser/team-bin-test.mjs pictures it).
+  ...['team-leaving-refused', 'team-left-and-bin', 'team-cannot-be-removed'].map((step) => ({
     name: `admin-${step}`,
     at: '/admin/teams',
     league: 'north-valley',
@@ -814,8 +976,19 @@ if (design !== '' && !/^[a-z][a-z0-9-]{0,39}$/.test(design)) {
   console.error('--design takes a design name, such as crest-light or pine.');
   process.exit(1);
 }
-/** A picture's file name: marked with the design it was taken under, when one is named. */
-const fileName = (name) => (design === '' ? name : `${name}-in-${design}`);
+// A team of the first league's current season put in the bin with its games as the world is
+// made (LOCAL_BINNED_TEAM, step 2.180): `--binned-team=badgers` pictures how the grid, the
+// standings and the rest show a team moved there before A-17 (`…-with-badgers-binned.jpg`).
+const binnedTeam = (process.argv.find((arg) => arg.startsWith('--binned-team=')) ?? '').slice(
+  '--binned-team='.length,
+);
+if (binnedTeam !== '' && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(binnedTeam)) {
+  console.error('--binned-team takes a team’s short name, such as badgers.');
+  process.exit(1);
+}
+/** A picture's file name: marked with the design and the team in the bin, when named. */
+const fileName = (name) =>
+  `${design === '' ? name : `${name}-in-${design}`}${binnedTeam === '' ? '' : `-with-${binnedTeam}-binned`}`;
 // Under a named design only the first league's public pages change, so only they are taken.
 const picturedLeagues = design === '' ? leagues : [leagues[0]];
 
@@ -990,6 +1163,13 @@ async function undoSteps(page, what) {
     );
     return;
   }
+  if (what === 'team-cannot-be-removed') {
+    await tapTo(
+      page.locator('main').getByRole('link', { name: 'Badgers', exact: true }),
+      /\/admin\/teams\//,
+    );
+    return;
+  }
   await tapTo(
     page.locator('main').getByRole('link', { name: 'Falcons', exact: true }),
     /\/admin\/teams\//,
@@ -1000,11 +1180,8 @@ async function undoSteps(page, what) {
     await tapTo(line.getByRole('button', { name: 'Mark as left' }), /problem=/);
     return;
   }
-  // The seed's Falcons already have a player who left; the bin's box is ticked, not sent.
-  await page
-    .locator('section', { has: page.getByRole('heading', { name: 'Remove this team' }) })
-    .locator('input[name=confirm]')
-    .check();
+  // The seed's Falcons already have a player who left. They have results, so since A-17
+  // their bin says they cannot be removed and has no box to tick (step 2.180).
 }
 
 /**
@@ -1187,6 +1364,7 @@ const origin = `http://localhost:${port}`;
 const server = start(dev ? ['dev', '--port', String(port)] : ['start', '--port', String(port)], {
   PUBLIC_BASE_URL: origin,
   ...(design === '' ? {} : { LOCAL_DESIGN: design }),
+  ...(binnedTeam === '' ? {} : { LOCAL_BINNED_TEAM: binnedTeam }),
 });
 const taken = [];
 const missed = [];

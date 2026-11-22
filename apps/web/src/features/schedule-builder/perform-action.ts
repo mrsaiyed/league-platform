@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
+import { backToTeamId, backToTeamParam } from './back-to-team.ts';
 import { answerParams } from './grid-answer.ts';
 import { runScheduleAction, type ScheduleActionKind } from './run-schedule-action.ts';
 
@@ -26,6 +27,9 @@ export async function performScheduleAction(
   const season = form.get('season');
   const query = new URLSearchParams();
   if (typeof season === 'string' && season !== '') query.set('season', season);
+  // The team "Remove this team" came from, so the way back stays offered (step 2.180).
+  const fromTeam = backToTeamId(form.get(backToTeamParam));
+  if (fromTeam !== undefined) query.set(backToTeamParam, fromTeam);
   const answer = answerParams(outcome);
   for (const [name, value] of Object.entries(answer.query)) query.set(name, value);
   const base = leagueUrl(view.context.league, 'admin-area', { area: 'schedule' });

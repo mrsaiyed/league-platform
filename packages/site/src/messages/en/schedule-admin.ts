@@ -17,6 +17,8 @@ export const enScheduleAdmin = {
   'schedule.admin.addRoundSubmit': 'Add round',
   'schedule.admin.askToShow': "Ask the league's owner or an admin to show it.",
   'schedule.admin.away': 'Away team',
+  // The way back to the team whose "Remove this team" led here (step 2.180).
+  'schedule.admin.backToTeam': 'Back to {name}',
   'schedule.admin.blocker.change-no-longer-fits':
     'A change in the draft no longer fits the schedule.',
   'schedule.admin.blocker.draft-unreadable': 'The saved draft cannot be read.',
@@ -94,11 +96,14 @@ export const enScheduleAdmin = {
   'schedule.admin.followRoundDate': 'Move it to {date} too?',
   'schedule.admin.followRoundDateNo': 'No, keep {date}',
   'schedule.admin.followRoundDateYes': 'Yes, move it to {date}',
+  // A game called off, in the grid: where it goes on from (step 2.158).
+  'schedule.admin.gameCancelled': 'This game is cancelled, so it is not edited here.',
   'schedule.admin.gameDetails': '{when}, {place}',
   'schedule.admin.gameDetailsRecording': '{when}, {place}, {recording}',
   'schedule.admin.gameLocked':
     'This game has started or been decided, so it cannot be edited here.',
-  'schedule.admin.gameNotScheduled': 'This game is {status}. It is left as it is here.',
+  'schedule.admin.gamePostponed':
+    'This game is postponed. It waits in Games, under “Waiting for a new date”, until it is given one.',
   'schedule.admin.gameVs': '{away} at {home}',
   'schedule.admin.gameWhen': '{date}, {time}',
   'schedule.admin.gameWhere': '{venue}, {court}',
@@ -187,6 +192,8 @@ export const enScheduleAdmin = {
     'Nothing public changes until you publish. Put it back now and it is exactly as it was. Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
   'schedule.admin.removedPublishedNoRound':
     'Nothing public changes until you publish. Put it back now and it is as it was, under "Games with no round". Once the draft is published it is kept for 30 days; the screen to bring it back is not ready yet.',
+  // A team in the bin, named in a game it played or was to play (A-17, step 2.180).
+  'schedule.admin.removedTeam': '{name} (removed)',
   'schedule.admin.renameRound': 'Round name',
   'schedule.admin.renameRoundSubmit': 'Rename round',
   'schedule.admin.reviewPublish': 'Review and publish',
@@ -229,6 +236,10 @@ export const enScheduleAdmin = {
   'schedule.admin.time': 'Time',
   // Admin → Schedule: the grid of rounds and games (step 2.52).
   'schedule.admin.title': 'Schedule',
+  'schedule.admin.toPutBack': 'Put it back from its page in Games',
+  'schedule.admin.toWaiting': 'See the games waiting for a new date',
+  // A game's team the season's list does not hold: words, never its id (step 2.180).
+  'schedule.admin.unknownTeam': 'Team not in this season',
   'schedule.admin.venueCourt': '{venue}: {court}',
   'schedule.admin.venueOnly': '{venue} (any court)',
 } as const;
