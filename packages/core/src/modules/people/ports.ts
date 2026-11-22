@@ -97,6 +97,11 @@ export type PeopleStore = {
    * person not in this league counts as a child: the careful reading.
    */
   readonly isMinor: (personId: string) => Promise<boolean | null>;
+  /**
+   * The league's own today (yyyy-mm-dd) in its own time zone, by the store's clock: a
+   * birth date may not be after it (the day R-28 measures an age on).
+   */
+  readonly leagueToday: () => Promise<string>;
   /** The league's own stored values of one setting (the name policy's, R-25). */
   readonly leagueSettingRows: (key: string) => Promise<readonly StoredSettingRow[]>;
 };

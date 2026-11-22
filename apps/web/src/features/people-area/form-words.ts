@@ -33,6 +33,3 @@ export function personFormWords(submit: string): PersonFormWords {
     meanwhileEmpty: t('adminPeople.meanwhile.empty'),
   };
 }
-
-/** Today's date, the latest date of birth the commands take (person-fields.ts reads it so). */
-export const todayForBirthDates = (): string => new Date().toISOString().slice(0, 10);

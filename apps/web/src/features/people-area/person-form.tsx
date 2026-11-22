@@ -61,7 +61,7 @@ export function PersonForm({
   readonly values: { readonly firstName: string; readonly lastName: string };
   /** The private details as stored, only for a role that may see them; else undefined. */
   readonly privateDetails: PrivateDetails | undefined;
-  /** The league's today, the latest date of birth the box offers. */
+  /** The league's own today, the latest date of birth the box offers (as the commands). */
   readonly today: string;
   readonly words: PersonFormWords;
   /**

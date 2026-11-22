@@ -19,7 +19,7 @@ import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffField, StaffNotice } from '../staff/index.ts';
 import { addPersonAction } from './actions.ts';
 import { addPersonAnchor } from './anchors.ts';
-import { personFormWords, todayForBirthDates } from './form-words.ts';
+import { personFormWords } from './form-words.ts';
 import { peopleAskOf, peoplePageSize, readPeopleList, type PeopleAsk } from './people-view.ts';
 import { PersonForm } from './person-form.tsx';
 
@@ -116,7 +116,7 @@ export async function PeoplePage({
             privateDetails={
               mayEnterPrivate ? { contactEmail: '', birthDate: '', child: '' } : undefined
             }
-            today={todayForBirthDates()}
+            today={(await ports.publicSchedule.clockOf(here.id)).today}
             words={personFormWords(t('adminPeople.add.submit'))}
             main
           />

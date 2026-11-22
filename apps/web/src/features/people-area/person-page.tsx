@@ -21,7 +21,7 @@ import { StaffTrail } from '../staff/index.ts';
 import { removePersonAction, savePersonAction } from './actions.ts';
 import { childDisagreement } from './age-on-record.ts';
 import { detailsAnchor, removeAnchor } from './anchors.ts';
-import { personFormWords, todayForBirthDates } from './form-words.ts';
+import { personFormWords } from './form-words.ts';
 import { readPerson, type PersonView } from './people-view.ts';
 import { PersonForm } from './person-form.tsx';
 import { RemoveForm } from './remove-form.tsx';
@@ -85,7 +85,7 @@ export async function PersonPage({
           values={{ firstName: person.firstName, lastName: person.lastName }}
           privateDetails={person.private}
           childNote={childNoteOf(person.private, leagueToday)}
-          today={todayForBirthDates()}
+          today={leagueToday}
           words={personFormWords(t('adminPeople.save.submit'))}
           main
         />

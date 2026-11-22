@@ -140,9 +140,10 @@ function askAboutBirthDate(
 export async function addPersonAction(_state: FormState, form: FormData): Promise<FormState> {
   const fields = typedOf(form);
   const { context, deps, record, leagueToday } = await peopleOf(fields);
-  const wrong = wrongBoxes(fields);
+  const today = await leagueToday();
+  const wrong = wrongBoxes(fields, today);
   if (wrong.length > 0) return refused('create_person', 'invalid-input', fields, wrong);
-  const ask = askAboutBirthDate(fields, await leagueToday());
+  const ask = askAboutBirthDate(fields, today);
   if (ask !== undefined) return ask;
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const made = await createPerson(context, newPersonInput(fields), deps);
@@ -160,14 +161,15 @@ export async function savePersonAction(_state: FormState, form: FormData): Promi
   const fields = typedOf(form);
   const { context, deps, list, record, leagueToday } = await peopleOf(fields);
   const personId = (fields['personId'] ?? '').trim().toLowerCase();
-  const wrong = wrongBoxes(fields);
+  const today = await leagueToday();
+  const wrong = wrongBoxes(fields, today);
   if (wrong.length > 0) return refused('update_person', 'invalid-input', fields, wrong);
   // Asked only about a date that is changed: one already saved is not asked about again.
   if ((fields['birthDate'] ?? '').trim() !== '' && fields['birthDateChecked'] !== 'on') {
     const stored = await getPerson(context, { personId }, deps);
     const ask = askAboutBirthDate(
       fields,
-      await leagueToday(),
+      today,
       stored.ok ? (stored.value.sensitive?.birthDate ?? undefined) : undefined,
     );
     if (ask !== undefined) return ask;

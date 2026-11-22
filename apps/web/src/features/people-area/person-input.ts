@@ -22,14 +22,14 @@ function minorOf(choice: string | undefined): boolean | null | 'wrong' {
   return 'wrong';
 }
 
-/** The boxes that are wrong, in the form's order. */
-export function wrongBoxes(fields: PersonFields): readonly PersonBox[] {
+/** The boxes that are wrong, in the form's order; a birth date on the league's today. */
+export function wrongBoxes(fields: PersonFields, leagueToday: string): readonly PersonBox[] {
   const typed: Partial<Record<PersonFieldName, string>> = {};
   for (const name of ['firstName', 'lastName', 'contactEmail', 'birthDate'] as const) {
     const value = fields[name];
     if (value !== undefined) typed[name] = value;
   }
-  const wrong: PersonBox[] = [...wrongPersonFields(typed)];
+  const wrong: PersonBox[] = [...wrongPersonFields(typed, leagueToday)];
   if (has(fields, 'child') && minorOf(fields['child']) === 'wrong') wrong.push('child');
   return wrong;
 }

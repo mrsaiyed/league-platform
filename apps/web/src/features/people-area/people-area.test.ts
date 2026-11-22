@@ -174,16 +174,22 @@ describe('the list address', () => {
 describe("a person's form", () => {
   it('marks the boxes that are wrong, in the form order', () => {
     expect(
-      wrongBoxes({
-        firstName: '',
-        lastName: 'Smith',
-        contactEmail: 'no-at-sign',
-        birthDate: '2999-01-01',
-        child: 'maybe',
-      }),
+      wrongBoxes(
+        {
+          firstName: '',
+          lastName: 'Smith',
+          contactEmail: 'no-at-sign',
+          birthDate: '2999-01-01',
+          child: 'maybe',
+        },
+        '2026-11-16',
+      ),
     ).toEqual(['firstName', 'contactEmail', 'birthDate', 'child']);
     expect(
-      wrongBoxes({ firstName: 'Jon', lastName: 'Smith', contactEmail: '', birthDate: '' }),
+      wrongBoxes(
+        { firstName: 'Jon', lastName: 'Smith', contactEmail: '', birthDate: '' },
+        '2026-11-16',
+      ),
     ).toEqual([]);
   });
 

@@ -280,6 +280,8 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
       const p = s.people.find((x) => x.id === personId);
       return p === undefined ? true : minorAt(p, s.timeZone, now());
     },
+    // The league's today in its own zone, by the world's one clock (as the teams store's).
+    leagueToday: async () => dayIn(now(), s.timeZone),
     leagueSettingRows: async (key) =>
       s.settings
         .filter((r) => r.key === key && r.place.level === 'league')

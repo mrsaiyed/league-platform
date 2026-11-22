@@ -179,6 +179,7 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
           const p = s.people.find((x) => x.id === id);
           return p === undefined ? true : isMinorOn(p.sensitiveFields, s.today);
         },
+        leagueToday: async () => s.today,
         leagueSettingRows: async (key) =>
           Object.hasOwn(s.settings, key)
             ? [{ level: 'league', document: { version: 1, value: s.settings[key] }, version: 1 }]
