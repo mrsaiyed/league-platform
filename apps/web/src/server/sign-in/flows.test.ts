@@ -1114,7 +1114,15 @@ describe('the test copy takes only made-up addresses for a code (step 2.205, T-1
     return { asked, deps: { ...env.deps, signIn, botCheck, testCopy: true } };
   }
 
-  const strangers = ['someone@gmail.com', 'SOMEONE@GMAIL.COM', 'a@example.test.gmail.com', 'x', ''];
+  const strangers = ['someone@gmail.com', 'SOMEONE@GMAIL.COM', 'a@example.test.gmail.com'];
+  /** Not addresses: read first, so a made-up name at the end never carries one past. */
+  const notAddresses = [
+    'x',
+    '',
+    'a@gmail.com@b.test',
+    '"a@gmail.com"@b.test',
+    'a@gmail.com x@y.test',
+  ];
 
   it('refuses a real address at sign-up and reset before the sign-in service or the bot check is asked', async () => {
     const env = setup();
@@ -1128,6 +1136,23 @@ describe('the test copy takes only made-up addresses for a code (step 2.205, T-1
         to: '/signin/forgot?problem=onlyMadeUpAddresses',
       });
       // Nothing set, nothing sent: the address went nowhere.
+      expect(b.names(), email).toEqual([]);
+    }
+    expect(asked).toEqual([]);
+    expect(env.outbox.messages()).toEqual([]);
+  });
+
+  it('reads the address first: one that is not an address is invalid, and no one is asked', async () => {
+    const env = setup();
+    const { asked, deps } = untouchable(env);
+    for (const email of notAddresses) {
+      const b = browser();
+      expect(await askForCode('sign-up', { email, next: '/a/b' }, b.visit, deps), email).toEqual({
+        to: '/signup?problem=invalidEmail&next=%2Fa%2Fb',
+      });
+      expect(await askForCode('reset', { email }, b.visit, deps), email).toEqual({
+        to: '/signin/forgot?problem=invalidEmail',
+      });
       expect(b.names(), email).toEqual([]);
     }
     expect(asked).toEqual([]);

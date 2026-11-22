@@ -132,9 +132,8 @@ export async function askForCode(
   const page = purpose === 'sign-up' ? 'signup' : 'forgotPassword';
   const next = safeReturnPath(fields['next']);
   const address = fields['email'] ?? '';
-  if (notTakenHere(address, deps)) {
-    return goTo(screenUrl(page, { problem: 'onlyMadeUpAddresses', next }));
-  }
+  const notHere = notTakenHere(address, deps);
+  if (notHere !== undefined) return goTo(screenUrl(page, { problem: notHere, next }));
   const refused = await botCheckProblem(purpose, fields, visit, deps);
   if (refused !== undefined) return goTo(screenUrl(page, { problem: refused, next }));
   return sendCode(purpose, address, next, page, visit, deps);
@@ -144,10 +143,17 @@ export async function askForCode(
  * The test copy's rule (step 2.205, T-13, T-201): it takes only an address on a name kept
  * for made-up mail (isMadeUpAddress), judged by the address's form alone, before the bot
  * check or the sign-in service is asked, so a stranger's address is never sent or stored
- * there. The refusal is the same whether or not an account exists (T-68). Elsewhere, never.
+ * there. The address is read as the service would read it first (signInEmail), and the
+ * name it is read on is the one tested: one that is not an address is today's
+ * invalidEmail, asked of no one. The refusal is the same whether or not an account exists
+ * (T-68). Undefined where the address is taken, and always off the test copy.
  */
-const notTakenHere = (address: string, deps: FlowDeps): boolean =>
-  deps.testCopy && !isMadeUpAddress(address);
+function notTakenHere(address: string, deps: FlowDeps): Problem | undefined {
+  if (!deps.testCopy) return undefined;
+  const parsed = signInEmail.safeParse(address);
+  if (!parsed.success) return 'invalidEmail';
+  return isMadeUpAddress(parsed.data) ? undefined : 'onlyMadeUpAddresses';
+}
 
 /**
  * "Send a new code" on the code screen (T-67): a new code to the address being proved, for
@@ -162,9 +168,8 @@ export async function resendCode(
   const flow = readFlow(visit.jar);
   if (flow === undefined) return goTo(screenUrl('signup', { problem: 'codeExpired' }));
   // The flow's address was taken once; asked again, so no cookie can carry another past it.
-  if (notTakenHere(flow.email, deps)) {
-    return goTo(screenUrl('enterCode', { problem: 'onlyMadeUpAddresses' }));
-  }
+  const notHere = notTakenHere(flow.email, deps);
+  if (notHere !== undefined) return goTo(screenUrl('enterCode', { problem: notHere }));
   const refused = await botCheckProblem(flow.purpose, fields, visit, deps);
   if (refused !== undefined) return goTo(screenUrl('enterCode', { problem: refused }));
   return sendCode(flow.purpose, flow.email, flow.next, 'enterCode', visit, deps);
