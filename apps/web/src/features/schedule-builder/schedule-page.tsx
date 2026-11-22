@@ -38,11 +38,12 @@ import {
   saveGameAction,
   swapGamesAction,
 } from './actions.ts';
+import { backToTeamOf, backToTeamParam, removeTeamPanelAnchor } from './back-to-team.ts';
 import {
-  buildGrid,
   clockText,
   dayText,
   daysAfter,
+  pageGrid,
   type Grid,
   type GridGame,
   type GridRound,
@@ -70,6 +71,8 @@ type Basis = {
   readonly basedOnRevision: number | null;
   readonly version: number | null;
   readonly draftId: string | null;
+  /** The team "Remove this team" came from, carried by every form (step 2.180). */
+  readonly fromTeam: string | null;
   /** What the viewer may do; the commands check again, this only hides what cannot work. */
   readonly canEdit: boolean;
   readonly canPublish: boolean;
@@ -115,7 +118,7 @@ export async function ScheduleBuilderPage({
     );
   }
   const deps = ports.scheduleAdmin.deps;
-  const [drafted, listed, teams] = await Promise.all([
+  const [drafted, listed, seasonTeams] = await Promise.all([
     getScheduleDraft(context, { seasonId: season.id }, deps),
     listVenues(context, {}, deps),
     ports.scheduleAdmin.teamsOf(addressee.id, season.id),
@@ -203,7 +206,10 @@ export async function ScheduleBuilderPage({
   }
   const draft = drafted.value;
   const venues = listed.ok ? listed.value : [];
-  const grid = buildGrid(draft, teams, venues);
+  // A team in the bin is named in its games ("Badgers (removed)"), never offered for one.
+  const { grid, teams } = pageGrid(draft, seasonTeams, venues);
+  // The team "Remove this team" sent the person here from, to go back to (step 2.180).
+  const fromTeam = backToTeamOf(firstValue(search[backToTeamParam]), seasonTeams);
   const saved = savedDetailOf(search);
   const refusedAt = refusedAtOf(search);
   // A refusal of a round's form is said beside that form, if it is on the page.
@@ -222,6 +228,7 @@ export async function ScheduleBuilderPage({
     basedOnRevision: draft.latestRevision,
     version: draft.draft?.version ?? null,
     draftId: draft.draft?.id ?? null,
+    fromTeam: fromTeam?.id ?? null,
     waitingHref: `${leagueUrl(addressee, 'admin-area', { area: 'games' })}#${waitingListAnchor}`,
     gameHref: (gameId) => leagueUrl(addressee, 'admin-area', { area: 'games', subpath: [gameId] }),
   };
@@ -270,6 +277,18 @@ export async function ScheduleBuilderPage({
         top,
         firstRound,
         draft.draft !== null && (basis.canEdit || basis.canPublish) ? '#publish-heading' : null,
+      )}
+      {fromTeam === undefined ? null : (
+        // Back to the team "Remove this team" sent the person here from (step 2.180).
+        <p className="staff-buttons" data-back-to-team={fromTeam.id}>
+          <a
+            className="ui-button"
+            data-kind="quiet"
+            href={`${leagueUrl(addressee, 'admin-area', { area: 'teams', subpath: [fromTeam.id] })}#${removeTeamPanelAnchor}`}
+          >
+            {t('schedule.admin.backToTeam', { name: fromTeam.name })}
+          </a>
+        </p>
       )}
       {/* How the draft stands, in one line: a pill, then the sentence. */}
       {draft.draft !== null ? (
@@ -390,6 +409,9 @@ function BasisFields({ basis }: { readonly basis: Basis }) {
       <input type="hidden" name="basedOnRevision" value={basis.basedOnRevision ?? ''} />
       <input type="hidden" name="version" value={basis.version ?? ''} />
       <input type="hidden" name="draftId" value={basis.draftId ?? ''} />
+      {basis.fromTeam === null ? null : (
+        <input type="hidden" name={backToTeamParam} value={basis.fromTeam} />
+      )}
     </>
   );
 }

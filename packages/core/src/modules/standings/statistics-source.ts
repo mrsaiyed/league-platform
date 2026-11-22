@@ -193,7 +193,12 @@ export async function statisticsSource(
     store.teamStatTotals(season.id),
     store.teamTurnoverGames(season.id),
   ]);
-  const settings = new Map(teams.map((team) => [team.id, teamSetting(viewing.leagueId, team)]));
+  // A team in the bin, kept in the standings for its results (A-17), is not in the statistics.
+  const settings = new Map(
+    teams
+      .filter((team) => !team.removed)
+      .map((team) => [team.id, teamSetting(viewing.leagueId, team)]),
+  );
   const shownTeam = (teamId: string): boolean => {
     const setting = settings.get(teamId);
     return setting !== undefined && statsShown(setting, viewing.viewer) === 'player_lines';

@@ -24,6 +24,7 @@ export function memoryStandingsRead(): StandingsReadStore {
         color: '#111111',
         divisionId,
         statsVisibility: 'everyone',
+        removed: false,
       },
       {
         id: staffTeam,
@@ -32,6 +33,7 @@ export function memoryStandingsRead(): StandingsReadStore {
         color: null,
         divisionId,
         statsVisibility: 'staff',
+        removed: false,
       },
     ],
     divisions: async () => [{ id: divisionId, name: 'North', color: null, sort: 0 }],

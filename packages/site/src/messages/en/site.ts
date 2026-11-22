@@ -196,6 +196,9 @@ export const enSite = {
   'standings.order.still-tied':
     'Level with another team: nothing in the rules separates them yet, so they are shown in a fixed order.',
   // What follows the tables on the standings page: the latest decided games, as scoreboards.
+  // A team in the bin with results (A-17): its row stays, unlinked, with this note.
+  'standings.removedTeam':
+    'No longer in the league. Its results stay in the table, as they are part of other teams’ records.',
   'standings.results': 'Latest results',
   'standings.results.kicker': 'How they got here',
   'standings.streak.lost': 'L{length}',

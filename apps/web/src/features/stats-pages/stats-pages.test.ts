@@ -493,6 +493,7 @@ describe('statistics page', () => {
           color: null,
           divisionId: null,
           statsVisibility: 'everyone',
+          removed: false,
         })),
       divisions: async () => [],
       standingsRows: async () => [],

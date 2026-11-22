@@ -7,6 +7,7 @@
 //   node scripts/shots.mjs --no-build           serves the build that is already here
 //   node scripts/shots.mjs --only=home,admin    only pictures whose name contains one of these
 //   node scripts/shots.mjs --design=pine        the first made-up league under a named design
+//   node scripts/shots.mjs --binned-team=badgers  with that team of the first league in the bin
 //   node scripts/shots.mjs --measure            also measures the contrast of every public page
 //   LOCAL_NOW=<UTC time> node scripts/shots.mjs  the made-up world's clock starts there, as in
 //                                                the browser tests (a game day at noon: worldAtNoon)
@@ -467,9 +468,11 @@ const adminPages = [
   // Step 2.161, in the first made-up league, by the owner's own taps (undoSteps): a leaving
   // date of next year refused beside its field, with the date kept; the Falcons' page,
   // whose "Left the team" line has its put-back button and whose bin says how many people
-  // are on the roster, ticked and ready to confirm; and a game removed from the schedule
-  // draft, answered "Removed: … Put it back".
-  ...['team-leaving-refused', 'team-left-and-bin'].map((step) => ({
+  // are on the roster; and a game removed from the schedule draft, answered "Removed: … Put
+  // it back". Step 2.180: the Badgers, with results and games to come, whose panel says up
+  // front they cannot be removed this season, with no tick or button (A-17); a team with
+  // no games keeps its tick (tests/browser/team-bin-test.mjs pictures it).
+  ...['team-leaving-refused', 'team-left-and-bin', 'team-cannot-be-removed'].map((step) => ({
     name: `admin-${step}`,
     at: '/admin/teams',
     league: 'north-valley',
@@ -973,8 +976,19 @@ if (design !== '' && !/^[a-z][a-z0-9-]{0,39}$/.test(design)) {
   console.error('--design takes a design name, such as crest-light or pine.');
   process.exit(1);
 }
-/** A picture's file name: marked with the design it was taken under, when one is named. */
-const fileName = (name) => (design === '' ? name : `${name}-in-${design}`);
+// A team of the first league's current season put in the bin with its games as the world is
+// made (LOCAL_BINNED_TEAM, step 2.180): `--binned-team=badgers` pictures how the grid, the
+// standings and the rest show a team moved there before A-17 (`…-with-badgers-binned.jpg`).
+const binnedTeam = (process.argv.find((arg) => arg.startsWith('--binned-team=')) ?? '').slice(
+  '--binned-team='.length,
+);
+if (binnedTeam !== '' && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(binnedTeam)) {
+  console.error('--binned-team takes a team’s short name, such as badgers.');
+  process.exit(1);
+}
+/** A picture's file name: marked with the design and the team in the bin, when named. */
+const fileName = (name) =>
+  `${design === '' ? name : `${name}-in-${design}`}${binnedTeam === '' ? '' : `-with-${binnedTeam}-binned`}`;
 // Under a named design only the first league's public pages change, so only they are taken.
 const picturedLeagues = design === '' ? leagues : [leagues[0]];
 
@@ -1149,6 +1163,13 @@ async function undoSteps(page, what) {
     );
     return;
   }
+  if (what === 'team-cannot-be-removed') {
+    await tapTo(
+      page.locator('main').getByRole('link', { name: 'Badgers', exact: true }),
+      /\/admin\/teams\//,
+    );
+    return;
+  }
   await tapTo(
     page.locator('main').getByRole('link', { name: 'Falcons', exact: true }),
     /\/admin\/teams\//,
@@ -1159,11 +1180,8 @@ async function undoSteps(page, what) {
     await tapTo(line.getByRole('button', { name: 'Mark as left' }), /problem=/);
     return;
   }
-  // The seed's Falcons already have a player who left; the bin's box is ticked, not sent.
-  await page
-    .locator('section', { has: page.getByRole('heading', { name: 'Remove this team' }) })
-    .locator('input[name=confirm]')
-    .check();
+  // The seed's Falcons already have a player who left. They have results, so since A-17
+  // their bin says they cannot be removed and has no box to tick (step 2.180).
 }
 
 /**
@@ -1346,6 +1364,7 @@ const origin = `http://localhost:${port}`;
 const server = start(dev ? ['dev', '--port', String(port)] : ['start', '--port', String(port)], {
   PUBLIC_BASE_URL: origin,
   ...(design === '' ? {} : { LOCAL_DESIGN: design }),
+  ...(binnedTeam === '' ? {} : { LOCAL_BINNED_TEAM: binnedTeam }),
 });
 const taken = [];
 const missed = [];

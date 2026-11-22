@@ -64,6 +64,7 @@ describe('readStandings', () => {
       color: null,
       divisionId,
       statsVisibility: 'everyone',
+      removed: false,
     });
     const row = (
       teamId: string,
@@ -168,6 +169,7 @@ describe('readStandings', () => {
           color: null,
           divisionId: null,
           statsVisibility: 'everyone',
+          removed: false,
         })),
       divisions: async () => [],
       // a beat b in the removed division; c beat d with no division: each alone at its rank

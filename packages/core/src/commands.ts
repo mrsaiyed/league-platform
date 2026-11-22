@@ -116,6 +116,7 @@ import { addAdjustment, rebuildStandings, removeAdjustment } from './modules/sta
 import {
   addToRoster,
   changeRosterEntry,
+  countTeamGames,
   createTeam,
   listRoster,
   markLeft,
@@ -140,6 +141,7 @@ export const commands = commandRegistry([
   changeDraftRoundDate,
   changeRosterEntry,
   clearSetting,
+  countTeamGames,
   createCourt,
   createDivision,
   createLeague,
