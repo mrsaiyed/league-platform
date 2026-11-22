@@ -9,10 +9,17 @@ import { createServer } from 'node:http';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { createGoTrueClient, trackerProjectFor } from '@srleagues/providers';
+import * as providers from '@srleagues/providers';
+import { trackerProjectFor } from '@srleagues/providers';
+import { createGoTrueClient } from '../packages/providers/src/sign-in/for-operations.ts';
 import { createFakeSupabaseAuth } from '../packages/providers/src/sign-in/supabase/fake-supabase-auth.test-helper.ts';
 import { exitCodeFor, runChecks, settingsFor } from '../scripts/check-sign-in-service-checks.mjs';
 import * as words from '../scripts/check-sign-in-service.messages.mjs';
+
+test('the client that can remove a user is not in the index the apps import (review L2)', () => {
+  assert.equal('createGoTrueClient' in providers, false);
+  assert.equal(typeof createGoTrueClient, 'function');
+});
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const secretKey = 'sb_secret_made_up_for_this_test_only';

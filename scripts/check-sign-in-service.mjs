@@ -9,7 +9,9 @@
 // its words in check-sign-in-service.messages.mjs. It never prints an error's own
 // message, which could repeat an address or a key; it exits 0 when every check was as
 // expected, 1 when one was not, 2 when it refused to run, 130 when stopped at once.
-import { createGoTrueClient, trackerProjectFor } from '@srleagues/providers';
+import { trackerProjectFor } from '@srleagues/providers';
+// The client that can remove a user is not in the package's index (review L2).
+import { createGoTrueClient } from '../packages/providers/src/sign-in/for-operations.ts';
 import { exitCodeFor, runChecks, settingsFor } from './check-sign-in-service-checks.mjs';
 import * as words from './check-sign-in-service.messages.mjs';
 
