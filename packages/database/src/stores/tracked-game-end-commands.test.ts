@@ -505,3 +505,76 @@ describe('reopening a tracked game on the database (T6 §8)', () => {
     expect(await actions(g)).toEqual(made);
   });
 });
+
+describe('overtime on the result, on the database (P7 §5.6, step 2.200)', () => {
+  const overtimeOf = async (g: Game) =>
+    (
+      await one<{ status: string; overtime_periods: number | null }>(
+        pglite,
+        'select status, overtime_periods from games where id = $1',
+        [g.gameId],
+      )
+    ).overtime_periods;
+  const periodTaps = (period: number): Input[] => [
+    { type: 'pause' },
+    { type: 'period', period },
+    { type: 'start' },
+  ];
+  /** Level 2 to 2 at the end of the fourth quarter. */
+  const level = (g: Game): Input[] => [
+    { type: 'lineup', side: 'home', playerIds: g.home.slice(0, 5) },
+    { type: 'lineup', side: 'away', playerIds: g.away.slice(0, 5) },
+    { type: 'start' },
+    { type: 'score', side: 'home', playerId: g.home[0] ?? '', points: 2 },
+    { type: 'score', side: 'away', playerId: g.away[0] ?? '', points: 2 },
+    ...[2, 3, 4].flatMap(periodTaps),
+  ];
+
+  it('case 44: End refused level after regulation, won in the first overtime, the count is 1', async () => {
+    const g = await trackedGame();
+    expect((await tap(g, [...level(g), { type: 'end' }])).at(-1)).toBe('refused');
+    expect(await overtimeOf(g)).toBeNull();
+    await tap(g, [
+      ...periodTaps(5),
+      { type: 'score', side: 'home', playerId: g.home[1] ?? '', points: 3 },
+      { type: 'end' },
+    ]);
+    expect((await rowsOf(g)).game).toMatchObject({ status: 'final', home_score: 5, away_score: 2 });
+    expect(await overtimeOf(g)).toBe(1);
+  });
+
+  it('two overtimes are 2; reopened, the count goes; ended again in regulation, it is 0', async () => {
+    const g = await trackedGame();
+    await tap(g, [
+      ...level(g),
+      ...periodTaps(5),
+      { type: 'score', side: 'away', playerId: g.away[1] ?? '', points: 2 },
+      { type: 'score', side: 'home', playerId: g.home[1] ?? '', points: 2 },
+      ...periodTaps(6),
+      { type: 'score', side: 'home', playerId: g.home[2] ?? '', points: 3 },
+      { type: 'end' },
+    ]);
+    expect(await overtimeOf(g)).toBe(2);
+    lapse();
+    const reopened = await reopenGame(
+      g.as(g.ownerId),
+      { gameId: g.gameId, version: await versionOf(g), reason: 'Played to a running clock' },
+      depsWith(),
+    );
+    expect(reopened).toMatchObject({ ok: true });
+    expect(await overtimeOf(g)).toBeNull();
+    // Both overtimes undone (their baskets and periods, last first): it ends in the fourth.
+    const undo: Input = { type: 'undo' };
+    await tap(g, [
+      undo,
+      undo,
+      undo,
+      undo,
+      undo,
+      { type: 'score', side: 'home', playerId: g.home[2] ?? '', points: 3 },
+      { type: 'end' },
+    ]);
+    expect((await rowsOf(g)).game).toMatchObject({ status: 'final', home_score: 5, away_score: 2 });
+    expect(await overtimeOf(g)).toBe(0);
+  });
+});

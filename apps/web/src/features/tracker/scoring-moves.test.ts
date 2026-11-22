@@ -152,6 +152,32 @@ describe('a player’s options (D4, D5)', () => {
       padAtRest,
     );
   });
+
+  it('shows the final panel for as long as the game is final, whatever was open; only the Reopen question stands in its place (step 2.37)', () => {
+    const live = played([{ type: 'score', side: 'home', playerId: 'h5', points: 2 }], tippedOff());
+    const final = viewOf(played([{ type: 'end' }], live));
+    const open: readonly PadMode[] = [
+      padAtRest,
+      { kind: 'player', playerId: 'h5' },
+      { kind: 'turnovers', side: 'home' },
+      { kind: 'timeouts', asking: null },
+      { kind: 'end', refused: null },
+      { kind: 'not-started' },
+    ];
+    for (const pad of open) expect(padFor(final, pad)).toEqual({ kind: 'final' });
+    expect(padFor(final, { kind: 'reopen' })).toEqual({ kind: 'reopen' });
+    // Live again (the End taken back, the game reopened): nothing of the final game stays.
+    expect(padFor(viewOf(live), { kind: 'final' })).toEqual(padAtRest);
+    expect(padFor(viewOf(live), { kind: 'reopen' })).toEqual(padAtRest);
+    // The questions about a live game stand while it is live.
+    expect(padFor(viewOf(live), { kind: 'end', refused: null })).toEqual({
+      kind: 'end',
+      refused: null,
+    });
+    expect(padFor(viewOf(live), { kind: 'not-started' })).toEqual({ kind: 'not-started' });
+    // Marked not started, the game is scheduled again: its question goes.
+    expect(padFor(viewOf(basketball.newGame()), { kind: 'not-started' })).toEqual(padAtRest);
+  });
 });
 
 describe('substitutions (E1 to E3)', () => {

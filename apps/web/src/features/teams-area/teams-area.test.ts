@@ -10,8 +10,12 @@ import {
   leavingAtOf,
   problemKey,
   refused,
+  removeRefusalOf,
+  removeTeamAnchor,
   done,
 } from './answer.ts';
+import { removePanel, tapRefusal } from './remove-team-words.ts';
+import { removeTeamPanelAnchor } from '../schedule-builder/back-to-team.ts';
 import {
   changeEntryInput,
   changeTeamInput,
@@ -251,9 +255,119 @@ describe('answers in the address', () => {
       expect(t(key)).toContain('kept for 30 days; the screen to bring');
       expect(t(key)).not.toMatch(/can be brought back|restore/i);
     }
+    // Putting back a cancelled game whose team, venue or court is in the bin.
+    for (const key of [
+      'admin.games.error.game-part-in-bin',
+      'error.leagues.restore_game.game-part-in-bin',
+    ] as const) {
+      expect(t(key)).toContain('the screen to bring it back is not ready yet');
+      expect(t(key)).toContain('cannot be put back for now');
+      expect(t(key)).not.toMatch(/back first|can be brought back|restore/i);
+    }
     expect(t.plural('adminTeams.remove.roster', 2)).toBe(
       '2 people are on its roster now. Once the team is removed, they can be taken off the league list.',
     );
+  });
+
+  describe('"Remove this team" says what is true now (A-17)', () => {
+    const at = (date: string, round: number | null = 6) => ({ date, round });
+    const has = (
+      played: number,
+      which: { date: string | null; round: number | null }[],
+      removedInDraft = 0,
+    ) => ({ played, toPlay: which.length, removedInDraft, which });
+    const ways = (panel: ReturnType<typeof removePanel>) =>
+      panel.kind === 'held' ? panel.ways.map((w) => w.anchor ?? w.area) : [];
+
+    it('a team with no games, or whose games could not be read, has the tick and the button', () => {
+      expect(removePanel('Wrens', has(0, []))).toEqual({
+        kind: 'free',
+        lines: ['This team has played no games.', 'It has no game without a result.'],
+      });
+      expect(removePanel('Wrens', undefined)).toMatchObject({ kind: 'free' });
+    });
+
+    it('a team with results cannot be removed this season; advice only when it has games to come', () => {
+      const panel = removePanel('Badgers', has(3, [at('2026-11-22'), at('2026-11-29', 7)]));
+      expect(panel).toMatchObject({
+        kind: 'held',
+        why: 'Badgers cannot be removed this season: its results are part of other teams’ records.',
+        lines: [
+          'This team has played 3 games.',
+          'It has 2 games without a result yet: Round 6, Sun, Nov 22; Round 7, Sun, Nov 29.',
+          'If the team has left the league, record this week’s games as forfeited in Games, and remove its later games from the schedule in Schedule. Either way the team stays, with the games it played.',
+        ],
+      });
+      expect(ways(panel)).toEqual(['games', 'schedule']);
+      // No games to come: no advice to forfeit them, and no way on.
+      const done = removePanel('Badgers', has(1, []));
+      expect(done).toMatchObject({
+        kind: 'held',
+        lines: ['This team has played 1 game.', 'It has no game without a result.'],
+      });
+      expect(ways(done)).toEqual([]);
+    });
+
+    it('a team with only games without a result cannot be removed yet: remove or cancel, never forfeit', () => {
+      const panel = removePanel('Kestrels', has(0, [at('2026-11-22'), at('2026-11-22')]));
+      expect(panel).toMatchObject({
+        kind: 'held',
+        why: 'Kestrels cannot be removed yet: it has games without a result.',
+        lines: [
+          'This team has played no games.',
+          'It has 2 games without a result yet: Round 6, Sun, Nov 22; Round 6, Sun, Nov 22.',
+          'Remove them from the schedule in Schedule, or cancel this week’s in Games. Do not record them as forfeited: a forfeit is a result, and a team with a result cannot be removed.',
+        ],
+      });
+      expect(ways(panel)).toEqual(['schedule', 'games']);
+      // Many games: counted, not named one by one.
+      const many = removePanel(
+        'Kestrels',
+        has(
+          0,
+          [1, 2, 3, 4].map(() => at('2026-11-22')),
+        ),
+      );
+      expect(many.kind === 'held' && many.lines[1]).toBe('It has 4 games without a result yet.');
+      expect(t('adminTeams.remove.noDay')).toBe('no day yet');
+    });
+
+    it('games removed in the draft and not yet published: say so, and lead to publishing', () => {
+      const all = removePanel('Kestrels', has(0, [at('2026-11-22'), at('2026-11-29')], 2));
+      expect(all).toMatchObject({
+        kind: 'held',
+        lines: [
+          'This team has played no games.',
+          'It has 2 games without a result yet: Round 6, Sun, Nov 22; Round 6, Sun, Nov 29.',
+          '2 of them are removed in the draft, which is not published yet: publish the schedule to finish.',
+        ],
+      });
+      expect(ways(all)).toEqual(['publish']);
+      const some = removePanel('Kestrels', has(0, [at('2026-11-22'), at('2026-11-29')], 1));
+      expect(some.kind === 'held' && some.lines).toContain(
+        '1 of them is removed in the draft, which is not published yet: publish the schedule to finish.',
+      );
+      expect(ways(some)).toEqual(['schedule', 'games', 'publish']);
+    });
+
+    it('never draws a refusal for games or results from the address: only a tap’s own', () => {
+      const address = answerQuery(refused('teams.remove_team', 'team-has-games-to-play'));
+      expect(address).toBe('?problem=teams.remove_team.team-has-games-to-play#remove-team');
+      expect(removeRefusalOf({ problem: 'teams.remove_team.team-has-results' })).toBe(
+        'team-has-results',
+      );
+      expect(removeRefusalOf({ problem: 'teams.mark_left.already-left' })).toBeUndefined();
+      expect(tapRefusal('team-has-games-to-play')).toBeUndefined();
+      expect(tapRefusal('team-has-results')).toBeUndefined();
+      expect(tapRefusal('not-confirmed')).toBe(
+        'Tick the box to confirm first. Nothing was changed.',
+      );
+      expect(tapRefusal('team-not-found')).toBe('That team is not there.');
+    });
+
+    it('the way back from Schedule lands on this panel', () => {
+      expect(removeTeamPanelAnchor).toBe(removeTeamAnchor);
+    });
   });
 
   it('carries a refusal and picks the command’s own words, then the code’s, then a general one', () => {
@@ -292,6 +406,9 @@ describe('answers in the address', () => {
       ['teams.put_back_on_roster', 'already-on-team'],
       ['teams.put_back_on_roster', 'jersey-taken'],
       ['teams.put_back_on_roster', 'roster-entry-not-found'],
+      ['teams.remove_team', 'team-has-games-to-play'],
+      ['teams.remove_team', 'team-has-results'],
+      ['teams.remove_team', 'not-confirmed'],
     ];
     for (const [command, code] of codes) {
       const key = problemKey({ problem: `${command}.${code}` });

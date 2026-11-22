@@ -14,6 +14,7 @@ const madeUp: Readonly<Record<string, { name: string; design: PicturedDesignKey 
   [standInLeagues.archived.id]: { name: standInLeagues.archived.name, design: 'clean-court' },
   [standInLeagues.suspended.id]: { name: standInLeagues.suspended.name, design: 'clean-court' },
   [standInLeagues.inBin.id]: { name: standInLeagues.inBin.name, design: 'clean-court' },
+  [standInLeagues.empty.id]: { name: standInLeagues.empty.name, design: 'clean-court' },
   [standInLeagues.otherDraft.id]: { name: standInLeagues.otherDraft.name, design: 'clean-court' },
 };
 

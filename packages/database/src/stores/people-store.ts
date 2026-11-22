@@ -3,6 +3,7 @@ import type { PeopleStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
   findLeagueAudience,
+  findLeagueToday,
   findPerson,
   findPersonIsMinor,
   insertPerson,
@@ -29,6 +30,11 @@ export function peopleStore(scope: LeagueScope): PeopleStore {
       return found === undefined ? true : found.isMinor;
     },
     // The league's own value only: the name settings are set for the whole league.
+    leagueToday: async () => {
+      const today = await findLeagueToday(scope);
+      if (today === undefined) throw new Error('people store: the league is not there.');
+      return today;
+    },
     leagueSettingRows: async (key) =>
       (await listSettingValues(scope, key, {})).filter((row) => row.level === 'league'),
   };

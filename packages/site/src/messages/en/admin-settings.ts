@@ -129,7 +129,7 @@ export const enAdminSettings = {
   'setting.privacy.publicNames.option.hidden':
     'Hidden for everyone, adults and children: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
   'setting.statistics.minimumGamesToRank.label':
-    'Games a player must have played to be ranked among the leaders. 0 ranks everyone. A player with fewer still shows in the full table.',
+    'Games in which a statistic must be recorded for a player to be ranked on its leaders board. 0 sets no minimum. A player with fewer still shows in the full table.',
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
   'setting.teams.startingStatsLevel.label':

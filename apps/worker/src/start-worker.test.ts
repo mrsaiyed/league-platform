@@ -177,7 +177,7 @@ describe('startWorker', () => {
     const start = startWorker(settings(), { logger, madeUpDatabase: async () => made });
     await expect(start).rejects.toThrow(WorkerStartError);
     await expect(start).rejects.toThrow('not fit for the worker');
-    await expect(start).rejects.toThrow('it is a superuser');
+    await expect(start).rejects.toThrow('postgres is a superuser: alter role postgres nosuperuser');
     expect(closed()).toBe(true);
     expect(parsed().some((line) => line['msg'] === 'worker.started')).toBe(false);
   }, 60_000);

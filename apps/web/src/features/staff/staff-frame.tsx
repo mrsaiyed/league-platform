@@ -23,7 +23,7 @@ import { Emblem } from '@srleagues/ui';
 import type { ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
 import type { LeagueView } from '../../server/league-gate.ts';
-import { leagueSites, siteOf } from '../../server/league-site.ts';
+import { siteOfThisRequest } from '../../server/league-site.ts';
 import { requestPath, signedInEmail } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
 import { accountMenuOf, displayStylesheet, SiteFooter } from '../shell/index.ts';
@@ -78,7 +78,7 @@ export async function StaffFrame({
   readonly children: ReactNode;
 }) {
   const league = view.context.league;
-  const site = await siteOf(league, await leagueSites());
+  const site = await siteOfThisRequest(league.id, league.slug);
   const path = await requestPath();
   const place = staffPlaceAt(league, path, view.areas);
   const account = accountMenuOf(view, await signedInEmail(), path);

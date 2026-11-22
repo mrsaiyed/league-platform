@@ -855,6 +855,18 @@ describe('a game as a scoreboard', () => {
       );
     expect(big({})).toContain('data-state="final" data-pill="quiet"');
     expect(big({})).toContain('<span class="ui-game-state">Final</span>');
+    const overtime = { text: 'Final, OT', said: 'Final after overtime' };
+    // A game won in overtime is as quiet as a plain "Final" (step 2.200), and a forfeit
+    // is named as a forfeit whatever it is given for a final game.
+    expect(big({ finalPill: overtime })).toContain('data-state="final" data-pill="quiet"');
+    // Its letters are drawn and kept from screen readers, which are told the words.
+    expect(big({ finalPill: overtime })).toContain(
+      '<span class="ui-game-state"><span aria-hidden="true">Final, OT</span><span class="ui-visually-hidden">Final after overtime</span></span>',
+    );
+    expect(big({ finalPill: overtime, stateText: 'Forfeit' })).toContain(
+      '<span class="ui-game-state">Forfeit</span>',
+    );
+    expect(big({ finalPill: overtime, state: 'live' })).not.toContain('overtime');
     expect(big({ stateText: 'Forfeit' })).not.toContain('data-pill');
     expect(big({ state: 'other', stateText: 'Postponed' })).not.toContain('data-pill');
     expect(big({ state: 'live' })).not.toContain('data-pill');

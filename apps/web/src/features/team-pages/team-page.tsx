@@ -157,6 +157,7 @@ export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
           {stats.playerLinesShown ? null : (
             <p className="ui-section-note">{t('team.statsTotalsOnly')}</p>
           )}
+          {stats.totalsNote === null ? null : <p className="ui-section-note">{stats.totalsNote}</p>}
         </div>
       )}
       {players}

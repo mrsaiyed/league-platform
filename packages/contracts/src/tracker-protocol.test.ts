@@ -159,6 +159,7 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
       recording: 'live',
       status: 'scheduled',
       uniqueJerseys: true,
+      allowTies: false,
       players: [
         {
           teamId: id(3),
@@ -190,6 +191,9 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
     // What the Players panel needs is part of the shape from the start (T-127).
     const { uniqueJerseys: _u, ...noRule } = rosters;
     expect(TrackerRosters.safeParse(noRule).success).toBe(false);
+    // And whether a level score may end the game (S-73): the device refuses End by it.
+    const { allowTies: _a, ...noTieRule } = rosters;
+    expect(TrackerRosters.safeParse(noTieRule).success).toBe(false);
     const { toReview: _t, ...noMark } = rosters.players[0] ?? {};
     expect(TrackerRosters.safeParse({ ...rosters, players: [noMark] }).success).toBe(false);
   });

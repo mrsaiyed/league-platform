@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode }
 import './court.css';
 import type { CourtBanner } from './court-view.tsx';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
+import { createFetchGameDoors } from './fetch-game-doors.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
 import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.ts';
@@ -17,6 +18,7 @@ import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
 import {
+  isOffline,
   savedBanner,
   savedBannerShortLines,
   savedBannerText,
@@ -24,7 +26,7 @@ import {
 } from './queue-banner.ts';
 import { ScoringScreen } from './scoring-screen.tsx';
 import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controller.ts';
-import { trackerNoticeText, trackerNotices } from './tracker-notice.ts';
+import { showsFinalPanel, trackerNoticeText, trackerNotices } from './tracker-notice.ts';
 import { holdSignOut } from './tracker-sign-out.ts';
 
 export type TrackerOpeningProps = {
@@ -49,6 +51,11 @@ export type TrackerOpeningProps = {
   readonly account?: ReactNode;
   /** The sign-in screen, coming back to this game: offered once the device is signed out. */
   readonly signInHref: string;
+  /**
+   * The account works in more areas than scoring, so it may correct games: a hint for
+   * the words of the Mark not started question only (step 2.37; S-40).
+   */
+  readonly mayCorrect?: boolean;
   readonly locale: string;
   /** The tracker's own messages (tracker-catalog.ts). */
   readonly catalog: Catalog;
@@ -75,12 +82,26 @@ export function TrackerOpening({
   accountHref,
   account = null,
   signInHref,
+  mayCorrect = false,
   locale,
   catalog,
 }: TrackerOpeningProps) {
   const t = useMemo(() => createTranslator(locale, { [locale]: catalog }), [locale, catalog]);
   const [phase, setPhase] = useState<Phase>({ kind: 'preparing' });
   const [storeFailed, setStoreFailed] = useState(false);
+  // What the browser says of the network: the saved banner says "No connection" while it
+  // says there is none (queue-banner.ts), also when no play is waiting to find it out.
+  const [browserOnline, setBrowserOnline] = useState(true);
+  useEffect(() => {
+    const read = () => setBrowserOnline(window.navigator.onLine);
+    read();
+    window.addEventListener('online', read);
+    window.addEventListener('offline', read);
+    return () => {
+      window.removeEventListener('online', read);
+      window.removeEventListener('offline', read);
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
   // What `busy` will be once drawn: read here, so a double tap before the next drawing
   // cannot run the same step twice.
@@ -112,6 +133,15 @@ export function TrackerOpening({
     const visible = () => {
       if (document.visibilityState === 'visible') opened.current?.controller.awake();
     };
+    // Leaving by the browser's own ways (back, reload, the tab closed) while plays wait:
+    // the browser asks in its own words, as far as it allows (lane 2.37, fix round, F1).
+    // What waits is sent only while the scoring screen is open. The screen's own links
+    // ask in the pad first, and do not ask twice.
+    const unload = (event: BeforeUnloadEvent) => {
+      if (leaving.current) return;
+      if ((opened.current?.controller.status().queue.waiting ?? 0) > 0) event.preventDefault();
+    };
+    window.addEventListener('beforeunload', unload);
     window.addEventListener('pagehide', hidden);
     window.addEventListener('pageshow', shown);
     document.addEventListener('visibilitychange', visible);
@@ -127,6 +157,8 @@ export function TrackerOpening({
         }),
         transport: createFetchCommandTransport({ leagueId, gameId }),
         server: createFetchTrackerServer({ leagueId, gameId }),
+        // Reopen and Mark not started are requests of their own, not taps (step 2.37).
+        doors: createFetchGameDoors({ leagueId, gameId }),
         newDeviceId: () => globalThis.crypto.randomUUID(),
         onStoreFailed: () => setStoreFailed(true),
       });
@@ -151,6 +183,7 @@ export function TrackerOpening({
       gone = true;
       unsubscribe();
       window.removeEventListener('online', online);
+      window.removeEventListener('beforeunload', unload);
       window.removeEventListener('pagehide', hidden);
       window.removeEventListener('pageshow', shown);
       document.removeEventListener('visibilitychange', visible);
@@ -272,13 +305,19 @@ export function TrackerOpening({
 
   const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
 
-  // The scoring screen, once this device holds the game and its format is confirmed.
+  // The scoring screen, once this device holds the game and its format is confirmed. And
+  // it stays while the game it shows is final (step 2.37): about half a minute after an
+  // End is saved the league tells the device the game is over, and the screen with its
+  // final panel (the score, Reopen with the time left) is not swapped for a card that
+  // says "this game is over". Reopened, the same screen carries on.
   if (
     phase.kind === 'open' &&
     phase.status.game !== null &&
-    screenOf(phase.status, phase.confirmed).kind === 'scoring'
+    (screenOf(phase.status, phase.confirmed).kind === 'scoring' || showsFinalPanel(phase.status))
   ) {
-    const banner = savedBanner(phase.status.queue);
+    // With no connection the banner says so, and never "All saved" (step 2.37).
+    const offline = isOffline(phase.status.queue, browserOnline);
+    const banner = savedBanner(phase.status.queue, offline);
     const notices = trackerNotices(phase.status);
     const anythingToTell = notices.length > 0 || signIn !== null || storeFailedNotice !== null;
     return (
@@ -308,6 +347,8 @@ export function TrackerOpening({
         account={account}
         leave={leaveBy}
         onNotRecorded={() => setLastTapLost(true)}
+        mayCorrect={mayCorrect}
+        offline={offline}
       />
     );
   }
@@ -370,7 +411,10 @@ export function TrackerOpening({
 function bannerState(banner: SavedBanner): CourtBanner['state'] {
   const first = banner[0].key;
   if (first === 'tracker.queue.allSaved') return 'saved';
-  return first === 'tracker.queue.waiting' ? 'waiting' : 'trouble';
+  // No connection is not a fault: the plays are kept, and wait as the others do.
+  return first === 'tracker.queue.waiting' || first === 'tracker.queue.offline'
+    ? 'waiting'
+    : 'trouble';
 }
 
 /** What the tracker tells about holding the game and taps that did not go in. */
