@@ -1,7 +1,7 @@
 // T-30 and T-60 at startup: the stand-in for local work, and the login check that
 // stops staging and production on a database role that could see past the fence.
 import { describe, expect, it, vi } from 'vitest';
-import { connectCauseOf, type DatabaseHandle } from '@srleagues/database';
+import { connectCauseOf, serverCodeOf, type DatabaseHandle } from '@srleagues/database';
 import type {
   EmailConfirmation,
   EmailConfirmationQuestion,
@@ -69,6 +69,7 @@ function deps(
   const known: Record<string, unknown> = {
     // The package's own reading of a failed connection, by its code (record 082).
     connectCauseOf,
+    serverCodeOf,
     createDatabase,
     checkLoginRole,
     checkSignInStoreLogin,
@@ -319,12 +320,14 @@ describe('startWebApp', () => {
       });
     const said = {
       certificate:
-        'The web app cannot start: the database’s certificate could not be checked: set PLATFORM_DATABASE_CA to the database’s own certificate (the PEM text from its settings page), then start the app again.',
+        'The web app cannot start: the database’s certificate was not accepted: set PLATFORM_DATABASE_CA to the database’s own certificate (its PEM text, or the path of a file holding it; for Supabase, the one on the project’s database settings page), then start the app again.',
       login:
         'The web app cannot start: the database refused the password or login: check the app’s own login and its password in PLATFORM_DATABASE_URL, then start the app again.',
       unreached:
         'The web app cannot start: the database could not be reached: check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
     };
+    const refused = (code: string) =>
+      `The web app cannot start: the database answered but refused the start (code ${code}): check the login name and the database name in PLATFORM_DATABASE_URL, then start the app again.`;
     const cases: [string, Error | string[], string][] = [
       ['SELF_SIGNED_CERT_IN_CHAIN', failed('SELF_SIGNED_CERT_IN_CHAIN'), said.certificate],
       [
@@ -336,6 +339,10 @@ describe('startWebApp', () => {
       ['28P01', failed('28P01'), said.login],
       ['28000', failed('28000'), said.login],
       ['ECONNREFUSED', failed('ECONNREFUSED'), said.unreached],
+      // The server answered with a code of its own: reached, so not "could not be reached"
+      // (Supabase's pooler with a wrong user name, too many connections; fix round 2.203).
+      ['XX000', failed('XX000'), refused('XX000')],
+      ['53300', failed('53300'), refused('53300')],
     ];
     for (const appEnv of ['staging', 'production']) {
       for (const [code, problem, sentence] of cases) {

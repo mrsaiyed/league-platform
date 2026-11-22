@@ -70,7 +70,7 @@ type ConnectCause = ReturnType<typeof DatabaseModule.connectCauseOf>;
  */
 const databaseRefusals: Readonly<Record<ConnectCause, string>> = {
   certificate:
-    'the database’s certificate could not be checked: set PLATFORM_DATABASE_CA to the database’s own certificate (the PEM text from its settings page), then start the app again.',
+    'the database’s certificate was not accepted: set PLATFORM_DATABASE_CA to the database’s own certificate (its PEM text, or the path of a file holding it; for Supabase, the one on the project’s database settings page), then start the app again.',
   ssl: 'the database would not take an encrypted connection: check that PLATFORM_DATABASE_URL is the hosted database’s address (PLATFORM_DATABASE_SSL=off is allowed only for a database on this computer), then start the app again.',
   login:
     'the database refused the password or login: check the app’s own login and its password in PLATFORM_DATABASE_URL, then start the app again.',
@@ -81,17 +81,26 @@ const databaseRefusals: Readonly<Record<ConnectCause, string>> = {
     'the database could not be reached: check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
   timeout:
     'the database could not be reached: it did not answer in time; check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
+  refused:
+    'the database answered but refused the start: check the login name and the database name in PLATFORM_DATABASE_URL, then start the app again.',
   unknown:
     'the database could not be reached: check PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
 };
 
-/** The sentence for a database that refused the start-up, by its kind. */
-export const databaseRefusal = (cause: ConnectCause): string => databaseRefusals[cause];
+/**
+ * The sentence for a database that refused the start-up, by its kind; when the server
+ * answered, with its 5-character code (not a secret), never its words.
+ */
+export const databaseRefusal = (cause: ConnectCause, code: string | null = null): string =>
+  cause === 'refused' && code !== null
+    ? databaseRefusals[cause].replace(': check', ` (code ${code}): check`)
+    : databaseRefusals[cause];
 
 export type DatabasePackage = Pick<
   typeof DatabaseModule,
   | 'createDatabase'
   | 'connectCauseOf'
+  | 'serverCodeOf'
   | 'checkLoginRole'
   | 'checkSignInStoreLogin'
   | 'createDatabaseSignInStore'
@@ -221,7 +230,9 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       problems = await database.checkLoginRole(db);
     } catch (error) {
       // The driver's message may hold the address; only its kind is told (record 082).
-      throw new StartupError(databaseRefusal(database.connectCauseOf(error)));
+      throw new StartupError(
+        databaseRefusal(database.connectCauseOf(error), database.serverCodeOf(error)),
+      );
     }
     if (problems.length > 0) {
       throw new StartupError(
@@ -232,7 +243,9 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
     try {
       storeProblems = await database.checkSignInStoreLogin(db);
     } catch (error) {
-      throw new StartupError(databaseRefusal(database.connectCauseOf(error)));
+      throw new StartupError(
+        databaseRefusal(database.connectCauseOf(error), database.serverCodeOf(error)),
+      );
     }
     if (storeProblems.length > 0) {
       throw new StartupError(

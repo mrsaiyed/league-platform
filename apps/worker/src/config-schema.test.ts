@@ -37,7 +37,49 @@ function failure(
   throw new Error('expected the settings to be refused');
 }
 
+// A made-up authority's certificate (packages/providers' fixture), never a real one.
+const madeUpCa = readFileSync(
+  new URL(
+    '../../../packages/providers/src/platform-database/fixtures/made-up-database-ca.certificate.txt',
+    import.meta.url,
+  ),
+  'utf8',
+);
+
 describe('loadWorkerConfig', () => {
+  it('takes the database’s certificate as text or as a file, read once, as the web app does', () => {
+    expect(loadWorkerConfig(production).PLATFORM_DATABASE_CA).toBeUndefined();
+    const asText = loadWorkerConfig({ ...production, PLATFORM_DATABASE_CA: madeUpCa });
+    expect(asText.PLATFORM_DATABASE_CA).toBe(`${madeUpCa.trim()}\n`);
+    const read: string[] = [];
+    const asFile = loadWorkerConfig(
+      { ...production, PLATFORM_DATABASE_CA: './made-up-ca.pem' },
+      {
+        trackerProject: 'madeupprojectref0001',
+        readFile: (path) => {
+          read.push(path);
+          return madeUpCa;
+        },
+      },
+    );
+    expect(asFile.PLATFORM_DATABASE_CA).toBe(`${madeUpCa.trim()}\n`);
+    expect(read).toEqual(['./made-up-ca.pem']);
+  });
+
+  it('refuses, by name and without its value, a certificate setting that is not one', () => {
+    const notOne = '-----BEGIN CERTIFICATE-----\nMADEUPmadeup0123\n-----END CERTIFICATE-----';
+    const error = failure({ ...production, PLATFORM_DATABASE_CA: notOne });
+    expect(error.invalid).toEqual([
+      'PLATFORM_DATABASE_CA: invalid, must be the server’s certificate: its PEM text, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----, or the path of a file holding it',
+    ]);
+    expect(error.message).not.toContain('MADEUP');
+    const unread = failure({ ...production, PLATFORM_DATABASE_CA: '/made-up/hidden/ca.pem' });
+    expect(unread.invalid).toEqual([
+      'PLATFORM_DATABASE_CA: invalid, it names a file that cannot be read; give the path of a file this program can read, or the certificate’s own PEM text',
+    ]);
+    expect(unread.message).not.toContain('hidden');
+  });
+
   it('needs no database address or email key in local work, and fills in defaults', () => {
     expect(loadWorkerConfig(local)).toEqual({
       ...local,
@@ -172,7 +214,7 @@ describe('loadWorkerConfig', () => {
     });
     expect(error.missing).toEqual(['PUBLIC_BASE_URL', 'EMAIL_FROM']);
     expect(error.invalid).toEqual([
-      'APP_ENV: invalid, not one of the allowed values',
+      'APP_ENV: invalid, not one of the allowed values (local, test, staging, production)',
       'PLATFORM_DATABASE_URL: invalid, must be a postgres:// address',
       'RESEND_API_KEY: invalid, must be at least 8 characters',
       'WORKER_HEALTH_PORT: invalid, must be a port from 0 to 65535',

@@ -272,6 +272,8 @@ const causeWords = {
     'the server’s certificate could not be checked (the file in MIGRATION_DATABASE_CA, or the host name)',
   ssl: 'the connection’s SSL setting (MIGRATION_DATABASE_SSL) does not suit that server',
   timeout: 'nothing answered within 15 seconds (the host, the port, or a firewall)',
+  refused:
+    'the database answered but refused the start (check the login name and the database name in the address)',
   unknown: 'no particular cause could be told',
 };
 const usualCauses =
@@ -300,7 +302,7 @@ export const targetProblemLines = (problem) => {
   }
   if (problem.kind === 'cannot-connect') {
     return [
-      `Could not connect through ${loginWords[problem.login]}: ${causeWords[problem.cause]}. Nothing was made.`,
+      `Could not connect through ${loginWords[problem.login]}: ${causeWords[problem.cause]}${problem.cause === 'refused' && problem.code ? `, code ${problem.code}` : ''}. Nothing was made.`,
       usualCauses,
     ];
   }

@@ -4,6 +4,7 @@ export {
   // Also the web app's start-up's (record 082): why the database refused it, by kind.
   connectCauseOf,
   openLeagueMakingTarget,
+  serverCodeOf,
   type ConnectCause,
   type LeagueMakingPlace,
   type LeagueMakingSource,

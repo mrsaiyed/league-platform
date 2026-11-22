@@ -1,6 +1,7 @@
 // T-30: the only file in the web app that reads process.env: the settings, once,
 // and whether this is Next.js's build (isBuildPhase). Everything else calls these;
 // the structure check fails the build on a read of process.env anywhere else.
+import { readFileSync } from 'node:fs';
 import { trackerProjectFor } from '@srleagues/providers';
 import { loadConfig, type Config } from './config-schema.ts';
 
@@ -13,7 +14,11 @@ let cached: Config | undefined;
  * calls return the same object.
  */
 export function getConfig(): Config {
-  cached ??= loadConfig(process.env, { trackerProject: trackerProjectFor(import.meta.url) });
+  cached ??= loadConfig(process.env, {
+    trackerProject: trackerProjectFor(import.meta.url),
+    // The file PLATFORM_DATABASE_CA may name, read here once, from the working folder.
+    readFile: (path) => readFileSync(path, 'utf8'),
+  });
   return cached;
 }
 
