@@ -133,8 +133,14 @@ export const enAccount = {
   'problem.codeUsedUp': 'Too many tries with this code. Ask for a new one.',
   'problem.codeWrong': 'That code is not right. Check the email and try again.',
   'problem.googleFailed': 'Signing in with Google did not work. Please try again.',
+  // The test copy only (step 2.205): an account made with Google would hold a real address.
+  'problem.googleOff':
+    'This is a test copy, so it does not sign in with Google. Use a made-up email address, such as someone@example.test.',
   'problem.invalidEmail': 'That does not look like an email address.',
   'problem.noPassword': 'Your account has no password. Sign in with Google again instead.',
+  // The test copy only (step 2.205): the same words whether or not an account exists.
+  'problem.onlyMadeUpAddresses':
+    'This is a test copy, so it takes only made-up email addresses, such as someone@example.test.',
   'problem.passwordLeaked':
     'That password appears in lists of leaked passwords. Please choose another.',
   'problem.passwordTooLong': 'Your password is too long. Please choose a shorter one.',

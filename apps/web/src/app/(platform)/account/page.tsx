@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import {
   MyLeaguesList,
   StandalonePage,
+  TestCopyLine,
   waitingQuestionWords,
 } from '../../../features/shell/index.ts';
 import { SignOutForm } from '../../../features/tracker/index.ts';
@@ -63,6 +64,8 @@ export default async function Page() {
           <p>{t('account.signOutEverywhereHelp')}</p>
           <button type="submit">{t('account.signOutEverywhere')}</button>
         </SignOutForm>
+        {/* At its foot, on the test copy only (step 2.205). */}
+        <TestCopyLine shown={ports.testCopy} />
       </main>
     </StandalonePage>
   );

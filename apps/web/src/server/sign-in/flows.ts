@@ -20,6 +20,10 @@
 //   on the attempt limits alone (record 081, Q2: a game night must not hang on an outside
 //   service; the check's own error-level line says so). Asking for a code stays closed
 //   then, because it emails any address typed.
+// - Step 2.205: on the test copy only, asking for a code (sign-up, the forgotten password,
+//   a new code) takes only a made-up address, refused by its form before the bot check and
+//   the sign-in service are asked (notTakenHere). Signing in with a password is untouched.
+//   Google is off there too (googleOff): its account would bring a real Gmail address.
 import { signInEmail } from '@srleagues/contracts';
 import { platformUrl } from '@srleagues/core';
 import type {
@@ -40,6 +44,7 @@ import {
   writeGoogleFlow,
   type CookieJar,
 } from './cookies.ts';
+import { isMadeUpAddress } from '../kept-emails.ts';
 import { deviceOf, safeReturnPath, type Visit } from './device.ts';
 import { screenUrl, type Problem } from './problems.ts';
 import type { SignInMail } from './sign-in-mail.ts';
@@ -53,6 +58,11 @@ export type FlowDeps = {
   readonly secureCookies: boolean;
   /** PUBLIC_BASE_URL, for Google's return address. */
   readonly siteOrigin: string;
+  /**
+   * Whether this is the test copy (the ports' `testCopy`, step 2.205): asking for a code
+   * then takes only a made-up address, and refuses any other before anything is asked.
+   */
+  readonly testCopy: boolean;
   readonly now: () => Date;
 };
 
@@ -121,9 +131,28 @@ export async function askForCode(
 ): Promise<FlowAnswer> {
   const page = purpose === 'sign-up' ? 'signup' : 'forgotPassword';
   const next = safeReturnPath(fields['next']);
+  const address = fields['email'] ?? '';
+  const notHere = notTakenHere(address, deps);
+  if (notHere !== undefined) return goTo(screenUrl(page, { problem: notHere, next }));
   const refused = await botCheckProblem(purpose, fields, visit, deps);
   if (refused !== undefined) return goTo(screenUrl(page, { problem: refused, next }));
-  return sendCode(purpose, fields['email'] ?? '', next, page, visit, deps);
+  return sendCode(purpose, address, next, page, visit, deps);
+}
+
+/**
+ * The test copy's rule (step 2.205, T-13, T-201): it takes only an address on a name kept
+ * for made-up mail (isMadeUpAddress), judged by the address's form alone, before the bot
+ * check or the sign-in service is asked, so a stranger's address is never sent or stored
+ * there. The address is read as the service would read it first (signInEmail), and the
+ * name it is read on is the one tested: one that is not an address is today's
+ * invalidEmail, asked of no one. The refusal is the same whether or not an account exists
+ * (T-68). Undefined where the address is taken, and always off the test copy.
+ */
+function notTakenHere(address: string, deps: FlowDeps): Problem | undefined {
+  if (!deps.testCopy) return undefined;
+  const parsed = signInEmail.safeParse(address);
+  if (!parsed.success) return 'invalidEmail';
+  return isMadeUpAddress(parsed.data) ? undefined : 'onlyMadeUpAddresses';
 }
 
 /**
@@ -138,6 +167,9 @@ export async function resendCode(
 ): Promise<FlowAnswer> {
   const flow = readFlow(visit.jar);
   if (flow === undefined) return goTo(screenUrl('signup', { problem: 'codeExpired' }));
+  // The flow's address was taken once; asked again, so no cookie can carry another past it.
+  const notHere = notTakenHere(flow.email, deps);
+  if (notHere !== undefined) return goTo(screenUrl('enterCode', { problem: notHere }));
   const refused = await botCheckProblem(flow.purpose, fields, visit, deps);
   if (refused !== undefined) return goTo(screenUrl('enterCode', { problem: refused }));
   return sendCode(flow.purpose, flow.email, flow.next, 'enterCode', visit, deps);
@@ -274,13 +306,19 @@ export async function signInWithPassword(
   return afterSignIn(next);
 }
 
-/** "Continue with Google": off to Google, which sends the browser back to googleReturn. */
+/**
+ * "Continue with Google": off to Google, which sends the browser back to googleReturn. Not
+ * on the test copy (step 2.205, T-13, T-201): an account made there would hold a real
+ * Gmail address, so it is refused before the sign-in service is asked (its screens do not
+ * show the button there either).
+ */
 export async function startGoogle(
   fields: Fields,
   visit: Visit,
   deps: FlowDeps,
 ): Promise<FlowAnswer> {
   const next = safeReturnPath(fields['next']);
+  if (deps.testCopy) return goTo(screenUrl('signin', { problem: 'googleOff', next }));
   const started = await deps.signIn.startExternalSignIn({
     provider: 'google',
     returnAddress: deps.siteOrigin + platformUrl('googleReturn'),
@@ -290,7 +328,7 @@ export async function startGoogle(
   return goTo(started.value.redirectTo);
 }
 
-/** Google sent the browser back with a code. */
+/** Google sent the browser back with a code. On the test copy, never taken (startGoogle). */
 export async function finishGoogle(
   code: string,
   visit: Visit,
@@ -298,6 +336,7 @@ export async function finishGoogle(
 ): Promise<FlowAnswer> {
   const flow = readGoogleFlow(visit.jar);
   visit.jar.delete(cookieNames.google);
+  if (deps.testCopy) return goTo(screenUrl('signin', { problem: 'googleOff' }));
   if (flow === undefined || code === '') {
     return goTo(screenUrl('signin', { problem: 'googleFailed' }));
   }

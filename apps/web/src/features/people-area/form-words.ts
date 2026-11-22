@@ -28,6 +28,8 @@ export function personFormWords(submit: string): PersonFormWords {
       birthDate: t('adminPeople.wrong.birthDate'),
       child: t('error.invalid-input'),
     },
+    // The test copy only (step 2.205): the same words as at sign-up.
+    onlyMadeUpEmail: t('problem.onlyMadeUpAddresses'),
     submit,
     birthDateChecked: t('adminPeople.birthDate.checked'),
     sameNameChecked: t('adminPeople.sameName.checked'),

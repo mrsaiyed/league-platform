@@ -51,6 +51,10 @@ export const enSite = {
   'footer.madeUp': 'A made-up league on this computer. It starts over when the app restarts.',
   'footer.privacy': 'Privacy',
   'footer.terms': 'Terms',
+  // Only on the test copy (APP_ENV staging, step 2.205): in the footer of every league and
+  // admin page, above the sign-in forms and on the account pages. Never on the scoring screen.
+  'footer.testCopy':
+    'A test copy. Every league and person here is made up: do not enter real people’s details.',
   'front.about':
     'SR Leagues runs the websites of sports leagues: their schedules, scores, standings and statistics, kept by the people who run each league.',
   'front.signIn': 'Sign in',

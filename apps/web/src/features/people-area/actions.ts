@@ -48,12 +48,14 @@ import { unlikelyYears } from './age-on-record.ts';
 import { detailsAnchor } from './anchors.ts';
 import {
   newPersonInput,
+  onlyMadeUpEmailCode,
   personChangeInput,
   sameNameKey,
   wrongBoxes,
   type PersonBox,
 } from './person-input.ts';
 import { currentTeamsByPerson } from './teams-of-people.ts';
+import { emailNotTakenHere } from './test-copy-email.ts';
 
 type Outcome =
   | { readonly ok: true; readonly personId: string }
@@ -69,9 +71,11 @@ async function peopleOf(fields: TypedFields) {
   const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'people');
   const league = view.context.league;
   const context: CommandContext = commandContextOf(view.context);
-  const { adminPeople, publicSchedule } = await webPorts();
+  const { adminPeople, publicSchedule, testCopy } = await webPorts();
   return {
     context,
+    /** The test copy takes only a made-up contact email (step 2.205): from the ports. */
+    testCopy,
     deps: adminPeople.deps,
     putBack: adminPeople.putBack,
     /** The league's own today, from the ports' one clock (the age a date makes is on it). */
@@ -107,6 +111,20 @@ function refused(
 ): Refused {
   if (code === 'changed-since-read') refresh();
   return { kind: 'refused', code, typed, wrong, said: problemText(command, code) };
+}
+
+/**
+ * On the test copy, a contact email that is not made up (step 2.205, T-13, T-201): nothing
+ * is saved, the email box says why and every box keeps what was typed.
+ */
+function onlyMadeUpEmail(typed: TypedFields): Refused {
+  return {
+    kind: 'refused',
+    code: onlyMadeUpEmailCode,
+    typed,
+    wrong: ['contactEmail'],
+    said: t('adminPeople.refused', { problem: t('problem.onlyMadeUpAddresses') }),
+  };
 }
 
 function leaveNotice(
@@ -230,10 +248,11 @@ export async function searchPeopleAction(form: FormData): Promise<void> {
 /** "Add a person": saved, the browser goes to their own new page, which says so. */
 export async function addPersonAction(_state: FormState, form: FormData): Promise<FormState> {
   const fields = typedOf(form);
-  const { context, deps, record, leagueToday } = await peopleOf(fields);
+  const { context, deps, record, leagueToday, testCopy } = await peopleOf(fields);
   const today = await leagueToday();
   const wrong = wrongBoxes(fields, today);
   if (wrong.length > 0) return refused('create_person', 'invalid-input', fields, wrong);
+  if (emailNotTakenHere(fields, testCopy)) return onlyMadeUpEmail(fields);
   const ask = askAboutBirthDate(fields, today) ?? (await askAboutSameName(context, deps, fields));
   if (ask !== undefined) return ask;
   const result = await requests().once(requestKeyOf(context, fields), async () => {
@@ -250,11 +269,12 @@ export async function addPersonAction(_state: FormState, form: FormData): Promis
 /** "Save details" on a person's page: saved, the page says so beside the details. */
 export async function savePersonAction(_state: FormState, form: FormData): Promise<FormState> {
   const fields = typedOf(form);
-  const { context, deps, list, record, leagueToday } = await peopleOf(fields);
+  const { context, deps, list, record, leagueToday, testCopy } = await peopleOf(fields);
   const personId = (fields['personId'] ?? '').trim().toLowerCase();
   const today = await leagueToday();
   const wrong = wrongBoxes(fields, today);
   if (wrong.length > 0) return refused('update_person', 'invalid-input', fields, wrong);
+  if (emailNotTakenHere(fields, testCopy)) return onlyMadeUpEmail(fields);
   // Asked only about a date that is changed: one already saved is not asked about again.
   const typedDate = (fields['birthDate'] ?? '').trim();
   if (typedDate !== '' && fields['birthDateChecked'] !== typedDate) {
