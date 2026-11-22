@@ -633,6 +633,7 @@ const ROUTES = {
   '/[league]/admin/games/[game]': () => boxScore,
   '/[league]/admin/messages': () => '/north-valley/admin/messages',
   '/[league]/admin/people': () => '/north-valley/admin/people',
+  '/[league]/admin/people/[person]': (at) => at.person,
   '/[league]/admin/registration': () => '/north-valley/admin/registration',
   '/[league]/admin/schedule': () => '/north-valley/admin/schedule',
   '/[league]/admin/schedule/import': () => '/north-valley/admin/schedule/import',
@@ -782,7 +783,14 @@ async function postedByHand(who, page, form, field) {
 /** The address of a team's page, found in the teams page as a visitor sees it. */
 async function addressesFound() {
   const teams = await (await fetch(`${origin}/north-valley/teams`)).text();
-  return { team: /href="(\/north-valley\/teams\/[^"/?#]+)"/.exec(teams)?.[1] ?? '' };
+  // A person's page in People, as the owner finds it.
+  const people = await (
+    await fetch(`${origin}/north-valley/admin/people`, { headers: asWho(owner) })
+  ).text();
+  return {
+    team: /href="(\/north-valley\/teams\/[^"/?#]+)"/.exec(teams)?.[1] ?? '',
+    person: /href="(\/north-valley\/admin\/people\/[^"/?#]+)"/.exec(people)?.[1] ?? '',
+  };
 }
 
 /** The questions a page reads (?season=…), from its own source, and the usual ones. */
