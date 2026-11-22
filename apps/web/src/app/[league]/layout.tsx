@@ -59,6 +59,7 @@ export default async function LeagueLayout({
   const current = currentMenuPage(league, path);
   const season =
     current === null ? null : headerSeason(league, path, await seasonsOfLeague(league.id));
+  const ports = await webPorts();
   return (
     <div className="league-site ui-root">
       <DesignStyle design={site.design} />
@@ -77,7 +78,7 @@ export default async function LeagueLayout({
       <div className="site-body" id="content">
         {children}
       </div>
-      <SiteFooter name={site.name} madeUp={(await webPorts()).madeUpWorld} />
+      <SiteFooter name={site.name} madeUp={ports.madeUpWorld} testCopy={ports.testCopy} />
     </div>
   );
 }

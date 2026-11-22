@@ -279,6 +279,8 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       warn: (message, fields) => deps.warn?.(message, fields),
       // A real database carries no local tools: both local pages answer "not found".
       localTools: null,
+      // Only staging gets here (production stopped above), and says so (step 2.205).
+      testCopy: config.APP_ENV === 'staging',
       reportDesign: (message, fields) => deps.warn?.(message, fields),
     });
   } catch (error) {

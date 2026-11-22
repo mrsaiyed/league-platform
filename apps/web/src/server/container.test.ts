@@ -156,6 +156,8 @@ describe('container.ts in staging, wired for real', () => {
     const ports = await webPortsWith(settings);
     expect(standInsReached).toEqual([]);
     expect(ports.madeUpWorld).toBe(false);
+    // The test copy says so, and takes only made-up addresses for a code (step 2.205).
+    expect(ports.testCopy).toBe(true);
     expect(ports.localTools).toBeNull();
     // A real database answers every request: nothing is kept to this computer's names.
     expect(ports.answers(new Headers({ host: 'leagues.example.com' }))).toBe(true);

@@ -99,6 +99,13 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
    */
   readonly madeUpWorld: boolean;
   /**
+   * Whether this is the test copy (APP_ENV staging, step 2.205): a real database that holds
+   * only made-up data. Its pages say so in one line, and sign-up and a password reset take
+   * only a made-up address (isMadeUpAddress), refused before the sign-in service is asked.
+   * Production and local work: false.
+   */
+  readonly testCopy: boolean;
+  /**
    * Whether a request with these headers may be answered at all. The made-up world, and any
    * ports that carry the local tools (the made-up database's), answer only one addressed to
    * this computer's names (or its own `.test` name) and not passed on by another server

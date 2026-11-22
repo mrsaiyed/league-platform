@@ -23,6 +23,7 @@ export { refusalScreenOf, type RefusalScreen } from './refusal-screen.ts';
 export { SiteFooter } from './site-footer.tsx';
 export { AccountButton, SiteHeader } from './site-header.tsx';
 export { StandalonePage } from './standalone-page.tsx';
+export { TestCopyLine } from './test-copy-line.tsx';
 
 /** What Next.js gives every page and layout under `[league]`. */
 export type LeagueRouteProps = { readonly params: Promise<{ readonly league: string }> };

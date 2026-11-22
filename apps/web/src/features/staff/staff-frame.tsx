@@ -84,6 +84,7 @@ export async function StaffFrame({
   const account = accountMenuOf(view, await signedInEmail(), path);
   const home = leagueUrl(league, 'admin');
   const notPublic = statuses[league.status];
+  const ports = await webPorts();
   const menu = (
     <>
       <StaffNav league={league} areas={view.areas} current={place} />
@@ -146,7 +147,7 @@ export async function StaffFrame({
         <div className="staff-body" id="content">
           {children}
         </div>
-        <SiteFooter madeUp={(await webPorts()).madeUpWorld} />
+        <SiteFooter madeUp={ports.madeUpWorld} testCopy={ports.testCopy} />
       </div>
     </div>
   );

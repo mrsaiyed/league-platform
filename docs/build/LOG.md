@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-22 11:32 UTC — Step 2.205 landed (20f48ca; T-297): on the test copy one line says everything is made up; sign-up, reset, a new code, Google sign-in and an admin's typed contact email all refuse an address that is not made up, before the bot check or the sign-in service is asked; production and local unchanged; one independent review at effort high with use in a browser (two Mediums: Google and the People email, both closed in the step); GitHub passed twice.
+
 - 2026-11-22 10:21 UTC — Step 2.93 landed whole (f7845c5): the website starts on the real database in staging (record 082, T-286): http site address refused, the database's certificate checked, three refusals told apart, the event handlers and the bot check each made in one place with tests that can fail; one independent review at effort high (two Mediums, both in tests, fixed); two faults GitHub showed were cured at their cause (a title check that looked too early; the made-up database server closing under a client just gone); GitHub passed twice.
 
 - 2026-11-22 09:22 UTC — Step 2.194 landed whole (e567af8, lane 2.194-walk-fixes on top of b40857a): the first test's walk works at any hour, the account page links to Admin, the two forms on a team's page are headed; every test that looked under the moved form is corrected, all 37 browser test files passed on the cloud machine, the walk's 110 checks pass after the merge with step 2.199; GitHub passed twice. TEST 1 IS READY (docs/operations/first-test.md).

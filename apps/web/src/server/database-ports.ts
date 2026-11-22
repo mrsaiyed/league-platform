@@ -111,6 +111,11 @@ export type DatabasePortsOptions = {
   readonly reportDesign?: DesignReport;
   readonly now?: () => Date;
   /**
+   * Whether this is the test copy (APP_ENV staging, step 2.205): given true by startup.ts
+   * there only. Absent, false: production, and the made-up database of local work and tests.
+   */
+  readonly testCopy?: boolean;
+  /**
    * The kept emails and "be this made-up person" (step 2.96): given only on the made-up
    * database (startup.ts), with the site's address (PUBLIC_BASE_URL). Ports that carry them
    * answer only requests made on this computer (answersOnlyHere, as the stand-in's do), so
@@ -307,6 +312,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     publishPlays: async () => {},
     liveFeed: null,
     madeUpWorld: false,
+    testCopy: options.testCopy ?? false,
     // The health check asks the database itself (health.ts).
     databaseCheck: () => database.databaseAnswers(db),
     // Carrying the local tools, only requests made on this computer (step 2.96).
