@@ -1155,7 +1155,15 @@ export function ScoringScreen(props: ScoringScreenProps) {
       );
     }
     if (pad.kind === 'leave') {
-      return <LeaveAsk t={t} final={state.status === 'final'} to={pad.to} on={leaveAnswers} />;
+      return (
+        <LeaveAsk
+          t={t}
+          final={state.status === 'final'}
+          waiting={props.status.waiting.length}
+          to={pad.to}
+          on={leaveAnswers}
+        />
+      );
     }
     if (pad.kind === 'reopen') {
       return (

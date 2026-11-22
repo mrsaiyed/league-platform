@@ -188,7 +188,10 @@ export const enTracker = {
   'tracker.leave.anyway': 'Leave anyway',
   'tracker.leave.kept':
     'If you leave, it stays on this device and is sent only when this game’s scoring screen is opened on it again.',
-  'tracker.leave.plays': 'Some plays are not sent yet. Stay on this screen until it says “Saved”.',
+  'tracker.leave.plays_one':
+    '{count} play is not sent yet. Stay on this screen until it says “Saved”.',
+  'tracker.leave.plays_other':
+    '{count} plays are not sent yet. Stay on this screen until it says “Saved”.',
   'tracker.leave.result': 'The result is not sent yet. Stay on this screen until it says “Saved”.',
   'tracker.leave.stay': 'Stay here',
   'tracker.leave.title': 'Not sent yet',
