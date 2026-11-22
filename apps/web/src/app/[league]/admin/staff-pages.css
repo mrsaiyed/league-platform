@@ -620,13 +620,16 @@
   position: sticky;
   inset-inline-start: 0;
   z-index: 1;
+  /* A long name wraps under itself, whole, instead of being cut short with "…": the column
+     is held to a share of the box so the counts beside it stay in reach. */
+  min-inline-size: 7rem;
   max-inline-size: 9.5rem;
   padding-inline: 0 var(--step-3);
-  overflow: hidden;
   background: var(--color-panel);
   font-size: var(--text-14);
   text-align: start;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 /* A count's box: a text box asking for number keys (box-score-sheet-form.tsx says why). */
 .staff .box-score-grid input[inputmode='numeric'] {
