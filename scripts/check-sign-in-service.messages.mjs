@@ -72,7 +72,8 @@ export const checks = {
   eightLetters:
     'A password of 8 lower-case letters is taken: 8 at least, no rules (018’s settings)',
   samePassword: 'The same password again is refused as same_password (018 #1)',
-  leakedPassword: 'A leaked password is refused as weak_password, pwned (018 #10)',
+  leakedPassword:
+    'A leaked password is refused as weak_password, pwned, where that paid protection is on (018 #10)',
   newPassword: 'A new password is taken (018 #1)',
   passwordSignIn: 'Signing in with the password gives a session in the shape we read (018 #1)',
   wrongPassword: 'A wrong password is refused as invalid_credentials (018 #1)',
@@ -98,6 +99,12 @@ export const checks = {
 
 export const asExpected = 'as expected';
 export const differed = 'DIFFERED';
+/** A line that says how the project is set, where either way is one we expect: not a difference. */
+export const noted = 'NOTED';
+export const leakedOff =
+  'leaked-password protection is OFF on this project (a paid setting; the founder’s call, 018 #10)';
+export const someNoted = (count) =>
+  `${count} ${count === 1 ? 'line' : 'lines'} NOTED above: not a difference, a setting for the founder to decide.`;
 export const line = (verdict, label, detail) =>
   detail === undefined
     ? `  ${verdict.padEnd(12)}${label}`

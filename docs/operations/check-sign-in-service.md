@@ -42,7 +42,7 @@ It exits 0 when every line is as expected and the made-up user is gone, 1 otherw
    Remove-Item Env:SUPABASE_URL, Env:SUPABASE_SECRET_KEY
    ```
 
-3. **Read every line together.** If any line says DIFFERED, **stop the session there** and give the lead the lines (they hold nothing secret). A difference means the adapter or the fake is wrong, and record 018 says to fix both together before anyone signs in. The lead decides which, in a change of its own; the session waits for it.
+3. **Read every line together.** A line marked NOTED is not a difference and does not change the result: "leaked-password protection is OFF on this project" only says the project lacks that paid setting, which is the founder's call (record 018, item 10). If any line says DIFFERED, **stop the session there** and give the lead the lines (they hold nothing secret). A difference means the adapter or the fake is wrong, and record 018 says to fix both together before anyone signs in. The lead decides which, in a change of its own; the session waits for it.
 4. **Make the person's checks** from the last block, in the dashboard, and say each one aloud. For "Confirm email", switch it off, run the tool again and see its "Confirm email" line differ, then switch it back on.
 5. **Write the result into the stage report:** every line as printed, the times, and the person's checks with what was seen.
 

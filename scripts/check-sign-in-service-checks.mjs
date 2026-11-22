@@ -107,6 +107,13 @@ class Differed extends Error {
 }
 /** A check that cannot be made, because a line above it that it needs differed. */
 class NotChecked extends Error {}
+/** An answer we expect from some projects that says how this one is set: not a difference. */
+class Noted extends Error {
+  constructor(note) {
+    super('noted');
+    this.note = note;
+  }
+}
 
 /** Supabase's error code, only when it is a short identifier; anything else is not repeated. */
 const safeCode = (code) =>
@@ -235,6 +242,7 @@ export async function runChecks({
   };
 
   const results = [];
+  let notes = 0;
   const check = async (label, run) => {
     let detail;
     if (signal.aborted) detail = words.stoppedHere;
@@ -242,6 +250,12 @@ export async function runChecks({
       try {
         await run();
       } catch (error) {
+        if (error instanceof Noted) {
+          // Neither as expected nor a difference: counted apart, the exit code unchanged.
+          notes += 1;
+          say(words.line(words.noted, error.note));
+          return;
+        }
         detail = error instanceof NotChecked ? words.notChecked : threw('a call', error).detail;
       }
     }
@@ -410,11 +424,11 @@ export async function runChecks({
       refused('user update', await setPassword(needed(state.first), eight), 'same_password');
     });
     await check(words.checks.leakedPassword, async () => {
-      const refusal = refused(
-        'user update',
-        await setPassword(needed(state.first), leakedPassword),
-        'weak_password',
-      );
+      const answer = await setPassword(needed(state.first), leakedPassword);
+      // The protection is a paid setting, the founder's call (018 #10): a project without
+      // it takes the password, which is noted on a line of its own, not a difference.
+      if (answer.ok) throw new Noted(words.leakedOff);
+      const refusal = refused('user update', answer, 'weak_password');
       if (!refusal.reasons.includes('pwned')) {
         throw new Differed(words.refusedWith('user update', refusal.status, 'weak_password'));
       }
@@ -695,6 +709,7 @@ export async function runChecks({
   const differedCount = results.filter((ok) => !ok).length;
   say('');
   say(differedCount === 0 ? words.allAsExpected(total) : words.someDiffered(differedCount, total));
+  if (notes > 0) say(words.someNoted(notes));
   if (!state.removed) for (const text of words.notRemoved) say(text);
   say('');
   say(words.personTitle);

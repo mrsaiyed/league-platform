@@ -33,12 +33,12 @@ function movingClock() {
  * answer a call another way after the fake has done its work; `setUp(fake)` may set
  * the fake's own overrides, which answer before it does any.
  */
-async function serveFake({ reshape, setUp } = {}) {
+async function serveFake({ reshape, setUp, leakedPasswords = [leaked] } = {}) {
   const fake = createFakeSupabaseAuth({
     now: movingClock(),
     secretKey,
     reuseSeconds: 0,
-    leakedPasswords: [leaked],
+    leakedPasswords,
   });
   setUp?.(fake);
   const seen = [];
@@ -164,6 +164,50 @@ test('against the fake over HTTP, every line says "as expected", and the made-up
     assertNothingSecret(output, served);
   } finally {
     await served.close();
+  }
+});
+
+test('a project without leaked-password protection is NOTED, not a difference; another refusal differs', async () => {
+  const off = await serveFake({ leakedPasswords: [] });
+  try {
+    const { outcome, lines, output } = await runAgainst(off);
+    assert.ok(lines.includes(words.line(words.noted, words.leakedOff)), output);
+    assert.ok(!lines.some((text) => text.includes(words.checks.leakedPassword)), output);
+    const made = checkLines(lines);
+    assert.equal(made.length, Object.keys(words.checks).length - 1, output);
+    for (const text of made) assert.ok(text.startsWith(`  ${words.asExpected}`), text);
+    assert.deepEqual(outcome, { total: made.length, differed: 0, removed: true });
+    assert.equal(exitCodeFor(outcome), 0);
+    assert.ok(lines.includes(words.someNoted(1)));
+    assert.equal(off.fake.hasUser(madeAddress(off)), false);
+    assertNothingSecret(output, off);
+  } finally {
+    await off.close();
+  }
+  // A weak_password refusal for another reason is no answer we expect.
+  const other = await serveFake({
+    reshape: (call) =>
+      call.method === 'PUT' && call.body.includes(leaked)
+        ? new Response(
+            JSON.stringify({
+              code: 422,
+              error_code: 'weak_password',
+              msg: 'Password is too weak',
+              weak_password: { reasons: ['characters'] },
+            }),
+            { status: 422, headers: { 'content-type': 'application/json' } },
+          )
+        : undefined,
+  });
+  try {
+    const { outcome, lines, output } = await runAgainst(other);
+    const leakedLine = lineFor(lines, words.checks.leakedPassword);
+    assert.ok(leakedLine?.startsWith(`  ${words.differed}`), output);
+    assert.ok(!lines.includes(words.line(words.noted, words.leakedOff)));
+    assert.equal(outcome.differed, 1);
+    assert.equal(exitCodeFor(outcome), 1);
+  } finally {
+    await other.close();
   }
 });
 
