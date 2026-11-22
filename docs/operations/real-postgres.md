@@ -9,6 +9,7 @@ Made-up data only (T-201). It answers on this computer only, it reaches no other
 - **PostgreSQL 16 or newer, already installed.** Nothing is installed for you. It looks in `/usr/lib/postgresql/<version>/bin` (Debian, Ubuntu and GitHub's machines; the newest version first), then in each folder on `PATH`. If yours is somewhere else, set `REAL_POSTGRES_BIN` to the folder that holds `initdb`, `pg_ctl` and `postgres`.
 - **openssl** on `PATH`, which makes the made-up authority and the server's certificate (Git Bash on Windows has one).
 - Run as an ordinary user. As root (a cloud machine), PostgreSQL will not run, so the server runs as the computer's own `postgres` account, which PostgreSQL's package made.
+- Run as root, the server runs as the `postgres` account: `start` lets that account pass through the folders on the way to `.local/pg` (o+x, g+x, never read), notes their old modes in `.local/pg/modes-on-the-way.json`, and `stop` puts them back.
 
 Where something is missing it stops before starting anything and says what and where it looked:
 
@@ -50,6 +51,7 @@ Stop it with: node scripts/real-postgres.mjs stop
 - **The certificate** names `localhost`, `127.0.0.1` and `::1`, and is signed by a made-up authority made at each start ("SR Leagues made-up test authority (not trusted anywhere)"). The authority's key is removed once it has signed, so nothing more can be signed with it. A client that checks certificates without being given the authority's file is refused, as the web app would be by Supabase's today (going-online audit, H1).
 - **Three roles.** The server's own superuser (`local_superuser`, made by `initdb`) makes the tables' owner and its database, then its password is forgotten: no test and no command ever uses it again. The **tables' owner**, `postgres`, is made as the audit describes Supabase's: not a superuser, may create roles, bypasses the fence, nothing more. It applies every migration with the repository's own runner, the certificate checked, as a release does, and makes **`app_login`** as on the test copy on 2026-11-13 ([make-a-league.md](make-a-league.md), step 2): `create role app_login login password '…'; grant app_user to app_login; grant sign_in_store to app_login;`.
 - **Its files**, in `.local/pg` (git ignores `.local`): `data` (the server's own), `tls` (the certificates and the server's key), `server.log`, and `connection.json`, which holds the owner's and `app_login`'s addresses, passwords included, readable by you only. The passwords are made at each start.
+- **A failed start** leaves `data/`, `tls/` and `server.log` in its folder for you to read (nothing is left running); `stop` or the next `start` removes them. `stop` and `start` remove only a folder that is empty or holds their own marks (`connection.json`, `modes-on-the-way.json` or `data/PG_VERSION`): naming any other folder inside `.local` is refused and removes nothing.
 
 ## What a test gets, and what it may do
 
