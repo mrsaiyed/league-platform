@@ -42,6 +42,7 @@
     "test:units": "vitest run",
     "seed": "node --disable-warning=ExperimentalWarning packages/database/scripts/seed-leagues.ts",
     "simulate": "node --disable-warning=ExperimentalWarning packages/database/scripts/simulate-league.ts",
+    "simulate:large": "node --disable-warning=ExperimentalWarning packages/database/scripts/simulate-league.ts --teams 60 --divisions 6 --rounds 10 --tracked 6",
     "db:types": "node packages/database/scripts/generate-schema-types.ts"
   },
   "devDependencies": {
