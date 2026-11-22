@@ -12,7 +12,7 @@
 // player's games and points on the statistics page.
 import { publicViewer, readGamePage, readGameSnapshot } from '@srleagues/core';
 import * as database from '@srleagues/database';
-import type { SignInService } from '@srleagues/providers';
+import { createLocalBotCheck, type SignInService } from '@srleagues/providers';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildHomeGames, buildScheduleView } from '../features/schedule-pages/index.ts';
 import { buildStandingsViews, loadStatsPage } from '../features/stats-pages/index.ts';
@@ -44,6 +44,7 @@ beforeAll(async () => {
     db,
     signIn: {} as SignInService,
     signInMail: {} as SignInMail,
+    botCheck: createLocalBotCheck({ appEnv: 'test' }),
     log: () => {},
     warn: () => {},
   });
