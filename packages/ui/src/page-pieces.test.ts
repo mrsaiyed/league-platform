@@ -689,6 +689,31 @@ describe('tables', () => {
     expect(html).toContain('<table class="ui-table ui-standings">');
     expect(html.match(/class="ui-team-cell"/g)).toHaveLength(2);
   });
+
+  it('on a phone keep the record and the ordering column in view, and leave out what the columns say', () => {
+    const html = render(
+      createElement(StandingsTable, {
+        caption: 'East',
+        idPrefix: 'east',
+        columns: [
+          { key: 'gp', label: 'GP', narrow: 'left-out' },
+          { key: 'w', label: 'W', narrow: 'in-view' },
+          { key: 'l', label: 'L', narrow: 'in-view' },
+          { key: 'pct', label: 'PCT', narrow: 'in-view' },
+          { key: 'pf', label: 'PF' },
+        ],
+        rows: [
+          { id: 'a', seed: 1, team: 'Owls', cells: { gp: 6, w: 5, l: 1, pct: '.833', pf: 300 } },
+        ],
+        labels: { seed: 'Seed', team: 'Team', note: 'Note', notes: 'Notes' },
+      }),
+    );
+    expect(html).toContain('data-narrow="fit" style="--ui-in-view:3;--ui-seed-col:1"');
+    // Games played, in the heading and the row, is left to the wide layout.
+    expect(html.match(/class="ui-num ui-left-out"/g)).toHaveLength(2);
+    expect(displayCss).toMatch(/@media \(max-width: 30rem\) \{\s*\.ui-standings\[data-narrow\] \{/);
+    expect(displayCss).toMatch(/\.ui-standings\[data-narrow\] \.ui-left-out \{\s*display: none;/);
+  });
   it('fade the far edge lightly: a column wholly in view under it keeps its digits', () => {
     // Narrow, and reaching the panel's color only at the very edge: never a solid band. A
     // step narrower since step 2.147 part 3 (16, was 24): under the wider one a number cut

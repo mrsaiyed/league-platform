@@ -197,6 +197,53 @@ It is safe to run again: a game already brought over is only compared, and a run
 
 It opens a database folder on this computer and refuses anything that reads as a network address (T-201). Use it on made-up backups: a backup of the live tracker holds real people's names, and bringing one over waits for the founder.
 
+## Play a whole made-up season with one command
+
+```sh
+npm run simulate
+```
+
+**What it is for.** It makes a made-up league from nothing and plays its whole season to the final tables, using the product's own buttons behind the scenes, the same ones a league's admin and scorekeepers use: it adds the teams and their players, brings in the schedule, puts the games into weeks, publishes the schedule, types in final scores, scores a few games play by play as the tracker does, and loses some games the way a real season does (postponed and played later, postponed and still waiting, cancelled, cancelled by mistake and put back, forfeited, and one score typed the wrong way round and then corrected). One tracked game is level after four periods and won in overtime. Then it checks its own work and prints a report. It is a way to see that a league of any size works from start to end, without waiting a season. Every name in it is invented, and the same `--seed` number always makes the same league.
+
+**Four ways to run it:**
+
+| What you want                                 | Type this                                                              | About     |
+| --------------------------------------------- | ---------------------------------------------------------------------- | --------- |
+| A small one, to try it                        | `npm run simulate`                                                     | 5 seconds |
+| A league like yours: 8 teams, each plays all  | `npm run simulate -- --teams 8 --rounds 7 --tracked 2`                 | 6 seconds |
+| 24 schools in 4 districts, 10 weeks           | `npm run simulate -- --teams 24 --divisions 4 --rounds 10 --tracked 6` | 15 s      |
+| 60 teams in 6 divisions, 10 weeks (300 games) | `npm run simulate:large`                                               | 65 s      |
+
+`--teams` is how many teams, `--divisions` how many divisions they are split into, `--rounds` how many game weeks, `--tracked` how many games are scored play by play, and `--seed` any number, to get a different made-up league.
+
+**What the report says.** The first lines say how big the league is and how many games were called off or changed. Then eleven checks, each `ok` or `FAIL`. **What they are held against:** the simulator's own plan, what it meant to happen (every game's score, which games were called off and how, every basket and foul of the games scored play by play). The checks work the season out again from that plan with their own plain sums, which use nothing of the product's standings or statistics, and compare the answer with what the product saved and what its pages read. So a product that saved a wrong score, counted a result to the wrong team or put two teams in the wrong order would fail, by name:
+
+- `final-scores`: every game is saved as planned: played or corrected at the planned score, a forfeit at the league's forfeit score against the side that forfeited, a cancelled or still-waiting game with no result. A wrong game is named.
+- `schedule`: every game is saved once, between the planned home and away teams, in its planned week (round), on its planned day and start time and in its planned division, and the public schedule shows it the same way; a postponed game still waiting keeps the day it had, as the product keeps it; a saved game the plan does not have is named too.
+- `standings`: every team's line (games, wins, losses, ties, points for and against; points too in a table ranked by points) and every place in the table, teams level on their record included: those are put in order by the season's own tiebreakers as the spec words them (head-to-head among the level teams, then point difference, then points scored; teams still level after a split start again among themselves). Teams nothing separates may come in either order; the report counts them.
+- `box-scores`: in every game scored play by play, each player's points and fouls.
+- `player-totals`: each player's games and points in the season's statistics.
+- `games-played`, `called-off` (each called-off game ended as planned, the corrected one corrected once) and `overtime` (the overtime game counted as overtime).
+- `wins-equal-losses`, `points-balance` and `tracked-points` only check that the product agrees with itself; they are cheap but prove little alone.
+
+The pages test (`apps/web/src/server/simulated-league-pages.test.ts`) holds what the pages show against the same plan: the standings page row by row, the schedule (every game once, in its week, on its day), five game pages, one team's results, the box scores and the statistics page.
+
+**What the checks do not cover yet:** the leaders' cards and their ranking rules (minimum games, averages), minutes played, streaks, seeds, the "why this team is ahead" notes, coin flips (the simulator records none), ties (its games never end level), standings adjustments, and a table ranked by points (the simulator's league ranks by win percentage, though the check can work out either).
+
+Then the final tables, `All 11 checks hold.` when all is well, and a last line saying how long each part took. If any check fails, the command says which one and ends with an error.
+
+**Seeing the league in your browser.** Start the web app with the size you want, written the same way as above, in one line:
+
+```sh
+LOCAL_DATA=made-up-database LOCAL_SIMULATED_LEAGUE="--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7" PUBLIC_BASE_URL=http://127.0.0.1:3000 npm run dev:web
+```
+
+(`LOCAL_SIMULATED_LEAGUE=on` gives a small league: 8 teams, one division, 7 weeks, 2 games scored play by play. You can also put the two settings in `.env` instead of typing them each time, and add `LOCAL_DEMO_LEAGUE=on` to have the demo league as well.)
+
+While it starts, the window you typed in prints two lines: first `Playing a simulated league at start: 24 teams in 4 division(s), …`, and when it is done `Simulated league ready: Simulated Made-up League, 120 games, all 11 checks hold, at http://127.0.0.1:3000/simulated (start took … s)`. Then open **http://127.0.0.1:3000/simulated** in your browser (the `127.0.0.1` address, as for every made-up league above: the page answers only for the address `PUBLIC_BASE_URL` names, which is why the line above sets it): the home page, schedule, standings, statistics, every team and every game are there. To see it as the league's owner, open **http://127.0.0.1:3000/signin/made-up-people** and press **Open Simulated Made-up League as Sim Owner**; the first time, it asks you to choose a password (any made-up one of 8 letters or more), then takes you to the league's admin.
+
+Two things to know. The league is made fresh every time the app starts, so nothing you change in it is kept after you stop the app. And above 30 teams the start takes about a minute (the first line says so); the page answers once the second line has printed. If the size cannot be played (for example 3 teams in 2 divisions), the app does not start and says in one sentence what was wrong, with an example that works.
+
 ## Make a league
 
 ```sh

@@ -96,10 +96,16 @@ export const enAdminPeople = {
   'adminPeople.sub':
     'Everyone in the league, on a team or not. Find someone, fix their details or add someone new.',
   'adminPeople.teams.add': 'Add to a team',
-  'adminPeople.teams.addLabel': 'Team',
-  'adminPeople.teams.admin': '{team} in Teams',
+  'adminPeople.teams.addLabel': 'Add to another team',
+  // The picker's label for someone on no team yet.
+  'adminPeople.teams.addLabelFirst': 'Add to a team',
+  'adminPeople.teams.admin': 'Its page in Teams',
+  // What the picker shows before a team is chosen.
+  'adminPeople.teams.choose': 'Choose a team',
   'adminPeople.teams.none': 'On no team’s roster this season.',
-  'adminPeople.teams.public': 'its public page',
+  // A team the person is on, before the links to its two pages.
+  'adminPeople.teams.on': 'On {team}',
+  'adminPeople.teams.public': 'Its public page',
   'adminPeople.teams.title': 'Teams',
   'adminPeople.treated.adultByBoth':
     'Treated as an adult: the date of birth and the choice both say so.',

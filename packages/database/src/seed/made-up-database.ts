@@ -19,6 +19,9 @@ import { seedLeaguesInto } from './seed-leagues.ts';
 import { putSeedSeasonsUnderWay } from './seed-season-under-way.ts';
 import { seedDemoLeagueInto } from './seed-demo-league.ts';
 import { addSeedTrackedGames } from './seed-tracked-games.ts';
+import type { SimulationOptions } from './simulate-league-plan.ts';
+import { checkSimulatedLeague, type SimulationReport } from './simulate-league-check.ts';
+import { simulateLeagueInto, type PlayedLeague } from './simulate-league.ts';
 
 /** The login role a made-up database is used as. */
 export const madeUpLoginRole = 'made_up_app_login';
@@ -34,6 +37,10 @@ export type MadeUpDatabase = {
   readonly source: DatabaseSource;
   /** The seed leagues it holds. */
   readonly leagues: readonly MadeUpLeague[];
+  /** The simulated league, when `simulate` asked for one. */
+  readonly simulated?: PlayedLeague;
+  /** The simulated league's self-check (the command's seven checks), run once it is played. */
+  readonly simulatedReport?: SimulationReport;
   /** Ends it; everything in it is gone. */
   readonly close: () => Promise<void>;
 };
@@ -65,6 +72,11 @@ export type MadeUpOptions = {
    * default: it takes some seconds to load.
    */
   readonly demo?: boolean;
+  /**
+   * A simulated league of that size as well, its season played to the end
+   * (simulate-league.ts, step 2.236): for reading its pages through the web app's ports.
+   */
+  readonly simulate?: SimulationOptions;
 };
 
 /** Opens a new made-up database in memory. Close it when done. */
@@ -77,6 +89,13 @@ export async function madeUpDatabase(options: MadeUpOptions = {}): Promise<MadeU
     if (options.underWay === true) await putSeedSeasonsUnderWay(pglite);
     if (options.underWay === true && options.tracked === true) await addSeedTrackedGames(pglite);
     if (options.demo === true) await seedDemoLeagueInto(pglite);
+    const simulated =
+      options.simulate === undefined
+        ? undefined
+        : await simulateLeagueInto(pglite, options.simulate);
+    // Checked as the command checks it, while the session may still read every row.
+    const simulatedReport =
+      simulated === undefined ? undefined : await checkSimulatedLeague(pglite, simulated);
     for (const [slug, audience] of Object.entries(options.audiences ?? {})) {
       const told = await pglite.query('update leagues set audience = $2 where slug = $1', [
         slug,
@@ -109,6 +128,8 @@ export async function madeUpDatabase(options: MadeUpOptions = {}): Promise<MadeU
     return {
       source: { kind: 'pglite', pglite },
       leagues: Object.freeze(rows.map((row) => Object.freeze({ ...row }))),
+      ...(simulated === undefined ? {} : { simulated }),
+      ...(simulatedReport === undefined ? {} : { simulatedReport }),
       close: () => pglite.close(),
     };
   } catch (error) {

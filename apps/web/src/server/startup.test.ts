@@ -6,6 +6,7 @@ import type { EmailConfirmation, EmailConfirmationQuestion } from '@srleagues/pr
 import { loadConfig } from './config-schema.ts';
 import {
   requireEmailConfirmation,
+  simulatedLeagueSize,
   startWebApp,
   type DatabasePackage,
   type RealSignInSettings,
@@ -132,6 +133,74 @@ describe('startWebApp', () => {
     ]);
     expect(listed.some((p) => p.email === 'owner@lakeside.example.test')).toBe(true);
   }, 120_000);
+
+  it('plays a simulated league at start with LOCAL_SIMULATED_LEAGUE=on, its checks holding (step 2.236)', async () => {
+    const config = loadConfig({
+      ...env,
+      APP_ENV: 'test',
+      LOCAL_DATA: 'made-up-database',
+      LOCAL_SIMULATED_LEAGUE: 'on',
+    });
+    const database = vi.fn(() => import('@srleagues/database'));
+    const realSignIn = vi.fn((_service: RealSignInSettings) => answering('off'));
+    const said: string[] = [];
+    const ports = await startWebApp(config, {
+      database,
+      realSignIn,
+      log: () => {},
+      say: (line) => said.push(line),
+    });
+    // One line before the play, one after: which league, its address, how long it took.
+    expect(said).toHaveLength(2);
+    expect(said[0]).toMatch(
+      /^Playing a simulated league at start: 8 teams in 1 division\(s\), 7 rounds, 2 tracked, seed 1\. This takes some seconds\.$/,
+    );
+    expect(said[1]).toMatch(
+      /^Simulated league ready: Simulated Made-up League, 28 games, all 11 checks hold, at http:\/\/localhost:3000\/simulated \(start took \d+\.\d s\)\./,
+    );
+    expect(await ports.findLeague('simulated')).toMatchObject({ slug: 'simulated' });
+    expect(await ports.findLeague('lakeside')).toMatchObject({ slug: 'lakeside' });
+    // "Be this made-up person" lists its owner, who acts for it.
+    const { simulatedOwner } = await import('@srleagues/database');
+    const listed = (await ports.localTools?.madeUpPeople()) ?? [];
+    const inSimulated = listed.filter((p) => p.places.some((place) => place.slug === 'simulated'));
+    expect(
+      inSimulated.map((p) => [p.email, p.places.flatMap((place) => place.memberships)]),
+    ).toEqual([[simulatedOwner.email, ['owner']]]);
+  }, 120_000);
+
+  it('reads LOCAL_SIMULATED_LEAGUE with the simulate command’s own reader (step 2.236)', async () => {
+    const database = await import('@srleagues/database');
+    expect(simulatedLeagueSize(database, 'on')).toEqual({
+      teams: 8,
+      divisions: 1,
+      rounds: 7,
+      tracked: 2,
+      seed: 1,
+    });
+    expect(
+      simulatedLeagueSize(database, '--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7'),
+    ).toEqual({ teams: 24, divisions: 4, rounds: 10, tracked: 6, seed: 7 });
+    // Numbers left out are the command's own defaults.
+    expect(simulatedLeagueSize(database, '--teams 12')).toEqual({
+      ...database.simulationDefaults,
+      teams: 12,
+    });
+  });
+
+  it('stops the start with one plain sentence for a size that cannot be played (step 2.236)', async () => {
+    const config = loadConfig({
+      ...env,
+      APP_ENV: 'test',
+      LOCAL_DATA: 'made-up-database',
+      LOCAL_SIMULATED_LEAGUE: '--teams 3 --divisions 2',
+    });
+    const database = vi.fn(() => import('@srleagues/database'));
+    const realSignIn = vi.fn((_service: RealSignInSettings) => answering('off'));
+    await expect(startWebApp(config, { database, realSignIn, log: () => {} })).rejects.toThrow(
+      'The web app cannot start: LOCAL_SIMULATED_LEAGUE="--teams 3 --divisions 2" cannot be read: Each division needs at least 2 teams. For example LOCAL_SIMULATED_LEAGUE="--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7"',
+    );
+  });
 
   it('refuses the made-up database too for a site address that is not local', async () => {
     const d = deps([]);

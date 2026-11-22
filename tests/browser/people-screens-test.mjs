@@ -317,9 +317,10 @@ if (built) {
     at = 'his record names his team, and removing says to take him off its roster first';
     const teamsPart = page.locator('[data-person-teams]');
     note(
-      'his record lists the Falcons, with their admin page and their public page',
-      (await teamsPart.getByRole('link', { name: 'Falcons in Teams' }).count()) === 1 &&
-        (await teamsPart.getByRole('link', { name: 'its public page' }).getAttribute('href')) ===
+      'his record says plainly he is on the Falcons, with their admin page and their public page',
+      (await teamsPart.innerText()).includes('On Falcons') &&
+        (await teamsPart.getByRole('link', { name: 'Its page in Teams' }).count()) === 1 &&
+        (await teamsPart.getByRole('link', { name: 'Its public page' }).getAttribute('href')) ===
           '/north-valley/teams/falcons',
     );
     const removePart = page.locator('#remove');
@@ -369,7 +370,15 @@ if (built) {
     );
     // Past 200 people a team page's picker cannot reach everyone: her record can.
     const addToTeam = page.locator('[data-add-to-team]');
-    const teamName = await addToTeam.locator('select option').first().innerText();
+    // The picker starts on "Choose a team", under "Add to a team" (she is on none).
+    note(
+      'her record\'s picker is labelled "Add to a team" and starts on "Choose a team"',
+      (await addToTeam.getByLabel('Add to a team').count()) === 1 &&
+        (await addToTeam.locator('select').inputValue()) === '' &&
+        (await addToTeam.locator('select option').first().innerText()) === 'Choose a team',
+    );
+    const teamName = await addToTeam.locator('select option:not([disabled])').first().innerText();
+    await addToTeam.locator('select').selectOption({ label: teamName });
     await Promise.all([
       page.waitForURL(/\/admin\/teams\/[^/]+$/),
       addToTeam.getByRole('button', { name: 'Add to a team' }).click(),
