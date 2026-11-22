@@ -330,10 +330,16 @@ if (browser) {
   await step("every other school's players' numbers hidden", async () => {
     // Every school but the tracked one: the five it played have players' lines from those
     // games, hidden; the other eighteen have no one listed at all.
+    const rostersListed = [];
     for (const school of schools.filter((s) => s !== tracked)) {
       const team = await open(`/${slug}/teams/${school.shortName}`);
       note(`${school.name}'s page is served`, team.status === 200);
       if (opponents.includes(school)) {
+        rostersListed.push(
+          demoLeague.trackerPlayers[school.shortName].every(([, name]) =>
+            has(team.text, shownAs(name)),
+          ),
+        );
         note(
           `${school.name}'s page says its players' numbers are not public`,
           has(team.text, "players' numbers are not public") ||
@@ -352,6 +358,14 @@ if (browser) {
       );
       await everyPage(`/${slug}/teams/${school.shortName}`);
     }
+    // Not what a real association's demo must show (P9 §3): the tracker's games name these
+    // players, so the transfer needs them on the roster (step 2.233), and no setting hides a
+    // roster yet (step 2.219). The day either lands, this check fails and says why.
+    note(
+      "known until step 2.219: the five opponents' rosters are listed",
+      rostersListed.length === 5 && rostersListed.every(Boolean),
+      JSON.stringify(rostersListed),
+    );
   });
 
   await step('"be this made-up person" lists the league\'s owner and a scorekeeper', async () => {

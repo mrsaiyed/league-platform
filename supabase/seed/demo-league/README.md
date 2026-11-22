@@ -11,8 +11,13 @@ games are in the file here.
 public. The tracker also keeps the other side's players in every game it scores, and the
 transfer brings a game in only when they are on that team's roster, so the five schools it
 played are listed too, with their players' statistics for staff only. The other eighteen
-schools list no one. Whether a school's roster is public at all is a question for the lead
-and the product (P9 §3), not for this seed.
+schools list no one.
+
+**What this league does not yet show as a real association's demo must.** The five schools
+the tracked school played have their players listed on their own team pages, because the
+tracker's games name them and the transfer needs them on the roster. Steps 2.219 (whether a
+roster is public) and 2.233 (the transfer brings the other side in as its team's totals,
+with no person made) must land before a real association's league is loaded.
 
 ## `fixtures.csv`: the games and their results
 
