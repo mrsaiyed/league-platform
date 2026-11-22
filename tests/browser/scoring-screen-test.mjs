@@ -32,6 +32,12 @@
 //   hundred plays is measured and judged; the figures are printed, with how long the
 //   options and the count take to follow. And the tile counts a play only after the
 //   device's own store has finished writing it (T-114): the store's writes are timed.
+//   A hundred plays tapped are a hundred plays recorded, said by the game itself (its
+//   count of plays, the tile's points) and not only by the watches that time each tap:
+//   a lost play is the worst thing this screen can do. The watch of a tap's mark looks
+//   for a NEW mark, also when the mark of the play before is still on the tile with the
+//   same words (a store that answers late): until step 2.37 it then saw no mark and a
+//   run counted 99 of a hundred plays that were all recorded (GitHub's run 43986010617).
 //   The clock runs through those hundred plays (step 2.36), and for three seconds after
 //   them its ticking is seen to change the clock's own place and nothing of any tile.
 // - Then the clock, periods, team fouls and timeouts of step 2.36, on the same game:
@@ -254,29 +260,69 @@ async function tapWhereItIs(page, locator, what) {
 
 /**
  * At rest the pad's words fit their place (the second look's L3): nothing of them is cut
- * and there is nothing to scroll to, with `sentences` of the hint's four showing (two
- * before the first play, under what to do next; all four once the game is in play).
+ * and there is nothing to scroll to, with as many of the hint's four sentences showing
+ * as the screen's rule says. `when` is `offered` while the Start clock button or the way
+ * to the next period stands over the hint, `running` while the clock runs.
+ *
+ * Since step 2.37 the pad at rest also holds the latest play's line once the game is
+ * under way (`latest`: false before the first play), and where the pad is a narrow column
+ * that line takes the place of part of the hint: one sentence while `offered`, three
+ * while `running`. Where the pad is wide (a tablet upright) or the log has a panel of its
+ * own under the pad and the line is not drawn (a tablet lying down), the hint is as step
+ * 2.36 left it: two and four. A sentence the hint leaves off is left off whole: it is
+ * counted as showing only where it is inside the hint's own place.
  */
-async function restFits(page, label, sentences) {
+async function restFits(page, label, when, { latest = true } = {}) {
   await twoFrames(page);
+  const { width, height } = page.viewportSize();
+  const logHasItsPanel = width >= 880 && height >= 760;
+  const narrow = width < 700 || height <= 520 || (width >= 880 && !logHasItsPanel);
+  const lineExpected = latest && !logHasItsPanel;
+  const sentences = latest && narrow ? (when === 'offered' ? 1 : 3) : when === 'offered' ? 2 : 4;
   const rest = await page.evaluate(() => {
     const el = document.querySelector('[data-pad] [data-rest]');
     if (el === null) return null;
-    const shown = [...el.querySelectorAll('[data-hint] p')].filter(
-      (p) => p.getClientRects().length > 0,
-    );
+    const hint = el.querySelector('[data-hint]');
+    const place = hint.getBoundingClientRect();
+    const shown = [...hint.querySelectorAll('p')].filter((p) => {
+      const r = p.getBoundingClientRect();
+      // Drawn, and inside the hint's own place: not wrapped out to its side.
+      return p.getClientRects().length > 0 && r.left < place.right - 0.5;
+    });
     const edge = el.getBoundingClientRect();
+    const line = el.querySelector('[data-latest] [data-log-open]');
+    const lineAt = line?.getBoundingClientRect();
     return {
       place: el.clientHeight,
       over: el.scrollHeight - el.clientHeight,
       sentences: shown.length,
-      cut: shown.filter((p) => p.getBoundingClientRect().bottom > edge.bottom + 0.5).length,
+      cut: shown.filter((p) => {
+        const r = p.getBoundingClientRect();
+        return r.bottom > edge.bottom + 0.5 || r.bottom > place.bottom + 0.5;
+      }).length,
+      // The latest play's line: drawn whole inside the pad's rest, 44 or more high.
+      line:
+        lineAt === undefined || lineAt.height === 0
+          ? null
+          : {
+              high: lineAt.height,
+              whole: lineAt.top >= edge.top - 0.5 && lineAt.bottom <= edge.bottom + 0.5,
+              playCut: [...line.querySelectorAll('[data-latest-play]')].some(
+                (play) => play.scrollWidth > play.clientWidth + 0.5,
+              ),
+            },
     };
   });
   note(
-    `${label}: at rest the pad’s words fit their place, nothing cut and nothing to scroll`,
-    rest !== null && rest.over <= 0 && rest.cut === 0 && rest.sentences === sentences,
-    JSON.stringify(rest),
+    `${label}: at rest the pad’s words fit their place, nothing cut and nothing to scroll${lineExpected ? ', under the latest play’s line' : ''}`,
+    rest !== null &&
+      rest.over <= 0 &&
+      rest.cut === 0 &&
+      rest.sentences === sentences &&
+      (lineExpected
+        ? rest.line !== null && rest.line.whole && rest.line.high >= 44
+        : rest.line === null),
+    JSON.stringify({ ...rest, expected: { sentences, lineExpected } }),
   );
 }
 
@@ -657,7 +703,11 @@ if (browser) {
           /Start clock · tip-off/.test(await c.pad.locator('[data-start-clock]').innerText()) &&
             /Start it at the tip\./.test(await c.pad.locator('[data-start-bar]').innerText()),
         );
-        await restFits(page, `${size.width} x ${size.height}, before the first play`, 2);
+        // Before the game is under way the pad has no latest play's line: the hint is
+        // its first two sentences under what to do next.
+        await restFits(page, `${size.width} x ${size.height}, before the first play`, 'offered', {
+          latest: false,
+        });
       }
       await page.setViewportSize({ width: phone.width, height: phone.height });
       await twoFrames(page);
@@ -1676,17 +1726,28 @@ if (browser) {
         // The hint says only what this size offers (second look, L2): dragging a bench
         // player where a bench is on the screen to drag from, the bench's button where
         // it is folded away.
-        const hint = await c.pad.locator('[data-hint]').innerText();
+        // The sentence about substitutions is the hint's second. Since step 2.37 a phone
+        // shows only the first while the Start clock button stands over the hint (the
+        // latest play's line has the room), so the sentence is read where it is in the
+        // page: which of its two wordings this size draws, whether its line shows now
+        // or only once the clock runs.
+        const hint = await c.pad.locator('[data-hint] p:nth-of-type(2)').evaluate((sentence) =>
+          [...sentence.querySelectorAll('span')]
+            .filter((wording) => getComputedStyle(wording).display !== 'none')
+            .map((wording) => wording.textContent)
+            .join(' | '),
+        );
         note(
           `${label}: the hint offers ${fold ? 'the bench’s button, and no drag' : 'the drag from the bench'}`,
           fold ? !/drag/i.test(hint) && /“Bench”/.test(hint) : /drag a bench player/.test(hint),
           hint,
         );
         // And it fits (L3). The game is in play and its clock is stopped, so the pad
-        // begins with the Start clock button of step 2.36, whose own line says the rest:
-        // the hint is then its first two sentences. All four, with the clock running, are
-        // measured at each size by that step (scoring-clock-steps.mjs).
-        await restFits(page, `${label}, in play`, 2);
+        // begins with the Start clock button of step 2.36, whose own line says the rest,
+        // and holds the latest play's line of step 2.37: the hint is then its first two
+        // sentences, or its first where the pad is a narrow column (`restFits`). With the
+        // clock running it is measured at each size by that step (scoring-clock-steps.mjs).
+        await restFits(page, `${label}, in play`, 'offered');
         // Where only its three dots show, More is still named for a screen reader.
         note(
           `${label}: the More button is named "More" for a screen reader, word shown or not`,
@@ -1938,14 +1999,21 @@ if (browser) {
             while (document.querySelector('[data-pad] [data-act="p1"]') !== null) await drawn();
           }
         }, id);
+        // With the network off the banner says that first (step 2.37), then how many wait.
         await page.waitForFunction(
-          () => /^500 /.test(document.querySelector('[data-saved-banner]').textContent),
+          () =>
+            /(^|\W)500 plays waiting to send/.test(
+              document.querySelector('[data-saved-banner]').textContent,
+            ),
           null,
           { timeout: 120_000 },
         );
+        const bannerSays = (await c.banner.innerText()).trim();
         note(
-          'the banner tells the truth: 500 waiting to send',
-          (await c.banner.getAttribute('data-state')) === 'waiting',
+          'the banner tells the truth: no connection, and 500 waiting to send',
+          (await c.banner.getAttribute('data-state')) === 'waiting' &&
+            /^No connection · 500 to send$/.test(bannerSays),
+          bannerSays,
         );
         // The clock is started (step 2.36) and runs through the hundred plays measured
         // below: a running clock must never make a tile's tap late. Start is a tap like
@@ -1986,11 +2054,20 @@ if (browser) {
             };
             let touched = 0;
             let waiting = null;
+            // A tap that landed on neither a player's tile nor an option: the option's tap
+            // made before the options were drawn (this run's pace is fixed, and a machine
+            // starved of its processor can fall behind it). Such a run cannot say whether
+            // a play was lost, and says so.
+            times.elsewhere = [];
             document.addEventListener(
               'click',
               (event) => {
                 touched = event.timeStamp;
-                waiting = event.target.closest('[data-act]') ? 'option' : 'tile';
+                const onOption = event.target.closest('[data-act]') !== null;
+                waiting = onOption ? 'option' : 'tile';
+                if (!onOption && event.target.closest('[data-teams] [data-player]') === null) {
+                  times.elsewhere.push(String(event.target.className || event.target.tagName));
+                }
               },
               true,
             );
@@ -2004,31 +2081,46 @@ if (browser) {
             }).observe(pad, { childList: true, subtree: true });
             // The tile is ringed the moment it is tapped; an option tapped marks it with
             // what was tapped, before that is saved; then the tile counts it.
-            let marked = 0;
+            // When each option was tapped whose play the tile has not counted yet, oldest
+            // first: plays are counted in the order they were tapped, so a play counted
+            // late (the store slow) is still timed from its own tap, not the next one's.
+            // (Kept with the times, so it is emptied with them before the hundred plays.)
+            const marked = [];
+            times.uncounted = marked;
             new MutationObserver((changes) => {
               for (const change of changes) {
-                const set = tile.hasAttribute(change.attributeName);
                 const ringed = tile.getAttribute('data-tapped') === 'on';
                 if (change.attributeName === 'data-tapped' && ringed && waiting === 'tile') {
                   waiting = null;
                   opening = touched;
                   painted(touched, times.ringed);
-                } else if (change.attributeName === 'data-mark' && set && waiting === 'option') {
+                } else if (
+                  // A new mark: its text is written, or, when the mark of the play before
+                  // is still on the tile and says the same ("+2" again), only the name of
+                  // its fade, which every new mark changes (tile-marks.ts: the two names
+                  // are taken in turn). Until step 2.37 only the text was watched, so a
+                  // play whose mark followed one still showing was not seen at all: on a
+                  // machine whose store answered late GitHub counted 99 of a hundred
+                  // plays that were all recorded (run 43986010617).
+                  (change.attributeName === 'data-mark' ||
+                    change.attributeName === 'data-mark-turn') &&
+                  tile.hasAttribute('data-mark') &&
+                  waiting === 'option'
+                ) {
                   waiting = null;
-                  marked = touched;
+                  marked.push(touched);
                   painted(touched, times.marked);
-                } else if (change.attributeName === 'data-points' && marked !== 0) {
-                  painted(marked, times.counted);
+                } else if (change.attributeName === 'data-points' && marked.length > 0) {
+                  const since = marked.shift();
+                  painted(since, times.counted);
                   // The tile counts the play now. The store's first write begun since the
                   // tap, and when it finished: after now, if the count was shown first.
                   const now = performance.now();
-                  const since = marked;
                   const write = writes.find((one) => one.began >= since);
                   times.stored.push({
                     wrote: write === undefined ? null : write.done - since,
                     counted: now - since,
                   });
-                  marked = 0;
                 }
               }
             }).observe(tile, { attributes: true, subtree: true });
@@ -2056,19 +2148,39 @@ if (browser) {
         // the player, the next play a little later. Each tap lasts as long as a finger's
         // does (60 ms down); a tap with no length at all is a test's, not a hand's.
         const finger = { delay: 60 };
+        const standing = async () => ({
+          plays: Number(await c.root.getAttribute('data-plays')),
+          points: Number(await home.locator('[data-points]').getAttribute('data-points')),
+        });
         const hundredPlays = async () => {
           await pause(1500);
           await page.evaluate(() => {
             for (const list of Object.values(window.tapTimes)) list.length = 0;
           });
+          const before = await standing();
           for (let i = 0; i < 100; i += 1) {
             await page.mouse.click(...tileAt, finger);
             await pause(300);
             await page.mouse.click(...optionAt, finger);
             await pause(600);
           }
+          // Nothing is read before every play tapped is on the screen: on a machine
+          // starved of its processor the last counts come late. A play that never comes
+          // is waited for half a minute, and the run then says how many came.
+          await page
+            .waitForFunction(
+              (want) => Number(document.querySelector('[data-scoring]').dataset.plays) >= want,
+              before.plays + 100,
+              { timeout: 30_000 },
+            )
+            .catch(() => undefined);
           await pause(1500);
+          const after = await standing();
           const measured = await page.evaluate(() => window.tapTimes);
+          measured.gained = {
+            plays: after.plays - before.plays,
+            points: after.points - before.points,
+          };
           console.log('Tap to paint, 500 taps waiting, processor slowed 4 times (finding M6):');
           console.log(`  ${line('a player tapped, the tile ringed', measured.ringed)}`);
           console.log(`  ${line('…and its options drawn in the pad', measured.opened)}`);
@@ -2177,6 +2289,22 @@ if (browser) {
           'every tap opened its options and its play was counted on the tile',
           times.opened.length === 100 && times.counted.length === 100,
           `${times.opened.length} opened, ${times.counted.length} counted`,
+        );
+        // And said by the game itself, not by the watches above: a hundred plays more
+        // stand, the tile counts two hundred points more, and every tap landed on a
+        // player or an option. A lost play is the worst thing this screen can do, so it
+        // is counted where it cannot be missed or miscounted. (An option's tap that
+        // landed before the options were drawn is this run falling behind its own fixed
+        // pace: it fails too, and says which it was.)
+        const early = [...new Set(times.elsewhere)];
+        note(
+          'a hundred plays tapped are a hundred plays recorded: none lost, none twice',
+          times.gained.plays === 100 && times.gained.points === 200 && early.length === 0,
+          `${times.gained.plays} plays and ${times.gained.points} points gained${
+            early.length === 0
+              ? ''
+              : `; ${times.elsewhere.length} taps were made before their option was drawn and landed on ${early.join(', ')}: the page fell behind the run’s fixed pace`
+          }`,
         );
         // Write before show (T-114): for every play, the device's store had finished a
         // write after the tap and before the tile counted it. A screen that counted

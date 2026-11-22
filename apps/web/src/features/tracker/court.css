@@ -390,6 +390,11 @@
   align-items: center;
   min-inline-size: 0;
 }
+/* The title and the saved line are held together for an upright phone, where they share
+   one place (further down). Everywhere else each is laid in the header by itself. */
+.court-top-start {
+  display: contents;
+}
 .court-title {
   grid-area: title;
   display: flex;
@@ -780,11 +785,17 @@
   background: var(--court-red);
   color: var(--court-text);
 }
-/* The same said shorter ("12 to send"): only on a phone whose scoreboard has no room for
-   the long one (lying down, and upright in its browser: further down). */
+/* The same said shorter ("12 to send"): on a phone, upright or lying down, whose first row
+   has no room for the long one (further down). And a sentence the screen says, shorter
+   (step 2.189): where the pad is a short phone's or a phone's lying down. */
 .court-banner-short,
 .court-say-short {
   display: none;
+}
+/* In the short form a thing it says is never broken in two, and the dot between two
+   things is held with the thing before it: it ends a line, never begins one. */
+.court-banner-line {
+  white-space: nowrap;
 }
 .court-notices {
   grid-area: notices;
@@ -927,16 +938,246 @@
 .court-timeouts-button:disabled {
   opacity: 0.45;
 }
-/* On a phone the play log has no panel of its own: its latest plays go in the pad at
+/* Undo and Redo (step 2.37; checklist I1, I3), after Start or Pause and the timeouts:
+   always on the screen whatever the pad shows, so a wrong basket is taken back with a
+   player's options open, and at the far end of the pad's column from +1, +2 and +3.
+   Neither is red, green, gold or blue: red means "takes away", and Undo as often gives
+   back (a "−Foul" undone, a substitution, a timeout taken back); a red Undo beside the
+   red Pause would be two red buttons that mean two things. They are the tile's own
+   ground with off-white words, as Turnover is.
+   Undo is two lines: the word with its arrow, and under it the play it takes back, said
+   shortest ("+2 #5 Ned": what happened first, then the number, so a line cut short
+   loses the end of the name and nothing else). Redo is the arrow turned the other way
+   over its word. With nothing to act on each is hollow and quiet, and still says why
+   when tapped. */
+.court-turn {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-inline-size: 48px;
+  min-block-size: 44px;
+  padding-block: 2px;
+  padding-inline: 6px;
+  border: 2px solid var(--court-dark-edge);
+  border-radius: var(--court-radius);
+  background: var(--court-tile);
+  color: var(--court-text);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+/* Undo takes what the row has left, a little more than Start or Pause: its second line
+   is the longest thing in the row. */
+.court-turn[data-undo] {
+  flex: 1.3 1 0;
+  min-inline-size: 0;
+}
+.court-turn[aria-disabled='true'] {
+  border-color: var(--court-line);
+  background: transparent;
+  color: var(--court-muted);
+}
+/* Resting (tap-rest.ts): after a tap taken, for as long as − on the timeouts, it takes no
+   tap and is drawn hollow, so a double tap takes one play back and never two. */
+.court-turn[data-resting] {
+  background: transparent;
+}
+.court-turn[data-taken] {
+  outline: 3px solid var(--court-gold);
+  outline-offset: 1px;
+}
+.court-turn-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.court-turn[data-redo] .court-turn-head {
+  flex-direction: column;
+  gap: 1px;
+  font-size: var(--court-size-small);
+  font-weight: 700;
+}
+/* An arrow that turns back, one line drawn in the words' own color. */
+.court-mark-turn {
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.court-mark-turn[data-forward] {
+  transform: scaleX(-1);
+}
+.court-turn-play {
+  max-inline-size: 100%;
+  overflow: hidden;
+  font-size: var(--court-size-small);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* In full ("#5 Ned Hawkins +2") only where the row has the room: a tablet upright. */
+.court-turn-full {
+  display: none;
+}
+/* On a phone the play log has no panel of its own: its latest play is in the pad at
    rest, and the whole list opens over the screen (step 2.37). */
 .court-log {
   display: none;
   grid-area: log;
   min-block-size: 0;
-  overflow-y: auto;
 }
 .court-slot-rest:empty {
   display: none;
+}
+.court-slot-rest {
+  flex: none;
+  min-inline-size: 0;
+}
+/* The latest play, in the pad while nobody is picked (step 2.37; checklist I4, I5): the
+   play Undo takes back, with its period and game clock, in the tracker's own words; how
+   many plays there are; and, the whole of it one button, the way to all of them. */
+.court-latest {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-inline-size: 0;
+}
+.court-latest-button {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  inline-size: 100%;
+  min-block-size: 44px;
+  padding-block: 2px;
+  padding-inline: 10px 8px;
+  border: 1px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: var(--court-tile);
+  color: var(--court-text);
+  text-align: start;
+}
+.court-latest-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--court-size-small);
+  line-height: 1.25;
+  white-space: nowrap;
+}
+.court-latest-button[data-unsent] .court-latest-play {
+  opacity: 0.65;
+}
+.court-latest-head .court-label {
+  font-size: 11px;
+}
+.court-latest-when,
+.court-logged-when {
+  color: var(--court-gold);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.court-latest-play {
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.court-latest-count {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: auto;
+  color: var(--court-muted);
+  font-size: var(--court-size-small);
+  font-weight: 700;
+  white-space: nowrap;
+}
+/* The plays before the latest: only where the pad has the room (a tablet upright). */
+.court-latest-before {
+  display: none;
+}
+/* One line of the play log (checklist I4): its period and game clock, what happened in
+   the tracker's words, and after a basket the score it made. A play the league does not
+   have yet is dimmed and says so in words, in the amber of plays that wait. */
+.court-logged {
+  display: grid;
+  grid-template-columns: 5.6em minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: baseline;
+  padding-block: 7px;
+  border-block-end: 1px solid var(--court-tile);
+  font-size: 15px;
+  line-height: 1.25;
+}
+.court-logged:last-child {
+  border-block-end: 0;
+}
+.court-logged-what {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+.court-logged-score {
+  color: var(--court-muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.court-logged[data-unsent] .court-logged-when,
+.court-logged[data-unsent] .court-logged-text,
+.court-logged[data-unsent] .court-logged-score {
+  opacity: 0.65;
+}
+.court-logged-unsent {
+  color: var(--court-amber);
+  font-size: var(--court-size-small);
+  font-weight: 700;
+}
+.court-log-count {
+  color: var(--court-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.court-log-rows {
+  flex: 1;
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* The log's own panel, under the pad where a tablet lying down has the room. */
+.court-log-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-block-size: 0;
+  padding-block: 8px;
+  padding-inline: 10px;
+  border: 1px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: var(--court-panel);
+}
+.court-log-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.court-log-panel .court-logged {
+  font-size: 14px;
+}
+.court-log-whole {
+  flex: none;
+  min-block-size: 44px;
+  font-size: 14px;
 }
 
 /* The teams. */
@@ -1399,6 +1640,37 @@
   font-size: 13px;
   line-height: 1.25;
 }
+/* The hint is never cut through a line, whatever stands over it (the Start clock button,
+   a sentence being said, the latest play's line of step 2.37) and however wide a
+   device's letters are: where the pad has no room for all of it, it leaves off whole
+   sentences, the last first. No script measures anything: a sentence that does not fit
+   under the one before wraps out of the hint, to its side, where nothing shows. (The
+   review of step 2.36 found its last line cut at 844 x 390 in wide letters while a
+   sentence was being said.) */
+.court-hint {
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  column-gap: 12px;
+  min-block-size: 0;
+  overflow: hidden;
+}
+.court-hint > * {
+  inline-size: 100%;
+}
+/* The first sentence too (step 2.37): the first thing in a line of such a box never
+   wraps, so where the pad had room for one line of it only (End game offered at 0:00,
+   a two-line sentence being said and the latest play's line, on a short phone) the first
+   sentence showed its first line and no more. With nothing of no height before it, it
+   is no longer the first thing, and leaves whole like the others. The margin takes back
+   the gap after it, so nothing moves where the hint fits. */
+.court-hint::before {
+  content: '';
+  flex: none;
+  inline-size: 100%;
+  block-size: 0;
+  margin-block-end: -3px;
+}
 .court-pregame ~ .court-hint p:nth-of-type(n + 3) {
   display: none;
 }
@@ -1681,11 +1953,15 @@
    the panel. A sentence that pushed the panel down put the "Full" button where − had been
    a moment before: the second tap of a double tap on − then called a timeout (found by
    the fix round's own double tap, in the browser). Nothing under the finger moves now;
-   the rule is back when the sentence goes, and × stays in reach beside it. */
-.court[data-pad-mode='timeouts'] .court-pad {
+   the rule is back when the sentence goes, and × stays in reach beside it.
+   Since step 2.37 the same holds whatever the pad has open (a player's options, a bench,
+   a team's turnovers): Undo is tapped with a player's options open, and what it says
+   ("Undone: #5 Ned Hawkins +2.") is drawn over the line that names the player, whose
+   tile is ringed all the while; +1, +2, +3 and Foul stay exactly where they were. */
+.court:not([data-pad-mode='rest']) .court-pad {
   position: relative;
 }
-.court[data-pad-mode='timeouts'] .court-say {
+.court:not([data-pad-mode='rest']) .court-say {
   /* The pad's own padding: its edge less its two lines, halved. */
   --court-say-inset: calc((var(--court-pad-edge) - 2px) / 2);
   position: absolute;
@@ -1696,8 +1972,25 @@
   align-items: center;
   min-block-size: var(--court-who-height);
 }
-.court[data-pad-mode='timeouts'] .court-say:empty {
+.court:not([data-pad-mode='rest']) .court-say:empty {
   display: none;
+}
+/* Over a player's line the sentence is in the size of that line's second row, so two
+   lines of it cover the line and no more. */
+.court[data-pad-mode='player'] .court-say,
+.court[data-pad-mode='bench'] .court-say,
+.court[data-pad-mode='turnovers'] .court-say {
+  padding-block: 3px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+/* The panels about ending a game (step 2.37) have no × at the end of their first line:
+   the sentence is as wide as the panel, so nothing of the line under it shows beside it. */
+.court[data-pad-mode='end'] .court-say,
+.court[data-pad-mode='final'] .court-say,
+.court[data-pad-mode='reopen'] .court-say,
+.court[data-pad-mode='not-started'] .court-say {
+  inset-inline-end: var(--court-say-inset);
 }
 .court-timeout-head {
   flex: 1;
@@ -1837,6 +2130,193 @@
 }
 .court-timeout-answers .court-opt {
   font-size: 15px;
+}
+/* Ending a game (step 2.37; checklist J1 to J5): the End game question, the final panel,
+   and the Reopen and Mark not started questions, all in the pad, whose place never moves.
+   Each is a title, what it says, and its answers in the pad's lowest band, as the
+   timeout question's are: away from whatever was tapped to ask, the answer that keeps
+   things as they are at the start, the one that acts at the end.
+
+   What a panel says never ends in a cut line. Where the pad has no room for all of it
+   (a long team name, wider letters) it leaves off whole sentences, the last first, as
+   the hint does: the least needed sentence is written last. */
+.court-ask,
+.court-final {
+  gap: 6px;
+  padding-inline: 6px;
+  padding-block-start: 2px;
+}
+.court-ask-title {
+  flex: none;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.court-ask-text,
+.court-final-state {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px 12px;
+  min-block-size: 0;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.3;
+}
+.court-ask-text > *,
+.court-final-state > * {
+  inline-size: 100%;
+}
+/* The score the question is about: the heaviest thing it says. */
+.court-ask-score {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+/* Ended early: time is still on the clock. Said in the clock's own color, gold (line 2:
+   gold is labels and the clock), heavy, right under the score, and in words. */
+.court-ask-warn {
+  color: var(--court-gold);
+  font-weight: 700;
+}
+.court-ask-more {
+  color: var(--court-muted);
+  font-size: 13px;
+  line-height: 1.25;
+}
+/* Why the thing asked for did not happen: a statement, as the tracker's notices are. */
+.court-ask-problem {
+  padding-block: 4px;
+  padding-inline: 8px;
+  border-inline-start: 4px solid var(--court-red-line);
+  border-radius: 4px;
+  background: var(--court-tile);
+  font-size: 13px;
+  line-height: 1.25;
+}
+.court-ask-answers {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--court-gap);
+  block-size: var(--court-acts-height);
+}
+.court-ask-answers .court-opt {
+  font-size: 15px;
+}
+.court a.court-opt {
+  color: var(--court-text);
+  text-decoration: none;
+}
+/* The answer that takes the next step: gold, the one filled button (line 2). */
+.court-opt-next,
+.court a.court-opt-next {
+  border-color: var(--court-gold);
+  background: var(--court-gold);
+  color: var(--court-gold-ink);
+}
+/* While what was asked for is under way its button waits, and says so in its words. */
+.court-ask-answers .court-opt[aria-disabled='true']:not([data-rest-disabled]) {
+  opacity: 0.4;
+}
+/* The reason: a field of the pad's own, 16 or more so that no phone zooms into it. */
+/* Its label stands clear of the field (the fix round, F6), and the field stands 8 above
+   the answers, as every answer stands 8 from the next (line 5). */
+.court-ask-field {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-block-end: calc(var(--court-gap) - 6px);
+}
+.court-ask-field-label {
+  color: var(--court-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+/* The field, and beside it the usual reason, one tap. */
+.court-ask-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--court-gap);
+}
+.court-ask-field-row .court-opt {
+  min-block-size: 44px;
+  padding-inline: 12px;
+  font-size: 15px;
+}
+.court-input {
+  inline-size: 100%;
+  block-size: 44px;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 10px;
+  border: 2px solid var(--court-dark-edge);
+  border-radius: var(--court-radius);
+  background: var(--court-page);
+  color: var(--court-text);
+  color-scheme: dark;
+  font: inherit;
+  font-size: 16px;
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* The final panel (J4): "Final", who won and the score, large; whether the league has
+   the result; and the way back in the lowest band. */
+.court-final-result {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.court-final-won {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.court-final-state {
+  font-size: 14px;
+}
+/* Where the pad is as wide as the screen (a tablet upright) there is room to say it
+   larger: the pad is read from further off there. */
+@media (min-width: 700px) and (max-width: 879px) and (min-height: 521px) {
+  .court-ask,
+  .court-final {
+    gap: 10px;
+    padding-inline: 10px;
+  }
+  .court-ask-title {
+    font-size: 22px;
+  }
+  .court-ask-text {
+    font-size: 18px;
+  }
+  .court-ask-score {
+    font-size: 24px;
+  }
+  .court-ask-more,
+  .court-ask-problem {
+    font-size: 16px;
+  }
+  .court-ask-field-label {
+    font-size: 14px;
+  }
+  .court-ask-answers .court-opt {
+    font-size: 18px;
+  }
+  .court-final-won {
+    font-size: 36px;
+  }
+  .court-final-state {
+    font-size: 17px;
+  }
+}
+/* "Not sent yet": in the amber of plays that wait, and in words. */
+.court-final-unsent {
+  color: var(--court-amber);
+  font-weight: 700;
 }
 /* A team's timeouts left, beside its name: only where the heading has room (a tablet). */
 .court-timeouts-chip {
@@ -2012,10 +2492,13 @@
   font-size: 18px;
   font-weight: 700;
 }
+/* Since step 2.37 More holds six things on a game in play (End game and Mark not started
+   came): set a little closer, so all six and the line under them are on a short phone's
+   screen with nothing to scroll to. */
 .court-sheet-items {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 11px;
 }
 .court-sheet-item {
   display: flex;
@@ -2029,6 +2512,26 @@
 }
 .court-sheet .court-quiet {
   font-size: 14px;
+}
+/* The whole play log (step 2.37; checklist I4), opened as More is: as high as the screen,
+   its title and how many plays there are staying put, the list scrolling inside it. */
+.court-sheet.court-log-sheet {
+  gap: 8px;
+  block-size: 100%;
+  padding-block-end: 0;
+  overflow: hidden;
+}
+.court-log-sheet h2 {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.court-log-sheet .court-log-rows {
+  margin-inline: -16px;
+  padding-block-end: max(16px, env(safe-area-inset-bottom));
+  padding-inline: 16px;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* The label that follows the finger while a player is dragged (checklist E2). */
@@ -2137,11 +2640,75 @@
     --court-size-clock: 40px;
     --court-size-score: 36px;
   }
+  /* The first row is the title over the saved line, with the account button and More at
+     its end: the scoreboard then has the whole width under it, and nothing above the two
+     teams grows while a game is scored (step 2.37; the area lead's rule for step 2.36).
+     The saved line said "All saved" under the scoreboard on a tall phone until then, in a
+     row of its own; with no connection and plays waiting it took two lines there and
+     pushed the lower bench under the pad.
+
+     The place is as high as it will ever be, and holds the saved line whole whatever it
+     says. The title is over it while both fit; when the saved line has much to say (the
+     storage, the connection, plays waiting and plays not saved, all at once) the title
+     gives way whole, never by a cut line: the teams' names are on the scoreboard, and a
+     screen reader is still given the title. No script measures anything: the two are
+     laid from the bottom, the saved line first, and what does not fit over it wraps out
+     of the place, to its side, where nothing shows. The empty first piece is as wide as
+     the place, so "to its side" is always out of it. */
+  .court-top {
+    grid-template-areas:
+      'start more'
+      'board board'
+      'notices notices';
+  }
+  .court-top-start {
+    grid-area: start;
+    display: flex;
+    flex-flow: column-reverse wrap;
+    align-content: flex-start;
+    align-items: flex-start;
+    justify-content: center;
+    block-size: 60px;
+    min-inline-size: 0;
+    overflow: hidden;
+  }
+  .court-top-start::before {
+    content: '';
+    order: -1;
+    inline-size: 100%;
+    block-size: 0;
+  }
+  .court-title {
+    flex: none;
+    order: 1;
+    inline-size: 100%;
+    min-block-size: 0;
+    margin-block-end: 2px;
+  }
+  .court-banner {
+    flex: none;
+    max-inline-size: 100%;
+    max-block-size: 100%;
+    overflow: hidden;
+    line-height: 1.2;
+    text-align: start;
+  }
+  .court-banner-long {
+    display: none;
+  }
+  .court-banner-short {
+    display: inline;
+  }
   .court-board {
     gap: 4px;
   }
   .court-score {
     padding-inline: 2px;
+  }
+  /* A name of two lines is 11 higher than a name of one, and the place has that to spare
+     at both heights: capitals need no more than their own height between two lines. */
+  .court-score-name {
+    line-height: 1;
   }
   .court-clock {
     min-inline-size: 0;
@@ -2150,6 +2717,14 @@
   /* The row of Start and the timeouts is as high as the line of fouls it made room for. */
   .court-controls {
     min-block-size: 48px;
+  }
+  /* Four things share the row since step 2.37: Start or Pause gives Undo the width its
+     second line needs, and keeps its word and its shape at their size but one. */
+  .court-go {
+    gap: 8px;
+    min-inline-size: 92px;
+    padding-inline: 6px;
+    font-size: 16px;
   }
   /* One line, 15 or 16 high and about 120 wide, is all the box has here, and the score is
      not moved for it. So the steps are taken in what fits: the count goes 11, 13, 15 and
@@ -2201,27 +2776,19 @@
   .court-teams {
     gap: 4px;
   }
-  /* The first row is the title over the saved line, with the account button and More
-     at its end: the scoreboard then has the whole width, and each team's box has room
-     for its fouls and its bonus (step 2.36). */
+  /* The first row is 44 high here, the height of its buttons: the title is one thin line
+     over the saved line (step 2.36). */
   .court-top {
-    grid-template-areas:
-      'title more'
-      'banner more'
-      'board board'
-      'notices notices';
     row-gap: 2px;
+  }
+  .court-top-start {
+    block-size: 44px;
   }
   .court-title {
     flex-direction: row;
     align-items: baseline;
     justify-content: flex-start;
     gap: 8px;
-    min-block-size: 0;
-  }
-  .court-banner {
-    justify-self: start;
-    text-align: start;
   }
   .court-score-fouls {
     min-block-size: 15px;
@@ -2250,8 +2817,16 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+  /* Every row counts on this screen, and a team's name of two lines must cost no more
+     than the two teams' panels have to spare (the area lead's second look at step 2.36,
+     N1: it pushed the visitors' five under the pad by 4). The score's figures are set
+     on a line a little lower than they are high, which touches no figure: a figure is
+     about seven tenths as high as its size. */
   .court-score {
-    padding-block: 2px;
+    padding-block: 1px;
+  }
+  .court-score-value {
+    line-height: 0.9;
   }
   /* The clock is a button now, and Start is right under it: it is as high as what it
      says, in the middle of its place, so the two are 8 apart. */
@@ -2263,19 +2838,14 @@
     font-size: var(--court-size-small);
     line-height: 1.1;
   }
-  /* The saved line says it shorter here ("12 to send"), so it stays one line beside the
-     title: a second line of it pushes the scoreboard down, and on a phone in its browser
-     the players under it then reach the pad. Only when it says three things at once in
-     wide letters does it take a second line, and that still fits. */
+  /* The saved line says it shorter here ("12 to send"), in the small size: one line under
+     the title for anything a game usually brings (no connection and plays waiting). */
   .court-banner {
     min-block-size: 18px;
     font-size: var(--court-size-small);
-    line-height: 1.2;
   }
-  .court-banner-long {
-    display: none;
-  }
-  .court-banner-short,
+  /* (Which form of the saved line shows on an upright phone is said once, for both
+     heights, in the block above: step 2.37.) */
   .court-say-short {
     display: inline;
   }
@@ -2374,19 +2944,31 @@
     --court-who-height: 40px;
     padding-block-start: max(4px, env(safe-area-inset-top));
   }
+  /* The pad's column is two fifths of the screen since step 2.37 (it was 36 in 100): the
+     row over it holds Start or Pause, the timeouts, Undo with the play it takes back,
+     and Redo. On an 844 phone it is 334 and a team's panel 241: three floor tiles of 70
+     and four bench tiles of 51 across, as wide as an upright phone's. A smaller phone
+     keeps the 300 it had. */
   .court-play {
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 36%) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 41%) minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr);
     grid-template-areas:
       'top top top'
       'home controls away'
       'home pad away';
   }
+  /* The first row is 48 high and never grows (step 2.37): the 4 that stood under it as a
+     gap, before a row of notices that is nearly always empty, are the row's own now, so
+     the saved line has room for the most it ever says (four things, a line each). */
   .court-top {
     grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
       'board banner more'
       'notices notices notices';
+    row-gap: 0;
+  }
+  .court-notices {
+    margin-block-start: 4px;
   }
   /* The title is kept for screen readers; the teams' names are on the scoreboard. */
   .court-play .court-title {
@@ -2412,7 +2994,7 @@
     align-content: center;
     column-gap: var(--court-gap);
     row-gap: 2px;
-    min-block-size: 44px;
+    min-block-size: 48px;
     padding-block: 2px;
     padding-inline: var(--court-gap);
   }
@@ -2470,13 +3052,18 @@
   }
   /* The saved line sits beside the scoreboard here, and every pixel of its width comes
      out of the two teams' names. So it says it shorter ("12 to send"), a line for each
-     thing it says, in a column of 96 at most: a name of fifteen letters is then whole
-     on a device whose letters are a sixth wider than most (it was cut at 132), and three
-     lines of it are as high as the scoreboard, so the row does not grow. Its own edges
-     are 3, so "12 not saved" is one line in those wider letters too (it needs 87 of 90). */
+     thing it says, in a column of 104 at most: a name of fifteen letters is then whole
+     on a device whose letters are a sixth wider than most (it was cut at 132), and "No
+     connection" is one line in those letters too (it needs 97 of the 98 inside its
+     edges of 3). The column is never higher than the row: three lines stand at their
+     ease, and the four it says at the very most close up, each still in its own size.
+     A line too wide for the column in some face ends in "…"; it never takes a second
+     line, so the row does not grow whatever a device's letters are. */
   .court-banner {
-    max-inline-size: 96px;
+    max-inline-size: 104px;
+    max-block-size: 48px;
     padding-inline: 3px;
+    overflow: hidden;
     font-size: var(--court-size-small);
     line-height: 1.2;
   }
@@ -2484,9 +3071,18 @@
   .court-banner-dot {
     display: none;
   }
-  .court-banner-short,
+  .court-banner-short {
+    display: flex;
+    flex-direction: column;
+    max-block-size: 48px;
+  }
+  /* Cut only at its end: the tail of a "g" may reach under its own line. */
   .court-banner-line {
-    display: block;
+    flex: 0 1 1.2em;
+    min-block-size: 1em;
+    overflow-x: clip;
+    line-height: 1;
+    text-overflow: ellipsis;
   }
   /* The sentence after a set clock, shorter, as upright in a browser (above). */
   .court-say-short {
@@ -2540,6 +3136,39 @@
   .court-controls {
     min-block-size: 48px;
     padding-block-start: 2px;
+  }
+  /* Four things in a row of 334 (step 2.37): each at its least, Undo with the rest, so
+     the play it names is whole or loses only its last letters in the widest letters.
+     "Period over" takes two lines here, whole. */
+  .court-go {
+    gap: 5px;
+    min-inline-size: 80px;
+    padding-inline: 4px;
+    font-size: 14px;
+  }
+  .court-go-word {
+    line-height: 1.05;
+    text-align: center;
+    white-space: normal;
+  }
+  .court-turn {
+    min-inline-size: 44px;
+    padding-inline: 4px;
+    font-size: 14px;
+  }
+  .court-turn[data-redo] {
+    padding-inline: 2px;
+  }
+  .court-turn[data-redo] .court-turn-head {
+    font-size: 11px;
+  }
+  /* (Said with the row's own name, so these hold over the two lines the button is given
+     wherever the row is narrow, at the end of this file.) */
+  .court-controls .court-timeouts-button {
+    padding-inline: 4px;
+  }
+  .court-controls .court-timeouts-word {
+    font-size: 11px;
   }
   .court-teams {
     display: contents;
@@ -2630,7 +3259,9 @@
 }
 
 /* ---- A tablet upright (820 x 1180): stacked, with the pad BETWEEN the two teams, so the
-   second tap is never more than one panel away. The play log takes what is left. ------ */
+   second tap is never more than one panel away. The latest plays are in the pad at rest,
+   which has a column to spare here; what is left under the second team is left empty
+   (fifteen a side fill it, and a log there was cut off by the screen's edge). ---------- */
 @media (min-width: 700px) and (min-height: 521px) {
   .court {
     --court-size-clock: 60px;
@@ -2674,8 +3305,12 @@
   /* The saved line sits in the first row, between the title and the buttons, upright as
      lying down: the row it had under the scoreboard is what each team's box now uses
      for its fouls and its bonus (step 2.36), so fifteen a side still fit upright. */
+  /* The title keeps a third of the row at least: with no connection the saved line says
+     it at length here ("No connection: plays are kept on this device · 2 plays waiting
+     to send"), and took its width from the title until "Bears at Hawks" read "Bears at
+     …" (step 2.37). It takes a second line instead, inside the row's own height. */
   .court-top {
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(34%, 1fr) auto auto;
     grid-template-areas:
       'title banner more'
       'board board board'
@@ -2724,6 +3359,43 @@
     padding-inline: 18px;
     font-size: 17px;
   }
+  /* The row is the screen's whole width here: Undo names its play in the tracker's full
+     words ("#5 Ned Hawkins +2"), as the play log does. */
+  .court-turn {
+    min-inline-size: 72px;
+    padding-inline: 12px;
+    font-size: 18px;
+  }
+  .court-turn-play {
+    font-size: 15px;
+  }
+  .court-turn-short {
+    display: none;
+  }
+  .court-turn-full {
+    display: inline;
+  }
+  .court-turn[data-redo] .court-turn-head {
+    font-size: 14px;
+  }
+  /* And the pad at rest has a column to spare: the plays before the latest are listed
+     under it, a few of them, so the last stretch of the game is read at a glance. */
+  .court-latest-before {
+    display: block;
+  }
+  .court-latest-before .court-logged {
+    padding-block: 5px;
+  }
+  .court-latest-play {
+    font-size: 17px;
+  }
+  .court-latest-head,
+  .court-latest-count {
+    font-size: 14px;
+  }
+  .court-latest-head .court-label {
+    font-size: 12px;
+  }
   /* A tablet's box has the room, and uses it: the count goes 14, 20, 26 and the badge 15,
      19, on one line that is 28 high from the first foul, so nothing moves at the bonus. */
   .court-score-fouls {
@@ -2765,10 +3437,6 @@
   }
   .court-keys {
     grid-auto-rows: 60px;
-  }
-  .court-log {
-    display: block;
-    min-block-size: 60px;
   }
   .court-team-name {
     font-size: 15px;
@@ -2926,5 +3594,102 @@
   }
   .court[data-stage='lineups'] .court-pad {
     block-size: auto;
+  }
+  /* The pad's column is 370 here: the row over it holds its four things as a phone's
+     does, Undo naming its play shortest. */
+  .court-go {
+    gap: 8px;
+    min-inline-size: 100px;
+    padding-inline: 6px;
+    font-size: 17px;
+  }
+  .court-turn {
+    min-inline-size: 52px;
+    padding-inline: 6px;
+    font-size: 16px;
+  }
+  /* The play Undo names, Redo's word and the timeouts' word are 12 here, as on a phone:
+     in the widest letters "+3 #11 Quin" is then whole in what the row leaves Undo. */
+  .court-turn-play,
+  .court-turn[data-redo] .court-turn-head,
+  .court-controls .court-timeouts-word {
+    font-size: 12px;
+  }
+  .court-turn-short {
+    display: inline;
+  }
+  .court-turn-full {
+    display: none;
+  }
+  .court-latest-before {
+    display: none;
+  }
+  .court-latest-play {
+    font-size: 15px;
+  }
+  .court-latest-head,
+  .court-latest-count {
+    font-size: var(--court-size-small);
+  }
+}
+
+/* ---- A tablet lying down with its height to spare (1180 x 820): the play log has a
+   panel of its own under the pad, as the standard's has under its court: the newest
+   plays, scrolling by themselves. The pad's own line of the latest play makes way for
+   it, since the panel's first line is that play. (On a wide screen that is low, a
+   laptop's window, the panel would be a sliver: the pad keeps its line there.) -------- */
+@media (min-width: 880px) and (min-height: 760px) {
+  .court-log {
+    display: flex;
+  }
+  .court-slot-rest {
+    display: none;
+  }
+}
+
+/* ---- Wherever the row under the scoreboard is narrow (a phone either way up, a tablet
+   lying down: everything but a tablet upright), the way to the timeouts is two lines,
+   the word over how many each team has left, so Undo has room to name its play. -------- */
+@media (max-width: 699px), (max-height: 520px), (min-width: 880px) {
+  .court-timeouts-button {
+    display: inline-grid;
+    grid-template-columns: auto auto;
+    align-content: center;
+    justify-content: center;
+    row-gap: 2px;
+    padding-inline: 6px;
+    line-height: 1.1;
+  }
+  .court-timeouts-word {
+    grid-column: 1 / -1;
+    margin-inline-end: 0;
+    font-size: var(--court-size-small);
+    text-align: center;
+  }
+}
+
+/* ---- Wherever the pad at rest is a narrow column and holds the latest play's line (a
+   phone either way up; a wide screen too low for the log's own panel), that line takes
+   the place of part of the hint: once a game is under way the hint is its first three
+   sentences while the clock runs (the fourth, that every tap is kept, is what the saved
+   line and the latest play now show), and its first while the Start clock button or the
+   way to the next period stands over it. ------------------------------------------- */
+@media (max-width: 699px), (max-height: 520px), (min-width: 880px) and (max-height: 759px) {
+  .court-slot-rest:not(:empty) ~ .court-hint p:nth-of-type(n + 4),
+  .court-pad[data-start] .court-slot-rest:not(:empty) ~ .court-hint p:nth-of-type(n + 2) {
+    display: none;
+  }
+  /* Under that line the hint has no title of its own drawn: the line over it sets it
+     apart, and a title can never be left standing alone where no sentence fits under
+     it (a phone in its browser, the Start clock button offered and a sentence being
+     said). It is still the hint's heading for a screen reader: out of sight, never out
+     of the page. */
+  .court-slot-rest:not(:empty) ~ .court-hint .court-label {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }

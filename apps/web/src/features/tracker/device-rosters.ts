@@ -30,6 +30,7 @@ export function deviceRosters(
     home: team(rosters.homeTeamId),
     away: team(rosters.awayTeamId),
     uniqueJerseys: rosters.uniqueJerseys,
+    allowTies: rosters.allowTies,
   };
 }
 

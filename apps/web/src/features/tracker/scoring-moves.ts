@@ -24,12 +24,29 @@ export type PadMode =
    * length left is about to be given: it is recorded only after the scorekeeper says so
    * (checklist G5).
    */
-  | { readonly kind: 'timeouts'; readonly asking: TimeoutCall | null };
+  | { readonly kind: 'timeouts'; readonly asking: TimeoutCall | null }
+  /**
+   * End game was tapped, in More or in the pad (step 2.37): the question, or why the game
+   * cannot be ended now. `refused` is what the league said of an End it did not take.
+   */
+  | { readonly kind: 'end'; readonly refused: string | null }
+  /** The game is final: the final panel. Never asked for; `padFor` gives it. */
+  | { readonly kind: 'final' }
+  /** "Reopen game" was tapped on the final panel: its question, with the reason. */
+  | { readonly kind: 'reopen' }
+  /** "Mark not started" was tapped in More: its question. */
+  | { readonly kind: 'not-started' }
+  /**
+   * A way off the screen was tapped while plays wait to be sent: asked first, since what
+   * waits is sent only from this screen (lane 2.37, fix round, F1). `to` is where to go.
+   */
+  | { readonly kind: 'leave'; readonly to: string };
 
 /** A timeout to record: whose, and how long. */
 export type TimeoutCall = { readonly side: Side; readonly seconds: 60 | 30 };
 
 export const padAtRest: PadMode = { kind: 'rest' };
+const padFinal: PadMode = { kind: 'final' };
 
 /**
  * A timeout button tapped (checklist G4, G5): the tap that records it, or, when the team
@@ -165,6 +182,15 @@ export const swapColorsTap = (game: basketball.GameState): TapInput => ({
  * the game was rebuilt without them) is not left open.
  */
 export function padFor(view: ScoringView, pad: PadMode): PadMode {
+  // A final game shows the final panel in the pad's place, whatever was open (step 2.37):
+  // only the Reopen question, and the question before leaving, stand in its place. And
+  // nothing about a final game is left open once the game is live again (the End taken
+  // back, the game reopened).
+  if (view.status === 'final')
+    return pad.kind === 'reopen' || pad.kind === 'leave' ? pad : padFinal;
+  if (pad.kind === 'final' || pad.kind === 'reopen') return padAtRest;
+  // A game that is not live has nothing to mark not started.
+  if (pad.kind === 'not-started') return view.status === 'live' ? pad : padAtRest;
   if (pad.kind === 'bench') {
     // The bench of a team with no lineup, or for a player no longer on the court, closes.
     if (view.teams[pad.side].stage !== 'set') return padAtRest;
