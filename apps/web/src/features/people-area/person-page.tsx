@@ -10,8 +10,13 @@
 import {
   leagueUrl,
   listRoster,
+  nameRequests,
+  publicViewer,
+  showName,
   type AdminArea,
+  type Audience,
   type CommandContext,
+  type NamePolicy,
   type TeamRecord,
 } from '@srleagues/core';
 import { PageHead } from '@srleagues/ui';
@@ -24,7 +29,7 @@ import { requestTokenField } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffTrail } from '../staff/index.ts';
 import { removePersonAction, savePersonAction } from './actions.ts';
-import { childDisagreement } from './age-on-record.ts';
+import { treatedAsChild, treatmentOf, type Treatment } from './age-on-record.ts';
 import { detailsAnchor, removeAnchor } from './anchors.ts';
 import { personFormWords } from './form-words.ts';
 import { readPerson, type PersonView } from './people-view.ts';
@@ -70,6 +75,8 @@ export async function PersonPage({
   // The league's own today (the ports' one clock): who is a child is measured on it (R-28).
   const leagueToday = (await (await webPorts()).publicSchedule.clockOf(here.id)).today;
   const teams = await teamsOf(context, person.id);
+  // Who plays in the league and how it shows names: what its public pages are drawn with.
+  const shownBy = await (await webPorts()).publicStats.settingsOf(here.id);
   const listUrl = leagueUrl(here, 'admin-area', { area });
   const pageUrl = leagueUrl(here, 'admin-area', { area, subpath: [person.id] });
 
@@ -91,7 +98,12 @@ export async function PersonPage({
           }}
           values={{ firstName: person.firstName, lastName: person.lastName }}
           privateDetails={person.private}
-          childNote={childNoteOf(person.private, leagueToday)}
+          childNote={treatmentLineOf(person, leagueToday, {
+            id: here.id,
+            audience: shownBy.audience,
+            policy: shownBy.namePolicy,
+          })}
+          nameRequest={nameRequestLineOf(person)}
           saved={said}
           today={leagueToday}
           words={personFormWords(t('adminPeople.save.submit'))}
@@ -176,10 +188,64 @@ async function teamsOf(context: CommandContext, personId: string): Promise<reado
   return teams.filter((_team, at) => holding[at] === true);
 }
 
-/** Said beside the child-or-adult choice when the date of birth and the choice disagree (R-28). */
-function childNoteOf(details: PersonView['private'], leagueToday: string): string | undefined {
-  const disagreement = details === undefined ? undefined : childDisagreement(details, leagueToday);
-  if (disagreement === 'tick-keeps-child') return t('adminPeople.field.childByTick');
-  if (disagreement === 'date-makes-child') return t('adminPeople.field.childByDate');
+const treatedText: Readonly<Record<Treatment, () => string>> = {
+  'child-by-both': () => t('adminPeople.treated.childByBoth'),
+  'child-by-date': () => t('adminPeople.field.childByDate'),
+  'child-by-choice': () => t('adminPeople.treated.childByChoice'),
+  'child-by-choice-over-date': () => t('adminPeople.field.childByTick'),
+  'child-not-recorded': () => t('adminPeople.treated.childNotRecorded'),
+  'adult-by-both': () => t('adminPeople.treated.adultByBoth'),
+  'adult-by-date': () => t('adminPeople.treated.adultByDate'),
+  'adult-by-choice': () => t('adminPeople.treated.adultByChoice'),
+  'adult-not-recorded': () => t('adminPeople.treated.adultNotRecorded'),
+};
+
+/** What they or their guardian asked for, as the name rule reads it; anything else is none. */
+const requestOf = (visibility: string) =>
+  nameRequests.find((request) => request === visibility) ?? 'none';
+
+/**
+ * The one line under the child-or-adult choice, in every state (R-28, R-15): how they are
+ * treated and because of what, then the name the public pages show, from the product's
+ * one name rule (showName) as a visitor sees a roster. Only for a role that sees the
+ * private details: how a person is treated is worked out from them.
+ */
+function treatmentLineOf(
+  person: PersonView,
+  leagueToday: string,
+  league: { readonly id: string; readonly audience: Audience; readonly policy: NamePolicy },
+): string | undefined {
+  const details = person.private;
+  if (details === undefined) return undefined;
+  const treatment = treatmentOf(details, leagueToday, league.audience);
+  const shown = showName(
+    {
+      firstName: person.firstName,
+      lastName: person.lastName,
+      isMinor: treatedAsChild(treatment),
+      nameRequest: requestOf(person.visibility),
+    },
+    {
+      audience: league.audience,
+      policy: league.policy,
+      viewer: publicViewer(league.id),
+      statsOf: null,
+    },
+  );
+  const showsText = shown.shown
+    ? t('adminPeople.publicShows', { name: shown.text })
+    : shown.why === 'removed'
+      ? t('adminPeople.publicShows.removed')
+      : shown.why === 'hidden'
+        ? t('adminPeople.publicShows.hidden')
+        : t('adminPeople.publicShows.noName');
+  return `${treatedText[treatment]()} ${showsText}`;
+}
+
+/** Their own request to be shown with less, read only, beside the name (R-23). */
+function nameRequestLineOf(person: PersonView): string | undefined {
+  const request = requestOf(person.visibility);
+  if (request === 'initials') return t('adminPeople.request.initials');
+  if (request === 'removed') return t('adminPeople.request.removed');
   return undefined;
 }

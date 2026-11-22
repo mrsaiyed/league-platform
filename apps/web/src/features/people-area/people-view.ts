@@ -99,6 +99,8 @@ export type PersonView = {
   readonly lastName: string;
   /** Their name as the admin's screens write it ("#12" for a player with none, S-34). */
   readonly name: string;
+  /** What they or their guardian asked for on public pages: none, initials or removed (R-23). */
+  readonly visibility: string;
   /** Present only when the record was read with the private fields (R-16). */
   readonly private?: PrivateDetails;
 };
@@ -110,6 +112,7 @@ export function personViewOf(person: PersonRecord): PersonView {
     firstName: person.firstName,
     lastName: person.lastName,
     name: rosterName(person),
+    visibility: person.visibility,
   };
   const sensitive = person.sensitive;
   if (sensitive === undefined) return view;

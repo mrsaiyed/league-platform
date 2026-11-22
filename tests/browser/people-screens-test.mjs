@@ -406,8 +406,18 @@ if (built) {
     );
     await details.getByLabel('Child or adult').selectOption('adult');
     await details.getByRole('button', { name: 'Save details' }).click();
-    await byTick.waitFor({ state: 'detached' });
-    note('and says nothing once they are marked as an adult', (await byTick.count()) === 0);
+    await details
+      .getByText('Treated as an adult: the date of birth and the choice both say so.', {
+        exact: false,
+      })
+      .waitFor();
+    note(
+      'once they are marked as an adult, the one line says they are treated as an adult because of both, and the name public pages show',
+      (await byTick.count()) === 1 &&
+        !(await byTick.innerText()).includes('treated as a child') &&
+        (await byTick.innerText()).includes('Public pages show: '),
+      await byTick.innerText(),
+    );
     note(
       'after a save the choice shows what was saved, so the next save sends it again',
       (await details.getByLabel('Child or adult').inputValue()) === 'adult',
@@ -422,6 +432,12 @@ if (built) {
     note(
       'marked as an adult with a date that makes them a child: the record says the date wins',
       (await byTick.innerText()).includes('treated as a child until their 18th birthday'),
+      await byTick.innerText(),
+    );
+    note(
+      'and the same line names what public pages show of a child, as the public roster does',
+      (await byTick.innerText()).includes('Public pages show: Jonathan S.') &&
+        (await publicText('/north-valley/teams/falcons')).includes('Jonathan S.'),
       await byTick.innerText(),
     );
 

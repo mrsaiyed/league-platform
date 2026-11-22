@@ -132,6 +132,7 @@ describe('what Admin → People reads, role by role (R-16, T-76)', () => {
       firstName: 'Jon',
       lastName: 'Smith',
       name: 'Jon Smith',
+      visibility: 'none',
     });
     expect(JSON.stringify(view)).not.toMatch(/private|email|birth|child/i);
   });

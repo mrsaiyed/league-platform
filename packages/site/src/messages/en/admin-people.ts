@@ -44,6 +44,15 @@ export const enAdminPeople = {
   'adminPeople.private.body':
     'Only the league’s owner, admins and registrars see these. They are never shown on public pages.',
   'adminPeople.private.title': 'Private details',
+  'adminPeople.publicShows': 'Public pages show: {name}.',
+  'adminPeople.publicShows.hidden':
+    'Public pages show no name: the league shows its players by number only.',
+  'adminPeople.publicShows.noName': 'Public pages show no name: none is recorded.',
+  'adminPeople.publicShows.removed': 'Public pages show no name: they asked to be taken off them.',
+  'adminPeople.putBack':
+    'Put back on the league list: {name}, as they were. They are on no team; a team’s page in Teams puts them on its roster.',
+  'adminPeople.putBack.notPutBack': 'Not put back. {problem}',
+  'adminPeople.putBack.submit': 'Put them back',
   'adminPeople.readFailed':
     'The league list could not be read just now. Reload the page to try again.',
   'adminPeople.refused': 'Not saved. {problem}',
@@ -55,14 +64,14 @@ export const enAdminPeople = {
     'They are on a team’s roster, so they cannot be taken off the league list yet. Take them off the roster first, on the team’s page:',
   'adminPeople.remove.submit': 'Remove from the league list',
   'adminPeople.remove.title': 'Remove from the league list',
-  'adminPeople.putBack':
-    'Put back on the league list: {name}, as they were. They are on no team; a team’s page in Teams puts them on its roster.',
-  'adminPeople.putBack.notPutBack': 'Not put back. {problem}',
-  'adminPeople.putBack.submit': 'Put them back',
   'adminPeople.removed':
     'Removed from the league list: {name}. If they never played on a team they are deleted for good after 30 days; if they have played they stay in the league’s bin, and their games keep their numbers.',
   'adminPeople.removed.unnamed':
     'Removed from the league list. If they never played on a team they are deleted for good after 30 days; if they have played they stay in the league’s bin, and their games keep their numbers.',
+  'adminPeople.request.initials':
+    'Shown to the public as: initials only, as they or their guardian asked.',
+  'adminPeople.request.removed':
+    'Shown to the public as: not at all, as they or their guardian asked to be taken off public pages.',
   'adminPeople.save.submit': 'Save details',
   'adminPeople.saved': 'Saved: {name}.',
   'adminPeople.search.clear': 'Show everyone',
@@ -76,6 +85,17 @@ export const enAdminPeople = {
   'adminPeople.teams.none': 'On no team’s roster this season.',
   'adminPeople.teams.public': 'its public page',
   'adminPeople.teams.title': 'Teams',
+  'adminPeople.treated.adultByBoth':
+    'Treated as an adult: the date of birth and the choice both say so.',
+  'adminPeople.treated.adultByChoice': 'Treated as an adult, because they are marked as an adult.',
+  'adminPeople.treated.adultByDate': 'Treated as an adult, because of the date of birth.',
+  'adminPeople.treated.adultNotRecorded':
+    'Treated as an adult: nothing records their age, and this is an adult league.',
+  'adminPeople.treated.childByBoth':
+    'Treated as a child: the date of birth and the choice both say so.',
+  'adminPeople.treated.childByChoice': 'Treated as a child, because they are marked as a child.',
+  'adminPeople.treated.childNotRecorded':
+    'Treated as a child: nothing records their age, and in this league anyone whose age is not recorded is shown as a child.',
   'adminPeople.wrong.birthDate': 'Type a real date of birth: not after today, and not before 1900.',
   'adminPeople.wrong.contactEmail': 'Type a whole email address, such as name@example.com.',
   'adminPeople.wrong.firstName': 'Type a first name, up to 100 letters.',

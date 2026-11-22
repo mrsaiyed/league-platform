@@ -54,6 +54,7 @@ export function PersonForm({
   today,
   words,
   childNote,
+  nameRequest,
   saved,
   main = false,
 }: {
@@ -69,10 +70,12 @@ export function PersonForm({
   readonly today: string;
   readonly words: PersonFormWords;
   /**
-   * Said beside the child-or-adult choice when the record's date of birth makes them an
-   * adult but they are marked as a child, who is then treated as a child (R-28).
+   * The one line under the child-or-adult choice, as the record is stored: whether they
+   * are treated as a child and because of what, and the name public pages show (R-28).
    */
   readonly childNote?: string | undefined;
+  /** Their own request to be shown with less, read only, beside the name (R-23). */
+  readonly nameRequest?: string | undefined;
   /** "Saved: …" from the last save, said once; it goes as soon as the form is sent again. */
   readonly saved?: string | undefined;
   /** The page's one filled button (DESIGN.md line 22); else outlined. */
@@ -204,6 +207,11 @@ export function PersonForm({
           {lastName.after}
         </label>
       </div>
+      {nameRequest === undefined ? null : (
+        <p className="staff-quiet" data-name-request="true">
+          {nameRequest}
+        </p>
+      )}
       {privateDetails === undefined ? null : (
         <>
           <h3>{words.privateTitle}</h3>

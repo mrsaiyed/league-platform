@@ -56,3 +56,41 @@ export function unlikelyYears(birthDate: string, today: string): number | undefi
   if (years === undefined || years < 0) return undefined;
   return years < unlikelyAge.under || years >= unlikelyAge.from ? years : undefined;
 }
+
+/**
+ * How the record says a person is treated, and because of what (R-28, R-15): by the date
+ * of birth, by the choice, by both, or, where neither says, by who plays in the league (a
+ * youth or mixed league shows someone whose age is not recorded as a child; an adult
+ * league as an adult). Asked of core's isMinorOn alone, as everywhere.
+ */
+export type Treatment =
+  | 'child-by-both'
+  | 'child-by-date'
+  | 'child-by-choice'
+  | 'child-by-choice-over-date'
+  | 'child-not-recorded'
+  | 'adult-by-both'
+  | 'adult-by-date'
+  | 'adult-by-choice'
+  | 'adult-not-recorded';
+
+export function treatmentOf(
+  details: { readonly birthDate: string; readonly child: '' | 'child' | 'adult' },
+  /** The league's own today, yyyy-mm-dd. */
+  today: string,
+  audience: 'adult' | 'youth' | 'mixed',
+): Treatment {
+  const byDate =
+    details.birthDate === ''
+      ? null
+      : isMinorOn({ birthDate: details.birthDate, isMinor: null }, today);
+  const choice = details.child;
+  if (byDate === true) return choice === 'child' ? 'child-by-both' : 'child-by-date';
+  if (choice === 'child') return byDate === false ? 'child-by-choice-over-date' : 'child-by-choice';
+  if (byDate === false) return choice === 'adult' ? 'adult-by-both' : 'adult-by-date';
+  if (choice === 'adult') return 'adult-by-choice';
+  return audience === 'adult' ? 'adult-not-recorded' : 'child-not-recorded';
+}
+
+/** Whether a treatment is a child's: what the public pages' name rule is given. */
+export const treatedAsChild = (treatment: Treatment): boolean => treatment.startsWith('child-');

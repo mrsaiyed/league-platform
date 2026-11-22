@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { childDisagreement, unlikelyYears, yearsOld } from './age-on-record.ts';
+import {
+  childDisagreement,
+  treatedAsChild,
+  treatmentOf,
+  unlikelyYears,
+  yearsOld,
+} from './age-on-record.ts';
 
 describe('yearsOld', () => {
   it('counts whole years, a birthday not yet come this year counting one fewer', () => {
@@ -49,5 +55,38 @@ describe('unlikelyYears', () => {
     expect(unlikelyYears('1950-01-01', today)).toBeUndefined();
     expect(unlikelyYears('2999-01-01', today)).toBeUndefined();
     expect(unlikelyYears('nonsense', today)).toBeUndefined();
+  });
+});
+
+describe('treatmentOf', () => {
+  const today = '2026-11-17';
+  const child = '2015-03-01';
+  const adult = '1990-01-01';
+  it('says what makes someone a child: the date, the choice, both, or a youth league that does not know', () => {
+    expect(treatmentOf({ birthDate: child, child: 'child' }, today, 'adult')).toBe('child-by-both');
+    expect(treatmentOf({ birthDate: child, child: '' }, today, 'adult')).toBe('child-by-date');
+    expect(treatmentOf({ birthDate: child, child: 'adult' }, today, 'adult')).toBe('child-by-date');
+    expect(treatmentOf({ birthDate: '', child: 'child' }, today, 'adult')).toBe('child-by-choice');
+    expect(treatmentOf({ birthDate: adult, child: 'child' }, today, 'adult')).toBe(
+      'child-by-choice-over-date',
+    );
+    expect(treatmentOf({ birthDate: '', child: '' }, today, 'youth')).toBe('child-not-recorded');
+    expect(treatmentOf({ birthDate: '', child: '' }, today, 'mixed')).toBe('child-not-recorded');
+  });
+  it('and what makes someone an adult', () => {
+    expect(treatmentOf({ birthDate: adult, child: 'adult' }, today, 'youth')).toBe('adult-by-both');
+    expect(treatmentOf({ birthDate: adult, child: '' }, today, 'youth')).toBe('adult-by-date');
+    expect(treatmentOf({ birthDate: '', child: 'adult' }, today, 'youth')).toBe('adult-by-choice');
+    expect(treatmentOf({ birthDate: '', child: '' }, today, 'adult')).toBe('adult-not-recorded');
+  });
+  it('turns 18 on the birthday itself, on the league’s today', () => {
+    expect(treatmentOf({ birthDate: '2008-11-17', child: '' }, today, 'youth')).toBe(
+      'adult-by-date',
+    );
+    expect(treatmentOf({ birthDate: '2008-11-18', child: '' }, today, 'adult')).toBe(
+      'child-by-date',
+    );
+    expect(treatedAsChild('child-not-recorded')).toBe(true);
+    expect(treatedAsChild('adult-by-date')).toBe(false);
   });
 });
