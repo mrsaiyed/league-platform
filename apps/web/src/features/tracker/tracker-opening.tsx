@@ -317,7 +317,7 @@ export function TrackerOpening({
   ) {
     // With no connection the banner says so, and never "All saved" (step 2.37).
     const offline = isOffline(phase.status.queue, browserOnline);
-    const banner = savedBanner(phase.status.queue, offline);
+    const banner = savedBanner(phase.status.queue, offline, keptOnly(phase.status));
     const notices = trackerNotices(phase.status);
     const anythingToTell = notices.length > 0 || signIn !== null || storeFailedNotice !== null;
     return (
@@ -412,10 +412,21 @@ function bannerState(banner: SavedBanner): CourtBanner['state'] {
   const first = banner[0].key;
   if (first === 'tracker.queue.allSaved') return 'saved';
   // No connection is not a fault: the plays are kept, and wait as the others do.
-  return first === 'tracker.queue.waiting' || first === 'tracker.queue.offline'
+  return first === 'tracker.queue.waiting' ||
+    first === 'tracker.queue.kept' ||
+    first === 'tracker.queue.offline'
     ? 'waiting'
     : 'trouble';
 }
+
+/**
+ * Signed out, or no longer allowed to score (step 2.37, part 2): the plays the device
+ * holds are not on their way, so the banner says they are kept, not waiting to send.
+ */
+const keptOnly = (status: Pick<TrackerControllerStatus, 'mode' | 'signedOut'>): boolean =>
+  status.signedOut ||
+  (status.mode.kind === 'read-only' &&
+    (status.mode.reason === 'not-allowed' || status.mode.reason === 'signed-out'));
 
 /** What the tracker tells about holding the game and taps that did not go in. */
 function Notices({
@@ -496,7 +507,7 @@ function OpenGame({
   useEffect(() => {
     if (screen.kind !== 'held-by-other') setAskingTakeOver(false);
   }, [screen.kind]);
-  const banner = savedBanner(status.queue);
+  const banner = savedBanner(status.queue, false, keptOnly(status));
   // Before the scoring screen, "All saved" would say nothing: the banner is shown only
   // when taps are waiting, refused or cannot be stored.
   const showBanner = banner[0].key !== 'tracker.queue.allSaved';

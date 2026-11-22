@@ -329,6 +329,12 @@ export const enTracker = {
   // The tracker's saved banner (T6 §4), chosen from the queue's status by
   // apps/web/src/features/tracker/queue-banner.ts.
   'tracker.queue.allSaved': 'All saved',
+  // Signed out or no longer allowed to score (step 2.37, part 2): nothing is on its way,
+  // so the plays are kept, never "waiting to send".
+  'tracker.queue.keptShort_one': '{count} kept',
+  'tracker.queue.keptShort_other': '{count} kept',
+  'tracker.queue.kept_one': '{count} play kept on this device',
+  'tracker.queue.kept_other': '{count} plays kept on this device',
   'tracker.queue.notSavedShort_one': '{count} not saved',
   'tracker.queue.notSavedShort_other': '{count} not saved',
   'tracker.queue.notSaved_one': '{count} play not saved',

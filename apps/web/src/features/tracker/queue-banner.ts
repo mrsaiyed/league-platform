@@ -13,7 +13,10 @@ export type SavedBannerLine =
         | 'tracker.queue.storageFailed'
         | 'tracker.queue.offline';
     }
-  | { readonly key: 'tracker.queue.waiting' | 'tracker.queue.notSaved'; readonly count: number };
+  | {
+      readonly key: 'tracker.queue.waiting' | 'tracker.queue.kept' | 'tracker.queue.notSaved';
+      readonly count: number;
+    };
 
 /** The banner's lines, most urgent first; never empty. */
 export type SavedBanner = readonly [SavedBannerLine, ...SavedBannerLine[]];
@@ -30,14 +33,25 @@ export function isOffline(
   return !browserOnline || queue.unansweredSince !== null;
 }
 
+/**
+ * `keptOnly`: the device is signed out or no longer allowed to score (step 2.37, part 2),
+ * so nothing it holds is on its way: its plays are "kept on this device", never "waiting
+ * to send" (finding M2).
+ */
 export function savedBanner(
   status: Pick<QueueStatus, 'waiting' | 'refused' | 'storageFailure'>,
   offline = false,
+  keptOnly = false,
 ): SavedBanner {
   const lines: SavedBannerLine[] = [];
   if (status.storageFailure !== null) lines.push({ key: 'tracker.queue.storageFailed' });
   if (offline) lines.push({ key: 'tracker.queue.offline' });
-  if (status.waiting > 0) lines.push({ key: 'tracker.queue.waiting', count: status.waiting });
+  if (status.waiting > 0) {
+    lines.push({
+      key: keptOnly ? 'tracker.queue.kept' : 'tracker.queue.waiting',
+      count: status.waiting,
+    });
+  }
   if (status.refused.length > 0) {
     lines.push({ key: 'tracker.queue.notSaved', count: status.refused.length });
   }
@@ -70,6 +84,8 @@ export function savedBannerShortLines(banner: SavedBanner, t: Translate): readon
         return t('tracker.queue.offlineShort');
       case 'tracker.queue.waiting':
         return t.plural('tracker.queue.waitingShort', line.count);
+      case 'tracker.queue.kept':
+        return t.plural('tracker.queue.keptShort', line.count);
       case 'tracker.queue.notSaved':
         return t.plural('tracker.queue.notSavedShort', line.count);
     }
