@@ -17,6 +17,8 @@ const nextBin = createRequire(path.join(app, 'package.json')).resolve('next/dist
 const madeUp = {
   LOG_LEVEL: 'warn',
   EMAIL_FROM: 'hello@example.test',
+  // The made-up address the Terms and Privacy pages give (step 2.135).
+  CONTACT_EMAIL: 'contact@example.test',
 };
 
 /** On GitHub the Chromium ci.yml installs; here the Edge Windows already has. */

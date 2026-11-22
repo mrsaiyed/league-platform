@@ -119,7 +119,12 @@ export default async function LeagueLayout({
       <div className="site-body" id="content">
         {children}
       </div>
-      <SiteFooter name={site.name} madeUp={ports.madeUpWorld} testCopy={ports.testCopy} />
+      <SiteFooter
+        name={site.name}
+        from={path}
+        madeUp={ports.madeUpWorld}
+        testCopy={ports.testCopy}
+      />
     </div>
   );
 }

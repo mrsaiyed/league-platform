@@ -1,3 +1,4 @@
+import { legalNoteHref } from '../../../features/shell/index.ts';
 import {
   BotCheckField,
   EmailField,
@@ -13,7 +14,9 @@ import { safeReturnPath } from '../../../server/sign-in/device.ts';
 import { botCheckOnPage } from '../../../server/sign-in/next-visit.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
 
-// A new account (R-2, T-67): the email first, then a code, then a password.
+// A new account (R-2, T-67): the email first, then a code, then a password. It links the
+// Terms and Privacy notes (step 2.135; the using-it audit, M22), which lead back to the
+// league the person came from.
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const next = safeReturnPath(search['next']);
@@ -40,6 +43,16 @@ export default async function Page({ searchParams }: SearchProps) {
       <p>
         <a className="ui-button" data-kind="quiet" href={screenUrl('signin', { next })}>
           {t('signIn.haveAccount')}
+        </a>
+      </p>
+      <p>
+        <a className="ui-button" data-kind="quiet" href={legalNoteHref('terms', next)}>
+          {t('legal.readTerms')}
+        </a>
+      </p>
+      <p>
+        <a className="ui-button" data-kind="quiet" href={legalNoteHref('privacy', next)}>
+          {t('legal.readPrivacy')}
         </a>
       </p>
     </SignInScreen>
