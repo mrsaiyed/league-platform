@@ -32,13 +32,13 @@ describe('sharedMyTeam', () => {
       reads.push(at);
       return coach;
     });
-    const heard: MyTeamReply[] = [];
+    const heard: MyTeamHeard[] = [];
     const stopA = shared.ask(address, (reply) => heard.push(reply));
     const stopB = shared.ask(address, (reply) => heard.push(reply));
     await settle();
     expect(reads).toEqual([address]);
     expect(heard).toEqual([coach, coach]);
-    const late: MyTeamReply[] = [];
+    const late: MyTeamHeard[] = [];
     const stopC = shared.ask(address, (reply) => late.push(reply));
     expect(late).toEqual([coach]);
     expect(reads).toHaveLength(1);
@@ -54,13 +54,13 @@ describe('sharedMyTeam', () => {
       reads.push(at);
       return answer;
     });
-    const first: MyTeamReply[] = [];
+    const first: MyTeamHeard[] = [];
     shared.ask(address, (reply) => first.push(reply))();
     await settle();
     // The view had gone before the answer came: nobody was handed it.
     expect(first).toEqual([]);
     answer = nothing;
-    const second: MyTeamReply[] = [];
+    const second: MyTeamHeard[] = [];
     const stop = shared.ask(address, (reply) => second.push(reply));
     await settle();
     expect(reads).toHaveLength(2);
