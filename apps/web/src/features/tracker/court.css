@@ -858,6 +858,20 @@
 .court-pad:has(.court-notices-pad) .court-start-why {
   display: none;
 }
+/* And while the notice has a list (kept plays, plays not applied), the latest play's line
+   gives way to it: the list is what the scorekeeper must act on, and with plays already
+   saved the line pushed the first "Enter again" off a short phone (2.37 part 2, the
+   confirming look). The line is only out of sight: it is still read, as before. */
+.court-rest:has(.court-notices-pad .court-kept-list) .court-slot-rest .court-latest {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .court-notices-pad .court-notice {
   padding-block: 6px;
   padding-inline: 10px;

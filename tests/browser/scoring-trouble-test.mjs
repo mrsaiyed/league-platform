@@ -115,6 +115,83 @@ async function still(page, label) {
   );
 }
 
+/**
+ * With plays already saved, the first play of a notice's list and its whole Enter again
+ * are on the screen unscrolled, at this size and on a short phone (360 x 640); buttons
+ * stay 44 high, the score and the Start clock button stay on the screen, nothing overlaps
+ * (2.37 part 2, the confirming look).
+ */
+async function firstPlayWhole(page, label, list) {
+  const size = page.viewportSize();
+  // The latest play's line says how many plays the game has: there are plays saved.
+  const saved = (await page.locator('[data-pad] [data-latest] .court-latest-count').innerText())
+    .replace(/\s+/g, ' ')
+    .trim();
+  const seen = {};
+  for (const at of [size, { width: 360, height: 640 }]) {
+    await page.setViewportSize(at);
+    await twoFrames(page);
+    seen[`${at.width}x${at.height}`] = await page.evaluate((list) => {
+      const box = (el) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { top: Math.round(r.top), bottom: Math.round(r.bottom) };
+      };
+      const row = document.querySelector(`${list} li`);
+      const again = row?.querySelector('[data-enter-again]');
+      const notices = document.querySelector('[data-pad] [data-pad-notices]');
+      const clock = [...document.querySelectorAll('[data-pad] button')].find((b) =>
+        /clock/i.test(b.innerText),
+      );
+      const score = document.querySelector('[data-score="home"]');
+      const shown = [row, again, clock, score].filter(Boolean).map(box);
+      const parts = [notices, clock, score].filter(Boolean).map((el) => el.getBoundingClientRect());
+      const overlaps = parts.some((a, i) =>
+        parts.some(
+          (b, j) =>
+            j > i &&
+            a.top < b.bottom - 0.5 &&
+            b.top < a.bottom - 0.5 &&
+            a.left < b.right &&
+            b.left < a.right,
+        ),
+      );
+      const small = [...document.querySelectorAll('[data-pad-notices] button')].filter(
+        (b) => b.getBoundingClientRect().height < 44,
+      ).length;
+      return {
+        row: box(row),
+        again: box(again),
+        clock: box(clock),
+        score: box(score),
+        offScreen: shown.some((r) => r.top < 0 || r.bottom > window.innerHeight + 0.5),
+        againHeight: again ? Math.round(again.getBoundingClientRect().height) : 0,
+        small,
+        overlaps,
+        scrolls: document.scrollingElement.scrollHeight - window.innerHeight,
+      };
+    }, list);
+  }
+  await page.setViewportSize(size);
+  await twoFrames(page);
+  console.log(`${label}, the game showing "${saved}": ${JSON.stringify(seen)}`);
+  note(
+    `${label}: the first play and its whole Enter again are on the screen, here and at 360 x 640`,
+    Object.values(seen).every(
+      (s) =>
+        s.row !== null &&
+        s.again !== null &&
+        s.score !== null &&
+        !s.offScreen &&
+        s.againHeight >= 44 &&
+        s.small === 0 &&
+        !s.overlaps &&
+        s.scrolls <= 0,
+    ),
+    JSON.stringify(seen),
+  );
+}
+
 /** Asks for the game's scoring session from a device that is not the browser's. */
 const session = async (origin, body, who = owner) => {
   const answer = await fetch(`${origin}/api/v1/leagues/${leagueId}/games/${liveGame}/session`, {
@@ -336,6 +413,7 @@ async function oneGame(browser, size) {
         String(await again.count()),
       );
       await still(page, `${at}, the kept plays listed in the pad`);
+      await firstPlayWhole(page, `${at}, the kept plays listed`, '[data-kept-list]');
       await again.first().tap();
       await page.locator('[data-kept-list] [data-kept-play]').nth(1).waitFor({ state: 'detached' });
       await c.saved();
@@ -393,6 +471,7 @@ async function oneGame(browser, size) {
           JSON.stringify(await rows.allInnerTexts()),
         );
         await still(page, `${at}, ten plays not applied`);
+        await firstPlayWhole(page, `${at}, the plays not applied`, '[data-not-applied-list]');
         const box = await page.evaluate(() => {
           const notices = document.querySelector('[data-pad] [data-pad-notices]');
           const rest = document.querySelector('[data-pad] [data-rest]').getBoundingClientRect();
