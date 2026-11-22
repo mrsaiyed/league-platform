@@ -4,16 +4,23 @@ export {
   // Also the web app's start-up's (record 082): why the database refused it, by kind.
   connectCauseOf,
   openLeagueMakingTarget,
+  // The release command's (step 2.95, record 101): the migration login alone, the same checks.
+  openMigrationTarget,
   serverCodeOf,
   type ConnectCause,
   type LeagueMakingPlace,
   type LeagueMakingSource,
   type LeagueMakingTarget,
   type Login,
+  type MigrationTarget,
+  type MigrationTargetResult,
+  type MigrationTargetSource,
   type OpenTargetProblem,
   type OpenTargetResult,
   type PostgresAddress,
 } from './league-making-target.ts';
+// The release command's (step 2.95, T-158): how many games are live, in every league.
+export { countLiveGames, type LiveGamesCount } from './count-live-games.ts';
 export { type LoginProblem, type MigrationLoginGap } from './probe-logins.ts';
 export {
   makeLeague,

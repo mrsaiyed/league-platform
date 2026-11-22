@@ -82,6 +82,7 @@ There are three different kinds of "undo", for three different mistakes.
 - **T-156: every release can be reversed in minutes** by promoting the previous version. That works because database changes are always made so that the previous version still runs against them (T-49).
 - **T-157: unfinished features ship switched off** behind our own rollout flags (T-100), so releasing is routine and small.
 - **T-158: no releases while many games are live.** The release step checks how many games are in progress and refuses above a small number unless overridden for an emergency fix.
+- **T-300 (step 2.95, record 101): how this is done on the test copy until the steps above are built.** A person runs the release command at their own terminal with the migration login, which is never a setting on the host, its password typed when asked with the typing hidden, never on the command line: it counts the live games (the limit is 0, and `--go-ahead` overrides it, until T-127 is proved), applies the database changes ("applied on release", T-48) and, only when every one applied, names the commit, which the person then deploys by hand on Render, its automatic deploys off. Reversing (T-156) is deploying the previous commit by hand; the database is never taken back. The procedures are in `docs/operations/`: `releasing-and-going-back.md`, `render-test-copy.md`, `new-test-copy.md`, `rotating-a-secret.md` and `restoring-the-database.md`.
 
 ## 7. Knowing what is happening
 
