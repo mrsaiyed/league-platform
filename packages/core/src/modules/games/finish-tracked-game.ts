@@ -21,6 +21,7 @@ import {
   changedLines,
   linesByPerson,
   linesOf,
+  overtimePeriodsOf,
   readState,
   rosterOf,
   scoreOf,
@@ -78,6 +79,9 @@ export async function finishTrackedGame(args: {
       homeScore: score.home,
       awayScore: score.away,
       decided: true,
+      // The period the engine ended the game in, less regulation: 0 for a game won in
+      // regulation, 1 for the first overtime (P7 §5.6).
+      overtimePeriods: overtimePeriodsOf(state),
       ...(game.format === null ? { format: args.rules } : {}),
     },
     game.version,

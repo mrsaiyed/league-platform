@@ -9,6 +9,7 @@
 //   admin.ts: admin
 //   admin-games.ts: admin.games, admin.boxScore, admin.myGames
 //   admin-import.ts: admin.import
+//   admin-people.ts: adminPeople
 //   admin-settings.ts: adminSettings, seasonSettings, setting
 //   admin-teams.ts: adminTeams
 //   error.ts: error
@@ -26,6 +27,7 @@ import { enActivity } from './en/activity.ts';
 import { enAdmin } from './en/admin.ts';
 import { enAdminGames } from './en/admin-games.ts';
 import { enAdminImport } from './en/admin-import.ts';
+import { enAdminPeople } from './en/admin-people.ts';
 import { enAdminSettings } from './en/admin-settings.ts';
 import { enAdminTeams } from './en/admin-teams.ts';
 import { enError } from './en/error.ts';
@@ -43,6 +45,7 @@ export const en = {
   ...enAdmin,
   ...enAdminGames,
   ...enAdminImport,
+  ...enAdminPeople,
   ...enAdminSettings,
   ...enAdminTeams,
   ...enError,

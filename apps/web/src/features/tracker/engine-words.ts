@@ -153,6 +153,44 @@ export function periodText(period: number, periods: 2 | 4, t: Translate): string
   return t(periods === 2 ? 'tracker.period.half' : 'tracker.period.quarter', { number: period });
 }
 
+/**
+ * A play said shortest, for the Undo button where a phone has room for a few words
+ * (step 2.37): what happened first, then who by number and first name ("+2 #4 Jordan"),
+ * so a line cut short loses the name, never what happened or the number. The same kinds
+ * of play as `playKeys`: a kind the engine gains is a type error here until it has a key.
+ */
+export function playShortText(
+  play: basketball.Play,
+  rosters: DeviceRosters,
+  periods: 2 | 4,
+  t: Translate,
+): string {
+  const who = (id: string) => playerShortLabel(findPlayer(rosters, id), t);
+  const team = (side: basketball.Side) => rosters[side].name;
+  switch (play.type) {
+    case 'score':
+      return t('tracker.play.short.score', { who: who(play.playerId), points: play.points });
+    case 'foul':
+    case 'unfoul':
+    case 'turnover':
+    case 'unturnover':
+      return t(`tracker.play.short.${play.type}`, { who: who(play.playerId) });
+    case 'team-turnover':
+    case 'team-unturnover':
+      return t(`tracker.play.short.${play.type}`);
+    case 'timeout':
+    case 'untimeout':
+    case 'lineup':
+      return t(`tracker.play.short.${play.type}`, { team: team(play.side) });
+    case 'sub':
+      return t('tracker.play.short.sub', { who: who(play.inId) });
+    case 'period':
+      return t('tracker.play.short.period', { period: periodText(play.period, periods, t) });
+    case 'clock-mode':
+      return t(`tracker.play.short.clock-mode.${play.mode === 'running' ? 'running' : 'stop'}`);
+  }
+}
+
 /** A play as the tracker says it: in the play log, on Undo, in the "not saved" lists. */
 export function playText(
   play: basketball.Play,

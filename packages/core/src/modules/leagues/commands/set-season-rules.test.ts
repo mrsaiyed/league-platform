@@ -73,6 +73,7 @@ const decided = (n: number, home: number, away: number, homeScore: number, awayS
     captureMode: 'final',
     homeScore,
     awayScore,
+    overtimePeriods: null,
     format: null,
     finalizedAt: '2026-12-20T20:00:00.000Z',
     binned: false,

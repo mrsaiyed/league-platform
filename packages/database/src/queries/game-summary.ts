@@ -12,6 +12,7 @@ export const gameSummaryColumns = [
   'capture_mode',
   'home_score',
   'away_score',
+  'overtime_periods',
   'format',
   'finalized_at',
   'deleted_at',
@@ -29,6 +30,7 @@ type GameRow = {
   capture_mode: string;
   home_score: number | null;
   away_score: number | null;
+  overtime_periods: number | null;
   format: unknown;
   finalized_at: Date | null;
   deleted_at: Date | null;
@@ -47,6 +49,7 @@ export function gameSummary(row: GameRow): GameRecord {
     captureMode: row.capture_mode,
     homeScore: row.home_score,
     awayScore: row.away_score,
+    overtimePeriods: row.overtime_periods,
     format: row.format,
     finalizedAt: row.finalized_at === null ? null : row.finalized_at.toISOString(),
     binned: row.deleted_at !== null,

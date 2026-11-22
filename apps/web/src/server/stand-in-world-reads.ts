@@ -11,6 +11,7 @@ import {
   minimumGamesToRank,
   placeRounds,
   publicRosterLine,
+  rulesOfGame,
   type GameSnapshotStore,
   type PublicGame,
   type PublicRoster,
@@ -78,6 +79,7 @@ function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
       slug: found?.slug ?? '',
       name: found?.name ?? '',
       color: found?.color ?? null,
+      removed: found?.binned === true,
     };
   };
   const venue = s.venues.find((v) => v.id === game.venueId);
@@ -91,6 +93,12 @@ function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
     awayTeam: team(game.awayTeamId),
     homeScore: game.homeScore,
     awayScore: game.awayScore,
+    overtimePeriods: game.overtimePeriods,
+    periods:
+      rulesOfGame(game.format, s.seasons.find((x) => x.id === game.seasonId)?.rules).gameFormat
+        .periods === 2
+        ? 2
+        : 4,
     divisionName: s.divisions.find((d) => d.id === game.divisionId)?.name ?? null,
     venue:
       venue === undefined
@@ -182,6 +190,13 @@ export function worldGameSnapshot(
       if (season === undefined) return undefined;
       const { format, version: _version, divisionId: _division, ...record } = gameRecordOf(game);
       return { ...record, rules: format ?? season.rules };
+    },
+    // As games-read-store.ts reads it: the list a public season names, and its rules.
+    seasonStatistics: async (seasonId) => {
+      const s = await read();
+      const season = s?.seasons.find((x) => x.id === seasonId);
+      if (season === undefined) return undefined;
+      return { statKeys: publicSeason(s, seasonId)?.statKeys ?? [], rules: season.rules };
     },
     teams: async (teamIds) =>
       ((await read())?.teams ?? [])

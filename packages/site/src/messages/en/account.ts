@@ -4,12 +4,35 @@
 // A comment above a key is about that key or, from before the split, about the keys
 // that followed it in the one file there was.
 export const enAccount = {
+  // Step 2.157: the refusal's ways on, for someone the league may be shown to.
+  'access.noAccess.backToLeague': 'Back to {league}',
+  // For someone who is not signed in.
   'access.noAccess.body':
     'This page is for the people who run this league. If you should have access, ask the league to invite you.',
+  // For someone signed in who holds no part of the league's admin: a coach, a member, a
+  // signed-in stranger at a league they may see.
+  'access.noAccess.notStaff':
+    "This page is for the people who run {league}. If you should be one of them, ask the league's owner or an admin.",
+  // For staff of this league at a page their role does not include.
+  'access.noAccess.notYourRole':
+    "Your role in this league does not include this page. If it should, ask the league's owner or an admin.",
+  // A role as the refusal names the person's own (access.noAccess.youAre), in the
+  // middle of a sentence.
+  'access.noAccess.role.admin': 'an admin',
+  'access.noAccess.role.captain': 'a captain',
+  'access.noAccess.role.club_admin': 'a club admin',
+  'access.noAccess.role.coach': 'a coach',
+  'access.noAccess.role.editor': 'an editor',
+  'access.noAccess.role.registrar': 'a registrar',
+  'access.noAccess.role.scheduler': 'a scheduler',
+  'access.noAccess.role.scorekeeper': 'a scorekeeper',
   'access.noAccess.signedInAs': 'You are signed in as {email}.',
   'access.noAccess.switch': 'Use another account',
   // U-6: an address you are not allowed to open.
   'access.noAccess.title': 'You do not have access',
+  // The staff refusal names the person's own roles here, joined in the language's way:
+  // "You are a scheduler in this league." (step 2.157).
+  'access.noAccess.youAre': 'You are {roles} in this league.',
   'account.devices': 'Signed-in devices',
   'account.lastActive': 'Last active {when}',
   'account.leagues': 'Your leagues',
