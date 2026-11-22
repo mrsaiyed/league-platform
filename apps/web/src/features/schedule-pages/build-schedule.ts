@@ -8,7 +8,8 @@ import {
   type PublicGame,
   type PublicSchedule,
 } from '@srleagues/core';
-import type { GameStatus } from '@srleagues/ui';
+import { finalLinkState, finalPillOf } from '@srleagues/site';
+import type { FinalPill, GameStatus } from '@srleagues/ui';
 import type { LeagueClock } from '../../server/public-schedule.ts';
 import { locale, t } from '../../server/messages.ts';
 
@@ -25,6 +26,18 @@ export type GameView = {
     readonly color: string | null;
   };
   readonly status: GameStatus;
+  /**
+   * A final game won in overtime (P7 §5.6): what its pill says, "Final, OT", and what its
+   * link says to a screen reader in place of "final", "final after overtime". Left out for
+   * any other game, which its pill and link name as before.
+   */
+  readonly finalPill?: FinalPill;
+  readonly finalSaid?: string;
+  /**
+   * The regulation periods of the rules it is played under, 2 or 4: a card open while the
+   * game is played works out its overtime from the live channel's last period when it ends.
+   */
+  readonly periods: 2 | 4;
   readonly whenText: string;
   /**
    * The same line as it reads beside the state's pill, where that is shorter: a scoreboard
@@ -148,6 +161,9 @@ export function gameView(
   const status = statusOf(game.status);
   const place = placeOf(game);
   const day = dayOf(game, clock);
+  const overtime = status === 'final' ? game.overtimePeriods : null;
+  const finalPill = finalPillOf(t, overtime);
+  const finalSaid = finalLinkState(t, overtime);
   const awaiting =
     status === 'scheduled' &&
     (game.startsAt !== null
@@ -158,6 +174,9 @@ export function gameView(
     home: { name: game.homeTeam.name, score: game.homeScore, color: game.homeTeam.color },
     away: { name: game.awayTeam.name, score: game.awayScore, color: game.awayTeam.color },
     status,
+    ...(finalPill === undefined ? {} : { finalPill }),
+    ...(finalSaid === undefined ? {} : { finalSaid }),
+    periods: game.periods,
     whenText: whenOf(game, clock),
     // Beside a pill that says "Postponed" the old day is still never written bare.
     ...(status === 'postponed' && day !== null
@@ -171,6 +190,27 @@ export function gameView(
     detailsHref: leagueUrl(league, 'game', { game: game.id, season: seasonSlug }),
     teamSlugs: [game.homeTeam.slug, game.awayTeam.slug],
     ...(awaiting ? { awaiting: true } : {}),
+  };
+}
+
+/**
+ * A final game's pill and link words for each count of overtime periods, written by the
+ * server in the league's language (`pill[2]` is "Final, 2OT"): what a card open while the
+ * game ends says, as its page drawn afresh would. Index 0 is regulation: nothing more.
+ */
+export type OvertimeWords = {
+  readonly pill: readonly (FinalPill | null)[];
+  readonly said: readonly string[];
+};
+
+/** The most overtime periods a game has: the engine's last period, 20, less 2 halves. */
+const mostOvertimes = 18;
+
+export function overtimeWords(): OvertimeWords {
+  const counts = Array.from({ length: mostOvertimes + 1 }, (_, count) => count);
+  return {
+    pill: counts.map((count) => finalPillOf(t, count) ?? null),
+    said: counts.map((count) => finalLinkState(t, count) ?? ''),
   };
 }
 

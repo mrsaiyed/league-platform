@@ -47,7 +47,13 @@ const person = (id: string) => ({
 });
 
 function store(
-  over: { status?: string; awayVisibility?: string; state?: unknown; rules?: unknown } = {},
+  over: {
+    status?: string;
+    awayVisibility?: string;
+    state?: unknown;
+    rules?: unknown;
+    overtimePeriods?: number | null;
+  } = {},
 ): GameSnapshotStore {
   const state = 'state' in over ? over.state : playedState();
   return {
@@ -63,6 +69,7 @@ function store(
             captureMode: 'live',
             homeScore: 3,
             awayScore: 0,
+            overtimePeriods: over.overtimePeriods ?? null,
             finalizedAt: null,
             binned: false,
             rules: over.rules ?? null,
@@ -228,6 +235,17 @@ describe('readGameSnapshot', () => {
     expect((await snapshot(store({ state: undefined }))).periods).toBe(2);
     // Once the tracker has the game, its saved state says (here quarters, over halves rules).
     expect((await snapshot(store({ rules: halves }))).periods).toBe(4);
+  });
+
+  it('gives a final game the last period played as its result counts it (step 2.200)', async () => {
+    // The saved state is of quarters and stands in the first quarter: a game reopened and
+    // put right in an earlier period, or one whose screen stood on an empty overtime.
+    expect((await snapshot(store({ status: 'final', overtimePeriods: 1 }))).period).toBe(5);
+    expect((await snapshot(store({ status: 'final', overtimePeriods: 0 }))).period).toBe(4);
+    expect((await snapshot(store({ status: 'final', overtimePeriods: 2 }))).period).toBe(6);
+    // No count kept (typed in, or final before it was kept), or not final: as before.
+    expect((await snapshot(store({ status: 'final', overtimePeriods: null }))).period).toBe(1);
+    expect((await snapshot(store({ status: 'live' }))).period).toBe(1);
   });
 
   it('reads a state the engine cannot as no state', async () => {
