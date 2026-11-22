@@ -121,6 +121,12 @@ export type PlayedLeague = {
   readonly gameIds: ReadonlyMap<number, string>;
   /** Seconds each part took, in the order they ran. */
   readonly timings: readonly { readonly part: string; readonly seconds: number }[];
+  /**
+   * What one schedule-draft command took while the games were put in rounds: the first
+   * tenth of them and the last tenth, in milliseconds each. Every draft edit replays the
+   * draft's changes so far (packages/core, draft-edit.ts), so the last cost more.
+   */
+  readonly moves: { readonly count: number; readonly firstMs: number; readonly lastMs: number };
 };
 
 /** The device the simulation scores on, as a scoring session names it. */
@@ -286,8 +292,16 @@ export async function simulateLeagueInto(
     const owner = as(ownerId);
     const seasonId = await setUpLeague(pglite, plan, as(staffId), owner, ownerId, setUp, deps);
     lap('league, divisions, teams and rosters');
-    const gameIds = await schedule(pglite, plan, owner, seasonId, as(null), setUp, deps);
-    lap('schedule');
+    const { gameIds, moves } = await schedule(
+      pglite,
+      plan,
+      owner,
+      seasonId,
+      as(null),
+      setUp,
+      deps,
+      lap,
+    );
     let tracked = 0;
     let finals = 0;
     let calledOff = 0;
@@ -310,7 +324,7 @@ export async function simulateLeagueInto(
     timings.push({ part: 'final scores', seconds: Math.round(finals) / 1000 });
     timings.push({ part: 'tracked games', seconds: Math.round(tracked) / 1000 });
     timings.push({ part: 'called-off games', seconds: Math.round(calledOff) / 1000 });
-    return { plan, leagueId, seasonId, gameIds, timings };
+    return { plan, leagueId, seasonId, gameIds, timings, moves };
   } finally {
     await db.close();
   }
@@ -441,7 +455,8 @@ async function schedule(
   worker: CommandContext,
   setUp: CommandDeps<SimulationTx>,
   deps: CommandDeps<SimulationTx>,
-): Promise<Map<number, string>> {
+  lap: (part: string) => void,
+): Promise<{ gameIds: Map<number, string>; moves: PlayedLeague['moves'] }> {
   const fileText = fixturesFileOf(plan);
   const started = must(
     'starting the fixture import',
@@ -471,7 +486,30 @@ async function schedule(
     d.teams.map((t) => ({ id: t.venue.name, name: t.venue.name })),
   );
   const fixtures = readFixtureSheet(fileText, { teams: names, venues }).fixtures;
-  await putInRounds(pglite, owner, seasonId, fixtures, setUp);
+  lap('schedule: the fixture import');
+  // Each draft command timed as it runs (its whole transaction), to see where time goes.
+  const took: number[] = [];
+  const timed: CommandDeps<SimulationTx> = {
+    ...setUp,
+    transaction: async (context, work) => {
+      const from = performance.now();
+      try {
+        return await setUp.transaction(context, work);
+      } finally {
+        took.push(performance.now() - from);
+      }
+    },
+  };
+  await putInRounds(pglite, owner, seasonId, fixtures, timed);
+  lap('schedule: games put in rounds');
+  const tenth = Math.max(1, Math.floor(took.length / 10));
+  const average = (part: number[]) =>
+    Math.round((10 * part.reduce((s, t) => s + t, 0)) / Math.max(1, part.length)) / 10;
+  const moves = {
+    count: took.length,
+    firstMs: average(took.slice(0, tenth)),
+    lastMs: average(took.slice(-tenth)),
+  };
 
   // The draft's games, matched to the plan's by day and teams.
   const teamIds = new Map(
@@ -527,7 +565,8 @@ async function schedule(
       deps,
     ),
   );
-  return gameIds;
+  lap('schedule: tracked games set live, published');
+  return { gameIds, moves };
 }
 
 /** Step 3, a tracked game: opened on one device, its plays sent, then let go. */

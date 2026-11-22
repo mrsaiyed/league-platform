@@ -344,10 +344,14 @@ export function reportLines(played: PlayedLeague, report: SimulationReport): str
       ? `All ${report.checks.length} checks hold.`
       : `${failed.length} check(s) failed: ${failed.join(', ')}`,
   );
+  const { moves } = played;
+  // One last line for everything that differs from run to run (the tests leave it out).
   out.push(
     `Time: ${report.timings.map((t) => `${t.part} ${t.seconds.toFixed(1)} s`).join(', ')}; total ${report.timings
       .reduce((s, t) => s + t.seconds, 0)
-      .toFixed(1)} s`,
+      .toFixed(
+        1,
+      )} s. Putting games in rounds took ${moves.count} schedule-draft commands: ${moves.firstMs} ms each in the first tenth, ${moves.lastMs} ms each in the last.`,
   );
   return out;
 }
