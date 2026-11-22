@@ -14,7 +14,7 @@ export {
   type KeptEmailSenderOptions,
   type NotKeptKind,
 } from './src/email/kept-email-sender.ts';
-export { isMadeUpAddress } from './src/email/made-up-address.ts';
+export { isMadeUpAddress, keptAddressOf } from './src/email/made-up-address.ts';
 export { resendEmail, type ResendEmailOptions } from './src/email/resend-email.ts';
 export * from './src/bot-check/index.ts';
 export * from './src/cloudflare/index.ts';

@@ -80,6 +80,7 @@ test('on a PGlite folder prints the newest code for the address, and nothing els
     const db = createDatabase({ kind: 'pglite', pglite });
     await keepEmail(db, { to: 'new.owner@example.test', subject: 'old', text: 'Code 111111.' });
     await keepEmail(db, { to: 'other@example.test', subject: 'x', text: 'Code 222222.' });
+    await keepEmail(db, { to: 'Dotted@example.test.', subject: 'd', text: 'Code 515151.' });
     await keepEmail(db, { to: 'new.owner@example.test', subject: 'new', text: 'Code 482913.' });
     await keepEmail(db, {
       to: 'invited@example.test',
@@ -96,6 +97,12 @@ test('on a PGlite folder prints the newest code for the address, and nothing els
 
     const link = runScript(['--db', folder, '--to', 'invited@example.test']);
     assert.equal(link.stdout, 'https://staging.example.test/invite/made-up-token\n');
+
+    // Kept with a final dot, asked for without one (and the other way): the same address.
+    const dotted = runScript(['--db', folder, '--to', 'dotted@example.test']);
+    assert.equal(dotted.stdout, '515151\n');
+    const asked = runScript(['--db', folder, '--to', 'Other@Example.test.']);
+    assert.equal(asked.stdout, '222222\n');
 
     const none = runScript(['--db', folder, '--to', 'nobody@example.test']);
     assert.equal(none.status, 1);

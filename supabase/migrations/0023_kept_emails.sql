@@ -9,7 +9,7 @@
 -- the tables' owner, at a terminal, in a session the founder started.
 --
 --   kept_emails.emails: one row per email kept, newest last (its id): who it was to (in
---     small letters), its subject and its plain words (every email has them, T7 §6; the
+--     the form the check sees, kept_emails.kept_form), its subject and its plain words (every email has them, T7 §6; the
 --     HTML is never kept). Only an address on a name kept for made-up mail (record 075's
 --     list: .test, .example, .invalid, .localhost, example.com, .net and .org), checked
 --     here again whatever the app checked. At most the newest 300 stay.
@@ -83,6 +83,22 @@ $$;
 
 revoke all on function kept_emails.is_made_up_address(text) from public;
 
+-- The form an address is kept and looked up in: the form the check sees, trimmed, one
+-- final dot dropped, A to Z in small letters (so `A@X.test.` and `a@x.test` are one).
+-- The same as keptAddressOf (packages/providers), which the script gives its --to.
+create function kept_emails.kept_form(address text) returns text
+language sql
+immutable
+set search_path = pg_catalog, pg_temp
+as $$
+  select translate(
+    regexp_replace(kept_emails.trimmed(address), '\.$', ''),
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'
+  )
+$$;
+
+revoke all on function kept_emails.kept_form(text) from public;
+
 comment on function kept_emails.is_made_up_address(text) is
   'Whether an address is on a name kept for made-up mail (record 075): the same list as isMadeUpAddress in packages/providers.';
 
@@ -93,7 +109,7 @@ create table kept_emails.emails (
   subject text not null,
   body_text text not null,
   constraint emails_to_made_up check (kept_emails.is_made_up_address(to_address)),
-  constraint emails_to_small_letters check (to_address = lower(to_address)),
+  constraint emails_to_kept_form check (to_address = kept_emails.kept_form(to_address)),
   constraint emails_to_size check (length(to_address) <= 320),
   constraint emails_subject_size check (length(subject) <= 1000),
   constraint emails_text_size check (length(body_text) <= 100000)
@@ -134,7 +150,7 @@ begin
       using errcode = 'check_violation';
   end if;
   insert into kept_emails.emails (to_address, subject, body_text)
-  values (lower(btrim(given_to)), given_subject, given_text);
+  values (kept_emails.kept_form(given_to), given_subject, given_text);
   -- Only the newest 300 stay.
   delete from kept_emails.emails
   where id <= (select e.id from kept_emails.emails e order by e.id desc offset 300 limit 1);

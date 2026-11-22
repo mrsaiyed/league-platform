@@ -10,7 +10,7 @@
 // the tracker's data, and reads as the migration login (the tables' owner): the app's
 // login cannot read kept_emails at all.
 import { newestKeptEmail, openLeagueMakingTarget } from '@srleagues/database';
-import { isMadeUpAddress, keptEmailAnswer } from '@srleagues/providers';
+import { isMadeUpAddress, keptAddressOf, keptEmailAnswer } from '@srleagues/providers';
 import { sourceFor } from './make-league-source.mjs';
 import * as words from './read-kept-emails.messages.mjs';
 
@@ -24,7 +24,7 @@ export function keptEmailsSourceFor({ to, ...options }) {
   if (!isMadeUpAddress(address)) return { problems: [words.toNotMadeUp] };
   const chosen = sourceFor(options);
   if ('problems' in chosen) return chosen;
-  return { ...chosen, to: address };
+  return { ...chosen, to: keptAddressOf(address) };
 }
 
 /**

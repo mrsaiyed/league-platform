@@ -11,6 +11,18 @@
 // tested before any lowercasing (so no letter outside A to Z can lowercase its way in).
 
 /**
+ * The form an address is kept and looked up in on the test copy, the form the check sees:
+ * trimmed, one final dot dropped, A to Z in small letters. The same as migration 0023's
+ * kept_emails.kept_form; scripts/read-kept-emails.mjs gives its --to in this form.
+ */
+export function keptAddressOf(address: string): string {
+  return address
+    .trim()
+    .replace(/\.$/, '')
+    .replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+}
+
+/**
  * Whether `address` is on a name kept for made-up mail: `.test`, `.example`, `.invalid`,
  * `.localhost`, or example.com, .net and .org.
  */

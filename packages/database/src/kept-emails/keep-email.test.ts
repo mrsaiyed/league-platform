@@ -32,6 +32,17 @@ describe('keepEmail and newestKeptEmail', () => {
     expect(await newestKeptEmail(pgliteDriver(pglite), 'c@example.test')).toBeNull();
   });
 
+  it('keeps an address in the form the check sees, so its final dot or spaces never hide it', async () => {
+    await keepEmail(db, { to: '\tDot@X.test. ', subject: 'dot', text: 'code 444444' });
+    const { rows } = await pgliteDriver(pglite).query<{ to_address: string }>(
+      'select to_address from kept_emails.emails order by id desc limit 1',
+    );
+    expect(rows[0]?.to_address).toBe('dot@x.test');
+    for (const asked of ['dot@x.test', 'Dot@X.test.', ' dot@x.test. ']) {
+      expect(await newestKeptEmail(pgliteDriver(pglite), asked)).toMatchObject({ subject: 'dot' });
+    }
+  });
+
   it('a refused address is told as refused, by its code only', async () => {
     const error = await keepEmail(db, { to: 'real@gmail.com', subject: 's', text: 't' }).catch(
       (e: unknown) => e,
