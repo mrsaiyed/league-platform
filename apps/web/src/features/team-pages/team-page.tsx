@@ -107,6 +107,30 @@ export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
 }
 
 /**
+ * The team's statistics on its page, and the signed-in request for its hidden players. The
+ * page shows the team's totals and says already that its players are not shown: only then
+ * can someone see more, and only then does the page ask, after it has arrived, as whoever is
+ * signed in here (step 2.46, T-95). A hidden team with nothing recorded sets up no request,
+ * so its page tells a visitor nothing of it, not even its address.
+ */
+export function TeamStatsPart({
+  stats,
+  staffAddress,
+}: {
+  readonly stats: TeamStatsView;
+  readonly staffAddress: string;
+}) {
+  const view = teamStatsView(stats);
+  const totalsShown = view.kind === 'numbers' && view.totals.length > 0;
+  if (stats.playerLinesShown || !totalsShown) return <TeamStatsSection stats={stats} />;
+  return (
+    <StaffTeamStats address={staffAddress}>
+      <TeamStatsSection stats={stats} />
+    </StaffTeamStats>
+  );
+}
+
+/**
  * Whether a team's results stand in the games' column beside the roster, or under both at
  * the page's width. A long roster beside a short list of games to come would leave the
  * games' column empty, so the results fill it; beside a short roster they would run far
@@ -278,21 +302,15 @@ export async function TeamPage({
       <Section title={t('team.stats')}>
         {stats === undefined ? (
           <EmptyPanel text={t('team.statsNone')} />
-        ) : stats.playerLinesShown ? (
-          <TeamStatsSection stats={stats} />
         ) : (
-          // The page says already that this team's players are not shown: only then can
-          // someone see more, and only then does the page ask, after it has arrived, as
-          // whoever is signed in here (step 2.46, T-95).
-          <StaffTeamStats
-            address={staffNumbersAddress(addressee, {
+          <TeamStatsPart
+            stats={stats}
+            staffAddress={staffNumbersAddress(addressee, {
               page: 'team',
               season: season.id,
               team: head.teamId,
             })}
-          >
-            <TeamStatsSection stats={stats} />
-          </StaffTeamStats>
+          />
         )}
       </Section>
     </main>

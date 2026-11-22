@@ -1,11 +1,13 @@
 // Step 2.46 on the made-up database: the signed-in read for the numbers a public page leaves
-// out, role by role (the read's rows in the role tests). The seed league's Otters are made
-// staff only and every role is given to a made-up account of its own; then each asks about
-// the statistics page, the Otters' page and the Otters' game. Only the league's owner and
-// admins of the whole league, and the Otters' coach and captain, are given the Otters'
-// player lines; everyone else, an admin of the other seed league among them, gets exactly the
-// answer of a page with nothing kept back. Roles are read on each request (T-75): a coach
-// whose role is taken back gets nothing on the next.
+// out, role by role (the read's rows in the role tests). The seed league's Otters and Herons,
+// who played each other, are made staff only and every role is given to a made-up account of
+// its own; then each asks about the statistics page, the Otters' page and the Otters' game.
+// Only the league's owner and admins of the whole league, and the Otters' coach and captain,
+// are given the Otters' player lines; the Herons' coach gets the Herons' and not one of the
+// Otters' (and the other way round); everyone else, an admin of the other seed league and the
+// coach of that league's own "Otters" among them, gets exactly the answer of a page with
+// nothing kept back. Roles are read on each request (T-75): a coach whose role is taken back
+// gets nothing on the next.
 import { leagueApiUrl, fail, ok, type Role, type Scope } from '@srleagues/core';
 import * as database from '@srleagues/database';
 import {
@@ -75,6 +77,7 @@ type Facts = {
   seasonId: string;
   otters: string;
   herons: string;
+  pines: string;
   game: string;
 };
 let facts: Facts;
@@ -120,13 +123,40 @@ beforeAll(async () => {
     await database.withTransaction(db, { leagueId }, (s) => database.listPrograms(s))
   ).find((p) => p.slug === 'summer-camp');
   if (camp === undefined) throw new Error('no summer camp');
-  facts = { seasonId: season.id, otters, herons, game: game.gameId };
-  // The Otters keep their players' numbers to their staff, as their admin may choose.
+  facts = { seasonId: season.id, otters, herons, pines: idOf('pines'), game: game.gameId };
+  // The Otters and the Herons, who played each other, both keep their players' numbers to
+  // their staff, as their admin may choose.
   await database.withTransaction(db, { leagueId, accountId: ownerAccountId }, async (s) => {
     const teamsOf = database.teamsStore(s);
-    const team = await teamsOf.find(otters);
-    if (team === undefined) throw new Error('no Otters');
-    await teamsOf.update(otters, { statsVisibility: 'staff' }, team.version);
+    for (const id of [otters, herons]) {
+      const team = await teamsOf.find(id);
+      if (team === undefined) throw new Error('no team to hide');
+      await teamsOf.update(id, { statsVisibility: 'staff' }, team.version);
+    }
+  });
+  // The other seed league has Otters of its own, staff only, with a coach.
+  const maple = seed('maple-street');
+  const [mapleSeason] = await ports.publicStats.seasonsOf(maple.leagueId);
+  if (mapleSeason === undefined) throw new Error('maple street has no public season');
+  const mapleOtters = await database.withTransaction(
+    db,
+    { leagueId: maple.leagueId, accountId: maple.ownerAccountId },
+    (s) =>
+      database.teamsStore(s).create({
+        seasonId: mapleSeason.id,
+        divisionId: null,
+        slug: 'otters',
+        name: 'Lakeside Otters',
+        color: null,
+        statsVisibility: 'staff',
+      }),
+  );
+  if (mapleOtters === 'slug-taken' || mapleOtters === 'name-taken') throw new Error(mapleOtters);
+  const mapleCoach = signedIn(`coach-${randomUUID()}@maple.example.test`);
+  people.set("the other league's Otters' coach", mapleCoach);
+  await give(maple.leagueId, maple.ownerAccountId, await accountOf(mapleCoach), 'coach', {
+    type: 'team',
+    id: mapleOtters,
   });
   people.set('owner', signedIn('owner@lakeside.example.test'));
   people.set('admin', signedIn('admin@lakeside.example.test'));
@@ -192,13 +222,15 @@ const questions = () => ({
 });
 /** The Otters' player of the seed's season under way: the adult league's child, Quinn S. */
 const ottersPlayer = 'Quinn S.';
+/** The Herons' player of that season, who played the Otters: Morgan Example. */
+const heronsPlayer = 'Morgan';
 
 describe('the staff numbers read on the database, role by role (S-22, T-87, T-287)', () => {
   const allowed = ['owner', 'admin', "the Otters' coach", "the Otters' captain"];
   const notAllowed = [
     'visitor',
     'member with no role',
-    "the Herons' coach",
+    "the other league's Otters' coach",
     'an admin of one program',
     'a registrar',
     'an editor',
@@ -244,15 +276,37 @@ describe('the staff numbers read on the database, role by role (S-22, T-87, T-28
       }
     }
     // A team with nothing kept back: the very same answer, the owner's too.
-    expect(
-      await ask('owner', { page: 'team', season: facts.seasonId, team: facts.herons }),
-    ).toEqual(nothingMore);
+    expect(await ask('owner', { page: 'team', season: facts.seasonId, team: facts.pines })).toEqual(
+      nothingMore,
+    );
   });
 
-  it("never sends another team's hidden players with a team's page", async () => {
-    // The Herons' page asked by the Otters' coach: nothing, so not the Otters' either.
-    expect(
-      await ask("the Otters' coach", { page: 'team', season: facts.seasonId, team: facts.herons }),
-    ).toEqual(nothingMore);
+  it("gives each of two hidden teams' coaches their own players and not one of the other's", async () => {
+    const both = [
+      { coach: "the Otters' coach", own: facts.otters, mine: ottersPlayer, theirs: facts.herons },
+      { coach: "the Herons' coach", own: facts.herons, mine: heronsPlayer, theirs: facts.otters },
+    ];
+    // The owner sees both teams' players on the game: each check below can bite.
+    const owners = JSON.stringify(await ask('owner', questions().game));
+    expect(owners).toContain(ottersPlayer);
+    expect(owners).toContain(heronsPlayer);
+    for (const { coach, own, mine, theirs } of both) {
+      const other = mine === ottersPlayer ? heronsPlayer : ottersPlayer;
+      const pages = {
+        stats: questions().stats,
+        'own team': { page: 'team', season: facts.seasonId, team: own },
+        'their game (box score and plays)': questions().game,
+      };
+      for (const [page, question] of Object.entries(pages)) {
+        const text = JSON.stringify(await ask(coach, question));
+        expect(text, `${coach} ${page}`).toContain(mine);
+        expect(text, `${coach} ${page}`).not.toContain(other);
+      }
+      // The other team's page: nothing at all.
+      expect(
+        await ask(coach, { page: 'team', season: facts.seasonId, team: theirs }),
+        `${coach} other team`,
+      ).toEqual(nothingMore);
+    }
   });
 });

@@ -93,8 +93,6 @@ const seeNothingMore: readonly Person[] = [
 const text = (answer: unknown) => JSON.stringify(answer);
 /** The Owls' players, as the adult league shows them (stand-in-world-seed.ts). */
 const owlsPlayer = /Jordan Castellanos|Imani Brooks/;
-/** The Bears' players. */
-const bearsPlayer = /Bearsley/;
 
 describe('the staff numbers read of a public page (S-22, T-87, T-95)', () => {
   it("gives the Owls' coach the statistics with the Owls' players, and says they are not public", async () => {
@@ -108,8 +106,10 @@ describe('the staff numbers read of a public page (S-22, T-87, T-95)', () => {
       text: "The players' numbers of Owls are shown only to the team's staff and the league's admins. Visitors see the team's totals only, so please keep these to yourself.",
     });
     expect(text(answer)).toMatch(owlsPlayer);
-    // Their own team only: the Bears' players stay out, and no note says the Owls' are hidden.
-    expect(text(answer)).not.toMatch(bearsPlayer);
+    // No note says the Owls' are hidden. "Their own team only" cannot bite here: the stand-in
+    // Bears have no player line, and giving them one changes pinned answers across the
+    // stand-in's tests. It is proved on the made-up database instead, where two staff-only
+    // teams that played each other both have lines (database-staff-numbers.test.ts).
     expect(text(answer)).not.toContain('Only team totals are shown for Owls');
   });
 

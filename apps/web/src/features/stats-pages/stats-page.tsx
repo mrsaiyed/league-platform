@@ -2,6 +2,7 @@ import { leagueUrl } from '@srleagues/core';
 import { EmptyPanel, FilterToolbar, OptionPicker, PageHead } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -24,6 +25,26 @@ export function StatsTables({
   readonly scheduleHref?: string;
 }) {
   return <StatsTablesDrawn view={statsTablesView(data, scheduleHref)} />;
+}
+
+/**
+ * The tables, and the signed-in request for the players they leave out. A team whose
+ * players' numbers are kept from the public, and that has totals to show, is named on the
+ * page already: only then can someone see more, and only then does the page ask, after it
+ * has arrived, as whoever is signed in here (step 2.46, T-95). A hidden team with nothing
+ * recorded sets up no request, so the page tells a visitor nothing of it.
+ */
+export function StatsTablesPart({
+  data,
+  staffAddress,
+  children,
+}: {
+  readonly data: Pick<StatsPageData, 'totalsNoteTeams'>;
+  readonly staffAddress: string;
+  readonly children: ReactNode;
+}) {
+  if (data.totalsNoteTeams.length === 0) return children;
+  return <StaffStatsTables address={staffAddress}>{children}</StaffStatsTables>;
 }
 
 /** `/{league}/stats`: leaders with the league's minimum games and the full sortable tables, following each team's statistics setting. */
@@ -83,18 +104,12 @@ export async function StatsPage({
               keep={asked === undefined || asked === '' ? {} : { season: asked }}
             />
           </FilterToolbar>
-          {/* A team whose players' numbers are kept from the public is named on the page
-              already: only then can someone see more, and only then does the page ask, after
-              it has arrived, as whoever is signed in here (step 2.46, T-95). */}
-          {data.totalsOnlyTeams.length > 0 ? (
-            <StaffStatsTables
-              address={staffNumbersAddress(addressee, { page: 'stats', season: season.id, by })}
-            >
-              {tables}
-            </StaffStatsTables>
-          ) : (
-            tables
-          )}
+          <StatsTablesPart
+            data={data}
+            staffAddress={staffNumbersAddress(addressee, { page: 'stats', season: season.id, by })}
+          >
+            {tables}
+          </StatsTablesPart>
         </>
       )}
     </main>

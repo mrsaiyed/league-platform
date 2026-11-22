@@ -49,3 +49,4 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.95: the health address does not name the running version (Render's Events list shows it)
 
 - 2.95: an empty answer at the password prompt for a database on this computer signs in silently with PGPASSWORD or .pgpass (release.mjs about line 111); a permission error while counting live games says 'what was applied is in the migration log' when nothing was applied (about line 152)
+- 2.46: `staff-numbers-endpoint.ts:154` `.catch(() => null)` turns a failed read into the plain "nothing more" answer and tells an operator nothing: log an error code only, nothing from the request
