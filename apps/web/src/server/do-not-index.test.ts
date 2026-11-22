@@ -12,8 +12,11 @@ vi.mock('./config.ts', () => ({
     return { APP_ENV: settings.APP_ENV, PUBLIC_BASE_URL: 'https://leagues.example.test' };
   },
   isBuildPhase: () => false,
+  isDevelopmentServer: () => false,
 }));
 const webPorts = vi.fn();
+// The proxy reads the started bot check's widget for the page's script policy; no check here.
+const botCheck = { widget: { kind: 'off', field: 'cf-turnstile-response' } } as const;
 vi.mock('./container.ts', () => ({ webPorts }));
 
 const { doNotIndex, marksDoNotIndex, keepOutRobots } = await import('./do-not-index.ts');
@@ -23,7 +26,7 @@ const { GET: robots } = await import('../app/robots.txt/route.ts');
 
 beforeEach(() => {
   webPorts.mockReset();
-  webPorts.mockResolvedValue({ answers: () => true });
+  webPorts.mockResolvedValue({ answers: () => true, botCheck });
 });
 
 describe('do not index', () => {
@@ -53,7 +56,7 @@ describe('do not index', () => {
       const api = await proxy(new NextRequest('https://leagues.example.test/api/v1/health'));
       expect(api.headers.get('x-robots-tag')).toBe(marked ? 'noindex' : null);
       // The proxy's own plain page, for a request it does not answer, carries it too.
-      webPorts.mockResolvedValue({ answers: () => false });
+      webPorts.mockResolvedValue({ answers: () => false, botCheck });
       const refused = await proxy(new NextRequest('https://leagues.example.test/lakeside'));
       expect(refused.status).toBe(421);
       expect(refused.headers.get('x-robots-tag')).toBe(marked ? 'noindex' : null);
