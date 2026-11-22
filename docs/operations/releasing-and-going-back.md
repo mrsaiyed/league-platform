@@ -51,7 +51,7 @@ What you see, in order:
 
 If instead it says **"A change could not be applied … Do NOT deploy"**: do not touch Render. That one change was undone; the ones before it stay, and the version running now keeps working with them (every change must leave the previous version working, T-49). Tell the lead: the fix is a new commit and a new release.
 
-If it says **"The web app cannot start" or any other refusal before the "Where" line**, nothing was opened. Its sentence says which setting to fix.
+If it stops **before the "Where" line**, nothing was changed. Its sentence ends "Nothing was opened." or starts "Nothing was applied:", and says what to fix, for example: "Nothing was applied: the database refused the password or login: check the migration login’s name in MIGRATION_DATABASE_URL and the password you typed, then run the release again." It never prints the address or the password.
 
 Run it a second time if you like: it applies nothing and names the same commit. That is how you check where the database stands.
 

@@ -12,8 +12,10 @@
 // IPv6 only on the free plan) or the pooler in session mode (port 5432 on the pooler's
 // host), which also answers over IPv4 (to confirm on the test copy).
 //
-// The release always checks the certificate ('verify', with PLATFORM_DATABASE_CA as
-// `ca`, step 2.203); 'no-verify' and 'off' are never its choice. Tested against PGlite
+// The release checks the certificate of a database anywhere else ('verify', with
+// PLATFORM_DATABASE_CA as `ca`, step 2.203); 'off' (no encryption) is its choice only for
+// a database on this computer given no certificate (scripts/release-source.mjs), as the
+// web app allows there, and 'no-verify' is never its choice. Tested against PGlite
 // over a local socket and PostgreSQL 16 on this computer (tests/real-postgres); not yet
 // run against the hosted test copy (the supervised session's step 6, audit 2.110).
 import pg from 'pg';
