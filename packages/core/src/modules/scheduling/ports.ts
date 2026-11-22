@@ -151,11 +151,15 @@ export type SchedulingStore = {
   ) => Promise<readonly GameFacts[]>;
   /** How many people are on the current rosters of these teams of the season (each counted once). */
   readonly countPeopleOnTeams: (seasonId: string, teamIds: readonly string[]) => Promise<number>;
-  /** Creates the games (and the season's regular stage if it has none yet); divisions follow the teams. */
+  /**
+   * Creates the games (and the season's regular stage if it has none yet); divisions follow
+   * the teams. How many were made: a game whose id any game has already, in this league or
+   * another (ids are the database's own across leagues), is not made, so the caller refuses.
+   */
   readonly insertPublishedGames: (
     seasonId: string,
     games: readonly NewPublishedGame[],
-  ) => Promise<void>;
+  ) => Promise<number>;
   /** Changes a game that has not started; false if it is not there, is in the bin or has started. */
   readonly updatePublishedGame: (
     seasonId: string,

@@ -496,6 +496,20 @@ const adminPages = [
     league: 'north-valley',
     steps: (page) => undoSteps(page, 'schedule-game-removed'),
   },
+  // Step 2.185, in the first made-up league's current season, by the owner's own taps
+  // (draftPutBackSteps): a published game removed and another moved, the removed one still
+  // in its place, struck through, with "Removed in this draft" and "Put it back"; and a
+  // game removed and put back, the draft then "the same as the published schedule" with
+  // "Discard the draft" beside it. The draft is discarded again once the page is drawn.
+  ...[
+    { name: 'admin-schedule-removed-stays', then: 'move' },
+    { name: 'admin-schedule-draft-same', then: 'put-back' },
+  ].map(({ name, then }) => ({
+    name,
+    at: '/admin/schedule',
+    league: 'north-valley',
+    steps: (page) => draftPutBackSteps(page, then),
+  })),
   // Step 2.181, in the first made-up league's current season, by the owner's own taps
   // (emptiedRoundSteps): both games of the last round removed from the draft, the round's
   // controls opened ("0 games" and whether it can be removed), and then "Remove this
@@ -591,6 +605,56 @@ const scheduler = { name: 'srl_session', value: 'local-scheduler-token' };
 const schedulerPages = [
   { name: 'scheduler-admin-home', at: '/admin' },
   { name: 'scheduler-admin-refused', at: '/admin/teams' },
+];
+// A refusal as each kind of person meets it (step 2.157): staff outside their role (a
+// scheduler and a scorekeeper at People), a coach and a signed-in stranger at the admin,
+// a signed-in stranger at a draft league's admin ("Page not found", nothing of the league),
+// a long address (a visitor at an admin area is sent to sign in since U-15 changed, so has
+// no picture here), another league's game under this league's address (on the
+// scoring page and in the admin), and a club admin's team page, which may not show the
+// league's list of people. `who` is the made-up person's cookie; null is a visitor.
+const otherLeaguesGame = '01900000-0000-7000-8000-006a00000002';
+const refusalPages = [
+  {
+    name: 'refusal-scheduler-people',
+    who: 'local-scheduler-token',
+    at: '/north-valley/admin/people',
+  },
+  {
+    name: 'refusal-scorekeeper-people',
+    who: 'local-scorekeeper-token',
+    at: '/north-valley/admin/people',
+  },
+  { name: 'refusal-coach-admin', who: 'local-coach-token', at: '/north-valley/admin' },
+  { name: 'refusal-stranger-admin', who: 'local-stranger-token', at: '/north-valley/admin' },
+  { name: 'refusal-stranger-draft-admin', who: 'local-stranger-token', at: '/quiet-pines/admin' },
+  // A scheduler signed in with a long address (52 letters): it breaks inside the card, in
+  // the admin's frame and on the plain screen.
+  {
+    name: 'refusal-long-address-people',
+    who: 'local-scheduler-with-long-address-token',
+    at: '/north-valley/admin/people',
+  },
+  {
+    name: 'refusal-long-address-plain',
+    who: 'local-scheduler-with-long-address-token',
+    at: '/harbor-city/admin',
+  },
+  {
+    name: 'refusal-other-leagues-game',
+    who: 'local-owner-token',
+    at: `/harbor-city/score/${otherLeaguesGame}`,
+  },
+  {
+    name: 'refusal-other-leagues-box-score',
+    who: 'local-owner-token',
+    at: `/harbor-city/admin/games/${otherLeaguesGame}`,
+  },
+  {
+    name: 'refusal-club-admin-team',
+    who: 'local-club-admin-token',
+    at: '/quiet-pines/admin/teams/01900000-0000-7000-8000-007e00000004',
+  },
 ];
 // The games list's taps (step 2.155): a game's place on the list, its boxes opened, and a
 // score typed and saved, which only asks.
@@ -1201,7 +1265,10 @@ async function undoSteps(page, what) {
       .locator('li[data-game]', { has: page.locator('summary', { hasText: 'Edit this game' }) })
       .first();
     await game.locator('summary', { hasText: 'Edit this game' }).click();
-    await tapTo(game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+    await tapTo(
+      game.getByRole('button', { name: 'Remove game' }),
+      /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
+    );
     return;
   }
   if (what === 'team-put-back-no-number') {
@@ -1286,12 +1353,65 @@ async function winterSteps(page, want, then) {
  * draft is discarded from a second page, so the pictures after these find the season as
  * the seed has it (the drawn page does not change: it has no scripts).
  */
+/**
+ * Step 2.185's pictures, by taps with scripts off: any draft discarded first; the first
+ * game that can be edited removed; then either the next one moved by half an hour, or the
+ * removed one put back from the grid. A second page discards the draft afterwards, as
+ * emptiedRoundSteps does, so the pictures after these find the season as the seed has it.
+ */
+async function draftPutBackSteps(page, then) {
+  const answered = /\/admin\/schedule(\?[^#]*)?#(saved|game-[\w-]+)$/;
+  const tapTo = async (on, locator, url) => {
+    await Promise.all([on.waitForEvent('load'), locator.click()]);
+    if (!url.test(on.url())) throw new Error(`a step landed on ${on.url()}, not ${url}`);
+  };
+  const discard = async (on) => {
+    // A draft that changes nothing is discarded in one tap (step 2.185).
+    const same = on.locator('[data-discard-same] button').first();
+    if ((await same.count()) > 0) return tapTo(on, same, /done=discarded/);
+    const box = on.locator('details', {
+      has: on.locator('button', { hasText: 'Discard all draft changes' }),
+    });
+    if ((await box.count()) === 0) return;
+    await box.locator('summary').click();
+    await tapTo(on, box.locator('button'), /done=discarded/);
+  };
+  await discard(page);
+  const editable = page.locator('li[data-game]', {
+    has: page.locator('summary', { hasText: 'Edit this game' }),
+  });
+  const first = editable.first();
+  const gameId = await first.getAttribute('data-game');
+  await first.locator('summary', { hasText: 'Edit this game' }).click();
+  await tapTo(page, first.getByRole('button', { name: 'Remove game' }), answered);
+  if (then === 'move') {
+    const next = editable.first();
+    await next.locator('summary', { hasText: 'Edit this game' }).click();
+    await next.locator('input[name=time]').fill('21:30');
+    await tapTo(page, next.getByRole('button', { name: 'Save game' }), /saved=game-saved/);
+  } else {
+    const struck = page.locator(`li[data-removed-game="${gameId}"]`);
+    await tapTo(page, struck.getByRole('button', { name: 'Put it back' }), answered);
+    await page.goto(page.url().replace(/#.*$/, ''));
+  }
+  const other = await page.context().newPage();
+  try {
+    await other.goto(page.url().replace(/\?.*$/, ''));
+    await discard(other);
+  } finally {
+    await other.close();
+  }
+}
+
 async function emptiedRoundSteps(page, remove) {
   const tapTo = async (on, locator, url) => {
     await Promise.all([on.waitForEvent('load'), locator.click()]);
     if (!url.test(on.url())) throw new Error(`a step landed on ${on.url()}, not ${url}`);
   };
   const discard = async (on) => {
+    // A draft that changes nothing is discarded in one tap (step 2.185).
+    const same = on.locator('[data-discard-same] button').first();
+    if ((await same.count()) > 0) return tapTo(on, same, /done=discarded/);
     const box = on.locator('details', {
       has: on.locator('button', { hasText: 'Discard all draft changes' }),
     });
@@ -1307,7 +1427,11 @@ async function emptiedRoundSteps(page, remove) {
   while ((await games.count()) > 0) {
     const game = games.first();
     await game.locator('summary', { hasText: 'Edit this game' }).click();
-    await tapTo(page, game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+    await tapTo(
+      page,
+      game.getByRole('button', { name: 'Remove game' }),
+      /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
+    );
   }
   await last.locator('summary', { hasText: 'Change or remove this round' }).click();
   if (remove) {
@@ -1473,6 +1597,16 @@ try {
     await keeper.addCookies([{ ...scorekeeper, url: origin }]);
     const planner = await browser.newContext({ viewport: width.viewport });
     await planner.addCookies([{ ...scheduler, url: origin }]);
+    // One browser for each person a refusal is pictured for (step 2.157).
+    const refused = new Map();
+    for (const page of design === '' ? refusalPages.filter((p) => wanted(p.name)) : []) {
+      if (refused.has(page.who)) continue;
+      const context = await browser.newContext({ viewport: width.viewport });
+      if (page.who !== null) {
+        await context.addCookies([{ name: 'srl_session', value: page.who, url: origin }]);
+      }
+      refused.set(page.who, context);
+    }
     const jobs = [
       ...(design === '' ? platformPages : []).map((page) => ({
         ...page,
@@ -1537,6 +1671,9 @@ try {
         context: planner,
         base: `/${leagues[0]}`,
       })),
+      ...(design === '' ? refusalPages : [])
+        .filter((page) => refused.has(page.who))
+        .map((page) => ({ ...page, context: refused.get(page.who), base: '' })),
       ...(design === '' ? draftPages : []).map((page) => ({
         ...page,
         name: `${draftLeague}-${page.name}`,
@@ -1644,6 +1781,7 @@ try {
     await staffTapping.close();
     await keeper.close();
     await planner.close();
+    for (const context of refused.values()) await context.close();
   }
   // A game won in overtime (`--only=overtime`): scored now, after every other picture.
   {

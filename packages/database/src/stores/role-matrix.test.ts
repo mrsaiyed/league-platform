@@ -101,6 +101,7 @@ import {
   previewSeasonRules,
   publishSchedule,
   publishSiteDesign,
+  putBackDraftGame,
   putBackOnRoster,
   putGameBack,
   readReopenOffer,
@@ -697,6 +698,20 @@ async function draftMovingFirstGame(
   return draft.id;
 }
 
+/** A draft on the season (before any publication) that removes its first game; its id. */
+async function draftRemovingFirstGame(
+  s: Awaited<ReturnType<typeof scheduleIn>>,
+  league: League,
+): Promise<string> {
+  const changes = { version: 1, changes: [{ kind: 'remove-game', gameId: s.first }] };
+  const draft = await one<{ id: string }>(
+    pglite,
+    'insert into schedule_drafts (league_id, season_id, changes) values ($1, $2, $3::jsonb) returning id',
+    [league.leagueId, s.seasonId, JSON.stringify(changes)],
+  );
+  return draft.id;
+}
+
 const firstEdit = (s: { seasonId: string }) => ({
   seasonId: s.seasonId,
   basedOnRevision: null,
@@ -752,6 +767,18 @@ const scheduleDraftRows: readonly Row[] = [
     'schedule.edit',
     (s) => ({ ...firstEdit(s), gameId: s.first }),
     (c, i) => removeDraftGame(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.put_back_draft_game',
+    'put a removed game back in the draft',
+    'schedule.edit',
+    async (s, league) => ({
+      ...firstEdit(s),
+      draftId: await draftRemovingFirstGame(s, league),
+      version: 1,
+      gameId: s.first,
+    }),
+    (c, i) => putBackDraftGame(c, i, schedulingDeps),
   ),
   ...scheduleRows(
     'scheduling.rename_draft_round',

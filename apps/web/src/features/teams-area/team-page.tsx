@@ -15,7 +15,7 @@ import { PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
-import { loadLeaguePage } from '../../server/load-league-page.ts';
+import { holdsHere, loadLeaguePage } from '../../server/load-league-page.ts';
 import { StaffField, StaffNotice, StaffTrail } from '../staff/index.ts';
 import { leagueDayText } from '../../server/game-when.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
@@ -111,8 +111,15 @@ export async function TeamPage({
   const leagueList = people.ok
     ? { ids: new Set(everyone.map((person) => person.id)), complete: everyone.length < peopleShown }
     : undefined;
-  // A read that fails is shown as such, never as an empty roster or list.
-  const readFailed = !roster.ok || !people.ok;
+  // A role that may not read the league's list of people (a club admin) is told so, in
+  // calm words; a read that fails is shown as such, never as an empty roster or list.
+  const peopleNotAllowed = !people.ok && people.error.code === 'not-allowed';
+  // No form that could only be refused (step 2.157): someone whose role may not add a
+  // person to the league (a club admin) is not offered "Someone not in the list yet", and
+  // when they can neither choose nor add anyone, the head's "Add a player" is not drawn.
+  const mayAddPeople = await holdsHere('people.manage');
+  const mayAddPlayer = mayAddPeople || !peopleNotAllowed;
+  const readFailed = !roster.ok || (!people.ok && !peopleNotAllowed);
   const onRoster = new Set(open.map((line) => line.personId));
   const available = everyone.filter((person) => !onRoster.has(person.id));
   const listUrl = leagueUrl(here, 'admin-area', { area: 'teams' });
@@ -143,9 +150,11 @@ export async function TeamPage({
           the page is for, and its main action at the top right (step 2.103). */}
       <StaffTrail steps={[{ href: listUrl, label: t('admin.area.teams') }]} here={team.name} />
       <PageHead title={team.name} sub={t('adminTeams.team.sub')} lead={<Swatch team={team} />}>
-        <a className="ui-button" data-kind="main" data-icon="plus" href={`#${addPlayerAnchor}`}>
-          {t('adminTeams.add.title')}
-        </a>
+        {mayAddPlayer ? (
+          <a className="ui-button" data-kind="main" data-icon="plus" href={`#${addPlayerAnchor}`}>
+            {t('adminTeams.add.title')}
+          </a>
+        ) : null}
       </PageHead>
       <Notice
         query={query}
@@ -322,6 +331,8 @@ export async function TeamPage({
       <Section title={t('adminTeams.add.title')} id={addPlayerAnchor}>
         {readFailed ? (
           <StaffNotice kind="refused">{t('adminTeams.add.readFailed')}</StaffNotice>
+        ) : peopleNotAllowed ? (
+          <p className="staff-quiet">{t('adminTeams.add.notAllowed')}</p>
         ) : available.length === 0 ? (
           <p className="staff-quiet">{t('adminTeams.add.noOne')}</p>
         ) : (
@@ -352,34 +363,40 @@ export async function TeamPage({
         )}
       </Section>
 
-      <Section title={t('adminTeams.newPerson.title')}>
-        <form action={addNewPersonAction} className="staff-form">
-          <LeagueField league={here.slug} />
-          <input type="hidden" name="team" value={team.id} />
-          <TextField
-            name="firstName"
-            label={t('adminTeams.newPerson.firstName')}
-            required
-            maxLength={100}
-          />
-          <TextField
-            name="lastName"
-            label={t('adminTeams.newPerson.lastName')}
-            required
-            maxLength={100}
-          />
-          <NumberAndRole />
-          <p className="staff-buttons">
-            <button type="submit" className="ui-button">
-              {t('adminTeams.newPerson.submit')}
-            </button>
-          </p>
-        </form>
-      </Section>
+      {mayAddPeople ? (
+        <Section title={t('adminTeams.newPerson.title')}>
+          <form action={addNewPersonAction} className="staff-form">
+            <LeagueField league={here.slug} />
+            <input type="hidden" name="team" value={team.id} />
+            <TextField
+              name="firstName"
+              label={t('adminTeams.newPerson.firstName')}
+              required
+              maxLength={100}
+            />
+            <TextField
+              name="lastName"
+              label={t('adminTeams.newPerson.lastName')}
+              required
+              maxLength={100}
+            />
+            <NumberAndRole />
+            <p className="staff-buttons">
+              <button type="submit" className="ui-button">
+                {t('adminTeams.newPerson.submit')}
+              </button>
+            </p>
+          </form>
+        </Section>
+      ) : null}
 
       <Section title={t('adminTeams.people.title')}>
-        <p className="staff-quiet">{t('adminTeams.people.body')}</p>
-        {people.ok ? null : (
+        {peopleNotAllowed ? (
+          <p className="staff-quiet">{t('adminTeams.people.notAllowed')}</p>
+        ) : (
+          <p className="staff-quiet">{t('adminTeams.people.body')}</p>
+        )}
+        {people.ok || peopleNotAllowed ? null : (
           <StaffNotice kind="refused">{t('adminTeams.people.readFailed')}</StaffNotice>
         )}
         <ul className="staff-rows admin-people">

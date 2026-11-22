@@ -10,7 +10,11 @@ import { maySeeSchedule } from '../policy.ts';
 import type { GameInRound, SchedulingTx } from '../ports.ts';
 import { undatedGamesIn } from '../round-use.ts';
 import { applyDraft, type ApplyDraftResult } from '../rules/apply-draft.ts';
-import { summarizePublish, type PublishSummary } from '../rules/summarize-publish.ts';
+import {
+  publishChangeCount,
+  summarizePublish,
+  type PublishSummary,
+} from '../rules/summarize-publish.ts';
 
 export type ScheduleDraftView = {
   readonly latestRevision: number | null;
@@ -20,7 +24,12 @@ export type ScheduleDraftView = {
     readonly basedOnRevision: number | null;
     /** A revision was published since the draft was started: it must be discarded. */
     readonly outOfDate: boolean;
-    readonly changeCount: number;
+    /**
+     * How many edits the draft holds, as saved: not what publishing would change (a game
+     * removed and put back is two edits and no change). The screen never shows it; it
+     * shows `toPublish`.
+     */
+    readonly savedEdits: number;
   } | null;
   readonly published: ApplyDraftResult['state'];
   /** The published schedule with the draft's changes applied (the published one if no draft). */
@@ -35,6 +44,11 @@ export type ScheduleDraftView = {
    */
   readonly undated: readonly GameInRound[];
   readonly summary: PublishSummary;
+  /**
+   * How many things publishing would change (publishChangeCount of the summary, as the
+   * preview counts them): 0 with no draft, or with one that changes nothing (step 2.185).
+   */
+  readonly toPublish: number;
 };
 
 export type GetScheduleDraftError = { readonly code: 'season-not-found' | 'draft-unreadable' };
@@ -55,6 +69,7 @@ export const getScheduleDraft = defineCommand({
     const document = draft === undefined ? undefined : parseDraftDocument(draft.changes);
     if (draft !== undefined && document === undefined) return fail({ code: 'draft-unreadable' });
     const applied = applyDraft(published, document?.changes ?? [], []);
+    const summary = summarizePublish(published, applied.state);
     return ok({
       latestRevision,
       draft:
@@ -65,7 +80,7 @@ export const getScheduleDraft = defineCommand({
               version: draft.version,
               basedOnRevision: draft.basedOnRevision,
               outOfDate: draft.basedOnRevision !== latestRevision,
-              changeCount: document.changes.length,
+              savedEdits: document.changes.length,
             },
       published,
       result: applied.state,
@@ -78,7 +93,8 @@ export const getScheduleDraft = defineCommand({
         applied.state.rounds.map((r) => r.id),
         published,
       ),
-      summary: summarizePublish(published, applied.state),
+      summary,
+      toPublish: publishChangeCount(summary),
     });
   },
 });

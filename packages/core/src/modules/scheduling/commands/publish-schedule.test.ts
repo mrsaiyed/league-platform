@@ -209,6 +209,20 @@ describe('publishing the schedule', () => {
     });
   });
 
+  it("refuses in words, changing nothing, an added game whose id another league's game has (step 2.185)", async () => {
+    // The plan cannot see another league's games; only making the game finds the id taken.
+    const { db, deps, as } = world([{ kind: 'add-game', game: game(9) }], {
+      takenElsewhere: [gameUuid(9)],
+    });
+    expect(await publishSchedule(as(ownerId), input, deps)).toEqual({
+      ok: false,
+      error: { code: 'game-id-taken' },
+    });
+    expect(db.state.inserted).toEqual([]);
+    expect(db.state.draft).toBeDefined();
+    expect(db.state.latestRevision).toBe(1);
+  });
+
   it('refuses games with no time, a team, venue or court that is gone', async () => {
     const noTime = world([{ kind: 'add-game', game: game(9, { time: null }) }]);
     expect(await publishSchedule(noTime.as(ownerId), input, noTime.deps)).toMatchObject({
