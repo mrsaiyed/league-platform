@@ -195,6 +195,8 @@ export const enTracker = {
   'tracker.keptList.againLabel': 'Enter again: {play}',
   'tracker.keptList.againRefused':
     'That play was not entered again: the game as it stands now does not take it. Enter it by hand if it is still needed.',
+  'tracker.keptList.againNotTakenOff':
+    'That play was entered again, but it could not be taken off this list. Tapping Enter again once more will not enter it twice.',
   // Cleared only by this deliberate tap: the scorekeeper has seen the list.
   'tracker.keptList.clear': 'I have seen these: clear the list',
   'tracker.keptList.readAloud':

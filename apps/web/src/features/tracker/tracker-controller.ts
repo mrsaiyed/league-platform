@@ -57,6 +57,7 @@ import {
   type TrackerCommand,
 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
+import { againCommandId } from './again-command-id.ts';
 import type { CommandTransport } from './command-transport.ts';
 import type { GameDoors } from './game-doors.ts';
 import { mayEnterAgain } from './kept-plays.ts';
@@ -193,7 +194,12 @@ export type TapResult =
 export type EnterAgainResult =
   | TapResult
   /** No such play on either list, or one that is not entered again (the clock, Undo…). */
-  | { readonly ok: false; readonly reason: 'not-kept' };
+  | { readonly ok: false; readonly reason: 'not-kept' }
+  /**
+   * Entered again, but it could not be taken off its list (the storage failed): it
+   * is still listed, and entering it again once more does not record it twice.
+   */
+  | { readonly ok: false; readonly reason: 'not-taken-off' };
 
 export type TakeOverResult =
   | { readonly ok: true }
@@ -1315,6 +1321,75 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
             : 'rejected',
     }) as const;
 
+  /** A tap, recorded under `commandId` (a new ID, or a play entered again: `againCommandId`). */
+  const tapWith = (input: TapInput, commandId: string): Promise<TapResult> =>
+    serially(async (): Promise<TapResult> => {
+      const game = current.game;
+      if (current.mode.kind !== 'scoring' || game === null || base === null || throughDoor) {
+        return { ok: false, reason: 'not-scoring' };
+      }
+      const command: TrackerCommand = { commandId, at: serverNow(), input };
+      let next: basketball.GameState;
+      try {
+        next = basketball.apply(game, input, { id: command.commandId, now: command.at });
+      } catch (thrown) {
+        if (thrown instanceof basketball.TrackerError) {
+          return { ok: false, reason: 'engine', message: thrown.message };
+        }
+        throw thrown;
+      }
+      const under = sessionId;
+      // Where in the game it was made, kept beside it (finding I).
+      const moment = momentIn(game, command.at);
+      try {
+        await queue.enqueue(command, moment);
+      } catch (thrown) {
+        const code = thrown instanceof QueueError ? thrown.code : 'storage-write-failed';
+        return { ok: false, reason: 'storage', code };
+      }
+      // The game may have been lost while the tap was being stored: then it is not
+      // shown but listed as not saved and set aside, so it is never lost silently.
+      // (Read-only for a reason that keeps the waiting taps, it is kept like them.)
+      // Read afresh: it may have changed while the tap was stored.
+      const mode = modeNow();
+      const keptLikeTheRest = mode.kind === 'read-only' && !losesTheGame(mode.reason, true);
+      const isListed = () =>
+        current.notSaved.some((t) => t.command.commandId === command.commandId);
+      const moved = mode.kind !== 'scoring' || sessionId !== under;
+      if (isListed() || (moved && !keptLikeTheRest)) {
+        if (!isListed()) {
+          // It may have gone out, and been taken, before the game was lost: wait for
+          // that answer, and list it only if the storage still holds it waiting
+          // (finding L1). If the storage cannot be read, it is listed: never lost silently.
+          await queue.idle();
+          const still = await storage.list(gameId).then(
+            (list) => list.find((e) => e.command.commandId === command.commandId)?.state,
+            () => 'waiting' as const,
+          );
+          // Taken by the server: saved. Shown on the game unless the server's state it
+          // was rebuilt on already has it (the reload after the loss may have gone
+          // unanswered): the game shown is never short of a saved play.
+          if (still === undefined) {
+            const id = command.commandId.toLowerCase();
+            const inBase = base?.state.recent.some((r) => r.toLowerCase() === id) ?? false;
+            if (!inBase && !made.some((c) => c.commandId === command.commandId)) {
+              made.push(command);
+              showGame();
+            }
+            return { ok: true, commandId: command.commandId };
+          }
+          if (still === 'waiting' && !isListed()) {
+            listNotSaved(withTaps(current.notSaved, [{ command, moment }]));
+          }
+        }
+        await queue.setAside([command.commandId]).catch(() => undefined);
+        return { ok: false, reason: 'not-scoring' };
+      }
+      made.push(command);
+      update({ game: next });
+      return { ok: true, commandId: command.commandId };
+    });
+
   const controller: TrackerController = {
     async start() {
       if (stopped) return;
@@ -1322,72 +1397,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     },
 
     tap(input) {
-      return serially(async (): Promise<TapResult> => {
-        const game = current.game;
-        if (current.mode.kind !== 'scoring' || game === null || base === null || throughDoor) {
-          return { ok: false, reason: 'not-scoring' };
-        }
-        const command: TrackerCommand = { commandId: newCommandId(), at: serverNow(), input };
-        let next: basketball.GameState;
-        try {
-          next = basketball.apply(game, input, { id: command.commandId, now: command.at });
-        } catch (thrown) {
-          if (thrown instanceof basketball.TrackerError) {
-            return { ok: false, reason: 'engine', message: thrown.message };
-          }
-          throw thrown;
-        }
-        const under = sessionId;
-        // Where in the game it was made, kept beside it (finding I).
-        const moment = momentIn(game, command.at);
-        try {
-          await queue.enqueue(command, moment);
-        } catch (thrown) {
-          const code = thrown instanceof QueueError ? thrown.code : 'storage-write-failed';
-          return { ok: false, reason: 'storage', code };
-        }
-        // The game may have been lost while the tap was being stored: then it is not
-        // shown but listed as not saved and set aside, so it is never lost silently.
-        // (Read-only for a reason that keeps the waiting taps, it is kept like them.)
-        // Read afresh: it may have changed while the tap was stored.
-        const mode = modeNow();
-        const keptLikeTheRest = mode.kind === 'read-only' && !losesTheGame(mode.reason, true);
-        const isListed = () =>
-          current.notSaved.some((t) => t.command.commandId === command.commandId);
-        const moved = mode.kind !== 'scoring' || sessionId !== under;
-        if (isListed() || (moved && !keptLikeTheRest)) {
-          if (!isListed()) {
-            // It may have gone out, and been taken, before the game was lost: wait for
-            // that answer, and list it only if the storage still holds it waiting
-            // (finding L1). If the storage cannot be read, it is listed: never lost silently.
-            await queue.idle();
-            const still = await storage.list(gameId).then(
-              (list) => list.find((e) => e.command.commandId === command.commandId)?.state,
-              () => 'waiting' as const,
-            );
-            // Taken by the server: saved. Shown on the game unless the server's state it
-            // was rebuilt on already has it (the reload after the loss may have gone
-            // unanswered): the game shown is never short of a saved play.
-            if (still === undefined) {
-              const id = command.commandId.toLowerCase();
-              const inBase = base?.state.recent.some((r) => r.toLowerCase() === id) ?? false;
-              if (!inBase && !made.some((c) => c.commandId === command.commandId)) {
-                made.push(command);
-                showGame();
-              }
-              return { ok: true, commandId: command.commandId };
-            }
-            if (still === 'waiting' && !isListed()) {
-              listNotSaved(withTaps(current.notSaved, [{ command, moment }]));
-            }
-          }
-          await queue.setAside([command.commandId]).catch(() => undefined);
-          return { ok: false, reason: 'not-scoring' };
-        }
-        made.push(command);
-        update({ game: next });
-        return { ok: true, commandId: command.commandId };
-      });
+      return tapWith(input, newCommandId());
     },
 
     async takeOver() {
@@ -1582,12 +1592,27 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         return { ok: false, reason: 'not-kept' };
       }
       // A new play, now, by the same path as a tap: the same checks, and Undo takes it back.
-      const tapped = await controller.tap(kept.input);
-      if (!tapped.ok) return tapped;
-      await track(
-        notSaved === undefined ? queue.forget([commandId]) : forgetNotSaved([commandId]),
-      ).catch(() => undefined);
-      return tapped;
+      // Its ID comes from the kept play's, so it is recorded once however often this is
+      // tapped (review M1): one this device already holds, waiting or saved, is not
+      // entered again, and the server answers a second copy as a duplicate.
+      const againId = againCommandId(commandId);
+      const held =
+        made.some((c) => c.commandId === againId) ||
+        (base?.state.recent ?? []).some((id) => id.toLowerCase() === againId);
+      if (!held) {
+        const tapped = await tapWith(kept.input, againId);
+        if (!tapped.ok) return tapped;
+      }
+      try {
+        await track(
+          notSaved === undefined ? queue.forget([commandId]) : forgetNotSaved([commandId]),
+        );
+      } catch {
+        // Entered, and still listed: the scorekeeper is told; tapping again only tries
+        // to take it off the list once more.
+        return { ok: false, reason: 'not-taken-off' };
+      }
+      return { ok: true, commandId: againId };
     },
 
     async leave() {

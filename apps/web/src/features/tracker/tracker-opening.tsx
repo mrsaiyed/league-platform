@@ -30,6 +30,9 @@ import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controll
 import { showsFinalPanel, trackerNoticeText, trackerNotices } from './tracker-notice.ts';
 import { holdSignOut } from './tracker-sign-out.ts';
 
+/** Why "Enter again" did not go through, for the words shown (review M1). */
+type AgainRefusal = 'refused' | 'not-taken-off';
+
 export type TrackerOpeningProps = {
   readonly leagueId: string;
   /** The signed-in account, from the server's session: the device keeps the game under it. */
@@ -268,7 +271,7 @@ export function TrackerOpening({
     phase.status.game !== null &&
     screenOf(phase.status, phase.confirmed).kind === 'scoring';
   const [lastTapLost, setLastTapLost] = useState(false);
-  const [againRefused, setAgainRefused] = useState(false);
+  const [againRefused, setAgainRefused] = useState<AgainRefusal | null>(null);
   const wasScoring = useRef(false);
   useEffect(() => {
     if (scoringNow && !wasScoring.current) setLastTapLost(false);
@@ -319,7 +322,9 @@ export function TrackerOpening({
     onEnterAgain: (id) =>
       void act(async (game) => {
         const result = await game.controller.enterAgain(id);
-        setAgainRefused(!result.ok);
+        setAgainRefused(
+          result.ok ? null : result.reason === 'not-taken-off' ? 'not-taken-off' : 'refused',
+        );
       })(),
     againRefused,
   };
@@ -467,7 +472,7 @@ type KeptLists = {
   /** "Enter again" on one play, while this device holds the game (S-77). */
   readonly onEnterAgain: (id: string) => void;
   /** The last "Enter again" was not taken: the game as it stands does not take it. */
-  readonly againRefused: boolean;
+  readonly againRefused: AgainRefusal | null;
 };
 
 /**
@@ -548,9 +553,13 @@ function Notices({
           {trackerNoticeText(notice, t)}
         </p>
       ))}
-      {lists.againRefused ? (
-        <p className="court-notice" data-kind="error" data-again-refused="">
-          {t('tracker.keptList.againRefused')}
+      {lists.againRefused !== null ? (
+        <p className="court-notice" data-kind="error" data-again-refused={lists.againRefused}>
+          {t(
+            lists.againRefused === 'not-taken-off'
+              ? 'tracker.keptList.againNotTakenOff'
+              : 'tracker.keptList.againRefused',
+          )}
         </p>
       ) : null}
       {list(

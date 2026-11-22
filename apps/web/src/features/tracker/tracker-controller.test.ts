@@ -384,6 +384,60 @@ describe('tracker controller: another device takes over (T6 §5)', () => {
     expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 3 });
   });
 
+  it('a kept play entered again whose taking off the list fails is never recorded twice, and says so (review M1)', async () => {
+    const network = endpointNetwork();
+    const memory = createMemoryQueueStorage();
+    let failRemoving: string | null = null;
+    const storage: QueueStorage = {
+      ...memory,
+      add: (...args) => memory.add(...args),
+      list: (...args) => memory.list(...args),
+      settle: (game, settlement) =>
+        failRemoving !== null && (settlement.remove ?? []).includes(failRemoving)
+          ? Promise.reject(new Error('storage full'))
+          : memory.settle(game, settlement),
+    };
+    const tablet = device(network, { storage });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, [...tipOff]);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet.controller, [basket('home', hawks[2] ?? '')]);
+    network.mode = 'up';
+    const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    tablet.controller.online();
+    await tablet.controller.idle();
+    await laptop.controller.leave();
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    if (tablet.controller.status().mode.kind === 'held-by-other') {
+      await tablet.controller.takeOver();
+      await tablet.controller.idle();
+    }
+    const keptId = tablet.controller.status().notSaved[0]?.command.commandId ?? '';
+    expect(keptId).not.toBe('');
+    failRemoving = keptId;
+    // Entered, but still on the list: the scorekeeper is told something failed.
+    expect((await tablet.controller.enterAgain(keptId)).ok).toBe(false);
+    expect(tablet.controller.status().notSaved).toHaveLength(1);
+    await tablet.controller.idle();
+    // A second tap does not record it again.
+    expect((await tablet.controller.enterAgain(keptId)).ok).toBe(false);
+    await tablet.controller.idle();
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
+    expect(scoreOf(tablet.controller.status().game)).toEqual({ home: 2, away: 0 });
+    // Once the storage works, the next tap only takes it off the list.
+    failRemoving = null;
+    expect((await tablet.controller.enterAgain(keptId)).ok).toBe(true);
+    await tablet.controller.idle();
+    expect(tablet.controller.status().notSaved).toEqual([]);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
+  });
+
   it('enters a kept play again only once it holds the game again, as a new play (S-77)', async () => {
     const network = endpointNetwork();
     const tablet = device(network);
