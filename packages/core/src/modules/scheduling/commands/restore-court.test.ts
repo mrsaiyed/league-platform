@@ -4,6 +4,8 @@ import {
   courtUuid,
   memoryScheduling,
   ownerId,
+  schedulerGrant,
+  schedulerId,
   venue,
 } from '../memory-scheduling.test-helper.ts';
 import { restoreCourt } from './restore-court.ts';
@@ -56,5 +58,17 @@ describe('restoreCourt', () => {
     expect(await restoreCourt(as('someone'), { courtId: courtUuid(1) }, deps)).toMatchObject({
       error: { code: 'not-allowed' },
     });
+  });
+
+  it('lets the scheduler who removed it put it back (A-5, D-L6)', async () => {
+    const { db, deps, as } = memoryScheduling({
+      venues: [venue(1)],
+      courts: [court(1, 1, { binned: true })],
+      grants: [schedulerGrant],
+    });
+    expect(await restoreCourt(as(schedulerId), { courtId: courtUuid(1) }, deps)).toMatchObject({
+      ok: true,
+    });
+    expect(db.state.courts[0]?.binned).toBe(false);
   });
 });

@@ -2,6 +2,7 @@
 // every query in ../queries for them and every command of the same step. Imported by
 // isolation-cases.test-helper.ts, which registers the rest.
 import {
+  countPlaceGames,
   createCourt,
   createDivision,
   createVenue,
@@ -23,6 +24,7 @@ import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
   findCourt,
   findDivision,
+  findPlaceGames,
   findVenue,
   hasLiveCourts,
   hasLiveSubdivisions,
@@ -115,6 +117,12 @@ registerIsolationCase({
   subject: hasLiveTeams,
   name: "ask about the target's division's teams",
   run: (scope, target) => hasLiveTeams(scope, target.divisionId),
+});
+
+registerIsolationCase({
+  subject: findPlaceGames,
+  name: "count the scope's games at its venues and courts, and read its drafts",
+  run: (scope) => findPlaceGames(scope),
 });
 
 registerIsolationCase({
@@ -214,6 +222,11 @@ registerCommandCase(restoreDivision, harnessTx, {
 registerCommandCase(listDivisionsCommand, harnessTx, {
   name: "list the target's season's divisions",
   input: (target) => ({ seasonId: target.seasonId }),
+});
+
+registerCommandCase(countPlaceGames, harnessTx, {
+  name: "count the scope's games at its venues and courts",
+  input: () => ({}),
 });
 
 registerCommandCase(createVenue, harnessTx, {

@@ -6,7 +6,8 @@
 //
 // An attacker's text is typed, through the screens' own forms as a person would, into every
 // field that takes free text: a team's name, a person's first and last names, a round's name,
-// a reason to reopen a result, an imported file's name and its venue and court, a name typed
+// a reason to reopen a result, a division's name, a venue's name, address and map link and a
+// court's name (step 2.49), an imported file's name and its venue and court, a name typed
 // at the scorer's table, the email boxes, and the addresses' own questions (?season=, ?next=,
 // ?problem=). Then every page that shows them is opened as a visitor, the owner and the
 // scorekeeper, and each must show the text as text: nothing of it became a page element and
@@ -77,6 +78,14 @@ const typed = {
   // A file's name cannot hold a slash: the browser keeps only what follows the last one.
   file: `'><img src=x onerror=__ran='file' data-ran=file>.csv`,
   query: attack('query'),
+  // Step 2.49: a division's name, and a venue's name, address and map link and a court's name,
+  // typed through the Divisions and Venues screens' own forms. The map link must be a web
+  // address with no spaces, so it carries the attack with no spaces after its start.
+  division: attack('division'),
+  venueName: attack('venueName'),
+  venueAddress: attack('venueAddress'),
+  mapLink: `https://example.test/${tightAttack('mapLink')}`,
+  courtName: attack('courtName'),
   // Posted by hand into every field a plain form holds (the fix round, F3).
   posted: attack('posted'),
 };
@@ -117,6 +126,13 @@ const FIELDS = {
     contactEmail: POSTED,
   },
   '/[league]/admin/schedule': { label: 'a round is renamed' },
+  // Step 2.49: a venue's and a court's boxes share the name "name"; each is typed into.
+  '/[league]/admin/schedule/venues': {
+    name: 'a venue and its court are added',
+    address: 'a venue and its court are added',
+    mapLink: 'a venue and its court are added',
+  },
+  '/[league]/admin/season/divisions': { name: 'a division is added' },
   '/[league]/admin/games/[game]': {
     reason: 'a result is reopened',
     awayScore: 'a box score is typed',
@@ -437,6 +453,47 @@ if (browser) {
     await page.getByText(typed.round).first().waitFor();
   });
 
+  await step('a division is added with the attack as its name', async () => {
+    await page.goto(`${origin}/north-valley/admin/season/divisions`);
+    const form = page.locator('form', {
+      has: page.getByRole('button', { name: 'Add the division', exact: true }),
+    });
+    await form.locator('input[name=name]').fill(typed.division);
+    await form.getByRole('button', { name: 'Add the division', exact: true }).click();
+    await page.getByRole('heading', { name: typed.division }).first().waitFor();
+  });
+
+  await step('a venue and its court are added with the attack in every box', async () => {
+    await page.goto(`${origin}/north-valley/admin/schedule/venues`);
+    const form = page.locator('form', {
+      has: page.getByRole('button', { name: 'Add the venue', exact: true }),
+    });
+    await form.locator('input[name=name]').fill(typed.venueName);
+    await form.locator('input[name=address]').fill(typed.venueAddress);
+    await form.locator('input[name=mapLink]').fill(typed.mapLink);
+    await form.getByRole('button', { name: 'Add the venue', exact: true }).click();
+    const venue = page
+      .locator('section.admin-venue')
+      .filter({ has: page.locator('h2', { hasText: typed.venueName }) });
+    await venue.waitFor();
+    const court = venue.locator('form', {
+      has: page.getByRole('button', { name: 'Add the court', exact: true }),
+    });
+    await court.locator('input[name=name]').fill(typed.courtName);
+    await court.getByRole('button', { name: 'Add the court', exact: true }).click();
+    await venue.locator('h4', { hasText: typed.courtName }).waitFor();
+    note(
+      "the venue's map link is kept as typed, only as a link's address",
+      (await venue.locator('a[target=_blank]').first().getAttribute('href')) === typed.mapLink,
+    );
+    const found = await harm(page);
+    note(
+      'the venues screen, with the attack in every box, made no element',
+      found.made.length === 0 && found.ran === null && found.refused.length === 0,
+      [...found.made, ...found.refused].join(' | '),
+    );
+  });
+
   await step('a file whose name, venue and court are the attack is imported', async () => {
     await page.goto(`${origin}/north-valley/admin/schedule/import`);
     const file = [
@@ -583,6 +640,8 @@ if (browser) {
     ['/north-valley/admin/teams', ['team']],
     [teamAdmin, ['team', 'first', 'last']],
     ['/north-valley/admin/schedule', ['round']],
+    ['/north-valley/admin/season/divisions', ['division']],
+    ['/north-valley/admin/schedule/venues', ['venueName', 'venueAddress', 'courtName']],
     ['/north-valley/admin/games', []],
     [boxScore, []],
     // The reopened game's own page: wherever the reason would be shown, it is text.
@@ -672,7 +731,9 @@ const ROUTES = {
   '/[league]/admin/registration': () => '/north-valley/admin/registration',
   '/[league]/admin/schedule': () => '/north-valley/admin/schedule',
   '/[league]/admin/schedule/import': () => '/north-valley/admin/schedule/import',
+  '/[league]/admin/schedule/venues': () => '/north-valley/admin/schedule/venues',
   '/[league]/admin/season': () => '/north-valley/admin/season',
+  '/[league]/admin/season/divisions': () => '/north-valley/admin/season/divisions',
   '/[league]/admin/settings': () => '/north-valley/admin/settings',
   '/[league]/admin/site': () => '/north-valley/admin/site',
   '/[league]/admin/standings': () => '/north-valley/admin/standings',

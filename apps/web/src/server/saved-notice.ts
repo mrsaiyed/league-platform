@@ -17,13 +17,15 @@ export const noticeScreens = [
   'schedule',
   'people',
   'person',
+  'divisions',
+  'venues',
   'season',
 ] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 
 export type SavedNotice = {
   readonly screen: NoticeScreen;
-  /** The id of the thing saved: a game, a person (step 2.50), or a season (Season settings, step 2.47). */
+  /** The id of the thing saved: a game, a person (step 2.50), a division, a venue or a court (step 2.49), or a season (Season settings, step 2.47). */
   readonly thing: string;
   /** What was done to it, as the last part of a message key: `final`, `reopen`, a part… */
   readonly said: string;
@@ -34,9 +36,9 @@ export type SavedNotice = {
    */
   readonly about?: readonly string[];
   /**
-   * The name of the person it is about as the admin's screens write it, read from the
-   * store when it was done, never from the form: someone just put in the bin cannot be
-   * read again to be named in "Removed …" (step 2.50). Held here for one look, as the rest.
+   * The thing's name as stored, read from the store when it was done, never from the form:
+   * a person, division or court just put in the bin cannot be read again to be named in
+   * "Removed …" (steps 2.49 and 2.50). Held here for one look, as the rest.
    */
   readonly name?: string;
 };

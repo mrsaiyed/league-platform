@@ -7,11 +7,13 @@
 //     signIn, signUp
 //   activity.ts: activity
 //   admin.ts: admin
+//   admin-divisions.ts: adminDivisions
 //   admin-games.ts: admin.games, admin.boxScore, admin.myGames
 //   admin-import.ts: admin.import
 //   admin-people.ts: adminPeople
 //   admin-settings.ts: adminSettings, seasonSettings, setting
 //   admin-teams.ts: adminTeams
+//   admin-venues.ts: adminVenues
 //   error.ts: error
 //   error-scheduling.ts: error.scheduling
 //   game.ts: game, stat
@@ -26,11 +28,13 @@
 import { enAccount } from './en/account.ts';
 import { enActivity } from './en/activity.ts';
 import { enAdmin } from './en/admin.ts';
+import { enAdminDivisions } from './en/admin-divisions.ts';
 import { enAdminGames } from './en/admin-games.ts';
 import { enAdminImport } from './en/admin-import.ts';
 import { enAdminPeople } from './en/admin-people.ts';
 import { enAdminSettings } from './en/admin-settings.ts';
 import { enAdminTeams } from './en/admin-teams.ts';
+import { enAdminVenues } from './en/admin-venues.ts';
 import { enError } from './en/error.ts';
 import { enErrorScheduling } from './en/error-scheduling.ts';
 import { enGame } from './en/game.ts';
@@ -45,11 +49,13 @@ export const en = {
   ...enAccount,
   ...enActivity,
   ...enAdmin,
+  ...enAdminDivisions,
   ...enAdminGames,
   ...enAdminImport,
   ...enAdminPeople,
   ...enAdminSettings,
   ...enAdminTeams,
+  ...enAdminVenues,
   ...enError,
   ...enErrorScheduling,
   ...enGame,

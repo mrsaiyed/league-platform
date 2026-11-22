@@ -60,6 +60,7 @@ import {
   changeRosterEntry,
   clearSettingFor,
   commands,
+  countPlaceGames,
   countTeamGames,
   createCourt,
   createDivision,
@@ -1573,7 +1574,7 @@ const divisionAndVenueRows: readonly Row[] = [
   {
     command: 'scheduling.restore_venue',
     name: 'restore a venue',
-    needs: 'bin.restore',
+    needs: 'venues.manage',
     prepare: async (league) => ({
       input: { venueId: await binned('venues', await newVenue(pglite, league.leagueId)) },
     }),
@@ -1612,7 +1613,7 @@ const divisionAndVenueRows: readonly Row[] = [
   {
     command: 'scheduling.restore_court',
     name: 'restore a court',
-    needs: 'bin.restore',
+    needs: 'venues.manage',
     prepare: async (league) => {
       const venueId = await newVenue(pglite, league.leagueId);
       const courtId = await newCourt(pglite, league.leagueId, venueId);
@@ -1629,6 +1630,15 @@ const divisionAndVenueRows: readonly Row[] = [
     scope: 'program',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listVenues(c, i, schedulingDeps),
+  },
+  {
+    command: 'scheduling.count_place_games',
+    name: 'see how many games each venue and court has',
+    needs: 'venues.manage',
+    // As the venues it counts: league-shared, so a program-limited scheduler reads it too.
+    scope: 'program',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => countPlaceGames(c, i, schedulingDeps),
   },
 ];
 

@@ -49,6 +49,14 @@ test('the commands, their options, and nothing else', () => {
     port: 55001,
     files: ['tests/real-postgres/a.test.ts'],
   });
+  assert.deepEqual(readArguments(['start', '--bare', '--port', '55002']), {
+    command: 'start',
+    folder: defaultFolder,
+    port: 55002,
+    files: [],
+    bare: true,
+  });
+  assert.deepEqual(readArguments(['test', '--bare']), { problem: 'option', option: '--bare' });
   assert.deepEqual(readArguments([]), { problem: 'command' });
   assert.deepEqual(readArguments(['begin']), { problem: 'command' });
   assert.deepEqual(readArguments(['start', '--port']), { problem: 'value', option: '--port' });

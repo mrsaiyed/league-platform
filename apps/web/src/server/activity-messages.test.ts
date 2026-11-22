@@ -25,6 +25,8 @@ const reads = new Set([
   'leagues.get_season',
   'leagues.preview_season_rules',
   'scheduling.list_venues',
+  // How many games each venue and court has, for the venues screen (step 2.49): a read.
+  'scheduling.count_place_games',
   'scheduling.get_schedule_draft',
   'imports.get_fixture_import',
   'scheduling.preview_schedule_publish',
