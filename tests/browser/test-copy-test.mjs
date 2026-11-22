@@ -15,7 +15,7 @@
 // database. Every answer says "do not index": a page, an API answer, an error page, a file
 // and robots.txt, the header and the page's own mark. The local-only pages and the "be
 // this person" action answer exactly as an address that does not exist (status, body and
-// every header but the date). Then production mode with the same world: it stops after
+// every header but the date and the page’s one-time script nonce). Then production mode with the same world: it stops after
 // every check, in its sentence, and nothing answers. The server's output (at debug level)
 // holds no code, key, password, token or address.
 import { readFileSync } from 'node:fs';
@@ -84,6 +84,10 @@ const deployed = (appEnv, origin) => ({
   LOCAL_DESIGN: '',
   LOCAL_NOW: '',
   RESEND_API_KEY: appEnv === 'production' ? `made-up-resend-key-${run}` : '',
+  // Production refuses to start without the bot check's two keys (record 081); staging
+  // without them switches the check off and says so in one line. Made up, never used.
+  TURNSTILE_SITE_KEY: appEnv === 'production' ? 'made-up-site-key' : '',
+  TURNSTILE_SECRET_KEY: appEnv === 'production' ? `made-up-turnstile-secret-${run}` : '',
   DATABASE_URL: '',
 });
 
@@ -359,8 +363,15 @@ async function sameAnswer(address, unknown, init) {
       ...(typeof init === 'function' ? init() : init),
     });
     const name = where.split('/').at(-1);
-    const body = (await response.text()).replaceAll(name, '<name>');
-    const headers = [...response.headers.entries()].filter(([key]) => key !== 'date');
+    // Each answer's own script nonce (step 2.98: new for every page, in its policy, its
+    // preload links and its scripts) is put in one place too: only it may differ.
+    const policy = response.headers.get('content-security-policy') ?? '';
+    const nonce = /'nonce-([^']+)'/.exec(policy)?.[1];
+    const sameNonce = (text) => (nonce === undefined ? text : text.replaceAll(nonce, '<nonce>'));
+    const body = sameNonce(await response.text()).replaceAll(name, '<name>');
+    const headers = [...response.headers.entries()]
+      .filter(([key]) => key !== 'date')
+      .map(([key, value]) => [key, sameNonce(value)]);
     return { status: response.status, headers, ...settle(body) };
   };
   const [one, other] = [await ask(address), await ask(unknown)];
