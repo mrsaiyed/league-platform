@@ -16,8 +16,10 @@
 //    and its plays sent through the tracker's door (games.apply_tracker_commands), which
 //    ends it with the real engine's End game; any other game gets its final score
 //    (games.record_final_score). Standings follow each result through the event handlers.
-// Games called off (postponed, cancelled, forfeited, corrected) are part 2 of the step:
-// they go in at `callOffSeam` below, once a plan names them.
+//    The games a real season loses or changes (part 2) go through `callOff` below: postponed
+//    (games.postpone_game), cancelled (games.cancel_game), put back (games.put_game_back),
+//    forfeited (games.record_forfeit), reopened with a reason (games.reopen_game) and typed
+//    in again; one tracked game is level after regulation and won in overtime.
 //
 // The season is a past one, on the plan's own dates, and the whole play acts at one fixed
 // moment, the day after its last game: no command reads the system clock.
@@ -33,6 +35,7 @@ import {
   addToRoster,
   applyFixtureImport,
   applyTrackerCommands,
+  cancelGame,
   createDivision,
   createLeague,
   createPerson,
@@ -42,12 +45,16 @@ import {
   getFixtureImport,
   getScheduleDraft,
   openScoringSession,
+  postponeGame,
   publishSchedule,
   publishSiteDesign,
+  putGameBack,
   readFixtureImport,
   readFixtureSheet,
   recordFinalScore,
+  recordForfeit,
   releaseScoringSession,
+  reopenGame,
   setDraftRecording,
   setLeagueStatus,
   setSeasonRules,
@@ -88,6 +95,7 @@ import { putInRounds } from './seed-demo-league.ts';
 import {
   fixturesFileOf,
   planSimulation,
+  type CallOff,
   type PlannedGame,
   type PlannedPlay,
   type SimulationOptions,
@@ -137,9 +145,90 @@ async function accountId(pglite: PGlite, email: string, displayName: string): Pr
   return made.rows[0]!.id;
 }
 
-/** The plan's games after step 2's seam: none called off yet (part 2 of step 2.236). */
-function callOffSeam(games: readonly PlannedGame[]): readonly PlannedGame[] {
-  return games;
+/** The game as the product holds it now: its version and its two teams. */
+async function gameNow(
+  context: CommandContext,
+  gameId: string,
+  deps: CommandDeps<SimulationTx>,
+): Promise<{ version: number; homeTeamId: string; awayTeamId: string }> {
+  const found = await deps.transaction(context, (tx) => tx.games.find(gameId));
+  if (found === undefined) throw new Error(`The simulation failed: game ${gameId} is gone.`);
+  return { version: found.version, homeTeamId: found.homeTeamId, awayTeamId: found.awayTeamId };
+}
+
+/** A final score typed in, as a scorer or the admin does after the game. */
+async function finalScore(
+  context: CommandContext,
+  game: PlannedGame,
+  gameId: string,
+  score: { home: number; away: number },
+  deps: CommandDeps<SimulationTx>,
+): Promise<void> {
+  const { version } = await gameNow(context, gameId, deps);
+  must(
+    `the final score of game ${game.number}`,
+    await recordFinalScore(
+      context,
+      { gameId, version, homeScore: score.home, awayScore: score.away },
+      deps,
+    ),
+  );
+}
+
+/**
+ * A game the season loses or changes (simulate-league-plan.ts, `CallOff`), each step through
+ * the product's own command, as the league's admin: the person whose role calls games off
+ * (`games.results`) and corrects them (`games.correct`).
+ */
+async function callOff(
+  admin: CommandContext,
+  game: PlannedGame,
+  gameId: string,
+  off: CallOff,
+  deps: CommandDeps<SimulationTx>,
+): Promise<void> {
+  const step = async (
+    what: string,
+    run: (version: number) => Promise<Parameters<typeof must>[1]>,
+  ) => must(`${what} game ${game.number}`, await run((await gameNow(admin, gameId, deps)).version));
+  const planned = { home: game.homeScore, away: game.awayScore };
+  switch (off.kind) {
+    case 'postponed-then-played':
+    case 'postponed-waiting':
+      await step('postponing', (version) => postponeGame(admin, { gameId, version }, deps));
+      if (off.kind === 'postponed-waiting') return;
+      await step('putting back', (version) =>
+        putGameBack(admin, { gameId, version, reason: 'willBePlayed' }, deps),
+      );
+      return finalScore(admin, game, gameId, planned, deps);
+    case 'cancelled':
+    case 'cancelled-then-played':
+      await step('cancelling', (version) => cancelGame(admin, { gameId, version }, deps));
+      if (off.kind === 'cancelled') return;
+      await step('putting back', (version) =>
+        putGameBack(admin, { gameId, version, reason: 'cancelledByMistake' }, deps),
+      );
+      return finalScore(admin, game, gameId, planned, deps);
+    case 'forfeit': {
+      const now = await gameNow(admin, gameId, deps);
+      const forfeitingTeamId = off.forfeiting === 'home' ? now.homeTeamId : now.awayTeamId;
+      must(
+        `the forfeit of game ${game.number}`,
+        await recordForfeit(admin, { gameId, version: now.version, forfeitingTeamId }, deps),
+      );
+      return;
+    }
+    case 'corrected':
+      await finalScore(admin, game, gameId, off.first, deps);
+      await step('reopening', (version) =>
+        reopenGame(
+          admin,
+          { gameId, version, reason: 'The score was entered the wrong way round.' },
+          deps,
+        ),
+      );
+      return finalScore(admin, game, gameId, planned, deps);
+  }
 }
 
 /** Makes the plan's league and plays its season (above); `options` or a plan already made. */
@@ -199,35 +288,28 @@ export async function simulateLeagueInto(
     lap('league, divisions, teams and rosters');
     const gameIds = await schedule(pglite, plan, owner, seasonId, as(null), setUp, deps);
     lap('schedule');
-    const games = callOffSeam(plan.games);
     let tracked = 0;
     let finals = 0;
-    for (const game of games) {
+    let calledOff = 0;
+    for (const game of plan.games) {
       const gameId = gameIds.get(game.number)!;
       const started = performance.now();
-      if (game.plays === null) {
-        const version = await transaction(
-          owner,
-          async (tx) => (await tx.games.find(gameId))?.version ?? 0,
-        );
-        must(
-          `the final score of game ${game.number}`,
-          await recordFinalScore(
-            owner,
-            { gameId, version, homeScore: game.homeScore, awayScore: game.awayScore },
-            deps,
-          ),
-        );
-        finals += performance.now() - started;
-      } else {
+      if (game.plays !== null) {
         await scoreLive(pglite, plan, owner, game, gameId, deps);
         tracked += performance.now() - started;
+      } else if (game.callOff === null) {
+        await finalScore(owner, game, gameId, { home: game.homeScore, away: game.awayScore }, deps);
+        finals += performance.now() - started;
+      } else {
+        await callOff(owner, game, gameId, game.callOff, deps);
+        calledOff += performance.now() - started;
       }
     }
     lap('results');
     timings.pop();
     timings.push({ part: 'final scores', seconds: Math.round(finals) / 1000 });
     timings.push({ part: 'tracked games', seconds: Math.round(tracked) / 1000 });
+    timings.push({ part: 'called-off games', seconds: Math.round(calledOff) / 1000 });
     return { plan, leagueId, seasonId, gameIds, timings };
   } finally {
     await db.close();

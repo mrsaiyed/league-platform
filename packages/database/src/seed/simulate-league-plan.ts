@@ -79,7 +79,49 @@ export type PlannedGame = {
   readonly awayScore: number;
   /** Plays for a game scored through the tracker; null for one entered as a final score. */
   readonly plays: readonly PlannedPlay[] | null;
+  /** For a tracked game: level at the end of regulation, won in one overtime period. */
+  readonly overtime: boolean;
+  /** What a real season does to this game besides playing it (part 2); null for nothing. */
+  readonly callOff: CallOff | null;
 };
+
+/**
+ * The games a real season loses or changes, each done through the product's own command:
+ * postponed then put back on its date and played; postponed and left waiting; cancelled;
+ * cancelled then put back and played; forfeited (the league's forfeit score); and a final
+ * score first entered wrongly (`first`), reopened with a reason and corrected.
+ */
+export type CallOff =
+  | {
+      readonly kind:
+        | 'postponed-then-played'
+        | 'postponed-waiting'
+        | 'cancelled'
+        | 'cancelled-then-played';
+    }
+  | { readonly kind: 'forfeit'; readonly forfeiting: Side }
+  | {
+      readonly kind: 'corrected';
+      readonly first: { readonly home: number; readonly away: number };
+    };
+
+export const callOffKinds = [
+  'postponed-then-played',
+  'postponed-waiting',
+  'cancelled',
+  'cancelled-then-played',
+  'forfeit',
+  'corrected',
+] as const satisfies readonly CallOff['kind'][];
+
+/** A called-off game the season never plays: it counts in no table and no games played. */
+export const neverPlayed = (callOff: CallOff | null): boolean =>
+  callOff?.kind === 'postponed-waiting' || callOff?.kind === 'cancelled';
+
+/** Games of each kind called off: none under 12 games, then 1 for every 60 games, at least 1. */
+export function callOffsOfEachKind(games: number): number {
+  return games < 12 ? 0 : Math.max(1, Math.floor(games / 60));
+}
 
 export type SimulationPlan = {
   readonly options: SimulationOptions;
@@ -229,9 +271,17 @@ function baskets(total: number, side: Side, random: () => number): PlannedPlay[]
 }
 
 /** The plays of a tracked game: lineups, four periods of baskets and a foul a side, End. */
-export function plannedPlays(home: number, away: number, random: () => number): PlannedPlay[] {
+export function plannedPlays(
+  home: number,
+  away: number,
+  random: () => number,
+  overtime = false,
+): PlannedPlay[] {
+  // An overtime game: level at the lower score after four periods, the rest in a fifth.
+  const level = Math.min(home, away);
+  const regulation = overtime ? { home: level, away: level } : { home, away };
   const all = shuffled(
-    [...baskets(home, 'home', random), ...baskets(away, 'away', random)],
+    [...baskets(regulation.home, 'home', random), ...baskets(regulation.away, 'away', random)],
     random,
   );
   const lineup = Array.from({ length: playersPerTeam }, (_, k) => k);
@@ -249,6 +299,15 @@ export function plannedPlays(home: number, away: number, random: () => number): 
     // A foul stops the clock on the high-school rules, so the period ends on the fouls.
     plays.push({ type: 'foul', side: 'home', player: p % playersPerTeam });
     plays.push({ type: 'foul', side: 'away', player: (p + 2) % playersPerTeam });
+  }
+  if (overtime) {
+    const winner: Side = home > away ? 'home' : 'away';
+    plays.push({ type: 'period', period: periods + 1 }, { type: 'start' });
+    plays.push(...baskets(Math.abs(home - away), winner, random));
+    plays.push(
+      { type: 'foul', side: 'home', player: 0 },
+      { type: 'foul', side: 'away', player: 1 },
+    );
   }
   plays.push({ type: 'end' });
   return plays;
@@ -292,7 +351,7 @@ export function planSimulation(options: SimulationOptions): SimulationPlan {
   });
 
   const firstDay = '2025-11-07';
-  const planned: Omit<PlannedGame, 'plays' | 'number'>[] = [];
+  const planned: Omit<PlannedGame, 'plays' | 'number' | 'overtime' | 'callOff'>[] = [];
   for (const [d, division] of divisions.entries()) {
     const robin = roundRobin(division.teams.length);
     for (let r = 0; r < options.rounds; r += 1) {
@@ -329,11 +388,53 @@ export function planSimulation(options: SimulationOptions): SimulationPlan {
       Math.floor(((j + 0.5) * planned.length) / Math.min(options.tracked, planned.length)),
     ),
   );
-  const games = planned.map((game, n) => ({
-    ...game,
-    number: 1001 + n,
-    plays: tracked.has(n) ? plannedPlays(game.homeScore, game.awayScore, random) : null,
-  }));
+  // Part 2: the first tracked game of a league of 12 games or more goes to overtime, and a
+  // small share of the other games is called off. Their own seeded generator, so the
+  // league, its results and its plays are those part 1 made from the same seed.
+  const firstTracked = Math.min(...tracked);
+  const overtimeAt = planned.length >= 12 && tracked.size > 0 ? firstTracked : -1;
+  const callOffs = new Map<number, CallOff>();
+  const offRandom = generator(options.seed + 0x2236);
+  const open = shuffled(
+    planned.map((_, n) => n).filter((n) => !tracked.has(n)),
+    offRandom,
+  );
+  const each = callOffsOfEachKind(planned.length);
+  for (const kind of callOffKinds) {
+    for (let k = 0; k < each && open.length > 0; k += 1) {
+      const n = open.pop()!;
+      const game = planned[n]!;
+      callOffs.set(
+        n,
+        kind === 'forfeit'
+          ? // The side that would have lost does not come.
+            { kind, forfeiting: game.homeScore < game.awayScore ? 'home' : 'away' }
+          : kind === 'corrected'
+            ? // Typed the wrong way round, so the wrong side had won.
+              { kind, first: { home: game.awayScore, away: game.homeScore } }
+            : { kind },
+      );
+    }
+  }
+  // An overtime period is short: the overtime game is won by at most 6 points.
+  const close = (game: (typeof planned)[number]) => {
+    const level = Math.min(game.homeScore, game.awayScore);
+    const margin = Math.min(6, Math.abs(game.homeScore - game.awayScore));
+    return game.homeScore > game.awayScore
+      ? { ...game, homeScore: level + margin }
+      : { ...game, awayScore: level + margin };
+  };
+  const games = planned
+    .map((plain, n) => (n === overtimeAt ? close(plain) : plain))
+    .map((game, n) => ({
+      ...game,
+      number: 1001 + n,
+      plays: tracked.has(n)
+        ? plannedPlays(game.homeScore, game.awayScore, random, n === overtimeAt)
+        : null,
+      overtime: n === overtimeAt,
+      callOff: callOffs.get(n) ?? null,
+    }));
   return {
     options,
     slug: 'simulated',

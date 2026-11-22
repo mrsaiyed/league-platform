@@ -4,18 +4,24 @@
 // them against a second, simple working-out written only for this check:
 // - wins-equal-losses: across the league, as many wins as losses;
 // - points-balance: in each division, points for equal points against;
-// - games-played: every team has played the games its schedule gave it;
+// - games-played: every team has played the games its schedule gave it, less those called
+//   off or still waiting;
 // - tracked-points: in every tracked game, its players' points add up to its final score;
+// - called-off: every game the plan called off ended as planned (postponed, cancelled, put
+//   back and played, forfeited at the season's forfeit score, corrected once);
+// - overtime: the product's overtime count on each tracked game is the plan's;
 // - standings: each team's wins, losses, points for and against as the product shows them
 //   equal those worked out again from the games' results, and the order by win percentage
 //   agrees; teams level on win percentage are said to be level, their tiebreak not judged.
 // Each failing check is named, and its detail names the teams it found wrong.
 import type { PGlite } from '@electric-sql/pglite';
+import { SeasonRules } from '@srleagues/contracts';
 import { readStandings } from '@srleagues/core';
 import { createDatabase } from '../db/create-database.ts';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import { withTransaction } from '../db/with-transaction.ts';
-import { liveGamesStore, standingsReadStore } from '../stores/index.ts';
+import { gamesStore, liveGamesStore, standingsReadStore } from '../stores/index.ts';
+import { callOffKinds, neverPlayed } from './simulate-league-plan.ts';
 import type { PlayedLeague } from './simulate-league.ts';
 
 export type CheckName =
@@ -23,6 +29,8 @@ export type CheckName =
   | 'points-balance'
   | 'games-played'
   | 'tracked-points'
+  | 'called-off'
+  | 'overtime'
   | 'standings';
 
 export type Check = { readonly name: CheckName; readonly ok: boolean; readonly detail: string };
@@ -68,17 +76,29 @@ export async function checkSimulatedLeague(
     if (!standings.ok) throw new Error(`The check found no standings: ${standings.error.code}`);
     const tables = standings.value.tables;
 
-    // The second working-out: from the games' results alone.
+    // The second working-out: from the games' results alone. Final and forfeit games count
+    // (packages/sports, count-games.ts); a postponed or cancelled one counts for nothing. A
+    // forfeit is a win and a loss at the season's forfeit score, which is stored on the game,
+    // and its points count for and against only when the season's rules say so.
     const { rows: games } = await pglite.query<{
+      status: 'final' | 'forfeit';
       home_team_id: string;
       away_team_id: string;
       home_score: number;
       away_score: number;
     }>(
-      `select home_team_id, away_team_id, home_score, away_score from games
-       where league_id = $1 and season_id = $2 and status = 'final' and deleted_at is null`,
+      `select status, home_team_id, away_team_id, home_score, away_score from games
+       where league_id = $1 and season_id = $2 and status in ('final', 'forfeit')
+         and deleted_at is null`,
       [leagueId, seasonId],
     );
+    const rulesRow = await pglite.query<{ rules: unknown }>(
+      'select rules from seasons where league_id = $1 and id = $2',
+      [leagueId, seasonId],
+    );
+    const rules = SeasonRules.safeParse(rulesRow.rows[0]?.rules);
+    if (!rules.success) throw new Error('The check could not read the season’s rules.');
+    const { forfeit } = rules.data;
     const worked = new Map<string, TeamRecord>();
     const of = (id: string) => {
       const found = worked.get(id) ?? { wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0 };
@@ -88,10 +108,12 @@ export async function checkSimulatedLeague(
     for (const g of games) {
       const home = of(g.home_team_id);
       const away = of(g.away_team_id);
-      home.pointsFor += g.home_score;
-      home.pointsAgainst += g.away_score;
-      away.pointsFor += g.away_score;
-      away.pointsAgainst += g.home_score;
+      if (g.status === 'final' || forfeit.countsInPointDifference) {
+        home.pointsFor += g.home_score;
+        home.pointsAgainst += g.away_score;
+        away.pointsFor += g.away_score;
+        away.pointsAgainst += g.home_score;
+      }
       const winner = g.home_score > g.away_score ? home : away;
       const loser = winner === home ? away : home;
       winner.wins += 1;
@@ -105,7 +127,7 @@ export async function checkSimulatedLeague(
     checks.push({
       name: 'wins-equal-losses',
       ok: wins === losses && wins === games.length,
-      detail: `${wins} wins, ${losses} losses, ${games.length} games final`,
+      detail: `${wins} wins, ${losses} losses, ${games.length} games decided`,
     });
 
     const balance = tables.map((t) => {
@@ -120,7 +142,10 @@ export async function checkSimulatedLeague(
     });
 
     const scheduled = new Map<string, number>();
+    // Scheduled games less those called off or still waiting: a game postponed and put back,
+    // cancelled and put back, forfeited or corrected is played; one waiting or cancelled is not.
     for (const g of plan.games) {
+      if (neverPlayed(g.callOff)) continue;
       for (const team of [g.home, g.away]) scheduled.set(team, (scheduled.get(team) ?? 0) + 1);
     }
     const shortOf = lines.filter((l) => l.gamesPlayed !== (scheduled.get(l.team.name) ?? 0));
@@ -130,7 +155,7 @@ export async function checkSimulatedLeague(
       ok: shortOf.length === 0 && lines.length === teamCount,
       detail:
         shortOf.length === 0 && lines.length === teamCount
-          ? `all ${teamCount} teams played every game scheduled for them`
+          ? `all ${teamCount} teams played every game scheduled for them, less those called off or waiting`
           : `${teamCount - lines.length} teams missing; wrong: ${shortOf
               .map((l) => `${l.team.name} ${l.gamesPlayed} of ${scheduled.get(l.team.name) ?? 0}`)
               .join(', ')}`,
@@ -164,6 +189,66 @@ export async function checkSimulatedLeague(
         wrongTracked.length === 0
           ? `${trackedGames.length} tracked games: players' points add up to every final score`
           : `players' points do not add up in game ${wrongTracked.join(', ')}`,
+    });
+
+    // Each game called off ended as the plan says, read back from the product's games.
+    const offGames = plan.games.filter((g) => g.callOff !== null);
+    const offWrong: string[] = [];
+    for (const game of offGames) {
+      const gameId = played.gameIds.get(game.number)!;
+      const found = await read((scope) => gamesStore(scope).find(gameId));
+      const corrections = await pglite.query<{ n: number }>(
+        'select count(*)::int as n from game_corrections where league_id = $1 and game_id = $2',
+        [leagueId, gameId],
+      );
+      const kind = game.callOff!.kind;
+      const want =
+        kind === 'postponed-waiting'
+          ? found?.status === 'postponed'
+          : kind === 'cancelled'
+            ? found?.status === 'cancelled'
+            : kind === 'forfeit'
+              ? found?.status === 'forfeit' &&
+                Math.max(found.homeScore ?? -1, found.awayScore ?? -1) === forfeit.winnerScore &&
+                Math.min(found.homeScore ?? -1, found.awayScore ?? -1) === forfeit.loserScore
+              : found?.status === 'final' &&
+                found.homeScore === game.homeScore &&
+                found.awayScore === game.awayScore &&
+                (corrections.rows[0]?.n ?? 0) === (kind === 'corrected' ? 1 : 0);
+      if (!want) {
+        offWrong.push(
+          `game ${game.number} (${kind}) is ${found?.status} ${found?.homeScore}-${found?.awayScore}, ${corrections.rows[0]?.n} correction(s)`,
+        );
+      }
+    }
+    const offCount = (kind: string) => offGames.filter((g) => g.callOff!.kind === kind).length;
+    checks.push({
+      name: 'called-off',
+      ok: offWrong.length === 0,
+      detail:
+        offWrong.length === 0
+          ? `${offGames.length} games: ${callOffKinds.map((k) => `${offCount(k)} ${k}`).join(', ')}; each as planned (forfeits ${forfeit.winnerScore}-${forfeit.loserScore}, points ${forfeit.countsInPointDifference ? 'counted' : 'not counted'}; the corrected game once, at its corrected score)`
+          : offWrong.join('; '),
+    });
+
+    // Overtime, as the product counts it on each tracked game when the tracker ends it.
+    const overtimeWrong: number[] = [];
+    let overtimeCounted = 0;
+    for (const game of trackedGames) {
+      const gameId = played.gameIds.get(game.number)!;
+      const found = await read((scope) => gamesStore(scope).find(gameId));
+      const periods = found?.overtimePeriods ?? null;
+      if (periods !== null && periods > 0) overtimeCounted += 1;
+      if (periods !== (game.overtime ? 1 : 0)) overtimeWrong.push(game.number);
+    }
+    const overtimePlanned = trackedGames.filter((g) => g.overtime).length;
+    checks.push({
+      name: 'overtime',
+      ok: overtimeWrong.length === 0,
+      detail:
+        overtimeWrong.length === 0
+          ? `${overtimePlanned} tracked game(s) went to overtime; the product counts ${overtimeCounted}`
+          : `the product's overtime count is wrong in game ${overtimeWrong.join(', ')}`,
     });
 
     const wrong: string[] = [];
@@ -240,6 +325,7 @@ export function reportLines(played: PlayedLeague, report: SimulationReport): str
   const out = [
     `Simulated league: ${teams} teams in ${options.divisions} division(s), ${options.rounds} rounds, ${games.length} games (${tracked} tracked, ${games.length - tracked} final scores), seed ${options.seed}`,
     'Schedule: brought in through the fixture import, put in rounds in the draft, published',
+    `Called off or changed: ${games.filter((g) => g.callOff !== null).length} games (${games.filter((g) => neverPlayed(g.callOff)).length} never played); overtime: ${games.filter((g) => g.overtime).length} tracked game(s)`,
     'Checks:',
     ...report.checks.map((c) => `  ${c.ok ? 'ok  ' : 'FAIL'} ${c.name}: ${c.detail}`),
     'Final tables:',

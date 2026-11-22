@@ -1,7 +1,9 @@
-// Step 2.236, part 1: a made-up league played from empty to its final tables through the
-// product's own commands checks its own work, at 4 teams and at 12 teams in 2 divisions;
-// the same seed gives the same report; and a result changed straight in the database after
-// the play makes the standings check fail by name. The 60-team run is part 2.
+// Step 2.236: a made-up league played from empty to its final tables through the
+// product's own commands checks its own work, at 4 teams and at 12 teams in 2 divisions,
+// with games postponed, cancelled, put back, forfeited and corrected and one in overtime;
+// the same seed gives the same report; a result changed straight in the database after
+// the play makes the standings check fail by name, and so does a cancelled game made final.
+// The 60-team run is its own command, `npm run simulate:large` (part 2).
 import { PGlite } from '@electric-sql/pglite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +11,12 @@ import { describe, expect, it } from 'vitest';
 import { applyMigrations, pgliteDriver } from '../migrations/index.ts';
 import { realNames, realNamesIn } from './real-names.test-helper.ts';
 import { checkSimulatedLeague, reportLines } from './simulate-league-check.ts';
-import { planSimulation, type SimulationOptions } from './simulate-league-plan.ts';
+import {
+  callOffKinds,
+  planSimulation,
+  type PlannedGame,
+  type SimulationOptions,
+} from './simulate-league-plan.ts';
 import { simulateLeagueInto } from './simulate-league.ts';
 
 const repository = fileURLToPath(new URL('../../../../', import.meta.url));
@@ -75,6 +82,8 @@ describe('simulateLeagueInto', () => {
         ['points-balance', true],
         ['games-played', true],
         ['tracked-points', true],
+        ['called-off', true],
+        ['overtime', true],
         ['standings', true],
       ]);
       expect(report.passed).toBe(true);
@@ -92,22 +101,48 @@ describe('simulateLeagueInto', () => {
       expect(first.report.passed).toBe(true);
       expect(first.report.tables).toHaveLength(2);
       expect(withoutTime(second.lines)).toEqual(withoutTime(first.lines));
+      // The games a season loses: at least one of each kind, and one tracked game in overtime.
+      const { games } = first.played.plan;
+      for (const kind of callOffKinds) {
+        expect(games.filter((g) => g.callOff?.kind === kind).length).toBeGreaterThanOrEqual(1);
+      }
+      expect(games.filter((g) => g.overtime && g.plays !== null)).toHaveLength(1);
+      expect(first.report.checks.find((c) => c.name === 'overtime')?.detail).toContain(
+        'the product counts 1',
+      );
 
-      // The planted fault: one final score changed straight in the database, after the play.
-      // The database refuses that for a decided game (a correction needs a reason), so the
-      // fault goes round its guard, with the table's triggers off for this one change.
-      const gameId = first.played.gameIds.get(
-        first.played.plan.games.find((g) => g.plays === null)!.number,
-      )!;
+      // The planted faults go round the database's guard (a decided game's score changes
+      // only with a reason), with the table's triggers off for these changes.
+      // First: one final score changed straight in the database, after the play.
+      const idOf = (game: PlannedGame | undefined) => first.played.gameIds.get(game!.number)!;
       await first.pglite.exec('set session_replication_role = replica');
       await first.pglite.query('update games set home_score = home_score + 40 where id = $1', [
-        gameId,
+        idOf(games.find((g) => g.plays === null && g.callOff === null)),
       ]);
       await first.pglite.exec('set session_replication_role = origin');
       const after = await checkSimulatedLeague(first.pglite, first.played);
       expect(after.passed).toBe(false);
       expect(after.checks.filter((c) => !c.ok).map((c) => c.name)).toContain('standings');
       expect(reportLines(first.played, after).at(-2)).toContain('standings');
+
+      // Second, on the other copy: the cancelled game made final, as if it had been played.
+      await second.pglite.exec('set session_replication_role = replica');
+      await second.pglite.query(
+        `update games set status = 'final', home_score = 50, away_score = 40, finalized_at = now(),
+           format = (select format from games where id = $2)
+         where id = $1`,
+        [
+          second.played.gameIds.get(games.find((g) => g.callOff?.kind === 'cancelled')!.number),
+          second.played.gameIds.get(
+            games.find((g) => g.plays === null && g.callOff === null)!.number,
+          ),
+        ],
+      );
+      await second.pglite.exec('set session_replication_role = origin');
+      const counted = await checkSimulatedLeague(second.pglite, second.played);
+      expect(counted.checks.filter((c) => !c.ok).map((c) => c.name)).toEqual(
+        expect.arrayContaining(['called-off', 'standings']),
+      );
     } finally {
       await first.pglite.close();
       await second.pglite.close();
