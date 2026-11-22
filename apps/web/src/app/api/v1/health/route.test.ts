@@ -15,12 +15,30 @@ beforeEach(() => {
 
 describe('GET /api/v1/health', () => {
   it('answers 200, ok and no-store once the app has started, and asks webPorts', async () => {
-    webPorts.mockResolvedValue({});
+    const databaseCheck = vi.fn(async () => true);
+    webPorts.mockResolvedValue({ databaseCheck });
     const response = await GET();
     expect(webPorts).toHaveBeenCalledTimes(1);
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    expect(await response.json()).toMatchObject({ status: 'ok', app: 'web' });
+    expect(await response.json()).toMatchObject({
+      status: 'ok',
+      app: 'web',
+      checks: { startup: 'ok', database: 'ok' },
+    });
+    // It asks the database each time, not only at start-up.
+    expect(databaseCheck).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers 503 and down, still no-store, when the database does not answer', async () => {
+    webPorts.mockResolvedValue({ databaseCheck: async () => false });
+    const response = await GET();
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.json()).toMatchObject({
+      status: 'down',
+      checks: { startup: 'ok', database: 'failed' },
+    });
   });
 
   it('answers 503 and down, still no-store, when start-up fails', async () => {

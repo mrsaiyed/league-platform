@@ -11,12 +11,17 @@
 // What keeps other computers out is that the made-up world listens on the loopback address
 // only (scripts/web-listen.mjs); this check keeps out what can still arrive here.
 //
+// Outside production every answer it passes on, and its own plain page, carries
+// `X-Robots-Tag: noindex` (do-not-index.ts, record 082): pages, API answers and error pages
+// alike, since the header is set here, whatever the route then answers.
+//
 // It also keeps a session going (T-69, T-70): when the browser sends the renewing
 // token and no session cookie (it ran out), the session is renewed here, the page
 // sees the new token, and the browser is given the new cookies (renew-session.ts).
 import { NextResponse, type NextRequest } from 'next/server';
 import { isDevelopmentServer } from './server/config.ts';
 import { webPorts } from './server/container.ts';
+import { doNotIndex, doNotIndexHeader } from './server/do-not-index.ts';
 import { t } from './server/messages.ts';
 import { pathHeader } from './server/request-facts-header.ts';
 import {
@@ -65,7 +70,17 @@ async function portsIfStarted() {
   }
 }
 
+/** The answer, marked "do not index" outside production (record 082). */
+function marked(response: NextResponse): NextResponse {
+  if (doNotIndex()) response.headers.set(doNotIndexHeader.name, doNotIndexHeader.value);
+  return response;
+}
+
 export async function proxy(request: NextRequest): Promise<NextResponse> {
+  return marked(await answer(request));
+}
+
+async function answer(request: NextRequest): Promise<NextResponse> {
   const ports = await portsIfStarted();
   if (ports?.answers(request.headers) === false) return notAnswered();
   const url = new URL(request.url);

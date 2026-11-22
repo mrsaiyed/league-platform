@@ -1,8 +1,12 @@
 // T-30 and T-60 at startup: the stand-in for local work, and the login check that
 // stops staging and production on a database role that could see past the fence.
 import { describe, expect, it, vi } from 'vitest';
-import type { DatabaseHandle } from '@srleagues/database';
-import type { EmailConfirmation, EmailConfirmationQuestion } from '@srleagues/providers';
+import { connectCauseOf, type DatabaseHandle } from '@srleagues/database';
+import type {
+  EmailConfirmation,
+  EmailConfirmationQuestion,
+  SignInService,
+} from '@srleagues/providers';
 import { createLogger } from '@srleagues/observability';
 import { loadConfig } from './config-schema.ts';
 import { logLinesFor } from './container.ts';
@@ -14,7 +18,7 @@ import {
   simulatedLeagueSize,
   startWebApp,
   type DatabasePackage,
-  type RealSignInSettings,
+  type RealSignInWiring,
   type StartupDeps,
 } from './startup.ts';
 
@@ -40,7 +44,16 @@ const answering = (answer: EmailConfirmation | Error): EmailConfirmationQuestion
   },
 });
 
-function deps(problems: string[] | Error, confirmation: EmailConfirmation | Error = 'on') {
+/**
+ * Start-up's database package and real sign-in service, made up: the login checks answer
+ * `problems` and `storeProblems`, the service `confirmation`. What the database ports
+ * would use is a function that does nothing (the real wiring is container.test.ts's).
+ */
+function deps(
+  problems: string[] | Error,
+  confirmation: EmailConfirmation | Error = 'on',
+  storeProblems: string[] | Error = [],
+) {
   const close = vi.fn(async () => {});
   const db = { close } as unknown as DatabaseHandle;
   const createDatabase = vi.fn((_source: { kind: 'postgres'; url: string }) => db);
@@ -48,13 +61,40 @@ function deps(problems: string[] | Error, confirmation: EmailConfirmation | Erro
     if (problems instanceof Error) throw problems;
     return problems;
   });
-  // Only these two are reached in staging and production today.
+  const checkSignInStoreLogin = vi.fn(async (_db: DatabaseHandle) => {
+    if (storeProblems instanceof Error) throw storeProblems;
+    return storeProblems;
+  });
+  const createDatabaseSignInStore = vi.fn(() => ({}));
+  const known: Record<string, unknown> = {
+    // The package's own reading of a failed connection, by its code (record 082).
+    connectCauseOf,
+    createDatabase,
+    checkLoginRole,
+    checkSignInStoreLogin,
+    createDatabaseSignInStore,
+  };
   const database = vi.fn(
-    async () => ({ createDatabase, checkLoginRole }) as unknown as DatabasePackage,
+    async () =>
+      new Proxy(known, {
+        // Not a promise: `then` is never made up, or awaiting the package would never end.
+        get: (target, name: string) => target[name] ?? (name === 'then' ? undefined : () => ({})),
+      }) as unknown as DatabasePackage,
   );
-  const realSignIn = vi.fn((_service: RealSignInSettings) => answering(confirmation));
+  const realSignIn = vi.fn(
+    (_wiring: RealSignInWiring) => answering(confirmation) as unknown as SignInService,
+  );
   const given: StartupDeps = { database, realSignIn, log: () => {} };
-  return { given, database, createDatabase, checkLoginRole, close, realSignIn };
+  return {
+    given,
+    database,
+    createDatabase,
+    checkLoginRole,
+    checkSignInStoreLogin,
+    createDatabaseSignInStore,
+    close,
+    realSignIn,
+  };
 }
 
 describe('startWebApp', () => {
@@ -74,7 +114,9 @@ describe('startWebApp', () => {
   it('runs on the made-up database with LOCAL_DATA=made-up-database (record 055)', async () => {
     const config = loadConfig({ ...env, APP_ENV: 'test', LOCAL_DATA: 'made-up-database' });
     const database = vi.fn(() => import('@srleagues/database'));
-    const realSignIn = vi.fn((_service: RealSignInSettings) => answering('off'));
+    const realSignIn = vi.fn(
+      (_wiring: RealSignInWiring) => answering('off') as unknown as SignInService,
+    );
     const ports = await startWebApp(config, { database, realSignIn, log: () => {} });
     // Local work signs in on the stand-in: the real service is never asked.
     expect(realSignIn).not.toHaveBeenCalled();
@@ -126,7 +168,9 @@ describe('startWebApp', () => {
       LOCAL_DEMO_LEAGUE: 'on',
     });
     const database = vi.fn(() => import('@srleagues/database'));
-    const realSignIn = vi.fn((_service: RealSignInSettings) => answering('off'));
+    const realSignIn = vi.fn(
+      (_wiring: RealSignInWiring) => answering('off') as unknown as SignInService,
+    );
     const ports = await startWebApp(config, { database, realSignIn, log: () => {} });
     const { demoLeague } = await import('@srleagues/database');
     expect(await ports.findLeague(demoLeague.slug)).toMatchObject({ slug: demoLeague.slug });
@@ -149,7 +193,9 @@ describe('startWebApp', () => {
       LOCAL_SIMULATED_LEAGUE: 'on',
     });
     const database = vi.fn(() => import('@srleagues/database'));
-    const realSignIn = vi.fn((_service: RealSignInSettings) => answering('off'));
+    const realSignIn = vi.fn(
+      (_wiring: RealSignInWiring) => answering('off') as unknown as SignInService,
+    );
     const said: string[] = [];
     const ports = await startWebApp(config, {
       database,
@@ -203,7 +249,9 @@ describe('startWebApp', () => {
       LOCAL_SIMULATED_LEAGUE: '--teams 3 --divisions 2',
     });
     const database = vi.fn(() => import('@srleagues/database'));
-    const realSignIn = vi.fn((_service: RealSignInSettings) => answering('off'));
+    const realSignIn = vi.fn(
+      (_wiring: RealSignInWiring) => answering('off') as unknown as SignInService,
+    );
     await expect(startWebApp(config, { database, realSignIn, log: () => {} })).rejects.toThrow(
       'The web app cannot start: LOCAL_SIMULATED_LEAGUE="--teams 3 --divisions 2" cannot be read: Each division needs at least 2 teams. For example LOCAL_SIMULATED_LEAGUE="--teams 24 --divisions 4 --rounds 10 --tracked 6 --seed 7"',
     );
@@ -234,14 +282,21 @@ describe('startWebApp', () => {
 
   it('checks the login role first in staging and production, and stops on a problem (T-60)', async () => {
     for (const appEnv of ['staging', 'production']) {
-      const d = deps(['it is a superuser', 'it bypasses row-level security']);
+      const d = deps([
+        'app is a superuser: alter role app nosuperuser',
+        'app bypasses row-level security: alter role app nobypassrls',
+      ]);
       await expect(startWebApp(configFor(appEnv), d.given)).rejects.toThrow(
         'The web app cannot start: the database login role is not fit for the app (T-60): ' +
-          'it is a superuser; it bypasses row-level security.',
+          'app is a superuser: alter role app nosuperuser; ' +
+          'app bypasses row-level security: alter role app nobypassrls.',
       );
+      // Over SSL with the certificate checked: the default (record 082).
       expect(d.createDatabase).toHaveBeenCalledWith({
         kind: 'postgres',
         url: env.PLATFORM_DATABASE_URL,
+        ssl: 'verify',
+        onIdleError: expect.any(Function),
       });
       expect(d.checkLoginRole).toHaveBeenCalledOnce();
       expect(d.close).toHaveBeenCalledOnce();
@@ -256,13 +311,101 @@ describe('startWebApp', () => {
     expect(d.close).toHaveBeenCalledOnce();
   });
 
-  it('stops with a plain reason after a good check, until real sign-in is wired', async () => {
+  it('tells apart a certificate not checked, a login refused and a database not reached (record 082)', async () => {
+    // What the driver throws for each, with the address and its password in the message.
+    const failed = (code: string) =>
+      Object.assign(new Error('failed for postgres://app:made-up-password@db.example.test'), {
+        code,
+      });
+    const said = {
+      certificate:
+        'The web app cannot start: the database’s certificate could not be checked: set PLATFORM_DATABASE_CA to the database’s own certificate (the PEM text from its settings page), then start the app again.',
+      login:
+        'The web app cannot start: the database refused the password or login: check the app’s own login and its password in PLATFORM_DATABASE_URL, then start the app again.',
+      unreached:
+        'The web app cannot start: the database could not be reached: check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
+    };
+    const cases: [string, Error | string[], string][] = [
+      ['SELF_SIGNED_CERT_IN_CHAIN', failed('SELF_SIGNED_CERT_IN_CHAIN'), said.certificate],
+      [
+        'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+        failed('UNABLE_TO_VERIFY_LEAF_SIGNATURE'),
+        said.certificate,
+      ],
+      ['ERR_TLS_CERT_ALTNAME_INVALID', failed('ERR_TLS_CERT_ALTNAME_INVALID'), said.certificate],
+      ['28P01', failed('28P01'), said.login],
+      ['28000', failed('28000'), said.login],
+      ['ECONNREFUSED', failed('ECONNREFUSED'), said.unreached],
+    ];
+    for (const appEnv of ['staging', 'production']) {
+      for (const [code, problem, sentence] of cases) {
+        // Whether the first check meets it or the second.
+        for (const d of [deps(problem), deps([], 'on', problem)]) {
+          const failure = await startWebApp(configFor(appEnv), d.given).catch((e: unknown) => e);
+          expect(String(failure), code).toBe(`StartupError: ${sentence}`);
+          expect(String(failure), code).not.toMatch(/made-up-password|example\.test/);
+          expect(d.close, code).toHaveBeenCalledOnce();
+        }
+      }
+    }
+  });
+
+  it('stops when the login cannot reach the sign-in store, in a plain sentence (record 052)', async () => {
+    for (const appEnv of ['staging', 'production']) {
+      const d = deps([], 'on', ['it is not a member of sign_in_store']);
+      await expect(startWebApp(configFor(appEnv), d.given)).rejects.toThrow(
+        'The web app cannot start: the database login cannot reach the sign-in store (record 052): it is not a member of sign_in_store. As the migration login, run "grant sign_in_store to <the app’s login>;" once, then start the app again.',
+      );
+      expect(d.realSignIn).not.toHaveBeenCalled();
+      expect(d.close).toHaveBeenCalledOnce();
+    }
+    const unreached = deps(
+      [],
+      'on',
+      new Error('connect failed for postgres://app:made-up-password@db'),
+    );
+    const failure = await startWebApp(configFor('staging'), unreached.given).catch(
+      (e: unknown) => e,
+    );
+    expect(String(failure)).toMatch(
+      /the database could not be reached: check PLATFORM_DATABASE_URL/,
+    );
+    expect(String(failure)).not.toMatch(/made-up-password/);
+  });
+
+  it('staging serves on the database, through the real sign-in service, after every check', async () => {
+    const d = deps([]);
+    const ports = await startWebApp(configFor('staging'), d.given);
+    expect(ports.madeUpWorld).toBe(false);
+    expect(ports.localTools).toBeNull();
+    expect(ports.databaseCheck).not.toBeNull();
+    // The service start-up asked is the one the app signs people in with.
+    expect(ports.signIn).toBe(d.realSignIn.mock.results[0]?.value);
+    expect(d.realSignIn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectUrl: env.SUPABASE_URL,
+        secretKey: env.SUPABASE_SECRET_KEY,
+        returnOrigins: [env.PUBLIC_BASE_URL],
+        // Only a service on this computer may be reached over plain http.
+        allowLocalHttp: false,
+      }),
+    );
+    expect(d.createDatabaseSignInStore).toHaveBeenCalledOnce();
+    expect(d.checkLoginRole).toHaveBeenCalledOnce();
+    expect(d.checkSignInStoreLogin).toHaveBeenCalledOnce();
+    // Open for as long as the server runs.
+    expect(d.close).not.toHaveBeenCalled();
+  });
+
+  it('production stops after every check has passed, with a plain reason (record 082)', async () => {
     const d = deps([]);
     await expect(startWebApp(configFor('production'), d.given)).rejects.toThrow(
-      /sign-in on the real service is not wired yet/,
+      'The web app cannot start: every check passed, but "production" does not serve anyone yet: only the test copy ("staging") is opened in this stage (record 082), because fixture import does not run on the database yet and youth leagues’ pages are not yet marked "do not index" there (step 2.60).',
     );
     expect(d.checkLoginRole).toHaveBeenCalledOnce();
+    expect(d.checkSignInStoreLogin).toHaveBeenCalledOnce();
     expect(d.realSignIn).toHaveBeenCalledOnce();
+    expect(d.close).toHaveBeenCalledOnce();
   });
 });
 
@@ -410,10 +553,12 @@ describe('email confirmation on the real sign-in service (step 2.115)', () => {
       expect(failure.message).toBe(off);
       expectNothingPrivate(failure.message);
       // Asked of the service the settings name, after the login role, and the database closed.
-      expect(d.realSignIn).toHaveBeenCalledWith({
-        projectUrl: env.SUPABASE_URL,
-        secretKey: env.SUPABASE_SECRET_KEY,
-      });
+      expect(d.realSignIn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectUrl: env.SUPABASE_URL,
+          secretKey: env.SUPABASE_SECRET_KEY,
+        }),
+      );
       expect(d.checkLoginRole).toHaveBeenCalledOnce();
       expect(d.close).toHaveBeenCalledOnce();
     }
@@ -485,18 +630,17 @@ describe('email confirmation on the real sign-in service (step 2.115)', () => {
     }
   });
 
-  it('with confirmation on, goes past the check to what still stops staging (step 2.93)', async () => {
-    for (const appEnv of ['staging', 'production']) {
-      const d = deps([], 'on');
-      const failure = await failureOf(appEnv, d);
-      expect(failure.message).toMatch(/sign-in on the real service is not wired yet/);
-      expect(failure.message).not.toMatch(/confirm/i);
-      expect(d.realSignIn).toHaveBeenCalledOnce();
-    }
+  it('with confirmation on, goes past the check: staging starts, production stops after it', async () => {
+    await expect(startWebApp(configFor('staging'), deps([], 'on').given)).resolves.toBeDefined();
+    const d = deps([], 'on');
+    const failure = await failureOf('production', d);
+    expect(failure.message).toMatch(/"production" does not serve anyone yet/);
+    expect(failure.message).not.toMatch(/confirm/i);
+    expect(d.realSignIn).toHaveBeenCalledOnce();
   });
 
   it('is not asked when the login role already stopped the start', async () => {
-    const d = deps(['it is a superuser'], 'off');
+    const d = deps(['app is a superuser: alter role app nosuperuser'], 'off');
     await expect(startWebApp(configFor('staging'), d.given)).rejects.toThrow(/login role/);
     expect(d.realSignIn).not.toHaveBeenCalled();
   });

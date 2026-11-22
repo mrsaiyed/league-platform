@@ -7,25 +7,33 @@
 //    (T-201). They run on the made-up stand-in, or with LOCAL_DATA=made-up-database
 //    on the made-up database in memory, every migration and the seed leagues with
 //    their seasons under way (record 055, step 2.93 part 2): its login role is checked
-//    as a hosted one is, people sign in on the sign-in stand-in, and the areas not yet
-//    moved onto the database refuse (database-ports.ts).
+//    as a hosted one is, people sign in on the sign-in stand-in, and the one area not yet
+//    moved onto the database (fixture import) refuses (database-ports.ts).
 // 3. Staging and production open PLATFORM_DATABASE_URL (never the tracker's
-//    DATABASE_URL, R8) and check the login role it uses
-//    (checkLoginRole, T-60): a superuser, a role that bypasses row-level security,
-//    or the tables' owner stops the start. They then ask the real sign-in service
-//    whether it confirms email addresses, and stop unless it plainly says it does
-//    (requireEmailConfirmation, step 2.115). They then stop anyway, with a plain
-//    reason, until sign-in on the real service is wired and every area has moved
-//    onto the database (step 2.93's later parts, record 055).
+//    DATABASE_URL, R8), over SSL with the server's certificate checked unless the
+//    database is on this computer (PLATFORM_DATABASE_SSL, record 082), and check the
+//    login role it uses (checkLoginRole, T-60): a superuser, a role that bypasses
+//    row-level security, or the tables' owner stops the start; so does a login that
+//    cannot act as sign_in_store, the sign-in store's role (record 052). They then make
+//    the real sign-in service, Supabase's adapter with the store in our own database,
+//    and ask it first whether it confirms email addresses: the start stops unless it
+//    plainly says it does (requireEmailConfirmation, step 2.115). Staging then serves on
+//    the database (databasePorts), with every email captured, never sent (T-140).
+//    Production stops there, with a plain reason (record 082): nothing is opened to
+//    production in this stage.
 import type { CommandLogLine } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
 import {
   botCheckFor,
+  emailSenderFor,
   type BotCheck,
   type EmailConfirmation,
   type EmailConfirmationQuestion,
   type EmailConfirmationUnknown,
+  type SignInCodeSender,
+  type SignInService,
+  type SupabaseSignInStore,
 } from '@srleagues/providers';
 import { leagueUrl } from '@srleagues/core';
 import { simulatedLeagueExample, type Config } from './config-schema.ts';
@@ -33,6 +41,7 @@ import { databasePorts, type DatabaseQueries } from './database-ports.ts';
 import { madeUpDatabaseTools, type SeedLeagueFacts } from './made-up-database-people.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
 import type { WebPorts } from './ports.ts';
+import { createSignInMail } from './sign-in/sign-in-mail.ts';
 import {
   standInMember,
   standInPorts,
@@ -51,10 +60,41 @@ export class StartupError extends Error {
  * What startup uses of packages/database: opening it (or the made-up one), checking
  * its login role, and what the database ports read.
  */
+type ConnectCause = ReturnType<typeof DatabaseModule.connectCauseOf>;
+
+/**
+ * Why the database could not be used, in one plain sentence each and what to set (record
+ * 082, the lead's correction of 2026-11-17 02:17): the certificate, the login, or the
+ * database not reached. Told by the error's kind only; never its message, which may hold
+ * the address and its password.
+ */
+const databaseRefusals: Readonly<Record<ConnectCause, string>> = {
+  certificate:
+    'the database’s certificate could not be checked: set PLATFORM_DATABASE_CA to the database’s own certificate (the PEM text from its settings page), then start the app again.',
+  ssl: 'the database would not take an encrypted connection: check that PLATFORM_DATABASE_URL is the hosted database’s address (PLATFORM_DATABASE_SSL=off is allowed only for a database on this computer), then start the app again.',
+  login:
+    'the database refused the password or login: check the app’s own login and its password in PLATFORM_DATABASE_URL, then start the app again.',
+  database:
+    'the database named at the end of PLATFORM_DATABASE_URL does not exist there: check its name in the address, then start the app again.',
+  host: 'the database could not be reached: its host in PLATFORM_DATABASE_URL was not found; check the address, then start the app again.',
+  network:
+    'the database could not be reached: check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
+  timeout:
+    'the database could not be reached: it did not answer in time; check the address and port in PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
+  unknown:
+    'the database could not be reached: check PLATFORM_DATABASE_URL and that the database is running, then start the app again.',
+};
+
+/** The sentence for a database that refused the start-up, by its kind. */
+export const databaseRefusal = (cause: ConnectCause): string => databaseRefusals[cause];
+
 export type DatabasePackage = Pick<
   typeof DatabaseModule,
   | 'createDatabase'
+  | 'connectCauseOf'
   | 'checkLoginRole'
+  | 'checkSignInStoreLogin'
+  | 'createDatabaseSignInStore'
   | 'demoLeague'
   | 'madeUpDatabase'
   | 'seedLeagues'
@@ -67,15 +107,27 @@ export type DatabasePackage = Pick<
 /** Where the real sign-in service is, from SUPABASE_URL and SUPABASE_SECRET_KEY (T-30). */
 export type RealSignInSettings = { readonly projectUrl: string; readonly secretKey: string };
 
+/** What the real sign-in service is made with in staging and production (record 018). */
+export type RealSignInWiring = RealSignInSettings & {
+  /** What Supabase does not keep, in our own database (createDatabaseSignInStore, record 052). */
+  readonly store: SupabaseSignInStore;
+  /** Where its codes go: our own email service (T4 §3), captured outside production. */
+  readonly codeSender: SignInCodeSender;
+  /** Our own origin, the one place Google may send the browser back to (PUBLIC_BASE_URL). */
+  readonly returnOrigins: readonly string[];
+  /** Plain http, only to a sign-in service on this computer (a local fake in a test). */
+  readonly allowLocalHttp: boolean;
+};
+
 export type StartupDeps = {
   /** Loads packages/database; only staging and production ask for it. */
   readonly database: () => Promise<DatabasePackage>;
   /**
-   * The real sign-in service; only staging and production ask for it. Today start-up
-   * asks it one question (step 2.115); step 2.93's last part builds the whole adapter
-   * here and hands it the same question first.
+   * The real sign-in service (Supabase's adapter, container.ts); only staging and
+   * production ask for it. Start-up asks it first whether it confirms email addresses
+   * (step 2.115), and only then serves anyone through it.
    */
-  readonly realSignIn: (service: RealSignInSettings) => EmailConfirmationQuestion;
+  readonly realSignIn: (wiring: RealSignInWiring) => SignInService;
   /** Where the access module's T-196 lines go. */
   readonly log: (line: CommandLogLine) => void;
   /**
@@ -149,33 +201,98 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       `SUPABASE_URL and SUPABASE_SECRET_KEY are needed when APP_ENV is ${config.APP_ENV}.`,
     );
   }
-  // The bot check (record 081): step 2.93's last part hands this one to the real ports.
-  hostedBotCheck(config, deps);
+  // The bot check (record 081), made here once for staging and production and handed to
+  // the database ports below: the one place it is wired online (step 2.93's last part).
+  const botCheck = hostedBotCheck(config, deps);
   const database = await deps.database();
-  const db = database.createDatabase({ kind: 'postgres', url });
+  const db = database.createDatabase({
+    kind: 'postgres',
+    url,
+    ssl: config.PLATFORM_DATABASE_SSL,
+    ...(config.PLATFORM_DATABASE_CA === undefined ? {} : { ca: config.PLATFORM_DATABASE_CA }),
+    // A connection that drops while idle is replaced by the pool; said by its kind only.
+    onIdleError: () => deps.warn?.('database connection dropped while idle', { kind: 'database' }),
+  });
   try {
     let problems: string[];
     try {
       problems = await database.checkLoginRole(db);
-    } catch {
-      // The driver's message may hold the address; it is not repeated here.
-      throw new StartupError('the database could not be reached to check its login role.');
+    } catch (error) {
+      // The driver's message may hold the address; only its kind is told (record 082).
+      throw new StartupError(databaseRefusal(database.connectCauseOf(error)));
     }
     if (problems.length > 0) {
       throw new StartupError(
         `the database login role is not fit for the app (T-60): ${problems.join('; ')}.`,
       );
     }
-    // Step 2.115, before anyone can sign in: `account_for_sign_in` links an account
-    // made in advance to whoever presents its address, which is safe only if the
-    // service confirms addresses. Step 2.93's last part replaces the refusal below
-    // with the real ports; this check stays above it, asked of the adapter it builds.
-    await requireEmailConfirmation(realSignIn(deps, { projectUrl, secretKey }));
-    throw new StartupError(
-      `sign-in on the real service is not wired yet and not every area runs on the database (step 2.93, record 055), so "${config.APP_ENV}" cannot serve anyone.`,
-    );
-  } finally {
+    let storeProblems: string[];
+    try {
+      storeProblems = await database.checkSignInStoreLogin(db);
+    } catch (error) {
+      throw new StartupError(databaseRefusal(database.connectCauseOf(error)));
+    }
+    if (storeProblems.length > 0) {
+      throw new StartupError(
+        `the database login cannot reach the sign-in store (record 052): ${storeProblems.join('; ')}. As the migration login, run "grant sign_in_store to <the app’s login>;" once, then start the app again.`,
+      );
+    }
+    const now = () => new Date();
+    // Outside production every email is captured, never sent (T-140): staging's sign-in
+    // codes stay in this server's memory (record 075 says how they are to be read).
+    const signInMail = createSignInMail({
+      sender: emailSenderFor({ appEnv: config.APP_ENV, resendApiKey: config.RESEND_API_KEY })
+        .sender,
+      fromAddress: config.EMAIL_FROM,
+      siteOrigin: config.PUBLIC_BASE_URL,
+      onNoticeFailed: (kind) => deps.warn?.('sign-in email not sent', { kind }),
+      now,
+    });
+    const signIn = realSignIn(deps, {
+      projectUrl,
+      secretKey,
+      store: database.createDatabaseSignInStore({ db, now }),
+      codeSender: signInMail.codeSender,
+      returnOrigins: [config.PUBLIC_BASE_URL],
+      allowLocalHttp: onThisComputer(projectUrl),
+    });
+    // Step 2.115, first of all that touches sign-in: `account_for_sign_in` links an account
+    // made in advance to whoever presents its address, which is safe only if the service
+    // confirms addresses. Asked of the very adapter the app then signs people in with.
+    await requireEmailConfirmation(signIn);
+    if (config.APP_ENV === 'production') throw new StartupError(productionNotOpen);
+    // Open for as long as the process runs.
+    return databasePorts({
+      database,
+      db,
+      signIn,
+      signInMail,
+      botCheck,
+      log: deps.log,
+      warn: (message, fields) => deps.warn?.(message, fields),
+      // A real database carries no local tools: both local pages answer "not found".
+      localTools: null,
+      reportDesign: (message, fields) => deps.warn?.(message, fields),
+    });
+  } catch (error) {
     await db.close();
+    throw error;
+  }
+}
+
+/**
+ * Why production stops after every check has passed (record 082): this stage opens only
+ * the test copy (T-270). Said in fixed words.
+ */
+const productionNotOpen =
+  'every check passed, but "production" does not serve anyone yet: only the test copy ("staging") is opened in this stage (record 082), because fixture import does not run on the database yet and youth leagues’ pages are not yet marked "do not index" there (step 2.60).';
+
+/** Whether an address's host is this computer's own name (localhost or a loopback address). */
+function onThisComputer(address: string): boolean {
+  try {
+    return ['localhost', '127.0.0.1', '[::1]'].includes(new URL(address).hostname);
+  } catch {
+    return false;
   }
 }
 
@@ -224,9 +341,9 @@ export function hostedBotCheck(
 }
 
 /** The real sign-in service; a fault in its settings is said in fixed words, never with a value. */
-function realSignIn(deps: StartupDeps, service: RealSignInSettings): EmailConfirmationQuestion {
+function realSignIn(deps: StartupDeps, wiring: RealSignInWiring): SignInService {
   try {
-    return deps.realSignIn(service);
+    return deps.realSignIn(wiring);
   } catch {
     throw new StartupError(
       'the sign-in service could not be set up from SUPABASE_URL and SUPABASE_SECRET_KEY: the address must be the project’s https address and the key its secret key.',
