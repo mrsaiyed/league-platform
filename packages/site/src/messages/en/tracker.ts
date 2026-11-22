@@ -241,6 +241,9 @@ export const enTracker = {
     'You are no longer allowed to score this game. {count} play is still on this device and is not saved. If an admin gives the game back to you, open it again here and it is sent.',
   'tracker.notAllowedKept_other':
     'You are no longer allowed to score this game. {count} plays are still on this device and are not saved. If an admin gives the game back to you, open it again here and they are sent.',
+  // The plays the league refused, play by play, cleared only by a tap (step 2.37, part 2).
+  'tracker.notAppliedList.clear': 'I have seen these: clear the list',
+  'tracker.notAppliedList.title': 'Not applied',
   'tracker.notApplied_one': '{count} play was not applied. The game now shows what was saved.',
   'tracker.notApplied_other': '{count} plays were not applied. The game now shows what was saved.',
   'tracker.notAssigned':

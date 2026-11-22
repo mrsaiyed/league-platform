@@ -15,7 +15,7 @@ import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
 import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.ts';
 import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
-import { keptRows, type KeptRow } from './kept-plays.ts';
+import { keptRows, notAppliedRows, type KeptRow } from './kept-plays.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
 import {
@@ -300,6 +300,12 @@ export function TrackerOpening({
         </a>
       </p>
     ) : null;
+  // The plays the league refused, play by play (step 2.37, part 2).
+  const notApplied =
+    phase.kind === 'open'
+      ? notAppliedRows(phase.status.notApplied, rosters, phase.status.game?.rules.periods ?? 2, t)
+      : [];
+  const clearNotApplied = act((game) => game.controller.dismissNotApplied());
   const storeFailedNotice = storeFailed ? (
     <p className="court-notice" data-kind="error" role="alert">
       {t('tracker.storeFailed')}
@@ -340,7 +346,13 @@ export function TrackerOpening({
         notices={
           anythingToTell ? (
             <>
-              <Notices status={phase.status} t={t} />
+              <Notices
+                status={phase.status}
+                t={t}
+                notApplied={notApplied}
+                onClear={clearNotApplied}
+                busy={busy}
+              />
               {signIn}
               {storeFailedNotice}
             </>
@@ -396,6 +408,8 @@ export function TrackerOpening({
                 t,
               )}
               onClearKept={act((game) => game.controller.dismissNotSaved())}
+              notApplied={notApplied}
+              onClearNotApplied={clearNotApplied}
               onConfirm={(format) => act((game) => game.confirmFormat(format))()}
             />
           ) : null}
@@ -438,13 +452,23 @@ const keptOnly = (status: Pick<TrackerControllerStatus, 'mode' | 'signedOut'>): 
   (status.mode.kind === 'read-only' &&
     (status.mode.reason === 'not-allowed' || status.mode.reason === 'signed-out'));
 
-/** What the tracker tells about holding the game and taps that did not go in. */
+/**
+ * What the tracker tells about holding the game and taps that did not go in; under them
+ * the plays the league refused, play by play, cleared only by a deliberate tap (step
+ * 2.37, part 2).
+ */
 function Notices({
   status,
   t,
+  notApplied,
+  onClear,
+  busy,
 }: {
   readonly status: TrackerControllerStatus;
   readonly t: ReturnType<typeof createTranslator>;
+  readonly notApplied: readonly KeptRow[];
+  readonly onClear: () => void;
+  readonly busy: boolean;
 }) {
   const notices = trackerNotices(status);
   return notices.length === 0 ? null : (
@@ -454,6 +478,27 @@ function Notices({
           {trackerNoticeText(notice, t)}
         </p>
       ))}
+      {notApplied.length === 0 ? null : (
+        <section
+          className="court-stack"
+          aria-labelledby="tracker-not-applied"
+          data-not-applied-list=""
+        >
+          <h2 id="tracker-not-applied">{t('tracker.notAppliedList.title')}</h2>
+          <ol className="court-stack">
+            {notApplied.map((row) => (
+              <li key={row.id} data-not-applied-play="">
+                {row.text}
+              </li>
+            ))}
+          </ol>
+          <p>
+            <button type="button" className="court-button" onClick={onClear} disabled={busy}>
+              {t('tracker.notAppliedList.clear')}
+            </button>
+          </p>
+        </section>
+      )}
     </div>
   );
 }
@@ -502,6 +547,8 @@ function OpenGame({
   onOpenAgain,
   kept,
   onClearKept,
+  notApplied,
+  onClearNotApplied,
   onConfirm,
 }: {
   readonly phase: Extract<Phase, { kind: 'open' }>;
@@ -518,6 +565,9 @@ function OpenGame({
   readonly kept: readonly KeptRow[];
   /** The scorekeeper has seen them: the list goes only by this deliberate tap. */
   readonly onClearKept: () => void;
+  /** The plays the league refused, play by play, and the tap that clears them. */
+  readonly notApplied: readonly KeptRow[];
+  readonly onClearNotApplied: () => void;
   readonly onConfirm: (format: GameFormat) => void;
 }) {
   const { status, confirmed } = phase;
@@ -546,7 +596,13 @@ function OpenGame({
           {savedBannerText(banner, t)}
         </p>
       ) : null}
-      <Notices status={status} t={t} />
+      <Notices
+        status={status}
+        t={t}
+        notApplied={notApplied}
+        onClear={onClearNotApplied}
+        busy={busy}
+      />
       {kept.length === 0 ? null : (
         <section className="court-stack" aria-labelledby="tracker-kept" data-kept-list="">
           <h2 id="tracker-kept">{t('tracker.keptList.title')}</h2>

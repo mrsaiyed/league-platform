@@ -8,6 +8,7 @@ import { basketball } from '@srleagues/sports';
 import { periodText, playText } from './engine-words.ts';
 import type { DeviceRosters } from './opened-game-storage.ts';
 import type { KeptTap } from './queue-storage.ts';
+import type { RefusedCommand } from './tracker-queue.ts';
 
 /** One play of the list. */
 export type KeptRow = {
@@ -82,4 +83,22 @@ export function keptRows(
             clock: basketball.formatClock(moment.clockMs),
           }),
   }));
+}
+
+/**
+ * The "not applied" list play by play (step 2.37, part 2): each tap the league refused,
+ * oldest first, in the same words. The league keeps no moment for a refused tap, so
+ * none is said. An End game the league did not take is said by the pad, not here, as
+ * the notice's count leaves it out (tracker-notice.ts).
+ */
+export function notAppliedRows(
+  refused: readonly RefusedCommand[],
+  rosters: DeviceRosters,
+  periods: 2 | 4,
+  t: Translate,
+): readonly KeptRow[] {
+  const taps = refused
+    .filter(({ command }) => !('input' in command && command.input.type === 'end'))
+    .map(({ command }) => ({ command, moment: null }));
+  return keptRows(taps, rosters, periods, t);
 }
