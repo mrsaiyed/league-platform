@@ -22,6 +22,7 @@ const madeUpAccount: AccountMenu = {
   email: 'owner@example.test',
   adminHref: '/north-valley/admin',
   gamesHref: '/north-valley/admin/games',
+  myTeam: null,
   accountHref: '/account',
   onScoringPage: false,
 };
@@ -322,6 +323,24 @@ describe('header, menu and footer', () => {
     expect(named).toContain('<p class="site-footer-name" dir="auto">دوري الوادي</p>');
     expect(named.indexOf('site-footer-name')).toBeLessThan(named.indexOf(en['footer.terms']));
     expect(html).not.toContain('site-footer-name');
+  });
+
+  it('says the test copy is made up where the made-up line stands, only on the test copy (step 2.205)', () => {
+    const plain = renderToStaticMarkup(createElement(SiteFooter));
+    expect(plain).not.toContain(en['footer.testCopy']);
+    expect(plain).not.toContain(en['footer.madeUp']);
+    const testCopy = renderToStaticMarkup(createElement(SiteFooter, { testCopy: true }));
+    expect(testCopy).toContain(
+      `<small class="site-footer-made-up" data-test-copy="">${en['footer.testCopy']}</small>`,
+    );
+    expect(testCopy).not.toContain(en['footer.madeUp']);
+    // One line only, even were both said: the test copy's.
+    const both = renderToStaticMarkup(createElement(SiteFooter, { madeUp: true, testCopy: true }));
+    expect(both).toContain('data-test-copy');
+    expect(both).not.toContain('data-made-up');
+    expect(renderToStaticMarkup(createElement(SiteFooter, { madeUp: true }))).toContain(
+      en['footer.madeUp'],
+    );
   });
 
   // Step 2.147: the header with presence.

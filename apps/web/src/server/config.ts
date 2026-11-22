@@ -26,6 +26,14 @@ export function isBuildPhase(): boolean {
   return process.env['NEXT_PHASE'] === 'phase-production-build';
 }
 
+/**
+ * Whether this is `next dev` on this computer, whose pages need `eval` for React's error
+ * stacks (security-headers.ts). Never a built server: `next start` sets production.
+ */
+export function isDevelopmentServer(): boolean {
+  return process.env['NODE_ENV'] === 'development';
+}
+
 /** Call once when the server starts, so a bad setting stops it before it serves anyone. */
 export function assertConfig(): Config {
   return getConfig();

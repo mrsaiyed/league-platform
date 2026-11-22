@@ -41,6 +41,9 @@ const historyTables = [
  * create_own_profile and erase_account (only the account set for the transaction),
  * and access_list_names (display names on the set league's access list only). Step
  * 2.127 added my_leagues (record 066): the leagues of the account set, no argument.
+ * Step 2.204 added keep_email (record 098): adds one email to a made-up address to the
+ * test copy's kept emails, outside public, keeps the newest 300, and returns nothing, so
+ * it reads no row of anyone's (schema/kept-emails.test.ts).
  */
 const definerFunctions = [
   'access_list_names',
@@ -52,6 +55,7 @@ const definerFunctions = [
   'create_own_profile',
   'erase_account',
   'find_league_by_slug',
+  'keep_email',
   'my_leagues',
   'take_jobs',
 ];

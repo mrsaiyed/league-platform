@@ -28,7 +28,14 @@
 //   bonus) is measured in this device's own letters and again in wider ones: the screen
 //   draws with the face a device already has, and GitHub's Ubuntu machines, like some
 //   phones, draw letters a sixth wider than Windows does (`facesOf`, in the test).
-import { court, drawIn, sizes, stopClockGame, trackerPath } from './tracker-driver.mjs';
+import {
+  bannerShortHtml,
+  court,
+  drawIn,
+  sizes,
+  stopClockGame,
+  trackerPath,
+} from './tracker-driver.mjs';
 
 const [phone, phoneLying, tabletUpright, , phoneInBrowser] = sizes;
 
@@ -190,7 +197,7 @@ export async function clockSteps(kit) {
         bar,
       );
       await measureTargets(page, '390 x 664, the clock stopped');
-      await restFits(page, '390 x 664, the Start clock button offered', 2);
+      await restFits(page, '390 x 664, the Start clock button offered', 'offered');
       await accessible(page, 'the clock stopped, the Start clock button offered');
 
       // It lies where no option of a picked player lies (the area 4 review of 2.35).
@@ -330,7 +337,7 @@ export async function clockSteps(kit) {
         `${first} to ${later} in 2.3 seconds`,
       );
       await measureTargets(page, '390 x 664, the clock running');
-      await restFits(page, '390 x 664, the clock running', 4);
+      await restFits(page, '390 x 664, the clock running', 'running');
       // The clock's form opened while the clock runs shows the clock as it reads now,
       // ticking, until a time is typed: it used to stand at the moment the form opened.
       await c.clock.click();
@@ -530,7 +537,7 @@ export async function clockSteps(kit) {
       await said(c, /^This period is over\. Pick the next period first\.$/);
       note('tapped, the greyed Start says what to do, in a sentence', true);
       await measureTargets(page, '390 x 664, the period over');
-      await restFits(page, '390 x 664, the period over', 2);
+      await restFits(page, '390 x 664, the period over', 'offered');
       await accessible(page, 'the period over');
       await tapWhereItIs(page, c.pickPeriodButton, 'Pick the next period');
       await c.clockSheet.waitFor();
@@ -1167,18 +1174,8 @@ export async function clockSteps(kit) {
                 el.textContent = text;
                 continue;
               }
-              const span = (name, says) => {
-                const part = document.createElement('span');
-                part.className = name;
-                part.textContent = says;
-                return part;
-              };
-              el.replaceChildren(
-                ...text.flatMap((line, index) => [
-                  ...(index === 0 ? [] : [span('court-banner-dot', ' · ')]),
-                  span('court-banner-line', line),
-                ]),
-              );
+              // The banner's short form, drawn as the screen draws it.
+              el.innerHTML = text.html;
             }
           }
         }, into);
@@ -1187,9 +1184,22 @@ export async function clockSteps(kit) {
         page.evaluate(() => {
           const pad = document.querySelector('[data-pad]').getBoundingClientRect();
           const rest = document.querySelector('[data-pad] [data-rest]');
+          // On an upright phone the two teams are in one block, which would scroll by
+          // itself if what is above it grew: a five cut at its lower edge is still inside
+          // its own panel and over the pad, so it is looked for here (the area lead's
+          // second look at step 2.36, N1: the block could be dragged 4 px).
+          const teams = document.querySelector('[data-teams]');
+          const block = teams.getBoundingClientRect();
+          const held = getComputedStyle(teams).display !== 'contents';
           return {
             page: document.scrollingElement.scrollHeight - window.innerHeight,
             sideways: document.documentElement.scrollWidth - window.innerWidth,
+            teams: held ? teams.scrollHeight - teams.clientHeight : 0,
+            tilesCutByTheirBlock: held
+              ? [...document.querySelectorAll('[data-floor] .court-tile')].filter(
+                  (el) => el.getBoundingClientRect().bottom > block.bottom + 0.5,
+                ).length
+              : 0,
             panels: [...document.querySelectorAll('.court-team')].map(
               (panel) => panel.scrollHeight - panel.clientHeight,
             ),
@@ -1204,13 +1214,32 @@ export async function clockSteps(kit) {
                 return under || r.top < 0 || r.bottom > window.innerHeight;
               },
             ).length,
+            // A tall phone keeps its two bench strips: the lower one went under the pad
+            // with the longest banner and a name of two lines (step 2.36's landing).
+            // The strip is measured, not its tiles: a line of bench players clips those
+            // it has no room for and says how many more in words.
+            benchUnderThePad: [...document.querySelectorAll('[data-bench]')].filter((el) => {
+              const r = el.getBoundingClientRect();
+              const under =
+                r.bottom > pad.top + 0.5 &&
+                r.top < pad.bottom &&
+                r.right > pad.left &&
+                r.left < pad.right;
+              return r.height > 0 && (under || r.top < 0 || r.bottom > window.innerHeight);
+            }).length,
             hintCutBy: rest === null ? null : rest.scrollHeight - rest.clientHeight,
           };
         });
       // On both phones that are short of room: lying down (the banner sits beside the
       // scoreboard there and takes its width from the names), and upright in a browser
-      // (where a name of two lines and a banner of two lines push the players down).
-      for (const { size, letters, family } of await fits(page, [phoneLying, phoneInBrowser])) {
+      // (where a name of two lines and a banner of two lines push the players down); and
+      // upright with the browser's bars tucked away, where the two bench strips stay
+      // (step 2.37, part 2: one rule for both upright heights).
+      for (const { size, letters, family } of await fits(page, [
+        phoneLying,
+        phoneInBrowser,
+        phone,
+      ])) {
         await drawIn(page, family);
         await page.setViewportSize({ width: size.width, height: size.height });
         await twoFrames(page);
@@ -1221,23 +1250,64 @@ export async function clockSteps(kit) {
         const bannerNow = (await c.banner.locator('.court-banner-long').textContent()) ?? '';
         const bannerShort = (await c.banner.locator('.court-banner-short').textContent()) ?? '';
         // What the banner shows a scorekeeper here, and what it gives a screen reader.
+        // Lying down each thing it says is a line of its own, with no dot between.
         const bannerShows = {
-          words: (await c.banner.innerText()).trim(),
+          words: (await c.banner.innerText()).trim().replace(/\s*\n\s*/g, ' · '),
           heard: (await c.banner.ariaSnapshot()).trim(),
         };
-        // The longest the banner says: all three of its lines at once (queue-banner.ts),
-        // in its long form and in the short one that a phone short of room shows.
+        // How high the rows above the two teams are, and where the lowest floor tile ends.
+        const above = () =>
+          page.evaluate(() => {
+            const high = (selector) =>
+              document.querySelector(selector)?.getBoundingClientRect().height ?? null;
+            return {
+              // The first row: the title over the saved line upright, the whole of the
+              // scoreboard's row lying down.
+              firstRow: high(
+                getComputedStyle(document.querySelector('.court-top-start')).display === 'contents'
+                  ? '.court-top'
+                  : '.court-top-start',
+              ),
+              scoreboard: high('.court-board'),
+              lowestTile: Math.max(
+                ...[...document.querySelectorAll('[data-floor] .court-tile')].map(
+                  (el) => el.getBoundingClientRect().bottom,
+                ),
+              ),
+            };
+          });
+        const aboveAsItIs = await above();
+        // The longest the banner says: all four of its lines at once (queue-banner.ts: the
+        // storage, the connection, plays waiting and plays not saved), in its long form
+        // and in the short one that a phone shows.
         await written({
-          '[data-saved-banner] .court-banner-long': `This device could not save to its storage · ${bannerNow} · 12 actions not saved`,
-          '[data-saved-banner] .court-banner-short': [
-            'Storage failed',
-            bannerShort,
-            '12 not saved',
-          ],
+          '[data-saved-banner] .court-banner-long': `This device could not save to its storage · ${bannerNow} · 12 plays not saved`,
+          '[data-saved-banner] .court-banner-short': {
+            html: bannerShortHtml(['Storage failed', ...bannerShort.split(' · '), '12 not saved']),
+          },
         });
         await twoFrames(page);
         const longestBanner = await names();
         const longestShows = (await c.banner.innerText()).trim().replace(/\s*\n\s*/g, ' · ');
+        const aboveAtLongest = await above();
+        // Every thing the banner says is whole where it is drawn: no line of it is cut
+        // at its end, and none is under the edge of its place. (A run of words is
+        // measured a little higher than the line it stands on, by the room a face keeps
+        // over and under its letters: 2 px of that is not a cut.)
+        const bannerWhole = await c.banner.evaluate((banner) => {
+          const edge = banner.getBoundingClientRect();
+          return [...banner.querySelectorAll('.court-banner-short .court-banner-line')].map(
+            (line) => {
+              const r = line.getBoundingClientRect();
+              return {
+                says: line.textContent,
+                cut: line.scrollWidth > line.clientWidth + 0.5,
+                outside:
+                  r.top < edge.top - 2 || r.bottom > edge.bottom + 2 || r.right > edge.right + 0.5,
+              };
+            },
+          );
+        });
         // A name of fifteen letters, and a truly long one (made-up names, written in).
         await written({
           '[data-score="home"] .court-score-name': 'Riverside Bears',
@@ -1261,20 +1331,37 @@ export async function clockSteps(kit) {
             asTheyAre.every((name) => !name.cut),
           JSON.stringify({ fullest, bannerNow, asTheyAre }),
         );
+        // With the network off the banner says so as well (step 2.37), and never only how
+        // many plays wait: two things, said shorter on a phone.
         note(
-          `${at}: the banner says it shorter (“68 to send”), in one form for the eye and for a screen reader`,
-          /^\d+ to send$/.test(bannerShows.words) &&
+          `${at}: the banner says it shorter (“No connection · 68 to send”), in one form for the eye and for a screen reader`,
+          /^No connection · \d+ to send$/.test(bannerShows.words) &&
             bannerShows.words === bannerShort &&
-            bannerShows.heard.includes(bannerShort) &&
-            !bannerShows.heard.includes('waiting to send'),
+            bannerShort.split(' · ').every((thing) => bannerShows.heard.includes(thing)) &&
+            !bannerShows.heard.includes('waiting to send') &&
+            !bannerShows.heard.includes('plays are kept'),
           JSON.stringify({ bannerShows, bannerShort }),
         );
         note(
           `…and with the longest the banner says, neither name is cut${again}`,
           longestBanner.length === 2 &&
             longestBanner.every((name) => !name.cut) &&
-            /^Storage failed · \d+ to send · 12 not saved$/.test(longestShows),
+            // Four things at once.
+            /^Storage failed · No connection · \d+ to send · 12 not saved$/.test(longestShows),
           JSON.stringify({ longestBanner, longestShows }),
+        );
+        // The rule the area lead left step 2.37 (the landing of step 2.36): nothing above
+        // the two teams grows with what the banner says. Its four things are all whole,
+        // and the first row, the scoreboard and the players under them stay where they were.
+        note(
+          `…the longest the banner says is whole, every thing it says, and nothing above the two teams grew for it: not the first row, not the scoreboard, and no player moved (${at})`,
+          bannerWhole.length === 4 &&
+            bannerWhole.every((line) => !line.cut && !line.outside) &&
+            aboveAtLongest.firstRow !== null &&
+            aboveAtLongest.firstRow <= aboveAsItIs.firstRow + 0.5 &&
+            aboveAtLongest.scoreboard <= aboveAsItIs.scoreboard + 0.5 &&
+            aboveAtLongest.lowestTile <= aboveAsItIs.lowestTile + 0.5,
+          JSON.stringify({ bannerWhole, aboveAsItIs, aboveAtLongest }),
         );
         note(
           `…a name of fifteen letters is whole; only a truly long one is cut, ending in "…", with room for fifteen${again}`,
@@ -1289,24 +1376,67 @@ export async function clockSteps(kit) {
           `…and with all of that at once, nothing is pushed under the pad or off the screen, nothing scrolls and the hint is whole (${at})`,
           atItsFullest.page <= 0 &&
             atItsFullest.sideways <= 0 &&
+            atItsFullest.teams <= 0 &&
+            atItsFullest.tilesCutByTheirBlock === 0 &&
             atItsFullest.panels.every((over) => over <= 0) &&
             atItsFullest.tilesUnderThePad === 0 &&
+            atItsFullest.benchUnderThePad === 0 &&
             atItsFullest.hintCutBy !== null &&
             atItsFullest.hintCutBy <= 0,
           JSON.stringify(atItsFullest),
         );
       }
       await drawIn(page, '');
-      // Where there is room (a phone upright at its full height, a tablet) the banner
-      // says it at length.
-      await page.setViewportSize({ width: phone.width, height: phone.height });
+      // Where there is room (a tablet) the banner says it at length.
+      await page.setViewportSize({ width: tabletUpright.width, height: tabletUpright.height });
       await twoFrames(page);
       const atLength = (await c.banner.innerText()).trim();
       note(
-        '390 x 844: the banner says it at length (“68 actions waiting to send”)',
-        /^\d+ actions waiting to send$/.test(atLength),
+        '820 x 1180: the banner says it at length (“No connection: plays are kept on this device · 68 plays waiting to send”)',
+        /^No connection: plays are kept on this device · \d+ plays waiting to send$/.test(atLength),
         atLength,
       );
+      // A phone upright at its full height says it shorter too (step 2.37): at length,
+      // with no connection, it took two lines under the scoreboard and pushed the lower
+      // bench under the pad. It is one line in the first row, in both faces, and the
+      // lower bench is whole.
+      for (const { letters, family } of await fits(page, [phone])) {
+        await drawIn(page, family);
+        await page.setViewportSize({ width: phone.width, height: phone.height });
+        await twoFrames(page);
+        const tall = await page.evaluate(() => {
+          const banner = document.querySelector('[data-saved-banner]');
+          const teams = document.querySelector('[data-teams]');
+          const pad = document.querySelector('[data-pad]').getBoundingClientRect();
+          return {
+            says: banner.innerText.trim(),
+            lines: Math.round(
+              banner.getBoundingClientRect().height /
+                Number.parseFloat(getComputedStyle(banner).lineHeight),
+            ),
+            teams: teams.scrollHeight - teams.clientHeight,
+            // The bench players its line shows: those it does not hold are counted on
+            // its end tile ("4 more") and are not drawn.
+            benchUnderThePad: [
+              ...document.querySelectorAll(
+                '[data-bench] [data-player]:not([data-folded]), [data-bench] .court-more-tile',
+              ),
+            ].filter((el) => {
+              const r = el.getBoundingClientRect();
+              return r.height > 0 && r.bottom > pad.top + 0.5;
+            }).length,
+          };
+        });
+        note(
+          `390 x 844${letters}: with no connection the banner says it shorter, in one line of the first row, and the lower bench is whole over the pad`,
+          /^No connection · \d+ to send$/.test(tall.says) &&
+            tall.lines === 1 &&
+            tall.teams <= 0 &&
+            tall.benchUnderThePad === 0,
+          JSON.stringify(tall),
+        );
+      }
+      await drawIn(page, '');
       await page.setViewportSize({ width: phoneLying.width, height: phoneLying.height });
       await context.setOffline(false);
       await page.evaluate(() => window.dispatchEvent(new Event('online')));
@@ -1800,7 +1930,7 @@ export async function clockSteps(kit) {
             box.width >= 200,
           JSON.stringify(box),
         );
-        await restFits(page, label, 2);
+        await restFits(page, label, 'offered');
         // Start and Pause, the clock and the timeouts are named for a screen reader.
         note(
           `${label}: Start, the clock and the timeouts are each named for a screen reader`,
@@ -2062,7 +2192,7 @@ export async function clockSteps(kit) {
 
       await c.startClock();
       await atEverySize('the clock running', async (size, label) => {
-        await restFits(page, label, 4);
+        await restFits(page, label, 'running');
       });
       await c.pauseClock();
 
@@ -2200,6 +2330,22 @@ export async function clockSteps(kit) {
 
       await c.setClock('1');
       await c.startClock().catch(() => undefined);
+      // Since step 2.37 the pad's first line at 0:00 is End game when the last period (or
+      // an overtime) has run out with a team ahead, and the way to the next period at any
+      // other 0:00. This game is past regulation by now: whichever its score calls for is
+      // checked where it is, and then the way to the next period as before, at the 0:00
+      // of an earlier period.
+      await c.pickPeriodButton.or(c.endOffer).first().waitFor();
+      if (await c.endOffer.isVisible()) {
+        await page.waitForTimeout(3400);
+        await atEverySize('the last period over, a team ahead', async (size, label) => {
+          note(`${label}: End game is offered whole in the pad`, await wholeInPad(c.endOffer));
+          await restFits(page, label, 'offered');
+        });
+        await c.pickPeriod(1);
+        await c.setClock('1');
+        await c.startClock().catch(() => undefined);
+      }
       await c.pickPeriodButton.waitFor();
       await page.waitForTimeout(3400);
       await atEverySize('the period over', async (size, label) => {
@@ -2207,7 +2353,7 @@ export async function clockSteps(kit) {
           `${label}: the way to the next period is whole in the pad`,
           await wholeInPad(c.pickPeriodButton),
         );
-        await restFits(page, label, 2);
+        await restFits(page, label, 'offered');
       });
       await c.setClock('500');
       await c.saved();

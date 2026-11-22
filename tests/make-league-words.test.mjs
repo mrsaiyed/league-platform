@@ -1,7 +1,12 @@
 // What `npm run league:make` says (scripts/make-league.messages.mjs) where saying too
 // much would be untrue or would answer its own question. Made-up values only.
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   checkBeforeAnswering,
   confirmHosted,
@@ -102,4 +107,46 @@ test('after making it, it prints what the database holds, read back, and that no
     '/made-up-hoops',
   ).join('\n');
   assert.match(wrong, /1 role grants in the league \(NOT as it should be/);
+});
+
+// U-16: a short name on the starter list of offensive words, or holding one as a word, is
+// refused in plain words by the script itself, before any database is opened or made; it
+// says which it was: one of our own words, or an offensive one.
+test('a short name with a word from the offensive starter list is refused in plain words', () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const folder = mkdtempSync(path.join(os.tmpdir(), 'make-league-words-'));
+  // No database address of this shell's reaches the script: it is told a folder only.
+  const withoutDatabases = Object.fromEntries(
+    Object.entries(process.env).filter(([name]) => !/DATABASE|^PG/i.test(name)),
+  );
+  try {
+    const offensive =
+      'Short name: that word is not allowed (it is on our list of offensive words). Choose another.';
+    const ours =
+      'Short name: that word is one of ours (the site uses it for its own pages). Choose another.';
+    for (const [shortName, said] of [
+      ['shit-hoops', offensive],
+      ['Fuck', offensive],
+      ['ragheads', offensive],
+      ['admin', ours],
+    ]) {
+      const run = spawnSync(
+        process.execPath,
+        [
+          '--disable-warning=ExperimentalWarning',
+          path.join(root, 'scripts/make-league.mjs'),
+          ...['--name', 'Made-up Hoops', '--short-name', shortName, '--sport', 'basketball'],
+          ...['--who-plays', 'adults', '--city', 'Springfield', '--time-zone', 'America/Chicago'],
+          ...['--contact-email', 'contact@example.test', '--owner-email', 'owner@example.test'],
+          ...['--as', 'staff@example.test', '--db', path.join(folder, 'db')],
+        ],
+        { cwd: root, encoding: 'utf8', input: '', env: withoutDatabases },
+      );
+      assert.equal(run.status, 2, `${shortName}: ${run.stderr}`);
+      assert.equal(run.stderr.trim(), said, shortName);
+      assert.ok(!existsSync(path.join(folder, 'db')), 'no database was made');
+    }
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
 });

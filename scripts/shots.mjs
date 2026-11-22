@@ -7,6 +7,7 @@
 //   node scripts/shots.mjs --no-build           serves the build that is already here
 //   node scripts/shots.mjs --only=home,admin    only pictures whose name contains one of these
 //   node scripts/shots.mjs --design=pine        the first made-up league under a named design
+//   node scripts/shots.mjs --binned-team=badgers  with that team of the first league in the bin
 //   node scripts/shots.mjs --measure            also measures the contrast of every public page
 //   LOCAL_NOW=<UTC time> node scripts/shots.mjs  the made-up world's clock starts there, as in
 //                                                the browser tests (a game day at noon: worldAtNoon)
@@ -49,6 +50,9 @@
 // (.local/shots/320 and /390, `…-long-name.jpg` and `…-long-name-scrolled.jpg`).
 //
 // `--only=menu` takes the phone menu, open, at 390 in each league's look (`…-menu-open.jpg`).
+//
+// `--only=overtime` plays a game won in overtime and takes the pages that show its result
+// (`north-valley-overtime-….jpg`, step 2.200): see overtimePages.
 //
 // Signed in as the made-up owner (step 2.127): the front page and the account page with
 // their leagues (`platform-home-signed-in`, `platform-account`), and the account button's
@@ -288,6 +292,160 @@ const gamesStates = [
   },
 ];
 
+// Step 2.158: forfeiting, postponing and cancelling ask first, and a game called off is put
+// back. Each state is reached by the owner's own taps on the games list (nothing rides in
+// the address, record 067), on games of the first league's week no other picture uses:
+// Owls at Badgers tonight (asked about, never changed), Lions at Hawks tomorrow (postponed,
+// then asked to go back on its date) and Herons at Falcons (cancelled, then put back). A
+// picture that changes a game finds it already changed at the second width, and starts
+// from there. A "Yes" is tapped once the question has been read: the server takes a "Yes"
+// within its first moments as the second tap of a double tap (call-off-step.ts).
+const callOffGame = (page, away, home) =>
+  page.locator('li.admin-game[id^="game-"]').filter({ hasText: away }).filter({ hasText: home });
+const owlsAtBadgers = (page) => callOffGame(page, 'Owls', 'Badgers');
+const lionsAtHawks = (page) => callOffGame(page, 'Lions', 'Hawks');
+const heronsAtFalcons = (page) => callOffGame(page, 'Herons', 'Falcons');
+const statusOf = (game) => game.locator('.ui-game-card').first().getAttribute('data-status');
+/** A game's panel by its button's words; the last one ("Forfeit, …") when none is named. */
+const panelOf = (game, summary) =>
+  summary === undefined
+    ? game.locator('details[data-call-off]').last()
+    : game.locator('details[data-call-off]').filter({
+        has: game.page().locator('summary', { hasText: summary }),
+      });
+async function openPanel(panel) {
+  if ((await panel.getAttribute('open')) === null) await panel.locator('> summary').click();
+}
+async function askToCallOff(game, button, summary) {
+  await openPanel(panelOf(game, summary));
+  await game.getByRole('button', { name: button, exact: true }).click();
+  await game.locator('[data-call-off-ask]').waitFor();
+}
+async function sayYes(game, name) {
+  await game.page().waitForTimeout(1000);
+  await game.getByRole('button', { name }).click();
+  await game.getByRole('status').filter({ hasText: 'Saved' }).waitFor();
+}
+/** Lions at Hawks postponed through its question, unless it already is. */
+async function postponedLions(page) {
+  const game = lionsAtHawks(page);
+  if ((await statusOf(game)) === 'scheduled') {
+    await askToCallOff(game, 'Postpone');
+    await sayYes(game, 'Yes, postpone it');
+  }
+  return game;
+}
+/** Herons at Falcons cancelled through its question, unless it already is. */
+async function cancelledHerons(page) {
+  const game = heronsAtFalcons(page);
+  if ((await statusOf(game)) !== 'cancelled') {
+    await askToCallOff(game, 'Cancel the game');
+    await sayYes(game, 'Yes, cancel it');
+  }
+  return game;
+}
+const callOffStates = [
+  {
+    // "Forfeit, postpone or cancel" open: its three buttons apart, the destructive one at
+    // the far end of its row.
+    name: 'admin-games-panel-open',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => openPanel(panelOf(owlsAtBadgers(page))),
+  },
+  {
+    // "No" stands where "Postpone" was; the question and its "Yes" come after.
+    name: 'admin-games-postpone-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => askToCallOff(owlsAtBadgers(page), 'Postpone'),
+  },
+  {
+    name: 'admin-games-cancel-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => askToCallOff(owlsAtBadgers(page), 'Cancel the game'),
+  },
+  {
+    // "Team that forfeits" starts empty; a team chosen, the question names both and the score.
+    name: 'admin-games-forfeit-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = owlsAtBadgers(page);
+      await openPanel(panelOf(game));
+      await game.getByLabel('Team that forfeits').selectOption({ label: 'Owls' });
+      await askToCallOff(game, 'Record forfeit');
+    },
+  },
+  {
+    // "Yes, postpone it": "Saved" says where it waits, its card leads to the list of games
+    // waiting for a new date, and the list holds it.
+    name: 'admin-games-postponed',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      await postponedLions(page);
+    },
+  },
+  {
+    // "Put it back on its date": a reason chosen, the question naming its old date.
+    name: 'admin-games-restore-ask',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = await postponedLions(page);
+      const panel = panelOf(game, 'Put it back on its date');
+      await openPanel(panel);
+      await panel.getByLabel(/Why are you putting it back/).selectOption({
+        label: 'Postponed by mistake',
+      });
+      await askToCallOff(game, 'Put it back', 'Put it back on its date');
+    },
+  },
+  {
+    // The postponed game's own page: why it has no score, no grid, the way to its new date.
+    name: 'admin-games-box-postponed',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = await postponedLions(page);
+      const id = ((await game.getAttribute('id')) ?? '').slice('game-'.length);
+      await page.goto(page.url().replace(/\/admin\/games.*$/, `/admin/games/${id}`));
+      await page.locator('main h1').waitFor();
+    },
+  },
+  {
+    // Cancelled through its question, then "Put this game back" opened, a reason to choose.
+    name: 'admin-games-put-back',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    light: true,
+    tap: async (page) => {
+      const game = await cancelledHerons(page);
+      await openPanel(game.locator('details[data-action-form]'));
+    },
+  },
+  {
+    // Put back with a reason: a scheduled game again, "Saved" beside it.
+    name: 'admin-games-put-back-saved',
+    at: '/admin/games',
+    onlyIn: leagues[0],
+    tap: async (page) => {
+      const game = await cancelledHerons(page);
+      const panel = game.locator('details[data-action-form]');
+      await openPanel(panel);
+      await panel.getByLabel(/Why are you putting it back/).selectOption({
+        label: 'Cancelled by mistake',
+      });
+      await panel.getByRole('button', { name: 'Put it back on the schedule' }).click();
+      await game.getByRole('status').filter({ hasText: 'back on the schedule' }).waitFor();
+    },
+  },
+];
+
 // What the league's owner sees.
 const adminPages = [
   { name: 'admin-home', at: '/admin' },
@@ -305,14 +463,21 @@ const adminPages = [
     job,
     ...(job.light ? [{ ...job, name: `${job.name}-light`, lookOf: leagues[1] }] : []),
   ]),
+  // Step 2.158's questions, the postponed game and the put-back (callOffStates).
+  ...callOffStates.flatMap((job) => [
+    job,
+    ...(job.light ? [{ ...job, name: `${job.name}-light`, lookOf: leagues[1] }] : []),
+  ]),
   { name: 'admin-teams', at: '/admin/teams' },
   { name: 'admin-team', at: '/admin/teams', first: '/admin/teams/' },
   // Step 2.161, in the first made-up league, by the owner's own taps (undoSteps): a leaving
   // date of next year refused beside its field, with the date kept; the Falcons' page,
   // whose "Left the team" line has its put-back button and whose bin says how many people
-  // are on the roster, ticked and ready to confirm; and a game removed from the schedule
-  // draft, answered "Removed: … Put it back".
-  ...['team-leaving-refused', 'team-left-and-bin'].map((step) => ({
+  // are on the roster; and a game removed from the schedule draft, answered "Removed: … Put
+  // it back". Step 2.180: the Badgers, with results and games to come, whose panel says up
+  // front they cannot be removed this season, with no tick or button (A-17); a team with
+  // no games keeps its tick (tests/browser/team-bin-test.mjs pictures it).
+  ...['team-leaving-refused', 'team-left-and-bin', 'team-cannot-be-removed'].map((step) => ({
     name: `admin-${step}`,
     at: '/admin/teams',
     league: 'north-valley',
@@ -333,6 +498,20 @@ const adminPages = [
     league: 'north-valley',
     steps: (page) => undoSteps(page, 'schedule-game-removed'),
   },
+  // Step 2.185, in the first made-up league's current season, by the owner's own taps
+  // (draftPutBackSteps): a published game removed and another moved, the removed one still
+  // in its place, struck through, with "Removed in this draft" and "Put it back"; and a
+  // game removed and put back, the draft then "the same as the published schedule" with
+  // "Discard the draft" beside it. The draft is discarded again once the page is drawn.
+  ...[
+    { name: 'admin-schedule-removed-stays', then: 'move' },
+    { name: 'admin-schedule-draft-same', then: 'put-back' },
+  ].map(({ name, then }) => ({
+    name,
+    at: '/admin/schedule',
+    league: 'north-valley',
+    steps: (page) => draftPutBackSteps(page, then),
+  })),
   // Step 2.181, in the first made-up league's current season, by the owner's own taps
   // (emptiedRoundSteps): both games of the last round removed from the draft, the round's
   // controls opened ("0 games" and whether it can be removed), and then "Remove this
@@ -409,6 +588,22 @@ const adminPages = [
   },
   { name: 'admin-settings', at: '/admin/settings' },
   { name: 'admin-people', at: '/admin/people' },
+  // Step 2.50, Admin → People: a search by name; one person's record (the first on the
+  // list); and, by the owner's own taps with scripts off (peopleSteps), a child added by hand
+  // with an email and a date of birth, landing on their record that says so; the add form
+  // refused beside its boxes, with what was typed kept; a misspelt name put right, "Saved"
+  // beside the details; and a date of birth that makes a player two years old shown back
+  // before it is saved (R-28). Each taken in the first league only.
+  { name: 'admin-people-search', at: '/admin/people?q=ta' },
+  { name: 'admin-person', at: '/admin/people', first: '/admin/people/' },
+  ...['person-added', 'person-add-refused', 'person-saved', 'person-birth-date-asked'].map(
+    (step) => ({
+      name: `admin-${step}`,
+      at: '/admin/people',
+      league: 'north-valley',
+      steps: (page) => peopleSteps(page, step),
+    }),
+  ),
   { name: 'admin-standings', at: '/admin/standings' },
   // The admin's own frame (step 2.103): its menu, open, as a phone holds it (on a laptop the
   // menu is always at the side, so the picture is the page's first screen); and "not
@@ -428,6 +623,56 @@ const scheduler = { name: 'srl_session', value: 'local-scheduler-token' };
 const schedulerPages = [
   { name: 'scheduler-admin-home', at: '/admin' },
   { name: 'scheduler-admin-refused', at: '/admin/teams' },
+];
+// A refusal as each kind of person meets it (step 2.157): staff outside their role (a
+// scheduler and a scorekeeper at People), a coach and a signed-in stranger at the admin,
+// a signed-in stranger at a draft league's admin ("Page not found", nothing of the league),
+// a long address (a visitor at an admin area is sent to sign in since U-15 changed, so has
+// no picture here), another league's game under this league's address (on the
+// scoring page and in the admin), and a club admin's team page, which may not show the
+// league's list of people. `who` is the made-up person's cookie; null is a visitor.
+const otherLeaguesGame = '01900000-0000-7000-8000-006a00000002';
+const refusalPages = [
+  {
+    name: 'refusal-scheduler-people',
+    who: 'local-scheduler-token',
+    at: '/north-valley/admin/people',
+  },
+  {
+    name: 'refusal-scorekeeper-people',
+    who: 'local-scorekeeper-token',
+    at: '/north-valley/admin/people',
+  },
+  { name: 'refusal-coach-admin', who: 'local-coach-token', at: '/north-valley/admin' },
+  { name: 'refusal-stranger-admin', who: 'local-stranger-token', at: '/north-valley/admin' },
+  { name: 'refusal-stranger-draft-admin', who: 'local-stranger-token', at: '/quiet-pines/admin' },
+  // A scheduler signed in with a long address (52 letters): it breaks inside the card, in
+  // the admin's frame and on the plain screen.
+  {
+    name: 'refusal-long-address-people',
+    who: 'local-scheduler-with-long-address-token',
+    at: '/north-valley/admin/people',
+  },
+  {
+    name: 'refusal-long-address-plain',
+    who: 'local-scheduler-with-long-address-token',
+    at: '/harbor-city/admin',
+  },
+  {
+    name: 'refusal-other-leagues-game',
+    who: 'local-owner-token',
+    at: `/harbor-city/score/${otherLeaguesGame}`,
+  },
+  {
+    name: 'refusal-other-leagues-box-score',
+    who: 'local-owner-token',
+    at: `/harbor-city/admin/games/${otherLeaguesGame}`,
+  },
+  {
+    name: 'refusal-club-admin-team',
+    who: 'local-club-admin-token',
+    at: '/quiet-pines/admin/teams/01900000-0000-7000-8000-007e00000004',
+  },
 ];
 // The games list's taps (step 2.155): a game's place on the list, its boxes opened, and a
 // score typed and saved, which only asks.
@@ -473,6 +718,49 @@ const scorekeeperPages = [
   { name: 'scorekeeper-tracker', at: '/admin', first: '/score/' },
   // The games list as a scorekeeper sees it: a final game says who can reopen it (2.154).
   { name: 'scorekeeper-games-list', at: '/admin/games' },
+];
+// What a coach finds (step 2.168): "My team" in the account menu, and their team marked as
+// theirs, after the page, on its page, the Teams list and the league home. The made-up coach
+// is on North Valley's Herons and Harbor City's Rockets, and Harbor City opens on a member's
+// team. A visitor whose device chose a team sees it marked; someone on no team who opens
+// `/my` is told so (the made-up stranger, signed in, holds nothing anywhere).
+const coach = { name: 'srl_session', value: 'local-coach-token' };
+const stranger = { name: 'srl_session', value: 'local-stranger-token' };
+const chosenComets = { name: `srl_my_team_${hexId('0000', 2)}`, value: 'comets' };
+/** The marks are read after the page: the picture waits for the first one. */
+const yoursDrawn = (page) =>
+  page
+    .locator('main :is([data-yours], [data-your-team])')
+    .first()
+    .waitFor({ state: 'attached', timeout: 60_000 });
+const coachPages = [
+  { name: 'coach-menu-open', at: '', opens: true },
+  { name: 'coach-league-home', at: '', steps: yoursDrawn },
+  { name: 'coach-team', at: '/teams/herons', steps: yoursDrawn },
+  { name: 'coach-team-opens-here', league: 'harbor-city', at: '/teams/rockets', steps: yoursDrawn },
+  { name: 'coach-teams', league: 'harbor-city', at: '/teams', steps: yoursDrawn },
+  { name: 'coach-home', league: 'harbor-city', at: '?start=league', steps: yoursDrawn },
+];
+const chosenTeamPages = [
+  { name: 'visitor-chose-teams', at: '/teams', steps: yoursDrawn },
+  { name: 'visitor-chose-home', at: '?start=league', steps: yoursDrawn },
+];
+const noTeamPages = [{ name: 'my-no-team', at: '/my' }];
+// A game won in overtime (step 2.200, `--only=overtime`): Lions v Tigers, the first league's
+// game 1, played level through regulation and won in the first overtime by this script's
+// own taps (scoreOvertimeGame), after every other picture is taken, so none of them
+// changes. Then its page, its card on the schedule, the home page and the Lions' page, and
+// the games lists of the owner and the scorekeeper, and its box score sheet: each says
+// "Final, OT", beside the made-up season's other results, which say "Final" alone.
+const overtimeGame = trackedGame(1);
+const overtimePages = [
+  { name: 'overtime-game', at: `/games/${overtimeGame}`, as: 'visitor' },
+  { name: 'overtime-schedule', at: '/schedule', as: 'visitor' },
+  { name: 'overtime-home', at: '', as: 'visitor' },
+  { name: 'overtime-team', at: '/teams/lions', as: 'visitor' },
+  { name: 'overtime-admin-games', at: '/admin/games', as: 'owner' },
+  { name: 'overtime-scorekeeper-games', at: '/admin', as: 'scorekeeper' },
+  { name: 'overtime-box-score', at: `/admin/games/${overtimeGame}`, as: 'owner' },
 ];
 // SR Leagues' own pages, signed in as the made-up owner (step 2.127).
 const signedInPlatformPages = [
@@ -818,8 +1106,19 @@ if (design !== '' && !/^[a-z][a-z0-9-]{0,39}$/.test(design)) {
   console.error('--design takes a design name, such as crest-light or pine.');
   process.exit(1);
 }
-/** A picture's file name: marked with the design it was taken under, when one is named. */
-const fileName = (name) => (design === '' ? name : `${name}-in-${design}`);
+// A team of the first league's current season put in the bin with its games as the world is
+// made (LOCAL_BINNED_TEAM, step 2.180): `--binned-team=badgers` pictures how the grid, the
+// standings and the rest show a team moved there before A-17 (`…-with-badgers-binned.jpg`).
+const binnedTeam = (process.argv.find((arg) => arg.startsWith('--binned-team=')) ?? '').slice(
+  '--binned-team='.length,
+);
+if (binnedTeam !== '' && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(binnedTeam)) {
+  console.error('--binned-team takes a team’s short name, such as badgers.');
+  process.exit(1);
+}
+/** A picture's file name: marked with the design and the team in the bin, when named. */
+const fileName = (name) =>
+  `${design === '' ? name : `${name}-in-${design}`}${binnedTeam === '' ? '' : `-with-${binnedTeam}-binned`}`;
 // Under a named design only the first league's public pages change, so only they are taken.
 const picturedLeagues = design === '' ? leagues : [leagues[0]];
 
@@ -861,6 +1160,56 @@ async function waitFor(url, server) {
     }
   }
   throw new Error(`the server did not answer within two minutes:\n${server.output()}`);
+}
+
+/**
+ * Plays Lions v Tigers (the first league's game 1, a halves game) level through both halves,
+ * then the first overtime, which the Lions win (step 2.200), as the owner's tablet would.
+ */
+async function scoreOvertimeGame(origin) {
+  const five = (team) => [1, 2, 3, 4, 5].map((n) => trackedPlayer(team, n));
+  const [lions, tigers] = [five(1), five(2)];
+  const post = async (at, body) => {
+    const answer = await fetch(
+      `${origin}/api/v1/leagues/${trackedLeagueId}/games/${overtimeGame}${at}`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: `${owner.name}=${owner.value}`,
+          origin,
+        },
+        body: JSON.stringify(body),
+      },
+    );
+    const text = await answer.text();
+    if (!answer.ok) throw new Error(`${at} answered ${answer.status}: ${text.slice(0, 200)}`);
+    return JSON.parse(text);
+  };
+  const { sessionId } = await post('/session', { type: 'open', deviceId: 'overtime-tablet' });
+  const score = (side, playerId, points) => ({ type: 'score', side, playerId, points });
+  const next = (period) => [{ type: 'pause' }, { type: 'period', period }, { type: 'start' }];
+  const inputs = [
+    { type: 'lineup', side: 'home', playerIds: lions },
+    { type: 'lineup', side: 'away', playerIds: tigers },
+    { type: 'start' },
+    score('home', lions[0], 3),
+    score('away', tigers[0], 2),
+    ...next(2),
+    score('away', tigers[1], 3),
+    score('home', lions[1], 2),
+    // Level at 5 when the second half ends: the first overtime.
+    ...next(3),
+    score('home', lions[2], 2),
+    { type: 'end' },
+  ];
+  const reply = await post('/commands', {
+    protocolVersion: 1,
+    sessionId,
+    commands: inputs.map((input) => ({ commandId: randomUUID(), at: Date.now(), input })),
+  });
+  const refused = reply.results.filter((r) => r.status !== 'accepted');
+  if (refused.length > 0) throw new Error(`refused: ${JSON.stringify(refused)}`);
 }
 
 /**
@@ -952,6 +1301,50 @@ async function scoreTrackedGames(origin) {
  * 2.160), from the season as the seed has it: any draft is discarded first, so each
  * picture, at each width, starts from no rounds. Nothing is published.
  */
+/** The owner's taps for step 2.50's pictures of People (see adminPages). Scripts are off. */
+async function peopleSteps(page, what) {
+  const add = page.locator('#add-person');
+  const send = async (form, button) => {
+    await Promise.all([
+      page.waitForEvent('load'),
+      form.getByRole('button', { name: button }).click(),
+    ]);
+  };
+  if (what === 'person-add-refused') {
+    await add.getByLabel('First name').fill('Jon');
+    await add.getByLabel('Last name').fill('Smiht');
+    await add.getByLabel('Email (optional)').fill('jon.parent.example.test');
+    await add.getByLabel('Date of birth (optional)').fill('2999-01-01');
+    await send(add, 'Add to the league');
+    await page.locator('#add-person [data-wrong]').first().waitFor();
+    await page.locator('#add-person').scrollIntoViewIfNeeded();
+    return;
+  }
+  await add.getByLabel('First name').fill('Jon');
+  await add.getByLabel('Last name').fill('Smiht');
+  await add.getByLabel('Email (optional)').fill('jon.parent@example.test');
+  await add.getByLabel('Date of birth (optional)').fill('2014-06-01');
+  await add.getByLabel('Child or adult').selectOption('child');
+  await send(add, 'Add to the league');
+  if (!/\/admin\/people\/[0-9a-f-]{36}/.test(page.url())) {
+    throw new Error(`adding a person landed on ${page.url()}`);
+  }
+  if (what === 'person-added') return;
+  const details = page.locator('#details');
+  if (what === 'person-birth-date-asked') {
+    // A date of birth that makes a player two years old is shown back before it is saved
+    // (R-28 as changed on 2026-11-17).
+    const year = new Date().getUTCFullYear() - 2;
+    await details.getByLabel('Date of birth (optional)').fill(`${year}-01-15`);
+    await send(details, 'Save details');
+    await page.locator('#details [data-wrong="birthDate"]').waitFor();
+    return;
+  }
+  await details.getByLabel('Last name').fill('Smith');
+  await send(details, 'Save details');
+  await page.getByText('Saved: Jon Smith.').waitFor();
+}
+
 /** The owner's taps for step 2.161's pictures (see adminPages). Scripts are off. */
 async function undoSteps(page, what) {
   const tapTo = async (locator, url) => {
@@ -963,7 +1356,10 @@ async function undoSteps(page, what) {
       .locator('li[data-game]', { has: page.locator('summary', { hasText: 'Edit this game' }) })
       .first();
     await game.locator('summary', { hasText: 'Edit this game' }).click();
-    await tapTo(game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+    await tapTo(
+      game.getByRole('button', { name: 'Remove game' }),
+      /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
+    );
     return;
   }
   if (what === 'team-put-back-no-number') {
@@ -994,6 +1390,13 @@ async function undoSteps(page, what) {
     );
     return;
   }
+  if (what === 'team-cannot-be-removed') {
+    await tapTo(
+      page.locator('main').getByRole('link', { name: 'Badgers', exact: true }),
+      /\/admin\/teams\//,
+    );
+    return;
+  }
   await tapTo(
     page.locator('main').getByRole('link', { name: 'Falcons', exact: true }),
     /\/admin\/teams\//,
@@ -1004,11 +1407,8 @@ async function undoSteps(page, what) {
     await tapTo(line.getByRole('button', { name: 'Mark as left' }), /problem=/);
     return;
   }
-  // The seed's Falcons already have a player who left; the bin's box is ticked, not sent.
-  await page
-    .locator('section', { has: page.getByRole('heading', { name: 'Remove this team' }) })
-    .locator('input[name=confirm]')
-    .check();
+  // The seed's Falcons already have a player who left. They have results, so since A-17
+  // their bin says they cannot be removed and has no box to tick (step 2.180).
 }
 
 /**
@@ -1044,12 +1444,65 @@ async function winterSteps(page, want, then) {
  * draft is discarded from a second page, so the pictures after these find the season as
  * the seed has it (the drawn page does not change: it has no scripts).
  */
+/**
+ * Step 2.185's pictures, by taps with scripts off: any draft discarded first; the first
+ * game that can be edited removed; then either the next one moved by half an hour, or the
+ * removed one put back from the grid. A second page discards the draft afterwards, as
+ * emptiedRoundSteps does, so the pictures after these find the season as the seed has it.
+ */
+async function draftPutBackSteps(page, then) {
+  const answered = /\/admin\/schedule(\?[^#]*)?#(saved|game-[\w-]+)$/;
+  const tapTo = async (on, locator, url) => {
+    await Promise.all([on.waitForEvent('load'), locator.click()]);
+    if (!url.test(on.url())) throw new Error(`a step landed on ${on.url()}, not ${url}`);
+  };
+  const discard = async (on) => {
+    // A draft that changes nothing is discarded in one tap (step 2.185).
+    const same = on.locator('[data-discard-same] button').first();
+    if ((await same.count()) > 0) return tapTo(on, same, /done=discarded/);
+    const box = on.locator('details', {
+      has: on.locator('button', { hasText: 'Discard all draft changes' }),
+    });
+    if ((await box.count()) === 0) return;
+    await box.locator('summary').click();
+    await tapTo(on, box.locator('button'), /done=discarded/);
+  };
+  await discard(page);
+  const editable = page.locator('li[data-game]', {
+    has: page.locator('summary', { hasText: 'Edit this game' }),
+  });
+  const first = editable.first();
+  const gameId = await first.getAttribute('data-game');
+  await first.locator('summary', { hasText: 'Edit this game' }).click();
+  await tapTo(page, first.getByRole('button', { name: 'Remove game' }), answered);
+  if (then === 'move') {
+    const next = editable.first();
+    await next.locator('summary', { hasText: 'Edit this game' }).click();
+    await next.locator('input[name=time]').fill('21:30');
+    await tapTo(page, next.getByRole('button', { name: 'Save game' }), /saved=game-saved/);
+  } else {
+    const struck = page.locator(`li[data-removed-game="${gameId}"]`);
+    await tapTo(page, struck.getByRole('button', { name: 'Put it back' }), answered);
+    await page.goto(page.url().replace(/#.*$/, ''));
+  }
+  const other = await page.context().newPage();
+  try {
+    await other.goto(page.url().replace(/\?.*$/, ''));
+    await discard(other);
+  } finally {
+    await other.close();
+  }
+}
+
 async function emptiedRoundSteps(page, remove) {
   const tapTo = async (on, locator, url) => {
     await Promise.all([on.waitForEvent('load'), locator.click()]);
     if (!url.test(on.url())) throw new Error(`a step landed on ${on.url()}, not ${url}`);
   };
   const discard = async (on) => {
+    // A draft that changes nothing is discarded in one tap (step 2.185).
+    const same = on.locator('[data-discard-same] button').first();
+    if ((await same.count()) > 0) return tapTo(on, same, /done=discarded/);
     const box = on.locator('details', {
       has: on.locator('button', { hasText: 'Discard all draft changes' }),
     });
@@ -1065,7 +1518,11 @@ async function emptiedRoundSteps(page, remove) {
   while ((await games.count()) > 0) {
     const game = games.first();
     await game.locator('summary', { hasText: 'Edit this game' }).click();
-    await tapTo(page, game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+    await tapTo(
+      page,
+      game.getByRole('button', { name: 'Remove game' }),
+      /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
+    );
   }
   await last.locator('summary', { hasText: 'Change or remove this round' }).click();
   if (remove) {
@@ -1191,6 +1648,7 @@ const origin = `http://localhost:${port}`;
 const server = start(dev ? ['dev', '--port', String(port)] : ['start', '--port', String(port)], {
   PUBLIC_BASE_URL: origin,
   ...(design === '' ? {} : { LOCAL_DESIGN: design }),
+  ...(binnedTeam === '' ? {} : { LOCAL_BINNED_TEAM: binnedTeam }),
 });
 const taken = [];
 const missed = [];
@@ -1230,6 +1688,22 @@ try {
     await keeper.addCookies([{ ...scorekeeper, url: origin }]);
     const planner = await browser.newContext({ viewport: width.viewport });
     await planner.addCookies([{ ...scheduler, url: origin }]);
+    const coaching = await browser.newContext({ viewport: width.viewport });
+    await coaching.addCookies([{ ...coach, url: origin }]);
+    const choosing = await browser.newContext({ viewport: width.viewport });
+    await choosing.addCookies([{ ...chosenComets, url: origin }]);
+    const teamless = await browser.newContext({ viewport: width.viewport });
+    await teamless.addCookies([{ ...stranger, url: origin }]);
+    // One browser for each person a refusal is pictured for (step 2.157).
+    const refused = new Map();
+    for (const page of design === '' ? refusalPages.filter((p) => wanted(p.name)) : []) {
+      if (refused.has(page.who)) continue;
+      const context = await browser.newContext({ viewport: width.viewport });
+      if (page.who !== null) {
+        await context.addCookies([{ name: 'srl_session', value: page.who, url: origin }]);
+      }
+      refused.set(page.who, context);
+    }
     const jobs = [
       ...(design === '' ? platformPages : []).map((page) => ({
         ...page,
@@ -1288,12 +1762,33 @@ try {
         context: keeper,
         base: `/${page.league ?? leagues[0]}`,
       })),
+      ...(design === '' ? coachPages : []).map((page) => ({
+        ...page,
+        name: `${page.league ?? leagues[0]}-${page.name}`,
+        context: coaching,
+        base: `/${page.league ?? leagues[0]}`,
+      })),
+      ...(design === '' ? chosenTeamPages : []).map((page) => ({
+        ...page,
+        name: `${leagues[1]}-${page.name}`,
+        context: choosing,
+        base: `/${leagues[1]}`,
+      })),
+      ...(design === '' ? noTeamPages : []).map((page) => ({
+        ...page,
+        name: `${leagues[0]}-${page.name}`,
+        context: teamless,
+        base: `/${leagues[0]}`,
+      })),
       ...(design === '' ? schedulerPages : []).map((page) => ({
         ...page,
         name: `${leagues[0]}-${page.name}`,
         context: planner,
         base: `/${leagues[0]}`,
       })),
+      ...(design === '' ? refusalPages : [])
+        .filter((page) => refused.has(page.who))
+        .map((page) => ({ ...page, context: refused.get(page.who), base: '' })),
       ...(design === '' ? draftPages : []).map((page) => ({
         ...page,
         name: `${draftLeague}-${page.name}`,
@@ -1401,6 +1896,65 @@ try {
     await staffTapping.close();
     await keeper.close();
     await planner.close();
+    await coaching.close();
+    await choosing.close();
+    await teamless.close();
+    for (const context of refused.values()) await context.close();
+  }
+  // A game won in overtime (`--only=overtime`): scored now, after every other picture.
+  {
+    const jobs = (design === '' ? overtimePages : []).filter((job) =>
+      wanted(`${leagues[0]}-${job.name}`),
+    );
+    let scored = jobs.length > 0;
+    if (scored) {
+      try {
+        await scoreOvertimeGame(origin);
+      } catch (error) {
+        scored = false;
+        missed.push(`the overtime game was not scored: ${String(error.message ?? error)}`);
+      }
+    }
+    for (const width of scored ? widths : []) {
+      fs.mkdirSync(path.join(out, width.name), { recursive: true });
+      const contexts = {};
+      for (const [as, cookie] of [
+        ['visitor', null],
+        ['owner', owner],
+        ['scorekeeper', scorekeeper],
+      ]) {
+        contexts[as] = await browser.newContext({ viewport: width.viewport });
+        if (cookie !== null) await contexts[as].addCookies([{ ...cookie, url: origin }]);
+      }
+      for (const job of jobs) {
+        const name = `${leagues[0]}-${job.name}`;
+        const label = `${width.name}/${name}`;
+        const page = await contexts[job.as].newPage();
+        page.setDefaultTimeout(90_000);
+        try {
+          await page.goto(`${origin}/${leagues[0]}${job.at}`, { waitUntil: 'networkidle' });
+          await page.evaluate(() => {
+            const style = document.createElement('style');
+            style.textContent = 'nextjs-portal { display: none !important; }';
+            document.head.append(style);
+            return document.fonts.ready.then(() => undefined);
+          });
+          await page.mouse.move(0, 0);
+          await page.screenshot({
+            path: path.join(out, width.name, `${name}.jpg`),
+            fullPage: true,
+            type: 'jpeg',
+            quality: 80,
+          });
+          taken.push(`${label}.jpg`);
+        } catch (error) {
+          missed.push(`${label}: ${String(error.message ?? error).split('\n')[0]}`);
+        } finally {
+          await page.close();
+        }
+      }
+      for (const context of Object.values(contexts)) await context.close();
+    }
   }
   // The phone menu, open (`--only=menu`), at 390 in each league's own look.
   {

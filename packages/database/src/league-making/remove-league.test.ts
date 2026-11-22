@@ -649,7 +649,14 @@ describe('removeLeague when a login may not do its part', () => {
     const before = await everything();
     const refusal = {
       kind: 'login',
-      problems: [{ login: 'app', problems: expect.arrayContaining(['it is a superuser']) }],
+      problems: [
+        {
+          login: 'app',
+          problems: expect.arrayContaining([
+            'postgres is a superuser: alter role postgres nosuperuser',
+          ]),
+        },
+      ],
     };
     expect(await previewLeagueRemoval(own, { slug: league.slug, staffEmail })).toEqual({
       ready: false,

@@ -1,6 +1,8 @@
 // Making a league from this computer (step 2.125 part 1, record 057), for
 // scripts/make-league.mjs. Used only through the package's index.ts.
 export {
+  // Also the web app's start-up's (record 082): why the database refused it, by kind.
+  connectCauseOf,
   openLeagueMakingTarget,
   type ConnectCause,
   type LeagueMakingPlace,

@@ -34,7 +34,14 @@ describe('recordFinalScore', () => {
       ok: true,
       value: { version: 2 },
     });
-    expect(db.state.games[0]).toMatchObject({ status: 'final', homeScore: 52, awayScore: 48 });
+    // Two numbers say nothing of overtime: no count, so no mark (step 2.200; step 2.56
+    // lets a typed score say it).
+    expect(db.state.games[0]).toMatchObject({
+      status: 'final',
+      homeScore: 52,
+      awayScore: 48,
+      overtimePeriods: null,
+    });
     expect(db.state.games[0]?.finalizedAt).not.toBeNull();
     expect(db.state.games[0]?.format).toMatchObject({ version: 1 });
     expect(db.state.activity.map((a) => a.action)).toEqual(['games.record_final_score']);
@@ -149,6 +156,17 @@ describe('recordFinalScore', () => {
     expect(await code({})).toBe('changed-since-read');
     expect(await code({ homeScore: -1 })).toBe('invalid-input');
     expect(await code({ awayScore: 1000 })).toBe('invalid-input');
+  });
+
+  it('refuses a postponed game: it is scored once it is played on its new date (step 2.158)', async () => {
+    const { db, deps, as, events } = memoryGames({ games: [game(1, { status: 'postponed' })] });
+    expect(await recordFinalScore(as(ownerId), input, deps)).toEqual({
+      ok: false,
+      error: { code: 'game-postponed' },
+    });
+    expect(db.state.games[0]).toMatchObject({ status: 'postponed', homeScore: null });
+    expect(db.state.activity).toEqual([]);
+    expect(events).toEqual([]);
   });
 
   it('needs games.score: scorekeepers and schedulers may, an editor may not, nor in a read-only league', async () => {

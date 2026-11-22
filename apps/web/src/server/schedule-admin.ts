@@ -7,7 +7,15 @@
 import type { AccessHolder, CommandDeps, SchedulingTx } from '@srleagues/core';
 import type { PublicSeason } from './public-stats.ts';
 
-export type ScheduleTeam = { readonly id: string; readonly name: string };
+/**
+ * A team of the season as the grid names it. One in the bin (`removed`) is not offered for
+ * a game, only named: its games from before A-17 are still in the grid ("Badgers (removed)").
+ */
+export type ScheduleTeam = {
+  readonly id: string;
+  readonly name: string;
+  readonly removed: boolean;
+};
 
 /**
  * A season the schedule can be built for; `isPublic` is false while visitors cannot see it.
@@ -21,7 +29,7 @@ export type ScheduleSeason = PublicSeason & {
 export type ScheduleAdminPorts = {
   /** Deps for the scheduling commands; the transaction follows the context's league. */
   readonly deps: CommandDeps<SchedulingTx>;
-  /** The season's teams that are not in the bin, by name. */
+  /** The season's teams by name, those in the bin too, marked `removed`. */
   readonly teamsOf: (leagueId: string, seasonId: string) => Promise<readonly ScheduleTeam[]>;
   /**
    * The league's seasons `holder` may be told of (P4 §4): the public ones in the order the

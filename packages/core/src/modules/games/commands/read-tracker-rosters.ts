@@ -16,13 +16,18 @@
 // unique numbers, and for each player whether they were added at a scorer's table, at
 // which game, and whether they still wait for an admin's review (only then may the table
 // rename them or take them off, S-45).
+//
+// Step 2.37 (S-73) added whether a level score may end the game: the device refuses End
+// game at a level score at once, with or without a signal, when it may not. It is read
+// from the rules the game is played under, the same ones the End tap is judged by
+// (games.apply_tracker_commands), which stays the judge.
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { recordingOf } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GameRosterPlayer, GamesTx } from '../ports.ts';
 import { lowerId } from '../scoring-session.ts';
-import { seasonRulesOf } from '../season-rules-of.ts';
+import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
 
 /** The game's two teams and their players, by team, roster order and name. */
 export type TrackerRosters = {
@@ -35,6 +40,8 @@ export type TrackerRosters = {
   readonly status: string;
   /** The game's season wants unique numbers on a team (S-37). */
   readonly uniqueJerseys: boolean;
+  /** A level score may end the game: the rules it is played under allow ties (S-73). */
+  readonly allowTies: boolean;
   readonly players: readonly GameRosterPlayer[];
 };
 
@@ -50,6 +57,7 @@ export const readTrackerRosters = defineCommand({
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
     const players = await tx.games.listRoster(game.id);
     const { uniqueJerseys } = (await seasonRulesOf(tx, game.seasonId)).rosters;
+    const { allowTies } = await effectiveRulesOf(tx, game);
     return ok({
       gameId: game.id,
       homeTeamId: game.homeTeamId,
@@ -57,6 +65,7 @@ export const readTrackerRosters = defineCommand({
       recording: recordingOf(game.captureMode),
       status: game.status,
       uniqueJerseys,
+      allowTies,
       players,
     });
   },

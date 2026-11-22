@@ -45,6 +45,11 @@ export type BoxScoreTableProps = {
   readonly totals: Readonly<Record<string, string | number>>;
   /** Said under the table when the players are hidden. */
   readonly hiddenNotice?: string;
+  /**
+   * Sentences under the table, each its own line: why a Total is not what its column
+   * adds up to (a typed score, a turnover charged to the team itself). Left out, none.
+   */
+  readonly notes?: readonly string[] | undefined;
   readonly labels: BoxScoreLabels;
   /**
    * The letters of the longest name in the tables this one is read beside (the two box
@@ -69,6 +74,7 @@ export function BoxScoreTable({
   players,
   totals,
   hiddenNotice,
+  notes,
   labels,
   nameRoom,
 }: BoxScoreTableProps) {
@@ -160,6 +166,11 @@ export function BoxScoreTable({
           </tfoot>
         </table>
         {!players && hiddenNotice ? <p className="ui-table-notice">{hiddenNotice}</p> : null}
+        {(notes ?? []).map((note) => (
+          <p key={note} className="ui-table-notice" dir="auto">
+            {note}
+          </p>
+        ))}
       </div>
     </div>
   );

@@ -6,6 +6,10 @@
 // the same answer, the password hash reads only 72 bytes, and a magic link for a new
 // address makes a user and answers `signup`. Where the real service may differ, the
 // adapter is marked "not verified against the live service" (record 018).
+//
+// The package exports it, served over HTTP on this computer (serve-fake-supabase-auth.ts),
+// only for the web app's test of its real wiring and the browser test of the test copy
+// (step 2.93's last part); the app itself never makes one.
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import type { FetchLike } from './gotrue-client.ts';
 
@@ -350,6 +354,19 @@ export function createFakeSupabaseAuth(options: FakeSupabaseAuthOptions) {
         endSessions(user.id, session.id);
         return json(200, userJson(user));
       }
+    }
+
+    if (call.method === 'DELETE' && path.startsWith('/admin/users/')) {
+      // Only the sign-in service check calls this, to remove its made-up user (step 2.206).
+      if (call.headers['authorization'] !== `Bearer ${options.secretKey}`) {
+        return refuse(403, 'not_admin', 'User not allowed');
+      }
+      const user = users.get(decodeURIComponent(path.slice('/admin/users/'.length)));
+      if (!user) return refuse(404, 'user_not_found', 'User not found');
+      endSessions(user.id);
+      users.delete(user.id);
+      usersByEmail.delete(user.email);
+      return json(200, {});
     }
 
     if (call.method === 'GET' && path === '/settings') {

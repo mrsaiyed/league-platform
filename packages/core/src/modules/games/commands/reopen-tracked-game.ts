@@ -99,7 +99,12 @@ export const reopenTrackedGame = defineCommand({
       after: { version: 1 as const, ...after },
     });
     // The game is locked and was read after the lock: it cannot have moved on.
-    const updated = await tx.games.setResult(game.id, { ...after, decided: false }, game.version);
+    // A game reopened is not final: it loses its overtime count until it ends again.
+    const updated = await tx.games.setResult(
+      game.id,
+      { ...after, decided: false, overtimePeriods: null },
+      game.version,
+    );
     if (updated === undefined) throw new Error('A locked game changed while it was reopened.');
     await recordActivity(tx, context, {
       action: 'games.reopen_tracked_game',

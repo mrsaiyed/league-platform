@@ -97,13 +97,13 @@ describe('the scoring read of a public page', () => {
   });
 
   it('answers a hidden league exactly as one that is not there or is in the bin (U-9)', async () => {
-    // Each person with the leagues they may not see: another league's admin (of the other
-    // draft) and another league's scorekeeper (of the live, draft and archived leagues) too.
+    // Each person with the leagues they may not see: another league's admin (of the empty
+    // league) and another league's scorekeeper (of the live, draft and archived leagues) too.
     const hidden: readonly (readonly [Person, readonly League[]])[] = [
-      ['visitor', ['draft', 'suspended']],
-      ['stranger', ['draft', 'suspended']],
+      ['visitor', ['draft', 'otherDraft', 'suspended']],
+      ['stranger', ['draft', 'otherDraft', 'suspended']],
       ['coach', ['draft', 'otherDraft', 'suspended']],
-      ['otherAdmin', ['draft', 'suspended']],
+      ['otherAdmin', ['draft', 'otherDraft', 'suspended']],
       ['scorekeeper', ['otherDraft', 'suspended']],
     ];
     for (const [person, leagues] of hidden) {

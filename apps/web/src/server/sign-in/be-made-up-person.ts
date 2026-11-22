@@ -17,6 +17,7 @@ import { noNewCode, type LocalTools } from '../local-tools.ts';
 import type { Visit } from './device.ts';
 import {
   askForCode,
+  botCheckFieldsDrawn,
   enterCode,
   signInWithPassword,
   type FlowAnswer,
@@ -38,16 +39,18 @@ export async function beMadeUpPerson(
   const chosen = tools.madeUpSignInOf(fields['person'] ?? '');
   if (chosen === undefined) return null;
   const next = fields['next'];
+  // The form as the page draws it, with the bot check's stand-in answer (record 081).
+  const drawn = botCheckFieldsDrawn(deps.botCheck.widget);
   if (chosen.kind === 'password') {
     return signInWithPassword(
-      { email: chosen.email, password: chosen.password, next },
+      { ...drawn, email: chosen.email, password: chosen.password, next },
       visit,
       deps,
     );
   }
   // Watching before asking: the code taken is the one this ask sends, never an older one.
   const watch = tools.watchForCode(chosen.email);
-  const asked = await askForCode('sign-up', { email: chosen.email, next }, visit, deps);
+  const asked = await askForCode('sign-up', { ...drawn, email: chosen.email, next }, visit, deps);
   if (asked.to !== platformUrl('enterCode')) {
     watch.stop();
     return asked;

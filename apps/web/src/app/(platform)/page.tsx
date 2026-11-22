@@ -1,6 +1,7 @@
 import { platformUrl } from '@srleagues/core';
 import { redirect } from 'next/navigation';
-import { MyLeaguesList, StandalonePage } from '../../features/shell/index.ts';
+import { MyLeaguesList, StandalonePage, TestCopyLine } from '../../features/shell/index.ts';
+import { webPorts } from '../../server/container.ts';
 import { t } from '../../server/messages.ts';
 import { screenUrl } from '../../server/sign-in/problems.ts';
 import { leaguesOfThisRequest, signedInPerson } from '../../server/signed-in-leagues.ts';
@@ -13,6 +14,8 @@ import { leaguesOfThisRequest, signedInPerson } from '../../server/signed-in-lea
 export default async function Page() {
   const person = await signedInPerson();
   if (person.kind === 'account-problem') redirect(platformUrl('account'));
+  // On the test copy only, its one line at the foot of the page (step 2.205).
+  const testCopy = <TestCopyLine shown={(await webPorts()).testCopy} />;
   if (person.kind === 'visitor') {
     return (
       <StandalonePage>
@@ -26,6 +29,7 @@ export default async function Page() {
           >
             {t('front.signIn')}
           </a>
+          {testCopy}
         </main>
       </StandalonePage>
     );
@@ -40,6 +44,7 @@ export default async function Page() {
         <a className="ui-button" href={platformUrl('account')}>
           {t('account.menu.account')}
         </a>
+        {testCopy}
       </main>
     </StandalonePage>
   );

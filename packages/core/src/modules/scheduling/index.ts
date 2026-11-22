@@ -72,6 +72,7 @@ export {
   type ScheduleDraftView,
 } from './commands/get-schedule-draft.ts';
 export { moveDraftGame, type MoveDraftGameError } from './commands/move-draft-game.ts';
+export { putBackDraftGame, type PutBackDraftGameError } from './commands/put-back-draft-game.ts';
 export { removeDraftGame, type RemoveDraftGameError } from './commands/remove-draft-game.ts';
 export { renameDraftRound, type RenameDraftRoundError } from './commands/rename-draft-round.ts';
 export { setDraftRecording, type SetDraftRecordingError } from './commands/set-draft-recording.ts';

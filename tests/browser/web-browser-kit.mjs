@@ -134,6 +134,24 @@ export function worldAtLeagueTime(time, argv = process.argv) {
   return new Date(guess).toISOString();
 }
 
+/**
+ * How the page writes the day `days` after the league's today, the league's today being
+ * the day in its own zone at `worldNow` (the LOCAL_NOW a test starts the world at), e.g.
+ * "Mon, Nov 23". The made-up world dates its games relative to that day (a game's `day`
+ * in stand-in-world-seed.ts), so a test that names a game's date works it out here, never
+ * by writing a weekday or a date by hand: that holds only on one day of the week.
+ */
+export function leagueDayWords(worldNow, days) {
+  const today = new Date(wallClock(new Date(worldNow))).toISOString().slice(0, 10);
+  const day = new Date(Date.parse(`${today}T12:00:00Z`) + days * 86_400_000);
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }).format(day);
+}
+
 /** The first made-up league's address in the tracker's own endpoints. */
 const leagueApi = '/api/v1/leagues/01900000-0000-7000-8000-000000000001';
 
@@ -282,9 +300,17 @@ export function titleInHeadProblem(html) {
  * scripts have not yet taken over (on a busy machine they can still be starting) is the
  * browser's own: it posts the form and loads a new document, whose refusal or heading
  * shows while the rest of it, its styles among it, is still arriving (step 2.175).
+ *
+ * After a form's step that the scripts did take over, the next page is drawn in place: no
+ * new document, so its load event has long passed, and Next.js streams the page's title a
+ * moment after the page itself. So they also give the title a few seconds to arrive; the
+ * check below still fails if none comes.
  */
 export async function accessibilityProblems(page) {
   await page.waitForLoadState('load');
+  await page
+    .waitForFunction(() => document.title.trim() !== '', null, { timeout: 5000 })
+    .catch(() => {});
   return page.evaluate(() => {
     const problems = [];
     if (!document.documentElement.lang) problems.push('the page has no language');

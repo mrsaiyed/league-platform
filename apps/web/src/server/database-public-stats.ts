@@ -142,6 +142,7 @@ function readStore(
         : Promise.resolve([]),
     decidedGames: ofSeason([], (store, id) => store.decidedGames(id)),
     teamStatTotals: ofSeason([], (store, id) => store.teamStatTotals(id)),
+    teamTurnoverGames: ofSeason([], (store, id) => store.teamTurnoverGames(id)),
     people: async (personIds) => {
       if (!withPeople) throw new NamesOnlyWithSettings();
       const ids = personIds.filter(isId);

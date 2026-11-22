@@ -118,7 +118,10 @@ if (built) {
     for (let i = 0; i < gameCount; i += 1) {
       const game = games.first();
       await game.locator('summary', { hasText: 'Edit this game' }).click();
-      await tap(game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+      await tap(
+        game.getByRole('button', { name: 'Remove game' }),
+        /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
+      );
       const said = (await page.locator('#saved').textContent()) ?? '';
       note(`removed game ${i + 1}: said beside the round`, said.includes('Removed:'), said);
     }
@@ -216,30 +219,45 @@ if (built) {
       const game = nextGames.first();
       putBackName = ((await game.locator('.admin-slot-line strong').textContent()) ?? '').trim();
       await game.locator('summary', { hasText: 'Edit this game' }).click();
-      await tap(game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+      await tap(
+        game.getByRole('button', { name: 'Remove game' }),
+        /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
+      );
       answer = page.url();
     }
     await nextRound.locator('summary', { hasText: 'Change or remove this round' }).click();
     await tap(nextRound.getByRole('button', { name: 'Remove this round' }), /saved=round-removed/);
 
-    at = 'the owner goes back to the "Removed" answer and puts the game back';
+    at = 'the owner finds the removed game under "Games with no round" and puts it back';
+    // The old answer's address says nothing old (step 2.185); the game itself stays in sight,
+    // struck through, where "Put it back" will bring it, and says so before the tap (S-60).
     await page.goto(answer);
-    const removedSaid = (await page.locator('#saved').textContent()) ?? '';
     note(
-      'the "Removed" answer names the round and says it was removed since',
-      removedSaid.includes(`${nextLabel} has since been removed from the draft.`),
+      'the old "Removed" address says nothing old',
+      (await page.locator('#saved').count()) === 0,
+    );
+    const looseSection = page.locator('section', {
+      has: page.getByRole('heading', { name: 'Games with no round' }),
+    });
+    const struck = looseSection.locator('li[data-removed-game]', { hasText: putBackName });
+    const removedSaid = (await struck.count()) === 1 ? ((await struck.textContent()) ?? '') : '';
+    note(
+      'the removed game stays under "Games with no round", struck through, naming its round',
+      removedSaid.includes(
+        `Removed in this draft, from ${nextLabel}, which the draft removes too.`,
+      ) && (await struck.locator('del').count()) === 2,
       removedSaid,
     );
     note(
-      'and says the game comes back under "Games with no round"',
-      removedSaid.includes('as it was, under "Games with no round"') &&
+      'and says the game comes back there, with no round',
+      removedSaid.includes('comes back here, with no round') &&
         !removedSaid.includes('exactly as it was'),
       removedSaid,
     );
     await accessible('a removed game whose round was removed since');
     await tap(
-      page.locator('#saved').getByRole('button', { name: 'Put it back' }),
-      /saved=game-put-back/,
+      struck.getByRole('button', { name: 'Put it back' }),
+      /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
     );
     const backSaid = (await page.locator('#saved').textContent()) ?? '';
     note(

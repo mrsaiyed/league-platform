@@ -58,9 +58,46 @@ describe('reading the rosters for the tracker (T-115, T-258)', () => {
         recording: 'live',
         status: 'scheduled',
         uniqueJerseys: false,
+        allowTies: false,
         players: roster.slice(0, 3),
       },
     });
+  });
+
+  it('says whether a level score may end the game, from the rules the game is played under (S-73)', async () => {
+    const withTies = (own: boolean) =>
+      memoryGames({
+        status: 'live',
+        seasons: [
+          {
+            id: seasonId,
+            programId: 'p1',
+            rules: rules((r) => {
+              r.allowTies = !own;
+            }),
+          },
+        ],
+        // A game with rules of its own is judged by them, as its End tap is.
+        games: [
+          game(1, {
+            captureMode: 'live',
+            ...(own
+              ? {
+                  format: rules((r) => {
+                    r.allowTies = true;
+                  }),
+                }
+              : {}),
+          }),
+        ],
+        grants: [scorekeeperGrant],
+        roster,
+      });
+    for (const own of [false, true]) {
+      const { deps, as } = withTies(own);
+      const result = await readTrackerRosters(as(scorekeeperId), { gameId: gameUuid(1) }, deps);
+      expect(result).toMatchObject({ ok: true, value: { allowTies: true } });
+    }
   });
 
   it('says whether the season wants unique numbers, and which players were added at a table and wait for review (record 058)', async () => {

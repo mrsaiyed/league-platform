@@ -2,7 +2,7 @@ import { leagueApiUrl } from '@srleagues/core';
 import { Group } from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { t } from '../../server/messages.ts';
-import type { GameView, RoundView } from './build-schedule.ts';
+import { overtimeWords, type GameView, type RoundView } from './build-schedule.ts';
 import type { GameLinkWords } from './game-link-text.ts';
 import { LiveGameList } from './live-game-list.tsx';
 
@@ -65,6 +65,7 @@ export function GameList({
       scoringAddress={scoringAddressOf(leagueId)}
       labels={displayLabels(t).game}
       linkWords={gameLinkWords()}
+      overtimeWords={overtimeWords()}
       announcement={t('schedule.liveAnnouncement', {
         away: '{away}',
         awayScore: '{awayScore}',

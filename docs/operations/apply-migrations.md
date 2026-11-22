@@ -39,6 +39,12 @@ A release runs the old version of the app and the new schema side by side for a 
 - **Allowed**: a file that does one of these is listed in `migrationDropsAllowed` in `scripts/structure/config.mjs`, by its file name, its checksum and a reason (which release stopped using what it removes). If the file changes afterwards, the entry stops counting. The list is empty today.
 - The safe way is two releases: add the new thing first while the old still works, then remove the old in a later file.
 
+## Migrations after which every server is switched together
+
+Some migrations add nothing the old version breaks on, but add a rule the old version does not know. After one of these, every server of the app is switched to the new version at once, not one by one. Each is listed here with what goes wrong if they are not.
+
+- **0021 (overtime on the result, step 2.200).** A game the new version ends in overtime keeps its count (`games.overtime_periods`), and the database allows a count on a final game only. The old version does not know the column: when it reopens, postpones or otherwise changes the result of such a game, it leaves the count in place, so the database refuses the change (`games_overtime_when_final`). It fails cleanly: the request ends in an error, the whole change is undone and nothing is lost; it works once the server runs the new version. Games the old version ends get no count (no mark), which is right for a game whose overtime is not known.
+
 ## Running it locally
 
 - **Seed database**: `npm run seed` applies every migration to a PGlite database in `.local/seed-db`, then loads made-up leagues. It is the most common local run. See [run it locally](run-it-locally.md).

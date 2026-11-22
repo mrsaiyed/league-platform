@@ -23,6 +23,19 @@ export function homeNextGames(upcoming: readonly GameView[]): readonly GameView[
   return [...toStart, ...waiting];
 }
 
+/**
+ * The heading over the home page's coming games: "The next matchups", or, when every game
+ * it lists is postponed (a season whose other games have all been played), words that say
+ * they are waiting for a new date. Its message key.
+ */
+export function homeNextTitle(
+  next: readonly GameView[],
+): 'home.upcoming' | 'home.upcoming.postponed' {
+  return next.length > 0 && next.every((g) => g.status === 'postponed')
+    ? 'home.upcoming.postponed'
+    : 'home.upcoming';
+}
+
 /** What of a standings table decides its height: its rows, and whether it has notes. */
 export type TableHeight = { readonly rows: number; readonly hasNotes: boolean };
 

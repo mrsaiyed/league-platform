@@ -51,6 +51,7 @@ import {
   teamsStore,
 } from '../stores/index.ts';
 import { seedLeagues, seedStaff, type SeedLeague } from './seed-data.ts';
+import { SeedPartlyLoaded } from './seed-partly-loaded.ts';
 
 export type SeededLeague = {
   readonly slug: string;
@@ -123,9 +124,7 @@ async function loadLeague(
   ]);
   if (existing.rows[0] !== undefined) {
     if (!(await holdsEverything(pglite, existing.rows[0].id, league))) {
-      throw new Error(
-        `The seed league ${league.slug} is only partly loaded (an earlier load stopped part-way). Start again from a fresh database.`,
-      );
+      throw new SeedPartlyLoaded(league.slug);
     }
     return { slug: league.slug, leagueId: existing.rows[0].id, created: false };
   }
