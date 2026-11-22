@@ -283,6 +283,38 @@ if (browser !== null) {
     await youth.context.close();
   });
 
+  await step('Ada Lovell is removed by one tap and put back from the notice (A-5)', async () => {
+    const page = owner.page;
+    await page.goto(`${origin}/lakeside/admin/people`);
+    const add = page.locator('#add-person');
+    await add.getByLabel('First name').fill('Ada');
+    await add.getByLabel('Last name').fill('Lovell');
+    await Promise.all([
+      page.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/),
+      add.getByRole('button', { name: 'Add to the league' }).click(),
+    ]);
+    const record = page.url().split('#')[0];
+    await page.locator('#remove').getByLabel('Yes, I am sure').check();
+    await Promise.all([
+      page.waitForURL((url) => url.pathname.endsWith('/admin/people')),
+      page.locator('#remove').getByRole('button', { name: 'Remove from the league list' }).click(),
+    ]);
+    const removed = page.locator('[data-removed]');
+    note(
+      'the removed notice names her and offers "Put them back"',
+      (await removed.innerText()).includes('Removed from the league list: Ada Lovell.'),
+    );
+    await Promise.all([
+      page.waitForURL((url) => url.href.startsWith(record)),
+      removed.getByRole('button', { name: 'Put them back' }).click(),
+    ]);
+    await page.getByText('Put back on the league list: Ada Lovell', { exact: false }).waitFor();
+    note(
+      'she is back on her record, on no team, from the database',
+      (await page.locator('[data-person-teams]').innerText()).includes('On no team'),
+    );
+  });
+
   await step(
     'what the server sends of the child’s record and the list, to each person',
     async () => {

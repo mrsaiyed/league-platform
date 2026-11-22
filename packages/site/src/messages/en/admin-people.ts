@@ -55,7 +55,13 @@ export const enAdminPeople = {
     'They are on a team’s roster, so they cannot be taken off the league list yet. Take them off the roster first, on the team’s page:',
   'adminPeople.remove.submit': 'Remove from the league list',
   'adminPeople.remove.title': 'Remove from the league list',
+  'adminPeople.putBack':
+    'Put back on the league list: {name}, as they were. They are on no team; a team’s page in Teams puts them on its roster.',
+  'adminPeople.putBack.notPutBack': 'Not put back. {problem}',
+  'adminPeople.putBack.submit': 'Put them back',
   'adminPeople.removed':
+    'Removed from the league list: {name}. If they never played on a team they are deleted for good after 30 days; if they have played they stay in the league’s bin, and their games keep their numbers.',
+  'adminPeople.removed.unnamed':
     'Removed from the league list. If they never played on a team they are deleted for good after 30 days; if they have played they stay in the league’s bin, and their games keep their numbers.',
   'adminPeople.save.submit': 'Save details',
   'adminPeople.saved': 'Saved: {name}.',

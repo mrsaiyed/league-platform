@@ -328,6 +328,48 @@ if (built) {
         (await removePart.getByRole('button').count()) === 0,
     );
 
+    at = 'one wrong tap on "Remove from the league list" has its way back (A-5)';
+    await toPeople();
+    const addAda = page.locator('#add-person');
+    await addAda.getByLabel('First name').fill('Ada');
+    await addAda.getByLabel('Last name').fill('Lovell');
+    await Promise.all([
+      page.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/),
+      addAda.getByRole('button', { name: 'Add to the league' }).click(),
+    ]);
+    const adaAddress = page.url().split('#')[0];
+    await page.locator('#remove').getByLabel('Yes, I am sure').check();
+    await Promise.all([
+      page.waitForURL((url) => url.pathname.endsWith('/admin/people')),
+      page.locator('#remove').getByRole('button', { name: 'Remove from the league list' }).click(),
+    ]);
+    const removedNotice = page.locator('[data-removed]');
+    note(
+      'the removed notice names her and offers "Put them back"',
+      (await removedNotice.innerText()).includes('Removed from the league list: Ada Lovell.') &&
+        (await removedNotice.getByRole('button', { name: 'Put them back' }).count()) === 1,
+    );
+    note(
+      'and she is off the list',
+      (await main().getByRole('link', { name: 'Ada Lovell', exact: true }).count()) === 0,
+    );
+    await Promise.all([
+      page.waitForURL((url) => url.href.startsWith(adaAddress)),
+      removedNotice.getByRole('button', { name: 'Put them back' }).click(),
+    ]);
+    await page.getByText('Put back on the league list: Ada Lovell', { exact: false }).waitFor();
+    note(
+      '"Put them back" brings her back to her record, on no team',
+      (await page.getByRole('heading', { level: 1, name: 'Ada Lovell' }).count()) === 1 &&
+        (await page.locator('[data-person-teams]').innerText()).includes('On no team'),
+    );
+    await toPeople();
+    note(
+      'and she is on the list again',
+      (await main().getByRole('link', { name: 'Ada Lovell', exact: true }).count()) === 1,
+    );
+    await page.goto(jonAddress);
+
     at = 'an unlikely date of birth is shown back before it is saved (R-28)';
     const twoYearsAgo = `${new Date().getUTCFullYear() - 2}-01-15`;
     await details.getByLabel('Date of birth (optional)').fill(twoYearsAgo);

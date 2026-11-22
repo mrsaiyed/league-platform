@@ -74,6 +74,7 @@ export type DatabaseQueries = Pick<
   | 'accessStore'
   | 'activityLogStore'
   | 'jobsStore'
+  | 'binStore'
 > &
   AdminSettingsQueries &
   AdminTeamsQueries &
@@ -268,7 +269,22 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     // The people commands and reads, on Admin → Teams' own transaction (step 2.50): every
     // one is a league transaction set to the session's league and account (T-23, T-28),
     // and a person's private fields are read only for people.read_sensitive (T-76).
-    adminPeople: { deps: peopleDepsOf(adminTeams.deps) },
+    // Putting a removed person back (A-5): the bin's command on the bin's own store, as
+    // the worker's purge has it; restoring a person sets off no handler.
+    adminPeople: {
+      deps: peopleDepsOf(adminTeams.deps),
+      putBack: {
+        transaction: database.commandTransaction(db, (scope) => ({
+          jobs: database.jobsStore(scope),
+          bin: database.binStore(scope),
+          access: database.accessStore(scope),
+          activity: database.activityLogStore(scope),
+        })),
+        events: [],
+        log: options.log,
+        now: () => performance.now(),
+      },
+    },
     // Its commands run with core's event handlers, never an empty list (part 5).
     adminTeams,
     adminSettings: databaseAdminSettings(database, db, options.log),

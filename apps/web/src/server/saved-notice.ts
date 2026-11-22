@@ -25,6 +25,12 @@ export type SavedNotice = {
    * called off, when it is put back (step 2.158). Ids only, never anything typed.
    */
   readonly about?: readonly string[];
+  /**
+   * The name of the person it is about as the admin's screens write it, read from the
+   * store when it was done, never from the form: someone just put in the bin cannot be
+   * read again to be named in "Removed …" (step 2.50). Held here for one look, as the rest.
+   */
+  readonly name?: string;
 };
 
 export type SavedNotices = {

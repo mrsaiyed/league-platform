@@ -64,7 +64,9 @@ export async function PersonPage({
         ? t('adminPeople.added', { name: person.name })
         : notice.said === 'saved'
           ? t('adminPeople.saved', { name: person.name })
-          : undefined;
+          : notice.said === 'putBack'
+            ? t('adminPeople.putBack', { name: person.name })
+            : undefined;
   // The league's own today (the ports' one clock): who is a child is measured on it (R-28).
   const leagueToday = (await (await webPorts()).publicSchedule.clockOf(here.id)).today;
   const teams = await teamsOf(context, person.id);

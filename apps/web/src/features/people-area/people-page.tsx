@@ -18,7 +18,7 @@ import { t } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffField, StaffNotice } from '../staff/index.ts';
-import { addPersonAction, searchPeopleAction } from './actions.ts';
+import { addPersonAction, putBackPersonAction, searchPeopleAction } from './actions.ts';
 import { addPersonAnchor } from './anchors.ts';
 import { personFormWords } from './form-words.ts';
 import { peopleAskOf, peoplePageSize, readPeopleList, type PeopleAsk } from './people-view.ts';
@@ -82,7 +82,32 @@ export async function PeoplePage({
         </a>
       </PageHead>
       {notice?.said === 'removed' ? (
-        <StaffNotice kind="removed">{t('adminPeople.removed')}</StaffNotice>
+        // The way back from one wrong tap, right where it is said (A-5).
+        <StaffNotice kind="removed" data={{ 'data-removed': notice.thing }}>
+          <p>
+            {notice.name === undefined
+              ? t('adminPeople.removed.unnamed')
+              : t('adminPeople.removed', { name: notice.name })}
+          </p>
+          <form action={putBackPersonAction}>
+            <input type="hidden" name="league" value={here.slug} />
+            <input type="hidden" name="personId" value={notice.thing} />
+            <input type="hidden" name={requestTokenField} value={crypto.randomUUID()} />
+            <button type="submit" className="ui-button">
+              {t('adminPeople.putBack.submit')}
+            </button>
+          </form>
+        </StaffNotice>
+      ) : null}
+      {notice?.said.startsWith('notPutBack.') === true ? (
+        <StaffNotice kind="refused">
+          {t('adminPeople.putBack.notPutBack', {
+            problem:
+              notice.said === 'notPutBack.person-profile-taken'
+                ? t('error.leagues.restore_person.person-profile-taken')
+                : t('error.leagues.restore_person.person-not-found'),
+          })}
+        </StaffNotice>
       ) : null}
 
       <section className="staff-panel admin-team-part">

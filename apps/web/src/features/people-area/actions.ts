@@ -21,6 +21,7 @@ import {
   getPerson,
   leagueUrl,
   removePerson,
+  restorePerson,
   updatePerson,
   type CommandContext,
 } from '@srleagues/core';
@@ -41,6 +42,7 @@ import {
   type Refused,
   type TypedFields,
 } from '../games-area/form-state.ts';
+import { rosterName } from '../teams-area/index.ts';
 import { unlikelyYears } from './age-on-record.ts';
 import { detailsAnchor } from './anchors.ts';
 import { newPersonInput, personChangeInput, wrongBoxes, type PersonBox } from './person-input.ts';
@@ -63,6 +65,7 @@ async function peopleOf(fields: TypedFields) {
   return {
     context,
     deps: adminPeople.deps,
+    putBack: adminPeople.putBack,
     /** The league's own today, from the ports' one clock (the age a date makes is on it). */
     leagueToday: async () => (await publicSchedule.clockOf(league.id)).today,
     list: leagueUrl(league, 'admin-area', { area: 'people' }),
@@ -98,9 +101,22 @@ function refused(
   return { kind: 'refused', code, typed, wrong, said: problemText(command, code) };
 }
 
-function leaveNotice(context: CommandContext, screen: NoticeScreen, thing: string, said: string) {
+function leaveNotice(
+  context: CommandContext,
+  screen: NoticeScreen,
+  thing: string,
+  said: string,
+  name?: string,
+) {
   const holder = noticeHolderOf(context);
-  if (holder !== undefined) savedNoticesHere().leave(holder, { screen, thing, said });
+  if (holder !== undefined) {
+    savedNoticesHere().leave(holder, {
+      screen,
+      thing,
+      said,
+      ...(name === undefined ? {} : { name }),
+    });
+  }
 }
 
 /** Back on the form's own page, drawn again in the answer with scripts on; else sent there. */
@@ -215,11 +231,44 @@ export async function removePersonAction(_state: FormState, form: FormData): Pro
   const { context, deps, list } = await peopleOf(fields);
   if (fields['confirm'] !== 'on') return refused('remove_person', 'not-confirmed', fields, []);
   const personId = (fields['personId'] ?? '').trim().toLowerCase();
+  // Their name as it is stored, read before they go to the bin, so the notice can name them.
+  const before = uuidShape.test(personId)
+    ? await getPerson(context, { personId }, deps)
+    : undefined;
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const removed = await removePerson(context, { personId }, deps);
     return removed.ok ? { ok: true, personId } : { ok: false, code: removed.error.code };
   });
   if (!result.ok) return refused('remove_person', result.code, fields, []);
-  leaveNotice(context, 'people', personId, 'removed');
+  leaveNotice(
+    context,
+    'people',
+    personId,
+    'removed',
+    before?.ok === true ? rosterName(before.value) : undefined,
+  );
   return redirect(list);
+}
+
+/**
+ * "Put them back", in the notice that says someone was removed (A-5: one wrong tap has
+ * its way back): the bin's own `leagues.restore_person`, which checks people.manage again.
+ * They come back as they were, on no team (they could only be removed while on none), and
+ * the browser goes to their record, which says so. Refused, the list says why, once.
+ */
+export async function putBackPersonAction(form: FormData): Promise<void> {
+  const fields = typedOf(form);
+  const { context, putBack, list, record } = await peopleOf(fields);
+  const personId = (fields['personId'] ?? '').trim().toLowerCase();
+  if (!uuidShape.test(personId)) redirect(list);
+  const result = await requests().once(requestKeyOf(context, fields), async () => {
+    const restored = await restorePerson(context, { personId }, putBack);
+    return restored.ok ? { ok: true, personId } : { ok: false, code: restored.error.code };
+  });
+  if (!result.ok) {
+    leaveNotice(context, 'people', personId, `notPutBack.${result.code}`);
+    redirect(list);
+  }
+  leaveNotice(context, 'person', personId, 'putBack');
+  redirect(`${record(personId)}#${detailsAnchor}`);
 }
