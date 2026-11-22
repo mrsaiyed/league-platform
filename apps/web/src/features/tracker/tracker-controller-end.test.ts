@@ -421,7 +421,8 @@ describe('tracker controller: Reopen (step 2.120; the review of the two doors, p
     expect(await phone.controller.reopen('End game tapped by mistake')).toEqual({ ok: true });
     // Live again, and the device that ended it still holds the game: it is offered.
     status = phone.controller.status();
-    expect(status.mode.kind).toBe('held-by-other');
+    // It says the game is open again before who is scoring it (the review by use, M3).
+    expect(status.mode).toMatchObject({ kind: 'held-by-other', reopened: true });
     expect(status.game?.status).toBe('live');
     expect(await phone.controller.takeOver()).toEqual({ ok: true });
     expect(phone.controller.status().mode).toEqual({ kind: 'scoring' });

@@ -82,6 +82,14 @@ describe('tracker notices (T6 §5, T-113)', () => {
     ]);
   });
 
+  it('reopened from this device while another holds the game, it says first that the game is open again (the review by use, M3)', () => {
+    const holder = { displayName: 'Sam Scorekeeper', since: 0 };
+    expect(texts({ ...calm, mode: { kind: 'held-by-other', holder, reopened: true } })).toEqual([
+      'The game is open again: it is live, no longer final.',
+      'Sam Scorekeeper is scoring this game on another device.',
+    ]);
+  });
+
   it('says so when signed out while scoring, and how many plays are kept for it (finding M2)', () => {
     expect(texts({ ...calm, mode: { kind: 'scoring' }, signedOut: true })).toEqual([
       'You are signed out. Keep scoring: what you enter is kept on this device and sent once you sign in again.',

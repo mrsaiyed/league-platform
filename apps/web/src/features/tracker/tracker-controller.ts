@@ -129,6 +129,11 @@ export type ControllerMode =
   | {
       readonly kind: 'held-by-other';
       readonly holder: { readonly displayName: string; readonly since: number };
+      /**
+       * This device has just reopened the game, and another holds it: the screen says
+       * the game is open again before who is scoring it (the review by use, M3).
+       */
+      readonly reopened?: true;
     }
   | { readonly kind: 'scoring' }
   | { readonly kind: 'read-only'; readonly reason: ReadOnlyReason };
@@ -846,7 +851,15 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     switch (reply.status) {
       case 'held-by-other': {
         stopScoring();
-        update({ mode: { kind: 'held-by-other', holder: reply.holder } });
+        // Still held by the same device after a reopen from here: that is still said.
+        const was = current.mode;
+        const reopened =
+          was.kind === 'held-by-other' &&
+          was.reopened === true &&
+          was.holder.displayName === reply.holder.displayName
+            ? ({ reopened: true } as const)
+            : {};
+        update({ mode: { kind: 'held-by-other', holder: reply.holder, ...reopened } });
         return lost();
       }
       case 'ended':
@@ -1582,6 +1595,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
             }
           }
           await carryOn();
+          // Another device holds it: the screen that says so says first it is open again.
+          const mode = current.mode;
+          if (mode.kind === 'held-by-other') update({ mode: { ...mode, reopened: true } });
           return { ok: true };
         }),
       );

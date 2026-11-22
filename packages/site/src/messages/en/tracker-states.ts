@@ -142,6 +142,8 @@ export const enTrackerStates = {
   'tracker.reopen.cancel': 'Keep it final',
   'tracker.reopen.confirm': 'Reopen the game',
   'tracker.reopen.done': 'The game is live again. Carry on scoring.',
+  // Reopened from a device that does not hold the game: said before who is scoring (M3).
+  'tracker.reopen.doneElsewhere': 'The game is open again: it is live, no longer final.',
   // "Keep it final" came after the league had already reopened the game (fix round B, M4).
   'tracker.reopen.doneThoughKept':
     'The league had already reopened the game before you chose to keep it final. It is live again: end it again if it should stay final.',
