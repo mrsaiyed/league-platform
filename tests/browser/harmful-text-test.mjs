@@ -694,6 +694,8 @@ const ANSWERS = {
   '/api/v1/leagues/[leagueId]/games/[game]/state': [keeper, owner],
   '/api/v1/leagues/[leagueId]/scoring': [keeper, owner],
   '/display.css': [null],
+  // A fixed text (step 2.93: "do not index" outside production): nothing typed reaches it.
+  '/robots.txt': [null],
   '/standalone.css': [null],
   // Its answer sends the browser on to Google: only its first answer is read, never followed.
   '/signin/google': [null],
