@@ -324,6 +324,7 @@ Open `http://127.0.0.1:4180`. Without `DATABASE_URL`, it saves to embedded Postg
 
 - A `ConfigError` names each missing or invalid setting. Fix that line in `.env`; the message never shows a value.
 - If `npm run dev:web` fails with a stand-in refusal, check that `PUBLIC_BASE_URL` uses `127.0.0.1` (or `localhost`) and that `APP_ENV` is `local`. If a league page answers "not found", check that the address in the browser is exactly the one `PUBLIC_BASE_URL` names.
+- In staging or production, a start-up that cannot use the database says which of three things it is. "The database's certificate was not accepted": set `PLATFORM_DATABASE_CA` to the database's own certificate, as the path of its file or as its text (for Supabase, the file on the project's database settings page). "The database refused the password or login" (the worker: "refused the login"): the user name or password in `PLATFORM_DATABASE_URL` is wrong. "The database could not be reached": the address or port is wrong, or the database is not running. None of them prints the address, the password or the certificate (record 100).
 - If a test fails only on one run, run `npm run test:units` again on its own. Database tests can be slow on a busy machine; they use long timeouts on purpose.
 
 Related: [applying migrations](apply-migrations.md), [verification](verification.md), and the decisions in `docs/architecture/decisions/` (records 041 to 048 cover the stack this guide uses).
