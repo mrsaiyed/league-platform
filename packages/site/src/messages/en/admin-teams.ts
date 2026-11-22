@@ -6,6 +6,9 @@
 export const enAdminTeams = {
   'adminTeams.add.choose': 'Choose a person',
   'adminTeams.add.noOne': 'Everyone in the league list is already on this roster.',
+  // When the league's list of people has nobody in it at all.
+  'adminTeams.add.nobody':
+    'Nobody is in the league’s list yet. Add a new player with the form above.',
   // Step 2.157: for a role that may not read the league's list of people (a club admin).
   'adminTeams.add.notAllowed':
     "Your role in this league does not include its list of people, so no one can be chosen from it here. If it should, ask the league's owner or an admin.",
