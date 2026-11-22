@@ -156,7 +156,7 @@ describe('startWebApp', () => {
       /^Playing a simulated league at start: 8 teams in 1 division\(s\), 7 rounds, 2 tracked, seed 1\. This takes some seconds\.$/,
     );
     expect(said[1]).toMatch(
-      /^Simulated league ready: Simulated Made-up League, 28 games, all 7 checks hold, at http:\/\/localhost:3000\/simulated \(start took \d+\.\d s\)\./,
+      /^Simulated league ready: Simulated Made-up League, 28 games, all 10 checks hold, at http:\/\/localhost:3000\/simulated \(start took \d+\.\d s\)\./,
     );
     expect(await ports.findLeague('simulated')).toMatchObject({ slug: 'simulated' });
     expect(await ports.findLeague('lakeside')).toMatchObject({ slug: 'lakeside' });
