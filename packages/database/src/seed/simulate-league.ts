@@ -30,6 +30,7 @@ import {
   seasonRulesPreset,
   startingDesign,
   trackerProtocolVersion,
+  type SeasonRules,
 } from '@srleagues/contracts';
 import {
   addToRoster,
@@ -121,6 +122,8 @@ export type PlayedLeague = {
   readonly seasonId: string;
   /** The database's game ids of the plan's games, by game number. */
   readonly gameIds: ReadonlyMap<number, string>;
+  /** The season's rules as the simulation set them (step 1), for a working-out of the plan. */
+  readonly rules: SeasonRules;
   /** Seconds each part took, in the order they ran. */
   readonly timings: readonly { readonly part: string; readonly seconds: number }[];
   /**
@@ -356,7 +359,15 @@ export async function simulateLeagueInto(
     timings.push({ part: 'final scores', seconds: Math.round(finals) / 1000 });
     timings.push({ part: 'tracked games', seconds: Math.round(tracked) / 1000 });
     timings.push({ part: 'called-off games', seconds: Math.round(calledOff) / 1000 });
-    return { plan, leagueId, seasonId, gameIds, timings, moves };
+    return {
+      plan,
+      leagueId,
+      seasonId,
+      gameIds,
+      rules: seasonRulesPreset('high-school'),
+      timings,
+      moves,
+    };
   } finally {
     await db.close();
   }

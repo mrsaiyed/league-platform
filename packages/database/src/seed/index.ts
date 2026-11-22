@@ -19,6 +19,12 @@ export {
   type SimulationReport,
 } from './simulate-league-check.ts';
 export {
+  expectedBoxScore,
+  expectedGame,
+  expectedPlayerTotals,
+  expectedTables,
+} from './simulate-league-expected.ts';
+export {
   planSimulation,
   simulatedOwner,
   simulationDefaults,
