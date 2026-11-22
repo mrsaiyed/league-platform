@@ -207,7 +207,16 @@ if (built) {
     for (let left = 3; left > 0; left -= 1) {
       const game = theirGames().first();
       await game.locator('summary', { hasText: 'Edit this game' }).click();
-      await tap(game.getByRole('button', { name: 'Remove game' }), /saved=game-removed/);
+      const removedId = await game.getAttribute('data-game');
+      // Since step 2.185 the answer is a one-time notice at the struck game, not the
+      // address: the page lands at the game, which stays struck through with "Removed:".
+      await tap(game.getByRole('button', { name: 'Remove game' }), /fromTeam=[^#]+#game-/);
+      note(
+        `the game removed is said removed at its struck row (${4 - left})`,
+        (await page
+          .locator(`li[data-removed-game="${removedId}"] #saved`, { hasText: 'Removed:' })
+          .count()) === 1,
+      );
       note(
         `the way back stays after removing a game (${4 - left})`,
         (await backToKestrels().count()) === 1,

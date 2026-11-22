@@ -10,6 +10,7 @@ import {
   getScheduleDraft,
   moveDraftGame,
   publishSchedule,
+  putBackDraftGame,
   removeDraftGame,
   removeDraftRound,
   renameDraftRound,
@@ -50,12 +51,26 @@ export type SavedDetail =
    * so the grid can offer to put it back (step 2.161). What it was is read from the draft
    * on the server, never from the address.
    */
-  | { readonly what: 'game-removed'; readonly roundId: string | null; readonly gameId?: string }
+  | {
+      readonly what: 'game-removed';
+      readonly roundId: string | null;
+      readonly gameId?: string;
+      /**
+       * A game of the published schedule: it stays in the grid, struck through, and the
+       * answer is said at it (step 2.185). One only in the draft is said in its round.
+       */
+      readonly stays?: true;
+    }
   /**
    * A removed game was put back in the draft as it was; with `fromRoundId`, the round it was
    * in has since been removed from the draft, so it came back with no round (S-60).
    */
-  | { readonly what: 'game-put-back'; readonly gameId: string; readonly fromRoundId?: string };
+  | { readonly what: 'game-put-back'; readonly gameId: string; readonly fromRoundId?: string }
+  /**
+   * "Put it back" on a game the draft holds already (a second tap, or a page from before
+   * the first): nothing was added, and the grid says the game is already back (step 2.185).
+   */
+  | { readonly what: 'game-already-back'; readonly gameId: string };
 
 /** Which form a refusal belongs beside: the new round's, or one round's own. */
 export type RefusedAt =
@@ -202,10 +217,27 @@ export async function runScheduleAction(
     }
     case 'remove-game': {
       const done = await removeDraftGame(context, { ...basis, gameId }, deps);
-      if (!done.ok) return refusal(done);
-      // Said in the round the game was in when the form was drawn.
+      // A second tap (a double tap) finds the draft moved on by the first: when the draft
+      // now removes the game, it is answered as the first was (step 2.185), never
+      // "someone else changed the draft".
+      if (!done.ok && done.error.code !== 'changed-since-read') return refusal(done);
+      const read = await getScheduleDraft(context, { seasonId: basis.seasonId }, deps);
+      if (!done.ok && !(read.ok && read.value.removed.some((g) => g.id === gameId))) {
+        return refusal(done);
+      }
+      // Said in the round the game was in when the form was drawn; at the game itself when
+      // it stays in the grid, struck through.
       const [wasRound = ''] = text(form, 'wasSlot').split('~');
-      return { kind: 'saved', detail: { what: 'game-removed', roundId: orNull(wasRound), gameId } };
+      const stays = read.ok && read.value.published.games.some((g) => g.id === gameId);
+      return {
+        kind: 'saved',
+        detail: {
+          what: 'game-removed',
+          roundId: orNull(wasRound),
+          gameId,
+          ...(stays ? { stays: true as const } : {}),
+        },
+      };
     }
     case 'put-back-game':
       return putBackGame(gameId, basis.seasonId, context, deps);
@@ -257,9 +289,9 @@ export async function runScheduleAction(
 }
 
 /**
- * "Put it back" (step 2.161): adds a game removed from the draft again exactly as it was,
- * read from the draft on the server by its id (the game as it stood just before it was
- * removed), never from the page's address. Its basis is the draft as it is now, so a page
+ * "Put it back" (steps 2.161 and 2.185): drops the draft's removal of a game, so the draft
+ * holds it again as it stood just before it was removed (putBackDraftGame), named by its
+ * id only, never by the page's address. Its basis is the draft as it is now, so a page
  * reloaded or tapped twice is not told someone else changed the draft: a game already back
  * is answered "put back"; one the draft no longer removes (published or discarded since,
  * or never removed) is refused in words, and nothing is added.
@@ -273,20 +305,23 @@ async function putBackGame(
   const read = await getScheduleDraft(context, { seasonId }, deps);
   if (!read.ok) return refusal(read);
   const view = read.value;
+  // No draft (published or discarded since): nothing to put back, said first, before the
+  // game is found in the published schedule and taken for "already back".
+  if (view.draft === null) return { kind: 'refused', code: 'nothing-to-put-back' };
   if (view.result.games.some((g) => g.id === gameId)) {
-    return { kind: 'saved', detail: { what: 'game-put-back', gameId } };
+    return { kind: 'saved', detail: { what: 'game-already-back', gameId } };
   }
+  // Whatever has happened to the game since (played, postponed, cancelled), dropping the
+  // removal only gives the draft the game back (step 2.185).
   const was = view.removed.find((g) => g.id === gameId);
-  if (was === undefined || view.draft === null || was.status !== 'scheduled') {
-    return { kind: 'refused', code: 'nothing-to-put-back' };
-  }
+  if (was === undefined) return { kind: 'refused', code: 'nothing-to-put-back' };
   // Its round removed from the draft since (step 2.181): it comes back with no round, as a
   // game brought back from the bin does (S-60), never refused for a round that is gone.
   const fromRoundId =
     was.roundId !== null && !view.result.rounds.some((r) => r.id === was.roundId)
       ? was.roundId
       : undefined;
-  const done = await addDraftGame(
+  const done = await putBackDraftGame(
     context,
     {
       seasonId,
@@ -294,14 +329,6 @@ async function putBackGame(
       draftId: view.draft.id,
       version: view.draft.version,
       gameId,
-      homeTeamId: was.homeTeamId,
-      awayTeamId: was.awayTeamId,
-      roundId: fromRoundId === undefined ? was.roundId : null,
-      date: was.date,
-      time: was.time,
-      venueId: was.venueId,
-      court: was.court,
-      recording: was.recording ?? null,
     },
     deps,
   );

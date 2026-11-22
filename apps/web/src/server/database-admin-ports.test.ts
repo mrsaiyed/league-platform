@@ -863,7 +863,7 @@ describe('Admin → Schedule on the database ports, role by role', () => {
     );
     expect(done).toMatchObject({ ok: true });
     const after = await campView();
-    expect(after.draft?.changeCount).toBe((before.draft?.changeCount ?? 0) + 1);
+    expect(after.draft?.savedEdits).toBe((before.draft?.savedEdits ?? 0) + 1);
     expect(after.result.rounds.map((r) => r.label)).toContain('Camp week 1');
   });
 

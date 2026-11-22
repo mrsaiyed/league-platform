@@ -28,7 +28,9 @@ import { loadTeamCardsOf } from '../team-pages/index.ts';
 import { buildScheduleView } from '../schedule-pages/build-schedule.ts';
 import { RoundSections } from '../schedule-pages/schedule-views.tsx';
 import { backToTeamId, backToTeamOf } from './back-to-team.ts';
+import { t } from '../../server/messages.ts';
 import { gridTeamName, pageGrid } from './build-grid.ts';
+import { runScheduleAction } from './run-schedule-action.ts';
 
 const anId = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
@@ -89,6 +91,41 @@ describe('a team in the bin with games is named on every screen (A-17)', () => {
       expect(`${game.homeName} ${game.awayName}`).not.toMatch(anId);
     }
     expect(grid.clashes.map((c) => c.text).join(' ')).not.toMatch(anId);
+  });
+
+  it('a removed game of a team in the bin is struck with no "Put it back", which could only fail (step 2.185)', async () => {
+    const { world, league, badgers, seasonId, context } = worldWithBadgersBinned();
+    const ports = standInSchedule(world);
+    const teams = await ports.teamsOf(league.leagueId, seasonId);
+    const first = await getScheduleDraft(context, { seasonId }, ports.deps);
+    if (!first.ok) throw new Error(first.error.code);
+    const game = first.value.published.games.find(
+      (g) =>
+        g.status === 'scheduled' && (g.homeTeamId === badgers.id || g.awayTeamId === badgers.id),
+    );
+    if (game === undefined) throw new Error('no scheduled Badgers game');
+    const form = new FormData();
+    const fields = {
+      seasonId,
+      basedOnRevision:
+        first.value.latestRevision === null ? '' : String(first.value.latestRevision),
+      version: first.value.draft === null ? '' : String(first.value.draft.version),
+      draftId: first.value.draft?.id ?? '',
+      gameId: game.id,
+      wasSlot: [game.roundId ?? '', game.date, game.time ?? '', ''].join('~'),
+    };
+    for (const [k, v] of Object.entries(fields)) form.set(k, v);
+    expect(await runScheduleAction('remove-game', form, context, ports.deps)).toMatchObject({
+      kind: 'saved',
+    });
+    const after = await getScheduleDraft(context, { seasonId }, ports.deps);
+    if (!after.ok) throw new Error(after.error.code);
+    const { grid } = pageGrid(after.value, teams, []);
+    const struck = [...grid.rounds.flatMap((r) => r.removed), ...grid.looseRemoved];
+    expect(struck.map((g) => [g.id, g.teamInBin])).toEqual([[game.id, true]]);
+    expect(t('schedule.admin.removedTeamInBin')).toBe(
+      'Removed in this draft, and one of its teams is in the bin, so this game stays removed. The team is kept for 30 days; the screen to bring it back is not ready yet.',
+    );
   });
 
   it('offers the way back only to a team of the season not in the bin, by an id of its shape', () => {

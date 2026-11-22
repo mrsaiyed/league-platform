@@ -15,7 +15,7 @@ describe('the words handed to the tracker’s device', () => {
   it('are enough for the tracker’s notices and banner', () => {
     const t = createTranslator('en', { en: trackerCatalog(en) });
     expect(savedBannerText(savedBanner({ waiting: 2, refused: [], storageFailure: null }), t)).toBe(
-      '2 actions waiting to send',
+      '2 plays waiting to send',
     );
     expect(trackerNoticeText({ key: 'tracker.heldByOther', name: 'Sam' }, t)).toBe(
       'Sam is scoring this game on another device.',

@@ -481,6 +481,12 @@ export const TrackerRosters = z.strictObject({
   status: z.string().max(20),
   /** The game's season wants unique numbers on a team: a change to a number worn is refused (S-37). */
   uniqueJerseys: z.boolean(),
+  /**
+   * A level score may end the game: the rules it is played under allow ties (S-73, step
+   * 2.37). The device refuses End game at a level score at once when they do not, with or
+   * without a signal; the server stays the judge of the End tap.
+   */
+  allowTies: z.boolean(),
   players: z.array(TrackerRosterPlayer).max(1000),
 });
 export type TrackerRosters = z.infer<typeof TrackerRosters>;
