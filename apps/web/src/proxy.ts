@@ -15,14 +15,19 @@
 // `X-Robots-Tag: noindex` (do-not-index.ts, record 082): pages, API answers and error pages
 // alike, since the header is set here, whatever the route then answers.
 //
+// A page of our site asked under a host that is not ours (the server fetching a form's new
+// page from itself, at its own listening address) gets a plain answer and nothing else, so
+// the browser goes there itself (other-host-render.ts, step 2.239).
+//
 // It also keeps a session going (T-69, T-70): when the browser sends the renewing
 // token and no session cookie (it ran out), the session is renewed here, the page
 // sees the new token, and the browser is given the new cookies (renew-session.ts).
 import { NextResponse, type NextRequest } from 'next/server';
-import { isDevelopmentServer } from './server/config.ts';
+import { getConfig, isDevelopmentServer } from './server/config.ts';
 import { webPorts } from './server/container.ts';
 import { doNotIndex, doNotIndexHeader } from './server/do-not-index.ts';
 import { t } from './server/messages.ts';
+import { isPageAskedUnderOtherHost } from './server/other-host-render.ts';
 import { pathHeader } from './server/request-facts-header.ts';
 import {
   contentSecurityPolicy,
@@ -80,9 +85,38 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   return marked(await answer(request));
 }
 
+/** The site's address, or undefined while the settings cannot be read: the pages say so. */
+function siteOriginIfReadable(): string | undefined {
+  try {
+    return getConfig().PUBLIC_BASE_URL;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The plain answer, with no page in it, to a page of our site asked under a host that is
+ * not ours: after a form's redirect() it is the server fetching the new page from itself,
+ * and Next.js then sends the browser there on its own, under our host
+ * (other-host-render.ts, step 2.239). Nothing is read and nothing is drawn.
+ */
+function noPageDataHere(): NextResponse {
+  return new NextResponse(null, {
+    status: 404,
+    headers: {
+      'cache-control': 'no-store',
+      'content-security-policy': fixedContentSecurityPolicy,
+    },
+  });
+}
+
 async function answer(request: NextRequest): Promise<NextResponse> {
   const ports = await portsIfStarted();
   if (ports?.answers(request.headers) === false) return notAnswered();
+  const siteOrigin = siteOriginIfReadable();
+  if (siteOrigin !== undefined && isPageAskedUnderOtherHost(request.headers, siteOrigin)) {
+    return noPageDataHere();
+  }
   const url = new URL(request.url);
   const changes: Change[] = [];
   if (
