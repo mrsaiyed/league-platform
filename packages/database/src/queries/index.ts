@@ -5,6 +5,7 @@ export { countPrograms } from './count-programs.ts';
 export { deleteSettingValue } from './delete-setting-value.ts';
 export { findCurrentLeague, type CurrentLeague } from './find-current-league.ts';
 export { findLeagueAudience } from './find-league-audience.ts';
+export { findLeagueContactEmail } from './find-league-contact-email.ts';
 export { hasRecordedChild } from './has-recorded-child.ts';
 export { findCourt } from './find-court.ts';
 export { findDivision } from './find-division.ts';

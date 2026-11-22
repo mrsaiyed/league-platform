@@ -28,7 +28,9 @@ import {
   createTeam,
   leagueScope,
   publishSiteDesign,
+  publicNames,
   setLeagueStatus,
+  setSetting,
   type AccessTx,
   type CommandContext,
   type CommandDeps,
@@ -146,6 +148,7 @@ async function loadLeague(
         timeZone: league.timeZone,
         audience: league.audience,
         ownerAccountId: ownerId,
+        contactEmail: `hello@${league.slug}.example.test`,
         sportKey: 'basketball',
         firstSeason: { ...league.season },
       },
@@ -162,6 +165,18 @@ async function loadLeague(
       deps.leagues,
     ),
   );
+  // Publishing waits for a youth or mixed league's privacy choice (step 2.240): the
+  // made-up owner keeps the names setting as it starts, so nothing shown changes.
+  if (league.audience !== 'adult') {
+    must(
+      'privacy choice',
+      await setSetting(
+        as(ownerId),
+        { level: 'league', key: publicNames.key, value: publicNames.default, version: null },
+        deps.leagues,
+      ),
+    );
+  }
   must(
     'league status',
     await setLeagueStatus(as(ownerId), { status: 'live', version: created.version }, deps.leagues),

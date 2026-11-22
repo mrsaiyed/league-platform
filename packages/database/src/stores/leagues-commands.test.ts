@@ -307,8 +307,18 @@ describe('renameShortName on the database', () => {
 });
 
 describe('setLeagueStatus on the database', () => {
-  it('moves along the table: owner publishes, staff suspend and lift', async () => {
+  it('waits for a contact email before it publishes (step 2.240)', async () => {
     const a = await create(unique('hoops'));
+    const owner = as(a.leagueId, a.ownerAccountId);
+    expect(await setLeagueStatus(owner, { status: 'live', version: 1 }, deps)).toEqual({
+      ok: false,
+      error: { code: 'no-contact-email' },
+    });
+    expect(await row(a.leagueId)).toMatchObject({ status: 'draft', version: 1 });
+  });
+
+  it('moves along the table: owner publishes, staff suspend and lift', async () => {
+    const a = await create(unique('hoops'), { contactEmail: 'hello@example.test' });
     const owner = as(a.leagueId, a.ownerAccountId);
     const staff = as(a.leagueId, staffId);
     expect(await setLeagueStatus(owner, { status: 'live', version: 1 }, deps)).toMatchObject({

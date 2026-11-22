@@ -86,6 +86,15 @@ export {
 } from './settings/describe-setting.ts';
 export { listLeagueSettings, type LeagueSettingRow } from './settings/list-league-settings.ts';
 export { readPrivacyFacts, type PrivacyFacts } from './settings/read-privacy-facts.ts';
+export { readPublishChecks } from './queries/read-publish-checks.ts';
+export {
+  firstUnmetCheck,
+  publishCheckKeys,
+  publishChecks,
+  type PublishCheck,
+  type PublishCheckKey,
+  type PublishFacts,
+} from './rules/publish-checks.ts';
 export { lookupSetting, type SettingValue, type StoredSetting } from './settings/lookup-setting.ts';
 export {
   leagueCreated,
