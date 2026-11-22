@@ -148,14 +148,29 @@ if (browser) {
         // inline page data (inline, with the nonce). The page has loaded by now, so its
         // scripts get 5 seconds, not the 30 a page's arrival gets: with a broken nonce the
         // test fails in under 2 minutes, not 9 (the 2.98 review, C4).
-        await page.waitForFunction(
-          () =>
-            Array.isArray(self.__next_f) &&
-            [...document.body.querySelectorAll('*')].some((element) =>
-              Object.keys(element).some((key) => key.startsWith('__reactFiber')),
-            ),
-          undefined,
-          { timeout: scriptsWait },
+        // A timeout here is said in plain words, naming the page, not as Playwright's own
+        // "waitForFunction: Timeout exceeded"; any other error is thrown as it is.
+        const scriptsRan = await page
+          .waitForFunction(
+            () =>
+              Array.isArray(self.__next_f) &&
+              [...document.body.querySelectorAll('*')].some((element) =>
+                Object.keys(element).some((key) => key.startsWith('__reactFiber')),
+              ),
+            undefined,
+            { timeout: scriptsWait },
+          )
+          .then(
+            () => true,
+            (error) => {
+              if (error?.name === 'TimeoutError') return false;
+              throw error;
+            },
+          );
+        note(
+          `${address}: the page's scripts ran within ${scriptsWait / 1000} seconds`,
+          scriptsRan,
+          `NO: this page's scripts did not run within ${scriptsWait / 1000} seconds: the browser refused them, or the nonce on them is not the header's`,
         );
         note(`${address}: the page's own scripts ran`, await reactRan(page));
         const refused = await page.evaluate(() => window.__refused);
