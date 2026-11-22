@@ -50,6 +50,36 @@ describe('the browser clock (finding M3)', () => {
 });
 
 describe('tracker queue: storing taps (T-114)', () => {
+  it('shows a stored tap waiting at once, before the read of every waiting tap ends (step 2.37, part 2)', async () => {
+    const memory = createMemoryQueueStorage();
+    let readsHeld = false;
+    const reads: (() => void)[] = [];
+    const storage: QueueStorage = {
+      ...memory,
+      list: async (gameId) => {
+        if (readsHeld) await new Promise<void>((go) => reads.push(go));
+        return memory.list(gameId);
+      },
+    };
+    const { queue, server } = setup({}, { storage, clock: createManualClock() });
+    server.mode = 'down';
+    await queue.start();
+    readsHeld = true;
+    const counts: number[] = [];
+    queue.subscribe((status) => counts.push(status.waiting));
+    const storing = queue.enqueue(tap(1));
+    while (reads.length === 0) await Promise.resolve();
+    // The read after the write has not ended: the count is up already, from memory.
+    expect(queue.status().waiting).toBe(1);
+    expect(queue.status().waitingTaps.map((t) => t.command.commandId)).toEqual([commandId(1)]);
+    readsHeld = false;
+    for (const go of reads.splice(0)) go();
+    await storing;
+    expect(queue.status().waiting).toBe(1);
+    // Never shown fewer than are held on the way.
+    expect(counts.every((n) => n >= 1)).toBe(true);
+  });
+
   it('has stored a tap by the time enqueue resolves, with no network at all', async () => {
     const { queue, server, storage } = setup();
     server.mode = 'down';

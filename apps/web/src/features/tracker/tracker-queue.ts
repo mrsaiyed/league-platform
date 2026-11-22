@@ -533,19 +533,20 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       const added = await stored('storage-write-failed', () =>
         storage.add(gameId, { protocolVersion, command, ...madeUnder, ...madeAt }),
       );
-      // Stored: whatever happens next, the tap is kept. If the read after it fails, the
-      // count goes up by hand, so the screen never shows fewer waiting than are held.
-      const shown = readsShown;
-      try {
-        await refresh();
-      } catch {
-        if (added === 'added' && readsShown === shown) {
-          update({
-            waiting: current.waiting + 1,
-            waitingTaps: [...current.waitingTaps, { command, moment: moment ?? null }],
-          });
-        }
+      // Stored: whatever happens next, the tap is kept, and shown waiting at once from
+      // memory (step 2.37, part 2): the screen's count never lags the read of every
+      // waiting tap, which takes a tenth of a second with 500 waiting. A read begun
+      // before the tap was stored is not shown over it; the read after it confirms.
+      if (added === 'added') {
+        readsShown = readsStarted;
+        update({
+          waiting: current.waiting + 1,
+          waitingTaps: [...current.waitingTaps, { command, moment: moment ?? null }],
+        });
       }
+      // The read after the write keeps the count true to what is held (another tab, say);
+      // if it fails, the count from memory stands.
+      await refresh().catch(() => undefined);
       kick();
     },
 
