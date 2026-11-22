@@ -39,6 +39,10 @@ const sections: Readonly<Record<LegalPage, readonly Section[]>> = {
       body: ['legal.privacy.children.body', 'legal.privacy.children.less'],
     },
     { title: 'legal.privacy.sell.title', body: ['legal.privacy.sell.body'] },
+    {
+      title: 'legal.privacy.remove.title',
+      body: ['legal.privacy.remove.body', 'legal.privacy.remove.league'],
+    },
   ],
 };
 

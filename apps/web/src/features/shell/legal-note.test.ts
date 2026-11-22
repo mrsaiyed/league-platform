@@ -79,6 +79,14 @@ describe('the Terms and Privacy note (step 2.135)', () => {
     }
   });
 
+  it('says how to have an account taken off, before who to write to', () => {
+    const text = textOf(draw('privacy'));
+    const removal = text.indexOf(en['legal.privacy.remove.body']);
+    expect(removal).toBeGreaterThan(-1);
+    expect(text).toContain(en['legal.privacy.remove.league']);
+    expect(removal).toBeLessThan(text.indexOf(en['legal.contact.title']));
+  });
+
   it("names the league's admin first and the site's address second, as a link", () => {
     for (const page of pages) {
       const html = draw(page);

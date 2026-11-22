@@ -13,7 +13,7 @@ export const enLegal = {
   'legal.contact.siteThroughLeague':
     'If they cannot help, ask them to pass your question on to the people who run SR Leagues.',
   'legal.contact.title': 'Who to write to',
-  'legal.lastChanged': 'Last changed on 17 November 2026.',
+  'legal.lastChanged': 'Last changed on 22 November 2026.',
   'legal.privacy.children.body':
     "A player the league knows to be under 18 is shown on public pages by first name and last initial, such as “Sam K.”, unless the league's admin has confirmed that the parents agreed to full names. In a youth league, a player whose age the league does not know is shown the same way.",
   'legal.privacy.children.less':
@@ -30,8 +30,13 @@ export const enLegal = {
   'legal.privacy.keep.players':
     "For players: name, team, jersey number, games played and statistics. A league can also keep a player's date of birth and email address.",
   'legal.privacy.keep.title': 'What we keep',
+  'legal.privacy.remove.body':
+    'There is no button yet to close your account. To have it closed and what we keep about you deleted, ask us as “Who to write to” says below.',
+  'legal.privacy.remove.league':
+    "A league's admin can take a player off the league's list. Someone who never played on a team is then deleted for good after 30 days. Someone who has played stays in the league's records, and the games they played keep their numbers.",
+  'legal.privacy.remove.title': 'Taking it off',
   'legal.privacy.sell.body':
-    'We do not sell your information, and the site shows no advertising. Besides your league and us, it goes only to the services the site runs on: its hosting, its database, signing in and sending email. If you sign in with Google, Google tells us your email address.',
+    'We do not sell your information, and the site shows no advertising. Besides your league and us, it goes only to the services the site runs on: its hosting, its database, signing in, checking that sign-ins are made by people, and sending email. If you sign in with Google, Google tells us your email address.',
   'legal.privacy.sell.title': 'We do not sell it',
   'legal.privacy.who.admins':
     "Your league's admins can see everything the league keeps about its players. The people who run SR Leagues can see it too, to keep the site working and fix problems.",
