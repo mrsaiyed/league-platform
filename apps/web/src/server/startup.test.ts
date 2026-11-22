@@ -282,10 +282,14 @@ describe('startWebApp', () => {
 
   it('checks the login role first in staging and production, and stops on a problem (T-60)', async () => {
     for (const appEnv of ['staging', 'production']) {
-      const d = deps(['it is a superuser', 'it bypasses row-level security']);
+      const d = deps([
+        'app is a superuser: alter role app nosuperuser',
+        'app bypasses row-level security: alter role app nobypassrls',
+      ]);
       await expect(startWebApp(configFor(appEnv), d.given)).rejects.toThrow(
         'The web app cannot start: the database login role is not fit for the app (T-60): ' +
-          'it is a superuser; it bypasses row-level security.',
+          'app is a superuser: alter role app nosuperuser; ' +
+          'app bypasses row-level security: alter role app nobypassrls.',
       );
       // Over SSL with the certificate checked: the default (record 082).
       expect(d.createDatabase).toHaveBeenCalledWith({
@@ -636,7 +640,7 @@ describe('email confirmation on the real sign-in service (step 2.115)', () => {
   });
 
   it('is not asked when the login role already stopped the start', async () => {
-    const d = deps(['it is a superuser'], 'off');
+    const d = deps(['app is a superuser: alter role app nosuperuser'], 'off');
     await expect(startWebApp(configFor('staging'), d.given)).rejects.toThrow(/login role/);
     expect(d.realSignIn).not.toHaveBeenCalled();
   });

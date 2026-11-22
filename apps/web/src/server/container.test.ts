@@ -343,9 +343,21 @@ describe('what stops the test copy from starting, each in a plain sentence', () 
 
   it('a login role that could see past the fence (T-60)', async () => {
     const { settings } = await world({ login: 'superuser' });
-    expect(await refusal(settings)).toBe(
-      'The web app cannot start: the database login role is not fit for the app (T-60): it is a superuser; it bypasses row-level security; it owns tables in public, or can act as their owner.',
-    );
+    // Word for word; only the count of the other tables it owns is left free, since
+    // every migration that adds a table changes it.
+    const expected =
+      'The web app cannot start: the database login role is not fit for the app (T-60): ' +
+      'postgres is a superuser: alter role postgres nosuperuser; ' +
+      'postgres bypasses row-level security: alter role postgres nobypassrls; ' +
+      'postgres may create roles: alter role postgres nocreaterole; ' +
+      'postgres may create databases: alter role postgres nocreatedb; ' +
+      'postgres may start replication: alter role postgres noreplication; ' +
+      'postgres owns tables (migration_log.applied and COUNT more), so it could switch their fence off: ' +
+      'the app must log in as a role of its own (as app_login is), not as the tables’ owner.';
+    const [before, after] = expected
+      .split('COUNT')
+      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    expect(await refusal(settings)).toMatch(new RegExp(`^${before}[1-9]\\d*${after}$`));
   }, 120_000);
 
   it('a login that cannot reach the sign-in store (record 052)', async () => {
