@@ -107,7 +107,12 @@ export const problemWords = {
     highlightColor: 'Highlight color: a color written #rrggbb, such as #d3b780.',
   },
   blocked: {
-    shortName: 'Short name: that word is not allowed (one of ours, or offensive). Choose another.',
+    shortName:
+      'Short name: that word is one of ours (the site uses it for its own pages). Choose another.',
+  },
+  offensive: {
+    shortName:
+      'Short name: that word is not allowed (it is on our list of offensive words). Choose another.',
   },
   'before-start': {
     seasonEndsOn: 'First season ends: before it starts.',
