@@ -216,8 +216,8 @@ if (built) {
       binText,
     );
     note(
-      'the bin says it is kept for 30 days and the screen to bring it back is not ready',
-      binText.includes('It is kept for 30 days; the screen to bring it back is not ready yet.'),
+      'the bin says it is kept for 30 days, and promises no screen to bring it back',
+      binText.includes('It is kept for 30 days.') && !/not ready|bring it back/i.test(binText),
     );
     note(
       'moving to the bin is a destructive button',
@@ -231,8 +231,7 @@ if (built) {
     const removed = await page.locator('main [role=status]').first().innerText();
     note(
       'removing the team promises only what is true',
-      removed ===
-        'Removed. The team is kept for 30 days; the screen to bring it back is not ready yet.',
+      removed === 'Removed. The team is kept for 30 days.',
       removed,
     );
     note(
@@ -256,7 +255,7 @@ if (built) {
     const gone = await page.locator('main [role=status]').first().innerText();
     note(
       'taking someone off the list promises only what is true',
-      gone.includes('kept for 30 days; the screen to bring them back is not ready yet.'),
+      gone.includes('The person is kept for 30 days.'),
       gone,
     );
     await accessible('a person taken off the league list');
