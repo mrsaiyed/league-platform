@@ -35,6 +35,8 @@ export function standInGames(world: World, options: StandInGamesOptions): StandI
     worldGameSnapshot(() => world.read(leagueId), world.now);
   return {
     deps,
+    // The world's one transaction holds the standings' stores too (step 2.56).
+    standingsDeps: deps,
     tracker: {
       deps,
       snapshotStoreOf,

@@ -83,6 +83,7 @@ import {
   invite,
   listAccess,
   listActivity,
+  listAdjustments,
   listBin,
   listDivisions,
   listEarlierGames,
@@ -1820,6 +1821,13 @@ const adjustmentRows: readonly Row[] = [
       return { seasonId, teamId, wins: 1, reason: 'Won by ruling' };
     },
     (c, i) => addAdjustment(c, i, standingsDeps),
+  ),
+  ...gameRows(
+    'standings.list_adjustments',
+    "list a season's adjustments",
+    'standings.adjust',
+    async (league, program) => ({ seasonId: await seasonIn(league, program) }),
+    (c, i) => listAdjustments(c, i, standingsDeps),
   ),
   ...gameRows(
     'standings.remove_adjustment',

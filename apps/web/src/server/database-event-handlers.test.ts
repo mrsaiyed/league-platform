@@ -118,6 +118,8 @@ describe('core’s event handlers on the database', () => {
       'adminSettings.seasons',
       'adminTeams',
       'games',
+      // The standings adjustments' commands on the games area's stores (step 2.56).
+      'games.standingsDeps',
       'scheduleAdmin',
       'tracker',
     ]);

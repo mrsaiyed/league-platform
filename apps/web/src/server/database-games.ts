@@ -19,7 +19,7 @@
 //
 // packages/database is handed in, not imported: Node.js loads it when the app starts
 // (container.ts), so Next.js never bundles it.
-import type { Clock, CommandDeps, TrackerTx } from '@srleagues/core';
+import type { Clock, CommandDeps, StandingsTx, TrackerTx } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle, LeagueScope } from '@srleagues/database';
 import { coreEventHandlers } from './database-event-handlers.ts';
@@ -71,13 +71,38 @@ export function databaseGamesDeps(
   };
 }
 
+/**
+ * The standings adjustments' commands' deps on the database (step 2.56): the same
+ * stores in one league transaction, with core's handlers, typed for the standings module.
+ */
+export function databaseStandingsDeps(
+  database: GamesQueries,
+  db: DatabaseHandle,
+  options: Pick<DatabaseGamesOptions, 'log'>,
+): CommandDeps<StandingsTx> {
+  return {
+    transaction: database.commandTransaction(db, (scope: LeagueScope) => ({
+      jobs: database.jobsStore(scope),
+      games: database.gamesStore(scope),
+      access: database.accessStore(scope),
+      activity: database.activityLogStore(scope),
+      standings: database.standingsStore(scope),
+    })),
+    events: coreEventHandlers<StandingsTx>(),
+    log: options.log,
+    now: () => performance.now(),
+  };
+}
+
 export function databaseGames(
   database: GamesQueries,
   db: DatabaseHandle,
   deps: CommandDeps<TrackerTx>,
+  standingsDeps: CommandDeps<StandingsTx>,
 ): GamesAreaPorts {
   return {
     deps,
+    standingsDeps,
     // The words beside the games, read in one transaction set to the league: its teams and
     // seasons by id, and each game's scorekeepers by the name their account gives (an
     // account that has given none, or holds nothing in the league any more, is '').
