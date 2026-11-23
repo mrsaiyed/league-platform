@@ -28,7 +28,15 @@ import { locale, t, type TextKey } from '../../server/messages.ts';
 import { momentIn } from '../../server/stand-in-world-clock.ts';
 import { StaffTrail } from '../staff/index.ts';
 import { adminsView } from './access-view.ts';
-import { dayAfter, logAskedOf, logLineOf, logQueryOf, type LogLine } from './activity-log-view.ts';
+import {
+  dayAfter,
+  logAskedOf,
+  logLineOf,
+  logQueryOf,
+  type LogLine,
+  type LogThingAsk,
+} from './activity-log-view.ts';
+import { logSentenceOf, whoChoicesOf } from './activity-log-words.ts';
 
 /** Entries on one page: a list that grows is never read whole (DESIGN, step 2.77). */
 const logPageSize = 20;
@@ -39,19 +47,11 @@ const roleNames: readonly string[] = ['owner', ...roles];
 const isRole = (value: string | undefined): value is Role | 'owner' =>
   value !== undefined && roleNames.includes(value);
 
-/** The entry's sentence; a sentence whose values the entry lacks reads as a plain change. */
-function sentenceOf(line: LogLine): string {
-  const role = line.values['role'];
-  const values = {
-    ...line.values,
-    role: isRole(role) ? t(`role.${role}` as TextKey) : '',
-  };
-  try {
-    return t(line.summary as TextKey, values);
-  } catch {
-    return t('activity.leagues.set_setting');
-  }
-}
+/** A role's name, and that it is for one program when it is (as on the Admins page). */
+const roleIn = (role: Role, program: boolean) =>
+  program
+    ? t('adminAccess.forOneProgram', { role: t(`role.${role}` as TextKey) })
+    : t(`role.${role}` as TextKey);
 
 export async function ActivityLogPage({
   league,
@@ -69,8 +69,8 @@ export async function ActivityLogPage({
   const clock = await ports.publicSchedule.clockOf(here.id);
   const asked = logAskedOf(query);
   const from = asked.from === undefined ? undefined : momentIn(asked.from, '00:00', clock.timeZone);
-  const until =
-    asked.to === undefined ? undefined : momentIn(dayAfter(asked.to), '00:00', clock.timeZone);
+  const toEnd = asked.to === undefined ? undefined : dayAfter(asked.to);
+  const until = toEnd === undefined ? undefined : momentIn(toEnd, '00:00', clock.timeZone);
   // The made-up world's transaction and the database's both read access and the log.
   const logDeps = ports.adminPeople.putBack;
   const [found, names, bin] = await Promise.all([
@@ -102,6 +102,22 @@ export async function ActivityLogPage({
   }).people;
   const binned = new Set(bin.ok ? bin.value.items.map((item) => item.id) : []);
   const lines = found.value.entries.map((entry) => logLineOf(entry, binned));
+  // What the page's entries point at, named as they are now, in one read (step 2.77).
+  const asks = lines.flatMap((line): LogThingAsk[] =>
+    line.thing === undefined ? [] : [line.thing],
+  );
+  const named = new Map(
+    (await ports.adminAccess.thingsNamed(here.id, context.accountId, asks)).map((thing) => [
+      thing.id,
+      thing,
+    ]),
+  );
+  const times = { locale, timeZone: clock.timeZone };
+  const sentenceOf = (line: LogLine) => {
+    const role = line.values['role'];
+    return logSentenceOf(line, isRole(role) ? t(`role.${role}` as TextKey) : '', named, times);
+  };
+  const unclear = new Set(asked.unclear ?? []);
   const page = leagueUrl(here, 'admin-area', { area: 'settings', subpath: ['activity'] });
   const binPage = leagueUrl(here, 'admin-area', { area: 'settings', subpath: ['bin'] });
   const pageWith = (more?: Parameters<typeof logQueryOf>[1]) =>
@@ -163,10 +179,7 @@ export async function ActivityLogPage({
           keep={keepBut('who')}
           options={[
             { value: '', label: t('adminAccess.log.any') },
-            ...people.map((person) => ({
-              value: person.accountId,
-              label: person.name ?? t('adminAccess.noName'),
-            })),
+            ...whoChoicesOf(people, roleIn),
           ]}
         />
         <OptionPicker
@@ -192,12 +205,32 @@ export async function ActivityLogPage({
         ))}
         <label>
           {t('adminAccess.log.from')}
-          <input type="date" name="from" defaultValue={asked.from ?? ''} />
+          <input
+            type="date"
+            name="from"
+            defaultValue={asked.from ?? ''}
+            {...(unclear.has('from') ? { 'aria-describedby': 'log-from-unclear' } : {})}
+          />
         </label>
+        {unclear.has('from') ? (
+          <span id="log-from-unclear" className="ui-notice" data-kind="error">
+            {t('adminAccess.log.dateUnclear')}
+          </span>
+        ) : null}
         <label>
           {t('adminAccess.log.to')}
-          <input type="date" name="to" defaultValue={asked.to ?? ''} />
+          <input
+            type="date"
+            name="to"
+            defaultValue={asked.to ?? ''}
+            {...(unclear.has('to') ? { 'aria-describedby': 'log-to-unclear' } : {})}
+          />
         </label>
+        {unclear.has('to') ? (
+          <span id="log-to-unclear" className="ui-notice" data-kind="error">
+            {t('adminAccess.log.dateUnclear')}
+          </span>
+        ) : null}
         <button type="submit" className="ui-button" data-kind="quiet">
           {t('adminAccess.log.filter')}
         </button>

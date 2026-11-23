@@ -32,6 +32,7 @@ describe('the activity log screen (step 2.77)', () => {
       kind: 'teams',
       from: '2026-11-01',
       before: { at: '2026-11-20T18:00:00.000Z', id },
+      unclear: ['to'],
     });
     expect(logAskedOf({ kind: 'everything', who: 'x' })).toEqual({});
     expect(logQueryOf(asked, { after: { at: 'A', id: 'B' } })).toEqual({
@@ -41,6 +42,34 @@ describe('the activity log screen (step 2.77)', () => {
       after: 'A|B',
     });
     expect(dayAfter('2026-12-31')).toBe('2027-01-01');
+  });
+
+  it('takes only a real day from 2000 to 2100, and says which box was not understood', () => {
+    expect(logAskedOf({ to: '9999-12-31' })).toEqual({ unclear: ['to'] });
+    expect(logAskedOf({ from: '2026-02-30', to: '1999-12-31' })).toEqual({
+      unclear: ['from', 'to'],
+    });
+    expect(logAskedOf({ from: '', to: '2100-12-31' })).toEqual({ to: '2100-12-31' });
+    expect(dayAfter('9999-12-31')).toBeUndefined();
+    expect(dayAfter('2100-12-31')).toBe('2101-01-01');
+  });
+
+  it('points at the thing an entry names, and a standings adjustment at its team', () => {
+    expect(logLineOf(record({}), new Set()).thing).toEqual({ kind: 'team', id: team });
+    const added = record({
+      action: 'standings.add_adjustment',
+      targetType: 'season',
+      details: { team: id, adjustment: team },
+    });
+    expect(logLineOf(added, new Set()).thing).toEqual({ kind: 'team', id });
+    const removed = record({
+      action: 'standings.remove_adjustment',
+      targetType: 'season',
+      details: { adjustment: team },
+    });
+    expect(logLineOf(removed, new Set()).thing).toEqual({ kind: 'adjustment', id: team });
+    const grant = record({ action: 'access.revoke_grant', targetType: 'role_grant' });
+    expect(logLineOf(grant, new Set()).thing).toBeUndefined();
   });
 
   it('leads a removal to the bin only while the thing is still there', () => {

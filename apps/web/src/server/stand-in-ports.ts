@@ -581,7 +581,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       },
     },
     publicStats: standInPublicStats(world, namePolicy),
-    adminAccess: standInAdminAccess(deps),
+    adminAccess: standInAdminAccess(deps, world),
     // The same made-up world's people, whom Admin → Teams puts on rosters (step 2.50).
     adminPeople: { deps: world.deps, putBack: world.deps },
     adminTeams: standInAdminTeams(world, accessOf),

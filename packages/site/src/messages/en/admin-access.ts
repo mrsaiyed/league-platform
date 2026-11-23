@@ -34,9 +34,14 @@ export const enAdminAccess = {
   'adminAccess.log.anyKind': 'Everything',
   'adminAccess.log.binLink': 'It is in the bin: bring it back',
   'adminAccess.log.clear': 'Show everything',
+  'adminAccess.log.dateUnclear':
+    'This date was not understood, so the log is not limited by it. Choose a day from 2000 to 2100.',
   'adminAccess.log.filter': 'Show',
   'adminAccess.log.filters': 'Choose what the log shows',
   'adminAccess.log.from': 'From',
+  // A game named in an entry: its two teams, and its day in the league's time zone.
+  'adminAccess.log.gameName': '{home} against {away} on {date}',
+  'adminAccess.log.gameNameNoDate': '{home} against {away}',
   'adminAccess.log.intro': 'Who changed what in the league, and when. The newest change is first.',
   'adminAccess.log.kind': 'What was changed',
   'adminAccess.log.kind.access': 'Who has access',
@@ -61,6 +66,9 @@ export const enAdminAccess = {
   'adminAccess.log.title': 'Activity log',
   'adminAccess.log.to': 'To',
   'adminAccess.log.who': 'Who',
+  // A choice of "Who": the name, and each role they hold, so no two read the same.
+  'adminAccess.log.whoChoice': '{name} ({roles})',
+  'adminAccess.log.whoChoiceAgain': '{name} ({roles}), number {number}',
   // A-14: someone on the list who has not given their name. Never their email address.
   'adminAccess.noName': 'No name yet',
   'adminAccess.owner': 'The owner can do everything, and cannot be removed here.',

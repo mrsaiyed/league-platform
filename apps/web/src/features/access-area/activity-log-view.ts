@@ -21,7 +21,17 @@ export type LogAsked = {
   readonly to?: string;
   readonly before?: { readonly at: string; readonly id: string };
   readonly after?: { readonly at: string; readonly id: string };
+  /** A day box whose value was not a real day from 2000 to 2100: not asked, and said so. */
+  readonly unclear?: readonly ('from' | 'to')[];
 };
+
+/** A real day (YYYY-MM-DD) from 2000 to 2100: anything else is not a filter. */
+export function isRealDay(text: string | undefined): text is string {
+  if (text === undefined || !day.test(text)) return false;
+  const [y, m, d] = text.split('-').map(Number);
+  if (y === undefined || m === undefined || d === undefined || y < 2000 || y > 2100) return false;
+  return new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10) === text;
+}
 
 const isKind = (value: string | undefined): value is ActivityKind =>
   activityKinds.some((kind) => kind === value);
@@ -39,13 +49,22 @@ export function logAskedOf(query: Query): LogAsked {
   const to = one(query['to']);
   const before = cursorOf(one(query['before']));
   const after = before === undefined ? cursorOf(one(query['after'])) : undefined;
+  const unclear = (
+    [
+      ['from', from],
+      ['to', to],
+    ] as const
+  )
+    .filter(([, value]) => value !== undefined && value !== '' && !isRealDay(value))
+    .map(([name]) => name);
   return {
     ...(who !== undefined && uuid.test(who) ? { who: who.toLowerCase() } : {}),
     ...(isKind(kind) ? { kind } : {}),
-    ...(from !== undefined && day.test(from) ? { from } : {}),
-    ...(to !== undefined && day.test(to) ? { to } : {}),
+    ...(isRealDay(from) ? { from } : {}),
+    ...(isRealDay(to) ? { to } : {}),
     ...(before === undefined ? {} : { before }),
     ...(after === undefined ? {} : { after }),
+    ...(unclear.length === 0 ? {} : { unclear }),
   };
 }
 
@@ -65,10 +84,61 @@ export function logQueryOf(
 }
 type Cursor = { readonly at: string; readonly id: string };
 
-/** The day after a day (YYYY-MM-DD), for a span that includes its last day. */
-export function dayAfter(of: string): string {
+/** The day after a real day (YYYY-MM-DD), for a span that includes its last day. */
+export function dayAfter(of: string): string | undefined {
+  if (!isRealDay(of)) return undefined;
   const [y, m, d] = of.split('-').map(Number);
   return new Date(Date.UTC(y ?? 0, (m ?? 1) - 1, (d ?? 1) + 1)).toISOString().slice(0, 10);
+}
+
+/** The kinds of thing an entry can point at, by the entry's target or details. */
+export type LogThingKind =
+  | 'team'
+  | 'person'
+  | 'game'
+  | 'season'
+  | 'division'
+  | 'venue'
+  | 'adjustment';
+export type LogThingAsk = { readonly kind: LogThingKind; readonly id: string };
+
+/** A thing as it is named now (apps/web's adminAccess.thingsNamed). */
+export type LogThingName =
+  | {
+      readonly kind: 'team' | 'season' | 'division' | 'venue' | 'adjustment';
+      readonly id: string;
+      /** For an adjustment, its team's name. */
+      readonly name: string;
+    }
+  | {
+      readonly kind: 'person';
+      readonly id: string;
+      readonly firstName: string;
+      readonly lastName: string;
+    }
+  | {
+      readonly kind: 'game';
+      readonly id: string;
+      readonly homeName: string;
+      readonly awayName: string;
+      readonly startsAt: string | null;
+    };
+
+const targetKinds: readonly string[] = ['team', 'person', 'game', 'season', 'division', 'venue'];
+
+/** What the entry points at, to be named: a standings adjustment by its team. */
+export function thingOf(entry: ActivityRecord): LogThingAsk | undefined {
+  const team = entry.details['team'];
+  const adjustment = entry.details['adjustment'];
+  if (entry.action === 'standings.add_adjustment' && typeof team === 'string') {
+    return { kind: 'team', id: team };
+  }
+  if (entry.action === 'standings.remove_adjustment' && typeof adjustment === 'string') {
+    return { kind: 'adjustment', id: adjustment };
+  }
+  const type = entry.targetType;
+  if (type === null || entry.targetId === null || !targetKinds.includes(type)) return undefined;
+  return { kind: type as LogThingKind, id: entry.targetId };
 }
 
 /** The entries that moved one thing, their target, to the bin. */
@@ -88,6 +158,8 @@ export type LogLine = {
   readonly seasonStatus?: string;
   /** The removed thing's id, while it is still in the bin. */
   readonly inBin?: string;
+  /** What the entry points at, to be named in its sentence when it can still be found. */
+  readonly thing?: LogThingAsk;
 };
 
 /** An entry as the page draws it; `binned` is the ids of what is in the bin now. */
@@ -100,6 +172,7 @@ export function logLineOf(entry: ActivityRecord, binned: ReadonlySet<string>): L
   const status = entry.details['status'];
   const removal = removals.has(entry.action);
   const target = entry.targetId;
+  const thing = thingOf(entry);
   return {
     id: entry.id,
     at: entry.at,
@@ -111,5 +184,6 @@ export function logLineOf(entry: ActivityRecord, binned: ReadonlySet<string>): L
       ? { seasonStatus: status }
       : {}),
     ...(removal && target !== null && binned.has(target) ? { inBin: target } : {}),
+    ...(thing === undefined ? {} : { thing }),
   };
 }

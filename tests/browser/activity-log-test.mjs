@@ -132,8 +132,7 @@ if (built) {
     note('the log holds a page of 20', first.length === 20, `${first.length}`);
     note(
       'the newest entry says the season is shown to visitors, by whom',
-      (first[0] ?? '').includes('Changed a season It is now shown to visitors.') &&
-        (first[0] ?? '').includes(owner),
+      (first[0] ?? '').includes('It is now shown to visitors.') && (first[0] ?? '').includes(owner),
       first[0],
     );
     note(
@@ -142,8 +141,13 @@ if (built) {
       first[1],
     );
     note(
+      "the removal names the team, by its name now (step 2.77's fix round)",
+      (first[2] ?? '').includes(`Moved the team ${larks} to the bin`),
+      first[2],
+    );
+    note(
       'the removal is there, by whom, with the way to the bin',
-      (first[2] ?? '').includes('Moved a team to the bin') &&
+      (first[2] ?? '').includes('to the bin') &&
         (first[2] ?? '').includes(owner) &&
         (first[2] ?? '').includes('It is in the bin: bring it back'),
       first[2],
@@ -167,7 +171,7 @@ if (built) {
     const after = await texts(page);
     note(
       'the log says first that the team was brought back',
-      (after[0] ?? '').includes('Restored a team from the bin'),
+      (after[0] ?? '').includes(`Restored the team ${larks} from the bin`),
       after[0],
     );
     note(
@@ -209,9 +213,16 @@ if (built) {
     );
     note(
       'the season entries are left out',
-      !(await texts(page)).some((text) => text.includes('Changed a season')),
+      !(await texts(page)).some((text) => /Changed (a|the) season/.test(text)),
     );
-    await pickerForm('who').locator('select').selectOption({ label: owner });
+    // Each choice says the roles too, so no two read the same ("Robin Example, You (Owner)").
+    const whoSelect = pickerForm('who').locator('select');
+    const ownerChoice = whoSelect.locator('option', { hasText: owner }).first();
+    note(
+      'the owner\'s choice of "Who" says the role',
+      /\(.+\)/.test(await ownerChoice.innerText()),
+    );
+    await whoSelect.selectOption((await ownerChoice.getAttribute('value')) ?? '');
     await tap(
       page,
       pickerForm('who').getByRole('button', { name: 'Show' }),
@@ -251,7 +262,7 @@ if (built) {
       const refused = await other.goto(`${origin}${logAddress}`);
       const text = await other.locator('body').innerText();
       note(`${token} is refused the log`, refused?.status() === 403, `${refused?.status()}`);
-      note(`${token} sees none of it`, !text.includes('Moved a team to the bin'));
+      note(`${token} sees none of it`, !text.includes(larks));
     }
   } catch (error) {
     failures.push(`${at}: ${whatWentWrong(error)}`);

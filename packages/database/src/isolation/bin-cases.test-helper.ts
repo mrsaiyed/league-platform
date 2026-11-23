@@ -10,6 +10,7 @@
 import { listBin, restoreGame, restorePerson, restoreTeam } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
+  findActivityTargets,
   hasBinnedGamePart,
   listBinned,
   purgeBinned,
@@ -140,6 +141,19 @@ registerIsolationCase({
     await setVenueBinned(scope, target.emptyVenueId, true);
     return listBinned(scope);
   },
+});
+
+registerIsolationCase({
+  subject: findActivityTargets,
+  name: "name the target's team, person, game and season in the activity log",
+  run: (scope, target) =>
+    findActivityTargets(scope, [
+      { kind: 'team', id: target.teamId },
+      { kind: 'person', id: target.personId },
+      { kind: 'game', id: target.gameId },
+      { kind: 'season', id: target.seasonId },
+      { kind: 'adjustment', id: target.standingsAdjustmentId },
+    ]),
 });
 
 registerIsolationCase({
