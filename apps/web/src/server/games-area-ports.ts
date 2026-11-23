@@ -3,7 +3,7 @@
 // the ids the commands use. The league comes from each call's context, never from the
 // request body. The made-up stand-in fills it (stand-in-games.ts), and so does the
 // database (database-games.ts, step 2.93 part 6, record 076).
-import type { CommandDeps, StandingsTx, TrackerTx } from '@srleagues/core';
+import type { CommandDeps, ScorekeepersTx, StandingsTx, TrackerTx } from '@srleagues/core';
 
 /** The words shown beside a league's games: teams by id, and who scores each game. */
 export type GameNames = {
@@ -12,6 +12,8 @@ export type GameNames = {
   readonly scorekeepers: Readonly<Record<string, readonly string[]>>;
   /** Seasons by id: an earlier round of another season is named with its season (step 2.156). */
   readonly seasons: Readonly<Record<string, string>>;
+  /** The name each of the league's staff gives, by account id (Admin → Games → Scorekeepers). */
+  readonly people: Readonly<Record<string, string>>;
 };
 
 export type GamesAreaPorts = {
@@ -25,5 +27,10 @@ export type GamesAreaPorts = {
    * 2.56): the same stores and the same event handlers, typed for the standings module.
    */
   readonly standingsDeps: CommandDeps<StandingsTx>;
+  /**
+   * What the scorekeepers' read runs on (Admin → Games → Scorekeepers, step 2.56, T-305):
+   * the same stores, whose access also lists the league's grants in force.
+   */
+  readonly scorekeepersDeps: CommandDeps<ScorekeepersTx>;
   readonly namesOf: (leagueId: string) => Promise<GameNames>;
 };

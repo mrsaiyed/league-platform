@@ -19,7 +19,7 @@
 //
 // packages/database is handed in, not imported: Node.js loads it when the app starts
 // (container.ts), so Next.js never bundles it.
-import type { Clock, CommandDeps, StandingsTx, TrackerTx } from '@srleagues/core';
+import type { Clock, CommandDeps, ScorekeepersTx, StandingsTx, TrackerTx } from '@srleagues/core';
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle, LeagueScope } from '@srleagues/database';
 import { coreEventHandlers } from './database-event-handlers.ts';
@@ -94,15 +94,40 @@ export function databaseStandingsDeps(
   };
 }
 
+/**
+ * The scorekeepers' read's deps on the database (step 2.56, T-305): the same stores in one
+ * league transaction, whose access store also lists the league's grants in force.
+ */
+export function databaseScorekeepersDeps(
+  database: GamesQueries,
+  db: DatabaseHandle,
+  options: Pick<DatabaseGamesOptions, 'log'>,
+): CommandDeps<ScorekeepersTx> {
+  return {
+    transaction: database.commandTransaction(db, (scope: LeagueScope) => ({
+      jobs: database.jobsStore(scope),
+      games: database.gamesStore(scope),
+      access: database.accessStore(scope),
+      activity: database.activityLogStore(scope),
+      standings: database.standingsStore(scope),
+    })),
+    events: coreEventHandlers<ScorekeepersTx>(),
+    log: options.log,
+    now: () => performance.now(),
+  };
+}
+
 export function databaseGames(
   database: GamesQueries,
   db: DatabaseHandle,
   deps: CommandDeps<TrackerTx>,
   standingsDeps: CommandDeps<StandingsTx>,
+  scorekeepersDeps: CommandDeps<ScorekeepersTx>,
 ): GamesAreaPorts {
   return {
     deps,
     standingsDeps,
+    scorekeepersDeps,
     // The words beside the games, read in one transaction set to the league: its teams and
     // seasons by id, and each game's scorekeepers by the name their account gives (an
     // account that has given none, or holds nothing in the league any more, is '').
@@ -120,6 +145,7 @@ export function databaseGames(
           teams: Object.fromEntries(rows.teams.map((t) => [t.id, t.name])),
           scorekeepers,
           seasons: Object.fromEntries(rows.seasons.map((s) => [s.id, s.name])),
+          people: Object.fromEntries([...named].map(([id, name]) => [id, name ?? ''])),
         };
       }),
   };

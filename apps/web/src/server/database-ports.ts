@@ -45,6 +45,7 @@ import { coreEventHandlers } from './database-event-handlers.ts';
 import {
   databaseGames,
   databaseGamesDeps,
+  databaseScorekeepersDeps,
   databaseStandingsDeps,
   type GamesQueries,
 } from './database-games.ts';
@@ -292,6 +293,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
       db,
       gamesDeps,
       databaseStandingsDeps(database, db, { log: options.log }),
+      databaseScorekeepersDeps(database, db, { log: options.log }),
     ),
     fixtureImport: notMovedYet('fixture import'),
     publicSchedule: databasePublicSchedule(database, db, now),

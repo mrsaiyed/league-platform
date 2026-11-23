@@ -567,7 +567,10 @@ if (browser) {
 
   await step('a box score with the attack in its numbers is refused as text', async () => {
     await page.goto(`${origin}/north-valley/admin/games`);
-    const box = page.locator('a[href*="/north-valley/admin/games/"]').first();
+    // A game's own page, not Games → Scorekeepers (step 2.56), whose link is at the top.
+    const box = page
+      .locator('a[href*="/north-valley/admin/games/"]:not([href$="/scorekeepers"])')
+      .first();
     await tap(box, /\/north-valley\/admin\/games\/[0-9a-f-]+/);
     boxScore = new URL(page.url()).pathname;
     const save = page.getByRole('button', { name: /Save box score/ });
@@ -690,6 +693,8 @@ if (browser) {
     ['/north-valley/admin/standings', ['reason']],
     ['/north-valley/standings', ['reason']],
     ['/north-valley/admin/games', []],
+    // Step 2.56: Games → Scorekeepers has no box to type in; its names are text.
+    ['/north-valley/admin/games/scorekeepers', []],
     [boxScore, []],
     // The reopened game's own page: wherever the reason would be shown, it is text.
     [`/north-valley/admin/games/${decidedGame}`, []],
@@ -766,6 +771,7 @@ const ROUTES = {
   '/[league]/admin/[...missing]': () => `/north-valley/admin/${encodeURIComponent(typed.query)}`,
   '/[league]/admin/games': () => '/north-valley/admin/games',
   '/[league]/admin/games/[game]': () => boxScore,
+  '/[league]/admin/games/scorekeepers': () => '/north-valley/admin/games/scorekeepers',
   '/[league]/admin/people': () => '/north-valley/admin/people',
   '/[league]/admin/people/[person]': (at) => at.person,
   '/[league]/admin/schedule': () => '/north-valley/admin/schedule',

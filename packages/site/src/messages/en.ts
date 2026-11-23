@@ -12,6 +12,7 @@
 //   admin-games.ts: admin.games, admin.boxScore, admin.myGames
 //   admin-import.ts: admin.import
 //   admin-people.ts: adminPeople
+//   admin-scorekeepers.ts: adminScorekeepers
 //   admin-settings.ts: adminSettings, seasonSettings, setting
 //   admin-standings.ts: adminStandings
 //   admin-teams.ts: adminTeams
@@ -35,6 +36,7 @@ import { enAdminDivisions } from './en/admin-divisions.ts';
 import { enAdminGames } from './en/admin-games.ts';
 import { enAdminImport } from './en/admin-import.ts';
 import { enAdminPeople } from './en/admin-people.ts';
+import { enAdminScorekeepers } from './en/admin-scorekeepers.ts';
 import { enAdminSettings } from './en/admin-settings.ts';
 import { enAdminStandings } from './en/admin-standings.ts';
 import { enAdminTeams } from './en/admin-teams.ts';
@@ -58,6 +60,7 @@ export const en = {
   ...enAdminGames,
   ...enAdminImport,
   ...enAdminPeople,
+  ...enAdminScorekeepers,
   ...enAdminSettings,
   ...enAdminStandings,
   ...enAdminTeams,

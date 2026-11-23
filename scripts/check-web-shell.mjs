@@ -737,6 +737,46 @@ const cases = [
     ['Admin areas', noAccess],
     '/signin?next=%2Fnorth-valley%2Fadmin%2Fstandings',
   ],
+  // Step 2.56: Games → Scorekeepers is for whoever manages games (games.manage): the owner
+  // and a scheduler; a scorekeeper reaches Games but is told this page is not theirs; every
+  // other kind of person is refused the area or sent to sign in.
+  [
+    'owner',
+    '/north-valley/admin/games/scorekeepers',
+    200,
+    [
+      'Scorekeepers',
+      'Games still to be played',
+      'Assign',
+      staffFrameAt('/north-valley/admin/games'),
+      oneHeading,
+    ],
+    [adminPlaceholder],
+  ],
+  [
+    'scheduler',
+    '/north-valley/admin/games/scorekeepers',
+    200,
+    ['Games still to be played', 'Assign', oneHeading],
+    [adminPlaceholder],
+  ],
+  [
+    'scorekeeper',
+    '/north-valley/admin/games/scorekeepers',
+    200,
+    ['You may not change who scores these games.'],
+    ['Assign'],
+  ],
+  ['coach', '/north-valley/admin/games/scorekeepers', 403, [noAccess], ['Assign']],
+  ['stranger', '/north-valley/admin/games/scorekeepers', 403, [noAccess], ['Assign']],
+  [
+    'visitor',
+    '/north-valley/admin/games/scorekeepers',
+    307,
+    [],
+    ['Admin areas', noAccess],
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fgames%2Fscorekeepers',
+  ],
   [
     'scheduler',
     '/north-valley/admin/games',

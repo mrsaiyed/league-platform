@@ -22,6 +22,7 @@ export const noticeScreens = [
   'venues',
   'season',
   'standings',
+  'scorekeepers',
 ] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 
