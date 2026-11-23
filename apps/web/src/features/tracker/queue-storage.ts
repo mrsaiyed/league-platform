@@ -88,6 +88,11 @@ export type QueueSettlement = {
   readonly refuse?: readonly { readonly commandId: string; readonly refusal: CommandRefusal }[];
   /** Commands to keep as not saved: never sent again, kept until they are removed. */
   readonly notSaved?: readonly string[];
+  /**
+   * Waiting commands to send under another session of the same device and account
+   * (step 2.38): its earlier one ended while it was away, and nobody else scored since.
+   */
+  readonly carryOn?: { readonly commandIds: readonly string[]; readonly sessionId: string };
 };
 
 /**

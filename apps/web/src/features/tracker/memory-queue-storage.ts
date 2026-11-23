@@ -45,7 +45,8 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
     async list(gameId) {
       return structuredClone(held.filter((entry) => entry.gameId === gameId));
     },
-    async settle(gameId, { remove = [], refuse = [], notSaved = [] }: QueueSettlement) {
+    async settle(gameId, { remove = [], refuse = [], notSaved = [], carryOn }: QueueSettlement) {
+      const carried = new Set(carryOn?.commandIds ?? []);
       const dropped = new Set(remove);
       const refusals = new Map(refuse.map((r) => [r.commandId, r.refusal]));
       const setAside = new Set(notSaved);
@@ -70,6 +71,9 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
         const refusal = refusals.get(id);
         if (refusal !== undefined) return [structuredClone({ ...kept, state: 'refused', refusal })];
         if (setAside.has(id)) return [structuredClone({ ...kept, state: 'not-saved' })];
+        if (carryOn !== undefined && carried.has(id) && entry.state === 'waiting') {
+          return [structuredClone({ ...entry, sessionId: carryOn.sessionId })];
+        }
         return [entry];
       });
     },

@@ -1000,6 +1000,53 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   };
 
   /**
+   * Whether anybody but this device scored the game between `from`, the state it last
+   * knew, and `now`: every command the server took since is one of `own` (by id, lower
+   * case), and none is missing from the state's recent ones. When that cannot be told
+   * (too many since), somebody may have.
+   */
+  const nobodyElseScored = (
+    from: ServerState,
+    now: ServerState,
+    own: ReadonlySet<string>,
+  ): boolean => {
+    const before = new Set(from.state.recent.map((id) => id.toLowerCase()));
+    const since = now.state.recent.map((id) => id.toLowerCase()).filter((id) => !before.has(id));
+    return now.sequence - from.sequence === since.length && since.every((id) => own.has(id));
+  };
+
+  /**
+   * The server gave this device a new session `held` while taps made under its earlier
+   * one wait (step 2.38): that one ended with the device away (released as the page
+   * reloaded with no signal, say). The server gives a session only to this device and
+   * account, so if nobody else scored since the state the device last knew, the taps
+   * fit the game as it is: they are moved to the new session in the storage and sent,
+   * neither lost nor listed. Otherwise somebody else took the game, and they are listed
+   * as not saved. With no answer, opening is asked again before anything is decided.
+   */
+  const carryOnTaps = async (
+    held: string,
+    stale: readonly KeptTap[],
+  ): Promise<'carried' | 'taken' | 'unanswered'> => {
+    const from = base ?? options.kept?.state ?? null;
+    if (from === null) return 'taken';
+    const loaded = await ask((signal) => server.loadState(signal));
+    if (loaded.kind === 'unanswered') return 'unanswered';
+    if (loaded.kind === 'rejected') return 'taken';
+    const own = new Set(
+      [...made, ...(options.kept?.scoring?.onTop ?? []), ...stale.map((t) => t.command)].map((c) =>
+        c.commandId.toLowerCase(),
+      ),
+    );
+    if (!nobodyElseScored(from, loaded.value, own)) return 'taken';
+    await queue.carryOn(
+      stale.map((t) => t.command.commandId),
+      held,
+    );
+    return 'carried';
+  };
+
+  /**
    * The server gave this device the session `held`. A waiting tap made under another
    * session was made when that one lost the game (or a closed tab's session did since):
    * it is never sent under this one (T6 §5, record 049). It is set aside in the queue's
@@ -1020,10 +1067,27 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       waiting = list.filter((entry) => entry.state === 'waiting');
       setAside = keptIn(list, 'not-saved');
       stale = waiting.filter((entry) => !madeUnder(entry)).map(keptTap);
-      if (stale.length > 0) await queue.setAside(stale.map((t) => t.command.commandId));
     } catch {
       // Not known to be dropped, so nothing may be sent: the session is not used, and
       // its lease runs out unless opening again (into the same session) gets this far.
+      return readOnly('storage-failed');
+    }
+    if (stale.length > 0) {
+      const carried = await carryOnTaps(held, stale).catch(() => 'storage-failed' as const);
+      if (carried === 'storage-failed') return readOnly('storage-failed');
+      // Asked again: the server gives this device the same session while it holds it.
+      if (carried === 'unanswered') return later(open);
+      if (carried === 'carried') {
+        const moved = new Set(stale.map((t) => t.command.commandId));
+        waiting = waiting.map((e) =>
+          moved.has(e.command.commandId) ? { ...e, sessionId: held } : e,
+        );
+        stale = [];
+      }
+    }
+    try {
+      if (stale.length > 0) await queue.setAside(stale.map((t) => t.command.commandId));
+    } catch {
       return readOnly('storage-failed');
     }
     // Not scoring, so every tap of this device's the server lacks is waiting in the
