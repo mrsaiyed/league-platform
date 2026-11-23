@@ -16,3 +16,14 @@ export function putBackOffer(
   }
   return 'offer';
 }
+
+/**
+ * A person on the roster now who is not on the league list (in the bin): their line is
+ * marked "not on the league list" (S-84, step 2.77). Only when the whole list was read.
+ */
+export function offTheLeagueList(
+  personId: string,
+  leagueList: { readonly ids: ReadonlySet<string>; readonly complete: boolean } | undefined,
+): boolean {
+  return leagueList !== undefined && leagueList.complete && !leagueList.ids.has(personId);
+}

@@ -30,7 +30,7 @@ import {
 } from './answer.ts';
 import { removePanel, tapRefusal, type RemoveWayOn } from './remove-team-words.ts';
 import { backToTeamParam, publishAnchor } from '../schedule-builder/index.ts';
-import { putBackOffer } from './put-back-offer.ts';
+import { offTheLeagueList, putBackOffer } from './put-back-offer.ts';
 import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
 import {
@@ -241,6 +241,9 @@ export async function TeamPage({
                   </strong>
                   {line.needsReview === true ? (
                     <span data-flag="review"> {t('adminTeams.roster.toReview')}</span>
+                  ) : null}
+                  {offTheLeagueList(line.personId, leagueList) ? (
+                    <span data-flag="off-the-list"> {t('adminTeams.roster.notOnTheList')}</span>
                   ) : null}
                   {line.jerseyNumber !== null && wornTwice.has(line.jerseyNumber) ? (
                     <span data-flag="clash">

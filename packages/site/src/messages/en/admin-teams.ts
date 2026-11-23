@@ -129,6 +129,8 @@ export const enAdminTeams = {
   'adminTeams.roster.name': 'Name',
   'adminTeams.roster.noNumber': 'No number',
   'adminTeams.roster.none': 'Nobody is on this roster yet.',
+  // S-84: a person on the roster who is in the bin, not on the league list (step 2.77).
+  'adminTeams.roster.notOnTheList': '(not on the league list: in the bin)',
   'adminTeams.roster.number': 'Number',
   'adminTeams.roster.numberTwice': '(#{number} is worn by two players)',
   'adminTeams.roster.offTheList':

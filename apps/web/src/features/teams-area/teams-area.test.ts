@@ -26,7 +26,7 @@ import {
   shortNameNeeded,
 } from './form-input.ts';
 import { hasName, numbersWornTwice, rosterName } from './roster-name.ts';
-import { putBackOffer } from './put-back-offer.ts';
+import { offTheLeagueList, putBackOffer } from './put-back-offer.ts';
 import { saidOnLine } from './said-on-line.ts';
 
 const t = createTranslator('en');
@@ -244,6 +244,15 @@ describe('answers in the address', () => {
     expect(putBackOffer('p1', new Set(), list(['p2'], false))).toBe('offer');
     expect(putBackOffer('p1', new Set(), undefined)).toBe('offer');
     expect(t('adminTeams.roster.offTheList')).toContain('taken off the league list');
+  });
+
+  it('marks a roster line whose person is in the bin, only when the whole list was read (S-84)', () => {
+    const list = (ids: string[], complete = true) => ({ ids: new Set(ids), complete });
+    expect(offTheLeagueList('p1', list(['p2']))).toBe(true);
+    expect(offTheLeagueList('p1', list(['p1']))).toBe(false);
+    expect(offTheLeagueList('p1', list(['p2'], false))).toBe(false);
+    expect(offTheLeagueList('p1', undefined)).toBe(false);
+    expect(t('adminTeams.roster.notOnTheList')).toContain('not on the league list');
   });
 
   it('says a removal moved it to the bin, whose screen brings it back (steps 2.161, 2.77)', () => {
