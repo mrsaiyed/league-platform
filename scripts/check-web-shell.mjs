@@ -1570,6 +1570,7 @@ try {
   failures.push(...(await checkSignIn(origin)));
   failures.push(...(await checkTeams(origin)));
   failures.push(...(await checkSettings(origin)));
+  failures.push(...(await checkSiteMarks(origin)));
   failures.push(...(await checkOtherHosts(port)));
 } finally {
   server.child.kill();
@@ -1971,6 +1972,11 @@ async function checkSnapshotCache(origin) {
   const labels = visitor.headers.get('cache-tag');
   if (labels !== `league:${northValley},league:${northValley}:game:${liveGame}`)
     problems.push(`a visitor's snapshot is labeled "${labels}"`);
+  // Step 2.60, record 107: no league JSON answer is indexed (league-api-route.ts sets it in
+  // every mode; here the test copy's proxy sets it too, so league-api-route.test.ts is
+  // what shows production's).
+  const robots = visitor.headers.get('x-robots-tag');
+  if (robots !== 'noindex') problems.push(`a visitor's snapshot has x-robots-tag "${robots}"`);
   for (const who of ['owner', 'stranger']) {
     const answer = await fetch(address, { headers: { cookie: `srl_session=${tokens[who]}` } });
     await answer.text();
@@ -2368,6 +2374,95 @@ async function checkSettings(origin) {
   if ((await pageOf('owner')).includes('Now: set for this league.')) {
     problems.push('the scheduler changed a setting');
   }
+  return problems;
+}
+
+/**
+ * The site notice and "do not index" (step 2.60, U-10, U-18, record 107), on every public
+ * page of a league: the home, schedule, standings, statistics and teams pages, team pages
+ * and a game page. (a) A league whose owner typed a notice (with
+ * markup in it, drawn as text) and asked not to be indexed shows the notice on each page,
+ * as a named region, and marks each page's head with the league's own robots mark
+ * (`noarchive` beside `noindex`: the test copy's own mark has `noindex` on every page, so
+ * the league's is told apart by it). (b) The youth league, and the adult league with a
+ * recorded child (north-valley), are marked on every page though they set nothing (U-18).
+ * (c) An adult league with no recorded child (still-waters, the empty league) is marked
+ * only while it asks, and north-valley's notice goes when it is cleared. The settings go
+ * back to the defaults at the end, so the checks after see the world as before.
+ */
+async function checkSiteMarks(origin) {
+  const problems = [];
+  const as = { cookie: `srl_session=${tokens.owner}` };
+  const leagueMark = /<meta name="robots" content="[^"]*noarchive[^"]*"/;
+  const notice = 'Unofficial demo <b>not run by</b> anyone';
+  const escaped = 'Unofficial demo &lt;b&gt;not run by&lt;/b&gt; anyone';
+  async function pagesOf(league, more) {
+    const fixed = ['', '/schedule', '/standings', '/stats', '/teams'].map((p) => `/${league}${p}`);
+    return [...fixed, ...more];
+  }
+  async function walk(league, { marked, withNotice }) {
+    for (const path of await pagesOf(league, more[league])) {
+      const response = await fetch(origin + path);
+      const html = await response.text();
+      if (response.status !== 200) problems.push(`site marks: ${path} answers ${response.status}`);
+      if (leagueMark.test(html) !== marked) {
+        problems.push(`site marks: ${path} ${marked ? 'lacks' : 'has'} the league's robots mark`);
+      }
+      const shown = html.includes(`aria-label="Notice from the league"><p>${escaped}</p>`);
+      if (shown !== withNotice) {
+        problems.push(`site marks: ${path} ${withNotice ? 'lacks' : 'has'} the league's notice`);
+      }
+      if (html.includes('<b>not run by</b>'))
+        problems.push(`site marks: ${path} drew the notice as markup`);
+    }
+  }
+  async function save(key, fields, league = 'north-valley') {
+    const page = `/${league}/admin/settings`;
+    const html = await (await fetch(origin + page, { headers: as })).text();
+    const id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[1];
+    const body = new FormData();
+    body.set(id ?? '', '');
+    for (const [name, value] of Object.entries({ league, key, ...fields })) {
+      body.set(name, value);
+    }
+    const response = await fetch(origin + page, {
+      method: 'POST',
+      body,
+      headers: { origin, ...as },
+      redirect: 'manual',
+    });
+    const to = response.headers.get('location') ?? '';
+    if (!to.includes('done='))
+      problems.push(`site marks: saving ${key} in ${league} answers ${to}`);
+  }
+  const more = {
+    'north-valley': ['/north-valley/teams/owls', `/north-valley/games/${game(2)}`],
+    'harbor-city': ['/harbor-city/teams/comets', '/harbor-city/teams/rockets'],
+    'still-waters': [],
+  };
+  await walk('north-valley', { marked: true, withNotice: false });
+  await walk('harbor-city', { marked: true, withNotice: false });
+  await walk('still-waters', { marked: false, withNotice: false });
+  const settings = await (
+    await fetch(`${origin}/north-valley/admin/settings`, { headers: as })
+  ).text();
+  for (const words of [
+    'Public site',
+    'A notice at the top of every public page',
+    'Ask search engines not to show this league',
+  ]) {
+    if (!settings.includes(words)) problems.push(`site marks: the settings page lacks "${words}"`);
+  }
+  await save('site.notice', { version: '', value: notice });
+  await save('site.doNotIndex', { version: '', value: 'true' });
+  await walk('north-valley', { marked: true, withNotice: true });
+  await save('site.notice', { version: '1', intent: 'clear' });
+  await save('site.doNotIndex', { version: '1', intent: 'clear' });
+  await walk('north-valley', { marked: true, withNotice: false });
+  await save('site.doNotIndex', { version: '', value: 'true' }, 'still-waters');
+  await walk('still-waters', { marked: true, withNotice: false });
+  await save('site.doNotIndex', { version: '1', intent: 'clear' }, 'still-waters');
+  await walk('still-waters', { marked: false, withNotice: false });
   return problems;
 }
 

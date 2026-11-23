@@ -6,8 +6,9 @@
 // every page carries the same mark in its own head (`<meta name="robots">`, the root
 // layout); and `/robots.txt` asks every robot to keep out of the whole site.
 //
-// Production answers none of the three: what production lets search engines show (a
-// youth league's pages above all, T4 §4) is step 2.60's to build. Failing closed: if the
+// Production answers none of the three for the whole site: step 2.60 marks a league's own
+// pages that are not to be indexed (league-search-marks.ts) and every league JSON answer
+// (league-api-route.ts). Failing closed: if the
 // app's settings cannot be read, the copy is taken for one that is not production.
 import { getConfig } from './config.ts';
 

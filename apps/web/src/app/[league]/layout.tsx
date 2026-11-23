@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import type { ReactNode } from 'react';
 import {
@@ -11,6 +12,7 @@ import {
   signInHrefFrom,
   SiteFooter,
   SiteHeader,
+  SiteNotice,
   type LeagueRouteProps,
 } from '../../features/shell/index.ts';
 import { isStaffAddress } from '../../features/staff/index.ts';
@@ -21,6 +23,7 @@ import { commandContextOf } from '../../server/context.ts';
 import type { LeagueView } from '../../server/league-gate.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { siteOfThisRequest } from '../../server/league-site.ts';
+import { leagueRobots, siteFactsOfThisRequest } from '../../server/league-search-marks.ts';
 import { leagueView, signedInEmail } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { pathHeader } from '../../server/request-facts-header.ts';
@@ -58,6 +61,20 @@ async function MyTeamOfPerson({
  * for a signed-in person only. A page the person has just signed out from says "You are
  * signed out." under the header (R-30).
  */
+/**
+ * Every page of a league that is not to be indexed (it asked, or children may be in it:
+ * U-10, U-18) says so in its head, once here for all of them (step 2.60). A league the
+ * page may not show gets nothing of its own.
+ */
+export async function generateMetadata({ params }: LeagueRouteProps): Promise<Metadata> {
+  const view = await leagueView((await params).league, 'site');
+  if (view === null) return {};
+  return leagueRobots(
+    await siteFactsOfThisRequest(view.context.league.id),
+    (await webPorts()).testCopy,
+  );
+}
+
 export default async function LeagueLayout({
   children,
   params,
@@ -85,6 +102,7 @@ export default async function LeagueLayout({
     current === null ? null : headerSeason(league, path, await seasonsOfLeague(league.id));
   const account = view.context.account;
   const ports = await webPorts();
+  const facts = await siteFactsOfThisRequest(league.id);
   const email = await signedInEmail();
   // The person's teams are read while the header is drawn, not before it: waiting for them
   // here, for a signed-in person only, would let the page under the header be drawn first
@@ -104,6 +122,7 @@ export default async function LeagueLayout({
       <a className="site-skip" href="#content">
         {t('shell.skipToContent')}
       </a>
+      <SiteNotice notice={facts.notice} />
       <SiteHeader
         league={league}
         name={site.name}

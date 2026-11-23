@@ -584,6 +584,13 @@ html {
 }
 
 /* A league that is not public says so, in one line under the header. */
+/* The league's own notice (step 2.60): the admin's words, wrapped at any width. */
+.league-site .league-own-notice p {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 .league-site .site-notice {
   margin: 0;
   padding-block: var(--step-3);

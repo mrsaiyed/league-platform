@@ -26,6 +26,7 @@ import {
   fail,
   isLeagueIdFormat,
   ok,
+  readSiteFacts,
   type AccessTx,
   type BinTx,
   type CommandDeps,
@@ -286,6 +287,14 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
       ...(options.reportDesign === undefined ? {} : { report: options.reportDesign }),
       now: () => now().getTime(),
     }),
+    // The notice and "do not index" (step 2.60), as no one, in one snapshot of the league.
+    siteFactsOf: (leagueId) =>
+      database.withTransaction(
+        db,
+        { leagueId },
+        (scope) => readSiteFacts(database.leaguesStore(scope)),
+        { snapshot: 'page' },
+      ),
     localTools: options.localTools?.tools ?? null,
     publicStats: databasePublicStats(database, db),
     games: databaseGames(

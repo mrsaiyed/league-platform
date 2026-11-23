@@ -8,6 +8,7 @@ export const enAdminSettings = {
   // A heading for each group of settings, by the first part of their keys.
   'adminSettings.area.members': 'Start page for members',
   'adminSettings.area.privacy': 'Privacy',
+  'adminSettings.area.site': 'Public site',
   'adminSettings.area.statistics': 'Statistics',
   'adminSettings.area.teams': 'Team statistics',
   'adminSettings.clear': 'Go back to the default',
@@ -416,6 +417,11 @@ export const enAdminSettings = {
     'Full names for adults, like "Jordan Ellis". Children are shown by first name and last initial, like "Jordan E.", unless their full names are confirmed below.',
   'setting.privacy.publicNames.option.hidden':
     'Hidden for everyone, adults and children: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
+  // The site's two settings (step 2.60, U-10, U-18).
+  'setting.site.doNotIndex.label':
+    'Ask search engines not to show this league. A league with children in it is never shown by search engines, whatever this says.',
+  'setting.site.notice.label':
+    'A notice at the top of every public page, in your own words, for example "Unofficial demo". Leave it empty for none. At most 200 characters.',
   'setting.statistics.minimumGamesToRank.label':
     'Games in which a statistic must be recorded for a player to be ranked on its leaders board. 0 sets no minimum. A player with fewer still shows in the full table.',
   'setting.teams.mayChooseStatsLevel.label':
