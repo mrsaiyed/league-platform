@@ -73,7 +73,7 @@ Until step 2.99 is built nothing tells the team when a pinned release gains a kn
 
 ## The scoring pilot's libraries, every advisory read (step 2.220)
 
-Read on 2026-11-17 with `npm audit --package-lock-only` in `apps/varsity-hosted` (its own lockfile, which the root `npm audit` cannot see). Before: **80 advisories** (4 critical, 29 high, 36 moderate, 11 low) in 32 packages (npm's count by package: 2 critical, 13 high, 16 moderate, 1 low). After the move on the lane: **2 advisories, both moderate**, in 8 packages (all moderate). Each line below says whether the advisory can be reached in the pilot **as it is online today** (the old libraries), and what the move did to it.
+Read on 2026-11-17 with `npm audit --package-lock-only` in `apps/varsity-hosted` (its own lockfile, which the root `npm audit` cannot see). Before: **80 advisories** (4 critical, 29 high, 36 moderate, 11 low) in 32 packages (npm's count by package: 2 critical, 13 high, 16 moderate, 1 low). After the move on the lane: **2 advisories, both moderate**, in 8 packages (all moderate). Read again on 2026-11-23, after the lane took in the build branch: the same 2 moderate advisories (GHSA-67mh-4wv8-2f99 in esbuild, GHSA-px8p-9vwx-vf98 in fflate, lines 11 and 18 below), nothing high or critical and no advisory newer than the 17th. Each line below says whether the advisory can be reached in the pilot **as it is online today** (the old libraries), and what the move did to it.
 
 ### How the pilot runs, which decides what can be reached
 
@@ -202,6 +202,8 @@ Along with them Miniflare went from 4.20260515.0 to 5.20261110.0-beta and worker
 - `tests/varsity-hosted-libraries.test.mjs` (in `npm test`) reads the pilot's lockfile offline and fails if any library named in a high or critical advisory resolves inside its range again, if a moved library is not pinned to one release, if React and its server components part, or if the runtime date moves. Run against the old lockfile, it fails.
 - The pilot type-checks and builds (`tsc --noEmit`, `npm run build`, as GitHub's `hosted-build` job does); its lint gives the same 6 warnings as before and no error; `tests/varsity-hosted.test.mjs` passes.
 - `node scripts/check-release.mjs --browser` in `apps/varsity-hosted` passes on the built Worker (10 checks: the page and its headers, the API, a practice game saved and read back, another site refused, action-shaped requests answered without decoding, no image optimizer, the scorer's own browser check). The same requests pass on the old libraries.
+
+- Run again on 2026-11-23 on the merged lane: `tsc --noEmit`, `npm run build` and `node scripts/check-release.mjs --browser` pass (10 checks, React server components 19.2.9), and so do the root tests that read the pilot.
 
 ### Considered
 
