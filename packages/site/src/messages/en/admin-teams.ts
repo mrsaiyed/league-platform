@@ -32,14 +32,12 @@ export const enAdminTeams = {
   'adminTeams.done.entrySaved': 'The number and role were saved.',
   'adminTeams.done.left': 'The player was marked as having left.',
   'adminTeams.done.moved': 'The roster order was saved.',
-  'adminTeams.done.personRemoved':
-    'Removed from the league list. The person is kept for 30 days; the screen to bring them back is not ready yet.',
+  'adminTeams.done.personRemoved': 'Removed from the league list. The person is kept for 30 days.',
   'adminTeams.done.putBack':
     'The player was put back on the roster. Their games and numbers are as they were.',
   'adminTeams.done.putBackNoNumber':
     'The player is back on the roster with no number, because someone else now wears theirs. Give them a number.',
-  'adminTeams.done.removed':
-    'Removed. The team is kept for 30 days; the screen to bring it back is not ready yet.',
+  'adminTeams.done.removed': 'Removed. The team is kept for 30 days.',
   'adminTeams.done.statsSaved': 'Who sees the numbers was saved.',
   'adminTeams.done.updated': 'The team was saved.',
   'adminTeams.edit.submit': 'Save team details',
@@ -75,11 +73,11 @@ export const enAdminTeams = {
   'adminTeams.people.title': 'The league list',
   // A person's name as the Teams screens show it; a language may put the parts the other way.
   'adminTeams.personName': '{firstName} {lastName}',
-  // Until step 2.77 gives the bin a screen, nothing here promises a way back (step 2.161).
+  // The bin has no screen of its own, so nothing here promises a way back (step 2.161).
   // A-17: only a team with no games, played or without a result, goes to the bin. The team
   // is "it" throughout the panel, as in step 2.161's "its roster".
   'adminTeams.remove.body':
-    'A team with no games, played or waiting for a result, can be moved to the bin. It is kept for 30 days; the screen to bring it back is not ready yet.',
+    'A team with no games, played or waiting for a result, can be moved to the bin. It is kept for 30 days.',
   'adminTeams.remove.cannot':
     '{name} cannot be removed this season: its results are part of other teams’ records.',
   'adminTeams.remove.gamesUnknown':

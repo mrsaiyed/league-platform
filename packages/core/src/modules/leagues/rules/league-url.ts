@@ -74,6 +74,12 @@ export const leaguePages = {
    * analytics (steps 1.14 and 1.17).
    */
   invitation: { path: ['invitation', ':token'], level: 'private' },
+  /**
+   * The accept page itself (step 2.97, record 086): the link above holds its token for the
+   * browser in a cookie and sends it here, so no secret stays in the address, the
+   * browser's history or the way back from signing in.
+   */
+  'invitation-held': { path: ['invitation'], level: 'private' },
 } as const satisfies Record<string, PageSpec>;
 
 export type LeaguePage = keyof typeof leaguePages;

@@ -18,7 +18,7 @@ import type {
 } from '@srleagues/core';
 import type { InvitationEmailTx } from './invitation-email-job.ts';
 
-type StoredInvitation = Omit<Invitation, 'status'> & {
+type StoredInvitation = Omit<Invitation, 'status' | 'acceptedByAccountId'> & {
   tokenHash: string;
   acceptedBy: string | null;
   cancelled: boolean;
@@ -61,6 +61,7 @@ const view = (i: StoredInvitation): Invitation => ({
   status: statusOf(i),
   invitedByAccountId: i.invitedByAccountId,
   expiresAt: i.expiresAt,
+  acceptedByAccountId: i.acceptedBy,
 });
 
 export function memoryLeague() {

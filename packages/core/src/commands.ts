@@ -15,6 +15,7 @@ import {
   listAccess,
   listActivity,
   myAccess,
+  readInvitation,
   resendInvitation,
   revokeGrant,
 } from './modules/access/index.ts';
@@ -186,6 +187,7 @@ export const commands = commandRegistry([
   publishSiteDesign,
   putBackDraftGame,
   putBackOnRoster,
+  readInvitation,
   putGameBack,
   readReopenOffer,
   readTrackerRosters,

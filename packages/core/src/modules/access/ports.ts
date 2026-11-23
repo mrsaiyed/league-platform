@@ -27,6 +27,11 @@ export type Invitation = {
   readonly status: InvitationStatus;
   readonly invitedByAccountId: string | null;
   readonly expiresAt: string;
+  /**
+   * Who accepted it, once accepted: so the person who did, opening the link again, is told
+   * it is done; anyone else is told only that the link does not work (step 2.97).
+   */
+  readonly acceptedByAccountId: string | null;
 };
 
 export type NewInvitation = {

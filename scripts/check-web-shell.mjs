@@ -88,6 +88,8 @@ const draftUnscored = '01900000-0000-7000-8000-0000b20003e8';
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
 // browser's script fills with the not-found or forbidden screen (record 020), so
 // the refusal is read from the page's data, beside its status.
+// A made-up invitation token of the right shape, which no invitation has (step 2.97).
+const heldMadeUpToken = 'made-up-invitation-token-000000000000000000';
 const noAccess = 'NEXT_HTTP_ERROR_FALLBACK;403';
 const notFound = 'NEXT_HTTP_ERROR_FALLBACK;404';
 
@@ -805,6 +807,62 @@ const cases = [
   ],
   ['scheduler', '/north-valley/admin/settings', 403, [noAccess]],
   ['coach', '/north-valley/admin/settings', 403, [noAccess]],
+  // League settings → Admins (step 2.97, P4 §4): only someone who may manage access for the
+  // whole league (the owner, an admin) opens it; everyone else is refused, and a refused
+  // person never sees who has access.
+  [
+    'owner',
+    '/north-valley/admin/settings/admins',
+    200,
+    ['Admins', 'Invite someone', 'People with access', 'Send the invitation', oneHeading],
+  ],
+  [
+    'admin',
+    '/quiet-pines/admin/settings/admins',
+    200,
+    ['Admins', 'Invite someone', 'People with access'],
+  ],
+  ['scheduler', '/north-valley/admin/settings/admins', 403, [noAccess], ['People with access']],
+  ['coach', '/north-valley/admin/settings/admins', 403, [noAccess], ['People with access']],
+  ['stranger', '/north-valley/admin/settings/admins', 403, [noAccess], ['People with access']],
+  ['scorekeeper', '/north-valley/admin/settings/admins', 403, [noAccess], ['People with access']],
+  ['registrar', '/quiet-pines/admin/settings/admins', 403, [noAccess], ['People with access']],
+  // The invitation's accept page (step 2.97, record 086): with no link held, everyone gets
+  // the one answer for a link that does not work; a visitor holding a link is offered
+  // signing in or up and nothing about the league; a signed-in person holding a link that
+  // is no invitation is told it does not work, as for every link that does not.
+  [
+    'visitor',
+    '/north-valley/invitation',
+    200,
+    ['This link does not work'],
+    ['Accept the invitation'],
+  ],
+  [
+    'visitor',
+    '/north-valley/invitation',
+    200,
+    ['Your invitation', 'Sign in', 'Create an account'],
+    ['invites you to help run it', 'This link does not work'],
+    undefined,
+    `srl_invitation=${heldMadeUpToken}`,
+  ],
+  [
+    'owner',
+    '/north-valley/invitation',
+    200,
+    ['This link does not work'],
+    ['Accept the invitation'],
+    undefined,
+    `srl_invitation=${heldMadeUpToken}`,
+  ],
+  [
+    'stranger',
+    '/north-valley/invitation',
+    200,
+    ['This link does not work'],
+    ['Accept the invitation'],
+  ],
   // Season settings' first panel (step 2.182, A-18): who can see a season, shown or
   // hidden by the owner or an admin after one question; never a scheduler's.
   [
@@ -1302,7 +1360,10 @@ try {
     }
     for (const words of mustNot)
       if (text.includes(words)) failures.push(`${label}: has "${words}"`);
-    for (const [name, value] of Object.entries(securityHeaders)) {
+    for (const [name, usual] of Object.entries(securityHeaders)) {
+      // The accept page keeps its referrer to this site (record 086, T-288).
+      const value =
+        name === 'referrer-policy' && address.endsWith('/invitation') ? 'same-origin' : usual;
       if (response.headers.get(name) !== value) failures.push(`${label}: ${name} not "${value}"`);
     }
     failures.push(...policyProblems(label, response, text));
@@ -1334,6 +1395,46 @@ try {
     failures.push(
       `an invitation address sends referrer-policy "${invitation.headers.get('referrer-policy')}"`,
     );
+  }
+  // The link holds its token in a cookie and forwards to an address with no secret in it
+  // (step 2.97, record 086, T-288): never kept by a cache, and the token is in no log.
+  if (!(invitation.headers.get('cache-control') ?? '').includes('no-store')) {
+    failures.push(
+      `an invitation address sends cache-control "${invitation.headers.get('cache-control')}"`,
+    );
+  }
+  if (
+    invitation.status !== 303 ||
+    new URL(invitation.headers.get('location') ?? '', origin).pathname !==
+      '/north-valley/invitation'
+  ) {
+    failures.push(
+      `an invitation address answers ${invitation.status} to "${invitation.headers.get('location')}"`,
+    );
+  }
+  const held = invitation.headers.get('set-cookie') ?? '';
+  if (
+    !/srl_invitation=/.test(held) ||
+    !/HttpOnly/i.test(held) ||
+    !/Path=\/north-valley\/invitation/i.test(held)
+  ) {
+    failures.push(`an invitation address holds its token as "${held.replace(/=[^;]*/, '=…')}"`);
+  }
+  const accept = await fetch(`${origin}/north-valley/invitation`, {
+    redirect: 'manual',
+    headers: { cookie: `srl_invitation=${heldMadeUpToken}` },
+  });
+  await accept.text();
+  if (!(accept.headers.get('cache-control') ?? '').includes('no-store')) {
+    failures.push(`the accept page sends cache-control "${accept.headers.get('cache-control')}"`);
+  }
+  if (!['no-referrer', 'same-origin'].includes(accept.headers.get('referrer-policy') ?? '')) {
+    failures.push(
+      `the accept page sends referrer-policy "${accept.headers.get('referrer-policy')}"`,
+    );
+  }
+  if (server.output().includes('made-up-token') || server.output().includes(heldMadeUpToken)) {
+    failures.push('an invitation token was written to the server log');
   }
   failures.push(...(await sameAsNoLeague(origin)));
   failures.push(...(await scoringSameAsNoLeague(origin)));

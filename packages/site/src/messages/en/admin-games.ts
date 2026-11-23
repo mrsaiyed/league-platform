@@ -151,7 +151,7 @@ export const enAdminGames = {
   'admin.games.error.game-now-postponed':
     'Someone postponed this game meanwhile, so nothing else was changed. It is shown again as it is now.',
   'admin.games.error.game-part-in-bin':
-    'One of this game’s teams, or its venue or court, is in the bin, and the screen to bring it back is not ready yet. So this game cannot be put back for now.',
+    'One of this game’s teams, or its venue or court, is in the bin, so this game cannot be put back. If it needs to come back, ask the league’s owner.',
   'admin.games.error.game-postponed':
     'That game is postponed, so it cannot have a score yet. Enter its score once it is played on its new date.',
   'admin.games.error.invalid-input': 'Enter the score as two whole numbers from 0 to 999.',
@@ -244,11 +244,11 @@ export const enAdminGames = {
   'admin.games.tracked':
     'Plays are being recorded for this game in the tracker, so it is ended there, not by typing a score.',
   // Postponed games, each until it is given a new date (P7 §4 "Also", step 2.158). Giving
-  // the new date from the list is step 2.53's, and is said not to be ready until then.
+  // the new date from the list is step 2.53's; until then the note promises nothing.
   'admin.games.waiting.empty': 'No game is waiting for a new date.',
   'admin.games.waiting.link': 'See the games waiting for a new date',
   'admin.games.waiting.note':
-    'Postponed games, oldest first. Each waits here until it is given a new date; giving one from this list is not ready yet.',
+    'Postponed games, oldest first. Each waits here until it is given a new date.',
   'admin.games.waiting.title': 'Waiting for a new date',
   'admin.games.weekEmpty': 'No more games in the next six days.',
   'admin.games.weekTitle': 'This week',
