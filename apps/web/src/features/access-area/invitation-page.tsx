@@ -3,16 +3,18 @@
 // (invitation-request.ts). What it says depends only on who is looking and what the token
 // gives, read on the server:
 //
-// - a visitor: "sign in, or create an account", each bringing them straight back here;
-//   nothing about the league or the role, since nothing has been proved yet;
+// - a visitor holding a token: "sign in, or create an account", each bringing them straight
+//   back here; nothing about the league or the role, since nothing has been proved yet, and
+//   the same at every address, whether a league is behind it or not, so a hidden league's
+//   short name cannot be tested;
 // - signed in, a link that works (access.read_invitation): the league, the role, the
 //   account they are signed in with (T-226: any signed-in holder may accept, so they are
 //   told which account will get it, and when the link was sent to another address), one
 //   filled button to accept and "Use another account";
 // - signed in, the account that accepted it already: "Already accepted", and the way in;
 // - anything else (no token held, a wrong, used, cancelled, run-out or withdrawn one, an
-//   address with no league behind it): one page, "This link does not work", the same for
-//   every case, so it tells nobody which it was.
+//   address with no league behind it, once signed in): one page, "This link does not
+//   work", the same for every case, so it tells nobody which it was.
 //
 // After accepting, the person lands on the league's home, in the league's own frame.
 import { leagueUrl, platformUrl, readInvitation, type Role } from '@srleagues/core';
@@ -45,12 +47,14 @@ export async function InvitationPage() {
 async function InvitationBody() {
   const request = await invitationRequest();
   if (request.kind === 'account-problem') return redirect(platformUrl('account'));
-  if (request.kind === 'no-league') return <NotUsable />;
-  const league = request.context.league;
-  const here = heldInvitationPath(league.slug);
+  const slug = request.kind === 'no-league' ? request.slug : request.context.league.slug;
+  const here = heldInvitationPath(slug);
   const token = await heldToken();
   if (here === undefined || token === undefined) return <NotUsable />;
-  if (request.context.account === null) {
+  // A visitor gets this one card at every address, a league behind it or not (even a
+  // hidden one): nothing is looked up for them, so the answer tells them nothing.
+  const visitor = request.kind === 'no-league' ? request.visitor : request.context.account === null;
+  if (visitor) {
     return (
       <Card title={t('invitation.title')} state="visitor">
         <p>{t('invitation.visitor.body')}</p>
@@ -63,6 +67,8 @@ async function InvitationBody() {
       </Card>
     );
   }
+  if (request.kind === 'no-league') return <NotUsable />;
+  const league = request.context.league;
   const ports = await webPorts();
   const offer = await readInvitation(contextOfRequest(request), { token }, ports.adminAccess.deps);
   if (!offer.ok) return <NotUsable />;

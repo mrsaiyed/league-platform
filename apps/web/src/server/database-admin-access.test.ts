@@ -264,7 +264,7 @@ describe('Admins on the database (step 2.97)', () => {
   });
 
   it('lets only the owner and admins invite, list, re-send, cancel and remove', async () => {
-    const { invitationId } = await emailed();
+    const { invitationId, token } = await emailed();
     for (const actor of actors) {
       const may = managers.includes(actor);
       const listed = await listAccess(as(actor), {}, deps());
@@ -288,17 +288,30 @@ describe('Admins on the database (step 2.97)', () => {
         });
       }
     }
-    // Another league's admin, acting in their own league, cannot reach this invitation.
-    expect(
-      await cancelInvitation(as('otherLeagueAdmin', otherLeagueId), { invitationId }, deps()),
-    ).toMatchObject({ error: { code: 'invitation-not-found' } });
+    // Another league's admin, acting in their own league, cannot reach this invitation:
+    // neither cancel nor re-send it, and its link still works afterwards.
+    const otherAdmin = as('otherLeagueAdmin', otherLeagueId);
+    expect(await cancelInvitation(otherAdmin, { invitationId }, deps())).toMatchObject({
+      error: { code: 'invitation-not-found' },
+    });
+    expect(await resendInvitation(otherAdmin, { invitationId }, deps())).toMatchObject({
+      error: { code: 'invitation-not-found' },
+    });
+    expect(await readInvitation(as('stranger'), { token }, deps())).toMatchObject({ ok: true });
     const scorekeeperGrant = await listAccess(as('owner'), {}, deps());
     const grantId = scorekeeperGrant.ok ? (scorekeeperGrant.value.grants[0]?.id ?? '') : '';
+    expect(grantId).not.toBe('');
     for (const actor of actors.filter((a) => !managers.includes(a))) {
       expect(await revokeGrant(as(actor), { grantId }, deps())).toMatchObject({
         error: { code: 'not-allowed' },
       });
     }
+    // Nor remove anyone's access here.
+    expect(await revokeGrant(otherAdmin, { grantId }, deps())).toMatchObject({
+      error: { code: 'grant-not-found' },
+    });
+    const still = await listAccess(as('owner'), {}, deps());
+    expect(still.ok && still.value.grants.some((g) => g.id === grantId)).toBe(true);
   });
 
   it('writes every change in the activity log, and no link or address in a log line', async () => {

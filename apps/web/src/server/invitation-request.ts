@@ -15,7 +15,9 @@
 // not public yet, which the person cannot see until they accept. What it shows a person
 // who may not see the league is only what the token proves (access.read_invitation): an
 // address with no league behind it, a hidden league, a wrong token, a used, cancelled or
-// run-out one all draw the same page, so the address tells nobody which it was.
+// run-out one all draw the same page, so the address tells nobody which it was. A visitor
+// holding a token is asked to sign in at every such address, a league behind it or not,
+// since nothing is looked up for them: so a hidden league's short name cannot be tested.
 import { leagueUrl, type CommandContext } from '@srleagues/core';
 import { cookies } from 'next/headers';
 import { webPorts } from './container.ts';
@@ -79,7 +81,13 @@ export async function forgetHeldToken(slug: string): Promise<void> {
 
 /** Who is looking at the accept page, and in which league, as the server's session says. */
 export type InvitationRequest =
-  | { readonly kind: 'no-league' }
+  | {
+      readonly kind: 'no-league';
+      /** The short name as the address holds it, looked up or not. */
+      readonly slug: string;
+      /** Nobody is signed in: answered exactly as a visitor to a league that is there. */
+      readonly visitor: boolean;
+    }
   /** The session is none of our accounts' (record 055): the account page explains. */
   | { readonly kind: 'account-problem' }
   | {
@@ -99,17 +107,20 @@ export async function invitationRequest(): Promise<InvitationRequest> {
   const ports = await webPorts();
   const deps = { ...ports, siteOrigin: getConfig().PUBLIC_BASE_URL };
   let built = await requestContext(facts, deps);
+  let visitor = facts.session === null;
   // A session that ran out or ended is drawn as a visitor's, as on every league page.
   if (!built.ok && (built.error.code === 'renew-session' || built.error.code === 'session-ended')) {
     built = await requestContext({ ...facts, session: null }, deps);
+    visitor = true;
   }
+  const slug = (facts.path.split(/[?#]/)[0] ?? '').split('/')[1] ?? '';
   if (!built.ok) {
     return built.error.code === 'account-problem'
       ? { kind: 'account-problem' }
-      : { kind: 'no-league' };
+      : { kind: 'no-league', slug, visitor };
   }
   const context = built.value;
-  if (context.kind !== 'league') return { kind: 'no-league' };
+  if (context.kind !== 'league') return { kind: 'no-league', slug, visitor };
   const email =
     context.account !== null && facts.session?.ok === true ? facts.session.value.email : null;
   return { kind: 'league', context, email };

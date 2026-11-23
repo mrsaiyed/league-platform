@@ -16,7 +16,8 @@
 // no-store and same-origin, and no token is in the server's output.
 // Beyond the line (the brief check): the same address twice, a cancelled and a replaced link,
 // the link opened twice, someone signed in with another address, the open session of a person
-// whose access is removed, a refusal with scripts on.
+// whose access is removed, a refusal with scripts on, the token's cookie gone once accepted,
+// and, signed out, a draft league's link answered exactly as one with no league.
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -455,6 +456,10 @@ if (browser !== null) {
       'with the league’s own header',
       (await phonePage.locator('header.site-header').count()) === 1,
     );
+    const held = (await volunteerContext.cookies()).filter(
+      (c) => c.name === 'srl_invitation' && c.value !== '',
+    );
+    note('the token’s cookie is gone once accepted', held.length === 0, String(held.length));
     const games = await phonePage.goto(`${origin}/lakeside/admin`);
     note(
       'the scorekeeper’s games open for them now',
@@ -662,6 +667,63 @@ if (browser !== null) {
       await scripted.close();
     },
   );
+
+  // A hidden league's short name cannot be tested from the accept page: signed out, the link
+  // at a draft league's address is answered exactly as at one with no league. Only the
+  // made-up stand-in has a draft league (quiet-pines), so a second server runs on it.
+  await step('signed out, a draft league’s address is answered as one with none', async () => {
+    const standInOrigin = `http://localhost:${await freePort()}`;
+    const standIn = startNext(['start', '--port', new URL(standInOrigin).port], {
+      APP_ENV: 'test',
+      PUBLIC_BASE_URL: standInOrigin,
+      LOG_LEVEL: 'debug',
+    });
+    try {
+      await waitFor(`${standInOrigin}/`, standIn);
+      const answerAt = async (slug) => {
+        const context = await browser.newContext(phone);
+        const tab = await context.newPage();
+        const response = await tab.goto(`${standInOrigin}/${slug}/invitation/${'y'.repeat(43)}`);
+        const state = tab.locator('[data-invitation-state]');
+        const answer = {
+          address: new URL(tab.url()).pathname.split(slug).join('{league}'),
+          status: String(response?.status()),
+          title: await tab.title(),
+          text: await tab.locator('body').innerText(),
+          state:
+            (await state.count()) === 1 ? await state.getAttribute('data-invitation-state') : '',
+          headers: Object.entries(response?.headers() ?? {})
+            .filter(([name]) => !['date', 'set-cookie', 'content-length'].includes(name))
+            .map(([name, value]) => `${name}: ${value.replace(/nonce-[^'\s]*/g, 'nonce')}`)
+            .sort()
+            .join('\n'),
+        };
+        await context.close();
+        return answer;
+      };
+      const draft = await answerAt('quiet-pines');
+      const none = await answerAt('no-such-league');
+      note(
+        'signed out, a draft league’s link asks to sign in',
+        draft.state === 'visitor',
+        draft.state,
+      );
+      for (const part of ['address', 'status', 'title', 'text', 'state', 'headers']) {
+        note(
+          `signed out, a draft league and no league answer the same ${part}`,
+          draft[part] === none[part],
+          `${JSON.stringify(draft[part]).slice(0, 300)} / ${JSON.stringify(none[part]).slice(0, 300)}`,
+        );
+      }
+      note(
+        'and the draft league is not named',
+        !draft.text.includes('Quiet Pines'),
+        draft.text.slice(0, 200),
+      );
+    } finally {
+      standIn.child.kill();
+    }
+  });
 
   await volunteerContext.close();
   await ownerContext.close();
