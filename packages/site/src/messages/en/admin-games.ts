@@ -169,6 +169,22 @@ export const enAdminGames = {
   // the week by day, and earlier games a round at a time.
   'admin.games.intro':
     'Games that still need a result come first, then today, this week and earlier games.',
+  // "Later games" (step 2.56): every scheduled game after this week, by team or all.
+  'admin.games.later.all': 'All teams',
+  'admin.games.later.choose': 'Choose a team',
+  'admin.games.later.empty': 'There are no games after this week.',
+  'admin.games.later.filters': 'Later games',
+  'admin.games.later.more': 'Only the first {count} games are shown.',
+  'admin.games.later.note':
+    'Every game still to come after this week, soonest first, to forfeit, postpone or cancel one further ahead.',
+  'admin.games.later.pick': 'Choose a team, or all teams, to see the games after this week.',
+  'admin.games.later.show': 'Show',
+  'admin.games.later.shown': 'Games of {team}',
+  'admin.games.later.shownAll': 'Every game after this week',
+  'admin.games.later.team': 'Team',
+  'admin.games.later.title': 'Later games',
+  // Step 2.56: a game whose line-ups are set in the tracker but has not started.
+  'admin.games.lineupsSet': 'Line-ups are set in the tracker, but the game has not started.',
   'admin.games.listProblem':
     'The games could not be shown. You may not have access to score or change games here.',
   'admin.games.needsResult.empty': 'Every game that has started has its result.',
@@ -219,6 +235,8 @@ export const enAdminGames = {
   'admin.games.refused.tie':
     '{result} is a tie, and this season does not allow ties. Change a score so one team wins.',
   'admin.games.refusedAbout': '{game}: {problem}',
+  // A team in the bin, named on the games list (step 2.56).
+  'admin.games.removedTeam': '{name} (removed)',
   'admin.games.reopenUntil':
     'You ended this game in the tracker, so you can reopen it until {time}.',
   'admin.games.reopenWho.admins': 'Only a league admin or a scheduler can reopen this game.',
@@ -246,6 +264,7 @@ export const enAdminGames = {
   'admin.games.scoreOf': 'Score for {team}',
   'admin.games.scorekeeper': 'Scorekeeper: {names}',
   'admin.games.toEarlier': 'Earlier games',
+  'admin.games.toLater': 'Later games',
   'admin.games.toScorekeepers': 'Scorekeepers',
   'admin.games.today': 'Today, {time}',
   'admin.games.todayEmpty': 'No more games today.',

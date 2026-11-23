@@ -8,6 +8,8 @@ import type { CommandDeps, ScorekeepersTx, StandingsTx, TrackerTx } from '@srlea
 /** The words shown beside a league's games: teams by id, and who scores each game. */
 export type GameNames = {
   readonly teams: Readonly<Record<string, string>>;
+  /** The teams of `teams` that are in the bin, by id (step 2.56: named "(removed)"). */
+  readonly removedTeams: readonly string[];
   /** Scorekeepers assigned to each game, by game id. */
   readonly scorekeepers: Readonly<Record<string, readonly string[]>>;
   /** Seasons by id: an earlier round of another season is named with its season (step 2.156). */

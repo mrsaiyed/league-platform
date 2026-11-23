@@ -12,7 +12,9 @@ import {
   getBoxScoreSheet,
   leagueUrl,
   listEarlierGames,
+  laterGamesLimit,
   listGamesNeedingResult,
+  listLaterGames,
   listMyGames,
   listPostponedGames,
   needsResultLimit,
@@ -26,7 +28,15 @@ import {
   maxOvertimePeriods,
 } from '@srleagues/core';
 import { displayLabels, finalPillOf } from '@srleagues/site';
-import { EmptyPanel, FilterToolbar, GameCard, PageHead, RoundPicker, Section } from '@srleagues/ui';
+import {
+  EmptyPanel,
+  FilterToolbar,
+  GameCard,
+  OptionPicker,
+  PageHead,
+  RoundPicker,
+  Section,
+} from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
 import { scorekeepersAddress } from '../scorekeepers-area/index.ts';
 import type { GameNames } from '../../server/games-area-ports.ts';
@@ -48,6 +58,7 @@ import { gamesSections } from './games-sections.ts';
 import { readReopenViews } from './read-reopen-views.ts';
 import { ReopenLine } from './reopen-line.tsx';
 import { SavedLine, type SavedKind } from './saved-line.tsx';
+import { shownTeamNames } from './shown-team-names.ts';
 import { waitingListAnchor as waitingAnchor } from './waiting-anchor.ts';
 
 /** What the words of a saved notice read of the game it names. */
@@ -209,14 +220,14 @@ function Controls({
   readonly times: LeagueTimes;
   /** The ports' clock now (ms, nowOf), to say when a game's time has not come. */
   readonly now: number;
-  /** The earlier round the game is shown in, kept in its place's address. */
-  readonly round: string | undefined;
+  /** Where the game is shown (its earlier round, or the later games), kept in its address. */
+  readonly round: Readonly<Record<string, string>> | undefined;
 }) {
   const trackerHref = leagueUrl(here, 'score', { game: game.id });
   const gameHref = leagueUrl(here, 'admin-area', { area: 'games', subpath: [game.id] });
   const list = leagueUrl(here, 'admin-area', {
     area: 'games',
-    query: round === undefined ? undefined : { round },
+    query: round,
   });
   const permalink = `${list}#${gameAnchor(game.id)}`;
   // A refusal names the game ("Tigers at Lions: …").
@@ -227,7 +238,8 @@ function Controls({
     game.status === 'scheduled' && game.startsAt !== null && Date.parse(game.startsAt) <= now;
   return (
     <div className="admin-game-controls">
-      {game.hasPlays ? (
+      {game.lineupsSet ? <p>{t('admin.games.lineupsSet')}</p> : null}
+      {game.playsRecorded ? (
         // Ended in the tracker (S-46): no score boxes and no forfeit.
         <>
           <p>{t('admin.games.tracked')}</p>
@@ -253,7 +265,7 @@ function Controls({
           texts={finalScoreTexts(game, early)}
         />
       ) : null}
-      {game.trackerLink && !game.hasPlays ? (
+      {game.trackerLink && !game.playsRecorded ? (
         <p>
           <a className="ui-button" href={trackerHref}>
             {t('admin.games.openTracker')}
@@ -342,8 +354,8 @@ function GameList({
 }: {
   readonly rows: readonly GameRowView[];
   readonly scene: ListScene;
-  /** The earlier round these are shown in, if they are. */
-  readonly round?: string;
+  /** Where these are shown (an earlier round, the later games), if not by their day. */
+  readonly round?: Readonly<Record<string, string>>;
 }) {
   const { here, times, now, labels, saved } = scene;
   return (
@@ -452,10 +464,13 @@ function WaitingList({
 export async function GamesPage({
   league,
   round,
+  later,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
   readonly round: string | undefined;
+  /** The later games asked for (step 2.56): "all", or a team's id. */
+  readonly later?: string | undefined;
 }) {
   const view = await loadLeaguePage(league, 'admin', 'games');
   const addressee = view.context.league;
@@ -473,6 +488,18 @@ export async function GamesPage({
   // Every postponed game, until it gets a new date (P7 §4 "Also", step 2.158): for whoever
   // may read the schedule (the command's own rule); for anyone else the part is not drawn.
   const postponed = await listPostponedGames(context, {}, ports.games.deps);
+  // Every scheduled game after this week (step 2.56), by team or all, when asked for: a
+  // team is asked for only when it has later games, else nothing is shown.
+  const laterAll = await listLaterGames(context, {}, ports.games.deps);
+  const laterTeams = laterAll.ok ? laterAll.value.teamIds : [];
+  const laterTeam = later !== undefined && laterTeams.includes(later) ? later : undefined;
+  const laterShown =
+    later === 'all'
+      ? laterAll
+      : laterTeam === undefined
+        ? undefined
+        : await listLaterGames(context, { teamId: laterTeam }, ports.games.deps);
+  const laterGames = laterShown?.ok === true ? laterShown.value.games : [];
   const ok = needs.ok && listed.ok && earlier.ok;
   const today = listed.ok ? listed.value.today : '';
   const sections = gamesSections(
@@ -486,10 +513,11 @@ export async function GamesPage({
     ...sections.today,
     ...sections.days.flatMap((d) => d.games),
     ...(shownRound?.games ?? []),
+    ...laterGames,
   ];
   const holder = await ports.accessOf(context);
   const reopens = await readReopenViews(games, context, holder, ports.games.deps);
-  const names = await ports.games.namesOf(addressee.id);
+  const names = shownTeamNames(await ports.games.namesOf(addressee.id));
   const rowsOf = (of: readonly MyGame[]) => buildGameRows(of, names, holder, reopens);
   // The ports' one clock (step 2.179): the made-up world's own on the stand-in, so a game's
   // time is never measured against another clock than the one it was read on.
@@ -545,6 +573,9 @@ export async function GamesPage({
       <PageHead title={t('admin.area.games')} sub={t('admin.games.intro')}>
         <a className="ui-more" href={`${list}#earlier`}>
           {t('admin.games.toEarlier')}
+        </a>
+        <a className="ui-more" href={`${list}#later`} data-to-later="">
+          {t('admin.games.toLater')}
         </a>
         {/* Who scores which game (step 2.56): for those who manage games somewhere. */}
         {holder !== undefined &&
@@ -605,6 +636,20 @@ export async function GamesPage({
               </Section>
             </div>
           ) : null}
+          <div id="later" data-later-games="">
+            <Section title={t('admin.games.later.title')} note={t('admin.games.later.note')}>
+              <LaterPart
+                list={list}
+                asked={later === 'all' ? 'all' : laterTeam}
+                teamOptions={laterTeams
+                  .map((id) => ({ value: id, label: names.teams[id] ?? '' }))
+                  .sort((a, b) => a.label.localeCompare(b.label, locale))}
+                rows={rows(laterGames)}
+                more={laterShown?.ok === true && laterShown.value.more}
+                scene={scene}
+              />
+            </Section>
+          </div>
           <div id="earlier">
             <Section title={t('admin.games.earlier.title')} note={t('admin.games.earlier.note')}>
               {roundOptions.length === 0 ? (
@@ -646,7 +691,7 @@ export async function GamesPage({
                       <GameList
                         rows={rows(shownRound.games)}
                         scene={scene}
-                        round={shownRound.round.key}
+                        round={{ round: shownRound.round.key }}
                       />
                       {shownRound.more ? (
                         <p className="ui-section-note">
@@ -664,6 +709,65 @@ export async function GamesPage({
         </>
       )}
     </main>
+  );
+}
+
+/**
+ * "Later games" (step 2.56): a team picker (all teams, or one), and the games asked for,
+ * soonest first, with the same changes as this week's.
+ */
+function LaterPart({
+  list,
+  asked,
+  teamOptions,
+  rows,
+  more,
+  scene,
+}: {
+  readonly list: string;
+  /** "all", a team's id, or nothing asked for yet. */
+  readonly asked: string | undefined;
+  readonly teamOptions: readonly { readonly value: string; readonly label: string }[];
+  readonly rows: readonly GameRowView[];
+  readonly more: boolean;
+  readonly scene: ListScene;
+}) {
+  if (teamOptions.length === 0) return <EmptyPanel text={t('admin.games.later.empty')} />;
+  const team = teamOptions.find((o) => o.value === asked)?.label;
+  return (
+    <div className="ui-stack">
+      <FilterToolbar label={t('admin.games.later.filters')}>
+        <OptionPicker
+          name="later"
+          label={t('admin.games.later.team')}
+          submitLabel={t('admin.games.later.show')}
+          action={`${list}#later`}
+          value={asked ?? ''}
+          options={[
+            { value: '', label: t('admin.games.later.choose') },
+            { value: 'all', label: t('admin.games.later.all') },
+            ...teamOptions,
+          ]}
+        />
+      </FilterToolbar>
+      {asked === undefined ? (
+        <p className="ui-section-note">{t('admin.games.later.pick')}</p>
+      ) : (
+        <section className="ui-stack" aria-labelledby="later-shown">
+          <h3 id="later-shown">
+            {team === undefined
+              ? t('admin.games.later.shownAll')
+              : t('admin.games.later.shown', { team })}
+          </h3>
+          <GameList rows={rows} scene={scene} round={{ later: asked }} />
+          {more ? (
+            <p className="ui-section-note">
+              {t('admin.games.later.more', { count: String(laterGamesLimit) })}
+            </p>
+          ) : null}
+        </section>
+      )}
+    </div>
   );
 }
 

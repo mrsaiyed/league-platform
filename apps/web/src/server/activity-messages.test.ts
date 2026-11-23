@@ -23,6 +23,7 @@ const reads = new Set([
   'games.list_my_games',
   // The games list's "Needs a result" and "Earlier games" (step 2.156): reads.
   'games.list_games_needing_result',
+  'games.list_later_games',
   'games.list_earlier_games',
   // Which of a public page's games the person may score (step 2.153): a read.
   'games.list_scoring_offers',

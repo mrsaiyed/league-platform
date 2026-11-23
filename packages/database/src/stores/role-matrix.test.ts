@@ -91,6 +91,7 @@ import {
   listDivisions,
   listEarlierGames,
   listGamesNeedingResult,
+  listLaterGames,
   listMyGames,
   listPeople,
   listPostponedGames,
@@ -1068,6 +1069,15 @@ const gameCommandRows: readonly Row[] = [
     scope: 'program',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listGamesNeedingResult(c, i, gamesDeps),
+  },
+  // Step 2.56: every scheduled game after this week.
+  {
+    command: 'games.list_later_games',
+    name: 'see the games after this week',
+    needs: 'games.score',
+    scope: 'program',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listLaterGames(c, i, gamesDeps),
   },
   {
     command: 'games.list_earlier_games',
