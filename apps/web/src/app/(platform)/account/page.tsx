@@ -8,10 +8,15 @@ import {
   TestCopyLine,
   waitingQuestionWords,
 } from '../../../features/shell/index.ts';
+import {
+  LocalTime,
+  type LocalTimeWords,
+  type SearchProps,
+} from '../../../features/sign-in/index.ts';
 import { SignOutForm } from '../../../features/tracker/index.ts';
 import { webPorts } from '../../../server/container.ts';
 import type { AccountProblem } from '../../../server/context.ts';
-import { t, type TextKey } from '../../../server/messages.ts';
+import { locale, t, type TextKey } from '../../../server/messages.ts';
 import { signOutAction, signOutEverywhereAction } from '../../../server/sign-in/actions.ts';
 import { cookieNames } from '../../../server/sign-in/cookies.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
@@ -26,16 +31,24 @@ import { timeInWords } from '../../../server/sign-in/sign-in-mail.ts';
 // Since step 2.127 it says first who is signed in (the address the sign-in service holds
 // for the session), then lists the leagues they belong to with their role in each, each a
 // link (P2 line 71; record 066), before the devices.
-export default async function Page() {
+// Since step 2.163 (M26, M30, L10): this device first and said to be this one; each time in
+// the reader's own time ("today at 8:41 PM"), by their browser (local-time.tsx); a list that
+// could not be read says so; and "Sign out everywhere" asks first, on this page
+// (`?ask=signOutEverywhere`, so it works with scripts off), with a way back.
+export default async function Page({ searchParams }: SearchProps) {
   // The cookies first: this makes the page drawn per request, never at build time.
   // The session is identified once for the whole request (this-request.ts).
   const accessToken = (await cookies()).get(cookieNames.session)?.value ?? '';
+  const asking = (await searchParams)['ask'] === 'signOutEverywhere';
   const ports = await webPorts();
   const who = await signedInPerson();
   if (who.kind === 'account-problem') return <AccountProblemPage problem={who.problem} />;
   if (who.kind === 'visitor') redirect(screenUrl('signin', { next: platformUrl('account') }));
   const listed = await ports.signIn.listSessions({ accessToken });
-  const sessions: readonly SessionSummary[] = listed.ok ? listed.value : [];
+  // This device first, then the others, most recent first, as the service lists them.
+  const sessions: readonly SessionSummary[] = listed.ok
+    ? [...listed.value.filter((s) => s.current), ...listed.value.filter((s) => !s.current)]
+    : [];
   const leagues = await leaguesOfThisRequest();
   return (
     <StandalonePage>
@@ -45,30 +58,79 @@ export default async function Page() {
         <h2>{t('account.leagues')}</h2>
         <MyLeaguesList leagues={leagues} />
         <h2>{t('account.devices')}</h2>
-        <ul>
-          {sessions.map((session) => (
-            <li key={session.sessionId}>
-              <strong>{session.deviceLabel}</strong>
-              {session.current ? <em> · {t('account.thisDevice')}</em> : null}
-              <br />
-              {t('account.signedInAt', { when: timeInWords(session.signedInAt) })}
-              <br />
-              {t('account.lastActive', { when: timeInWords(session.lastActiveAt) })}
-            </li>
-          ))}
-        </ul>
+        {sessions.length === 0 ? (
+          <p data-devices-unreadable="">{t('account.devicesUnreadable')}</p>
+        ) : (
+          <ul>
+            {sessions.map((session) => (
+              <li key={session.sessionId} data-this-device={session.current ? '' : undefined}>
+                <strong>{session.deviceLabel}</strong>
+                {session.current ? <em> · {t('account.thisDevice')}</em> : null}
+                <br />
+                <LocalTime
+                  at={session.signedInAt.toISOString()}
+                  utcWords={timeInWords(session.signedInAt)}
+                  locale={locale}
+                  words={lineWords('account.signedInAt')}
+                />
+                <br />
+                <LocalTime
+                  at={session.lastActiveAt.toISOString()}
+                  utcWords={timeInWords(session.lastActiveAt)}
+                  locale={locale}
+                  words={lineWords('account.lastActive')}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
         <SignOutForm action={signOutAction} waitingQuestion={waitingQuestionWords()}>
-          <button type="submit">{t('account.signOut')}</button>
+          <button className="ui-button" type="submit">
+            {t('account.signOut')}
+          </button>
         </SignOutForm>
-        <SignOutForm action={signOutEverywhereAction} waitingQuestion={waitingQuestionWords()}>
-          <p>{t('account.signOutEverywhereHelp')}</p>
-          <button type="submit">{t('account.signOutEverywhere')}</button>
-        </SignOutForm>
+        {asking ? (
+          <section className="account-ask" aria-labelledby="sign-out-everywhere-ask">
+            <p id="sign-out-everywhere-ask">{t('account.signOutEverywhereAsk')}</p>
+            <SignOutForm action={signOutEverywhereAction} waitingQuestion={waitingQuestionWords()}>
+              <button className="ui-button" data-kind="danger" type="submit">
+                {t('account.signOutEverywhereConfirm')}
+              </button>
+            </SignOutForm>
+            <a className="ui-button" data-kind="quiet" href={platformUrl('account')}>
+              {t('account.signOutEverywhereKeep')}
+            </a>
+          </section>
+        ) : (
+          <>
+            <p>{t('account.signOutEverywhereHelp')}</p>
+            <a
+              className="ui-button"
+              data-kind="quiet"
+              href={screenUrl('account', { ask: 'signOutEverywhere' })}
+            >
+              {t('account.signOutEverywhere')}
+            </a>
+          </>
+        )}
         {/* At its foot, on the test copy only (step 2.205). */}
         <TestCopyLine shown={ports.testCopy} />
       </main>
     </StandalonePage>
   );
+}
+
+/** A device line's words with a hole for the time, and the ways to say a time. */
+function lineWords(line: 'account.signedInAt' | 'account.lastActive'): LocalTimeWords {
+  const hole = '\u0000';
+  const [before = '', after = ''] = t(line, { when: hole }).split(hole);
+  return {
+    before,
+    after,
+    today: t('account.when.today', { time: '{time}' }),
+    yesterday: t('account.when.yesterday', { time: '{time}' }),
+    day: t('account.when.day', { date: '{date}', time: '{time}' }),
+  };
 }
 
 const problemText = {

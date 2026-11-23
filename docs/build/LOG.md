@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-23 02:30 UTC — Step 2.163 landed (2026-11-23): the sign-in pages say what is happening; sign-out stays on the page with a notice, switching accounts goes through 'You are already signed in', Back to the league leads to its home while Terms and Privacy lead back to the page they were opened from; reviewed at high effort, fix round, confirming look (no High or Medium); GitHub passed 1382eb7 twice.
+
 - 2026-11-23 01:26 UTC — Step 2.240 landed (2026-11-23, the fourth lead): a Publishing part in League settings: the owner or an admin sees that the league is a draft, the must-fix list (a contact email; for a league with under-18s the names choice saved; sample data put off, U-17, decided for the founder), and publishes after one question; the checks sit inside the command. The rehearsal's walk publishes and the signed-out visitor goes from not found to reading home, game, standings and statistics (63 checks). One review at high effort (no High; two Mediums fixed), GitHub passed twice on 208f47d. U-17, T-303.
 
 - 2026-11-23 00:17 UTC — Step 2.46 landed (2026-11-23, the fourth lead): a team's own coach or captain and the league's owner and admins get the player lines a league hides, through a signed-in answer route; everyone else gets nothing (S-80, decided for the founder: the narrower reading of who is staff; T-287). Picked up after five days, six conflicts merged, one review at high effort (no High; one Medium: two teams that both hide their players, each coach asking about the other, is now proved at the database), a hint of the team's setting removed from a visitor's page, GitHub passed twice on ee8eafe.

@@ -5,6 +5,7 @@
 // the lawyer's versions exist (step 2.135).
 export {
   accountMenuOf,
+  isAdminPage,
   isScoringPage,
   signInHrefFrom,
   waitingQuestionWords,
@@ -22,8 +23,9 @@ export { LeagueNotFound, PlatformNotFound } from './not-found-screens.tsx';
 export { DocumentShown, RefusalFresh } from './refusal-fresh.tsx';
 export { RefusalPage } from './refusal-page.tsx';
 export { refusalScreenOf, type RefusalScreen } from './refusal-screen.ts';
+export { SignedOutNotice } from './signed-out-notice.tsx';
 export { SiteFooter } from './site-footer.tsx';
-export { AccountButton, MyTeamEntry, SiteHeader } from './site-header.tsx';
+export { AccountButton, MyTeamEntry, SignOutFields, SiteHeader } from './site-header.tsx';
 export { StandalonePage } from './standalone-page.tsx';
 export { TestCopyLine } from './test-copy-line.tsx';
 

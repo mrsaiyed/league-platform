@@ -221,7 +221,9 @@ if (browser !== null) {
           both.count === 2 && both.current === 1,
           JSON.stringify(both),
         );
-        await second.getByRole('button', { name: 'Sign out everywhere' }).click();
+        // "Sign out everywhere" asks first (step 2.163).
+        await second.getByRole('link', { name: 'Sign out everywhere' }).click();
+        await second.getByRole('button', { name: 'Yes, sign out everywhere' }).click();
         await second.waitForFunction(
           () =>
             location.pathname !== '/account' || !document.body.innerText.includes('Your account'),

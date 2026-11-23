@@ -1472,12 +1472,19 @@ if (browser) {
       await open(again, '/account');
       await again.getByRole('heading', { name: 'Your account' }).waitFor();
       note('back in a new browser, still signed in', pathOf(again) === '/account');
-      await again.getByRole('button', { name: 'Sign out everywhere' }).click();
-      // Either the sign-in page, or the account page showing the signed-out state.
+      // "Sign out everywhere" asks first (step 2.163), then signs out and says so on the
+      // front page.
+      await again.getByRole('link', { name: 'Sign out everywhere' }).click();
+      await again
+        .getByText('Sign out every device that uses your account, this one too?')
+        .waitFor();
+      await again.getByRole('button', { name: 'Yes, sign out everywhere' }).click();
       await again.waitForFunction(
         () =>
-          location.pathname === '/signin' ||
-          (location.pathname === '/account' && !document.body.innerText.includes('Your account')),
+          location.pathname === '/' &&
+          document.body.innerText.includes(
+            'You are signed out on every device that used your account.',
+          ),
       );
       await open(again, '/account');
       note('after signing out, sent to sign in', pathOf(again) === '/signin');

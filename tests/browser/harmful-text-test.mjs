@@ -593,13 +593,14 @@ if (browser) {
   });
 
   await step('the email boxes refuse the attack as text', async () => {
-    for (const address of [
-      '/signin',
-      '/signup',
-      '/signin/forgot',
-      // The Admins page's invitation (step 2.97), as the owner whose page this is.
-      '/north-valley/admin/settings/admins',
-    ]) {
+    // First the Admins page's invitation (step 2.97), as the owner whose page this is; then
+    // the three sign-in addresses as a visitor: a signed-in person is told they are signed in
+    // there, with no email box (step 2.163, L10). The cookies are cleared only between the
+    // two, and this context is closed after this step.
+    const asOwner = ['/north-valley/admin/settings/admins'];
+    const asVisitor = ['/signin', '/signup', '/signin/forgot'];
+    for (const address of [...asOwner, ...asVisitor]) {
+      if (address === asVisitor[0]) await context.clearCookies();
       await page.goto(origin + address);
       const form = page.locator('form', { has: page.locator('input[name=email]') }).first();
       await form.evaluate((element) => {

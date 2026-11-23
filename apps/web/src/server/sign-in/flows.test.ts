@@ -14,7 +14,13 @@ import {
 } from '@srleagues/providers';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { cookieNames, type CookieJar, type CookieOptions } from './cookies.ts';
+import {
+  cookieNames,
+  readFlow,
+  readTypedEmail,
+  type CookieJar,
+  type CookieOptions,
+} from './cookies.ts';
 import { networkAddressOf, type Visit } from './device.ts';
 import {
   askForCode as askForCodeWith,
@@ -568,7 +574,10 @@ describe('the bot check in front of signing in and asking for a code (T4 §6, re
         });
       }
       expect(env.outbox.messages()).toHaveLength(sent);
-      expect(await resendCode(drawn({}), b.visit, env.deps)).toEqual({ to: '/signup/code' });
+      // Back on the code screen, saying a new code was sent (step 2.163, M24).
+      expect(await resendCode(drawn({}), b.visit, env.deps)).toEqual({
+        to: '/signup/code?notice=codeSentAgain',
+      });
       expect(env.outbox.messages()).toHaveLength(sent + 1);
     }
     // With no code asked for, sign-up starts again.
@@ -692,7 +701,7 @@ describe('devices and sessions (T-70, T-71)', () => {
     await signUp(env, laptop, 'me@example.test');
     const phone = browser('192.0.2.20', safariOnIphone);
     await signInWithPassword({ email: 'me@example.test', password }, phone.visit, env.deps);
-    await signOut(phone.visit, env.deps);
+    await signOut({}, phone.visit, env.deps);
     await signInWithPassword({ email: 'me@example.test', password }, phone.visit, env.deps);
     const notices = env.outbox
       .messages()
@@ -723,7 +732,9 @@ describe('devices and sessions (T-70, T-71)', () => {
       'Safari on iPhone',
     ]);
     const laptopToken = laptop.jar.get(cookieNames.session) ?? '';
-    expect(await signOutEverywhere(laptop.visit, env.deps)).toEqual({ to: '/signin' });
+    expect(await signOutEverywhere(laptop.visit, env.deps)).toEqual({
+      to: '/?notice=signedOutEverywhere',
+    });
     expect(laptop.names()).toEqual([cookieNames.device]);
     for (const accessToken of [laptopToken, phoneToken]) {
       expect((await env.deps.signIn.identify({ accessToken })).ok).toBe(false);
@@ -803,7 +814,7 @@ describe('staying signed in (T-69, T-70)', () => {
     const b = browser();
     await signUp(env, b, 'me@example.test');
     const renewToken = b.jar.get(cookieNames.renew) ?? '';
-    await signOut(b.visit, env.deps);
+    await signOut({}, b.visit, env.deps);
     b.jar.set(cookieNames.renew, renewToken, {
       httpOnly: true,
       secure: false,
@@ -958,23 +969,36 @@ describe('after review', () => {
     await signInWithPassword({ email: 'me@example.test', password }, b.visit, env.deps);
     expect(b.jar.get(cookieNames.flow)).toBeUndefined();
     await askForCode('sign-up', { email: 'other@example.test' }, b.visit, env.deps);
-    await signOut(b.visit, env.deps);
+    await signOut({}, b.visit, env.deps);
     expect(b.jar.get(cookieNames.flow)).toBeUndefined();
   });
 
-  it('"sign out everywhere" that could not be done says so', async () => {
+  it('"sign out everywhere" says it failed only when it did, and never that it worked (M30)', async () => {
     const env = setup();
-    const failedTo = '/signin?problem=signOutEverywhereFailed&next=%2Faccount';
-    expect(await signOutEverywhere(browser().visit, env.deps)).toEqual({ to: failedTo });
+    const already = '/?notice=alreadySignedOut';
+    // No session on this device: it is signed out already, and nothing is claimed of others.
+    expect(await signOutEverywhere(browser().visit, env.deps)).toEqual({ to: already });
     const empty = browser();
     empty.jar.set(cookieNames.session, '', options);
-    expect(await signOutEverywhere(empty.visit, env.deps)).toEqual({ to: failedTo });
-    // A session that has already ended: this device is still signed out.
+    expect(await signOutEverywhere(empty.visit, env.deps)).toEqual({ to: already });
+    // A session that has already ended (signed out from elsewhere): this device is still
+    // signed out, and it is told so, not that the others could not be signed out.
     const b = browser();
     await signUp(env, b, 'me@example.test');
     await env.deps.signIn.signOut({ accessToken: b.jar.get(cookieNames.session) ?? '' });
-    expect(await signOutEverywhere(b.visit, env.deps)).toEqual({ to: failedTo });
+    expect(await signOutEverywhere(b.visit, env.deps)).toEqual({ to: already });
     expect(b.jar.get(cookieNames.session)).toBeUndefined();
+    // A live session the service would not end everywhere (its access token ran out):
+    // the other devices are still signed in, and the person is told it failed.
+    const late = browser('192.0.2.30');
+    await signUp(env, late, 'late@example.test');
+    const phone = browser('192.0.2.31', safariOnIphone);
+    await signInWithPassword({ email: 'late@example.test', password }, phone.visit, env.deps);
+    env.advanceSeconds(61 * 60);
+    expect(await signOutEverywhere(late.visit, env.deps)).toEqual({
+      to: '/signin?problem=signOutEverywhereFailed&next=%2Faccount',
+    });
+    expect(late.jar.get(cookieNames.session)).toBeUndefined();
   });
 
   it('treats an empty session cookie as none when asking for the password again', async () => {
@@ -1085,6 +1109,161 @@ describe('after review', () => {
     await renew(token(limit));
     expect(calls).toBe(limit + 2);
     expect(sharedRenewalLimit).toBeLessThanOrEqual(10_000);
+  });
+});
+
+describe('the screens say what is happening (step 2.163)', () => {
+  it('"Send a new code" sends another to the same address and stays on the code screen (M24)', async () => {
+    const env = setup();
+    const b = browser();
+    await askForCode(
+      'sign-up',
+      { email: 'pat@example.test', next: '/north-valley' },
+      b.visit,
+      env.deps,
+    );
+    const first = env.codeFor('pat@example.test');
+    expect(await resendCode(drawn({}), b.visit, env.deps)).toEqual({
+      to: '/signup/code?notice=codeSentAgain',
+    });
+    const sent = env.outbox.messages().filter((m) => m.to === 'pat@example.test');
+    expect(sent).toHaveLength(2);
+    // The same address, purpose and page to come back to.
+    expect(readFlow(b.jar)).toMatchObject({
+      purpose: 'sign-up',
+      email: 'pat@example.test',
+      next: '/north-valley',
+    });
+    // The newest code is the one that works.
+    const second = env.codeFor('pat@example.test');
+    if (second !== first) {
+      expect(await enterCode({ code: first }, b.visit, env.deps)).not.toEqual({
+        to: '/signup/password',
+      });
+    }
+    expect(await enterCode({ code: second }, b.visit, env.deps)).toEqual({
+      to: '/signup/password',
+    });
+  });
+
+  it('after a right code, and only then, the flow knows the address had an account (R-31)', async () => {
+    for (const purpose of ['sign-up', 'reset'] as const) {
+      const env = setup();
+      await signUp(env, browser(), 'taken@example.test');
+      const known = browser();
+      const unknown = browser();
+      await askForCode(purpose, { email: 'taken@example.test' }, known.visit, env.deps);
+      await askForCode(purpose, { email: 'nobody@example.test' }, unknown.visit, env.deps);
+      // Before the code: nothing in the flow says it (T-68).
+      expect(readFlow(known.jar)?.existing).toBeUndefined();
+      expect(readFlow(unknown.jar)?.existing).toBeUndefined();
+      await enterCode({ code: env.codeFor('taken@example.test') }, known.visit, env.deps);
+      expect(readFlow(known.jar)?.existing).toBe(true);
+      if (purpose === 'sign-up') {
+        await enterCode({ code: env.codeFor('nobody@example.test') }, unknown.visit, env.deps);
+        expect(readFlow(unknown.jar)?.existing).toBe(false);
+      }
+    }
+  });
+
+  it('"Send a new code" keeps to the limits there are and says so on the code screen', async () => {
+    const env = setup();
+    const b = browser();
+    await askForCode('sign-up', { email: 'pat@example.test' }, b.visit, env.deps);
+    const answers = [];
+    for (let i = 0; i < 5; i++) answers.push(await resendCode(drawn({}), b.visit, env.deps));
+    expect(answers.slice(0, 4)).toEqual(Array(4).fill({ to: '/signup/code?notice=codeSentAgain' }));
+    // Five codes an hour (T-225): the fifth "new code" is the sixth asked for.
+    expect(answers[4]?.to).toMatch(/^\/signup\/code\?problem=tooManyAttempts&wait=\d+$/);
+    // With nothing under way it is the first screen again, as an old code is.
+    expect(await resendCode(drawn({}), browser().visit, env.deps)).toEqual({
+      to: '/signup?problem=codeExpired',
+    });
+  });
+
+  it('"Send a new code" answers alike for an address with an account and one without (T-68)', async () => {
+    for (const purpose of ['sign-up', 'reset'] as const) {
+      const env = setup();
+      await signUp(env, browser(), 'taken@example.test');
+      const known = browser();
+      const unknown = browser();
+      await askForCode(purpose, { email: 'taken@example.test' }, known.visit, env.deps);
+      await askForCode(purpose, { email: 'nobody@example.test' }, unknown.visit, env.deps);
+      expect(await resendCode(drawn({}), known.visit, env.deps)).toEqual(
+        await resendCode(drawn({}), unknown.visit, env.deps),
+      );
+      expect(known.names()).toEqual(unknown.names());
+    }
+  });
+
+  it('a refused sign-in keeps the address typed, for either kind of address (M28, T-68)', async () => {
+    const env = setup();
+    await signUp(env, browser(), 'taken@example.test');
+    const names: string[][] = [];
+    for (const email of ['taken@example.test', 'nobody@example.test']) {
+      const b = browser();
+      await signInWithPassword({ email, password: 'not the password' }, b.visit, env.deps);
+      expect(readTypedEmail(b.jar)).toBe(email);
+      const kept = b.cookies.get(cookieNames.typed)?.options;
+      expect(kept).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/', maxAge: 600 });
+      names.push(b.names());
+    }
+    expect(names[0]).toEqual(names[1]);
+    // Gone once the person signs in, and on signing out.
+    const b = browser();
+    await signInWithPassword({ email: 'taken@example.test', password: 'nope' }, b.visit, env.deps);
+    await signInWithPassword({ email: 'taken@example.test', password }, b.visit, env.deps);
+    expect(readTypedEmail(b.jar)).toBeUndefined();
+    const c = browser();
+    await signInWithPassword({ email: 'taken@example.test', password: 'nope' }, c.visit, env.deps);
+    await signOut({}, c.visit, env.deps);
+    expect(readTypedEmail(c.jar)).toBeUndefined();
+  });
+
+  it('signing out leaves the person where they were, saying so (R-30)', async () => {
+    const env = setup();
+    const signedIn = async () => {
+      const b = browser();
+      await signUp(env, b, `out-${Math.random().toString(36).slice(2)}@example.test`);
+      return b;
+    };
+    // A league page: back on it.
+    let b = await signedIn();
+    expect(await signOut({ next: '/north-valley/schedule?team=owls' }, b.visit, env.deps)).toEqual({
+      to: '/north-valley/schedule?team=owls&notice=signedOut',
+    });
+    expect(b.jar.get(cookieNames.session)).toBeUndefined();
+    // No page named, or one that is not ours: our front page.
+    b = await signedIn();
+    expect(await signOut({}, b.visit, env.deps)).toEqual({ to: '/?notice=signedOut' });
+    for (const elsewhere of ['//evil.example', 'https://evil.example/', '/\\evil.example']) {
+      expect(await signOut({ next: elsewhere }, browser().visit, env.deps)).toEqual({
+        to: '/?notice=signedOut',
+      });
+    }
+    // A staff page asks a signed-out person to sign in (U-15): the sign-in screen, saying so.
+    b = await signedIn();
+    expect(
+      await signOut({ next: '/north-valley/admin/teams', staff: 'yes' }, b.visit, env.deps),
+    ).toEqual({ to: '/signin?notice=signedOut&next=%2Fnorth-valley%2Fadmin%2Fteams' });
+    // A notice already in the address is replaced, never repeated.
+    expect(
+      await signOut({ next: '/north-valley?notice=signedOut' }, browser().visit, env.deps),
+    ).toEqual({ to: '/north-valley?notice=signedOut' });
+  });
+
+  it('with Google not set up, a hand-sent "Continue with Google" never reaches the service (M27)', async () => {
+    const env = setup();
+    const started = vi.fn(env.deps.signIn.startExternalSignIn);
+    const deps = {
+      ...env.deps,
+      google: false,
+      signIn: { ...env.deps.signIn, startExternalSignIn: started },
+    };
+    expect(await startGoogle({ next: '/north-valley' }, browser().visit, deps)).toEqual({
+      to: '/signin?problem=googleFailed&next=%2Fnorth-valley',
+    });
+    expect(started).not.toHaveBeenCalled();
   });
 });
 

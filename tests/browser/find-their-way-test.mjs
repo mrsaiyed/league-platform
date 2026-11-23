@@ -562,6 +562,12 @@ if (browser) {
       await accessible(page, 'no access, signed in');
       await noSidewaysScroll(page, 'no access, signed in');
       await link(page, 'Use another account').click();
+      // Since step 2.163 (L10) /signin tells a signed-in person so, with "Sign out and use
+      // another account", which signs out and comes back to the form with the same `next`.
+      await Promise.all([
+        page.getByLabel('Email').waitFor(),
+        page.getByRole('button', { name: 'Sign out and use another account' }).click(),
+      ]);
       await signIn(page, people.owner);
       note(
         'after switching, the owner is on the page that was refused',

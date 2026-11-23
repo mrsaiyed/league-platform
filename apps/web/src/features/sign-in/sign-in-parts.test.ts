@@ -7,12 +7,15 @@ import {
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { BotCheckField } from './sign-in-parts.tsx';
+import { t } from '../../server/messages.ts';
+import { problems } from '../../server/sign-in/problems.ts';
+import { BotCheckField, needsScriptsWords, problemWords } from './sign-in-parts.tsx';
 
 const draw = (
   widget: Parameters<typeof BotCheckField>[0]['widget'],
   action: Parameters<typeof BotCheckField>[0]['action'] = 'sign-up',
-) => renderToStaticMarkup(createElement(BotCheckField, { widget, action }));
+  google = false,
+) => renderToStaticMarkup(createElement(BotCheckField, { widget, action, google }));
 
 describe('BotCheckField', () => {
   it('draws nothing when the check is off (staging without its keys, T-270)', () => {
@@ -47,15 +50,54 @@ describe('BotCheckField', () => {
       secretKey: 'made-up-secret-key',
       siteHostname: 'leagues.example.test',
     }).widget;
-    const said = (['sign-in', 'sign-up', 'reset'] as const).map(
-      (action) => /<noscript><p>([^<]+)<\/p><\/noscript>/.exec(draw(widget, action))?.[1],
-    );
-    expect(said[0]).toMatch(/^Signing in with a password checks/);
-    expect(said[1]).toMatch(/^Creating an account first checks/);
-    expect(said[2]).toMatch(/^Asking for a code to choose a new password/);
-    expect(said[0]).toContain('Continue with Google works without scripts and has no check.');
-    expect(said[1]).toContain('Continue with Google works without scripts and has no check.');
+    const saidOn = (google: boolean) =>
+      (['sign-in', 'sign-up', 'reset'] as const).map(
+        (action) =>
+          /<noscript><p>([^<]+)<\/p><\/noscript>/.exec(draw(widget, action, google))?.[1] ?? '',
+      );
+    const withGoogle = saidOn(true);
+    const without = saidOn(false);
+    expect(withGoogle[0]).toMatch(/^Signing in with a password checks/);
+    expect(withGoogle[1]).toMatch(/^Creating an account first checks/);
+    expect(withGoogle[2]).toMatch(/^Asking for a code to choose a new password/);
+    // In words a parent on a phone understands (step 2.163's fix round), not "scripts".
+    for (const said of [...withGoogle, ...without]) {
+      expect(said).toContain('Your browser is blocking part of this page');
+      expect(said).not.toContain('scripts');
+    }
+    // A screen that draws Google's button says it works without; one that does not (Google
+    // not set up, the test copy) never sends the person to a button that is not there (M27).
+    expect(withGoogle[0]).toContain('Or use Continue with Google, which works without it.');
+    expect(withGoogle[1]).toContain('Or use Continue with Google, which works without it.');
+    for (const said of without) expect(said).not.toContain('Google');
     // The forgotten-password screen has no Google button, so it does not speak of one.
-    expect(said[2]).not.toContain('Google');
+    expect(withGoogle[2]).not.toContain('Google');
+  });
+});
+
+describe('the words that offer "Continue with Google" (M27)', () => {
+  it('are chosen only where the screen draws the button', () => {
+    for (const name of ['botCheckDidNotLoad', 'botCheckFailed'] as const) {
+      expect(t(problemWords(name, true))).toContain('Continue with Google');
+      expect(t(problemWords(name, false))).not.toContain('Google');
+      expect(t(problemWords(name, false))).toContain('try again in a few minutes');
+    }
+    expect(needsScriptsWords('sign-in', false)).toBe('signIn.botCheckNeedsScripts.signInNoGoogle');
+    expect(needsScriptsWords('sign-up', false)).toBe('signIn.botCheckNeedsScripts.signUpNoGoogle');
+    expect(needsScriptsWords('reset', true)).toBe('signIn.botCheckNeedsScripts.reset');
+  });
+
+  it('leave every other problem as it is, and none speaks of Google without the button', () => {
+    for (const name of Object.keys(problems) as (keyof typeof problems)[]) {
+      if (name !== 'botCheckDidNotLoad' && name !== 'botCheckFailed') {
+        expect(problemWords(name, false)).toBe(problems[name]);
+      }
+      expect(problemWords(name, true)).toBe(problems[name]);
+      // "Sign in with Google again" (an account with no password) and the test copy's
+      // "does not sign in with Google" are about Google, not a way to tap it.
+      if (name !== 'noPassword' && name !== 'googleOff' && name !== 'googleFailed') {
+        expect(t(problemWords(name, false))).not.toContain('Continue with Google');
+      }
+    }
   });
 });
