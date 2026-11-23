@@ -4,6 +4,18 @@
 
 The online scoring pilot (`apps/varsity-hosted`, the owner-private site the Al-Hadi games are scored on) runs on older libraries with known holes. Step 2.220 moved them on its lane branch and read every advisory against the pilot's code ([record 079](../architecture/decisions/079-next-js-off-a-release-with-a-known-hole.md), last section). **Nothing has been published.** This page is the release, so that the session with the founder is short.
 
+## For the founder: what you do, in order
+
+The lead does the technical part. Your part is five things, all with your own hands:
+
+1. **Pick the time.** A day with no game in the next 24 hours, when no one is scoring. Tell the lead "release the pilot's new libraries" and the time.
+2. **Start the session yourself**, in the Claude app where you publish the pilot today (the one with access to Sites, the host the pilot lives on). The lead cannot release from an unattended run, only from a session you started.
+3. **Say yes when the lead asks to publish.** Before asking, the lead will have checked the new version on its own computer (part 1 below) and told you it passed. If the lead says a check failed, nothing has changed online and you do nothing more.
+4. **Check it on your phone**, signed in as usual: the scorer opens and says "Saved to shared database"; last season's games and totals look the same as before; start a practice game, add one basket, and see it in another browser. Tell the lead what you saw.
+5. **If anything looks wrong, say "go back".** The lead puts the old version back in a few minutes (part 3). Your saved games are not touched either way, so nothing is lost by going back.
+
+It costs nothing and takes about half an hour. The address and who can open the site stay the same.
+
 ## Who and when
 
 - **Only the technical lead releases it, in a session the founder started** (CLAUDE.md). Never an unattended run or a builder.
