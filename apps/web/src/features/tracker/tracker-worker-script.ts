@@ -37,6 +37,7 @@ import {
   trackerAccountMetaName,
   trackerKeptPrefix,
   trackerNetworkWaitMs,
+  trackerWorkerForgetMessage,
   trackerWorkerKeepMessage,
   trackerWorkerUpdateMessage,
 } from './tracker-worker-rules.ts';
@@ -102,9 +103,25 @@ async function letGoOfEarlier() {
   );
 }
 
-async function keep(key, answer) {
-  const box = await caches.open(current);
-  await box.put(key, answer);
+// Signing out (T-115): once told, the worker keeps nothing more. Copies are written one
+// after another, so the forgetting waits for the one under way and none lands after it.
+let forgotten = false;
+let writing = Promise.resolve();
+function keep(key, answer) {
+  const write = writing.then(async () => {
+    if (forgotten) return;
+    const box = await caches.open(current);
+    await box.put(key, answer);
+  });
+  writing = write.catch(() => undefined);
+  return write;
+}
+
+async function forgetEverything() {
+  forgotten = true;
+  await writing;
+  const all = await caches.keys();
+  await Promise.all(all.filter((name) => name.startsWith(names.kept)).map((name) => caches.delete(name)));
 }
 
 function keptIn(key) {
@@ -235,6 +252,15 @@ self.addEventListener('message', (event) => {
     event.waitUntil(keepThisPage(event.data));
     return;
   }
+  if (event.data && event.data.type === names.forgetMessage) {
+    const port = event.ports && event.ports[0];
+    event.waitUntil(
+      forgetEverything()
+        .catch(() => undefined)
+        .then(() => port && port.postMessage(names.forgetMessage)),
+    );
+    return;
+  }
   if (!event.data || event.data.type !== names.updateMessage) return;
   event.waitUntil(
     gamesOpen().then((open) => (mayReplaceStored(open) ? self.skipWaiting() : undefined)),
@@ -259,6 +285,7 @@ export function trackerWorkerScript(): string {
     queue: queueStoreName,
     updateMessage: trackerWorkerUpdateMessage,
     keepMessage: trackerWorkerKeepMessage,
+    forgetMessage: trackerWorkerForgetMessage,
     accountMeta: trackerAccountMetaName,
     networkWaitMs: trackerNetworkWaitMs,
   };

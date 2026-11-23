@@ -65,7 +65,6 @@ const note = (label, ok, detail = '') => {
   if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ''}`);
 };
 const step = async (name, run) => {
-  console.log(Date.now() % 1000000, 'DBG STEP', name);
   try {
     await run();
   } catch (error) {
@@ -182,9 +181,6 @@ async function oneGame(browser) {
     page.on('dialog', (dialog) => void dialog.accept());
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    page.on('console', (m) => { if (m.text().startsWith('DBG')) console.log(Date.now() % 1000000, m.text()); });
-    page.on('request', (r) => { if (r.url().includes('/session')) console.log(Date.now() % 1000000, 'DBG REQ', r.postData()); });
-    const mark = (s) => console.log(Date.now() % 1000000, 'DBG STEP', s);
     // The one address typed: the tracker, as a scorekeeper opens it from a link.
     await page.goto(`${origin}${trackerPath()}`);
     const c = court(page);
@@ -269,14 +265,22 @@ async function oneGame(browser) {
         await c.open();
         await play('home', 7, 'p2');
         await play('away', 5, 'p3');
+        // Another device gets the game, as the server says it may: if the reloading page's
+        // release reached it (Chromium can send a leaving page's keepalive request though
+        // the page is offline), the owner's tablet holds it by opening it, else takes over.
         const asked = await session(origin, { type: 'open', deviceId: 'owner-tablet' });
-        if (asked.status !== 'held-by-other') throw new Error(JSON.stringify(asked));
-        const taken = await session(origin, {
-          type: 'take-over',
-          deviceId: 'owner-tablet',
-          confirmed: true,
-          expectedHolderSince: asked.holder.since,
-        });
+        if (asked.status !== 'held-by-other' && asked.status !== 'held-by-you') {
+          throw new Error(JSON.stringify(asked));
+        }
+        const taken =
+          asked.status === 'held-by-you'
+            ? asked
+            : await session(origin, {
+                type: 'take-over',
+                deviceId: 'owner-tablet',
+                confirmed: true,
+                expectedHolderSince: asked.holder.since,
+              });
         await context.setOffline(false);
         const rows = page.locator('[data-kept-list] [data-kept-play]');
         await rows.nth(1).waitFor({ timeout: 90_000 });

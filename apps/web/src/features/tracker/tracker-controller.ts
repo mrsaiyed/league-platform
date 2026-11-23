@@ -721,6 +721,21 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * game is settled as on any opening (`hold`, then the server's state; T-253).
    */
   let fromDevice = false;
+  /**
+   * The kept session scored under until opening is answered. A send or renewal under it
+   * that the server refuses (it ended while the device was away) decides nothing: the
+   * device's taps are settled by opening (`hold`), which knows whether the server gave
+   * this device a new session or somebody else holds the game. Treated as a loss, the
+   * taps were listed not saved though nobody took the game (step 2.38, part 6).
+   */
+  let keptSession: string | null = null;
+  /** Openings under way (asked, or answered and being settled). */
+  let opening = 0;
+  const settleByOpening = async (): Promise<void> => {
+    if (opening > 0 || stopped) return;
+    clearTimer();
+    return open();
+  };
   const startFromDevice = async (): Promise<void> => {
     const kept = options.kept;
     if (fromDevice || stopped || base !== null || kept === undefined) return;
@@ -741,11 +756,15 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     }
     if (stopped || base !== null || current.mode.kind !== 'opening') return;
     const onTop = new Set(scoring.onTop.map((c) => c.commandId));
+    // A kept tap the kept state has already (its load was kept, the scoring not yet) is
+    // not counted twice.
+    const inState = new Set(state.state.recent.map((id) => id.toLowerCase()));
     made = [...scoring.onTop, ...waiting.filter((c) => !onTop.has(c.commandId))].filter(
-      (c) => !refusedIds.has(c.commandId),
+      (c) => !refusedIds.has(c.commandId) && !inState.has(c.commandId.toLowerCase()),
     );
     base = state;
     sessionId = scoring.sessionId;
+    keptSession = scoring.sessionId;
     showGame();
     update({ mode: { kind: 'scoring' } });
   };
@@ -987,6 +1006,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       return;
     }
     sessionId = held;
+    keptSession = null;
     resumedAfterNotHeld = 0;
     scheduleRenew();
     const loading = async (): Promise<void> => {
@@ -1038,25 +1058,6 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         c.commandId.toLowerCase(),
       ),
     );
-    {
-      const b = new Set(from.state.recent.map((id) => id.toLowerCase()));
-      const s = loaded.value.state.recent.map((id) => id.toLowerCase()).filter((id) => !b.has(id));
-      console.log(
-        'DBG carryOn',
-        JSON.stringify({
-          base: base !== null,
-          fromSeq: from.sequence,
-          fromRecent: from.state.recent.length,
-          nowSeq: loaded.value.sequence,
-          nowRecent: loaded.value.state.recent.length,
-          since: s.length,
-          notOwn: s.filter((id) => !own.has(id)).map((id) => id.slice(0, 8)),
-          made: made.length,
-          onTop: options.kept?.scoring?.onTop.length,
-          stale: stale.length,
-        }),
-      );
-    }
     if (!nobodyElseScored(from, loaded.value, own)) return 'taken';
     await queue.carryOn(
       stale.map((t) => t.command.commandId),
@@ -1125,6 +1126,15 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** Opens the game: asks for the session, and scores if it is given. */
   const open = async (): Promise<void> => {
+    opening += 1;
+    try {
+      await openOnce();
+    } finally {
+      opening -= 1;
+    }
+  };
+
+  const openOnce = async (): Promise<void> => {
     // Scoring from what the device kept (step 2.38) carries on while opening is asked again.
     if (!(fromDevice && current.mode.kind === 'scoring')) update({ mode: { kind: 'opening' } });
     const opened = await session({ type: 'open', deviceId });
@@ -1135,7 +1145,6 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     failures = 0;
     if (opened.kind === 'rejected') return readOnly(reasonOfStatus(opened.httpStatus));
     const reply = opened.value;
-    console.log('DBG open', reply.status, String(sessionId), reply.status === 'held-by-you' ? reply.sessionId : '');
     if (reply.status !== 'held-by-you') return notHeld(reply);
     return hold(reply.sessionId);
   };
@@ -1148,7 +1157,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // Signed out: keep scoring, and keep renewing, which finds the sign-in again (M4).
     if (renewed.kind === 'rejected' && renewed.httpStatus === 401) signedOutWhileScoring();
     if (renewed.kind === 'answer') {
-      if (renewed.value.status !== 'held-by-you') return notHeld(renewed.value);
+      if (renewed.value.status !== 'held-by-you') {
+        return held === keptSession ? settleByOpening() : notHeld(renewed.value);
+      }
       signedInAgain();
     }
     scheduleRenew();
@@ -1162,6 +1173,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     if (reason !== 'check-session') return readOnly(reason);
     const held = sessionId;
     if (held === null) return;
+    // Scoring under the session kept on the device, opening not answered yet: its end
+    // is no loss yet, as the server may give this device a new one (step 2.38).
+    if (held === keptSession) return settleByOpening();
     const renewed = await session({ type: 'renew', sessionId: held });
     if (sessionId !== held) return;
     if (renewed.kind === 'rejected' && renewed.httpStatus === 401) {
@@ -1582,6 +1596,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       }
       made.push(command);
       update({ game: next });
+      // Kept with every tap, not only on a load: a page reloaded with no signal before
+      // the next load reopens on the kept state with this tap on top (step 2.38).
+      keepScoringNow();
       return { ok: true, commandId: command.commandId };
     });
 

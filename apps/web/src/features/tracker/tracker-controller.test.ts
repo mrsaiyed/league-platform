@@ -340,6 +340,73 @@ describe('tracker controller: offline and reconnecting (T6 §4)', () => {
     expect(status.mode).toEqual({ kind: 'scoring' });
     expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 3 });
   });
+
+  /**
+   * Step 2.38, part 6: a tap saved, then the page reloaded with no signal before the next
+   * load; the leaving page's release reached the server. Reopened from what the device
+   * kept, two taps more, and the network back.
+   */
+  async function reloadedRightAfterATap(
+    stateKept: 'before-the-tap' | 'with-it' = 'before-the-tap',
+  ) {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    let keptScoring: DeviceScoring | null = null;
+    const first = device(network, {
+      storage,
+      keepScoring: (scoring) => {
+        keptScoring = scoring;
+        return Promise.resolve();
+      },
+    });
+    await first.controller.start();
+    await tapAll(first.controller, tipOff);
+    await first.controller.idle();
+    // What the device kept of the server's state: its last load, before the tap.
+    let keptState: ServerState = await serverGame(network);
+    await tapAll(first.controller, [basket('home', hawks[0] ?? '')]);
+    // The reload comes before the load that follows the tap's saving is kept: the
+    // scoring kept is the one as of the tap (the state too, or the load's, with it).
+    const kept = keptScoring as DeviceScoring | null;
+    await first.controller.idle();
+    expect(first.controller.status().queue.waiting).toBe(0);
+    if (stateKept === 'with-it') keptState = await serverGame(network);
+    await first.controller.leave();
+    expect(network.reached).toContain('POST session:release');
+    if (kept === null) throw new Error('nothing kept');
+    network.mode = 'down';
+    const second = device(network, { storage, kept: { state: keptState, scoring: kept } });
+    await second.controller.start();
+    return { network, second };
+  }
+
+  it('keeps each tap on the device at once: reopened with no signal, the score has it', async () => {
+    const { second } = await reloadedRightAfterATap();
+    expect(second.controller.status().mode).toEqual({ kind: 'scoring' });
+    // Without it: 0-0, the kept state being older than the tap (fault c).
+    expect(scoreOf(second.controller.status().game)).toEqual({ home: 2, away: 0 });
+    // A kept state that has the tap already counts it once.
+    const withIt = await reloadedRightAfterATap('with-it');
+    expect(scoreOf(withIt.second.controller.status().game)).toEqual({ home: 2, away: 0 });
+  });
+
+  it('sends the taps made since under the new session, though a send under the ended one was refused first', async () => {
+    const { network, second } = await reloadedRightAfterATap();
+    await tapAll(second.controller, [
+      basket('home', hawks[1] ?? ''),
+      basket('away', bears[0] ?? '', 3),
+    ]);
+    network.mode = 'up';
+    // The queue sends under the kept session, which the release ended: refused. Opening
+    // gives this device a new session; nobody else scored, so the taps carry on (fault a).
+    second.controller.online();
+    await second.controller.idle();
+    const status = second.controller.status();
+    expect(status.notSaved).toEqual([]);
+    expect(status.queue.waiting).toBe(0);
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 4, away: 3 });
+  });
 });
 
 describe('tracker controller: a refused tap (T-113)', () => {

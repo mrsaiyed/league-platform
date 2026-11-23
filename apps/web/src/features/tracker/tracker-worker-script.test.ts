@@ -7,6 +7,8 @@ import {
   mayServeKeptPage,
   pageAnswerPlan,
   signedInFrom,
+  trackerWorkerForgetMessage,
+  trackerWorkerKeepMessage,
 } from './tracker-worker-rules.ts';
 import { trackerWorkerScript } from './tracker-worker-script.ts';
 
@@ -71,6 +73,59 @@ describe("the tracker worker's script (step 2.38)", () => {
     expect(script).toContain(
       'if (kept && !mayServeKeptPage(await accountOf(kept), signedIn)) kept = undefined;',
     );
+  });
+
+  it('signing out: a copy still being written never lands after the forgetting (T-115)', async () => {
+    // The order the browser test found: the reloaded page asks the worker to keep it, the
+    // page's fetch is under way, signing out deletes the caches, then the copy landed.
+    const boxes = new Map<string, Map<string, unknown>>();
+    const box = (name: string) => {
+      const found = boxes.get(name) ?? new Map<string, unknown>();
+      boxes.set(name, found);
+      return {
+        put: (key: string, value: unknown) => {
+          found.set(String(key), value);
+          return Promise.resolve();
+        },
+        match: (key: string) => Promise.resolve(found.get(String(key))),
+        keys: () => Promise.resolve([...found.keys()].map((url) => ({ url }))),
+        delete: (key: { url: string }) => Promise.resolve(found.delete(key.url)),
+      };
+    };
+    const caches = {
+      open: (name: string) => Promise.resolve(box(name)),
+      keys: () => Promise.resolve([...boxes.keys()]),
+      delete: (name: string) => Promise.resolve(boxes.delete(name)),
+    };
+    let answerPage: (answer: unknown) => void = () => undefined;
+    const fetch = () => new Promise((done) => (answerPage = done));
+    const handlers = new Map<string, (event: unknown) => void>();
+    const self = {
+      registration: { scope: 'https://site.test/north/score/' },
+      location: { href: 'https://site.test/north/score/tracker-worker.js?code=abc' },
+      addEventListener: (type: string, handler: (event: unknown) => void) =>
+        handlers.set(type, handler),
+    };
+    new Function('self', 'caches', 'fetch', trackerWorkerScript())(self, caches, fetch);
+    const pending: Promise<unknown>[] = [];
+    const message = (data: unknown, ports: unknown[] = []) =>
+      handlers.get('message')?.({
+        data,
+        ports,
+        waitUntil: (p: Promise<unknown>) => pending.push(p),
+      });
+    message({
+      type: trackerWorkerKeepMessage,
+      page: 'https://site.test/north/score/g-1',
+      code: [],
+    });
+    await new Promise((done) => setTimeout(done, 0));
+    let answered = false;
+    message({ type: trackerWorkerForgetMessage }, [{ postMessage: () => (answered = true) }]);
+    answerPage({ status: 200, type: 'basic', redirected: false, ok: true });
+    await Promise.all(pending);
+    expect(answered).toBe(true);
+    expect([...boxes.keys()]).toEqual([]);
   });
 
   it('reads the opened games store and never creates it', () => {

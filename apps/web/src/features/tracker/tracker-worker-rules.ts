@@ -222,6 +222,14 @@ export const trackerWorkerKeepMessage = 'srleagues-tracker-keep';
 /** What the page sends a waiting worker: take over now if no game is open. */
 export const trackerWorkerUpdateMessage = 'srleagues-tracker-update';
 
+/**
+ * What signing out sends each worker before it deletes the caches (T-115): keep nothing
+ * more, and delete every kept copy once a copy being written has landed, then answer on
+ * the message's port. Without it a copy still being written (the files of the page just
+ * reloaded) landed after the clearing, and a page stayed for the next person.
+ */
+export const trackerWorkerForgetMessage = 'srleagues-tracker-forget';
+
 /** The worker's reach: the folder of its own address (`/{league}/score/`). */
 export function trackerScopeOf(workerHref: string): string {
   return workerHref.slice(0, workerHref.lastIndexOf('/') + 1);

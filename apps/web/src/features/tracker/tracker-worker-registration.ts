@@ -4,9 +4,31 @@ import {
   codeMarkOf,
   trackerKeptPrefix,
   trackerScopeOf,
+  trackerWorkerForgetMessage,
   trackerWorkerKeepMessage,
   trackerWorkerUpdateMessage,
 } from './tracker-worker-rules.ts';
+
+/** The longest a worker is given to answer that it forgot (one of an earlier release never does). */
+const forgetAnswerMs = 1000;
+
+/** Tells `worker` to keep nothing more and delete what it kept; settles on its answer. */
+function workerForgets(worker: ServiceWorker): Promise<void> {
+  return new Promise<void>((done) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(done, forgetAnswerMs);
+    channel.port1.onmessage = () => {
+      clearTimeout(timer);
+      done();
+    };
+    try {
+      worker.postMessage({ type: trackerWorkerForgetMessage }, [channel.port2]);
+    } catch {
+      clearTimeout(timer);
+      done();
+    }
+  });
+}
 
 /**
  * Registers the league's tracker worker (`workerHref`, built by the one address helper)
@@ -45,6 +67,15 @@ export async function registerTrackerWorker(workerHref: string): Promise<void> {
  */
 export async function forgetTrackerPagesOnDevice(): Promise<void> {
   try {
+    // First each worker keeps nothing more and lets its copy being written land (T-115).
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(
+        registrations
+          .flatMap((r) => [r.active, r.waiting, r.installing])
+          .map((worker) => (worker === null ? Promise.resolve() : workerForgets(worker))),
+      );
+    }
     if (typeof caches !== 'undefined') {
       const names = await caches.keys();
       await Promise.all(
