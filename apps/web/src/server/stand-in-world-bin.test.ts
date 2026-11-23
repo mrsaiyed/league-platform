@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { standInSeedCast } from './stand-in-cast.ts';
 import { worldBinStore } from './stand-in-world-bin.ts';
+import { binTeamOfFirstLeague } from './stand-in-world-binned-team.ts';
+import { madeUpLeagues } from './stand-in-world-seed.ts';
 import { emptyLeagueWorld, type WorldPerson } from './stand-in-world-state.ts';
 
 const ada: WorldPerson = {
@@ -40,6 +43,60 @@ describe('the made-up world’s bin, for a person', () => {
   });
 
   it('says what it does not do yet, rather than doing it wrong', async () => {
-    await expect(worldBinStore(worldWithAda()).list()).rejects.toThrow('Not on the stand-in yet');
+    await expect(worldBinStore(worldWithAda()).purge(new Date())).rejects.toThrow(
+      'Not on the stand-in yet',
+    );
+  });
+
+  it('lists a person in the bin by name', async () => {
+    const listed = await worldBinStore(worldWithAda()).list();
+    expect(listed.map((i) => [i.kind, i.id, i.name])).toEqual([['person', ada.id, 'Ada Lovell']]);
+  });
+});
+
+describe('the made-up world’s bin, for a team and a game (step 2.77)', () => {
+  const firstLeague = () => {
+    const leagues = madeUpLeagues(standInSeedCast, new Date('2026-11-16T18:00:00Z'));
+    binTeamOfFirstLeague(leagues, 'badgers');
+    const s = leagues[0];
+    if (s === undefined) throw new Error('no league');
+    return s;
+  };
+
+  it('lists a team with its games played and to come, and brings it back', async () => {
+    const s = firstLeague();
+    const bin = worldBinStore(s);
+    const team = (await bin.list()).find((i) => i.kind === 'team');
+    expect(team?.name).toBe('Badgers');
+    expect((team?.details?.gamesPlayed ?? 0) + (team?.details?.gamesToCome ?? 0)).toBeGreaterThan(
+      0,
+    );
+    expect(await bin.restoreTeam(team?.id ?? '')).toBe(true);
+    expect(await bin.list()).toEqual([]);
+  });
+
+  it('refuses a team whose name another team of the season took meanwhile', async () => {
+    const s = firstLeague();
+    const binned = s.teams.find((t) => t.binned);
+    const other = s.teams.find((t) => !t.binned && t.seasonId === binned?.seasonId);
+    if (binned === undefined || other === undefined) throw new Error('no teams');
+    s.teams = s.teams.map((t) => (t === other ? { ...t, name: 'BADGERS' } : t));
+    expect(await worldBinStore(s).restoreTeam(binned.id)).toBe('name-taken');
+  });
+
+  it('keeps a game in the bin while one of its teams is there', async () => {
+    const s = firstLeague();
+    const binned = s.teams.find((t) => t.binned);
+    const at = s.games.findIndex(
+      (g) =>
+        g.status === 'scheduled' && (g.homeTeamId === binned?.id || g.awayTeamId === binned?.id),
+    );
+    const game = s.games[at];
+    if (game === undefined) throw new Error('no game');
+    s.games = s.games.map((g, i) => (i === at ? { ...g, binned: true, roundId: null } : g));
+    const bin = worldBinStore(s);
+    expect(await bin.findGame(game.id)).toMatchObject({ binned: true, partInBin: true });
+    const listed = (await bin.list()).find((i) => i.id === game.id);
+    expect(listed?.details?.withoutRound).toBe(true);
   });
 });

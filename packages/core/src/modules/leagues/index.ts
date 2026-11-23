@@ -203,6 +203,7 @@ export {
   binKinds,
   removedForGoodAt,
   type BinCounts,
+  type BinDetails,
   type BinKind,
   type BinListing,
   type BinnedItem,

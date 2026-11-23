@@ -143,6 +143,52 @@ describe('the bin: restoring', () => {
     expect(value(await listBin(l.as, {}, deps)).items.map((i) => i.id)).toEqual([teamId]);
   });
 
+  it('refuses a team whose name another team of the season took meanwhile (S-83)', async () => {
+    const l = await league();
+    const { teamId } = value(await createTeam(l.as, { ...hawks, seasonId: l.seasonId }, deps));
+    value(await removeTeam(l.as, { teamId }, deps));
+    value(await createTeam(l.as, { ...hawks, shortName: 'hawks-2', seasonId: l.seasonId }, deps));
+    expect(await restoreTeam(l.as, { teamId }, deps)).toEqual({
+      ok: false,
+      error: { code: 'team-name-taken' },
+    });
+    expect(value(await listBin(l.as, {}, deps)).items.map((i) => i.id)).toEqual([teamId]);
+  });
+
+  it("tells a team's games played and to come, and who on its roster is in the bin too", async () => {
+    const l = await league();
+    const a = value(await createTeam(l.as, { ...hawks, seasonId: l.seasonId }, deps)).teamId;
+    const b = value(
+      await createTeam(
+        l.as,
+        { ...hawks, name: 'Owls', shortName: 'owls', seasonId: l.seasonId },
+        deps,
+      ),
+    ).teamId;
+    const { personId } = value(
+      await createPerson(l.as, { firstName: 'Sam', lastName: 'Player' }, deps),
+    );
+    value(await addToRoster(l.as, { teamId: a, personId, jerseyNumber: '7' }, deps));
+    const stage = await one<{ id: string }>(
+      pglite,
+      `insert into stages (league_id, season_id, type, name) values ($1, $2, 'regular', 'Regular') returning id`,
+      [l.leagueId, l.seasonId],
+    );
+    await pglite.query(
+      `insert into games (league_id, season_id, stage_id, home_team_id, away_team_id, status,
+         capture_mode, home_score, away_score, finalized_at, format)
+       values ($1, $2, $3, $4, $5, 'final', 'final', 5, 4, now(), '{"version": 1, "periods": 2}'),
+              ($1, $2, $3, $5, $4, 'scheduled', 'final', null, null, null, null),
+              ($1, $2, $3, $4, $5, 'scheduled', 'final', null, null, null, null)`,
+      [l.leagueId, l.seasonId, stage.id, a, b],
+    );
+    // As a team could reach the bin before A-17, and its player off the list after (A-16).
+    await age('teams', a, 1);
+    await age('people', personId, 0);
+    const team = value(await listBin(l.as, {}, deps)).items.find((i) => i.id === a);
+    expect(team?.details).toEqual({ gamesPlayed: 1, gamesToCome: 2, rosterInBin: [personId] });
+  });
+
   it('brings back a person, and a game nobody played, but never a played one', async () => {
     const l = await league();
     const { personId } = value(
@@ -180,6 +226,11 @@ describe('the bin: restoring', () => {
     expect(
       value(await listBin(l.as, {}, deps)).items.map((i) => [i.id, i.removedForGoodAt]),
     ).toEqual([[planned.id, null]]);
+    // With no round and no date, the bin says it comes back with no round (S-60).
+    expect(value(await listBin(l.as, {}, deps)).items[0]?.details).toEqual({
+      startsAt: null,
+      withoutRound: true,
+    });
     value(await restoreGame(l.as, { gameId: planned.id }, deps));
     expect(await restoreGame(l.as, { gameId: played.id }, deps)).toMatchObject({
       error: { code: 'game-not-restorable' },
