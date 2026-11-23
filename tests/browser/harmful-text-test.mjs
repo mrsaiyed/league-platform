@@ -1207,7 +1207,55 @@ async function walkEveryRoute() {
   });
 }
 
+/**
+ * The Publishing part of League settings (step 2.240) draws its form only on a draft whose
+ * must-fix items are met, so the walk above, on the live first league, never meets it. Here
+ * the draft league (quiet-pines) is put right the owner's way (Names on public pages saved, in
+ * a browser), its asking state `?publish=ask` and a question of the attack are read, and every
+ * field of the publish form is posted the attack by hand. The league stays a draft.
+ */
+async function walkThePublishPart() {
+  const settings = '/quiet-pines/admin/settings';
+  await step("the draft league's Publishing part is asked and posted the attack", async () => {
+    const context = await contextFor(owner);
+    const page = await context.newPage();
+    await page.goto(origin + settings);
+    if ((await page.locator('li[data-check="privacyChosen"][data-met="no"]').count()) > 0) {
+      const save = page.locator('section[data-setting="privacy.publicNames"] button[type=submit]');
+      await Promise.all([page.waitForURL(/done=|problem=/), save.first().click()]);
+    }
+    await context.close();
+    const asked = `${settings}?publish=ask`;
+    for (const address of [asked, `${settings}?publish=${encodeURIComponent(typed.query)}`]) {
+      const answer = await fetch(origin + address, { headers: asWho(owner) });
+      const raw = unescapedIn(await answer.text());
+      note(
+        `the owner at ${address}: not a server failure`,
+        answer.status < 500,
+        `${answer.status}`,
+      );
+      note(`the owner at ${address}: no attack unescaped`, raw.length === 0, raw.join(', '));
+    }
+    const html = await (await fetch(origin + asked, { headers: asWho(owner) })).text();
+    const forms = formsIn(html).filter((form) => form.fields.some((f) => f.name === 'version'));
+    const publish = forms.filter((form) => form.body.includes('Publish this league?'));
+    note('the asking state draws the publish form', publish.length === 1, `${publish.length}`);
+    for (const form of publish) {
+      for (const field of form.fields) {
+        if (field.name === null || KINDS[field.kind] === 'not a field') continue;
+        const label = `the publish form's ${plainName(field.name)} posted the attack by hand`;
+        const back = await postedByHand(owner, asked, form, field);
+        note(`${label}: not a server failure`, back.status < 500, String(back.status));
+        note(`${label}: no attack unescaped`, back.problems.length === 0, back.problems.join(', '));
+      }
+    }
+    const visitor = await fetch(`${origin}/quiet-pines`);
+    note('the attack published nothing: a visitor is still told not found', visitor.status === 404);
+  });
+}
+
 if (browser) await walkEveryRoute();
+if (browser) await walkThePublishPart();
 
 await browser?.close();
 server?.child.kill();

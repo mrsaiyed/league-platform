@@ -156,8 +156,9 @@ but it is slower. More detail is in [run it locally](run-it-locally.md).
 
 Open a private window (or another browser) where you are not signed in, and open
 `…/still-waters`. You see the league's home page, not "Page not found" and not a sign-in
-page. In the finished product a new league stays hidden until its owner publishes it; that
-screen is not built yet, so this practice league starts already public.
+page. A new league stays hidden ("Page not found") until its owner publishes it, in League
+settings, in the Publishing part at the top; this practice league starts already published,
+so there is nothing to publish here.
 
 16. **The game's page.** In the private window, on `…/still-waters`, tap the first game,
     now final. It says "Wolves at Ravens", "Played" with the day and your first game's

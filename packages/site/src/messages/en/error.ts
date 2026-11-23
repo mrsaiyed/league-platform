@@ -136,6 +136,11 @@ export const enError = {
   'error.leagues.set_setting.invalid-value':
     'That value is not allowed for this setting. Check what it accepts and try again.',
   'error.leagues.set_setting.unknown-setting': 'That setting does not exist.',
+  // Publishing waits for P3's "Must fix" list (step 2.240): each item says where it is put right.
+  'error.leagues.set_status.no-contact-email':
+    'The league has no contact email yet, so it cannot be published. Ask the people who run SR Leagues, who made the league, to add it.',
+  'error.leagues.set_status.privacy-not-chosen':
+    'Choose how young players\' names show first: save "Names on public pages" under Privacy, then publish.',
   'error.leagues.update_season.season-not-found': 'That season is not there.',
   'error.not-allowed': 'You are not allowed to do that.',
   'error.not-confirmed': 'Tick the box to confirm first. Nothing was changed.',

@@ -11,6 +11,7 @@ import {
 } from '@srleagues/core';
 import {
   findLeagueAudience,
+  findLeagueContactEmail,
   findPerson,
   findPersonIsMinor,
   hasRecordedChild,
@@ -73,6 +74,12 @@ registerIsolationCase({
   subject: findLeagueAudience,
   name: "read who plays in the scope's league",
   run: (scope) => findLeagueAudience(scope),
+});
+
+registerIsolationCase({
+  subject: findLeagueContactEmail,
+  name: "read how people reach the scope's league",
+  run: (scope) => findLeagueContactEmail(scope),
 });
 
 registerIsolationCase({

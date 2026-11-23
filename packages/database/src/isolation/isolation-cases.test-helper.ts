@@ -23,6 +23,7 @@ import {
   revokeGrant,
   setCurrentSeason as setCurrentSeasonCommand,
   setLeagueName,
+  publicNames,
   setLeagueStatus,
   setSetting,
   setSettingFor,
@@ -147,7 +148,28 @@ registerCommandCase(renameShortName, harnessTx, {
   input: () => ({ slug: 'harness-renamed', version: 1 }),
 });
 
-registerCommandCase(setLeagueStatus, harnessTx, {
+// Publishing waits for the league's privacy choice (step 2.240), and the harness's league
+// records a child: this case reads that choice as made, so it judges where publishing
+// writes. What the checks read is in the harness itself (findLeagueContactEmail and the
+// rest).
+const namesChosenTx: typeof harnessTx = (scope, jobs) => {
+  const tx = harnessTx(scope, jobs);
+  const chosen = {
+    level: 'league' as const,
+    document: { version: 1, value: 'fullName' },
+    version: 1,
+  };
+  return {
+    ...tx,
+    leagues: {
+      ...tx.leagues,
+      settingRows: async (key, places) =>
+        key === publicNames.key ? [chosen] : tx.leagues.settingRows(key, places),
+    },
+  };
+};
+
+registerCommandCase(setLeagueStatus, namesChosenTx, {
   name: 'publish the league as its owner',
   input: () => ({ status: 'live', version: 1 }),
 });

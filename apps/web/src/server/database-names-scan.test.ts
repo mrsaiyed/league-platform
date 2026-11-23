@@ -234,15 +234,18 @@ const personIdsIn = (data: unknown, ids: readonly string[]) => {
 /** Saves a league setting as its owner, through the settings command (League settings). */
 const versions = new Map<string, number>();
 async function save(slug: string, key: string, value: unknown, confirmed?: boolean) {
-  const { leagueId, ownerAccountId } = leagueOf(slug);
+  const { leagueId, ownerAccountId, seed } = leagueOf(slug);
   const known = `${leagueId}/${key}`;
+  // A youth or mixed seed league saved "Names on public pages" once, as it starts, so it
+  // could be published (step 2.240): the first save here follows that one.
+  const seeded = key === 'privacy.publicNames' && seed.audience !== 'adult' ? 1 : null;
   const saved = await setSetting(
     { leagueId, accountId: ownerAccountId, requestId: 'scan' },
     {
       level: 'league',
       key,
       value,
-      version: versions.get(known) ?? null,
+      version: versions.get(known) ?? seeded,
       ...(confirmed === undefined ? {} : { confirmed }),
     },
     settingsDeps,

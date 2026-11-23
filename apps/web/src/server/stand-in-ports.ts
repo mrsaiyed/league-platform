@@ -56,6 +56,7 @@ import { createPlayPublisher } from './publish-plays.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
+import { standInStatusOf } from './stand-in-league-states.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import {
   castId,
@@ -170,7 +171,7 @@ function accessTx(leagueId: string): AccessTx {
     activity: { record: notInTheShell('write the activity log'), list: async () => [] },
     access: {
       ownerAccountId: async () => found?.ownerAccountId,
-      leagueStatus: async () => found?.status,
+      leagueStatus: async () => (found === undefined ? undefined : standInStatusOf(found)),
       activeGrantsOf: async (accountId) =>
         found === undefined
           ? []
@@ -432,7 +433,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     const found = leagues.find((l) => l.id === leagueId && !l.inBin);
     return found === undefined
       ? undefined
-      : { id: found.id, slug: found.slug, status: found.status };
+      : { id: found.id, slug: found.slug, status: standInStatusOf(found) };
   };
   const identify: WebPorts['identify'] = async (accessToken) => {
     const person = people.find((p) => p.token === accessToken);
@@ -508,7 +509,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       return {
         leagueId: found.id,
         slug: found.slug,
-        status: found.status,
+        status: standInStatusOf(found),
         inBin: found.inBin,
         forwarded: found.slug !== shortName,
       };

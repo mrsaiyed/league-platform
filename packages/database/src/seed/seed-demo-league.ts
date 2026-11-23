@@ -49,7 +49,9 @@ import {
   readFixtureImport,
   readFixtureSheet,
   recordImportedScores,
+  publicNames,
   setLeagueStatus,
+  setSetting,
   setSeasonRules,
   startFixtureImport,
   updateSeason,
@@ -221,6 +223,7 @@ export async function seedDemoLeagueInto(
           timeZone: league.timeZone,
           audience: league.audience,
           ownerAccountId: ownerId,
+          contactEmail: `hello@${league.slug}.example.test`,
           sportKey: 'basketball',
           firstSeason: { ...league.season },
         },
@@ -237,6 +240,20 @@ export async function seedDemoLeagueInto(
         setUp,
       ),
     );
+    // Publishing waits for a youth or mixed league's privacy choice (step 2.240): the
+    // made-up owner keeps the names setting as it starts, so nothing shown changes. This is
+    // the seed acting as the made-up owner, so that the must-fix check is met; it is not a
+    // real person's confirmation of the choice.
+    if (league.audience !== 'adult') {
+      must(
+        'privacy choice',
+        await setSetting(
+          owner,
+          { level: 'league', key: publicNames.key, value: publicNames.default, version: null },
+          setUp,
+        ),
+      );
+    }
     must(
       'league status',
       await setLeagueStatus(owner, { status: 'live', version: created.version }, setUp),

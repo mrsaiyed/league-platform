@@ -15,7 +15,8 @@
 //   in a browser with the code read by `node scripts/read-kept-emails.mjs --hosted`; then
 //   step 2.194's walk (tests/browser/first-test-walk.mjs, the same code as its browser
 //   test) to the final table, the owner signing in on the sign-in page, a second browser
-//   watching signed out (the league is a draft: it sees every page hidden);
+//   watching signed out (the league is a draft: it is told the home is not found, the
+//   owner publishes it in League settings after step 15, and it then reads steps 16 to 18);
 // - steps 8.2 and 8.3, `npm run check:test-copy` against the rehearsed site with the build's
 //   own manifest, so that the posted "be this person" line is checked too.
 //

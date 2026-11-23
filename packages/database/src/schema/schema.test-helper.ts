@@ -44,8 +44,9 @@ export async function newLeague(db: PGlite, slug = unique('league')): Promise<Ma
   return db.transaction(async (tx) => {
     const league = await one<{ id: string }>(
       tx,
-      `insert into leagues (slug, name, time_zone, audience, listed, owner_account_id)
-       values ($1, 'Made-up League', 'America/Chicago', 'adult', true, $2) returning id`,
+      `insert into leagues (slug, name, time_zone, audience, listed, owner_account_id, contact_email)
+       values ($1, 'Made-up League', 'America/Chicago', 'adult', true, $2, 'hello@example.test')
+       returning id`,
       [slug, ownerId],
     );
     const program = await one<{ id: string }>(

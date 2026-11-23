@@ -5,7 +5,7 @@
 import { catalogs } from '@srleagues/site';
 import type { TextKey } from '../../server/messages.ts';
 
-export const doneNames = ['saved', 'cleared'] as const;
+export const doneNames = ['saved', 'cleared', 'published'] as const;
 export type DoneName = (typeof doneNames)[number];
 
 export type Answer =
