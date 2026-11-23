@@ -12,7 +12,7 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 
 - 2.50 (the confirming look, 2026-11-22): on a person's record the line under "Child or adult" ends with two full stops when the name is shortened ("Public pages show: Marcus O.."); after "someone else changed this person's details", a box the person did not touch quietly takes the stored value with no mark that it changed meanwhile.
 
-- Home page at 390 wide (seen on the simulated league, `/simulated`, 2026-11-22): the small standings card cuts off the win-percentage column at the right edge ("1.00"); the page is no wider than the screen, so the width check does not see it. After a season has ended "The next matchups" shows only a postponed game and the count reads "1 games to play".
+- Home page at 390 wide (seen on the simulated league, `/simulated`, 2026-11-22): after a season has ended "The next matchups" shows only a postponed game and the count reads "1 games to play".
 
 - Seen by the first-test walk (2026-11-22): with a season's default statistics the scoring pad offers Team turnover, which shows in the play-by-play and in no total, and no screen switches a season to the full set of statistics; under each leader card the list ranks players who have 0 (step 2.199 may already cover it).
 
@@ -58,7 +58,6 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.240: the Publish question (`adminSettings.publish.ask`) does not mention Find a league: that page is not built yet and no screen changes a league's listing (`leagues.listed`, U-10). When Find a league lists leagues, add for a listed league that it will be listed there, and where to turn that off.
 
 - 2.163 (Low): a crafted link (?notice=signedOutEverywhere) shows any signed-out visitor 'You are signed out on every device'; show the everywhere and already-signed-out notices only right after the action (apps/web/src/app/(platform)/page.tsx:27, features/shell/signed-out-notice.tsx:20).
-- First-look pictures of 2026-11-23, on a phone (390 wide): the standings table clips GP and the percentage, the statistics table clips 3PM, and the admin game page's stat table runs off the edge at PTS; the first-look page has no picture of editing divisions or venues (add them to `scripts/first-look/look.mjs`).
 
 - 2.220 (Low): tests/varsity-hosted-libraries.test.mjs pins the resolved version exactly only for react-server-dom-webpack; the others are minimums (upward drift is not stopped); the pilot's lint has 7 warnings.
 
