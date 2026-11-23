@@ -13,6 +13,8 @@ The one file that says where the build is. Every run reads it first and updates 
 
 ## Handover of 2026-11-23, 11:15 UTC (delete this part when everything in it is done)
 
+THE SEVENTH LEAD (session_01GUxQEfxGx3yE5ho1kM4PqR, lineage depth 6 of 8) took over at 11:12 UTC on 2026-11-23; the meter read 32% at 11:13. It opened the three lanes of "In progress"; the shared rules every helper reads are in `.local/brief-common.md` on its machine.
+
 The sixth lead (session_01GUxQEfBSgrNYkeMQwsud84) worked from 05:36 UTC on 2026-11-23 and hands over because its conversation neared the 300 thousand line (USAGE.md, rule 13). The meter read 32% at 11:11 UTC (the day's number until 22:00 UTC on 2026-11-23 is 40%): READ IT AGAIN FIRST. The founder's window is session_01GUxQEgr89W9ggpA1toGhGY (told at 09:50 UTC: the first-look page republished, what landed). Lane folders are `.local/lanes/<name>` on a lead's own machine and are NOT handed on. THE CHAIN OF LEADS IS FINITE: `get_session` showed "lineage depth 5, limit 8" for the sixth lead, so a lead started by a lead can happen about three more times; hand over late (near 300 thousand, not before), and when `create_session` refuses for depth, ask the founder's window (it is at the top of the chain) to start the next lead with the same prompt.
 
 Landed by the sixth lead: 2.224 (whole: 215 filters, 168 caught, 47 excused and pinned, no leak), 2.56 parts 1 to 3 (the Corrected rule S-81, the standings adjustments screen, the Scorekeepers page S-82, T-305), 2.77 parts 1 and 2 (the bin and the activity log; S-83, S-84, T-306), lane polish-4 (three phone tables; by hand, a polish lane has no plan line for `land-lane.mjs`). The first-look page was republished at 09:48 UTC with 29 pictures and its "not right yet" list corrected. Next actions, in this order:
@@ -33,13 +35,14 @@ Learned, not yet rules elsewhere: (a) a lane that adds a page, a route, a field,
 
 Every lane's work is on GitHub. Three at a time, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`) | Where it stands                             | What is left                                   |
-| ---------------------- | ------------------------------------------- | ---------------------------------------------- |
-| 2.77 (the rest)        | parts 1 and 2 landed; the plan line is open | a small lane, or the polish lane               |
-| 2.56 (the rest)        | parts 1 to 3 landed; the plan line is open  | a new lane `lane/2.56-rest`                    |
-| 2.191-ci-parallel      | parked                                      | after the first test is in the founder's hands |
+| Lane (branch `lane/…`) | Where it stands                                                                                                                                      | What is left                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 2.77-rest              | builder working since 11:25 UTC on 2026-11-23 (the unreliable people-screens test first, then the scoped bin list and the bin's lines)               | push twice, review, fix round, land                                             |
+| 2.56-rest              | part 4 builder working since 11:25 UTC (Overturn a result, Award a game not played, the seed fix, the public pencil, overtime on a typed final)      | push, review, fix, land as a part; then the coin flip and the Games-list points |
+| 2.26-cache-labels      | builder working since 11:25 UTC (T-309 and record 106 given to it; 2.77-rest holds A-18, T-308, record 105; 2.56-rest holds S-85, T-307, record 104) | push, review, fix, land                                                         |
+| 2.191-ci-parallel      | parked                                                                                                                                               | after the first test is in the founder's hands                                  |
 
-Next free: STEP 2.241, migration 0024, record 104, T-307, S-85, U-18. Numbers already given out stand with their lanes (in each lane's note).
+Next free: STEP 2.241, migration 0024 (2.56-rest may take it), record 107, T-310, S-86, A-19, U-18. Numbers already given out stand with their lanes (in each lane's note).
 
 ## Needs the founder
 
