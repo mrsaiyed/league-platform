@@ -278,6 +278,37 @@ describe('schedule draft commands', () => {
     ).toContain('invalid-input');
   });
 
+  it('makes no new game for a team that has left the league, and keeps its games (S-87)', async () => {
+    const { db, deps, as } = world();
+    db.state.leftTeamIds = [teamUuid(2)];
+    const game = (gameId: string, homeTeamId: string, awayTeamId: string) =>
+      addDraftGame(as(ownerId), { ...basis(), gameId, homeTeamId, awayTeamId, ...slot }, deps);
+    expect(await game(gameUuid(9), teamUuid(1), teamUuid(2))).toMatchObject({
+      ok: false,
+      error: { code: 'team-left' },
+    });
+    expect(await game(gameUuid(9), teamUuid(2), teamUuid(3))).toMatchObject({
+      ok: false,
+      error: { code: 'team-left' },
+    });
+    expect(db.state.draft).toBeUndefined();
+    // A team still playing is offered as before; the mark taken off, so is the team.
+    expect(await game(gameUuid(9), teamUuid(1), teamUuid(3))).toMatchObject({ ok: true });
+    db.state.leftTeamIds = [];
+    const back = await addDraftGame(
+      as(ownerId),
+      {
+        ...basis(1),
+        gameId: gameUuid(10),
+        homeTeamId: teamUuid(2),
+        awayTeamId: teamUuid(4),
+        ...slot,
+      },
+      deps,
+    );
+    expect(back).toMatchObject({ ok: true });
+  });
+
   it('discards the draft, only the version that was seen', async () => {
     const { db, deps, as } = world();
     expect(

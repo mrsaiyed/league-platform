@@ -381,7 +381,8 @@ const cases = [
     200,
     // The records are worked out from the season's results (step 2.152): the Owls are 2-1.
     ['Owls', 'Falcons', '2-1', 'East', 'Seed', 'Record'],
-    ['This page is not built yet.'],
+    // No team of the made-up season has left the league (S-87), so none is marked.
+    ['This page is not built yet.', 'data-team-left='],
   ],
   // A league with no divisions says nothing about divisions on its team cards.
   ['visitor', '/harbor-city/teams', 200, ['Comets', 'Rockets', 'Meteors'], ['No division']],
@@ -849,8 +850,17 @@ const cases = [
     'owner',
     `/north-valley/admin/teams/${lionsTeam}`,
     200,
-    ['Lions', staffFrameAt('/north-valley/admin/teams'), oneHeading],
-    [adminPlaceholder],
+    [
+      'Lions',
+      staffFrameAt('/north-valley/admin/teams'),
+      oneHeading,
+      // S-87: what marking a team as having left does, its button, and its later games.
+      'If this team leaves the league',
+      'data-team-left-panel="playing"',
+      'data-team-left-button="mark"',
+      `href="/north-valley/admin/games?later=${lionsTeam}#later"`,
+    ],
+    [adminPlaceholder, 'data-team-left-button="undo"'],
   ],
   ['owner', '/north-valley/admin/teams/not-a-team', 404, [notFound]],
   ['scheduler', '/harbor-city/admin', 403, [noAccess]],

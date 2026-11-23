@@ -70,6 +70,11 @@ export function teamStatsInput(fields: Fields) {
   };
 }
 
+/** The team and the version read, for marking it as having left the league or undoing it (S-87). */
+export function teamLeftInput(fields: Fields) {
+  return { teamId: text(fields, 'team'), version: versionOf(fields) };
+}
+
 export function addToRosterInput(fields: Fields, personId: string) {
   const jerseyNumber = given(fields, 'jerseyNumber');
   return {

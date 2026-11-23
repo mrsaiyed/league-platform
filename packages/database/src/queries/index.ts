@@ -35,6 +35,7 @@ export { findScheduleDraft } from './find-schedule-draft.ts';
 export { insertScheduleDraft } from './insert-schedule-draft.ts';
 export { latestScheduleRevision } from './latest-schedule-revision.ts';
 export { listTeamsOfSeason } from './list-teams-of-season.ts';
+export { listLeftTeamsOfSeason } from './list-left-teams-of-season.ts';
 export { loadSchedule } from './load-schedule.ts';
 export { updateScheduleDraft } from './update-schedule-draft.ts';
 export { hasLiveCourts } from './has-live-courts.ts';

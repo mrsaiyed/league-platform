@@ -65,6 +65,10 @@ export const addDraftGame = defineCommand({
         const wanted = new Set([input.homeTeamId, input.awayTeamId]);
         const found = await tx.scheduling.teamsOfSeason(input.seasonId, [...wanted]);
         if (found.length !== wanted.size) return { code: 'unknown-team' };
+        // A team that has left the league plays no new game (S-87); its games already in
+        // the schedule stay, for the admin to forfeit or cancel.
+        const left = await tx.scheduling.leftTeamsOfSeason(input.seasonId, [...wanted]);
+        if (left.length > 0) return { code: 'team-left' };
         return checkSlotPlace(tx, input);
       },
     }),

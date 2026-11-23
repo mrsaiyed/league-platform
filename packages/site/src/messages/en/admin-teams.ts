@@ -40,6 +40,8 @@ export const enAdminTeams = {
     'The player is back on the roster with no number, because someone else now wears theirs. Give them a number.',
   'adminTeams.done.removed': 'Moved to the bin: the team is kept there for 30 days.',
   'adminTeams.done.statsSaved': 'Who sees the numbers was saved.',
+  'adminTeams.done.teamBack': 'The mark is off: the team is playing in the league again.',
+  'adminTeams.done.teamLeft': 'The team is marked as having left the league.',
   'adminTeams.done.updated': 'The team was saved.',
   'adminTeams.edit.submit': 'Save team details',
   'adminTeams.edit.title': 'Team details',
@@ -52,6 +54,19 @@ export const enAdminTeams = {
   'adminTeams.field.useOwnColors': "Use the league's own colors",
   // After a team's name in the list, with the space before it: " (North)".
   'adminTeams.inDivision': ' ({division})',
+  // S-87: a team that leaves the league mid-season. Its results stay, it is marked in
+  // public, and it is offered for no new game; its games to come are the admin's to settle.
+  'adminTeams.leftLeague.body':
+    'If this team leaves the league mid-season, mark it here. Its results stay, so other teams’ records still add up. It is marked “Left the league” in the standings and on Teams, and it is offered for no new game. Its games still to come stay in the schedule: forfeit or cancel each one from Games.',
+  'adminTeams.leftLeague.isLeft':
+    'This team has left the league. Its results stay, it is marked “Left the league” in the standings and on Teams, and it is offered for no new game. Its games still to come are yours to forfeit or cancel, each one, from Games.',
+  'adminTeams.leftLeague.mark': 'Mark as having left the league',
+  'adminTeams.leftLeague.title': 'If this team leaves the league',
+  'adminTeams.leftLeague.titleLeft': 'This team has left the league',
+  'adminTeams.leftLeague.toLaterGames': 'See its games still to come',
+  'adminTeams.leftLeague.undo': 'Take the mark off: it has not left',
+  'adminTeams.leftLeague.undoBody':
+    'Marked by mistake, or the team is back? Taking the mark off makes it a team of the league again, offered for new games.',
   'adminTeams.newPerson.firstName': 'First name',
   'adminTeams.newPerson.lastName': 'Last name',
   'adminTeams.newPerson.submit': 'Add the person and put them on the roster',

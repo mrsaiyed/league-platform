@@ -26,6 +26,7 @@ const problems = {
   'draft-unreadable': () => t('schedule.admin.error.draft-unreadable'),
   'draft-too-large': () => t('schedule.admin.error.draft-too-large'),
   'unknown-team': () => t('schedule.admin.error.unknown-team'),
+  'team-left': () => t('schedule.admin.error.team-left'),
   'unknown-venue': () => t('schedule.admin.error.unknown-venue'),
   'unknown-court': () => t('schedule.admin.error.unknown-court'),
   'draft-not-found': () => t('schedule.admin.error.draft-not-found'),

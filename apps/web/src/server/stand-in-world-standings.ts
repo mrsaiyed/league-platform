@@ -202,6 +202,7 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
           divisionId: t.divisionId,
           statsVisibility: t.statsVisibility,
           removed: t.binned,
+          left: t.left,
         }));
     },
     divisions: async (seasonId) =>

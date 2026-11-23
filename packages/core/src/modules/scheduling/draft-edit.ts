@@ -46,6 +46,8 @@ export type DraftEditError =
         | 'draft-unreadable'
         | 'draft-too-large'
         | 'unknown-team'
+        /** A team of the new game has left the league (S-87): no new game is made for it. */
+        | 'team-left'
         | 'unknown-venue'
         | 'unknown-court'
         /**

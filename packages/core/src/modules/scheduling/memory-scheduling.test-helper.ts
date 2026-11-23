@@ -40,6 +40,8 @@ export type MemoryScheduling = {
   schedule: ScheduleState;
   /** The teams of the season. */
   teamIds: string[];
+  /** The teams of the season that have left the league (S-87). */
+  leftTeamIds: string[];
   /** Games that exist besides the published schedule's (in the bin, undated, scored). */
   otherGames: GameFacts[];
   /** The season's rules as stored; none yet by default. */
@@ -135,6 +137,7 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
     draftsStarted: 0,
     schedule: { rounds: [], games: [] },
     teamIds: [],
+    leftTeamIds: [],
     otherGames: [],
     seasonRules: undefined,
     people: 0,
@@ -274,6 +277,7 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           return true;
         },
         teamsOfSeason: async (_season, ids) => ids.filter((t) => s.teamIds.includes(t)),
+        leftTeamsOfSeason: async (_season, ids) => ids.filter((t) => s.leftTeamIds.includes(t)),
         findVenue: async (id) => s.venues.find((v) => v.id === id),
         listVenues: async () =>
           s.venues

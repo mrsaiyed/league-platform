@@ -16,6 +16,8 @@ export const enErrorScheduling = {
   'error.scheduling.add_draft_game.revision-out-of-date':
     'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
   'error.scheduling.add_draft_game.season-not-found': 'That season is not there.',
+  'error.scheduling.add_draft_game.team-left':
+    'One of those teams has left the league, so no new game is made for it.',
   'error.scheduling.add_draft_game.unknown-court': 'That court is not at the chosen venue.',
   'error.scheduling.add_draft_game.unknown-team':
     'One of those teams is not a team of this season.',

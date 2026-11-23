@@ -389,6 +389,9 @@ export const enSite = {
   'team.isMine': 'This is your team on this device.',
   'team.jersey': 'Number',
   'team.leagueHome': 'League home',
+  // S-87: a team that has left the league keeps its page, marked so.
+  'team.left':
+    'This team has left the league. Its results this season stay, as they are part of other teams’ records.',
   'team.makeMine': 'Make this my team',
   'team.mineNote': 'This device will open the league on this team.',
   // A member's own page of a league, `/{league}/my` (step 2.168).
@@ -431,6 +434,8 @@ export const enSite = {
   'teams.empty': 'No teams are in this season yet.',
   'teams.heading': 'The teams.',
   'teams.lead': 'Every team’s record, roster and games.',
+  // S-87: the mark on the card of a team that has left the league.
+  'teams.left': 'Left the league',
   'teams.noDivision': 'No division',
   'teams.noSeason': 'There is no season to show yet.',
   'teams.noSeed': 'Not seeded yet',

@@ -94,6 +94,8 @@ export const enScheduleAdmin = {
   'schedule.admin.error.round-in-use':
     'A game with no date yet is still in this round, so it cannot be removed.',
   'schedule.admin.error.season-not-found': 'That season is not there.',
+  'schedule.admin.error.team-left':
+    'One of those teams has left the league, so no new game is made for it. Its games already in the schedule stay, to forfeit or cancel from Games.',
   'schedule.admin.error.unknown-court': 'That court is not at the chosen venue.',
   'schedule.admin.error.unknown-team': 'One of those teams is not in this season.',
   'schedule.admin.error.unknown-venue': 'That venue is not there.',
