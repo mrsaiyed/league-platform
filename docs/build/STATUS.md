@@ -33,7 +33,6 @@ Every lane's work is on GitHub. All sessions stopped on 2026-11-17 at about 03:0
 
 | Lane (branch `lane/…`)                       | Where it stands                   | What is left                                           |
 | -------------------------------------------- | --------------------------------- | ------------------------------------------------------ |
-| 2.46-staff-numbers (record 085, T-287, S-80) | reviewed, fixed, pushed           | lands when GitHub has passed twice                     |
 | 2.97-invitations (record 086, T-288)         | 5 commits; 2 conflicts            | finish, review, land                                   |
 | 2.140-nothing-unfinished (record 087, T-289) | 5 commits                         | finish, review, land                                   |
 | 2.163-sign-in-says (record 091, T-291)       | being merged and finished         | review, land                                           |
