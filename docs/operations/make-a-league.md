@@ -12,7 +12,7 @@ It makes one league in draft. The league's first season is made in the same step
 
 The owner needs no account yet. One is made for their email address, and it becomes theirs the first time they sign in with that address. **The tool sends nothing to anyone.** Tell the owner yourself to sign up with exactly that address.
 
-Nothing can publish the league yet: it stays in draft until part 2 of step 2.125 is built. Its first season starts hidden, so even the owner's league home says "There is no season to show yet" until the owner, in Season settings, taps "Show this season to visitors" and "Yes" (found by `npm run rehearse:test-copy`, step 2.207).
+The league stays in draft, "not found" to visitors who are signed out, until its owner publishes it in League settings, in the Publishing part at the top. Its "Must fix before publishing" list asks first for a contact email (this tool always gives one, `--contact-email`) and, for a league with players under 18, that "Names on public pages" is saved under Privacy, even unchanged; then "Publish" asks once. Its first season starts hidden, so even the owner's league home says "There is no season to show yet" until the owner, in Season settings, taps "Show this season to visitors" and "Yes" (found by `npm run rehearse:test-copy`, step 2.207).
 
 Before it makes anything it shows the whole plan, including exactly which database it reached, and asks. Afterwards it reads back what it made from the database and prints it, so nobody has to query the database by hand.
 
@@ -149,7 +149,7 @@ These are still missing before this is used for a real league with real children
 - a restore of the database, tried once;
 - the release procedure;
 - the removal tried once on the test copy (step 4 of the practice run does it);
-- part 2 of step 2.125, so "who plays" can be corrected and the league published;
+- part 2 of step 2.125, so "who plays" and the contact email can be corrected (publishing is built, step 2.240);
 - step 2.133: until it is built, a league that has been used in any way cannot be deleted by anyone, its owner included;
 - step 2.114: until it is built, a person on a roster cannot be erased;
 - the founder's legal sign-off on holding children's data.

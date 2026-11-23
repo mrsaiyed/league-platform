@@ -65,7 +65,7 @@ export const enAdminSettings = {
   'adminSettings.publish.cancel': 'Not now',
   'adminSettings.publish.check.contactEmail': 'A contact email for the league',
   'adminSettings.publish.check.contactEmail.cure':
-    'The contact email is given when the league is made. Write to us and we will add it.',
+    'The contact email is given when the league is made, and no screen changes it yet: ask the people who run SR Leagues, who made the league, to add it.',
   'adminSettings.publish.check.privacyChosen':
     'Your privacy choice for young players: how names show on public pages',
   'adminSettings.publish.check.privacyChosen.cure':
