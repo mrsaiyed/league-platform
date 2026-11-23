@@ -3,7 +3,7 @@
 import type { PlayerSeasonTotals, StandingsRow } from '@srleagues/sports';
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
-import type { GamesStore } from '../games/index.ts';
+import type { GamesStore, ScoringSessionsStore } from '../games/index.ts';
 
 /** A team of the season, not in the bin, and the division whose table it sits in. */
 export type TableTeam = { readonly teamId: string; readonly divisionId: string | null };
@@ -74,11 +74,14 @@ export type StandingsStore = {
 
 /**
  * The transaction standings work in: its own store, the games module's store to ask
- * for results (T-22), and access and the activity log for the rebuild command.
+ * for results (T-22), the game's lock (T-111) so an overturn and a reopen of the same
+ * game are worked out one after the other, and access and the activity log for the
+ * rebuild command.
  */
 export type StandingsTx = CommandTx & {
   readonly standings: StandingsStore;
   readonly games: Pick<GamesStore, 'findSeason' | 'listDecided' | 'listDecidedLines'>;
+  readonly scoringSessions: Pick<ScoringSessionsStore, 'lockGame'>;
   readonly access: AccessReader;
   readonly activity: ActivityLog;
 };

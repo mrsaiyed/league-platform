@@ -11,6 +11,7 @@
 --     each (the calculation counts only games actually played, and a team awarded a
 --     game would otherwise show more wins and losses than games).
 --   paired_with: on the second half of a pair, the first half's id; empty otherwise.
+--     No two rows name the same first half (a unique index where it is set).
 --     Moving either half to the bin moves both (queries/bin-standings-adjustment.ts),
 --     so the two halves never exist apart. The first half is of the same league and
 --     season (a foreign key on all three).
@@ -45,7 +46,9 @@ alter table public.standings_adjustments add constraint standings_adjustments_pa
 alter table public.standings_adjustments add constraint standings_adjustments_not_own_pair
   check (paired_with is null or paired_with <> id);
 
-create index standings_adjustments_paired_with on public.standings_adjustments (paired_with)
+-- A half is paired at most once: two rows never point at the same first half.
+create unique index standings_adjustments_paired_with
+  on public.standings_adjustments (paired_with)
   where paired_with is not null;
 
 alter table public.standings_adjustments add column game_id uuid;

@@ -7,6 +7,7 @@ import {
   seasonId,
   teamId,
 } from '../memory-standings.test-helper.ts';
+import { reopenGame } from '../../games/index.ts';
 import { listAdjustments } from './list-adjustments.ts';
 import { overturnResult } from './overturn-result.ts';
 import { removeAdjustment } from './remove-adjustment.ts';
@@ -96,5 +97,21 @@ describe('overturnResult', () => {
     });
     expect(db.state.adjustments).toEqual([]);
     expect(db.state.activity).toEqual([]);
+  });
+
+  it('refuses a game that was reopened: it reads the game only once it holds its lock', async () => {
+    const { db, deps, as } = memoryStandings({ games });
+    const version = db.state.games[0]?.version ?? 1;
+    const reopened = await reopenGame(
+      as(ownerId),
+      { gameId: gameId(1), version, reason: 'Score typed wrong' },
+      deps,
+    );
+    expect(reopened.ok).toBe(true);
+    expect(await overturnResult(as(ownerId), input, deps)).toEqual({
+      ok: false,
+      error: { code: 'game-not-found' },
+    });
+    expect(db.state.adjustments).toEqual([]);
   });
 });

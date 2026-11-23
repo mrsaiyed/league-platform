@@ -449,3 +449,24 @@ describe("a page's games the person may score, on the database", () => {
     expect(r.ok && r.value.games.map((g) => g.gameId)).toEqual([tonight, yesterday]);
   });
 });
+
+describe('a game overturned, on the database', () => {
+  it('reads as overturned while an adjustment names it, and not once that is in the bin', async () => {
+    const l = await league();
+    const gameId = await l.gameAt(final(l.at(-day)));
+    const { id } = await one<{ id: string }>(
+      pglite,
+      `insert into standings_adjustments
+         (league_id, season_id, team_id, wins, losses, reason, account_id, game_id)
+       values ($1, $2, $3, -1, 1, 'Ineligible player', $4, $5) returning id`,
+      [l.leagueId, l.seasonId, l.home, l.ownerId, gameId],
+    );
+    const find = () =>
+      withTransaction(db, { leagueId: l.leagueId, accountId: l.ownerId }, (scope) =>
+        gamesStore(scope).find(gameId),
+      );
+    expect((await find())?.overturned).toBe(true);
+    await pglite.query('update standings_adjustments set deleted_at = now() where id = $1', [id]);
+    expect((await find())?.overturned).toBe(false);
+  });
+});

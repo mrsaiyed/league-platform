@@ -265,6 +265,9 @@ describe('standings adjustments (S-10)', () => {
     );
     const second = await newTeam(db, s.leagueId, s.seasonId);
     const paired = await adjust(db, s, second, { wins: 1, losses: -1, paired_with: first });
+    await expect(
+      adjust(db, s, second, { wins: 1, losses: -1, paired_with: first }),
+    ).rejects.toMatchObject({ ...refused.unique, constraint: 'standings_adjustments_paired_with' });
     for (const set of ['paired_with = null', 'games_played = 1', `game_id = '${foreignGame}'`]) {
       await expect(
         asApp(db, { league: s.leagueId }, (tx) =>

@@ -37,12 +37,17 @@ const byId = <T extends { id: string }>(a: T, b: T) => a.id.localeCompare(b.id);
 export function standingsStores(
   s: StandingsData,
   options: MemoryOptions = {},
-): { standings: StandingsStore; games: ReadGames } {
+): {
+  standings: StandingsStore;
+  games: ReadGames;
+  scoringSessions: StandingsTx['scoringSessions'];
+} {
   const decidedOf = (season: string) =>
     s.games
       .filter((g) => g.seasonId === season && !g.binned && ['final', 'forfeit'].includes(g.status))
       .sort(byId);
   return {
+    scoringSessions: { lockGame: async (id) => s.games.some((g) => g.id === id && !g.binned) },
     games: {
       listDecided: async (season) => decidedOf(season),
       listDecidedLines: async (season) => {

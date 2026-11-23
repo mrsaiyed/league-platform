@@ -4,7 +4,8 @@
 // the two can never exist apart: taking either off takes both (the store bins a pair
 // together). The game itself keeps its score (A-12): an adjustment is one of the
 // things the calculation reads, and the public table shows the reason as a footnote
-// on both rows. Needs `standings.adjust`; logged (A-6) with the game it names.
+// on both rows. Holds the game's lock, then the season's, as a reopen does (T-111).
+// Needs `standings.adjust`; logged (A-6) with the game it names.
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { recordActivity } from '../../access/index.ts';
@@ -41,12 +42,20 @@ export const overturnResult = defineCommand({
       return fail({ code: 'season-not-found' });
     }
     if (context.accountId === null) return fail({ code: 'not-allowed' });
+    // The game's lock first, then the season's: the order a reopen takes them in (its
+    // standings follow it in the same transaction), so the two never wait on each other
+    // and a reopen and an overturn started together are worked out one after the other.
+    // The game is read as decided only once it is held: a reopen that got there first
+    // leaves it not decided, and the overturn is refused.
+    if (!(await tx.scoringSessions.lockGame(input.gameId))) {
+      return fail({ code: 'game-not-found' });
+    }
+    await tx.standings.lockSeason(input.seasonId);
     const game = (await tx.games.listDecided(input.seasonId)).find((g) => g.id === input.gameId);
     if (game === undefined) return fail({ code: 'game-not-found' });
     const winner = winnerOf(game);
     if (winner === null) return fail({ code: 'game-has-no-winner' });
     const loser = winner === game.homeTeamId ? game.awayTeamId : game.homeTeamId;
-    await tx.standings.lockSeason(input.seasonId);
     // One overturn per game at a time, so a second tap never makes it two (S-85).
     const adjustments = await tx.standings.listAdjustments(input.seasonId);
     if (adjustments.some((a) => a.gameId === input.gameId)) {
