@@ -11,6 +11,8 @@ import { binCutoff, type BinCounts, type BinTx } from './bin.ts';
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const ownerId = '01900000-0000-7000-8000-0000000000a1';
 export const seasonId = '01900000-0000-7000-8000-0000000000c1';
+/** A season of program p2; every other season is of program p1. */
+export const otherSeasonId = '01900000-0000-7000-8000-0000000000c2';
 export const teamId = (n: number) =>
   `01900000-0000-7000-8000-0000000e${String(n).padStart(4, '0')}`;
 
@@ -25,6 +27,8 @@ type Thing = {
   divisionInBin?: boolean;
   status?: string;
   partInBin?: boolean;
+  /** Its season, for things of a season (the bin lists null otherwise). */
+  season?: string;
   /** What restoring it meets: another thing holds its name. */
   clash?:
     | 'short-name-taken'
@@ -91,11 +95,11 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
               id: t.id,
               name: t.name,
               secondName: null,
-              seasonId: null,
+              seasonId: t.season ?? null,
               binnedAt: t.binnedAt ?? '',
               kept: t.referenced === true,
             })),
-        seasonProgramId: async () => 'p1',
+        seasonProgramId: async (id) => (id === otherSeasonId ? 'p2' : 'p1'),
         findTeam: async (id) => {
           const t = find(id);
           return t === undefined

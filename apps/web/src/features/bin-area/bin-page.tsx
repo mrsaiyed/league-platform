@@ -1,11 +1,11 @@
 // League settings → Bin (step 2.77, A-5, P4 §5): what was removed from the league, teams,
 // people and games, each with "Bring it back". Reached from where things are removed:
 // "Removed teams and people" on Teams, "Removed games" on Schedule, and the notice right
-// after a removal. Only the owner and the league's admins see it: League settings is
-// refused to anyone else before anything is read (loadLeaguePage), and the bin's own list
-// refuses again (leagues.list_bin). A refusal to bring something back is said beside it,
+// after a removal. The owner and admins see the whole bin; a scheduler, a registrar or an
+// admin of one program sees the part they may bring back (leagues.list_bin_part, T-308),
+// and someone who may bring back nothing is refused. A refusal to bring something back is said beside it,
 // with what to do first; what was brought back is said at the top, with the way to it.
-import { leagueUrl, listBin } from '@srleagues/core';
+import { leagueUrl, listBinPart } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { forbidden } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -30,12 +30,13 @@ export async function BinPage({
   readonly league: string;
   readonly query: Query;
 }) {
-  const view = await loadLeaguePage(league, 'admin', 'settings');
+  const view = await loadLeaguePage(league, 'admin');
   const here = view.context.league;
   const context = commandContextOf(view.context);
   const ports = await webPorts();
-  const listed = await listBin(context, {}, ports.adminPeople.putBack);
-  if (!listed.ok) return forbidden();
+  const listed = await listBinPart(context, {}, ports.adminPeople.putBack);
+  if (!listed.ok || listed.value.kinds.length === 0) return forbidden();
+  const mine = new Set<string>(listed.value.kinds);
   const clock = await ports.publicSchedule.clockOf(here.id);
   const times: LeagueTimes = { locale, timeZone: clock.timeZone };
   const rows = binView(listed.value.items, times);
@@ -143,24 +144,30 @@ export async function BinPage({
       )}
       <p>{t('admin.bin.keep', { days: listed.value.keepDays })}</p>
       {nothing ? <EmptyPanel text={t('admin.bin.empty')} /> : null}
-      <Part
-        id={binAnchors.teams}
-        title={t('admin.bin.teams.title')}
-        none={t('admin.bin.teams.none')}
-        of={rows.teams}
-      />
-      <Part
-        id={binAnchors.people}
-        title={t('admin.bin.people.title')}
-        none={t('admin.bin.people.none')}
-        of={rows.people}
-      />
-      <Part
-        id={binAnchors.games}
-        title={t('admin.bin.games.title')}
-        none={t('admin.bin.games.none')}
-        of={rows.games}
-      />
+      {!mine.has('team') ? null : (
+        <Part
+          id={binAnchors.teams}
+          title={t('admin.bin.teams.title')}
+          none={t('admin.bin.teams.none')}
+          of={rows.teams}
+        />
+      )}
+      {!mine.has('person') ? null : (
+        <Part
+          id={binAnchors.people}
+          title={t('admin.bin.people.title')}
+          none={t('admin.bin.people.none')}
+          of={rows.people}
+        />
+      )}
+      {!mine.has('game') ? null : (
+        <Part
+          id={binAnchors.games}
+          title={t('admin.bin.games.title')}
+          none={t('admin.bin.games.none')}
+          of={rows.games}
+        />
+      )}
     </main>
   );
 }

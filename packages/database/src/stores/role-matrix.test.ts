@@ -85,6 +85,7 @@ import {
   listActivity,
   listAdjustments,
   listBin,
+  listBinPart,
   listDivisions,
   listEarlierGames,
   listGamesNeedingResult,
@@ -1549,6 +1550,14 @@ const divisionAndVenueRows: readonly Row[] = [
     needs: 'bin.restore',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listBin(c, i, binDeps),
+  },
+  {
+    command: 'leagues.list_bin_part',
+    name: 'see the part of the bin one may bring back (T-308)',
+    // Anyone signed in; each sees only what their own restores allow (none: nothing).
+    needs: 'signed-in',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listBinPart(c, i, binDeps),
   },
   ...divisionRows(
     'leagues.list_divisions',
