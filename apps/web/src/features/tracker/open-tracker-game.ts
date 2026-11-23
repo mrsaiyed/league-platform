@@ -96,6 +96,12 @@ export type OpenTrackerGameOptions = {
    * browser, fetch-game-doors.ts. Left out, the controller offers neither.
    */
   readonly doors?: GameDoors;
+  /**
+   * True once the page let go of the game before it was open (signed out on the device,
+   * or left): the opening then keeps nothing more on the device and makes no controller,
+   * so the clearing of a sign-out is the last thing written (step 2.38). Left out: never.
+   */
+  readonly letGo?: () => boolean;
   /** A new device id, used only the first time this device opens a game. */
   readonly newDeviceId: () => string;
   readonly now?: () => number;
@@ -133,7 +139,9 @@ export type OpenedTrackerGame = {
 export type OpenTrackerGameResult =
   | { readonly ok: true; readonly game: OpenedTrackerGame }
   /** The device's storage is not there or failed: nothing can be kept, so nothing is opened. */
-  | { readonly ok: false; readonly code: QueueErrorCode };
+  | { readonly ok: false; readonly code: QueueErrorCode }
+  /** Let go of before it was open (`letGo`): nothing was kept for it, nothing is opened. */
+  | { readonly ok: false; readonly code: 'let-go' };
 
 const codeOf = (error: unknown): QueueErrorCode =>
   error instanceof QueueError ? error.code : 'storage-unavailable';
@@ -145,17 +153,23 @@ const codeOf = (error: unknown): QueueErrorCode =>
 export async function openTrackerGame(
   options: OpenTrackerGameOptions,
 ): Promise<OpenTrackerGameResult> {
-  const { gameId, leagueId, accountId, rosters, now = Date.now } = options;
+  const { gameId, leagueId, accountId, rosters, now = Date.now, letGo = () => false } = options;
   const owner = { gameId, leagueId, accountId };
+  const letGoOf = { ok: false, code: 'let-go' } as const;
   let storage: Awaited<ReturnType<OpenTrackerGameOptions['openStorage']>>;
   let deviceId: string;
   let confirmed: GameFormat | null;
   let picks: LineupPicks;
   let keptGame: { readonly state: ServerState | null; readonly scoring: DeviceScoring | null };
   try {
+    // Checked after each wait, just before the next write: a sign-out made meanwhile
+    // has its clearing come after, so no rosters come back once it has cleared.
+    if (letGo()) return letGoOf;
     storage = await options.openStorage();
     const openedAt = now();
+    if (letGo()) return letGoOf;
     await storage.games.forgetOthers(owner, openedAt - openedGameKeepMs);
+    if (letGo()) return letGoOf;
     await storage.games.saveRosters(owner, rosters, openedAt);
     deviceId = await storage.games.deviceId(options.newDeviceId);
     const kept = await storage.games.find(gameId);
@@ -165,6 +179,7 @@ export async function openTrackerGame(
   } catch (error) {
     return { ok: false, code: codeOf(error) };
   }
+  if (letGo()) return letGoOf;
   const { games } = storage;
   const controller = createTrackerController({
     renewEveryMs: holdCheckMs,

@@ -29,7 +29,8 @@ import {
 import { ScoringScreen } from './scoring-screen.tsx';
 import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controller.ts';
 import { showsFinalPanel, trackerNoticeText, trackerNotices } from './tracker-notice.ts';
-import { holdSignOut } from './tracker-sign-out.ts';
+import { inLeague } from './queue-storage.ts';
+import { holdSignOut, waitingOnDevice } from './tracker-sign-out.ts';
 
 /** Why "Enter again" did not go through, for the words shown (review M1). */
 type AgainRefusal = 'refused' | 'not-taken-off';
@@ -122,6 +123,9 @@ export function TrackerOpening({
   const working = useRef(false);
   const opened = useRef<OpenedTrackerGame | null>(null);
   const leaving = useRef(false);
+  // Settles once the opening under way has stopped writing to the device (opened, or let
+  // go of): a sign-out waits for it before it clears the games kept here (step 2.38).
+  const opening = useRef<Promise<void>>(Promise.resolve());
   // The rosters the page last brought. The page drawn again (a refresh) brings the same
   // rosters as a new object: the game is opened once per game, league and account, not
   // let go of and taken again each time, so the opening reads them from here.
@@ -161,7 +165,11 @@ export function TrackerOpening({
     window.addEventListener('pagehide', hidden);
     window.addEventListener('pageshow', shown);
     document.addEventListener('visibilitychange', visible);
-    void (async () => {
+    let settle = () => {};
+    opening.current = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    const open = async (): Promise<OpenedTrackerGame | null> => {
       const result = await openTrackerGame({
         gameId,
         leagueId,
@@ -177,14 +185,16 @@ export function TrackerOpening({
         doors: createFetchGameDoors({ leagueId, gameId }),
         newDeviceId: () => globalThis.crypto.randomUUID(),
         onStoreFailed: () => setStoreFailed(true),
+        // Signed out or left while opening: nothing more is kept and no session taken.
+        letGo: () => gone || leaving.current,
       });
-      if (gone) {
+      if (gone || leaving.current) {
         if (result.ok) void result.game.controller.leave();
-        return;
+        return null;
       }
       if (!result.ok) {
         setPhase({ kind: 'no-storage' });
-        return;
+        return null;
       }
       const { game } = result;
       opened.current = game;
@@ -193,7 +203,11 @@ export function TrackerOpening({
       unsubscribe = game.controller.subscribe(show);
       show(game.controller.status());
       window.addEventListener('online', online);
-      await game.controller.start();
+      return game;
+    };
+    void (async () => {
+      const game = await open().finally(settle);
+      if (game !== null && !leaving.current) await game.controller.start();
     })();
     return () => {
       gone = true;
@@ -249,15 +263,21 @@ export function TrackerOpening({
   useEffect(
     () =>
       holdSignOut({
-        waitingPlays: () => opened.current?.controller.status().queue.waiting ?? 0,
+        waitingPlays: () =>
+          waitingOnDevice(opened.current?.controller.status().queue.waiting ?? 0, async () =>
+            inLeague(await openIndexedDbQueueStorage(), leagueId, accountId).list(gameId),
+          ),
         leave: async () => {
           leaving.current = true;
           working.current = true;
           setBusy(true);
+          // A game still opening (just after a reload) stops before it keeps its rosters
+          // again, and is waited for: the sign-out's clearing then comes last (step 2.38).
+          await opening.current;
           await opened.current?.controller.leave();
         },
       }),
-    [],
+    [gameId, leagueId, accountId],
   );
   const leaveBy = (to: string) => (event: MouseEvent<HTMLAnchorElement>) => {
     // A link opened in a new tab or window leaves this page as it is.

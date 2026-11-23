@@ -115,17 +115,21 @@ const keptPages = (page) =>
     return found;
   });
 
-/** How many rows a store of the tracker's own database holds; -1 when there is none. */
-const rowsIn = (page, database) =>
+/**
+ * How many rows the store `store` of the tracker's own database holds; -1 when there is
+ * none. Named, never the first: the names come sorted, and the games' database also
+ * keeps the device's id ('device'), which signing out keeps (T-115).
+ */
+const rowsIn = (page, database, store) =>
   page.evaluate(
-    (name) =>
+    ([name, storeName]) =>
       new Promise((done) => {
         const asking = indexedDB.open(name);
         asking.onupgradeneeded = () => asking.transaction.abort();
         asking.onerror = () => done(-1);
         asking.onsuccess = () => {
           const db = asking.result;
-          const store = db.objectStoreNames[0];
+          const store = db.objectStoreNames.contains(storeName) ? storeName : undefined;
           if (store === undefined) {
             db.close();
             done(-1);
@@ -138,7 +142,7 @@ const rowsIn = (page, database) =>
           };
         };
       }),
-    database,
+    [database, store],
   );
 
 const accountOfPage = (page) =>
@@ -407,7 +411,7 @@ async function oneGame(browser) {
     await step('a new release waits while a game is open on the device', async () => {
       const games = await until(
         page,
-        () => rowsIn(page, 'srleagues-tracker-games'),
+        () => rowsIn(page, 'srleagues-tracker-games', 'games'),
         (n) => n > 0,
         'no game open on the device',
       );
@@ -481,17 +485,20 @@ async function oneGame(browser) {
       await page.locator('[data-tracker]').first().waitFor();
       await until(
         page,
-        () => rowsIn(page, 'srleagues-tracker-games'),
+        () => rowsIn(page, 'srleagues-tracker-games', 'games'),
         (n) => n > 0,
         'no game kept',
       );
+      // Whether the sign-out asked about plays waiting (said in the detail below).
+      let asked = 0;
+      page.on('dialog', () => (asked += 1));
       await page.locator('[data-tracker] [data-account] > summary').click();
       await page.locator('[data-tracker] [data-account] .site-account-sign-out').click();
       // Signed out, the page has no account menu any more.
       await page.locator('[data-tracker] [data-account]').waitFor({ state: 'detached' });
       await page.waitForLoadState('load');
       const left = {
-        games: await rowsIn(page, 'srleagues-tracker-games'),
+        games: await rowsIn(page, 'srleagues-tracker-games', 'games'),
         pages: (await keptPages(page)).length,
         caches: await page.evaluate(
           async () =>
@@ -504,7 +511,7 @@ async function oneGame(browser) {
       note(
         'signed out, no game, no page, nothing kept and no worker is left on the device',
         left.games <= 0 && left.pages === 0 && left.caches === 0 && left.workers === 0,
-        JSON.stringify(left),
+        JSON.stringify({ ...left, asked }),
       );
     });
 

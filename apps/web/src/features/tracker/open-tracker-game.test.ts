@@ -232,6 +232,32 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     expect(await device.games.find(other)).toBeUndefined();
   });
 
+  it('signed out on the device while it opens: writes nothing after the clearing (step 2.38)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const fetch = network.fetchAs('scorekeeper');
+    let signedOut = false;
+    const result = await openTrackerGame({
+      gameId,
+      leagueId: liveLeagueId,
+      accountId: accountOf('scorekeeper'),
+      rosters: madeUpRosters,
+      // The sign-out lands while the device's storage opens, and clears what is kept.
+      openStorage: async () => {
+        signedOut = true;
+        await device.games.forgetAll();
+        return device;
+      },
+      transport: createFetchCommandTransport({ leagueId: liveLeagueId, gameId, fetch }),
+      server: createFetchTrackerServer({ leagueId: liveLeagueId, gameId, fetch }),
+      newDeviceId: () => 'device-signed-out',
+      now: () => 1_000,
+      letGo: () => signedOut,
+    });
+    expect(result).toEqual({ ok: false, code: 'let-go' });
+    expect(await device.games.find(gameId)).toBeUndefined();
+  });
+
   it('keeps the rosters, names and state when the sign-in runs out mid-game (record 054)', async () => {
     const network = endpointNetwork();
     const device = newDevice();
