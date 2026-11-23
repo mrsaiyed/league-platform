@@ -141,6 +141,7 @@ import {
   restoreTeam,
   restoreVenue,
   revokeGrant,
+  searchActivity,
   setBoxScore,
   setCurrentSeason,
   setDraftRecording,
@@ -2320,6 +2321,14 @@ const rows: readonly Row[] = [
     scope: 'program',
     prepare: async (league) => ({ input: { scope: { type: 'program', id: league.programId } } }),
     run: (c, i) => listActivity(c, i, accessDeps),
+  },
+  // The log's own screen (step 2.77): the whole league's, by person, kind and time.
+  {
+    command: 'access.search_activity',
+    name: "search the league's activity log",
+    needs: 'activity.read',
+    prepare: async () => ({ input: { kind: 'teams' } }),
+    run: (c, i) => searchActivity(c, i, accessDeps),
   },
   // Anyone signed in who holds the link (P4 §4: sign in, and they are in).
   {

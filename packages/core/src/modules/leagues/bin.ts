@@ -30,6 +30,26 @@ export type BinnedItem = {
    * at it (a team with games, a person with a roster history). Games are always kept.
    */
   readonly kept: boolean;
+  /**
+   * What the bin screen tells about it before it is brought back (step 2.77), where the
+   * store reads it: a team's games played and still to play (they come back with it,
+   * A-17), and the people on its open roster who are in the bin too (A-16); a game's
+   * start and whether it has a round to come back to (S-60).
+   */
+  readonly details?: BinDetails;
+};
+
+export type BinDetails = {
+  /** A team: its games outside the bin with a result (final or forfeited). */
+  readonly gamesPlayed?: number;
+  /** A team: its games outside the bin still to play (scheduled, postponed or live). */
+  readonly gamesToCome?: number;
+  /** A team: the people on its roster, not marked as left, who are in the bin themselves. */
+  readonly rosterInBin?: readonly string[];
+  /** A game: when it starts (ISO 8601), or null with no date yet. */
+  readonly startsAt?: string | null;
+  /** A game: true when it has no round, so it comes back with none (S-60). */
+  readonly withoutRound?: boolean;
 };
 
 /**

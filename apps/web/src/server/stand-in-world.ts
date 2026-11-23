@@ -20,6 +20,7 @@
 import {
   eventHandlers,
   importsRunJob,
+  pageOfActivity,
   readFixtureImport,
   rebuildSeason,
   systemClock,
@@ -161,10 +162,13 @@ export function madeUpWorld(options: WorldOptions): World {
       listGrants: options.listGrantsOf?.(leagueId) ?? (async () => []),
     };
     const activity: ActivityLog = {
+      // An id that grows with each entry, so entries of the same moment keep their order.
       record: async (entry) => {
-        s.activity = [...s.activity, entry];
+        const id = `01900000-0000-7000-8000-${String(s.activity.length + 1).padStart(12, '0')}`;
+        s.activity = [...s.activity, { ...entry, id, at: now().toISOString() }];
       },
-      list: async () => [],
+      list: async (limit, before, scope, search) =>
+        pageOfActivity(s.activity, limit, before, scope, search),
     };
     const tx: WorldTx = {
       jobs: { enqueue: async (job) => void jobs.push(job) },

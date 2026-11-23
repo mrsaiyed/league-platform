@@ -230,8 +230,13 @@ if (built) {
     await tap(bin.getByRole('button', { name: 'Move the team to the bin' }), /done=removed/);
     const removed = await page.locator('main [role=status]').first().innerText();
     note(
-      'removing the team promises only what is true',
-      removed === 'Removed. The team is kept for 30 days.',
+      'removing the team says it is in the bin, with the way to bring it back (step 2.77)',
+      removed.startsWith('Moved to the bin: the team is kept there for 30 days.') &&
+        (await page
+          .locator('main [role=status]')
+          .first()
+          .getByRole('link', { name: 'Bring it back' })
+          .count()) === 1,
       removed,
     );
     note(
@@ -255,7 +260,7 @@ if (built) {
     const gone = await page.locator('main [role=status]').first().innerText();
     note(
       'taking someone off the list promises only what is true',
-      gone.includes('The person is kept for 30 days.'),
+      gone.includes('kept in the bin for 30 days.'),
       gone,
     );
     await accessible('a person taken off the league list');

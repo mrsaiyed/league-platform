@@ -11,7 +11,13 @@
 // A person's name comes from the one name function (T-81), as an admin sees it: the
 // full name as recorded, whatever the public pages show, since the admin is choosing
 // whom to bring back. Empty when no name is left (it was erased).
-import { publicViewer, showName, type BinKind, type BinnedItem } from '@srleagues/core';
+import {
+  publicViewer,
+  showName,
+  type BinDetails,
+  type BinKind,
+  type BinnedItem,
+} from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
@@ -25,6 +31,11 @@ type Row = {
   kept: boolean;
   first_name: string | null;
   last_name: string | null;
+  played: number | null;
+  to_come: number | null;
+  roster_in_bin: string[] | null;
+  starts_at: Date | string | null;
+  without_round: boolean | null;
 };
 
 /** A person's name on an admin's screen: in full, as recorded (T-81). */
@@ -55,7 +66,18 @@ export async function listBinned(scope: LeagueScope): Promise<readonly BinnedIte
         or exists (select 1 from standings_adjustments s where s.league_id = t.league_id
           and s.team_id = t.id)
         or exists (select 1 from player_game_stats p where p.league_id = t.league_id
-          and p.team_id = t.id)) as kept
+          and p.team_id = t.id)) as kept,
+      (select count(*) from games g where g.league_id = t.league_id and g.deleted_at is null
+          and t.id in (g.home_team_id, g.away_team_id)
+          and g.status in ('final', 'forfeit'))::int as played,
+      (select count(*) from games g where g.league_id = t.league_id and g.deleted_at is null
+          and t.id in (g.home_team_id, g.away_team_id)
+          and g.status in ('scheduled', 'postponed', 'live'))::int as to_come,
+      array(select r.person_id::text from roster_entries r
+          join people p on p.league_id = r.league_id and p.id = r.person_id
+          where r.league_id = t.league_id and r.team_id = t.id and r.left_on is null
+            and p.deleted_at is not null order by r.sort, r.id) as roster_in_bin,
+      null::timestamptz as starts_at, null::boolean as without_round
       from teams t where t.league_id = ${league} and t.deleted_at is not null
     union all
     select 'division', d.id, d.name, null, d.season_id, d.deleted_at, null, null,
@@ -66,17 +88,20 @@ export async function listBinned(scope: LeagueScope): Promise<readonly BinnedIte
         or exists (select 1 from games g where g.league_id = d.league_id
           and g.division_id = d.id)
         or exists (select 1 from standings_rows s where s.league_id = d.league_id
-          and s.division_id = d.id)
+          and s.division_id = d.id),
+      null, null, null, null, null
       from divisions d where d.league_id = ${league} and d.deleted_at is not null
     union all
     select 'venue', v.id, v.name, null, null, v.deleted_at, null, null,
       exists (select 1 from courts c where c.league_id = v.league_id
           and c.venue_id = v.id and c.deleted_at is null)
-        or exists (select 1 from games g where g.league_id = v.league_id and g.venue_id = v.id)
+        or exists (select 1 from games g where g.league_id = v.league_id and g.venue_id = v.id),
+      null, null, null, null, null
       from venues v where v.league_id = ${league} and v.deleted_at is not null
     union all
     select 'court', c.id, c.name, null, null, c.deleted_at, null, null,
-      exists (select 1 from games g where g.league_id = c.league_id and g.court_id = c.id)
+      exists (select 1 from games g where g.league_id = c.league_id and g.court_id = c.id),
+      null, null, null, null, null
       from courts c where c.league_id = ${league} and c.deleted_at is not null
     union all
     select 'person', p.id, '', null, null, p.deleted_at, p.first_name, p.last_name,
@@ -87,11 +112,13 @@ export async function listBinned(scope: LeagueScope): Promise<readonly BinnedIte
         or exists (select 1 from season_player_totals s where s.league_id = p.league_id
           and s.person_id = p.id)
         or exists (select 1 from people m where m.league_id = p.league_id
-          and m.merged_into_id = p.id)
+          and m.merged_into_id = p.id),
+      null, null, null, null, null
       from people p where p.league_id = ${league} and p.deleted_at is not null
         and p.merged_into_id is null
     union all
-    select 'game', g.id, h.name, a.name, g.season_id, g.deleted_at, null, null, true
+    select 'game', g.id, h.name, a.name, g.season_id, g.deleted_at, null, null, true,
+      null, null, null, g.starts_at, g.round_id is null
       from games g
       join teams h on h.league_id = g.league_id and h.id = g.home_team_id
       join teams a on a.league_id = g.league_id and a.id = g.away_team_id
@@ -110,5 +137,28 @@ export async function listBinned(scope: LeagueScope): Promise<readonly BinnedIte
     seasonId: row.season_id,
     binnedAt: new Date(row.deleted_at).toISOString(),
     kept: row.kept,
+    ...detailsOf(row),
   }));
+}
+
+/** What the bin screen tells about a team or a game before it comes back (step 2.77). */
+function detailsOf(row: Row): { details?: BinDetails } {
+  if (row.kind === 'team') {
+    return {
+      details: {
+        gamesPlayed: row.played ?? 0,
+        gamesToCome: row.to_come ?? 0,
+        rosterInBin: row.roster_in_bin ?? [],
+      },
+    };
+  }
+  if (row.kind === 'game') {
+    return {
+      details: {
+        startsAt: row.starts_at === null ? null : new Date(row.starts_at).toISOString(),
+        withoutRound: row.without_round === true,
+      },
+    };
+  }
+  return {};
 }

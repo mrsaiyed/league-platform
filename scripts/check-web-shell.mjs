@@ -874,6 +874,20 @@ const cases = [
   ],
   ['scheduler', '/north-valley/admin/settings', 403, [noAccess]],
   ['coach', '/north-valley/admin/settings', 403, [noAccess]],
+  // League settings → Admins → Activity log (step 2.77, A-6): only the owner and the
+  // league's admins open it; everyone else is refused and sees none of its entries.
+  [
+    'owner',
+    '/north-valley/admin/settings/activity',
+    200,
+    ['Activity log', 'What was changed', 'Who', 'Show', oneHeading],
+  ],
+  ['admin', '/quiet-pines/admin/settings/activity', 200, ['Activity log', 'What was changed']],
+  ['scheduler', '/north-valley/admin/settings/activity', 403, [noAccess], ['What was changed']],
+  ['coach', '/north-valley/admin/settings/activity', 403, [noAccess], ['What was changed']],
+  ['stranger', '/north-valley/admin/settings/activity', 403, [noAccess], ['What was changed']],
+  ['scorekeeper', '/north-valley/admin/settings/activity', 403, [noAccess], ['What was changed']],
+  ['registrar', '/quiet-pines/admin/settings/activity', 403, [noAccess], ['What was changed']],
   // League settings → Admins (step 2.97, P4 §4): only someone who may manage access for the
   // whole league (the owner, an admin) opens it; everyone else is refused, and a refused
   // person never sees who has access.
@@ -894,6 +908,20 @@ const cases = [
   ['stranger', '/north-valley/admin/settings/admins', 403, [noAccess], ['People with access']],
   ['scorekeeper', '/north-valley/admin/settings/admins', 403, [noAccess], ['People with access']],
   ['registrar', '/quiet-pines/admin/settings/admins', 403, [noAccess], ['People with access']],
+  // League settings → Bin (step 2.77, A-5): only the owner and the league's admins open it;
+  // everyone else is refused and sees nothing of what is in it.
+  [
+    'owner',
+    '/north-valley/admin/settings/bin',
+    200,
+    ['Bin', 'Removed teams', 'Removed people', 'Removed games', oneHeading],
+  ],
+  ['admin', '/quiet-pines/admin/settings/bin', 200, ['Bin', 'Removed teams']],
+  ['scheduler', '/north-valley/admin/settings/bin', 403, [noAccess], ['Removed teams']],
+  ['coach', '/north-valley/admin/settings/bin', 403, [noAccess], ['Removed teams']],
+  ['stranger', '/north-valley/admin/settings/bin', 403, [noAccess], ['Removed teams']],
+  ['scorekeeper', '/north-valley/admin/settings/bin', 403, [noAccess], ['Removed teams']],
+  ['registrar', '/quiet-pines/admin/settings/bin', 403, [noAccess], ['Removed teams']],
   // The invitation's accept page (step 2.97, record 086): with no link held, everyone gets
   // the one answer for a link that does not work; a visitor holding a link is offered
   // signing in or up and nothing about the league; a signed-in person holding a link that

@@ -89,4 +89,58 @@ export const enActivity = {
   'activity.teams.reorder_roster': 'Changed the order of a roster',
   'activity.teams.set_stats_visibility': "Changed who sees a team's players' numbers",
   'activity.teams.update_team': 'Changed a team',
+  // The same sentences naming the thing the entry points at, as it is named now (step
+  // 2.77): {name} is a team's, a season's, a division's, a venue's, a person's as the
+  // People page writes it, or a game's (adminAccess.log.gameName). Without one, the
+  // entry's plain sentence above.
+  'activityNamed.games.assign_scorekeeper': 'Assigned a scorekeeper to the game {name}',
+  'activityNamed.games.cancel_game': 'Cancelled the game {name}',
+  'activityNamed.games.mark_not_started': 'Marked the started game {name} not started',
+  'activityNamed.games.postpone_game': 'Postponed the game {name}',
+  'activityNamed.games.put_game_back': 'Put the cancelled game {name} back on the schedule',
+  'activityNamed.games.reopen_game': 'Reopened the final game {name} to correct it',
+  'activityNamed.games.reopen_tracked_game': 'Reopened the game {name}, ended from the tracker',
+  'activityNamed.games.take_over_scoring': 'Took over scoring the game {name} from another device',
+  'activityNamed.games.unassign_scorekeeper': 'Took a scorekeeper off the game {name}',
+  'activityNamed.leagues.create_division': 'Added the division {name}',
+  'activityNamed.leagues.create_season': 'Added the season {name}',
+  'activityNamed.leagues.remove_division': 'Moved the division {name} to the bin',
+  'activityNamed.leagues.reorder_divisions':
+    'Changed the order of the divisions of the season {name}',
+  'activityNamed.leagues.restore_division': 'Restored the division {name} from the bin',
+  'activityNamed.leagues.restore_game': 'Restored the game {name} from the bin',
+  'activityNamed.leagues.restore_person': 'Restored the person {name} from the bin',
+  'activityNamed.leagues.restore_team': 'Restored the team {name} from the bin',
+  'activityNamed.leagues.set_current_season': 'Made {name} the current season',
+  'activityNamed.leagues.set_season_roster_settings':
+    'Changed the roster settings of the season {name}',
+  'activityNamed.leagues.set_season_rules': 'Changed the rules of the season {name}',
+  'activityNamed.leagues.update_division': 'Changed the division {name}',
+  'activityNamed.leagues.update_season': 'Changed the season {name}',
+  'activityNamed.people.create_person': 'Added the person {name}',
+  'activityNamed.people.remove_person': 'Moved the person {name} to the bin',
+  'activityNamed.people.set_name_request': 'Changed how the name of {name} shows on public pages',
+  'activityNamed.people.update_person': 'Changed the person {name}',
+  'activityNamed.scheduling.create_venue': 'Added the venue {name}',
+  'activityNamed.scheduling.discard_schedule_draft':
+    'Discarded the schedule draft of the season {name}',
+  'activityNamed.scheduling.publish_schedule': 'Published the schedule of the season {name}',
+  'activityNamed.scheduling.remove_venue': 'Moved the venue {name} to the bin',
+  'activityNamed.scheduling.restore_venue': 'Restored the venue {name} from the bin',
+  'activityNamed.scheduling.update_venue': 'Changed the venue {name}',
+  'activityNamed.standings.add_adjustment': 'Added a standings adjustment for the team {name}',
+  'activityNamed.standings.rebuild_season':
+    'Worked out the standings and totals of the season {name} again',
+  'activityNamed.standings.remove_adjustment': 'Removed a standings adjustment for the team {name}',
+  'activityNamed.teams.add_to_roster': 'Added a person to the roster of the team {name}',
+  'activityNamed.teams.change_roster_entry': "Changed a player's number or role on the team {name}",
+  'activityNamed.teams.create_team': 'Added the team {name}',
+  'activityNamed.teams.mark_left': 'Marked a person as having left the team {name}',
+  'activityNamed.teams.put_back_on_roster':
+    'Put a person marked as left by mistake back on the roster of the team {name}',
+  'activityNamed.teams.remove_team': 'Moved the team {name} to the bin',
+  'activityNamed.teams.reorder_roster': 'Changed the order of the roster of the team {name}',
+  'activityNamed.teams.set_stats_visibility':
+    "Changed who sees the players' numbers of the team {name}",
+  'activityNamed.teams.update_team': 'Changed the team {name}',
 } as const;

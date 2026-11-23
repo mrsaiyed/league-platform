@@ -7,6 +7,7 @@ import {
   memoryTransaction,
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
+import { pageOfActivity } from './activity-search.ts';
 import { issueInvitationLink } from './invitation-link.ts';
 import type { AccessTx, ActivityEntry, Grant, Invitation } from './ports.ts';
 import { sameScope, type Scope } from './scopes.ts';
@@ -79,17 +80,19 @@ export function memoryAccess(state: Partial<MemoryAccess> = {}) {
       jobs,
       activity: {
         record: async (entry) => void s.activity.push(entry),
-        list: async (limit, _before, scope) =>
-          s.activity
-            .map((entry, n) => ({ ...entry, id: `entry-${n}`, at: `2026-11-13T00:00:0${n}Z` }))
-            .filter(
-              (entry) =>
-                scope.type === 'league' ||
-                (entry.details['scopeType'] === scope.type &&
-                  entry.details['scopeId'] === scope.id),
-            )
-            .reverse()
-            .slice(0, limit),
+        // A second apart from 13 November, in the order written.
+        list: async (limit, before, scope, search) =>
+          pageOfActivity(
+            s.activity.map((entry, n) => ({
+              ...entry,
+              id: `01900000-0000-7000-8000-${String(n).padStart(12, '0')}`,
+              at: new Date(Date.UTC(2026, 10, 13) + n * 1000).toISOString(),
+            })),
+            limit,
+            before,
+            scope,
+            search,
+          ),
       },
       access: {
         ownerAccountId: async () => s.ownerId,

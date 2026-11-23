@@ -7,6 +7,7 @@ import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
+import { binLinkFor } from '../bin-area/index.ts';
 import { t } from '../../server/messages.ts';
 import { createTeamAction } from './actions.ts';
 import {
@@ -35,6 +36,7 @@ export async function TeamsPage({
   const ports = (await webPorts()).adminTeams;
   const context = commandContextOf(view.context);
   const season = await ports.currentSeason(context);
+  const binLink = await binLinkFor(here, context, 'teams');
   return (
     <main className="admin-teams">
       <PageHead
@@ -47,7 +49,15 @@ export async function TeamsPage({
           </a>
         )}
       </PageHead>
-      <Notice query={query} />
+      {binLink === undefined ? null : (
+        <p>
+          <a href={binLink}>{t('admin.bin.link.teamsPeople')}</a>
+        </p>
+      )}
+      <Notice
+        query={query}
+        binHref={leagueUrl(here, 'admin-area', { area: 'settings', subpath: ['bin'] })}
+      />
       {season === undefined ? (
         <EmptyPanel text={t('adminTeams.noSeason')} />
       ) : (

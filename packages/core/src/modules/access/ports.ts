@@ -5,6 +5,7 @@
 import type { CommandTx } from '../../command/index.ts';
 import type { InvitationStatus } from './access-values.ts';
 import type { Role } from './roles.ts';
+import type { ActivitySearch } from './activity-search.ts';
 import type { Scope } from './scopes.ts';
 
 /** "This account has this role here" (T3 §5). */
@@ -136,12 +137,15 @@ export type ActivityLog = {
   readonly record: (entry: ActivityEntry) => Promise<void>;
   /**
    * Newest first, at most `limit`, older than `before` when given. For a program,
-   * club or team scope, only the entries whose details name that scope.
+   * club or team scope, only the entries whose details name that scope. A search keeps
+   * only the entries it names, and with `after` gives the `limit` entries just newer than
+   * it instead, still newest first (step 2.77).
    */
   readonly list: (
     limit: number,
     before: ActivityCursor | undefined,
     scope: Scope,
+    search?: ActivitySearch,
   ) => Promise<readonly ActivityRecord[]>;
 };
 

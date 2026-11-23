@@ -192,6 +192,12 @@ export { listScheduleTeams, type ScheduleTeamRow } from './list-schedule-teams.t
 export { updateImport } from './update-import.ts';
 export { hasBinnedGamePart } from './has-binned-game-part.ts';
 export { listBinned } from './list-binned.ts';
+export {
+  findActivityTargets,
+  type ActivityTargetAsk,
+  type ActivityTargetKind,
+  type ActivityTargetName,
+} from './find-activity-targets.ts';
 export { purgeBinned } from './purge-binned.ts';
 export { restoreBinnedGame } from './restore-binned-game.ts';
 export { restoreBinnedPerson } from './restore-binned-person.ts';

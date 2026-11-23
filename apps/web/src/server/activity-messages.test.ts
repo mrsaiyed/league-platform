@@ -12,6 +12,8 @@ const reads = new Set([
   'access.list_activity',
   'access.my_access',
   'access.read_invitation',
+  // The activity log's own screen, by person, kind and time (step 2.77): a read.
+  'access.search_activity',
   'leagues.list_divisions',
   'leagues.list_bin',
   'people.get_person',

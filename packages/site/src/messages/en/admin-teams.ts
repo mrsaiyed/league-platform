@@ -32,12 +32,13 @@ export const enAdminTeams = {
   'adminTeams.done.entrySaved': 'The number and role were saved.',
   'adminTeams.done.left': 'The player was marked as having left.',
   'adminTeams.done.moved': 'The roster order was saved.',
-  'adminTeams.done.personRemoved': 'Removed from the league list. The person is kept for 30 days.',
+  'adminTeams.done.personRemoved':
+    'Moved to the bin: taken off the league list, and kept in the bin for 30 days.',
   'adminTeams.done.putBack':
     'The player was put back on the roster. Their games and numbers are as they were.',
   'adminTeams.done.putBackNoNumber':
     'The player is back on the roster with no number, because someone else now wears theirs. Give them a number.',
-  'adminTeams.done.removed': 'Removed. The team is kept for 30 days.',
+  'adminTeams.done.removed': 'Moved to the bin: the team is kept there for 30 days.',
   'adminTeams.done.statsSaved': 'Who sees the numbers was saved.',
   'adminTeams.done.updated': 'The team was saved.',
   'adminTeams.edit.submit': 'Save team details',
@@ -73,7 +74,7 @@ export const enAdminTeams = {
   'adminTeams.people.title': 'The league list',
   // A person's name as the Teams screens show it; a language may put the parts the other way.
   'adminTeams.personName': '{firstName} {lastName}',
-  // The bin has no screen of its own, so nothing here promises a way back (step 2.161).
+  // The bin has its screen (step 2.77): the notice after a removal leads to it.
   // A-17: only a team with no games, played or without a result, goes to the bin. The team
   // is "it" throughout the panel, as in step 2.161's "its roster".
   'adminTeams.remove.body':
@@ -128,6 +129,8 @@ export const enAdminTeams = {
   'adminTeams.roster.name': 'Name',
   'adminTeams.roster.noNumber': 'No number',
   'adminTeams.roster.none': 'Nobody is on this roster yet.',
+  // S-84: a person on the roster who is in the bin, not on the league list (step 2.77).
+  'adminTeams.roster.notOnTheList': '(not on the league list: in the bin)',
   'adminTeams.roster.number': 'Number',
   'adminTeams.roster.numberTwice': '(#{number} is worn by two players)',
   'adminTeams.roster.offTheList':

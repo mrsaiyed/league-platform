@@ -9,9 +9,12 @@
 // The owner opens Admin → Teams and sees the season's six teams; adds a team and lands on
 // its page; adds someone not in the league list with a number, and a person from the list
 // with a number and a role; changes a number; marks a player as left and puts them back;
-// moves a player up; moves the team to the bin and finds it gone from the list. Every
-// change is a plain form, read back from the database. Each page passes the accessibility
-// checks; the server's output holds no code and none of the seed's private values.
+// moves a player up; moves the team to the bin and finds it gone from the list. At its
+// admin address the owner then reads "This team is in the bin" with "Bring it back" and
+// nothing else to change (step 2.77); a visitor, a coach, a scorekeeper and another
+// league's admin are not shown it; its public page, a team that never was and the team
+// under another league's address are "Page not found" (404). Every change is a plain
+// form, read back from the database. Each page passes the accessibility checks; the server's output holds no code and none of the seed's private values.
 import {
   accessibilityProblems,
   buildNext,
@@ -41,6 +44,12 @@ const seedOwner = 'owner@lakeside.example.test';
 const chosenPassword = 'a made-up chosen password';
 const teamName = `Database Larks ${run}`;
 const newcomer = { first: 'Avery', last: `Newcomer${run}` };
+/** The team's short name, as the Teams form makes it from the name (shortNameFrom). */
+const shortNameFrom = (name) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 /** The seed's private values (packages/database/src/seed/seed-data.ts): never printed. */
 const privateValues = ['1990-04-12', '2012-09-03', '2013-06-02', 'morgan@lakeside.example.test'];
 const seasonTeams = [
@@ -298,6 +307,8 @@ if (browser !== null) {
   });
 
   await step('the team is moved to the bin, and is gone from the list', async () => {
+    const shown = await page.goto(`${origin}/lakeside/teams/${shortNameFrom(teamName)}`);
+    note('before, its public page answers (200)', shown?.status() === 200, String(shown?.status()));
     await page.goto(`${origin}${teamPath}`);
     const form = page.locator('form').filter({
       has: page.getByRole('button', { name: 'Move the team to the bin' }),
@@ -315,9 +326,113 @@ if (browser !== null) {
     );
     const listed = await page.locator('a.staff-row-link').allInnerTexts();
     note('the team is not listed', !listed.includes(teamName), listed.join(', '));
-    const gone = await page.goto(`${origin}${teamPath}`);
-    note('its page is not found any more', gone?.status() === 404, String(gone?.status()));
   });
+
+  // Step 2.77: the team's admin address, while it is in the bin, is a page of its own for
+  // staff who may bring it back, holding nothing that could be changed but "Bring it back".
+  // For everyone else, and on the public address, it is "Page not found".
+  const teamId = teamPath.split('/').pop() ?? '';
+  const publicPath = `/lakeside/teams/${shortNameFrom(teamName)}`;
+  const notFound = async (where, label, path) => {
+    const answer = await where.goto(`${origin}${path}`);
+    const text = await where.locator('body').innerText();
+    note(`${label}: "Page not found" (404)`, answer?.status() === 404, String(answer?.status()));
+    note(`${label}: not the bin sentence`, !text.includes('This team is in the bin'));
+    note(
+      `${label}: nothing of the team`,
+      !text.includes(teamName) && !text.includes(newcomer.last),
+    );
+  };
+
+  await step('the owner, at the team’s admin address, sees it is in the bin', async () => {
+    const binned = await page.goto(`${origin}${teamPath}`);
+    note('the address answers for staff (200)', binned?.status() === 200, String(binned?.status()));
+    const main = page.locator('main').first();
+    const text = await main.innerText();
+    note('it says "This team is in the bin"', text.includes('This team is in the bin'));
+    note('it names the team', text.includes(teamName), text);
+    note(
+      'it offers "Bring it back"',
+      (await main.getByRole('button', { name: 'Bring it back' }).count()) === 1,
+    );
+    note('no roster is shown', (await page.locator('ol.admin-roster').count()) === 0);
+    note('no player of the team is shown', !text.includes(newcomer.last));
+    note(
+      'its only form is "Bring it back", with nothing to type in',
+      (await main.locator('form').count()) === 1 &&
+        (await main.locator('form button').count()) === 1 &&
+        (await main.locator('input:not([type=hidden]), select, textarea').count()) === 0,
+    );
+    await accessible(page, 'a team in the bin at its admin address, on the database');
+  });
+
+  await step('a team that never was is not found', async () => {
+    await notFound(
+      page,
+      'a team that never was',
+      '/lakeside/admin/teams/00000000-0000-4000-8000-000000000000',
+    );
+  });
+
+  /** A no-script page signed in as `address`, by the code on the kept emails' page. */
+  const signedInAs = async (address) => {
+    const signing = await browser.newContext({ viewport: screen });
+    const first = await signing.newPage();
+    first.setDefaultTimeout(60_000);
+    await signUpByTheKeptCode(first, origin, address);
+    const state = await signing.storageState();
+    await signing.close();
+    const theirs = await browser.newContext({
+      viewport: screen,
+      javaScriptEnabled: false,
+      storageState: state,
+    });
+    const opened = await theirs.newPage();
+    opened.setDefaultTimeout(60_000);
+    return { context: theirs, page: opened };
+  };
+
+  await step('a visitor finds the team’s public and admin addresses not found', async () => {
+    const visitor = await browser.newContext({ viewport: screen, javaScriptEnabled: false });
+    const visiting = await visitor.newPage();
+    await notFound(visiting, 'a visitor, at its public address', publicPath);
+    const admin = await visiting.goto(`${origin}${teamPath}`);
+    note(
+      'a visitor, at its admin address: not the bin sentence',
+      !(await visiting.locator('body').innerText()).includes('This team is in the bin'),
+      String(admin?.status()),
+    );
+    await visitor.close();
+  });
+
+  for (const [who, address] of [
+    ['a coach', 'herons-coach@lakeside.example.test'],
+    ['a scorekeeper', 'scorer@lakeside.example.test'],
+    ['another league’s admin', 'admin@maple.example.test'],
+  ]) {
+    await step(`${who} is not shown the team in the bin`, async () => {
+      const person = await signedInAs(address);
+      const answer = await person.page.goto(`${origin}${teamPath}`);
+      const text = await person.page.locator('body').innerText();
+      note(
+        `${who}: refused or "Page not found"`,
+        answer !== null && [403, 404].includes(answer.status()),
+        String(answer?.status()),
+      );
+      note(`${who}: not the bin sentence`, !text.includes('This team is in the bin'));
+      note(`${who}: no "Bring it back"`, !text.includes('Bring it back'));
+      await notFound(person.page, `${who}, at its public address`, publicPath);
+      if (address.endsWith('@maple.example.test')) {
+        // Staff of another league, in their own league's admin: the team is not theirs.
+        await notFound(
+          person.page,
+          `${who}, in their own admin`,
+          `/maple-street/admin/teams/${teamId}`,
+        );
+      }
+      await person.context.close();
+    });
+  }
 
   await context.close();
   await browser.close();

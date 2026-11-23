@@ -199,6 +199,14 @@ export async function AdminsPage({ league }: { readonly league: string }) {
 
       <section className="admin-access-part" aria-labelledby="activity-title">
         <h2 id="activity-title">{t('adminAccess.activity.title')}</h2>
+        <p>
+          <a
+            href={leagueUrl(here, 'admin-area', { area: 'settings', subpath: ['activity'] })}
+            data-activity-log-link=""
+          >
+            {t('adminAccess.activity.all')}
+          </a>
+        </p>
         {shown.activity.length === 0 ? (
           <p className="ui-empty">{t('adminAccess.activity.none')}</p>
         ) : (

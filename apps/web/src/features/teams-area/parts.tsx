@@ -8,6 +8,12 @@ import type { AdminDivision } from '../../server/admin-teams.ts';
 import { t, type TextKey } from '../../server/messages.ts';
 import { doneKey, problemKey } from './answer.ts';
 
+/** The notices that say something went to the bin, and so lead to it (step 2.77). */
+const removedKeys: ReadonlySet<TextKey> = new Set<TextKey>([
+  'adminTeams.done.removed',
+  'adminTeams.done.personRemoved',
+]);
+
 /** What Next.js gives a page: the address's query. */
 export type SearchProps = {
   readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
@@ -21,9 +27,12 @@ export type SearchProps = {
 export function Notice({
   query,
   saidBeside = false,
+  binHref,
 }: {
   readonly query: Readonly<Record<string, string | string[] | undefined>>;
   readonly saidBeside?: boolean;
+  /** The bin's screen: a removal's notice leads to it, "Bring it back" (step 2.77). */
+  readonly binHref?: string;
 }) {
   const problem = problemKey(query);
   const good = doneKey(query);
@@ -44,6 +53,12 @@ export function Notice({
         role="status"
       >
         {t(good)}
+        {binHref !== undefined && removedKeys.has(good) ? (
+          <>
+            {' '}
+            <a href={binHref}>{t('admin.bin.back')}</a>
+          </>
+        ) : null}
       </p>
     );
   }

@@ -8,6 +8,7 @@
 // that is checked: every case runs on its own and is rolled back.
 import {
   acceptInvitation,
+  activityMatchOf,
   cancelInvitation,
   clearSetting,
   clearSettingFor,
@@ -22,6 +23,7 @@ import {
   renameShortName,
   resendInvitation,
   revokeGrant,
+  searchActivity,
   setCurrentSeason as setCurrentSeasonCommand,
   setLeagueName,
   publicNames,
@@ -621,6 +623,24 @@ registerIsolationCase({
   run: (scope) => listActivityEntries(scope, 50, undefined, { type: 'league' }),
 });
 
+registerIsolationCase({
+  subject: listActivityEntries,
+  name: "search the scope's activity log by kind and time (step 2.77)",
+  run: (scope) =>
+    listActivityEntries(
+      scope,
+      50,
+      undefined,
+      { type: 'league' },
+      {
+        // The seeded entry is `league.renamed`.
+        match: { ...activityMatchOf('access'), also: ['league.renamed'] },
+        from: '2000-01-01T00:00:00Z',
+        after: { at: '2000-01-01T00:00:00Z', id: '00000000-0000-7000-8000-000000000000' },
+      },
+    ),
+});
+
 registerCommandCase(invite, harnessTx, {
   name: 'invite someone to the league as its owner',
   input: () => ({ email: 'harness-invitee@example.test', role: 'editor' }),
@@ -662,6 +682,11 @@ registerCommandCase(listAccess, harnessTx, {
 
 registerCommandCase(listActivity, harnessTx, {
   name: "read the scope's activity log",
+  input: () => ({}),
+});
+
+registerCommandCase(searchActivity, harnessTx, {
+  name: "search the league's activity log",
   input: () => ({}),
 });
 

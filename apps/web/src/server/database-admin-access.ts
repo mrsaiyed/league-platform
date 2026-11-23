@@ -13,7 +13,10 @@ import type { AdminAccessPorts } from './admin-access.ts';
 import type { SendQueuedInvitations } from './made-up-invitation-mail.ts';
 
 /** What these ports use of packages/database. */
-export type AdminAccessQueries = Pick<typeof DatabaseModule, 'withTransaction' | 'listAccessNames'>;
+export type AdminAccessQueries = Pick<
+  typeof DatabaseModule,
+  'withTransaction' | 'listAccessNames' | 'findActivityTargets'
+>;
 
 export function databaseAdminAccess(
   database: AdminAccessQueries,
@@ -28,6 +31,12 @@ export function databaseAdminAccess(
         const rows = await database.listAccessNames(scope);
         return new Map(rows.map((row) => [row.accountId, row.displayName]));
       }),
+    thingsNamed: (leagueId, accountId, asks) =>
+      asks.length === 0
+        ? Promise.resolve([])
+        : database.withTransaction(db, { leagueId, accountId: accountId ?? undefined }, (scope) =>
+            database.findActivityTargets(scope, asks),
+          ),
     sendQueuedInvitations,
   };
 }

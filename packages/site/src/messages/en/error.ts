@@ -104,22 +104,23 @@ export const enError = {
   'error.leagues.restore_game.game-not-found': 'That game is not there.',
   'error.leagues.restore_game.game-not-restorable':
     'A game that was played cannot be restored. Correct it instead.',
-  'error.leagues.restore_game.game-number-taken': 'Another game now has this game number.',
+  'error.leagues.restore_game.game-number-taken':
+    'Another game of the season now has this game number. Give that game another number in Schedule, then bring this one back.',
   'error.leagues.restore_game.game-part-in-bin':
-    'A team, division, venue or court of this game is in the bin, so this game cannot be put back. If it needs to come back, ask the league’s owner.',
+    'A team, division, venue or court of this game is in the bin, so this game cannot come back yet. Bring that back first, from the bin in League settings.',
   'error.leagues.restore_game.game-reference-taken': 'Another game now has this outside reference.',
   'error.leagues.restore_person.person-not-found': 'That person is not there.',
   'error.leagues.restore_person.person-profile-taken':
-    'The account of this person is now linked to someone else in this league.',
+    'The account of this person is now linked to someone else in this league. Bring them back once that person is taken off the league list, or add them again as someone new in People.',
   'error.leagues.restore_team.team-division-in-bin':
     'The division of this team is in the bin. Bring the division back first.',
   'error.leagues.restore_team.team-lineage-taken':
     'This season already has a team that carries on this team from other seasons. Move that team to the bin first, then try again.',
   'error.leagues.restore_team.team-name-taken':
-    'Another team now has this name. Rename one of them, then try again.',
+    'Another team of the season now has this name. Rename that team on its page in Teams, then bring this one back.',
   'error.leagues.restore_team.team-not-found': 'That team is not there.',
   'error.leagues.restore_team.team-short-name-taken':
-    'Another team now has this short name. Rename one of them, then try again.',
+    'Another team of the season now has this short name. Change that team’s short name on its page in Teams, then bring this one back.',
   // Why a season's roster settings were refused (T-187): `error.`, the command's name,
   // the code, and the setting at fault when there is one.
   'error.leagues.set_season_roster_settings.invalid-rules': 'These roster settings are not valid.',
