@@ -87,7 +87,7 @@ What each role sees is trimmed to what they can use. A scorekeeper who opens the
 ## 6. League settings in detail
 
 - **Profile**: league name, address (short name), logo, contact email, city and time zone, adult or youth.
-- **Admins**: the people with roles, pending invitations, the activity log.
+- **Admins**: the people with roles, pending invitations, the activity log. The log has a page of its own (build step 2.77, T-306): newest first, twenty at a time with "Older" and "Newer", filtered by who, by what was changed (teams, people, games and results, schedule, standings, settings and seasons, who has access) and by a span of days. Each entry says who, what, when in the league's time zone, and why when a reason was given; a season's status says whether it is now shown to visitors or hidden; a removal leads to the bin while the thing is still there.
 - **Features**: switches for the optional parts: registration fees, draft, awards and trophies, sponsors, media, news, player pages, live stats. Switching a feature off hides it from the site and the admin but keeps its data. Player pages start switched off in a league of under-18s and on in an adult league; the league's admin switches them either way (**A-15**, decided for you on November 14 as "on", changed on November 17: where nobody decides, a child's page must not be public).
 - **Wording**: the league's own words for division, round, team leader and club (U-4).
 - **Start page for members**: the league home, or each member's own team page (U-5).
