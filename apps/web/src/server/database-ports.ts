@@ -42,7 +42,13 @@ import { databaseAdminAccess, type AdminAccessQueries } from './database-admin-a
 import { databaseAdminSettings, type AdminSettingsQueries } from './database-admin-settings.ts';
 import { databaseAdminTeams, type AdminTeamsQueries } from './database-admin-teams.ts';
 import { coreEventHandlers } from './database-event-handlers.ts';
-import { databaseGames, databaseGamesDeps, type GamesQueries } from './database-games.ts';
+import {
+  databaseGames,
+  databaseGamesDeps,
+  databaseScorekeepersDeps,
+  databaseStandingsDeps,
+  type GamesQueries,
+} from './database-games.ts';
 import {
   databaseLeagueSites,
   type DesignReport,
@@ -282,7 +288,13 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     }),
     localTools: options.localTools?.tools ?? null,
     publicStats: databasePublicStats(database, db),
-    games: databaseGames(database, db, gamesDeps),
+    games: databaseGames(
+      database,
+      db,
+      gamesDeps,
+      databaseStandingsDeps(database, db, { log: options.log }),
+      databaseScorekeepersDeps(database, db, { log: options.log }),
+    ),
     fixtureImport: notMovedYet('fixture import'),
     publicSchedule: databasePublicSchedule(database, db, now),
     // Its seasonsOf lists only what mayListSeason allows the holder, read again for the

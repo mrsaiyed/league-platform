@@ -12,7 +12,7 @@ import { boxScoreStores } from '../../command/testing/memory-box-scores.ts';
 import type { DomainEvent, EventHandler, JobQueue } from '../../command/index.ts';
 import type { ActivityEntry, Grant } from '../access/index.ts';
 import { dayIn, type StoredSetting } from '../leagues/index.ts';
-import { isDecided } from './game-fields.ts';
+import { isClosed, isDecided } from './game-fields.ts';
 import {
   earlierRoundsOf,
   inEarlierRound,
@@ -27,6 +27,7 @@ import type {
   GameRecord,
   GameRosterPlayer,
   GamesTx,
+  ScorekeepersTx,
   NewGameCorrection,
 } from './ports.ts';
 
@@ -203,7 +204,7 @@ export function memoryGames(state: Partial<MemoryGames> = {}) {
 }
 
 /** The games transaction over one copy of the state. */
-export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
+export function gamesTxOf(s: MemoryGames, jobs: JobQueue): ScorekeepersTx {
   return {
     jobs,
     access: {
@@ -211,6 +212,7 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
       leagueStatus: async () => s.status,
       activeGrantsOf: async (account) =>
         s.grants.filter((g) => g.accountId === account && g.revokedAt === null),
+      listGrants: async () => s.grants.filter((g) => g.revokedAt === null),
     },
     activity: {
       record: async (entry) => void s.activity.push(entry),
@@ -265,6 +267,13 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): GamesTx {
               (season === undefined || g.seasonId === season),
           )
           .sort((a, b) => (a.startsAt ?? '9').localeCompare(b.startsAt ?? '9')),
+      listSeasonAssignments: async (season) => {
+        const games = s.games
+          .filter((g) => g.seasonId === season && !g.binned && !isClosed(g.status))
+          .sort((a, b) => (a.startsAt ?? '9').localeCompare(b.startsAt ?? '9'));
+        const ids = new Set(games.map((g) => g.id));
+        return { games, assignments: s.assignments.filter((a) => ids.has(a.gameId)) };
+      },
       // The newest cancelling of the game says what it was (step 2.158).
       statusBeforeCancelled: async (id) => {
         const entry = s.activity

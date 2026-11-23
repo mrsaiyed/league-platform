@@ -462,6 +462,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
   const world = madeUpWorld({
     leagues: worldLeagues,
     accessOf: (leagueId) => accessTx(leagueId).access,
+    listGrantsOf: (leagueId) => accessTx(leagueId).access.listGrants,
     log: options.log,
     clock,
   });

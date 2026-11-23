@@ -35,6 +35,10 @@ export function standInGames(world: World, options: StandInGamesOptions): StandI
     worldGameSnapshot(() => world.read(leagueId), world.now);
   return {
     deps,
+    // The world's one transaction holds the standings' stores too (step 2.56).
+    standingsDeps: deps,
+    // And the grants in force, for who may be assigned to score (T-305).
+    scorekeepersDeps: deps,
     tracker: {
       deps,
       snapshotStoreOf,
@@ -55,7 +59,7 @@ export function standInGames(world: World, options: StandInGamesOptions): StandI
     },
     namesOf: async (leagueId): Promise<GameNames> => {
       const s = await world.read(leagueId);
-      if (s === undefined) return { teams: {}, scorekeepers: {}, seasons: {} };
+      if (s === undefined) return { teams: {}, scorekeepers: {}, seasons: {}, people: {} };
       const scorekeepers: Record<string, string[]> = {};
       for (const a of s.assignments) {
         (scorekeepers[a.gameId] ??= []).push(options.people[a.accountId] ?? '');
@@ -64,6 +68,7 @@ export function standInGames(world: World, options: StandInGamesOptions): StandI
         teams: Object.fromEntries(s.teams.map((t) => [t.id, t.name])),
         scorekeepers,
         seasons: Object.fromEntries(s.seasons.map((x) => [x.id, x.name])),
+        people: options.people,
       };
     },
   };

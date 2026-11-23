@@ -88,6 +88,7 @@ describe('which modes draw pages not built yet', () => {
       'teams',
       'schedule',
       'games',
+      'standings',
       'season',
       'settings',
     ]);

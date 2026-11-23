@@ -710,6 +710,73 @@ const cases = [
     ['Admin areas', noAccess],
     '/signin?next=%2Fnorth-valley%2Fadmin%2Fschedule%2Fvenues',
   ],
+  // Step 2.56: Standings and stats, the season's adjustments, is the owner's and the
+  // admins' (standings.adjust); every other kind of person is refused it or sent to sign in.
+  [
+    'owner',
+    '/north-valley/admin/standings',
+    200,
+    [
+      'Standings and stats',
+      'Add an adjustment',
+      'See the public table',
+      staffFrameAt('/north-valley/admin/standings'),
+      oneHeading,
+    ],
+    [adminPlaceholder],
+  ],
+  ['scheduler', '/north-valley/admin/standings', 403, [noAccess], ['Add an adjustment']],
+  ['scorekeeper', '/north-valley/admin/standings', 403, [noAccess], ['Add an adjustment']],
+  ['coach', '/north-valley/admin/standings', 403, [noAccess], ['Add an adjustment']],
+  ['stranger', '/north-valley/admin/standings', 403, [noAccess], ['Add an adjustment']],
+  [
+    'visitor',
+    '/north-valley/admin/standings',
+    307,
+    [],
+    ['Admin areas', noAccess],
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fstandings',
+  ],
+  // Step 2.56: Games → Scorekeepers is for whoever manages games (games.manage): the owner
+  // and a scheduler; a scorekeeper reaches Games but is told this page is not theirs; every
+  // other kind of person is refused the area or sent to sign in.
+  [
+    'owner',
+    '/north-valley/admin/games/scorekeepers',
+    200,
+    [
+      'Scorekeepers',
+      'Games still to be played',
+      'Assign',
+      staffFrameAt('/north-valley/admin/games'),
+      oneHeading,
+    ],
+    [adminPlaceholder],
+  ],
+  [
+    'scheduler',
+    '/north-valley/admin/games/scorekeepers',
+    200,
+    ['Games still to be played', 'Assign', oneHeading],
+    [adminPlaceholder],
+  ],
+  [
+    'scorekeeper',
+    '/north-valley/admin/games/scorekeepers',
+    200,
+    ['You may not change who scores these games.'],
+    ['Assign'],
+  ],
+  ['coach', '/north-valley/admin/games/scorekeepers', 403, [noAccess], ['Assign']],
+  ['stranger', '/north-valley/admin/games/scorekeepers', 403, [noAccess], ['Assign']],
+  [
+    'visitor',
+    '/north-valley/admin/games/scorekeepers',
+    307,
+    [],
+    ['Admin areas', noAccess],
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fgames%2Fscorekeepers',
+  ],
   [
     'scheduler',
     '/north-valley/admin/games',

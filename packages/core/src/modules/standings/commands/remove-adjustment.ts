@@ -1,6 +1,7 @@
 // Takes a standings adjustment off the season (S-10): it goes to the bin, the
 // season's standings are worked out again without it, and its footnote goes. Needs
-// `standings.adjust`; logged (A-6).
+// `standings.adjust`; logged (A-6). The admin's screen asks why (step 2.56): the reason
+// for taking it off is kept in the activity log line, as the row itself goes to the bin.
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { recordActivity } from '../../access/index.ts';
@@ -15,7 +16,11 @@ export type RemoveAdjustmentError = {
 export const removeAdjustment = defineCommand({
   name: 'standings.remove_adjustment',
   permission: 'standings.adjust',
-  input: z.object({ seasonId: z.uuid(), adjustmentId: z.uuid() }),
+  input: z.object({
+    seasonId: z.uuid(),
+    adjustmentId: z.uuid(),
+    reason: z.string().trim().min(1).max(500).optional(),
+  }),
   allowed: (context, input, tx: StandingsTx) => mayAdjustStandings(context, tx, input.seasonId),
   run: async ({
     context,
@@ -33,7 +38,10 @@ export const removeAdjustment = defineCommand({
     await recordActivity(tx, context, {
       action: 'standings.remove_adjustment',
       target: { type: 'season', id: input.seasonId },
-      details: { adjustment: input.adjustmentId },
+      details: {
+        adjustment: input.adjustmentId,
+        ...(input.reason === undefined ? {} : { reason: input.reason }),
+      },
     });
     return ok({});
   },

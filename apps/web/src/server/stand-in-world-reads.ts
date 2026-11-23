@@ -6,6 +6,7 @@
 // only published games of a season the public may see, teams by name and color, and
 // people only through the one name function (T-81). Nothing here changes the world.
 import {
+  correctedMarkDate,
   lookupSetting,
   membersStartPage,
   minimumGamesToRank,
@@ -239,12 +240,16 @@ export function worldGameSnapshot(
           visibility: p.visibility,
         }));
     },
-    correctedOn: async (gameId) =>
-      ((await read())?.corrections ?? [])
-        .filter((c) => c.gameId === gameId)
-        .map((c) => c.on)
-        .sort()
-        .at(-1),
+    // Only a correction whose next final differs marks the game (S-81), as on the database.
+    correctedOn: async (gameId) => {
+      const s = await read();
+      const game = s?.games.find((g) => g.id === gameId);
+      if (s === undefined || game === undefined) return undefined;
+      return correctedMarkDate(
+        s.corrections.filter((c) => c.gameId === gameId),
+        game,
+      );
+    },
   };
 }
 

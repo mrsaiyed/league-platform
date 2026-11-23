@@ -16,6 +16,7 @@ import {
   listMyGames,
   listPostponedGames,
   needsResultLimit,
+  roleHasPermission,
   type CommandContext,
   type CommandDeps,
   type LeagueAddressee,
@@ -26,6 +27,7 @@ import {
 import { displayLabels, finalPillOf } from '@srleagues/site';
 import { EmptyPanel, FilterToolbar, GameCard, PageHead, RoundPicker, Section } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
+import { scorekeepersAddress } from '../scorekeepers-area/index.ts';
 import type { GameNames } from '../../server/games-area-ports.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { gameWhenText, type LeagueTimes } from '../../server/game-when.ts';
@@ -532,6 +534,13 @@ export async function GamesPage({
         <a className="ui-more" href={`${list}#earlier`}>
           {t('admin.games.toEarlier')}
         </a>
+        {/* Who scores which game (step 2.56): for those who manage games somewhere. */}
+        {holder !== undefined &&
+        (holder.isOwner || holder.grants.some((g) => roleHasPermission(g.role, 'games.manage'))) ? (
+          <a className="ui-more" href={scorekeepersAddress(addressee)}>
+            {t('admin.games.toScorekeepers')}
+          </a>
+        ) : null}
       </PageHead>
       {saved === undefined || aboutRow !== undefined ? null : (
         <SavedLine text={saved} kind={savedKind} />

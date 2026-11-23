@@ -556,6 +556,10 @@ const adminPages = [
   // league's venues with their courts; the answers are taken by divisionVenueSteps' taps.
   { name: 'admin-divisions', at: '/admin/season/divisions' },
   { name: 'admin-venues', at: '/admin/schedule/venues' },
+  // Step 2.56: Standings and stats, the season's adjustments (the made-up one listed).
+  { name: 'admin-standings', at: '/admin/standings' },
+  // Step 2.56: Games → Scorekeepers, who scores each game still to be played.
+  { name: 'admin-scorekeepers', at: '/admin/games/scorekeepers' },
   ...['divisions-refused', 'divisions-removed', 'venues-refused', 'venues-court-removed'].map(
     (what) => ({
       name: `admin-${what}`,
@@ -639,6 +643,7 @@ const adminPages = [
     }),
   ),
   { name: 'admin-standings', at: '/admin/standings' },
+  { name: 'admin-scorekeepers', at: '/admin/games/scorekeepers' },
   // The admin's own frame (step 2.103): its menu, open, as a phone holds it (on a laptop the
   // menu is always at the side, so the picture is the page's first screen); and "not
   // found" inside the admin, for a team that is not there.

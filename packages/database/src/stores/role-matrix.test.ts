@@ -33,7 +33,7 @@ import {
   type CommandContext,
   type CommandDeps,
   type CommandRequirement,
-  type GamesTx,
+  type ScorekeepersTx,
   type ImportScoresTx,
   type Job,
   type LeagueRemovalTx,
@@ -83,6 +83,7 @@ import {
   invite,
   listAccess,
   listActivity,
+  listAdjustments,
   listBin,
   listDivisions,
   listEarlierGames,
@@ -91,6 +92,7 @@ import {
   listPeople,
   listPostponedGames,
   listRoster,
+  listScorekeepers,
   listScoringOffers,
   listVenues,
   markLeft,
@@ -245,7 +247,7 @@ let staffId: string;
 let accessDeps: CommandDeps<AccessTx>;
 let leaguesDeps: CommandDeps<LeaguesTx & StandingsTx>;
 let schedulingDeps: CommandDeps<SchedulingTx>;
-let gamesDeps: CommandDeps<GamesTx>;
+let gamesDeps: CommandDeps<ScorekeepersTx>;
 let scoringDeps: CommandDeps<ScoringTx>;
 let trackerDeps: CommandDeps<TrackerTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
@@ -1024,6 +1026,14 @@ const gameCommandRows: readonly Row[] = [
       return { gameId, accountId };
     },
     (c, i) => unassignScorekeeper(c, i, gamesDeps),
+  ),
+  // Step 2.56: Admin → Games → Scorekeepers, a season's open games and who may score them.
+  ...gameRows(
+    'games.list_scorekeepers',
+    "see who scores a season's games",
+    'games.manage',
+    async (league, program) => ({ seasonId: await seasonIn(league, program) }),
+    (c, i) => listScorekeepers(c, i, gamesDeps),
   ),
   {
     command: 'games.list_my_games',
@@ -1821,6 +1831,13 @@ const adjustmentRows: readonly Row[] = [
       return { seasonId, teamId, wins: 1, reason: 'Won by ruling' };
     },
     (c, i) => addAdjustment(c, i, standingsDeps),
+  ),
+  ...gameRows(
+    'standings.list_adjustments',
+    "list a season's adjustments",
+    'standings.adjust',
+    async (league, program) => ({ seasonId: await seasonIn(league, program) }),
+    (c, i) => listAdjustments(c, i, standingsDeps),
   ),
   ...gameRows(
     'standings.remove_adjustment',

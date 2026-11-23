@@ -40,6 +40,7 @@ import {
   type SchedulingTx,
   type StandingsTx,
   type TeamsTx,
+  type ScorekeepersTx,
   type TrackerTx,
   type TransactionRunner,
 } from '@srleagues/core';
@@ -54,6 +55,7 @@ import { worldPeopleStore, worldTeamsStore } from './stand-in-world-teams.ts';
 
 /** Every store of every module, in one transaction: what the database's transaction offers. */
 export type WorldTx = TrackerTx &
+  ScorekeepersTx &
   StandingsTx &
   TeamsTx &
   PeopleTx &
@@ -91,6 +93,11 @@ export type WorldOptions = {
   readonly leagues: readonly LeagueWorld[];
   /** What a permission check reads for one league: its owner, state and grants. */
   readonly accessOf: (leagueId: string) => AccessReader;
+  /**
+   * Every grant in force in one league, for who may be assigned to score (step 2.56); a
+   * world given none knows only the owner as one.
+   */
+  readonly listGrantsOf?: (leagueId: string) => ScorekeepersTx['access']['listGrants'];
   /** Where the commands' T-196 lines go. */
   readonly log: (line: CommandLogLine) => void;
   /**
@@ -147,7 +154,13 @@ export function madeUpWorld(options: WorldOptions): World {
   const inside = new AsyncLocalStorage<true>();
 
   const txOf = (leagueId: string, s: LeagueWorld, jobs: Job[]): WorldTx => {
-    const access = options.accessOf(leagueId);
+    const reader = options.accessOf(leagueId);
+    const access: ScorekeepersTx['access'] = {
+      ownerAccountId: reader.ownerAccountId,
+      leagueStatus: reader.leagueStatus,
+      activeGrantsOf: reader.activeGrantsOf,
+      listGrants: options.listGrantsOf?.(leagueId) ?? (async () => []),
+    };
     const activity: ActivityLog = {
       // An id that grows with each entry, so entries of the same moment keep their order.
       record: async (entry) => {
