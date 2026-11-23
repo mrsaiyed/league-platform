@@ -603,23 +603,48 @@ th[aria-sort='descending'] .ui-sort-button::after {
 .ui-standings .ui-moved {
   display: none;
 }
+/* The least the team column holds: a name's longest single word of about eleven letters,
+   in the table's own face, worked out once on the table like the last column. */
+@property --ui-name-least {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
 @media (max-width: 30rem) {
   .ui-standings[data-narrow] {
-    --ui-num-col: calc(var(--step-6) + var(--step-3));
+    --ui-num-col: calc(var(--step-6) + var(--step-1));
     /* The last column in view (what the table is ordered by: a percentage such as "1.000",
        or the points) is wide enough for five figures in the table's own face, whatever that
        face is, and the fade's width after them, so it never grows past its share and stands
        half out of the box, and no figure of it is faded. */
     --ui-last-col: max(var(--ui-num-col), calc(5ch + 6 * var(--step-1)));
-    --ui-place-col: calc(var(--step-7) + var(--step-3));
-    --ui-name-col: calc(
+    --ui-place-col: var(--step-7);
+    /* Beside the name's words: the column's two paddings, the shield and its gap. */
+    --ui-name-beside: calc(2 * var(--step-2) + var(--step-5) + var(--step-1) + var(--step-2));
+    --ui-name-least: calc(11ch + var(--ui-name-beside));
+    /* What the box leaves the name beside the place and every column in view. */
+    --ui-name-fit: calc(
       100cqi - var(--ui-seed-col, 0) * var(--ui-place-col) - (var(--ui-in-view, 1) - 1) *
         var(--ui-num-col) - var(--ui-last-col)
     );
-    /* The name's own words: the column less its two paddings, the shield and its gap. */
-    --ui-name-words: calc(
-      var(--ui-name-col) - 2 * var(--step-2) - var(--step-5) - var(--step-1) - var(--step-2)
+    /* Too narrow for that least: the last column in view (the percentage, or the points)
+       joins the columns scrolled to, starting at the box's edge, and the name has its room
+       but for the fade's room kept at the end of the column before it. A name is never
+       squeezed below its least: its words wrap between them, never inside one. Here
+       --ui-too-many is 0 when the name fits beside them all and a great length when not. */
+    --ui-too-many: clamp(
+      0px,
+      (var(--ui-name-least) - var(--ui-name-fit)) * 100000,
+      100000px
     );
+    --ui-name-col: max(
+      var(--ui-name-least),
+      calc(
+        var(--ui-name-fit) + min(var(--ui-too-many), calc(var(--ui-last-col) - var(--step-3)))
+      )
+    );
+    /* The name's own words: the column less what stands beside them. */
+    --ui-name-words: calc(var(--ui-name-col) - var(--ui-name-beside));
   }
   .ui-standings[data-narrow] .ui-left-out {
     display: none;
@@ -645,10 +670,16 @@ th[aria-sort='descending'] .ui-sort-button::after {
        goes on (to the columns reached by scrolling). */
     padding-inline: var(--step-1) var(--step-4);
   }
+  /* Then the column before it is the last in view, and its figures keep clear of the fade. */
+  .ui-standings[data-narrow] .ui-num.ui-next-to-last {
+    inline-size: calc(var(--ui-num-col) + min(var(--ui-too-many), var(--step-3)));
+    min-inline-size: calc(var(--ui-num-col) + min(var(--ui-too-many), var(--step-3)));
+    padding-inline-end: max(var(--step-1), min(var(--ui-too-many), var(--step-4)));
+  }
   .ui-standings[data-narrow] tr > .ui-num:first-child {
     inline-size: var(--ui-place-col);
     min-inline-size: var(--ui-place-col);
-    padding-inline: var(--step-4) var(--step-2);
+    padding-inline: var(--step-2) var(--step-1);
   }
   .ui-table.ui-standings[data-narrow] .ui-team-cell {
     padding-inline: var(--step-2);

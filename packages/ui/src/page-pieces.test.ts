@@ -724,7 +724,30 @@ describe('tables', () => {
     // The last column in view has room for five figures ("1.000") in the table's own face.
     expect(displayCss).toMatch(
       /--ui-last-col: max\(var\(--ui-num-col\), calc\(5ch \+ 6 \* var\(--step-1\)\)\);/,
+    ); // The team column never goes below a word of about eleven letters (beside its shield):
+    // too narrow for that, the last column in view joins the scroll, and the one before it
+    // keeps the fade's room.
+    expect(html.match(/class="ui-num ui-next-to-last"/g)).toHaveLength(2);
+    expect(displayCss).toMatch(/--ui-name-least: calc\(11ch \+ var\(--ui-name-beside\)\);/);
+    expect(displayCss).toMatch(/--ui-name-col: max\(\s*var\(--ui-name-least\),/);
+  });
+
+  it('on a phone draw a wide-only column nowhere, not even after the scroll', () => {
+    const html = render(
+      createElement(StandingsTable, {
+        caption: 'East',
+        idPrefix: 'east',
+        columns: [
+          { key: 'gp', label: 'GP', narrow: 'wide-only' },
+          { key: 'w', label: 'W', narrow: 'in-view' },
+          { key: 'pct', label: 'PCT', narrow: 'in-view' },
+        ],
+        rows: [{ id: 'a', team: 'Owls', cells: { gp: 6, w: 5, pct: '.833' } }],
+        labels: { seed: 'Seed', team: 'Team', note: 'Note', notes: 'Notes' },
+      }),
     );
+    expect(html.match(/class="ui-num ui-left-out"/g)).toHaveLength(2);
+    expect(html).not.toContain('ui-moved');
   });
   it('fade the far edge lightly: a column wholly in view under it keeps its digits', () => {
     // Narrow, and reaching the panel's color only at the very edge: never a solid band. A
