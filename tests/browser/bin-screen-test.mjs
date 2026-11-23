@@ -13,7 +13,8 @@
 // - removes a published game in Schedule's draft and publishes; Schedule's "Removed games"
 //   leads to it in the bin, which brings it back.
 // With scripts on: a team removed and brought back from the notice's way to the bin. A
-// scheduler is refused the bin. Each bin page passes the accessibility checks and nothing
+// scheduler sees the bin's games and not its teams or people (T-308); a coach, who may
+// bring back nothing, is refused it. Each bin page passes the accessibility checks and nothing
 // scrolls sideways at 390.
 import {
   accessibilityProblems,
@@ -236,10 +237,22 @@ if (built) {
     );
     note('scripts on: the team is back', (await binRow(live, wrens).count()) === 0);
 
-    at = 'a scheduler is refused the bin';
+    at = "a scheduler sees the bin's games only";
     const scheduler = await open(false, 'local-scheduler-token');
-    const refused = await scheduler.goto(`${origin}/north-valley/admin/settings/bin`);
-    note('a scheduler is refused the bin', refused?.status() === 403, `${refused?.status()}`);
+    const part = await scheduler.goto(`${origin}/north-valley/admin/settings/bin`);
+    const headings = await scheduler.locator('main h2').allTextContents();
+    note(
+      "a scheduler sees the bin's games, not its teams or people",
+      part?.status() === 200 &&
+        headings.includes('Removed games') &&
+        !headings.includes('Removed teams') &&
+        !headings.includes('Removed people'),
+      `${part?.status()} ${headings.join(', ')}`,
+    );
+    at = 'a coach is refused the bin';
+    const coach = await open(false, 'local-coach-token');
+    const refused = await coach.goto(`${origin}/north-valley/admin/settings/bin`);
+    note('a coach is refused the bin', refused?.status() === 403, `${refused?.status()}`);
   } catch (error) {
     failures.push(`${at}: ${whatWentWrong(error)}`);
   } finally {
