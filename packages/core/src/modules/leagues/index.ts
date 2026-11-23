@@ -168,6 +168,7 @@ export {
   isLeagueSiteName,
   leagueApiBase,
   leagueApiUrl,
+  leaguePages,
   leagueUrl,
   type AdminArea,
   type LeagueAddressee,

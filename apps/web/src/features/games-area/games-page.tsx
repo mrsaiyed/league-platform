@@ -384,7 +384,7 @@ function Part({
  * "Waiting for a new date" (step 2.158): every postponed game, soonest first, as its card
  * (the Postponed pill and the date it was to be played). Cancelling it is offered on its
  * card where it is listed by its day or its earlier round; giving it a new date from here
- * is step 2.53's, and the part's note says it is not ready yet.
+ * is step 2.53's; until then the part's note promises nothing.
  */
 function WaitingList({
   games,

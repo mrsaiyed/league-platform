@@ -26,6 +26,8 @@ export const enAdmin = {
   'admin.home.areas': 'Where to go',
   // The areas with no screen yet, named together under the cards.
   'admin.home.coming': 'Coming',
+  'admin.home.nothingYet.body': 'What your role looks after in {league} will be listed here.',
+  'admin.home.nothingYet.title': 'Nothing to do here yet',
   'admin.home.purpose.games': 'Results, box scores and who scores each game.',
   'admin.home.purpose.schedule': 'Rounds, games, places and times.',
   'admin.home.purpose.season': 'Who can see each season.',

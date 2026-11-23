@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { localToolScreen } from '../../../../features/local-tools/index.ts';
+import { unreleasedScreen } from '../../../../features/unreleased/index.ts';
 import { loadLeaguePage } from '../../../../server/load-league-page.ts';
 
 // Drawn for each request, never once when the site is built (step 2.96): the two local-only
@@ -19,6 +20,11 @@ export const dynamic = 'force-dynamic';
  * `/signin/made-up-people` (step 2.96, features/local-tools), drawn only when the gate
  * gives the local tools. Anywhere else they go on below as every unknown `/signin/<name>`
  * does, through this same route, so they answer exactly as an address that does not exist.
+ *
+ * The pages not built yet below a league or one of our words (`/{league}/register`,
+ * `/account/inbox`; step 2.140, server/releases.ts) are drawn here too, only where pages not
+ * built yet are shown (local work and tests); in staging and production they go on below,
+ * as the addresses that do not exist that they are there.
  */
 export default async function Page({
   params,
@@ -30,6 +36,8 @@ export default async function Page({
   const { league, missing } = await params;
   const local = await localToolScreen(league, missing, (await searchParams) ?? {});
   if (local !== null) return local;
+  const unreleased = await unreleasedScreen([league, ...missing]);
+  if (unreleased !== null) return unreleased;
   await loadLeaguePage(league, 'site');
   return notFound();
 }

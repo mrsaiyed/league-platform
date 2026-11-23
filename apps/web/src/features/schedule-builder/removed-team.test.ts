@@ -124,7 +124,7 @@ describe('a team in the bin with games is named on every screen (A-17)', () => {
     const struck = [...grid.rounds.flatMap((r) => r.removed), ...grid.looseRemoved];
     expect(struck.map((g) => [g.id, g.teamInBin])).toEqual([[game.id, true]]);
     expect(t('schedule.admin.removedTeamInBin')).toBe(
-      'Removed in this draft, and one of its teams is in the bin, so this game stays removed. The team is kept for 30 days; the screen to bring it back is not ready yet.',
+      'Removed in this draft, and one of its teams is in the bin, so this game stays removed. The team is kept for 30 days.',
     );
   });
 

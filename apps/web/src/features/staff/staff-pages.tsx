@@ -10,7 +10,8 @@ import type { LeagueView } from '../../server/league-gate.ts';
 import { leagueSites, siteOf } from '../../server/league-site.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
-import { isReadyArea } from './staff-area.ts';
+import { isReadyArea, shownHere } from '../../server/releases.ts';
+import { leagueHomeStayUrl } from '../team-pages/index.ts';
 import { StaffIcon } from './staff-icon.tsx';
 
 /** One line on what an area is for, for the areas that have a screen today. */
@@ -42,11 +43,13 @@ export async function StaffHome({ view }: { readonly view: LeagueView }) {
   const league = view.context.league;
   const site = await siteOf(league, await leagueSites());
   // The areas with a screen are the cards. The ones with no screen yet are not somewhere
-  // to go: they are named quietly together under "Coming", and are no links here (the
-  // menu still lists each one, marked "Not ready").
+  // to go: in local work and tests they are named quietly together under "Coming", and are
+  // no links here (the menu lists each one, marked "Not ready"); in staging and production
+  // they are not named at all (step 2.140, server/releases.ts). Someone left with nothing
+  // (a registrar, while Registration and People are not built) is told so, calmly.
   const ready = view.areas.filter(isReadyArea);
-  const coming = view.areas.filter((area) => !isReadyArea(area));
-  const action = mainActions.find(([area]) => view.areas.includes(area));
+  const coming = shownHere().unreleased ? view.areas.filter((area) => !isReadyArea(area)) : [];
+  const action = mainActions.find(([area]) => ready.includes(area));
   return (
     <main className="staff-home">
       <PageHead
@@ -91,6 +94,13 @@ export async function StaffHome({ view }: { readonly view: LeagueView }) {
           </ul>
         </section>
       )}
+      {ready.length === 0 && coming.length === 0 ? (
+        <EmptyPanel
+          title={t('admin.home.nothingYet.title')}
+          text={t('admin.home.nothingYet.body', { league: site.name })}
+          action={{ href: leagueHomeStayUrl(league), label: t('admin.viewSite') }}
+        />
+      ) : null}
       {/* What else the home shows (numbers, a checklist of what to do next) is step
           2.129's, and stands here, between the cards and what is coming. */}
       {coming.length === 0 ? null : (
