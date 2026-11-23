@@ -13,7 +13,7 @@ The one file that says where the build is. Every run reads it first and updates 
 
 ## Handover of 2026-11-23, 01:40 UTC (delete this part when everything in it is done)
 
-The fourth lead (session_01GUxQEf54CzkKH8LtSKNsoT) worked from 22:05 UTC on 2026-11-22 to 01:40 UTC and stopped because its conversation reached the 300 thousand line (USAGE.md, rule 13); the meter read 23% (the day's number until 22:00 UTC on 2026-11-23 is 40%). No helper was running; nothing waits for GitHub. The founder's window is session_01GUxQEgr89W9ggpA1toGhGY (told at 00:00 and 01:30 UTC). Lane folders are `.local/lanes/<name>` on a lead's own machine and are NOT handed on: a new lead makes them again from GitHub's branches.
+The fourth lead (session_01GUxQEf54CzkKH8LtSKNsoT) worked from 22:05 UTC on 2026-11-22 to 01:40 UTC and stopped because its conversation reached the 300 thousand line (USAGE.md, rule 13); the meter read 23% (the day's number until 22:00 UTC on 2026-11-23 is 40%). No helper was running; nothing waits for GitHub. The fifth lead is session_01GUxQEiaAFYvMDTjvE4N44e (started at 01:35 UTC; if it never starts, the founder writes "continue" in the founder's window). The founder's window is session_01GUxQEgr89W9ggpA1toGhGY (told at 00:00 and 01:30 UTC). Lane folders are `.local/lanes/<name>` on a lead's own machine and are NOT handed on: a new lead makes them again from GitHub's branches.
 
 Landed by the fourth lead: 2.47, 2.207, 2.49, 2.46, 2.240 (131 steps done). Next actions, in this order:
 
