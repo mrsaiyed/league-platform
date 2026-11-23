@@ -46,6 +46,14 @@ export type { ScoringRule } from './scoring-access.ts';
 // What a person may score, as the stores filter the lists before they cut (step 2.156).
 export { inScoringReach } from './scoring-access.ts';
 export { listPostponedGames, type PostponedGame } from './commands/list-postponed-games.ts';
+// Admin → Games → Scorekeepers (step 2.56): a season's open games and who may score them.
+export {
+  listScorekeepers,
+  type GameScorekeepers,
+  type ListScorekeepersError,
+  type PossibleScorekeeper,
+  type SeasonScorekeepers,
+} from './commands/list-scorekeepers.ts';
 export { postponeGame, type PostponeGameError } from './commands/postpone-game.ts';
 export {
   putBackReasons,
@@ -180,5 +188,8 @@ export type {
   GameResultChange,
   GamesStore,
   GamesTx,
+  GameAssignment,
   NewGameCorrection,
+  ScorekeepersTx,
+  SeasonAssignments,
 } from './ports.ts';

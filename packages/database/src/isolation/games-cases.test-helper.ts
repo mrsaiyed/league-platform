@@ -10,6 +10,7 @@ import {
   listGamesNeedingResult as listGamesNeedingResultCommand,
   listMyGames,
   listPostponedGames as listPostponedGamesCommand,
+  listScorekeepers,
   listScoringOffers,
   openScoringSession,
   postponeGame,
@@ -65,6 +66,7 @@ import {
   listGamesInWindow,
   listGamesNeedingResult,
   listPostponedGames,
+  listSeasonAssignments,
   replaceGameLines,
   updateGameResult,
   findLastEventSeq,
@@ -118,6 +120,13 @@ registerIsolationCase({
     await postponeTargetGame(scope, target);
     return listPostponedGames(scope);
   },
+});
+
+// A season's open games and their scorekeepers (step 2.56).
+registerIsolationCase({
+  subject: listSeasonAssignments,
+  name: "list the target's season's open games and their scorekeepers",
+  run: (scope, target) => listSeasonAssignments(scope, target.seasonId),
 });
 
 // A season's results, as the games module gives them to standings (step 2.24).
@@ -539,6 +548,11 @@ registerCommandCase(assignScorekeeper, harnessTx, {
   // The target's owner may score any of its games, so may be assigned.
   name: "assign the target's owner to the target's upcoming game",
   input: (target) => ({ gameId: target.upcomingGameId, accountId: target.ownerId }),
+});
+
+registerCommandCase(listScorekeepers, harnessTx, {
+  name: "list the target's season's games' scorekeepers",
+  input: (target) => ({ seasonId: target.seasonId }),
 });
 
 registerCommandCase(unassignScorekeeper, harnessTx, {
