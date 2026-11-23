@@ -34,7 +34,7 @@ export const doing = {
 };
 
 export const walked = (checks) =>
-  `the walk, steps 1 to 18, ${checks} checks passed: the owner signed in on the sign-in page and scored game 1 to the final table; the league is a draft, so the owner read steps 16 to 18 and the visitor, signed out in a browser of its own, saw each of those pages hidden (404)`;
+  `the walk, steps 1 to 18, ${checks} checks passed: the owner signed in on the sign-in page and scored game 1 to the final table; the league was a draft: the visitor, signed out in a browser of its own, was told its home is not found (404), the owner published it in League settings, and the visitor then read steps 16 to 18 with 200`;
 
 export const refusedHere = (sentence) => `  refused, as asked: “${sentence}”`;
 export const refusedPassed = (setting, sentence) =>

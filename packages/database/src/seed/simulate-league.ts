@@ -393,6 +393,7 @@ async function setUpLeague(
         timeZone: plan.timeZone,
         audience: 'adult',
         ownerAccountId: ownerId,
+        contactEmail: 'hello@simulated-league.example.test',
         sportKey: 'basketball',
         firstSeason: { ...plan.season },
       },

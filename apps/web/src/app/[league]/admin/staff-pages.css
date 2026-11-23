@@ -1007,3 +1007,24 @@
 .admin-people > li .ui-button {
   margin-inline-start: auto;
 }
+/* League settings → Publishing (step 2.240): the "Must fix" list, one item a line, its
+   cure under it; it wraps at phone width like the groups below it. */
+.admin-settings > .settings-publish {
+  margin-block-end: var(--step-4);
+}
+.staff .publish-checks {
+  display: grid;
+  gap: var(--step-2);
+  margin: 0 0 var(--step-3);
+  padding: 0;
+  list-style: none;
+}
+.staff .publish-checks li {
+  overflow-wrap: anywhere;
+}
+.staff .publish-cure {
+  display: block;
+  max-inline-size: 44rem;
+  margin-block-start: var(--step-1);
+  font-size: var(--text-14);
+}

@@ -103,6 +103,11 @@ export type LeaguesStore = {
    * some (record 065). It says yes or no and nothing about who.
    */
   readonly hasRecordedChild: () => Promise<boolean>;
+  /**
+   * How people reach the league (given when it is made), or null when it never was:
+   * publishing waits for one (P3 §3, step 2.240).
+   */
+  readonly leagueContactEmail: () => Promise<string | null>;
   /** Whether the acting account is one of our own staff (named in the app settings; not a league role). */
   readonly isPlatformStaff: () => Promise<boolean>;
   /** Creates the transaction's league and its default program together. */

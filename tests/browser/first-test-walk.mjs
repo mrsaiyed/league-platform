@@ -6,11 +6,12 @@
 //
 // What differs between the two runs is given, not guessed: the league (its short name, its
 // name, its season's name, and whether it is still a draft) and how the owner signs in
-// (`signIn`, by default the sign-in page with an email and a password). A draft league is
-// one nothing can publish yet (step 2.125, part 2): steps 16 to 18 are then read by the
-// owner, who may see it, and the visitor, signed out in a browser of its own, sees that every
-// one of those pages is hidden from them (404). Steps 5 and 6 then check the product's own
-// sentence that visitors cannot see the league until it is published.
+// (`signIn`, by default the sign-in page with an email and a password). A draft league (a
+// league made by `league:make`) is published by its owner after step 15, in League
+// settings' Publishing part (step 2.240), once a visitor, signed out in a browser of its
+// own, has been told its home is not found; steps 16 to 18 are then read by that visitor.
+// Steps 5 and 6 check the product's own sentence that visitors cannot see the league until
+// it is published.
 import { leagueUrl } from '@srleagues/core';
 import { court } from './tracker-driver.mjs';
 import { openStaffMenu } from './web-browser-kit.mjs';
@@ -481,25 +482,82 @@ export async function walkFirstTest(o) {
     say(15, `after Save: ${saved}`);
     await picture(page, 15);
 
+    // A draft league (a league made by `league:make`, the rehearsal's): a visitor, signed
+    // out in a browser of its own, is first told its home is not found, the proof that a
+    // draft is hidden. Then the owner publishes it where the procedure says
+    // (docs/operations/new-test-copy.md, step 8.1.4): League settings, its Publishing part,
+    // each must-fix item met first (for a league with under-18s, "Names on public pages"
+    // saved, even unchanged, as the list says), then Publish, asked once. The stand-in's
+    // league starts live, so its run has nothing to publish.
+    if (draft) {
+      at = 'before publishing: the visitor, signed out, cannot see the draft league';
+      const watcher = await (o.visitorBrowser ?? browser).newContext(phone);
+      const look = await watcher.newPage();
+      const hiddenPages = [
+        ['the league home', leagueHome],
+        ["game 1's page", full(leagueUrl({ slug: league }, 'game', { game: gameId }))],
+        ['the standings', full(leagueUrl({ slug: league }, 'standings'))],
+        ['the statistics', full(leagueUrl({ slug: league }, 'stats'))],
+      ];
+      for (const [label, address] of hiddenPages) {
+        const hidden = await look.goto(address);
+        note(
+          `15. before publishing, ${label} is hidden from a visitor, signed out (404)`,
+          hidden?.status() === 404 && (await watcher.cookies()).length === 0,
+          `${hidden?.status()} at ${address}`,
+        );
+      }
+      await watcher.close();
+      at = "publishing: League settings' Publishing part";
+      await staffLink(page, 'League settings', /\/admin\/settings/);
+      const panel = page.locator('section#publish');
+      say(15, `the Publishing part: ${await panel.innerText()}`);
+      if ((await panel.locator('li[data-check="privacyChosen"][data-met="no"]').count()) > 0) {
+        at = 'publishing: saving "Names on public pages" as it starts, as the list asks';
+        const names = page.locator('section[data-setting="privacy.publicNames"]');
+        await tap(page, names.locator('button[type=submit]').first(), /done=/);
+        await staffLink(page, 'League settings', /\/admin\/settings/);
+      }
+      note(
+        '15. the Publishing part: every must-fix item is met',
+        (await panel.locator('li[data-met="no"]').count()) === 0,
+        await panel.innerText(),
+      );
+      at = 'publishing: Publish, asked once';
+      await tap(page, panel.getByRole('link', { name: 'Publish' }), /publish=ask/);
+      note(
+        '15. Publish asks once',
+        (await panel.innerText()).includes(
+          'Publish this league? Anyone will then be able to see its public pages, and you cannot turn it back into a draft afterwards.',
+        ),
+        await panel.innerText(),
+      );
+      await tap(page, panel.getByRole('button', { name: 'Publish' }), /done=/);
+      const publishedSaid = await page.locator('[role=status], [role=alert]').first().innerText();
+      note(
+        '15. the owner publishes: "The league is published."',
+        publishedSaid.includes('The league is published.'),
+        publishedSaid,
+      );
+      say(15, `after Publish: ${publishedSaid}`);
+      await picture(page, 15);
+    }
+
     // Steps 16 to 18: a visitor, signed out, reads the public pages: a fresh browser with
-    // no cookies, at the same phone size. Each page is read again by address to be sure it
-    // answers 200 to someone signed out. A draft league: the owner reads them, and the
-    // visitor, in a browser of its own, then sees each one hidden (after step 18).
-    const who = draft ? 'the owner (a draft league)' : 'a visitor';
+    // no cookies, at the same phone size (a draft league now published). Each page is read
+    // again by address to be sure it answers 200 to someone signed out.
+    const who = 'a visitor';
     at = `step 16: ${who} opens the league`;
-    const visitor = await (draft ? browser : (o.visitorBrowser ?? browser)).newContext(phone);
-    if (draft) await visitor.addCookies(await live.cookies());
+    const visitor = await (o.visitorBrowser ?? browser).newContext(phone);
     const away = await visitor.newPage();
     const answers = async (label) => {
       const again = await away.goto(away.url());
       note(`${label} answers 200 to ${who}`, again?.status() === 200, `${again?.status()}`);
-      read.push([label, away.url()]);
     };
-    const read = [[`16. the league home`, leagueHome]];
     const home = await away.goto(leagueHome);
     note(
-      `16. ${draft ? who : 'a visitor, signed out,'} opens the league home: 200`,
-      home?.status() === 200 && (draft || (await visitor.cookies()).length === 0),
+      '16. a visitor, signed out, opens the league home: 200',
+      home?.status() === 200 && (await visitor.cookies()).length === 0,
       `${home?.status()}`,
     );
     at = "step 16: game 1's page";
@@ -605,27 +663,6 @@ export async function walkFirstTest(o) {
     await fits(away, '18. the statistics');
     await answers('18. the statistics');
     await visitor.close();
-
-    // A league made by `league:make` is a draft, and nothing in the product can publish one
-    // yet: the command setLeagueStatus is in core, but no screen calls it. So here a visitor,
-    // signed out, gets 404 on every page, and the second sitting (guests on their phones,
-    // signed out) cannot be held (docs/operations/new-test-copy.md, step 8.1.4). The step
-    // that adds the Publish button, the one right after 2.207, must make the rehearsal tap it
-    // here and expect 200 on these pages instead, with the visitor reading the final table.
-    if (draft) {
-      at = 'steps 16 to 18: the visitor, signed out, cannot see the draft league';
-      const watcher = await (o.visitorBrowser ?? browser).newContext(phone);
-      const look = await watcher.newPage();
-      for (const [label, address] of read) {
-        const answer = await look.goto(address);
-        note(
-          `${label}: hidden from a visitor, signed out (404, the league is a draft)`,
-          answer?.status() === 404 && (await watcher.cookies()).length === 0,
-          `${answer?.status()} at ${address}`,
-        );
-      }
-      await watcher.close();
-    }
   } catch (error) {
     throw Object.assign(error instanceof Error ? error : new Error(String(error)), { at });
   }

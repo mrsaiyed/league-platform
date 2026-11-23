@@ -17,6 +17,7 @@ import {
   type StandingsReadStore,
   type StandingsStore,
 } from '@srleagues/core';
+import { setStandInStatus, standInStatusVersion } from './stand-in-league-states.ts';
 import { minorAt } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
@@ -389,10 +390,11 @@ function numberWornTwice(s: LeagueWorld, seasonId: string): boolean {
  * mark from its program's other current season, raising that one's version too. So the
  * setCurrentSeason, setSeasonRules and setSeasonRosterSettings commands, which change a
  * season through updateSeason, work here. Creating leagues and seasons and changing a
- * league's name, address or state have no screen on the stand-in yet: those parts fail by
- * name (createLeague, setLeagueName, renameShortName, setLeagueStatus, createSeason, and
- * the store's own setCurrentSeason, which only createLeague calls). The divisions are the
- * world's own rows, changed as the database's divisions store changes them (step 2.49).
+ * league's name or address have no screen on the stand-in yet: those parts fail by name
+ * (createLeague, setLeagueName, renameShortName, createSeason, and the store's own
+ * setCurrentSeason, which only createLeague calls). A league's state is real
+ * (stand-in-league-states.ts, step 2.240). The divisions are the world's own rows, changed
+ * as the database's divisions store changes them (step 2.49).
  * Publishing a site design has no screen yet either: the stand-in's made-up
  * leagues keep their designs as data (stand-in-league-sites.ts), so its two site parts fail
  * by name.
@@ -408,6 +410,8 @@ export function worldLeaguesStores(
     // child, read from its own rows, so the Privacy settings say what the public pages do
     // (record 065; has-recorded-child.ts reads the people table the same way).
     leagueAudience: async () => s.audience,
+    // Every made-up league was made with a contact email of its own (step 2.240).
+    leagueContactEmail: async () => `${s.slug}@example.org`,
     // R-28: a child by birth date or by the tick counts.
     hasRecordedChild: async () =>
       s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
@@ -418,12 +422,21 @@ export function worldLeaguesStores(
       const known = leagueStatuses.find((candidate) => candidate === status);
       return known === undefined || ownerAccountId === undefined
         ? undefined
-        : { id: s.leagueId, name: s.name, slug: s.slug, status: known, ownerAccountId, version: 1 };
+        : {
+            id: s.leagueId,
+            name: s.name,
+            slug: s.slug,
+            status: known,
+            ownerAccountId,
+            version: standInStatusVersion(s.leagueId),
+          };
     },
     setName: notYet('leagues.setName'),
     createLeague: notYet('leagues.createLeague'),
     renameShortName: notYet('leagues.renameShortName'),
-    setStatus: notYet('leagues.setStatus'),
+    // Publishing a made-up draft (step 2.240): the state is kept beside the cast's
+    // (stand-in-league-states.ts), which the access reader and the address lookups read.
+    setStatus: async (status, version) => setStandInStatus(s.leagueId, status, version),
     createSeason: notYet('leagues.createSeason'),
     findSeason: async (seasonId) => {
       const found = s.seasons.find((x) => x.id === seasonId);
