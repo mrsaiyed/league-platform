@@ -28,6 +28,18 @@ export type IsolationCase = {
    */
   run: (scope: LeagueScope, target: LeagueRecords) => Promise<unknown>;
   /**
+   * Puts the target in the state the subject looks for (its season open to the public,
+   * a game postponed, a venue in the bin, no draft), inside the TARGET'S OWN fence (the
+   * database set to the target's league and its owner), before every run (step 2.224,
+   * D-M1). A write made in `run` goes through the run's own fence, so in another
+   * league's runs it finds nothing of the target, and a query with its league filter
+   * taken out would then still find nothing to reach: the case could not fail. What is
+   * arranged here is there in every run, so only the subject's own filter keeps the
+   * target out of the code-only run. Write only fixed values (no clock, no new rows
+   * with new ids): every run is judged against the database as arranged, read once.
+   */
+  arrange?: (inTarget: LeagueScope, target: LeagueRecords) => Promise<unknown>;
+  /**
    * Also compare what the run wrote in its own league with what it writes once the
    * other league's rows are gone (an event handler's work is its writes). Off by
    * default: it reads the whole database once more per run.

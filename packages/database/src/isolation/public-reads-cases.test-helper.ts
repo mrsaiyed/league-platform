@@ -48,6 +48,7 @@ async function openTargetSeason(scope: LeagueScope, target: LeagueRecords) {
 registerIsolationCase({
   subject: listSeasonTeams,
   name: "list the target's season's teams",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return listSeasonTeams(scope, target.seasonId);
@@ -99,6 +100,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: listSeasonStatKeys,
   name: "read the target's season's statistics",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return listSeasonStatKeys(scope, target.seasonId);
@@ -136,6 +138,7 @@ const viewing = (leagueId: string) => ({
 registerIsolationCase({
   subject: standingsReadStore,
   name: "read the target's season's standings",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return readStandings(standingsReadStore(scope), { seasonId: target.seasonId });
@@ -144,6 +147,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: standingsReadStore,
   name: "list the target's season's decided games for the standings' notes",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return standingsReadStore(scope).decidedGames(target.seasonId);
@@ -152,6 +156,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: standingsReadStore,
   name: "read the target's season's team records",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return readTeamRecords(standingsReadStore(scope), { seasonId: target.seasonId });
@@ -160,6 +165,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: standingsReadStore,
   name: "read the target's season's statistics as a visitor",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return readStatisticsTable(standingsReadStore(scope), {
@@ -171,6 +177,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: standingsReadStore,
   name: "read the target's season's leaders as a visitor",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return readStatLeaders(
@@ -187,17 +194,24 @@ const asTargetStaff = (target: LeagueRecords) => ({
   viewer: { leagueId: target.leagueId, leagueAdmin: true, staffOfTeamIds: [target.teamId] },
 });
 
+const limitTargetTeamToStaff = (scope: LeagueScope, target: LeagueRecords) =>
+  transactionOf(scope)
+    .updateTable('teams')
+    .set({ stats_visibility: 'staff' })
+    .where('league_id', '=', scope.leagueId)
+    .where('id', '=', target.teamId)
+    .execute();
+
 registerIsolationCase({
   subject: standingsReadStore,
   name: "find the target's season's teams a staff viewer sees more of",
+  arrange: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    await limitTargetTeamToStaff(scope, target);
+  },
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
-    await transactionOf(scope)
-      .updateTable('teams')
-      .set({ stats_visibility: 'staff' })
-      .where('league_id', '=', scope.leagueId)
-      .where('id', '=', target.teamId)
-      .execute();
+    await limitTargetTeamToStaff(scope, target);
     return readTeamsBeyondPublic(
       standingsReadStore(scope),
       { seasonId: target.seasonId },
@@ -208,6 +222,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: standingsReadStore,
   name: "read the target's season's statistics as the target's staff",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return readStatisticsTable(standingsReadStore(scope), {
@@ -219,6 +234,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: gamesReadStore,
   name: "read the target's final game's page as the target's staff",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return readGamePage(gamesReadStore(scope), { gameId: target.gameId }, asTargetStaff(target));
@@ -227,6 +243,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: gamesReadStore,
   name: "read the target's final game's page as a visitor",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return readGamePage(gamesReadStore(scope), { gameId: target.gameId }, viewing(target.leagueId));
@@ -235,6 +252,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: gamesReadStore,
   name: "read the target's game's live snapshot as a visitor",
+  arrange: openTargetSeason,
   run: async (scope, target) => {
     await openTargetSeason(scope, target);
     return readGameSnapshot(
