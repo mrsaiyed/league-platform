@@ -59,3 +59,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 
 - 2.163 (Low): a crafted link (?notice=signedOutEverywhere) shows any signed-out visitor 'You are signed out on every device'; show the everywhere and already-signed-out notices only right after the action (apps/web/src/app/(platform)/page.tsx:27, features/shell/signed-out-notice.tsx:20).
 - First-look pictures of 2026-11-23, on a phone (390 wide): the standings table clips GP and the percentage, the statistics table clips 3PM, and the admin game page's stat table runs off the edge at PTS; the first-look page has no picture of editing divisions or venues (add them to `scripts/first-look/look.mjs`).
+
+- 2.220 (Low): tests/varsity-hosted-libraries.test.mjs pins the resolved version exactly only for react-server-dom-webpack; the others are minimums (upward drift is not stopped); the pilot's lint has 7 warnings.
