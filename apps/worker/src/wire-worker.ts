@@ -44,7 +44,12 @@ import {
   type QueueOptions,
 } from '@srleagues/database';
 import type { Logger } from '@srleagues/observability';
-import { emailSenderFor, keptEmailSender } from '@srleagues/providers';
+import {
+  createLocalPageCache,
+  createPageCacheOff,
+  emailSenderFor,
+  keptEmailSender,
+} from '@srleagues/providers';
 import {
   checkedInvitationEmailSettings,
   type InvitationEmailTx,
@@ -124,7 +129,16 @@ export function wireWorker(settings: WorkerSettings, logger: Logger): WiredWorke
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));
+  // The cache in front of the site (step 2.26, T-309): locally the stand-in, which records
+  // what it clears; elsewhere nothing yet, as no answer a shared cache keeps carries a label
+  // beyond the snapshot's 2 seconds. Cloudflare's adapter is given its zone and key when the
+  // site's pages are cached (record 106).
+  const pageCache =
+    settings.appEnv === 'local' || settings.appEnv === 'test'
+      ? createLocalPageCache()
+      : createPageCacheOff();
   const handlers = jobHandlers({
+    pageCache,
     bin: { transaction: binTransaction, now: () => new Date() },
     importsTransaction,
     transaction,

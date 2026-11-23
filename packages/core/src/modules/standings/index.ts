@@ -17,6 +17,14 @@ export {
   rebuildOnGameReopened,
   standingsHandlers,
 } from './on-game-result.ts';
+export {
+  clearLeagueOnSettingChanged,
+  clearLeagueOnStatusChanged,
+  clearPagesOnGameFinalized,
+  clearPagesOnGameReopened,
+  pageCacheClearJob,
+  type PageCacheClearIds,
+} from './clear-page-cache.ts';
 export { levelDocument, readLevel, type LevelDocument } from './level-document.ts';
 export { rebuildSeason, type SeasonRebuilt } from './rebuild-season.ts';
 export { previewRulesChange, type RulesChangePreview } from './preview-rules-change.ts';

@@ -225,14 +225,17 @@ export function registerHandlerCase(
   {
     name,
     event,
+    group,
   }: {
     name: string;
     event: (scope: LeagueScope, target: LeagueRecords) => DomainEvent;
+    /** Told apart from another handler of the same event (the group's name). */
+    group?: string;
   },
 ): void {
   registerIsolationCase({
     subject: handler.handle,
-    subjectName: `the ${handler.type} handler`,
+    subjectName: `the ${handler.type} handler${group === undefined ? '' : ` (${group})`}`,
     name,
     compareWrites: true,
     run: (scope, target) => runHandler(handler, harnessTx, scope, event(scope, target)),

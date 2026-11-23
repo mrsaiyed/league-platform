@@ -81,3 +81,4 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.77: restore-court answers court-venue-in-bin also when the venue is gone for good; it needs its own code and sentence.
 - 2.77: tests/browser/people-on-database-test.mjs:365 searches whole pages for the ordinary word Sample; lengthen it.
 - 2.77: not seen in a browser: an admin limited to one program in the bin, the 'its round was removed' sentence, restoring a division, venue or court.
+- 2.26: the refused-result test of clear-page-cache covers only a refusal before the event; a job rolled back after a later failure rests on leagues-store.test.ts.

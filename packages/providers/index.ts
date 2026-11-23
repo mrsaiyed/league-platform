@@ -21,3 +21,4 @@ export * from './src/cloudflare/index.ts';
 export * from './src/sign-in/index.ts';
 export * from './src/live-updates/index.ts';
 export * from './src/platform-database/index.ts';
+export * from './src/page-cache/index.ts';

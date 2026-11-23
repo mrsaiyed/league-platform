@@ -4,7 +4,12 @@
 export const leagueNameChanged = 'leagues.name_changed';
 export const leagueCreated = 'leagues.created';
 export const leagueShortNameChanged = 'leagues.short_name_changed';
-export const leagueStatusChanged = 'leagues.status_changed';
+export {
+  leagueSettingChanged,
+  leagueStatusChanged,
+  type LeagueSettingChanged,
+  type LeagueStatusChanged,
+} from '../../events/league-events.ts';
 
 export type LeagueNameChanged = {
   readonly type: typeof leagueNameChanged;
@@ -13,9 +18,5 @@ export type LeagueNameChanged = {
 export type LeagueCreated = { readonly type: typeof leagueCreated; readonly leagueId: string };
 export type LeagueShortNameChanged = {
   readonly type: typeof leagueShortNameChanged;
-  readonly leagueId: string;
-};
-export type LeagueStatusChanged = {
-  readonly type: typeof leagueStatusChanged;
   readonly leagueId: string;
 };

@@ -2,6 +2,7 @@
 // is given. On a stand-in for the bin; the real stores run it against two leagues in
 // packages/database (bin-commands.test.ts).
 import type { BinCounts, BinTx, QueuedJob, TransactionRunner } from '@srleagues/core';
+import { createPageCacheOff } from '@srleagues/providers';
 import { describe, expect, it } from 'vitest';
 import { runBinEmptying } from './bin-job.ts';
 import { jobHandlers } from './job-handlers.ts';
@@ -63,6 +64,7 @@ describe('the bin.empty job', () => {
       email: { send: async () => undefined } as never,
       siteOrigin: 'https://example.test',
       sendingAddress: 'a@example.test',
+      pageCache: createPageCacheOff(),
     };
     expect(Object.keys(jobHandlers(base))).not.toContain('bin.empty');
     expect(
