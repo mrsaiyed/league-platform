@@ -92,6 +92,31 @@ export function worldStandingsStore(s: LeagueWorld): StandingsStore {
       );
       return true;
     },
+    listCoinFlips: async (seasonId) =>
+      s.coinFlips
+        .filter((f) => f.seasonId === seasonId && !f.binned)
+        .sort(byId)
+        .map(({ seasonId: _season, binned: _binned, ...flip }) => flip),
+    addCoinFlip: async (seasonId, flip) => {
+      const named = flip.teamIds.every((teamId) =>
+        s.teams.some((t) => t.seasonId === seasonId && t.id === teamId),
+      );
+      if (!named || new Set(flip.teamIds).size !== flip.teamIds.length) {
+        throw new Error('The database refuses a coin flip naming a team of another season.');
+      }
+      const id = newId();
+      const recordedAt = new Date().toISOString();
+      s.coinFlips = [...s.coinFlips, { id, seasonId, binned: false, recordedAt, ...flip }];
+      return id;
+    },
+    binCoinFlip: async (seasonId, flipId) => {
+      const found = s.coinFlips.some(
+        (f) => f.id === flipId && f.seasonId === seasonId && !f.binned,
+      );
+      if (!found) return false;
+      s.coinFlips = s.coinFlips.map((f) => (f.id === flipId ? { ...f, binned: true } : f));
+      return true;
+    },
     replaceRows: async (seasonId, rows) => {
       s.standingsRows = { ...s.standingsRows, [seasonId]: [...rows] };
     },
@@ -177,6 +202,7 @@ function standingsReadOver(s: ReadWorld | undefined, moment: Date): StandingsRea
           divisionId: t.divisionId,
           statsVisibility: t.statsVisibility,
           removed: t.binned,
+          left: t.left,
         }));
     },
     divisions: async (seasonId) =>

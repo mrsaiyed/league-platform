@@ -37,6 +37,8 @@ export type ApplyFixtureImportError =
         | 'teams-changed'
         | 'venues-changed';
     }
+  /** A row names a team that has left the league since (S-87): no new game for it. */
+  | { readonly code: 'team-left'; readonly teamIds: readonly string[] }
   | { readonly code: 'change-refused'; readonly reason: ChangeError };
 
 export type FixtureImportApplied = {
@@ -88,6 +90,8 @@ export const applyFixtureImport = defineCommand({
     if ((await store.teamsOfSeason(seasonId, teamIds)).length !== teamIds.length) {
       return fail({ code: 'teams-changed' });
     }
+    const left = await store.leftTeamsOfSeason(seasonId, teamIds);
+    if (left.length > 0) return fail({ code: 'team-left', teamIds: left });
     const courtsOf = new Map<string, readonly string[]>();
     const venueIds = new Set(report.fixtures.flatMap((f) => (f.venueId ? [f.venueId] : [])));
     for (const venueId of venueIds) {

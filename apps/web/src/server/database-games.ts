@@ -144,6 +144,7 @@ export function databaseGames(
         }
         return {
           teams: Object.fromEntries(rows.teams.map((t) => [t.id, t.name])),
+          removedTeams: rows.teams.filter((t) => t.removed).map((t) => t.id),
           scorekeepers,
           seasons: Object.fromEntries(rows.seasons.map((s) => [s.id, s.name])),
           people: Object.fromEntries([...named].map(([id, name]) => [id, name ?? ''])),

@@ -6,6 +6,7 @@ import type { PlayerSeasonTotals, StandingsRow } from '@srleagues/sports';
 import type { GameLine, GameRecord } from '../../modules/games/index.ts';
 import type {
   SeasonAdjustment,
+  SeasonCoinFlip,
   StandingsStore,
   StandingsTx,
   TableTeam,
@@ -18,6 +19,8 @@ export type StandingsData = {
   games: GameRecord[];
   lines: GameLine[];
   adjustments: (SeasonAdjustment & { seasonId: string; binned?: boolean })[];
+  /** Coin flips recorded (S-89); none when left out. */
+  coinFlips?: (SeasonCoinFlip & { seasonId: string; binned?: boolean })[];
   /** Saved standings rows and player totals, by season. */
   rows: Record<string, StandingsRow[]>;
   totals: Record<string, PlayerSeasonTotals[]>;
@@ -88,6 +91,29 @@ export function standingsStores(
             a.binned = true;
           }
         }
+        return true;
+      },
+      listCoinFlips: async (season) =>
+        (s.coinFlips ?? [])
+          .filter((f) => f.seasonId === season && f.binned !== true)
+          .map(({ seasonId: _season, binned: _binned, ...flip }) => flip)
+          .sort(byId),
+      addCoinFlip: async (season, flip) => {
+        const named = flip.teamIds.every((teamId) =>
+          s.teams.some((t) => t.seasonId === season && t.teamId === teamId),
+        );
+        if (!named) throw new Error('The database refuses a coin flip for another season.');
+        const flips = (s.coinFlips ??= []);
+        const id = `01900000-0000-7000-8000-0000000f${String(flips.length + 1).padStart(4, '0')}`;
+        flips.push({ id, seasonId: season, ...flip, recordedAt: '2026-11-23T12:00:00.000Z' });
+        return id;
+      },
+      binCoinFlip: async (season, id) => {
+        const found = (s.coinFlips ?? []).find(
+          (f) => f.id === id && f.seasonId === season && f.binned !== true,
+        );
+        if (found === undefined) return false;
+        found.binned = true;
         return true;
       },
       replaceRows: async (season, rows) => {

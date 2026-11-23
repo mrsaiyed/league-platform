@@ -43,7 +43,9 @@ import {
   removePersonAction,
   removeTeamAction,
   saveTeamAction,
+  markTeamLeftAction,
   saveTeamStatsAction,
+  undoTeamLeftAction,
 } from './actions.ts';
 import {
   ColorFields,
@@ -446,6 +448,18 @@ export async function TeamPage({
         </ul>
       </Section>
 
+      <LeftLeaguePanel
+        league={here.slug}
+        teamId={team.id}
+        version={team.version}
+        left={team.left}
+        laterGamesHref={
+          view.areas.includes('games')
+            ? `${leagueUrl(here, 'admin-area', { area: 'games' })}?later=${team.id}#later`
+            : undefined
+        }
+      />
+
       <Section title={t('adminTeams.remove.title')} kind="danger" id={removeTeamAnchor}>
         <p className="staff-quiet">{t('adminTeams.remove.body')}</p>
         {panel.kind === 'held' ? (
@@ -508,6 +522,62 @@ function wayOnHref(
   if (way.area !== 'schedule') return address;
   return `${address}?${backToTeamParam}=${teamId}${way.anchor === 'publish' ? `#${publishAnchor}` : ''}`;
 }
+
+/**
+ * "A team that has left the league" (S-87): what marking it does, said plainly, and one
+ * button: mark it, or, once marked, take the mark off. Its games still to come are the
+ * admin's to forfeit or cancel, each, from Games' "Later games" for this team.
+ */
+function LeftLeaguePanel({
+  league,
+  teamId,
+  version,
+  left,
+  laterGamesHref,
+}: {
+  readonly league: string;
+  readonly teamId: string;
+  readonly version: number;
+  readonly left: boolean;
+  /** Admin → Games' "Later games" for this team; undefined when Games is not open to them. */
+  readonly laterGamesHref: string | undefined;
+}) {
+  return (
+    <Section
+      title={t(left ? 'adminTeams.leftLeague.titleLeft' : 'adminTeams.leftLeague.title')}
+      id={leftLeagueAnchor}
+    >
+      <div data-team-left-panel={left ? 'left' : 'playing'}>
+        <p className={left ? undefined : 'staff-quiet'}>
+          {t(left ? 'adminTeams.leftLeague.isLeft' : 'adminTeams.leftLeague.body')}
+        </p>
+        {left ? <p className="staff-quiet">{t('adminTeams.leftLeague.undoBody')}</p> : null}
+        <form action={left ? undoTeamLeftAction : markTeamLeftAction} className="staff-form">
+          <LeagueField league={league} />
+          <input type="hidden" name="team" value={teamId} />
+          <input type="hidden" name="version" value={version} />
+          <p className="staff-buttons">
+            <button
+              type="submit"
+              className="ui-button"
+              data-team-left-button={left ? 'undo' : 'mark'}
+            >
+              {t(left ? 'adminTeams.leftLeague.undo' : 'adminTeams.leftLeague.mark')}
+            </button>
+            {laterGamesHref === undefined ? null : (
+              <a className="ui-button" href={laterGamesHref} data-team-later-games={teamId}>
+                {t('adminTeams.leftLeague.toLaterGames')}
+              </a>
+            )}
+          </p>
+        </form>
+      </div>
+    </Section>
+  );
+}
+
+/** Where the browser lands on the team page: the panel of a team leaving the league. */
+const leftLeagueAnchor = 'left-league';
 
 /** The tick and "Move the team to the bin", for a team with no games (or none read). */
 function RemoveForm({ league, teamId }: { readonly league: string; readonly teamId: string }) {

@@ -218,6 +218,38 @@ if (built) {
       (await page.locator('main').innerText()).includes('The game is on the schedule again.'),
     );
     note('the game left the bin', (await page.locator(`li[id="bin-${gameId}"]`).count()) === 0);
+    // A-19: bringing a published game back is a schedule change, with its revision and
+    // the teams and people it reaches (A-7).
+    const gameBack = page.locator('[data-bin-game-back]');
+    const gameBackText = (await gameBack.count()) === 1 ? await gameBack.innerText() : '';
+    note(
+      'the bin says the game back is a schedule revision reaching its teams (A-19)',
+      /revision \d+, reaching 2 teams and \d+ people/.test(gameBackText),
+      gameBackText,
+    );
+    // The notice says only what the restore left on the server: a crafted address shows none.
+    await page.goto(`${binAddress}?back=game&id=${gameId}&revision=99&teams=9&people=999`);
+    note(
+      'a crafted address cannot make the bin say a revision (A-19)',
+      (await page.locator('[data-bin-game-back]').count()) === 0,
+    );
+
+    at = 'a second team of the same name while the first is in the bin';
+    const larks = `Larks ${run}`;
+    await toTeams(page);
+    await addTeam(page, larks);
+    await removeTeamHere(page);
+    await toTeams(page);
+    await addTeam(page, larks);
+    await page.goto(binAddress);
+    await tap(page, binRow(page, larks).getByRole('button', { name: 'Bring it back' }), /not=/);
+    const refusedText = await binRow(page, larks).innerText();
+    note(
+      'bringing the first back is refused with one sentence naming the other (A-19)',
+      refusedText.includes(`Another team of the same season, ${larks}`) &&
+        refusedText.includes('of them first'),
+      refusedText,
+    );
 
     at = 'with scripts on, a team removed and brought back';
     const live = await open(true);

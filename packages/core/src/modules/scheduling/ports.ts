@@ -222,6 +222,11 @@ export type SchedulingStore = {
     seasonId: string,
     teamIds: readonly string[],
   ) => Promise<readonly string[]>;
+  /** Which of these teams of the season have left the league (S-87): offered for no new game. */
+  readonly leftTeamsOfSeason: (
+    seasonId: string,
+    teamIds: readonly string[],
+  ) => Promise<readonly string[]>;
   /** The venue with this id, in the bin or not, or undefined if it is not in this league. */
   readonly findVenue: (venueId: string) => Promise<VenueRecord | undefined>;
   /** Venues not in the bin, by name, each with its courts not in the bin, in order. */

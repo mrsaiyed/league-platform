@@ -12,6 +12,8 @@ import {
   reorderRoster,
   setTeamStatsVisibility,
   updateTeam as updateTeamCommand,
+  markTeamLeft,
+  undoTeamLeft,
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -21,6 +23,7 @@ import {
   findTeamGames,
   insertRosterEntry,
   insertTeam,
+  listLeftTeamsOfSeason,
   listRoster,
   listScheduleTeams,
   listStaffSeasonTeams,
@@ -81,6 +84,20 @@ registerIsolationCase({
 });
 
 registerIsolationCase({
+  subject: listLeftTeamsOfSeason,
+  // The target's team marked as left, a fixed time, so there is something to reach.
+  arrange: (scope, target) =>
+    transactionOf(scope)
+      .updateTable('teams')
+      .set({ left_at: '2026-01-01T00:00:00Z' })
+      .where('league_id', '=', scope.leagueId)
+      .where('id', '=', target.teamId)
+      .execute(),
+  name: "say which of the target's season's teams have left the league",
+  run: (scope, target) => listLeftTeamsOfSeason(scope, target.seasonId, [target.teamId]),
+});
+
+registerIsolationCase({
   subject: insertTeam,
   name: "add a team to a season of the scope's league",
   run: async (scope) =>
@@ -119,6 +136,16 @@ registerCommandCase(createTeam, harnessTx, {
 registerCommandCase(updateTeamCommand, harnessTx, {
   name: "rename the target's team",
   input: (target) => ({ teamId: target.teamId, version: 1, name: 'Harness renamed' }),
+});
+
+registerCommandCase(markTeamLeft, harnessTx, {
+  name: "mark the target's team as having left the league",
+  input: (target) => ({ teamId: target.teamId, version: 1 }),
+});
+
+registerCommandCase(undoTeamLeft, harnessTx, {
+  name: "take off the mark of the target's team having left",
+  input: (target) => ({ teamId: target.teamId, version: 1 }),
 });
 
 registerCommandCase(countTeamGames, harnessTx, {

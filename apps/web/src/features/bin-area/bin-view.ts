@@ -7,7 +7,7 @@
 // cannot come back before them; a division says its season, a court its venue. The words
 // come from the message files (T-187).
 import type { BinKind, BinListing } from '@srleagues/core';
-import { gameWhenText, type LeagueTimes } from '../../server/game-when.ts';
+import { gameWhenText, leagueDayText, type LeagueTimes } from '../../server/game-when.ts';
 import { t } from '../../server/messages.ts';
 
 export type BinKindShown = BinKind;
@@ -136,13 +136,66 @@ export function teamsInBinWords(
 }
 
 /**
- * The live team of the same season that now has a team-in-the-bin's name (S-83), for the
- * refusal to say which one and lead to it; the same name whatever its capitals and spaces.
+ * The other team of the same season that now has a team-in-the-bin's name (S-83), or its
+ * short name (`short`), for the refusal to say which one and lead to it: the same name
+ * whatever its capitals and spaces; the same short name as the binned team's own record
+ * when the list holds it, else the same name.
  */
-export function nameTakenBy<T extends { readonly id: string; readonly name: string }>(
+export function nameTakenBy<
+  T extends { readonly id: string; readonly name: string; readonly slug: string },
+>(
   binned: { readonly id: string; readonly name: string },
   teams: readonly T[],
+  short = false,
 ): T | undefined {
+  const others = teams.filter((team) => team.id !== binned.id);
+  if (short) {
+    // The list may leave out teams in the bin: then the one that took its short name is
+    // the one that took its name too (A-19: a second team of the same name).
+    const slug = teams.find((team) => team.id === binned.id)?.slug;
+    if (slug !== undefined) return others.find((team) => team.slug === slug);
+  }
   const same = (a: string) => a.trim().toLowerCase() === binned.name.trim().toLowerCase();
-  return teams.find((team) => team.id !== binned.id && same(team.name));
+  return others.find((team) => same(team.name));
+}
+
+/** What a game back from the bin was (A-19), as the server keeps it for the next page. */
+export type GameBack = {
+  readonly revision: number;
+  readonly teams: number;
+  readonly people: number;
+};
+
+export const gameBackSaid = (back: GameBack): string =>
+  `${back.revision}.${back.teams}.${back.people}`;
+
+export function gameBackOf(said: string): GameBack | undefined {
+  const found = /^([0-9]{1,9})\.([0-9]{1,9})\.([0-9]{1,9})$/.exec(said);
+  if (found === null) return undefined;
+  return { revision: Number(found[1]), teams: Number(found[2]), people: Number(found[3]) };
+}
+
+/** A game now at a restored game's time (A-19): "Hawks at Owls, Sat, Dec 5, 19:00, court 2". */
+export function clashWords(
+  game: {
+    readonly homeTeamId: string;
+    readonly awayTeamId: string;
+    readonly date: string;
+    readonly time: string | null;
+    readonly court: string | null;
+  },
+  teamNames: Readonly<Record<string, string>>,
+  locale: string,
+): string {
+  const when = [leagueDayText(game.date, locale), game.time ?? '']
+    .filter((w) => w !== '')
+    .join(', ');
+  const words = {
+    home: teamNames[game.homeTeamId] ?? '',
+    away: teamNames[game.awayTeamId] ?? '',
+    when,
+  };
+  return game.court === null || game.court === ''
+    ? t('admin.bin.gameBackClash', words)
+    : t('admin.bin.gameBackClashCourt', { ...words, court: game.court });
 }

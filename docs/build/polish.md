@@ -89,3 +89,13 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.26: the refused-result test of clear-page-cache covers only a refusal before the event; a job rolled back after a later failure rests on leagues-store.test.ts.
 - 2.60: there is no league error.tsx, so a league page's server error shows without the site notice.
 - 2.60: site.notice has no protective order, so an archived or suspended league cannot add or remove its notice (R-26).
+- 2.56: head-to-head tiebreakers read an overturned game as played (packages/sports/src/standings/order-teams.ts, the head-to-head step, from the games team-records.ts keeps); changing it needs the build plan's leave to change packages/sports.
+- 2.56: when a season lists the coin flip before other tiebreakers, sports tries a flip at that step on the wider group, so a flip recorded for the final level set orders nobody there while Admin shows it in use (rebuild-season.ts withCoinFlipLast); accept flips only with coin-flip last, or work level sets out at that step.
+- 2.56: record-coin-flip carries no version (two admins at once: the later bins the earlier's order with no "changed since"), and "drawn" is the web action's claim; carry the shown flip's id as the version and draw in core through a random port.
+- 2.56: list-later-games reads every game of a year with no limit, twice per Games page load; games past 366 days are on no list though the note says "every game still to come"; "Only the first 100 are shown" does not say to choose a team. Cut in the query and word both notes truly.
+- 2.56: coin-flip-test.mjs and later-games-test.mjs find some things on the whole page (getByText(name).first(), the "Later games" link by name though data-to-later exists); find them by their data- marks.
+- 2.56: no lock between mark_team_left and add_draft_game (or publish), so a game added at the same moment as the mark can slip through; lock the team row in both.
+- 2.56: the team-left refusals carry the team ids (add, put back, fixture import), but the schedule grid and import pages say "one of those teams" without its name: the grid's notice is built from fixed words in the address; name it from the page's own team list.
+- 2.77 (review Low): `leagues.restore_game` counts the restored game in its schedule revision's `gamesAdded: 1` and `gameIds.added`, so a future revision history would call it a new game; count it only in `restoredFromBin`, or say in T-220 that "added" includes "restored".
+
+- 2.56: head-to-head tiebreakers read an overturned game as played (packages/sports/src/standings/order-teams.ts): needs the build plan's leave to change packages/sports

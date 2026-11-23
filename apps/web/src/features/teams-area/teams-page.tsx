@@ -96,7 +96,7 @@ async function Body({
             const division = divisionName(team.divisionId);
             return (
               // The link is the team's name alone and covers the whole row (staff.css).
-              <li key={team.id} className="staff-row">
+              <li key={team.id} className="staff-row" data-team-row={team.id}>
                 <Swatch team={team} size="small" />
                 <span className="staff-row-words">
                   <a
@@ -111,6 +111,11 @@ async function Body({
                       {division}
                     </span>
                   )}
+                  {team.left ? (
+                    <span className="staff-row-facts" data-team-left-mark={team.id}>
+                      {t('adminTeams.leftMark')}
+                    </span>
+                  ) : null}
                 </span>
               </li>
             );
@@ -119,7 +124,7 @@ async function Body({
       )}
       <div id={addTeamAnchor} className="admin-add-team">
         <Section title={t('adminTeams.create.title')}>
-          <form action={createTeamAction} className="staff-form">
+          <form action={createTeamAction} className="staff-form" data-form="create-team">
             <LeagueField league={league.slug} />
             <TextField name="name" label={t('adminTeams.field.name')} required maxLength={120} />
             <TextField

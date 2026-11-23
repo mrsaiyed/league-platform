@@ -28,6 +28,7 @@ import {
   getBoxScoreSheet,
   listEarlierGames,
   listGamesNeedingResult,
+  listLaterGames,
   listMyGames,
   listPostponedGames,
   listScorekeepers,
@@ -125,7 +126,9 @@ import {
   listAdjustments,
   overturnResult,
   rebuildStandings,
+  recordCoinFlip,
   removeAdjustment,
+  removeCoinFlip,
 } from './modules/standings/index.ts';
 import {
   addToRoster,
@@ -139,6 +142,8 @@ import {
   reorderRoster,
   setTeamStatsVisibility,
   updateTeam,
+  markTeamLeft,
+  undoTeamLeft,
 } from './modules/teams/index.ts';
 
 export const commands = commandRegistry([
@@ -182,6 +187,7 @@ export const commands = commandRegistry([
   listDivisions,
   listEarlierGames,
   listGamesNeedingResult,
+  listLaterGames,
   listMyGames,
   listPeople,
   listPostponedGames,
@@ -208,11 +214,13 @@ export const commands = commandRegistry([
   readTrackerRosters,
   readTrackerState,
   rebuildStandings,
+  recordCoinFlip,
   recordFinalScore,
   recordForfeit,
   recordImportedScores,
   releaseScoringSession,
   removeAdjustment,
+  removeCoinFlip,
   removeCourt,
   removeDivision,
   removeDraftGame,
@@ -247,6 +255,8 @@ export const commands = commandRegistry([
   setSeasonRules,
   setSetting,
   setTeamStatsVisibility,
+  markTeamLeft,
+  undoTeamLeft,
   startFixtureImport,
   swapDraftGames,
   takeOverScoring,

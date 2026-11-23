@@ -21,6 +21,7 @@ import { discardScheduleDraft } from './discard-schedule-draft.ts';
 import { getScheduleDraft } from './get-schedule-draft.ts';
 import { moveDraftGame } from './move-draft-game.ts';
 import { previewSchedulePublish } from './preview-schedule-publish.ts';
+import { publishSchedule } from './publish-schedule.ts';
 import { putBackDraftGame } from './put-back-draft-game.ts';
 import { removeDraftGame } from './remove-draft-game.ts';
 import { renameDraftRound } from './rename-draft-round.ts';
@@ -276,6 +277,59 @@ describe('schedule draft commands', () => {
         renameDraftRound(as(ownerId), { ...basis(), roundId: roundUuid(1), label: '  ' }, deps),
       ),
     ).toContain('invalid-input');
+  });
+
+  it('makes no new game for a team that has left the league, and keeps its games (S-87)', async () => {
+    const { db, deps, as } = world();
+    db.state.leftTeamIds = [teamUuid(2)];
+    const game = (gameId: string, homeTeamId: string, awayTeamId: string) =>
+      addDraftGame(as(ownerId), { ...basis(), gameId, homeTeamId, awayTeamId, ...slot }, deps);
+    expect(await game(gameUuid(9), teamUuid(1), teamUuid(2))).toMatchObject({
+      ok: false,
+      error: { code: 'team-left' },
+    });
+    expect(await game(gameUuid(9), teamUuid(2), teamUuid(3))).toMatchObject({
+      ok: false,
+      error: { code: 'team-left' },
+    });
+    expect(db.state.draft).toBeUndefined();
+    // A team still playing is offered as before; the mark taken off, so is the team.
+    expect(await game(gameUuid(9), teamUuid(1), teamUuid(3))).toMatchObject({ ok: true });
+    db.state.leftTeamIds = [];
+    const back = await addDraftGame(
+      as(ownerId),
+      {
+        ...basis(1),
+        gameId: gameUuid(10),
+        homeTeamId: teamUuid(2),
+        awayTeamId: teamUuid(4),
+        ...slot,
+      },
+      deps,
+    );
+    expect(back).toMatchObject({ ok: true });
+
+    // Marked as left while a game of it is in the draft, not yet published: publishing is
+    // refused naming the game, and that game, once removed, cannot be put back.
+    db.state.leftTeamIds = [teamUuid(2)];
+    const preview = await previewSchedulePublish(as(ownerId), { seasonId }, deps);
+    expect(preview.ok && preview.value.blockers).toContainEqual({
+      code: 'team-left',
+      gameId: gameUuid(10),
+    });
+    expect(
+      await publishSchedule(
+        as(ownerId),
+        { seasonId, basedOnRevision: null, draftId: draftUuid(1), version: 2 },
+        deps,
+      ),
+    ).toMatchObject({ ok: false, error: { code: 'team-left', gameId: gameUuid(10) } });
+    expect(
+      await removeDraftGame(as(ownerId), { ...basis(2), gameId: gameUuid(10) }, deps),
+    ).toMatchObject({ ok: true });
+    expect(
+      await putBackDraftGame(as(ownerId), { ...basis(3), gameId: gameUuid(10) }, deps),
+    ).toMatchObject({ ok: false, error: { code: 'team-left', teamIds: [teamUuid(2)] } });
   });
 
   it('discards the draft, only the version that was seen', async () => {

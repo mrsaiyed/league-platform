@@ -40,6 +40,8 @@ async function tableAfter(
     readonly coinFlips?: readonly CoinFlip[];
     readonly binned?: readonly string[];
     readonly kept?: readonly string[];
+    /** Teams that have left the league (S-87): kept, with their results, marked. */
+    readonly left?: readonly string[];
     readonly stored?: (rows: StoredRow[]) => StoredRow[];
   } = {},
 ): Promise<Made> {
@@ -78,6 +80,7 @@ async function tableAfter(
           divisionId: null,
           statsVisibility: 'everyone',
           removed: (options.kept ?? []).includes(name),
+          left: (options.left ?? []).includes(name),
         })),
     divisions: async () => [],
     standingsRows: async () =>
@@ -160,7 +163,7 @@ const held = (text: string) => text.replace(/(\d)–(?=\d)/g, `$1${joiner}–${j
 function levelNoteBeside(made: Made, team: string): string | undefined {
   const row = made.view.rows.find((r) => r.team === team);
   const ids = (row?.notes ?? []).filter(
-    (id) => !id.startsWith('adjustment-') && id !== 'removed-team',
+    (id) => !id.startsWith('adjustment-') && id !== 'removed-team' && id !== 'left-team',
   );
   expect(ids.length).toBeLessThanOrEqual(1);
   return made.view.footnotes.find((f) => f.id === ids[0])?.text.replaceAll(joiner, '');
@@ -404,6 +407,26 @@ describe('the note beside each team of the standings', () => {
     expect(notesBeside(made, 'Cedar')).toContain(removedNote);
     expect(notesBeside(made, 'Ash')).not.toContain(removedNote);
     nothingPlacedAbove(made);
+  });
+
+  // S-87: a team that has left the league keeps its row, place and results, marked
+  // "Left the league" beside its name; the others are not marked, and the table is the same.
+  it('marks a team that has left the league, keeping its row and its results', async () => {
+    const games: readonly Game[] = [
+      ['Ash', 50, 'Cedar', 40],
+      ['Cedar', 50, 'Birch', 40],
+    ];
+    const teams = ['Ash', 'Birch', 'Cedar'];
+    const whole = await tableAfter(teams, games);
+    const made = await tableAfter(teams, games, { left: ['Cedar'] });
+    expect(order(made)).toEqual(order(whole));
+    expect(made.view.rows.map((r) => r.seed)).toEqual(whole.view.rows.map((r) => r.seed));
+    const leftNote = made.view.footnotes.find((f) => f.id === 'left-team')?.text;
+    expect(leftNote).toMatch(/^Left the league\./);
+    expect(notesBeside(made, 'Cedar')).toContain(leftNote);
+    expect(notesBeside(made, 'Ash')).not.toContain(leftNote);
+    expect(whole.view.footnotes.some((f) => f.id === 'left-team')).toBe(false);
+    expect(made.html).toContain('Left the league.');
   });
 
   // Item 5: four teams at 1–1; head-to-head puts two above two, and nothing separates
@@ -859,6 +882,25 @@ describe('the note for three or more level teams', () => {
     });
     expect(sharedNote(flipped, ['Cedar', 'Ash', 'Birch'])).toBe(
       'Cedar, Ash, and Birch are level on win percentage (.500). A coin flip puts them in this order: Cedar, Ash, Birch.',
+    );
+  });
+
+  it('teams that have played nobody, ordered by a recorded flip: the note says the flip did it', async () => {
+    const rules = {
+      ...defaultSeasonRules(),
+      tiebreakers: ['head-to-head', 'coin-flip'],
+    } satisfies SeasonRules;
+    const two = await tableAfter(['Ash', 'Birch'], [], { rules, coinFlips: [['Birch', 'Ash']] });
+    expect(order(two)).toEqual(['Birch', 'Ash']);
+    const pair = 'Birch and Ash have not played yet. A coin flip puts Birch ahead of Ash.';
+    for (const team of ['Birch', 'Ash']) expect(levelNoteBeside(two, team)).toBe(pair);
+    const three = await tableAfter(['Ash', 'Birch', 'Cedar'], [], {
+      rules,
+      coinFlips: [['Cedar', 'Ash', 'Birch']],
+    });
+    expect(order(three)).toEqual(['Cedar', 'Ash', 'Birch']);
+    expect(levelNoteBeside(three, 'Ash')).toBe(
+      'Cedar, Ash, and Birch have not played yet. A coin flip puts them in this order: Cedar, Ash, Birch.',
     );
   });
 });

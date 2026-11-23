@@ -18,6 +18,8 @@ export type SeasonTeamRow = {
   readonly statsVisibility: string;
   /** In the bin, kept for its results: listed in the standings only, never linked. */
   readonly removed: boolean;
+  /** Has left the league mid-season (S-87): listed with its results, marked; absent: playing. */
+  readonly left?: boolean;
 };
 
 /** A division of a season, not in the bin. */

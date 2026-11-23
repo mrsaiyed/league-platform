@@ -43,6 +43,29 @@ export type NewAdjustment = {
   readonly gameId?: string;
 };
 
+/** How a coin flip was made (S-89): flipped at the table and typed in, or drawn by the server. */
+export type CoinFlipMethod = 'by-hand' | 'drawn';
+
+/** A coin flip the admin recorded, not in the bin (T-314): the level teams, winner first. */
+export type SeasonCoinFlip = {
+  readonly id: string;
+  readonly teamIds: readonly string[];
+  readonly method: CoinFlipMethod;
+  readonly note: string | null;
+  /** Who recorded it: an id only. */
+  readonly accountId: string;
+  /** When it was recorded (ISO 8601). */
+  readonly recordedAt: string;
+};
+
+/** A coin flip to record: the teams in the order it put them, winner first. */
+export type NewCoinFlip = {
+  readonly teamIds: readonly string[];
+  readonly method: CoinFlipMethod;
+  readonly note: string | null;
+  readonly accountId: string;
+};
+
 export type StandingsStore = {
   /**
    * Holds the season's standings for the rest of the transaction, so two results
@@ -63,6 +86,12 @@ export type StandingsStore = {
    * it (T-307): false if it is not there or already in it.
    */
   readonly binAdjustment: (seasonId: string, adjustmentId: string) => Promise<boolean>;
+  /** The season's coin flips not in the bin, in the order recorded (T-314). */
+  readonly listCoinFlips: (seasonId: string) => Promise<readonly SeasonCoinFlip[]>;
+  /** Records a coin flip for teams of the season: its id. */
+  readonly addCoinFlip: (seasonId: string, flip: NewCoinFlip) => Promise<string>;
+  /** Moves the season's coin flip to the bin (T-45): false if not there or already in it. */
+  readonly binCoinFlip: (seasonId: string, flipId: string) => Promise<boolean>;
   /** Makes the season's standings rows exactly these: one per team, others removed. */
   readonly replaceRows: (seasonId: string, rows: readonly StandingsRow[]) => Promise<void>;
   /** Makes the season's player totals exactly these: one per person, others removed. */

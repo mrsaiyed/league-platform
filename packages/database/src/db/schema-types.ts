@@ -496,6 +496,20 @@ export interface StandingsAdjustmentsTable {
   game_id: string | null;
 }
 
+export interface StandingsCoinFlipsTable {
+  id: Generated<string>;
+  league_id: string;
+  season_id: string;
+  team_ids: ColumnType<(string | null)[], string[], string[]>;
+  method: string;
+  note: string | null;
+  account_id: string;
+  deleted_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  version: Generated<number>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface StandingsRowsTable {
   id: Generated<string>;
   league_id: string;
@@ -545,6 +559,7 @@ export interface TeamsTable {
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  left_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
 }
 
 export interface VenuesTable {
@@ -595,6 +610,7 @@ export interface Database {
   sites: SitesTable;
   stages: StagesTable;
   standings_adjustments: StandingsAdjustmentsTable;
+  standings_coin_flips: StandingsCoinFlipsTable;
   standings_rows: StandingsRowsTable;
   support_access_log: SupportAccessLogTable;
   teams: TeamsTable;

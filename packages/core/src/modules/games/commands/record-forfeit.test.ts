@@ -154,4 +154,15 @@ describe('recordForfeit', () => {
       ok: true,
     });
   });
+
+  it('forfeits a game not live whose line-ups are set (step 2.56: a no-show after line-ups)', async () => {
+    const lineups = memoryGames({
+      games: [game(1, { captureMode: 'live' })],
+      tracked: [gameUuid(1)],
+    });
+    expect(await recordForfeit(lineups.as(ownerId), input, lineups.deps)).toMatchObject({
+      ok: true,
+    });
+    expect(lineups.db.state.games[0]?.status).toBe('forfeit');
+  });
 });

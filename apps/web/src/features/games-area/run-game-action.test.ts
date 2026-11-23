@@ -235,7 +235,7 @@ describe('the games area actions', () => {
     expect(back.every((r) => r.canPutBack && !r.canCancel && !r.canScore)).toBe(true);
   });
 
-  it('offers postponing and cancelling a scheduled game whose line-ups a scorer’s table set', async () => {
+  it('offers forfeiting, postponing and cancelling a scheduled game whose line-ups a scorer’s table set', async () => {
     const { ports, games } = setup();
     const list = (await games(owner)).map((g) => ({
       ...g,
@@ -249,10 +249,14 @@ describe('the games area actions', () => {
       isOwner: true,
       grants: [],
     });
-    // Its forfeit and score are the tracker's (S-46); postponing and cancelling keep its line-ups.
-    expect(rows.every((r) => r.canPostpone && r.canCancel && !r.canForfeit && !r.canScore)).toBe(
-      true,
-    );
+    // Its score is the tracker's (S-46); postponing and cancelling keep its line-ups, and a
+    // team that did not come may be forfeited (step 2.56). Not "plays are being recorded".
+    expect(
+      rows.every(
+        (r) => r.canPostpone && r.canCancel && r.canForfeit && !r.canScore && !r.playsRecorded,
+      ),
+    ).toBe(true);
+    expect(rows.every((r) => r.lineupsSet)).toBe(true);
   });
 
   it('puts a cancelled game back: scheduled again, its line in the activity log', async () => {

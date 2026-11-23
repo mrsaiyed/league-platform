@@ -72,6 +72,7 @@ export type ImportsSchedulingStore = Pick<
   | 'deleteDraft'
   | 'loadSchedule'
   | 'teamsOfSeason'
+  | 'leftTeamsOfSeason'
   | 'findVenue'
   | 'listCourts'
 >;

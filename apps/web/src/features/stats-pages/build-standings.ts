@@ -68,6 +68,9 @@ const isTiebreaker = (value: string): value is Tiebreaker => Object.hasOwn(tiebr
 /** The note of a team no longer in the league, kept in the table for its results (A-17). */
 const removedNote = 'removed-team';
 
+/** The note of a team that has left the league mid-season, kept for its results (S-87). */
+const leftNote = 'left-team';
+
 /** The note shared by every group that nothing in the rules separates. */
 const stillTiedId = 'order-still-tied';
 
@@ -411,6 +414,20 @@ function stepSentences(
   return sentences;
 }
 
+/**
+ * What a recorded coin flip did (S-89), for the teams of a group it ordered, in the table's
+ * order: said wherever such teams are told about, so the note never leaves the flip out.
+ */
+function flipSentence(lines: readonly StandingsLine[]): string | null {
+  const flipped = lines.filter((line) => line.orderedBy === 'coin-flip');
+  const [first, second] = flipped;
+  if (first === undefined || second === undefined) return null;
+  if (flipped.length === 2) {
+    return t('standings.level.ahead.coin-flip', { team: first.team.name, other: second.team.name });
+  }
+  return t(orderedBy['coin-flip'], { values: entries.format(flipped.map((l) => l.team.name)) });
+}
+
 /** The shared note for teams nothing in the rules separates: true of each, however many. */
 const stillTiedNote = () => ({ id: stillTiedId, text: t('standings.order.still-tied') });
 
@@ -488,6 +505,8 @@ function levelNote(
       t('standings.level.stillLevel', { teams: names.format(part.map((l) => l.team.name)) }),
     );
   }
+  const flip = flipSentence(members);
+  if (flip !== null) sentences.push(flip);
   return { id: null, text: sentences.join(join), brief: level };
 }
 
@@ -623,12 +642,19 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
     const members = group.teamIds.flatMap((id) => table.lines.filter((l) => l.team.id === id));
     // A team that has not played is level only because none counts as 0: it is told so,
     // and is in no note about the teams that have played.
-    const idle = members.filter((line) => group.notPlayed.includes(line.team.id));
+    const idle = members
+      .filter((line) => group.notPlayed.includes(line.team.id))
+      .sort((a, b) => table.lines.indexOf(a) - table.lines.indexOf(b));
     const played = members.filter((line) => !group.notPlayed.includes(line.team.id));
     if (idle.length > 0) {
+      const notPlayed = t('standings.level.notPlayed', {
+        teams: names.format(idle.map((l) => l.team.name)),
+      });
+      const flip = flipSentence(idle);
       mark(idle, {
         id: `not-played-${n + 1}`,
-        text: t('standings.level.notPlayed', { teams: names.format(idle.map((l) => l.team.name)) }),
+        text: flip === null ? notPlayed : [notPlayed, flip].join(t('standings.level.sentenceJoin')),
+        ...(flip === null ? {} : { brief: notPlayed }),
       });
     }
     if (played.length >= 2) {
@@ -654,6 +680,10 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
     if (line.team.removed && !footnotes.some((f) => f.id === removedNote)) {
       footnotes.push({ id: removedNote, text: t('standings.removedTeam') });
     }
+    const left = line.team.left && !line.team.removed;
+    if (left && !footnotes.some((f) => f.id === leftNote)) {
+      footnotes.push({ id: leftNote, text: t('standings.leftTeam') });
+    }
     return {
       id: line.team.id,
       seed: line.seed,
@@ -663,6 +693,7 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
       notes: [
         ...line.footnotes.map((n) => `adjustment-${n}`),
         ...(line.team.removed ? [removedNote] : []),
+        ...(left ? [leftNote] : []),
         ...(level ? [level] : []),
       ],
     };

@@ -1232,6 +1232,7 @@ function leagueOf(
         statsVisibility: t.statsVisibility,
         lineageId: lineageOf(t.slug),
         binned: false,
+        left: false,
         version: 1,
       };
       s.teams.push(kept);
@@ -1398,6 +1399,25 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
     { gameId: standInGameId(1), accountId: first },
     { gameId: standInGameId(2), accountId: first },
     { gameId: standInGameId(4), accountId: second },
+  ];
+  // Made-up changes to who has access, so Admin → Admins has Latest changes to show (A-6):
+  // an admin invited and joined, a scorekeeper's access removed. The ids follow the log's
+  // own numbering, so the next entry written takes the next number.
+  const daysBefore = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
+  const accessEntry = (n: number, action: string, role: string, days: number) => ({
+    id: `01900000-0000-7000-8000-${String(n).padStart(12, '0')}`,
+    at: daysBefore(days),
+    actorAccountId: null,
+    action,
+    targetType: action === 'access.revoke_grant' ? 'grant' : 'invitation',
+    targetId: madeUp('00ac', n),
+    summary: `activity.${action}`,
+    details: { role, scopeType: 'league', scopeId: null },
+  });
+  adult.activity = [
+    accessEntry(1, 'access.invite', 'admin', 9),
+    accessEntry(2, 'access.accept_invitation', 'admin', 8),
+    accessEntry(3, 'access.revoke_grant', 'scorekeeper', 3),
   ];
 
   const youthProgram = madeUp('009a', 2);

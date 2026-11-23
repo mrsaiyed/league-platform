@@ -74,6 +74,7 @@ describe('listStaffSeasonTeams', () => {
       statsVisibility: 'everyone',
       lineageId: expect.any(String),
       binned: false,
+      left: false,
       version: 1,
     });
   });

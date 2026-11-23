@@ -42,6 +42,8 @@ export type StandingsLine = {
     readonly color: string | null;
     /** In the bin, kept for its results (A-17): marked, and never linked to a page. */
     readonly removed: boolean;
+    /** Has left the league mid-season (S-87): its row stays, marked "Left the league". */
+    readonly left: boolean;
   };
   readonly gamesPlayed: number;
   readonly wins: number;
@@ -290,6 +292,7 @@ function buildTable(
         slug: team.slug,
         color: team.color,
         removed: team.removed,
+        left: team.left === true,
       },
       gamesPlayed: row.gamesPlayed,
       wins: row.wins,

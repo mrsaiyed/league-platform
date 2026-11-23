@@ -16,7 +16,7 @@ import {
   removeDraftRound,
   renameDraftRound,
   restoreGame,
-  type BinTx,
+  type RestoreGameTx,
   type CommandDeps,
   type Job,
   type SchedulingTx,
@@ -44,11 +44,12 @@ import {
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { binStore } from './bin-store.ts';
+import { gamesStore } from './games-store.ts';
 import { schedulingStore } from './scheduling-store.ts';
 
 let pglite: PGlite;
 let db: DatabaseHandle;
-let deps: CommandDeps<SchedulingTx & BinTx>;
+let deps: CommandDeps<SchedulingTx & RestoreGameTx>;
 beforeAll(async () => {
   pglite = await freshSchema();
   db = createDatabase({ kind: 'pglite', pglite });
@@ -56,6 +57,7 @@ beforeAll(async () => {
     jobs: { enqueue: async (_job: Job) => {} },
     scheduling: schedulingStore(scope),
     bin: binStore(scope),
+    games: gamesStore(scope),
     access: accessStore(scope),
     activity: activityLogStore(scope),
   }));
@@ -731,7 +733,14 @@ describe('publishing against the database', () => {
     // Brought back from the bin, it has no round.
     expect(await restoreGame(s.as, { gameId: first }, deps)).toEqual({
       ok: true,
-      value: { gameId: first },
+      value: {
+        gameId: first,
+        seasonId: expect.any(String),
+        revision: 4,
+        teamCount: 2,
+        peopleCount: 2,
+        clashes: [],
+      },
     });
     expect(await gameRow(first)).toMatchObject({ deleted_at: null, round_id: null });
   });

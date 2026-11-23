@@ -27,7 +27,13 @@ import {
   type MemoryOptions,
 } from '../../command/testing/memory-standings-stores.ts';
 import { standingsHandlers } from './on-game-result.ts';
-import type { SeasonAdjustment, StandingsStore, StandingsTx, TableTeam } from './ports.ts';
+import type {
+  SeasonAdjustment,
+  SeasonCoinFlip,
+  StandingsStore,
+  StandingsTx,
+  TableTeam,
+} from './ports.ts';
 
 export type MemoryStandings = {
   status: string;
@@ -40,6 +46,8 @@ export type MemoryStandings = {
   /** Games the tracker has recorded plays for. */
   tracked: string[];
   adjustments: (SeasonAdjustment & { seasonId: string; binned?: boolean })[];
+  /** Coin flips recorded (S-89). */
+  coinFlips?: (SeasonCoinFlip & { seasonId: string; binned?: boolean })[];
   corrections: NewGameCorrection[];
   grants: Grant[];
   activity: ActivityEntry[];
