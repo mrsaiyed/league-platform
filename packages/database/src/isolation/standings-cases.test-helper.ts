@@ -5,8 +5,14 @@
 // isolation-cases.test-helper.ts.
 import {
   addAdjustment,
+  clearLeagueOnSettingChanged,
+  clearLeagueOnStatusChanged,
+  clearPagesOnGameFinalized,
+  clearPagesOnGameReopened,
   gameFinalized,
   gameReopened,
+  leagueSettingChanged,
+  leagueStatusChanged,
   listAdjustments,
   rebuildOnGameFinalized,
   rebuildOnGameReopened,
@@ -203,5 +209,47 @@ registerHandlerCase(rebuildOnGameReopened, {
     leagueId: scope.leagueId,
     gameId: target.gameId,
     seasonId: target.seasonId,
+  }),
+});
+
+// The page cache's handlers (step 2.26) read no rows: they copy the event's league and
+// ids into a `cache.clear` job of the scope's own league. The event names made-up ids, so
+// all that could cross is the league, and in the target's own scope the job is the target's.
+const madeUpSeasonId = '01900000-0000-7000-8000-00000000e0c1';
+const madeUpGameId = '01900000-0000-7000-8000-00000000e0f1';
+
+registerHandlerCase(clearPagesOnGameFinalized, {
+  name: 'clear the pages of a decided game',
+  group: 'page cache',
+  event: (scope) => ({
+    type: gameFinalized,
+    leagueId: scope.leagueId,
+    gameId: madeUpGameId,
+    seasonId: madeUpSeasonId,
+  }),
+});
+
+registerHandlerCase(clearPagesOnGameReopened, {
+  name: 'clear the pages of a reopened game',
+  group: 'page cache',
+  event: (scope) => ({
+    type: gameReopened,
+    leagueId: scope.leagueId,
+    gameId: madeUpGameId,
+    seasonId: madeUpSeasonId,
+  }),
+});
+
+registerHandlerCase(clearLeagueOnStatusChanged, {
+  name: "clear the whole league's pages after its status changed",
+  event: (scope) => ({ type: leagueStatusChanged, leagueId: scope.leagueId }),
+});
+
+registerHandlerCase(clearLeagueOnSettingChanged, {
+  name: "clear the whole league's pages after how names show changed",
+  event: (scope) => ({
+    type: leagueSettingChanged,
+    leagueId: scope.leagueId,
+    key: 'privacy.publicNames',
   }),
 });

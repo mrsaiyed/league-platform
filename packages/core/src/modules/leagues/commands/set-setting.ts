@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
+import { leagueSettingChanged } from '../events.ts';
 import type { LeaguesTx, SettingPlace } from '../ports.ts';
 import { declaredSettings } from '../settings/declarations.ts';
 import { needsConfirming, type SettingRegistry } from '../settings/define-setting.ts';
@@ -80,7 +81,7 @@ export function setSettingFor(registry: SettingRegistry) {
     ),
     allowed: (context, input, tx: LeaguesTx) =>
       mayChangeSetting(context, tx, registry, input, { value: input.value }),
-    run: async ({ context, input, tx }): Promise<Result<SettingSaved, SetSettingError>> => {
+    run: async ({ context, input, tx, emit }): Promise<Result<SettingSaved, SetSettingError>> => {
       const setting = registry.get(input.key);
       if (setting === undefined) return fail({ code: 'unknown-setting' });
       if (!setting.levels.includes(input.level)) return fail({ code: 'level-not-allowed' });
@@ -118,6 +119,8 @@ export function setSettingFor(registry: SettingRegistry) {
           ...(await placeScopeDetails(tx, place)),
         },
       });
+      // Other modules react to some settings (the public pages' cache, step 2.26).
+      emit({ type: leagueSettingChanged, leagueId: context.leagueId, key: setting.key });
       return ok({ key: setting.key, version });
     },
   });

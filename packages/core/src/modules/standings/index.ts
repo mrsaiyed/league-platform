@@ -18,6 +18,8 @@ export {
   standingsHandlers,
 } from './on-game-result.ts';
 export {
+  clearLeagueOnSettingChanged,
+  clearLeagueOnStatusChanged,
   clearPagesOnGameFinalized,
   clearPagesOnGameReopened,
   pageCacheClearJob,

@@ -4,7 +4,10 @@
 import { describe, expect, it } from 'vitest';
 import { eventHandlers } from '../../event-handlers.ts';
 import { recordFinalScore, reopenGame } from '../games/index.ts';
+import type { Job } from '../../command/index.ts';
 import {
+  clearLeagueOnSettingChanged,
+  clearLeagueOnStatusChanged,
   clearPagesOnGameFinalized,
   clearPagesOnGameReopened,
   pageCacheClearJob,
@@ -75,5 +78,20 @@ describe('a result clears its season’s page labels (T5 §4, step 2.26)', () =>
   it('is in core’s list of handlers, for both events', () => {
     expect(eventHandlers).toContain(clearPagesOnGameFinalized);
     expect(eventHandlers).toContain(clearPagesOnGameReopened);
+    expect(eventHandlers).toContain(clearLeagueOnStatusChanged);
+    expect(eventHandlers).toContain(clearLeagueOnSettingChanged);
+  });
+
+  it('a league-wide change records a job with no ids; another setting records none', async () => {
+    const jobs: Job[] = [];
+    const tx = { jobs: { enqueue: async (job: Job) => void jobs.push(job) } };
+    await clearLeagueOnStatusChanged.handle({ type: 'leagues.status_changed', leagueId }, tx);
+    const setting = (key: string) => ({ type: 'leagues.setting_changed', leagueId, key });
+    await clearLeagueOnSettingChanged.handle(setting('privacy.publicNames'), tx);
+    await clearLeagueOnSettingChanged.handle(setting('notifications.reminderLeadHours'), tx);
+    expect(jobs).toEqual([
+      { type: 'cache.clear', leagueId, ids: {} },
+      { type: 'cache.clear', leagueId, ids: {} },
+    ]);
   });
 });

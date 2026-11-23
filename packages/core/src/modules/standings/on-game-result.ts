@@ -10,7 +10,12 @@ import {
   type GameReopened,
 } from '../../events/game-events.ts';
 import type { StandingsTx } from './ports.ts';
-import { clearPagesOnGameFinalized, clearPagesOnGameReopened } from './clear-page-cache.ts';
+import {
+  clearLeagueOnSettingChanged,
+  clearLeagueOnStatusChanged,
+  clearPagesOnGameFinalized,
+  clearPagesOnGameReopened,
+} from './clear-page-cache.ts';
 import { rebuildSeason } from './rebuild-season.ts';
 
 export const rebuildOnGameFinalized = onEvent<GameFinalized, StandingsTx>(
@@ -36,4 +41,6 @@ export const standingsHandlers: readonly EventHandler<StandingsTx>[] = [
   rebuildOnGameReopened,
   clearPagesOnGameFinalized,
   clearPagesOnGameReopened,
+  clearLeagueOnStatusChanged,
+  clearLeagueOnSettingChanged,
 ];

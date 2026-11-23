@@ -4,20 +4,15 @@
 // score raises it), the job is handed to the worker's handler, and the local page cache
 // says what was cleared.
 import {
+  clearLeagueOnStatusChanged,
   clearPagesOnGameFinalized,
   gameFinalized,
+  leagueStatusChanged,
   pageCacheClearJob,
   type Job,
   type QueuedJob,
 } from '@srleagues/core';
-import {
-  createLocalPageCache,
-  gamePageLabel,
-  labelsForGameResult,
-  PageCacheClearError,
-  seasonPageKinds,
-  seasonPageLabel,
-} from '@srleagues/providers';
+import { createLocalPageCache, PageCacheClearError } from '@srleagues/providers';
 import { describe, expect, it } from 'vitest';
 import { jobHandlers } from './job-handlers.ts';
 import { runCacheClear } from './cache-clear-job.ts';
@@ -50,24 +45,38 @@ describe('cache.clear (step 2.26)', () => {
     const run = runCacheClear({ pageCache });
     for (const job of jobs.filter((j) => j.type === pageCacheClearJob)) await run(queued(job));
 
-    const cleared = pageCache.cleared();
-    expect(cleared).toEqual(labelsForGameResult({ leagueId, seasonId, gameId: gameId(1) }));
-    for (const kind of seasonPageKinds) {
-      expect(cleared).toContain(seasonPageLabel(leagueId, seasonId, kind));
-      expect(cleared).not.toContain(seasonPageLabel(leagueId, otherSeasonId, kind));
-      expect(cleared).not.toContain(seasonPageLabel(otherLeagueId, seasonId, kind));
-    }
-    expect(cleared).not.toContain(gamePageLabel(leagueId, gameId(2)));
-    expect(cleared.every((label) => label.startsWith(`league:${leagueId}:`))).toBe(true);
+    // Exactly these four, written out: another season's, another league's and another
+    // game's labels are not among them.
+    expect(pageCache.cleared()).toEqual([
+      `league:${leagueId}:season:${seasonId}:standings`,
+      `league:${leagueId}:season:${seasonId}:results`,
+      `league:${leagueId}:season:${seasonId}:stats`,
+      `league:${leagueId}:game:${gameId(1)}`,
+    ]);
+    expect(pageCache.cleared().join(' ')).not.toContain(otherSeasonId);
+    expect(pageCache.cleared().join(' ')).not.toContain(otherLeagueId);
   });
 
-  it('a job without a season and a game fails at once, clearing nothing', async () => {
+  it('a league’s status changing clears the whole league’s label, and only its own', async () => {
+    const jobs: Job[] = [];
+    const tx = { jobs: { enqueue: async (job: Job) => void jobs.push(job) } };
+    await clearLeagueOnStatusChanged.handle({ type: leagueStatusChanged, leagueId }, tx);
+    expect(jobs).toEqual([{ type: 'cache.clear', leagueId, ids: {} }]);
     const pageCache = createLocalPageCache();
     const run = runCacheClear({ pageCache });
-    await expect(run(queued({ type: 'cache.clear', leagueId, ids: {} }))).rejects.toMatchObject({
-      code: 'bad_job_data',
-      retryable: false,
-    });
+    for (const job of jobs) await run(queued(job));
+    expect(pageCache.cleared()).toEqual([`league:${leagueId}`]);
+  });
+
+  it('a job with only part of a game’s ids fails at once, clearing nothing', async () => {
+    const pageCache = createLocalPageCache();
+    const run = runCacheClear({ pageCache });
+    for (const ids of [{ seasonId }, { gameId: gameId(1) }, { seasonId, gameId: 'not-an-id' }]) {
+      await expect(run(queued({ type: 'cache.clear', leagueId, ids }))).rejects.toMatchObject({
+        code: 'bad_job_data',
+        retryable: false,
+      });
+    }
     expect(pageCache.cleared()).toEqual([]);
   });
 
