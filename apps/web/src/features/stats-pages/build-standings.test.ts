@@ -861,6 +861,22 @@ describe('the note for three or more level teams', () => {
       'Cedar, Ash, and Birch are level on win percentage (.500). A coin flip puts them in this order: Cedar, Ash, Birch.',
     );
   });
+
+  it('teams that have played nobody, ordered by a recorded flip: the note says the flip did it', async () => {
+    const rules = { ...defaultSeasonRules(), tiebreakers: ['head-to-head', 'coin-flip'] as const };
+    const two = await tableAfter(['Ash', 'Birch'], [], { rules, coinFlips: [['Birch', 'Ash']] });
+    expect(order(two)).toEqual(['Birch', 'Ash']);
+    const pair = 'Birch and Ash have not played yet. A coin flip puts Birch ahead of Ash.';
+    for (const team of ['Birch', 'Ash']) expect(levelNoteBeside(two, team)).toBe(pair);
+    const three = await tableAfter(['Ash', 'Birch', 'Cedar'], [], {
+      rules,
+      coinFlips: [['Cedar', 'Ash', 'Birch']],
+    });
+    expect(order(three)).toEqual(['Cedar', 'Ash', 'Birch']);
+    expect(levelNoteBeside(three, 'Ash')).toBe(
+      'Cedar, Ash, and Birch have not played yet. A coin flip puts them in this order: Cedar, Ash, Birch.',
+    );
+  });
 });
 
 // The lead's answer (a) to step 2.198: the home page's small table keeps each level note's
