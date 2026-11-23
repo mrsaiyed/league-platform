@@ -410,9 +410,9 @@ export function worldLeaguesStores(
     // child, read from its own rows, so the Privacy settings say what the public pages do
     // (record 065; has-recorded-child.ts reads the people table the same way).
     leagueAudience: async () => s.audience,
-    // R-28: a child by birth date or by the tick counts.
     // Every made-up league was made with a contact email of its own (step 2.240).
     leagueContactEmail: async () => `${s.slug}@example.org`,
+    // R-28: a child by birth date or by the tick counts.
     hasRecordedChild: async () =>
       s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
     // The permission check asks who the league is and whether it may be changed.

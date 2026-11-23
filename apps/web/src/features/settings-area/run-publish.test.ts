@@ -1,6 +1,7 @@
 // The Publish button on the stand-in (step 2.240): the owner and an admin publish a draft;
-// a scheduler, a scorekeeper, another league's admin and a signed-out visitor cannot; a
-// "Must fix" item not met refuses with its own sentence; publishing twice is harmless.
+// a scheduler, a scorekeeper, a registrar, an admin of one program only, another league's
+// admin and a signed-out visitor cannot; a "Must fix" item not met refuses with its own
+// sentence; publishing twice is harmless; an archived league is not brought back here.
 import {
   setSetting,
   type AccessReader,
@@ -12,7 +13,11 @@ import {
 import { catalogs } from '@srleagues/site';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { standInAdminSettings } from '../../server/stand-in-admin-settings.ts';
-import { forgetStandInStatuses, standInStatusOf } from '../../server/stand-in-league-states.ts';
+import {
+  forgetStandInStatuses,
+  setStandInStatus,
+  standInStatusOf,
+} from '../../server/stand-in-league-states.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { problemKey } from './answer.ts';
 import { runPublish } from './run-publish.ts';
@@ -23,6 +28,8 @@ const adminId = '01900000-0000-7000-8000-0000000000c1';
 const schedulerId = '01900000-0000-7000-8000-0000000000c2';
 const scorekeeperId = '01900000-0000-7000-8000-0000000000c3';
 const otherAdminId = '01900000-0000-7000-8000-0000000000c4';
+const registrarId = '01900000-0000-7000-8000-0000000000c5';
+const programAdminId = '01900000-0000-7000-8000-0000000000c6';
 
 const grant = (accountId: string, role: Role): Grant => ({
   id: `g-${accountId}`,
@@ -36,6 +43,8 @@ const grants = [
   grant(adminId, 'admin'),
   grant(schedulerId, 'scheduler'),
   grant(scorekeeperId, 'scorekeeper'),
+  grant(registrarId, 'registrar'),
+  { ...grant(programAdminId, 'admin'), scope: { type: 'program' as const, id: 'p1' } },
 ];
 
 // The league starts as a draft and reads its state where the stand-in keeps it, as the
@@ -99,9 +108,17 @@ describe('runPublish', () => {
     expect(await runPublish(as(adminId), ports.deps, 1)).toMatchObject({ done: 'published' });
   });
 
-  it('refuses a scheduler, a scorekeeper, another league’s admin and a signed-out visitor', async () => {
+  it('refuses a scheduler, a scorekeeper, a registrar, an admin of one program only, another league’s admin and a signed-out visitor', async () => {
     const ports = standIn('adult');
-    for (const who of [schedulerId, scorekeeperId, otherAdminId, null]) {
+    await chooseNames(ports);
+    for (const who of [
+      schedulerId,
+      scorekeeperId,
+      registrarId,
+      programAdminId,
+      otherAdminId,
+      null,
+    ]) {
       expect(await runPublish(as(who), ports.deps, 1)).toEqual({
         kind: 'refused',
         command: 'leagues.set_status',
@@ -109,6 +126,18 @@ describe('runPublish', () => {
       });
     }
     expect(standInStatusOf({ id: leagueId, status: 'draft' })).toBe('draft');
+  });
+
+  it('publishes only a draft: an archived league is refused and stays archived', async () => {
+    const ports = standIn('adult');
+    await chooseNames(ports);
+    setStandInStatus(leagueId, 'archived', 1);
+    expect(await runPublish(as(ownerId), ports.deps, 2)).toEqual({
+      kind: 'refused',
+      command: 'leagues.set_status',
+      code: 'illegal-transition',
+    });
+    expect(standInStatusOf({ id: leagueId, status: 'draft' })).toBe('archived');
   });
 
   it("refuses a youth league until its names are chosen, with that item's own sentence", async () => {

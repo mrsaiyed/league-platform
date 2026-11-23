@@ -60,7 +60,8 @@ export const enAdminSettings = {
     'In this league, anyone whose record does not say whether they are a child or an adult is shown as a child, coaches too.',
   // The Publish part at the top of League settings (step 2.240, U-9, P3 §3): what a draft
   // means, the "Must fix" list with each item met or not, and the button that asks once.
-  'adminSettings.publish.ask': 'Publish this league? Visitors will be able to see it.',
+  'adminSettings.publish.ask':
+    'Publish this league? Anyone will then be able to see its public pages, and you cannot turn it back into a draft afterwards.',
   'adminSettings.publish.button': 'Publish',
   'adminSettings.publish.cancel': 'Not now',
   'adminSettings.publish.check.contactEmail': 'A contact email for the league',

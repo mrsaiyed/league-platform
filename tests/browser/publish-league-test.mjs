@@ -8,7 +8,10 @@
 // A signed-out visitor is told the draft league (quiet-pines) is not found. Its owner sees
 // the draft notice point to League settings, where the league is said to be a draft and
 // the "Must fix" list is drawn. Each item not met is put right (the names choice under
-// Privacy, when the league asks for it), the owner presses Publish, is asked once, and
+// Privacy, when the league asks for it). A scheduler and a scorekeeper of the draft league
+// see no Publish button, and the owner's publish form, posted by hand with their sign-in,
+// leaves the league a draft; posted by hand signed out, it is told "not found" (the draft is
+// hidden, U-9) and changes nothing. The owner then presses Publish, is asked once, and
 // publishes. The screen then says the league is published, draws no Publish button, and
 // the draft notice is gone; the visitor reads the league's home with a 200 answer.
 import {
@@ -109,14 +112,71 @@ if (browser) {
     );
   });
 
+  // The owner's own publish form, as the asking state draws it, is posted by hand with
+  // another person's sign-in (or none): only the command's own check stands in the way.
+  await step('a scheduler, a scorekeeper and a signed-out visitor cannot publish', async () => {
+    await owner.goto(`${settings}?publish=ask`);
+    const fields = await panel
+      .locator('form input')
+      .evaluateAll((inputs) => inputs.map((input) => [input.name, input.value]));
+    note(
+      'the owner is asked, with the publish form',
+      fields.some(([name]) => name === 'version'),
+    );
+    const handPost = (token) => {
+      const body = new FormData();
+      for (const [name, value] of fields) if (name !== '') body.append(name, value);
+      const cookie = token === null ? {} : { cookie: `srl_session=${token}` };
+      return fetch(settings, {
+        method: 'POST',
+        body,
+        headers: { origin, ...cookie },
+        redirect: 'manual',
+      });
+    };
+    const stillDraft = async (label) => {
+      const answer = await fetch(`${origin}/${league}`);
+      note(`${label}: the league is still a draft, a visitor gets 404`, answer.status === 404);
+    };
+    for (const who of ['scheduler', 'scorekeeper']) {
+      const token = `local-${who}-token`;
+      const context = await browser.newContext({ javaScriptEnabled: false });
+      await context.addCookies([{ name: 'srl_session', value: token, url: origin }]);
+      const page = await context.newPage();
+      await page.goto(`${settings}?publish=ask`);
+      const part = page.locator('section#publish');
+      const buttons =
+        (await part.getByRole('link', { name: 'Publish' }).count()) +
+        (await part.getByRole('button', { name: 'Publish' }).count());
+      note(`the ${who} sees no Publish button`, buttons === 0);
+      await context.close();
+      const answer = await handPost(token);
+      note(`the ${who}'s hand-post: not a server failure`, answer.status < 500, `${answer.status}`);
+      await stillDraft(`after the ${who}'s hand-post`);
+    }
+    const signedOut = await handPost(null);
+    // A draft is hidden from anyone signed out (U-9), so the post is told "not found" like a
+    // visitor's reading, rather than sent to sign in: that would say the league is there.
+    const to = signedOut.headers.get('location') ?? '';
+    note(
+      'a signed-out hand-post is told not found, as the draft is hidden',
+      signedOut.status === 404 && to === '',
+      `${signedOut.status} ${to}`,
+    );
+    await stillDraft('after the signed-out hand-post');
+    await owner.goto(settings);
+  });
+
   await step('publishing', async () => {
     await Promise.all([
       owner.waitForURL(/publish=ask/),
       panel.getByRole('link', { name: 'Publish' }).click(),
     ]);
     note(
-      'Publish asks once',
-      (await panel.innerText()).includes('Publish this league? Visitors will be able to see it.'),
+      'Publish asks once, and says it cannot be made a draft again',
+      (await panel.innerText()).includes(
+        'Publish this league? Anyone will then be able to see its public pages, and you cannot turn it back into a draft afterwards.',
+      ),
     );
     await Promise.all([
       owner.waitForURL(/done=|problem=/),

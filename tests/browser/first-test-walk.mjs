@@ -492,12 +492,21 @@ export async function walkFirstTest(o) {
     if (draft) {
       at = 'before publishing: the visitor, signed out, cannot see the draft league';
       const watcher = await (o.visitorBrowser ?? browser).newContext(phone);
-      const hidden = await (await watcher.newPage()).goto(leagueHome);
-      note(
-        '15. before publishing, the league home is hidden from a visitor, signed out (404)',
-        hidden?.status() === 404 && (await watcher.cookies()).length === 0,
-        `${hidden?.status()}`,
-      );
+      const look = await watcher.newPage();
+      const hiddenPages = [
+        ['the league home', leagueHome],
+        ["game 1's page", full(leagueUrl({ slug: league }, 'game', { game: gameId }))],
+        ['the standings', full(leagueUrl({ slug: league }, 'standings'))],
+        ['the statistics', full(leagueUrl({ slug: league }, 'stats'))],
+      ];
+      for (const [label, address] of hiddenPages) {
+        const hidden = await look.goto(address);
+        note(
+          `15. before publishing, ${label} is hidden from a visitor, signed out (404)`,
+          hidden?.status() === 404 && (await watcher.cookies()).length === 0,
+          `${hidden?.status()} at ${address}`,
+        );
+      }
       await watcher.close();
       at = "publishing: League settings' Publishing part";
       await staffLink(page, 'League settings', /\/admin\/settings/);
@@ -518,7 +527,9 @@ export async function walkFirstTest(o) {
       await tap(page, panel.getByRole('link', { name: 'Publish' }), /publish=ask/);
       note(
         '15. Publish asks once',
-        (await panel.innerText()).includes('Publish this league? Visitors will be able to see it.'),
+        (await panel.innerText()).includes(
+          'Publish this league? Anyone will then be able to see its public pages, and you cannot turn it back into a draft afterwards.',
+        ),
         await panel.innerText(),
       );
       await tap(page, panel.getByRole('button', { name: 'Publish' }), /done=/);

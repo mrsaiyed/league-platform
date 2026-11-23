@@ -68,11 +68,15 @@ describe('setLeagueStatus', () => {
           grantOf(adminId, 'admin'),
           grantOf(schedulerId, 'scheduler'),
           grantOf(scorekeeperId, 'scorekeeper'),
+          grantOf(registrarId, 'registrar'),
+          { ...grantOf(programAdminId, 'admin'), scope: { type: 'program' as const, id: 'p1' } },
         ],
       });
     const schedulerId = '01900000-0000-7000-8000-0000000000c2';
     const scorekeeperId = '01900000-0000-7000-8000-0000000000c3';
     const strangerId = '01900000-0000-7000-8000-0000000000c4';
+    const registrarId = '01900000-0000-7000-8000-0000000000c5';
+    const programAdminId = '01900000-0000-7000-8000-0000000000c6';
 
     it('lets the owner and an admin publish', async () => {
       for (const who of [ownerId, adminId]) {
@@ -86,8 +90,15 @@ describe('setLeagueStatus', () => {
       }
     });
 
-    it('refuses a scheduler, a scorekeeper, another league’s admin and nobody signed in', async () => {
-      for (const who of [schedulerId, scorekeeperId, strangerId, null]) {
+    it('refuses a scheduler, a scorekeeper, a registrar, an admin of one program only, another league’s admin and nobody signed in', async () => {
+      for (const who of [
+        schedulerId,
+        scorekeeperId,
+        registrarId,
+        programAdminId,
+        strangerId,
+        null,
+      ]) {
         const { db, deps, as } = staffed();
         expect(await setLeagueStatus(as(who), publish, deps)).toEqual({
           ok: false,

@@ -2,7 +2,9 @@
 // it is tested on the stand-in as it runs. The command decides who may (the owner or an
 // admin, U-14) and refuses while a "Must fix" item is not met (P3 §3), each with its own
 // sentence. A league that is already published answers as published, so pressing the
-// button twice, or posting the form again, changes nothing and says it is done.
+// button twice, or posting the form again, changes nothing and says it is done. Only a
+// draft is published here: the same form posted for an archived (or suspended) league is
+// refused, as bringing an archived league back is not this button's work.
 import {
   setLeagueStatus,
   type CommandContext,
@@ -19,6 +21,9 @@ export async function runPublish(
 ): Promise<Answer> {
   const league = await deps.transaction(context, (tx) => tx.leagues.currentLeague());
   if (league?.status === 'live') return done('published');
+  if (league !== undefined && league.status !== 'draft') {
+    return refused(setLeagueStatus.commandName, 'illegal-transition');
+  }
   const result = await setLeagueStatus(context, { status: 'live', version }, deps);
   return result.ok ? done('published') : refused(setLeagueStatus.commandName, result.error.code);
 }
