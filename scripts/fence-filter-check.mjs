@@ -17,6 +17,8 @@
 //   node scripts/fence-filter-check.mjs list-binned#1 …     only these filters (as --list names them)
 //   node scripts/fence-filter-check.mjs --list              the filters it would take out, no runs
 //   node scripts/fence-filter-check.mjs --excused           the reviewed excused list
+//   node scripts/fence-filter-check.mjs --prints [files]    each excused file's count and
+//                                                            prints, to paste after a review
 //   --jobs=N                                                 N filters at a time, each in its own copy
 //
 // Each filter is one test process (about ten seconds), so the whole sweep takes 30 to 45
@@ -36,6 +38,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { filtersIn, fingerprintsOf, unknownComparisons } from './fence-filter-shapes.mjs';
 import { verdictOf } from './fence-filter-verdict.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -207,24 +210,106 @@ function joinedOnLeague(file, count) {
   ]);
 }
 
-/** What a league filter looks like, and what is left when it is taken out. */
-const shapes = [
-  // .where('league_id', '=', scope.leagueId), .where('t.league_id', '=', leagueId)
-  { pattern: /\n?[ \t]*\.where\(\s*'(?:\w+\.)?league_id',\s*'=',\s*[\w.]+\s*\)/g, gone: '' },
-  // the leagues table itself: .where('id', '=', scope.leagueId)
-  { pattern: /\n?[ \t]*\.where\(\s*'(?:\w+\.)?id',\s*'=',\s*scope\.leagueId\s*\)/g, gone: '' },
-  // SQL text: t.league_id = ${scope.leagueId}, league_id = ${league}
-  { pattern: /\b(?:\w+\.)?league_id\s*=\s*\$\{[^}]+\}/g, gone: 'true' },
-];
+/**
+ * Each file with excuses by position, as it was when they were reviewed: its number of
+ * filters, and each excused filter's print (its text and the lines around it,
+ * fence-filter-shapes.mjs). A filter added, removed or moved in the file changes one or the
+ * other, and the check then fails until a person reads the file's excuses again and pastes
+ * the new line that `--prints <file>` writes. So an excuse never slides onto another filter.
+ */
+const reviewedFiles = new Map(
+  [
+    ['delete-rounds.ts', 3, '#1:e138b693 #2:0327236f #3:af2d161c'],
+    ['find-table-player.ts', 3, '#1:25235fe9 #2:9f5402e5 #3:c6fdbf4f'],
+    ['games-for-lists.ts', 5, '#2:737306aa #3:53141c2d #4:25c7777a #5:4ea42f7d'],
+    ['insert-published-games.ts', 6, '#4:c7893d9a #5:57bc3665 #6:ad4483e8'],
+    ['insert-roster-entry.ts', 1, '#1:95defd5a'],
+    ['insert-table-player.ts', 1, '#1:1e47bf4f'],
+    ['is-person-on-roster.ts', 2, '#1:bd91ec9f #2:075519b6'],
+    ['list-decided-game-lines.ts', 2, '#1:089ba6a0 #2:7a0a9c01'],
+    ['list-earlier-rounds.ts', 3, '#1:c16e2061 #2:101d4ef4 #3:0140c76a'],
+    ['list-game-roster.ts', 4, '#1:6751b205 #2:23489906 #3:fae8f946 #4:177fd99d'],
+    ['list-public-schedule.ts', 1, '#1:4ccdd30a'],
+    ['list-season-names.ts', 3, '#3:01b68703'],
+    ['list-season-teams.ts', 3, '#1:90945392 #2:2983ac7d #3:5ce51dbb'],
+    ['list-table-teams.ts', 2, '#2:2983ac7d'],
+    ['list-teams-of-account.ts', 3, '#1:5f91450f #2:70d90293 #3:5b693c32'],
+    ['list-venues.ts', 2, '#2:d7b516be'],
+    ['purge-binned.ts', 8, '#3:06901377 #4:0c9fbde6 #5:81e26238 #6:fe28f835'],
+    ['remove-table-player.ts', 4, '#4:6f98646a'],
+    ['set-current-season.ts', 3, '#2:0bed84f4 #3:665c9135'],
+    ['update-published-game.ts', 3, '#2:93321121'],
+    ['update-season.ts', 3, '#1:bcca7281 #2:0bed84f4 #3:c5c04ff0'],
+  ].map(([file, filters, prints]) => [file, { filters, prints }]),
+);
 
-function filtersIn(text) {
+/**
+ * A `league_id` comparison in a shape the check does not know (not a join equality, not a
+ * written value) is a problem unless its line is excused here: `<file>.ts: <the line's
+ * text>` with the reason the check need not take it out. Empty: today every comparison is
+ * of a known shape.
+ */
+const unknownExcused = new Map([]);
+
+/** The file's excused positions (n of `file.ts#n`). */
+const excusedPositions = (name) =>
+  [...excused.keys()]
+    .filter((key) => key.startsWith(`${name}#`))
+    .map((key) => Number(key.slice(name.length + 1)));
+
+/** The line `--prints` writes for a file, to paste into reviewedFiles once its excuses are read. */
+function printsLine(name, text) {
+  const filters = filtersIn(text);
+  const prints = fingerprintsOf(text, filters);
+  const at = excusedPositions(name).sort((x, y) => x - y);
+  return `    ['${name}', ${filters.length}, '${at.map((n) => `#${n}:${prints[n - 1] ?? 'none'}`).join(' ')}'],`;
+}
+
+/**
+ * Why the file's excuses by position may no longer name the filters they were written for:
+ * its number of filters, or an excused filter's print, differs from the reviewed one.
+ */
+function slidExcuses(name, text, filters) {
+  const at = excusedPositions(name);
+  const reviewed = reviewedFiles.get(name);
+  if (at.length === 0 && reviewed === undefined) return [];
+  const again = `review this file's excuses again (node scripts/fence-filter-check.mjs --prints ${name.replace(/\.ts$/, '')})`;
+  if (reviewed === undefined)
+    return [`${name}: excused by position with no reviewed prints: ${again}`];
   const found = [];
-  for (const { pattern, gone } of shapes) {
-    for (const match of text.matchAll(pattern)) {
-      found.push({ at: match.index, length: match[0].length, text: match[0].trim(), gone });
+  if (reviewed.filters !== filters.length) {
+    found.push(
+      `${name}: had ${reviewed.filters} filters when its excuses were reviewed, has ${filters.length} now: ${again}`,
+    );
+  }
+  const prints = fingerprintsOf(text, filters);
+  const kept = new Map(
+    reviewed.prints
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((p) => /^#(\d+):(\w+)$/.exec(p) ?? [p, p, ''])
+      .map(([, n, print]) => [Number(n), print]),
+  );
+  for (const n of at) {
+    if (kept.get(n) !== prints[n - 1]) {
+      found.push(`${name}#${n}: not the filter it was excused for (its print differs): ${again}`);
     }
   }
-  return found.sort((x, y) => x.at - y.at);
+  for (const n of kept.keys()) {
+    if (!at.includes(n)) found.push(`${name}#${n}: a reviewed print with no excuse: ${again}`);
+  }
+  return found;
+}
+
+/** Each comparison in an unknown shape whose line is not excused, as a problem. */
+function unknownShapes(name, text, filters) {
+  return unknownComparisons(text, filters)
+    .filter(({ text: line }) => !unknownExcused.has(`${name}: ${line}`))
+    .map(
+      ({ line, text: code }) =>
+        `${name}:${line}: a league_id comparison in a shape the check does not know: ${code}` +
+        ' (teach the check its shape, or excuse the line with a reason)',
+    );
 }
 
 function exportedNames(text) {
@@ -415,6 +500,17 @@ const jobs = Math.max(
   Number(/^--jobs=(\d+)$/.exec(args.find((a) => a.startsWith('--jobs=')) ?? '')?.[1] ?? 1),
 );
 const asked = filesToCheck(args.filter((a) => !a.startsWith('--')));
+if (args.includes('--prints')) {
+  // For a person who has read a file's excuses again: the line to paste into reviewedFiles
+  // (every file with excuses by position, or only the files named).
+  for (const { file } of asked) {
+    const name = file.split('/').pop();
+    if (args.length > 1 || excusedPositions(name).length > 0) {
+      console.log(printsLine(name, readFileSync(join(root, file), 'utf8')));
+    }
+  }
+  process.exit(0);
+}
 
 if (excused.size > mostExcused) {
   console.error(
@@ -431,6 +527,7 @@ for (const { file, only } of asked) {
   const name = file.split('/').pop();
   const filters = filtersIn(original);
   const fileExcuse = excused.get(name);
+  problems.push(...slidExcuses(name, original, filters), ...unknownShapes(name, original, filters));
   if (filters.length === 0) {
     if (fileExcuse !== undefined) console.log(`${name}  excused: ${fileExcuse}`);
     else {

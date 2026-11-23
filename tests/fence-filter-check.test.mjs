@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { test } from 'node:test';
+import { filtersIn, fingerprintsOf, unknownComparisons } from '../scripts/fence-filter-shapes.mjs';
 import { verdictOf } from '../scripts/fence-filter-verdict.mjs';
 
 const script = 'scripts/fence-filter-check.mjs';
@@ -82,6 +83,50 @@ test('a failure is caught only when it lists a leak, never for a case that crash
     verdict: 'error',
     reason: 'Error: Failed to load url ../queries/list-public-roster.js',
   });
+});
+
+/** A query file's text, its filters given line by line. */
+const fixture = (...lines) =>
+  ['export async function listThings(scope) {', '  return trx', ...lines, '}', ''].join('\n');
+const own = "    .where('league_id', '=', scope.leagueId)";
+
+test('an excuse by position cannot slide: each filter has a print its neighbours do not', () => {
+  const two = fixture("    .selectFrom('a')", own, '    .execute();', "    .selectFrom('b')", own);
+  const prints = fingerprintsOf(two);
+  assert.equal(prints.length, 2);
+  assert.notEqual(prints[0], prints[1], 'two filters alike in text are told apart');
+  assert.deepEqual(fingerprintsOf(two), prints, 'the same text, the same prints');
+  // A filter added above the second: the count changes, and #2 is no longer the same one.
+  const three = fixture(
+    "    .selectFrom('a')",
+    own,
+    '    .execute();',
+    "    .selectFrom('b')",
+    own,
+    own,
+  );
+  const now = fingerprintsOf(three);
+  assert.equal(now.length, 3);
+  assert.notEqual(now[1], prints[1]);
+});
+
+test('a league_id comparison in a shape the check does not know is reported with its line', () => {
+  const text = fixture(
+    "    .selectFrom('seasons')",
+    "    .innerJoin('programs', 'programs.league_id', 'seasons.league_id')",
+    "    .onRef('programs.league_id', '=', 'seasons.league_id')",
+    "    .values({ league_id: scope.leagueId, name: 'x' })",
+    '    // not a filter: where league_id = 1',
+    own,
+    "    .where((e) => e('seasons.league_id','=',scope.leagueId))",
+    '    sql`select 1 from t where t.league_id = s.league_id and t.league_id = any(${ids})`',
+  );
+  assert.equal(filtersIn(text).length, 1);
+  assert.deepEqual(
+    unknownComparisons(text).map(({ line }) => line),
+    [9, 10],
+    'the e(...) filter and the league_id = any(...), not the join, value, comment or known filter',
+  );
 });
 
 test('the excused list is no longer than reviewed, and each excuse names a filter it finds', () => {
