@@ -93,6 +93,8 @@ export const enErrorScheduling = {
     'A round the draft renames or re-dates is no longer in this season. Discard the draft and start again.',
   // Why publishing the schedule, or previewing it, was refused (P7 §4.4, T-187).
   'error.scheduling.publish_schedule.season-not-found': 'That season is not there.',
+  'error.scheduling.publish_schedule.team-left':
+    'A game new in the draft is for a team that has left the league, so the draft cannot be published. Remove the game from the draft, or undo “Left the league” on the team’s page.',
   'error.scheduling.publish_schedule.unknown-court':
     'A game in the draft names a court that is not at its venue.',
   'error.scheduling.publish_schedule.unknown-team':
@@ -110,6 +112,8 @@ export const enErrorScheduling = {
   'error.scheduling.put_back_draft_game.revision-out-of-date':
     'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
   'error.scheduling.put_back_draft_game.season-not-found': 'That season is not there.',
+  'error.scheduling.put_back_draft_game.team-left':
+    'That game is new to the schedule and one of its teams has left the league, so it is not put back.',
   'error.scheduling.remove_draft_game.change-refused':
     'That change cannot be made to the schedule as it stands.',
   'error.scheduling.remove_draft_game.changed-since-read':

@@ -68,7 +68,7 @@ export const addDraftGame = defineCommand({
         // A team that has left the league plays no new game (S-87); its games already in
         // the schedule stay, for the admin to forfeit or cancel.
         const left = await tx.scheduling.leftTeamsOfSeason(input.seasonId, [...wanted]);
-        if (left.length > 0) return { code: 'team-left' };
+        if (left.length > 0) return { code: 'team-left', teamIds: left };
         return checkSlotPlace(tx, input);
       },
     }),

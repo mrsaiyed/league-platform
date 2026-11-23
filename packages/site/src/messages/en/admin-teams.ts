@@ -67,6 +67,7 @@ export const enAdminTeams = {
   'adminTeams.leftLeague.undo': 'Take the mark off: it has not left',
   'adminTeams.leftLeague.undoBody':
     'Marked by mistake, or the team is back? Taking the mark off makes it a team of the league again, offered for new games.',
+  'adminTeams.leftMark': 'Left the league',
   'adminTeams.newPerson.firstName': 'First name',
   'adminTeams.newPerson.lastName': 'Last name',
   'adminTeams.newPerson.submit': 'Add the person and put them on the roster',

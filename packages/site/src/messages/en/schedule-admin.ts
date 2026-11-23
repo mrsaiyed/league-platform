@@ -33,6 +33,8 @@ export const enScheduleAdmin = {
     'A newer schedule was published after this draft was started.',
   'schedule.admin.blocker.round-in-use':
     'The draft removes a round that a game with no date yet is still in.',
+  'schedule.admin.blocker.team-left':
+    'This game is new in the draft and one of its teams has left the league, so it cannot be published. Remove it from the draft, or undo “Left the league” on the team’s page.',
   'schedule.admin.blocker.unknown-court': 'A game in the draft names a court that is gone.',
   'schedule.admin.blocker.unknown-team':
     'A game in the draft names a team that is not in the season.',

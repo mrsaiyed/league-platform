@@ -111,6 +111,11 @@ async function Body({
                       {division}
                     </span>
                   )}
+                  {team.left ? (
+                    <span className="staff-row-facts" data-team-left-mark={team.id}>
+                      {t('adminTeams.leftMark')}
+                    </span>
+                  ) : null}
                 </span>
               </li>
             );

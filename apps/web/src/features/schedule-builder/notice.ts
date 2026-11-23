@@ -71,6 +71,7 @@ const blockers = {
   'game-id-taken': () => t('schedule.admin.blocker.game-id-taken'),
   'game-without-time': () => t('schedule.admin.blocker.game-without-time'),
   'unknown-team': () => t('schedule.admin.blocker.unknown-team'),
+  'team-left': () => t('schedule.admin.blocker.team-left'),
   'unknown-venue': () => t('schedule.admin.blocker.unknown-venue'),
   'unknown-court': () => t('schedule.admin.blocker.unknown-court'),
   'draft-unreadable': () => t('schedule.admin.blocker.draft-unreadable'),

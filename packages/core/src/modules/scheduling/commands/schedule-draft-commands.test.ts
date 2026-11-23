@@ -21,6 +21,7 @@ import { discardScheduleDraft } from './discard-schedule-draft.ts';
 import { getScheduleDraft } from './get-schedule-draft.ts';
 import { moveDraftGame } from './move-draft-game.ts';
 import { previewSchedulePublish } from './preview-schedule-publish.ts';
+import { publishSchedule } from './publish-schedule.ts';
 import { putBackDraftGame } from './put-back-draft-game.ts';
 import { removeDraftGame } from './remove-draft-game.ts';
 import { renameDraftRound } from './rename-draft-round.ts';
@@ -307,6 +308,28 @@ describe('schedule draft commands', () => {
       deps,
     );
     expect(back).toMatchObject({ ok: true });
+
+    // Marked as left while a game of it is in the draft, not yet published: publishing is
+    // refused naming the game, and that game, once removed, cannot be put back.
+    db.state.leftTeamIds = [teamUuid(2)];
+    const preview = await previewSchedulePublish(as(ownerId), { seasonId }, deps);
+    expect(preview.ok && preview.value.blockers).toContainEqual({
+      code: 'team-left',
+      gameId: gameUuid(10),
+    });
+    expect(
+      await publishSchedule(
+        as(ownerId),
+        { seasonId, basedOnRevision: null, draftId: draftUuid(1), version: 2 },
+        deps,
+      ),
+    ).toMatchObject({ ok: false, error: { code: 'team-left', gameId: gameUuid(10) } });
+    expect(
+      await removeDraftGame(as(ownerId), { ...basis(2), gameId: gameUuid(10) }, deps),
+    ).toMatchObject({ ok: true });
+    expect(
+      await putBackDraftGame(as(ownerId), { ...basis(3), gameId: gameUuid(10) }, deps),
+    ).toMatchObject({ ok: false, error: { code: 'team-left', teamIds: [teamUuid(2)] } });
   });
 
   it('discards the draft, only the version that was seen', async () => {
