@@ -89,3 +89,4 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.26: the refused-result test of clear-page-cache covers only a refusal before the event; a job rolled back after a later failure rests on leagues-store.test.ts.
 - 2.60: there is no league error.tsx, so a league page's server error shows without the site notice.
 - 2.60: site.notice has no protective order, so an archived or suspended league cannot add or remove its notice (R-26).
+- 2.56: head-to-head tiebreakers read an overturned game as played (packages/sports/src/standings/order-teams.ts, the head-to-head step, from the games team-records.ts keeps); changing it needs the build plan's leave to change packages/sports.
