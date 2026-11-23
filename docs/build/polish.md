@@ -97,3 +97,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.56: no lock between mark_team_left and add_draft_game (or publish), so a game added at the same moment as the mark can slip through; lock the team row in both.
 - 2.56: the team-left refusals carry the team ids (add, put back, fixture import), but the schedule grid and import pages say "one of those teams" without its name: the grid's notice is built from fixed words in the address; name it from the page's own team list.
 - 2.77 (review Low): `leagues.restore_game` counts the restored game in its schedule revision's `gamesAdded: 1` and `gameIds.added`, so a future revision history would call it a new game; count it only in `restoredFromBin`, or say in T-220 that "added" includes "restored".
+
+- 2.56: head-to-head tiebreakers read an overturned game as played (packages/sports/src/standings/order-teams.ts): needs the build plan's leave to change packages/sports
