@@ -16,14 +16,18 @@
 // - a new worker (a release that changed the code) takes over, and the code kept for
 //   earlier releases is let go, only when no game is open on the device (T-127). Until
 //   then the kept pages keep opening with the code they were kept with;
-// - "open on the device" is read from the tracker's own store of opened games
-//   (indexeddb-opened-game-storage.ts), which closing the game and signing out clear.
-//   The worker never creates that store: if it is not there, no game is open.
+// - "open on the device" (T-322, gamesHoldingBack): a game in the tracker's own store of
+//   opened games (indexeddb-opened-game-storage.ts) that is not final, or whose plays
+//   still wait in the queue (indexeddb-queue-storage.ts); closing the game and signing
+//   out clear the store. The worker never creates either: if it is not there, no game
+//   is open.
 // Signing out deletes everything kept here (forgetTrackerPagesOnDevice).
 import { openedGamesDatabaseName, openedGamesStoreName } from './indexeddb-opened-game-storage.ts';
+import { queueDatabaseName, queueStoreName } from './indexeddb-queue-storage.ts';
 import {
   accountMarkOfPage,
   codeMarkOf,
+  gamesHoldingBack,
   keptAddressOf,
   mayKeepAnswer,
   mayReplaceStored,
@@ -43,34 +47,35 @@ const mark = new URL(self.location.href).searchParams.get('code') || 'none';
 const prefix = names.kept + scope + ' ';
 const current = prefix + mark;
 
-function gamesOpen() {
+// Every record of a store, or [] when it was never made (never made here: the upgrade is
+// aborted), or null when it cannot be read.
+function readAll(database, store) {
   return new Promise((resolve) => {
     let asking;
     try {
-      asking = indexedDB.open(names.database);
+      asking = indexedDB.open(database);
     } catch (error) {
       resolve(null);
       return;
     }
-    // No such store yet: no game was ever opened here. Never create it (abort the upgrade).
     asking.onupgradeneeded = () => asking.transaction.abort();
-    asking.onerror = () => resolve(asking.error && asking.error.name === 'AbortError' ? 0 : null);
+    asking.onerror = () => resolve(asking.error && asking.error.name === 'AbortError' ? [] : null);
     asking.onblocked = () => resolve(null);
     asking.onsuccess = () => {
       const db = asking.result;
       db.onversionchange = () => db.close();
-      if (!db.objectStoreNames.contains(names.games)) {
+      if (!db.objectStoreNames.contains(store)) {
         db.close();
-        resolve(0);
+        resolve([]);
         return;
       }
       try {
-        const counting = db.transaction(names.games, 'readonly').objectStore(names.games).count();
-        counting.onsuccess = () => {
+        const reading = db.transaction(store, 'readonly').objectStore(store).getAll();
+        reading.onsuccess = () => {
           db.close();
-          resolve(counting.result);
+          resolve(reading.result);
         };
-        counting.onerror = () => {
+        reading.onerror = () => {
           db.close();
           resolve(null);
         };
@@ -80,6 +85,13 @@ function gamesOpen() {
       }
     };
   });
+}
+
+// How many games hold a release back (gamesHoldingBack): not final, or plays waiting.
+async function gamesOpen() {
+  const games = await readAll(names.database, names.games);
+  if (games === null) return null;
+  return gamesHoldingBack(games, await readAll(names.queueDatabase, names.queue));
 }
 
 async function letGoOfEarlier() {
@@ -243,6 +255,8 @@ export function trackerWorkerScript(): string {
     kept: trackerKeptPrefix,
     database: openedGamesDatabaseName,
     games: openedGamesStoreName,
+    queueDatabase: queueDatabaseName,
+    queue: queueStoreName,
     updateMessage: trackerWorkerUpdateMessage,
     keepMessage: trackerWorkerKeepMessage,
     accountMeta: trackerAccountMetaName,
@@ -251,6 +265,7 @@ export function trackerWorkerScript(): string {
   const rules = {
     accountMarkOfPage,
     codeMarkOf,
+    gamesHoldingBack,
     keptAddressOf,
     mayKeepAnswer,
     mayReplaceStored,

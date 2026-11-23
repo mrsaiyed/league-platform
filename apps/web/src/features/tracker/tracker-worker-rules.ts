@@ -75,12 +75,43 @@ export function mayKeepAnswer(answer: WorkerAnswer): boolean {
 
 /**
  * The update rule (T-127): the stored tracker is replaced only when no game is open on
- * the device. `gamesOpen` is how many games the device keeps open (its opened games'
- * store, T-115), or null when the worker cannot tell, which counts as a game open: a
- * release must never interrupt a game.
+ * the device. `gamesOpen` is how many games hold a release back (`gamesHoldingBack`),
+ * or null when the worker cannot tell, which counts as a game open: a release must
+ * never interrupt a game.
  */
 export function mayReplaceStored(gamesOpen: number | null): boolean {
   return gamesOpen === 0;
+}
+
+/** A game the device keeps (its opened games' store, T-115), as the worker reads it. */
+export type KeptGameRecord = {
+  readonly gameId: string;
+  readonly state?: { readonly state?: { readonly status?: string } } | null;
+};
+
+/** A play in the device's queue, as the worker reads it. */
+export type QueuedPlayRecord = { readonly gameId: string; readonly state: string };
+
+/**
+ * How many games hold a release back (T-127, T-322): a game is open as a scorekeeper
+ * means it while it is not final, or while plays of it still wait on this device. A
+ * final game with nothing waiting holds nothing back, nor does a game the device has let
+ * go (no longer in its store), whatever waits of it. `games` null: the store cannot be
+ * read, so the worker cannot tell. `queued` null: the queue cannot be read, so every
+ * kept game, final or not, counts as open.
+ */
+export function gamesHoldingBack(
+  games: readonly KeptGameRecord[] | null,
+  queued: readonly QueuedPlayRecord[] | null,
+): number | null {
+  if (games === null) return null;
+  const waiting =
+    queued === null
+      ? null
+      : new Set(queued.filter((play) => play.state === 'waiting').map((play) => play.gameId));
+  return games.filter(
+    (game) => game.state?.state?.status !== 'final' || waiting === null || waiting.has(game.gameId),
+  ).length;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  gamesHoldingBack,
   accountMarkOfPage,
   keptAddressOf,
   mayReplaceStored,
@@ -77,5 +78,15 @@ describe("the tracker worker's script (step 2.38)", () => {
     expect(script).toContain('"database":"srleagues-tracker-games"');
     expect(script).toContain('"games":"games"');
     expect(script).toContain('asking.transaction.abort()');
+  });
+
+  it('counts a game open only while it is not final or its plays wait (T-322)', () => {
+    const script = trackerWorkerScript();
+    expect(script).toContain('"queueDatabase":"srleagues-tracker-queue"');
+    expect(script).toContain('"queue":"commands"');
+    expect(script).toContain(`const gamesHoldingBack = (${String(gamesHoldingBack)});`);
+    expect(script).toContain(
+      'return gamesHoldingBack(games, await readAll(names.queueDatabase, names.queue));',
+    );
   });
 });

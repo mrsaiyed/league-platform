@@ -4,6 +4,7 @@ import {
   codeMarkOf,
   keptAddressOf,
   mayKeepAnswer,
+  gamesHoldingBack,
   mayReplaceStored,
   mayServeKeptPage,
   pageAnswerPlan,
@@ -93,6 +94,40 @@ describe('the update rule (T-127): the stored tracker is replaced only when no g
   it('with no game open, the network first, and its answer replaces the kept page', () => {
     expect(pageAnswerPlan(0, true)).toEqual({ first: 'network', keepNetworkAnswer: true });
     expect(pageAnswerPlan(0, false)).toEqual({ first: 'network', keepNetworkAnswer: true });
+  });
+});
+
+describe('which games hold a release back (T-127, T-322): open as a scorekeeper means it', () => {
+  const live = { gameId: 'g1', state: { state: { status: 'live' } } };
+  const final = { gameId: 'g2', state: { state: { status: 'final' } } };
+  const notLoaded = { gameId: 'g3', state: null };
+
+  it('a game not final holds a release back, waiting plays or not', () => {
+    expect(gamesHoldingBack([live], [])).toBe(1);
+    expect(gamesHoldingBack([notLoaded], [])).toBe(1);
+    expect(gamesHoldingBack([live, notLoaded], [{ gameId: 'g1', state: 'waiting' }])).toBe(2);
+  });
+
+  it('a final game holds it back only while its plays wait on this device', () => {
+    expect(gamesHoldingBack([final], [])).toBe(0);
+    expect(gamesHoldingBack([final], [{ gameId: 'g2', state: 'waiting' }])).toBe(1);
+    // Plays listed not saved, or refused, wait for nobody: nothing is sent.
+    expect(gamesHoldingBack([final], [{ gameId: 'g2', state: 'not-saved' }])).toBe(0);
+    expect(gamesHoldingBack([final], [{ gameId: 'g2', state: 'refused' }])).toBe(0);
+    expect(mayReplaceStored(gamesHoldingBack([final], []))).toBe(true);
+  });
+
+  it('a game the device let go holds nothing back, whatever of it waits', () => {
+    expect(gamesHoldingBack([], [{ gameId: 'g1', state: 'waiting' }])).toBe(0);
+    expect(gamesHoldingBack([final], [{ gameId: 'g9', state: 'waiting' }])).toBe(0);
+  });
+
+  it('never replaces when it cannot tell', () => {
+    expect(gamesHoldingBack(null, [])).toBeNull();
+    expect(mayReplaceStored(gamesHoldingBack(null, []))).toBe(false);
+    // The queue unread: a final game may still have plays waiting, so it counts.
+    expect(gamesHoldingBack([final], null)).toBe(1);
+    expect(gamesHoldingBack([], null)).toBe(0);
   });
 });
 

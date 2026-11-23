@@ -30,6 +30,8 @@ import {
 
 export const queueDatabaseName = 'srleagues-tracker-queue';
 const store = 'commands';
+/** The queue's store, read by the tracker's worker (T-322). */
+export const queueStoreName = store;
 const byGame = 'by-game';
 const byCommand = 'by-command';
 
