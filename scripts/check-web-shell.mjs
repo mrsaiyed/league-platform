@@ -279,6 +279,14 @@ const cases = [
     ['Sign in', 'Forgot your password?', 'New here? Create an account'],
     ['Continue with Google'],
   ],
+  // Nor does a refusal of the bot check: its words without Google (M27).
+  [
+    'visitor',
+    '/signin?problem=botCheckFailed',
+    200,
+    ['We could not check that you are a person.', 'try again in a few minutes'],
+    ['Continue with Google'],
+  ],
   ['visitor', '/signin?problem=wrongEmailOrPassword', 200, ['Wrong email or password.']],
   ['visitor', '/signin?problem=%3Cscript%3E', 200, ['Sign in'], ['role="alert"']],
   // A lock-out is said in minutes, with the way in that does not wait (step 2.163, M28).
@@ -292,12 +300,21 @@ const cases = [
   ['visitor', '/signup', 200, ['Create your account', 'Email me a code'], ['Continue with Google']],
   // The forgotten-password route is "Choose a new password", with a way back (step 2.163).
   ['visitor', '/signin/forgot', 200, ['Choose a new password', 'Back to sign in']],
-  // With no sign-up or reset under way the code screen names no address, as before step
-  // 2.163; there is no password to choose (L10): the first screen again, saying why. The
-  // code screen's words, which name the address the code went to, are checked in a
-  // browser (sign-in-says-test.mjs).
-  ['visitor', '/signup/code', 200, ['Enter your code', 'If that address can sign in']],
+  // With no sign-up or reset under way the code screen names no address and says no code
+  // was sent (step 2.163's fix round); there is no password to choose (L10): the first
+  // screen again, saying why, or a signed-in person's account. The code screen's words,
+  // which name the address the code went to, are checked in a browser
+  // (sign-in-says-test.mjs).
+  [
+    'visitor',
+    '/signup/code',
+    200,
+    ['Enter your code', 'Nothing is waiting for a code on this device.', 'Start again'],
+    ['we have sent', 'We sent'],
+  ],
   ['visitor', '/signup/password', 307, [], [], '/signup?problem=proofInvalid'],
+  ['visitor', '/signup?problem=proofInvalid', 200, ['That took too long. Start again.']],
+  ['owner', '/signup/password', 307, [], [], '/account'],
   // The password again is for a signed-in person: anyone else signs in and comes back.
   ['visitor', '/account/confirm', 307, [], [], '/signin?next=%2Faccount%2Fconfirm'],
   ['owner', '/account/confirm', 200, ['Enter your password again'], ['Continue with Google']],

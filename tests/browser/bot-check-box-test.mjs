@@ -387,10 +387,12 @@ if (browser) {
     try {
       await page.goto(`${origin}/signin?problem=botCheckFailed`);
       const said = await alertText(page);
+      // Plain words since step 2.163's fix round ("allow JavaScript", not "turn on
+      // scripts"); Google is set up here, so the refusal may offer its button (M27).
       note(
         'the refusal says the lead’s words',
         said ===
-          'We could not check that you are a person. Please wait a moment and try again. If it keeps happening, turn on scripts for this site, or use Continue with Google.',
+          "We could not check that you are a person. Please wait a moment and try again. If it keeps happening, your browser may be blocking part of this page: allow JavaScript for this site in your browser's settings, or use Continue with Google.",
         said,
       );
       const look = await page.evaluate(() => {
@@ -420,17 +422,18 @@ if (browser) {
       for (const [address, words, shot] of [
         [
           '/signin',
-          /^Signing in with a password checks .* Continue with Google works without scripts and has no check\.$/,
+          // Plain words since step 2.163's fix round; Google is set up here (M27).
+          /^Signing in with a password checks .* allow JavaScript for this site .* Or use Continue with Google, which works without it\.$/,
           'no-scripts-sign-in',
         ],
         [
           '/signup',
-          /^Creating an account first checks .* Continue with Google works without scripts and has no check\.$/,
+          /^Creating an account first checks .* allow JavaScript for this site .* Or use Continue with Google, which works without it\.$/,
           'no-scripts-sign-up',
         ],
         [
           '/signin/forgot',
-          /^Asking for a code to choose a new password first checks .*this site\.$/,
+          /^Asking for a code to choose a new password first checks .*allow JavaScript for this site .*then try again\.$/,
           'no-scripts-forgot',
         ],
       ]) {

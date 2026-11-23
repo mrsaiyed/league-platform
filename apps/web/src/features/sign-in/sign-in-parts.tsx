@@ -10,12 +10,46 @@ import { StandalonePage, TestCopyLine } from '../shell/index.ts';
 import { BotCheckBox } from './bot-check-box.tsx';
 import { ShowPassword } from './show-password.tsx';
 
-/** With scripts off, what each form says of its check (record 081, F5). */
+/**
+ * With scripts off, what each form says of its check (record 081, F5): on a screen that
+ * draws "Continue with Google", and on one that does not (M27). The forgotten-password
+ * screen never draws it.
+ */
 const needsScripts = {
-  'sign-in': 'signIn.botCheckNeedsScripts.signIn',
-  'sign-up': 'signIn.botCheckNeedsScripts.signUp',
-  reset: 'signIn.botCheckNeedsScripts.reset',
-} as const satisfies Record<BotCheckAction, TextKey>;
+  'sign-in': {
+    google: 'signIn.botCheckNeedsScripts.signIn',
+    noGoogle: 'signIn.botCheckNeedsScripts.signInNoGoogle',
+  },
+  'sign-up': {
+    google: 'signIn.botCheckNeedsScripts.signUp',
+    noGoogle: 'signIn.botCheckNeedsScripts.signUpNoGoogle',
+  },
+  reset: {
+    google: 'signIn.botCheckNeedsScripts.reset',
+    noGoogle: 'signIn.botCheckNeedsScripts.reset',
+  },
+} as const satisfies Record<BotCheckAction, { google: TextKey; noGoogle: TextKey }>;
+
+/** The scripts-off words of `action`'s form; Google's only where `google` is drawn (M27). */
+export function needsScriptsWords(action: BotCheckAction, google: boolean): TextKey {
+  return needsScripts[action][google ? 'google' : 'noGoogle'];
+}
+
+/** The refusals that offer "Continue with Google", in their words for a screen without it. */
+const withoutGoogle: Partial<Record<keyof typeof problems, TextKey>> = {
+  botCheckDidNotLoad: 'problem.botCheckDidNotLoadNoGoogle',
+  botCheckFailed: 'problem.botCheckFailedNoGoogle',
+};
+
+/**
+ * A problem's words on a screen that draws "Continue with Google" (`google`) or not (M27):
+ * Google is offered only where its button really is (it is off unless GOOGLE_SIGN_IN is
+ * set, the test copy never offers it, and the code and forgotten-password screens never
+ * draw it).
+ */
+export function problemWords(name: keyof typeof problems, google: boolean): TextKey {
+  return (google ? undefined : withoutGoogle[name]) ?? problems[name];
+}
 
 /** A wait said in whole minutes, rounded up (record 081): never "900 seconds". */
 export const minutesOf = (seconds: number): number => Math.max(1, Math.ceil(seconds / 60));
@@ -42,6 +76,7 @@ export async function SignInScreen({
   intro,
   search,
   forgotHint = false,
+  google = false,
   noticeWords,
   children,
 }: {
@@ -50,6 +85,8 @@ export async function SignInScreen({
   readonly search: Search;
   /** The screen offers "Forgot your password?": a lock-out says it gets the person in now. */
   readonly forgotHint?: boolean;
+  /** The screen draws "Continue with Google": only then may a refusal offer it (M27). */
+  readonly google?: boolean;
   /** The words of a notice the screen words itself (the code screen names the address). */
   readonly noticeWords?: string | undefined;
   readonly children: ReactNode;
@@ -78,7 +115,7 @@ export async function SignInScreen({
           <p className="ui-refusal" role="alert">
             {problem.name === 'tooManyAttempts'
               ? tooManyWords(problem.wait, forgotHint)
-              : t(problems[problem.name])}
+              : t(problemWords(problem.name, google))}
           </p>
         )}
         {children}
@@ -140,9 +177,12 @@ export function PasswordField({ fresh = false }: { readonly fresh?: boolean }) {
 export function BotCheckField({
   widget,
   action,
+  google = false,
 }: {
   readonly widget: BotCheckWidget;
   readonly action: BotCheckAction;
+  /** The screen draws "Continue with Google" (M27). */
+  readonly google?: boolean;
 }) {
   // Switched off (staging without Turnstile's keys, T-270): nothing is drawn or asked.
   if (widget.kind === 'off') return null;
@@ -160,7 +200,7 @@ export function BotCheckField({
         waiting={t('signIn.botCheckWaiting')}
       />
       <noscript>
-        <p>{t(needsScripts[action])}</p>
+        <p>{t(needsScriptsWords(action, google))}</p>
       </noscript>
     </>
   );

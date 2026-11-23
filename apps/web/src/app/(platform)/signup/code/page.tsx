@@ -20,19 +20,21 @@ import { signedInPerson } from '../../../../server/signed-in-leagues.ts';
 // with the address filled in; "Send a new code" sends one to the same address and comes
 // back here saying so. The address comes from this device's own cookie, never the
 // address bar. With nothing under way (an old tab, Back after the account was made) a
-// signed-in person goes to their account; anyone else sees the screen as before, naming no
-// address, with a way to start again (the build's behaviour, kept at the merge).
+// signed-in person goes to their account; anyone else is told nothing is waiting for a
+// code on this device, with a way to start again, and no word of a code sent (step 2.163's
+// fix round). The code box stays; a code typed there is answered the same for every
+// visitor (the first screen, "That code has run out"), naming no address (T-68).
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const flow = await flowOfThisRequest();
   if (flow === undefined) {
     if ((await signedInPerson()).kind === 'signed-in') redirect(platformUrl('account'));
     return (
-      <SignInScreen title="code.title" intro={t('code.sent', { minutes: 10 })} search={search}>
+      <SignInScreen title="code.title" intro={t('code.nothingWaiting')} search={search}>
         <CodeForm />
         <p>
           <a className="ui-button" data-kind="quiet" href={platformUrl('signup')}>
-            {t('code.again')}
+            {t('code.startAgain')}
           </a>
         </p>
       </SignInScreen>

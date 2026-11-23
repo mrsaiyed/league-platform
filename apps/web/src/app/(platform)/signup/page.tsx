@@ -32,11 +32,11 @@ export default async function Page({ searchParams }: SearchProps) {
   const google = googleSetUp() && !(await webPorts()).testCopy;
   const botCheck = await botCheckOnPage();
   return (
-    <SignInScreen title="signUp.title" intro={t('signUp.intro')} search={search}>
+    <SignInScreen title="signUp.title" intro={t('signUp.intro')} search={search} google={google}>
       <form action={signUpAction}>
         <NextField next={next} />
         <EmailField value={flow?.purpose === 'sign-up' ? flow.email : undefined} />
-        <BotCheckField {...botCheck} action="sign-up" />
+        <BotCheckField {...botCheck} action="sign-up" google={google} />
         <SubmitButton words="signUp.sendCode" />
       </form>
       {google ? (

@@ -351,8 +351,12 @@ if (browser !== null) {
       await page.goto(origin + pages.stats);
       await page.locator('main').getByText(ottersPlayer).first().waitFor();
       await page.locator('.site-header .site-menu > summary').click();
+      // Since step 2.163 (R-30) signing out stays on this page, `?notice=signedOut`.
       await Promise.all([
-        page.waitForURL((url) => url.pathname !== '/lakeside/stats'),
+        page.waitForURL(
+          (url) =>
+            url.pathname !== '/lakeside/stats' || url.searchParams.get('notice') === 'signedOut',
+        ),
         page.getByRole('button', { name: 'Sign out', exact: true }).click(),
       ]);
       const session = (await context.cookies()).find((c) => c.name === 'srl_session');
@@ -388,8 +392,13 @@ if (browser !== null) {
       const other = await context.newPage();
       await other.goto(origin + pages.stats);
       await other.locator('.site-header .site-menu > summary').click();
+      // Since step 2.163 (R-30) signing out leaves the person on the page they were on,
+      // saying "You are signed out." (`?notice=signedOut`), rather than at /signin.
       await Promise.all([
-        other.waitForURL((url) => url.pathname !== '/lakeside/stats'),
+        other.waitForURL(
+          (url) =>
+            url.pathname !== '/lakeside/stats' || url.searchParams.get('notice') === 'signedOut',
+        ),
         other.getByRole('button', { name: 'Sign out', exact: true }).click(),
       ]);
       await other.close();

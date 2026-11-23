@@ -42,12 +42,13 @@ export default async function Page({ searchParams }: SearchProps) {
       intro={from === null ? undefined : t('signIn.fromLeague', { league: from.name })}
       search={search}
       forgotHint
+      google={google}
     >
       <form action={signInAction}>
         <NextField next={next} />
         <EmailField value={await typedEmailOfThisRequest()} />
         <PasswordField />
-        <BotCheckField {...botCheck} action="sign-in" />
+        <BotCheckField {...botCheck} action="sign-in" google={google} />
         <SubmitButton words="signIn.submit" />
       </form>
       <p>
