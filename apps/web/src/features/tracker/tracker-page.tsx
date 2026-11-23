@@ -51,6 +51,7 @@ import { trackerCatalog } from './tracker-catalog.ts';
 import { TrackerOpening } from './tracker-opening.tsx';
 import { isDevelopmentServer } from '../../server/config.ts';
 import { trackerHeadOf } from './tracker-install.ts';
+import { trackerAccountMetaName } from './tracker-worker-rules.ts';
 
 export async function TrackerPage({
   league,
@@ -63,11 +64,17 @@ export async function TrackerPage({
 }) {
   const view = await loadLeaguePage(league, 'score', null, { problem: 'signInToScore' });
   const here = view.context.league;
+  // The account this page is made for, in its head (T-321): the worker shows a kept copy
+  // of a tracker page only while the same account is signed in.
+  const signedInAs = commandContextOf(view.context).accountId;
+  const accountMark =
+    signedInAs === null ? null : <meta name={trackerAccountMetaName} content={signedInAs} />;
   const backHref = scoresOnly(view.areas)
     ? leagueUrl(here, 'admin')
     : leagueUrl(here, 'admin-area', { area: 'games' });
   const refusal = (message: TextKey, enter?: { readonly href: string }) => (
     <LeagueLook league={here}>
+      {accountMark}
       <TrackerRefusal
         message={message}
         backHref={backHref}
@@ -123,6 +130,7 @@ export async function TrackerPage({
     <>
       <link rel="manifest" href={head.manifestHref} />
       <meta name="theme-color" content={head.colour} />
+      {accountMark}
       <TrackerOpening
         leagueId={here.id}
         accountId={context.accountId}

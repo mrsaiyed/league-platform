@@ -20,6 +20,8 @@ import type { OpenedGame } from './opened-game-storage.ts';
 
 export type HeldGamesPanelProps = {
   readonly leagueId: string;
+  /** The signed-in account, from the server's session: only its own plays are listed (T-321). */
+  readonly accountId: string | null;
   /** The tracker's address for `heldGameMark`, built by the address helper (held-games.ts). */
   readonly scoreHref: string;
   readonly locale: string;
@@ -28,7 +30,13 @@ export type HeldGamesPanelProps = {
 };
 
 /** The games kept on this device, or nothing. */
-export function HeldGamesPanel({ leagueId, scoreHref, locale, catalog }: HeldGamesPanelProps) {
+export function HeldGamesPanel({
+  leagueId,
+  accountId,
+  scoreHref,
+  locale,
+  catalog,
+}: HeldGamesPanelProps) {
   const t = useMemo(() => translatorFrom(locale, { [locale]: catalog }), [locale, catalog]);
   const [games, setGames] = useState<readonly HeldGame[]>([]);
   const [dismissFailed, setDismissFailed] = useState(false);
@@ -48,12 +56,12 @@ export function HeldGamesPanel({ leagueId, scoreHref, locale, catalog }: HeldGam
           // The teams' names are not known: each game is listed all the same.
         }
       }
-      setGames(heldGames(all, leagueId, (gameId) => kept.get(gameId)));
+      setGames(heldGames(all, { leagueId, accountId }, (gameId) => kept.get(gameId)));
     } catch {
       // No storage on this device: nothing can be held on it.
       setGames([]);
     }
-  }, [leagueId]);
+  }, [leagueId, accountId]);
 
   useEffect(() => {
     void load();
@@ -62,7 +70,7 @@ export function HeldGamesPanel({ leagueId, scoreHref, locale, catalog }: HeldGam
   const dismiss = async (game: HeldGame) => {
     if (!window.confirm(dismissQuestion(game, t))) return;
     try {
-      await (await openIndexedDbQueueStorage()).forget(game.gameId);
+      await (await openIndexedDbQueueStorage()).forget(game.gameId, accountId);
       setDismissFailed(false);
     } catch {
       setDismissFailed(true);

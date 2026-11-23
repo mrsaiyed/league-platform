@@ -164,6 +164,22 @@ export function queueStorageContract(name: string, make: () => Promise<DeviceQue
       ]);
     });
 
+    it('keeps the account that made each tap, and forgets only that account’s (T-321)', async () => {
+      const storage = await make();
+      await storage.add(game, { protocolVersion: 1, command: tap(1), accountId: 'account-1' });
+      await storage.add(game, { protocolVersion: 1, command: tap(2), accountId: 'account-2' });
+      await storage.add(game, { protocolVersion: 1, command: tap(3) });
+      await storage.settle(game, { notSaved: [commandId(1)] });
+      expect((await storage.list(game)).map((e) => [e.accountId, e.state])).toEqual([
+        ['account-1', 'not-saved'],
+        ['account-2', 'waiting'],
+        [undefined, 'waiting'],
+      ]);
+      // Dismissed by account 1: its own and the older one go, account 2's stays.
+      await storage.forget(game, 'account-1');
+      expect(ids(await storage.listAll())).toEqual([commandId(2)]);
+    });
+
     it("forgets one game's taps, and only that game's (S-88)", async () => {
       const storage = await make();
       await storage.add(game, { protocolVersion: 1, command: tap(1) });

@@ -20,6 +20,7 @@
 // releases, so every step from the stored version on runs in turn. An older build
 // opening a database a newer one has upgraded gets `storage-newer-version`.
 import {
+  madeBy,
   QueueError,
   type DeviceQueueStorage,
   type QueueErrorCode,
@@ -136,7 +137,7 @@ export async function openIndexedDbQueueStorage(
   await connection();
 
   return {
-    add(gameId, { protocolVersion, command, sessionId, moment, leagueId }) {
+    add(gameId, { protocolVersion, command, sessionId, moment, leagueId, accountId }) {
       return write<'added' | 'held'>('added', (commands, outcome, tx) => {
         const known = commands.index(byCommand).get(command.commandId);
         known.onsuccess = () => {
@@ -145,6 +146,7 @@ export async function openIndexedDbQueueStorage(
             const madeUnder = sessionId === undefined ? {} : { sessionId };
             const madeAt = moment === undefined ? {} : { moment };
             const madeIn = leagueId === undefined ? {} : { leagueId };
+            const maker = accountId === undefined ? {} : { accountId };
             const fresh: Row = {
               gameId,
               protocolVersion,
@@ -152,6 +154,7 @@ export async function openIndexedDbQueueStorage(
               ...madeUnder,
               ...madeAt,
               ...madeIn,
+              ...maker,
               state: 'waiting',
             };
             commands.add(fresh);
@@ -171,13 +174,13 @@ export async function openIndexedDbQueueStorage(
     // Every game's rows, in the order of their key: the order tapped (step 2.38).
     listAll: () => read((commands) => commands.getAll()),
 
-    async forget(gameId) {
+    async forget(gameId, accountId) {
       await write(undefined, (commands) => {
         const walk = commands.index(byGame).openCursor(gameId);
         walk.onsuccess = () => {
           const cursor = walk.result;
           if (cursor === null) return;
-          cursor.delete();
+          if (accountId === undefined || madeBy(cursor.value as Row, accountId)) cursor.delete();
           cursor.continue();
         };
       });

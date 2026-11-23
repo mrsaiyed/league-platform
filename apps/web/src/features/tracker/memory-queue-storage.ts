@@ -2,6 +2,7 @@
 // storage. It copies what goes in and what comes out, as the browser's storage does,
 // so a test cannot pass by changing an object the queue still holds.
 import {
+  madeBy,
   QueueError,
   type DeviceQueueStorage,
   type QueueSettlement,
@@ -17,7 +18,7 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
   let held: QueuedCommand[] = [];
 
   return {
-    async add(gameId, { protocolVersion, command, sessionId, moment, leagueId }) {
+    async add(gameId, { protocolVersion, command, sessionId, moment, leagueId, accountId }) {
       const known = held.find((entry) => entry.command.commandId === command.commandId);
       if (known !== undefined) {
         if (known.gameId !== gameId) throw new QueueError('command-id-in-other-game');
@@ -26,6 +27,7 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
       const madeUnder = sessionId === undefined ? {} : { sessionId };
       const madeAt = moment === undefined ? {} : { moment };
       const madeIn = leagueId === undefined ? {} : { leagueId };
+      const madeByOf = accountId === undefined ? {} : { accountId };
       held.push(
         structuredClone({
           gameId,
@@ -34,6 +36,7 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
           ...madeUnder,
           ...madeAt,
           ...madeIn,
+          ...madeByOf,
           state: 'waiting',
         }),
       );
@@ -54,7 +57,16 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
         const madeUnder = entry.sessionId === undefined ? {} : { sessionId: entry.sessionId };
         const madeAt = entry.moment === undefined ? {} : { moment: entry.moment };
         const madeIn = entry.leagueId === undefined ? {} : { leagueId: entry.leagueId };
-        const kept = { gameId: game, protocolVersion, command, ...madeUnder, ...madeAt, ...madeIn };
+        const maker = entry.accountId === undefined ? {} : { accountId: entry.accountId };
+        const kept = {
+          gameId: game,
+          protocolVersion,
+          command,
+          ...madeUnder,
+          ...madeAt,
+          ...madeIn,
+          ...maker,
+        };
         const refusal = refusals.get(id);
         if (refusal !== undefined) return [structuredClone({ ...kept, state: 'refused', refusal })];
         if (setAside.has(id)) return [structuredClone({ ...kept, state: 'not-saved' })];
@@ -64,8 +76,11 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
     async listAll() {
       return structuredClone(held);
     },
-    async forget(gameId) {
-      held = held.filter((entry) => entry.gameId !== gameId);
+    async forget(gameId, accountId) {
+      held = held.filter(
+        (entry) =>
+          entry.gameId !== gameId || (accountId !== undefined && !madeBy(entry, accountId)),
+      );
     },
     all: () => structuredClone(held),
   };

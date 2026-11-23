@@ -171,8 +171,9 @@ export async function openTrackerGame(
     ...options.controller,
     gameId,
     deviceId,
-    // Each tap keeps its league, so "Your games" lists it there however old (T-317).
-    storage: inLeague(storage.queue, leagueId),
+    // Each tap keeps its league, so "Your games" lists it there however old (T-317), and
+    // its account: another account's taps on this device are never sent from here (T-321).
+    storage: inLeague(storage.queue, leagueId, accountId),
     // With no answer on opening, scoring starts from what the device kept (step 2.38).
     kept: keptGame,
     keepScoring: (scoring) => games.saveScoring(gameId, scoring),

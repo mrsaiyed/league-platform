@@ -343,6 +343,9 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     expect(again.controller.status().mode).toEqual({ kind: 'scoring' });
     const basket: TapInput = { type: 'score', side: 'home', playerId: hawks[0] ?? '', points: 2 };
     expect((await again.controller.tap(basket)).ok).toBe(true);
+    // Its send is tried while the signal is still down (each tap's account is read with
+    // the queue, T-321, which takes the send a moment longer to start).
+    await again.controller.idle();
     // Meanwhile someone else takes the game on another device.
     network.mode = 'up';
     const other = await open(network, 'owner');

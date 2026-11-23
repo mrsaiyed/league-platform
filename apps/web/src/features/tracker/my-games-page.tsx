@@ -82,6 +82,7 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
       {/* Plays this device still holds for any game, however old (step 2.38; S-88). */}
       <HeldGamesPanel
         leagueId={here.id}
+        accountId={commandContextOf(view.context).accountId}
         scoreHref={leagueUrl(here, 'score', { game: heldGameMark })}
         locale={locale}
         catalog={Object.fromEntries(

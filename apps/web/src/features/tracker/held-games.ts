@@ -6,7 +6,7 @@
 // No drawing here: held-games-panel.tsx draws it.
 import type { Translate } from '@srleagues/site';
 import type { OpenedGame } from './opened-game-storage.ts';
-import type { QueuedCommand } from './queue-storage.ts';
+import { madeBy, type QueuedCommand } from './queue-storage.ts';
 
 /** One game this device holds plays for. */
 export type HeldGame = {
@@ -35,18 +35,22 @@ export type HeldGame = {
  */
 export function heldGames(
   queue: readonly QueuedCommand[],
-  leagueId: string,
-  kept: (gameId: string) => Pick<OpenedGame, 'leagueId' | 'rosters'> | undefined,
+  owner: { readonly leagueId: string; readonly accountId: string | null },
+  kept: (gameId: string) => Pick<OpenedGame, 'leagueId' | 'rosters' | 'accountId'> | undefined,
 ): readonly HeldGame[] {
+  const { leagueId, accountId } = owner;
   const byGame = new Map<string, QueuedCommand[]>();
   for (const entry of queue) {
+    // Only the signed-in account's own plays (T-321): another's stay on the device, for it.
+    if (!madeBy(entry, accountId)) continue;
     const rows = byGame.get(entry.gameId);
     if (rows === undefined) byGame.set(entry.gameId, [entry]);
     else rows.push(entry);
   }
   const held: HeldGame[] = [];
   for (const [gameId, rows] of byGame) {
-    const game = kept(gameId);
+    const keptGame = kept(gameId);
+    const game = keptGame?.accountId === accountId ? keptGame : undefined;
     const madeIn = rows.find((row) => row.leagueId !== undefined)?.leagueId ?? game?.leagueId;
     if (madeIn !== undefined && madeIn !== leagueId) continue;
     const waiting = rows.filter((row) => row.state === 'waiting').length;

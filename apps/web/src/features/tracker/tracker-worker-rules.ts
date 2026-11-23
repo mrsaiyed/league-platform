@@ -85,10 +85,10 @@ export function mayReplaceStored(gamesOpen: number | null): boolean {
 
 /**
  * How the worker answers a tracker page. While a game is open on the device and the page
- * is kept, the kept page, at once, with the code it was kept with: a reload in a gym with
- * no signal (or a weak one) scores on within seconds, and a release made meanwhile waits
- * until the game is closed. Otherwise the network first, the kept page only when the
- * network does not answer.
+ * is kept (and `mayServeKeptPage` allows it), the kept page, with the code it was kept
+ * with: a reload in a gym with no signal (or a weak one) scores on within seconds, and a
+ * release made meanwhile waits until the game is closed. Otherwise the network first,
+ * the kept page only when the network does not answer.
  */
 export function pageAnswerPlan(
   gamesOpen: number | null,
@@ -101,6 +101,62 @@ export function pageAnswerPlan(
     keepNetworkAnswer: replace || !kept,
   };
 }
+
+/**
+ * The account a tracker page was made for (T-321), read from the page's own text: the
+ * tracker page carries `<meta name="{metaName}" content="{account id}">` whenever someone
+ * is signed in. Null when the page names no account.
+ */
+export function accountMarkOfPage(html: string, metaName: string): string | null {
+  const tags = html.match(/<meta\b[^>]*>/gi) ?? [];
+  for (const tag of tags) {
+    if (!tag.includes(`name="${metaName}"`)) continue;
+    const value = /\bcontent="([^"]*)"/.exec(tag)?.[1];
+    return value === undefined || value === '' ? null : value;
+  }
+  return null;
+}
+
+/**
+ * Who the network says is signed in (T-321), from its answer to a tracker page and the
+ * account that page names (`accountMarkOfPage`): that account; null for nobody (sent to
+ * sign in, refused as signed out, or a page that names no account); undefined when the
+ * network did not say (no answer in time, an error, "not found").
+ */
+export function signedInFrom(
+  answer: WorkerAnswer | null,
+  pageMark: string | null,
+): string | null | undefined {
+  if (answer === null) return undefined;
+  if (answer.redirected || answer.type === 'opaqueredirect') return null;
+  if (answer.status === 401 || answer.status === 403) return null;
+  if (answer.status !== 200 || answer.type !== 'basic') return undefined;
+  return pageMark;
+}
+
+/**
+ * Whether a kept tracker page may be shown (T-321): it belongs to the account that made
+ * it. Never when it names no account; never when the network says another account, or
+ * nobody, is signed in now. When the network did not say (no signal), the kept page is
+ * shown: signing in needs the network, so the device is still the maker's.
+ */
+export function mayServeKeptPage(
+  keptMark: string | null,
+  signedIn: string | null | undefined,
+): boolean {
+  if (keptMark === null) return false;
+  return signedIn === undefined || signedIn === keptMark;
+}
+
+/** The meta tag's name that says which account a tracker page was made for (T-321). */
+export const trackerAccountMetaName = 'srleagues-account';
+
+/**
+ * How long a tracker page waits for the network to say who is signed in before it opens
+ * the kept page (T-321): long enough for a working connection, short enough that a
+ * reload in a gym with a weak signal still scores on within seconds.
+ */
+export const trackerNetworkWaitMs = 3_000;
 
 /**
  * The mark of the code a page runs: made from its built script files' addresses, which

@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  accountMarkOfPage,
   codeMarkOf,
   keptAddressOf,
   mayKeepAnswer,
   mayReplaceStored,
+  mayServeKeptPage,
   pageAnswerPlan,
+  signedInFrom,
+  trackerAccountMetaName,
   trackerScopeOf,
 } from './tracker-worker-rules.ts';
 
@@ -109,5 +113,55 @@ describe('the code mark and the scope', () => {
 
   it('reaches the folder of the worker: the league tracker addresses', () => {
     expect(trackerScopeOf('/north/score/tracker-worker.js')).toBe('/north/score/');
+  });
+});
+
+describe('a kept page is the account’s that made it (T-321)', () => {
+  const meta = trackerAccountMetaName;
+  const html = (account: string) =>
+    `<!DOCTYPE html><html><head><meta charSet="utf-8"/><meta name="theme-color" content="#123"/><meta name="${meta}" content="${account}"/></head><body>…</body></html>`;
+  const answer = (status: number, more: Partial<{ type: string; redirected: boolean }> = {}) => ({
+    status,
+    type: 'basic',
+    redirected: false,
+    ...more,
+  });
+
+  it('reads the account a page was made for from its head, and nothing from a page without one', () => {
+    expect(accountMarkOfPage(html('account-1'), meta)).toBe('account-1');
+    expect(accountMarkOfPage(`<meta content="account-2" name="${meta}">`, meta)).toBe('account-2');
+    expect(
+      accountMarkOfPage('<html><head><meta name="theme-color" content="#123"/></head>', meta),
+    ).toBeNull();
+    expect(accountMarkOfPage(`<meta name="${meta}" content=""/>`, meta)).toBeNull();
+    // Written in the page's data, not as a tag: not the page's mark.
+    expect(
+      accountMarkOfPage(`<script>["$","meta",{"name":"${meta}","content":"x"}]</script>`, meta),
+    ).toBeNull();
+  });
+
+  it('learns who is signed in only from an answer that says it', () => {
+    expect(signedInFrom(answer(200), 'account-1')).toBe('account-1');
+    // Sent to sign in, or refused as signed out: nobody.
+    expect(signedInFrom(answer(200, { redirected: true }), null)).toBeNull();
+    expect(signedInFrom(answer(0, { type: 'opaqueredirect' }), null)).toBeNull();
+    expect(signedInFrom(answer(403), null)).toBeNull();
+    expect(signedInFrom(answer(401), null)).toBeNull();
+    // A page that names nobody.
+    expect(signedInFrom(answer(200), null)).toBeNull();
+    // No answer in time, an error or "not found": the network did not say.
+    expect(signedInFrom(null, null)).toBeUndefined();
+    expect(signedInFrom(answer(500), null)).toBeUndefined();
+    expect(signedInFrom(answer(404), null)).toBeUndefined();
+  });
+
+  it('shows a kept page only while its own account is signed in, or while the network cannot say', () => {
+    expect(mayServeKeptPage('account-1', 'account-1')).toBe(true);
+    expect(mayServeKeptPage('account-1', undefined)).toBe(true);
+    expect(mayServeKeptPage('account-1', 'account-2')).toBe(false);
+    expect(mayServeKeptPage('account-1', null)).toBe(false);
+    // A kept page that names no account is never shown.
+    expect(mayServeKeptPage(null, undefined)).toBe(false);
+    expect(mayServeKeptPage(null, null)).toBe(false);
   });
 });

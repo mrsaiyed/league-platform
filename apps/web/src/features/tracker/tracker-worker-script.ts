@@ -6,8 +6,11 @@
 // How it behaves:
 // - it reaches only the league's tracker pages (its scope), and keeps only what
 //   keptAddressOf allows: those pages and the built code and styles they load;
-// - a page: while a game is open on the device, the kept copy at once if there is one;
-//   otherwise the network, and the kept copy when the network does not answer;
+// - a page: while a game is open on the device, the kept copy if there is one, once the
+//   network has said the same account is still signed in or has not answered within a
+//   few seconds; otherwise the network, and the kept copy when the network does not
+//   answer. A kept page is the account's that made it (T-321): when the network says
+//   another account or nobody is signed in, the kept pages are deleted, never shown;
 // - code: kept by address (each built file's address names its content), so it is
 //   answered from the device first;
 // - a new worker (a release that changed the code) takes over, and the code kept for
@@ -19,12 +22,17 @@
 // Signing out deletes everything kept here (forgetTrackerPagesOnDevice).
 import { openedGamesDatabaseName, openedGamesStoreName } from './indexeddb-opened-game-storage.ts';
 import {
+  accountMarkOfPage,
   codeMarkOf,
   keptAddressOf,
   mayKeepAnswer,
   mayReplaceStored,
+  mayServeKeptPage,
   pageAnswerPlan,
+  signedInFrom,
+  trackerAccountMetaName,
   trackerKeptPrefix,
+  trackerNetworkWaitMs,
   trackerWorkerUpdateMessage,
 } from './tracker-worker-rules.ts';
 
@@ -97,22 +105,55 @@ function keptIn(key) {
   });
 }
 
+async function accountOf(answer) {
+  if (!answer || answer.type !== 'basic') return null;
+  try {
+    return accountMarkOfPage(await answer.clone().text(), names.accountMeta);
+  } catch (error) {
+    return null;
+  }
+}
+
+// Kept pages belong to the account that made them (T-321): once the network says who is
+// signed in, every kept page of another account (or of nobody) is deleted.
+async function forgetPagesNotOf(signedIn) {
+  const all = await caches.keys();
+  for (const name of all.filter((n) => n.startsWith(prefix))) {
+    const box = await caches.open(name);
+    for (const asked of await box.keys()) {
+      const what = keptAddressOf({ url: asked.url, method: 'GET', mode: 'navigate' }, scope);
+      if (what === null || what.kind !== 'page') continue;
+      if (!mayServeKeptPage(await accountOf(await box.match(asked)), signedIn)) await box.delete(asked);
+    }
+  }
+}
+
 async function answerPage(request, key) {
   const open = await gamesOpen();
-  const kept = await keptIn(key);
+  let kept = await keptIn(key);
+  const asking = fetch(request);
+  // With a page kept, the network has a few seconds to say who is signed in; with none,
+  // the network's answer (or its failure) is the only one there is.
+  const answer = kept
+    ? await Promise.race([
+        asking.catch(() => null),
+        new Promise((done) => setTimeout(() => done(null), names.networkWaitMs)),
+      ])
+    : await asking;
+  const signedIn = signedInFrom(
+    answer && { status: answer.status, type: answer.type, redirected: answer.redirected },
+    await accountOf(answer),
+  );
+  if (signedIn !== undefined) await forgetPagesNotOf(signedIn);
+  if (kept && !mayServeKeptPage(await accountOf(kept), signedIn)) kept = undefined;
   const plan = pageAnswerPlan(open, kept !== undefined);
   if (plan.first === 'kept' && kept) return kept;
-  try {
-    const answer = await fetch(request);
-    if (plan.keepNetworkAnswer && mayKeepAnswer(answer)) {
-      await keep(key, answer.clone());
-      if (mayReplaceStored(open)) await letGoOfEarlier();
-    }
-    return answer;
-  } catch (error) {
-    if (kept) return kept;
-    throw error;
+  if (!answer) return kept || Response.error();
+  if (plan.keepNetworkAnswer && mayKeepAnswer(answer)) {
+    await keep(key, answer.clone());
+    if (mayReplaceStored(open)) await letGoOfEarlier();
   }
+  return answer;
 }
 
 async function answerCode(request, key) {
@@ -155,8 +196,19 @@ export function trackerWorkerScript(): string {
     database: openedGamesDatabaseName,
     games: openedGamesStoreName,
     updateMessage: trackerWorkerUpdateMessage,
+    accountMeta: trackerAccountMetaName,
+    networkWaitMs: trackerNetworkWaitMs,
   };
-  const rules = { codeMarkOf, keptAddressOf, mayKeepAnswer, mayReplaceStored, pageAnswerPlan };
+  const rules = {
+    accountMarkOfPage,
+    codeMarkOf,
+    keptAddressOf,
+    mayKeepAnswer,
+    mayReplaceStored,
+    mayServeKeptPage,
+    pageAnswerPlan,
+    signedInFrom,
+  };
   return [
     "'use strict';",
     `const names = ${JSON.stringify(names)};`,
