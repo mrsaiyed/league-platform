@@ -16,6 +16,10 @@ const managedLinux = readExecutionProfile() === 'managed-linux';
 
 const localBindingConfig = {
   main: './worker/index.ts',
+  // The date the live pilot was built with (Cloudflare's plugin 1.37.1 chose it). Newer plugins
+  // default to their own runtime's date, which would change the Worker's behaviour along with the
+  // libraries; moving it is a decision of its own (record 079).
+  compatibility_date: '2026-05-15',
   compatibility_flags: ['nodejs_compat'],
   d1_databases: d1
     ? [

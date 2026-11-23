@@ -9,7 +9,7 @@ import {
   unknownNetwork,
 } from './device.ts';
 import { needsPasswordAgain } from './password-again.ts';
-import { problemOf, screenUrl } from './problems.ts';
+import { noticeOf, problemOf, screenUrl, withNotice } from './problems.ts';
 
 describe('deviceLabel', () => {
   it('names common browsers and systems', () => {
@@ -145,6 +145,28 @@ describe('problems', () => {
     expect(problemOf({ problem: '<script>' })).toBeUndefined();
     expect(screenUrl('signin', { problem: 'tooManyAttempts', wait: 4.2 })).toBe(
       '/signin?problem=tooManyAttempts&wait=5',
+    );
+  });
+});
+
+describe('notices and waits (step 2.163)', () => {
+  it('reads back only the notices it writes', () => {
+    expect(noticeOf({ notice: 'signedOut' })).toBe('signedOut');
+    expect(noticeOf(new URLSearchParams('notice=codeSentAgain'))).toBe('codeSentAgain');
+    for (const junk of ['toString', '<script>', '', 'signedout']) {
+      expect(noticeOf({ notice: junk }), junk).toBeUndefined();
+    }
+    expect(noticeOf({ notice: ['signedOut', 'signedOut'] })).toBeUndefined();
+  });
+
+  it('puts a notice on a page, keeping its query and place and replacing an old notice', () => {
+    expect(withNotice('/north-valley', 'signedOut')).toBe('/north-valley?notice=signedOut');
+    expect(withNotice('/north-valley/schedule?team=owls#round-3', 'signedOut')).toBe(
+      '/north-valley/schedule?team=owls&notice=signedOut#round-3',
+    );
+    expect(withNotice('/?notice=codeSentAgain', 'signedOut')).toBe('/?notice=signedOut');
+    expect(screenUrl('account', { ask: 'signOutEverywhere' })).toBe(
+      '/account?ask=signOutEverywhere',
     );
   });
 });

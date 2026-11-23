@@ -30,14 +30,11 @@ Learned, not yet rules elsewhere: (a) a lane that adds a page, a route, a field,
 
 Every lane's work is on GitHub. All sessions stopped on 2026-11-17 at about 03:05 UTC when the allowance ran out. Three at a time are picked up again, in the order of "Next step" above, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`)                       | Where it stands                         | What is left                                           |
-| -------------------------------------------- | --------------------------------------- | ------------------------------------------------------ |
-| 2.97-invitations (record 086, T-288)         | 5 commits; 2 conflicts                  | finish, review, land                                   |
-| 2.140-nothing-unfinished (record 087, T-289) | 5 commits                               | finish, review, land                                   |
-| 2.163-sign-in-says (record 091, T-291)       | reviewed, fixed; one browser test fails | the Handover part, item 1                              |
-| 2.220-pilot-libraries                        | 3 commits                               | finish, review, land; then the founder's short session |
-| 2.221, 2.56, 2.224                           | opened, nothing pushed                  | start again from their briefs when their turn comes    |
-| 2.191-ci-parallel                            | parked                                  | after the first test is in the founder's hands         |
+| Lane (branch `lane/…`)                       | Where it stands        | What is left                                        |
+| -------------------------------------------- | ---------------------- | --------------------------------------------------- |
+| 2.140-nothing-unfinished (record 087, T-289) | 5 commits              | finish, review, land                                |
+| 2.221, 2.56, 2.224                           | opened, nothing pushed | start again from their briefs when their turn comes |
+| 2.191-ci-parallel                            | parked                 | after the first test is in the founder's hands      |
 
 Next free: STEP 2.241, migration 0024, record 102, T-304, S-81, U-18. Numbers already given out stand with their lanes (in each lane's note).
 

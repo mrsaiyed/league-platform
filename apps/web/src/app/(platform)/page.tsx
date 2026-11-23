@@ -1,17 +1,21 @@
 import { platformUrl } from '@srleagues/core';
 import { redirect } from 'next/navigation';
 import { MyLeaguesList, StandalonePage, TestCopyLine } from '../../features/shell/index.ts';
+import type { SearchProps } from '../../features/sign-in/index.ts';
 import { webPorts } from '../../server/container.ts';
 import { t } from '../../server/messages.ts';
-import { screenUrl } from '../../server/sign-in/problems.ts';
+import { noticeOf, notices, screenUrl } from '../../server/sign-in/problems.ts';
 import { leaguesOfThisRequest, signedInPerson } from '../../server/signed-in-leagues.ts';
 
 // Our front page (P2 line 67), as far as step 2.127 builds it: a signed-in person sees
 // the leagues they belong to first, each a link, with their role in each (record 066); a
 // visitor sees one plain page, what SR Leagues is and "Sign in". The rest of the front
 // page (finding a league, starting one) is stage 5's. It reads the session cookie, so it
-// is drawn per request and a visitor's page never holds anyone's leagues.
-export default async function Page() {
+// is drawn per request and a visitor's page never holds anyone's leagues. Signing out from
+// a page of no league leaves the person here, told so (R-30; step 2.163), and told only
+// while they are signed out.
+export default async function Page({ searchParams }: SearchProps) {
+  const notice = noticeOf(await searchParams);
   const person = await signedInPerson();
   if (person.kind === 'account-problem') redirect(platformUrl('account'));
   // On the test copy only, its one line at the foot of the page (step 2.205).
@@ -20,6 +24,11 @@ export default async function Page() {
     return (
       <StandalonePage>
         <main className="ui-message front">
+          {notice === undefined || notice === 'codeSentAgain' ? null : (
+            <p role="status" data-notice="">
+              {t(notices[notice])}
+            </p>
+          )}
           <h1>{t('front.title')}</h1>
           <p>{t('front.about')}</p>
           <a

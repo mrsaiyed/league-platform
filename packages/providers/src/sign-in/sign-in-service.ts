@@ -135,8 +135,18 @@ export type TooManyAttempts = {
 
 export type CodeRequestError = { readonly code: 'invalid-email' } | TooManyAttempts | CodeNotSent;
 
-/** Proof that the person holds the mailbox, good for one `setPassword`. */
-export type CodeProof = { readonly proof: string; readonly proofExpiresAt: Date };
+/**
+ * Proof that the person holds the mailbox, good for one `setPassword`. `accountExists`
+ * says whether the address already has an account, so the password screen can say that
+ * saving changes its password and signs out its other devices (R-31). It is given only
+ * after a right code, to whoever holds the mailbox, which the code's email already tells
+ * (`SignInCodeMessage.accountExists`): before the code nothing differs (T-68).
+ */
+export type CodeProof = {
+  readonly proof: string;
+  readonly proofExpiresAt: Date;
+  readonly accountExists: boolean;
+};
 
 /**
  * `code-expired` covers a code past its time and an address no code was asked for;

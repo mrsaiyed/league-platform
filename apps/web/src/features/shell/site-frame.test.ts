@@ -25,6 +25,7 @@ const madeUpAccount: AccountMenu = {
   myTeam: null,
   accountHref: '/account',
   onScoringPage: false,
+  signOutFields: { next: '/north-valley' },
 };
 
 describe('league design', () => {

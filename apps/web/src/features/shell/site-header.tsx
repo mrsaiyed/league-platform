@@ -95,6 +95,7 @@ function AccountEntries({
         <SignOutLink
           action={signOutAction}
           waitingQuestion={waitingQuestionWords()}
+          fields={account.signOutFields}
           href={account.accountHref}
           className="site-account-sign-out"
         >
@@ -102,6 +103,7 @@ function AccountEntries({
         </SignOutLink>
       ) : (
         <SignOutForm action={signOutAction} waitingQuestion={waitingQuestionWords()}>
+          <SignOutFields fields={account.signOutFields} />
           <button className="site-account-sign-out" type="submit">
             {t('account.signOut')}
           </button>
@@ -109,6 +111,13 @@ function AccountEntries({
       )}
     </>
   );
+}
+
+/** What a sign-out form tells the server: where the person is (account-menu.ts). */
+export function SignOutFields({ fields }: { readonly fields: Readonly<Record<string, string>> }) {
+  return Object.entries(fields).map(([name, value]) => (
+    <input key={name} type="hidden" name={name} value={value} />
+  ));
 }
 
 /**

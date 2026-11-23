@@ -77,8 +77,16 @@ const config: NextConfig = {
     // An invitation's address holds its secret: it is never passed on (record 023).
     // Later rules win for the same header.
     {
-      source: '/:league/invitation/:rest*',
+      source: '/:league/invitation/:rest+',
       headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+    },
+    // The accept page the link forwards to holds no secret in its address (record 086), and
+    // its buttons must work with no script in the page: under no-referrer a browser sends a
+    // plain form with `Origin: null`, which Next.js refuses as another site's. So nothing of
+    // it goes to another site, and our own forms still say where they come from.
+    {
+      source: '/:league/invitation',
+      headers: [{ key: 'Referrer-Policy', value: 'same-origin' }],
     },
     // Google's return address holds its one-time code (step 1.14).
     {

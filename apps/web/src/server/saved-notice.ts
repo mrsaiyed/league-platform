@@ -12,6 +12,7 @@
 
 /** The screens that say "Saved" from a notice. */
 export const noticeScreens = [
+  'admins',
   'games',
   'box-score',
   'schedule',
@@ -25,7 +26,7 @@ export type NoticeScreen = (typeof noticeScreens)[number];
 
 export type SavedNotice = {
   readonly screen: NoticeScreen;
-  /** The id of the thing saved: a game, a person (step 2.50), a division, a venue or a court (step 2.49), or a season (Season settings, step 2.47). */
+  /** The id of the thing saved: a game, an invitation or a part of the Admins page (step 2.97), a person (step 2.50), a division, a venue or a court (step 2.49), or a season (Season settings, step 2.47). */
   readonly thing: string;
   /** What was done to it, as the last part of a message key: `final`, `reopen`, a part… */
   readonly said: string;

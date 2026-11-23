@@ -37,6 +37,7 @@ import {
 import { leagueUrl } from '@srleagues/core';
 import { simulatedLeagueExample, type Config } from './config-schema.ts';
 import { databasePorts, type DatabaseQueries } from './database-ports.ts';
+import { madeUpInvitationMail } from './made-up-invitation-mail.ts';
 import { madeUpDatabaseTools, type SeedLeagueFacts } from './made-up-database-people.ts';
 import { runsOnMadeUpData } from './made-up-mode.ts';
 import type { WebPorts } from './ports.ts';
@@ -112,6 +113,7 @@ export type DatabasePackage = Pick<
   | 'simulatedOwner'
   | 'simulationDefaults'
   | 'simulationOptionsFrom'
+  | 'tableQueue'
 > &
   DatabaseQueries;
 
@@ -567,5 +569,19 @@ async function onMadeUpDatabase(
       publicBaseUrl: options.publicBaseUrl,
     },
     reportDesign: (message, fields) => deps.warn?.(message, fields),
+    // No worker can reach a database in this process's memory, so the app sends the
+    // invitation emails itself, to the made-up capture (step 2.97, record 086).
+    sendQueuedInvitations: madeUpInvitationMail({
+      transaction: database.commandTransaction(db, (scope) => ({
+        jobs: database.jobsStore(scope),
+        leagues: database.leaguesStore(scope),
+        access: database.accessStore(scope),
+        activity: database.activityLogStore(scope),
+      })),
+      email: signIn.mail,
+      siteOrigin: options.publicBaseUrl,
+      sendingAddress: options.emailFrom,
+      runDue: database.tableQueue(db).runDue,
+    }),
   });
 }

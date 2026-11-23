@@ -19,7 +19,7 @@ export default async function Page({
   readonly params: Promise<{ readonly league: string; readonly missing: readonly string[] }>;
 }) {
   const { league, missing } = await params;
-  const unreleased = unreleasedScreen([league, 'admin', ...missing]);
+  const unreleased = await unreleasedScreen([league, 'admin', ...missing]);
   if (unreleased !== null) return unreleased;
   await loadLeaguePage(league, 'site');
   return notFound();

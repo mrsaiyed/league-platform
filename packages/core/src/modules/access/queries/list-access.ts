@@ -2,8 +2,8 @@
 // the whole league or for one program. Whoever manages access there may read it, so
 // a program's admin sees their program's people and no one else's. It changes
 // nothing, but runs in the same shape as a command, so it has the same permission
-// check, transaction and log line (record 014). Accounts are given by id; their
-// names need the owner-run lookup of record 008, which is not built yet.
+// check, transaction and log line (record 014). Accounts are given by id; the page
+// reads their names apart, through the narrow function of step 2.92 (listAccessNames).
 import { z } from 'zod';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
 import { hasPermission } from '../policy.ts';

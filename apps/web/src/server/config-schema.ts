@@ -56,6 +56,7 @@ export const fields = {
   TURNSTILE_SECRET_KEY: { secret: true },
   RESEND_API_KEY: { secret: true },
   EMAIL_FROM: { secret: false },
+  GOOGLE_SIGN_IN: { secret: false },
   CONTACT_EMAIL: { secret: false },
   STRIPE_SECRET_KEY: { secret: true },
   STRIPE_WEBHOOK_SECRET: { secret: true },
@@ -173,6 +174,10 @@ const schema = z.object({
   // Only production sends email (T-140); elsewhere every email is captured.
   RESEND_API_KEY: secretText(8).optional(),
   EMAIL_FROM: text.regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, 'must be an email address'),
+  // Whether "Continue with Google" is set up on the sign-in service (record 091): 'on' once
+  // Google is configured there, so the sign-in screens draw the button; 'off' (the default)
+  // draws none, so nobody taps a button that can only fail (the using-it audit, M27).
+  GOOGLE_SIGN_IN: z.enum(['on', 'off']).default('off'),
   // Where the Terms and Privacy pages tell people to write to the people who run the site
   // (step 2.135): an address the founder gives, never one written in the code. Without
   // it the pages send a question through the league's admin instead.
@@ -204,6 +209,7 @@ const optional: readonly ConfigName[] = [
   'TURNSTILE_SITE_KEY',
   'TURNSTILE_SECRET_KEY',
   'RESEND_API_KEY',
+  'GOOGLE_SIGN_IN',
   'CONTACT_EMAIL',
 ];
 

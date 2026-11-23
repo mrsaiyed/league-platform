@@ -417,8 +417,13 @@ if (browser) {
 
         // Signs out with the account menu.
         await openMenu(page);
+        // Since step 2.163 (R-30) signing out leaves the person on the page they were on,
+        // saying "You are signed out.", rather than at /signin.
         await Promise.all([
-          page.waitForURL((url) => url.pathname === '/signin'),
+          page.waitForURL(
+            (url) =>
+              url.pathname === '/north-valley' && url.searchParams.get('notice') === 'signedOut',
+          ),
           // The menu's own button: the header holds one for each width, one of them shown.
           page.locator('.site-header .site-account-sign-out').filter({ visible: true }).click(),
         ]);

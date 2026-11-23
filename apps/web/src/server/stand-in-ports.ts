@@ -55,6 +55,7 @@ import type { WebPorts } from './ports.ts';
 import { createPlayPublisher } from './publish-plays.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
+import { standInAdminAccess } from './stand-in-admin-access.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
 import { standInStatusOf } from './stand-in-league-states.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
@@ -304,6 +305,12 @@ export type StandInSignIn = Pick<
   readonly watchForCode: (email: string) => CodeWatch;
   /** From now on emails to made-up addresses are written to the folder (after startup). */
   readonly startKeeping: () => void;
+  /**
+   * The same capture the sign-in emails go to, which keeps a copy of each email to a
+   * made-up address once started: the made-up database's invitation emails go here too
+   * (step 2.97, made-up-invitation-mail.ts).
+   */
+  readonly mail: EmailSender;
 };
 
 /**
@@ -415,6 +422,7 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
     keptEmails: async () => (folder === null ? [] : readKeptEmails(folder, options.publicBaseUrl)),
     watchForCode,
     startKeeping: keeping.startKeeping,
+    mail: keeping.sender,
   };
 }
 
@@ -572,6 +580,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       },
     },
     publicStats: standInPublicStats(world, namePolicy),
+    adminAccess: standInAdminAccess(deps),
     // The same made-up world's people, whom Admin → Teams puts on rosters (step 2.50).
     adminPeople: { deps: world.deps, putBack: world.deps },
     adminTeams: standInAdminTeams(world, accessOf),

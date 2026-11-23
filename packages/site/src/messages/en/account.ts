@@ -33,7 +33,11 @@ export const enAccount = {
   // The staff refusal names the person's own roles here, joined in the language's way:
   // "You are a scheduler in this league." (step 2.157).
   'access.noAccess.youAre': 'You are {roles} in this league.',
+  'account.alreadySignedOutNotice':
+    'This device was already signed out. To sign out your other devices, sign in and choose "Sign out everywhere" again.',
   'account.devices': 'Signed-in devices',
+  'account.devicesUnreadable':
+    'We could not read the list of devices just now. Reload the page to try again.',
   'account.lastActive': 'Last active {when}',
   // Beside a league the person helps run, on their own lists: the way to its admin.
   'account.leagueAdmin': 'Admin',
@@ -57,7 +61,10 @@ export const enAccount = {
   'account.signInOrCreate': 'Sign in or create an account',
   'account.signOut': 'Sign out',
   'account.signOutEverywhere': 'Sign out everywhere',
+  'account.signOutEverywhereAsk': 'Sign out every device that uses your account, this one too?',
+  'account.signOutEverywhereConfirm': 'Yes, sign out everywhere',
   'account.signOutEverywhereHelp': 'Signs out every device that uses your account, this one too.',
+  'account.signOutEverywhereKeep': 'No, keep them signed in',
   // Signing out with a game open on the device and plays not yet sent (step 2.127).
   'account.signOutWaiting_one':
     '{count} play is not sent yet. It stays on this device and is sent when you sign in again. Sign out?',
@@ -67,13 +74,26 @@ export const enAccount = {
   // every league page (U-8), the account page's leagues, the front page.
   'account.signedInAs': 'Signed in as {email}',
   'account.signedInAt': 'Signed in {when}',
+  'account.signedOutEverywhereNotice': 'You are signed out on every device that used your account.',
+  'account.signedOutNotice': 'You are signed out.',
   'account.thisDevice': 'This device',
+  'account.when.day': '{date} at {time}',
+  'account.when.today': 'today at {time}',
+  'account.when.yesterday': 'yesterday at {time}',
   'code.again': 'Send a new code',
+  'code.changeAddress': 'Change it',
   'code.label': 'Code',
-  'code.sent':
-    'If that address can sign in, we have sent it a code. It works for {minutes} minutes.',
+  // With no sign-up or reset under way on this device (an old tab): no address to name and
+  // no code sent, so it says so, the same for every visitor (step 2.163).
+  'code.nothingWaiting': 'Nothing is waiting for a code on this device. Start again.',
+  'code.sentAgain': 'We sent a new code to {email}. Use the newest one.',
+  'code.sentAgainReset': 'If {email} has an account, we sent it a new code. Use the newest one.',
+  'code.sentReset': 'If {email} has an account, we sent it a code. It works for {minutes} minutes.',
+  'code.sentSignUp': 'We sent a 6-digit code to {email}. It works for {minutes} minutes.',
+  'code.startAgain': 'Start again',
   'code.submit': 'Continue',
   'code.title': 'Enter your code',
+  'code.wrongAddress': 'Wrong address?',
   'confirm.google': 'Sign in with Google again',
   'confirm.intro': 'This needs your password when you have not entered it in the last hour.',
   'confirm.submit': 'Continue',
@@ -112,18 +132,30 @@ export const enAccount = {
   // code, {minutes} how long it works, {device} a device's name, {when} a time, {url}
   // an address of ours.
   'email.signInCode.subjectSignUp': 'Your code to create your account',
+  'forgot.backToSignIn': 'Back to sign in',
   'forgot.intro':
-    'Enter your email. If that address can sign in, we will send it a code to choose a new password.',
-  'forgot.title': 'Forgot your password',
+    'Enter your email. If it has an account, we will send it a 6-digit code, and then you choose a new password.',
+  'forgot.title': 'Choose a new password',
+  'password.existing':
+    'You already have an account. This changes its password and signs out your other devices.',
+  'password.hide': 'Hide',
   'password.rules': 'At least 8 characters. Passwords that have leaked are refused.',
+  'password.show': 'Show',
   'password.submit': 'Save and sign in',
   'password.title': 'Choose your password',
+  'password.titleReset': 'Choose a new password',
   // The bot check in front of sign-in and sign-up (T4 §6, record 081).
-  // Refused, though the form keeps the email typed (record 081, F4 and C2).
+  // Refused, though the form keeps the email typed (record 081, F4 and C2). Each has a
+  // wording for a screen that draws "Continue with Google" and one for a screen that does
+  // not (M27): Google is offered only where its button really is.
   'problem.botCheckDidNotLoad':
     'The check that you are a person could not load on this connection. Please try again, or try another connection (mobile data instead of this Wi-Fi, for example), or use Continue with Google.',
+  'problem.botCheckDidNotLoadNoGoogle':
+    'The check that you are a person could not load on this connection. Please try another connection (mobile data instead of this Wi-Fi, for example), or try again in a few minutes.',
   'problem.botCheckFailed':
-    'We could not check that you are a person. Please wait a moment and try again. If it keeps happening, turn on scripts for this site, or use Continue with Google.',
+    "We could not check that you are a person. Please wait a moment and try again. If it keeps happening, your browser may be blocking part of this page: allow JavaScript for this site in your browser's settings, or use Continue with Google.",
+  'problem.botCheckFailedNoGoogle':
+    "We could not check that you are a person. Please wait a moment and try again. If it keeps happening, your browser may be blocking part of this page: allow JavaScript for this site in your browser's settings, or try again in a few minutes.",
   'problem.botCheckUnavailable':
     'We could not check that you are a person just now. Please try again in a few minutes.',
   'problem.botCheckUnreachable':
@@ -137,6 +169,11 @@ export const enAccount = {
   'problem.googleOff':
     'This is a test copy, so it does not sign in with Google. Use a made-up email address, such as someone@example.test.',
   'problem.invalidEmail': 'That does not look like an email address.',
+  // The wait in whole minutes, rounded up (record 081), with the way in that does not wait.
+  'problem.lockedOut_one':
+    'Too many tries. Please wait {count} minute, or tap "Forgot your password?" to choose a new one now.',
+  'problem.lockedOut_other':
+    'Too many tries. Please wait {count} minutes, or tap "Forgot your password?" to choose a new one now.',
   'problem.noPassword': 'Your account has no password. Sign in with Google again instead.',
   // The test copy only (step 2.205): the same words whether or not an account exists.
   'problem.onlyMadeUpAddresses':
@@ -145,7 +182,8 @@ export const enAccount = {
     'That password appears in lists of leaked passwords. Please choose another.',
   'problem.passwordTooLong': 'Your password is too long. Please choose a shorter one.',
   'problem.passwordTooShort': 'Your password needs at least 8 characters.',
-  'problem.proofInvalid': 'That took too long. Ask for a new code.',
+  // Fits both routes it ends: sign-up and the forgotten password (step 2.163).
+  'problem.proofInvalid': 'That took too long. Start again.',
   'problem.signInAgain': 'Please sign in again.',
   'problem.signInToScore': 'Sign in to score this game.',
   'problem.signOutEverywhereFailed':
@@ -165,15 +203,25 @@ export const enAccount = {
   'role.registrar': 'Registrar',
   'role.scheduler': 'Scheduler',
   'role.scorekeeper': 'Scorekeeper',
+  'signIn.already.account': 'Go to your account',
+  'signIn.already.body': 'You are signed in as {email}.',
+  'signIn.already.carryOn': 'Carry on',
+  'signIn.already.switch': 'Sign out and use another account',
+  'signIn.already.title': 'You are already signed in',
   'signIn.backTo': 'Back to {league}',
   // With scripts off, each form its own words (record 081, F5). Continue with Google is a
-  // plain form that works without scripts and has no check (script-policy-test.mjs proves it).
+  // plain form that works without scripts and has no check (script-policy-test.mjs proves
+  // it): spoken of only on a screen that draws it (M27).
   'signIn.botCheckNeedsScripts.reset':
-    'Asking for a code to choose a new password first checks that you are a person, and the check needs scripts: please turn them on for this site.',
+    "Asking for a code to choose a new password first checks that you are a person. Your browser is blocking part of this page: allow JavaScript for this site in your browser's settings, then try again.",
   'signIn.botCheckNeedsScripts.signIn':
-    'Signing in with a password checks that you are a person, and the check needs scripts: please turn them on for this site. Continue with Google works without scripts and has no check.',
+    "Signing in with a password checks that you are a person. Your browser is blocking part of this page: allow JavaScript for this site in your browser's settings, then try again. Or use Continue with Google, which works without it.",
+  'signIn.botCheckNeedsScripts.signInNoGoogle':
+    "Signing in with a password checks that you are a person. Your browser is blocking part of this page: allow JavaScript for this site in your browser's settings, then try again.",
   'signIn.botCheckNeedsScripts.signUp':
-    'Creating an account first checks that you are a person, and the check needs scripts: please turn them on for this site. Continue with Google works without scripts and has no check.',
+    "Creating an account first checks that you are a person. Your browser is blocking part of this page: allow JavaScript for this site in your browser's settings, then try again. Or use Continue with Google, which works without it.",
+  'signIn.botCheckNeedsScripts.signUpNoGoogle':
+    "Creating an account first checks that you are a person. Your browser is blocking part of this page: allow JavaScript for this site in your browser's settings, then try again.",
   'signIn.botCheckWaiting': 'Checking that you are a person…',
   'signIn.createAccount': 'New here? Create an account',
   // The sign-in screens (step 1.14, P6 §2 and §5). The same words whether or not an

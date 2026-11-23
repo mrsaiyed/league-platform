@@ -13,6 +13,7 @@ Date: 2026-11-13. Step 1.19 part 2 and its review; carries out T-226 (record 014
   - answer with `Referrer-Policy: no-referrer`, so the link never leaves in a Referer header;
   - answer with `Cache-Control: no-store`, so no browser, proxy or Cloudflare cache keeps it;
   - leave the path out of our request logs and out of any analytics: the request is logged as `/{league}/invitation/[link]`, never with the token.
+- **Since step 2.97 (record 086)** the link's address draws nothing: it answers as above, holds the token in a cookie for the league's accept page and forwards to `/{league}/invitation`, whose address holds no secret. That page answers `no-store` and `same-origin` (under `no-referrer` a plain form is sent with `Origin: null`, which Next.js refuses).
 - **`invitation` is a name the site uses.** Since the page sits directly under the league, a program or custom page cannot be called `invitation` (P2 §5); `leagueSiteNames` already holds it, because it is read from the list of pages.
 
 ## Not done yet, and where it goes

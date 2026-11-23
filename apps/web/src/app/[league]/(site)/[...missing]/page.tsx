@@ -36,7 +36,7 @@ export default async function Page({
   const { league, missing } = await params;
   const local = await localToolScreen(league, missing, (await searchParams) ?? {});
   if (local !== null) return local;
-  const unreleased = unreleasedScreen([league, ...missing]);
+  const unreleased = await unreleasedScreen([league, ...missing]);
   if (unreleased !== null) return unreleased;
   await loadLeaguePage(league, 'site');
   return notFound();

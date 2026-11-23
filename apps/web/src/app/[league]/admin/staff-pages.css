@@ -1007,6 +1007,68 @@
 .admin-people > li .ui-button {
   margin-inline-start: auto;
 }
+
+/* ---------- League settings → Admins (step 2.97) ---------- */
+
+.admin-settings > .settings-admins,
+.admin-access > .staff-panel,
+.admin-access > .admin-access-part {
+  margin-block-end: var(--step-5);
+}
+.admin-access > .admin-access-part {
+  display: grid;
+  gap: var(--step-3);
+}
+.staff .admin-access-part > * {
+  margin: 0;
+}
+/* Where a change lands with scripts off stops clear of the row that stays on top. */
+.admin-access [id] {
+  scroll-margin-block-start: calc(var(--tap) + var(--step-5));
+}
+/* One person or one invitation: who, then the buttons that change it, which wrap under the
+   name on a phone and sit at the line's end above. */
+.admin-access-line {
+  display: grid;
+  gap: var(--step-3);
+  padding-block: var(--step-3);
+  padding-inline: var(--step-4);
+}
+.staff .admin-access-line > * {
+  margin: 0;
+}
+.admin-access-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--step-2) var(--step-3);
+}
+/* An address is one long word: it breaks anywhere rather than push the page sideways. */
+.admin-access-address {
+  overflow-wrap: anywhere;
+}
+.admin-access-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--step-3);
+}
+.staff .admin-access-remove > summary {
+  min-block-size: var(--tap);
+}
+.admin-access-remove[open] {
+  display: grid;
+  gap: var(--step-3);
+}
+.staff .admin-access-remove > p {
+  margin: 0;
+}
+.staff .admin-access-roles {
+  margin-block: var(--step-2) 0;
+  padding-inline-start: var(--step-5);
+  color: var(--color-muted);
+  font-size: var(--text-14);
+}
 /* League settings → Publishing (step 2.240): the "Must fix" list, one item a line, its
    cure under it; it wraps at phone width like the groups below it. */
 .admin-settings > .settings-publish {

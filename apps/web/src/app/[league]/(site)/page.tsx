@@ -19,7 +19,7 @@ export default async function Page({
   readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
 }) {
   const { league } = await params;
-  const unreleased = unreleasedScreen([league]);
+  const unreleased = await unreleasedScreen([league]);
   if (unreleased !== null) return unreleased;
   const search = await searchParams;
   // The league's start page for members (U-5): its own team's page, when it has chosen that.

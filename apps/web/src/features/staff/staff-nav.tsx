@@ -5,7 +5,7 @@
 import { leagueUrl, type AdminArea, type LeagueAddressee } from '@srleagues/core';
 import { t } from '../../server/messages.ts';
 import { signOutAction } from '../../server/sign-in/actions.ts';
-import { waitingQuestionWords, type AccountMenu } from '../shell/index.ts';
+import { SignOutFields, waitingQuestionWords, type AccountMenu } from '../shell/index.ts';
 import { leagueHomeStayUrl } from '../team-pages/index.ts';
 import { SignOutForm } from '../tracker/index.ts';
 import { isReadyArea } from '../../server/releases.ts';
@@ -83,6 +83,7 @@ export function StaffFoot({
             </span>
           </a>
           <SignOutForm action={signOutAction} waitingQuestion={waitingQuestionWords()}>
+            <SignOutFields fields={account.signOutFields} />
             <button className="staff-foot-link" type="submit">
               <StaffIcon name="sign-out" />
               <span>{t('account.signOut')}</span>

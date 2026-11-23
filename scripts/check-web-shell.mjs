@@ -88,6 +88,8 @@ const draftUnscored = '01900000-0000-7000-8000-0000b20003e8';
 // Which refusal the page made. Next.js 16 sends a refused page as a shell that the
 // browser's script fills with the not-found or forbidden screen (record 020), so
 // the refusal is read from the page's data, beside its status.
+// A made-up invitation token of the right shape, which no invitation has (step 2.97).
+const heldMadeUpToken = 'made-up-invitation-token-000000000000000000';
 const noAccess = 'NEXT_HTTP_ERROR_FALLBACK;403';
 const notFound = 'NEXT_HTTP_ERROR_FALLBACK;404';
 
@@ -186,6 +188,30 @@ const cases = [
     200,
     ['Sign in to carry on at North Valley League.', 'Back to North Valley League'],
   ],
+  // Sent to sign in from a page that refused them, "Back to" leads to the league's home,
+  // never to the refusal again; signing in still goes on to the page (review of 2.157).
+  [
+    'visitor',
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fteams',
+    200,
+    [
+      '<a class="ui-button" data-kind="quiet" href="/north-valley">Back to North Valley League</a>',
+      'name="next" value="/north-valley/admin/teams"',
+    ],
+  ],
+  // A signed-in person refused there ("Use another account") is told who they are signed in
+  // as and can sign out to use another, coming back to sign in for the same page (2.163).
+  [
+    'coach',
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fteams',
+    200,
+    [
+      'You are already signed in',
+      'Sign out and use another account',
+      'name="next" value="/signin?next=%2Fnorth-valley%2Fadmin%2Fteams"',
+    ],
+    ['name="password"'],
+  ],
   ...['visitor', 'coach'].flatMap((who) =>
     ['%2Fquiet-pines', '%2Fquiet-pines%2Fadmin', '%2Fclosed-gate', '%2Fno-such-league'].map(
       (next) => [
@@ -247,14 +273,75 @@ const cases = [
   // The sign-in screens (step 1.14).
   ['visitor', '/account', 307, [], [], '/signin?next=%2Faccount'],
   ['owner', '/account', 200, ['Your account', 'Signed-in devices', 'Sign out everywhere']],
-  ['visitor', '/signin', 200, ['Sign in', 'Continue with Google', 'Forgot your password?']],
+  // Google is not set up here (GOOGLE_SIGN_IN), so no screen offers it (step 2.163, M27).
+  [
+    'visitor',
+    '/signin',
+    200,
+    ['Sign in', 'Forgot your password?', 'New here? Create an account'],
+    ['Continue with Google'],
+  ],
+  // Nor does a refusal of the bot check: its words without Google (M27).
+  [
+    'visitor',
+    '/signin?problem=botCheckFailed',
+    200,
+    ['We could not check that you are a person.', 'try again in a few minutes'],
+    ['Continue with Google'],
+  ],
   ['visitor', '/signin?problem=wrongEmailOrPassword', 200, ['Wrong email or password.']],
   ['visitor', '/signin?problem=%3Cscript%3E', 200, ['Sign in'], ['role="alert"']],
-  ['visitor', '/signup', 200, ['Create your account', 'Email me a code']],
-  ['visitor', '/signin/forgot', 200, ['Forgot your password']],
-  ['visitor', '/signup/code', 200, ['Enter your code', 'If that address can sign in']],
-  ['visitor', '/signup/password', 200, ['Choose your password']],
-  ['visitor', '/account/confirm', 200, ['Enter your password again']],
+  // A lock-out is said in minutes, with the way in that does not wait (step 2.163, M28).
+  [
+    'visitor',
+    '/signin?problem=tooManyAttempts&wait=900',
+    200,
+    ['Please wait 15 minutes, or tap &quot;Forgot your password?&quot; to choose a new one now.'],
+    ['900 seconds'],
+  ],
+  ['visitor', '/signup', 200, ['Create your account', 'Email me a code'], ['Continue with Google']],
+  // The forgotten-password route is "Choose a new password", with a way back (step 2.163).
+  ['visitor', '/signin/forgot', 200, ['Choose a new password', 'Back to sign in']],
+  // With no sign-up or reset under way the code screen names no address and says no code
+  // was sent (step 2.163's fix round); there is no password to choose (L10): the first
+  // screen again, saying why, or a signed-in person's account. The code screen's words,
+  // which name the address the code went to, are checked in a browser
+  // (sign-in-says-test.mjs).
+  [
+    'visitor',
+    '/signup/code',
+    200,
+    ['Enter your code', 'Nothing is waiting for a code on this device.', 'Start again'],
+    ['we have sent', 'We sent'],
+  ],
+  ['visitor', '/signup/password', 307, [], [], '/signup?problem=proofInvalid'],
+  ['visitor', '/signup?problem=proofInvalid', 200, ['That took too long. Start again.']],
+  ['owner', '/signup/password', 307, [], [], '/account'],
+  // The password again is for a signed-in person: anyone else signs in and comes back.
+  ['visitor', '/account/confirm', 307, [], [], '/signin?next=%2Faccount%2Fconfirm'],
+  ['owner', '/account/confirm', 200, ['Enter your password again'], ['Continue with Google']],
+  ['visitor', '/account/inbox', 307, [], [], '/signin?next=%2Faccount%2Finbox'],
+  // A signed-in person at /signin and /signup is told so (step 2.163, L10).
+  [
+    'owner',
+    '/signin',
+    200,
+    ['You are already signed in', 'You are signed in as local-owner-token@example.test'],
+    ['name="password"'],
+  ],
+  ['owner', '/signup', 200, ['You are already signed in'], ['name="email"']],
+  // Signing out leaves the person on the page, told so, and only while signed out (R-30).
+  ['visitor', '/?notice=signedOut', 200, ['You are signed out.']],
+  ['owner', '/?notice=signedOut', 200, [], ['You are signed out.']],
+  ['visitor', '/north-valley?notice=signedOut', 200, ['You are signed out.']],
+  ['owner', '/north-valley?notice=signedOut', 200, [], ['You are signed out.']],
+  // "Sign out everywhere" asks first (step 2.163, M30).
+  [
+    'owner',
+    '/account?ask=signOutEverywhere',
+    200,
+    ['Sign out every device that uses your account, this one too?', 'No, keep them signed in'],
+  ],
   // The home and schedule pages (step 2.42): real content, not the placeholder; the two
   // leagues have different rounds.
   [
@@ -720,6 +807,62 @@ const cases = [
   ],
   ['scheduler', '/north-valley/admin/settings', 403, [noAccess]],
   ['coach', '/north-valley/admin/settings', 403, [noAccess]],
+  // League settings → Admins (step 2.97, P4 §4): only someone who may manage access for the
+  // whole league (the owner, an admin) opens it; everyone else is refused, and a refused
+  // person never sees who has access.
+  [
+    'owner',
+    '/north-valley/admin/settings/admins',
+    200,
+    ['Admins', 'Invite someone', 'People with access', 'Send the invitation', oneHeading],
+  ],
+  [
+    'admin',
+    '/quiet-pines/admin/settings/admins',
+    200,
+    ['Admins', 'Invite someone', 'People with access'],
+  ],
+  ['scheduler', '/north-valley/admin/settings/admins', 403, [noAccess], ['People with access']],
+  ['coach', '/north-valley/admin/settings/admins', 403, [noAccess], ['People with access']],
+  ['stranger', '/north-valley/admin/settings/admins', 403, [noAccess], ['People with access']],
+  ['scorekeeper', '/north-valley/admin/settings/admins', 403, [noAccess], ['People with access']],
+  ['registrar', '/quiet-pines/admin/settings/admins', 403, [noAccess], ['People with access']],
+  // The invitation's accept page (step 2.97, record 086): with no link held, everyone gets
+  // the one answer for a link that does not work; a visitor holding a link is offered
+  // signing in or up and nothing about the league; a signed-in person holding a link that
+  // is no invitation is told it does not work, as for every link that does not.
+  [
+    'visitor',
+    '/north-valley/invitation',
+    200,
+    ['This link does not work'],
+    ['Accept the invitation'],
+  ],
+  [
+    'visitor',
+    '/north-valley/invitation',
+    200,
+    ['Your invitation', 'Sign in', 'Create an account'],
+    ['invites you to help run it', 'This link does not work'],
+    undefined,
+    `srl_invitation=${heldMadeUpToken}`,
+  ],
+  [
+    'owner',
+    '/north-valley/invitation',
+    200,
+    ['This link does not work'],
+    ['Accept the invitation'],
+    undefined,
+    `srl_invitation=${heldMadeUpToken}`,
+  ],
+  [
+    'stranger',
+    '/north-valley/invitation',
+    200,
+    ['This link does not work'],
+    ['Accept the invitation'],
+  ],
   // Season settings' first panel (step 2.182, A-18): who can see a season, shown or
   // hidden by the owner or an admin after one question; never a scheduler's.
   [
@@ -1217,7 +1360,10 @@ try {
     }
     for (const words of mustNot)
       if (text.includes(words)) failures.push(`${label}: has "${words}"`);
-    for (const [name, value] of Object.entries(securityHeaders)) {
+    for (const [name, usual] of Object.entries(securityHeaders)) {
+      // The accept page keeps its referrer to this site (record 086, T-288).
+      const value =
+        name === 'referrer-policy' && address.endsWith('/invitation') ? 'same-origin' : usual;
       if (response.headers.get(name) !== value) failures.push(`${label}: ${name} not "${value}"`);
     }
     failures.push(...policyProblems(label, response, text));
@@ -1249,6 +1395,46 @@ try {
     failures.push(
       `an invitation address sends referrer-policy "${invitation.headers.get('referrer-policy')}"`,
     );
+  }
+  // The link holds its token in a cookie and forwards to an address with no secret in it
+  // (step 2.97, record 086, T-288): never kept by a cache, and the token is in no log.
+  if (!(invitation.headers.get('cache-control') ?? '').includes('no-store')) {
+    failures.push(
+      `an invitation address sends cache-control "${invitation.headers.get('cache-control')}"`,
+    );
+  }
+  if (
+    invitation.status !== 303 ||
+    new URL(invitation.headers.get('location') ?? '', origin).pathname !==
+      '/north-valley/invitation'
+  ) {
+    failures.push(
+      `an invitation address answers ${invitation.status} to "${invitation.headers.get('location')}"`,
+    );
+  }
+  const held = invitation.headers.get('set-cookie') ?? '';
+  if (
+    !/srl_invitation=/.test(held) ||
+    !/HttpOnly/i.test(held) ||
+    !/Path=\/north-valley\/invitation/i.test(held)
+  ) {
+    failures.push(`an invitation address holds its token as "${held.replace(/=[^;]*/, '=…')}"`);
+  }
+  const accept = await fetch(`${origin}/north-valley/invitation`, {
+    redirect: 'manual',
+    headers: { cookie: `srl_invitation=${heldMadeUpToken}` },
+  });
+  await accept.text();
+  if (!(accept.headers.get('cache-control') ?? '').includes('no-store')) {
+    failures.push(`the accept page sends cache-control "${accept.headers.get('cache-control')}"`);
+  }
+  if (!['no-referrer', 'same-origin'].includes(accept.headers.get('referrer-policy') ?? '')) {
+    failures.push(
+      `the accept page sends referrer-policy "${accept.headers.get('referrer-policy')}"`,
+    );
+  }
+  if (server.output().includes('made-up-token') || server.output().includes(heldMadeUpToken)) {
+    failures.push('an invitation token was written to the server log');
   }
   failures.push(...(await sameAsNoLeague(origin)));
   failures.push(...(await scoringSameAsNoLeague(origin)));
