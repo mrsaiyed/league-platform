@@ -116,7 +116,10 @@ export const enError = {
     'Another game of the season now has this game number. Give that game another number in Schedule, then bring this one back.',
   'error.leagues.restore_game.game-part-in-bin':
     'A team, division, venue or court of this game is in the bin, so this game cannot come back yet. Bring that back first, from the bin in League settings.',
-  'error.leagues.restore_game.game-reference-taken': 'Another game now has this outside reference.',
+  'error.leagues.restore_game.game-reference-taken':
+    'Another game now has this outside reference. Change that game’s reference in Schedule, then bring this one back.',
+  'error.leagues.restore_game.revision-out-of-date':
+    'Someone published this season’s schedule at the same moment. Try again.',
   'error.leagues.restore_person.person-not-found': 'That person is not there.',
   'error.leagues.restore_person.person-profile-taken':
     'The account of this person is now linked to someone else in this league. Bring them back once that person is taken off the league list, or add them again as someone new in People.',

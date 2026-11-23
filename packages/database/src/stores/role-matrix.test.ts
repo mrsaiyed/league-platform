@@ -29,7 +29,7 @@ import type { PGlite } from '@electric-sql/pglite';
 // In alphabetical order, a new name in its place, never at the end (step 2.188).
 import {
   type AccessTx,
-  type BinTx,
+  type RestoreGameTx,
   type CommandContext,
   type CommandDeps,
   type CommandRequirement,
@@ -260,7 +260,7 @@ let scoringDeps: CommandDeps<ScoringTx>;
 let trackerDeps: CommandDeps<TrackerTx>;
 let peopleDeps: CommandDeps<PeopleTx>;
 let teamsDeps: CommandDeps<TeamsTx>;
-let binDeps: CommandDeps<BinTx>;
+let binDeps: CommandDeps<RestoreGameTx>;
 let standingsDeps: CommandDeps<StandingsTx>;
 let importsDeps: CommandDeps<ImportScoresTx>;
 let removalDeps: CommandDeps<LeagueRemovalTx>;

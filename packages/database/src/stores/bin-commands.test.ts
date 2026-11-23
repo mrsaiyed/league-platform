@@ -13,7 +13,7 @@ import {
   restoreGame,
   restorePerson,
   restoreTeam,
-  type BinTx,
+  type RestoreGameTx,
   type CommandDeps,
   type Job,
   type PeopleTx,
@@ -27,10 +27,12 @@ import { freshSchema, newLeague, newSeason, one } from '../schema/schema.test-he
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { binStore } from './bin-store.ts';
+import { gamesStore } from './games-store.ts';
 import { peopleStore } from './people-store.ts';
+import { schedulingStore } from './scheduling-store.ts';
 import { teamsStore } from './teams-store.ts';
 
-type Tx = BinTx & TeamsTx & PeopleTx;
+type Tx = RestoreGameTx & TeamsTx & PeopleTx;
 
 let pglite: PGlite;
 let db: DatabaseHandle;
@@ -42,6 +44,8 @@ beforeAll(async () => {
   run = commandTransaction(db, (scope) => ({
     jobs: { enqueue: async (_job: Job) => {} },
     bin: binStore(scope),
+    scheduling: schedulingStore(scope),
+    games: gamesStore(scope),
     teams: teamsStore(scope),
     people: peopleStore(scope),
     access: accessStore(scope),
@@ -244,10 +248,42 @@ describe('the bin: restoring', () => {
     const held = value(await listBin(l.as, {}, deps)).items.find((i) => i.id === planned.id);
     expect(held?.details?.teamsInBin).toEqual([{ id: a, name: hawks.name }]);
     await pglite.query(`update teams set deleted_at = null where id = $1`, [a]);
-    value(await restoreGame(l.as, { gameId: planned.id }, deps));
+    // A-19: bringing it back is a schedule change, with a revision of its own.
+    expect(value(await restoreGame(l.as, { gameId: planned.id }, deps)).revision).toBe(1);
     expect(await restoreGame(l.as, { gameId: played.id }, deps)).toMatchObject({
       error: { code: 'game-not-restorable' },
     });
+  });
+
+  it('names a game that took a restored game’s time with a team in common, and brings it back all the same (A-19)', async () => {
+    const l = await league();
+    const team = async (name: string, shortName: string) =>
+      value(await createTeam(l.as, { ...hawks, name, shortName, seasonId: l.seasonId }, deps))
+        .teamId;
+    const a = await team('Hawks', 'hawks');
+    const b = await team('Owls', 'owls');
+    const c = await team('Larks', 'larks');
+    const stage = await one<{ id: string }>(
+      pglite,
+      `insert into stages (league_id, season_id, type, name) values ($1, $2, 'regular', 'Regular') returning id`,
+      [l.leagueId, l.seasonId],
+    );
+    const at = '2027-01-09T18:00:00.000Z';
+    const game = (home: string, away: string, binned: boolean) =>
+      one<{ id: string }>(
+        pglite,
+        `insert into games (league_id, season_id, stage_id, home_team_id, away_team_id, status,
+           capture_mode, starts_at, deleted_at)
+         values ($1, $2, $3, $4, $5, 'scheduled', 'final', $6, ${binned ? 'now()' : 'null'})
+         returning id`,
+        [l.leagueId, l.seasonId, stage.id, home, away, at],
+      );
+    const removed = await game(a, b, true);
+    const taken = await game(a, c, false);
+    const restored = value(await restoreGame(l.as, { gameId: removed.id }, deps));
+    expect(restored).toMatchObject({ seasonId: l.seasonId, revision: 1, teamCount: 2 });
+    expect(restored.clashes).toEqual([{ id: taken.id }]);
+    expect(await exists('games', removed.id)).toBe(true);
   });
 });
 

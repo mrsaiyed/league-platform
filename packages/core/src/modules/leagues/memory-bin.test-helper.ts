@@ -6,7 +6,7 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant, Role } from '../access/index.ts';
-import { binCutoff, type BinCounts, type BinTx } from './bin.ts';
+import { binCutoff, type BinCounts, type RestoreGameTx } from './bin.ts';
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const ownerId = '01900000-0000-7000-8000-0000000000a1';
@@ -36,6 +36,8 @@ type Thing = {
     | 'lineage-taken'
     | 'profile-taken'
     | 'game-number-taken';
+  /** A game's other games at its time now (the clash check, A-19). */
+  clashesWith?: string[];
 };
 
 export type MemoryBin = {
@@ -45,14 +47,18 @@ export type MemoryBin = {
   rosters: Record<string, string[]>;
   grants: Grant[];
   activity: ActivityEntry[];
+  /** The season's schedule revisions, numbered (A-19: a restored game writes one). */
+  revisions: { number: number; summary: unknown }[];
+  /** People on each team's roster, as the A-7 count reads them. */
+  people: Record<string, number>;
 };
 
-/** A league-wide grant of `role` to `accountId`, in force. */
-export const grantOf = (accountId: string, role: Role): Grant => ({
+/** A grant of `role` to `accountId`, in force: league-wide, or at one program's (`program`). */
+export const grantOf = (accountId: string, role: Role, program?: string): Grant => ({
   id: `g-${accountId}`,
   accountId,
   role,
-  scope: { type: 'league' },
+  scope: program === undefined ? { type: 'league' } : { type: 'program', id: program },
   grantedByAccountId: null,
   revokedAt: null,
 });
@@ -64,9 +70,11 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
     rosters: {},
     grants: [],
     activity: [],
+    revisions: [],
+    people: {},
     ...state,
   });
-  const transaction = memoryTransaction(db, (s, jobs): BinTx => {
+  const transaction = memoryTransaction(db, (s, jobs): RestoreGameTx => {
     const find = (id: string) => s.things.find((t) => t.id === id);
     const restore = <T extends string>(id: string, clashes: readonly T[]): boolean | T => {
       const t = find(id);
@@ -86,6 +94,21 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
           s.grants.filter((g) => g.accountId === account && g.revokedAt === null),
       },
       activity: { record: async (entry) => void s.activity.push(entry), list: async () => [] },
+      scheduling: {
+        latestRevision: async () => s.revisions.at(-1)?.number ?? null,
+        insertRevision: async (_season, revision) => {
+          if (s.revisions.some((r) => r.number === revision.number)) return false;
+          s.revisions.push({ number: revision.number, summary: revision.summary });
+          return true;
+        },
+        countPeopleOnTeams: async (_season, teams) =>
+          teams.reduce((sum, team) => sum + (s.people[team] ?? 0), 0),
+      },
+      games: {
+        find: async (id) =>
+          find(id)?.kind === 'game' ? { homeTeamId: 'home', awayTeamId: 'away' } : undefined,
+        clashesOf: async (id) => (find(id)?.clashesWith ?? []).map((other) => ({ id: other })),
+      },
       bin: {
         list: async () =>
           s.things
@@ -115,7 +138,7 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
           return t === undefined
             ? undefined
             : {
-                seasonId,
+                seasonId: t.season ?? seasonId,
                 binned: t.binnedAt !== null,
                 status: t.status ?? 'scheduled',
                 partInBin: t.partInBin === true,
