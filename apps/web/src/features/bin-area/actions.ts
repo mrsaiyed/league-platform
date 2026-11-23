@@ -75,7 +75,16 @@ export async function bringBackAction(form: FormData): Promise<never> {
                   }
                 : undefined;
   if (result === undefined) return redirect(bin);
-  if (result.done.ok) return redirect(`${bin}?back=${kind}&id=${id}`);
+  if (result.done.ok) {
+    // A game brought back is a schedule change (A-19): the page says its revision, the
+    // teams and people it reaches (A-7) and how many games now share its time.
+    const game = 'revision' in result.done.value ? result.done.value : undefined;
+    const said =
+      game === undefined || game.revision === null
+        ? ''
+        : `&revision=${game.revision}&teams=${game.teamCount}&people=${game.peopleCount}&clashes=${game.clashes.length}`;
+    return redirect(`${bin}?back=${kind}&id=${id}${said}`);
+  }
   const why = encodeURIComponent(`${result.name}.${result.done.error.code}`);
   return redirect(`${bin}?not=${id}&why=${why}#bin-${id}`);
 }

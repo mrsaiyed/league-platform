@@ -69,7 +69,9 @@ export async function BinPage({
   const takenBy =
     refusedTeam === undefined ||
     refusedTeam.seasonId === null ||
-    !(one(query['why']) ?? '').endsWith('.team-name-taken')
+    // A second team of the same name takes its short name too (A-19): either refusal
+    // names that team when there is one.
+    !/\.team-(short-)?name-taken$/.test(one(query['why']) ?? '')
       ? undefined
       : nameTakenBy(refusedTeam, await ports.adminTeams.teams(context, refusedTeam.seasonId));
   const back = one(query['back']);
@@ -104,7 +106,10 @@ export async function BinPage({
           <span className="ui-notice" data-kind="error" role="alert">
             {heldByTeam(row)
               ? teamsInBinWords(row.teamsInBin, myTeams, 'refusal')
-              : t('admin.bin.notBack', { problem: t(refusal) })}
+              : takenBy !== undefined
+                ? // A second team of the same name (A-19): which one, and what to do.
+                  t('admin.bin.nameTakenBy', { name: takenBy.name })
+                : t('admin.bin.notBack', { problem: t(refusal) })}
             {!heldByTeam(row)
               ? null
               : row.teamsInBin
@@ -169,6 +174,22 @@ export async function BinPage({
 
   const backKind = binKindsShown.find((kind) => kind === back);
   const backHref = backKind === undefined ? undefined : backTo(backKind);
+  // A game brought back is a schedule change (A-19): its revision, who it reaches (A-7)
+  // and the games now at its time, as the action passed them on.
+  const count = (name: string) => {
+    const said = one(query[name]) ?? '';
+    return /^[0-9]{1,6}$/.test(said) ? Number(said) : undefined;
+  };
+  const gameRevision = count('revision');
+  const gameBack =
+    backKind !== 'game' || gameRevision === undefined
+      ? undefined
+      : {
+          revision: gameRevision,
+          teams: count('teams') ?? 0,
+          people: count('people') ?? 0,
+          clashes: count('clashes') ?? 0,
+        };
   const nothing = binKindsShown.every((kind) => rows[kind].length === 0);
   return (
     <main className="admin-teams">
@@ -181,6 +202,14 @@ export async function BinPage({
               <a href={backHref}>{t(`admin.bin.backLink.${backKind}`)}</a>
             )}
           </p>
+          {gameBack === undefined ? null : (
+            <p data-bin-game-back={gameBack.revision}>
+              {t('admin.bin.gameBack', gameBack)}
+              {gameBack.clashes === 0 ? null : (
+                <> {t.plural('admin.bin.gameBackClashes', gameBack.clashes)}</>
+              )}
+            </p>
+          )}
         </StaffNotice>
       )}
       <p>{t('admin.bin.keep', { days: listed.value.keepDays })}</p>

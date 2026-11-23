@@ -63,7 +63,13 @@ export const restoreGame = defineCommand({
     const game = await tx.bin.findGame(input.gameId);
     if (game === undefined) return fail({ code: 'game-not-found' });
     if (!game.binned) {
-      return ok({ gameId: input.gameId, revision: null, teamCount: 0, peopleCount: 0, clashes: [] });
+      return ok({
+        gameId: input.gameId,
+        revision: null,
+        teamCount: 0,
+        peopleCount: 0,
+        clashes: [],
+      });
     }
     if (!neverPlayed.includes(game.status)) return fail({ code: 'game-not-restorable' });
     if (game.partInBin) return fail({ code: 'game-part-in-bin' });

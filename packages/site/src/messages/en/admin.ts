@@ -58,6 +58,12 @@ export const enAdmin = {
     'Its teams {first} and {second} are in the bin. Bring the teams back first.',
   'admin.bin.game.teamsInBinAsk':
     'Its teams {first} and {second} are in the bin. Ask an admin to bring the teams back.',
+  'admin.bin.gameBack':
+    'It is a change to the published schedule: revision {revision}, reaching {teams} teams and {people} people.',
+  'admin.bin.gameBackClashes_one':
+    'One other game now has a team or the court in common at its time. Check it in Schedule.',
+  'admin.bin.gameBackClashes_other':
+    '{count} other games now have a team or the court in common at its time. Check them in Schedule.',
   'admin.bin.games.none': 'No removed games.',
   'admin.bin.games.title': 'Removed games',
   'admin.bin.inSeason': 'Season: {season}.',
@@ -66,6 +72,8 @@ export const enAdmin = {
   'admin.bin.link.games': 'Removed games',
   'admin.bin.link.teamsPeople': 'Removed teams and people',
   'admin.bin.movedToBin': 'Moved to the bin.',
+  'admin.bin.nameTakenBy':
+    'The team {name} of the same season now has this name. Rename one of them first, then bring this one back.',
   'admin.bin.notBack': 'Not brought back. {problem}',
   'admin.bin.people.none': 'No removed people.',
   'admin.bin.people.title': 'Removed people',
