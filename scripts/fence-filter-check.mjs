@@ -58,8 +58,114 @@ const excused = new Map([
   ['purge-binned.ts#4', "keyed by the team ids #3's league-filtered read chose"],
   ['purge-binned.ts#5', "keyed by the team ids #3's league-filtered read chose"],
   ['purge-binned.ts#6', "keyed by the team ids #3's league-filtered read chose"],
+  // Step 2.224, part 2: filters that only repeat another filter of the same statement.
+  // Every row names its league with the season or game it belongs to (the composite
+  // foreign keys teams_season, games_season, rounds_season, game_assignments_game), so
+  // with any one of these taken out the statement's other league filter still holds.
+  ['games-for-lists.ts#2', "keyed by g.id, the game #3 and #4 hold to the scope's league"],
+  ['games-for-lists.ts#3', "the join's s.league_id = g.league_id and #4 still hold the game"],
+  ['games-for-lists.ts#4', "the join's s.league_id = g.league_id and #3 still hold the season"],
+  ['games-for-lists.ts#5', "keyed by g.id, the game #3 and #4 hold to the scope's league"],
+  ['list-earlier-rounds.ts#1', "keyed by g.id, the game #2 and #3 hold to the scope's league"],
+  ['list-earlier-rounds.ts#2', "the join's s.league_id = g.league_id and #3 still hold the game"],
+  ['list-earlier-rounds.ts#3', "the join's s.league_id = g.league_id and #2 still hold the season"],
+  // findPublicSeason (its filter checked in its own file) answers first and the rounds are
+  // read only for a season it found; rounds_season ties each round to its season's league.
+  [
+    'list-public-schedule.ts#1',
+    'read only for a season the league-filtered findPublicSeason found',
+  ],
+  ['list-season-teams.ts#1', "#3 keeps the season to the scope's league; teams_season the rest"],
+  ['list-season-teams.ts#2', 'keyed by teams.id and season_id, which #1 and #3 hold'],
+  ['list-season-teams.ts#3', "#1 keeps the teams to the scope's league; teams_season the rest"],
+  // Whole files with no league filter of their own (keyed by the file name alone): the
+  // check has nothing to take out, and each says why. A new file with no filter of a
+  // known shape and no reason here is a problem of the check, also with --list.
+  ...wholeFiles(
+    'runs no SQL of its own: it shapes rows other queries read, or names a constraint',
+    'access-rows.ts',
+    'constraint-of.ts',
+    'division-summary.ts',
+    'game-summary.ts',
+    'league-status-of.ts',
+    'person-summary.ts',
+    'program-summary.ts',
+    'roster-entry-summary.ts',
+    'scoring-session-summary.ts',
+    'team-summary.ts',
+    'venue-summary.ts',
+  ),
+  ...wholeFiles(
+    'an SQL piece the people queries select, joined to their rows; their filters are checked',
+    'minor-by-age-sql.ts',
+  ),
+  ...wholeFiles('reads no table: a savepoint around another write', 'in-savepoint.ts'),
+  ...wholeFiles(
+    "reads no row: a lock whose key names the scope's league and season",
+    'lock-season-standings.ts',
+  ),
+  ...wholeFiles(
+    'an insert writes the league as a value, not a filter, and the fence (with check' +
+      ' league_id = current_league_id(), 0005 and on) refuses a row of any other league',
+    'insert-activity.ts',
+    'insert-court.ts',
+    'insert-division.ts',
+    'insert-game-assignment.ts',
+    'insert-game-correction.ts',
+    'insert-game-events.ts',
+    'insert-invitation.ts',
+    'insert-job.ts',
+    'insert-person.ts',
+    'insert-role-grant.ts',
+    'insert-rounds.ts',
+    'insert-scoring-session.ts',
+    'insert-season.ts',
+    'insert-site-release.ts',
+    'insert-standings-adjustment.ts',
+    'insert-team.ts',
+    'insert-venue.ts',
+    'save-game-state.ts',
+  ),
+  ...wholeFiles(
+    'makes a new league and its first rows: no league is set yet to filter by',
+    'insert-league.ts',
+  ),
+  ...wholeFiles(
+    'before or beside any league by design, through a narrow database function that' +
+      ' answers only for the account or name it is given (record 008)',
+    'account-for-sign-in.ts',
+    'create-own-profile.ts',
+    'erase-account.ts',
+    'find-account-of-sign-in.ts',
+    'find-league-by-short-name.ts',
+    'list-my-leagues.ts',
+    'take-jobs.ts',
+  ),
+  ...wholeFiles(
+    "the league is the transaction's own, inside public.access_list_names (0012)",
+    'list-access-names.ts',
+  ),
+  ...wholeFiles(
+    'the league is an argument of a database function, whose filter is in its migration',
+    'game-has-plays.ts',
+    'game-was-decided.ts',
+  ),
+  ...wholeFiles(
+    'reads only through other query files, whose filters are checked there with these cases',
+    'games-read-store.ts',
+    'list-earlier-round.ts',
+    'list-games-by-ids.ts',
+    'list-games-needing-result.ts',
+    'standings-read-store.ts',
+  ),
 ]);
-const mostExcused = 4;
+// 4 of the purge, 11 repeated filters and 48 files with no filter of their own (2.224).
+const mostExcused = 63;
+
+/** Whole-file excuses: each file name with the one reason. */
+function wholeFiles(reason, ...files) {
+  return files.map((file) => [file, reason]);
+}
 
 /** What a league filter looks like, and what is left when it is taken out. */
 const shapes = [
@@ -284,9 +390,21 @@ for (const { file, only } of asked) {
   const original = readFileSync(join(root, file), 'utf8');
   const name = file.split('/').pop();
   const filters = filtersIn(original);
+  const fileExcuse = excused.get(name);
   if (filters.length === 0) {
-    console.log(`${name}: no league filter of a known shape (not checked)`);
+    if (fileExcuse !== undefined) console.log(`${name}  excused: ${fileExcuse}`);
+    else {
+      console.log(`${name}: no league filter of a known shape (not checked)`);
+      problems.push(
+        `${name}: no league filter of a known shape, and no reason in the excused list`,
+      );
+    }
     continue;
+  }
+  if (fileExcuse !== undefined) {
+    problems.push(
+      `${name}: excused as having no filter, but has ${filters.length}: drop the excuse`,
+    );
   }
   const subjects = subjectsOf(original);
   subjectsByFile.set(file, subjects);
@@ -302,7 +420,10 @@ for (const { file, only } of asked) {
     }
   }
 }
-if (listOnly) process.exit(problems.length === 0 ? 0 : 1);
+if (listOnly) {
+  for (const problem of problems) console.error(problem);
+  process.exit(problems.length === 0 ? 0 : 1);
+}
 
 // The cases must pass as written first, or a failure with a filter gone proves nothing:
 // one run for all the files' subjects together.

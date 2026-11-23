@@ -392,7 +392,12 @@ registerIsolationCase({
 registerIsolationCase({
   subject: listGamesInWindow,
   name: "list this week's games after bringing the target's upcoming game near",
+  // Step 2.224, part 2: the window starts at the league's own today, read from its row;
+  // with the target set apart and the scope's row moved last, a read that lost its
+  // `where id = scope.leagueId` answers with the target's day.
+  arrange: setTargetLeagueApart,
   run: async (scope, target) => {
+    await moveOwnLeagueRowLast(scope);
     await bringTargetGameNear(scope, target);
     return listGamesInWindow(scope, target.memberId, 7);
   },
