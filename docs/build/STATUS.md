@@ -30,12 +30,11 @@ Learned, not yet rules elsewhere: (a) a lane that adds a page, a route, a field,
 
 Every lane's work is on GitHub. All sessions stopped on 2026-11-17 at about 03:05 UTC when the allowance ran out. Three at a time are picked up again, in the order of "Next step" above, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`)                       | Where it stands                               | What is left                                        |
-| -------------------------------------------- | --------------------------------------------- | --------------------------------------------------- |
-| 2.140-nothing-unfinished (record 087, T-289) | reviewed, fixed, GitHub passed 061f00c        | merging with 2.163 and 2.97, then push twice, land  |
-| 2.221-yes-takes-a-tap                        | builder at work since 03:30 UTC on 2026-11-23 | push twice, review, land                            |
-| 2.56, 2.224                                  | opened, nothing pushed                        | start again from their briefs when their turn comes |
-| 2.191-ci-parallel                            | parked                                        | after the first test is in the founder's hands      |
+| Lane (branch `lane/…`) | Where it stands                               | What is left                                        |
+| ---------------------- | --------------------------------------------- | --------------------------------------------------- |
+| 2.221-yes-takes-a-tap  | builder at work since 03:30 UTC on 2026-11-23 | push twice, review, land                            |
+| 2.56, 2.224            | opened, nothing pushed                        | start again from their briefs when their turn comes |
+| 2.191-ci-parallel      | parked                                        | after the first test is in the founder's hands      |
 
 Next free: STEP 2.241, migration 0024, record 102, T-304, S-81, U-18. Numbers already given out stand with their lanes (in each lane's note).
 
