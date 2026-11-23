@@ -9,6 +9,8 @@ import {
   setNameRequest,
   updatePerson as updatePersonCommand,
 } from '@srleagues/core';
+import { sql } from 'kysely';
+import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
   findLeagueAudience,
   findLeagueContactEmail,
@@ -24,6 +26,7 @@ import {
 import { harnessTx, registerCommandCase } from './command-cases.test-helper.ts';
 import { moveOwnLeagueRowLast, setTargetLeagueApart } from './public-schedule-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
+import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
 // Queries -----------------------------------------------------------------------------
 
@@ -83,14 +86,46 @@ registerIsolationCase({
 
 registerIsolationCase({
   subject: findLeagueContactEmail,
-  name: "read how people reach the scope's league",
-  run: (scope) => findLeagueContactEmail(scope),
+  name: "read how people reach the scope's league, its row moved after the target's",
+  // Step 2.224, part 3: each league has its own contact address (the seed's), so a read
+  // that lost its `where id = scope.leagueId` meets the target's row first and names it.
+  run: async (scope) => {
+    await moveOwnLeagueRowLast(scope);
+    return findLeagueContactEmail(scope);
+  },
 });
+
+/**
+ * Step 2.224, part 3: in another league's runs the scope's own people are first marked
+ * adults with no birth date (in the run's rolled-back transaction, where the fence lets
+ * it), so the target's child (the seed's) is the only one anywhere and only the query's
+ * league filter keeps the answer "no". In the target's own runs nothing is changed.
+ */
+async function noChildInOwnLeague(scope: LeagueScope, target: LeagueRecords) {
+  if (scope.leagueId === target.leagueId) return;
+  const trx = transactionOf(scope);
+  await sql`savepoint no_child_here`.execute(trx);
+  try {
+    await trx
+      .updateTable('people')
+      .set({ is_minor: false, birth_date: null })
+      .where('league_id', '=', scope.leagueId)
+      .execute();
+    await sql`release savepoint no_child_here`.execute(trx);
+  } catch (error) {
+    // Rolled back, then thrown: the case must not go on quietly in a weaker form.
+    await sql`rollback to savepoint no_child_here`.execute(trx);
+    throw error;
+  }
+}
 
 registerIsolationCase({
   subject: hasRecordedChild,
-  name: "ask whether anyone in the scope's league is recorded as a child",
-  run: (scope) => hasRecordedChild(scope),
+  name: "ask whether anyone in the scope's league is recorded as a child, none of its own",
+  run: async (scope, target) => {
+    await noChildInOwnLeague(scope, target);
+    return hasRecordedChild(scope);
+  },
 });
 
 registerIsolationCase({

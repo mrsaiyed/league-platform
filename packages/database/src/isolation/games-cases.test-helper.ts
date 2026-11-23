@@ -27,7 +27,7 @@ import {
   takeOverScoring,
   unassignScorekeeper,
 } from '@srleagues/core';
-import { seasonRulesPreset } from '@srleagues/contracts';
+import { refusedAddEventType, seasonRulesPreset } from '@srleagues/contracts';
 import type { JsonObject } from '../db/schema-types.ts';
 import { sql } from 'kysely';
 import { randomUUID } from 'node:crypto';
@@ -196,6 +196,25 @@ registerCommandCase(cancelGame, harnessTx, {
 registerIsolationCase({
   subject: findStatusBeforeCancelled,
   name: "read what the target's upcoming game was when it was cancelled",
+  // Step 2.224, part 3: the target's league already holds a cancelling of that game (fixed
+  // id and time, inside its own fence), so a read elsewhere that lost its league filter
+  // finds it; the cancelling done in the run is refused in any other league.
+  arrange: (inTarget, target) =>
+    transactionOf(inTarget)
+      .insertInto('activity_log')
+      .values({
+        id: '01900000-0000-7000-8000-00000000c2b1',
+        league_id: inTarget.leagueId,
+        actor_account_id: target.ownerId,
+        action: 'games.cancel_game',
+        target_type: 'game',
+        target_id: target.upcomingGameId,
+        summary: 'Cancelled',
+        details: { was: 'postponed' },
+        at: new Date('2026-11-01T00:00:00Z'),
+        created_at: new Date('2026-11-01T00:00:00Z'),
+      })
+      .execute(),
   run: async (scope, target) => {
     await runAsApp(cancelGame, harnessTx, scope, {
       gameId: target.upcomingGameId,
@@ -206,17 +225,18 @@ registerIsolationCase({
 });
 
 // Step 2.158: the games holding the target's upcoming game's place, once it is moved to the
-// time of the target's final game, which has the same teams (in the run's own scope).
+// time of the target's final game, which has the same teams. Step 2.224, part 3: moved in
+// the target's own fence before every run (it was moved in the run's own scope, so in other
+// leagues' runs the target had no clash for a query without its filter to find).
 registerIsolationCase({
   subject: listGameClashes,
   name: "list the games at the target's upcoming game's time with one of its teams",
-  run: async (scope, target) => {
-    await sql`update games set starts_at = '2026-12-06T18:00:00Z'
-      where league_id = ${scope.leagueId} and id = ${target.upcomingGameId}`.execute(
-      transactionOf(scope),
-    );
-    return listGameClashes(scope, target.upcomingGameId);
-  },
+  arrange: (inTarget, target) =>
+    sql`update games set starts_at = '2026-12-06T18:00:00Z'
+      where league_id = ${inTarget.leagueId} and id = ${target.upcomingGameId}`.execute(
+      transactionOf(inTarget),
+    ),
+  run: (scope, target) => listGameClashes(scope, target.upcomingGameId),
 });
 
 // Step 2.158 (S-51): the target's upcoming game cancelled in the run's own scope (in any
@@ -392,7 +412,12 @@ registerIsolationCase({
 registerIsolationCase({
   subject: listGamesInWindow,
   name: "list this week's games after bringing the target's upcoming game near",
+  // Step 2.224, part 2: the window starts at the league's own today, read from its row;
+  // with the target set apart and the scope's row moved last, a read that lost its
+  // `where id = scope.leagueId` answers with the target's day.
+  arrange: setTargetLeagueApart,
   run: async (scope, target) => {
+    await moveOwnLeagueRowLast(scope);
     await bringTargetGameNear(scope, target);
     return listGamesInWindow(scope, target.memberId, 7);
   },
@@ -919,17 +944,6 @@ async function ownGameAndTeam(scope: LeagueScope) {
   return { gameId: row?.id ?? randomUUID(), teamId: row?.home_team_id ?? randomUUID() };
 }
 
-/** The target's walk-up's person, as the scope's fence lets it be read: in another league, none. */
-async function walkUpPersonOf(scope: LeagueScope, target: LeagueRecords) {
-  const entry = await transactionOf(scope)
-    .selectFrom('roster_entries')
-    .select('person_id')
-    .where('league_id', '=', scope.leagueId)
-    .where('id', '=', target.walkUpRosterEntryId)
-    .executeTakeFirst();
-  return entry?.person_id;
-}
-
 registerIsolationCase({
   subject: findTablePlayer,
   name: "find the target's player on the target's team for the scorer's table",
@@ -956,13 +970,14 @@ registerIsolationCase({
 registerIsolationCase({
   subject: changeTablePlayer,
   name: "renumber and rename the target's walk-up player",
-  run: async (scope, target) =>
-    changeTablePlayer(
-      scope,
-      target.walkUpRosterEntryId,
-      (await walkUpPersonOf(scope, target)) ?? randomUUID(),
-      { jerseyNumber: '77', firstName: 'Renamed', lastName: 'Elsewhere' },
-    ),
+  // Step 2.224, part 2: the target's own entry and person ids, so only the query's league
+  // filters keep the target's rows unchanged.
+  run: (scope, target) =>
+    changeTablePlayer(scope, target.walkUpRosterEntryId, target.walkUpPersonId, {
+      jerseyNumber: '77',
+      firstName: 'Renamed',
+      lastName: 'Elsewhere',
+    }),
 });
 
 // An add refused at the target's upcoming game (review of step 2.117, L4), kept as one of
@@ -972,6 +987,25 @@ registerIsolationCase({
 registerIsolationCase({
   subject: listRefusedAdds,
   name: "list the adds refused at the target's upcoming game",
+  // Step 2.224, part 3: the target's upcoming game already keeps a refused add (fixed id,
+  // inside its own fence): the takeover and add below are refused in any other league, so
+  // without it a read that lost its league filter had nothing of the target's to find.
+  arrange: (inTarget, target) =>
+    transactionOf(inTarget)
+      .insertInto('game_events')
+      .values({
+        id: '01900000-0000-7000-8000-00000000c2b2',
+        league_id: inTarget.leagueId,
+        game_id: target.upcomingGameId,
+        seq: 900,
+        command_id: '01900000-0000-7000-8000-00000000c2b3',
+        type: refusedAddEventType,
+        payload: { playerId: target.personId, problem: 'arranged' },
+        tapped_at: new Date('2026-11-01T00:00:00Z'),
+        account_id: target.ownerId,
+        created_at: new Date('2026-11-01T00:00:00Z'),
+      })
+      .execute(),
   run: async (scope, target) => {
     const taken = await runAsApp(takeOverScoring, harnessTx, scope, {
       gameId: target.upcomingGameId,
@@ -1011,11 +1045,29 @@ registerIsolationCase({
 registerIsolationCase({
   subject: removeTablePlayer,
   name: "take the target's walk-up player off its team",
-  run: async (scope, target) =>
+  // Step 2.224, part 3: the walk-up has a box score line in the target's final game (fixed
+  // id, inside its own fence), so a read of their lines that lost its league filter answers
+  // 'has-lines' where the scope's league has none of theirs.
+  arrange: (inTarget, target) =>
+    transactionOf(inTarget)
+      .insertInto('player_game_stats')
+      .values({
+        id: '01900000-0000-7000-8000-00000000c2b4',
+        league_id: inTarget.leagueId,
+        game_id: target.gameId,
+        team_id: target.teamId,
+        person_id: target.walkUpPersonId,
+        jersey_number: '7',
+        played: true,
+        created_at: new Date('2026-11-01T00:00:00Z'),
+        updated_at: new Date('2026-11-01T00:00:00Z'),
+      })
+      .execute(),
+  run: (scope, target) =>
     removeTablePlayer(
       scope,
       target.walkUpRosterEntryId,
-      (await walkUpPersonOf(scope, target)) ?? randomUUID(),
+      target.walkUpPersonId,
       target.upcomingGameId,
       true,
     ),

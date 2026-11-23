@@ -7,13 +7,31 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { test } from 'node:test';
+import { filtersIn, fingerprintsOf, unknownComparisons } from '../scripts/fence-filter-shapes.mjs';
 import { verdictOf } from '../scripts/fence-filter-verdict.mjs';
 
 const script = 'scripts/fence-filter-check.mjs';
 const run = (...args) => execFileSync(process.execPath, [script, ...args], { encoding: 'utf8' });
 
-/** The reviewed number: raising it is a change to this test, seen in review. */
-const reviewedExcused = 4;
+/**
+ * The reviewed number: raising it is a change to this test, seen in review. 64 since step
+ * 2.224, part 2: the purge's 4; 12 filters that only repeat another filter of the same
+ * statement (games-for-lists #2 to #5, list-earlier-rounds #1 to #3, list-season-teams #1
+ * to #3, remove-table-player #4, which only narrows which entries keep a person #3 already
+ * holds to the league; list-public-schedule #1, read only after the league-filtered
+ * findPublicSeason);
+ * and 48 files with no league filter of their own (no SQL, inserts the fence checks,
+ * reads before any league by design, reads only through other checked query files).
+ * 95 since part 3: 14 filters of one statement whose tables are joined on league_id, so the
+ * others still hold every row (find-table-player #1 to #3, is-person-on-roster #1 and #2,
+ * list-decided-game-lines #1 and #2, list-game-roster #1 to #4, list-teams-of-account #1 to
+ * #3); 17 keyed by ids another league-filtered statement chose, or whose write a composite
+ * foreign key refuses for another league's row (delete-rounds #1 to #3,
+ * insert-published-games #4 to #6, insert-roster-entry #1, insert-table-player #1,
+ * list-season-names #3, list-table-teams #2, list-venues #2, set-current-season #2 and #3,
+ * update-published-game #2, update-season #1 to #3).
+ */
+const reviewedExcused = 95;
 
 /** The audit's confirmed gaps, by name, each with the start of the filter it takes out. */
 const gaps = [
@@ -65,6 +83,50 @@ test('a failure is caught only when it lists a leak, never for a case that crash
     verdict: 'error',
     reason: 'Error: Failed to load url ../queries/list-public-roster.js',
   });
+});
+
+/** A query file's text, its filters given line by line. */
+const fixture = (...lines) =>
+  ['export async function listThings(scope) {', '  return trx', ...lines, '}', ''].join('\n');
+const own = "    .where('league_id', '=', scope.leagueId)";
+
+test('an excuse by position cannot slide: each filter has a print its neighbours do not', () => {
+  const two = fixture("    .selectFrom('a')", own, '    .execute();', "    .selectFrom('b')", own);
+  const prints = fingerprintsOf(two);
+  assert.equal(prints.length, 2);
+  assert.notEqual(prints[0], prints[1], 'two filters alike in text are told apart');
+  assert.deepEqual(fingerprintsOf(two), prints, 'the same text, the same prints');
+  // A filter added above the second: the count changes, and #2 is no longer the same one.
+  const three = fixture(
+    "    .selectFrom('a')",
+    own,
+    '    .execute();',
+    "    .selectFrom('b')",
+    own,
+    own,
+  );
+  const now = fingerprintsOf(three);
+  assert.equal(now.length, 3);
+  assert.notEqual(now[1], prints[1]);
+});
+
+test('a league_id comparison in a shape the check does not know is reported with its line', () => {
+  const text = fixture(
+    "    .selectFrom('seasons')",
+    "    .innerJoin('programs', 'programs.league_id', 'seasons.league_id')",
+    "    .onRef('programs.league_id', '=', 'seasons.league_id')",
+    "    .values({ league_id: scope.leagueId, name: 'x' })",
+    '    // not a filter: where league_id = 1',
+    own,
+    "    .where((e) => e('seasons.league_id','=',scope.leagueId))",
+    '    sql`select 1 from t where t.league_id = s.league_id and t.league_id = any(${ids})`',
+  );
+  assert.equal(filtersIn(text).length, 1);
+  assert.deepEqual(
+    unknownComparisons(text).map(({ line }) => line),
+    [9, 10],
+    'the e(...) filter and the league_id = any(...), not the join, value, comment or known filter',
+  );
 });
 
 test('the excused list is no longer than reviewed, and each excuse names a filter it finds', () => {

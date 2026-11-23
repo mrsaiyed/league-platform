@@ -31,7 +31,9 @@ import {
   settingRegistry,
 } from '@srleagues/core';
 import { createHash, randomUUID } from 'node:crypto';
+import { sql } from 'kysely';
 import { z } from 'zod';
+import { transactionOf } from '../db/transaction-scope.ts';
 import {
   deleteSettingValue,
   findCurrentLeague,
@@ -303,10 +305,43 @@ registerIsolationCase({
     }),
 });
 
+// Step 2.224, part 3: the scope's league row is moved after the target's (which the
+// database then reads first) and the target's version made the one the scope's row then
+// has (2: the arrange holds the trigger that counts versions), so a read or a rename that
+// lost its `where id = scope.leagueId` meets the target's row: the old name kept for
+// forwarding is then the target's, or both rows take the new name and the database refuses
+// it. That refusal leaves the transaction unusable, as the caller would roll it back: the
+// case rolls back to a savepoint, so the run can still be judged.
 registerIsolationCase({
   subject: renameLeagueSlug,
-  name: "rename the scope's league",
-  run: (scope) => renameLeagueSlug(scope, 'harness-renamed', 1, 12),
+  name: "rename the scope's league, its row moved after the target's",
+  arrange: (inTarget) =>
+    transactionOf(inTarget)
+      .updateTable('leagues')
+      .set({ version: 2 })
+      .where('id', '=', inTarget.leagueId)
+      .execute(),
+  compareWrites: true,
+  run: async (scope) => {
+    await moveOwnLeagueRowLast(scope);
+    const trx = transactionOf(scope);
+    const own = await trx
+      .selectFrom('leagues')
+      .select('version')
+      .where('id', '=', scope.leagueId)
+      .executeTakeFirst();
+    await sql`savepoint rename_league`.execute(trx);
+    try {
+      const renamed = await renameLeagueSlug(scope, 'harness-renamed', own?.version ?? 1, 12);
+      await sql`${sql.raw(renamed === 'taken' ? 'rollback to' : 'release')} savepoint rename_league`.execute(
+        trx,
+      );
+      return renamed;
+    } catch (thrown) {
+      await sql`rollback to savepoint rename_league`.execute(trx);
+      throw thrown;
+    }
+  },
 });
 
 registerIsolationCase({

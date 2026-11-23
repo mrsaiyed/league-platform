@@ -4,6 +4,7 @@
 // target's league there is a live game with plays, lines and a session to clear.
 // Anywhere else the scoring is refused and there is nothing of the target's to reach.
 import { markNotStarted } from '@srleagues/core';
+import { sql } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { gameWasDecided, insertGameEvents, updateGameNotStarted } from '../queries/index.ts';
@@ -40,9 +41,28 @@ registerIsolationCase({
   run: (scope, target) => gameWasDecided(scope, target.gameId),
 });
 
+/**
+ * Step 2.224, part 2: the target's upcoming game live in its own league before every run
+ * (triggers held, so its version stays the seed's), so a run elsewhere that lost its
+ * league filter meets a live game of the version it asks for and changes it.
+ */
+const setTargetGameLive = (inTarget: LeagueScope, target: LeagueRecords) =>
+  transactionOf(inTarget)
+    .updateTable('games')
+    .set({
+      status: 'live',
+      // A started game carries its format (games_format_when_started): the final game's.
+      format: sql`(select f.format from games f
+        where f.league_id = games.league_id and f.id = ${target.gameId})`,
+    })
+    .where('league_id', '=', inTarget.leagueId)
+    .where('id', '=', target.upcomingGameId)
+    .execute();
+
 registerIsolationCase({
   subject: updateGameNotStarted,
   name: "mark the target's upcoming game not started once it is scored",
+  arrange: setTargetGameLive,
   run: async (scope, target) => {
     const { version, sequence } = await scoredTargetGame(scope, target);
     // The database clears a game's rules only behind the command's own marker (0016):

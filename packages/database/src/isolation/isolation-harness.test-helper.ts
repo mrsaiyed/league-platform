@@ -143,6 +143,13 @@ async function arrangeInTarget(
   // The rows' own triggers are held while the target is arranged: the one that stamps
   // updated_at reads the real clock, so each run's arranged rows would differ from the
   // reading they are judged by. Row-level security still holds the arrange to the target.
+  // This also switches off the foreign-key checks (PostgreSQL runs them as triggers), so
+  // an arrange could leave a row pointing at nothing: write arranges that keep their keys.
+  // The narrow cure is not small: public.on_row_update stamps updated_at with
+  // pg_catalog.now() whatever the row says (0002), so setting it does not help, and
+  // holding only the thirty-odd `*_on_update` triggers by name is `alter table … disable
+  // trigger`, a lock on every such table that the files running beside this one share
+  // (review of 2.224, kept as it is).
   await sql`reset role`.execute(trx);
   await sql`set local session_replication_role = replica`.execute(trx);
   await sql`set local role app_user`.execute(trx);

@@ -93,6 +93,8 @@ export type LeagueRecords = MadeLeague & {
   scoringSessionSince: number;
   /** A player added at the final game's scorer's table, waiting for the admin's review (S-6). */
   walkUpRosterEntryId: string;
+  /** That walk-up's person. */
+  walkUpPersonId: string;
   /** The team's standings row, an adjustment to it, and the player's season totals. */
   standingsRowId: string;
   standingsAdjustmentId: string;
@@ -131,7 +133,8 @@ const seededSessionSince = Date.UTC(2026, 11, 13, 18, 0, 0);
 export const harnessNow = seededSessionSince + 30_000;
 
 /**
- * Fixes SQL's clock too (step 2.224, D-M1): `now()` named in a query answers harnessNow,
+ * Fixes SQL's clock too (step 2.224, D-M1): `now()` named in a query answers harnessNow
+ * (and `statement_timestamp()`, since part 2: find-game-ended-ago.ts),
  * through a function of that name in a schema searched before PostgreSQL's own, so no
  * case's result depends on the day the tests run. Set before the leagues are seeded, so
  * what the seed dates from now() (an invitation's expiry, a job's lease) dates from it
@@ -145,6 +148,9 @@ async function fixClock(pglite: PGlite) {
       language sql stable as $$ select '${at}'::timestamptz $$;
     grant usage on schema harness_clock to public;
     grant execute on function harness_clock.now() to public;
+    create function harness_clock.statement_timestamp() returns timestamptz
+      language sql stable as $$ select '${at}'::timestamptz $$;
+    grant execute on function harness_clock.statement_timestamp() to public;
     select set_config('search_path',
       'harness_clock, ' || current_setting('search_path') || ', pg_catalog', false);
   `);
@@ -663,6 +669,7 @@ async function seededLeague(
     scoringSessionId,
     scoringSessionSince,
     walkUpRosterEntryId,
+    walkUpPersonId,
     standingsRowId,
     standingsAdjustmentId,
     seasonPlayerTotalsId,

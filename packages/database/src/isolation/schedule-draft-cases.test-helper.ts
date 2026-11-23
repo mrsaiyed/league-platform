@@ -19,6 +19,7 @@ import {
   swapDraftGames,
   type DraftDocument,
 } from '@srleagues/core';
+import { sql } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
@@ -43,6 +44,7 @@ import {
 } from '../queries/index.ts';
 import { harnessTx, registerCommandCase, runAsApp } from './command-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
+import { moveOwnLeagueRowLast, setTargetLeagueApart } from './public-schedule-cases.test-helper.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
 
 // A write needs a season of the scope's own league: a refusal naming the target's ids
@@ -78,6 +80,92 @@ registerIsolationCase({
   subject: loadSchedule,
   name: "load the target's season's published schedule",
   run: (scope, target) => loadSchedule(scope, target.seasonId),
+});
+
+// Step 2.224, part 3: the league's own time zone. The target is set to another (its day
+// and hour differ from the scope's) and the scope's league row moved after it, so a read
+// of the time zone that lost its `where id = scope.leagueId` meets the target's first:
+// the scope's own season is then read, or its games written, at the target's hours.
+registerIsolationCase({
+  subject: loadSchedule,
+  name: "load the scope's own season's schedule, its league row moved after the target's",
+  arrange: setTargetLeagueApart,
+  run: async (scope) => {
+    await moveOwnLeagueRowLast(scope);
+    return loadSchedule(scope, await ownSeasonId(scope));
+  },
+});
+
+/**
+ * A game of the scope's own league not yet played, with its date and hour as its own
+ * league reads them, so writing the same slot back gives a time the database already holds.
+ */
+async function ownUpcomingGameInOwnTime(scope: LeagueScope) {
+  const { rows } = await sql<{
+    id: string;
+    season_id: string;
+    round_id: string | null;
+    venue_id: string | null;
+    home_team_id: string;
+    away_team_id: string;
+    day: string;
+    clock: string;
+  }>`
+    select g.id, g.season_id, g.round_id, g.venue_id, g.home_team_id, g.away_team_id,
+      to_char(g.starts_at at time zone l.time_zone, 'YYYY-MM-DD') as day,
+      to_char(g.starts_at at time zone l.time_zone, 'HH24:MI') as clock
+    from games g join leagues l on l.id = g.league_id
+    where g.league_id = ${scope.leagueId} and g.deleted_at is null
+      and g.starts_at is not null and g.status not in ('live', 'final', 'forfeit')
+    order by g.starts_at, g.id
+    limit 1`.execute(transactionOf(scope));
+  return rows[0];
+}
+
+registerIsolationCase({
+  subject: insertPublishedGames,
+  name: "create a game in the scope's own season at an hour its league already has a game, its league row moved after the target's",
+  arrange: setTargetLeagueApart,
+  compareWrites: true,
+  run: async (scope) => {
+    await moveOwnLeagueRowLast(scope);
+    const own = await ownUpcomingGameInOwnTime(scope);
+    if (own === undefined) return 'no game of its own in sight';
+    return insertPublishedGames(scope, own.season_id, [
+      {
+        id: randomUUID(),
+        roundId: own.round_id,
+        date: own.day,
+        time: own.clock,
+        venueId: own.venue_id,
+        court: null,
+        homeTeamId: own.home_team_id,
+        awayTeamId: own.away_team_id,
+        captureMode: 'final',
+      },
+    ]);
+  },
+});
+
+registerIsolationCase({
+  subject: updatePublishedGame,
+  name: "move the scope's own upcoming game to the hour it has, its league row moved after the target's",
+  arrange: setTargetLeagueApart,
+  compareWrites: true,
+  run: async (scope) => {
+    await moveOwnLeagueRowLast(scope);
+    const own = await ownUpcomingGameInOwnTime(scope);
+    if (own === undefined) return 'no game of its own in sight';
+    return updatePublishedGame(scope, own.season_id, own.id, {
+      slot: {
+        roundId: own.round_id,
+        date: own.day,
+        time: own.clock,
+        venueId: own.venue_id,
+        court: null,
+      },
+    });
+  },
 });
 
 registerIsolationCase({
