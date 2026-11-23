@@ -108,7 +108,6 @@ describe('which modes draw pages not built yet', () => {
       'awards',
       'club',
       'draft',
-      'invitation',
       'media',
       'news',
       'news-post',

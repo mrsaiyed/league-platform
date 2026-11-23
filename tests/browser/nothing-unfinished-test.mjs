@@ -361,6 +361,12 @@ try {
               );
               if (href.startsWith('/') && !href.startsWith('//')) links.add(href);
             }
+          } else if (address === '/account/inbox' && who === null) {
+            // The inbox is a signed-in person's own: its placeholder sends a visitor to sign
+            // in first, as the page will (step 2.163, L10). That is its answer here.
+            const to = new URL(response.headers.get('location') ?? '/', server.origin).pathname;
+            if (response.status >= 300 && to.startsWith('/signin')) found.push(address);
+            note(`${label}: sends a visitor to sign in`, to.startsWith('/signin'), to);
           } else if (placeholderAddresses.has(address)) {
             if (html.includes(en['shell.notBuilt'])) found.push(address);
             note(`${label}: says it is not built yet`, html.includes(en['shell.notBuilt']));
@@ -418,8 +424,29 @@ try {
           return '';
         },
       );
-      // How the stream happened to be cut is the only other thing that may differ.
-      const rows = pieces.join('').split('\n').filter(Boolean).sort().join('\n');
+      // How the stream happened to be cut is the only other thing that may differ: the rows'
+      // order, and whether a part of the page came inline or as a row of its own, named
+      // "$L<row>" where it goes (a signed-in person's league menu came either way, after the
+      // merge with 2.163 and 2.97). Each such row is put back where it is named, so only
+      // what is drawn is compared, never the timing.
+      const byId = new Map();
+      for (const row of pieces.join('').split('\n').filter(Boolean)) {
+        const colon = row.indexOf(':');
+        byId.set(row.slice(0, colon), row.slice(colon + 1));
+      }
+      const named = new Set();
+      const inline = (text, depth = 0) =>
+        text.replace(/"\$L([0-9a-f]+)"/g, (whole, id) => {
+          if (!byId.has(id) || depth > 50) return whole;
+          named.add(id);
+          return inline(byId.get(id), depth + 1);
+        });
+      const expanded = [...byId].map(([id, text]) => [id, inline(text)]);
+      const rows = expanded
+        .filter(([id]) => !named.has(id))
+        .map(([id, text]) => `${id}:${text}`)
+        .sort()
+        .join('\n');
       return { status: response.status, headers, markup, rows };
     };
     const cases = [

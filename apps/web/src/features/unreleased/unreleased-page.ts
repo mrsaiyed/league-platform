@@ -25,8 +25,8 @@ export type UnreleasedPage =
 
 /**
  * The pages not built yet that have a placeholder to show in local work and tests, and
- * its title. A page the list says is not built and that is not here (awards, a club, an
- * invitation…) has none yet: it is an unknown address in every mode.
+ * its title. A page the list says is not built and that is not here (awards, a club, a sponsor
+ * page…) has none yet: it is an unknown address in every mode.
  */
 const platformPlaceholders: Partial<Readonly<Record<PlatformPage, TextKey>>> = {
   contact: 'page.contact',

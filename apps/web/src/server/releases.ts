@@ -77,7 +77,9 @@ export const leaguePageReleases = {
   admin: 'released',
   'admin-area': 'released',
   score: 'released',
-  invitation: 'not-built',
+  // Accepting an invitation: the email's link and the page it leads to (step 2.97).
+  invitation: 'released',
+  'invitation-held': 'released',
 } as const satisfies Record<LeaguePage, Release>;
 
 /** The admin's areas (league-url.ts), in the menu's order. Its home is always there. */
