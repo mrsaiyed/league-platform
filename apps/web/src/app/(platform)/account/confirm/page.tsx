@@ -40,7 +40,7 @@ export default async function Page({ searchParams }: SearchProps) {
       {google ? (
         <form action={googleAction}>
           <NextField next={next} />
-          <SubmitButton words="confirm.google" />
+          <SubmitButton words="confirm.google" kind="second" />
         </form>
       ) : null}
     </SignInScreen>

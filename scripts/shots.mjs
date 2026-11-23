@@ -813,6 +813,11 @@ const platformPages = [
   { name: 'platform-home', at: '/' },
   { name: 'platform-signin', at: '/signin' },
   { name: 'platform-signup', at: '/signup' },
+  // Step 2.102: the sign-in family's other screens, and sign-in after a mid-game sign-out.
+  { name: 'platform-signin-again', at: '/signin?problem=backToYourGame' },
+  { name: 'platform-signin-refused', at: '/signin?problem=wrongEmailOrPassword' },
+  { name: 'platform-forgot', at: '/signin/forgot' },
+  { name: 'platform-signup-code', at: '/signup/code' },
   { name: 'platform-find', at: '/find' },
   { name: 'platform-start', at: '/start' },
   { name: 'platform-help', at: '/help' },

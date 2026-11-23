@@ -254,6 +254,28 @@ if (browser) {
         await accessible(page, 'sign-in from a league');
         await noSidewaysScroll(page, 'sign-in from a league');
         await tallEnough(page, 'main', 'the sign-in screen');
+        // Step 2.102: the sign-in family's other screens, in the same look and width.
+        const other = await page.context().newPage();
+        await other.setViewportSize(page.viewportSize() ?? { width: 390, height: 844 });
+        for (const [at, name] of [
+          ['/signin?problem=backToYourGame', 'sign-in after a mid-game sign-out'],
+          ['/signin/forgot', 'the forgotten-password screen'],
+          ['/signup/code', 'the code screen'],
+        ]) {
+          await other.goto(`${origin}${at}`);
+          await accessible(other, name);
+          await noSidewaysScroll(other, name);
+          await tallEnough(other, 'main', name);
+        }
+        await other.goto(`${origin}/signin?problem=backToYourGame`);
+        const kept = await other.locator('[data-sign-in-problem=backToYourGame]').innerText();
+        note(
+          'after a mid-game sign-out, sign-in says the game is kept on this device',
+          kept.trim() ===
+            'Sign in again to go back to your game. What you entered is kept on this device.',
+          kept,
+        );
+        await other.close();
         await signIn(page, people.scorekeeper);
         note(
           'signed in, the scorekeeper is back on the league home',

@@ -10,6 +10,7 @@
 import { baseCss } from './styles/base-css.ts';
 import { cardsCss } from './styles/cards-css.ts';
 import { gameCss } from './styles/game-css.ts';
+import { formCardCss } from './styles/form-card-css.ts';
 import { heroCss } from './styles/hero-css.ts';
 import { layoutCss } from './styles/layout-css.ts';
 import { pickerCss } from './styles/picker-css.ts';
@@ -23,4 +24,5 @@ export const displayCss = [
   pickerCss,
   cardsCss,
   heroCss,
+  formCardCss,
 ].join('');

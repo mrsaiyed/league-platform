@@ -65,7 +65,7 @@ export default async function Page({ searchParams }: SearchProps) {
       {/* A new code to the same address, behind the same check as the first (T4 §6). */}
       <form action={resendCodeAction}>
         <BotCheckField {...botCheck} action={flow.purpose} />
-        <SubmitButton words="code.again" />
+        <SubmitButton words="code.again" kind="second" />
       </form>
     </SignInScreen>
   );
@@ -75,7 +75,7 @@ export default async function Page({ searchParams }: SearchProps) {
 function CodeForm() {
   return (
     <form action={enterCodeAction}>
-      <p>
+      <p className="ui-field">
         <label>
           {t('code.label')}
           <input

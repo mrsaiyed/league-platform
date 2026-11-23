@@ -52,7 +52,8 @@ export default async function Page({ searchParams }: SearchProps) {
   const leagues = await leaguesOfThisRequest();
   return (
     <StandalonePage>
-      <main className="ui-message account">
+      <main className="ui-message ui-form-card account">
+        {/* Who is signed in, above everything else (step 2.127), in the kicker's place. */}
         <p className="account-who">{t('account.signedInAs', { email: who.email })}</p>
         <h1>{t('page.account')}</h1>
         <h2>{t('account.leagues')}</h2>
@@ -61,7 +62,7 @@ export default async function Page({ searchParams }: SearchProps) {
         {sessions.length === 0 ? (
           <p data-devices-unreadable="">{t('account.devicesUnreadable')}</p>
         ) : (
-          <ul>
+          <ul className="ui-rows">
             {sessions.map((session) => (
               <li key={session.sessionId} data-this-device={session.current ? '' : undefined}>
                 <strong>{session.deviceLabel}</strong>
@@ -85,12 +86,12 @@ export default async function Page({ searchParams }: SearchProps) {
           </ul>
         )}
         <SignOutForm action={signOutAction} waitingQuestion={waitingQuestionWords()}>
-          <button className="ui-button" type="submit">
+          <button className="ui-button" data-kind="second" type="submit">
             {t('account.signOut')}
           </button>
         </SignOutForm>
         {asking ? (
-          <section className="account-ask" aria-labelledby="sign-out-everywhere-ask">
+          <section className="ui-apart account-ask" aria-labelledby="sign-out-everywhere-ask">
             <p id="sign-out-everywhere-ask">{t('account.signOutEverywhereAsk')}</p>
             <SignOutForm action={signOutEverywhereAction} waitingQuestion={waitingQuestionWords()}>
               <button className="ui-button" data-kind="danger" type="submit">
@@ -102,7 +103,8 @@ export default async function Page({ searchParams }: SearchProps) {
             </a>
           </section>
         ) : (
-          <>
+          // Set apart from "Sign out" by a hairline and space, never beside it (M25).
+          <div className="ui-apart account-everywhere">
             <p>{t('account.signOutEverywhereHelp')}</p>
             <a
               className="ui-button"
@@ -111,7 +113,7 @@ export default async function Page({ searchParams }: SearchProps) {
             >
               {t('account.signOutEverywhere')}
             </a>
-          </>
+          </div>
         )}
         {/* At its foot, on the test copy only (step 2.205). */}
         <TestCopyLine shown={ports.testCopy} />
@@ -142,12 +144,17 @@ const problemText = {
 /** What is wrong with the account, in plain words, and signing out (record 055). */
 function AccountProblemPage({ problem }: { readonly problem: AccountProblem }) {
   return (
-    <main>
-      <h1>{t('account.problem.title')}</h1>
-      <p>{t(problemText[problem])}</p>
-      <form action={signOutAction}>
-        <button type="submit">{t('account.signOut')}</button>
-      </form>
-    </main>
+    <StandalonePage>
+      <main className="ui-message ui-form-card account">
+        <p className="ui-kicker">{t('shell.siteName')}</p>
+        <h1>{t('account.problem.title')}</h1>
+        <p>{t(problemText[problem])}</p>
+        <form action={signOutAction}>
+          <button className="ui-button" data-kind="main" type="submit">
+            {t('account.signOut')}
+          </button>
+        </form>
+      </main>
+    </StandalonePage>
   );
 }

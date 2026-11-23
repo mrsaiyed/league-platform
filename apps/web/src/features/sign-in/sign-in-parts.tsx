@@ -51,6 +51,16 @@ export function problemWords(name: keyof typeof problems, google: boolean): Text
   return (google ? undefined : withoutGoogle[name]) ?? problems[name];
 }
 
+/**
+ * The "problems" that only ask the person to sign in (a game kept on this device, a game to
+ * score): drawn calm, in the main color, not as refused (step 2.102).
+ */
+const asksToSignIn: Readonly<Record<string, true>> = {
+  backToYourGame: true,
+  signInToScore: true,
+  signInAgain: true,
+};
+
 /** A wait said in whole minutes, rounded up (record 081): never "900 seconds". */
 export const minutesOf = (seconds: number): number => Math.max(1, Math.ceil(seconds / 60));
 
@@ -97,11 +107,12 @@ export async function SignInScreen({
     noticeWords ??
     (notice === undefined || notice === 'codeSentAgain' ? undefined : t(notices[notice]));
   const { testCopy } = await webPorts();
-  // In the frame of our own pages, on the neutral design, so every field and button is 44
-  // high (step 2.127). Their real look is step 2.102's.
+  // In the frame of our own pages, on SR Leagues' own look (step 2.102): the form card, our
+  // name as its kicker, a serif title, every field and button 44 high.
   return (
     <StandalonePage>
-      <main className="ui-message sign-in">
+      <main className="ui-message ui-form-card sign-in">
+        <p className="ui-kicker">{t('shell.siteName')}</p>
         <h1>{t(title)}</h1>
         {said === undefined ? null : (
           <p role="status" data-notice="">
@@ -112,7 +123,12 @@ export async function SignInScreen({
         {/* Above the form, on the test copy only (step 2.205). */}
         <TestCopyLine shown={testCopy} />
         {problem === undefined ? null : (
-          <p className="ui-refusal" role="alert">
+          <p
+            className="ui-refusal"
+            role="alert"
+            data-sign-in-problem={problem.name}
+            data-ask={problem.name in asksToSignIn ? '' : undefined}
+          >
             {problem.name === 'tooManyAttempts'
               ? tooManyWords(problem.wait, forgotHint)
               : t(problemWords(problem.name, google))}
@@ -127,7 +143,7 @@ export async function SignInScreen({
 /** `value`: the address to fill in again (one typed before, on this device). */
 export function EmailField({ value }: { readonly value?: string | undefined } = {}) {
   return (
-    <p>
+    <p className="ui-field">
       <label>
         {t('signIn.email')}
         <input
@@ -151,18 +167,20 @@ export function EmailField({ value }: { readonly value?: string | undefined } = 
 export function PasswordField({ fresh = false }: { readonly fresh?: boolean }) {
   const id = fresh ? 'new-password' : 'current-password';
   return (
-    <p>
+    <p className="ui-field">
       <label htmlFor={id}>{t('signIn.password')}</label>
-      <input
-        id={id}
-        name="password"
-        type="password"
-        autoComplete={fresh ? 'new-password' : 'current-password'}
-        minLength={fresh ? 8 : 1}
-        maxLength={1024}
-        required
-      />
-      <ShowPassword field={id} show={t('password.show')} hide={t('password.hide')} />
+      <span className="ui-field-row">
+        <input
+          id={id}
+          name="password"
+          type="password"
+          autoComplete={fresh ? 'new-password' : 'current-password'}
+          minLength={fresh ? 8 : 1}
+          maxLength={1024}
+          required
+        />
+        <ShowPassword field={id} show={t('password.show')} hide={t('password.hide')} />
+      </span>
     </p>
   );
 }
@@ -211,6 +229,25 @@ export function NextField({ next }: { readonly next: string | null }) {
   return next === null ? null : <input type="hidden" name="next" value={next} />;
 }
 
-export function SubmitButton({ words }: { readonly words: TextKey }) {
-  return <button type="submit">{t(words)}</button>;
+/**
+ * A form's button: the main one, filled with the main color (the default: one to a form),
+ * or `second`, outlined, for another way (Google, a new code). DESIGN.md line 22.
+ */
+export function SubmitButton({
+  words,
+  kind = 'main',
+}: {
+  readonly words: TextKey;
+  readonly kind?: 'main' | 'second';
+}) {
+  return (
+    <button className="ui-button" data-kind={kind} type="submit">
+      {t(words)}
+    </button>
+  );
+}
+
+/** "or", between two ways in, drawn with a hairline on each side. */
+export function OrLine() {
+  return <p className="ui-or">{t('signIn.or')}</p>;
 }

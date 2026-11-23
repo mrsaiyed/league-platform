@@ -3,6 +3,7 @@ import {
   BotCheckField,
   EmailField,
   NextField,
+  OrLine,
   PasswordField,
   SignInScreen,
   SubmitButton,
@@ -58,10 +59,10 @@ export default async function Page({ searchParams }: SearchProps) {
       </p>
       {google ? (
         <>
-          <p>{t('signIn.or')}</p>
+          <OrLine />
           <form action={googleAction}>
             <NextField next={next} />
-            <SubmitButton words="signIn.google" />
+            <SubmitButton words="signIn.google" kind="second" />
           </form>
         </>
       ) : null}
