@@ -87,16 +87,25 @@ if (built) {
       tap(on, panel(on, part).getByRole('link', { name }), new RegExp(`edit=${part}`));
     /** The visitor's standings: each table's headings and teams in order. */
     const visitor = await pageAs(undefined);
-    const publicTables = async () => {
+    // Only the cells a visitor sees: a column left out of its place on a phone is drawn a
+    // second time after the percentage and one of the two is never displayed (table-css.ts).
+    const publicTables = async (width = screen.width) => {
+      await visitor.setViewportSize({ width, height: screen.height });
       await visitor.goto(`${origin}/north-valley/standings?season=fall-2026`);
-      return visitor.evaluate(() =>
-        [...document.querySelectorAll('table.ui-standings')].map((table) => ({
-          heads: [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim()),
+      return visitor.evaluate(() => {
+        const shown = (cell) => getComputedStyle(cell).display !== 'none';
+        return [...document.querySelectorAll('table.ui-standings')].map((table) => ({
+          heads: [...table.querySelectorAll('thead th')]
+            .filter(shown)
+            .map((th) => th.textContent.trim()),
+          rowCells: [...table.querySelectorAll('tbody tr')].map(
+            (tr) => [...tr.children].filter(shown).length,
+          ),
           teams: [...table.querySelectorAll('tbody .ui-team-name')].map((n) =>
             n.textContent.trim(),
           ),
-        })),
-      );
+        }));
+      });
     };
 
     at = 'the owner opens Season settings from the admin';
@@ -226,14 +235,30 @@ if (built) {
       page.getByRole('button', { name: 'Save the standings rules' }),
       /#season-standings$/,
     );
-    const heads = (await publicTables()).map((table) =>
-      table.heads.slice(table.heads.indexOf('Team') + 1).join(' '),
-    );
-    note(
-      "the visitor's table draws exactly the columns chosen, in their order",
-      heads.length > 0 && heads.every((h) => h === 'GP W L PCT PF STRK'),
-      JSON.stringify(heads),
-    );
+    // On a phone games played stands straight after the percentage, one scroll away; wider,
+    // every column chosen is in its own place. At every width each column is shown once and
+    // every row has a cell under each heading shown.
+    for (const [width, order] of [
+      [1280, 'GP W L PCT PF STRK'],
+      [768, 'GP W L PCT PF STRK'],
+      [320, 'W L PCT GP PF STRK'],
+      [screen.width, 'W L PCT GP PF STRK'],
+    ]) {
+      const tables = await publicTables(width);
+      const heads = tables.map((table) =>
+        table.heads.slice(table.heads.indexOf('Team') + 1).join(' '),
+      );
+      note(
+        `the visitor's table shows exactly the columns chosen, in their order, at ${width}`,
+        heads.length > 0 && heads.every((h) => h === order),
+        JSON.stringify(heads),
+      );
+      note(
+        `every row of the visitor's table has one cell under each heading shown, at ${width}`,
+        tables.every((table) => table.rowCells.every((n) => n === table.heads.length)),
+        JSON.stringify(tables.map((table) => [table.heads.length, table.rowCells])),
+      );
+    }
     await accessible(visitor, "the visitor's standings");
 
     at = 'the owner, with scripts on, changes the name and dates';

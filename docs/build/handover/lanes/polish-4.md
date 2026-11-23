@@ -25,3 +25,8 @@
 - Team column on a phone: never below `11ch` plus its shield and paddings (`--ui-name-least`, registered); too narrow for that (320, 360 here), the percentage (or points) joins the scroll at the box's edge, the column before it keeps the fade's room (`ui-next-to-last`) and the name takes the rest; number columns 36 (step-6 + step-1), place 48 (step-7). Names wrap only between words. The home card leaves GP off on a phone (`narrow: 'wide-only'`), so at 390 it fits with no scroll.
 - simulated-league-test: home, standings, statistics must have a table; `clippedCells` at 320, 360 and 390 (and the admin game page at all three); new `brokenNames` check (no word of a team name over two lines) on standings and home at 320/360/390. It failed on the old CSS (Marrowbrook etc. broken at all three widths) and passes on the new. web-exit's long-name share at 320 raised from 50% to 55% (the name keeps the percentage's room).
 - Ran, all passed: vitest page-pieces (45) and schedule-pages, npm run check, typecheck, prettier on changed files, simulated-league (116), public-pages-on-database (108), web-exit (332). Looked at standings 320 and 390, home 390.
+
+## Fix after GitHub
+
+- season-settings-test read every heading cell, so it saw GP twice (its own place, hidden on a phone, and the copy after PCT, hidden wider). It now reads only cells shown, at 1280 and 768 (GP W L PCT PF STRK) and at 320 and 390 (W L PCT GP PF STRK), and checks each row has one shown cell per shown heading; the CSS already shows exactly one GP at every width, so the table is unchanged.
+- Ran: season-settings (passed), vitest page-pieces, hero-pieces, display, schedule-pages, build-standings; the whole browser chain in chunks of six (results in the report).
