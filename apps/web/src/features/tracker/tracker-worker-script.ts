@@ -33,6 +33,7 @@ import {
   trackerAccountMetaName,
   trackerKeptPrefix,
   trackerNetworkWaitMs,
+  trackerWorkerKeepMessage,
   trackerWorkerUpdateMessage,
 } from './tracker-worker-rules.ts';
 
@@ -128,7 +129,7 @@ async function forgetPagesNotOf(signedIn) {
   }
 }
 
-async function answerPage(request, key) {
+async function answerPage(request, key, event) {
   const open = await gamesOpen();
   let kept = await keptIn(key);
   const asking = fetch(request);
@@ -145,6 +146,25 @@ async function answerPage(request, key) {
     await accountOf(answer),
   );
   if (signedIn !== undefined) await forgetPagesNotOf(signedIn);
+  // The network answered too late to choose: if it then names another account (or
+  // nobody), the kept pages go and the page shown is opened again from the network.
+  if (answer === null && kept) {
+    const shownMark = await accountOf(kept);
+    event.waitUntil(
+      asking
+        .then(async (late) => {
+          const now = signedInFrom(
+            { status: late.status, type: late.type, redirected: late.redirected },
+            await accountOf(late),
+          );
+          if (now === undefined || mayServeKeptPage(shownMark, now)) return;
+          await forgetPagesNotOf(now);
+          const client = await self.clients.get(event.resultingClientId);
+          if (client) await client.navigate(client.url);
+        })
+        .catch(() => undefined),
+    );
+  }
   if (kept && !mayServeKeptPage(await accountOf(kept), signedIn)) kept = undefined;
   const plan = pageAnswerPlan(open, kept !== undefined);
   if (plan.first === 'kept' && kept) return kept;
@@ -174,7 +194,35 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(letGoOfEarlier().then(() => self.clients.claim()));
 });
 
+// The page's first visit came before the worker: keep it and its files now, when they
+// are not kept yet (nothing kept is replaced here, T-127).
+async function keepThisPage(data) {
+  const code = Array.isArray(data.code) ? data.code.map(String) : [];
+  for (const href of code) {
+    const what = keptAddressOf({ url: href, method: 'GET', mode: 'no-cors' }, scope);
+    if (what === null || what.kind !== 'code' || (await keptIn(what.key))) continue;
+    try {
+      const answer = await fetch(href);
+      if (mayKeepAnswer(answer)) await keep(what.key, answer);
+    } catch (error) {
+      // Not kept this time: the next visit keeps it.
+    }
+  }
+  const page = keptAddressOf({ url: String(data.page), method: 'GET', mode: 'navigate' }, scope);
+  if (page === null || page.kind !== 'page' || (await keptIn(page.key))) return;
+  try {
+    const answer = await fetch(page.key, { credentials: 'same-origin' });
+    if (mayKeepAnswer(answer)) await keep(page.key, answer);
+  } catch (error) {
+    // Not kept this time: the next visit keeps it.
+  }
+}
+
 self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === names.keepMessage) {
+    event.waitUntil(keepThisPage(event.data));
+    return;
+  }
   if (!event.data || event.data.type !== names.updateMessage) return;
   event.waitUntil(
     gamesOpen().then((open) => (mayReplaceStored(open) ? self.skipWaiting() : undefined)),
@@ -185,7 +233,7 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const kept = keptAddressOf({ url: request.url, method: request.method, mode: request.mode }, scope);
   if (kept === null) return;
-  event.respondWith(kept.kind === 'page' ? answerPage(request, kept.key) : answerCode(request, kept.key));
+  event.respondWith(kept.kind === 'page' ? answerPage(request, kept.key, event) : answerCode(request, kept.key));
 });
 `;
 
@@ -196,6 +244,7 @@ export function trackerWorkerScript(): string {
     database: openedGamesDatabaseName,
     games: openedGamesStoreName,
     updateMessage: trackerWorkerUpdateMessage,
+    keepMessage: trackerWorkerKeepMessage,
     accountMeta: trackerAccountMetaName,
     networkWaitMs: trackerNetworkWaitMs,
   };

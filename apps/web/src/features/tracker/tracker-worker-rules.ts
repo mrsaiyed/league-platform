@@ -180,6 +180,14 @@ export function codeMarkOf(scriptAddresses: readonly string[]): string {
 /** The start of the name of everything the worker keeps (one box per scope and code mark). */
 export const trackerKeptPrefix = 'srleagues-tracker ';
 
+/**
+ * What the page sends the worker once it is active (T-321 lane, step 2.38): keep this
+ * page and the files it runs on. The first visit's page and scripts were fetched before
+ * the worker was there, so without this a reload with no signal right after the first
+ * visit would find nothing kept.
+ */
+export const trackerWorkerKeepMessage = 'srleagues-tracker-keep';
+
 /** What the page sends a waiting worker: take over now if no game is open. */
 export const trackerWorkerUpdateMessage = 'srleagues-tracker-update';
 

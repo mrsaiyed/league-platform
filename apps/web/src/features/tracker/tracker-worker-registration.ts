@@ -4,6 +4,7 @@ import {
   codeMarkOf,
   trackerKeptPrefix,
   trackerScopeOf,
+  trackerWorkerKeepMessage,
   trackerWorkerUpdateMessage,
 } from './tracker-worker-rules.ts';
 
@@ -22,6 +23,17 @@ export async function registerTrackerWorker(workerHref: string): Promise<void> {
       { scope: trackerScopeOf(workerHref), updateViaCache: 'none' },
     );
     registration.waiting?.postMessage({ type: trackerWorkerUpdateMessage });
+    // The page and files of this first visit came before the worker: it keeps them now.
+    const ready = await navigator.serviceWorker.ready;
+    const sheets = Array.from(
+      document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
+      (link) => link.href,
+    );
+    ready.active?.postMessage({
+      type: trackerWorkerKeepMessage,
+      page: window.location.href,
+      code: [...Array.from(document.scripts, (script) => script.src), ...sheets],
+    });
   } catch {
     // No worker (a private window, a browser without them): the tracker still scores.
   }
