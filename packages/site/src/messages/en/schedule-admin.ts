@@ -163,15 +163,15 @@ export const enScheduleAdmin = {
   'schedule.admin.publishCount_one': 'Publishing makes {count} change.',
   'schedule.admin.publishCount_other': 'Publishing makes {count} changes.',
   'schedule.admin.publishGame.added': 'New: {game}, {when}.',
-  'schedule.admin.publishGame.changed': 'Changed: {game}.',
   'schedule.admin.publishGame.backOnDate':
     'Back on its date: {game}, {when}. Publishing makes it scheduled again.',
+  'schedule.admin.publishGame.changed': 'Changed: {game}.',
   'schedule.admin.publishGame.moved': 'Moved: {game}, {what}.',
   'schedule.admin.publishGame.noRound': 'no round',
   'schedule.admin.publishGame.place': '{to} instead of {from}',
+  'schedule.admin.publishGame.removed': 'Removed: {game}, was {when}.',
   'schedule.admin.publishGame.round': 'now in {round}',
   'schedule.admin.publishGame.time': 'from {from} to {to}',
-  'schedule.admin.publishGame.removed': 'Removed: {game}, was {when}.',
   'schedule.admin.publishGames': 'What changes',
   'schedule.admin.publishNothing':
     'The draft is the same as the published schedule, so there is nothing to publish.',
