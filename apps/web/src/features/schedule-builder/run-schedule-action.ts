@@ -79,7 +79,8 @@ export type RefusedAt =
 
 export type ScheduleActionOutcome =
   | { readonly kind: 'saved'; readonly detail?: SavedDetail }
-  | { readonly kind: 'published' | 'discarded' }
+  | { readonly kind: 'published'; readonly removed?: number }
+  | { readonly kind: 'discarded' }
   | {
       readonly kind: 'refused';
       /** The command's error code, or `invalid-input`. */
@@ -274,7 +275,11 @@ export async function runScheduleAction(
         },
         deps,
       );
-      return done.ok ? { kind: 'published' } : refusal(done);
+      return done.ok
+        ? done.value.summary.gamesRemoved.length === 0
+          ? { kind: 'published' }
+          : { kind: 'published', removed: done.value.summary.gamesRemoved.length }
+        : refusal(done);
     }
     case 'discard': {
       if (basis.draftId === null || basis.version === null) return invalid;

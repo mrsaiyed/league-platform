@@ -58,6 +58,10 @@ export function answerParams(outcome: ScheduleActionOutcome): {
     };
   }
   const query: Record<string, string> = { done: outcome.kind };
+  // How many games the publish moved to the bin, for "Moved to the bin" with the way back.
+  if (outcome.kind === 'published' && (outcome.removed ?? 0) > 0) {
+    return { query: { ...query, removed: String(outcome.removed) }, hash: '' };
+  }
   if (outcome.kind !== 'saved' || outcome.detail === undefined) return { query, hash: '' };
   const detail = outcome.detail;
   const hash = `#${savedAnchor}`;

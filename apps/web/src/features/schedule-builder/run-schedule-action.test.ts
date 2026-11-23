@@ -319,7 +319,7 @@ describe('schedule grid', () => {
     expect(await press('remove-game', { gameId: game.id, wasSlot })).toMatchObject({
       kind: 'saved',
     });
-    expect(await press('publish', {})).toEqual({ kind: 'published' });
+    expect(await press('publish', {})).toEqual({ kind: 'published', removed: 1 });
     const published = await read();
     expect(published.published.games.some((g) => g.id === game.id)).toBe(false);
     // The old page's "Put it back": refused in words, and no game is added to a new draft.
