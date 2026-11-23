@@ -1026,6 +1026,22 @@
 .admin-access [id] {
   scroll-margin-block-start: calc(var(--tap) + var(--step-5));
 }
+/* The activity log (step 2.77): two days side by side, wrapping on a phone; its pages. */
+.activity-log-days,
+.activity-log-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--step-3);
+  margin-block: var(--step-4);
+}
+.activity-log-days label {
+  display: grid;
+  gap: var(--step-1);
+}
+.activity-log-pages .ui-button[rel='next'] {
+  margin-inline-start: auto;
+}
 /* One person or one invitation: who, then the buttons that change it, which wrap under the
    name on a phone and sit at the line's end above. */
 .admin-access-line {

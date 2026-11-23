@@ -35,6 +35,7 @@ export const enAdminAccess = {
   'adminAccess.log.binLink': 'It is in the bin: bring it back',
   'adminAccess.log.clear': 'Show everything',
   'adminAccess.log.filter': 'Show',
+  'adminAccess.log.filters': 'Choose what the log shows',
   'adminAccess.log.from': 'From',
   'adminAccess.log.intro': 'Who changed what in the league, and when. The newest change is first.',
   'adminAccess.log.kind': 'What was changed',

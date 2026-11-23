@@ -618,6 +618,8 @@ const adminPages = [
   // invitations are pictured on the made-up database by admins-invitations-test.mjs --shots),
   // and the accept page with no invitation held: "This link does not work".
   { name: 'admin-settings-admins', at: '/admin/settings/admins' },
+  // Step 2.77: its activity log, the filters and what an empty answer says.
+  { name: 'admin-settings-activity', at: '/admin/settings/activity' },
   { name: 'invitation-not-usable', at: '/invitation' },
   { name: 'admin-people', at: '/admin/people' },
   // Step 2.50, Admin → People: a search by name; one person's record (the first on the
