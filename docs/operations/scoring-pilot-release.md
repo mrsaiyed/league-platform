@@ -11,8 +11,8 @@ The lead does the technical part. Your part is five things, all with your own ha
 1. **Pick the time.** A day with no game in the next 24 hours, when no one is scoring. Tell the lead "release the pilot's new libraries" and the time.
 2. **Start the session yourself**, in the Claude app where you publish the pilot today (the one with access to Sites, the host the pilot lives on). The lead cannot release from an unattended run, only from a session you started.
 3. **Say yes when the lead asks to publish.** Before asking, the lead will have checked the new version on its own computer (part 1 below) and told you it passed. If the lead says a check failed, nothing has changed online and you do nothing more.
-4. **Check it on your phone**, signed in as usual: the scorer opens and says "Saved to shared database"; last season's games and totals look the same as before; start a practice game, add one basket, and see it in another browser. Tell the lead what you saw.
-5. **If anything looks wrong, say "go back".** The lead puts the old version back in a few minutes (part 3). Your saved games are not touched either way, so nothing is lost by going back.
+4. **Check it on your phone**, signed in as usual: the scorer opens and says "Saved to shared database"; last season's games and totals look the same as before; start a practice game, add one basket, and see it in another browser. If the scorer shows "One action has not been acknowledged", press **Retry saved action** (it cannot count twice). Tell the lead what you saw.
+5. **If anything looks wrong, say "go back".** The lead puts back the version that was live before, in a few minutes (part 3). Your saved games are not touched either way, so nothing is lost by going back.
 
 It costs nothing and takes about half an hour. The address and who can open the site stay the same.
 
@@ -44,13 +44,18 @@ The last command starts the built site on this computer with a fresh local datab
 
 ## 2. The release (with the founder)
 
-1. **Note what is live now.** In Sites, write down the version that is published today. That is the way back. Also note the time.
-2. **Publish**, exactly as `varsity-hosting.md` says, steps 6 to 8: build with `build-site.mjs`, run `npm run prepare:varsity:publish` from the repository's root, save the mirror with a short-lived source credential (never printed or committed), deploy that saved private version. The audience stays private.
-3. **Check it on a phone, signed in:**
+1. **Note what is live now, before publishing anything.** The lead writes down, in the session, everything that identifies the build online today: the version Sites shows as published (that version is the way back, and the only one promised), the time, and the commit it was built from if Sites or the built files show it. If nothing shows the commit, the lead writes plainly "the commit of the live build is not known". Nothing is published until this is written down.
+2. **Look at the database step before saying yes.** The new libraries write a migrations folder into the built settings (`migrations_dir`, record 079); it points at `apps/varsity-hosted/migrations`, which does not exist (the pilot's one migration is in `drizzle/` and has not changed). If the host's build or publish shows a step that applies database migrations, it must say there is nothing new to apply. If it says it will apply one, or cannot find the migrations, stop: nothing is published, and the lead finds out why first.
+3. **Publish**, exactly as `varsity-hosting.md` says, steps 6 to 8: build with `build-site.mjs`, run `npm run prepare:varsity:publish` from the repository's root, save the mirror with a short-lived source credential (never printed or committed), deploy that saved private version. The audience stays private.
+4. **Check it on a phone, signed in:**
    - the scorer opens and the bar says "Saved to shared database";
    - last season's games are all there, with the same scores and totals;
    - start a practice game, record one basket, and open the same game in another browser: the basket is there. Practice games are labelled and never count in the season's totals.
-4. **Write it down:** the lead records the commit released, the time and the Sites version in `docs/build/STATUS.md`.
+   - if the scorer shows "One action has not been acknowledged", press **Retry saved action** (it sends the same action again and cannot count twice).
+
+   These checks are the only proof of four things the release check on a computer cannot reach: signing in (the host does it before the pilot sees the visit), the host's own build, reading the games the old version saved, and Cloudflare's real runtime (the computer runs a local copy of it).
+
+5. **Write it down:** the lead records the commit released, the time and the Sites version in `docs/build/STATUS.md`.
 
 ## 3. Going back
 
@@ -58,11 +63,11 @@ The last command starts the built site on this computer with a fresh local datab
 
 **How:**
 
-1. In Sites, publish again the version noted in step 2.1. The address and the audience are the same.
-2. If that version cannot be published, build the old one: the pilot's files on `main` are still the old libraries until the move is promoted, so check out `main` and follow `varsity-hosting.md`, steps 1 to 8.
-3. Check it on a phone as in step 2.3.
+1. In Sites, publish again the version noted in step 2.1. The address and the audience are the same. This is the way back that is promised.
+2. **Only as a last resort**, if Sites cannot publish that version again: rebuild the old site from the commit written down in step 2.1, following `varsity-hosting.md`, steps 1 to 8. This is not promised to work: it needs that commit to be known, and a fresh build of an old commit is not proven to be the same as what was live. If step 2.1 says the commit is not known, this way does not exist; tell the founder plainly.
+3. Check it on a phone as in step 2.4.
 
-**What going back costs:** minutes. The database is not touched in either direction, so every game saved after the release is still there in the old version. Make sure no one is scoring while the site is switched: a score being sent at that moment waits in the scorer's browser and is sent again, but it is simpler not to need that.
+**What going back costs:** minutes. The database is not touched in either direction, so every game saved after the release is still there in the old version. Make sure no one is scoring while the site is switched: a score being sent at that moment is kept in the scorer's browser, but it is not sent again by itself. The scorer shows "One action has not been acknowledged", and the person scoring must press **Retry saved action** (the same action ID is used, so it cannot count twice). It is simpler not to need that.
 
 ## After the release
 

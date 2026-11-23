@@ -187,6 +187,7 @@ try {
       body: JSON.stringify({ commandId: randomUUID() }),
     });
     assert.equal(refused.status, 403);
+    assert.match(refused.text, /Cross-origin request denied/);
   });
   // The pilot has no server actions, so vinext builds it without the code that decodes them: a
   // request shaped like one is answered before React's decoder could read its body.
@@ -213,13 +214,25 @@ try {
       assert.match(action.text, /Server action not found/);
     });
   }
-  await check('a form posted to the page without an action is refused', async () => {
-    const form = multipart({ '1_$ACTION_ID_0': '', 0: '["$@1"]' });
-    const posted = await ask('POST', '/', {
-      headers: { 'content-type': form.type, origin: base },
-      body: form.body,
+  // The same save that succeeded above, with the browser's proof of where it came from missing or
+  // saying "another site": the pilot's own guard (lib/api.ts) refuses it, by name, not a generic 404.
+  await check('a save without its own origin, or marked cross-site, is refused', async () => {
+    const noOrigin = await ask('POST', '/api/practice', {
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ commandId: randomUUID() }),
     });
-    assert.ok(posted.status >= 400 && posted.status < 500, `${posted.status} ${posted.text}`);
+    assert.equal(noOrigin.status, 403, noOrigin.text);
+    assert.match(noOrigin.text, /Same-origin request required/);
+    const crossSite = await ask('POST', '/api/practice', {
+      headers: {
+        'content-type': 'application/json',
+        origin: base,
+        'sec-fetch-site': 'cross-site',
+      },
+      body: JSON.stringify({ commandId: randomUUID() }),
+    });
+    assert.equal(crossSite.status, 403, crossSite.text);
+    assert.match(crossSite.text, /Cross-origin request denied/);
   });
   await check('there is no image optimizer to send pictures through', async () => {
     const image = await ask('GET', '/_next/image?url=%2Ffavicon.svg&w=64&q=75');
