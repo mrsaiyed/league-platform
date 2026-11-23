@@ -37,12 +37,17 @@ const byId = <T extends { id: string }>(a: T, b: T) => a.id.localeCompare(b.id);
 export function standingsStores(
   s: StandingsData,
   options: MemoryOptions = {},
-): { standings: StandingsStore; games: ReadGames } {
+): {
+  standings: StandingsStore;
+  games: ReadGames;
+  scoringSessions: StandingsTx['scoringSessions'];
+} {
   const decidedOf = (season: string) =>
     s.games
       .filter((g) => g.seasonId === season && !g.binned && ['final', 'forfeit'].includes(g.status))
       .sort(byId);
   return {
+    scoringSessions: { lockGame: async (id) => s.games.some((g) => g.id === id && !g.binned) },
     games: {
       listDecided: async (season) => decidedOf(season),
       listDecidedLines: async (season) => {
@@ -77,7 +82,12 @@ export function standingsStores(
           (a) => a.id === id && a.seasonId === season && a.binned !== true,
         );
         if (found === undefined) return false;
-        found.binned = true;
+        // The other half of an overturned or awarded game goes with it (T-307).
+        for (const a of s.adjustments) {
+          if (a.id === id || a.pairedWith === id || (found.pairedWith ?? null) === a.id) {
+            a.binned = true;
+          }
+        }
         return true;
       },
       replaceRows: async (season, rows) => {

@@ -13,10 +13,18 @@
 // A visitor, a session that no longer works, and anyone who scores nowhere in the league get
 // no games and no words; nothing is said about a game the person may not score, nor whether
 // it exists. Always private, never kept by a cache.
+//
+// With `correct={id}` (step 2.56, H5: the public pencil) it also says whether the person may
+// put that one decided game right, and where: "Correct this result", leading to the game's
+// reopen form in Games, the same door step 2.154 put on the games list (reopen-view.ts).
+// Only the public game page asks it, after the page has arrived, so no page anyone could be
+// served carries the pencil; whoever may not reopen the game hears nothing of it.
 import {
+  getBoxScoreSheet,
   gameAnchor,
   leagueUrl,
   listScoringOffers,
+  readReopenOffer,
   mayOpenLeague,
   mayOpenTracker,
   scoringOffersLimit,
@@ -25,6 +33,7 @@ import {
   type ScoringOffer,
 } from '@srleagues/core';
 import type { CommandDeps, LeagueAddressee, TrackerTx } from '@srleagues/core';
+import { sheetNeedsOffer, sheetReopenViewOf } from '../features/games-area/reopen-view.ts';
 import type { ScoringOfferReply } from '../features/schedule-pages/index.ts';
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { isGameIdFormat, refusalAnswer, type ApiAnswer, type ApiRefusal } from './league-api.ts';
@@ -86,6 +95,7 @@ export async function scoringOffersRequest(
       }
     | { readonly ok: false; readonly refusal: ApiRefusal },
   games: string | null,
+  correct: string | null = null,
 ): Promise<ApiAnswer> {
   // Every answer is private and never kept. "Not found" is the one exception: it says
   // exactly what the snapshot's says for a hidden league (no-store), so the two public
@@ -105,8 +115,44 @@ export async function scoringOffersRequest(
   // every signed-in person's page asks, a coach's and a fan's too.
   if (context.account === null || !mayOpenTracker(holder)) return none;
   const gameIds = askedGameIds(games);
-  if (gameIds.length === 0) return none;
-  return scoringOffers(context, gameIds, ports.games);
+  const [corrected] = askedGameIds(correct);
+  const pencil =
+    corrected === undefined ? undefined : await correction(context, corrected, ports.games);
+  if (gameIds.length === 0) return pencil === undefined ? none : answer({ games: [], pencil });
+  const offers = await scoringOffers(context, gameIds, ports.games);
+  if (pencil === undefined) return offers;
+  return { ...offers, body: { ...(offers.body as ScoringOfferReply), pencil } };
+}
+
+/**
+ * "Correct this result" on a decided game's public page, for someone who may reopen it by
+ * either door (reopen-view.ts: the games list's own rule), leading to its reopen form; else
+ * nothing. Every refusal (a game not theirs to score, not this league's, not decided) is
+ * nothing too, so the answer never tells one game from another.
+ */
+async function correction(
+  context: LeagueRequestContext,
+  gameId: string,
+  deps: () => CommandDeps<TrackerTx>,
+): Promise<ScoringOfferReply['pencil']> {
+  const command = commandContextOf(context);
+  const read = await getBoxScoreSheet(command, { gameId }, deps());
+  if (!read.ok) return undefined;
+  const sheet = read.value;
+  if (sheet.game.status !== 'final' && sheet.game.status !== 'forfeit') return undefined;
+  const offer = sheetNeedsOffer(sheet)
+    ? await readReopenOffer(command, { gameId }, deps()).then((o) => (o.ok ? o.value : undefined))
+    : undefined;
+  const view = sheetReopenViewOf(sheet, offer);
+  // An overturned result leads to its page too, which says where to go (S-85).
+  if (view.kind !== 'correct' && !(view.kind === 'who' && view.because === 'overturned')) {
+    return undefined;
+  }
+  return {
+    gameId,
+    href: leagueUrl(context.league, 'admin-area', { area: 'games', subpath: [gameId] }),
+    label: t('admin.games.correct'),
+  };
 }
 
 /** The read for someone who may see the league and scores somewhere in it. */

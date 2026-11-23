@@ -14,6 +14,21 @@ export type ListAdjustmentsError = { readonly code: 'season-not-found' };
 export type SeasonAdjustments = {
   readonly adjustments: readonly SeasonAdjustment[];
   readonly teams: readonly TableTeam[];
+  /**
+   * The season's decided games with a winner and no overturn on them, latest first: the
+   * ones a ruling may overturn (one overturn per game at a time, S-85).
+   */
+  readonly games: readonly OverturnableGame[];
+};
+
+/** A decided game a ruling may overturn: who played, the score and when. */
+export type OverturnableGame = {
+  readonly gameId: string;
+  readonly homeTeamId: string;
+  readonly awayTeamId: string;
+  readonly homeScore: number;
+  readonly awayScore: number;
+  readonly startsAt: string | null;
 };
 
 export const listAdjustments = defineCommand({
@@ -25,10 +40,33 @@ export const listAdjustments = defineCommand({
     if ((await tx.games.findSeason(input.seasonId)) === undefined) {
       return fail({ code: 'season-not-found' });
     }
-    const [adjustments, teams] = await Promise.all([
+    const [adjustments, teams, decided] = await Promise.all([
       tx.standings.listAdjustments(input.seasonId),
       tx.standings.listTeams(input.seasonId),
+      tx.games.listDecided(input.seasonId),
     ]);
-    return ok({ adjustments, teams });
+    const overturned = new Set(
+      adjustments.flatMap((a) => (a.gameId === undefined || a.gameId === null ? [] : [a.gameId])),
+    );
+    const games = decided
+      .flatMap((g) =>
+        overturned.has(g.id) ||
+        g.homeScore === null ||
+        g.awayScore === null ||
+        g.homeScore === g.awayScore
+          ? []
+          : [
+              {
+                gameId: g.id,
+                homeTeamId: g.homeTeamId,
+                awayTeamId: g.awayTeamId,
+                homeScore: g.homeScore,
+                awayScore: g.awayScore,
+                startsAt: g.startsAt,
+              },
+            ],
+      )
+      .sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? ''));
+    return ok({ adjustments, teams, games });
   },
 });

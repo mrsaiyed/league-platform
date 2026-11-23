@@ -81,4 +81,9 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.77: restore-court answers court-venue-in-bin also when the venue is gone for good; it needs its own code and sentence.
 - 2.77: tests/browser/people-on-database-test.mjs:365 searches whole pages for the ordinary word Sample; lengthen it.
 - 2.77: not seen in a browser: an admin limited to one program in the bin, the 'its round was removed' sentence, restoring a division, venue or court.
+
+- AN UNRELIABLE TEST, NOT SEEN AGAIN (2026-11-23): `be-made-up-person` (a sign-in test under `apps/web/src/server`) failed once under load in lane 2.56 and passed alone; `npx vitest run apps/web/src/server` then passed twice in a row (77 files, 1129 tests). Watch for it under load.
+
+- 2.56: an award is not linked to a scheduled game; if that game is played later it counts twice (S-85 says so): link it or warn.
+- 2.56: the public-pencil browser test covers only a league where scorekeepers cannot reopen; add one inside a tracker reopen window, and an admin limited to another program.
 - 2.26: the refused-result test of clear-page-cache covers only a refusal before the event; a job rolled back after a later failure rests on leagues-store.test.ts.

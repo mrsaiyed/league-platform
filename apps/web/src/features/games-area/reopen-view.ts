@@ -17,7 +17,7 @@ export type ReopenView =
   /** They may reopen it: by this door, and until this server time (ms) when it closes. */
   | { readonly kind: 'correct'; readonly door: ReopenDoor; readonly until: number | null }
   /** They may not: who can, and why not them. */
-  | { readonly kind: 'who'; readonly because: 'admins' | 'time-over' }
+  | { readonly kind: 'who'; readonly because: 'admins' | 'time-over' | 'overturned' }
   /** Nothing to say: no door would accept anyone's reopening here. */
   | { readonly kind: 'none' };
 
@@ -36,11 +36,13 @@ export function reopenViewOf(offer: ReopenOffer | undefined, mayCorrect: boolean
       : { kind: 'who', because: 'admins' };
   }
   if (when.code === 'game-not-decided') return { kind: 'none' };
+  // Theirs to reopen, but an overturn rules on the result (S-85).
+  if (when.code === 'result-overturned') return { kind: 'who', because: 'overturned' };
   return { kind: 'who', because: when.code === 'reopen-time-over' ? 'time-over' : 'admins' };
 }
 
 type SheetFacts = Pick<BoxScoreSheet, 'mayReopen' | 'mayCorrect' | 'locked'> & {
-  readonly game: Pick<BoxScoreSheet['game'], 'status'>;
+  readonly game: Pick<BoxScoreSheet['game'], 'status' | 'overturned'>;
 };
 
 /** Whether the game's page needs the tracker's read to know: a decided game locked as tracked. */
@@ -59,7 +61,13 @@ export function sheetNeedsOffer(sheet: SheetFacts): boolean {
  * (games.reopen_game hands it back to its tracker, S-46); nothing for any other.
  */
 export function sheetReopenViewOf(sheet: SheetFacts, offer: ReopenOffer | undefined): ReopenView {
-  if (sheet.mayReopen) return { kind: 'correct', door: 'by-hand', until: null };
-  if (!sheetNeedsOffer(sheet)) return { kind: 'none' };
-  return reopenViewOf(offer, sheet.mayCorrect);
+  const view: ReopenView = sheet.mayReopen
+    ? { kind: 'correct', door: 'by-hand', until: null }
+    : sheetNeedsOffer(sheet)
+      ? reopenViewOf(offer, sheet.mayCorrect)
+      : { kind: 'none' };
+  // An overturn rules on the result: say where to go instead (S-85).
+  return view.kind === 'correct' && sheet.game.overturned === true
+    ? { kind: 'who', because: 'overturned' }
+    : view;
 }

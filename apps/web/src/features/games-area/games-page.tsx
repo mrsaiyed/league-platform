@@ -23,6 +23,7 @@ import {
   type MyGame,
   type PostponedGame,
   type TrackerTx,
+  maxOvertimePeriods,
 } from '@srleagues/core';
 import { displayLabels, finalPillOf } from '@srleagues/site';
 import { EmptyPanel, FilterToolbar, GameCard, PageHead, RoundPicker, Section } from '@srleagues/ui';
@@ -149,6 +150,17 @@ function finalScoreTexts(game: GameRowView, early: string | undefined): FinalSco
   return {
     enterFinal: t('admin.games.enterFinal'),
     save: t('admin.games.saveScore'),
+    // Step 2.56 (S-86): how many overtimes it went to; none, unless chosen.
+    overtime: {
+      label: t('admin.games.overtime'),
+      options: [
+        { value: '', label: t('admin.games.overtimeNone') },
+        ...Array.from({ length: maxOvertimePeriods }, (_, i) => ({
+          value: String(i + 1),
+          label: t.plural('admin.games.overtimeCount', i + 1),
+        })),
+      ],
+    },
     labels: {
       awayScore: t('admin.games.scoreOf', { team: team.awayScore }),
       homeScore: t('admin.games.scoreOf', { team: team.homeScore }),

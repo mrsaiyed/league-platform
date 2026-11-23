@@ -93,6 +93,8 @@ export async function decideGame(args: {
   readonly awayScore: number;
   /** How the game is now recorded, when deciding it changes that (a box score: `box`). */
   readonly captureMode?: 'final' | 'box' | 'live';
+  /** How many overtime periods it went to, when the person deciding it says (a typed final). */
+  readonly overtimePeriods?: number;
 }): Promise<Result<{ version: number }, DecideGameError>> {
   const { context, tx, game } = args;
   const rules = await seasonRulesOf(tx, game.seasonId);
@@ -103,9 +105,9 @@ export async function decideGame(args: {
       homeScore: args.homeScore,
       awayScore: args.awayScore,
       decided: true,
-      // Decided by hand (a score typed in, a box score, an import, a forfeit): nothing yet
-      // says whether it went to overtime (step 2.56 lets a typed score say it).
-      overtimePeriods: null,
+      // Decided by hand: a typed final score says whether it went to overtime (step 2.56,
+      // S-86); a box score, an import and a forfeit say nothing, so it is not known.
+      overtimePeriods: args.overtimePeriods ?? null,
       ...(game.format === null ? { format: rules } : {}),
       ...(args.captureMode === undefined ? {} : { captureMode: args.captureMode }),
     },

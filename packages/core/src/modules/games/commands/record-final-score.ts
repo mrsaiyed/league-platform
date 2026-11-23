@@ -7,7 +7,9 @@
 // the live tracker has recorded plays of is refused (`game-is-tracked`, S-46): it is
 // ended in the tracker, so its plays still explain its numbers; one set to live tracking
 // with no plays yet can still be finished with two numbers. A postponed game is refused
-// (`game-postponed`, step 2.158): it has not been played.
+// (`game-postponed`, step 2.158): it has not been played. It may say how many overtime
+// periods the game went to (step 2.56, S-86), 0 for none, which the pages mark as the
+// tracker's own end does (step 2.200); left out, it is not known.
 import { z } from 'zod';
 import { defineCommand, fail, type Result } from '../../../command/index.ts';
 import { decideGame, openGameToScore, type DecideGameError } from '../decide-game.ts';
@@ -18,6 +20,9 @@ import { effectiveRulesOf } from '../season-rules-of.ts';
 
 export type RecordFinalScoreError = DecideGameError;
 
+/** The most overtime periods a game can have: the engine's last period is 20 (migration 0021). */
+export const maxOvertimePeriods = 18;
+
 export const recordFinalScore = defineCommand({
   name: 'games.record_final_score',
   permission: 'games.score',
@@ -26,6 +31,8 @@ export const recordFinalScore = defineCommand({
     version: gameVersion,
     homeScore: gameScore,
     awayScore: gameScore,
+    /** Overtime periods played: 0 to 18, as the tracker's engine allows (migration 0021). */
+    overtimePeriods: z.number().int().min(0).max(maxOvertimePeriods).optional(),
   }),
   // Whoever may score this game, by the league's setting (P4 §4).
   allowed: (context, input, tx: GamesTx) => mayScoreGame(context, tx, input.gameId),
@@ -58,6 +65,7 @@ export const recordFinalScore = defineCommand({
       homeScore: input.homeScore,
       awayScore: input.awayScore,
       ...(wasBox ? { captureMode: 'final' as const } : {}),
+      ...(input.overtimePeriods === undefined ? {} : { overtimePeriods: input.overtimePeriods }),
     });
   },
 });

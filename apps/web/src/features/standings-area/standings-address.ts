@@ -4,6 +4,8 @@ import { leagueUrl, type LeagueAddressee } from '@srleagues/core';
 
 export const addAdjustmentAnchor = 'add-adjustment';
 export const adjustmentsListAnchor = 'adjustments';
+export const overturnResultAnchor = 'overturn-result';
+export const awardGameAnchor = 'award-game';
 export const adjustmentAnchor = (adjustmentId: string) => `adjustment-${adjustmentId}`;
 
 /** The area's page, for a season other than the current one with `?season=`. */

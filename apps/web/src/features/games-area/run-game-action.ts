@@ -73,6 +73,10 @@ export async function runGameAction(
             ...base,
             homeScore: numberOf(fields['homeScore']),
             awayScore: numberOf(fields['awayScore']),
+            // How many overtimes (step 2.56, S-86): "No overtime" (empty) is a count of 0,
+            // kept as known, as a game the tracker ended in regulation is.
+            overtimePeriods:
+              (fields['overtime'] ?? '').trim() === '' ? 0 : numberOf(fields['overtime']),
           },
           deps,
         );

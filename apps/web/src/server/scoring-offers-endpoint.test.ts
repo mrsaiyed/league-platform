@@ -26,7 +26,12 @@ const noLeague = '01900000-0000-7000-8000-0000000fffff';
  * The read as `person` through the address of `league` (by its id), as the route makes it;
  * with `notMoved`, its games area refuses as on the database before it has moved there.
  */
-async function askById(person: Person, leagueId: string, games: string | null = firstFive) {
+async function askById(
+  person: Person,
+  leagueId: string,
+  games: string | null = firstFive,
+  correct: string | null = null,
+) {
   const world = trackerWorld();
   const { ports } = world;
   const session = person === 'visitor' ? null : await ports.identify(standInPeople[person].token);
@@ -38,10 +43,46 @@ async function askById(person: Person, leagueId: string, games: string | null = 
     'visitor',
   );
   const read = { accessOf: ports.accessOf, games: () => ports.games.deps };
-  return scoringOffersRequest(resolved.ok ? { ...resolved, ports: read } : resolved, games);
+  return scoringOffersRequest(
+    resolved.ok ? { ...resolved, ports: read } : resolved,
+    games,
+    correct,
+  );
 }
 const ask = (person: Person, league: League = 'live', games: string | null = firstFive) =>
   askById(person, standInLeagues[league].id, games);
+
+describe('the public pencil: "Correct this result" on a decided game (step 2.56, H5)', () => {
+  const live = standInLeagues.live.id;
+  it('tells whoever may reopen the decided game, leading to its reopen form in Games', async () => {
+    const answer = await askById('owner', live, null, gameId(5));
+    expect(answer.headers).toEqual({ 'Cache-Control': 'private, no-store' });
+    expect(answer.body).toEqual({
+      games: [],
+      pencil: {
+        gameId: gameId(5),
+        href: `/north-valley/admin/games/${gameId(5)}`,
+        label: 'Correct this result',
+      },
+    });
+  });
+
+  it('says nothing to a visitor, a coach or a scorekeeper who may not reopen it', async () => {
+    for (const person of ['visitor', 'coach', 'scorekeeper', 'otherAdmin'] as const) {
+      const answer = await askById(person, live, null, gameId(5));
+      expect(answer.body, person).toEqual({ games: [] });
+    }
+  });
+
+  it('says nothing of a game not decided, and keeps the buttons beside it', async () => {
+    expect((await askById('owner', live, null, gameId(1))).body).toEqual({ games: [] });
+    const both = await askById('owner', live, gameId(2), gameId(5));
+    expect(both.body).toMatchObject({
+      games: [{ gameId: gameId(2), kind: 'score' }],
+      pencil: { gameId: gameId(5) },
+    });
+  });
+});
 
 describe('the scoring read of a public page', () => {
   it("gives a scorekeeper each game they may score, the button's kind and where it leads", async () => {

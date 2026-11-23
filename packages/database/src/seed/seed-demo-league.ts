@@ -78,6 +78,7 @@ import {
   jobsStore,
   leaguesStore,
   schedulingStore,
+  scoringSessionsStore,
   standingsStore,
   teamsStore,
 } from '../stores/index.ts';
@@ -201,6 +202,7 @@ export async function seedDemoLeagueInto(
       imports: importsStore(scope),
       games: gamesStore(scope),
       standings: standingsStore(scope),
+      scoringSessions: scoringSessionsStore(scope),
     }));
     // Setting the league up emits nothing the seed needs handled; results update standings.
     const setUp: CommandDeps<DemoTx> = { transaction, events: [], log: () => {}, now: () => at };

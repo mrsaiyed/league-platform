@@ -223,6 +223,145 @@ if (browser) {
   });
 }
 
+/**
+ * Every public row as { team: { GP, W, L, T } }, read in a fresh signed-out page, with the
+ * page's whole text for the footnotes.
+ */
+async function publicRows() {
+  const context = await browser.newContext({ viewport: phone });
+  try {
+    const page = await context.newPage();
+    await page.goto(`${origin}/north-valley/standings`);
+    await page.locator('main table').first().waitFor();
+    const rows = await page.evaluate(() => {
+      const found = {};
+      for (const table of document.querySelectorAll('main table')) {
+        const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+        for (const tr of table.querySelectorAll('tbody tr')) {
+          const team = tr.querySelector('.ui-team-name')?.textContent.trim() ?? '';
+          const cells = [...tr.children].map((cell) => cell.textContent.trim());
+          const row = {};
+          heads.forEach((head, i) => {
+            row[head] = Number(cells[i]);
+          });
+          found[team] = row;
+        }
+      }
+      return found;
+    });
+    return { rows, text: (await page.locator('main').textContent()) ?? '' };
+  } finally {
+    await context.close();
+  }
+}
+
+/** Games played is wins + losses (+ ties) for a team's public row. */
+function addsUp(rows, team) {
+  const row = rows[team];
+  return row !== undefined && row.GP === row.W + row.L + (Number.isNaN(row.T) ? 0 : (row.T ?? 0));
+}
+
+const overturnWhy = 'Ineligible player found after the game';
+const awardWhy = 'The other team did not come, by ruling of the league';
+
+if (browser) {
+  await step('a result overturned and a game awarded (scripts on)', async () => {
+    const { context, page } = await signedIn(true);
+    try {
+      await openArea(page);
+      const overturn = page.locator('form[data-form=overturn-result]');
+      const award = page.locator('form[data-form=award-game]');
+      // A picture to look at, only when asked for (SHOTS=<folder>).
+      if (process.env.SHOTS) {
+        await page.screenshot({
+          path: `${process.env.SHOTS}/standings-pairs-390.png`,
+          fullPage: true,
+        });
+      }
+      await noSideScroll(page, 'the adjustments screen with the two new forms');
+      // The game chosen first: "Falcons 61–55 Badgers" names both teams.
+      const game = (
+        await overturn.locator('select[name=game] option').first().textContent()
+      )?.trim();
+      const named = /^(.+?) \d+–\d+ (.+)$/.exec(game ?? '');
+      note('the overturn form names a decided game by its score', named !== null, game ?? '');
+      const [, home, away] = named ?? ['', '', ''];
+      const before = await publicRows();
+      await overturn.getByLabel('Reason').fill(overturnWhy);
+      await overturn.getByRole('button', { name: 'Overturn the result' }).click();
+      await page
+        .locator('#adjustments')
+        .getByText(/^Saved: the result of /)
+        .waitFor();
+      const after = await publicRows();
+      for (const team of [home, away]) {
+        note(`overturned: ${team}'s games played adds up`, addsUp(after.rows, team));
+        note(
+          `overturned: ${team}'s games played is unchanged`,
+          after.rows[team]?.GP === before.rows[team]?.GP,
+        );
+      }
+      note(
+        'overturned: the footnote names the game',
+        after.text.includes(`${game}: ${overturnWhy}`),
+        after.text.slice(0, 300),
+      );
+      // Awarded: the first two teams listed, as the form offers them.
+      const winner = (
+        await award.locator('select[name=winner] option:checked').textContent()
+      )?.trim();
+      const loser = (
+        await award.locator('select[name=loser] option:checked').textContent()
+      )?.trim();
+      await award.getByLabel('Reason').fill(awardWhy);
+      await award.getByRole('button', { name: 'Award the game' }).click();
+      await page.locator('.admin-adjustment', { hasText: awardWhy }).first().waitFor();
+      const awarded = await publicRows();
+      for (const team of [winner, loser]) {
+        note(`awarded: ${team}'s games played adds up`, addsUp(awarded.rows, team));
+        note(
+          `awarded: ${team} has one game more`,
+          awarded.rows[team]?.GP === (after.rows[team]?.GP ?? NaN) + 1,
+          `${after.rows[team]?.GP} → ${awarded.rows[team]?.GP}`,
+        );
+      }
+      note('awarded: the footnote gives the reason', awarded.text.includes(awardWhy));
+      note(
+        'each action is listed as two halves',
+        (await page.locator('.admin-adjustment', { hasText: overturnWhy }).count()) === 2 &&
+          (await page.locator('.admin-adjustment', { hasText: awardWhy }).count()) === 2,
+      );
+      await noSideScroll(page, 'the adjustments screen with two pairs listed');
+      // One half taken off: both go.
+      const half = page
+        .locator('.admin-adjustment', { hasText: overturnWhy })
+        .first()
+        .locator('form[data-form=remove-adjustment]');
+      await half.getByLabel('Why it comes off').fill('The ruling was withdrawn');
+      await half.getByLabel('Yes, take this adjustment off').check();
+      await half.getByRole('button', { name: 'Take it off' }).click();
+      await page.getByText(/^Taken off: /).waitFor();
+      note(
+        'one half taken off takes both off',
+        (await page.locator('.admin-adjustment', { hasText: overturnWhy }).count()) === 0,
+      );
+      const undone = await publicRows();
+      note('the overturn footnote is gone', !undone.text.includes(overturnWhy));
+      for (const team of [home, away]) {
+        // Back as before the overturn, with only the award's change (if it touched them).
+        const awardMoved = awarded.rows[team]?.W - after.rows[team]?.W;
+        note(
+          `taken off: ${team}'s wins are back as they were`,
+          undone.rows[team]?.W === before.rows[team]?.W + awardMoved,
+          `${before.rows[team]?.W} / ${undone.rows[team]?.W}`,
+        );
+      }
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 await browser?.close();
 server?.child.kill();
 

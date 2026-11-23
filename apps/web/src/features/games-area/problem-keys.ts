@@ -32,6 +32,7 @@ const boxScoreKeys: readonly TextKey[] = [
   'admin.boxScore.error.did-not-play-has-stats',
   'admin.boxScore.error.game-not-decided',
   'admin.boxScore.error.reopen-time-over',
+  'admin.boxScore.error.result-overturned',
 ];
 
 /** A refusal on the games list, as words. */

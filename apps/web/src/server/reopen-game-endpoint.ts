@@ -59,6 +59,7 @@ const refusalOf = (code: ReopenTrackedGameError['code']): ReopenRefusalCode => {
     case 'scorekeepers-may-not-reopen':
     case 'not-ended-by-you':
     case 'reopen-time-over':
+    case 'result-overturned':
       return code;
   }
 };

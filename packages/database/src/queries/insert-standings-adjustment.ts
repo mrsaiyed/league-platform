@@ -21,6 +21,9 @@ export async function insertStandingsAdjustment(
       points: adjustment.points,
       reason: adjustment.reason,
       account_id: adjustment.accountId,
+      games_played: adjustment.gamesPlayed ?? 0,
+      paired_with: adjustment.pairedWith ?? null,
+      game_id: adjustment.gameId ?? null,
     })
     .returning('id')
     .executeTakeFirstOrThrow();

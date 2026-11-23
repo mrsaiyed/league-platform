@@ -530,6 +530,27 @@ if (browser) {
     await form.locator('input[name=wins]').fill('1');
     await form.getByRole('button', { name: 'Add the adjustment', exact: true }).click();
     await page.locator('.admin-adjustment', { hasText: typed.reason }).first().waitFor();
+    // Step 2.56, part 4: "Overturn a result" and "Award a game not played" have reason boxes
+    // ("reason") of their own; each is typed the attack and saved, and the list shown back.
+    for (const [name, button] of [
+      ['overturn-result', 'Overturn the result'],
+      ['award-game', 'Award the game'],
+    ]) {
+      const pair = page.locator(`form[data-form=${name}]`);
+      const before = await page.locator('.admin-adjustment', { hasText: typed.reason }).count();
+      await pair.locator('input[name=reason], textarea[name=reason]').fill(typed.reason);
+      await pair.getByRole('button', { name: button, exact: true }).click();
+      await page
+        .locator('.admin-adjustment', { hasText: typed.reason })
+        .nth(before + 1)
+        .waitFor();
+      const shown = await harm(page);
+      note(
+        `the ${name} form, saved with the attack as its reason, made no element`,
+        shown.made.length === 0 && shown.ran === null && shown.refused.length === 0,
+        [...shown.made, ...shown.refused].join(' | '),
+      );
+    }
   });
 
   await step('a file whose name, venue and court are the attack is imported', async () => {

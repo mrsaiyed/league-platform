@@ -48,6 +48,8 @@ export const reopenNotOfferedCodes = [
   'not-ended-by-you',
   /** Longer ago than the league allows. */
   'reopen-time-over',
+  /** It could be reopened, but an overturn rules on its result (S-85). */
+  'result-overturned',
 ] as const;
 export const ReopenNotOffered = z.enum(reopenNotOfferedCodes);
 export type ReopenNotOffered = z.infer<typeof ReopenNotOffered>;
@@ -77,6 +79,7 @@ export const reopenRefusalStatus: Readonly<Record<ReopenRefusalCode, number>> = 
   'scorekeepers-may-not-reopen': 403,
   'not-ended-by-you': 403,
   'reopen-time-over': 403,
+  'result-overturned': 409,
   'not-allowed': 403,
   'game-not-found': 404,
   'changed-since-read': 409,

@@ -187,6 +187,8 @@ export const enTrackerStates = {
   'tracker.reopen.refused.reason-needed': 'Say in a few words why the game is being reopened.',
   'tracker.reopen.refused.reopen-time-over':
     'It is too long since this game ended to reopen it here. A league admin can reopen it.',
+  'tracker.reopen.refused.result-overturned':
+    'This result was overturned. Take the overturn off in Standings and stats first.',
   'tracker.reopen.refused.scorekeepers-may-not-reopen':
     'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
   'tracker.reopen.until': 'You can reopen this game until {time}.',

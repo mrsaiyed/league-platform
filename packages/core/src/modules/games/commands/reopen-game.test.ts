@@ -51,6 +51,17 @@ describe('reopenGame', () => {
     expect(db.state.games[1]).toMatchObject({ status: 'scheduled', homeScore: null });
   });
 
+  it('is refused while an overturn rules on the result, and changes nothing (S-85)', async () => {
+    const { db, deps, as, events } = memoryTracker({ games: [finalGame(1, { overturned: true })] });
+    expect(await reopenGame(as(ownerId), input, deps)).toEqual({
+      ok: false,
+      error: { code: 'result-overturned' },
+    });
+    expect(db.state.games[0]?.status).toBe('final');
+    expect(db.state.corrections).toEqual([]);
+    expect(events).toEqual([]);
+  });
+
   it('is refused without a reason, and leaves nothing behind', async () => {
     const { db, deps, as, events } = memoryTracker({ games: [finalGame(1)] });
     for (const reason of [undefined, '', '   ', 'x'.repeat(1001)]) {

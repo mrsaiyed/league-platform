@@ -21,23 +21,30 @@ import { requestTokenField } from '../../server/same-request.ts';
 import { ListForm, SaidLine, takeNotice, type ListField } from '../list-forms/index.ts';
 import { StaffNotice } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
-import { addAdjustmentAction, removeAdjustmentAction } from './actions.ts';
+import {
+  addAdjustmentAction,
+  awardGameAction,
+  overturnResultAction,
+  removeAdjustmentAction,
+} from './actions.ts';
 import { adjustmentProblemKey } from './adjustment-answers.ts';
-import { changesText } from './adjustment-text.ts';
+import { changesText, gameName } from './adjustment-text.ts';
 import {
   addAdjustmentAnchor,
   adjustmentAnchor,
+  awardGameAnchor,
+  overturnResultAnchor,
   adjustmentsListAnchor,
   standingsAreaAddress,
 } from './standings-address.ts';
 
-const reasonField = (name: string, help: string, label: string): ListField => ({
+const reasonField = (name: string, help: string, label: string, maxLength = 500): ListField => ({
   kind: 'text',
   name,
   label,
   value: '',
   required: true,
-  maxLength: 500,
+  maxLength,
   help,
 });
 
@@ -87,6 +94,10 @@ export async function StandingsAreaPage({
   const options = (listed.ok ? listed.value.teams : [])
     .map((team) => ({ value: team.teamId, label: nameOf(team.teamId) }))
     .sort((a, b) => a.label.localeCompare(b.label));
+  const games = (listed.ok ? listed.value.games : []).map((g) => ({
+    value: g.gameId,
+    label: gameName(g, nameOf),
+  }));
   const count = (name: 'wins' | 'losses' | 'ties' | 'points', help?: string): ListField => ({
     kind: 'number',
     name,
@@ -135,6 +146,9 @@ export async function StandingsAreaPage({
               key={a.id}
               adjustment={a}
               team={nameOf(a.teamId)}
+              paired={
+                (a.pairedWith ?? null) !== null || adjustments.some((o) => o.pairedWith === a.id)
+              }
               // Its own place: with scripts off, React gives a refusal back to the form
               // whose action and permalink match, so each adjustment's form has its own.
               permalink={`${page}#${adjustmentAnchor(a.id)}`}
@@ -180,6 +194,78 @@ export async function StandingsAreaPage({
           />
         )}
       </section>
+      <section
+        id={overturnResultAnchor}
+        className="staff-panel"
+        aria-labelledby="overturn-result-title"
+      >
+        <h2 id="overturn-result-title">{t('adminStandings.overturn.title')}</h2>
+        <p className="staff-quiet">{t('adminStandings.overturn.intro')}</p>
+        {games.length === 0 ? (
+          <p className="staff-quiet">{t('adminStandings.overturn.none')}</p>
+        ) : (
+          <ListForm
+            name="overturn-result"
+            label={t('adminStandings.overturn.title')}
+            action={overturnResultAction}
+            permalink={`${page}#${overturnResultAnchor}`}
+            hidden={hidden()}
+            fields={[
+              {
+                kind: 'select',
+                name: 'game',
+                label: t('adminStandings.field.game'),
+                value: games[0]?.value ?? '',
+                options: games,
+              },
+              reasonField(
+                'reason',
+                t('adminStandings.field.reasonHelp'),
+                t('adminStandings.field.reason'),
+                400,
+              ),
+            ]}
+            button={t('adminStandings.overturn.submit')}
+          />
+        )}
+      </section>
+      <section id={awardGameAnchor} className="staff-panel" aria-labelledby="award-game-title">
+        <h2 id="award-game-title">{t('adminStandings.award.title')}</h2>
+        <p className="staff-quiet">{t('adminStandings.award.intro')}</p>
+        {options.length < 2 ? (
+          <p className="staff-quiet">{t('adminStandings.noTeams')}</p>
+        ) : (
+          <ListForm
+            name="award-game"
+            label={t('adminStandings.award.title')}
+            action={awardGameAction}
+            permalink={`${page}#${awardGameAnchor}`}
+            hidden={hidden()}
+            fields={[
+              {
+                kind: 'select',
+                name: 'winner',
+                label: t('adminStandings.field.winner'),
+                value: options[0]?.value ?? '',
+                options,
+              },
+              {
+                kind: 'select',
+                name: 'loser',
+                label: t('adminStandings.field.loser'),
+                value: options[1]?.value ?? '',
+                options,
+              },
+              reasonField(
+                'reason',
+                t('adminStandings.field.reasonHelp'),
+                t('adminStandings.field.reason'),
+              ),
+            ]}
+            button={t('adminStandings.award.submit')}
+          />
+        )}
+      </section>
     </main>
   );
 }
@@ -187,11 +273,13 @@ export async function StandingsAreaPage({
 function AdjustmentPart({
   adjustment,
   team,
+  paired,
   permalink,
   hidden,
 }: {
   readonly adjustment: SeasonAdjustment;
   readonly team: string;
+  readonly paired: boolean;
   readonly permalink: string;
   readonly hidden: Readonly<Record<string, string>>;
 }) {
@@ -202,6 +290,7 @@ function AdjustmentPart({
         <strong>{changesText(adjustment)}</strong>
       </p>
       <p dir="auto">{adjustment.reason}</p>
+      {!paired ? null : <p className="staff-quiet">{t('adminStandings.pairNote')}</p>}
       <div data-kind="danger">
         <ListForm
           name="remove-adjustment"

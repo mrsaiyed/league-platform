@@ -34,8 +34,7 @@ describe('recordFinalScore', () => {
       ok: true,
       value: { version: 2 },
     });
-    // Two numbers say nothing of overtime: no count, so no mark (step 2.200; step 2.56
-    // lets a typed score say it).
+    // Two numbers alone say nothing of overtime: no count, so no mark (step 2.200).
     expect(db.state.games[0]).toMatchObject({
       status: 'final',
       homeScore: 52,
@@ -48,6 +47,24 @@ describe('recordFinalScore', () => {
     expect(events).toEqual([
       { type: 'games.finalized', leagueId: expect.any(String), gameId: gameUuid(1), seasonId },
     ]);
+  });
+
+  it('keeps how many overtimes a typed final went to, 0 for none (step 2.56, S-86)', async () => {
+    for (const overtimePeriods of [0, 2, 18]) {
+      const { db, deps, as } = memoryGames({ games: [game(1)] });
+      expect(
+        await recordFinalScore(as(ownerId), { ...input, overtimePeriods }, deps),
+      ).toMatchObject({ ok: true });
+      expect(db.state.games[0]).toMatchObject({ status: 'final', overtimePeriods });
+    }
+    for (const overtimePeriods of [-1, 19, 1.5]) {
+      const { db, deps, as } = memoryGames({ games: [game(1)] });
+      expect(
+        await recordFinalScore(as(ownerId), { ...input, overtimePeriods }, deps),
+        String(overtimePeriods),
+      ).toMatchObject({ ok: false });
+      expect(db.state.games[0]?.status).toBe('scheduled');
+    }
   });
 
   it('clears the old lines of a box score game saved now as a final score only', async () => {

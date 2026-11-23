@@ -7,7 +7,9 @@
 // what was typed and the wrong box marked, or saved with a one-time notice in the list.
 import {
   addAdjustment,
+  awardGame,
   listAdjustments,
+  overturnResult,
   removeAdjustment,
   type CommandContext,
   type Result,
@@ -31,7 +33,7 @@ import {
   reasonProblem,
   wrongAdjustmentFields,
 } from './adjustment-answers.ts';
-import { adjustmentWhat } from './adjustment-text.ts';
+import { adjustmentWhat, gameName } from './adjustment-text.ts';
 import { adjustmentsListAnchor, standingsAreaAddress } from './standings-address.ts';
 
 type Outcome = Result<unknown, { readonly code: string }> & {
@@ -138,5 +140,66 @@ export async function removeAdjustmentAction(
     if (!result.ok || gone === undefined) return result;
     const team = (await teamsOf(leagueId, seasonId)).find((x) => x.id === gone.teamId)?.name ?? '';
     return { ...result, name: adjustmentWhat(team, gone) };
+  });
+}
+
+/** "Overturn a result" (S-10, M6): one action, both teams' halves, one reason naming the game. */
+export async function overturnResultAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
+  const { deps, leagueId, teamsOf } = await standingsOf(fields);
+  const seasonId = text(fields, 'season');
+  return answer(fields, 'added', async (context) => {
+    const gameId = text(fields, 'game');
+    const reasonWrong = reasonProblem(fields['reason']);
+    if (reasonWrong !== undefined) return refuse(reasonWrong, 'reason');
+    const listed = await listAdjustments(context, { seasonId }, deps);
+    if (listed.ok && listed.value.adjustments.some((a) => a.gameId === gameId)) {
+      // A second tap of the same overturn (S-85).
+      return refuse('game-already-overturned', 'game');
+    }
+    const game = listed.ok ? listed.value.games.find((g) => g.gameId === gameId) : undefined;
+    if (game === undefined) return refuse('game-not-found', 'game');
+    const teams = await teamsOf(leagueId, seasonId);
+    const named = gameName(game, (id) => teams.find((x) => x.id === id)?.name ?? '');
+    // The footnote names the game it overturns, on both teams' rows.
+    const reason = t('adminStandings.overturn.reasonText', {
+      game: named,
+      reason: text(fields, 'reason'),
+    });
+    // The game's name counts towards the reason's 500 characters.
+    if (reasonProblem(reason) !== undefined) return refuse('reason-too-long', 'reason');
+    const result = await overturnResult(context, { seasonId, gameId, reason }, deps);
+    if (!result.ok) return result;
+    return { ...result, name: t('adminStandings.overturn.what', { game: named }) };
+  });
+}
+
+/** "Award a game not played" (S-85): a win for one team, a loss for the other, one reason. */
+export async function awardGameAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
+  const { deps, leagueId, teamsOf } = await standingsOf(fields);
+  const seasonId = text(fields, 'season');
+  return answer(fields, 'added', async (context) => {
+    const winnerTeamId = text(fields, 'winner');
+    const loserTeamId = text(fields, 'loser');
+    if (winnerTeamId === '') return refuse('team-not-found', 'winner');
+    if (loserTeamId === '' || loserTeamId === winnerTeamId) return refuse('same-team', 'loser');
+    const reasonWrong = reasonProblem(fields['reason']);
+    if (reasonWrong !== undefined) return refuse(reasonWrong, 'reason');
+    const result = await awardGame(
+      context,
+      { seasonId, winnerTeamId, loserTeamId, reason: text(fields, 'reason') },
+      deps,
+    );
+    if (!result.ok) return result;
+    const teams = await teamsOf(leagueId, seasonId);
+    const nameOf = (id: string) => teams.find((x) => x.id === id)?.name ?? '';
+    return {
+      ...result,
+      name: t('adminStandings.award.what', {
+        winner: nameOf(winnerTeamId),
+        loser: nameOf(loserTeamId),
+      }),
+    };
   });
 }
