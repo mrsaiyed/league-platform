@@ -182,6 +182,9 @@ export async function ScheduleBuilderPage({
         data-notice="done"
         data-published=""
       >
+        {firstValue(search['already']) === '1' ? (
+          <p data-published-already="">{t('schedule.admin.publishedAlready')}</p>
+        ) : null}
         <p>{published.text}</p>
         {publishedToBin === 0 ? null : (
           <p data-published-to-bin={publishedToBin}>
@@ -1532,7 +1535,7 @@ function PublishPanel({
         <form action={publishAction} className="staff-form">
           <BasisFields basis={basis} />
           <p className="staff-buttons">
-            <button type="submit" className="ui-button" data-kind="main">
+            <button type="submit" className="ui-button" data-kind="main" data-publish-submit="">
               {t('schedule.admin.publishSubmit')}
             </button>
           </p>

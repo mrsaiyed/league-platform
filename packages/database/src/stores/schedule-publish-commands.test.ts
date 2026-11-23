@@ -496,6 +496,44 @@ describe('publishing against the database', () => {
     expect(row.version).toBeGreaterThan(before.version);
   });
 
+  it("numbers added games after the season's highest, a binned game included, in date order (step 2.53)", async () => {
+    const s = await season();
+    await s.game(s.teams.a, s.teams.b, { starts_at: '2026-12-07T00:30:00Z', game_number: 5 });
+    await s.game(s.teams.a, s.teams.b, {
+      starts_at: '2026-12-08T00:30:00Z',
+      game_number: 40,
+      deleted_at: '2026-12-01T00:00:00Z',
+    });
+    const later = randomUUID();
+    const sooner = randomUUID();
+    const add = (gameId: string, date: string) => (b: ReturnType<typeof basis>) =>
+      addDraftGame(
+        s.as,
+        {
+          ...b,
+          gameId,
+          homeTeamId: s.teams.a,
+          awayTeamId: s.teams.b,
+          roundId: s.round2,
+          date,
+          time: '18:00',
+          venueId: s.venueId,
+          court: null,
+        },
+        deps,
+      );
+    // Added later-first: the numbers follow the dates, not the order of the edits.
+    await publishDraft(s, 1, add(later, '2026-12-20'), [add(sooner, '2026-12-13')]);
+    const numbers = await pglite.query<{ id: string; game_number: number | null }>(
+      'select id, game_number from games where id = any($1) order by game_number',
+      [[later, sooner]],
+    );
+    expect(numbers.rows).toEqual([
+      { id: sooner, game_number: 41 },
+      { id: later, game_number: 42 },
+    ]);
+  });
+
   it('never moves, removes or re-records a live or decided game', async () => {
     const s = await season();
     const final = await s.game(s.teams.a, s.teams.b, {

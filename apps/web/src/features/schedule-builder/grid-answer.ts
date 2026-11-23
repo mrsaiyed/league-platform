@@ -57,7 +57,10 @@ export function answerParams(outcome: ScheduleActionOutcome): {
       hash: `#${addRoundAnchor}`,
     };
   }
-  const query: Record<string, string> = { done: outcome.kind };
+  const query: Record<string, string> = {
+    done: outcome.kind,
+    ...(outcome.kind === 'published' && outcome.already === true ? { already: '1' } : {}),
+  };
   // How many games the publish moved to the bin, for "Moved to the bin" with the way back.
   if (outcome.kind === 'published' && (outcome.removed ?? 0) > 0) {
     return { query: { ...query, removed: String(outcome.removed) }, hash: '' };

@@ -189,6 +189,7 @@ export const enScheduleAdmin = {
   'schedule.admin.publishWhen': '{date} at {time}',
   'schedule.admin.publishWhenNoTime': '{date}, no time yet',
   'schedule.admin.published': 'The schedule is published. Visitors can see it now.',
+  'schedule.admin.publishedAlready': 'This was published already: nothing more to do.',
   'schedule.admin.publishedBothHidden':
     'The schedule is published, but visitors cannot see this league until it is published, and {season} is hidden from them too.',
   'schedule.admin.publishedLeagueHidden':

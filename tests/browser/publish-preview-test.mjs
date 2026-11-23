@@ -131,6 +131,8 @@ if (built) {
     note('no draft is left', (await page.locator('[data-draft-bar]').count()) === 0);
 
     at = 'the new games are on the public schedule, each with its game number';
+    // Numbered in the summary's order (date and time, then id), one after the other.
+    const numbers = [];
     for (const id of ids) {
       await page.goto(`${origin}/north-valley/schedule`);
       const link = page.locator(`main a[href*="${id}"]`);
@@ -138,8 +140,15 @@ if (built) {
       if ((await link.count()) === 0) continue;
       await page.goto(new URL((await link.first().getAttribute('href')) ?? '', origin).href);
       const text = await page.locator('main').innerText();
-      note(`the added game ${id} has its game number`, /game \d+/i.test(text), text.slice(0, 200));
+      const number = /game (\d+)/i.exec(text)?.[1];
+      note(`the added game ${id} has its game number`, number !== undefined, text.slice(0, 200));
+      numbers.push(Number(number));
     }
+    note(
+      'the added games are numbered one after the other, in date order',
+      numbers.length === 2 && numbers[1] === numbers[0] + 1,
+      numbers.join(', '),
+    );
   } catch (error) {
     failures.push(`${at}: ${whatWentWrong(error)}`);
   } finally {

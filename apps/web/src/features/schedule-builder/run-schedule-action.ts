@@ -79,7 +79,12 @@ export type RefusedAt =
 
 export type ScheduleActionOutcome =
   | { readonly kind: 'saved'; readonly detail?: SavedDetail }
-  | { readonly kind: 'published'; readonly removed?: number }
+  | {
+      readonly kind: 'published';
+      readonly removed?: number;
+      /** Sent again after it worked (a second tap): published already, said calmly (step 2.53). */
+      readonly already?: true;
+    }
   | { readonly kind: 'discarded' }
   | {
       readonly kind: 'refused';
@@ -124,6 +129,21 @@ function refusal(result: Extract<Result<unknown, { code: string }>, { ok: false 
 
 /** The draft's place after an edit: what the next edit names as its basis. */
 type Moved = { draftId: string; version: number; basedOnRevision: number | null };
+
+/**
+ * A publish refused because the draft is gone and a later revision is out (step 2.53 fix
+ * round): the same publish sent twice, its first one done. Said as "published already",
+ * never as a refusal. A draft discarded and nothing published still reads as a refusal.
+ */
+async function publishedSince(
+  context: CommandContext,
+  basis: Basis,
+  deps: CommandDeps<SchedulingTx>,
+): Promise<boolean> {
+  const now = await getScheduleDraft(context, { seasonId: basis.seasonId }, deps);
+  if (!now.ok || now.value.draft !== null || now.value.latestRevision === null) return false;
+  return basis.basedOnRevision === null || now.value.latestRevision > basis.basedOnRevision;
+}
 
 export async function runScheduleAction(
   kind: ScheduleActionKind,
@@ -289,7 +309,9 @@ export async function runScheduleAction(
         ? done.value.summary.gamesRemoved.length === 0
           ? { kind: 'published' }
           : { kind: 'published', removed: done.value.summary.gamesRemoved.length }
-        : refusal(done);
+        : (await publishedSince(context, basis, deps))
+          ? { kind: 'published', already: true }
+          : refusal(done);
     }
     case 'discard': {
       if (basis.draftId === null || basis.version === null) return invalid;

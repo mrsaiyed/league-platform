@@ -92,7 +92,7 @@ if (built) {
     note('the game is in the grid on its new date', (await inGrid.innerText()).includes('Mar 6'));
 
     at = 'publishing puts it on the public schedule';
-    await tap(page.getByRole('button', { name: 'Publish this schedule' }));
+    await tap(page.locator('[data-publish-submit]'));
     note('published', page.url().includes('done=published'), page.url());
     await tap(page.locator('[data-to-waiting]'));
     note(
