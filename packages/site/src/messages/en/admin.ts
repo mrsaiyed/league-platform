@@ -58,6 +58,15 @@ export const enAdmin = {
     'Its teams {first} and {second} are in the bin. Bring the teams back first.',
   'admin.bin.game.teamsInBinAsk':
     'Its teams {first} and {second} are in the bin. Ask an admin to bring the teams back.',
+  'admin.bin.gameBack':
+    'It is a change to the published schedule: revision {revision}, reaching {teams} teams and {people} people.',
+  'admin.bin.gameBackCheck': 'Check them in Schedule',
+  'admin.bin.gameBackClash': '{away} at {home}, {when}',
+  'admin.bin.gameBackClashCourt': '{away} at {home}, {when}, court {court}',
+  'admin.bin.gameBackClashes_one':
+    'One other game now has a team or the court in common at its time:',
+  'admin.bin.gameBackClashes_other':
+    '{count} other games now have a team or the court in common at its time:',
   'admin.bin.games.none': 'No removed games.',
   'admin.bin.games.title': 'Removed games',
   'admin.bin.inSeason': 'Season: {season}.',
@@ -66,10 +75,14 @@ export const enAdmin = {
   'admin.bin.link.games': 'Removed games',
   'admin.bin.link.teamsPeople': 'Removed teams and people',
   'admin.bin.movedToBin': 'Moved to the bin.',
+  'admin.bin.nameTakenBy':
+    'Another team of the same season, {name} (short name {slug}), now has this name. Rename one of them first, then bring this one back.',
   'admin.bin.notBack': 'Not brought back. {problem}',
   'admin.bin.people.none': 'No removed people.',
   'admin.bin.people.title': 'Removed people',
   'admin.bin.person.unnamed': 'Someone whose name was erased',
+  'admin.bin.shortNameTakenBy':
+    'Another team of the same season, {name}, now has this team’s short name {slug}. Change the short name of one of them first, then bring this one back.',
   'admin.bin.sub': 'What was removed from this league, and the way to bring each thing back.',
   // Beside the refusal when another team took the name (S-83): the way to that team.
   'admin.bin.takenBy': 'Open the team {name}',

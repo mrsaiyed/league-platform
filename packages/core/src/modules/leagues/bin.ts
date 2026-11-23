@@ -134,6 +134,35 @@ export type BinTx = CommandTx & {
   readonly activity: ActivityLog;
 };
 
+/**
+ * Bringing a published game back is a schedule change like a publish (A-19): its
+ * transaction also reads and writes the season's schedule revisions, counts the people
+ * the change reaches (A-7) and finds the games at the same time (the schedule's stores,
+ * as packages/database and the made-up world supply them; the shapes are written here so
+ * the leagues module does not depend on the games or scheduling modules).
+ */
+export type RestoreGameTx = BinTx & {
+  readonly scheduling: {
+    readonly latestRevision: (seasonId: string) => Promise<number | null>;
+    readonly insertRevision: (
+      seasonId: string,
+      revision: {
+        readonly number: number;
+        readonly publishedByAccountId: string | null;
+        readonly summary: unknown;
+      },
+    ) => Promise<boolean>;
+    readonly countPeopleOnTeams: (seasonId: string, teamIds: readonly string[]) => Promise<number>;
+  };
+  readonly games: {
+    readonly find: (
+      gameId: string,
+    ) => Promise<{ readonly homeTeamId: string; readonly awayTeamId: string } | undefined>;
+    /** The games at the same time with a team or the court in common, the game itself left out. */
+    readonly clashesOf: (gameId: string) => Promise<readonly { readonly id: string }[]>;
+  };
+};
+
 /** The moment a thing binned at `binnedAt` is removed for good. */
 export function removedForGoodAt(binnedAt: string): string {
   return new Date(Date.parse(binnedAt) + binKeepDays * dayMs).toISOString();

@@ -12,7 +12,7 @@ import {
   invitationLifetimeDays,
   leagueUrl,
   listAccess,
-  listActivity,
+  searchActivity,
   type Role,
 } from '@srleagues/core';
 import { PageHead } from '@srleagues/ui';
@@ -47,14 +47,21 @@ export async function AdminsPage({ league }: { readonly league: string }) {
   if (!listed.ok) return forbidden();
   const [names, activity, clock] = await Promise.all([
     ports.adminAccess.namesOf(here.id),
-    // The newest page of the log; the page lists its changes to who has access.
-    listActivity(context, { limit: activityPageLimit }, deps),
+    // The newest page of the log's access entries (A-6: kind 'access', so a busy league's
+    // other entries never push them out). Read where
+    // the activity log page reads it (the bin's transaction: access and the log), so the
+    // made-up world shows its own log here too, not the access stand-in's empty one.
+    searchActivity(
+      context,
+      { limit: activityPageLimit, kind: 'access' },
+      ports.adminPeople.putBack,
+    ),
     ports.publicSchedule.clockOf(here.id),
   ]);
   const shown = adminsView({
     list: listed.value,
     names,
-    activity: activity.ok ? activity.value : [],
+    activity: activity.ok ? activity.value.entries : [],
     you: context.accountId,
   });
   const holder = noticeHolderOf(context);

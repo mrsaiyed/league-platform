@@ -5,7 +5,7 @@
 // adapter: the made-up world's people (stand-in-ports.ts), the same rows Admin → Teams
 // puts on rosters; or the database's, on Admin → Teams' own transaction
 // (database-ports.ts, step 2.50).
-import type { BinTx, CommandDeps, PeopleTx } from '@srleagues/core';
+import type { CommandDeps, PeopleTx, RestoreGameTx } from '@srleagues/core';
 import type { AdminTeamsTx } from './admin-teams.ts';
 import { coreEventHandlers } from './database-event-handlers.ts';
 
@@ -16,7 +16,7 @@ export type AdminPeoplePorts = {
    * Runs `leagues.restore_person`, the one way back from "Remove from the league list"
    * (A-5), on the bin's own transaction: its people.manage check is the command's own.
    */
-  readonly putBack: CommandDeps<BinTx>;
+  readonly putBack: CommandDeps<RestoreGameTx>;
 };
 
 /**

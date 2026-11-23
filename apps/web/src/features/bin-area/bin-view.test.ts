@@ -1,6 +1,6 @@
 import type { BinListing } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
-import { binView, nameTakenBy } from './bin-view.ts';
+import { binView, clashWords, gameBackOf, gameBackSaid, nameTakenBy } from './bin-view.ts';
 
 const at = '2026-11-20T18:00:00.000Z';
 const base = { secondName: null, seasonId: 's-1', binnedAt: at, removedForGoodAt: null };
@@ -142,10 +142,44 @@ describe('what the bin screen shows (step 2.77)', () => {
 describe('the team that took a binned team’s name (S-83)', () => {
   it('is the other team of the season with the same name, whatever its capitals', () => {
     const teams = [
-      { id: 'x', name: 'Hawks' },
-      { id: 'y', name: ' riverside hawks ' },
+      { id: 'x', name: 'Hawks', slug: 'hawks' },
+      { id: 'y', name: ' riverside hawks ', slug: 'riverside-hawks' },
     ];
     expect(nameTakenBy({ id: 'x', name: 'Riverside Hawks' }, teams)?.id).toBe('y');
     expect(nameTakenBy({ id: 'y', name: 'Riverside Hawks' }, teams)).toBeUndefined();
+  });
+});
+
+describe('the team that took a binned team’s short name (A-19)', () => {
+  it('is the other team with the binned team’s own short name, not one of its name', () => {
+    const teams = [
+      { id: 'binned', name: 'Hawks', slug: 'hawks' },
+      { id: 'same-name', name: 'Hawks', slug: 'hawks-2' },
+      { id: 'same-short', name: 'Harbour Hawks', slug: 'hawks' },
+    ];
+    expect(nameTakenBy({ id: 'binned', name: 'Hawks' }, teams, true)?.id).toBe('same-short');
+    expect(nameTakenBy({ id: 'binned', name: 'Hawks' }, teams)?.id).toBe('same-name');
+    // Not in the list (it is in the bin): the team of its name.
+    expect(nameTakenBy({ id: 'gone', name: 'Harbour Hawks' }, teams, true)?.id).toBe('same-short');
+  });
+});
+
+describe('a game back from the bin (A-19)', () => {
+  it('keeps its revision and counts as the server left them, and nothing else', () => {
+    const said = gameBackSaid({ revision: 7, teams: 2, people: 23 });
+    expect(gameBackOf(said)).toEqual({ revision: 7, teams: 2, people: 23 });
+    expect(gameBackOf('7.2')).toBeUndefined();
+    expect(gameBackOf('x.2.3')).toBeUndefined();
+  });
+
+  it('names a game now at its time by its teams, day, time and court', () => {
+    const names = { h: 'Owls', a: 'Hawks' };
+    const game = { homeTeamId: 'h', awayTeamId: 'a', date: '2026-12-05', time: '19:00' };
+    expect(clashWords({ ...game, court: '2' }, names, 'en')).toBe(
+      'Hawks at Owls, Sat, Dec 5, 19:00, court 2',
+    );
+    expect(clashWords({ ...game, court: null }, names, 'en')).toBe(
+      'Hawks at Owls, Sat, Dec 5, 19:00',
+    );
   });
 });

@@ -28,7 +28,7 @@ import {
   ok,
   readSiteFacts,
   type AccessTx,
-  type BinTx,
+  type RestoreGameTx,
   type CommandDeps,
   type Result,
 } from '@srleagues/core';
@@ -328,8 +328,10 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
           // (database-event-handlers.ts) though restoring a person sets none of them off.
           standings: database.standingsStore(scope),
           games: database.gamesStore(scope),
+          // Bringing a game back writes a schedule revision and counts who it reaches (A-19).
+          scheduling: database.schedulingStore(scope),
         })),
-        events: coreEventHandlers<BinTx>(),
+        events: coreEventHandlers<RestoreGameTx>(),
         log: options.log,
         now: () => performance.now(),
       },
