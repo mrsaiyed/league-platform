@@ -27,7 +27,12 @@ describe('wireWorker', () => {
         queue: 'table',
         email: 'capture',
       });
-      expect(Object.keys(worker.handlers)).toEqual(['email.send', 'imports.run', 'bin.empty']);
+      expect(Object.keys(worker.handlers)).toEqual([
+        'email.send',
+        'cache.clear',
+        'imports.run',
+        'bin.empty',
+      ]);
       await worker.close();
     }
   });

@@ -2,6 +2,8 @@
 // against the real database are in packages/database (stores, role matrix, harness).
 import { z } from 'zod';
 import { describe, expect, it } from 'vitest';
+import { testDeps } from '../../../command/testing/memory-transaction.ts';
+import { eventHandlers } from '../../../event-handlers.ts';
 import { memoryLeagues, ownerId, leagueId } from '../memory-leagues.test-helper.ts';
 import { defineSetting, settingRegistry } from '../settings/define-setting.ts';
 import { getSetting } from '../settings/get-setting.ts';
@@ -118,6 +120,25 @@ describe('setSetting', () => {
     const back = await set(context, at({ value: 'firstNameLastInitial', version: 1 }), deps);
     expect(back).toMatchObject({ ok: true });
     expect(db.state.activity[1]?.details).not.toHaveProperty('confirmed');
+  });
+
+  it('a change of how names show records one league-wide cache.clear job; others none (step 2.26)', async () => {
+    const { db, transaction, context } = setUp();
+    const deps = testDeps(transaction, eventHandlers);
+    const named = input({ key: names.key, value: 'hidden' });
+    expect(await set(context, named, deps)).toMatchObject({ ok: true });
+    expect(db.jobs).toEqual([{ type: 'cache.clear', leagueId, ids: {} }]);
+    // The same value again changes nothing; another setting clears nothing.
+    expect(await set(context, { ...named, version: 1 }, deps)).toMatchObject({ ok: true });
+    expect(await set(context, input({}), deps)).toMatchObject({ ok: true });
+    expect(db.jobs).toHaveLength(1);
+    // Going back to the default is a change of names too.
+    const back = { level: 'league', key: names.key, version: 1 };
+    expect(await clear(context, back, deps)).toMatchObject({ ok: true });
+    expect(db.jobs).toEqual([
+      { type: 'cache.clear', leagueId, ids: {} },
+      { type: 'cache.clear', leagueId, ids: {} },
+    ]);
   });
 
   it('writes nothing and logs nothing when the same value is saved again (record 065)', async () => {

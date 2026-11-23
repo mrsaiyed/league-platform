@@ -84,3 +84,4 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 
 - 2.56: an award is not linked to a scheduled game; if that game is played later it counts twice (S-85 says so): link it or warn.
 - 2.56: the public-pencil browser test covers only a league where scorekeepers cannot reopen; add one inside a tracker reopen window, and an admin limited to another program.
+- 2.26: the refused-result test of clear-page-cache covers only a refusal before the event; a job rolled back after a later failure rests on leagues-store.test.ts.

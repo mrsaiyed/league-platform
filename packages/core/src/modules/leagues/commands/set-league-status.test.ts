@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { leagueTransitions } from '../league-states.ts';
 import { leagueStatuses, type LeagueStatus } from '../league-values.ts';
 import { grantOf } from '../memory-bin.test-helper.ts';
-import { memoryLeagues, ownerId, staffId } from '../memory-leagues.test-helper.ts';
+import { testDeps } from '../../../command/testing/memory-transaction.ts';
+import { eventHandlers } from '../../../event-handlers.ts';
+import { leagueId, memoryLeagues, ownerId, staffId } from '../memory-leagues.test-helper.ts';
 import { setLeagueStatus } from './set-league-status.ts';
 
 function inState(status: LeagueStatus) {
@@ -23,6 +25,19 @@ describe('setLeagueStatus', () => {
       });
     }
     expect(db.state.league).toMatchObject({ status: 'live', version: 6 });
+  });
+
+  it('records one league-wide cache.clear job with each change, none when refused (step 2.26)', async () => {
+    const { db, transaction, as } = memoryLeagues({ audience: 'adult' });
+    const deps = testDeps(transaction, eventHandlers);
+    expect(await setLeagueStatus(as(ownerId), { status: 'live', version: 3 }, deps)).toMatchObject({
+      ok: true,
+    });
+    expect(db.jobs).toEqual([{ type: 'cache.clear', leagueId, ids: {} }]);
+    expect(await setLeagueStatus(as(ownerId), { status: 'live', version: 3 }, deps)).toMatchObject({
+      ok: false,
+    });
+    expect(db.jobs).toHaveLength(1);
   });
 
   it('lets only our staff suspend, and only they lift it', async () => {

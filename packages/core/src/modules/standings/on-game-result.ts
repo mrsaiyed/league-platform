@@ -10,6 +10,12 @@ import {
   type GameReopened,
 } from '../../events/game-events.ts';
 import type { StandingsTx } from './ports.ts';
+import {
+  clearLeagueOnSettingChanged,
+  clearLeagueOnStatusChanged,
+  clearPagesOnGameFinalized,
+  clearPagesOnGameReopened,
+} from './clear-page-cache.ts';
 import { rebuildSeason } from './rebuild-season.ts';
 
 export const rebuildOnGameFinalized = onEvent<GameFinalized, StandingsTx>(
@@ -26,8 +32,15 @@ export const rebuildOnGameReopened = onEvent<GameReopened, StandingsTx>(
   },
 );
 
-/** The standings module's handlers, for the apps' list (core's eventHandlers). */
+/**
+ * The standings module's handlers, for the apps' list (core's eventHandlers): the season is
+ * worked out again, then its pages' cache labels are queued to be cleared (step 2.26).
+ */
 export const standingsHandlers: readonly EventHandler<StandingsTx>[] = [
   rebuildOnGameFinalized,
   rebuildOnGameReopened,
+  clearPagesOnGameFinalized,
+  clearPagesOnGameReopened,
+  clearLeagueOnStatusChanged,
+  clearLeagueOnSettingChanged,
 ];

@@ -75,7 +75,13 @@ describe('GET …/games/{game}/snapshot', () => {
     await play(world);
     const answer = await read(world);
     expect(answer.status).toBe(200);
-    expect(answer.headers).toEqual({ 'Cache-Control': 'public, max-age=0, s-maxage=2' });
+    expect(answer.headers).toEqual({
+      'Cache-Control': 'public, max-age=0, s-maxage=2',
+      // Labeled by its league and its game, so a final clears it at once (step 2.26).
+      'Cache-Tag': expect.stringMatching(
+        new RegExp(`^league:([0-9a-f-]{36}),league:\\1:game:${games.hawksBears}$`),
+      ) as unknown as string,
+    });
     const snapshot = GameSnapshot.parse(answer.body);
     expect(snapshot).toMatchObject({
       gameId: games.hawksBears,
