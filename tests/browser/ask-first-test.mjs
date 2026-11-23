@@ -1067,6 +1067,48 @@ if (browser) {
     });
   }
 
+  await step('"Yes" becomes ready without moving, and says so politely', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token', { hasTouch: true });
+    try {
+      await openGames(page);
+      const game = gameNamed(page, 'Owls', 'Badgers');
+      await tapToCallOff(game, 'Postpone');
+      const yes = questionOf(game).getByRole('button', { name: 'Yes, postpone it' });
+      await yes.waitFor();
+      const said = questionOf(game).locator('[data-ready-said]');
+      const restingBox = await yes.boundingBox();
+      const restingSaid = (await said.textContent()) ?? '';
+      const restingLive = await said.getAttribute('aria-live');
+      const restingDisabled = await yes.getAttribute('aria-disabled');
+      await page.locator('[data-resting]').waitFor({ state: 'detached', timeout: 3000 });
+      const readyBox = await yes.boundingBox();
+      note(
+        'while "Yes" is not ready it is aria-disabled and the polite live region says nothing',
+        restingDisabled === 'true' && restingLive === 'polite' && restingSaid === '',
+        `${restingDisabled} ${restingLive} "${restingSaid}"`,
+      );
+      note(
+        'once "Yes" is ready: no aria-disabled, and "You can answer now." is said politely',
+        (await yes.getAttribute('aria-disabled')) === null &&
+          (await said.textContent()) === 'You can answer now.',
+        `${await yes.getAttribute('aria-disabled')} "${await said.textContent()}"`,
+      );
+      note(
+        '"Yes" keeps its place and size when it becomes ready',
+        restingBox !== null &&
+          readyBox !== null &&
+          ['x', 'y', 'width', 'height'].every(
+            (key) => Math.abs(restingBox[key] - readyBox[key]) < 0.5,
+          ),
+        `${JSON.stringify(restingBox)} → ${JSON.stringify(readyBox)}`,
+      );
+      await game.getByRole('button', { name: 'No, keep it on its date' }).click();
+      await questionOf(game).waitFor({ state: 'detached' });
+    } finally {
+      await context.close();
+    }
+  });
+
   await step('at 390 by touch, "Yes" tapped every 300 ms goes through within 1.5 s', async () => {
     const { context, page } = await signedInAs('local-scheduler-token', { hasTouch: true });
     try {

@@ -85,6 +85,8 @@ export const enAdminGames = {
   'admin.games.callOff.no.forfeit': 'No, keep the game as it is',
   'admin.games.callOff.no.postpone': 'No, keep it on its date',
   'admin.games.callOff.no.restore': 'No, keep it postponed',
+  // Said politely (a live region) when the question's "Yes" becomes ready (step 2.221).
+  'admin.games.callOff.ready': 'You can answer now.',
   'admin.games.callOff.restore': 'Put it back',
   'admin.games.callOff.yes.cancel': 'Yes, cancel it',
   'admin.games.callOff.yes.forfeit': 'Yes, record the forfeit',

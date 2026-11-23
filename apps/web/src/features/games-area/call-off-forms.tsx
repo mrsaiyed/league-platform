@@ -49,6 +49,8 @@ export type CallOffTexts = {
   readonly summary: string;
   /** A refusal's sentence, naming the game, with {problem} for why. */
   readonly refusal: string;
+  /** Said politely once the question's "Yes" takes a tap: "You can answer now." */
+  readonly ready: string;
   /** The changes offered, in the order they are drawn. */
   readonly acts: Readonly<Partial<Record<CallOffAct, CallOffActTexts>>>;
 };
@@ -81,8 +83,12 @@ export function CallOffForms(props: CallOffFormsProps) {
   // its `readyInMs` is what is left of the wait, never the whole wait again.
   const readyAt = useRef(0);
   const [resting, setResting] = useState(false);
+  // Whether "Yes" became ready while the question was open: then its polite live region says
+  // so (once, quietly); a question whose "Yes" is ready from the start says nothing more.
+  const [becameReady, setBecameReady] = useState(false);
   const readyInMs = asked?.readyInMs;
   useLayoutEffect(() => {
+    setBecameReady(false);
     if (readyInMs === undefined || readyInMs <= 0) {
       readyAt.current = 0;
       setResting(false);
@@ -90,7 +96,10 @@ export function CallOffForms(props: CallOffFormsProps) {
     }
     readyAt.current = performance.now() + readyInMs;
     setResting(true);
-    const timer = setTimeout(() => setResting(false), readyInMs);
+    const timer = setTimeout(() => {
+      setResting(false);
+      setBecameReady(true);
+    }, readyInMs);
     return () => clearTimeout(timer);
   }, [state, readyInMs]);
   const refused = state.kind === 'refused' ? state : undefined;
@@ -253,6 +262,11 @@ export function CallOffForms(props: CallOffFormsProps) {
             {words.yes}
           </button>
         </form>
+        {/* Drawn empty with the question, so the sentence put in it later is heard. Not a
+            "status" role: the game's "Saved" is the game's one status. */}
+        <p className="ui-visually-hidden" aria-live="polite" data-ready-said="">
+          {becameReady ? texts.ready : ''}
+        </p>
       </div>
     );
   };
