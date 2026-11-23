@@ -556,6 +556,8 @@ const adminPages = [
   // league's venues with their courts; the answers are taken by divisionVenueSteps' taps.
   { name: 'admin-divisions', at: '/admin/season/divisions' },
   { name: 'admin-venues', at: '/admin/schedule/venues' },
+  // Step 2.56: Standings and stats, the season's adjustments (the made-up one listed).
+  { name: 'admin-standings', at: '/admin/standings' },
   ...['divisions-refused', 'divisions-removed', 'venues-refused', 'venues-court-removed'].map(
     (what) => ({
       name: `admin-${what}`,
