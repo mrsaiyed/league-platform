@@ -136,6 +136,7 @@ export const enScheduleAdmin = {
     'The new date goes into the schedule draft, checked for clashes like any change, and reaches everyone when the schedule is published.',
   'schedule.admin.newDate.publish': 'Review and publish the schedule',
   'schedule.admin.newDate.save': 'Give it this date',
+  'schedule.admin.newDate.takeBack': 'Take back the new date',
   'schedule.admin.newDate.title': 'Give it a new date',
   'schedule.admin.noDate': 'no date',
   'schedule.admin.noDraft': 'There is no draft yet. You are looking at the published schedule.',

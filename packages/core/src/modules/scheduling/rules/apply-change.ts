@@ -122,6 +122,15 @@ export function applyDraftChange(
       );
       return done({ ...state, games }, [change.gameId]);
     }
+    case 'take-back-date': {
+      if (!find(change.gameId)) return fail({ code: 'unknown-game', gameId: change.gameId });
+      // The draft's new date taken back (step 2.53): the game is again as it is published,
+      // its slot and its status, so publishing changes nothing of it.
+      const games = state.games.map((g) =>
+        g.id === change.gameId ? { ...g, ...slotOf(change.to), status: change.status } : g,
+      );
+      return done({ ...state, games }, [change.gameId]);
+    }
     case 'swap-games': {
       const a = find(change.gameId);
       const b = find(change.otherGameId);

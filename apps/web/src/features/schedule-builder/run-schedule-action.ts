@@ -166,6 +166,16 @@ export async function runScheduleAction(
       return done.ok ? { kind: 'saved', detail: { what: 'game-saved', gameId } } : refusal(done);
     }
     case 'save-game': {
+      // "Take back the new date" on the waiting list (step 2.53 fix round): the game goes
+      // back to where and how it is published; the slot is not read.
+      if (text(form, 'takeBack') === 'yes') {
+        const back = await moveDraftGame(
+          context,
+          { ...basis, gameId, ...slot, takeBack: true },
+          deps,
+        );
+        return back.ok ? { kind: 'saved', detail: { what: 'game-saved', gameId } } : refusal(back);
+      }
       // Only what changed is sent, so a game that was not touched adds nothing to the draft.
       const wasSlot = text(form, 'wasSlot');
       const nowSlot = [slot.roundId ?? '', slot.date, slot.time ?? '', text(form, 'place')].join(

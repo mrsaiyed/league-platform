@@ -72,6 +72,41 @@ describe('publishLines (step 2.53)', () => {
   });
 });
 
+describe('publishLines: what of a slot changed (step 2.53 fix round)', () => {
+  const at = (venueId: string | null, court: string | null, roundId: string | null = null) => ({
+    ...slot('2026-11-29', '18:00'),
+    venueId,
+    court,
+    roundId,
+  });
+  const places = {
+    placeOf: (venueId: string | null, court: string | null) =>
+      venueId === 'gym' ? `Main Gym${court === null ? '' : `, ${court}`}` : null,
+    roundOf: (roundId: string | null) => (roundId === 'r2' ? 'Round 2: Week 2' : null),
+  };
+  const moved = (before: ReturnType<typeof at>, after: ReturnType<typeof at>) =>
+    publishLines(
+      [{ gameId: 'm', kind: 'moved', homeTeamId: 'owls', awayTeamId: 'bears', before, after }],
+      teams,
+      places,
+    )[0]?.text;
+
+  it('names a court-only move by its courts, not the same time twice', () => {
+    expect(moved(at('gym', 'Court 1'), at('gym', 'Court 2'))).toBe(
+      'Moved: Bears at Owls, Main Gym, Court 2 instead of Main Gym, Court 1.',
+    );
+  });
+
+  it('names a round change, and a postponed game back on its own date', () => {
+    expect(moved(at('gym', 'Court 1'), at('gym', 'Court 1', 'r2'))).toBe(
+      'Moved: Bears at Owls, now in Round 2: Week 2.',
+    );
+    expect(moved(at('gym', 'Court 1'), at('gym', 'Court 1'))).toBe(
+      'Back on its date: Bears at Owls, Sun, Nov 29 at 6:00 PM. Publishing makes it scheduled again.',
+    );
+  });
+});
+
 describe('publishWarnings (S-53, S-62)', () => {
   it('names a standing clash and a game outside its round, as a question', () => {
     const said = publishWarnings(

@@ -23,7 +23,8 @@
 // confirmed, saves it. So a double tap, or going back and sending the boxes again, only
 // asks again. A forfeit, a postponement and a cancellation take the same two steps (step
 // 2.158, callOffAction); a cancelled game is put back in one, with a reason chosen.
-import { gameAnchor, leagueUrl, type CommandContext } from '@srleagues/core';
+import { gameAnchor, leagueUrl, listPostponedGames, type CommandContext } from '@srleagues/core';
+import { mayGiveNewDates, takeBackNewDate } from '../schedule-builder/index.ts';
 import { newDateAnchor } from './waiting-anchor.ts';
 import { refresh } from 'next/cache';
 import { headers } from 'next/headers';
@@ -35,7 +36,7 @@ import { t } from '../../server/messages.ts';
 import { questionKeyOf, questionTimesHere } from '../../server/question-times.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere, type NoticeScreen } from '../../server/saved-notice.ts';
-import { callOffStep, choiceOf, newDateNow } from './call-off-step.ts';
+import { callOffStep, choiceOf, newDateNow, newDateRefused } from './call-off-step.ts';
 import {
   sheetScoresId,
   typedOf,
@@ -70,6 +71,7 @@ async function gamesOf(fields: TypedFields) {
   const context: CommandContext = commandContextOf(view.context);
   return {
     context,
+    league,
     list: leagueUrl(league, 'admin-area', { area: 'games' }),
     sheet: (gameId: string) =>
       leagueUrl(league, 'admin-area', { area: 'games', subpath: [gameId] }),
@@ -199,12 +201,26 @@ async function act(
   fields: TypedFields,
   field: string | undefined,
 ): Promise<Refused | typeof untouched> {
-  const { context, list } = await gamesOf(fields);
+  const { context, league, list } = await gamesOf(fields);
   const gameId = gameIdOf(fields['gameId']);
+  if (action === 'postpone' && newDateRefused(fields, await mayGiveNewDates(league, context))) {
+    return refused('not-allowed', fields, [], t(gamesProblemKey('not-allowed')));
+  }
   const { games } = await webPorts();
+  // A postponed game put back on its date: its season, read before, so a new date the
+  // schedule draft gives it is taken back after (step 2.53 fix round).
+  const waitingIn =
+    fields['act'] === 'restore' && gameId !== undefined
+      ? await listPostponedGames(context, {}, games.deps).then((r) =>
+          r.ok ? r.value.find((g) => g.id === gameId)?.seasonId : undefined,
+        )
+      : undefined;
   const result = await gameRequests().once(requestKeyOf(context, fields), () =>
     runGameAction(action, fields, context, games.deps),
   );
+  if (result.ok && gameId !== undefined && waitingIn !== undefined) {
+    await takeBackNewDate(context, waitingIn, gameId);
+  }
   if (result.ok && gameId !== undefined) {
     // A game put back says what it is now, and names any game that took its place since.
     const said =

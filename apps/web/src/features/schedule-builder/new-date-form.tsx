@@ -8,6 +8,7 @@ import {
   getScheduleDraft,
   leagueUrl,
   listVenues,
+  moveDraftGame,
   type CommandContext,
   type VenueWithCourts,
 } from '@srleagues/core';
@@ -20,21 +21,29 @@ import { PlaceSelect } from './place-select.tsx';
 import { seasonControls } from './season-controls.ts';
 
 /** What "Waiting for a new date" offers one game: the form, or its new date in the draft. */
+/** What a form to the grid's own save names: the season and the draft it was read from. */
+type DraftBasisFields = {
+  readonly league: string;
+  readonly seasonSlug: string;
+  readonly seasonId: string;
+  readonly basedOnRevision: number | null;
+  readonly version: number | null;
+  readonly draftId: string | null;
+};
+
 export type NewDate =
-  | {
+  | (DraftBasisFields & {
       readonly kind: 'form';
-      readonly league: string;
-      readonly seasonSlug: string;
-      readonly seasonId: string;
-      readonly basedOnRevision: number | null;
-      readonly version: number | null;
-      readonly draftId: string | null;
       readonly roundId: string | null;
       readonly time: string | null;
       readonly place: string;
       readonly venues: readonly VenueWithCourts[];
-    }
-  | { readonly kind: 'in-draft'; readonly when: string; readonly publishHref: string };
+    })
+  | (DraftBasisFields & {
+      readonly kind: 'in-draft';
+      readonly when: string;
+      readonly publishHref: string;
+    });
 
 /** By game id; a game missing is one this person may not give a date (no schedule.edit). */
 export type NewDates = ReadonlyMap<string, NewDate>;
@@ -65,11 +74,20 @@ export async function readNewDates(
     if (!drafted.ok) continue;
     const draft = drafted.value;
     const query = new URLSearchParams({ season: season.slug });
+    const basis: DraftBasisFields = {
+      league,
+      seasonSlug: season.slug,
+      seasonId,
+      basedOnRevision: draft.latestRevision,
+      version: draft.draft?.version ?? null,
+      draftId: draft.draft?.id ?? null,
+    };
     for (const game of games.filter((g) => g.seasonId === seasonId)) {
       const now = draft.result.games.find((g) => g.id === game.id);
       if (now === undefined) continue;
       if (now.status === 'scheduled') {
         found.set(game.id, {
+          ...basis,
           kind: 'in-draft',
           when:
             now.time === null
@@ -83,13 +101,8 @@ export async function readNewDates(
         continue;
       }
       found.set(game.id, {
+        ...basis,
         kind: 'form',
-        league,
-        seasonSlug: season.slug,
-        seasonId,
-        basedOnRevision: draft.latestRevision,
-        version: draft.draft?.version ?? null,
-        draftId: draft.draft?.id ?? null,
         roundId: now.roundId,
         time: now.time,
         place: placeValue(now.venueId, now.court),
@@ -98,6 +111,76 @@ export async function readNewDates(
     }
   }
   return found;
+}
+
+/**
+ * Whether this person may give a postponed game a new date: may edit the schedule of a season
+ * of the league (the schedule's own rule, seasonControls). Postponing's "give it a new date
+ * now" is offered, and taken, only then (step 2.53 fix round).
+ */
+export async function mayGiveNewDates(
+  addressee: { readonly id: string },
+  context: CommandContext,
+): Promise<boolean> {
+  const ports = await webPorts();
+  const holder = await ports.accessOf(context);
+  const seasons = await ports.scheduleAdmin.seasonsOf(addressee.id, holder);
+  return seasons.some((s) => seasonControls(holder, s).canEdit);
+}
+
+/**
+ * "Put it back on its date" while the draft gives the game a new date (step 2.53 fix round):
+ * the drafted move is taken back too, so publishing does not move the game later. Only for
+ * whoever may edit the season's schedule (the command's own rule); for anyone else, and when
+ * the draft does not move the game, nothing is done and the move stays for the publisher.
+ */
+export async function takeBackNewDate(
+  context: CommandContext,
+  seasonId: string,
+  gameId: string,
+): Promise<void> {
+  const deps = (await webPorts()).scheduleAdmin.deps;
+  const drafted = await getScheduleDraft(context, { seasonId }, deps);
+  if (!drafted.ok || drafted.value.draft === null) return;
+  if (!drafted.value.summary.gamesMoved.includes(gameId)) return;
+  await moveDraftGame(
+    context,
+    {
+      seasonId,
+      basedOnRevision: drafted.value.latestRevision,
+      version: drafted.value.draft.version,
+      draftId: drafted.value.draft.id,
+      gameId,
+      roundId: null,
+      date: '',
+      time: null,
+      venueId: null,
+      court: null,
+      takeBack: true,
+    },
+    deps,
+  );
+}
+
+/** The fields every form to the grid's own save carries. */
+function BasisFields({
+  basis,
+  gameId,
+}: {
+  readonly basis: DraftBasisFields;
+  readonly gameId: string;
+}) {
+  return (
+    <>
+      <input type="hidden" name="league" value={basis.league} />
+      <input type="hidden" name="season" value={basis.seasonSlug} />
+      <input type="hidden" name="seasonId" value={basis.seasonId} />
+      <input type="hidden" name="basedOnRevision" value={basis.basedOnRevision ?? ''} />
+      <input type="hidden" name="version" value={basis.version ?? ''} />
+      <input type="hidden" name="draftId" value={basis.draftId ?? ''} />
+      <input type="hidden" name="gameId" value={gameId} />
+    </>
+  );
 }
 
 /** One waiting game's "Give it a new date", or the date the draft gives it already. */
@@ -110,12 +193,21 @@ export function NewDateForm({
 }) {
   if (newDate.kind === 'in-draft') {
     return (
-      <p className="staff-quiet" data-new-date-drafted={gameId}>
-        {t('schedule.admin.newDate.inDraft', { when: newDate.when })}{' '}
-        <a href={newDate.publishHref} data-new-date-publish="">
-          {t('schedule.admin.newDate.publish')}
-        </a>
-      </p>
+      <div className="ui-stack" data-new-date-drafted={gameId}>
+        <p className="staff-quiet">
+          {t('schedule.admin.newDate.inDraft', { when: newDate.when })}{' '}
+          <a href={newDate.publishHref} data-new-date-publish="">
+            {t('schedule.admin.newDate.publish')}
+          </a>
+        </p>
+        <form action={saveGameAction} data-new-date-take-back={gameId}>
+          <BasisFields basis={newDate} gameId={gameId} />
+          <input type="hidden" name="takeBack" value="yes" />
+          <button type="submit" className="ui-button" data-kind="quiet">
+            {t('schedule.admin.newDate.takeBack')}
+          </button>
+        </form>
+      </div>
     );
   }
   return (
@@ -126,13 +218,7 @@ export function NewDateForm({
     >
       <fieldset className="ui-stack">
         <legend>{t('schedule.admin.newDate.title')}</legend>
-        <input type="hidden" name="league" value={newDate.league} />
-        <input type="hidden" name="season" value={newDate.seasonSlug} />
-        <input type="hidden" name="seasonId" value={newDate.seasonId} />
-        <input type="hidden" name="basedOnRevision" value={newDate.basedOnRevision ?? ''} />
-        <input type="hidden" name="version" value={newDate.version ?? ''} />
-        <input type="hidden" name="draftId" value={newDate.draftId ?? ''} />
-        <input type="hidden" name="gameId" value={gameId} />
+        <BasisFields basis={newDate} gameId={gameId} />
         <input type="hidden" name="roundId" value={newDate.roundId ?? ''} />
         {/* Never the slot sent: so a new date is always put in the draft, even its old one. */}
         <input type="hidden" name="wasSlot" value="" />

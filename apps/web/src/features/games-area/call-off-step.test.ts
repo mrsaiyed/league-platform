@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { askRestMs, callOffStep } from './call-off-step.ts';
+import { askRestMs, callOffStep, newDateNow, newDateRefused } from './call-off-step.ts';
 
 const now = 1_000_000;
 const yes = (act: string, more: Record<string, string> = {}) => ({
@@ -104,5 +104,13 @@ describe('a post of "Forfeit, postpone or cancel" (step 2.158)', () => {
     expect(callOffStep({ act: 'cancel', step: 'back' }, now)).toEqual({ kind: 'back' });
     expect(callOffStep({ act: 'delete', step: 'ask' }, now)).toBeUndefined();
     expect(callOffStep({ step: 'ask' }, now)).toBeUndefined();
+  });
+});
+
+describe('postponing\'s "give it a new date now" (step 2.53 fix round)', () => {
+  it('is refused on the server for someone who may not edit the schedule', () => {
+    expect(newDateRefused({ newDate: newDateNow }, false)).toBe(true);
+    expect(newDateRefused({ newDate: newDateNow }, true)).toBe(false);
+    expect(newDateRefused({}, false)).toBe(false);
   });
 });

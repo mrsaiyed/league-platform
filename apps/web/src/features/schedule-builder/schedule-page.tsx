@@ -320,7 +320,22 @@ export async function ScheduleBuilderPage({
       ? '#publish-heading'
       : null;
   const changes = preview !== undefined && preview.ok ? preview.value.games : [];
-  const lines = publishLines(changes, teams);
+  // A move of court, venue or round only is named so (step 2.53 fix round).
+  const lines = publishLines(changes, teams, {
+    placeOf: (venueId, court) => {
+      const venue = venues.find((v) => v.id === venueId);
+      if (venue === undefined) return null;
+      return court === null
+        ? venue.name
+        : t('schedule.admin.gameWhere', { venue: venue.name, court });
+    },
+    roundOf: (roundId) => {
+      const round = draft.result.rounds.find((r) => r.id === roundId);
+      return round === undefined
+        ? null
+        : t('schedule.admin.round', { number: round.number, label: round.label });
+    },
+  });
   const warnings =
     preview !== undefined && preview.ok
       ? publishWarnings(preview.value.clashes, grid.allGames, teams)

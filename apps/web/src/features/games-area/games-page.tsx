@@ -60,7 +60,12 @@ import { ReopenLine } from './reopen-line.tsx';
 import { SavedLine, type SavedKind } from './saved-line.tsx';
 import { shownTeamNames } from './shown-team-names.ts';
 import { newDateAnchor, waitingListAnchor as waitingAnchor } from './waiting-anchor.ts';
-import { NewDateForm, readNewDates, type NewDates } from '../schedule-builder/index.ts';
+import {
+  mayGiveNewDates,
+  NewDateForm,
+  readNewDates,
+  type NewDates,
+} from '../schedule-builder/index.ts';
 
 /** What the words of a saved notice read of the game it names. */
 type NamedGame = Pick<
@@ -210,12 +215,15 @@ function Controls({
   now,
   round,
   waitingHref,
+  giveNewDates,
 }: {
   readonly league: string;
   readonly here: LeagueAddressee;
   readonly game: GameRowView;
   /** "Waiting for a new date" on this page, when it is shown to this person. */
   readonly waitingHref: string | undefined;
+  /** Postponing may give a new date at once: this person may edit the schedule (step 2.53). */
+  readonly giveNewDates: boolean;
   /** The game was just reopened to correct it: its boxes start open. */
   readonly reopened: boolean;
   readonly times: LeagueTimes;
@@ -313,6 +321,7 @@ function Controls({
             forfeit: game.canForfeit,
             postpone: game.canPostpone,
             cancel: game.canCancel,
+            newDate: giveNewDates,
           })}
         />
       ) : null}
@@ -345,6 +354,8 @@ type ListScene = {
   readonly reopenedId: string | undefined;
   /** "Waiting for a new date" on this page, when it is shown to this person. */
   readonly waitingHref: string | undefined;
+  /** Postponing may give a new date at once: this person may edit the schedule (step 2.53). */
+  readonly giveNewDates: boolean;
 };
 
 /** One list of games, each with who scores it and what this person may do to it. */
@@ -399,6 +410,7 @@ function GameList({
               now={now}
               round={round}
               waitingHref={scene.waitingHref}
+              giveNewDates={scene.giveNewDates}
             />
           </div>
         </li>
@@ -575,6 +587,7 @@ export async function GamesPage({
         ? undefined
         : { row: aboutRow, text: saved, kind: savedKind },
     reopenedId: notice?.said === 'reopen' ? notice.thing : undefined,
+    giveNewDates: await mayGiveNewDates(addressee, context),
     waitingHref: postponed.ok
       ? `${leagueUrl(addressee, 'admin-area', { area: 'games' })}#${waitingAnchor}`
       : undefined,

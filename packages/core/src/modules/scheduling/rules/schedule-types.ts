@@ -74,6 +74,16 @@ export type ScheduleState = {
 export type DraftChange =
   | { kind: 'add-game'; game: ScheduleGame }
   | { kind: 'move-game'; gameId: string; to: ScheduleSlot }
+  /**
+   * Takes back the draft's new date of a game (step 2.53): the game goes back to the slot
+   * and status it has in the published schedule, which the command copies in.
+   */
+  | {
+      kind: 'take-back-date';
+      gameId: string;
+      to: ScheduleSlot;
+      status: 'scheduled' | 'postponed';
+    }
   | { kind: 'swap-games'; gameId: string; otherGameId: string }
   | { kind: 'remove-game'; gameId: string }
   /**
