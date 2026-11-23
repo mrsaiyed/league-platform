@@ -14,6 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { Fragment, type ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
+import { binLinkFor } from '../bin-area/index.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
@@ -130,6 +131,7 @@ export async function ScheduleBuilderPage({
   // What the page lets you do, at the top right of its head: bring games in from a
   // spreadsheet and, while a draft is waiting, go to "Review and publish" (the box itself
   // is at the foot of the grid; its place is step 2.53's).
+  const binLink = await binLinkFor(addressee, context, 'games');
   const headActions = (reviewHref: string | null) => (
     <div className="staff-actions">
       <a className="ui-button" href={importLinkOf(addressee)}>
@@ -138,6 +140,11 @@ export async function ScheduleBuilderPage({
       <a className="ui-button" href={venuesAddress(addressee)}>
         {t('schedule.admin.venuesLink')}
       </a>
+      {binLink === undefined ? null : (
+        <a className="ui-button" href={binLink}>
+          {t('admin.bin.link.games')}
+        </a>
+      )}
       {reviewHref === null ? null : (
         <a className="ui-button" data-kind="main" href={reviewHref}>
           {t('schedule.admin.reviewPublish')}

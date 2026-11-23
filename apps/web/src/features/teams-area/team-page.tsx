@@ -16,6 +16,7 @@ import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { holdsHere, loadLeaguePage } from '../../server/load-league-page.ts';
+import { binnedTeamPage } from '../bin-area/index.ts';
 import { StaffField, StaffNotice, StaffTrail } from '../staff/index.ts';
 import { leagueDayText } from '../../server/game-when.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
@@ -93,7 +94,10 @@ export async function TeamPage({
     ports.divisions(context, season.id),
   ]);
   const team = teams.find((candidate) => candidate.id === teamId.toLowerCase());
-  if (team === undefined) return notFound();
+  // A team in the bin: its way back, for staff who may see the bin (step 2.77).
+  if (team === undefined) {
+    return (await binnedTeamPage(here, context, teamId.toLowerCase())) ?? notFound();
+  }
 
   const roster = await listRoster(context, { teamId: team.id }, ports.deps);
   const lines: readonly RosterLine[] = roster.ok ? roster.value : [];
@@ -161,6 +165,7 @@ export async function TeamPage({
       </PageHead>
       <Notice
         query={query}
+        binHref={leagueUrl(here, 'admin-area', { area: 'settings', subpath: ['bin'] })}
         saidBeside={
           leavingProblem !== undefined || onLine !== undefined || removeCode !== undefined
         }
