@@ -17,6 +17,16 @@ export {
   type InvitationOffer,
   type ReadInvitationError,
 } from './queries/read-invitation.ts';
+export { searchActivity, type ActivityPage } from './queries/search-activity.ts';
+export {
+  activityKindOf,
+  activityKinds,
+  activityMatchOf,
+  pageOfActivity,
+  type ActivityKind,
+  type ActivityMatch,
+  type ActivitySearch,
+} from './activity-search.ts';
 export {
   activityPageLimit,
   invitationLifetimeDays,

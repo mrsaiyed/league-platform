@@ -18,6 +18,7 @@ import {
   readInvitation,
   resendInvitation,
   revokeGrant,
+  searchActivity,
 } from './modules/access/index.ts';
 import {
   applyTrackerCommands,
@@ -221,6 +222,7 @@ export const commands = commandRegistry([
   restoreTeam,
   restoreVenue,
   revokeGrant,
+  searchActivity,
   setBoxScore,
   setCurrentSeason,
   setDraftRecording,

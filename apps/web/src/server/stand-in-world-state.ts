@@ -7,7 +7,7 @@
 // (stand-in-world.ts), so a team added, a schedule published or a score typed shows
 // wherever the product shows it. Plain data only, so a transaction can copy it whole.
 import type {
-  ActivityEntry,
+  ActivityRecord,
   Audience,
   DraftRecord,
   GameRecord,
@@ -142,7 +142,8 @@ export type LeagueWorld = {
   adjustments: (SeasonAdjustment & { readonly seasonId: string; readonly binned: boolean })[];
   imports: ImportRecord[];
   settings: WorldSetting[];
-  activity: ActivityEntry[];
+  /** Kept as the database keeps it: each entry with its id and its moment (step 2.77). */
+  activity: ActivityRecord[];
 };
 
 /** A league that holds nothing yet. */

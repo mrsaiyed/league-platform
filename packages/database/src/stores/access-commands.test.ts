@@ -13,6 +13,7 @@ import {
   readInvitation,
   resendInvitation,
   revokeGrant,
+  searchActivity,
   setLeagueName,
   type AccessTx,
   type CommandDeps,
@@ -337,5 +338,45 @@ describe('the activity log on the database (A-6)', () => {
     const next = await listActivity(owner, { limit: 1, before: first }, deps);
     expect(next).toMatchObject({ ok: true, value: [{ action: 'access.resend_invitation' }] });
     expect(JSON.stringify(all.value)).not.toContain('helper@example.test');
+  });
+
+  it("searches one league's log by person, kind and time, older and newer (step 2.77)", async () => {
+    const { league, owner, invitationId } = await invited('editor');
+    await resendInvitation(owner, { invitationId }, deps);
+    expect(
+      await setLeagueName(owner, { name: 'Renamed League', version: 1 }, leaguesDeps),
+    ).toMatchObject({ ok: true });
+    // Another league's entries never show (the isolation harness checks every query too).
+    const other = await invited('editor');
+    await setLeagueName(other.owner, { name: 'Elsewhere', version: 1 }, leaguesDeps);
+    const all = await searchActivity(owner, {}, deps);
+    if (!all.ok) throw new Error('not read');
+    expect(all.value.entries.map((e) => e.action)).toEqual([
+      'leagues.set_name',
+      'access.resend_invitation',
+      'access.invite',
+    ]);
+    const access = await searchActivity(owner, { kind: 'access', actor: league.ownerId }, deps);
+    expect(access.ok && access.value.entries.map((e) => e.action)).toEqual([
+      'access.resend_invitation',
+      'access.invite',
+    ]);
+    const nobody = await searchActivity(owner, { actor: other.league.ownerId }, deps);
+    expect(nobody).toMatchObject({ ok: true, value: { entries: [], older: null, newer: null } });
+    const page = await searchActivity(owner, { limit: 1 }, deps);
+    if (!page.ok || page.value.older === null) throw new Error('no older page');
+    const older = await searchActivity(owner, { limit: 1, before: page.value.older }, deps);
+    if (!older.ok || older.value.newer === null) throw new Error('no newer page');
+    expect(older.value.entries.map((e) => e.action)).toEqual(['access.resend_invitation']);
+    const newer = await searchActivity(owner, { limit: 1, after: older.value.newer }, deps);
+    expect(newer).toMatchObject({
+      ok: true,
+      value: { entries: [{ action: 'leagues.set_name' }], newer: null },
+    });
+    const at = all.value.entries[1]?.at ?? '';
+    const span = await searchActivity(owner, { from: at, until: all.value.entries[0]?.at }, deps);
+    expect(span.ok && span.value.entries.map((e) => e.action)).toEqual([
+      'access.resend_invitation',
+    ]);
   });
 });

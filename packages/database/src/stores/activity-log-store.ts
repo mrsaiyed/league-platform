@@ -6,6 +6,7 @@ import { insertActivity, listActivityEntries } from '../queries/index.ts';
 export function activityLogStore(scope: LeagueScope): ActivityLog {
   return {
     record: (entry) => insertActivity(scope, entry),
-    list: (limit, before, where) => listActivityEntries(scope, limit, before, where),
+    list: (limit, before, where, search) =>
+      listActivityEntries(scope, limit, before, where, search),
   };
 }

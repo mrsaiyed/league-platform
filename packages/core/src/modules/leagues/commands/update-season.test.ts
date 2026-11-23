@@ -33,6 +33,8 @@ describe('updateSeason', () => {
     });
     expect(db.state.seasons[0]?.isCurrent).toBe(false);
     expect(db.state.activity.map((a) => a.action)).toEqual(['leagues.update_season']);
+    // The log says it is now shown to visitors (step 2.77).
+    expect(db.state.activity[0]?.details).toMatchObject({ status: 'active' });
   });
 
   it('gives a version conflict to the second of two admins saving the same season (A-8)', async () => {

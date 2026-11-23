@@ -76,7 +76,9 @@ export const updateSeason = defineCommand({
     await recordActivity(tx, context, {
       action: 'leagues.update_season',
       target: { type: 'season', id: season.id },
-      details: { changed: fields.join(',') },
+      // The status it was given, so the log says whether it was shown to visitors or
+      // hidden from them again (step 2.77).
+      details: { changed: fields.join(','), ...(status === undefined ? {} : { status }) },
     });
     return ok({ version: updated });
   },

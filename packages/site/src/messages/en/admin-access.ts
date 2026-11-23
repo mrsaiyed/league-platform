@@ -3,6 +3,8 @@
 // Keys in alphabetical order: a new key goes in its place, never at the end (step 2.188).
 // A comment above a key is about that key.
 export const enAdminAccess = {
+  // The link from Admins to the activity log's own screen (step 2.77).
+  'adminAccess.activity.all': 'See the whole activity log',
   'adminAccess.activity.none': 'No one has been invited or removed yet.',
   'adminAccess.activity.someone': 'Someone without access now',
   'adminAccess.activity.title': 'Latest changes',
@@ -27,6 +29,37 @@ export const enAdminAccess = {
   'adminAccess.invite.roles': 'What each role can do',
   'adminAccess.invite.submit': 'Send the invitation',
   'adminAccess.invite.title': 'Invite someone',
+  // The activity log's screen (step 2.77, A-6): filters, paging, and what an entry adds.
+  'adminAccess.log.any': 'Anyone',
+  'adminAccess.log.anyKind': 'Everything',
+  'adminAccess.log.binLink': 'It is in the bin: bring it back',
+  'adminAccess.log.clear': 'Show everything',
+  'adminAccess.log.filter': 'Show',
+  'adminAccess.log.from': 'From',
+  'adminAccess.log.intro': 'Who changed what in the league, and when. The newest change is first.',
+  'adminAccess.log.kind': 'What was changed',
+  'adminAccess.log.kind.access': 'Who has access',
+  'adminAccess.log.kind.games': 'Games and results',
+  'adminAccess.log.kind.people': 'People',
+  'adminAccess.log.kind.schedule': 'Schedule',
+  'adminAccess.log.kind.settings': 'Settings and seasons',
+  'adminAccess.log.kind.standings': 'Standings',
+  'adminAccess.log.kind.teams': 'Teams',
+  'adminAccess.log.newer': 'Newer',
+  'adminAccess.log.none': 'Nothing matches these choices. Try a wider one.',
+  'adminAccess.log.noneAtAll': 'Nothing has been changed in the league yet.',
+  'adminAccess.log.older': 'Older',
+  'adminAccess.log.pages': 'More of the log',
+  // {reason}: the words the person gave when they made the change.
+  'adminAccess.log.reason': 'Why: {reason}',
+  // A season's status entry says what visitors see now (from the reviews of step 2.93).
+  'adminAccess.log.season.active': 'It is now shown to visitors.',
+  'adminAccess.log.season.completed': 'It is now marked as finished.',
+  'adminAccess.log.season.draft': 'It is now hidden from visitors.',
+  'adminAccess.log.system': 'The league itself, overnight',
+  'adminAccess.log.title': 'Activity log',
+  'adminAccess.log.to': 'To',
+  'adminAccess.log.who': 'Who',
   // A-14: someone on the list who has not given their name. Never their email address.
   'adminAccess.noName': 'No name yet',
   'adminAccess.owner': 'The owner can do everything, and cannot be removed here.',
