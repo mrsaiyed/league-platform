@@ -203,6 +203,58 @@ registerIsolationCase({
   },
 });
 
+/**
+ * The scope's own team with a player whose age is not known (the seed's shared account's
+ * child, a former player), its season opened inside the run's rolled-back transaction.
+ * Only for such a player does the league's audience change the line (R-28: shown as a
+ * child unless the league is for adults). Where the fence hides the scope's own rows, the
+ * target's team, which the run then cannot read either.
+ */
+async function ownTeamWithUnknownAge(scope: LeagueScope, target: LeagueRecords) {
+  const trx = transactionOf(scope);
+  const own = await trx
+    .selectFrom('roster_entries')
+    .innerJoin('teams', (join) =>
+      join
+        .onRef('teams.league_id', '=', 'roster_entries.league_id')
+        .onRef('teams.id', '=', 'roster_entries.team_id'),
+    )
+    .innerJoin('people', (join) =>
+      join
+        .onRef('people.league_id', '=', 'roster_entries.league_id')
+        .onRef('people.id', '=', 'roster_entries.person_id'),
+    )
+    .select(['teams.id as team_id', 'teams.season_id as season_id'])
+    .where('roster_entries.league_id', '=', scope.leagueId)
+    .where('people.birth_date', 'is', null)
+    .where('people.is_minor', 'is', null)
+    .orderBy('teams.id')
+    .executeTakeFirst();
+  if (own === undefined) return target.teamId;
+  await trx
+    .updateTable('seasons')
+    .set({ status: 'active', is_current: true })
+    .where('league_id', '=', scope.leagueId)
+    .where('id', '=', own.season_id)
+    .execute();
+  return own.team_id;
+}
+
+registerIsolationCase({
+  subject: listPublicRoster,
+  // Step 2.224 fix round: the roster's audience read (`where id = scope.leagueId`) is
+  // seen only where the audience changes the scope's own answer. The target is set to
+  // youth (the scope stays adult) and the scope's row moved after it, so without that
+  // filter the scope's player of unknown age is shown as a child, by initial.
+  name: "list the scope's own roster, a player of unknown age on it, the target set to youth",
+  arrange: setTargetLeagueApart,
+  run: async (scope, target) => {
+    const teamId = await ownTeamWithUnknownAge(scope, target);
+    await moveOwnLeagueRowLast(scope);
+    return listPublicRoster(scope, teamId, displayFor(scope));
+  },
+});
+
 registerIsolationCase({
   subject: listPublicRoster,
   name: "list the target team's public roster after opening its season",
