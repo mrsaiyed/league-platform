@@ -143,6 +143,8 @@ const FIELDS = {
     ties: 'an adjustment is added and refused',
     points: 'an adjustment is added and refused',
     reason: 'an adjustment is added and refused',
+    // The last part of 2.56: a coin flip's note (its two forms share the name "note").
+    note: 'a coin flip is recorded',
   },
   '/[league]/admin/games/[game]': {
     reason: 'a result is reopened',
@@ -389,7 +391,7 @@ if (browser) {
 
   await step('a team is added with the attack as its name', async () => {
     await page.goto(`${origin}/north-valley/admin/teams`);
-    const form = page.locator('form', { has: page.getByRole('button', { name: 'Add team' }) });
+    const form = page.locator('form[data-form=create-team]');
     await form.locator('input[name=name]').fill(typed.team);
     await form.locator('input[name=shortName]').fill('harmful-text');
     const division = form.locator('select[name=divisionId]');
@@ -556,6 +558,40 @@ if (browser) {
         [...shown.made, ...shown.refused].join(' | '),
       );
     }
+  });
+
+  await step('a coin flip is recorded and taken off with the attack in its boxes', async () => {
+    // Two new teams that have played nobody share a place: Standings and stats offers a
+    // coin flip for them (as in the coin-flip test).
+    for (const name of ['Level Partner', 'Level Partner Two']) {
+      await page.goto(`${origin}/north-valley/admin/teams`);
+      const create = page.locator('form[data-form=create-team]');
+      await create.locator('input[name=name]').fill(name);
+      await tap(create.getByRole('button', { name: 'Add team' }), /done=created/);
+    }
+    await page.goto(`${origin}/north-valley/admin/standings`);
+    const set = page.locator('[data-level-set*="Level Partner"]');
+    const byHand = set.locator('[data-flip-form=by-hand] form[data-form=record-coin-flip]');
+    await byHand.locator('input[name=note]').fill(typed.reason);
+    await byHand.getByRole('button', { name: 'Save this order' }).click();
+    await page.getByText(/^Saved: a coin flip for /).waitFor();
+    const saved = await harm(page);
+    note(
+      'the coin flip, saved with the attack as its note beside the attack team, made no element',
+      saved.made.length === 0 && saved.ran === null && saved.refused.length === 0,
+      [...saved.made, ...saved.refused].join(' | '),
+    );
+    const remove = set.locator('[data-remove-flip] form');
+    await remove.locator('[name=reason]').fill(typed.reason);
+    await remove.getByLabel('Yes, take this coin flip off').check();
+    await remove.getByRole('button', { name: 'Take the coin flip off' }).click();
+    await page.getByText(/^Taken off: the coin flip for /).waitFor();
+    const taken = await harm(page);
+    note(
+      'the coin flip, taken off with the attack as its reason, made no element',
+      taken.made.length === 0 && taken.ran === null && taken.refused.length === 0,
+      [...taken.made, ...taken.refused].join(' | '),
+    );
   });
 
   await step('a file whose name, venue and court are the attack is imported', async () => {
