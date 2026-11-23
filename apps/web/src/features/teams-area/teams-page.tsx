@@ -96,7 +96,7 @@ async function Body({
             const division = divisionName(team.divisionId);
             return (
               // The link is the team's name alone and covers the whole row (staff.css).
-              <li key={team.id} className="staff-row">
+              <li key={team.id} className="staff-row" data-team-row={team.id}>
                 <Swatch team={team} size="small" />
                 <span className="staff-row-words">
                   <a

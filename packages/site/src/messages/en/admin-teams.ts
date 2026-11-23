@@ -105,7 +105,7 @@ export const enAdminTeams = {
     '{count} of them are removed in the draft, which is not published yet: publish the schedule to finish.',
   // Advice for a team with results that has left: never a way to remove it.
   'adminTeams.remove.leftAdvice':
-    'If the team has left the league, record this week’s games as forfeited in Games, and remove its later games from the schedule in Schedule. Either way the team stays, with the games it played.',
+    'If the team has left the league, mark it so above, under “If this team leaves the league”: it stays, with the games it played, and its games still to come are yours to forfeit or cancel in Games.',
   'adminTeams.remove.noDay': 'no day yet',
   'adminTeams.remove.notYet': '{name} cannot be removed yet: it has games without a result.',
   'adminTeams.remove.notYetWay':

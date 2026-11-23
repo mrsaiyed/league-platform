@@ -12,6 +12,8 @@
 // - A scheduled game whose line-ups the tracker holds (sent through the tracker's own
 //   endpoints, as a tablet would) does not say "Plays are being recorded", says its
 //   line-ups are set, and is forfeited from the list.
+// - S-87: the admin marks the Hawks as having left the league on their page; public
+//   standings and Teams mark them, the new-game form leaves them out; undone, offered again.
 // - Accessibility checks (T-186) and no sideways scrolling at phone width (A-2).
 import {
   accessibilityProblems,
@@ -47,6 +49,8 @@ const step = async (name, run) => {
 
 // The made-up games of the first league (apps/web/src/server/stand-in-games.ts).
 const tomorrowGame = '01900000-0000-7000-8000-006a00000003'; // Lions at Hawks, set to live, no plays
+// The Hawks, a team of the first league's season (stand-in-world-seed.ts).
+const hawksTeam = '01900000-0000-7000-8000-007e00000003';
 const phone = { width: 390, height: 844 };
 
 let built = true;
@@ -88,6 +92,28 @@ async function openGames(page) {
       .click(),
   ]);
   await page.getByRole('heading', { level: 1, name: 'Games' }).waitFor();
+}
+
+/** From the admin's home to one of its areas, by tapping the admin's own menu. */
+async function openArea(page, area) {
+  await page.goto(`${origin}/north-valley/admin`);
+  await openStaffMenu(page);
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === `/north-valley/admin/${area}`),
+    page
+      .getByRole('navigation', { name: 'Admin areas' })
+      .locator(`a[href="/north-valley/admin/${area}"]`)
+      .click(),
+  ]);
+}
+
+/** From a public page to another of the league's, by its own menu. */
+async function openSite(page, where) {
+  await page.locator('.site-header .site-menu > summary').click();
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === `/north-valley/${where}`),
+    page.locator(`.site-header a[href="/north-valley/${where}"]`).first().click(),
+  ]);
 }
 
 /**
@@ -181,6 +207,60 @@ if (browser) {
     await page.getByText('Lions forfeited').first().waitFor();
     note('the forfeit after line-ups is saved', true);
     await phoneProblems(page, 'a forfeit after line-ups');
+  });
+  await step('a team that has left the league (S-87), marked and undone', async () => {
+    await openArea(page, 'teams');
+    const openHawks = async () => {
+      await Promise.all([
+        page.waitForURL((url) => url.pathname.endsWith(hawksTeam)),
+        page.locator(`li[data-team-row="${hawksTeam}"] a`).click(),
+      ]);
+    };
+    await openHawks();
+    await page.locator('[data-team-left-panel="playing"]').waitFor();
+    await phoneProblems(page, "the team page's leaving panel");
+    await page.locator('[data-team-left-button="mark"]').click();
+    await page.locator('[data-team-left-panel="left"]').waitFor();
+    note('the admin marks the team as having left', true);
+    const later = (await page.locator('[data-team-later-games]').getAttribute('href')) ?? '';
+    note("the panel leads to the team's later games", later.includes(`later=${hawksTeam}`), later);
+    await phoneProblems(page, 'a team marked as having left');
+    // In public: the standings' row and the Teams card are marked.
+    await openStaffMenu(page);
+    await Promise.all([
+      page.waitForURL((url) => url.pathname === '/north-valley'),
+      page.locator('.staff-bar a.staff-foot-link[href^="/north-valley"]').click(),
+    ]);
+    await openSite(page, 'standings');
+    note(
+      'public standings mark the team as having left',
+      ((await page.locator('main').textContent()) ?? '').includes('Left the league.'),
+    );
+    await openSite(page, 'teams');
+    note(
+      'public Teams marks the team, and only it',
+      (await page.locator('[data-team-left="hawks"]').count()) === 1 &&
+        (await page.locator('[data-team-left]').count()) === 1,
+    );
+    await phoneProblems(page, 'public Teams with a team that has left');
+    // Not offered for a new game.
+    const offered = async () =>
+      page
+        .locator(`[data-add-game] select[name="homeTeamId"] option[value="${hawksTeam}"]`)
+        .count();
+    await openArea(page, 'schedule');
+    note('the new-game form leaves the team out', (await offered()) === 0);
+    note(
+      'the new-game form still offers the others',
+      (await page.locator('[data-add-game] select[name="homeTeamId"] option').count()) > 1,
+    );
+    // Undone: playing again, offered again.
+    await openArea(page, 'teams');
+    await openHawks();
+    await page.locator('[data-team-left-button="undo"]').click();
+    await page.locator('[data-team-left-panel="playing"]').waitFor();
+    await openArea(page, 'schedule');
+    note('undone, the team is offered for a new game again', (await offered()) > 0);
   });
   await context.close();
 }

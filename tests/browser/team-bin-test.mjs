@@ -289,9 +289,8 @@ if (built) {
     );
     note(
       'forfeiting is advice for a team that has left, never a way to remove it',
-      season.some((line) =>
-        line.startsWith('If the team has left the league, record this week’s games as forfeited'),
-      ) && season.some((line) => line.includes('Either way the team stays')),
+      season.some((line) => line.startsWith('If the team has left the league, mark it so above')) &&
+        season.some((line) => line.includes('it stays, with the games it played')),
     );
     note('no button', (await binButtons().count()) === 0);
     note(
