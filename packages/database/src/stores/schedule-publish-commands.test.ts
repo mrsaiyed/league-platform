@@ -733,7 +733,14 @@ describe('publishing against the database', () => {
     // Brought back from the bin, it has no round.
     expect(await restoreGame(s.as, { gameId: first }, deps)).toEqual({
       ok: true,
-      value: { gameId: first, revision: 4, teamCount: 2, peopleCount: 2, clashes: [] },
+      value: {
+        gameId: first,
+        seasonId: expect.any(String),
+        revision: 4,
+        teamCount: 2,
+        peopleCount: 2,
+        clashes: [],
+      },
     });
     expect(await gameRow(first)).toMatchObject({ deleted_at: null, round_id: null });
   });

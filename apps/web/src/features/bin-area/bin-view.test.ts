@@ -159,7 +159,8 @@ describe('the team that took a binned team’s short name (A-19)', () => {
     ];
     expect(nameTakenBy({ id: 'binned', name: 'Hawks' }, teams, true)?.id).toBe('same-short');
     expect(nameTakenBy({ id: 'binned', name: 'Hawks' }, teams)?.id).toBe('same-name');
-    expect(nameTakenBy({ id: 'gone', name: 'Hawks' }, teams, true)).toBeUndefined();
+    // Not in the list (it is in the bin): the team of its name.
+    expect(nameTakenBy({ id: 'gone', name: 'Harbour Hawks' }, teams, true)?.id).toBe('same-short');
   });
 });
 

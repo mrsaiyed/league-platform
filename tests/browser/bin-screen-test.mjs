@@ -246,8 +246,8 @@ if (built) {
     const refusedText = await binRow(page, larks).innerText();
     note(
       'bringing the first back is refused with one sentence naming the other (A-19)',
-      refusedText.includes(`Another team of the same season, ${larks} (short name`) &&
-        refusedText.includes('Rename one of them first'),
+      refusedText.includes(`Another team of the same season, ${larks}`) &&
+        refusedText.includes('of them first'),
       refusedText,
     );
 

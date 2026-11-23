@@ -138,7 +138,8 @@ export function teamsInBinWords(
 /**
  * The other team of the same season that now has a team-in-the-bin's name (S-83), or its
  * short name (`short`), for the refusal to say which one and lead to it: the same name
- * whatever its capitals and spaces; the same short name as the binned team's own record.
+ * whatever its capitals and spaces; the same short name as the binned team's own record
+ * when the list holds it, else the same name.
  */
 export function nameTakenBy<
   T extends { readonly id: string; readonly name: string; readonly slug: string },
@@ -149,8 +150,10 @@ export function nameTakenBy<
 ): T | undefined {
   const others = teams.filter((team) => team.id !== binned.id);
   if (short) {
+    // The list may leave out teams in the bin: then the one that took its short name is
+    // the one that took its name too (A-19: a second team of the same name).
     const slug = teams.find((team) => team.id === binned.id)?.slug;
-    return slug === undefined ? undefined : others.find((team) => team.slug === slug);
+    if (slug !== undefined) return others.find((team) => team.slug === slug);
   }
   const same = (a: string) => a.trim().toLowerCase() === binned.name.trim().toLowerCase();
   return others.find((team) => same(team.name));
