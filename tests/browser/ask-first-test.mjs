@@ -38,6 +38,7 @@ import {
   buildNext,
   freePort,
   launch,
+  leagueDayWords,
   openStaffMenu,
   startNext,
   trackedPlayer,
@@ -68,6 +69,8 @@ const phone = { width: 390, height: 844 };
 const laptop = { width: 1280, height: 800 };
 /** Longer than the server takes a "Yes" to be read in (call-off-step.ts, askRestMs). */
 const readTheQuestion = 1000;
+/** When the made-up world's clock starts: noon on the league's today, or `--now=`. */
+const worldNow = worldAtNoon();
 
 let built = true;
 if (!process.argv.includes('--no-build')) {
@@ -85,7 +88,7 @@ if (built) {
   server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
-    LOCAL_NOW: worldAtNoon(),
+    LOCAL_NOW: worldNow,
   });
   await step('starting the server and the browser', async () => {
     await waitFor(`${origin}/`, server);
@@ -661,7 +664,11 @@ if (browser) {
         const asked = ((await questionOf(game()).textContent()) ?? '').trim();
         note(
           'its question names the game and its old date',
-          asked.startsWith('Put Bears at Tigers back on its date, Wed'),
+          // Bears at Tigers is two days after the league's today at 18:00 (`day: 2` in
+          // stand-in-world-seed.ts), whatever day of the week the test is run on.
+          asked.startsWith(
+            `Put Bears at Tigers back on its date, ${leagueDayWords(worldNow, 2)}, 6:00`,
+          ),
           asked,
         );
         await sayYes(game(), 'Yes, put it back on its date');

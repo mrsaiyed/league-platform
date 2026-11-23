@@ -12,9 +12,29 @@
 // - T-70: a sign-in on a device the account has not used before emails the account;
 //   a changed password emails it too (T-85) and has ended every other session.
 // - A place to go after signing in is only ever a path on this site (safeReturnPath).
+// - T4 §6: the bot check (record 081) stands in front of signing in with a password and
+//   of asking for a code (sign-up and the forgotten password). A form it refuses goes
+//   back to its screen before the sign-in service hears of it, so nothing is counted,
+//   sent or set, and the answer is the same whether or not an account exists (T-68).
+//   Only when our server cannot reach the check's service does password sign-in go on,
+//   on the attempt limits alone (record 081, Q2: a game night must not hang on an outside
+//   service; the check's own error-level line says so). Asking for a code stays closed
+//   then, because it emails any address typed.
+// - Step 2.205: on the test copy only, asking for a code (sign-up, the forgotten password,
+//   a new code) takes only a made-up address, refused by its form before the bot check and
+//   the sign-in service are asked (notTakenHere). Signing in with a password is untouched.
+//   Google is off there too (googleOff): its account would bring a real Gmail address.
 import { signInEmail } from '@srleagues/contracts';
 import { platformUrl } from '@srleagues/core';
-import type { SessionTokens, SignInService } from '@srleagues/providers';
+import {
+  isMadeUpAddress,
+  type BotCheck,
+  type BotCheckAction,
+  type BotCheckRefusal,
+  type BotCheckWidget,
+  type SessionTokens,
+  type SignInService,
+} from '@srleagues/providers';
 import {
   clearSessionCookies,
   cookieNames,
@@ -33,10 +53,17 @@ import type { SignInMail } from './sign-in-mail.ts';
 export type FlowDeps = {
   readonly signIn: SignInService;
   readonly mail: SignInMail;
+  /** The bot check in front of sign-in and asking for a code (T4 §6, record 081). */
+  readonly botCheck: BotCheck;
   /** Whether the site is on HTTPS (PUBLIC_BASE_URL), so cookies are Secure. */
   readonly secureCookies: boolean;
   /** PUBLIC_BASE_URL, for Google's return address. */
   readonly siteOrigin: string;
+  /**
+   * Whether this is the test copy (the ports' `testCopy`, step 2.205): asking for a code
+   * then takes only a made-up address, and refuses any other before anything is asked.
+   */
+  readonly testCopy: boolean;
   readonly now: () => Date;
   /**
    * Whether "Continue with Google" is set up here (GOOGLE_SIGN_IN, record 091). When it
@@ -65,6 +92,43 @@ const tooMany = (retryAfterSeconds: number): { problem: Problem; wait: number } 
   wait: retryAfterSeconds,
 });
 
+/**
+ * The bot check's verdict on a form (record 081): undefined when it passed, else the
+ * problem its screen shows. The answer is what the page's widget put in the form.
+ */
+async function botCheckProblem(
+  action: BotCheckAction,
+  fields: Fields,
+  visit: Visit,
+  deps: FlowDeps,
+): Promise<Problem | undefined> {
+  const verdict = await deps.botCheck.verify({
+    answer: fields[deps.botCheck.widget.field] ?? '',
+    action,
+  });
+  if (verdict.passed) return undefined;
+  if (verdict.refusal === 'unreachable' && action === 'sign-in') return undefined;
+  return botCheckProblems[verdict.refusal];
+}
+
+/** Each refusal of the check, as its screen says it (record 081: C2, F4). */
+const botCheckProblems = {
+  failed: 'botCheckFailed',
+  missing: 'botCheckFailed',
+  'did-not-load': 'botCheckDidNotLoad',
+  unreachable: 'botCheckUnreachable',
+  unavailable: 'botCheckUnavailable',
+} as const satisfies Record<BotCheckRefusal, Problem>;
+
+/**
+ * The fields a form drawn with this bot check holds before anyone types: the stand-in's
+ * answer (local work and tests), or nothing (Turnstile's answer is the browser's to add).
+ * For flows run on the server as a form would be ("be this made-up person").
+ */
+export function botCheckFieldsDrawn(widget: BotCheckWidget): Readonly<Record<string, string>> {
+  return widget.kind === 'stand-in' ? { [widget.field]: widget.passingAnswer } : {};
+}
+
 /** Sign-up (`sign-up`) or the forgotten-password route (`reset`): email a code (T-67). */
 export async function askForCode(
   purpose: 'sign-up' | 'reset',
@@ -74,41 +138,59 @@ export async function askForCode(
 ): Promise<FlowAnswer> {
   const page = purpose === 'sign-up' ? 'signup' : 'forgotPassword';
   const next = safeReturnPath(fields['next']);
-  const asked = await sendCode(purpose, fields['email'] ?? '', next, visit, deps);
-  if (asked.ok) return goTo(platformUrl('enterCode'));
-  return goTo(screenUrl(page, { ...asked.problem, next }));
+  const address = fields['email'] ?? '';
+  const notHere = notTakenHere(address, deps);
+  if (notHere !== undefined) return goTo(screenUrl(page, { problem: notHere, next }));
+  const refused = await botCheckProblem(purpose, fields, visit, deps);
+  if (refused !== undefined) return goTo(screenUrl(page, { problem: refused, next }));
+  return sendCode(purpose, address, next, page, visit, deps);
 }
 
 /**
- * "Send a new code" (step 2.163, M24): another code to the address the code screen
- * names, for the same purpose, under the same limits as the first; the person stays on
- * the code screen and is told it was sent, or why it was not. With no sign-up or reset
- * under way it is the first screen again, as an old code is.
+ * The test copy's rule (step 2.205, T-13, T-201): it takes only an address on a name kept
+ * for made-up mail (isMadeUpAddress), judged by the address's form alone, before the bot
+ * check or the sign-in service is asked, so a stranger's address is never sent or stored
+ * there. isMadeUpAddress takes only an address in the form the service reads
+ * (signInEmail), tested as typed, so the gate is exactly the one rule the kept emails and
+ * migration 0023 share (made-up-address-cases.json). A refused one that is not an address
+ * is today's invalidEmail, asked of no one. The refusal is the same whether or not an
+ * account exists (T-68). Undefined where the address is taken, and always off the test copy.
  */
-export async function sendCodeAgain(visit: Visit, deps: FlowDeps): Promise<FlowAnswer> {
-  const flow = readFlow(visit.jar);
-  if (flow === undefined) return goTo(screenUrl('signup', { problem: 'codeExpired' }));
-  const asked = await sendCode(flow.purpose, flow.email, flow.next, visit, deps);
-  if (asked.ok) return goTo(screenUrl('enterCode', { notice: 'codeSentAgain' }));
-  return goTo(screenUrl('enterCode', asked.problem));
+function notTakenHere(address: string, deps: FlowDeps): Problem | undefined {
+  if (!deps.testCopy || isMadeUpAddress(address)) return undefined;
+  return signInEmail.safeParse(address).success ? 'onlyMadeUpAddresses' : 'invalidEmail';
 }
 
 /**
- * Asks the service for a code and, when it is sent, keeps the address, the purpose and
- * the page to come back to in the flow cookie: whatever the address, the same answer
- * and the same cookie (T-68).
+ * "Send a new code" on the code screen (T-67): a new code to the address being proved, for
+ * the same purpose, behind the same bot check as asking for the first one (T4 §6). Its
+ * refusals are shown on the code screen; with no flow under way, sign-up starts again.
  */
-async function sendCode(
-  purpose: 'sign-up' | 'reset',
-  typed: string,
-  next: string | null,
+export async function resendCode(
+  fields: Fields,
   visit: Visit,
   deps: FlowDeps,
-): Promise<
-  | { readonly ok: true }
-  | { readonly ok: false; readonly problem: { problem: Problem; wait?: number } }
-> {
-  const input = { email: typed, networkAddress: visit.networkAddress };
+): Promise<FlowAnswer> {
+  const flow = readFlow(visit.jar);
+  if (flow === undefined) return goTo(screenUrl('signup', { problem: 'codeExpired' }));
+  // The flow's address was taken once; asked again, so no cookie can carry another past it.
+  const notHere = notTakenHere(flow.email, deps);
+  if (notHere !== undefined) return goTo(screenUrl('enterCode', { problem: notHere }));
+  const refused = await botCheckProblem(flow.purpose, fields, visit, deps);
+  if (refused !== undefined) return goTo(screenUrl('enterCode', { problem: refused }));
+  return sendCode(flow.purpose, flow.email, flow.next, 'enterCode', visit, deps);
+}
+
+/** Asks the service for a code once the bot check has passed; refusals go back to `page`. */
+async function sendCode(
+  purpose: 'sign-up' | 'reset',
+  address: string,
+  next: string | null,
+  page: 'enterCode' | 'forgotPassword' | 'signup',
+  visit: Visit,
+  deps: FlowDeps,
+): Promise<FlowAnswer> {
+  const input = { email: address, networkAddress: visit.networkAddress };
   const asked =
     purpose === 'sign-up'
       ? await deps.signIn.startSignUp(input)
@@ -116,12 +198,10 @@ async function sendCode(
   if (!asked.ok) {
     const error = asked.error;
     if (error.code === 'too-many-attempts') {
-      return { ok: false, problem: tooMany(error.retryAfterSeconds) };
+      return goTo(screenUrl(page, { ...tooMany(error.retryAfterSeconds), next }));
     }
-    return {
-      ok: false,
-      problem: { problem: error.code === 'invalid-email' ? 'invalidEmail' : 'codeNotSent' },
-    };
+    const problem: Problem = error.code === 'invalid-email' ? 'invalidEmail' : 'codeNotSent';
+    return goTo(screenUrl(page, { problem, next }));
   }
   // The service accepted the address, so it is one; kept as the service keeps it.
   const email = signInEmail.parse(input.email);
@@ -130,7 +210,9 @@ async function sendCode(
     { purpose, email, minutes: asked.value.codeValidMinutes, next },
     deps.secureCookies,
   );
-  return { ok: true };
+  // Asked again from the code screen, the person stays there and is told so (step 2.163, M24).
+  if (page === 'enterCode') return goTo(screenUrl('enterCode', { notice: 'codeSentAgain' }));
+  return goTo(platformUrl('enterCode'));
 }
 
 /** The 6-digit code from the email. */
@@ -212,6 +294,9 @@ export async function signInWithPassword(
   deps: FlowDeps,
 ): Promise<FlowAnswer> {
   const next = safeReturnPath(fields['next']);
+  // Before the device cookie too: a refused form sets nothing.
+  const refused = await botCheckProblem('sign-in', fields, visit, deps);
+  if (refused !== undefined) return goTo(screenUrl('signin', { problem: refused, next }));
   const device = deviceOf(visit, deps.secureCookies);
   const signed = await deps.signIn.signIn({
     email: fields['email'] ?? '',
@@ -238,13 +323,19 @@ export async function signInWithPassword(
   return afterSignIn(next);
 }
 
-/** "Continue with Google": off to Google, which sends the browser back to googleReturn. */
+/**
+ * "Continue with Google": off to Google, which sends the browser back to googleReturn. Not
+ * on the test copy (step 2.205, T-13, T-201): an account made there would hold a real
+ * Gmail address, so it is refused before the sign-in service is asked (its screens do not
+ * show the button there either).
+ */
 export async function startGoogle(
   fields: Fields,
   visit: Visit,
   deps: FlowDeps,
 ): Promise<FlowAnswer> {
   const next = safeReturnPath(fields['next']);
+  if (deps.testCopy) return goTo(screenUrl('signin', { problem: 'googleOff', next }));
   if (deps.google === false) return goTo(screenUrl('signin', { problem: 'googleFailed', next }));
   const started = await deps.signIn.startExternalSignIn({
     provider: 'google',
@@ -255,7 +346,7 @@ export async function startGoogle(
   return goTo(started.value.redirectTo);
 }
 
-/** Google sent the browser back with a code. */
+/** Google sent the browser back with a code. On the test copy, never taken (startGoogle). */
 export async function finishGoogle(
   code: string,
   visit: Visit,
@@ -263,6 +354,7 @@ export async function finishGoogle(
 ): Promise<FlowAnswer> {
   const flow = readGoogleFlow(visit.jar);
   visit.jar.delete(cookieNames.google);
+  if (deps.testCopy) return goTo(screenUrl('signin', { problem: 'googleOff' }));
   if (flow === undefined || code === '') {
     return goTo(screenUrl('signin', { problem: 'googleFailed' }));
   }

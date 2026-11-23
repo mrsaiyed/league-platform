@@ -40,7 +40,14 @@ const sensitiveWords = new Set([
   'credentials',
   'birthday',
   'birthdate',
+  // A date of birth however it is spelt (birthDate, birth_date, dateOfBirth), whether a
+  // person is a child (is_minor) and what they asked to be shown as (visibility): the
+  // people table's private columns, each in every casing (step 2.50; the 2.108 audit,
+  // D-L4; packages/database's people-columns-masked.test.ts holds the list to the table).
+  'birth',
   'dob',
+  'minor',
+  'visibility',
   'input',
   'form',
   'comment',

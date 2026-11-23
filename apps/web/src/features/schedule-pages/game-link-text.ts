@@ -24,6 +24,8 @@ type LinkedGame = {
   readonly home: { readonly name: string; readonly score: number | null };
   readonly away: { readonly name: string; readonly score: number | null };
   readonly status: GameStatus;
+  /** A final game won in overtime: "final after overtime", said in place of "final". */
+  readonly finalSaid?: string | undefined;
   /** When it is played, as its card writes it. */
   readonly whenText: string;
   /** Its start has passed with no result yet (build-schedule.ts). */
@@ -47,7 +49,10 @@ export function gameLinkText(game: LinkedGame, words: GameLinkWords): string {
       game.awaiting === true && words.awaiting !== undefined ? words.awaiting : words.when;
     return fill(sentence, { ...teams, when: game.whenText });
   }
-  const state = words.states[game.status];
+  const state =
+    game.status === 'final' && game.finalSaid !== undefined
+      ? game.finalSaid
+      : words.states[game.status];
   const played = game.status === 'live' || game.status === 'final' || game.status === 'forfeit';
   return played && game.home.score !== null && game.away.score !== null
     ? fill(words.score, {

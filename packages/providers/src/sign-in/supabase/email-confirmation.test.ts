@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { EmailConfirmation } from '../sign-in-service.ts';
 import type { FetchLike } from './gotrue-client.ts';
 import { createSupabaseEmailConfirmation } from './email-confirmation.ts';
-import { createFakeSupabaseAuth } from './fake-supabase-auth.test-helper.ts';
+import { createFakeSupabaseAuth } from './fake-supabase-auth.ts';
 import { projectUrl, secretKey, setup } from './supabase-sign-in.test-helper.ts';
 
 /** The question alone, asked of a Supabase that answers every call with `answer`. */

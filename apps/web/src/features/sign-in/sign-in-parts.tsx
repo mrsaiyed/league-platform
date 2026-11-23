@@ -1,17 +1,24 @@
 // The pieces every sign-in screen is made of (step 1.14). Words come from the
 // message files (T-187); a problem or a notice is shown from its name in the address
 // (problems.ts), never from anything the person typed.
+import { botCheckDidNotLoad, type BotCheckAction, type BotCheckWidget } from '@srleagues/providers';
 import type { ReactNode } from 'react';
+import { webPorts } from '../../server/container.ts';
 import { t, type TextKey } from '../../server/messages.ts';
-import {
-  noticeOf,
-  notices,
-  problemOf,
-  problems,
-  waitInWords,
-} from '../../server/sign-in/problems.ts';
-import { StandalonePage } from '../shell/index.ts';
+import { noticeOf, notices, problemOf, problems } from '../../server/sign-in/problems.ts';
+import { StandalonePage, TestCopyLine } from '../shell/index.ts';
+import { BotCheckBox } from './bot-check-box.tsx';
 import { ShowPassword } from './show-password.tsx';
+
+/** With scripts off, what each form says of its check (record 081, F5). */
+const needsScripts = {
+  'sign-in': 'signIn.botCheckNeedsScripts.signIn',
+  'sign-up': 'signIn.botCheckNeedsScripts.signUp',
+  reset: 'signIn.botCheckNeedsScripts.reset',
+} as const satisfies Record<BotCheckAction, TextKey>;
+
+/** A wait said in whole minutes, rounded up (record 081): never "900 seconds". */
+export const minutesOf = (seconds: number): number => Math.max(1, Math.ceil(seconds / 60));
 
 /** What Next.js gives a page: the address's query. */
 export type SearchProps = {
@@ -21,23 +28,16 @@ export type SearchProps = {
 type Search = Readonly<Record<string, string | string[] | undefined>>;
 
 /**
- * "Too many tries" in the words people use (M28): the wait in seconds under a minute,
- * otherwise in minutes; on a screen with "Forgot your password?" (`forgotHint`), with the
- * way in that does not wait.
+ * "Too many tries" in the words people use (M28): the wait in whole minutes (record 081);
+ * on a screen with "Forgot your password?" (`forgotHint`), with the way in that does not
+ * wait.
  */
 function tooManyWords(seconds: number, forgotHint: boolean): string {
-  const wait = waitInWords(seconds);
-  const key = forgotHint
-    ? wait.unit === 'seconds'
-      ? 'problem.lockedOut'
-      : 'problem.lockedOutMinutes'
-    : wait.unit === 'seconds'
-      ? 'problem.tooManyAttempts'
-      : 'problem.tooManyAttemptsMinutes';
-  return t.plural(key, wait.count, { count: wait.count });
+  const count = minutesOf(seconds);
+  return t.plural(forgotHint ? 'problem.lockedOut' : 'problem.tooManyAttempts', count, { count });
 }
 
-export function SignInScreen({
+export async function SignInScreen({
   title,
   intro,
   search,
@@ -59,6 +59,7 @@ export function SignInScreen({
   const said =
     noticeWords ??
     (notice === undefined || notice === 'codeSentAgain' ? undefined : t(notices[notice]));
+  const { testCopy } = await webPorts();
   // In the frame of our own pages, on the neutral design, so every field and button is 44
   // high (step 2.127). Their real look is step 2.102's.
   return (
@@ -71,8 +72,10 @@ export function SignInScreen({
           </p>
         )}
         {intro === undefined ? null : <p>{intro}</p>}
+        {/* Above the form, on the test copy only (step 2.205). */}
+        <TestCopyLine shown={testCopy} />
         {problem === undefined ? null : (
-          <p role="alert">
+          <p className="ui-refusal" role="alert">
             {problem.name === 'tooManyAttempts'
               ? tooManyWords(problem.wait, forgotHint)
               : t(problems[problem.name])}
@@ -124,6 +127,42 @@ export function PasswordField({ fresh = false }: { readonly fresh?: boolean }) {
       />
       <ShowPassword field={id} show={t('password.show')} hide={t('password.hide')} />
     </p>
+  );
+}
+
+/**
+ * The bot check's widget, inside its form (T4 §6, record 081). The stand-in's is a hidden
+ * field holding its passing answer; Turnstile's is its own box, drawn in explicit mode by
+ * a client part (bot-check-box.tsx) each time the form appears, which writes a fresh answer
+ * into the form for every try. With scripts off Turnstile cannot run, and the form is
+ * refused: the page says so, in each form's own words.
+ */
+export function BotCheckField({
+  widget,
+  action,
+}: {
+  readonly widget: BotCheckWidget;
+  readonly action: BotCheckAction;
+}) {
+  // Switched off (staging without Turnstile's keys, T-270): nothing is drawn or asked.
+  if (widget.kind === 'off') return null;
+  if (widget.kind === 'stand-in') {
+    return <input type="hidden" name={widget.field} value={widget.passingAnswer} />;
+  }
+  return (
+    <>
+      <BotCheckBox
+        siteKey={widget.siteKey}
+        action={action}
+        field={widget.field}
+        scriptUrl={widget.scriptUrl}
+        didNotLoad={botCheckDidNotLoad}
+        waiting={t('signIn.botCheckWaiting')}
+      />
+      <noscript>
+        <p>{t(needsScripts[action])}</p>
+      </noscript>
+    </>
   );
 }
 

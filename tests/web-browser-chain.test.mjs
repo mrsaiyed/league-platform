@@ -37,7 +37,8 @@ test('the chain is every test file in tests/browser: the exit test first, then a
   assert.ok(
     !files.includes('web-browser-kit.mjs') &&
       !files.includes('tracker-driver.mjs') &&
-      !files.includes('scoring-clock-steps.mjs'),
+      !files.includes('scoring-clock-steps.mjs') &&
+      !files.includes('first-test-walk.mjs'),
   );
   // The first builds; every other serves its build.
   assert.deepEqual(chain[0].args, []);
@@ -61,6 +62,7 @@ test('a file that is neither a test nor a listed helper, or a test that does not
   // The real folder: only tests and the listed helpers, every test a real run.
   assert.deepEqual(folderProblems(fs.readdirSync(folder), read), []);
   assert.deepEqual(HELPERS, [
+    'first-test-walk.mjs',
     'scoring-clock-steps.mjs',
     'tracker-driver.mjs',
     'web-browser-kit.mjs',

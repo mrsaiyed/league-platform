@@ -14,7 +14,7 @@
 // suggests pointing at the same folder) writes every address it is given. Nothing here logs
 // what an email holds: a failure to write is reported by its kind only (T4 §10, T-86).
 import type { EmailMessage, EmailSender, SentEmail } from '@srleagues/core';
-import { captureEmail } from '@srleagues/providers';
+import { captureEmail, isMadeUpAddress } from '@srleagues/providers';
 import { existsSync, readFileSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -60,27 +60,8 @@ function isWorkingFolder(dir: string): boolean {
   }
 }
 
-/**
- * Whether `address` is on a name kept for made-up mail (RFC 2606 and 6761): `.test`,
- * `.example`, `.invalid`, `.localhost`, or example.com, .net and .org. Only these are
- * written to a file.
- */
-export function isMadeUpAddress(address: string): boolean {
-  const at = address.lastIndexOf('@');
-  if (at <= 0) return false;
-  const domain = address
-    .slice(at + 1)
-    .trim()
-    .toLowerCase()
-    .replace(/\.$/, '');
-  if (!/^[a-z0-9.-]+$/.test(domain)) return false;
-  if (['test', 'example', 'invalid', 'localhost'].some((top) => domain.endsWith(`.${top}`))) {
-    return true;
-  }
-  return ['example.com', 'example.net', 'example.org'].some(
-    (name) => domain === name || domain.endsWith(`.${name}`),
-  );
-}
+/** Record 075's list, now in packages/providers (step 2.204): the one the test copy uses too. */
+export { isMadeUpAddress };
 
 export type KeepingSender = {
   readonly sender: EmailSender;

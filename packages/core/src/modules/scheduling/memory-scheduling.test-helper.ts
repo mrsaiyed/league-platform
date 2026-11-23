@@ -16,6 +16,7 @@ import type {
   NewPublishedGame,
   NewRound,
   NewScheduleRevision,
+  PlacePublishedGames,
   PublishedGameChange,
   SchedulingTx,
   VenueRecord,
@@ -53,6 +54,8 @@ export type MemoryScheduling = {
   /** Rounds publishing created and removed, in order. */
   roundsAdded: NewRound[];
   roundsRemoved: string[];
+  /** Ids games of another league have: the database makes no second game with one. */
+  takenElsewhere: string[];
   /** Games outside the published schedule and the bin (no date yet) and the round each is in. */
   gamesInOtherRounds: GameInRound[];
   /** Games in the bin and the round each is in: they do not hold it (S-60). */
@@ -62,6 +65,8 @@ export type MemoryScheduling = {
   revisions: NewScheduleRevision[];
   /** Makes every round update find no such round, to test the refusal. */
   roundsMissing?: boolean;
+  /** The published games by venue and court, as the database counts them (step 2.49). */
+  placed: PlacePublishedGames[];
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -121,6 +126,7 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
     status: 'draft',
     venues: [],
     courts: [],
+    placed: [],
     grants: [],
     activity: [],
     seasons: [{ id: seasonId, programId }],
@@ -138,6 +144,7 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
     roundChanges: [],
     roundsAdded: [],
     roundsRemoved: [],
+    takenElsewhere: [],
     gamesInOtherRounds: [],
     binnedInRounds: [],
     roundsCleared: [],
@@ -198,7 +205,12 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           ...s.otherGames.filter((g) => ids.includes(g.id)),
         ],
         countPeopleOnTeams: async () => s.people,
-        insertPublishedGames: async (_season, games) => void s.inserted.push(...games),
+        insertPublishedGames: async (_season, games) => {
+          // An id another league's game has is not made, as on the database.
+          const made = games.filter((g) => !s.takenElsewhere.includes(g.id));
+          s.inserted.push(...made);
+          return made.length;
+        },
         updatePublishedGame: async (_season, gameId, change) => {
           const game = s.schedule.games.find((g) => g.id === gameId);
           if (game === undefined || ['live', 'final', 'forfeit'].includes(game.status)) {
@@ -323,6 +335,11 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
           s.courts[at] = { ...found, binned, version: found.version + 1 };
           return true;
         },
+        placeGames: async () => ({
+          published: structuredClone(s.placed),
+          drafts:
+            s.draft === undefined ? [] : [{ seasonId: s.draft.seasonId, changes: s.draft.changes }],
+        }),
       },
     };
   });

@@ -280,6 +280,16 @@ describe('season rules limits', () => {
     ).toBe(true);
   });
 
+  it('allows a points column only in a table ranked by points (T-290)', () => {
+    expect(accepts((r) => r.standings.columns.push('points'))).toBe(false);
+    expect(
+      accepts((r) => {
+        r.standings.rankBy = 'points';
+        r.standings.columns.push('points');
+      }),
+    ).toBe(true);
+  });
+
   it('lets a coin flip decide only last', () => {
     expect(accepts((r) => (r.tiebreakers = ['coin-flip', 'head-to-head']))).toBe(false);
     expect(accepts((r) => (r.tiebreakers = ['head-to-head', 'coin-flip']))).toBe(true);

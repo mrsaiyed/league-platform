@@ -12,6 +12,8 @@ export const league = 'north-valley';
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const liveGame = '01900000-0000-7000-8000-006a00000002';
 export const scorekeeper = { name: 'srl_session', value: 'local-scorekeeper-token' };
+/** The made-up league's owner: may score the game and may correct games too (step 2.37). */
+export const owner = { name: 'srl_session', value: 'local-owner-token' };
 export const trackerPath = (game = liveGame) => `/${league}/score/${game}`;
 
 /** The five sizes every scoring screen is designed and photographed at (DESIGN.md section 7, line 8). */
@@ -86,6 +88,22 @@ export async function lettersHere(page) {
   await drawIn(page, '');
   return { own, wider };
 }
+
+/**
+ * The saved banner's short form as the screen itself draws it (court-view.tsx,
+ * `SavedWords`), for a test or a picture that writes the banner's longest words into the
+ * page: each thing it says is one piece, the dot between two is held with the thing
+ * before it, and a space stands between two pieces. Given the lines, it gives the markup
+ * of what goes inside `.court-banner-short`.
+ */
+export const bannerShortHtml = (lines) =>
+  lines
+    .map((line, index) => {
+      const words = line.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+      const dot = index === lines.length - 1 ? '' : '<span class="court-banner-dot"> ·</span>';
+      return `<span class="court-banner-line">${words}${dot}</span>`;
+    })
+    .join(' ');
 
 /** Three more a side on top of `morePlayers`: fifteen a side, a bench of ten. */
 export const evenMorePlayers = {
@@ -404,6 +422,78 @@ export function court(page) {
       await recorded(() => sheet.locator(`[data-period-pick="${period}"]`).click());
       await root.locator(`[data-clock] [data-period="${period}"]`).waitFor();
     },
+    // --- Undo, Redo and the play log (step 2.37). ---
+    /** Undo and Redo, in the row under the scoreboard, and the play Undo names. */
+    undoButton: root.locator('[data-undo]'),
+    redoButton: root.locator('[data-redo]'),
+    undoNames: async () =>
+      (
+        (await root.locator('[data-undo] [data-undo-play] .court-turn-full').textContent()) ?? ''
+      ).trim(),
+    /**
+     * Takes the latest play back with Undo, and waits until the game on the screen holds
+     * one play fewer. Undo rests for a moment after each tap taken and takes no tap then
+     * (it is marked `data-resting`): it is tapped once it is ready, as a person would.
+     */
+    undo: () => recorded(() => root.locator('[data-undo]:not([data-resting])').click()),
+    /** Brings the play back with Redo, and waits until the screen holds it again. */
+    redo: () => recorded(() => root.locator('[data-redo]:not([data-resting])').click()),
+    /** The latest play's line in the pad at rest: the button that opens the log. */
+    latest: pad.locator('[data-latest] [data-log-open]'),
+    /** The whole play log, open over the screen, and its rows, newest first. */
+    logSheet: root.locator('[data-play-log] [role="dialog"]'),
+    logRows: root.locator('[data-play-log] [role="dialog"] [data-play]'),
+    /** The log's own panel under the pad (a tablet lying down). */
+    logPanel: root.locator('[data-log-panel]'),
+    /** Opens the whole play log by the way this size has to it: the pad's line, or More. */
+    async openLog() {
+      const sheet = root.locator('[data-play-log] [role="dialog"]');
+      if (await sheet.isVisible()) return;
+      if (await pad.locator('[data-latest] [data-log-open]').isVisible()) {
+        await pad.locator('[data-latest] [data-log-open]').click();
+      } else {
+        await root.locator('.court-more-button').click();
+        await root.locator('[data-more] [data-more-log]').click();
+      }
+      await sheet.waitFor();
+    },
+    async closeLog() {
+      await root.locator('[data-play-log] .court-close').click();
+      await root.locator('[data-play-log]').waitFor({ state: 'detached' });
+    },
+
+    // --- Ending a game (step 2.37): each is in the pad. ---
+    /** "End the game?", and why it cannot end now (a level score, or what the league said). */
+    endAsk: pad.locator('[data-end-ask]'),
+    endRefused: pad.locator('[data-end-refused]'),
+    /** End game offered in the pad's first line, at 0:00 of the last period with a team ahead. */
+    endOffer: pad.locator('[data-end-offer] [data-end-game]'),
+    /** The final panel; `data-final` says sending, not-sent or saved. */
+    finalPanel: pad.locator('[data-final]'),
+    reopenAsk: pad.locator('[data-reopen-ask]'),
+    notStartedAsk: pad.locator('[data-not-started-ask]'),
+    /**
+     * An answer of the question the pad asks, "yes" or "no", once it takes a tap: the
+     * answers rest for a moment after a question is asked (they are marked `data-resting`).
+     */
+    answer: (which) =>
+      pad.locator(`[data-ask-answers]:not([data-resting]) [data-answer="${which}"]`),
+    /** A button of the final panel, once the panel takes a tap: `take-back`, `reopen`, `final-back`. */
+    finalButton: (which) => pad.locator(`[data-final-actions]:not([data-resting]) [data-${which}]`),
+    /** Opens More and taps one of its buttons: `more-end` (End game), `more-not-started`. */
+    async fromMore(which) {
+      await root.locator('.court-more-button').click();
+      await root.locator(`[data-more] [data-${which}]`).click();
+      await root.locator('[data-more] [role="dialog"]').waitFor({ state: 'detached' });
+    },
+    /** Ends the game from More: the question, then "End game". The pad shows the final panel. */
+    async endGame() {
+      await this.fromMore('more-end');
+      await pad.locator('[data-end-ask]').waitFor();
+      await this.answer('yes').click();
+      await pad.locator('[data-final]').waitFor();
+    },
+
     /** Opens the timeouts and calls one for a team; answers "Record it anyway" if asked. */
     async timeout(side, seconds = 60, { anyway = true } = {}) {
       if (!(await pad.locator('[data-timeout-list]').isVisible())) {

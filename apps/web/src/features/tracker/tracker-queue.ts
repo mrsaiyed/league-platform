@@ -145,6 +145,23 @@ export type TrackerQueueOptions = {
   readonly sendTimeoutMs?: number;
   /** A number from 0 to 1, for spreading the waits. */
   readonly random?: () => number;
+  /**
+   * False when the device knows it has no network (the browser's `navigator.onLine`): a
+   * batch sent then cannot have reached the server. Otherwise a batch with no answer may
+   * have, and `withdraw` will not drop its taps (lane 2.37, fix round, F2).
+   */
+  readonly reachable?: () => boolean;
+};
+
+/** What `withdraw` did with each tap it was asked to take back. */
+export type Withdrawn = {
+  /** Dropped: never sent, or sent only while the device knew it had no network. */
+  readonly dropped: readonly string[];
+  /**
+   * Still waiting, and kept: each was sent and no answer came, so the server may have it.
+   * The next answer settles it (`duplicate` means the server had it).
+   */
+  readonly unsure: readonly string[];
 };
 
 export type TrackerQueue = {
@@ -165,6 +182,11 @@ export type TrackerQueue = {
    */
   resume(): void;
   /**
+   * The server answered another request (the session, a read): with nothing waiting to
+   * send, the device is not offline, though no send has said so (the review by use, M2).
+   */
+  heard(): void;
+  /**
    * Drops taps for good: refused ones the scorekeeper has been told about, or waiting
    * ones after another device took over and they were shown as not saved (T6 §5).
    * A halt is cleared once no waiting tap is left for it to hold back.
@@ -175,6 +197,14 @@ export type TrackerQueue = {
    * list survives a reload (T6 §5). A halt is cleared as `forget` clears it.
    */
   setAside(commandIds: readonly string[]): Promise<void>;
+  /**
+   * Takes waiting taps back before they are sent (step 2.37: "Take back End game"). No
+   * batch goes out while this runs: it waits for the one on its way, then drops those of
+   * `commandIds` the device still holds waiting and the server cannot have. A tap the
+   * server took meanwhile is in neither list, and stays taken; one sent with no answer
+   * yet is `unsure`, and stays waiting.
+   */
+  withdraw(commandIds: readonly string[]): Promise<Withdrawn>;
   /** The scorekeeper has seen these notices (record 058): they are dropped. */
   dismissNotices(commandIds: readonly string[]): void;
   status(): QueueStatus;
@@ -202,6 +232,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     retry = defaultRetryTiming,
     sendTimeoutMs = 15_000,
     random = Math.random,
+    reachable = () => globalThis.navigator?.onLine !== false,
   } = options;
   const size = Math.min(Math.max(Math.trunc(batchSize), 1), maxCommandsPerBatch);
 
@@ -226,9 +257,16 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
   let singlesLeft = 0;
   let cancelRetry: (() => void) | null = null;
   let pumping: Promise<void> | null = null;
+  /** Taps are being taken back (`withdraw`): nothing is sent until that is done. */
+  let withdrawing = 0;
   let again = false;
   let readsStarted = 0;
   let readsShown = 0;
+  /**
+   * Taps sent with no answer back, while the device did not know it was offline: the
+   * server may have them. Each leaves this set with the server's next word about it.
+   */
+  const unsure = new Set<string>();
 
   const update = (change: Partial<QueueStatus>): void => {
     current = { ...current, ...change };
@@ -275,6 +313,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
 
   const kick = (): void => {
     if (!started || stopped || current.halted !== null || cancelRetry !== null) return;
+    if (withdrawing > 0) return;
     if (pumping !== null) {
       again = true;
       return;
@@ -393,6 +432,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     let halt: QueueHalt | null = null;
     for (const result of outcome.reply.results) {
       if (!sent.delete(result.commandId)) continue;
+      unsure.delete(result.commandId);
       if (result.status !== 'refused') {
         remove.push(result.commandId);
         // A change of players taken with something to say (S-44): kept for the screen.
@@ -439,7 +479,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     try {
       for (;;) {
         again = false;
-        if (stopped || current.halted !== null) return;
+        if (stopped || current.halted !== null || withdrawing > 0) return;
         const session = sessionId();
         if (session === null) return;
         const batch = nextBatch(await refresh(), session);
@@ -448,7 +488,15 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
           if (current.unansweredSince !== null) update({ unansweredSince: null });
           return;
         }
-        if (!(await apply(batch, await send(batch)))) return;
+        const known = reachable();
+        const outcome = await send(batch);
+        const ids = batch.commands.map((command) => command.commandId);
+        // No answer while the device had a network: the batch may have reached the server.
+        // Any answer about the batch as a whole says it did not take it.
+        if (outcome.kind === 'unanswered') {
+          if (known) for (const id of ids) unsure.add(id);
+        } else if (outcome.kind !== 'reply') for (const id of ids) unsure.delete(id);
+        if (!(await apply(batch, outcome))) return;
       }
     } catch {
       // The storage could not be read or written (`storageFailure` says so). What it
@@ -463,6 +511,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
   /** Drops taps, or keeps them as not saved; either way they are never sent. */
   const putAway = async (remove: readonly string[], notSaved: readonly string[]) => {
     await settle(remove, [], notSaved);
+    for (const id of [...remove, ...notSaved]) unsure.delete(id);
     const list = await refresh();
     // Nothing left for the halt to hold back: the queue is free again.
     if (current.halted !== null && !list.some((entry) => entry.state === 'waiting')) {
@@ -489,19 +538,20 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       const added = await stored('storage-write-failed', () =>
         storage.add(gameId, { protocolVersion, command, ...madeUnder, ...madeAt }),
       );
-      // Stored: whatever happens next, the tap is kept. If the read after it fails, the
-      // count goes up by hand, so the screen never shows fewer waiting than are held.
-      const shown = readsShown;
-      try {
-        await refresh();
-      } catch {
-        if (added === 'added' && readsShown === shown) {
-          update({
-            waiting: current.waiting + 1,
-            waitingTaps: [...current.waitingTaps, { command, moment: moment ?? null }],
-          });
-        }
+      // Stored: whatever happens next, the tap is kept, and shown waiting at once from
+      // memory (step 2.37, part 2): the screen's count never lags the read of every
+      // waiting tap, which takes a tenth of a second with 500 waiting. A read begun
+      // before the tap was stored is not shown over it; the read after it confirms.
+      if (added === 'added') {
+        readsShown = readsStarted;
+        update({
+          waiting: current.waiting + 1,
+          waitingTaps: [...current.waitingTaps, { command, moment: moment ?? null }],
+        });
       }
+      // The read after the write keeps the count true to what is held (another tab, say);
+      // if it fails, the count from memory stands.
+      await refresh().catch(() => undefined);
       kick();
     },
 
@@ -516,9 +566,34 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       kick();
     },
 
+    heard() {
+      // With taps waiting, only their own send can say the device is back (a session
+      // may be answered while sends still fail); with none, nothing else would say it.
+      if (current.unansweredSince !== null && current.waiting === 0) answered();
+    },
+
     forget: (commandIds) => putAway(commandIds, []),
 
     setAside: (commandIds) => putAway([], commandIds),
+
+    async withdraw(commandIds) {
+      withdrawing += 1;
+      try {
+        while (pumping !== null) await pumping;
+        const list = await refresh();
+        const held = new Set(
+          list.flatMap((entry) => (entry.state === 'waiting' ? [entry.command.commandId] : [])),
+        );
+        // A tap sent with no answer yet may be on the server: it is not taken back.
+        const dropped = commandIds.filter((id) => held.has(id) && !unsure.has(id));
+        const kept = commandIds.filter((id) => held.has(id) && unsure.has(id));
+        if (dropped.length > 0) await putAway(dropped, []);
+        return { dropped, unsure: kept };
+      } finally {
+        withdrawing -= 1;
+        kick();
+      }
+    },
 
     dismissNotices(commandIds) {
       const seen = new Set(commandIds);

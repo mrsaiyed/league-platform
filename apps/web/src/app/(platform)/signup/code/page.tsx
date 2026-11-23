@@ -1,12 +1,14 @@
 import { platformUrl } from '@srleagues/core';
 import { redirect } from 'next/navigation';
 import {
+  BotCheckField,
   SignInScreen,
   SubmitButton,
   type SearchProps,
 } from '../../../../features/sign-in/index.ts';
 import { t } from '../../../../server/messages.ts';
-import { enterCodeAction, sendCodeAgainAction } from '../../../../server/sign-in/actions.ts';
+import { enterCodeAction, resendCodeAction } from '../../../../server/sign-in/actions.ts';
+import { botCheckOnPage } from '../../../../server/sign-in/next-visit.ts';
 import { noticeOf, screenUrl } from '../../../../server/sign-in/problems.ts';
 import { flowOfThisRequest } from '../../../../server/sign-in/this-screen.ts';
 import { signedInPerson } from '../../../../server/signed-in-leagues.ts';
@@ -31,6 +33,7 @@ export default async function Page({ searchParams }: SearchProps) {
   const reset = flow.purpose === 'reset';
   const words = { email: flow.email, minutes: flow.minutes };
   const sentAgain = noticeOf(search) === 'codeSentAgain';
+  const botCheck = await botCheckOnPage();
   return (
     <SignInScreen
       title="code.title"
@@ -61,10 +64,10 @@ export default async function Page({ searchParams }: SearchProps) {
         </p>
         <SubmitButton words="code.submit" />
       </form>
-      <form action={sendCodeAgainAction}>
-        <button className="ui-button" data-kind="quiet" type="submit">
-          {t('code.again')}
-        </button>
+      {/* A new code to the same address, behind the same check as the first (T4 §6). */}
+      <form action={resendCodeAction}>
+        <BotCheckField {...botCheck} action={flow.purpose} />
+        <SubmitButton words="code.again" />
       </form>
     </SignInScreen>
   );

@@ -3,6 +3,7 @@
 export { AlreadySignedIn } from './already-signed-in.tsx';
 export { LocalTime, localWhen, type LocalTimeWords } from './local-time.tsx';
 export {
+  BotCheckField,
   EmailField,
   NextField,
   PasswordField,

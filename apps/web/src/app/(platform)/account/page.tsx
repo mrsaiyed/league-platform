@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import {
   MyLeaguesList,
   StandalonePage,
+  TestCopyLine,
   waitingQuestionWords,
 } from '../../../features/shell/index.ts';
 import {
@@ -112,6 +113,8 @@ export default async function Page({ searchParams }: SearchProps) {
             </a>
           </>
         )}
+        {/* At its foot, on the test copy only (step 2.205). */}
+        <TestCopyLine shown={ports.testCopy} />
       </main>
     </StandalonePage>
   );

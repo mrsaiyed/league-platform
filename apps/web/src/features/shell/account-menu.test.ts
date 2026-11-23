@@ -50,6 +50,7 @@ describe('accountMenuOf', () => {
       email: 'olive@example.test',
       adminHref: '/north-valley/admin',
       gamesHref: '/north-valley/admin/games',
+      myTeam: null,
       accountHref: '/account',
       onScoringPage: false,
       signOutFields: { next: '/north-valley' },
@@ -71,6 +72,28 @@ describe('accountMenuOf', () => {
     }
     // A page whose name only starts like the admin's is not the admin.
     expect(fields('/north-valley/administer')).toEqual({ next: '/north-valley/administer' });
+  });
+
+  it('gives "My team" to anyone with a team here, a coach and an admin alike (step 2.168)', () => {
+    const coach = accountMenuOf(viewOf([], false), 'cat@example.test', '/north-valley', 1);
+    expect(coach?.myTeam).toEqual({ href: '/north-valley/my', several: false });
+    expect([coach?.adminHref, coach?.gamesHref]).toEqual([null, null]);
+    const admin = accountMenuOf(viewOf(everyArea, true), 'olive@example.test', '/north-valley', 1);
+    expect(admin?.myTeam?.href).toBe('/north-valley/my');
+    expect(admin?.adminHref).toBe('/north-valley/admin');
+    // Two teams: "My teams", to the page that shows both.
+    expect(
+      accountMenuOf(viewOf([], false), 'cat@example.test', '/north-valley', 2)?.myTeam,
+    ).toEqual({ href: '/north-valley/my', several: true });
+    // No team: no "My team" at all.
+    expect(accountMenuOf(viewOf([], false), 'cat@example.test', '/north-valley', 0)?.myTeam).toBe(
+      null,
+    );
+    expect(accountMenuOf(viewOf([], false), 'cat@example.test', '/north-valley')?.myTeam).toBe(
+      null,
+    );
+    // A visitor has no menu, whatever is counted.
+    expect(accountMenuOf(viewOf([], false, null), null, '/north-valley', 1)).toBeNull();
   });
 
   it('gives a scorekeeper their games, which are their admin home, and no second "Admin"', () => {
@@ -182,6 +205,23 @@ describe('the account button in the header', () => {
     expect(html).not.toContain(en['shell.notBuilt']);
   });
 
+  it('leads a person with a team to it first, in both places', () => {
+    const coach = accountMenuOf(viewOf([], false), 'cat@example.test', '/north-valley', 1);
+    const html = header(coach);
+    const phone = html.slice(html.indexOf('class="site-menu-panel"'), html.indexOf('</details>'));
+    const wide = html.slice(
+      html.indexOf('class="site-account"'),
+      html.indexOf('class="site-tabs"'),
+    );
+    for (const part of [phone, wide]) {
+      const entries = part.slice(part.indexOf('<ul>', part.indexOf('Signed in as')));
+      expect(entries).toMatch(
+        new RegExp(`^<ul><li><a href="/north-valley/my">${en['account.menu.myTeam']}</a></li>`),
+      );
+    }
+    expect(header(owner)).not.toContain('/north-valley/my');
+  });
+
   it("holds nothing of a signed-in person in a visitor's header", () => {
     const html = header(null);
     expect(html).toContain(`href="${signInHref.replace(/&/g, '&amp;')}"`);
@@ -190,6 +230,7 @@ describe('the account button in the header', () => {
       'site-account',
       en['account.menu.admin'],
       en['account.menu.myGames'],
+      en['account.menu.myTeam'],
       en['account.menu.account'],
       en['account.signOut'],
       'Signed in as',

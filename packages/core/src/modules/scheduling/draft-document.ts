@@ -27,6 +27,7 @@ const change = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('move-game'), gameId: text, to: slot }),
   z.strictObject({ kind: z.literal('swap-games'), gameId: text, otherGameId: text }),
   z.strictObject({ kind: z.literal('remove-game'), gameId: text }),
+  z.strictObject({ kind: z.literal('put-back-game'), gameId: text }),
   z.strictObject({
     kind: z.literal('set-recording'),
     gameId: text,

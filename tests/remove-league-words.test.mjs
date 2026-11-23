@@ -178,3 +178,16 @@ test('the twin’s refusals say "removed" where they said "made"', () => {
   assert.match(lines, /Nothing was read and nothing was removed\./);
   assert.match(lines, /may not run the removal/);
 });
+
+test('a server that answered and refused is not "not reached", and says its code only (2.203)', () => {
+  const lines = targetProblemLines({
+    kind: 'cannot-connect',
+    login: 'app',
+    cause: 'refused',
+    code: 'XX000',
+  }).join('\n');
+  assert.match(lines, /the database answered but refused the start/);
+  assert.match(lines, /code XX000/);
+  assert.match(lines, /PLATFORM_DATABASE_URL/);
+  assert.ok(!/could not be found|nothing answered/.test(lines), lines);
+});

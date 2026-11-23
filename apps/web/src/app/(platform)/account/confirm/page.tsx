@@ -7,6 +7,7 @@ import {
   SubmitButton,
   type SearchProps,
 } from '../../../../features/sign-in/index.ts';
+import { webPorts } from '../../../../server/container.ts';
 import { t } from '../../../../server/messages.ts';
 import { confirmPasswordAction, googleAction } from '../../../../server/sign-in/actions.ts';
 import { safeReturnPath } from '../../../../server/sign-in/device.ts';
@@ -26,6 +27,9 @@ export default async function Page({ searchParams }: SearchProps) {
   if (person.kind === 'visitor') {
     redirect(screenUrl('signin', { next: screenUrl('confirmPassword', { next }) }));
   }
+  // Drawn only where Google is set up (M27), and not on the test copy (step 2.205): an
+  // account made with Google holds a real address.
+  const google = googleSetUp() && !(await webPorts()).testCopy;
   return (
     <SignInScreen title="confirm.title" intro={t('confirm.intro')} search={search}>
       <form action={confirmPasswordAction}>
@@ -33,7 +37,7 @@ export default async function Page({ searchParams }: SearchProps) {
         <PasswordField />
         <SubmitButton words="confirm.submit" />
       </form>
-      {googleSetUp() ? (
+      {google ? (
         <form action={googleAction}>
           <NextField next={next} />
           <SubmitButton words="confirm.google" />

@@ -4,18 +4,43 @@
 // A comment above a key is about that key or, from before the split, about the keys
 // that followed it in the one file there was.
 export const enAccount = {
+  // Step 2.157: the refusal's ways on, for someone the league may be shown to.
+  'access.noAccess.backToLeague': 'Back to {league}',
+  // For someone who is not signed in.
   'access.noAccess.body':
     'This page is for the people who run this league. If you should have access, ask the league to invite you.',
+  // For someone signed in who holds no part of the league's admin: a coach, a member, a
+  // signed-in stranger at a league they may see.
+  'access.noAccess.notStaff':
+    "This page is for the people who run {league}. If you should be one of them, ask the league's owner or an admin.",
+  // For staff of this league at a page their role does not include.
+  'access.noAccess.notYourRole':
+    "Your role in this league does not include this page. If it should, ask the league's owner or an admin.",
+  // A role as the refusal names the person's own (access.noAccess.youAre), in the
+  // middle of a sentence.
+  'access.noAccess.role.admin': 'an admin',
+  'access.noAccess.role.captain': 'a captain',
+  'access.noAccess.role.club_admin': 'a club admin',
+  'access.noAccess.role.coach': 'a coach',
+  'access.noAccess.role.editor': 'an editor',
+  'access.noAccess.role.registrar': 'a registrar',
+  'access.noAccess.role.scheduler': 'a scheduler',
+  'access.noAccess.role.scorekeeper': 'a scorekeeper',
   'access.noAccess.signedInAs': 'You are signed in as {email}.',
   'access.noAccess.switch': 'Use another account',
   // U-6: an address you are not allowed to open.
   'access.noAccess.title': 'You do not have access',
   'account.alreadySignedOutNotice':
     'This device was already signed out. To sign out your other devices, sign in and choose "Sign out everywhere" again.',
+  // The staff refusal names the person's own roles here, joined in the language's way:
+  // "You are a scheduler in this league." (step 2.157).
+  'access.noAccess.youAre': 'You are {roles} in this league.',
   'account.devices': 'Signed-in devices',
   'account.devicesUnreadable':
     'We could not read the list of devices just now. Reload the page to try again.',
   'account.lastActive': 'Last active {when}',
+  // Beside a league the person helps run, on their own lists: the way to its admin.
+  'account.leagueAdmin': 'Admin',
   'account.leagues': 'Your leagues',
   'account.leaguesEmpty':
     'The leagues you belong to will be listed here, with your role in each, once a league adds you.',
@@ -23,6 +48,8 @@ export const enAccount = {
   'account.menu.account': 'Your account',
   'account.menu.admin': 'Admin',
   'account.menu.myGames': 'My games to score',
+  'account.menu.myTeam': 'My team',
+  'account.menu.myTeams': 'My teams',
   'account.problem.addressRefused':
     'You are signed in, but we cannot open an account for this email address. Nothing has been lost, and we have noted it. Please contact us, or sign out and sign in with another email address.',
   'account.problem.linkConflict':
@@ -113,21 +140,34 @@ export const enAccount = {
   'password.submit': 'Save and sign in',
   'password.title': 'Choose your password',
   'password.titleReset': 'Choose a new password',
+  // The bot check in front of sign-in and sign-up (T4 §6, record 081).
+  // Refused, though the form keeps the email typed (record 081, F4 and C2).
+  'problem.botCheckDidNotLoad':
+    'The check that you are a person could not load on this connection. Please try again, or try another connection (mobile data instead of this Wi-Fi, for example), or use Continue with Google.',
+  'problem.botCheckFailed':
+    'We could not check that you are a person. Please wait a moment and try again. If it keeps happening, turn on scripts for this site, or use Continue with Google.',
+  'problem.botCheckUnavailable':
+    'We could not check that you are a person just now. Please try again in a few minutes.',
+  'problem.botCheckUnreachable':
+    'We cannot send a code just now, because the check that you are a person is not answering. Please try again in a few minutes.',
   'problem.codeExpired': 'That code has run out. Ask for a new one.',
   'problem.codeNotSent': 'We could not send the email just now. Please try again in a minute.',
   'problem.codeUsedUp': 'Too many tries with this code. Ask for a new one.',
   'problem.codeWrong': 'That code is not right. Check the email and try again.',
   'problem.googleFailed': 'Signing in with Google did not work. Please try again.',
+  // The test copy only (step 2.205): an account made with Google would hold a real address.
+  'problem.googleOff':
+    'This is a test copy, so it does not sign in with Google. Use a made-up email address, such as someone@example.test.',
   'problem.invalidEmail': 'That does not look like an email address.',
-  'problem.lockedOutMinutes_one':
-    'Too many tries. Please wait {count} minute, or tap "Forgot your password?" to choose a new one now.',
-  'problem.lockedOutMinutes_other':
-    'Too many tries. Please wait {count} minutes, or tap "Forgot your password?" to choose a new one now.',
+  // The wait in whole minutes, rounded up (record 081), with the way in that does not wait.
   'problem.lockedOut_one':
-    'Too many tries. Please wait {count} second, or tap "Forgot your password?" to choose a new one now.',
+    'Too many tries. Please wait {count} minute, or tap "Forgot your password?" to choose a new one now.',
   'problem.lockedOut_other':
-    'Too many tries. Please wait {count} seconds, or tap "Forgot your password?" to choose a new one now.',
+    'Too many tries. Please wait {count} minutes, or tap "Forgot your password?" to choose a new one now.',
   'problem.noPassword': 'Your account has no password. Sign in with Google again instead.',
+  // The test copy only (step 2.205): the same words whether or not an account exists.
+  'problem.onlyMadeUpAddresses':
+    'This is a test copy, so it takes only made-up email addresses, such as someone@example.test.',
   'problem.passwordLeaked':
     'That password appears in lists of leaked passwords. Please choose another.',
   'problem.passwordTooLong': 'Your password is too long. Please choose a shorter one.',
@@ -137,11 +177,9 @@ export const enAccount = {
   'problem.signInToScore': 'Sign in to score this game.',
   'problem.signOutEverywhereFailed':
     'We could not sign out your other devices. This one is signed out: sign in and try again.',
-  'problem.tooManyAttemptsMinutes_one': 'Too many tries. Please wait {count} minute and try again.',
-  'problem.tooManyAttemptsMinutes_other':
-    'Too many tries. Please wait {count} minutes and try again.',
-  'problem.tooManyAttempts_one': 'Too many tries. Please wait {count} second and try again.',
-  'problem.tooManyAttempts_other': 'Too many tries. Please wait {count} seconds and try again.',
+  // The wait in whole minutes, rounded up (record 081).
+  'problem.tooManyAttempts_one': 'Too many tries. Please wait {count} minute and try again.',
+  'problem.tooManyAttempts_other': 'Too many tries. Please wait {count} minutes and try again.',
   'problem.wrongEmailOrPassword': 'Wrong email or password.',
   'problem.wrongPassword': 'Wrong password.',
   'role.admin': 'Admin',
@@ -160,6 +198,15 @@ export const enAccount = {
   'signIn.already.switch': 'Sign out and use another account',
   'signIn.already.title': 'You are already signed in',
   'signIn.backTo': 'Back to {league}',
+  // With scripts off, each form its own words (record 081, F5). Continue with Google is a
+  // plain form that works without scripts and has no check (script-policy-test.mjs proves it).
+  'signIn.botCheckNeedsScripts.reset':
+    'Asking for a code to choose a new password first checks that you are a person, and the check needs scripts: please turn them on for this site.',
+  'signIn.botCheckNeedsScripts.signIn':
+    'Signing in with a password checks that you are a person, and the check needs scripts: please turn them on for this site. Continue with Google works without scripts and has no check.',
+  'signIn.botCheckNeedsScripts.signUp':
+    'Creating an account first checks that you are a person, and the check needs scripts: please turn them on for this site. Continue with Google works without scripts and has no check.',
+  'signIn.botCheckWaiting': 'Checking that you are a person…',
   'signIn.createAccount': 'New here? Create an account',
   // The sign-in screens (step 1.14, P6 §2 and §5). The same words whether or not an
   // account exists (T-68).

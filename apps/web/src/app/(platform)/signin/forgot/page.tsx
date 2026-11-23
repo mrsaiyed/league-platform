@@ -1,4 +1,5 @@
 import {
+  BotCheckField,
   EmailField,
   NextField,
   SignInScreen,
@@ -13,6 +14,7 @@ import {
   flowOfThisRequest,
   typedEmailOfThisRequest,
 } from '../../../../server/sign-in/this-screen.ts';
+import { botCheckOnPage } from '../../../../server/sign-in/next-visit.ts';
 
 // The forgotten-password route (T-67): an emailed code, then a new password. It keeps
 // the page to come back to (step 2.127), checked again by the flow (safeReturnPath), so
@@ -25,11 +27,13 @@ export default async function Page({ searchParams }: SearchProps) {
   const next = safeReturnPath(search['next']);
   const flow = await flowOfThisRequest();
   const typed = flow?.purpose === 'reset' ? flow.email : await typedEmailOfThisRequest();
+  const botCheck = await botCheckOnPage();
   return (
     <SignInScreen title="forgot.title" intro={t('forgot.intro')} search={search}>
       <form action={forgotPasswordAction}>
         <NextField next={next} />
         <EmailField value={typed} />
+        <BotCheckField {...botCheck} action="reset" />
         <SubmitButton words="signUp.sendCode" />
       </form>
       <p>

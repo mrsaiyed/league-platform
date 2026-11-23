@@ -1,5 +1,6 @@
 import {
   AlreadySignedIn,
+  BotCheckField,
   EmailField,
   NextField,
   PasswordField,
@@ -7,10 +8,11 @@ import {
   SubmitButton,
   type SearchProps,
 } from '../../../features/sign-in/index.ts';
+import { webPorts } from '../../../server/container.ts';
 import { t } from '../../../server/messages.ts';
 import { googleAction, signInAction } from '../../../server/sign-in/actions.ts';
 import { safeReturnPath } from '../../../server/sign-in/device.ts';
-import { googleSetUp } from '../../../server/sign-in/next-visit.ts';
+import { botCheckOnPage, googleSetUp } from '../../../server/sign-in/next-visit.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
 import { returnLeagueOf } from '../../../server/sign-in/return-league.ts';
 import { typedEmailOfThisRequest } from '../../../server/sign-in/this-screen.ts';
@@ -29,7 +31,11 @@ export default async function Page({ searchParams }: SearchProps) {
   const next = safeReturnPath(search['next']);
   const person = await signedInPerson();
   if (person.kind === 'signed-in') return <AlreadySignedIn email={person.email} next={next} />;
+  // Drawn only where Google is set up (M27), and not on the test copy (step 2.205): an
+  // account made with Google holds a real address.
+  const google = googleSetUp() && !(await webPorts()).testCopy;
   const from = await returnLeagueOf(next);
+  const botCheck = await botCheckOnPage();
   return (
     <SignInScreen
       title="page.signIn"
@@ -41,6 +47,7 @@ export default async function Page({ searchParams }: SearchProps) {
         <NextField next={next} />
         <EmailField value={await typedEmailOfThisRequest()} />
         <PasswordField />
+        <BotCheckField {...botCheck} action="sign-in" />
         <SubmitButton words="signIn.submit" />
       </form>
       <p>
@@ -48,7 +55,7 @@ export default async function Page({ searchParams }: SearchProps) {
           {t('signIn.forgot')}
         </a>
       </p>
-      {googleSetUp() ? (
+      {google ? (
         <>
           <p>{t('signIn.or')}</p>
           <form action={googleAction}>

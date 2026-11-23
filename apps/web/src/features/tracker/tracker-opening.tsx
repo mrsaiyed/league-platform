@@ -10,13 +10,16 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode }
 import './court.css';
 import type { CourtBanner } from './court-view.tsx';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
+import { createFetchGameDoors } from './fetch-game-doors.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
 import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.ts';
 import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
+import { keptRows, notAppliedRows, type KeptRow } from './kept-plays.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
 import {
+  isOffline,
   savedBanner,
   savedBannerShortLines,
   savedBannerText,
@@ -24,8 +27,11 @@ import {
 } from './queue-banner.ts';
 import { ScoringScreen } from './scoring-screen.tsx';
 import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controller.ts';
-import { trackerNoticeText, trackerNotices } from './tracker-notice.ts';
+import { showsFinalPanel, trackerNoticeText, trackerNotices } from './tracker-notice.ts';
 import { holdSignOut } from './tracker-sign-out.ts';
+
+/** Why "Enter again" did not go through, for the words shown (review M1). */
+type AgainRefusal = 'refused' | 'not-taken-off';
 
 export type TrackerOpeningProps = {
   readonly leagueId: string;
@@ -49,6 +55,11 @@ export type TrackerOpeningProps = {
   readonly account?: ReactNode;
   /** The sign-in screen, coming back to this game: offered once the device is signed out. */
   readonly signInHref: string;
+  /**
+   * The account works in more areas than scoring, so it may correct games: a hint for
+   * the words of the Mark not started question only (step 2.37; S-40).
+   */
+  readonly mayCorrect?: boolean;
   readonly locale: string;
   /** The tracker's own messages (tracker-catalog.ts). */
   readonly catalog: Catalog;
@@ -75,12 +86,26 @@ export function TrackerOpening({
   accountHref,
   account = null,
   signInHref,
+  mayCorrect = false,
   locale,
   catalog,
 }: TrackerOpeningProps) {
   const t = useMemo(() => createTranslator(locale, { [locale]: catalog }), [locale, catalog]);
   const [phase, setPhase] = useState<Phase>({ kind: 'preparing' });
   const [storeFailed, setStoreFailed] = useState(false);
+  // What the browser says of the network: the saved banner says "No connection" while it
+  // says there is none (queue-banner.ts), also when no play is waiting to find it out.
+  const [browserOnline, setBrowserOnline] = useState(true);
+  useEffect(() => {
+    const read = () => setBrowserOnline(window.navigator.onLine);
+    read();
+    window.addEventListener('online', read);
+    window.addEventListener('offline', read);
+    return () => {
+      window.removeEventListener('online', read);
+      window.removeEventListener('offline', read);
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
   // What `busy` will be once drawn: read here, so a double tap before the next drawing
   // cannot run the same step twice.
@@ -109,9 +134,20 @@ export function TrackerOpening({
     };
     // The page shown again (the phone woke, the tab came back): the device may have
     // slept, so the controller measures the server's time again, renews and sends.
+    // Hidden, it stops checking its hold on the game until it is shown (T-295).
     const visible = () => {
       if (document.visibilityState === 'visible') opened.current?.controller.awake();
+      else opened.current?.controller.hidden();
     };
+    // Leaving by the browser's own ways (back, reload, the tab closed) while plays wait:
+    // the browser asks in its own words, as far as it allows (lane 2.37, fix round, F1).
+    // What waits is sent only while the scoring screen is open. The screen's own links
+    // ask in the pad first, and do not ask twice.
+    const unload = (event: BeforeUnloadEvent) => {
+      if (leaving.current) return;
+      if ((opened.current?.controller.status().queue.waiting ?? 0) > 0) event.preventDefault();
+    };
+    window.addEventListener('beforeunload', unload);
     window.addEventListener('pagehide', hidden);
     window.addEventListener('pageshow', shown);
     document.addEventListener('visibilitychange', visible);
@@ -127,6 +163,8 @@ export function TrackerOpening({
         }),
         transport: createFetchCommandTransport({ leagueId, gameId }),
         server: createFetchTrackerServer({ leagueId, gameId }),
+        // Reopen and Mark not started are requests of their own, not taps (step 2.37).
+        doors: createFetchGameDoors({ leagueId, gameId }),
         newDeviceId: () => globalThis.crypto.randomUUID(),
         onStoreFailed: () => setStoreFailed(true),
       });
@@ -151,6 +189,7 @@ export function TrackerOpening({
       gone = true;
       unsubscribe();
       window.removeEventListener('online', online);
+      window.removeEventListener('beforeunload', unload);
       window.removeEventListener('pagehide', hidden);
       window.removeEventListener('pageshow', shown);
       document.removeEventListener('visibilitychange', visible);
@@ -232,6 +271,7 @@ export function TrackerOpening({
     phase.status.game !== null &&
     screenOf(phase.status, phase.confirmed).kind === 'scoring';
   const [lastTapLost, setLastTapLost] = useState(false);
+  const [againRefused, setAgainRefused] = useState<AgainRefusal | null>(null);
   const wasScoring = useRef(false);
   useEffect(() => {
     if (scoringNow && !wasScoring.current) setLastTapLost(false);
@@ -264,6 +304,30 @@ export function TrackerOpening({
         </a>
       </p>
     ) : null;
+  // The plays the league refused, play by play (step 2.37, part 2).
+  const notApplied =
+    phase.kind === 'open'
+      ? notAppliedRows(phase.status.notApplied, rosters, phase.status.game?.rules.periods ?? 2, t)
+      : [];
+  const clearNotApplied = act((game) => game.controller.dismissNotApplied());
+  // "Enter again" (S-77): a new play now, by the path of a tap; said when not taken.
+  const lists: KeptLists = {
+    notApplied,
+    onClearNotApplied: clearNotApplied,
+    kept:
+      phase.kind === 'open'
+        ? keptRows(phase.status.notSaved, rosters, phase.status.game?.rules.periods ?? 2, t)
+        : [],
+    onClearKept: act((game) => game.controller.dismissNotSaved()),
+    onEnterAgain: (id) =>
+      void act(async (game) => {
+        const result = await game.controller.enterAgain(id);
+        setAgainRefused(
+          result.ok ? null : result.reason === 'not-taken-off' ? 'not-taken-off' : 'refused',
+        );
+      })(),
+    againRefused,
+  };
   const storeFailedNotice = storeFailed ? (
     <p className="court-notice" data-kind="error" role="alert">
       {t('tracker.storeFailed')}
@@ -272,13 +336,19 @@ export function TrackerOpening({
 
   const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
 
-  // The scoring screen, once this device holds the game and its format is confirmed.
+  // The scoring screen, once this device holds the game and its format is confirmed. And
+  // it stays while the game it shows is final (step 2.37): about half a minute after an
+  // End is saved the league tells the device the game is over, and the screen with its
+  // final panel (the score, Reopen with the time left) is not swapped for a card that
+  // says "this game is over". Reopened, the same screen carries on.
   if (
     phase.kind === 'open' &&
     phase.status.game !== null &&
-    screenOf(phase.status, phase.confirmed).kind === 'scoring'
+    (screenOf(phase.status, phase.confirmed).kind === 'scoring' || showsFinalPanel(phase.status))
   ) {
-    const banner = savedBanner(phase.status.queue);
+    // With no connection the banner says so, and never "All saved" (step 2.37).
+    const offline = isOffline(phase.status.queue, browserOnline);
+    const banner = savedBanner(phase.status.queue, offline, keptOnly(phase.status));
     const notices = trackerNotices(phase.status);
     const anythingToTell = notices.length > 0 || signIn !== null || storeFailedNotice !== null;
     return (
@@ -298,7 +368,7 @@ export function TrackerOpening({
         notices={
           anythingToTell ? (
             <>
-              <Notices status={phase.status} t={t} />
+              <Notices status={phase.status} t={t} lists={lists} busy={busy} />
               {signIn}
               {storeFailedNotice}
             </>
@@ -308,6 +378,8 @@ export function TrackerOpening({
         account={account}
         leave={leaveBy}
         onNotRecorded={() => setLastTapLost(true)}
+        mayCorrect={mayCorrect}
+        offline={offline}
       />
     );
   }
@@ -345,6 +417,7 @@ export function TrackerOpening({
               signIn={signIn}
               onTakeOver={act((game) => game.controller.takeOver())}
               onOpenAgain={act((game) => game.controller.openAgain())}
+              lists={lists}
               onConfirm={(format) => act((game) => game.confirmFormat(format))()}
             />
           ) : null}
@@ -370,18 +443,109 @@ export function TrackerOpening({
 function bannerState(banner: SavedBanner): CourtBanner['state'] {
   const first = banner[0].key;
   if (first === 'tracker.queue.allSaved') return 'saved';
-  return first === 'tracker.queue.waiting' ? 'waiting' : 'trouble';
+  // No connection is not a fault: the plays are kept, and wait as the others do.
+  return first === 'tracker.queue.waiting' ||
+    first === 'tracker.queue.kept' ||
+    first === 'tracker.queue.offline'
+    ? 'waiting'
+    : 'trouble';
 }
 
-/** What the tracker tells about holding the game and taps that did not go in. */
+/**
+ * Signed out, or no longer allowed to score (step 2.37, part 2): the plays the device
+ * holds are not on their way, so the banner says they are kept, not waiting to send.
+ */
+const keptOnly = (status: Pick<TrackerControllerStatus, 'mode' | 'signedOut'>): boolean =>
+  status.signedOut ||
+  (status.mode.kind === 'read-only' &&
+    (status.mode.reason === 'not-allowed' || status.mode.reason === 'signed-out'));
+
+/** The two lists of kept plays, and what can be done with them (step 2.37, part 2). */
+type KeptLists = {
+  /** The plays the league refused, play by play, and the tap that clears them. */
+  readonly notApplied: readonly KeptRow[];
+  readonly onClearNotApplied: () => void;
+  /** The plays this device made that will not be sent, play by play. */
+  readonly kept: readonly KeptRow[];
+  /** The scorekeeper has seen them: the list goes only by this deliberate tap. */
+  readonly onClearKept: () => void;
+  /** "Enter again" on one play, while this device holds the game (S-77). */
+  readonly onEnterAgain: (id: string) => void;
+  /** The last "Enter again" was not taken: the game as it stands does not take it. */
+  readonly againRefused: AgainRefusal | null;
+};
+
+/**
+ * What the tracker tells about holding the game and taps that did not go in; under them
+ * the plays the league refused and the plays not saved, play by play, each cleared only
+ * by a deliberate tap (step 2.37, part 2). While this device holds the game each play
+ * can be entered again; on a device that does not, the list is for reading out (S-77).
+ */
 function Notices({
   status,
   t,
+  lists,
+  busy,
 }: {
   readonly status: TrackerControllerStatus;
   readonly t: ReturnType<typeof createTranslator>;
+  readonly lists: KeptLists;
+  readonly busy: boolean;
 }) {
   const notices = trackerNotices(status);
+  const holds = status.mode.kind === 'scoring';
+  const list = (
+    name: 'not-applied' | 'kept',
+    rows: readonly KeptRow[],
+    title: string,
+    clear: string,
+    onClear: () => void,
+  ) =>
+    rows.length === 0 ? null : (
+      <section
+        className="court-stack"
+        aria-labelledby={`tracker-${name}`}
+        {...(name === 'kept' ? { 'data-kept-list': '' } : { 'data-not-applied-list': '' })}
+      >
+        <h2 id={`tracker-${name}`}>{title}</h2>
+        {holds ? null : (
+          <p className="court-quiet" data-read-aloud="">
+            {t('tracker.keptList.readAloud')}
+          </p>
+        )}
+        <ol className="court-stack court-kept-list">
+          {rows.map((row) => (
+            <li
+              key={row.id}
+              {...(name === 'kept' ? { 'data-kept-play': '' } : { 'data-not-applied-play': '' })}
+            >
+              {row.when === null ? null : <span className="court-quiet">{row.when} </span>}
+              {row.text}
+              {holds && row.again ? (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    className="court-button"
+                    data-enter-again=""
+                    aria-label={t('tracker.keptList.againLabel', { play: row.text })}
+                    onClick={() => lists.onEnterAgain(row.id)}
+                    disabled={busy}
+                  >
+                    {t('tracker.keptList.again')}
+                  </button>
+                </>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+        <p>
+          <button type="button" className="court-button" onClick={onClear} disabled={busy}>
+            {clear}
+          </button>
+        </p>
+      </section>
+    );
   return notices.length === 0 ? null : (
     <div role="alert" className="court-stack" data-tracker-notices="">
       {notices.map((notice) => (
@@ -389,6 +553,29 @@ function Notices({
           {trackerNoticeText(notice, t)}
         </p>
       ))}
+      {lists.againRefused !== null ? (
+        <p className="court-notice" data-kind="error" data-again-refused={lists.againRefused}>
+          {t(
+            lists.againRefused === 'not-taken-off'
+              ? 'tracker.keptList.againNotTakenOff'
+              : 'tracker.keptList.againRefused',
+          )}
+        </p>
+      ) : null}
+      {list(
+        'not-applied',
+        lists.notApplied,
+        t('tracker.notAppliedList.title'),
+        t('tracker.notAppliedList.clear'),
+        lists.onClearNotApplied,
+      )}
+      {list(
+        'kept',
+        lists.kept,
+        t('tracker.keptList.title'),
+        t('tracker.keptList.clear'),
+        lists.onClearKept,
+      )}
     </div>
   );
 }
@@ -414,11 +601,18 @@ function useSlowAfter(active: boolean, afterMs: number): boolean {
 }
 
 /**
- * Whether opening the game again can help: not for someone signed out, refused or
- * sent to a game that is not there, who would only be turned away again.
+ * Whether opening the game again can help: not for someone signed out (the way to sign
+ * in comes back to this game) or sent to a game that is not there. No longer allowed to
+ * score, it can: an admin may give the game back, and the plays kept here are then sent
+ * (step 2.37, part 2; the notice says "open it again here").
  */
 const mayOpenAgain = (reason: ReadOnlyReason): boolean =>
-  reason !== 'signed-out' && reason !== 'not-allowed' && reason !== 'unknown-game';
+  reason !== 'signed-out' &&
+  reason !== 'unknown-game' &&
+  // A game that is over is not opened again (step 2.37, part 2), and a tracker that
+  // needs an update is reloaded instead: the server would refuse it again.
+  reason !== 'game-not-live' &&
+  reason !== 'update-needed';
 
 function OpenGame({
   phase,
@@ -429,6 +623,7 @@ function OpenGame({
   signIn,
   onTakeOver,
   onOpenAgain,
+  lists,
   onConfirm,
 }: {
   readonly phase: Extract<Phase, { kind: 'open' }>;
@@ -441,6 +636,8 @@ function OpenGame({
   readonly signIn: ReactNode;
   readonly onTakeOver: () => void;
   readonly onOpenAgain: () => void;
+  /** The plays kept on this device, play by play (step 2.37, part 2). */
+  readonly lists: KeptLists;
   readonly onConfirm: (format: GameFormat) => void;
 }) {
   const { status, confirmed } = phase;
@@ -452,7 +649,7 @@ function OpenGame({
   useEffect(() => {
     if (screen.kind !== 'held-by-other') setAskingTakeOver(false);
   }, [screen.kind]);
-  const banner = savedBanner(status.queue);
+  const banner = savedBanner(status.queue, false, keptOnly(status));
   // Before the scoring screen, "All saved" would say nothing: the banner is shown only
   // when taps are waiting, refused or cannot be stored.
   const showBanner = banner[0].key !== 'tracker.queue.allSaved';
@@ -469,7 +666,7 @@ function OpenGame({
           {savedBannerText(banner, t)}
         </p>
       ) : null}
-      <Notices status={status} t={t} />
+      <Notices status={status} t={t} lists={lists} busy={busy} />
       {signIn}
       {screen.kind === 'opening' ? openingText : null}
       {screen.kind === 'held-by-other' && !askingTakeOver ? (
@@ -517,6 +714,19 @@ function OpenGame({
           <button type="button" className="court-button" onClick={onOpenAgain} disabled={busy}>
             {/* Taken over: opening again shows who has the game, and offers it back. */}
             {t(screen.reason === 'taken-over' ? 'tracker.seeWhoIsScoring' : 'tracker.openAgain')}
+          </button>
+        </p>
+      ) : null}
+      {screen.kind === 'read-only' && screen.reason === 'update-needed' ? (
+        <p>
+          <button
+            type="button"
+            className="court-button"
+            data-kind="main"
+            data-reload=""
+            onClick={() => window.location.reload()}
+          >
+            {t('tracker.readOnly.reload')}
           </button>
         </p>
       ) : null}

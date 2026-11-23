@@ -5,6 +5,8 @@
 import type { PGlite } from '@electric-sql/pglite';
 import {
   eventHandlers,
+  readStandings,
+  readTeamRecords,
   rebuildStandings,
   recordFinalScore,
   recordForfeit,
@@ -20,6 +22,7 @@ import { commandTransaction } from '../db/command-transaction.ts';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import type { LeagueScope } from '../db/transaction-scope.ts';
+import { withTransaction } from '../db/with-transaction.ts';
 import {
   freshSchema,
   newDivision,
@@ -37,6 +40,7 @@ import { activityLogStore } from './activity-log-store.ts';
 import { gamesStore } from './games-store.ts';
 import { liveGamesStore } from './live-games-store.ts';
 import { scoringSessionsStore } from './scoring-sessions-store.ts';
+import { standingsReadStore } from './standings-read-store.ts';
 import { standingsStore } from './standings-store.ts';
 
 let pglite: PGlite;
@@ -311,5 +315,39 @@ describe('standings follow every result (step 2.24)', () => {
     const { rows } = await calculated(s);
     expect(rows.map((r) => r.team_id)).not.toContain(extra);
     expect(rows).toHaveLength(4);
+  });
+
+  it('a team put in the bin with a result stays counted, so its opponent keeps the win (A-17)', async () => {
+    const s = await season();
+    const deps = depsWith();
+    // Game 0: team 0 beats team 1. Then team 1 goes to the bin directly, as before A-17.
+    await recordFinalScore(
+      s.ctx,
+      { gameId: s.game(0), version: 1, homeScore: 60, awayScore: 50 },
+      deps,
+    );
+    const before = await calculated(s);
+    await pglite.query('update teams set deleted_at = now() where id = $1', [s.teams[1]]);
+    await rebuildStandings(s.ctx, { seasonId: s.seasonId }, deps);
+    const after = await calculated(s);
+    expect(after.rows).toEqual(before.rows);
+    const winner = after.rows.find((r) => r.team_id === s.teams[0]);
+    expect(winner).toMatchObject({ games_played: 1, wins: 1, losses: 0 });
+
+    // The public reads keep its row, marked, with every place filled; it has no card.
+    await pglite.query(`update seasons set status = 'active' where id = $1`, [s.seasonId]);
+    const read = await withTransaction(db, { leagueId: s.l.leagueId }, async (scope) => ({
+      standings: await readStandings(standingsReadStore(scope), { seasonId: s.seasonId }),
+      records: await readTeamRecords(standingsReadStore(scope), { seasonId: s.seasonId }),
+    }));
+    if (!read.standings.ok || !read.records.ok) throw new Error('no public read');
+    const lines = read.standings.value.tables.flatMap((t) => t.lines);
+    expect(lines).toHaveLength(4);
+    expect(lines.filter((l) => l.team.removed).map((l) => l.team.id)).toEqual([s.teams[1]]);
+    for (const table of read.standings.value.tables) {
+      expect(table.lines.map((l) => l.seed)).toEqual(table.lines.map((_, i) => i + 1));
+    }
+    expect(read.records.value.map((r) => r.team.id)).not.toContain(s.teams[1]);
+    expect(read.records.value).toHaveLength(3);
   });
 });

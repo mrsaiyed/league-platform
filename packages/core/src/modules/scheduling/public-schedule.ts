@@ -25,6 +25,8 @@ export type PublicGameTeam = {
   readonly slug: string;
   readonly name: string;
   readonly color: string | null;
+  /** In the bin (A-17): named in its games, never offered as a team to pick. */
+  readonly removed?: boolean;
 };
 
 /** A published game, as the schedule and team pages show it. */
@@ -42,6 +44,18 @@ export type PublicGame = {
   /** Null until the game is decided (or while it is live and only final scores are kept). */
   readonly homeScore: number | null;
   readonly awayScore: number | null;
+  /**
+   * How many overtime periods a final game had (P7 §5.6): 0 in regulation. Null when it
+   * is not known (a score typed in, a box score, a game final before the count was kept)
+   * and for every game that is not final.
+   */
+  readonly overtimePeriods: number | null;
+  /**
+   * The regulation periods of the rules it is played under (its own once fixed, else its
+   * season's): 2 halves or 4 quarters. A card open while the game is played works out its
+   * overtime from the live channel's period when it ends (step 2.200).
+   */
+  readonly periods: 2 | 4;
   readonly divisionName: string | null;
   /** A venue is public: where to turn up. */
   readonly venue: {

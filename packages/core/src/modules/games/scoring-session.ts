@@ -94,19 +94,53 @@ export const heldByOther = (session: ScoringSession, now: number): ScoringSessio
 });
 
 /**
- * Renews a session its own device is still holding: the lease runs again from now.
- * If it was ended a moment ago by another request, says who holds the game instead.
+ * The least time the hold has to spare before another device may open the game without
+ * the takeover question (T-295, the code review's M2): never less than before T-295,
+ * when the lease was written again every half minute, so a phone locked for a minute or
+ * a minute with no signal does not let the game go.
+ */
+export const holdSpareMs = 90_000;
+
+/** How often the tracker asks whether it still holds the game (`holdCheckMs`, T-295). */
+const trackerCheckMs = 5_000;
+
+/**
+ * The lease is written again only once less than the spare time and one check of the
+ * tracker's are left (T-295): the tracker asks every few seconds whether it still holds
+ * the game, so that a takeover is learnt at once, and most answers are a read. With
+ * the lease at two minutes that is a write about every half minute, as before.
+ */
+export const renewWhenLeftMs = Math.min(leaseMs, holdSpareMs + trackerCheckMs);
+
+/**
+ * Renews a session its own device is still holding: while more than `renewWhenLeftMs` is
+ * left nothing is written and the lease stands; otherwise it runs again from now, in one
+ * write that matches only this session. If it was ended a moment ago by another
+ * request, says who holds the game instead.
  */
 export async function keepSession(
   tx: ScoringTx,
   session: ScoringSession,
   now: number,
 ): Promise<ScoringSessionReply> {
+  const held = (expiresAt: number): ScoringSessionReply => ({
+    status: 'held-by-you',
+    sessionId: session.id,
+    expiresAt,
+    sentAt: now,
+  });
+  const dueBefore = now + renewWhenLeftMs;
+  if (session.heldUntil >= dueBefore) return held(session.heldUntil);
   const heldUntil = now + leaseMs;
-  if (await tx.scoringSessions.extend(session.gameId, session.id, heldUntil)) {
-    return { status: 'held-by-you', sessionId: session.id, expiresAt: heldUntil, sentAt: now };
+  if (await tx.scoringSessions.extend(session.gameId, session.id, heldUntil, dueBefore)) {
+    return held(heldUntil);
   }
-  return answerFromHolder(tx, session.gameId, now);
+  const current = await tx.scoringSessions.findForGame(session.gameId);
+  // Still this session, renewed by another request a moment ago: it stands.
+  if (current?.id === session.id) return held(current.heldUntil);
+  return current === undefined
+    ? { status: 'ended', reason: 'released', sentAt: now }
+    : heldByOther(current, now);
 }
 
 /**

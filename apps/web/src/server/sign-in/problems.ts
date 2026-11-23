@@ -9,7 +9,17 @@ import type { TextKey } from '../messages.ts';
 
 /** Every problem a sign-in screen can show, by name: its words. */
 export const problems = {
+  /** The bot check refused the form (T4 §6, record 081). */
+  botCheckFailed: 'problem.botCheckFailed',
+  /** The bot check could not be asked just now, or refused our key. */
+  botCheckUnavailable: 'problem.botCheckUnavailable',
+  /** The person's browser could not load the check (its box wrote botCheckDidNotLoad). */
+  botCheckDidNotLoad: 'problem.botCheckDidNotLoad',
+  /** Our server could not reach the check's service: asking for a code waits (Q2). */
+  botCheckUnreachable: 'problem.botCheckUnreachable',
   invalidEmail: 'problem.invalidEmail',
+  /** The test copy takes only a made-up address for a code (step 2.205). */
+  onlyMadeUpAddresses: 'problem.onlyMadeUpAddresses',
   codeUsedUp: 'problem.codeUsedUp',
   codeNotSent: 'problem.codeNotSent',
   codeWrong: 'problem.codeWrong',
@@ -21,6 +31,8 @@ export const problems = {
   wrongEmailOrPassword: 'problem.wrongEmailOrPassword',
   wrongPassword: 'problem.wrongPassword',
   googleFailed: 'problem.googleFailed',
+  /** The test copy does not sign in with Google (step 2.205). */
+  googleOff: 'problem.googleOff',
   signInAgain: 'problem.signInAgain',
   /** Sent from the tracker's address with no session (step 2.33). */
   signInToScore: 'problem.signInToScore',
@@ -103,18 +115,4 @@ export function noticeOf(
 ): Notice | undefined {
   const name = search instanceof URLSearchParams ? search.get('notice') : search['notice'];
   return typeof name === 'string' && Object.hasOwn(notices, name) ? (name as Notice) : undefined;
-}
-
-/**
- * A wait as people say it (M28): seconds under a minute, otherwise whole minutes, rounded
- * up so nobody comes back too early ("15 minutes", never "900 seconds").
- */
-export function waitInWords(seconds: number): {
-  readonly unit: 'seconds' | 'minutes';
-  readonly count: number;
-} {
-  const whole = Math.max(1, Math.ceil(seconds));
-  return whole < 60
-    ? { unit: 'seconds', count: whole }
-    : { unit: 'minutes', count: Math.ceil(whole / 60) };
 }

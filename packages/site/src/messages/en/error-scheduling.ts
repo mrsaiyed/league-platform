@@ -97,6 +97,17 @@ export const enErrorScheduling = {
     'A game in the draft names a team that is no longer in this season.',
   'error.scheduling.publish_schedule.unknown-venue':
     'A game in the draft names a venue that is no longer there.',
+  'error.scheduling.put_back_draft_game.change-refused':
+    'That game is not removed in the draft, so there is nothing to put back.',
+  'error.scheduling.put_back_draft_game.changed-since-read':
+    'Someone else changed the schedule draft since you opened it. Reload it to see their changes.',
+  'error.scheduling.put_back_draft_game.draft-too-large':
+    'The schedule draft has grown too large. Publish it or discard it before adding more.',
+  'error.scheduling.put_back_draft_game.draft-unreadable':
+    'The saved schedule draft cannot be read. Discard it and start again.',
+  'error.scheduling.put_back_draft_game.revision-out-of-date':
+    'The schedule was published since you opened it. Discard this draft and start again from the published schedule.',
+  'error.scheduling.put_back_draft_game.season-not-found': 'That season is not there.',
   'error.scheduling.remove_draft_game.change-refused':
     'That change cannot be made to the schedule as it stands.',
   'error.scheduling.remove_draft_game.changed-since-read':

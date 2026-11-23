@@ -1,5 +1,5 @@
-// U-7: short names nobody may take: our own words and (to be extended by the
-// founder) obviously offensive ones. Data, one word per line; no league is named.
+// U-7: short names nobody may take: our own words and obviously offensive ones (a
+// starter list the founder reviews, U-16). Data, one word per line; no league is named.
 // The two lists are kept apart because they mean different things: our own words
 // are also how a request knows it is for one of our pages, not a league
 // (apps/web/src/server/context.ts); an offensive word is only refused as a name.
@@ -59,8 +59,101 @@ export const systemShortNames: ReadonlySet<string> = new Set([
   'staff',
 ]);
 
-/** Obviously offensive words, refused as a short name. The founder extends this list. */
-export const offensiveShortNames: ReadonlySet<string> = new Set<string>([]);
+/**
+ * Obviously offensive words and phrases, refused as a short name and as any word of one
+ * (U-16, decided for you on 2026-11-17 for the founder to review: a starter list, which
+ * the founder extends or trims). A phrase is its words joined by hyphens, as a short name
+ * writes them. Kept to words with no everyday meaning that a league could want, since
+ * a word here also refuses every short name it is a word of (`shit-hoops`); a word that
+ * is offensive only in some uses (`cock`, `dyke`, `fag`, `spic`) is left to the founder.
+ * Approved by the lead as a starter list on 2026-11-22 (the 2.98 review): the plurals of
+ * the words that have them, and the anti-Muslim slurs the reviewer found taken, are here;
+ * words joined without a hyphen (`shithoops`) and letters swapped (`sh1t`) are left for
+ * later. In alphabetical order.
+ */
+export const offensiveShortNames: ReadonlySet<string> = new Set<string>([
+  'arsehole',
+  'arseholes',
+  'asshole',
+  'assholes',
+  'bastard',
+  'bastards',
+  'bitch',
+  'bitches',
+  'bullshit',
+  'chink',
+  'chinks',
+  'cocksucker',
+  'cocksuckers',
+  'cunt',
+  'cunts',
+  'dickhead',
+  'dickheads',
+  'faggot',
+  'faggots',
+  'fuck',
+  'fucker',
+  'fuckers',
+  'fucking',
+  'fucks',
+  'heil',
+  'hitler',
+  'kike',
+  'kikes',
+  'kkk',
+  'motherfucker',
+  'motherfuckers',
+  'nazi',
+  'nazis',
+  'nigga',
+  'niggas',
+  'nigger',
+  'niggers',
+  'paedo',
+  'paedophile',
+  'paedophiles',
+  'paedos',
+  'pedo',
+  'pedophile',
+  'pedophiles',
+  'pedos',
+  'porn',
+  'porno',
+  'pornos',
+  'pussies',
+  'pussy',
+  'raghead',
+  'ragheads',
+  'rape',
+  'rapes',
+  'rapist',
+  'rapists',
+  'retard',
+  'retarded',
+  'retards',
+  'sandnigger',
+  'sandniggers',
+  'shit',
+  'shits',
+  'shitty',
+  'slut',
+  'sluts',
+  'towelhead',
+  'towelheads',
+  'trannies',
+  'tranny',
+  'twat',
+  'twats',
+  'wank',
+  'wanker',
+  'wankers',
+  'wanks',
+  'wetback',
+  'wetbacks',
+  'whore',
+  'whores',
+  'xxx',
+]);
 
 /** Every name nobody may take. */
 export const blockedShortNames: ReadonlySet<string> = new Set([

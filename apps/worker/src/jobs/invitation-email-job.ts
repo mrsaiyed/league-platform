@@ -156,6 +156,7 @@ export function sendInvitationEmail(deps: InvitationEmailDeps): JobHandler {
             html: rendered.html,
             text: rendered.text,
             idempotencyKey: emailKeyFor(link.invitation.id, link.token),
+            carries: 'link',
           };
         } catch {
           // Thrown inside the transaction, so the new link is rolled back with it.

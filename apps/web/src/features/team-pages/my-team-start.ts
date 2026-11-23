@@ -26,7 +26,10 @@ export async function myTeamStart(
   if ((await ports.publicTeams.startPageOf(leagueId)) !== 'myTeam') return undefined;
   const season = chooseSeason(await ports.publicStats.seasonsOf(leagueId), undefined);
   if (season === undefined) return undefined;
-  const teams = await ports.publicStats.readStoreOf(leagueId).teams(season.id);
+  // A team in the bin, listed in the standings for its results, has no page to start on.
+  const teams = (await ports.publicStats.readStoreOf(leagueId).teams(season.id)).filter(
+    (team) => !team.removed,
+  );
   if (accountId === null) {
     return chooseMyTeam({
       teams,

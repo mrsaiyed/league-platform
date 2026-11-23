@@ -9,7 +9,7 @@ import {
   choosePassword,
   confirmPassword,
   enterCode,
-  sendCodeAgain,
+  resendCode,
   signInWithPassword,
   signOut,
   signOutEverywhere,
@@ -25,12 +25,12 @@ export async function forgotPasswordAction(form: FormData): Promise<never> {
   redirect((await askForCode('reset', fieldsOf(form), await nextVisit(), await flowDeps())).to);
 }
 
-export async function sendCodeAgainAction(): Promise<never> {
-  redirect((await sendCodeAgain(await nextVisit(), await flowDeps())).to);
-}
-
 export async function enterCodeAction(form: FormData): Promise<never> {
   redirect((await enterCode(fieldsOf(form), await nextVisit(), await flowDeps())).to);
+}
+
+export async function resendCodeAction(form: FormData): Promise<never> {
+  redirect((await resendCode(fieldsOf(form), await nextVisit(), await flowDeps())).to);
 }
 
 export async function choosePasswordAction(form: FormData): Promise<never> {

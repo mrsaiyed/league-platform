@@ -53,7 +53,7 @@ export type PersonChange = {
 };
 
 export type PeopleSearch = {
-  /** Part of a name (and, when `sensitive`, of a contact email), in any capitals. */
+  /** Part of a name, in any capitals; never part of an email, whoever asks. */
   readonly search?: string;
   readonly limit: number;
   readonly offset: number;
@@ -97,6 +97,11 @@ export type PeopleStore = {
    * person not in this league counts as a child: the careful reading.
    */
   readonly isMinor: (personId: string) => Promise<boolean | null>;
+  /**
+   * The league's own today (yyyy-mm-dd) in its own time zone, by the store's clock: a
+   * birth date may not be after it (the day R-28 measures an age on).
+   */
+  readonly leagueToday: () => Promise<string>;
   /** The league's own stored values of one setting (the name policy's, R-25). */
   readonly leagueSettingRows: (key: string) => Promise<readonly StoredSettingRow[]>;
 };
