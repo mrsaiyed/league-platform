@@ -32,6 +32,8 @@ export const enAdminStandings = {
   'adminStandings.problem.not-confirmed': 'Tick the box first, to say you are sure.',
   'adminStandings.problem.nothing-changes':
     'Type at least one change: wins, losses, ties or points.',
+  'adminStandings.problem.number-too-big':
+    'That is too big a change. Wins, losses and ties go from -{count} to {count}, points from -{points} to {points}.',
   'adminStandings.problem.reason-missing': 'Say why, in a few words. It is kept with the change.',
   'adminStandings.problem.reason-too-long': 'Keep the reason to 500 letters or fewer.',
   'adminStandings.problem.season-not-found':

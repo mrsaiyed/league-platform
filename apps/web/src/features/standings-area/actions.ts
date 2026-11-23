@@ -25,6 +25,7 @@ import {
   type TypedFields,
 } from '../list-forms/index.ts';
 import {
+  adjustmentLimitWords,
   adjustmentProblemKey,
   readCounts,
   reasonProblem,
@@ -72,7 +73,9 @@ async function answer(
       code,
       fields,
       wrongAdjustmentFields(code, outcome.box),
-      t(adjustmentProblemKey(code)),
+      code === 'number-too-big'
+        ? t(adjustmentProblemKey(code), adjustmentLimitWords)
+        : t(adjustmentProblemKey(code)),
     );
   }
   return answerSaved(

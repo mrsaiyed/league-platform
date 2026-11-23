@@ -123,6 +123,19 @@ if (browser) {
         (await add(page).getByLabel('Reason').inputValue()) === reason &&
           (await add(page).getByLabel('Wins').inputValue()) === 'two',
       );
+      // 5000 wins is past what the command takes: said beside the box, naming the limits.
+      await add(page).getByLabel('Wins').fill('5000');
+      await add(page).getByRole('button', { name: 'Add the adjustment' }).click();
+      await add(page)
+        .getByText(/^That is too big a change/)
+        .waitFor();
+      note(
+        'refused: 5000 wins is said beside the Wins box, with the limits',
+        ((await problem.textContent()) ?? '').includes('from -1000 to 1000') &&
+          (await add(page).getByLabel('Wins').getAttribute('aria-invalid')) === 'true' &&
+          (await add(page).getByLabel('Wins').inputValue()) === '5000',
+        (await problem.textContent()) ?? '',
+      );
       await add(page).getByLabel('Wins').fill('1');
       await add(page).getByRole('button', { name: 'Add the adjustment' }).click();
       const said = page.locator('#adjustments').getByText(/^Saved: /);
@@ -143,6 +156,18 @@ if (browser) {
         table.slice(0, 400),
       );
       await noSideScroll(page, 'the adjustments screen with one listed');
+      // Taking it off with no reason is refused; the tick stays as it was.
+      const remove = page
+        .locator('.admin-adjustment', { hasText: reason })
+        .locator('form[data-form=remove-adjustment]');
+      await remove.getByLabel('Yes, take this adjustment off').check();
+      await remove.getByLabel('Why it comes off').fill(' ');
+      await remove.getByRole('button', { name: 'Take it off' }).click();
+      await remove.locator('[data-problem=remove-adjustment]').waitFor();
+      note(
+        'scripts on, refused: the tick is kept',
+        await remove.getByLabel('Yes, take this adjustment off').isChecked(),
+      );
     } finally {
       await context.close();
     }
@@ -176,6 +201,10 @@ if (browser) {
       const again = page
         .locator('.admin-adjustment', { hasText: reason })
         .locator('form[data-form=remove-adjustment]');
+      note(
+        'scripts off, refused: the tick is kept',
+        await again.getByLabel('Yes, take this adjustment off').isChecked(),
+      );
       await again.getByLabel('Why it comes off').fill('Ruling withdrawn');
       await again.getByLabel('Yes, take this adjustment off').check();
       await again.getByRole('button', { name: 'Take it off' }).click();

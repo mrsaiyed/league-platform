@@ -34,6 +34,18 @@ describe('the adjustments form', () => {
     });
   });
 
+  it('refuses a box past the limits the command takes, beside that box', () => {
+    expect(readCounts({ wins: '5000' })).toEqual({
+      ok: false,
+      code: 'number-too-big',
+      box: 'wins',
+    });
+    expect(readCounts({ ties: '-1001' })).toMatchObject({ code: 'number-too-big', box: 'ties' });
+    expect(readCounts({ points: '-10001' })).toMatchObject({ box: 'points' });
+    expect(readCounts({ wins: '-1000', points: '10000' })).toMatchObject({ ok: true });
+    expect(adjustmentProblemKey('number-too-big')).toBe('adminStandings.problem.number-too-big');
+  });
+
   it('asks for a reason of at most 500 letters', () => {
     expect(reasonProblem('  ')).toBe('reason-missing');
     expect(reasonProblem('x'.repeat(501))).toBe('reason-too-long');

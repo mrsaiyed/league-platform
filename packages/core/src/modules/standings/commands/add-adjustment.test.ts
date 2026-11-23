@@ -44,6 +44,15 @@ describe('addAdjustment', () => {
     expect(db.state.activity).toEqual([
       expect.objectContaining({ action: 'standings.add_adjustment', targetId: seasonId }),
     ]);
+    expect(db.state.activity[0]?.details).toEqual({
+      adjustment: db.state.adjustments[0]?.id,
+      team: teamId(2),
+      reason: 'Ruling: protest upheld',
+      wins: 1,
+      losses: -1,
+      ties: 0,
+      points: 0,
+    });
   });
 
   it('refuses one the calculation would leave out, saving nothing', async () => {

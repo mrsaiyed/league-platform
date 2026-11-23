@@ -2,6 +2,7 @@
 // which box a refusal marks with which sentence (step 2.56, record 067). The numbers are
 // read here, so a box holding "two" is refused beside that box before any command runs;
 // the command itself checks everything again.
+import { adjustmentLimits } from '@srleagues/core';
 import type { TextKey } from '../../server/messages.ts';
 
 export const adjustmentCounts = ['wins', 'losses', 'ties', 'points'] as const;
@@ -18,12 +19,24 @@ export type AdjustmentRead =
   | { readonly ok: true; readonly counts: Readonly<Record<AdjustmentCount, number>> }
   | { readonly ok: false; readonly code: string; readonly box: string };
 
-/** The four counts of an adjustment form, or the first box that is not a whole number. */
+/** The largest change a box may make, either way: the command's own limits. */
+const limitOf = (name: AdjustmentCount) =>
+  name === 'points' ? adjustmentLimits.points : adjustmentLimits.count;
+
+/** The limits, for the sentence that names them. */
+export const adjustmentLimitWords = {
+  count: String(adjustmentLimits.count),
+  points: String(adjustmentLimits.points),
+} as const;
+
+/** The four counts of an adjustment form, or the first box that is not a whole number
+ * or is past the limits the command takes. */
 export function readCounts(typed: Readonly<Record<string, string>>): AdjustmentRead {
   const counts: Partial<Record<AdjustmentCount, number>> = {};
   for (const name of adjustmentCounts) {
     const value = countOf(typed[name]);
     if (value === undefined) return { ok: false, code: 'invalid-number', box: name };
+    if (Math.abs(value) > limitOf(name)) return { ok: false, code: 'number-too-big', box: name };
     counts[name] = value;
   }
   const { wins = 0, losses = 0, ties = 0, points = 0 } = counts;
@@ -47,6 +60,7 @@ const known = [
   'not-allowed',
   'not-confirmed',
   'nothing-changes',
+  'number-too-big',
   'reason-missing',
   'reason-too-long',
   'season-not-found',

@@ -212,7 +212,15 @@ export function ListForm({
       {confirm === undefined ? null : (
         <p>
           <label className="staff-check">
-            <input type="checkbox" name="confirm" value="yes" required /> {confirm}
+            <input
+              key={`confirm:${String(typed('confirm') === 'yes')}`}
+              type="checkbox"
+              name="confirm"
+              value="yes"
+              defaultChecked={typed('confirm') === 'yes'}
+              required
+            />{' '}
+            {confirm}
           </label>
         </p>
       )}
