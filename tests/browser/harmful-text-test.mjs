@@ -426,7 +426,9 @@ if (browser) {
   // Step 2.168: the made-up coach (Amal Nasser, the coach token's person) is put on the attack
   // team's roster too, so the coach's own "my teams" read (/my-team) answers with its name.
   await step("the coach is put on the attack team's roster", async () => {
-    await page.goto(origin + teamAdmin);
+    // The refused jersey number's page may still be finishing its own navigation (it aborted
+    // this one once on the lane of step 2.97): once more if so, as the next step does.
+    await page.goto(origin + teamAdmin).catch(() => page.goto(origin + teamAdmin));
     const form = page.locator('form', {
       has: page.getByRole('button', { name: 'Add to the roster', exact: true }),
     });

@@ -37,11 +37,18 @@ export async function acceptHeldInvitationAction(): Promise<never> {
 
 /**
  * "Use another account": signs this browser out and opens sign-in, which brings the person
- * back to the accept page; the invitation stays held for this browser.
+ * back to the accept page; the invitation stays held for this browser. Since step 2.163 a
+ * plain sign-out leaves the person on the page they were on, so the accept page is named as
+ * a page that asks for sign-in (`staff`): the sign-in screen, saying "You are signed out",
+ * with the way back to the invitation.
  */
 export async function useAnotherAccountAction(form: FormData): Promise<never> {
   const league = form.get('league');
   const back = typeof league === 'string' ? heldInvitationPath(league) : undefined;
-  await signOut(await nextVisit(), await flowDeps());
-  return redirect(screenUrl('signin', { next: back ?? null }));
+  if (back === undefined) {
+    await signOut({}, await nextVisit(), await flowDeps());
+    return redirect(screenUrl('signin', { next: null }));
+  }
+  const answer = await signOut({ next: back, staff: 'yes' }, await nextVisit(), await flowDeps());
+  return redirect(answer.to);
 }
