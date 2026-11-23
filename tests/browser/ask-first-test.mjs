@@ -31,6 +31,13 @@
 // - Accessibility checks (T-186), no sideways scrolling at phone width (A-2), and the
 //   question's buttons at least 44 high.
 //
+// - Step 2.221: at 390 by touch, scripts on and off, two taps on one spot 100, 300, 600 and
+//   900 ms apart change no game, for each of the five buttons; "Yes" is drawn as not ready
+//   and, tapped every 300 ms, goes through within 1.5 s of the question, once (the taps too
+//   soon send nothing, so the wait never starts again); a hand-made "Yes" with an old time
+//   is asked again (the server keeps the time); a postpone refused because the game was
+//   cancelled meanwhile says so beside the game, scripts on and off.
+//
 // The activity log's line for a game put back (who and why) has no screen yet: it is
 // proved by apps/web/src/features/games-area/run-game-action.test.ts on the same world.
 import {
@@ -218,6 +225,8 @@ async function doubleTap(page, target, gap, touch) {
 
 /** Where the finger was, and where "No" and "Yes" stand once the question is drawn. */
 const places = [];
+/** What stood under the finger after each double tap with scripts off (step 2.221). */
+const scriptsOffUnder = [];
 
 /** One tap: once the question is drawn, what stands where the finger was. */
 async function spotAfterOneTap(page, game, target, touch, label) {
@@ -793,12 +802,326 @@ if (browser) {
       }
     },
   );
+
+  // Step 2.221 (the area lead's confirming look at 2.158): "Yes" takes a tap once it is
+  // drawn ready, and the wait never starts again; the time it waits from is the server's.
+  // Owls at Badgers was postponed above: put back on its date, a scheduled game again.
+  await step('Owls at Badgers is put back on its date for step 2.221', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token');
+    try {
+      await openGames(page);
+      const game = () => gameNamed(page, 'Owls', 'Badgers');
+      if ((await statusOf(game())) === 'postponed') {
+        const restore = panelOf(game(), 'Put it back on its date');
+        await openPanel(restore);
+        await restore.getByLabel(/Why are you putting it back/).selectOption({
+          label: 'Postponed by mistake',
+        });
+        await restore.getByRole('button', { name: 'Put it back', exact: true }).click();
+        await sayYes(game(), 'Yes, put it back on its date');
+        await game().getByRole('status').waitFor();
+      }
+      const status = await statusOf(game());
+      if (status !== 'scheduled') throw new Error(`Owls at Badgers is ${status}`);
+    } finally {
+      await context.close();
+    }
+  });
+
+  for (const scripts of [true, false]) {
+    const mode = scripts ? 'scripts on' : 'scripts off';
+    await step(`at 390 by touch, ${mode}: two taps on one spot 100 to 900 ms apart`, async () => {
+      const { context, page } = await signedInAs('local-scheduler-token', {
+        hasTouch: true,
+        javaScriptEnabled: scripts,
+      });
+      const gaps = [100, 300, 600, 900];
+      /** A game's status now, from the games list (a second tap may have followed a link). */
+      const statusNow = async (game) => {
+        if ((await game().count()) === 0) await openGames(page);
+        return statusOf(game());
+      };
+      const check = (what, gap, status, want, under) => {
+        if (!scripts) scriptsOffUnder.push(`${what} ${gap} ms: ${under || '-'}`);
+        note(
+          `390, ${mode}, ${gap} ms: two taps on one spot of ${what} change no game`,
+          status === want && (!scripts || !under.startsWith('Yes')),
+          `${status}, the spot holds: ${under}`,
+        );
+      };
+      try {
+        for (const button of ['Postpone', 'Cancel the game', 'Record forfeit']) {
+          for (const gap of gaps) {
+            await openGames(page);
+            const game = gameNamed(page, 'Owls', 'Badgers');
+            await openPanel(game.locator('details[data-call-off]').last());
+            if (button === 'Record forfeit') {
+              await game.getByLabel('Team that forfeits').selectOption({ label: 'Badgers' });
+            }
+            const button1 = game.getByRole('button', { name: button, exact: true });
+            const under = await doubleTap(page, button1, gap, true);
+            const status = await statusNow(() => gameNamed(page, 'Owls', 'Badgers'));
+            check(`"${button}"`, gap, status, 'scheduled', under);
+          }
+        }
+        // "Put it back" on a postponed game (Bears at Tigers, postponed for it).
+        const bears = () => gameOn(page, bearsAtTigers);
+        await openGames(page);
+        await tapToCallOff(bears(), 'Postpone');
+        await sayYes(bears(), 'Yes, postpone it');
+        await bears().getByRole('status').waitFor();
+        const restoreReady = async () => {
+          await openGames(page);
+          const restore = panelOf(bears(), 'Put it back on its date');
+          await openPanel(restore);
+          await restore.getByLabel(/Why are you putting it back/).selectOption({
+            label: 'Postponed by mistake',
+          });
+          return restore.getByRole('button', { name: 'Put it back', exact: true });
+        };
+        for (const gap of gaps) {
+          const under = await doubleTap(page, await restoreReady(), gap, true);
+          check('"Put it back"', gap, await statusNow(bears), 'postponed', under);
+        }
+        await (await restoreReady()).click();
+        await sayYes(bears(), 'Yes, put it back on its date');
+        await bears().getByRole('status').waitFor();
+        // "Put it back on the schedule" on a cancelled game (Herons at Falcons): its one
+        // change is made once, and nothing more.
+        const herons = () => gameNamed(page, 'Herons', 'Falcons');
+        for (const gap of gaps) {
+          await openGames(page);
+          await tapToCallOff(herons(), 'Cancel the game');
+          await sayYes(herons(), 'Yes, cancel it');
+          await herons().getByRole('status').waitFor();
+          await openGames(page);
+          const putBack = herons().locator('details[data-action-form]');
+          await openPanel(putBack);
+          await putBack
+            .getByLabel(/Why are you putting it back/)
+            .selectOption({ label: 'Cancelled by mistake' });
+          const under = await doubleTap(
+            page,
+            putBack.getByRole('button', { name: 'Put it back on the schedule' }),
+            gap,
+            true,
+          );
+          check('"Put it back on the schedule"', gap, await statusNow(herons), 'scheduled', under);
+        }
+      } finally {
+        await context.close();
+      }
+    });
+  }
+
+  // The look's point 2: with scripts off, the button tapped standing exactly where "Yes"
+  // lands on the page drawn anew. A second tap 800 ms later is on "Yes", and only asks.
+  await step('scripts off: a second tap 800 ms later, right where "Yes" lands', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token', {
+      hasTouch: true,
+      javaScriptEnabled: false,
+    });
+    try {
+      const game = () => gameNamed(page, 'Owls', 'Badgers');
+      const postpone = () => game().getByRole('button', { name: 'Postpone', exact: true });
+      // Where "Yes" lands on the page the question is drawn in.
+      await openGames(page);
+      await openPanel(game().locator('details[data-call-off]').last());
+      await postpone().click();
+      await questionOf(game()).waitFor();
+      const yes = await questionOf(game()).getByRole('button').boundingBox();
+      if (yes === null) throw new Error('"Yes" is not on the screen');
+      // "Postpone" moved to that very spot, and tapped twice there.
+      await openGames(page);
+      await openPanel(game().locator('details[data-call-off]').last());
+      await postpone().scrollIntoViewIfNeeded();
+      const before = await postpone().boundingBox();
+      if (before === null) throw new Error('"Postpone" is not on the screen');
+      await page.evaluate(
+        (dy) => window.scrollBy(0, dy),
+        before.y + before.height / 2 - (yes.y + yes.height / 2),
+      );
+      const button = await postpone().boundingBox();
+      if (button === null) throw new Error('"Postpone" is not on the screen');
+      const x = Math.max(button.x, yes.x) + 12;
+      const y = yes.y + yes.height / 2;
+      await page.touchscreen.tap(x, y);
+      await page.waitForTimeout(800);
+      await page.touchscreen.tap(x, y);
+      await page.waitForTimeout(1500);
+      await page.waitForLoadState('load');
+      const under = await page.evaluate(
+        ([px, py]) =>
+          (
+            document.elementFromPoint(px, py)?.closest('button, summary, a')?.textContent ?? ''
+          ).trim(),
+        [x, y],
+      );
+      if ((await game().count()) === 0) await openGames(page);
+      note(
+        'scripts off: a second tap 800 ms later on "Yes", where the button tapped stood, only asks',
+        under.startsWith('Yes') && (await statusOf(game())) === 'scheduled',
+        `${await statusOf(game())}, the spot holds: ${under}`,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  await step('a hand-made "Yes" with an old time is asked again', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token', {
+      javaScriptEnabled: false,
+    });
+    const old = String(Date.now() - 60_000);
+    /** Makes a form say it is the question's confirmed "Yes", asked a minute ago. */
+    const handMade = (form) =>
+      form.evaluate((f, at) => {
+        const step = f.querySelector('input[name="step"]');
+        if (step !== null) step.value = 'confirm';
+        f.querySelector('input[name="askedAt"]')?.remove();
+        for (const [name, value] of [
+          ['confirmed', 'yes'],
+          ['askedAt', at],
+        ]) {
+          if (f.querySelector(`input[name="${name}"]`) !== null) continue;
+          const field = document.createElement('input');
+          field.type = 'hidden';
+          field.name = name;
+          field.value = value;
+          f.append(field);
+        }
+      }, old);
+    try {
+      // With no question asked at all: the asking form turned into a "Yes".
+      await openGames(page);
+      const game = () => gameNamed(page, 'Owls', 'Badgers');
+      await openPanel(game().locator('details[data-call-off]').last());
+      await handMade(game().locator('form[data-call-off-act="postpone"]'));
+      await game().getByRole('button', { name: 'Postpone', exact: true }).click();
+      await page.waitForLoadState('load');
+      note(
+        'a hand-made "Yes" that was never asked, saying a minute-old time, is asked again',
+        (await statusOf(game())) === 'scheduled' && (await questionOf(game()).count()) === 1,
+        `${await statusOf(game())}`,
+      );
+      // The question's own "Yes", sent at once with a minute-old time added.
+      await openGames(page);
+      await tapToCallOff(game(), 'Postpone');
+      await questionOf(game()).waitFor();
+      await handMade(questionOf(game()).locator('form'));
+      await questionOf(game()).getByRole('button', { name: 'Yes, postpone it' }).click();
+      await page.waitForLoadState('load');
+      note(
+        'the question\'s "Yes" sent at once with a minute-old time is asked again',
+        (await statusOf(game())) === 'scheduled' && (await questionOf(game()).count()) === 1,
+        `${await statusOf(game())}`,
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
+  for (const scripts of [true, false]) {
+    const mode = scripts ? 'scripts on' : 'scripts off';
+    await step(`${mode}: postponing a game someone cancelled meanwhile says so`, async () => {
+      const mine = await signedInAs('local-scheduler-token', {
+        hasTouch: true,
+        javaScriptEnabled: scripts,
+      });
+      const theirs = await signedInAs('local-scheduler-token');
+      try {
+        const page = mine.page;
+        const game = () => gameNamed(page, 'Herons', 'Falcons');
+        await openGames(page);
+        await tapToCallOff(game(), 'Postpone');
+        await questionOf(game()).waitFor();
+        // Someone else cancels it meanwhile.
+        const other = () => gameNamed(theirs.page, 'Herons', 'Falcons');
+        await openGames(theirs.page);
+        await tapToCallOff(other(), 'Cancel the game');
+        await sayYes(other(), 'Yes, cancel it');
+        await other().getByRole('status').waitFor();
+        await sayYes(game(), 'Yes, postpone it');
+        const said = game().getByRole('alert').filter({
+          hasText: 'Someone cancelled this game meanwhile, so nothing else was changed.',
+        });
+        await said.waitFor();
+        note(
+          `${mode}: the stale postpone says its sentence beside the game, shown cancelled`,
+          (await statusOf(game())) === 'cancelled' && (await said.count()) === 1,
+          `${await statusOf(game())}`,
+        );
+        if (scripts) await accessible(page, 'a postpone refused: the game was cancelled meanwhile');
+        await openGames(theirs.page);
+        const putBack = other().locator('details[data-action-form]');
+        await openPanel(putBack);
+        await putBack
+          .getByLabel(/Why are you putting it back/)
+          .selectOption({ label: 'Cancelled by mistake' });
+        await putBack.getByRole('button', { name: 'Put it back on the schedule' }).click();
+        await other().getByRole('status').waitFor();
+      } finally {
+        await mine.context.close();
+        await theirs.context.close();
+      }
+    });
+  }
+
+  await step('at 390 by touch, "Yes" tapped every 300 ms goes through within 1.5 s', async () => {
+    const { context, page } = await signedInAs('local-scheduler-token', { hasTouch: true });
+    try {
+      await openGames(page);
+      const game = gameNamed(page, 'Owls', 'Badgers');
+      await tapToCallOff(game, 'Postpone');
+      const yes = questionOf(game).getByRole('button', { name: 'Yes, postpone it' });
+      await yes.waitFor();
+      const drawn = Date.now();
+      const notReady = (await yes.getAttribute('aria-disabled')) === 'true';
+      // Every "Yes" the page sends, by when it was sent after the question was drawn.
+      const sent = [];
+      page.on('request', (request) => {
+        if (request.method() === 'POST' && (request.postData() ?? '').includes('confirmed')) {
+          sent.push(Date.now() - drawn);
+        }
+      });
+      await yes.scrollIntoViewIfNeeded();
+      const box = await yes.boundingBox();
+      if (box === null) throw new Error('"Yes" is not on the screen');
+      const taps = [];
+      // Each tap at its own time from the drawing (300, 600, …), so a slow machine never
+      // pushes the later ones back; no more once a "Yes" has been sent.
+      for (let k = 1; k <= 8 && sent.length === 0; k += 1) {
+        const wait = drawn + 300 * k - Date.now();
+        if (wait > 0) await page.waitForTimeout(wait);
+        taps.push(Date.now() - drawn);
+        await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      }
+      await game.getByRole('status').waitFor();
+      const before = taps.filter((at) => sent.length > 0 && at < sent[0]).length;
+      note('"Yes" is drawn as not ready when the question is drawn', notReady);
+      note(
+        '"Yes" tapped every 300 ms goes through within 1.5 s, once; the taps too soon send nothing',
+        sent.length === 1 &&
+          sent[0] <= 1500 &&
+          before >= 2 &&
+          (await statusOf(game)) === 'postponed',
+        `taps at ${taps.join(', ')} ms; sent at ${sent.join(', ')} ms; ${await statusOf(game)}`,
+      );
+      note(
+        '"Yes" is drawn ready once it takes a tap',
+        (await page.locator('[data-resting]').count()) === 0,
+      );
+    } finally {
+      await context.close();
+    }
+  });
 }
 
 await browser?.close();
 server?.child.kill();
 
 console.log(`Where the answers stand (x,y of each box's top left):\n  ${places.join('\n  ')}`);
+console.log(`Under the finger after a double tap, scripts off:\n  ${scriptsOffUnder.join('\n  ')}`);
 
 if (failures.length > 0) {
   console.error(`Ask-first browser test failed:\n- ${failures.join('\n- ')}`);
