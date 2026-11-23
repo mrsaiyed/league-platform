@@ -253,6 +253,21 @@ if (built) {
     const coach = await open(false, 'local-coach-token');
     const refused = await coach.goto(`${origin}/north-valley/admin/settings/bin`);
     note('a coach is refused the bin', refused?.status() === 403, `${refused?.status()}`);
+
+    // A registrar may bring back people's league records only (T-308): the people part.
+    at = "a registrar sees the bin's people only";
+    const registrar = await open(false, 'local-registrar-token');
+    const theirs = await registrar.goto(`${origin}/quiet-pines/admin/settings/bin`);
+    const parts = await registrar.locator('main h2').allTextContents();
+    note(
+      "a registrar sees the bin's people, not its teams, games or divisions",
+      theirs?.status() === 200 &&
+        parts.includes('Removed people') &&
+        !parts.includes('Removed teams') &&
+        !parts.includes('Removed games') &&
+        !parts.includes('Removed divisions'),
+      `${theirs?.status()} ${parts.join(', ')}`,
+    );
   } catch (error) {
     failures.push(`${at}: ${whatWentWrong(error)}`);
   } finally {
