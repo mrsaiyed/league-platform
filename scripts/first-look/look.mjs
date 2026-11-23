@@ -380,6 +380,14 @@ try {
       await go(a, origin, `${ad}/season`);
       await shot(a, '28b-admin-season-phone.jpg', 'B', "The season's settings");
     });
+    await safe('28c', async () => {
+      await go(a, origin, `${ad}/season/divisions`);
+      await shot(a, '28c-admin-divisions-phone.jpg', 'B', 'Editing divisions');
+    });
+    await safe('28d', async () => {
+      await go(a, origin, `${ad}/schedule/venues`);
+      await shot(a, '28d-admin-venues-phone.jpg', 'B', 'Venues');
+    });
   }
 
   if (mode === 'score') {

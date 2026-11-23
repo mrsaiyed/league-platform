@@ -709,10 +709,45 @@ describe('tables', () => {
       }),
     );
     expect(html).toContain('data-narrow="fit" style="--ui-in-view:3;--ui-seed-col:1"');
-    // Games played, in the heading and the row, is left to the wide layout.
+    // Games played, in the heading and the row, leaves its place on a phone and is drawn
+    // again straight after the last column in view, the first one scrolled to: never lost.
     expect(html.match(/class="ui-num ui-left-out"/g)).toHaveLength(2);
+    expect(html.match(/class="ui-num ui-moved"/g)).toHaveLength(2);
+    expect(html).toMatch(/>PCT<\/th><th scope="col" class="ui-num ui-moved">GP<\/th><th[^>]*>PF</);
+    expect(html.match(/class="ui-num ui-last-in-view"/g)).toHaveLength(2);
+    expect(displayCss).toMatch(/\.ui-standings \.ui-moved \{\s*display: none;/);
     expect(displayCss).toMatch(/@media \(max-width: 30rem\) \{\s*\.ui-standings\[data-narrow\] \{/);
     expect(displayCss).toMatch(/\.ui-standings\[data-narrow\] \.ui-left-out \{\s*display: none;/);
+    expect(displayCss).toMatch(
+      /\.ui-standings\[data-narrow\] \.ui-moved \{\s*display: table-cell;/,
+    );
+    // The last column in view has room for five figures ("1.000") in the table's own face.
+    expect(displayCss).toMatch(
+      /--ui-last-col: max\(var\(--ui-num-col\), calc\(5ch \+ 6 \* var\(--step-1\)\)\);/,
+    ); // The team column never goes below a word of about eleven letters (beside its shield):
+    // too narrow for that, the last column in view joins the scroll, and the one before it
+    // keeps the fade's room.
+    expect(html.match(/class="ui-num ui-next-to-last"/g)).toHaveLength(2);
+    expect(displayCss).toMatch(/--ui-name-least: calc\(11ch \+ var\(--ui-name-beside\)\);/);
+    expect(displayCss).toMatch(/--ui-name-col: max\(\s*var\(--ui-name-least\),/);
+  });
+
+  it('on a phone draw a wide-only column nowhere, not even after the scroll', () => {
+    const html = render(
+      createElement(StandingsTable, {
+        caption: 'East',
+        idPrefix: 'east',
+        columns: [
+          { key: 'gp', label: 'GP', narrow: 'wide-only' },
+          { key: 'w', label: 'W', narrow: 'in-view' },
+          { key: 'pct', label: 'PCT', narrow: 'in-view' },
+        ],
+        rows: [{ id: 'a', team: 'Owls', cells: { gp: 6, w: 5, pct: '.833' } }],
+        labels: { seed: 'Seed', team: 'Team', note: 'Note', notes: 'Notes' },
+      }),
+    );
+    expect(html.match(/class="ui-num ui-left-out"/g)).toHaveLength(2);
+    expect(html).not.toContain('ui-moved');
   });
   it('fade the far edge lightly: a column wholly in view under it keeps its digits', () => {
     // Narrow, and reaching the panel's color only at the very edge: never a solid band. A
@@ -812,7 +847,11 @@ describe('the stylesheet of the page pieces', () => {
     // the spacing scale (DESIGN.md, section 4, line 2). The only bare lengths are a
     // hairline, the one pixel that hides words kept for screen readers, and a share (%).
     const step = String.raw`var\(--(?:step-\d|space(?:-tight|-section)?)\)`;
-    const plain = String.raw`(?:${step}|0|auto|-?1px|\d+%)`;
+    // A table of statistics on a phone picks one of two steps by whether its columns fit
+    // (--ui-too-many and --ui-few are 0 or a great length): still only steps of the scale.
+    const fit = String.raw`var\(--ui-(?:too-many|few)\)`;
+    const pick = String.raw`max\(${step}, min\(${fit}, ${step}\)\)|min\(${fit}, ${step}\)`;
+    const plain = String.raw`(?:${step}|${pick}|0|auto|-?1px|\d+%)`;
     const sum = String.raw`calc\((?:${step}|-?1px|\d+%|-?\d+|[-+*/ ()])+\)`;
     const onScale = new RegExp(`^(?:${plain}|${sum})(?: (?:${plain}|${sum}))*$`);
     const spaces = [

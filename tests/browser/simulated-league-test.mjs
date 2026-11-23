@@ -9,7 +9,9 @@
 //    teams, a typed final game, a tracked final game (its box score and play by play), the
 //    overtime game when this size has one ("Final, OT"), a postponed game still waiting and
 //    a forfeited game, each saying so. Each answers 200, shows no error and is no wider
-//    than the screen.
+//    than the screen. On a phone (320, 360 and 390) home, standings and statistics each
+//    have a table, every cell whole or scrolling in its own box, and no team's name broken
+//    inside a word.
 // 2. The standings' games played for one team are what the simulator's own check counts:
 //    its games, less those never played.
 // 3. As the league's owner, signed in on "Be a made-up person": Admin → Games shows the
@@ -79,6 +81,117 @@ if (built) {
   });
 }
 
+/**
+ * The table cells on the page that a person on this screen cannot see whole and cannot
+ * scroll to: a cell is fine when it lies inside the screen, or inside a box that scrolls
+ * sideways (the table's own box, which DESIGN.md line 14 allows), and not fine when a box
+ * that hides what overflows cuts it, or it runs past the screen's edge with no box to
+ * scroll. A cell's own text cut short by the cell counts too, and so does a cell standing
+ * half in view at the edge of its scrolling box while the table is at rest, or holding
+ * words or a text box under the fade of that edge. The width check above only
+ * sees a page wider than the screen, and a table cut inside a hidden box is not that.
+ */
+async function clippedCells(page) {
+  return page.evaluate(() => {
+    const out = [];
+    const width = document.documentElement.clientWidth;
+    for (const [t, table] of [...document.querySelectorAll('main table')].entries()) {
+      for (const cell of table.querySelectorAll('th, td')) {
+        const box = cell.getBoundingClientRect();
+        if (box.width === 0 || box.height === 0) continue;
+        const name = `table ${t + 1} "${(cell.textContent ?? '').trim().slice(0, 20)}"`;
+        const own = getComputedStyle(cell);
+        if (own.overflowX !== 'visible' && cell.scrollWidth > cell.clientWidth + 1) {
+          out.push(`${name}: its text is cut by the cell`);
+          continue;
+        }
+        let clip = null;
+        for (let e = cell.parentElement; e && e !== document.body; e = e.parentElement) {
+          if (getComputedStyle(e).overflowX !== 'visible') {
+            clip = e;
+            break;
+          }
+        }
+        const scrolls = clip && ['auto', 'scroll'].includes(getComputedStyle(clip).overflowX);
+        const edge = clip ? clip.getBoundingClientRect() : { left: 0, right: width };
+        if (scrolls) {
+          // In a box that scrolls, at rest a cell is wholly in view or wholly out of it (the
+          // first one to scroll to starts at the box's edge): never half in view.
+          const end = edge.left + clip.clientWidth;
+          if (box.left < end - 1 && box.right > end + 1) {
+            out.push(
+              `${name}: half in view, ${Math.round(box.left)}..${Math.round(box.right)} at an edge of ${Math.round(end)}`,
+            );
+          }
+          // While the box goes on, its far edge fades (DESIGN.md line 14, 16 wide): what a
+          // cell wholly in view holds (its words or its text box) stands clear of that fade
+          // but for a sliver, so the last column in view is never read half faded.
+          const goesOn = clip.scrollWidth > clip.clientWidth + 1;
+          if (goesOn && box.right <= end + 1) {
+            // The words drawn (not those kept for screen readers only), or the text box.
+            const field = cell.querySelector('input, select');
+            let ends = field ? field.getBoundingClientRect().right : 0;
+            const walk = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+            for (let n = walk.nextNode(); n && !field; n = walk.nextNode()) {
+              if (!n.textContent.trim() || n.parentElement.closest('.ui-visually-hidden')) continue;
+              const range = document.createRange();
+              range.selectNodeContents(n);
+              for (const r of range.getClientRects()) ends = Math.max(ends, r.right);
+            }
+            const held = { width: ends, right: ends };
+            if (held.width > 0 && held.right > end - 12) {
+              out.push(
+                `${name}: under the far edge's fade, ends ${Math.round(held.right)} of ${Math.round(end)}`,
+              );
+            }
+          }
+          continue;
+        }
+        const right = Math.min(edge.right, width);
+        const left = Math.max(edge.left, 0);
+        if (box.right > right + 1 || box.left < left - 1) {
+          out.push(
+            `${name}: ${Math.round(box.left)}..${Math.round(box.right)} of ${left}..${right}`,
+          );
+        }
+      }
+    }
+    return out;
+  });
+}
+
+/**
+ * The team names of the page's tables whose words are broken inside a word: a name wraps
+ * only between its words, so each word's own letters stand on one line (a range over the
+ * word has one line box). Also gives the narrowest team column seen, to say in a failure.
+ */
+async function brokenNames(page) {
+  return page.evaluate(() => {
+    const out = [];
+    for (const name of document.querySelectorAll('main table .ui-team-name')) {
+      const cell = name.closest('th, td');
+      for (const node of name.childNodes) {
+        if (node.nodeType !== Node.TEXT_NODE) continue;
+        const text = node.textContent ?? '';
+        for (const m of text.matchAll(/\S+/g)) {
+          const range = document.createRange();
+          range.setStart(node, m.index);
+          range.setEnd(node, m.index + m[0].length);
+          const rects = [...range.getClientRects()];
+          const tops = new Set(rects.map((r) => Math.round(r.top)));
+          if (tops.size > 1) {
+            const long = Math.round(rects.reduce((sum, r) => sum + r.width, 0));
+            out.push(
+              `"${m[0]}" (${long} px) in ${tops.size} lines (cell ${Math.round(cell.clientWidth)} px)`,
+            );
+          }
+        }
+      }
+    }
+    return out;
+  });
+}
+
 /** The game pages the schedule links to, each with its page's text, fetched once. */
 async function gamePages() {
   const schedule = await (await fetch(`${origin}/${slug}/schedule`)).text();
@@ -122,6 +235,48 @@ if (browser) {
   ].filter(([, address]) => address !== undefined);
   note(`the season has ${plan.games.length} games, every one linked`, games.length > 30);
 
+  // On a phone, the tables of home, standings and statistics: there is a table, each cell
+  // is whole or scrolls in its own box, and no team's name is broken inside a word.
+  const phoneTables = async (page, label, width) => {
+    note(`${label} at ${width}: has a table`, (await page.locator('main table').count()) > 0);
+    const cut = await clippedCells(page);
+    note(
+      `${label} at ${width}: every table cell is on the screen or in a box that scrolls`,
+      cut.length === 0,
+      cut.slice(0, 6).join('; '),
+    );
+    if (label === 'home' || label === 'standings') {
+      const broken = await brokenNames(page);
+      note(
+        `${label} at ${width}: no team's name is broken inside a word`,
+        broken.length === 0,
+        broken.slice(0, 6).join('; '),
+      );
+    }
+  };
+  for (const width of [320, 360]) {
+    await step(`home, standings and statistics at ${width} wide`, async () => {
+      const context = await browser.newContext({ viewport: { width, height: 900 } });
+      const page = await context.newPage();
+      page.setDefaultTimeout(60_000);
+      for (const [label, address] of pages) {
+        if (!['home', 'standings', 'statistics'].includes(label)) continue;
+        await page.goto(origin + address);
+        const wide = await page.evaluate(() => document.documentElement.scrollWidth);
+        note(`${label} at ${width}: no wider than the screen`, wide <= width, `${wide} px`);
+        await phoneTables(page, label, width);
+        if (shots && label !== 'statistics') {
+          mkdirSync(shots, { recursive: true });
+          await page.screenshot({
+            path: `${shots}/simulated-${label}-${width}.png`,
+            fullPage: true,
+          });
+        }
+      }
+      await context.close();
+    });
+  }
+
   for (const width of [390, 1280]) {
     await step(`the league's pages at ${width} wide`, async () => {
       const context = await browser.newContext({ viewport: { width, height: 900 } });
@@ -137,6 +292,9 @@ if (browser) {
         );
         const wide = await page.evaluate(() => document.documentElement.scrollWidth);
         note(`${label} at ${width}: no wider than the screen`, wide <= width, `${wide} px`);
+        if (width === 390 && ['home', 'standings', 'statistics'].includes(label)) {
+          await phoneTables(page, label, 390);
+        }
         if (shots && (label === 'home' || label === 'standings')) {
           mkdirSync(shots, { recursive: true });
           await page.screenshot({
@@ -212,6 +370,27 @@ if (browser) {
         text.includes(waiting.away),
       `${page.url()} ${waiting?.home} v ${waiting?.away}: ${text.slice(0, 1200)}`,
     );
+    // One typed final game's page in the admin, on a phone: its stat table is whole or
+    // scrolls inside its own box, never cut at the screen's edge.
+    const typed = pages.find(([label]) => label === 'a typed final game')?.[1];
+    note('a typed final game to open in the admin', typed !== undefined);
+    if (typed !== undefined) {
+      for (const width of [320, 360, 390]) {
+        await page.setViewportSize({ width, height: 844 });
+        const answer = await page.goto(`${origin}/${slug}/admin/games/${typed.split('/').pop()}`);
+        note(`the admin's game page at ${width} answers 200`, answer?.status() === 200);
+        note(
+          `the admin game page at ${width} has a stat table`,
+          (await page.locator('main table').count()) > 0,
+        );
+        const cut = await clippedCells(page);
+        note(
+          `the admin's game page at ${width}: every table cell is on the screen or in a box that scrolls`,
+          cut.length === 0,
+          cut.slice(0, 6).join('; '),
+        );
+      }
+    }
     await context.close();
   });
 }

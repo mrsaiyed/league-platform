@@ -7,10 +7,12 @@ export type StandingsColumn = {
   readonly label: string;
   /**
    * In a phone-wide page: `in-view` columns stand beside the team with nothing to scroll
-   * (they must come first among the columns drawn there), `left-out` ones are left to the
-   * wide layout, and the others are reached by scrolling inside the table's own box.
+   * (they must come first among the columns drawn there), `left-out` ones are moved out of
+   * their place to stand straight after the in-view ones, the first reached by scrolling,
+   * and the others are reached by scrolling inside the table's own box after those.
+   * `wide-only` ones are not drawn on a phone at all (the home page's small table).
    */
-  readonly narrow?: 'in-view' | 'left-out';
+  readonly narrow?: 'in-view' | 'left-out' | 'wide-only';
 };
 
 export type StandingsRow = {
@@ -66,7 +68,27 @@ export function StandingsTable({
   const numberOf = new Map(footnotes.map((n, i) => [n.id, i + 1]));
   const hasSeeds = rows.some((r) => r.seed !== undefined && r.seed !== null);
   const classOf = (c: StandingsColumn) =>
-    c.narrow === 'left-out' ? 'ui-num ui-left-out' : 'ui-num';
+    c.narrow === 'left-out' || c.narrow === 'wide-only' ? 'ui-num ui-left-out' : 'ui-num';
+  // The columns in the order drawn: each left-out one is drawn twice, in its own place
+  // (shown only in a wide layout) and again after the last in-view column (shown only on a
+  // phone-wide page), so on a phone it is never lost, only one scroll away (table-css.ts).
+  const lastInView = columns.findLastIndex((c) => c.narrow === 'in-view');
+  const moved = columns
+    .filter((c) => c.narrow === 'left-out')
+    .map((c) => ({ c, key: `${c.key}-moved`, className: 'ui-num ui-moved' }));
+  // The column in view before the last one stands at the box's edge when the screen is too
+  // narrow for the last one beside the name, and that one is then scrolled to (table-css.ts).
+  const nextToLast = columns[lastInView - 1]?.narrow === 'in-view' ? lastInView - 1 : -1;
+  const classAt = (c: StandingsColumn, i: number) =>
+    i === lastInView
+      ? 'ui-num ui-last-in-view'
+      : i === nextToLast
+        ? 'ui-num ui-next-to-last'
+        : classOf(c);
+  const drawn = columns.flatMap((c, i) => [
+    { c, key: c.key, className: classAt(c, i) },
+    ...(i === lastInView ? moved : []),
+  ]);
   // What a phone-wide table gives the team column: the box less the place and the columns
   // in view beside it, so those show whole and the first column to scroll to starts at the
   // box's edge, none of it half in view (table-css.ts).
@@ -96,8 +118,8 @@ export function StandingsTable({
               <th scope="col" className="ui-team-cell">
                 {labels.team}
               </th>
-              {columns.map((c) => (
-                <th key={c.key} scope="col" className={classOf(c)}>
+              {drawn.map(({ c, key, className }) => (
+                <th key={key} scope="col" className={className}>
                   {c.label}
                 </th>
               ))}
@@ -141,8 +163,8 @@ export function StandingsTable({
                       ))}
                     </span>
                   </th>
-                  {columns.map((c) => (
-                    <td key={c.key} className={classOf(c)}>
+                  {drawn.map(({ c, key, className }) => (
+                    <td key={key} className={className}>
                       {row.cells[c.key] ?? ''}
                     </td>
                   ))}

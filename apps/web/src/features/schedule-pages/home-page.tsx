@@ -36,7 +36,10 @@ export function compactStandings(table: StandingsTableView): StandingsTableView 
   const kept = new Set(compactColumns);
   return {
     ...table,
-    columns: table.columns.filter((c) => kept.has(c.key)),
+    // Games played is left off on a phone: the small table fits beside the name there.
+    columns: table.columns
+      .filter((c) => kept.has(c.key))
+      .map((c) => (c.narrow === 'left-out' ? { ...c, narrow: 'wide-only' as const } : c)),
     footnotes: table.briefFootnotes,
   };
 }

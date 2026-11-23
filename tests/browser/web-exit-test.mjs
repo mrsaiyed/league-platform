@@ -1017,7 +1017,9 @@ if (browser) {
         await context.close();
       }
       // A team name of 36 letters at 320 wide: the column that stays put takes about half the
-      // box at most, and the last column of numbers can be brought into view beside it.
+      // box at most, and the last column of numbers can be brought into view beside it. At
+      // 320 the percentage has joined the scroll so the name keeps a word of about eleven
+      // letters whole (polish-4's fix round), and the name has the room it left: 55% at most.
       const narrow = await browser.newContext({ viewport: { width: 320, height: 700 } });
       try {
         const page = await narrow.newPage();
@@ -1060,7 +1062,7 @@ if (browser) {
         });
         note(
           'a long team name leaves the column that stays put about half the box at most',
-          measured.share <= 0.5 && measured.shareWithMark <= 0.6,
+          measured.share <= 0.55 && measured.shareWithMark <= 0.6,
           `${Math.round(measured.share * 100)}%, ${Math.round(measured.shareWithMark * 100)}% with a footnote's mark`,
         );
         note(
