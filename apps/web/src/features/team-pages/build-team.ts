@@ -17,6 +17,7 @@ import {
   type PublicSchedule,
   type StandingsReadStore,
   type TeamStanding,
+  type Viewer,
 } from '@srleagues/core';
 import type { StatRow, StatsColumn } from '@srleagues/ui';
 import type { LeagueClock } from '../../server/public-schedule.ts';
@@ -202,17 +203,23 @@ export type TeamStatsView = {
 
 const whole = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
 
-/** The team's totals and, when its setting lets the public see them, its players' lines. */
+/** The team's totals and, when its setting lets this viewer see them, its players' lines. */
 export async function loadTeamStats(
   store: StandingsReadStore,
   settings: PublicStatsSettings,
-  input: { readonly leagueId: string; readonly seasonId: string; readonly teamId: string },
+  input: {
+    readonly leagueId: string;
+    readonly seasonId: string;
+    readonly teamId: string;
+    /** Who is looking, from the server's session; the public viewer when left out (step 2.46). */
+    readonly viewer?: Viewer;
+  },
 ): Promise<TeamStatsView | undefined> {
   const table = await readStatisticsTable(store, {
     seasonId: input.seasonId,
     viewing: {
       leagueId: input.leagueId,
-      viewer: publicViewer(input.leagueId),
+      viewer: input.viewer ?? publicViewer(input.leagueId),
       audience: settings.audience,
       policy: settings.namePolicy,
     },

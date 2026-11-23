@@ -48,6 +48,11 @@ export {
   type ReadTeamRecordsError,
   type TeamStanding,
 } from './queries/read-team-records.ts';
+export {
+  readTeamsBeyondPublic,
+  teamsBeyondPublicInput,
+  type ReadTeamsBeyondPublicError,
+} from './queries/read-teams-beyond-public.ts';
 export type {
   DecidedGameLines,
   DecidedGameRecord,

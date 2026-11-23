@@ -12,6 +12,12 @@ export type SeedMember = {
   readonly role: Role;
   /** The short name of the league's other program the role is limited to (`programs`). */
   readonly program?: string;
+  /**
+   * The short name of the season's team a coach's or captain's role is for: such a role is
+   * always one team's (T3 §5). The team's staff see its players' numbers where the team
+   * keeps them from the public (S-22, step 2.46).
+   */
+  readonly team?: string;
 };
 
 /** A program of the league besides its hidden default one (U-3, U-12). */
@@ -81,6 +87,19 @@ export const seedLeagues: readonly SeedLeague[] = [
         displayName: 'Cam Scheduler',
         role: 'scheduler',
         program: 'summer-camp',
+      },
+      // A coach of each of two teams, by a role on that one team (step 2.46).
+      {
+        email: 'herons-coach@lakeside.example.test',
+        displayName: 'Hollis Coach',
+        role: 'coach',
+        team: 'herons',
+      },
+      {
+        email: 'otters-coach@lakeside.example.test',
+        displayName: 'Oakley Coach',
+        role: 'coach',
+        team: 'otters',
       },
     ],
     programs: [{ slug: 'summer-camp', name: 'Summer Camp' }],

@@ -34,6 +34,7 @@ import {
   type CommandDeps,
   type LeaguesTx,
   type PeopleTx,
+  type Scope,
   type TeamsTx,
 } from '@srleagues/core';
 import { commandTransaction } from '../db/command-transaction.ts';
@@ -166,13 +167,14 @@ async function loadLeague(
     'league status',
     await setLeagueStatus(as(ownerId), { status: 'live', version: created.version }, deps.leagues),
   );
+  const teamIds = new Map<string, string>();
   for (const division of league.divisions) {
     const { divisionId } = must(
       'division',
       await createDivision(as(ownerId), { seasonId, name: division.name }, deps.leagues),
     );
     for (const team of division.teams) {
-      must(
+      const { teamId } = must(
         'team',
         await createTeam(
           as(ownerId),
@@ -180,6 +182,7 @@ async function loadLeague(
           deps.teams,
         ),
       );
+      teamIds.set(team.shortName, teamId);
     }
   }
   for (const person of league.people) {
@@ -208,11 +211,21 @@ async function loadLeague(
     if (member.program !== undefined && programId === undefined) {
       throw new Error(`Seeding failed at role: ${league.slug} has no program ${member.program}.`);
     }
-    await withTransaction(db, { leagueId, accountId: ownerId }, (scope) =>
-      accessStore(scope).createGrant({
+    const teamId = member.team === undefined ? undefined : teamIds.get(member.team);
+    if (member.team !== undefined && teamId === undefined) {
+      throw new Error(`Seeding failed at role: ${league.slug} has no team ${member.team}.`);
+    }
+    const scope: Scope =
+      teamId !== undefined
+        ? { type: 'team', id: teamId }
+        : programId !== undefined
+          ? { type: 'program', id: programId }
+          : leagueScope;
+    await withTransaction(db, { leagueId, accountId: ownerId }, (tx) =>
+      accessStore(tx).createGrant({
         accountId: memberId,
         role: member.role,
-        scope: programId === undefined ? leagueScope : { type: 'program', id: programId },
+        scope,
         grantedByAccountId: ownerId,
       }),
     );

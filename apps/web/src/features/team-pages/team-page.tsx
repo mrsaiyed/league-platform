@@ -1,20 +1,11 @@
 import { leagueApiUrl, leagueUrl, publicViewer } from '@srleagues/core';
-import {
-  Emblem,
-  EmptyPanel,
-  NoValue,
-  PageHead,
-  Section,
-  SortableStatsTable,
-  StatStrip,
-} from '@srleagues/ui';
-import { displayLabels } from '@srleagues/site';
+import { Emblem, EmptyPanel, NoValue, PageHead, Section } from '@srleagues/ui';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { locale, t } from '../../server/messages.ts';
+import { t } from '../../server/messages.ts';
 import { myTeamCookieName } from '../../server/my-team-cookie.ts';
 import { GameList } from '../schedule-pages/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
@@ -28,8 +19,12 @@ import {
   type TeamStatsView,
 } from './build-team.ts';
 import { chooseMyTeamAction, clearMyTeamAction } from './my-team-actions.ts';
+import { staffNumbersAddress } from '../staff-numbers/index.ts';
 import { TeamMine } from './my-team-marks.tsx';
 import { leagueHomeStayUrl } from './start-page.ts';
+import { StaffTeamStats } from './staff-team-stats.tsx';
+import { TeamStatsDrawn } from './team-stats-drawn.tsx';
+import { teamStatsView } from './team-stats-view.ts';
 
 function RosterTable({
   rows,
@@ -102,66 +97,36 @@ export function RosterSections({ roster }: { readonly roster: RosterView }) {
   );
 }
 
-/** How many statistics a team's totals may have and still stand beside the players' table. */
-const besideLimit = 4;
-
 /**
- * The team's statistics as its setting allows: totals always, player lines when shown.
- * The totals are a strip of big numbers under their small label, never a table of one row
- * the width of the page: a few in one line, many wrapping onto a second (the strip's own
- * doing). With few statistics the totals and the players' table stand side by side on a
- * laptop, so a row's numbers stay near its name; with many each takes the page's width.
- * A team with nothing recorded says so in a calm panel, whoever may see its players.
+ * The team's statistics as its setting allows: totals always, player lines when shown
+ * (team-stats-view.ts words them, team-stats-drawn.tsx draws them). A team with nothing
+ * recorded says so in a calm panel, whoever may see its players.
  */
 export function TeamStatsSection({ stats }: { readonly stats: TeamStatsView }) {
-  const labels = displayLabels(t);
-  if (!stats.hasNumbers) {
-    return <EmptyPanel text={t('team.statsNone')} />;
-  }
-  const totals = stats.totalsRows[0];
-  const numbers =
-    totals === undefined
-      ? []
-      : stats.totalsColumns.slice(1).flatMap((column) => {
-          const value = totals.cells[column.key];
-          return value === null || value === undefined
-            ? []
-            : [{ key: column.key, label: column.fullName ?? column.label, value: String(value) }];
-        });
-  const beside = numbers.length > 0 && stats.totalsColumns.length - 1 <= besideLimit;
-  // The players open sorted by points, biggest first, as on the statistics page; by the
-  // first statistic where the sport has no points.
-  const sortColumn =
-    stats.playerColumns.find((column) => column.key === 'points') ??
-    stats.playerColumns.find((column) => column.numeric === true && column.key !== 'games');
-  const players =
-    stats.playerLinesShown && stats.playerRows.length > 0 ? (
-      <SortableStatsTable
-        caption={t('team.statsPlayers')}
-        columns={stats.playerColumns}
-        rows={stats.playerRows}
-        initialSort={
-          sortColumn === undefined ? null : { key: sortColumn.key, direction: 'descending' }
-        }
-        locale={locale}
-        labels={labels.stats}
-        emblems
-      />
-    ) : null;
+  return <TeamStatsDrawn view={teamStatsView(stats)} />;
+}
+
+/**
+ * The team's statistics on its page, and the signed-in request for its hidden players. The
+ * page shows the team's totals and says already that its players are not shown: only then
+ * can someone see more, and only then does the page ask, after it has arrived, as whoever is
+ * signed in here (step 2.46, T-95). A hidden team with nothing recorded sets up no request,
+ * so its page tells a visitor nothing of it, not even its address.
+ */
+export function TeamStatsPart({
+  stats,
+  staffAddress,
+}: {
+  readonly stats: TeamStatsView;
+  readonly staffAddress: string;
+}) {
+  const view = teamStatsView(stats);
+  const totalsShown = view.kind === 'numbers' && view.totals.length > 0;
+  if (stats.playerLinesShown || !totalsShown) return <TeamStatsSection stats={stats} />;
   return (
-    <div className="team-stats" data-layout={beside && players !== null ? 'pair' : 'stack'}>
-      {numbers.length === 0 ? null : (
-        <div className="team-totals">
-          <p className="ui-eyebrow">{t('team.statsTotals')}</p>
-          <StatStrip label={t('team.statsTotals')} items={numbers} />
-          {stats.playerLinesShown ? null : (
-            <p className="ui-section-note">{t('team.statsTotalsOnly')}</p>
-          )}
-          {stats.totalsNote === null ? null : <p className="ui-section-note">{stats.totalsNote}</p>}
-        </div>
-      )}
-      {players}
-    </div>
+    <StaffTeamStats address={staffAddress}>
+      <TeamStatsSection stats={stats} />
+    </StaffTeamStats>
   );
 }
 
@@ -338,7 +303,14 @@ export async function TeamPage({
         {stats === undefined ? (
           <EmptyPanel text={t('team.statsNone')} />
         ) : (
-          <TeamStatsSection stats={stats} />
+          <TeamStatsPart
+            stats={stats}
+            staffAddress={staffNumbersAddress(addressee, {
+              page: 'team',
+              season: season.id,
+              team: head.teamId,
+            })}
+          />
         )}
       </Section>
     </main>

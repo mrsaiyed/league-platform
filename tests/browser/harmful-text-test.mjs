@@ -767,6 +767,9 @@ const ANSWERS = {
   '/api/v1/leagues/[leagueId]/games/[game]/snapshot': [keeper, owner],
   '/api/v1/leagues/[leagueId]/games/[game]/state': [keeper, owner],
   '/api/v1/leagues/[leagueId]/scoring': [keeper, owner],
+  // The numbers a page keeps from the public (step 2.46), asked with the attack as its
+  // season and team: a question that names nothing is answered "nothing more", whoever asks.
+  '/api/v1/leagues/[leagueId]/staff-numbers': [null, owner, coach, stranger],
   // A person's own teams (step 2.168): the coach's carry the attack team's name, a person with
   // no team and a visitor are answered nothing to mark.
   '/api/v1/leagues/[leagueId]/my-team': [null, coach, stranger],
@@ -1087,7 +1090,11 @@ async function walkEveryRoute() {
   await step('every answer route holds the attack only as data', async () => {
     let carried = false;
     for (const { route, source } of answerRoutes) {
-      const address = route.replace('[leagueId]', leagueId).replace('[game]', liveGame);
+      const address = `${route.replace('[leagueId]', leagueId).replace('[game]', liveGame)}${
+        route.endsWith('/staff-numbers')
+          ? `?page=team&season=${encodeURIComponent(typed.query)}&team=${encodeURIComponent(typed.query)}`
+          : ''
+      }`;
       const methods = ['GET', 'POST'].filter((method) =>
         new RegExp(`export\\s+(?:async\\s+function|const)\\s+${method}\\b`).test(source),
       );
@@ -1126,6 +1133,13 @@ async function walkEveryRoute() {
               body.slice(0, 80),
             );
             carried ||= body.includes(JSON.stringify(typed.table).slice(1, -1));
+            if (route.endsWith('/staff-numbers')) {
+              note(
+                `${label}: a question holding the attack is answered nothing more`,
+                body === '{"more":null}',
+                body.slice(0, 80),
+              );
+            }
             if (route.endsWith('/my-team')) {
               const names = (parsed?.marked ?? []).map((team) => team.name);
               note(
