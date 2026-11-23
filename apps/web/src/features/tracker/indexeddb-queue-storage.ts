@@ -21,9 +21,9 @@
 // opening a database a newer one has upgraded gets `storage-newer-version`.
 import {
   QueueError,
+  type DeviceQueueStorage,
   type QueueErrorCode,
   type QueueSettlement,
-  type QueueStorage,
   type QueuedCommand,
 } from './queue-storage.ts';
 
@@ -51,7 +51,7 @@ const databaseVersion = upgradeSteps.length;
 export async function openIndexedDbQueueStorage(
   factory: IDBFactory = indexedDB,
   name: string = queueDatabaseName,
-): Promise<QueueStorage> {
+): Promise<DeviceQueueStorage> {
   let db: IDBDatabase | null = null;
   let opening: Promise<IDBDatabase> | null = null;
 
@@ -111,10 +111,32 @@ export async function openIndexedDbQueueStorage(
     });
   };
 
+  const read = async (
+    ask: (commands: IDBObjectStore) => IDBRequest,
+  ): Promise<readonly QueuedCommand[]> => {
+    const tx = await transaction('readonly');
+    return new Promise((resolve, reject) => {
+      const failed = (cause: unknown) => reject(new QueueError('storage-read-failed', { cause }));
+      tx.onabort = () => failed(tx.error);
+      let request: IDBRequest;
+      try {
+        request = ask(tx.objectStore(store));
+      } catch (error) {
+        failed(error);
+        return;
+      }
+      request.onsuccess = () => {
+        const rows = request.result as Row[];
+        resolve(rows.map(({ position: _position, ...entry }) => entry));
+      };
+      request.onerror = () => failed(request.error);
+    });
+  };
+
   await connection();
 
   return {
-    add(gameId, { protocolVersion, command, sessionId, moment }) {
+    add(gameId, { protocolVersion, command, sessionId, moment, leagueId }) {
       return write<'added' | 'held'>('added', (commands, outcome, tx) => {
         const known = commands.index(byCommand).get(command.commandId);
         known.onsuccess = () => {
@@ -122,12 +144,14 @@ export async function openIndexedDbQueueStorage(
           if (row === undefined) {
             const madeUnder = sessionId === undefined ? {} : { sessionId };
             const madeAt = moment === undefined ? {} : { moment };
+            const madeIn = leagueId === undefined ? {} : { leagueId };
             const fresh: Row = {
               gameId,
               protocolVersion,
               command,
               ...madeUnder,
               ...madeAt,
+              ...madeIn,
               state: 'waiting',
             };
             commands.add(fresh);
@@ -141,24 +165,21 @@ export async function openIndexedDbQueueStorage(
       });
     },
 
-    async list(gameId) {
-      const tx = await transaction('readonly');
-      return new Promise((resolve, reject) => {
-        const failed = (cause: unknown) => reject(new QueueError('storage-read-failed', { cause }));
-        tx.onabort = () => failed(tx.error);
-        let request: IDBRequest;
-        try {
-          request = tx.objectStore(store).index(byGame).getAll(gameId);
-        } catch (error) {
-          failed(error);
-          return;
-        }
-        // Within one game, rows come back in the order of their key: the order tapped.
-        request.onsuccess = () => {
-          const rows = request.result as Row[];
-          resolve(rows.map(({ position: _position, ...entry }) => entry));
+    // Within one game, rows come back in the order of their key: the order tapped.
+    list: (gameId) => read((commands) => commands.index(byGame).getAll(gameId)),
+
+    // Every game's rows, in the order of their key: the order tapped (step 2.38).
+    listAll: () => read((commands) => commands.getAll()),
+
+    async forget(gameId) {
+      await write(undefined, (commands) => {
+        const walk = commands.index(byGame).openCursor(gameId);
+        walk.onsuccess = () => {
+          const cursor = walk.result;
+          if (cursor === null) return;
+          cursor.delete();
+          cursor.continue();
         };
-        request.onerror = () => failed(request.error);
       });
     },
 

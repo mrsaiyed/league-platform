@@ -264,6 +264,10 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     const kept = await device.games.find(gameId);
     expect(kept?.rosters).toEqual(madeUpRosters);
     expect(kept?.state).not.toBeNull();
+    // The tap still waiting keeps its league, so "Your games" lists it there (T-317).
+    expect((await device.queue.list(gameId)).map((entry) => entry.leagueId)).toEqual([
+      liveLeagueId,
+    ]);
   });
 
   it('keeps the names on the device when refused for another reason', async () => {

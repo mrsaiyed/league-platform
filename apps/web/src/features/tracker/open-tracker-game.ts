@@ -18,7 +18,7 @@
 //    are deleted (`forgetAll`), as signing out on the device deletes them: whoever
 //    picks the device up next does not find the players' names on it (T-115).
 import type { QueueErrorCode } from './queue-storage.ts';
-import { QueueError, type QueueStorage } from './queue-storage.ts';
+import { inLeague, QueueError, type QueueStorage } from './queue-storage.ts';
 import type { CommandTransport } from './command-transport.ts';
 import type { GameDoors } from './game-doors.ts';
 import {
@@ -168,7 +168,8 @@ export async function openTrackerGame(
     ...options.controller,
     gameId,
     deviceId,
-    storage: storage.queue,
+    // Each tap keeps its league, so "Your games" lists it there however old (T-317).
+    storage: inLeague(storage.queue, leagueId),
     transport: options.transport,
     ...(options.doors === undefined ? {} : { doors: options.doors }),
     server: createStoringTrackerServer({

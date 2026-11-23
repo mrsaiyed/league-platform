@@ -59,6 +59,11 @@ export type QueuedCommand = {
   readonly sessionId?: string;
   /** Where in the game the tap was made (finding I). Absent on a tap stored before this was kept. */
   readonly moment?: GameMoment;
+  /**
+   * The league the game is in, so "Your games" lists the tap in its own league however
+   * old the game is (step 2.38, T-317). Absent on a tap stored before this was kept.
+   */
+  readonly leagueId?: string;
 } & (
   | { readonly state: 'waiting' }
   /** Refused: kept so the scorekeeper can be told, never sent again. */
@@ -131,10 +136,35 @@ export interface QueueStorage {
       readonly command: BatchCommand;
       readonly sessionId?: string;
       readonly moment?: GameMoment;
+      readonly leagueId?: string;
     },
   ): Promise<AddResult>;
   /** The game's queue, oldest tap first. */
   list(gameId: string): Promise<readonly QueuedCommand[]>;
   /** Applies one answer in a single write. IDs the queue no longer holds are ignored. */
   settle(gameId: string, settlement: QueueSettlement): Promise<void>;
+}
+
+/**
+ * The queue read across games, for "Your games" (step 2.38, T-317): every tap the device
+ * holds that the server does not have, of any game however old, and letting go of a
+ * game's taps when the scorekeeper dismisses them (S-88). Both storages give it.
+ */
+export interface HeldPlaysStorage {
+  /** Every tap held on the device, of every game, oldest first. */
+  listAll(): Promise<readonly QueuedCommand[]>;
+  /** Deletes every tap held for the game, in one write: they are never sent. */
+  forget(gameId: string): Promise<void>;
+}
+
+/** The queue's storage as the browser gives it: a game's queue and the reads across games. */
+export type DeviceQueueStorage = QueueStorage & HeldPlaysStorage;
+
+/** `storage`, keeping `leagueId` with every tap it stores (T-317). */
+export function inLeague(storage: QueueStorage, leagueId: string): QueueStorage {
+  return {
+    add: (gameId, entry) => storage.add(gameId, { ...entry, leagueId }),
+    list: (gameId) => storage.list(gameId),
+    settle: (gameId, settlement) => storage.settle(gameId, settlement),
+  };
 }

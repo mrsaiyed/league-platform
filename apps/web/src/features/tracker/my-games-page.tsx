@@ -5,8 +5,9 @@
 // games.list_my_games's own rule: in a league that scores assigned games only, only the
 // games the scorekeeper is assigned to (P7 §5.1). Shown on the admin's home to anyone
 // whose only area of the admin is Games; everyone else gets the admin's home as before.
+// Above the list, the games this device still holds plays for (held-games-panel.tsx).
 import { leagueUrl, listMyGames, platformUrl, type MyGame } from '@srleagues/core';
-import { displayLabels, finalPillOf } from '@srleagues/site';
+import { catalogs, displayLabels, en, finalPillOf } from '@srleagues/site';
 import { EmptyPanel, GameCard, PageHead, type GameStatus } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
@@ -14,6 +15,8 @@ import { gameWhenText, type LeagueTimes } from '../../server/game-when.ts';
 import type { LeagueView } from '../../server/league-gate.ts';
 import { locale, t } from '../../server/messages.ts';
 import { readReopenViews, ReopenLine } from '../games-area/index.ts';
+import { heldGameMark, heldGamesPrefix } from './held-games.ts';
+import { HeldGamesPanel } from './held-games-panel.tsx';
 import {
   entersScoreInGames,
   gameNightOrder,
@@ -76,6 +79,15 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
       ) : games.some((g) => !g.scorable) ? (
         <p className="ui-notice">{t('admin.games.notScorable')}</p>
       ) : null}
+      {/* Plays this device still holds for any game, however old (step 2.38; S-88). */}
+      <HeldGamesPanel
+        leagueId={here.id}
+        scoreHref={leagueUrl(here, 'score', { game: heldGameMark })}
+        locale={locale}
+        catalog={Object.fromEntries(
+          Object.entries(catalogs[locale] ?? en).filter(([key]) => key.startsWith(heldGamesPrefix)),
+        )}
+      />
       {!listed.ok ? (
         <p className="ui-notice" data-kind="error" role="alert">
           {t('admin.games.listProblem')}

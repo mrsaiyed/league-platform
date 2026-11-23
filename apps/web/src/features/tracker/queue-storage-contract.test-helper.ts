@@ -3,7 +3,7 @@
 // IndexedDB one in indexeddb-queue-storage.test.ts on a stand-in database (record 024).
 import type { BatchCommand, TrackerCommand } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
-import type { QueueStorage } from './queue-storage.ts';
+import type { DeviceQueueStorage } from './queue-storage.ts';
 
 const game = '00000000-0000-4000-8000-0000000000a1';
 const other = '00000000-0000-4000-8000-0000000000a2';
@@ -21,7 +21,7 @@ export const tap = (n: number): TrackerCommand => ({
 const ids = (list: readonly { command: BatchCommand }[]) =>
   list.map((entry) => entry.command.commandId);
 
-export function queueStorageContract(name: string, make: () => Promise<QueueStorage>): void {
+export function queueStorageContract(name: string, make: () => Promise<DeviceQueueStorage>): void {
   describe(`${name} (queue storage contract)`, () => {
     it('keeps taps in the order they were added, per game', async () => {
       const storage = await make();
@@ -141,6 +141,39 @@ export function queueStorageContract(name: string, make: () => Promise<QueueStor
       await storage.add(other, { protocolVersion: 1, command: tap(5) });
       await storage.settle(game, { remove: [commandId(5)] });
       expect(ids(await storage.list(other))).toEqual([commandId(5)]);
+    });
+
+    it('lists every game it holds taps for, with the league each was made in (step 2.38)', async () => {
+      const storage = await make();
+      await storage.add(game, { protocolVersion: 1, command: tap(1), leagueId: 'league-1' });
+      await storage.add(other, { protocolVersion: 1, command: tap(2) });
+      await storage.add(game, { protocolVersion: 1, command: tap(3), leagueId: 'league-1' });
+      await storage.settle(game, {
+        refuse: [
+          {
+            commandId: commandId(3),
+            refusal: { code: 'rule', message: 'Player is not on the court.' },
+          },
+        ],
+      });
+      const all = await storage.listAll();
+      expect(all.map((e) => [e.gameId, e.leagueId, e.state])).toEqual([
+        [game, 'league-1', 'waiting'],
+        [other, undefined, 'waiting'],
+        [game, 'league-1', 'refused'],
+      ]);
+    });
+
+    it("forgets one game's taps, and only that game's (S-88)", async () => {
+      const storage = await make();
+      await storage.add(game, { protocolVersion: 1, command: tap(1) });
+      await storage.add(other, { protocolVersion: 1, command: tap(2) });
+      await storage.add(game, { protocolVersion: 1, command: tap(3) });
+      await storage.forget(game);
+      expect(ids(await storage.list(game))).toEqual([]);
+      expect(ids(await storage.listAll())).toEqual([commandId(2)]);
+      // A forgotten tap's command ID may be stored again, as new.
+      expect(await storage.add(game, { protocolVersion: 1, command: tap(1) })).toBe('added');
     });
 
     it('hands out copies, not what it holds', async () => {

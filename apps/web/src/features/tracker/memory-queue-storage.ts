@@ -3,12 +3,12 @@
 // so a test cannot pass by changing an object the queue still holds.
 import {
   QueueError,
+  type DeviceQueueStorage,
   type QueueSettlement,
-  type QueueStorage,
   type QueuedCommand,
 } from './queue-storage.ts';
 
-export type MemoryQueueStorage = QueueStorage & {
+export type MemoryQueueStorage = DeviceQueueStorage & {
   /** Every held command of every game, oldest first: for tests to look at. */
   readonly all: () => readonly QueuedCommand[];
 };
@@ -17,7 +17,7 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
   let held: QueuedCommand[] = [];
 
   return {
-    async add(gameId, { protocolVersion, command, sessionId, moment }) {
+    async add(gameId, { protocolVersion, command, sessionId, moment, leagueId }) {
       const known = held.find((entry) => entry.command.commandId === command.commandId);
       if (known !== undefined) {
         if (known.gameId !== gameId) throw new QueueError('command-id-in-other-game');
@@ -25,6 +25,7 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
       }
       const madeUnder = sessionId === undefined ? {} : { sessionId };
       const madeAt = moment === undefined ? {} : { moment };
+      const madeIn = leagueId === undefined ? {} : { leagueId };
       held.push(
         structuredClone({
           gameId,
@@ -32,6 +33,7 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
           command,
           ...madeUnder,
           ...madeAt,
+          ...madeIn,
           state: 'waiting',
         }),
       );
@@ -51,12 +53,19 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
         const { gameId: game, protocolVersion, command } = entry;
         const madeUnder = entry.sessionId === undefined ? {} : { sessionId: entry.sessionId };
         const madeAt = entry.moment === undefined ? {} : { moment: entry.moment };
-        const kept = { gameId: game, protocolVersion, command, ...madeUnder, ...madeAt };
+        const madeIn = entry.leagueId === undefined ? {} : { leagueId: entry.leagueId };
+        const kept = { gameId: game, protocolVersion, command, ...madeUnder, ...madeAt, ...madeIn };
         const refusal = refusals.get(id);
         if (refusal !== undefined) return [structuredClone({ ...kept, state: 'refused', refusal })];
         if (setAside.has(id)) return [structuredClone({ ...kept, state: 'not-saved' })];
         return [entry];
       });
+    },
+    async listAll() {
+      return structuredClone(held);
+    },
+    async forget(gameId) {
+      held = held.filter((entry) => entry.gameId !== gameId);
     },
     all: () => structuredClone(held),
   };
