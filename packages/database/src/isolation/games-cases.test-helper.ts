@@ -924,17 +924,6 @@ async function ownGameAndTeam(scope: LeagueScope) {
   return { gameId: row?.id ?? randomUUID(), teamId: row?.home_team_id ?? randomUUID() };
 }
 
-/** The target's walk-up's person, as the scope's fence lets it be read: in another league, none. */
-async function walkUpPersonOf(scope: LeagueScope, target: LeagueRecords) {
-  const entry = await transactionOf(scope)
-    .selectFrom('roster_entries')
-    .select('person_id')
-    .where('league_id', '=', scope.leagueId)
-    .where('id', '=', target.walkUpRosterEntryId)
-    .executeTakeFirst();
-  return entry?.person_id;
-}
-
 registerIsolationCase({
   subject: findTablePlayer,
   name: "find the target's player on the target's team for the scorer's table",
@@ -961,13 +950,14 @@ registerIsolationCase({
 registerIsolationCase({
   subject: changeTablePlayer,
   name: "renumber and rename the target's walk-up player",
-  run: async (scope, target) =>
-    changeTablePlayer(
-      scope,
-      target.walkUpRosterEntryId,
-      (await walkUpPersonOf(scope, target)) ?? randomUUID(),
-      { jerseyNumber: '77', firstName: 'Renamed', lastName: 'Elsewhere' },
-    ),
+  // Step 2.224, part 2: the target's own entry and person ids, so only the query's league
+  // filters keep the target's rows unchanged.
+  run: (scope, target) =>
+    changeTablePlayer(scope, target.walkUpRosterEntryId, target.walkUpPersonId, {
+      jerseyNumber: '77',
+      firstName: 'Renamed',
+      lastName: 'Elsewhere',
+    }),
 });
 
 // An add refused at the target's upcoming game (review of step 2.117, L4), kept as one of
@@ -1016,11 +1006,11 @@ registerIsolationCase({
 registerIsolationCase({
   subject: removeTablePlayer,
   name: "take the target's walk-up player off its team",
-  run: async (scope, target) =>
+  run: (scope, target) =>
     removeTablePlayer(
       scope,
       target.walkUpRosterEntryId,
-      (await walkUpPersonOf(scope, target)) ?? randomUUID(),
+      target.walkUpPersonId,
       target.upcomingGameId,
       true,
     ),

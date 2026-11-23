@@ -13,14 +13,16 @@ const script = 'scripts/fence-filter-check.mjs';
 const run = (...args) => execFileSync(process.execPath, [script, ...args], { encoding: 'utf8' });
 
 /**
- * The reviewed number: raising it is a change to this test, seen in review. 63 since step
- * 2.224, part 2: the purge's 4; 11 filters that only repeat another filter of the same
+ * The reviewed number: raising it is a change to this test, seen in review. 64 since step
+ * 2.224, part 2: the purge's 4; 12 filters that only repeat another filter of the same
  * statement (games-for-lists #2 to #5, list-earlier-rounds #1 to #3, list-season-teams #1
- * to #3, list-public-schedule #1, read only after the league-filtered findPublicSeason);
+ * to #3, remove-table-player #4, which only narrows which entries keep a person #3 already
+ * holds to the league; list-public-schedule #1, read only after the league-filtered
+ * findPublicSeason);
  * and 48 files with no league filter of their own (no SQL, inserts the fence checks,
  * reads before any league by design, reads only through other checked query files).
  */
-const reviewedExcused = 63;
+const reviewedExcused = 64;
 
 /** The audit's confirmed gaps, by name, each with the start of the filter it takes out. */
 const gaps = [

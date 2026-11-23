@@ -93,6 +93,8 @@ export type LeagueRecords = MadeLeague & {
   scoringSessionSince: number;
   /** A player added at the final game's scorer's table, waiting for the admin's review (S-6). */
   walkUpRosterEntryId: string;
+  /** That walk-up's person. */
+  walkUpPersonId: string;
   /** The team's standings row, an adjustment to it, and the player's season totals. */
   standingsRowId: string;
   standingsAdjustmentId: string;
@@ -663,6 +665,7 @@ async function seededLeague(
     scoringSessionId,
     scoringSessionSince,
     walkUpRosterEntryId,
+    walkUpPersonId,
     standingsRowId,
     standingsAdjustmentId,
     seasonPlayerTotalsId,

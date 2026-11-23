@@ -77,6 +77,7 @@ const excused = new Map([
   ],
   ['list-season-teams.ts#1', "#3 keeps the season to the scope's league; teams_season the rest"],
   ['list-season-teams.ts#2', 'keyed by teams.id and season_id, which #1 and #3 hold'],
+  ['remove-table-player.ts#4', 'only narrows which entries keep a person #3 holds to the league'],
   ['list-season-teams.ts#3', "#1 keeps the teams to the scope's league; teams_season the rest"],
   // Whole files with no league filter of their own (keyed by the file name alone): the
   // check has nothing to take out, and each says why. A new file with no filter of a
@@ -159,8 +160,8 @@ const excused = new Map([
     'standings-read-store.ts',
   ),
 ]);
-// 4 of the purge, 11 repeated filters and 48 files with no filter of their own (2.224).
-const mostExcused = 63;
+// 4 of the purge, 12 repeated filters and 48 files with no filter of their own (2.224).
+const mostExcused = 64;
 
 /** Whole-file excuses: each file name with the one reason. */
 function wholeFiles(reason, ...files) {
