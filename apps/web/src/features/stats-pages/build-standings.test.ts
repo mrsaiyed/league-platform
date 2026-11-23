@@ -863,7 +863,10 @@ describe('the note for three or more level teams', () => {
   });
 
   it('teams that have played nobody, ordered by a recorded flip: the note says the flip did it', async () => {
-    const rules = { ...defaultSeasonRules(), tiebreakers: ['head-to-head', 'coin-flip'] as const };
+    const rules = {
+      ...defaultSeasonRules(),
+      tiebreakers: ['head-to-head', 'coin-flip'],
+    } satisfies SeasonRules;
     const two = await tableAfter(['Ash', 'Birch'], [], { rules, coinFlips: [['Birch', 'Ash']] });
     expect(order(two)).toEqual(['Birch', 'Ash']);
     const pair = 'Birch and Ash have not played yet. A coin flip puts Birch ahead of Ash.';
