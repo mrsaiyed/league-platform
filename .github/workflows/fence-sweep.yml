@@ -3,7 +3,10 @@
 # expected to notice. It takes 15 to 45 minutes, so it is not part of the gate (ci.yml):
 # it runs by hand and once a week. It needs no secret and reaches nothing outside the
 # runner; it reads the repository and writes only its temporary copies and its log.
-# Compare its log with docs/build/handover/lanes/2.224-sweep.tsv.
+# It passes exactly when every filter is caught or on the script's reviewed excused list
+# (and no excused filter is caught): one that survives, errors or has no case fails it.
+# Since step 2.224, part 3 nothing survives, so it compares with no baseline; its log
+# should match docs/build/handover/lanes/2.224-sweep.tsv.
 name: Fence sweep
 on:
   workflow_dispatch:
