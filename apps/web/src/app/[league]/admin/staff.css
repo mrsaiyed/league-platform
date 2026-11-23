@@ -686,6 +686,34 @@ html:has(.staff) {
 .staff .ui-button[data-kind='quiet'] {
   background: transparent;
 }
+/* A question's "Yes" not ready yet (step 2.221): it takes no tap until the wait is over.
+   Drawn as its quiet, unfilled form on every kind, so it reads as not ready by its shape
+   and not by colour alone: no fill, a 2px dashed edge in its words' colour (the padding a
+   pixel less, so nothing moves when it fills), the words in a colour that reads on the
+   panel. Under the pointer it stays so. It fills, at once, when the wait is over. */
+.staff [data-question] .ui-button[data-kind][data-resting],
+.staff [data-question] .ui-button[data-kind][data-resting]:hover {
+  padding-block: calc(var(--step-2) - 1px);
+  padding-inline: calc(var(--step-4) - 1px);
+  border: 2px dashed currentColor;
+  background: var(--color-panel);
+  color: var(--color-text);
+  cursor: progress;
+  transition: none;
+}
+.staff [data-question] .ui-button[data-kind='main'][data-resting],
+.staff [data-question] .ui-button[data-kind='main'][data-resting]:hover {
+  color: var(--color-primary-text);
+}
+.staff [data-question] .ui-button[data-kind='danger'][data-resting],
+.staff [data-question] .ui-button[data-kind='danger'][data-resting]:hover {
+  color: var(--color-danger);
+}
+@media (prefers-reduced-motion: reduce) {
+  .staff [data-question] .ui-button {
+    transition: none;
+  }
+}
 /* A button that opens a form to add something. */
 .staff .ui-button[data-icon='plus']::before {
   content: '';

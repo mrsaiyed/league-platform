@@ -27,12 +27,14 @@ import type { DatabaseHandle } from '../db/database-handle.ts';
 import {
   freshSchema,
   newAccount,
+  newCourt,
   newGame,
   newLeague,
   newProgram,
   newSeason,
   newStage,
   newTeam,
+  newVenue,
   one,
   type MadeLeague,
 } from '../schema/schema.test-helper.ts';
@@ -262,6 +264,31 @@ describe('the games commands on the database', () => {
     ).toEqual({ ok: false, error: { code: 'game-part-in-bin' } });
     expect((await rowOf(g.gameId)).status).toBe('cancelled');
   });
+
+  for (const part of ['venue', 'court'] as const) {
+    it(`refuses to put back a cancelled game whose ${part} is in the bin (step 2.221)`, async () => {
+      const g = await leagueWithGame();
+      const venueId = await newVenue(pglite, g.l.leagueId);
+      const courtId = await newCourt(pglite, g.l.leagueId, venueId);
+      await pglite.query('update games set venue_id = $1, court_id = $2 where id = $3', [
+        venueId,
+        courtId,
+        g.gameId,
+      ]);
+      // Setting its place moved the game's version on.
+      const { version } = await rowOf(g.gameId);
+      expect(await cancelGame(g.ctx, { gameId: g.gameId, version }, deps)).toMatchObject({
+        ok: true,
+      });
+      await pglite.query(`update ${part}s set deleted_at = now() where id = $1`, [
+        part === 'venue' ? venueId : courtId,
+      ]);
+      expect(
+        await putGameBack(g.ctx, { gameId: g.gameId, version: version + 1, reason: 'other' }, deps),
+      ).toEqual({ ok: false, error: { code: 'game-part-in-bin' } });
+      expect((await rowOf(g.gameId)).status).toBe('cancelled');
+    });
+  }
 
   it('reopens a final game with a correction row in the same transaction (S-7)', async () => {
     const g = await leagueWithGame();

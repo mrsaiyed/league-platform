@@ -62,13 +62,15 @@ export type CallOffState =
   | Refused
   /**
    * The question: which change, what was chosen (the team that forfeits, the reason), and
-   * when the server drew it (call-off-step.ts: a "Yes" sent too soon after only asks again).
+   * when the server first drew it and how much longer its "Yes" takes no tap
+   * (call-off-step.ts: a "Yes" sent too soon only asks again, keeping that first time).
    */
   | {
       readonly kind: 'ask';
       readonly act: CallOffAct;
       readonly typed: TypedFields;
       readonly askedAt: number;
+      readonly readyInMs: number;
     };
 
 export const untouched: Untouched = { kind: 'untouched' };

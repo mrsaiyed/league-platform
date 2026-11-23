@@ -73,6 +73,7 @@ export function callOffTexts(
         : 'admin.games.otherActions',
     ),
     refusal: refusalOf(game),
+    ready: t('admin.games.callOff.ready'),
     acts: {
       ...(offers.forfeit ? { forfeit: forfeitTexts(game) } : {}),
       ...(offers.postpone
@@ -117,6 +118,7 @@ export function restoreTexts(
   return {
     summary: t('admin.games.putBack.date'),
     refusal: refusalOf(game),
+    ready: t('admin.games.callOff.ready'),
     acts: {
       restore: {
         button: t('admin.games.callOff.restore'),
