@@ -44,13 +44,15 @@ function forfeitTexts(game: CallOffGame): CallOffActTexts {
     ask: Object.fromEntries(
       sides.map((side) => [
         side.team,
-        t('admin.games.callOff.ask.forfeit', {
+        // The server cannot know a game was started on a device with no signal: the
+        // admin is told what a forfeit does to plays that reach it later.
+        `${t('admin.games.callOff.ask.forfeit', {
           team: side.name,
           winner: side.other,
           game: named,
           winnerScore: String(game.forfeitScore.winner),
           loserScore: String(game.forfeitScore.loser),
-        }),
+        })} ${t('admin.games.callOff.ask.forfeitOffline')}`,
       ]),
     ),
   };

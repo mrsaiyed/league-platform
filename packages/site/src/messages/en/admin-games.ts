@@ -75,6 +75,8 @@ export const enAdminGames = {
     'Cancel {game}? Everyone will see it as cancelled, and it will count for nothing. You can put it back afterwards. The players already set for it at the scorer’s table are kept.',
   'admin.games.callOff.ask.forfeit':
     'Record a forfeit by {team} in {game}? {winner} win {winnerScore}–{loserScore}, the league’s forfeit score, and it counts in the standings.',
+  'admin.games.callOff.ask.forfeitOffline':
+    'If someone is scoring this game on a device with no signal, their plays will not be saved.',
   'admin.games.callOff.ask.postpone':
     'Postpone {game}? Everyone will see it as postponed. It waits for a new date, and counts for nothing until it is played.',
   'admin.games.callOff.ask.postponeLineups':
@@ -183,8 +185,10 @@ export const enAdminGames = {
   'admin.games.later.shownAll': 'Every game after this week',
   'admin.games.later.team': 'Team',
   'admin.games.later.title': 'Later games',
-  // Step 2.56: a game whose line-ups are set in the tracker but has not started.
-  'admin.games.lineupsSet': 'Line-ups are set in the tracker, but the game has not started.',
+  // Step 2.56: a game whose line-ups are set in the tracker, with no plays here yet: a
+  // game started on a device with no signal looks the same, so this says only what is known.
+  'admin.games.lineupsSet':
+    'Line-ups are set in the tracker, but no plays have reached us from it yet.',
   'admin.games.listProblem':
     'The games could not be shown. You may not have access to score or change games here.',
   'admin.games.needsResult.empty': 'Every game that has started has its result.',
