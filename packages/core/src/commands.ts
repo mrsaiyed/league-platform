@@ -142,6 +142,8 @@ import {
   reorderRoster,
   setTeamStatsVisibility,
   updateTeam,
+  markTeamLeft,
+  undoTeamLeft,
 } from './modules/teams/index.ts';
 
 export const commands = commandRegistry([
@@ -253,6 +255,8 @@ export const commands = commandRegistry([
   setSeasonRules,
   setSetting,
   setTeamStatsVisibility,
+  markTeamLeft,
+  undoTeamLeft,
   startFixtureImport,
   swapDraftGames,
   takeOverScoring,

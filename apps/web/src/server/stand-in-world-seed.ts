@@ -1232,6 +1232,7 @@ function leagueOf(
         statsVisibility: t.statsVisibility,
         lineageId: lineageOf(t.slug),
         binned: false,
+        left: false,
         version: 1,
       };
       s.teams.push(kept);

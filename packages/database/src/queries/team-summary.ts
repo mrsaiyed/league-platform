@@ -12,6 +12,8 @@ export type TeamSummary = {
   lineageId: string;
   /** In the bin (A-5). */
   binned: boolean;
+  /** Has left the league (S-87). */
+  left: boolean;
   version: number;
 };
 
@@ -26,6 +28,7 @@ export const teamSummaryColumns = [
   'stats_visibility',
   'lineage_id',
   'deleted_at',
+  'left_at',
   'version',
 ] as const;
 
@@ -39,6 +42,7 @@ type TeamRow = {
   stats_visibility: string;
   lineage_id: string;
   deleted_at: Date | null;
+  left_at: Date | null;
   version: number;
 };
 
@@ -53,6 +57,7 @@ export function teamSummary(row: TeamRow): TeamSummary {
     statsVisibility: row.stats_visibility,
     lineageId: row.lineage_id,
     binned: row.deleted_at !== null,
+    left: row.left_at !== null,
     version: row.version,
   };
 }

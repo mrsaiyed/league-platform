@@ -68,6 +68,9 @@ const isTiebreaker = (value: string): value is Tiebreaker => Object.hasOwn(tiebr
 /** The note of a team no longer in the league, kept in the table for its results (A-17). */
 const removedNote = 'removed-team';
 
+/** The note of a team that has left the league mid-season, kept for its results (S-87). */
+const leftNote = 'left-team';
+
 /** The note shared by every group that nothing in the rules separates. */
 const stillTiedId = 'order-still-tied';
 
@@ -677,6 +680,10 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
     if (line.team.removed && !footnotes.some((f) => f.id === removedNote)) {
       footnotes.push({ id: removedNote, text: t('standings.removedTeam') });
     }
+    const left = line.team.left && !line.team.removed;
+    if (left && !footnotes.some((f) => f.id === leftNote)) {
+      footnotes.push({ id: leftNote, text: t('standings.leftTeam') });
+    }
     return {
       id: line.team.id,
       seed: line.seed,
@@ -686,6 +693,7 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
       notes: [
         ...line.footnotes.map((n) => `adjustment-${n}`),
         ...(line.team.removed ? [removedNote] : []),
+        ...(left ? [leftNote] : []),
         ...(level ? [level] : []),
       ],
     };

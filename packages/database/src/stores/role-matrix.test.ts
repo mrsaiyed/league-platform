@@ -168,6 +168,8 @@ import {
   updateDivision,
   updatePerson,
   updateSeason,
+  markTeamLeft,
+  undoTeamLeft,
   updateTeam,
   updateVenue,
 } from '@srleagues/core';
@@ -507,6 +509,18 @@ const teamCommandRows: readonly Row[] = [
       name: 'Renamed',
     }),
     (c, i) => updateTeam(c, i, teamsDeps),
+  ),
+  ...teamRows(
+    'teams.mark_team_left',
+    'mark a team as having left the league',
+    async (league, program) => ({ teamId: await teamIn(league, program), version: 1 }),
+    (c, i) => markTeamLeft(c, i, teamsDeps),
+  ),
+  ...teamRows(
+    'teams.undo_team_left',
+    'take off the mark of a team having left',
+    async (league, program) => ({ teamId: await teamIn(league, program), version: 1 }),
+    (c, i) => undoTeamLeft(c, i, teamsDeps),
   ),
   ...teamRows(
     'teams.count_team_games',

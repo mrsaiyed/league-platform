@@ -6,6 +6,8 @@ import type { PGlite } from '@electric-sql/pglite';
 import {
   countTeamGames,
   createDivision,
+  markTeamLeft,
+  undoTeamLeft,
   createTeam,
   removeDivision,
   removeTeam,
@@ -136,6 +138,30 @@ describe('teams', () => {
       'teams.set_stats_visibility',
       'teams.update_team',
     ]);
+  });
+
+  it('marks a team as having left the league and takes the mark off (S-87)', async () => {
+    const l = await league();
+    const a = value(await createTeam(l.as, { ...hawks, seasonId: l.seasonId }, deps));
+    const leftAt = async () =>
+      (
+        await one<{ left_at: Date | null }>(pglite, 'select left_at from teams where id = $1', [
+          a.teamId,
+        ])
+      ).left_at;
+    expect(value(await markTeamLeft(l.as, { teamId: a.teamId, version: 1 }, deps))).toEqual({
+      version: 2,
+    });
+    expect(await leftAt()).not.toBeNull();
+    const refused = await undoTeamLeft(l.as, { teamId: a.teamId, version: 1 }, deps);
+    expect(refused).toMatchObject({ ok: false, error: { code: 'changed-since-read' } });
+    value(await undoTeamLeft(l.as, { teamId: a.teamId, version: 2 }, deps));
+    expect(await leftAt()).toBeNull();
+    const log = await pglite.query<{ action: string }>(
+      'select action from activity_log where league_id = $1 and action like $2 order by at',
+      [l.leagueId, 'teams.%team_left'],
+    );
+    expect(log.rows.map((r) => r.action)).toEqual(['teams.mark_team_left', 'teams.undo_team_left']);
   });
 
   it("keeps a team's short name unique in its season, outside the bin", async () => {

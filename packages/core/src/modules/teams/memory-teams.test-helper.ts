@@ -96,6 +96,7 @@ export function team(n: number, fields: Partial<TeamRecord> = {}): TeamRecord {
     color: null,
     statsVisibility: 'everyone',
     lineageId: `lineage-${n}`,
+    left: false,
     binned: false,
     version: 1,
     ...fields,
@@ -193,6 +194,7 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
             id,
             ...t,
             lineageId: `lineage-${s.teams.length + 1}`,
+            left: false,
             binned: false,
             version: 1,
           });

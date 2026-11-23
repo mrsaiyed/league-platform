@@ -12,7 +12,16 @@ export async function listSeasonTeams(
 ): Promise<SeasonTeamRow[]> {
   const rows = await transactionOf(scope)
     .selectFrom('teams')
-    .select(['id', 'name', 'slug', 'color', 'division_id', 'stats_visibility', 'deleted_at'])
+    .select([
+      'id',
+      'name',
+      'slug',
+      'color',
+      'division_id',
+      'stats_visibility',
+      'deleted_at',
+      'left_at',
+    ])
     .where('league_id', '=', scope.leagueId)
     .where('season_id', '=', seasonId)
     .where((eb) =>
@@ -54,5 +63,6 @@ export async function listSeasonTeams(
     divisionId: row.division_id,
     statsVisibility: row.stats_visibility,
     removed: row.deleted_at !== null,
+    left: row.left_at !== null,
   }));
 }

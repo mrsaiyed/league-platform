@@ -207,6 +207,8 @@ export const enSite = {
   // they are level on and the season's tiebreakers, never which one placed which team.
   // Three or more, from the engine's own steps (step 2.198, S-74): each team's record in the
   // games among them, then what separated the teams still level, with the figures.
+  'standings.leftTeam':
+    'Left the league. Its results stay in the table, as they are part of other teams’ records.',
   'standings.level.ahead.coin-flip': 'A coin flip puts {team} ahead of {other}.',
   'standings.level.ahead.fewest-points-allowed':
     'Fewer points allowed puts {team} ahead of {other}: {ahead} against {behind}.',

@@ -11,6 +11,8 @@ export type TeamChangeRow = {
   name?: string;
   color?: string | null;
   statsVisibility?: string;
+  /** S-87: true sets left_at to now, false clears it. */
+  left?: boolean;
 };
 
 /** The new version, which field is taken, or undefined if it is not there, in the bin or moved on. */
@@ -28,6 +30,7 @@ export async function updateTeam(
         ...(change.slug === undefined ? {} : { slug: change.slug }),
         ...(change.name === undefined ? {} : { name: change.name }),
         ...(change.color === undefined ? {} : { color: change.color }),
+        ...(change.left === undefined ? {} : { left_at: change.left ? new Date() : null }),
         ...(change.statsVisibility === undefined
           ? {}
           : { stats_visibility: change.statsVisibility }),

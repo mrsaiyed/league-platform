@@ -12,6 +12,8 @@ import {
   reorderRoster,
   setTeamStatsVisibility,
   updateTeam as updateTeamCommand,
+  markTeamLeft,
+  undoTeamLeft,
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -119,6 +121,16 @@ registerCommandCase(createTeam, harnessTx, {
 registerCommandCase(updateTeamCommand, harnessTx, {
   name: "rename the target's team",
   input: (target) => ({ teamId: target.teamId, version: 1, name: 'Harness renamed' }),
+});
+
+registerCommandCase(markTeamLeft, harnessTx, {
+  name: "mark the target's team as having left the league",
+  input: (target) => ({ teamId: target.teamId, version: 1 }),
+});
+
+registerCommandCase(undoTeamLeft, harnessTx, {
+  name: "take off the mark of the target's team having left",
+  input: (target) => ({ teamId: target.teamId, version: 1 }),
 });
 
 registerCommandCase(countTeamGames, harnessTx, {

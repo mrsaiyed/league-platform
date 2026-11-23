@@ -20,6 +20,8 @@ export type TeamRecord = {
   /** The same team across seasons (a new team gets its own). */
   readonly lineageId: string;
   readonly binned: boolean;
+  /** Has left the league mid-season (S-87): kept, with its results, marked, offered for no new game. */
+  readonly left: boolean;
   readonly version: number;
 };
 
@@ -39,6 +41,8 @@ export type TeamChange = {
   name?: string;
   color?: string | null;
   statsVisibility?: string;
+  /** S-87: true marks the team as having left the league now, false takes the mark off. */
+  left?: boolean;
 };
 
 /**

@@ -21,6 +21,8 @@ export {
   type SetTeamStatsVisibilityError,
 } from './commands/set-team-stats-visibility.ts';
 export { updateTeam, type UpdateTeamError } from './commands/update-team.ts';
+export { markTeamLeft, type MarkTeamLeftError } from './commands/mark-team-left.ts';
+export { undoTeamLeft, type UndoTeamLeftError } from './commands/undo-team-left.ts';
 export {
   publicRosterLine,
   publicTeam,
