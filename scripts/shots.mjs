@@ -98,6 +98,8 @@ const publicPages = [
   { name: 'stats', at: '/stats' },
   { name: 'teams', at: '/teams' },
   { name: 'team', at: '/teams', first: '/teams/' },
+  // Step 2.102: a page not found inside a league keeps the league's own look.
+  { name: 'league-not-found', at: '/teams/no-such-team' },
 ];
 // A game's page in each of its states. The ids are the stand-in's own
 // (apps/web/src/server/stand-in-games.ts and stand-in-public-schedule.ts): a tracked game
