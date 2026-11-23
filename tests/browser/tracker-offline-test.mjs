@@ -336,15 +336,16 @@ async function oneGame(browser) {
     await step(
       'another account on the device sees none of the plays, which stay (T-321)',
       async () => {
-        const menuBefore = await page.locator('[data-account]').first().textContent();
+        // Who is signed in, as the page's own menu says it ("Your games" is a staff page).
+        const signedIn = page.locator('[data-account], [data-staff-account]').first();
+        const menuBefore = await signedIn.textContent();
         // The owner signs in on this device without the scorekeeper signing out.
         await context.addCookies([{ ...owner, url: origin }]);
         await page.reload();
-        await page.locator('[data-account]').first().waitFor();
+        await signedIn.waitFor({ state: 'attached' });
         note(
           'signed in as another account, "Your games" lists none of the first one’s plays',
-          (await held.count()) === 0 &&
-            (await page.locator('[data-account]').first().textContent()) !== menuBefore,
+          (await held.count()) === 0 && (await signedIn.textContent()) !== menuBefore,
           JSON.stringify({ held: await held.count() }),
         );
         await context.addCookies([{ ...scorekeeper, url: origin }]);
