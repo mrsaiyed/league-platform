@@ -25,6 +25,8 @@ export const enAdminGames = {
     'Say why the game needs correcting (up to 1000 characters) to reopen it.',
   'admin.boxScore.error.reopen-time-over':
     'Your time to reopen this game is over. Ask a league admin or a scheduler.',
+  'admin.boxScore.error.result-overturned':
+    'This result was overturned. Take the overturn off in Standings and stats first.',
   'admin.boxScore.help':
     'Copy the paper score sheet. Tick each player who played; a player with any number filled in counts as played. Leave a whole column empty if the sheet did not keep that number; it then does not count in that player’s averages. In a column you fill in, an empty box counts as 0.',
   'admin.boxScore.jersey': '#{number}',
@@ -220,6 +222,8 @@ export const enAdminGames = {
   'admin.games.reopenUntil':
     'You ended this game in the tracker, so you can reopen it until {time}.',
   'admin.games.reopenWho.admins': 'Only a league admin or a scheduler can reopen this game.',
+  'admin.games.reopenWho.overturned':
+    'This result was overturned. Take the overturn off in Standings and stats first.',
   'admin.games.reopenWho.time-over':
     'Your time to reopen this game is over. Only a league admin or a scheduler can reopen it now.',
   'admin.games.result': '{away} {awayScore}, {home} {homeScore}',

@@ -489,6 +489,7 @@ export interface StandingsAdjustmentsTable {
   account_id: string;
   games_played: Generated<number>;
   paired_with: string | null;
+  game_id: string | null;
   deleted_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;

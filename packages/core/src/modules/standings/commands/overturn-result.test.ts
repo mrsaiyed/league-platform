@@ -7,6 +7,7 @@ import {
   seasonId,
   teamId,
 } from '../memory-standings.test-helper.ts';
+import { listAdjustments } from './list-adjustments.ts';
 import { overturnResult } from './overturn-result.ts';
 import { removeAdjustment } from './remove-adjustment.ts';
 
@@ -67,6 +68,24 @@ describe('overturnResult', () => {
     const rows = db.state.rows[seasonId];
     expect(row(rows, 1)).toMatchObject({ wins: 1, losses: 0 });
     expect(row(rows, 2)).toMatchObject({ wins: 1, losses: 1 });
+  });
+
+  it('ties both halves to the game, refuses a second overturn of it and leaves it off the list', async () => {
+    const { db, deps, as } = memoryStandings({ games });
+    expect((await overturnResult(as(ownerId), input, deps)).ok).toBe(true);
+    expect(db.state.adjustments.map((a) => a.gameId)).toEqual([gameId(1), gameId(1)]);
+    // A double tap on a phone must not make it −2 wins.
+    expect(await overturnResult(as(ownerId), input, deps)).toEqual({
+      ok: false,
+      error: { code: 'game-already-overturned' },
+    });
+    expect(db.state.adjustments).toHaveLength(2);
+    const listed = await listAdjustments(as(ownerId), { seasonId }, deps);
+    expect(listed.ok && listed.value.games.map((g) => g.gameId)).toEqual([gameId(2)]);
+    // Taken off, the game may be overturned again.
+    const first = db.state.adjustments[0]?.id ?? '';
+    await removeAdjustment(as(ownerId), { seasonId, adjustmentId: first }, deps);
+    expect((await overturnResult(as(ownerId), input, deps)).ok).toBe(true);
   });
 
   it('refuses a game that is not decided in the season, saving nothing', async () => {

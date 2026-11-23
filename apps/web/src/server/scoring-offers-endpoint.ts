@@ -143,7 +143,11 @@ async function correction(
   const offer = sheetNeedsOffer(sheet)
     ? await readReopenOffer(command, { gameId }, deps()).then((o) => (o.ok ? o.value : undefined))
     : undefined;
-  if (sheetReopenViewOf(sheet, offer).kind !== 'correct') return undefined;
+  const view = sheetReopenViewOf(sheet, offer);
+  // An overturned result leads to its page too, which says where to go (S-85).
+  if (view.kind !== 'correct' && !(view.kind === 'who' && view.because === 'overturned')) {
+    return undefined;
+  }
   return {
     gameId,
     href: leagueUrl(context.league, 'admin-area', { area: 'games', subpath: [gameId] }),

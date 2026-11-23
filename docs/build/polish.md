@@ -81,3 +81,6 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.77 leftovers (2026-11-23): no browser check yet for the taken-name link on the bin screen; whether a team named with markup reaches the activity log in the harmful-text browser test is unchecked (a unit test shows it as text); the From/To labels on the activity log are not styled like the picker labels.
 
 - AN UNRELIABLE TEST, NOT SEEN AGAIN (2026-11-23): `be-made-up-person` (a sign-in test under `apps/web/src/server`) failed once under load in lane 2.56 and passed alone; `npx vitest run apps/web/src/server` then passed twice in a row (77 files, 1129 tests). Watch for it under load.
+
+- 2.56: an award is not linked to a scheduled game; if that game is played later it counts twice (S-85 says so): link it or warn.
+- 2.56: the public-pencil browser test covers only a league where scorekeepers cannot reopen; add one inside a tracker reopen window, and an admin limited to another program.

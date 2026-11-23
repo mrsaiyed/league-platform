@@ -48,6 +48,22 @@ describe('what the device is told before the tap (games.read_reopen_offer)', () 
     expect(t.db.state.corrections).toEqual([]);
   });
 
+  it('answers "no" to whoever could reopen it while an overturn rules on the result (S-85)', async () => {
+    const t = setUp();
+    const endedAt = await endedOnTablet(t);
+    t.clock.at = endedAt + minutes(10);
+    t.db.state.games = t.db.state.games.map((g) =>
+      g.id === gameId ? { ...g, overturned: true } : g,
+    );
+    for (const who of [scorekeeperId, schedulerId]) {
+      expect((await offerTo(t, who)).reopen).toEqual({ when: 'no', code: 'result-overturned' });
+    }
+    expect((await offerTo(t, otherScorekeeperId)).reopen).toEqual({
+      when: 'no',
+      code: 'not-ended-by-you',
+    });
+  });
+
   it('answers "no" with the reason for every game it would refuse, and refuses whoever may not score it', async () => {
     const t = setUp({
       games: [game(1, { captureMode: 'live' }), finalGame(2)],

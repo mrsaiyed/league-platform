@@ -42,6 +42,8 @@ export const enError = {
     'Say in a few words why the game is being reopened (up to 1000 characters). It is kept in the game’s corrections, never shown publicly.',
   'error.games.reopen_tracked_game.reopen-time-over':
     'It is too long since this game ended for a scorekeeper to reopen it. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.result-overturned':
+    'This result was overturned. Take the overturn off in Standings and stats first.',
   'error.games.reopen_tracked_game.scorekeepers-may-not-reopen':
     'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
   'error.games.take_over_scoring.game-closed':

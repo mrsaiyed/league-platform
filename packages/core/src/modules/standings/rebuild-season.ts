@@ -116,23 +116,67 @@ export async function calculateSeason(
   const games = results.games.filter((g): g is GameRecord & { status: 'final' | 'forfeit' } =>
     decided(g.status),
   );
-  const standings = calculateStandings({
-    teams: teams.map((t) => ({ teamId: t.teamId, divisionId: t.divisionId })),
-    games: games.map(standingsGame),
-    rules: rules ?? results.rules,
-    adjustments: adjustments.map((a) => ({
-      adjustmentId: a.id,
-      teamId: a.teamId,
-      wins: a.wins,
-      losses: a.losses,
-      ties: a.ties,
-      points: a.points,
-      reason: a.reason,
-    })),
-    coinFlips: [],
-  });
+  const calculate = (counted: readonly SeasonAdjustment[]): StandingsResult =>
+    calculateStandings({
+      teams: teams.map((t) => ({ teamId: t.teamId, divisionId: t.divisionId })),
+      games: games.map(standingsGame),
+      rules: rules ?? results.rules,
+      adjustments: counted.map((a) => ({
+        adjustmentId: a.id,
+        teamId: a.teamId,
+        wins: a.wins,
+        losses: a.losses,
+        ties: a.ties,
+        points: a.points,
+        reason: a.reason,
+      })),
+      coinFlips: [],
+    });
+  const standings = withWholePairs(calculate, adjustments);
   return { results, games, standings: withAwardedGames(standings, adjustments) };
 }
+
+/**
+ * The calculation with never one half of a pair (S-85, T-307) counted without the other:
+ * packages/sports leaves out an adjustment that names a team not in the table or would
+ * take a count below zero, so when it leaves out one half, the other is left out too,
+ * with the same reason, and the calculation is run again without both.
+ */
+export function withWholePairs(
+  calculate: (counted: readonly SeasonAdjustment[]) => StandingsResult,
+  adjustments: readonly SeasonAdjustment[],
+): StandingsResult {
+  const partner = new Map<string, string>();
+  for (const a of adjustments) {
+    if (a.pairedWith === undefined || a.pairedWith === null) continue;
+    partner.set(a.id, a.pairedWith);
+    partner.set(a.pairedWith, a.id);
+  }
+  const withheld = new Map<string, StandingsProblem>();
+  let standings = calculate(adjustments);
+  // Each pass withholds at least one more pair, so this ends.
+  for (;;) {
+    const newly = standings.problems.filter((p) => {
+      if (p.kind !== 'adjustment' || !p.leftOut || withheld.has(p.id)) return false;
+      const other = partner.get(p.id);
+      return other !== undefined && !withheld.has(other);
+    });
+    if (newly.length === 0) break;
+    for (const p of newly) {
+      withheld.set(p.id, p);
+      const other = partner.get(p.id) ?? '';
+      if (!withheld.has(other)) withheld.set(other, { ...p, id: other });
+    }
+    standings = calculate(adjustments.filter((a) => !withheld.has(a.id)));
+  }
+  if (withheld.size === 0) return standings;
+  const problems = [...standings.problems, ...withheld.values()].sort(
+    (a, b) => order(a.kind, b.kind) || order(a.id, b.id) || order(a.reason, b.reason),
+  );
+  return { ...standings, problems };
+}
+
+const order = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
  * Adds the games played of a game awarded that was not played (S-85) to the rows its

@@ -57,6 +57,7 @@ const known = [
   'adjustment-not-counted',
   'adjustment-not-found',
   'invalid-number',
+  'game-already-overturned',
   'game-has-no-winner',
   'game-not-found',
   'not-allowed',

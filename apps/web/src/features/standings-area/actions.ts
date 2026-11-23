@@ -153,6 +153,10 @@ export async function overturnResultAction(_state: FormState, form: FormData): P
     const reasonWrong = reasonProblem(fields['reason']);
     if (reasonWrong !== undefined) return refuse(reasonWrong, 'reason');
     const listed = await listAdjustments(context, { seasonId }, deps);
+    if (listed.ok && listed.value.adjustments.some((a) => a.gameId === gameId)) {
+      // A second tap of the same overturn (S-85).
+      return refuse('game-already-overturned', 'game');
+    }
     const game = listed.ok ? listed.value.games.find((g) => g.gameId === gameId) : undefined;
     if (game === undefined) return refuse('game-not-found', 'game');
     const teams = await teamsOf(leagueId, seasonId);
@@ -162,6 +166,8 @@ export async function overturnResultAction(_state: FormState, form: FormData): P
       game: named,
       reason: text(fields, 'reason'),
     });
+    // The game's name counts towards the reason's 500 characters.
+    if (reasonProblem(reason) !== undefined) return refuse('reason-too-long', 'reason');
     const result = await overturnResult(context, { seasonId, gameId, reason }, deps);
     if (!result.ok) return result;
     return { ...result, name: t('adminStandings.overturn.what', { game: named }) };

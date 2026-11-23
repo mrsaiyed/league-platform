@@ -19,7 +19,12 @@ import { gameScope, mayChangeGames } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
 
 export type ReopenGameError = {
-  readonly code: 'game-not-found' | 'changed-since-read' | 'game-not-decided' | 'not-allowed';
+  readonly code:
+    | 'game-not-found'
+    | 'changed-since-read'
+    | 'game-not-decided'
+    | 'not-allowed'
+    | 'result-overturned';
 };
 
 export const reopenGame = defineCommand({
@@ -41,6 +46,8 @@ export const reopenGame = defineCommand({
     // A correction names who made it; with no account there is no one to name.
     if (context.accountId === null) return fail({ code: 'not-allowed' });
     if (!isDecided(game.status)) return fail({ code: 'game-not-decided' });
+    // An overturn rules on this result: a correction could flip it the wrong way (S-85).
+    if (game.overturned === true) return fail({ code: 'result-overturned' });
     // The result before is kept in the correction. By hand: back to scheduled with the
     // scores cleared. Tracked: back to the tracker, live with its plays' score.
     // A game whose only events are players added at its table, then entered from paper,

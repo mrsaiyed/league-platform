@@ -19,6 +19,7 @@ export async function listStandingsAdjustments(
       'reason',
       'games_played',
       'paired_with',
+      'game_id',
     ])
     .where('league_id', '=', scope.leagueId)
     .where('season_id', '=', seasonId)
@@ -35,5 +36,6 @@ export async function listStandingsAdjustments(
     reason: row.reason,
     gamesPlayed: row.games_played,
     pairedWith: row.paired_with,
+    gameId: row.game_id,
   }));
 }

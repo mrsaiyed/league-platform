@@ -14,7 +14,10 @@ export type ListAdjustmentsError = { readonly code: 'season-not-found' };
 export type SeasonAdjustments = {
   readonly adjustments: readonly SeasonAdjustment[];
   readonly teams: readonly TableTeam[];
-  /** The season's decided games with a winner, latest first: the ones a ruling may overturn. */
+  /**
+   * The season's decided games with a winner and no overturn on them, latest first: the
+   * ones a ruling may overturn (one overturn per game at a time, S-85).
+   */
   readonly games: readonly OverturnableGame[];
 };
 
@@ -42,9 +45,15 @@ export const listAdjustments = defineCommand({
       tx.standings.listTeams(input.seasonId),
       tx.games.listDecided(input.seasonId),
     ]);
+    const overturned = new Set(
+      adjustments.flatMap((a) => (a.gameId === undefined || a.gameId === null ? [] : [a.gameId])),
+    );
     const games = decided
       .flatMap((g) =>
-        g.homeScore === null || g.awayScore === null || g.homeScore === g.awayScore
+        overturned.has(g.id) ||
+        g.homeScore === null ||
+        g.awayScore === null ||
+        g.homeScore === g.awayScore
           ? []
           : [
               {

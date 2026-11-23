@@ -13,7 +13,13 @@ import type { StandingsTx } from '../ports.ts';
 import { rebuildSeason } from '../rebuild-season.ts';
 
 export type OverturnResultError =
-  | { readonly code: 'season-not-found' | 'game-not-found' | 'game-has-no-winner' }
+  | {
+      readonly code:
+        | 'season-not-found'
+        | 'game-not-found'
+        | 'game-has-no-winner'
+        | 'game-already-overturned';
+    }
   | { readonly code: 'not-allowed' }
   | { readonly code: 'adjustment-not-counted'; readonly reason: string };
 
@@ -41,6 +47,11 @@ export const overturnResult = defineCommand({
     if (winner === null) return fail({ code: 'game-has-no-winner' });
     const loser = winner === game.homeTeamId ? game.awayTeamId : game.homeTeamId;
     await tx.standings.lockSeason(input.seasonId);
+    // One overturn per game at a time, so a second tap never makes it two (S-85).
+    const adjustments = await tx.standings.listAdjustments(input.seasonId);
+    if (adjustments.some((a) => a.gameId === input.gameId)) {
+      return fail({ code: 'game-already-overturned' });
+    }
     const half = (teamId: string, wins: number) => ({
       teamId,
       wins,
@@ -49,6 +60,7 @@ export const overturnResult = defineCommand({
       points: 0,
       reason: input.reason,
       accountId: context.accountId ?? '',
+      gameId: input.gameId,
     });
     const first = await tx.standings.addAdjustment(input.seasonId, half(winner, -1));
     const second = await tx.standings.addAdjustment(input.seasonId, {

@@ -93,6 +93,51 @@ describe('rebuildSeason', () => {
     expect(result.problems).toEqual([]);
   });
 
+  describe('a pair of adjustments (S-85, T-307) counts whole or not at all', () => {
+    const half = (n: number, team: number, wins: number, pairedWith?: string) => ({
+      id: `01900000-0000-7000-8000-0000000e000${n}`,
+      seasonId,
+      teamId: teamId(team),
+      wins,
+      losses: -wins,
+      ties: 0,
+      points: 0,
+      reason: 'Ruling',
+      ...(pairedWith === undefined ? {} : { pairedWith }),
+    });
+    const first = half(1, 1, -1);
+
+    it('leaves out the winning half when the other names a team no longer in the table', async () => {
+      const { rows, result } = await rebuilt({
+        games: [game(1, 1, 2, { ...final, homeScore: 60, awayScore: 50 })],
+        // Team 5 is not in the season's table (a team removed).
+        adjustments: [first, half(2, 5, 1, first.id)],
+      });
+      expect(rows.find((r) => r.teamId === teamId(1))).toMatchObject({ wins: 1, losses: 0 });
+      expect(result.problems).toEqual([
+        { kind: 'adjustment', id: first.id, reason: 'unknown-team', leftOut: true },
+        { kind: 'adjustment', id: half(2, 5, 1).id, reason: 'unknown-team', leftOut: true },
+      ]);
+    });
+
+    it("leaves out the loser's +1 W when the winner's −1 W would go below zero", async () => {
+      const { rows, result } = await rebuilt({
+        games: [
+          game(1, 1, 2, { ...final, homeScore: 60, awayScore: 50 }),
+          game(2, 1, 4, { ...final, homeScore: 60, awayScore: 50 }),
+        ],
+        // Team 3 has no win to take off, so team 4 (one loss) may not gain one.
+        adjustments: [half(1, 3, -1), half(2, 4, 1, first.id)],
+      });
+      expect(rows.find((r) => r.teamId === teamId(4))).toMatchObject({ wins: 0, losses: 1 });
+      expect(rows.find((r) => r.teamId === teamId(3))).toMatchObject({ wins: 0, losses: 0 });
+      expect(result.problems.map((p) => [p.id, p.leftOut])).toEqual([
+        [first.id, true],
+        [half(2, 4, 1).id, true],
+      ]);
+    });
+  });
+
   it('saves nothing for a season that is not here', async () => {
     const { db, transaction, as } = memoryStandings();
     const missing = '01900000-0000-7000-8000-0000000000c9';

@@ -45,6 +45,8 @@ export const enAdminStandings = {
     'That would take a team’s count below zero, or change nothing the table shows. Nothing was saved.',
   'adminStandings.problem.adjustment-not-found':
     'That adjustment has already been taken off. The list has been brought up to date.',
+  'adminStandings.problem.game-already-overturned':
+    'That result has already been overturned. Nothing more was saved.',
   'adminStandings.problem.game-has-no-winner': 'That game has no winner to overturn.',
   'adminStandings.problem.game-not-found': 'Choose one of this season’s decided games.',
   'adminStandings.problem.invalid-number':

@@ -21,6 +21,8 @@ export type SeasonAdjustment = {
   readonly gamesPlayed?: number;
   /** The other half's id, for the second half of an overturned or awarded game. */
   readonly pairedWith?: string | null;
+  /** The game an overturn rules on, on both its halves; empty otherwise (S-85). */
+  readonly gameId?: string | null;
 };
 
 /** An adjustment to add (S-10); at least one of the four changes is not zero. */
@@ -37,6 +39,8 @@ export type NewAdjustment = {
   readonly gamesPlayed?: number;
   /** The first half's id, when this is the second half of a pair (T-307). */
   readonly pairedWith?: string;
+  /** The game overturned, on both halves of an overturned result (S-85). */
+  readonly gameId?: string;
 };
 
 export type StandingsStore = {

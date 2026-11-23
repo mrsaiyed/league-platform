@@ -21,7 +21,8 @@ export type GameRecord = {
   readonly awayScore: number | null;
   /**
    * How many overtime periods a final game had (P7 §5.6): 0 when the tracker ended it in
-   * regulation. Null when it is not known: a score typed in, a box score, a forfeit, a
+   * regulation or a score typed in with "No overtime" (S-86). Null when it is not known: a
+   * box score, a forfeit, a score typed in before step 2.56, a
    * game not final, a game final before the count was kept (migration 0021).
    */
   readonly overtimePeriods: number | null;
@@ -30,6 +31,11 @@ export type GameRecord = {
   readonly finalizedAt: string | null;
   readonly binned: boolean;
   readonly version: number;
+  /**
+   * True while an overturn (S-85) rules on this game's result: it is then not reopened,
+   * corrected or moved to the bin until the overturn is taken off. Read by `find` only.
+   */
+  readonly overturned?: boolean;
 };
 
 /**
