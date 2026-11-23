@@ -10,6 +10,9 @@ const partKind: Readonly<Record<keyof typeof binAnchors, BinKind>> = {
   teams: 'team',
   people: 'person',
   games: 'game',
+  divisions: 'division',
+  venues: 'venue',
+  courts: 'court',
 };
 
 export async function binLinkFor(

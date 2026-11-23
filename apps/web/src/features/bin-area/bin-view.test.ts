@@ -15,19 +15,27 @@ describe('what the bin screen shows (step 2.77)', () => {
         id: 't-1',
         name: 'Hawks',
         kept: true,
-        details: { gamesPlayed: 3, gamesToCome: 2, rosterInBin: ['p-1'] },
+        details: {
+          gamesPlayed: 3,
+          gamesToCome: 2,
+          rosterInBin: ['p-1'],
+          seasonName: 'Winter 2027',
+          divisionName: 'Boys U12',
+        },
       },
       { ...base, kind: 'person', id: 'p-1', name: 'Sam Player', seasonId: null, kept: true },
     ];
     const view = binView(items, times);
-    expect(view.teams[0]?.facts).toEqual([
+    expect(view.team[0]?.facts).toEqual([
+      'Season: Winter 2027.',
+      'Division: Boys U12.',
       'Games played: 3. Games still to play: 2. They come back with it.',
       'On its roster and in the bin too: Sam Player. The team comes back without them on the league list: bring them back as well, under Removed people.',
     ]);
-    expect(view.people.map((p) => p.title)).toEqual(['Sam Player']);
+    expect(view.person.map((p) => p.title)).toEqual(['Sam Player']);
   });
 
-  it('says a game with no round comes back with none, and leaves out other kinds', () => {
+  it('tells a game by its season, its day and the team of it in the bin', () => {
     const items: BinListing[] = [
       {
         ...base,
@@ -36,14 +44,48 @@ describe('what the bin screen shows (step 2.77)', () => {
         name: 'Hawks',
         secondName: 'Owls',
         kept: true,
-        details: { startsAt: null, withoutRound: true },
+        details: {
+          startsAt: null,
+          withoutRound: true,
+          seasonName: 'Winter 2027',
+          teamsInBin: [{ id: 't-1', name: 'Hawks' }],
+        },
       },
-      { ...base, kind: 'court', id: 'c-1', name: 'Court 1', seasonId: null, kept: false },
+    ];
+    const game = binView(items, times).game[0];
+    expect(game?.title).toBe('Hawks against Owls');
+    expect(game?.facts[0]).toBe('Season: Winter 2027.');
+    expect(game?.facts).toContain('It has no round now, so it comes back with no round.');
+    expect(game?.facts).toContain('Its team in the bin: Hawks. Bring the team back first.');
+    expect(game?.teamsInBin).toEqual([{ id: 't-1', name: 'Hawks' }]);
+  });
+
+  it('lists divisions with their season, venues, and courts with their venue', () => {
+    const items: BinListing[] = [
+      {
+        ...base,
+        kind: 'division',
+        id: 'd-1',
+        name: 'Girls',
+        kept: false,
+        details: { seasonName: 'Winter 2027' },
+      },
+      { ...base, kind: 'venue', id: 'v-1', name: 'North Hall', seasonId: null, kept: false },
+      {
+        ...base,
+        kind: 'court',
+        id: 'c-1',
+        name: 'Court 1',
+        seasonId: null,
+        kept: false,
+        details: { venueName: 'South Hall' },
+      },
     ];
     const view = binView(items, times);
-    expect(view.games[0]?.title).toBe('Hawks against Owls');
-    expect(view.games[0]?.facts).toContain('It has no round now, so it comes back with no round.');
-    expect([...view.teams, ...view.people]).toEqual([]);
+    expect(view.division[0]?.facts).toEqual(['Season: Winter 2027.']);
+    expect(view.venue.map((v) => v.title)).toEqual(['North Hall']);
+    expect(view.court[0]?.facts).toEqual(['At South Hall.']);
+    expect([...view.team, ...view.person, ...view.game]).toEqual([]);
   });
 });
 
