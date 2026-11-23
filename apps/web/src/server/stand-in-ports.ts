@@ -26,6 +26,7 @@ import {
   ok,
   systemClock,
   type AccessTx,
+  readSiteFacts,
   type Clock,
   type CommandDeps,
   type EmailSender,
@@ -552,6 +553,11 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     answers: answersOnlyHere(options.publicBaseUrl),
     fixtureImport: standInFixtureImport(world),
     leagueSites: standInLeagueSitesIn(options.localDesign),
+    // The notice and "do not index" (step 2.60), read as no one from the saved settings.
+    siteFactsOf: (leagueId) =>
+      adminSettings.deps.transaction({ leagueId, accountId: null, requestId: 'site-facts' }, (tx) =>
+        readSiteFacts(tx.leagues),
+      ),
     // The kept emails and "be this made-up person" (step 2.96): the made-up people who sign
     // in with a password, each with the leagues they may see, read as the front page reads
     // them (core's myLeagues over the same rows).

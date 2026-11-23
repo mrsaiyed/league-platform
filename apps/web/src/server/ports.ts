@@ -4,7 +4,13 @@
 //
 // The imports, and each area's ports below (adminSettings to tracker), are in alphabetical
 // order: a new area's go in their place, never at the end (step 2.188, record 072).
-import type { AccessHolder, AccountLeagueRow, CommandContext, Result } from '@srleagues/core';
+import type {
+  AccessHolder,
+  AccountLeagueRow,
+  CommandContext,
+  Result,
+  SiteFacts,
+} from '@srleagues/core';
 import type { BotCheck, SessionIdentity, SignInService } from '@srleagues/providers';
 import type { AdminAccessPorts } from './admin-access.ts';
 import type { AdminPeoplePorts } from './admin-people.ts';
@@ -74,6 +80,11 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
   readonly games: GamesAreaPorts;
   /** Each league's name and design, as its pages show them (league-site.ts). */
   readonly leagueSites: LeagueSiteLookup;
+  /**
+   * Each league's site notice and whether its public pages ask search engines not to
+   * index them (step 2.60, core's readSiteFacts): read as no one, in one page snapshot.
+   */
+  readonly siteFactsOf: (leagueId: string) => Promise<SiteFacts>;
   /**
    * The kept emails' page and "be this made-up person" (step 2.96, local-tools.ts): only on
    * made-up data, null on a real database. The pages ask the app's mode first (local-only.ts).

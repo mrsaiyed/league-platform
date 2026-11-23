@@ -86,6 +86,8 @@ const typed = {
   venueAddress: attack('venueAddress'),
   mapLink: `https://example.test/${tightAttack('mapLink')}`,
   courtName: attack('courtName'),
+  // Step 2.60: the league's site notice, typed on League settings, on every public page.
+  notice: attack('notice'),
   // Posted by hand into every field a plain form holds (the fix round, F3).
   posted: attack('posted'),
 };
@@ -152,6 +154,9 @@ const FIELDS = {
     'stat.fg1.{id}': 'a box score is typed',
     'stat.fouls.{id}': 'a box score is typed',
   },
+  // League settings (step 2.60): the site notice, the one text setting, shown on every
+  // public page of the league.
+  '/[league]/admin/settings': { value: 'the site notice is typed' },
   // League settings → Admins (step 2.97): the address an invitation is sent to.
   '/[league]/admin/settings/admins': { email: 'the email boxes' },
   '/signin': { email: 'the email boxes' },
@@ -667,16 +672,31 @@ if (browser) {
     await addPlayers(origin, { home: [['55', typed.table]], away: [] }, liveGame);
   });
 
+  await step('the site notice is typed as the attack', async () => {
+    const ownerContext = await contextFor(owner);
+    const settingsPage = await ownerContext.newPage();
+    await settingsPage.goto(`${origin}/north-valley/admin/settings`);
+    const form = settingsPage.locator('form', {
+      has: settingsPage.locator('input[type=text][name=value]'),
+    });
+    await form.locator('input[name=value]').fill(typed.notice);
+    await Promise.all([
+      settingsPage.waitForURL(/done=saved/),
+      form.locator('button').first().click(),
+    ]);
+    await ownerContext.close();
+  });
+
   // Every page that shows the text, as each person who sees it.
   const visitorPages = [
-    ['/north-valley', []],
-    ['/north-valley/teams', ['team']],
-    ['/north-valley/teams/harmful-text', ['team', 'first']],
-    ['/north-valley/schedule', []],
-    ['/north-valley/standings', []],
-    ['/north-valley/stats', []],
-    [`/north-valley/games/${liveGame}`, []],
-    [`/north-valley/schedule?season=${encodeURIComponent(typed.query)}`, []],
+    ['/north-valley', ['notice']],
+    ['/north-valley/teams', ['team', 'notice']],
+    ['/north-valley/teams/harmful-text', ['team', 'first', 'notice']],
+    ['/north-valley/schedule', ['notice']],
+    ['/north-valley/standings', ['notice']],
+    ['/north-valley/stats', ['notice']],
+    [`/north-valley/games/${liveGame}`, ['notice']],
+    [`/north-valley/schedule?season=${encodeURIComponent(typed.query)}`, ['notice']],
     [`/signin?next=${encodeURIComponent(`/${typed.query}`)}`, []],
     [`/signin?problem=${encodeURIComponent(typed.query)}`, []],
   ];

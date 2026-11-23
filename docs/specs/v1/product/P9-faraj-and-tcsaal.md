@@ -135,7 +135,7 @@ Al-Hadi is a team we run ourselves. It is not a kind of customer (B-2).
 3. A game scored live in front of them on a phone, appearing on a second screen within two seconds.
 4. The admin: roles for a school's staff, a schedule change, a corrected score.
 
-**F-10 (new, recommended; needs the founder's yes): until TCSAAL agrees, the demo league does not present itself as TCSAAL.** It carries a clear "unofficial demo, not run by TCSAAL" notice, does not use TCSAAL's logo, and stays out of `/find` and search engines. Using an organization's public schedule and results to pitch it is normal. A public site that looks like its official one is how a pitch turns into a complaint. The day TCSAAL agrees, renaming and listing the league is a setting.
+**F-10 (new, recommended; needs the founder's yes): until TCSAAL agrees, the demo league does not present itself as TCSAAL.** It carries a clear "unofficial demo, not run by TCSAAL" notice, does not use TCSAAL's logo, and stays out of `/find` and search engines. Using an organization's public schedule and results to pitch it is normal. A public site that looks like its official one is how a pitch turns into a complaint. The day TCSAAL agrees, renaming and listing the league is a setting. The notice and "do not index" are two League settings any league has (step 2.60): the notice's words are typed by the league's admin, never written into the code.
 
 ### Timing, honestly
 

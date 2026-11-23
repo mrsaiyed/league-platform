@@ -169,6 +169,38 @@ export const minimumGamesToRank = defineSetting({
   label: 'setting.statistics.minimumGamesToRank.label',
 });
 
+/**
+ * The league's site notice (step 2.60, F-10, P9 §3): one short line of the admin's own
+ * words shown at the top of every public page of the league, such as "Unofficial demo,
+ * not run by …". Empty, the start, shows none. Plain text: the page draws it as text,
+ * never as markup, like every other free text. At most 200 characters, so it stays a
+ * line or two on a phone.
+ */
+export const siteNotice = defineSetting({
+  key: 'site.notice',
+  type: z.string().trim().max(200),
+  default: '',
+  levels: ['league'],
+  permission: 'league.settings',
+  label: 'setting.site.notice.label',
+});
+
+/**
+ * Whether the league asks search engines not to index its public pages (U-10: any league
+ * may). Off to start. A youth or mixed league is never
+ * indexed whatever this says (U-18, readSiteFacts). Switching it on shows less, so
+ * it works even in an archived or suspended league (R-26).
+ */
+export const siteDoNotIndex = defineSetting({
+  key: 'site.doNotIndex',
+  type: z.boolean(),
+  default: false,
+  levels: ['league'],
+  permission: 'league.settings',
+  label: 'setting.site.doNotIndex.label',
+  protectiveOrder: [false, true],
+});
+
 export const declaredSettings = settingRegistry([
   membersStartPage,
   whoMayScore,
@@ -179,4 +211,6 @@ export const declaredSettings = settingRegistry([
   publicNames,
   childrenInFullConfirmed,
   playersMayAskForInitials,
+  siteNotice,
+  siteDoNotIndex,
 ]);

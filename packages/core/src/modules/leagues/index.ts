@@ -64,7 +64,15 @@ export {
   publicNamesChoices,
   childrenInFullConfirmed,
   playersMayAskForInitials,
+  siteNotice,
+  siteDoNotIndex,
 } from './settings/declarations.ts';
+export {
+  childrenKeepOutOfSearch,
+  readSiteFacts,
+  type SiteFacts,
+  type SiteFactsStore,
+} from './settings/read-site-facts.ts';
 export {
   defineSetting,
   hasLimits,
