@@ -61,6 +61,7 @@ import { againCommandId } from './again-command-id.ts';
 import type { CommandTransport } from './command-transport.ts';
 import type { GameDoors } from './game-doors.ts';
 import { mayEnterAgain } from './kept-plays.ts';
+import type { DeviceScoring } from './opened-game-storage.ts';
 import {
   QueueError,
   keptTap,
@@ -285,6 +286,15 @@ export type TrackerControllerOptions = {
   readonly renewEveryMs?: number;
   /** Passed on to the queue. */
   readonly queue?: Pick<TrackerQueueOptions, 'batchSize' | 'retry' | 'sendTimeoutMs' | 'reachable'>;
+  /**
+   * What the device kept of the game (step 2.38, finding M5; T-248, T-253): the server's
+   * state as last loaded and how this device was scoring it. When the session gets no
+   * answer on opening, scoring starts from them at once, under the kept session, and
+   * settles with the server once it answers. Left out, opening waits for the server.
+   */
+  readonly kept?: { readonly state: ServerState | null; readonly scoring: DeviceScoring | null };
+  /** Keeps how the device is scoring the game, each time it changes (step 2.38). */
+  readonly keepScoring?: (scoring: DeviceScoring) => Promise<void>;
 };
 
 export type TrackerController = {
@@ -686,9 +696,58 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     return state;
   };
 
+  /** The kept scoring, written one after another so an older one never lands last. */
+  let keeping: Promise<void> = Promise.resolve();
+  const keepScoringNow = (): void => {
+    const keep = options.keepScoring;
+    if (keep === undefined || sessionId === null) return;
+    const scoring: DeviceScoring = { sessionId, onTop: [...made] };
+    // Best effort: the taps themselves are in the queue, which says when storage fails.
+    keeping = keeping.then(() => keep(scoring)).catch(() => undefined);
+  };
+
   const showGame = (): void => {
     if (base === null) return;
     update({ game: replay(base, made), serverSequence: base.sequence });
+    keepScoringNow();
+  };
+
+  /**
+   * The server did not answer on opening (step 2.38, finding M5): with the state and the
+   * session the device kept, scoring starts from them at once, the kept taps on top,
+   * under the kept session, so a reload with no signal carries on within seconds. The
+   * queue sends under that session as the network allows, and the server takes them if
+   * nobody took the game (T-248); opening goes on being asked, and once answered the
+   * game is settled as on any opening (`hold`, then the server's state; T-253).
+   */
+  let fromDevice = false;
+  const startFromDevice = async (): Promise<void> => {
+    const kept = options.kept;
+    if (fromDevice || stopped || base !== null || kept === undefined) return;
+    const { state, scoring } = kept;
+    if (state === null || scoring === null || state.state.status === 'final') return;
+    fromDevice = true;
+    let waiting: BatchCommand[];
+    try {
+      waiting = (await storage.list(gameId))
+        .filter(
+          (entry) =>
+            entry.state === 'waiting' &&
+            (entry.sessionId === undefined || entry.sessionId === scoring.sessionId),
+        )
+        .map((entry) => entry.command);
+    } catch {
+      return;
+    }
+    if (stopped || base !== null || current.mode.kind !== 'opening') return;
+    const onTop = new Set(scoring.onTop.map((c) => c.commandId));
+    made = [...scoring.onTop, ...waiting.filter((c) => !onTop.has(c.commandId))].filter(
+      (c) => !refusedIds.has(c.commandId),
+    );
+    base = state;
+    sessionId = scoring.sessionId;
+    showGame();
+    update({ mode: { kind: 'scoring' } });
   };
 
   const clearTimer = (): void => {
@@ -983,9 +1042,13 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** Opens the game: asks for the session, and scores if it is given. */
   const open = async (): Promise<void> => {
-    update({ mode: { kind: 'opening' } });
+    // Scoring from what the device kept (step 2.38) carries on while opening is asked again.
+    if (!(fromDevice && current.mode.kind === 'scoring')) update({ mode: { kind: 'opening' } });
     const opened = await session({ type: 'open', deviceId });
-    if (opened.kind === 'unanswered') return later(open);
+    if (opened.kind === 'unanswered') {
+      await startFromDevice();
+      return later(open);
+    }
     failures = 0;
     if (opened.kind === 'rejected') return readOnly(reasonOfStatus(opened.httpStatus));
     const reply = opened.value;

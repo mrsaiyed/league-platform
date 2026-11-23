@@ -27,6 +27,7 @@ import {
   openedGameKeepMs,
   sameFormat,
   type DeviceRosters,
+  type DeviceScoring,
   type GameFormat,
   type LineupPicks,
   type OpenedGameStorage,
@@ -39,7 +40,7 @@ import {
   type TrackerControllerOptions,
   type TrackerControllerStatus,
 } from './tracker-controller.ts';
-import type { TrackerServer } from './tracker-server.ts';
+import type { ServerState, TrackerServer } from './tracker-server.ts';
 
 /** What the tracker's page shows while a game is opened, chosen from the controller's status. */
 export type OpeningScreen =
@@ -150,6 +151,7 @@ export async function openTrackerGame(
   let deviceId: string;
   let confirmed: GameFormat | null;
   let picks: LineupPicks;
+  let keptGame: { readonly state: ServerState | null; readonly scoring: DeviceScoring | null };
   try {
     storage = await options.openStorage();
     const openedAt = now();
@@ -158,6 +160,7 @@ export async function openTrackerGame(
     deviceId = await storage.games.deviceId(options.newDeviceId);
     const kept = await storage.games.find(gameId);
     confirmed = kept?.confirmedFormat ?? null;
+    keptGame = { state: kept?.state ?? null, scoring: kept?.scoring ?? null };
     picks = kept?.lineupPicks ?? noLineupPicks;
   } catch (error) {
     return { ok: false, code: codeOf(error) };
@@ -170,6 +173,9 @@ export async function openTrackerGame(
     deviceId,
     // Each tap keeps its league, so "Your games" lists it there however old (T-317).
     storage: inLeague(storage.queue, leagueId),
+    // With no answer on opening, scoring starts from what the device kept (step 2.38).
+    kept: keptGame,
+    keepScoring: (scoring) => games.saveScoring(gameId, scoring),
     transport: options.transport,
     ...(options.doors === undefined ? {} : { doors: options.doors }),
     server: createStoringTrackerServer({

@@ -140,6 +140,7 @@ export async function openIndexedDbOpenedGameStorage(
             state: found?.state ?? null,
             confirmedFormat: found?.confirmedFormat ?? null,
             ...(found?.lineupPicks === undefined ? {} : { lineupPicks: found.lineupPicks }),
+            ...(found?.scoring === undefined ? {} : { scoring: found.scoring }),
           };
           store.put(game);
         };
@@ -166,6 +167,9 @@ export async function openIndexedDbOpenedGameStorage(
     },
     confirmFormat(gameId, format) {
       return change(gameId, (game) => ({ ...game, confirmedFormat: format }));
+    },
+    saveScoring(gameId, scoring) {
+      return change(gameId, (game) => ({ ...game, scoring }));
     },
     saveLineupPicks(gameId, picks) {
       return change(gameId, (game) => withLineupPicks(game, picks));
