@@ -17,6 +17,10 @@
 // The menu is in the page twice, as the public header's is: once in the phone's panel and
 // once at the side. Only one of the two is ever drawn, whatever the width, so the keyboard
 // and a screen reader meet it once.
+//
+// The menu lists only the areas that may be shown here (step 2.140, server/releases.ts): in
+// staging and production an area with no screen yet is not in it at all; in local work and
+// tests it is, marked "Not ready". Who may open which area is the league gate's alone.
 import { leagueUrl, type LeagueStatus } from '@srleagues/core';
 import { staffCssText, type DesignDocument } from '@srleagues/site';
 import { Emblem } from '@srleagues/ui';
@@ -26,6 +30,7 @@ import type { LeagueView } from '../../server/league-gate.ts';
 import { siteOfThisRequest } from '../../server/league-site.ts';
 import { requestPath, signedInEmail } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
+import { shownHere } from '../../server/releases.ts';
 import { accountMenuOf, displayStylesheet, SiteFooter } from '../shell/index.ts';
 import { CloseWhenLeft } from './close-when-left.tsx';
 import { staffPlaceAt } from './staff-area.ts';
@@ -95,7 +100,9 @@ export async function StaffFrame({
   const league = view.context.league;
   const site = await siteOfThisRequest(league.id, league.slug);
   const path = await requestPath();
-  const place = staffPlaceAt(league, path, view.areas);
+  const shown = shownHere();
+  const areas = view.areas.filter(shown.adminArea);
+  const place = staffPlaceAt(league, path, areas);
   const account = accountMenuOf(view, await signedInEmail(), path);
   const home = leagueUrl(league, 'admin');
   const notPublic = statuses[league.status];
@@ -107,7 +114,7 @@ export async function StaffFrame({
   const ports = await webPorts();
   const menu = (
     <>
-      <StaffNav league={league} areas={view.areas} current={place} />
+      <StaffNav league={league} areas={areas} current={place} />
       <StaffFoot league={league} account={account} />
     </>
   );

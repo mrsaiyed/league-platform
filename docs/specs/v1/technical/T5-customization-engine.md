@@ -138,7 +138,7 @@ defineSetting({
 An optional feature (awards, draft, sponsors, media, news, registration fees, player pages) is declared with its key, what it depends on, whether it has to be part of the league's agreement with us, and what it brings: section types, standard pages, an admin area, notification types.
 
 - **T-99:** switching a feature off hides all of that and stops its jobs. Its tables and data are untouched, so switching it back on restores everything.
-- **T-100:** three separate questions are never mixed: does the league's **agreement** with us include it, has the league **switched it on**, and have **we** released it yet (a rollout flag we control). A feature shows only when all three are yes.
+- **T-100:** three separate questions are never mixed: does the league's **agreement** with us include it, has the league **switched it on**, and have **we** released it yet (a rollout flag we control). A feature shows only when all three are yes. The third is, for now, one list in code for every league (T-289).
 
 ## 8. Sports
 

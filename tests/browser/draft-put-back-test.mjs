@@ -600,7 +600,7 @@ if (built) {
     ]);
     await struck.waitFor({ state: 'attached' });
     const binnedWords =
-      'one of its teams is in the bin, so this game stays removed. The team is kept for 30 days; the screen to bring it back is not ready yet.';
+      'one of its teams is in the bin, so this game stays removed. The team is kept for 30 days.';
     note(
       'a removed game of a team in the bin says why it stays removed, with no "Put it back"',
       (await struck.innerText()).includes(binnedWords) &&
