@@ -73,3 +73,7 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 
 - 2.56 leftovers (2026-11-23): the activity log could not be checked in a browser on the made-up world (it lists none) until step 2.77 part 2 lands; on a league where any scorekeeper may score any game, assigning only puts the game on their list: say so on the Scorekeepers page.
 - The venues page is about 29,000 px tall on a phone at the simulated league's size (one whole form per venue; seen 2026-11-23).
+
+- polish-4 leftovers (2026-11-23): the standings name column can take 60% of the box at 360 with seeds and 71% at 320 without (cap it: `min(…, 55cqi)` in table-css.ts near line 640, and check 320 and 360 with and without seeds in web-exit-test.mjs); `brokenNames` in simulated-league-test.mjs should also assert it found names; the footnote marks beside team names are 24 by 24, below the 44 the design asks.
+
+- AN UNRELIABLE TEST (2026-11-23): `tests/browser/people-screens-test.mjs` failed once on GitHub with "coach: the list is refused and holds nothing of the person: 404" and passed twice on the same commit (991fcd1, branch lane/polish-4-again): find why a refusal answered 404 once and make it steady.
