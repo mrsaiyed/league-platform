@@ -102,10 +102,12 @@ export { lookupSetting, type SettingValue, type StoredSetting } from './settings
 export {
   leagueCreated,
   leagueNameChanged,
+  leagueSettingChanged,
   leagueShortNameChanged,
   leagueStatusChanged,
   type LeagueCreated,
   type LeagueNameChanged,
+  type LeagueSettingChanged,
   type LeagueShortNameChanged,
   type LeagueStatusChanged,
 } from './events.ts';

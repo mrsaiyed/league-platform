@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
+import { leagueSettingChanged } from '../events.ts';
 import type { LeaguesTx } from '../ports.ts';
 import { declaredSettings } from '../settings/declarations.ts';
 import type { SettingRegistry } from '../settings/define-setting.ts';
@@ -31,7 +32,12 @@ export function clearSettingFor(registry: SettingRegistry) {
     // works only where that shows less of people (R-26).
     allowed: (context, input, tx: LeaguesTx) =>
       mayChangeSetting(context, tx, registry, input, 'default'),
-    run: async ({ context, input, tx }): Promise<Result<{ key: string }, ClearSettingError>> => {
+    run: async ({
+      context,
+      input,
+      tx,
+      emit,
+    }): Promise<Result<{ key: string }, ClearSettingError>> => {
       const setting = registry.get(input.key);
       if (setting === undefined) return fail({ code: 'unknown-setting' });
       const place = await findPlace(tx, input);
@@ -49,6 +55,7 @@ export function clearSettingFor(registry: SettingRegistry) {
           ...(await placeScopeDetails(tx, place)),
         },
       });
+      emit({ type: leagueSettingChanged, leagueId: context.leagueId, key: setting.key });
       return ok({ key: setting.key });
     },
   });
