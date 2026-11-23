@@ -29,6 +29,7 @@ import {
   type SeasonResults,
 } from '../games/index.ts';
 import type { SeasonAdjustment, SeasonCoinFlip, StandingsStore, StandingsTx } from './ports.ts';
+import { flipsInUse } from './level-groups.ts';
 
 export type SeasonRebuilt = {
   /** Standings rows saved: one per team of the season. */
@@ -126,27 +127,34 @@ export async function calculateSeason(
   if (results === undefined) return undefined;
   const teams = await tx.standings.listTeams(seasonId);
   const adjustments = await tx.standings.listAdjustments(seasonId);
-  const flips = options.withoutFlips === true ? [] : await tx.standings.listCoinFlips(seasonId);
+  const recorded = options.withoutFlips === true ? [] : await tx.standings.listCoinFlips(seasonId);
   const games = results.games.filter((g): g is GameRecord & { status: 'final' | 'forfeit' } =>
     decided(g.status),
   );
-  const calculate = (counted: readonly SeasonAdjustment[]): StandingsResult =>
-    calculateStandings({
-      teams: teams.map((t) => ({ teamId: t.teamId, divisionId: t.divisionId })),
-      games: games.map(standingsGame),
-      rules: withCoinFlipLast(rules ?? results.rules, flips),
-      adjustments: counted.map((a) => ({
-        adjustmentId: a.id,
-        teamId: a.teamId,
-        wins: a.wins,
-        losses: a.losses,
-        ties: a.ties,
-        points: a.points,
-        reason: a.reason,
-      })),
-      coinFlips: flips.map((flip) => flip.teamIds),
-    });
-  const standings = withWholePairs(calculate, adjustments);
+  const calculate =
+    (flips: readonly SeasonCoinFlip[]) =>
+    (counted: readonly SeasonAdjustment[]): StandingsResult =>
+      calculateStandings({
+        teams: teams.map((t) => ({ teamId: t.teamId, divisionId: t.divisionId })),
+        games: games.map(standingsGame),
+        rules: withCoinFlipLast(rules ?? results.rules, flips),
+        adjustments: counted.map((a) => ({
+          adjustmentId: a.id,
+          teamId: a.teamId,
+          wins: a.wins,
+          losses: a.losses,
+          ties: a.ties,
+          points: a.points,
+          reason: a.reason,
+        })),
+        coinFlips: flips.map((flip) => flip.teamIds),
+      });
+  // Only a flip naming exactly a set of teams level after every tiebreaker orders them,
+  // the same rule the coin-flip screen shows (S-89): the level sets come first, worked
+  // out without the flips.
+  const flips =
+    recorded.length === 0 ? [] : flipsInUse(recorded, withWholePairs(calculate([]), adjustments));
+  const standings = withWholePairs(calculate(flips), adjustments);
   return { results, games, standings: withAwardedGames(standings, adjustments) };
 }
 

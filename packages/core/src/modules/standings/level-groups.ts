@@ -28,3 +28,20 @@ export function flipFor(
 ): SeasonCoinFlip | undefined {
   return [...flips].reverse().find((flip) => sameTeams(flip.teamIds, teamIds));
 }
+
+/**
+ * The flips that order teams (S-89): for each set of teams level after every tiebreaker
+ * in `level` (worked out without the flips), the latest flip naming exactly that set. A
+ * flip for teams no longer level as a set, because one pulled clear or another joined,
+ * orders nobody: it is shown as no longer in use, and taking it off changes nothing.
+ */
+export function flipsInUse(
+  flips: readonly SeasonCoinFlip[],
+  level: StandingsResult,
+): readonly SeasonCoinFlip[] {
+  if (flips.length === 0) return [];
+  return levelGroups(level).flatMap((teamIds) => {
+    const flip = flipFor(flips, teamIds);
+    return flip === undefined ? [] : [flip];
+  });
+}

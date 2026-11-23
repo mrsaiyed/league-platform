@@ -46,8 +46,9 @@ export const enAdminStandings = {
   'adminStandings.flip.said.saved': 'Saved: a coin flip for {what}. The table is worked out again.',
   'adminStandings.flip.submit': 'Save this order',
   'adminStandings.flip.title': 'Teams level after every tiebreaker',
-  'adminStandings.flip.unused': 'Coin flips for teams that are no longer level',
-  'adminStandings.flip.unusedHelp': 'Results have changed since, so these flips order nobody now.',
+  'adminStandings.flip.unused': 'Coin flips no longer in use',
+  'adminStandings.flip.unusedHelp':
+    'Results have changed since: the teams each flip names are no longer level as that set, so it orders nobody now, and taking it off changes nothing in the public table.',
   'adminStandings.gamePlayed': '+1 game played',
   'adminStandings.intro':
     'The table is worked out from the results. An adjustment changes a team’s line with a reason, which the public table shows as a footnote.',
