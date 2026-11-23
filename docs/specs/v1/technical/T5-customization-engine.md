@@ -101,7 +101,7 @@ defineSection({
 
 Clearing by label is a Cloudflare feature, and which plans include it is checked when stage 1 starts. The fallback is clearing by address prefix (everything under `/farajleague/`), which is coarser but just as correct.
 
-**T-95:** personal additions (the bell, "my next game", my team highlighted) are loaded separately after the cached page, with the visitor's session. The cached page is identical for everyone.
+**T-95:** personal additions (the bell, "my next game", my team highlighted) are loaded separately after the cached page, with the visitor's session. The cached page is identical for everyone. The first is a staff-only team's numbers for its staff and the league's admins (step 2.46, T-287): the statistics, team and game pages ask `/api/v1/leagues/{leagueId}/staff-numbers` after they arrive.
 
 Not yet (step 2.127, [record 066](../../../architecture/decisions/066-the-leagues-a-person-belongs-to.md)): the account button's signed-in form and the "You are signed in as …" line of the refusal screen are drawn into the page, so every page is drawn per request and answers `private, no-store`, and no shared cache may keep a league page until a later step reads those two after the page.
 

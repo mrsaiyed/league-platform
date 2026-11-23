@@ -19,6 +19,9 @@
     "stats:copy": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning apps/live-stats/copy.ts",
     "transfer:tracker": "node --disable-warning=ExperimentalWarning scripts/transfer-tracker-games.mjs",
     "league:make": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/make-league.mjs",
+    "release": "node --disable-warning=ExperimentalWarning scripts/release.mjs",
+    "rehearse:test-copy": "node --disable-warning=ExperimentalWarning scripts/rehearse-test-copy.mjs",
+    "check:test-copy": "node --disable-warning=ExperimentalWarning scripts/check-test-copy.mjs",
     "league:remove": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/remove-league.mjs",
     "build:demo": "node scripts/build-demo.mjs",
     "build:pages": "node scripts/build-pages.mjs",
@@ -30,6 +33,7 @@
     "test:varsity:browser": "node scripts/check-varsity-browser.mjs",
     "test:stats:browser": "node scripts/check-live-stats-browser.mjs",
     "test:pages:browser": "node --disable-warning=ExperimentalWarning scripts/check-pages-browser.mjs",
+    "test:real-postgres": "node --disable-warning=ExperimentalWarning scripts/real-postgres.mjs test",
     "test:web:browser": "node scripts/run-web-browser-tests.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -41,6 +45,8 @@
     "typecheck": "tsc --project tsconfig.varsity.json && tsc --project tsconfig.workspaces.json && tsc --project apps/web/tsconfig.json && tsc --project packages/ui/tsconfig.json",
     "test:units": "vitest run",
     "seed": "node --disable-warning=ExperimentalWarning packages/database/scripts/seed-leagues.ts",
+    "simulate": "node --disable-warning=ExperimentalWarning packages/database/scripts/simulate-league.ts",
+    "simulate:large": "node --disable-warning=ExperimentalWarning packages/database/scripts/simulate-league.ts --teams 60 --divisions 6 --rounds 10 --tracked 6",
     "db:types": "node packages/database/scripts/generate-schema-types.ts"
   },
   "devDependencies": {

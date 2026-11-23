@@ -86,6 +86,18 @@ export {
 } from './settings/describe-setting.ts';
 export { listLeagueSettings, type LeagueSettingRow } from './settings/list-league-settings.ts';
 export { readPrivacyFacts, type PrivacyFacts } from './settings/read-privacy-facts.ts';
+export { readPublishChecks } from './queries/read-publish-checks.ts';
+// Whether the person may change the league's settings: the League settings screen draws
+// its Publish button by it (step 2.240); the commands check it themselves.
+export { mayChangeLeagueSettings } from './policy.ts';
+export {
+  firstUnmetCheck,
+  publishCheckKeys,
+  publishChecks,
+  type PublishCheck,
+  type PublishCheckKey,
+  type PublishFacts,
+} from './rules/publish-checks.ts';
 export { lookupSetting, type SettingValue, type StoredSetting } from './settings/lookup-setting.ts';
 export {
   leagueCreated,

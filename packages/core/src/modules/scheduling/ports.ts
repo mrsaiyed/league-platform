@@ -29,6 +29,28 @@ export type CourtRecord = {
 
 export type VenueWithCourts = VenueRecord & { readonly courts: readonly CourtRecord[] };
 
+/**
+ * How many published games not in the bin are at one place (a venue, and a court of it or
+ * none): with a final or forfeited result, and without a result yet (scheduled, postponed,
+ * or being played now). A cancelled game is in neither.
+ */
+export type PlacePublishedGames = {
+  readonly venueId: string;
+  readonly courtId: string | null;
+  readonly played: number;
+  readonly toCome: number;
+};
+
+/**
+ * What the league's games are at its venues and courts (step 2.49): the published ones by
+ * place, and every season's schedule draft as stored, whose games count too
+ * (place-games.ts reads them).
+ */
+export type PlaceGamesRecord = {
+  readonly published: readonly PlacePublishedGames[];
+  readonly drafts: readonly { readonly seasonId: string; readonly changes: unknown }[];
+};
+
 export type NewVenue = {
   readonly name: string;
   readonly address: string | null;
@@ -151,11 +173,15 @@ export type SchedulingStore = {
   ) => Promise<readonly GameFacts[]>;
   /** How many people are on the current rosters of these teams of the season (each counted once). */
   readonly countPeopleOnTeams: (seasonId: string, teamIds: readonly string[]) => Promise<number>;
-  /** Creates the games (and the season's regular stage if it has none yet); divisions follow the teams. */
+  /**
+   * Creates the games (and the season's regular stage if it has none yet); divisions follow
+   * the teams. How many were made: a game whose id any game has already, in this league or
+   * another (ids are the database's own across leagues), is not made, so the caller refuses.
+   */
   readonly insertPublishedGames: (
     seasonId: string,
     games: readonly NewPublishedGame[],
-  ) => Promise<void>;
+  ) => Promise<number>;
   /** Changes a game that has not started; false if it is not there, is in the bin or has started. */
   readonly updatePublishedGame: (
     seasonId: string,
@@ -227,6 +253,8 @@ export type SchedulingStore = {
     version?: number,
   ) => Promise<number | 'name-taken' | undefined>;
   readonly setCourtBinned: (courtId: string, binned: boolean) => Promise<boolean | 'name-taken'>;
+  /** The league's games at its venues and courts, and its schedule drafts (step 2.49). */
+  readonly placeGames: () => Promise<PlaceGamesRecord>;
 };
 
 /** A scheduling command's transaction: its store, the permission reader and the activity log. */

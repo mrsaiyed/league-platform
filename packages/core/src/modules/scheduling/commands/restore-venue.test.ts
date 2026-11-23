@@ -41,13 +41,16 @@ describe('restoreVenue', () => {
     });
   });
 
-  it('is for the owner and admins only: a scheduler may not (record 014)', async () => {
+  it('is for whoever may remove it: a scheduler may (A-5, D-L6), someone with no role may not', async () => {
     const { deps, as } = memoryScheduling({
       venues: [venue(1, { binned: true })],
       grants: [schedulerGrant],
     });
-    expect(await restoreVenue(as(schedulerId), { venueId: venueUuid(1) }, deps)).toMatchObject({
+    expect(await restoreVenue(as('someone'), { venueId: venueUuid(1) }, deps)).toMatchObject({
       error: { code: 'not-allowed' },
+    });
+    expect(await restoreVenue(as(schedulerId), { venueId: venueUuid(1) }, deps)).toMatchObject({
+      ok: true,
     });
   });
 });

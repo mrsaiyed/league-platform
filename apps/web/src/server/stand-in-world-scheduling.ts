@@ -127,6 +127,10 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
     insertPublishedGames: async (seasonId, games) => {
       const added: WorldGame[] = [];
       for (const g of games) {
+        // A game id a game of this league's world has already is not made a second time.
+        // This world holds one league only, so it cannot meet the database's case of an id
+        // another league's game has (schedule-publish-commands.test.ts covers that).
+        if (s.games.some((x) => x.id === g.id)) continue;
         const home = s.teams.find((t) => t.id === g.homeTeamId && t.seasonId === seasonId);
         const away = s.teams.find((t) => t.id === g.awayTeamId && t.seasonId === seasonId);
         if (home === undefined || away === undefined) {
@@ -143,6 +147,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
           captureMode: g.captureMode,
           homeScore: null,
           awayScore: null,
+          overtimePeriods: null,
           format: null,
           finalizedAt: null,
           binned: false,
@@ -156,6 +161,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
         });
       }
       s.games = [...s.games, ...added];
+      return added.length;
     },
     updatePublishedGame: async (seasonId, gameId, change) => {
       const at = s.games.findIndex((g) => g.id === gameId && g.seasonId === seasonId);
@@ -318,6 +324,35 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       if (!binned && courtNameTaken(found.venueId, found.name, courtId)) return 'name-taken';
       s.courts = replacedAt(s.courts, at, { ...found, binned, version: found.version + 1 });
       return true;
+    },
+    // As find-place-games.ts: games not in the bin by venue and court, and every draft.
+    placeGames: async () => {
+      const counts = new Map<
+        string,
+        { venueId: string; courtId: string | null; played: number; toCome: number }
+      >();
+      for (const g of s.games) {
+        if (g.binned || g.venueId === null) continue;
+        const played = ['final', 'forfeit'].includes(g.status);
+        const toCome = ['scheduled', 'postponed', 'live'].includes(g.status);
+        if (!played && !toCome) continue;
+        const key = `${g.venueId}|${g.courtId ?? ''}`;
+        const row = counts.get(key) ?? {
+          venueId: g.venueId,
+          courtId: g.courtId,
+          played: 0,
+          toCome: 0,
+        };
+        counts.set(key, {
+          ...row,
+          played: row.played + (played ? 1 : 0),
+          toCome: row.toCome + (toCome ? 1 : 0),
+        });
+      }
+      return {
+        published: [...counts.values()],
+        drafts: s.drafts.map((d) => ({ seasonId: d.seasonId, changes: d.changes })),
+      };
     },
   };
 }

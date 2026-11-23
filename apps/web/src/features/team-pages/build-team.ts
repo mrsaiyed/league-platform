@@ -17,6 +17,7 @@ import {
   type PublicSchedule,
   type StandingsReadStore,
   type TeamStanding,
+  type Viewer,
 } from '@srleagues/core';
 import type { StatRow, StatsColumn } from '@srleagues/ui';
 import type { LeagueClock } from '../../server/public-schedule.ts';
@@ -193,21 +194,32 @@ export type TeamStatsView = {
   readonly totalsColumns: readonly StatsColumn[];
   readonly totalsRows: readonly StatRow[];
   readonly hasNumbers: boolean;
+  /**
+   * Said under the totals when one of them is not the players' numbers added up (step
+   * 2.196: the team's own turnovers, its final scores as entered); null otherwise.
+   */
+  readonly totalsNote: string | null;
 };
 
 const whole = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
 
-/** The team's totals and, when its setting lets the public see them, its players' lines. */
+/** The team's totals and, when its setting lets this viewer see them, its players' lines. */
 export async function loadTeamStats(
   store: StandingsReadStore,
   settings: PublicStatsSettings,
-  input: { readonly leagueId: string; readonly seasonId: string; readonly teamId: string },
+  input: {
+    readonly leagueId: string;
+    readonly seasonId: string;
+    readonly teamId: string;
+    /** Who is looking, from the server's session; the public viewer when left out (step 2.46). */
+    readonly viewer?: Viewer;
+  },
 ): Promise<TeamStatsView | undefined> {
   const table = await readStatisticsTable(store, {
     seasonId: input.seasonId,
     viewing: {
       leagueId: input.leagueId,
-      viewer: publicViewer(input.leagueId),
+      viewer: input.viewer ?? publicViewer(input.leagueId),
       audience: settings.audience,
       policy: settings.namePolicy,
     },
@@ -284,7 +296,19 @@ export async function loadTeamStats(
     totalsRows.some((row) =>
       Object.entries(row.cells).some(([key, value]) => key !== 'team' && value !== null),
     );
-  return { playerLinesShown, playerColumns, playerRows, totalsColumns, totalsRows, hasNumbers };
+  const totalsNote =
+    team !== undefined && team.countsMoreThanPlayers.length > 0
+      ? t('stats.teamTotalsCountTeam')
+      : null;
+  return {
+    playerLinesShown,
+    playerColumns,
+    playerRows,
+    totalsColumns,
+    totalsRows,
+    hasNumbers,
+    totalsNote,
+  };
 }
 
 export type TeamPageData = {

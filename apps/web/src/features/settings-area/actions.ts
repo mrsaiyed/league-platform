@@ -6,6 +6,7 @@
 import { clearSetting, declaredSettings, describeSetting, setSetting } from '@srleagues/core';
 import { done, refused } from './answer.ts';
 import { clearIntent, tickValue, valueOf, versionOf } from './form-input.ts';
+import { runPublish } from './run-publish.ts';
 import { runSettingsAction } from './run-settings-action.ts';
 
 export async function saveSettingAction(form: FormData): Promise<never> {
@@ -40,4 +41,14 @@ export async function saveSettingAction(form: FormData): Promise<never> {
     );
     return result.ok ? done('saved') : refused(setSetting.commandName, result.error.code);
   });
+}
+
+/**
+ * Publishes the league (step 2.240, U-9): the Publish button's form, after the page asked
+ * once. What it does is runPublish's; the league and the person come from the session.
+ */
+export async function publishLeagueAction(form: FormData): Promise<never> {
+  return runSettingsAction(form, ({ context, ports, fields }) =>
+    runPublish(context, ports.deps, versionOf(fields) ?? Number.NaN),
+  );
 }

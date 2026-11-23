@@ -216,14 +216,18 @@ describe('the public reads against the database (S-22, T-87)', () => {
     expect(text).not.toContain('Sam');
     expect(text).not.toContain('alpha P.');
     expect(text).not.toContain('"41"');
-    // What everyone may see is there: the other team's numbers, both teams' totals.
+    // What everyone may see is there: the other team's numbers, both teams' totals. A
+    // team's season points are its final scores (S-26 as changed by step 2.196): the
+    // staff-only team's are its 52 in the one final game its players' points were in.
     expect(numbersIn(JSON.parse(text))).toContain(openPoints);
     expect(text).toContain(openPlayerId);
     expect(text).toContain('Olive Open');
     expect(text).toContain('Team alpha');
     expect(text).toContain(
-      '"points":{"total":' + (hiddenPoints + otherHiddenPoints + mixedHiddenPoints),
+      '"playerLinesShown":false,"stats":{"points":{"total":52,"gamesRecorded":1',
     );
+    // And what its players' points add to is not handed to a visitor beside it.
+    expectNowhere(text, hiddenPoints + otherHiddenPoints + mixedHiddenPoints);
   });
 
   it("show the team's coach and an admin the numbers, and another team's coach does not", async () => {

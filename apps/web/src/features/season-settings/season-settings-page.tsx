@@ -1,34 +1,57 @@
 // Admin → Season settings (P7 §1, P4 §3). Its first panel, "Who can see this season"
 // (step 2.182, A-18): the season's state in one line, and "Show this season to visitors"
 // or "Hide it again", each asking once on a step of its own before the season command
-// runs, so it all works with no script in the page. Step 2.47 builds the season's name,
-// dates and rules around this panel; starting a season and choosing the current one are
-// step 2.130's. Drawn inside the admin's own frame with its shared pieces, as every admin
-// page is (step 2.103): the page's head (its title and one line of what it is for), the
-// season picker, then the panel; the question asked on a step of its own inside it.
+// runs, so it all works with no script in the page. Around it, step 2.47's parts: the
+// season's name and dates, its game rules (with their presets), how games are recorded
+// and the statistics kept, the standings, and the rosters. Each part says what it is set
+// to in a few lines, with "Change …" for the owner and admins, which opens the part's
+// form on a step of its own (`&edit=…`): one form, one filled button. Starting a season
+// and choosing the current one are step 2.130's. Drawn inside the admin's own frame with
+// its shared pieces, as every admin page is (step 2.103).
 //
 // The seasons it names are the ones `scheduleAdmin.seasonsOf` lists for this person (the
 // hidden ones only to someone who may see them, `mayListSeason`), and the one season is
 // read through the season command's own read (getSeason, `season.settings`), in the
 // league of the session: a season of another league is never found (T-28).
-import { getSeason, isLeagueHidden, type SeasonView } from '@srleagues/core';
+import { getSeason, isLeagueHidden, readOnlyStatuses, type SeasonView } from '@srleagues/core';
 import { displayLabels } from '@srleagues/site';
 import { EmptyPanel, OptionPicker, PageHead } from '@srleagues/ui';
+import { randomUUID } from 'node:crypto';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { t } from '../../server/messages.ts';
+import { t, type TextKey } from '../../server/messages.ts';
 import type { PublicSchedulePorts } from '../../server/public-schedule.ts';
-import { StaffNotice } from '../staff/index.ts';
+import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
+import { StaffNotice, StaffPill, StaffTrail } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
-import { changeVisibilityAction } from './actions.ts';
+import { changeVisibilityAction, savePartAction } from './actions.ts';
 import { earnedDone, problemKey } from './answer.ts';
 import { mayShowSeason } from './may-show-season.ts';
+import { PartForm } from './part-form.tsx';
+import { partFacts, partGroups, partTexts } from './part-words.ts';
 import { panelWords } from './panel-words.ts';
-import { seasonSettingsAddress, visibilityAnchor } from './season-settings-address.ts';
+import {
+  isSeasonPart,
+  nameFields,
+  partAnchor,
+  rulesFields,
+  seasonParts,
+  type SeasonPart,
+} from './season-parts.ts';
+import {
+  divisionsAddress,
+  divisionsScreenBuilt,
+  partAddress,
+  seasonSettingsAddress,
+  visibilityAnchor,
+} from './season-settings-address.ts';
 import { visibilityOf, wishOf, type VisibilityWish } from './season-visibility.ts';
 
-/** `/{league}/admin/season`: Season settings, with its first panel. */
+const partKey = (part: SeasonPart, word: string): TextKey =>
+  `seasonSettings.part.${part}.${word}` as TextKey;
+
+/** `/{league}/admin/season`: Season settings, with its parts. */
 export async function SeasonSettingsPage({
   league,
   search,
@@ -59,7 +82,20 @@ export async function SeasonSettingsPage({
       </main>
     );
   }
-  const read = await getSeason(context, { seasonId: season.id }, ports.adminSettings.deps);
+  const read = await getSeason(context, { seasonId: season.id }, ports.adminSettings.seasons);
+  const mayChange = mayShowSeason(holder, season, addressee.status);
+  const edit = firstValue(search['edit']);
+  if (read.ok && mayChange && isSeasonPart(edit)) {
+    return <PartPage league={addressee} route={league} season={read.value} part={edit} />;
+  }
+  // "Saved", beside the part saved, once (record 067): taken as the page is drawn.
+  const noticeHolder = noticeHolderOf(context);
+  const notice =
+    noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'season');
+  const savedPart =
+    notice !== undefined && notice.thing === season.id && isSeasonPart(notice.said)
+      ? notice.said
+      : undefined;
   // Only while "Hide it again" is being asked: whether a game of the season is being scored
   // now, read from the season's public schedule (what visitors following it would lose).
   const gameUnderWay =
@@ -90,21 +126,156 @@ export async function SeasonSettingsPage({
         </StaffNotice>
       ) : null}
       {read.ok ? (
-        <VisibilityPanel
-          season={read.value}
-          base={seasonSettingsAddress(addressee)}
-          address={(more) => seasonSettingsAddress(addressee, season.slug, more)}
-          league={addressee.slug}
-          leagueHidden={isLeagueHidden(addressee.status)}
-          mayChange={mayShowSeason(holder, season, addressee.status)}
-          gameUnderWay={gameUnderWay}
-          search={search}
-        />
+        <>
+          <VisibilityPanel
+            season={read.value}
+            base={seasonSettingsAddress(addressee)}
+            address={(more) => seasonSettingsAddress(addressee, season.slug, more)}
+            league={addressee.slug}
+            leagueHidden={isLeagueHidden(addressee.status)}
+            mayChange={mayChange}
+            gameUnderWay={gameUnderWay}
+            search={search}
+          />
+          {readOnlyStatuses.includes(addressee.status) ? (
+            <p className="staff-quiet">{t('seasonSettings.readOnly')}</p>
+          ) : null}
+          {read.value.rulesWarnings.length > 0 ? (
+            <StaffNotice kind="refused">
+              <p>{t('seasonSettings.rulesUpgraded')}</p>
+            </StaffNotice>
+          ) : null}
+          {seasonParts.map((part) => (
+            <PartPanel
+              key={part}
+              part={part}
+              season={read.value}
+              change={
+                mayChange ? partAddress(addressee, season.slug, part, partAnchor(part)) : undefined
+              }
+              saved={savedPart === part}
+            />
+          ))}
+          {divisionsScreenBuilt ? (
+            <p>
+              <a className="ui-button" href={divisionsAddress(addressee, season.slug)}>
+                {t('seasonSettings.divisions')}
+              </a>
+            </p>
+          ) : null}
+        </>
       ) : (
         <StaffNotice kind="refused">
           <p>{t(problemKey({ problem: read.error.code }) ?? 'error.unknown')}</p>
         </StaffNotice>
       )}
+    </main>
+  );
+}
+
+/** One part: what it is set to now, and the way to change it. */
+function PartPanel({
+  part,
+  season,
+  change,
+  saved,
+}: {
+  readonly part: SeasonPart;
+  readonly season: SeasonView;
+  /** Its form's address, for someone who may change it. */
+  readonly change: string | undefined;
+  /** Whether it was just saved: "Saved" is said here, once. */
+  readonly saved: boolean;
+}) {
+  const titleId = `${partAnchor(part)}-title`;
+  const facts = partFacts(part, season);
+  return (
+    <section
+      className="staff-panel admin-season-part"
+      id={partAnchor(part)}
+      aria-labelledby={titleId}
+      data-part={part}
+    >
+      <div className="staff-panel-head">
+        <h2 id={titleId}>{t(partKey(part, 'title'))}</h2>
+        {change === undefined ? null : (
+          <a className="ui-button" href={change}>
+            {t(partKey(part, 'change'))}
+          </a>
+        )}
+      </div>
+      <p className="staff-quiet">{t(partKey(part, 'about'))}</p>
+      {saved ? (
+        <StaffNotice kind="saved" data={{ 'data-notice': 'saved' }}>
+          <p>{t(partKey(part, 'saved'))}</p>
+        </StaffNotice>
+      ) : null}
+      {part === 'game' && !season.rulesSaved ? (
+        <p className="staff-quiet">{t('seasonSettings.notSavedYet')}</p>
+      ) : null}
+      <dl className="admin-season-facts">
+        {facts.map((fact) => (
+          <div key={fact.term}>
+            <dt>{fact.term}</dt>
+            <dd>
+              {fact.value}
+              {fact.unused === undefined ? null : (
+                <>
+                  {' '}
+                  <StaffPill kind="wait">{fact.unused}</StaffPill>
+                </>
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {facts.some((fact) => fact.unused !== undefined) ? (
+        <p className="staff-quiet">{t('seasonSettings.notInUse.help')}</p>
+      ) : null}
+    </section>
+  );
+}
+
+/** A part's form on a step of its own, under a trail back to the season's settings. */
+function PartPage({
+  league,
+  route,
+  season,
+  part,
+}: {
+  readonly league: Parameters<typeof seasonSettingsAddress>[0];
+  /** The route's `[league]` value, which the form's post finds the page by. */
+  readonly route: string;
+  readonly season: SeasonView;
+  readonly part: SeasonPart;
+}) {
+  const back = `${seasonSettingsAddress(league, season.slug)}#${partAnchor(part)}`;
+  const title = t(partKey(part, 'title'));
+  return (
+    <main className="admin-season">
+      <StaffTrail steps={[{ href: back, label: t('admin.area.season') }]} here={title} />
+      <PageHead title={title} sub={t(partKey(part, 'about'))} />
+      <p className="staff-quiet">{t('seasonSettings.seasonName', { name: season.name })}</p>
+      <section
+        className="staff-panel admin-season-part"
+        id={partAnchor(part)}
+        aria-label={title}
+        data-part={part}
+      >
+        <PartForm
+          action={savePartAction}
+          league={route}
+          seasonId={season.id}
+          part={part}
+          version={season.version}
+          token={randomUUID()}
+          saved={part === 'name' ? nameFields(season) : rulesFields(part, season.rules)}
+          groups={partGroups(part, season.rules)}
+          back={back}
+          permalink={partAddress(league, season.slug, part, partAnchor(part))}
+          texts={partTexts(part, season.rules)}
+        />
+      </section>
     </main>
   );
 }

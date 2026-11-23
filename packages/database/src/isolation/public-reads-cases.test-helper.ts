@@ -13,6 +13,7 @@ import {
   readStatisticsTable,
   readStatLeaders,
   readTeamRecords,
+  readTeamsBeyondPublic,
 } from '@srleagues/core';
 import {
   findGameCorrectedDate,
@@ -28,6 +29,7 @@ import {
   listStandingsAdjustments,
   listStandingsRows,
   listTeamStatTotals,
+  listTeamTurnoverGames,
 } from '../queries/index.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { gamesReadStore, standingsReadStore } from '../stores/index.ts';
@@ -80,6 +82,14 @@ registerIsolationCase({
   subject: listTeamStatTotals,
   name: "total the target's season's team statistics",
   run: (scope, target) => listTeamStatTotals(scope, target.seasonId),
+});
+registerIsolationCase({
+  subject: listTeamTurnoverGames,
+  // Every league's seeded final game has a turnover charged to its away team
+  // (two-leagues.test-helper.ts), so the target's is there in every run, not only the
+  // control: only the query's own league filter keeps it out of the code-only run.
+  name: "count the turnovers charged to a team in the target's season's final games",
+  run: (scope, target) => listTeamTurnoverGames(scope, target.seasonId),
 });
 registerIsolationCase({
   subject: listPeopleForDisplay,
@@ -168,6 +178,50 @@ registerIsolationCase({
       { seasonId: target.seasonId, measure: 'points' },
       viewing(target.leagueId),
     );
+  },
+});
+// The signed-in request after a public page (step 2.46, T-287), as a viewer claiming to be
+// the target league's admin and the target team's coach: the fence still shows nothing.
+const asTargetStaff = (target: LeagueRecords) => ({
+  ...viewing(target.leagueId),
+  viewer: { leagueId: target.leagueId, leagueAdmin: true, staffOfTeamIds: [target.teamId] },
+});
+
+registerIsolationCase({
+  subject: standingsReadStore,
+  name: "find the target's season's teams a staff viewer sees more of",
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    await transactionOf(scope)
+      .updateTable('teams')
+      .set({ stats_visibility: 'staff' })
+      .where('league_id', '=', scope.leagueId)
+      .where('id', '=', target.teamId)
+      .execute();
+    return readTeamsBeyondPublic(
+      standingsReadStore(scope),
+      { seasonId: target.seasonId },
+      asTargetStaff(target),
+    );
+  },
+});
+registerIsolationCase({
+  subject: standingsReadStore,
+  name: "read the target's season's statistics as the target's staff",
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return readStatisticsTable(standingsReadStore(scope), {
+      seasonId: target.seasonId,
+      viewing: asTargetStaff(target),
+    });
+  },
+});
+registerIsolationCase({
+  subject: gamesReadStore,
+  name: "read the target's final game's page as the target's staff",
+  run: async (scope, target) => {
+    await openTargetSeason(scope, target);
+    return readGamePage(gamesReadStore(scope), { gameId: target.gameId }, asTargetStaff(target));
   },
 });
 registerIsolationCase({

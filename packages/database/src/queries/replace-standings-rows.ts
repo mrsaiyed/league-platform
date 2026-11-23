@@ -3,7 +3,9 @@
 // are removed. Seeds are checked when the transaction ends, so teams may swap seeds
 // here in any order (migration 0010). Win percentage and point difference are not
 // stored; they follow from the counts. The footnotes of adjustments come from
-// standings_adjustments, not from here.
+// standings_adjustments, not from here. How a team's set of level teams was ordered is
+// the versioned document of migration 0022 (step 2.198), in core's one format.
+import { levelDocument } from '@srleagues/core';
 import type { StandingsRow } from '@srleagues/sports';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
@@ -22,6 +24,7 @@ function columnsOf(row: StandingsRow) {
     streak_result: row.streak?.result ?? null,
     streak_length: row.streak?.length ?? null,
     decided_by: row.decidedBy,
+    level: levelDocument(row.level),
   };
 }
 
@@ -69,6 +72,7 @@ export async function replaceStandingsRows(
         streak_result: excluded.ref('excluded.streak_result'),
         streak_length: excluded.ref('excluded.streak_length'),
         decided_by: excluded.ref('excluded.decided_by'),
+        level: excluded.ref('excluded.level'),
       })),
     )
     .execute();

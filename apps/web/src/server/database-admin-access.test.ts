@@ -21,7 +21,12 @@ import {
   type CommandLogLine,
 } from '@srleagues/core';
 import * as database from '@srleagues/database';
-import { captureEmail, type SessionIdentity, type SignInService } from '@srleagues/providers';
+import {
+  captureEmail,
+  createLocalBotCheck,
+  type SessionIdentity,
+  type SignInService,
+} from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databasePorts } from './database-ports.ts';
@@ -103,6 +108,7 @@ beforeAll(async () => {
       },
     } as unknown as SignInService,
     signInMail: {} as SignInMail,
+    botCheck: createLocalBotCheck({ appEnv: 'test' }),
     log: (line) => void logLines.push(line),
     warn: () => {},
     sendQueuedInvitations: madeUpInvitationMail({

@@ -26,7 +26,7 @@ import {
   newStage,
   newTeam,
 } from '../schema/schema.test-helper.ts';
-import { writeDataFolder } from './data-folder.test-helper.ts';
+import { writeDataFolder } from './data-folder.ts';
 import { transferTrackerGames, type TransferTrackerGamesOptions } from './index.ts';
 
 const schemaFile = fileURLToPath(new URL('../live-stats/001-schema.sql', import.meta.url));
@@ -439,16 +439,23 @@ describe('the tracker transfer (step 2.58)', () => {
     expect(held.rows).toEqual([]);
     for (const [g, gameId] of league.games.entries()) {
       const row = (
-        await pglite.query<{ status: string; home_score: number; away_score: number }>(
-          'select status, home_score, away_score from games where id = $1',
-          [gameId],
-        )
+        await pglite.query<{
+          status: string;
+          home_score: number;
+          away_score: number;
+          overtime_periods: number | null;
+        }>('select status, home_score, away_score, overtime_periods from games where id = $1', [
+          gameId,
+        ])
       ).rows[0]!;
       const tracked = first.backup.games.find((game) => game.id === fixtures[g]!.id)!;
       expect(row).toEqual({
         status: 'final',
         home_score: tracked.homeScore,
         away_score: tracked.awayScore,
+        // Its overtime periods, as the tracker's taps ended it (step 2.200): game 3 was
+        // reopened there and won in the first overtime; every other game in regulation.
+        overtime_periods: g === 3 ? 1 : 0,
       });
     }
     // Lines carry ids and numbers, never a name (T-220).

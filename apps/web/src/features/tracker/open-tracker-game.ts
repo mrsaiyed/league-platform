@@ -20,6 +20,7 @@
 import type { QueueErrorCode } from './queue-storage.ts';
 import { QueueError, type QueueStorage } from './queue-storage.ts';
 import type { CommandTransport } from './command-transport.ts';
+import type { GameDoors } from './game-doors.ts';
 import {
   formatOf,
   noLineupPicks,
@@ -89,6 +90,11 @@ export type OpenTrackerGameOptions = {
   }>;
   readonly transport: CommandTransport;
   readonly server: TrackerServer;
+  /**
+   * Reopening the game and marking it not started (game-doors.ts; step 2.37): in the
+   * browser, fetch-game-doors.ts. Left out, the controller offers neither.
+   */
+  readonly doors?: GameDoors;
   /** A new device id, used only the first time this device opens a game. */
   readonly newDeviceId: () => string;
   readonly now?: () => number;
@@ -97,9 +103,18 @@ export type OpenTrackerGameOptions = {
   /** Passed on to the controller (tests). */
   readonly controller?: Pick<
     TrackerControllerOptions,
-    'clock' | 'newCommandId' | 'random' | 'retry' | 'queue'
+    'clock' | 'newCommandId' | 'random' | 'retry' | 'queue' | 'renewEveryMs'
   >;
 };
+
+/**
+ * How often the scoring screen asks whether it still holds the game (step 2.37, part 2;
+ * T-295): every few seconds, not every half minute, so a device that has lost the game
+ * to another says so within a few seconds even when no tap is being sent. The renewal
+ * is the one request that finds this out. The server writes the lease only when less
+ * than half of it is left, and a hidden page does not ask (the controller's `hidden`).
+ */
+export const holdCheckMs = 5_000;
 
 export type OpenedTrackerGame = {
   readonly controller: TrackerController;
@@ -149,11 +164,13 @@ export async function openTrackerGame(
   }
   const { games } = storage;
   const controller = createTrackerController({
+    renewEveryMs: holdCheckMs,
     ...options.controller,
     gameId,
     deviceId,
     storage: storage.queue,
     transport: options.transport,
+    ...(options.doors === undefined ? {} : { doors: options.doors }),
     server: createStoringTrackerServer({
       gameId,
       server: options.server,

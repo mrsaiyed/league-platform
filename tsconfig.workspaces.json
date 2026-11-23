@@ -2,6 +2,7 @@
   "extends": "./tsconfig.base.json",
   "include": [
     "apps/worker/**/*.ts",
+    "tests/real-postgres/**/*.ts",
     "vitest.config.ts",
     "vitest.reporter.ts",
     "vitest.reporter.test.ts",

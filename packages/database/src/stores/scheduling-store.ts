@@ -15,6 +15,7 @@ import {
   listGamesInRounds,
   deleteScheduleDraft,
   findCourt,
+  findPlaceGames,
   findScheduleDraft,
   findSeasonProgramId,
   insertScheduleDraft,
@@ -73,5 +74,6 @@ export function schedulingStore(scope: LeagueScope): SchedulingStore {
     createCourt: (court) => insertCourt(scope, court),
     updateCourt: (courtId, change, version) => updateCourt(scope, courtId, change, version),
     setCourtBinned: (courtId, binned) => setCourtBinned(scope, courtId, binned),
+    placeGames: () => findPlaceGames(scope),
   };
 }

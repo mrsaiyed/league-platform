@@ -7,7 +7,7 @@
 // (S-27), so they no longer count in totals. A game the live tracker has recorded plays
 // of is refused, as record_final_score refuses it (`game-is-tracked`, S-46).
 import { fail, type CommandContext, type Result } from '../../command/index.ts';
-import { decideGame, openGameByHand, type DecideGameError } from './decide-game.ts';
+import { decideGame, openGameToScore, type DecideGameError } from './decide-game.ts';
 import type { GameFinalized } from '../../events/game-events.ts';
 import type { GamesTx } from './ports.ts';
 import { effectiveRulesOf } from './season-rules-of.ts';
@@ -24,7 +24,9 @@ export async function recordFinalScoreWithin(args: {
   readonly action: string;
 }): Promise<Result<{ version: number }, DecideGameError>> {
   const { context, tx, emit } = args;
-  const open = await openGameByHand(tx, args.gameId, args.version);
+  // A postponed game is refused (`game-postponed`, step 2.158, S-75): the import leaves
+  // its score waiting until the game is played on a new date.
+  const open = await openGameToScore(tx, args.gameId, args.version);
   if (!open.ok) return open;
   const game = open.value;
   const version = game.version;

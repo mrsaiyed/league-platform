@@ -1,7 +1,8 @@
 // `/{league}/admin/games/{game}`: the box score grid (step 2.64). A paper score sheet
 // is copied into a grid of each team's players and the stats the game's rules keep,
 // saved, and the game is final. A final game is shown as it was saved, with a way to
-// reopen it with a reason (S-7) and correct it. On a phone the grid scrolls sideways
+// reopen it with a reason (S-7) and correct it. A postponed or cancelled game has no grid
+// (step 2.158, M32): its page says why, and a cancelled one can be put back from it. On a phone the grid scrolls sideways
 // inside its own box, never the page (A-2). Words come from the message files (T-187).
 //
 // Its forms are answered without the address (T-271, record 067, step 2.155): a refusal
@@ -15,19 +16,30 @@ import {
   type BoxScoreSheet,
   type GameLine,
   type GameRosterPlayer,
+  type LeagueAddressee,
 } from '@srleagues/core';
-import { MessagePage, PageHead } from '@srleagues/ui';
+import { finalPillOf } from '@srleagues/site';
+import { FinalStatePill, MessagePage, PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
-import { clockTimeText } from '../../server/game-when.ts';
+import { clockTimeText, gameWhenText } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffTrail } from '../staff/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
 import { hasName, rosterName } from '../teams-area/index.ts';
-import { reopenBoxScoreAction, saveBoxScoreAction } from './actions.ts';
+import { ActionForm } from './action-form.tsx';
+import {
+  callOffAction,
+  putBackAction,
+  reopenBoxScoreAction,
+  saveBoxScoreAction,
+} from './actions.ts';
+import { CallOffForms } from './call-off-forms.tsx';
+import { putBackChoice, restoreTexts } from './call-off-texts.ts';
+import { waitingListAnchor } from './waiting-anchor.ts';
 import { boxScoreField } from './box-score-form.ts';
 import { BoxScoreSheetForm, type SheetRow, type SheetTeam } from './box-score-sheet-form.tsx';
 import { sheetScoresId } from './form-state.ts';
@@ -111,18 +123,14 @@ export async function BoxScorePage({
   const context = commandContextOf(view.context);
   const read = await getBoxScoreSheet(context, { gameId: gameId.toLowerCase() }, ports.games.deps);
   const back = leagueUrl(here, 'admin-area', { area: 'games' });
-  if (!read.ok) {
-    // A finished page too (DESIGN.md section 4, line 19): centered, titled, one way on.
-    return (
-      <MessagePage
-        className="admin-games"
-        title={t('common.notFoundTitle')}
-        action={{ href: back, label: t('admin.boxScore.back') }}
-      >
-        <p role="alert">{t('admin.boxScore.notFound')}</p>
-      </MessagePage>
-    );
-  }
+  // Any game this person cannot open here is "Page not found" with status 404, inside the
+  // admin's frame, in this page's own words (BoxScoreNotFound; step 2.157): a game that is
+  // not this league's (another league's among them: nothing of it is said), and one they
+  // may not score. The second is not answered as a refusal: who may score is checked before
+  // the game is looked up, so it never tells an existing game from a missing one, and it
+  // covers a league that is archived or suspended, where nobody scores, for which "your role
+  // does not include this page" would be untrue.
+  if (!read.ok) return notFound();
   const sheet = read.value;
   const { game } = sheet;
   const names = (await ports.games.namesOf(here.id)).teams;
@@ -158,6 +166,15 @@ export async function BoxScorePage({
       : undefined,
   );
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
+  // Postponed or cancelled: no box score, no grid; the way it is put back (step 2.158).
+  const calledOff = sheet.locked === 'cancelled' || sheet.locked === 'postponed';
+  const named = t('admin.games.game', { away: awayName, home: homeName });
+  const calledOffHidden = {
+    league,
+    gameId: game.id,
+    version: String(game.version),
+    then: 'games',
+  };
   const sides = [
     { teamId: game.awayTeamId, name: awayName, score: game.awayScore, field: 'awayScore' },
     { teamId: game.homeTeamId, name: homeName, score: game.homeScore, field: 'homeScore' },
@@ -183,13 +200,25 @@ export async function BoxScorePage({
         here={t('admin.games.game', { away: awayName, home: homeName })}
       />
       <PageHead
-        title={t('admin.boxScore.title', { away: awayName, home: homeName })}
+        title={t(calledOff ? 'admin.boxScore.titleCalledOff' : 'admin.boxScore.title', {
+          away: awayName,
+          home: homeName,
+        })}
         sub={
           sheet.locked === null
             ? t('admin.boxScore.help')
             : t(`admin.boxScore.locked.${sheet.locked}`)
         }
-      />
+      >
+        {/* A final game's state, as its card says it: "Final", or "Final, OT" for one the
+            tracker ended in overtime (step 2.200). */}
+        {game.status === 'final' ? (
+          <FinalStatePill
+            label={t('display.final')}
+            finalPill={finalPillOf(t, game.overtimePeriods)}
+          />
+        ) : null}
+      </PageHead>
       {reopened === undefined ? null : <SavedLine text={reopened} />}
       {reopen.kind === 'correct' ? (
         <div className="staff-panel">
@@ -225,59 +254,120 @@ export async function BoxScorePage({
           {t(`admin.games.reopenWho.${reopen.because}`)}
         </p>
       ) : null}
-      <BoxScoreSheetForm
-        action={saveBoxScoreAction}
-        permalink={`${sheetHref}#${sheetScoresId}`}
-        hidden={{
-          league,
-          gameId: game.id,
-          version: String(game.version),
-          requestToken: crypto.randomUUID(),
-        }}
-        teams={teams}
-        editable={editable}
-        {...(saved === undefined ? {} : { saved })}
-        texts={{
-          player: t('admin.boxScore.player'),
-          played: t('admin.boxScore.played'),
-          ...(sheet.minutes
+      {calledOff ? (
+        // Its own page puts it back too (step 2.158, S-51, S-75), so a game called off
+        // outside this week's list is never stuck: a cancelled one to what it was, a
+        // postponed one on its date (asking first), with the way to the games waiting for a
+        // new date. For whoever may call it off (games.results); the command checks again.
+        // Done, it goes to the games list, where "Saved" names it.
+        <div className="staff-panel ui-stack">
+          {sheet.locked === 'postponed' ? (
+            <p>
+              <a className="ui-more" href={`${back}#${waitingListAnchor}`}>
+                {t('admin.games.waiting.link')}
+              </a>
+            </p>
+          ) : null}
+          {!sheet.mayCallOff ? null : sheet.locked === 'cancelled' ? (
+            <ActionForm
+              action={putBackAction}
+              permalink={sheetHref}
+              hidden={{ ...calledOffHidden, requestToken: crypto.randomUUID() }}
+              summary={t('admin.games.putBack')}
+              choice={putBackChoice()}
+              button={t('admin.games.putBack.save')}
+              refusal={t('admin.games.refusedAbout', { game: named, problem: '{problem}' })}
+            />
+          ) : (
+            <CallOffForms
+              action={callOffAction}
+              permalink={sheetHref}
+              hidden={{ ...calledOffHidden, requestToken: crypto.randomUUID() }}
+              summaryButton
+              texts={restoreTexts(
+                { homeName, awayName },
+                gameWhenText(game.startsAt, { locale, timeZone }),
+              )}
+            />
+          )}
+        </div>
+      ) : null}
+      {calledOff ? null : (
+        // A game called off has no score to enter (step 2.158, M32): no grid at all.
+        <BoxScoreSheetForm
+          action={saveBoxScoreAction}
+          permalink={`${sheetHref}#${sheetScoresId}`}
+          hidden={{
+            league,
+            gameId: game.id,
+            version: String(game.version),
+            requestToken: crypto.randomUUID(),
+          }}
+          teams={teams}
+          editable={editable}
+          {...(saved === undefined ? {} : { saved })}
+          texts={{
+            player: t('admin.boxScore.player'),
+            played: t('admin.boxScore.played'),
+            ...(sheet.minutes
+              ? {
+                  minutes: {
+                    short: t('admin.boxScore.minutes.short'),
+                    full: t('admin.boxScore.minutes'),
+                  },
+                }
+              : {}),
+            columns: sheet.statKeys.map((key) => {
+              const label = statLabel(key);
+              return { key, short: label.short, full: label.full };
+            }),
+            teamShown: t('admin.boxScore.teamShown'),
+            columnsKey: t('admin.boxScore.columnsKey'),
+            noPlayers: t('admin.boxScore.noPlayers'),
+            empty: t('admin.boxScore.empty'),
+            scoreHelp: t('admin.boxScore.scoreHelp'),
+            save: t('admin.boxScore.save'),
+            wrongCell: t('admin.boxScore.refused.cell', { cell: '{cell}' }),
+            wrongMinutes: t('admin.boxScore.refused.minutes', { cell: '{cell}' }),
+            tie: t('admin.games.refused.tie', { result: result('{homeScore}', '{awayScore}') }),
+          }}
+          {...(editable && sheet.statKeys.includes('points')
             ? {
-                minutes: {
-                  short: t('admin.boxScore.minutes.short'),
-                  full: t('admin.boxScore.minutes'),
+                check: {
+                  teams: teams.map((team) => ({
+                    scoreField: team.score.field,
+                    personIds: team.rows.map((row) => row.personId),
+                    warning: t('admin.boxScore.scoreMismatch', {
+                      team: team.name,
+                      score: '{score}',
+                      points: '{points}',
+                    }),
+                  })),
                 },
               }
-            : {}),
-          columns: sheet.statKeys.map((key) => {
-            const label = statLabel(key);
-            return { key, short: label.short, full: label.full };
-          }),
-          teamShown: t('admin.boxScore.teamShown'),
-          columnsKey: t('admin.boxScore.columnsKey'),
-          noPlayers: t('admin.boxScore.noPlayers'),
-          empty: t('admin.boxScore.empty'),
-          scoreHelp: t('admin.boxScore.scoreHelp'),
-          save: t('admin.boxScore.save'),
-          wrongCell: t('admin.boxScore.refused.cell', { cell: '{cell}' }),
-          wrongMinutes: t('admin.boxScore.refused.minutes', { cell: '{cell}' }),
-          tie: t('admin.games.refused.tie', { result: result('{homeScore}', '{awayScore}') }),
-        }}
-        {...(editable && sheet.statKeys.includes('points')
-          ? {
-              check: {
-                teams: teams.map((team) => ({
-                  scoreField: team.score.field,
-                  personIds: team.rows.map((row) => row.personId),
-                  warning: t('admin.boxScore.scoreMismatch', {
-                    team: team.name,
-                    score: '{score}',
-                    points: '{points}',
-                  }),
-                })),
-              },
-            }
-          : {})}
-      />
+            : {})}
+        />
+      )}
     </main>
+  );
+}
+
+/**
+ * "Page not found" at a game's box score address, for someone with the admin's Games area
+ * (app/[league]/admin/games/[game]/not-found.tsx, step 2.157): a game that is not there for
+ * them to score, with the way back to the games. The admin's frame is drawn around it.
+ */
+export function BoxScoreNotFound({ league }: { readonly league: LeagueAddressee }) {
+  return (
+    <MessagePage
+      className="admin-games"
+      title={t('common.notFoundTitle')}
+      action={{
+        href: leagueUrl(league, 'admin-area', { area: 'games' }),
+        label: t('admin.boxScore.back'),
+      }}
+    >
+      <p>{t('admin.boxScore.notFound')}</p>
+    </MessagePage>
   );
 }

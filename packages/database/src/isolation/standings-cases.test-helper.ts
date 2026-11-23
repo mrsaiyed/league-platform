@@ -82,6 +82,7 @@ const rowFor = (target: LeagueRecords): StandingsRow => ({
   points: null,
   streak: { result: 'won', length: 2 },
   decidedBy: null,
+  level: null,
   adjustments: [],
 });
 
@@ -89,6 +90,41 @@ registerIsolationCase({
   subject: replaceStandingsRows,
   name: "make the target's season's standings one row for the target's team",
   run: (scope, target) => replaceStandingsRows(scope, target.seasonId, [rowFor(target)]),
+});
+
+registerIsolationCase({
+  subject: replaceStandingsRows,
+  name: "make the target's team level with another, with how they were ordered (0022)",
+  run: (scope, target) =>
+    replaceStandingsRows(scope, target.seasonId, [
+      {
+        ...rowFor(target),
+        decidedBy: 'head-to-head',
+        level: {
+          teamIds: [target.teamId, target.teamId.replace(/.$/, '0')],
+          steps: [
+            {
+              tiebreaker: 'head-to-head',
+              applied: true,
+              teams: [
+                {
+                  teamId: target.teamId,
+                  place: 1,
+                  value: null,
+                  record: { wins: 1, losses: 0, ties: 0 },
+                },
+                {
+                  teamId: target.teamId.replace(/.$/, '0'),
+                  place: 2,
+                  value: null,
+                  record: { wins: 0, losses: 1, ties: 0 },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    ]),
 });
 
 registerIsolationCase({

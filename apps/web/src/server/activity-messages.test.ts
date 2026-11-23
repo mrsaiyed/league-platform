@@ -14,6 +14,7 @@ const reads = new Set([
   'access.read_invitation',
   'leagues.list_divisions',
   'leagues.list_bin',
+  'people.get_person',
   'people.list_people',
   'games.list_postponed_games',
   'games.list_my_games',
@@ -25,10 +26,14 @@ const reads = new Set([
   'leagues.get_season',
   'leagues.preview_season_rules',
   'scheduling.list_venues',
+  // How many games each venue and court has, for the venues screen (step 2.49): a read.
+  'scheduling.count_place_games',
   'scheduling.get_schedule_draft',
   'imports.get_fixture_import',
   'scheduling.preview_schedule_publish',
   'teams.list_roster',
+  // What a team has of games, said before it is removed (A-17): a read.
+  'teams.count_team_games',
   'games.get_box_score_sheet',
   // Holding a game to score (T-116): the tracker opens, renews every half minute and
   // leaves, which would flood the log. Only taking over a game from someone is logged.

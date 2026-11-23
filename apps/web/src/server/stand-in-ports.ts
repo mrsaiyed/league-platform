@@ -35,6 +35,8 @@ import {
 } from '@srleagues/core';
 import {
   captureEmail,
+  createLocalBotCheck,
+  createMadeUpTurnstileBotCheck,
   createLocalLiveHub,
   createLocalSignInStandIn,
   type SessionIdentity,
@@ -55,6 +57,7 @@ import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
 import { standInAdminAccess } from './stand-in-admin-access.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
+import { standInStatusOf } from './stand-in-league-states.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import {
   castId,
@@ -77,8 +80,9 @@ import {
   standInMemberAccountId,
   standInStaffSignIns,
 } from './stand-in-sign-ins.ts';
-import { madeUpLeagues } from './stand-in-world-seed.ts';
+import { madeUpLeagues, standInOwlsTeamId } from './stand-in-world-seed.ts';
 import { madeUpWorld } from './stand-in-world.ts';
+import { binTeamOfFirstLeague } from './stand-in-world-binned-team.ts';
 import { answersOnlyHere, isLocalOrTestHost } from './this-computer.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
@@ -126,10 +130,17 @@ const grants = [
     type: 'program',
     id: standInDraftProgramId,
   }),
-  grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.otherDraft.id),
+  grantOf(12, standInPeople.otherAdmin.accountId, 'admin', standInLeagues.empty.id),
   // A scorekeeper still holding the role in an archived league is told it is archived,
   // not "no access" (step 2.33).
   grantOf(13, scorekeeper.accountId, 'scorekeeper', standInLeagues.archived.id),
+  // A scheduler with a long address, in the first league only (step 2.157).
+  grantOf(14, standInPeople.longAddress.accountId, 'scheduler', standInLeagues.live.id),
+  // The Owls' coach, by a role on that one team (stand-in-world-seed.ts, adultTeams).
+  grantOf(15, standInPeople.teamCoach.accountId, 'coach', standInLeagues.live.id, {
+    type: 'team',
+    id: standInOwlsTeamId,
+  }),
 ];
 
 const leagues: readonly (typeof standInLeagues)[keyof typeof standInLeagues][] =
@@ -161,7 +172,7 @@ function accessTx(leagueId: string): AccessTx {
     activity: { record: notInTheShell('write the activity log'), list: async () => [] },
     access: {
       ownerAccountId: async () => found?.ownerAccountId,
-      leagueStatus: async () => found?.status,
+      leagueStatus: async () => (found === undefined ? undefined : standInStatusOf(found)),
       activeGrantsOf: async (accountId) =>
         found === undefined
           ? []
@@ -205,12 +216,19 @@ export type StandInOptions = {
    * design, so every page can be pictured in every color set (scripts/shots.mjs).
    */
   readonly localDesign?: PicturedDesignKey | undefined;
+  /** LOCAL_BOT_CHECK: the hidden-field stand-in (the default), or the made-up Turnstile. */
+  readonly localBotCheck?: 'made-up-turnstile' | 'stand-in' | undefined;
   /**
    * LOCAL_NOW: the moment the one made-up world's clock starts at (step 2.179), so a test
    * runs as if at that hour; the world is seeded then and its clock runs on from there.
    * Only the world reads it; sign-in and sessions keep this computer's clock.
    */
   readonly worldStartsAt?: string;
+  /**
+   * LOCAL_BINNED_TEAM (step 2.180): the short name of a team of the first made-up league's
+   * current season, put in the bin as the world is made, with its games and results.
+   */
+  readonly binnedTeam?: string;
   /**
    * The working folder's `.local/captured-email` (kept-emails.ts, step 2.96): once the app
    * has started, a copy of each email to a made-up address is written there for the kept
@@ -272,7 +290,10 @@ export type StandInPorts = WebPorts & {
 };
 
 /** The sign-in stand-in and its emails, for the stand-in and for the made-up database. */
-export type StandInSignIn = Pick<StandInPorts, 'signIn' | 'signInMail' | 'signUpMadeUpMember'> & {
+export type StandInSignIn = Pick<
+  StandInPorts,
+  'botCheck' | 'signIn' | 'signInMail' | 'signUpMadeUpMember'
+> & {
   /** Gives one made-up address an account with this password, through the service's steps. */
   readonly signUpMadeUp: (email: string, password: string) => Promise<void>;
   /** The newest kept emails in the folder, newest first (the kept emails' page). */
@@ -389,6 +410,11 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
     await signIn.signOut({ accessToken: set.value.session.accessToken });
   };
   return {
+    // The bot check's stand-in (record 081): it too refuses anything but local work and tests.
+    botCheck:
+      options.localBotCheck === 'made-up-turnstile'
+        ? createMadeUpTurnstileBotCheck({ appEnv: options.appEnv })
+        : createLocalBotCheck({ appEnv: options.appEnv }),
     signIn,
     signInMail,
     signUpMadeUp,
@@ -402,7 +428,7 @@ export function standInSignIn(options: StandInOptions): StandInSignIn {
 
 export function standInPorts(options: StandInOptions): StandInPorts {
   const made = standInSignIn(options);
-  const { signIn, signInMail, signUpMadeUpMember, signUpMadeUp } = made;
+  const { botCheck, signIn, signInMail, signUpMadeUpMember, signUpMadeUp } = made;
   const people: readonly MadeUpPerson[] = Object.values(standInPeople);
   const now = () => new Date();
   const deps: CommandDeps<AccessTx> = {
@@ -415,7 +441,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     const found = leagues.find((l) => l.id === leagueId && !l.inBin);
     return found === undefined
       ? undefined
-      : { id: found.id, slug: found.slug, status: found.status };
+      : { id: found.id, slug: found.slug, status: standInStatusOf(found) };
   };
   const identify: WebPorts['identify'] = async (accessToken) => {
     const person = people.find((p) => p.token === accessToken);
@@ -431,8 +457,10 @@ export function standInPorts(options: StandInOptions): StandInPorts {
   // The one made-up world: every area below reads and writes the same rows (step 2.152).
   const clock =
     options.worldStartsAt === undefined ? systemClock : clockStartingAt(options.worldStartsAt);
+  const worldLeagues = madeUpLeagues(standInSeedCast, new Date(clock.now()));
+  if (options.binnedTeam !== undefined) binTeamOfFirstLeague(worldLeagues, options.binnedTeam);
   const world = madeUpWorld({
-    leagues: madeUpLeagues(standInSeedCast, new Date(clock.now())),
+    leagues: worldLeagues,
     accessOf: (leagueId) => accessTx(leagueId).access,
     log: options.log,
     clock,
@@ -489,7 +517,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       return {
         leagueId: found.id,
         slug: found.slug,
-        status: found.status,
+        status: standInStatusOf(found),
         inBin: found.inBin,
         forwarded: found.slug !== shortName,
       };
@@ -499,6 +527,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     identify,
     signIn,
     signInMail,
+    botCheck,
     renewSession: sharedRenewal((refreshToken) => signIn.renew({ refreshToken }), now),
     accessOf,
     leaguesOfAccount: leaguesOf,
@@ -510,6 +539,10 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     }),
     liveFeed: (request) => hub.serve(request),
     madeUpWorld: true,
+    // Local work and tests, never the test copy (step 2.205).
+    testCopy: false,
+    // The made-up world in memory: no database for the health check to ask.
+    databaseCheck: null,
     // The made-up owner's cookie is in the code and the world takes writes. Other computers
     // cannot connect at all: the server listens on the loopback address alone
     // (scripts/web-listen.mjs). This keeps out what can still arrive on this computer
@@ -548,6 +581,8 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     },
     publicStats: standInPublicStats(world, namePolicy),
     adminAccess: standInAdminAccess(deps),
+    // The same made-up world's people, whom Admin → Teams puts on rosters (step 2.50).
+    adminPeople: { deps: world.deps, putBack: world.deps },
     adminTeams: standInAdminTeams(world, accessOf),
     adminSettings,
     publicSchedule: standInPublicSchedule(world),

@@ -44,8 +44,9 @@ export type SignInMailOptions = {
 export function createSignInMail(options: SignInMailOptions): SignInMail {
   const from = fromHeader(t('shell.siteName'), options.fromAddress);
   const siteUrl = options.siteOrigin;
-  const send = (to: string, email: RenderedEmail) =>
-    options.sender.send({ from, to, ...email, idempotencyKey: randomUUID() });
+  // `carries`: the code email hands over a code, the notices a link (step 2.204).
+  const send = (to: string, email: RenderedEmail, carries: 'code' | 'link' = 'link') =>
+    options.sender.send({ from, to, ...email, idempotencyKey: randomUUID(), carries });
 
   return {
     codeSender: {
@@ -66,7 +67,7 @@ export function createSignInMail(options: SignInMailOptions): SignInMail {
         if (message.code !== null) {
           // Not awaited (see above). Any failure, thrown or rejected, is only reported.
           void Promise.resolve()
-            .then(() => send(message.to, email))
+            .then(() => send(message.to, email, 'code'))
             .catch(() => options.onNoticeFailed('code'));
         }
         return ok({ queued: true as const });

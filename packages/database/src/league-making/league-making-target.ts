@@ -96,6 +96,8 @@ export type ConnectCause =
   | 'ssl'
   /** Nothing answered within the time limit. */
   | 'timeout'
+  /** The server answered with a code of its own (SQLSTATE) not sorted above: it was reached. */
+  | 'refused'
   | 'unknown';
 
 export type OpenTargetProblem =
@@ -104,7 +106,13 @@ export type OpenTargetProblem =
   | { readonly kind: 'certificate-not-checked'; readonly login: Login }
   /** A hosted address with anything after "?": nothing may come from a query string. */
   | { readonly kind: 'query-string'; readonly login: Login }
-  | { readonly kind: 'cannot-connect'; readonly login: Login; readonly cause: ConnectCause }
+  | {
+      readonly kind: 'cannot-connect';
+      readonly login: Login;
+      readonly cause: ConnectCause;
+      /** The server's 5-character code (SQLSTATE), when it answered; never its words. */
+      readonly code: string | null;
+    }
   /** The database holds the tracker's own schema, live_stats. */
   | { readonly kind: 'tracker-database'; readonly login: Login }
   | { readonly kind: 'not-the-same-database' };
@@ -172,6 +180,18 @@ export function supabaseProjectOf(host: string, user: string): string | null {
   return pooled === undefined ? null : pooled.toLowerCase();
 }
 
+/**
+ * The server's own 5-character code (SQLSTATE: two characters of class, then three) when
+ * the error carries one, so the server was reached; null for the driver's and Node's own
+ * codes (ECONNREFUSED, ERR_TLS...). A code is not a secret; the server's words are never
+ * read, as they may repeat the address.
+ */
+export function serverCodeOf(error: unknown): string | null {
+  const code =
+    typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
+  return /^(?:[0-5][0-9A-Z]|F0|HV|P0|XX)[0-9A-Z]{3}$/.test(code) ? code : null;
+}
+
 /** The cause of a failed connection, from its code alone: a message can repeat the address. */
 export function connectCauseOf(error: unknown): ConnectCause {
   const code =
@@ -179,18 +199,24 @@ export function connectCauseOf(error: unknown): ConnectCause {
   const message = error instanceof Error ? error.message.toLowerCase() : '';
   if (code === '28P01' || code === '28000') return 'login';
   if (code === '3D000') return 'database';
+  // Any other code of the server's own (XX000 "tenant or user not found" from Supabase's
+  // pooler, 53300 too many connections...): reached, and it refused (step 2.203 fix round).
+  if (serverCodeOf(error) !== null) return 'refused';
   if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return 'host';
   if (['ECONNREFUSED', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH', 'ENETUNREACH'].includes(code)) {
     return 'network';
   }
+  // Every refusal of a certificate by Node's TLS has a code (SELF_SIGNED_CERT_IN_CHAIN,
+  // UNABLE_TO_GET_ISSUER_CERT_LOCALLY, ERR_TLS_CERT_ALTNAME_INVALID...): told by it alone,
+  // never by the words, which could repeat what the server or the address said (2.203).
   if (
     code.startsWith('ERR_TLS') ||
     code.includes('CERT') ||
-    code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
-    message.includes('certificate')
+    code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
   ) {
     return 'certificate';
   }
+  // pg's own fixed sentences, which carry no code: a server without SSL, and its timeout.
   if (message.includes('ssl')) return 'ssl';
   if (message.includes('timeout') || message.includes('timed out')) return 'timeout';
   return 'unknown';
@@ -242,46 +268,91 @@ async function pgliteTarget(
   };
 }
 
+/** The address's own refusal before anything connects, or undefined when it may be opened. */
+function addressProblem(address: PostgresAddress, login: Login): OpenTargetProblem | undefined {
+  // Nothing may come from a query string: the guard refuses the keys it knows, and
+  // a hosted address carries none at all.
+  if (/[?#]/.test(address.url)) return { kind: 'query-string', login };
+  // A database anywhere else has its certificate checked, or nothing is opened.
+  if (!hostOnThisComputer(addressHost(address.url)) && !checksCertificate(address)) {
+    return { kind: 'certificate-not-checked', login };
+  }
+  return undefined;
+}
+
+const options = (address: PostgresAddress): PostgresDriverOptions => {
+  const chosen: PostgresDriverOptions = { ca: address.ca };
+  if (address.ssl !== undefined) chosen.ssl = address.ssl;
+  // Connecting gives up after a time limit, with a plain message, rather than wait.
+  chosen.connectionTimeoutMillis = address.connectionTimeoutMillis ?? connectionTimeLimit;
+  return chosen;
+};
+
+type OpenedLogin =
+  | { readonly ok: true; readonly login: PostgresDriver; readonly facts: ServerFacts }
+  | { readonly ok: false; readonly problem: OpenTargetProblem };
+
+/**
+ * Connects the migration login and asks its first question (live_stats, the database's
+ * name, id and start time), refusing the tracker's database. A refusal leaves it closed.
+ */
+async function openMigrationLogin(address: PostgresAddress): Promise<OpenedLogin> {
+  const cannot = (error: unknown): OpenedLogin => ({
+    ok: false,
+    problem: {
+      kind: 'cannot-connect',
+      login: 'migration',
+      cause: connectCauseOf(error),
+      code: serverCodeOf(error),
+    },
+  });
+  let login: PostgresDriver;
+  try {
+    login = await connectPostgresDriver(address.url, options(address));
+  } catch (error) {
+    return cannot(error);
+  }
+  const closeLogin = () => login.close().catch(() => {});
+  let facts: ServerFacts;
+  try {
+    facts = await sessionFacts(login);
+  } catch (error) {
+    await closeLogin();
+    return cannot(error);
+  }
+  if (facts.tracker) {
+    await closeLogin();
+    return { ok: false, problem: { kind: 'tracker-database', login: 'migration' } };
+  }
+  return { ok: true, login, facts };
+}
+
+/** Where a connected login really is, from the connection itself, never from the address. */
+function postgresPlace(login: PostgresDriver, facts: ServerFacts): LeagueMakingPlace {
+  const { host, port, user } = login.connectedTo;
+  return {
+    kind: 'postgres',
+    host,
+    port,
+    database: facts.database,
+    project: supabaseProjectOf(host, user),
+    onThisComputer: hostOnThisComputer(host),
+  };
+}
+
 async function hostedTarget(
   source: Extract<LeagueMakingSource, { kind: 'hosted' }>,
 ): Promise<OpenTargetResult> {
   const refuse = (problem: OpenTargetProblem): OpenTargetResult => ({ ok: false, problem });
   for (const login of ['migration', 'app'] as const) {
-    const address = source[login];
-    // Nothing may come from a query string: the guard refuses the keys it knows, and
-    // a hosted address carries none at all.
-    if (/[?#]/.test(address.url)) return refuse({ kind: 'query-string', login });
-    // A database anywhere else has its certificate checked, or nothing is opened.
-    if (!hostOnThisComputer(addressHost(address.url)) && !checksCertificate(address)) {
-      return refuse({ kind: 'certificate-not-checked', login });
-    }
+    const problem = addressProblem(source[login], login);
+    if (problem !== undefined) return refuse(problem);
   }
-  const options = (address: PostgresAddress): PostgresDriverOptions => {
-    const chosen: PostgresDriverOptions = { ca: address.ca };
-    if (address.ssl !== undefined) chosen.ssl = address.ssl;
-    // Connecting gives up after a time limit, with a plain message, rather than wait.
-    chosen.connectionTimeoutMillis = address.connectionTimeoutMillis ?? connectionTimeLimit;
-    return chosen;
-  };
 
-  let login: PostgresDriver;
-  try {
-    login = await connectPostgresDriver(source.migration.url, options(source.migration));
-  } catch (error) {
-    return refuse({ kind: 'cannot-connect', login: 'migration', cause: connectCauseOf(error) });
-  }
+  const opened = await openMigrationLogin(source.migration);
+  if (!opened.ok) return refuse(opened.problem);
+  const { login, facts: loginFacts } = opened;
   const closeLogin = () => login.close().catch(() => {});
-  let loginFacts: ServerFacts;
-  try {
-    loginFacts = await sessionFacts(login);
-  } catch (error) {
-    await closeLogin();
-    return refuse({ kind: 'cannot-connect', login: 'migration', cause: connectCauseOf(error) });
-  }
-  if (loginFacts.tracker) {
-    await closeLogin();
-    return refuse({ kind: 'tracker-database', login: 'migration' });
-  }
 
   const db = createDatabase({
     kind: 'postgres',
@@ -298,7 +369,12 @@ async function hostedTarget(
     appFacts = await handleFacts(db);
   } catch (error) {
     await closeBoth();
-    return refuse({ kind: 'cannot-connect', login: 'app', cause: connectCauseOf(error) });
+    return refuse({
+      kind: 'cannot-connect',
+      login: 'app',
+      cause: connectCauseOf(error),
+      code: serverCodeOf(error),
+    });
   }
   if (appFacts.tracker) {
     await closeBoth();
@@ -313,21 +389,13 @@ async function hostedTarget(
     return refuse({ kind: 'not-the-same-database' });
   }
 
-  const { host, port, user } = login.connectedTo;
   return {
     ok: true,
     target: {
       login,
       db,
       appLogin: 'own',
-      place: {
-        kind: 'postgres',
-        host,
-        port,
-        database: loginFacts.database,
-        project: supabaseProjectOf(host, user),
-        onThisComputer: hostOnThisComputer(host),
-      },
+      place: postgresPlace(login, loginFacts),
       freshLogin: () => connectPostgresDriver(source.migration.url, options(source.migration)),
       close: closeBoth,
     },
@@ -350,4 +418,51 @@ export async function openLeagueMakingTarget(
     return pgliteTarget(new PGlite(folder), { kind: 'folder', folder }, true);
   }
   return hostedTarget(source);
+}
+
+/**
+ * Where the release command (step 2.95, record 101) applies the database's changes: the
+ * same PGlite database, or a hosted database through the migration login ALONE, which
+ * owns the tables and is the only login that may change them (T-48). The same checks as
+ * the league-making tool, from the same code: no query string, a certificate checked
+ * for a database anywhere else, the tracker's schema refused whatever the address said,
+ * and the place read from what was really connected to.
+ */
+export type MigrationTargetSource =
+  | Extract<LeagueMakingSource, { kind: 'pglite' | 'folder' }>
+  | { readonly kind: 'migration-login'; readonly migration: PostgresAddress };
+
+export type MigrationTarget = {
+  readonly login: MigrationDriver;
+  readonly place: LeagueMakingPlace;
+  readonly close: () => Promise<void>;
+};
+
+export type MigrationTargetResult =
+  | { readonly ok: true; readonly target: MigrationTarget }
+  | { readonly ok: false; readonly problem: OpenTargetProblem };
+
+/** Opens the migration login's target. Close it when done. A refusal leaves nothing open. */
+export async function openMigrationTarget(
+  source: MigrationTargetSource,
+): Promise<MigrationTargetResult> {
+  if (source.kind !== 'migration-login') {
+    const opened = await openLeagueMakingTarget(source);
+    if (!opened.ok) return opened;
+    const { login, place, close } = opened.target;
+    return { ok: true, target: { login, place, close } };
+  }
+  const problem = addressProblem(source.migration, 'migration');
+  if (problem !== undefined) return { ok: false, problem };
+  const opened = await openMigrationLogin(source.migration);
+  if (!opened.ok) return opened;
+  const { login, facts } = opened;
+  return {
+    ok: true,
+    target: {
+      login,
+      place: postgresPlace(login, facts),
+      close: () => login.close().catch(() => {}),
+    },
+  };
 }

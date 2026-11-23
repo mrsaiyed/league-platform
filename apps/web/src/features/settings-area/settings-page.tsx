@@ -1,6 +1,13 @@
 // Admin → League settings (step 2.48, P4 §6, T5 §6): a form for every setting the
 // product declares at the league level, drawn from the declarations (T-98).
-import { leagueUrl, listLeagueSettings, readNamePolicy, readPrivacyFacts } from '@srleagues/core';
+import {
+  leagueUrl,
+  listLeagueSettings,
+  mayChangeLeagueSettings,
+  readNamePolicy,
+  readPrivacyFacts,
+  readPublishChecks,
+} from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
@@ -8,6 +15,7 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { doneKey, problemKey } from './answer.ts';
 import { privacyNotes } from './privacy-notes.ts';
+import { publishAsk, PublishPanel } from './publish-panel.tsx';
 import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
 
 /** The groups the settings are shown under, in the order they are drawn, each once. */
@@ -31,12 +39,17 @@ export async function SettingsPage({
 }) {
   const view = await loadLeaguePage(league, 'admin', 'settings');
   const { adminSettings, publicSchedule } = await webPorts();
-  const { rows, facts, policy } = await adminSettings.deps.transaction(
-    commandContextOf(view.context),
+  const context = commandContextOf(view.context);
+  const { rows, facts, policy, current, checks, mayPublish } = await adminSettings.deps.transaction(
+    context,
     async (tx) => ({
       rows: await listLeagueSettings(tx),
       facts: await readPrivacyFacts(tx),
       policy: await readNamePolicy(tx.leagues),
+      // The Publish part (step 2.240): the league's state and version, and the checks.
+      current: await tx.leagues.currentLeague(),
+      checks: await readPublishChecks(tx),
+      mayPublish: await mayChangeLeagueSettings(context, tx),
     }),
   );
   const { timeZone } = await publicSchedule.clockOf(view.context.league.id);
@@ -73,6 +86,17 @@ export async function SettingsPage({
           {t(good)}
         </p>
       ) : null}
+      {current === undefined ? null : (
+        <PublishPanel
+          league={view.context.league.slug}
+          address={leagueUrl(view.context.league, 'admin-area', { area: 'settings' })}
+          status={current.status}
+          version={current.version}
+          checks={checks}
+          mayPublish={mayPublish}
+          asking={query[publishAsk.name] === publishAsk.value}
+        />
+      )}
       {rows.length === 0 ? (
         <EmptyPanel text={t('adminSettings.none')} />
       ) : (

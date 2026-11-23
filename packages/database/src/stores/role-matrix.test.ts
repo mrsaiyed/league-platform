@@ -60,6 +60,8 @@ import {
   changeRosterEntry,
   clearSettingFor,
   commands,
+  countPlaceGames,
+  countTeamGames,
   createCourt,
   createDivision,
   createLeague,
@@ -75,6 +77,7 @@ import {
   engineRulesOf,
   getBoxScoreSheet,
   getFixtureImport,
+  getPerson,
   getScheduleDraft,
   getSeason,
   invite,
@@ -100,8 +103,10 @@ import {
   previewSeasonRules,
   publishSchedule,
   publishSiteDesign,
+  putBackDraftGame,
   putBackOnRoster,
   readInvitation,
+  putGameBack,
   readReopenOffer,
   readTrackerRosters,
   readTrackerState,
@@ -495,6 +500,12 @@ const teamCommandRows: readonly Row[] = [
     (c, i) => updateTeam(c, i, teamsDeps),
   ),
   ...teamRows(
+    'teams.count_team_games',
+    "count a team's games before removing it",
+    async (league, program) => ({ teamId: await teamIn(league, program) }),
+    (c, i) => countTeamGames(c, i, teamsDeps),
+  ),
+  ...teamRows(
     'teams.remove_team',
     'remove a team',
     async (league, program) => ({ teamId: await teamIn(league, program) }),
@@ -690,6 +701,20 @@ async function draftMovingFirstGame(
   return draft.id;
 }
 
+/** A draft on the season (before any publication) that removes its first game; its id. */
+async function draftRemovingFirstGame(
+  s: Awaited<ReturnType<typeof scheduleIn>>,
+  league: League,
+): Promise<string> {
+  const changes = { version: 1, changes: [{ kind: 'remove-game', gameId: s.first }] };
+  const draft = await one<{ id: string }>(
+    pglite,
+    'insert into schedule_drafts (league_id, season_id, changes) values ($1, $2, $3::jsonb) returning id',
+    [league.leagueId, s.seasonId, JSON.stringify(changes)],
+  );
+  return draft.id;
+}
+
 const firstEdit = (s: { seasonId: string }) => ({
   seasonId: s.seasonId,
   basedOnRevision: null,
@@ -745,6 +770,18 @@ const scheduleDraftRows: readonly Row[] = [
     'schedule.edit',
     (s) => ({ ...firstEdit(s), gameId: s.first }),
     (c, i) => removeDraftGame(c, i, schedulingDeps),
+  ),
+  ...scheduleRows(
+    'scheduling.put_back_draft_game',
+    'put a removed game back in the draft',
+    'schedule.edit',
+    async (s, league) => ({
+      ...firstEdit(s),
+      draftId: await draftRemovingFirstGame(s, league),
+      version: 1,
+      gameId: s.first,
+    }),
+    (c, i) => putBackDraftGame(c, i, schedulingDeps),
   ),
   ...scheduleRows(
     'scheduling.rename_draft_round',
@@ -930,6 +967,18 @@ const gameCommandRows: readonly Row[] = [
     'games.results',
     async (league, program) => ({ gameId: (await gameIn(league, program)).gameId, version: 1 }),
     (c, i) => cancelGame(c, i, gamesDeps),
+  ),
+  // Whoever may cancel a game may put it back (S-51).
+  ...gameRows(
+    'games.put_game_back',
+    'put a cancelled game back',
+    'games.results',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program, { status: 'cancelled' })).gameId,
+      version: 1,
+      reason: 'cancelledByMistake',
+    }),
+    (c, i) => putGameBack(c, i, gamesDeps),
   ),
   ...gameRows(
     'games.reopen_game',
@@ -1526,7 +1575,7 @@ const divisionAndVenueRows: readonly Row[] = [
   {
     command: 'scheduling.restore_venue',
     name: 'restore a venue',
-    needs: 'bin.restore',
+    needs: 'venues.manage',
     prepare: async (league) => ({
       input: { venueId: await binned('venues', await newVenue(pglite, league.leagueId)) },
     }),
@@ -1565,7 +1614,7 @@ const divisionAndVenueRows: readonly Row[] = [
   {
     command: 'scheduling.restore_court',
     name: 'restore a court',
-    needs: 'bin.restore',
+    needs: 'venues.manage',
     prepare: async (league) => {
       const venueId = await newVenue(pglite, league.leagueId);
       const courtId = await newCourt(pglite, league.leagueId, venueId);
@@ -1582,6 +1631,15 @@ const divisionAndVenueRows: readonly Row[] = [
     scope: 'program',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listVenues(c, i, schedulingDeps),
+  },
+  {
+    command: 'scheduling.count_place_games',
+    name: 'see how many games each venue and court has',
+    needs: 'venues.manage',
+    // As the venues it counts: league-shared, so a program-limited scheduler reads it too.
+    scope: 'program',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => countPlaceGames(c, i, schedulingDeps),
   },
 ];
 
@@ -1669,6 +1727,15 @@ const peopleRows: readonly Row[] = [
     needs: 'people.manage',
     prepare: async () => ({ input: { firstName: 'Sam', lastName: 'Ng' } }),
     run: (c, i) => createPerson(c, i, peopleDeps),
+  },
+  {
+    command: 'people.get_person',
+    name: "read one person's record",
+    needs: 'people.read',
+    prepare: async (league) => ({
+      input: { personId: await newPerson(pglite, league.leagueId) },
+    }),
+    run: (c, i) => getPerson(c, i, peopleDeps),
   },
   {
     command: 'people.update_person',

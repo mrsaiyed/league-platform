@@ -3,8 +3,10 @@
 // so tests can hand it any set of values; config.ts reads the real environment once.
 // Names shared with the web app mean the same thing in both (.env.example).
 import {
+  databaseCertificateFrom,
   platformDatabaseProblem,
   trackerProjectProblem,
+  type CertificateFileReader,
   type TrackerGuardFacts,
 } from '@srleagues/providers';
 import { z } from 'zod';
@@ -14,6 +16,7 @@ export const workerFields = {
   APP_ENV: { secret: false },
   LOG_LEVEL: { secret: false },
   PLATFORM_DATABASE_URL: { secret: true },
+  PLATFORM_DATABASE_CA: { secret: false },
   PUBLIC_BASE_URL: { secret: false },
   EMAIL_FROM: { secret: false },
   RESEND_API_KEY: { secret: true },
@@ -38,6 +41,12 @@ const schema = z.object({
     .trim()
     .regex(/^postgres(?:ql)?:\/\//, 'must be a postgres:// address')
     .optional(),
+  // The database server's certificate, as the web app takes it (step 2.203, T-299): its
+  // PEM text, or the path of a file holding it, read once here and checked by
+  // databaseCertificateFrom before this schema sees it; by then it is the PEM text.
+  // Left out, the computer's own certificate authorities check the server, as before.
+  // The certificate is always checked: the worker has no way to turn that off.
+  PLATFORM_DATABASE_CA: z.string().optional(),
   // The web app has no base path (its addresses are built from the origin alone, T-34,
   // and it refuses a PUBLIC_BASE_URL with a path when it builds them), so the worker
   // takes only a scheme and host too, rather than quietly dropping a path from links.
@@ -78,6 +87,7 @@ export type WorkerConfig = Readonly<z.infer<typeof schema>>;
 const optional: readonly WorkerConfigName[] = [
   'LOG_LEVEL',
   'PLATFORM_DATABASE_URL',
+  'PLATFORM_DATABASE_CA',
   'RESEND_API_KEY',
   'EMAIL_CAPTURE_DIR',
   'WORKER_HEALTH_PORT',
@@ -118,6 +128,11 @@ export type WorkerConfigGuard = {
    * production refuse to start. That project holds real games; the worker never uses it.
    */
   readonly trackerProject: string | null;
+  /**
+   * Reads the file PLATFORM_DATABASE_CA names, when it names one (config.ts hands the
+   * real one). Without it, only the certificate's own text is taken.
+   */
+  readonly readFile?: CertificateFileReader;
 };
 
 /**
@@ -157,6 +172,12 @@ export function loadWorkerConfig(
   if (databaseProblem !== undefined) invalid.set('PLATFORM_DATABASE_URL', databaseProblem);
   const fileProblem = trackerProjectProblem(['PLATFORM_DATABASE_URL'], facts);
   if (fileProblem !== undefined) invalid.set('supabase/site.json', fileProblem);
+  const certificate = given['PLATFORM_DATABASE_CA'];
+  if (certificate !== undefined) {
+    const read = databaseCertificateFrom('PLATFORM_DATABASE_CA', certificate, guard?.readFile);
+    given['PLATFORM_DATABASE_CA'] = read.ok ? read.pem : undefined;
+    if (!read.ok) invalid.set('PLATFORM_DATABASE_CA', read.problem);
+  }
   const result = schema.safeParse(given);
   if (
     result.success &&
@@ -183,7 +204,13 @@ export function loadWorkerConfig(
 // messages (those starting with "must") are written above and contain no values.
 function reason(issue: z.core.$ZodIssue): string {
   if (issue.message.startsWith('must')) return issue.message;
-  if (issue.code === 'invalid_value') return 'not one of the allowed values';
+  if (issue.code === 'invalid_value') return `not one of the allowed values (${allowed(issue)})`;
   if (issue.code === 'too_small' || issue.code === 'too_big') return 'out of range';
   return 'wrong format';
+}
+
+/** The values an enum allows, which are ours and never secret (step 2.203, L1). */
+function allowed(issue: z.core.$ZodIssue): string {
+  const values = 'values' in issue && Array.isArray(issue.values) ? issue.values : [];
+  return values.map(String).join(', ');
 }

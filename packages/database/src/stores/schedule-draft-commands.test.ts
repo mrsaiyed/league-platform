@@ -177,7 +177,7 @@ describe('schedule draft commands against the database', () => {
     expect(view).toMatchObject({
       ok: true,
       value: {
-        draft: { version: 2, changeCount: 2, outOfDate: false },
+        draft: { version: 2, savedEdits: 2, outOfDate: false },
         summary: { gamesMoved: [s.gameId] },
       },
     });

@@ -46,7 +46,9 @@ export function summarizePublish(published: ScheduleState, draft: ScheduleState)
       gamesMoved.push(id);
       addTeams(old);
       addTeams(g);
-    } else if ((old.recording ?? null) !== (g.recording ?? null)) {
+    } else if (g.recording !== null && g.recording !== undefined && old.recording !== g.recording) {
+      // Only a recording the draft names is written (publish-schedule.ts): a draft's empty
+      // one leaves the game as it is, so it changes nothing (step 2.185).
       gamesRecordingChanged.push(id);
     }
   }
