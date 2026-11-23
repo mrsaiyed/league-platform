@@ -155,6 +155,7 @@ const excused = new Map([
     'insert-season.ts',
     'insert-site-release.ts',
     'insert-standings-adjustment.ts',
+    'insert-standings-coin-flip.ts',
     'insert-team.ts',
     'insert-venue.ts',
     'save-game-state.ts',
@@ -194,8 +195,8 @@ const excused = new Map([
 ]);
 // 4 of the purge, 12 repeated filters and 48 files with no filter of their own (2.224,
 // part 2); 14 filters of statements joined on league_id and 17 statements keyed by another
-// league-filtered statement or held by a composite key (part 3).
-const mostExcused = 95;
+// league-filtered statement or held by a composite key (part 3); the coin flip's insert (2.56).
+const mostExcused = 96;
 
 /** Whole-file excuses: each file name with the one reason. */
 function wholeFiles(reason, ...files) {
