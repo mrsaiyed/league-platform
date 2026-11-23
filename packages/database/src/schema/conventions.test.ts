@@ -104,6 +104,7 @@ describe('every table', () => {
         'sites',
         'stages',
         'standings_adjustments',
+        'standings_coin_flips',
         'standings_rows',
         'support_access_log',
         'teams',

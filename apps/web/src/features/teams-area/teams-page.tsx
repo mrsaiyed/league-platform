@@ -119,7 +119,7 @@ async function Body({
       )}
       <div id={addTeamAnchor} className="admin-add-team">
         <Section title={t('adminTeams.create.title')}>
-          <form action={createTeamAction} className="staff-form">
+          <form action={createTeamAction} className="staff-form" data-form="create-team">
             <LeagueField league={league.slug} />
             <TextField name="name" label={t('adminTeams.field.name')} required maxLength={120} />
             <TextField

@@ -9,11 +9,14 @@ export {
   listAdjustments,
   type ListAdjustmentsError,
   type OverturnableGame,
+  type LevelSet,
   type SeasonAdjustments,
 } from './commands/list-adjustments.ts';
 export { awardGame, type AwardGameError } from './commands/award-game.ts';
 export { overturnResult, type OverturnResultError } from './commands/overturn-result.ts';
 export { removeAdjustment, type RemoveAdjustmentError } from './commands/remove-adjustment.ts';
+export { recordCoinFlip, type RecordCoinFlipError } from './commands/record-coin-flip.ts';
+export { removeCoinFlip, type RemoveCoinFlipError } from './commands/remove-coin-flip.ts';
 export { rebuildStandings, type RebuildStandingsError } from './commands/rebuild-standings.ts';
 export {
   rebuildOnGameFinalized,
@@ -33,8 +36,11 @@ export { rebuildSeason, type SeasonRebuilt } from './rebuild-season.ts';
 export { previewRulesChange, type RulesChangePreview } from './preview-rules-change.ts';
 export { whatWouldMove, type MovedField, type TeamMove } from './what-would-move.ts';
 export type {
+  CoinFlipMethod,
   NewAdjustment,
+  NewCoinFlip,
   SeasonAdjustment,
+  SeasonCoinFlip,
   StandingsStore,
   StandingsTx,
   TableTeam,

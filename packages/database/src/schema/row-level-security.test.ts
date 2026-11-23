@@ -501,6 +501,26 @@ const leagueTables: LeagueTable[] = [
     ],
   },
   {
+    table: 'standings_coin_flips',
+    key: 'league_id',
+    touch: 'update standings_coin_flips set deleted_at = deleted_at where league_id = $1',
+    canUpdate: true,
+    // Taken-off coin flips go to the bin.
+    canDelete: false,
+    insert: (leagueId, { ownerId }) => [
+      `with season as (
+         select season_id as id from teams where league_id = $1
+         group by season_id having count(*) >= 2 order by season_id limit 1
+       )
+       insert into standings_coin_flips (league_id, season_id, team_ids, method, account_id)
+       values ($1, (select id from season),
+         array(select id from teams where league_id = $1
+           and season_id = (select id from season) order by id limit 2),
+         'by-hand', $2)`,
+      [leagueId, ownerId],
+    ],
+  },
+  {
     table: 'season_player_totals',
     key: 'league_id',
     touch: 'update season_player_totals set games_played = games_played where league_id = $1',

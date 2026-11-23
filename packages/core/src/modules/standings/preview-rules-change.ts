@@ -15,7 +15,7 @@ export type RulesChangePreview = {
 };
 
 type PreviewTx = {
-  readonly standings: Pick<StandingsStore, 'listTeams' | 'listAdjustments'>;
+  readonly standings: Pick<StandingsStore, 'listTeams' | 'listAdjustments' | 'listCoinFlips'>;
   readonly games: Pick<GamesStore, 'findSeason' | 'listDecided' | 'listDecidedLines'>;
 };
 

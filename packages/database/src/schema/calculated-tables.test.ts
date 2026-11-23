@@ -337,3 +337,87 @@ describe('season player totals (T3 §9)', () => {
     });
   });
 });
+
+describe('standings coin flips (S-89, T-314)', () => {
+  const flip = (
+    sql: Sql,
+    s: Made,
+    teamIds: readonly string[],
+    columns: Record<string, unknown> = {},
+  ) => {
+    const all: Record<string, unknown> = {
+      league_id: s.leagueId,
+      season_id: s.seasonId,
+      team_ids: teamIds,
+      method: 'by-hand',
+      account_id: s.ownerId,
+      ...columns,
+    };
+    const names = Object.keys(all);
+    return sql.query<{ id: string }>(
+      `insert into standings_coin_flips (${names.join(', ')})
+       values (${names.map((_, k) => `$${k + 1}`).join(', ')}) returning id`,
+      Object.values(all),
+    );
+  };
+  const twoTeams = async (s: Made) => [
+    await newTeam(db, s.leagueId, s.seasonId),
+    await newTeam(db, s.leagueId, s.seasonId),
+  ];
+
+  it('name two or more teams of their own season, each once', async () => {
+    const s = await season();
+    const [a = '', b = ''] = await twoTeams(s);
+    const otherSeason = await newSeason(db, s.leagueId, s.defaultProgramId);
+    const elsewhere = await newTeam(db, s.leagueId, otherSeason);
+    await expect(flip(db, s, [a])).rejects.toMatchObject(
+      refusedBy('standings_coin_flips_team_count'),
+    );
+    await expect(flip(db, s, [a, a])).rejects.toMatchObject(
+      refusedBy('standings_coin_flips_teams'),
+    );
+    await expect(flip(db, s, [a, elsewhere])).rejects.toMatchObject(
+      refusedBy('standings_coin_flips_teams', refused.foreignKey),
+    );
+    await expect(flip(db, s, [a, b], { method: 'guessed' })).rejects.toMatchObject(
+      refusedBy('standings_coin_flips_method'),
+    );
+    await expect(flip(db, s, [a, b], { note: ' ' })).rejects.toMatchObject(
+      refusedBy('standings_coin_flips_note_length'),
+    );
+    await flip(db, s, [b, a], { method: 'drawn', note: 'Flipped at the scorer table' });
+  });
+
+  it('keep their teams once made, and go to the bin rather than away', async () => {
+    const s = await season();
+    const [a = '', b = ''] = await twoTeams(s);
+    const { rows } = await flip(db, s, [a, b]);
+    const id = rows[0]?.id;
+    await expect(
+      asApp(db, { league: s.leagueId }, (tx) =>
+        tx.query(
+          'update standings_coin_flips set team_ids = array[$2::uuid, $3::uuid] where id = $1',
+          [id, b, a],
+        ),
+      ),
+    ).rejects.toThrow('cannot be changed');
+    await asApp(db, { league: s.leagueId }, (tx) =>
+      tx.query('update standings_coin_flips set deleted_at = now() where id = $1', [id]),
+    );
+    await expect(
+      asApp(db, { league: s.leagueId }, (tx) =>
+        tx.query('delete from standings_coin_flips where id = $1', [id]),
+      ),
+    ).rejects.toMatchObject(refused.privilege);
+  });
+
+  it('a team carries when it left the league, empty while it plays (S-87)', async () => {
+    const s = await season();
+    const team = await newTeam(db, s.leagueId, s.seasonId);
+    const { rows } = await db.query<{ left_at: string | null }>(
+      'select left_at from teams where id = $1',
+      [team],
+    );
+    expect(rows[0]?.left_at).toBeNull();
+  });
+});

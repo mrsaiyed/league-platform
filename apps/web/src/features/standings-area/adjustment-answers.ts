@@ -57,6 +57,7 @@ const known = [
   'adjustment-not-counted',
   'adjustment-not-found',
   'invalid-number',
+  'flip-not-found',
   'game-already-overturned',
   'game-has-no-winner',
   'game-not-found',
@@ -64,11 +65,13 @@ const known = [
   'not-confirmed',
   'nothing-changes',
   'number-too-big',
+  'place-twice',
   'reason-missing',
   'reason-too-long',
   'same-team',
   'season-not-found',
   'team-not-found',
+  'teams-not-level',
 ] as const;
 
 /** The boxes a refusal marks. */

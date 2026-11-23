@@ -5,9 +5,11 @@
 // rows as the running result.
 //
 // Results come from the games module (T-22): only final and forfeit games count for
-// standings (S-9), only final games for player totals (S-11). Coin flips have no
-// place to be stored yet (record 030), so teams no tiebreaker separates share a rank
-// and take seeds in id order. Player totals hold every team's lines: who may see a
+// standings (S-9), only final games for player totals (S-11). Teams no tiebreaker
+// separates share a rank and take seeds in id order until the admin records a coin
+// flip for them (S-89, T-314): the season's flips go to the calculation, with the coin
+// flip tried last when the season's tiebreakers do not name it, so a flip the admin
+// recorded always counts (packages/sports applies it, order-teams.ts). Player totals hold every team's lines: who may see a
 // player's numbers (S-22) is decided when they are shown (record 033).
 import {
   calculateStandings,
@@ -26,7 +28,7 @@ import {
   type GamesStore,
   type SeasonResults,
 } from '../games/index.ts';
-import type { SeasonAdjustment, StandingsStore, StandingsTx } from './ports.ts';
+import type { SeasonAdjustment, SeasonCoinFlip, StandingsStore, StandingsTx } from './ports.ts';
 
 export type SeasonRebuilt = {
   /** Standings rows saved: one per team of the season. */
@@ -88,7 +90,7 @@ function statsGame(
 }
 
 type Readers = {
-  readonly standings: Pick<StandingsStore, 'listTeams' | 'listAdjustments'>;
+  readonly standings: Pick<StandingsStore, 'listTeams' | 'listAdjustments' | 'listCoinFlips'>;
   readonly games: Pick<GamesStore, 'findSeason' | 'listDecided' | 'listDecidedLines'>;
 };
 
@@ -99,20 +101,32 @@ export type SeasonCalculation = {
   readonly standings: StandingsResult;
 };
 
+/** The rules with the coin flip tried last when flips are recorded and the rules leave it out. */
+export function withCoinFlipLast(
+  rules: SeasonRules,
+  flips: readonly SeasonCoinFlip[],
+): SeasonRules {
+  if (flips.length === 0 || rules.tiebreakers.includes('coin-flip')) return rules;
+  return { ...rules, tiebreakers: [...rules.tiebreakers, 'coin-flip'] };
+}
+
 /**
- * Works the season's standings out from its results, its teams and its adjustments,
- * under `rules` when given (to see what a change would do) or else the season's own.
- * Saves nothing; undefined if the season is not here.
+ * Works the season's standings out from its results, its teams, its adjustments and its
+ * coin flips, under `rules` when given (to see what a change would do) or else the
+ * season's own; `withoutFlips` leaves the flips out, to see which teams are level after
+ * every tiebreaker (the coin-flip screen). Saves nothing; undefined if the season is not here.
  */
 export async function calculateSeason(
   tx: Readers,
   seasonId: string,
   rules?: SeasonRules,
+  options: { readonly withoutFlips?: boolean } = {},
 ): Promise<SeasonCalculation | undefined> {
   const results = await seasonResults(tx, seasonId);
   if (results === undefined) return undefined;
   const teams = await tx.standings.listTeams(seasonId);
   const adjustments = await tx.standings.listAdjustments(seasonId);
+  const flips = options.withoutFlips === true ? [] : await tx.standings.listCoinFlips(seasonId);
   const games = results.games.filter((g): g is GameRecord & { status: 'final' | 'forfeit' } =>
     decided(g.status),
   );
@@ -120,7 +134,7 @@ export async function calculateSeason(
     calculateStandings({
       teams: teams.map((t) => ({ teamId: t.teamId, divisionId: t.divisionId })),
       games: games.map(standingsGame),
-      rules: rules ?? results.rules,
+      rules: withCoinFlipLast(rules ?? results.rules, flips),
       adjustments: counted.map((a) => ({
         adjustmentId: a.id,
         teamId: a.teamId,
@@ -130,7 +144,7 @@ export async function calculateSeason(
         points: a.points,
         reason: a.reason,
       })),
-      coinFlips: [],
+      coinFlips: flips.map((flip) => flip.teamIds),
     });
   const standings = withWholePairs(calculate, adjustments);
   return { results, games, standings: withAwardedGames(standings, adjustments) };

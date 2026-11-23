@@ -358,9 +358,10 @@ describe('the harness, with commands (step 1.10)', () => {
         throw Object.assign(new Error('roll back'), { counted: rows[0]?.n, teams: before.length });
       },
     ).catch((error: unknown) => error as { counted?: number; teams?: number });
-    // Seeded with one row; every team of the season has one now.
+    // Seeded with one row; every team of the season has one now (four since step 2.56's
+    // two level teams, S-89).
     expect(scored.counted).toBe(scored.teams);
-    expect(scored.counted).toBe(2);
+    expect(scored.counted).toBe(4);
   });
 });
 

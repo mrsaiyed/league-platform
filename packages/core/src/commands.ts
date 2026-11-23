@@ -126,7 +126,9 @@ import {
   listAdjustments,
   overturnResult,
   rebuildStandings,
+  recordCoinFlip,
   removeAdjustment,
+  removeCoinFlip,
 } from './modules/standings/index.ts';
 import {
   addToRoster,
@@ -210,11 +212,13 @@ export const commands = commandRegistry([
   readTrackerRosters,
   readTrackerState,
   rebuildStandings,
+  recordCoinFlip,
   recordFinalScore,
   recordForfeit,
   recordImportedScores,
   releaseScoringSession,
   removeAdjustment,
+  removeCoinFlip,
   removeCourt,
   removeDivision,
   removeDraftGame,
