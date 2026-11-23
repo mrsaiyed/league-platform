@@ -21,6 +21,13 @@ export {
   type EarlierGames,
   type EarlierRound,
 } from './commands/list-earlier-games.ts';
+// Every scheduled game after this week (step 2.56).
+export {
+  laterGamesDays,
+  laterGamesLimit,
+  listLaterGames,
+  type LaterGames,
+} from './commands/list-later-games.ts';
 // Which of a public page's games the signed-in person may score (step 2.153).
 export {
   listScoringOffers,

@@ -95,9 +95,10 @@ describe('listGameNames', () => {
     ]);
   });
 
-  it('keeps the name of a team in the bin', async () => {
+  it('keeps the name of a team in the bin, and says it is there (step 2.56)', async () => {
     const names = await withTransaction(db, { leagueId: a.leagueId }, listGameNames);
-    expect(names.teams).toContainEqual({ id: ids['Gulls'], name: 'Gulls' });
+    expect(names.teams).toContainEqual({ id: ids['Gulls'], name: 'Gulls', removed: true });
+    expect(names.teams).toContainEqual({ id: ids['Herons'], name: 'Herons', removed: false });
   });
 
   it("never returns another league's teams, seasons or assignments", async () => {

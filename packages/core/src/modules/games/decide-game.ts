@@ -55,11 +55,19 @@ export async function openGameByHand(
   gameId: string,
   /** The version the caller saw; the game's own, as read under the lock, when left out. */
   version: number | undefined,
+  /**
+   * A forfeit's: a game that is not live may be decided though the tracker holds its
+   * line-ups (step 2.56, a no-show after line-ups were set). The engine keeps a game
+   * scheduled until a play other than a line-up or the clock mode, so a game not live
+   * holds nothing a forfeit would contradict.
+   */
+  lineupsAllowed = false,
 ): Promise<Result<GameRecord, DecideGameError>> {
   if (!(await tx.games.lockGame(gameId))) return fail({ code: 'game-not-found' });
   const found = await tx.games.find(gameId);
   const open = openGame(found, version ?? found?.version ?? 0);
   if (!open.ok) return open;
+  if (lineupsAllowed && open.value.status !== 'live') return open;
   if (await tx.games.hasPlays(open.value.id)) return fail({ code: 'game-is-tracked' });
   return open;
 }

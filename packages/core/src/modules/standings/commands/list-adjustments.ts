@@ -7,7 +7,9 @@
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { mayAdjustStandings } from '../policy.ts';
-import type { SeasonAdjustment, StandingsTx, TableTeam } from '../ports.ts';
+import { flipFor, levelGroups } from '../level-groups.ts';
+import type { SeasonAdjustment, SeasonCoinFlip, StandingsTx, TableTeam } from '../ports.ts';
+import { calculateSeason } from '../rebuild-season.ts';
 
 export type ListAdjustmentsError = { readonly code: 'season-not-found' };
 
@@ -19,6 +21,19 @@ export type SeasonAdjustments = {
    * ones a ruling may overturn (one overturn per game at a time, S-85).
    */
   readonly games: readonly OverturnableGame[];
+  /**
+   * The sets of teams level after every tiebreaker (S-89), in the table's order, each
+   * with the coin flip that orders them, if one is recorded.
+   */
+  readonly levelSets: readonly LevelSet[];
+  /** Coin flips recorded for teams that are no longer level: still in use by nothing. */
+  readonly unusedFlips: readonly SeasonCoinFlip[];
+};
+
+/** Teams level after every tiebreaker, and the flip recorded for them. */
+export type LevelSet = {
+  readonly teamIds: readonly string[];
+  readonly flip: SeasonCoinFlip | null;
 };
 
 /** A decided game a ruling may overturn: who played, the score and when. */
@@ -40,11 +55,19 @@ export const listAdjustments = defineCommand({
     if ((await tx.games.findSeason(input.seasonId)) === undefined) {
       return fail({ code: 'season-not-found' });
     }
-    const [adjustments, teams, decided] = await Promise.all([
+    const [adjustments, teams, decided, flips, level] = await Promise.all([
       tx.standings.listAdjustments(input.seasonId),
       tx.standings.listTeams(input.seasonId),
       tx.games.listDecided(input.seasonId),
+      tx.standings.listCoinFlips(input.seasonId),
+      calculateSeason(tx, input.seasonId, undefined, { withoutFlips: true }),
     ]);
+    const levelSets = (level === undefined ? [] : levelGroups(level.standings)).map((teamIds) => ({
+      teamIds,
+      flip: flipFor(flips, teamIds) ?? null,
+    }));
+    const used = new Set(levelSets.flatMap((set) => (set.flip === null ? [] : [set.flip.id])));
+    const unusedFlips = flips.filter((flip) => !used.has(flip.id));
     const overturned = new Set(
       adjustments.flatMap((a) => (a.gameId === undefined || a.gameId === null ? [] : [a.gameId])),
     );
@@ -67,6 +90,6 @@ export const listAdjustments = defineCommand({
             ],
       )
       .sort((a, b) => (b.startsAt ?? '').localeCompare(a.startsAt ?? ''));
-    return ok({ adjustments, teams, games });
+    return ok({ adjustments, teams, games, levelSets, unusedFlips });
   },
 });

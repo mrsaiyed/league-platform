@@ -70,6 +70,8 @@ export const enError = {
     'The schedule was published since the import was previewed. Discard the draft or start the import again from the published schedule.',
   // Why a fixtures import was refused (T-187).
   'error.imports.apply_fixture_import.season-not-found': 'That season is not there.',
+  'error.imports.apply_fixture_import.team-left':
+    'A team named in the file has left the league since, so no game is made for it. Undo “Left the league” on the team’s page, or take its games out of the file and upload it again.',
   'error.imports.apply_fixture_import.teams-changed':
     'A team named in the file has since been removed from this season. Upload the file again.',
   'error.imports.apply_fixture_import.venues-changed':

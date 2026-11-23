@@ -144,6 +144,16 @@ describe('reading a fixtures import (the worker job)', () => {
 });
 
 describe('a file of 300 games', () => {
+  it('refuses to apply a file naming a team that has left the league since (S-87)', async () => {
+    const world = memoryImports();
+    const { importId, view } = await uploaded(world, fixturesCsv(4));
+    world.db.state.leftTeamIds = world.db.state.names.teams.map((team) => team.id);
+    expect(
+      await applyFixtureImport(world.as(ownerId), { importId, version: view.version }, world.deps),
+    ).toMatchObject({ ok: false, error: { code: 'team-left' } });
+    expect(world.db.state.draft).toBeUndefined();
+  });
+
   it('imports, previews, applies and undoes', async () => {
     const world = memoryImports();
     const { importId, view } = await uploaded(world, fixturesCsv(300, { scoreEvery: 3 }));

@@ -3,8 +3,11 @@ import type { StandingsStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
   binStandingsAdjustment,
+  binStandingsCoinFlip,
   insertStandingsAdjustment,
+  insertStandingsCoinFlip,
   listStandingsAdjustments,
+  listStandingsCoinFlips,
   listTableTeams,
   lockSeasonStandings,
   replaceSeasonPlayerTotals,
@@ -19,6 +22,9 @@ export function standingsStore(scope: LeagueScope): StandingsStore {
     addAdjustment: (seasonId, adjustment) => insertStandingsAdjustment(scope, seasonId, adjustment),
     binAdjustment: (seasonId, adjustmentId) =>
       binStandingsAdjustment(scope, seasonId, adjustmentId),
+    listCoinFlips: (seasonId) => listStandingsCoinFlips(scope, seasonId),
+    addCoinFlip: (seasonId, flip) => insertStandingsCoinFlip(scope, seasonId, flip),
+    binCoinFlip: (seasonId, flipId) => binStandingsCoinFlip(scope, seasonId, flipId),
     replaceRows: (seasonId, rows) => replaceStandingsRows(scope, seasonId, rows),
     replaceTotals: (seasonId, totals) => replaceSeasonPlayerTotals(scope, seasonId, totals),
   };

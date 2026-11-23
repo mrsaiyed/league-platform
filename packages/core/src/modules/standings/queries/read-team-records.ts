@@ -11,6 +11,8 @@ export type TeamStanding = {
     readonly slug: string;
     readonly color: string | null;
     readonly divisionId: string | null;
+    /** Has left the league mid-season (S-87): its card and page are marked so. */
+    readonly left: boolean;
   };
   readonly gamesPlayed: number;
   readonly wins: number;
@@ -66,6 +68,7 @@ export async function readTeamRecords(
           slug: team.slug,
           color: team.color,
           divisionId: team.divisionId,
+          left: team.left === true,
         },
         byTeam.get(team.id),
       ),

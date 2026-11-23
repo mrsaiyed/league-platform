@@ -19,13 +19,18 @@ import {
   rebuildOnGameFinalized,
   rebuildOnGameReopened,
   rebuildStandings,
+  recordCoinFlip,
   removeAdjustment,
+  removeCoinFlip,
 } from '@srleagues/core';
 import type { PlayerSeasonTotals, StandingsRow } from '@srleagues/sports';
 import {
   binStandingsAdjustment,
+  binStandingsCoinFlip,
   insertStandingsAdjustment,
+  insertStandingsCoinFlip,
   listStandingsAdjustments,
+  listStandingsCoinFlips,
   listTableTeams,
   replaceSeasonPlayerTotals,
   replaceStandingsRows,
@@ -72,6 +77,30 @@ registerIsolationCase({
   name: "bin the target's adjustment",
   run: (scope, target) =>
     binStandingsAdjustment(scope, target.seasonId, target.standingsAdjustmentId),
+});
+
+registerIsolationCase({
+  subject: listStandingsCoinFlips,
+  name: "list the target's season's coin flips",
+  run: (scope, target) => listStandingsCoinFlips(scope, target.seasonId),
+});
+
+registerIsolationCase({
+  subject: insertStandingsCoinFlip,
+  name: "record a coin flip for the target's teams",
+  run: (scope, target) =>
+    insertStandingsCoinFlip(scope, target.seasonId, {
+      teamIds: [target.levelTeamIds[1], target.levelTeamIds[0]],
+      method: 'by-hand',
+      note: null,
+      accountId: scope.accountId ?? '',
+    }),
+});
+
+registerIsolationCase({
+  subject: binStandingsCoinFlip,
+  name: "bin the target's coin flip",
+  run: (scope, target) => binStandingsCoinFlip(scope, target.seasonId, target.standingsCoinFlipId),
 });
 
 /** One standings row for the target's team, in its division, alone in its table. */
@@ -205,6 +234,20 @@ registerCommandCase(removeAdjustment, harnessTx, {
     seasonId: target.seasonId,
     adjustmentId: target.standingsAdjustmentId,
   }),
+});
+
+registerCommandCase(recordCoinFlip, harnessTx, {
+  name: "record a coin flip for the target's teams",
+  input: (target) => ({
+    seasonId: target.seasonId,
+    teamIds: [target.levelTeamIds[1], target.levelTeamIds[0]],
+    method: 'by-hand',
+  }),
+});
+
+registerCommandCase(removeCoinFlip, harnessTx, {
+  name: "take off the target's coin flip",
+  input: (target) => ({ seasonId: target.seasonId, flipId: target.standingsCoinFlipId }),
 });
 
 // Event handlers ----------------------------------------------------------------------

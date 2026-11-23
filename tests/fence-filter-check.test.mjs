@@ -30,8 +30,9 @@ const run = (...args) => execFileSync(process.execPath, [script, ...args], { enc
  * insert-published-games #4 to #6, insert-roster-entry #1, insert-table-player #1,
  * list-season-names #3, list-table-teams #2, list-venues #2, set-current-season #2 and #3,
  * update-published-game #2, update-season #1 to #3).
+ * 96 since step 2.56, last part: insert-standings-coin-flip, an insert the fence checks.
  */
-const reviewedExcused = 95;
+const reviewedExcused = 96;
 
 /** The audit's confirmed gaps, by name, each with the start of the filter it takes out. */
 const gaps = [

@@ -7,7 +7,13 @@ import { leagueDayText } from '../../server/game-when.ts';
 import { locale, t } from '../../server/messages.ts';
 
 /** A team as the grid names it; one in the bin (`removed`) is only named, never offered. */
-export type GridTeam = { readonly id: string; readonly name: string; readonly removed?: boolean };
+export type GridTeam = {
+  readonly id: string;
+  readonly name: string;
+  readonly removed?: boolean;
+  /** Has left the league (S-87): named in its games, offered for no new game. */
+  readonly left?: boolean;
+};
 
 /**
  * A team's name in the grid: "Badgers (removed)" for one in the bin (A-17), and words, never
@@ -21,7 +27,7 @@ export function gridTeamName(teams: readonly GridTeam[], id: string): string {
 
 /** The teams a new game can be given: those not in the bin. */
 export const pickableTeams = (teams: readonly GridTeam[]): readonly GridTeam[] =>
-  teams.filter((team) => team.removed !== true);
+  teams.filter((team) => team.removed !== true && team.left !== true);
 
 /**
  * What Admin → Schedule draws from the season's teams (the page's one wiring of them): the

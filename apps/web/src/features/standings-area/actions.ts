@@ -10,10 +10,13 @@ import {
   awardGame,
   listAdjustments,
   overturnResult,
+  recordCoinFlip,
   removeAdjustment,
+  removeCoinFlip,
   type CommandContext,
   type Result,
 } from '@srleagues/core';
+import { randomInt } from 'node:crypto';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -34,7 +37,11 @@ import {
   wrongAdjustmentFields,
 } from './adjustment-answers.ts';
 import { adjustmentWhat, gameName } from './adjustment-text.ts';
-import { adjustmentsListAnchor, standingsAreaAddress } from './standings-address.ts';
+import {
+  adjustmentsListAnchor,
+  coinFlipsAnchor,
+  standingsAreaAddress,
+} from './standings-address.ts';
 
 type Outcome = Result<unknown, { readonly code: string }> & {
   readonly name?: string;
@@ -64,8 +71,9 @@ async function standingsOf(fields: TypedFields) {
 
 async function answer(
   fields: TypedFields,
-  said: 'added' | 'removed',
+  said: 'added' | 'removed' | 'flip-saved' | 'flip-removed',
   run: (context: CommandContext) => Promise<Outcome>,
+  anchor: string = adjustmentsListAnchor,
 ): Promise<FormState> {
   const { context, page } = await standingsOf(fields);
   const outcome = await requests().once(requestKeyOf(context, fields), () => run(context));
@@ -88,7 +96,91 @@ async function answer(
       said,
       ...(outcome.name === undefined ? {} : { name: outcome.name }),
     },
-    `${page}#${adjustmentsListAnchor}`,
+    `${page}#${anchor}`,
+  );
+}
+
+/** The level teams a coin-flip form is about, as its hidden field lists them. */
+const teamsField = (fields: TypedFields) =>
+  text(fields, 'teams')
+    .split(',')
+    .filter((id) => id !== '');
+
+/** The teams' names, in this order, for the answer. */
+async function namesOf(fields: TypedFields, teamIds: readonly string[]): Promise<string> {
+  const { leagueId, teamsOf } = await standingsOf(fields);
+  const teams = await teamsOf(leagueId, text(fields, 'season'));
+  return teamIds.map((id) => teams.find((x) => x.id === id)?.name ?? '').join(', ');
+}
+
+/** A fair order, drawn here on the server (S-89): every order of the teams as likely. */
+function drawn(teamIds: readonly string[]): string[] {
+  const order = [...teamIds];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [order[i], order[j]] = [order[j] ?? '', order[i] ?? ''];
+  }
+  return order;
+}
+
+/**
+ * Records a coin flip for teams level after every tiebreaker: the order chosen place by
+ * place (flipped at the table), or, with `method=drawn` ("Flip for us"), drawn here.
+ */
+export async function recordCoinFlipAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
+  const { deps } = await standingsOf(fields);
+  const seasonId = text(fields, 'season');
+  const level = teamsField(fields);
+  const byHand = text(fields, 'method') !== 'drawn';
+  return answer(
+    fields,
+    'flip-saved',
+    async (context) => {
+      const placed = byHand ? level.map((_, i) => text(fields, `place${i + 1}`)) : drawn(level);
+      if (new Set(placed).size !== placed.length || !placed.every((id) => level.includes(id))) {
+        return refuse('place-twice');
+      }
+      const note = text(fields, 'note');
+      if (note.length > 500) return refuse('reason-too-long', 'note');
+      const result = await recordCoinFlip(
+        context,
+        {
+          seasonId,
+          teamIds: placed,
+          method: byHand ? 'by-hand' : 'drawn',
+          ...(note === '' ? {} : { note }),
+        },
+        deps,
+      );
+      if (!result.ok) return result;
+      return { ...result, name: await namesOf(fields, placed) };
+    },
+    coinFlipsAnchor,
+  );
+}
+
+/** Takes a coin flip off, after the tick and with a reason kept in the activity log. */
+export async function removeCoinFlipAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
+  const { deps } = await standingsOf(fields);
+  const seasonId = text(fields, 'season');
+  return answer(
+    fields,
+    'flip-removed',
+    async (context) => {
+      const reasonWrong = reasonProblem(fields['reason']);
+      if (reasonWrong !== undefined) return refuse(reasonWrong, 'reason');
+      if (fields['confirm'] !== 'yes') return refuse('not-confirmed');
+      const result = await removeCoinFlip(
+        context,
+        { seasonId, flipId: text(fields, 'flip'), reason: text(fields, 'reason') },
+        deps,
+      );
+      if (!result.ok) return result;
+      return { ...result, name: await namesOf(fields, teamsField(fields)) };
+    },
+    coinFlipsAnchor,
   );
 }
 

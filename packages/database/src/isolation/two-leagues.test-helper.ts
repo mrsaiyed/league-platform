@@ -98,6 +98,10 @@ export type LeagueRecords = MadeLeague & {
   /** The team's standings row, an adjustment to it, and the player's season totals. */
   standingsRowId: string;
   standingsAdjustmentId: string;
+  /** Two teams of the season with no games: level after every tiebreaker (S-89). */
+  levelTeamIds: readonly [string, string];
+  /** A coin flip ordering those two teams (S-89). */
+  standingsCoinFlipId: string;
   seasonPlayerTotalsId: string;
   /** A fixtures import, applied, with what it created: the draft's one change and a score waiting for the upcoming game. */
   importId: string;
@@ -538,6 +542,20 @@ async function seededLeague(
      values ($1, $2, $3, -1, $4, $5)`,
     [leagueId, seasonId, teamId, `Late roster for ${m}`, ownerId],
   );
+  const levelTeam = (n: number) =>
+    id(
+      pglite,
+      `insert into teams (league_id, season_id, division_id, slug, name, stats_visibility)
+       values ($1, $2, $3, $4, $5, 'everyone')`,
+      [leagueId, seasonId, divisionId, unique(`${m}-level-${n}`), `Level ${n} ${m}`],
+    );
+  const levelTeamIds = [await levelTeam(1), await levelTeam(2)] as const;
+  const standingsCoinFlipId = await id(
+    pglite,
+    `insert into standings_coin_flips (league_id, season_id, team_ids, method, note, account_id)
+     values ($1, $2, array[$3::uuid, $4::uuid], 'by-hand', $5, $6)`,
+    [leagueId, seasonId, levelTeamIds[0], levelTeamIds[1], `Flipped for ${m}`, ownerId],
+  );
   const seasonPlayerTotalsId = await id(
     pglite,
     `insert into season_player_totals (league_id, season_id, person_id, games_played,
@@ -672,6 +690,8 @@ async function seededLeague(
     walkUpPersonId,
     standingsRowId,
     standingsAdjustmentId,
+    levelTeamIds,
+    standingsCoinFlipId,
     seasonPlayerTotalsId,
     importId,
     readyImportId,

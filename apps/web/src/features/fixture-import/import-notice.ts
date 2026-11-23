@@ -29,6 +29,7 @@ const problemKeys: readonly TextKey[] = [
   'admin.import.error.draft-too-large',
   'admin.import.error.draft-changed',
   'admin.import.error.teams-changed',
+  'admin.import.error.team-left',
   'admin.import.error.venues-changed',
   'admin.import.error.change-refused',
 ];

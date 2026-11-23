@@ -8,10 +8,12 @@ import {
   changeRosterEntry,
   createTeam,
   markLeft,
+  markTeamLeft,
   putBackOnRoster,
   removePerson,
   removeTeam,
   setTeamStatsVisibility,
+  undoTeamLeft,
   updateTeam,
   type Result,
 } from '@srleagues/core';
@@ -24,6 +26,7 @@ import {
   newTeamInput,
   putBackInput,
   shortNameNeeded,
+  teamLeftInput,
   teamStatsInput,
 } from './form-input.ts';
 import { addNewPerson, moveEntry } from './roster-changes.ts';
@@ -166,5 +169,31 @@ export async function removePersonAction(form: FormData): Promise<never> {
     }
     const result = await removePerson(context, { personId: fields['personId'] ?? '' }, ports.deps);
     return settle(removePerson, result, 'personRemoved', fields['team']);
+  });
+}
+
+/** S-87: marks the team as having left the league; its results and games stay. */
+export async function markTeamLeftAction(form: FormData): Promise<never> {
+  return runTeamsAction(form, async ({ context, ports, fields }) => {
+    const input = teamLeftInput(fields);
+    return settle(
+      markTeamLeft,
+      await markTeamLeft(context, input, ports.deps),
+      'teamLeft',
+      input.teamId,
+    );
+  });
+}
+
+/** S-87: takes the mark off, so the team is offered for new games again. */
+export async function undoTeamLeftAction(form: FormData): Promise<never> {
+  return runTeamsAction(form, async ({ context, ports, fields }) => {
+    const input = teamLeftInput(fields);
+    return settle(
+      undoTeamLeft,
+      await undoTeamLeft(context, input, ports.deps),
+      'teamBack',
+      input.teamId,
+    );
   });
 }

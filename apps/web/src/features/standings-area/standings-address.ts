@@ -6,6 +6,8 @@ export const addAdjustmentAnchor = 'add-adjustment';
 export const adjustmentsListAnchor = 'adjustments';
 export const overturnResultAnchor = 'overturn-result';
 export const awardGameAnchor = 'award-game';
+export const coinFlipsAnchor = 'coin-flips';
+export const levelSetAnchor = (teamIds: readonly string[]) => `level-${teamIds.join('-')}`;
 export const adjustmentAnchor = (adjustmentId: string) => `adjustment-${adjustmentId}`;
 
 /** The area's page, for a season other than the current one with `?season=`. */

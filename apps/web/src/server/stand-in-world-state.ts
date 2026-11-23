@@ -20,6 +20,7 @@ import type {
   RosterEntryRecord,
   ScoringSession,
   SeasonAdjustment,
+  SeasonCoinFlip,
   SettingPlace,
   StandingsStore,
   TeamRecord,
@@ -140,6 +141,8 @@ export type LeagueWorld = {
   standingsRows: Record<string, SavedStandingsRow[]>;
   playerTotals: Record<string, SavedPlayerTotals[]>;
   adjustments: (SeasonAdjustment & { readonly seasonId: string; readonly binned: boolean })[];
+  /** Coin flips the admin recorded for teams level after every tiebreaker (S-89). */
+  coinFlips: (SeasonCoinFlip & { readonly seasonId: string; readonly binned: boolean })[];
   imports: ImportRecord[];
   settings: WorldSetting[];
   /** Kept as the database keeps it: each entry with its id and its moment (step 2.77). */
@@ -179,6 +182,7 @@ export function emptyLeagueWorld(
     standingsRows: {},
     playerTotals: {},
     adjustments: [],
+    coinFlips: [],
     imports: [],
     settings: [],
     activity: [],

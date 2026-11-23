@@ -23,6 +23,13 @@ export type GameRowView = {
    * the tracker, so it has no score boxes and no forfeit (S-46).
    */
   readonly hasPlays: boolean;
+  /**
+   * Plays are being recorded: a live game with plays, ended only in the tracker (S-46). A
+   * game that is not live holds at most its line-ups (step 2.56): not this.
+   */
+  readonly playsRecorded: boolean;
+  /** The tracker holds the line-ups of a game that has not started (step 2.56). */
+  readonly lineupsSet: boolean;
   /** The tracker is worth opening: the game is being played, or is scored live. */
   readonly trackerLink: boolean;
   /**
@@ -86,13 +93,20 @@ export function buildGameRows(
       startsAt: game.startsAt,
       scorekeepers: names.scorekeepers[game.id] ?? [],
       hasPlays: game.hasPlays,
+      playsRecorded: game.hasPlays && status === 'live',
+      lineupsSet: game.hasPlays && status !== 'live',
       trackerLink: status === 'live' || (status === 'scheduled' && game.recording === 'live'),
       canScore: game.scorable && open,
       boxScoreLink:
         game.scorable &&
         ((status === 'scheduled' && !game.hasPlays) ||
           ((status === 'final' || status === 'forfeit') && game.recording === 'box-score')),
-      canForfeit: game.scorable && mayChange && (open || status === 'postponed'),
+      // A game with only its line-ups set may be forfeited too (step 2.56): a team that
+      // did not come after line-ups were set.
+      canForfeit:
+        game.scorable &&
+        mayChange &&
+        (open || status === 'postponed' || (status === 'scheduled' && game.hasPlays)),
       // A scheduled game that holds line-ups from a scorer's table (it has "plays" by the
       // store's rule, but is not live) may still be postponed or cancelled: its line-ups
       // are kept, and the question says so (step 2.158).

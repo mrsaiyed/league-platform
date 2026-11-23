@@ -54,6 +54,8 @@ export type DraftEditError =
          */
         | 'round-in-use';
     }
+  /** A team of the new game has left the league (S-87): no new game is made for it. */
+  | { readonly code: 'team-left'; readonly teamIds: readonly string[] }
   | { readonly code: 'change-refused'; readonly reason: ChangeError };
 
 export type DraftEditValue = {

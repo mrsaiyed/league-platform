@@ -16,7 +16,7 @@ export function standInSchedule(world: World): ScheduleAdminPorts {
       ((await world.read(leagueId))?.teams ?? [])
         .filter((t) => t.seasonId === seasonId)
         .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-        .map(({ id, name, binned }) => ({ id, name, removed: binned })),
+        .map(({ id, name, binned, left }) => ({ id, name, removed: binned, left })),
     seasonsOf: async (leagueId, holder) => {
       const s = await world.read(leagueId);
       const all = s?.seasons ?? [];

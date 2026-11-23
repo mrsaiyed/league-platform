@@ -19,6 +19,8 @@ export const doneNames = [
   'putBack',
   'putBackNoNumber',
   'personRemoved',
+  'teamLeft',
+  'teamBack',
 ] as const;
 export type DoneName = (typeof doneNames)[number];
 

@@ -81,15 +81,19 @@ export const enActivity = {
   'activity.standings.award_game': 'Awarded a game not played',
   'activity.standings.overturn_result': 'Overturned a result',
   'activity.standings.rebuild_season': "Worked out a season's standings and totals again",
+  'activity.standings.record_coin_flip': 'Recorded a coin flip for teams level in the standings',
   'activity.standings.remove_adjustment': 'Removed a standings adjustment',
+  'activity.standings.remove_coin_flip': 'Took a coin flip off the standings',
   'activity.teams.add_to_roster': 'Added a person to a roster',
   'activity.teams.change_roster_entry': "Changed a player's number or role",
   'activity.teams.create_team': 'Added a team',
   'activity.teams.mark_left': 'Marked a person as having left a team',
+  'activity.teams.mark_team_left': 'Marked a team as having left the league',
   'activity.teams.put_back_on_roster': 'Put a person marked as left by mistake back on a roster',
   'activity.teams.remove_team': 'Moved a team to the bin',
   'activity.teams.reorder_roster': 'Changed the order of a roster',
   'activity.teams.set_stats_visibility': "Changed who sees a team's players' numbers",
+  'activity.teams.undo_team_left': 'Took off a team’s mark of having left the league',
   'activity.teams.update_team': 'Changed a team',
   // The same sentences naming the thing the entry points at, as it is named now (step
   // 2.77): {name} is a team's, a season's, a division's, a venue's, a person's as the
@@ -140,11 +144,14 @@ export const enActivity = {
   'activityNamed.teams.change_roster_entry': "Changed a player's number or role on the team {name}",
   'activityNamed.teams.create_team': 'Added the team {name}',
   'activityNamed.teams.mark_left': 'Marked a person as having left the team {name}',
+  'activityNamed.teams.mark_team_left': 'Marked the team {name} as having left the league',
   'activityNamed.teams.put_back_on_roster':
     'Put a person marked as left by mistake back on the roster of the team {name}',
   'activityNamed.teams.remove_team': 'Moved the team {name} to the bin',
   'activityNamed.teams.reorder_roster': 'Changed the order of the roster of the team {name}',
   'activityNamed.teams.set_stats_visibility':
     "Changed who sees the players' numbers of the team {name}",
+  'activityNamed.teams.undo_team_left':
+    'Took off the mark of the team {name} having left the league',
   'activityNamed.teams.update_team': 'Changed the team {name}',
 } as const;

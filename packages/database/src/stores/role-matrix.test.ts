@@ -91,6 +91,7 @@ import {
   listDivisions,
   listEarlierGames,
   listGamesNeedingResult,
+  listLaterGames,
   listMyGames,
   listPeople,
   listPostponedGames,
@@ -120,7 +121,9 @@ import {
   recordForfeit,
   recordImportedScores,
   releaseScoringSession,
+  recordCoinFlip,
   removeAdjustment,
+  removeCoinFlip,
   removeCourt,
   removeDivision,
   removeDraftGame,
@@ -165,6 +168,8 @@ import {
   updateDivision,
   updatePerson,
   updateSeason,
+  markTeamLeft,
+  undoTeamLeft,
   updateTeam,
   updateVenue,
 } from '@srleagues/core';
@@ -504,6 +509,18 @@ const teamCommandRows: readonly Row[] = [
       name: 'Renamed',
     }),
     (c, i) => updateTeam(c, i, teamsDeps),
+  ),
+  ...teamRows(
+    'teams.mark_team_left',
+    'mark a team as having left the league',
+    async (league, program) => ({ teamId: await teamIn(league, program), version: 1 }),
+    (c, i) => markTeamLeft(c, i, teamsDeps),
+  ),
+  ...teamRows(
+    'teams.undo_team_left',
+    'take off the mark of a team having left',
+    async (league, program) => ({ teamId: await teamIn(league, program), version: 1 }),
+    (c, i) => undoTeamLeft(c, i, teamsDeps),
   ),
   ...teamRows(
     'teams.count_team_games',
@@ -1068,6 +1085,15 @@ const gameCommandRows: readonly Row[] = [
     scope: 'program',
     prepare: async () => ({ input: {} }),
     run: (c, i) => listGamesNeedingResult(c, i, gamesDeps),
+  },
+  // Step 2.56: every scheduled game after this week.
+  {
+    command: 'games.list_later_games',
+    name: 'see the games after this week',
+    needs: 'games.score',
+    scope: 'program',
+    prepare: async () => ({ input: {} }),
+    run: (c, i) => listLaterGames(c, i, gamesDeps),
   },
   {
     command: 'games.list_earlier_games',
@@ -1865,6 +1891,38 @@ const adjustmentRows: readonly Row[] = [
       return { seasonId, adjustmentId: added.rows[0]?.id };
     },
     (c, i) => removeAdjustment(c, i, standingsDeps),
+  ),
+  ...gameRows(
+    'standings.record_coin_flip',
+    'record a coin flip',
+    'standings.adjust',
+    async (league, program) => {
+      const seasonId = await seasonIn(league, program);
+      // Two teams with no games: level after every tiebreaker.
+      const teamIds = [
+        await newTeam(pglite, league.leagueId, seasonId),
+        await newTeam(pglite, league.leagueId, seasonId),
+      ];
+      return { seasonId, teamIds, method: 'by-hand' };
+    },
+    (c, i) => recordCoinFlip(c, i, standingsDeps),
+  ),
+  ...gameRows(
+    'standings.remove_coin_flip',
+    'take a coin flip off',
+    'standings.adjust',
+    async (league, program) => {
+      const seasonId = await seasonIn(league, program);
+      const one = await newTeam(pglite, league.leagueId, seasonId);
+      const two = await newTeam(pglite, league.leagueId, seasonId);
+      const added = await pglite.query<{ id: string }>(
+        `insert into standings_coin_flips (league_id, season_id, team_ids, method, account_id)
+         values ($1, $2, array[$3::uuid, $4::uuid], 'by-hand', $5) returning id`,
+        [league.leagueId, seasonId, one, two, league.ownerId],
+      );
+      return { seasonId, flipId: added.rows[0]?.id };
+    },
+    (c, i) => removeCoinFlip(c, i, standingsDeps),
   ),
   ...gameRows(
     'standings.overturn_result',

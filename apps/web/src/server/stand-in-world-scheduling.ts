@@ -263,6 +263,8 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       teamIds.filter((id) =>
         s.teams.some((t) => t.id === id && t.seasonId === seasonId && !t.binned),
       ),
+    leftTeamsOfSeason: async (seasonId, teamIds) =>
+      teamIds.filter((id) => s.teams.some((t) => t.id === id && t.seasonId === seasonId && t.left)),
     findVenue: async (venueId) => s.venues.find((v) => v.id === venueId),
     listVenues: async () =>
       s.venues

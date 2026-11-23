@@ -56,7 +56,10 @@ export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
       const taken = clash(t);
       if (taken !== undefined) return taken;
       const id = newId();
-      s.teams = [...s.teams, { id, ...t, lineageId: newId(), binned: false, version: 1 }];
+      s.teams = [
+        ...s.teams,
+        { id, ...t, lineageId: newId(), binned: false, left: false, version: 1 },
+      ];
       return id;
     },
     update: async (id, change, version) => {

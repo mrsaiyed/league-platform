@@ -34,6 +34,8 @@ export type TeamCard = {
   readonly seedText: string;
   readonly recordText: string;
   readonly divisionName: string | null;
+  /** Has left the league mid-season (S-87): the card is marked "Left the league". */
+  readonly left: boolean;
 };
 
 export function recordText(record: TeamStanding): string {
@@ -74,6 +76,7 @@ function cardOf(
     recordText: recordText(record),
     divisionName:
       record.team.divisionId === null ? null : (divisions.get(record.team.divisionId) ?? null),
+    left: record.team.left,
   };
 }
 
@@ -317,6 +320,8 @@ export type TeamPageData = {
     readonly name: string;
     readonly color: string | null;
     readonly divisionName: string | null;
+    /** Has left the league mid-season (S-87): the page says so under its head. */
+    readonly left: boolean;
   };
   readonly teamId: string;
   readonly seedText: string;
@@ -364,6 +369,7 @@ export async function loadTeamHead(
       name: row.name,
       color: row.color,
       divisionName: division?.name ?? null,
+      left: record.team.left,
     },
     teamId: row.id,
     seedText,

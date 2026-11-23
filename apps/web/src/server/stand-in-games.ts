@@ -59,13 +59,15 @@ export function standInGames(world: World, options: StandInGamesOptions): StandI
     },
     namesOf: async (leagueId): Promise<GameNames> => {
       const s = await world.read(leagueId);
-      if (s === undefined) return { teams: {}, scorekeepers: {}, seasons: {}, people: {} };
+      if (s === undefined)
+        return { teams: {}, removedTeams: [], scorekeepers: {}, seasons: {}, people: {} };
       const scorekeepers: Record<string, string[]> = {};
       for (const a of s.assignments) {
         (scorekeepers[a.gameId] ??= []).push(options.people[a.accountId] ?? '');
       }
       return {
         teams: Object.fromEntries(s.teams.map((t) => [t.id, t.name])),
+        removedTeams: s.teams.filter((t) => t.binned).map((t) => t.id),
         scorekeepers,
         seasons: Object.fromEntries(s.seasons.map((x) => [x.id, x.name])),
         people: options.people,

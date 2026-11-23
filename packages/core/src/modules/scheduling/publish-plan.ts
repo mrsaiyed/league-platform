@@ -33,6 +33,8 @@ export type PublishBlocker =
         | 'game-id-taken'
         | 'game-without-time'
         | 'unknown-team'
+        /** A game new to the schedule names a team that has left the league (S-87). */
+        | 'team-left'
         | 'unknown-venue'
         | 'unknown-court'
         /** The draft removes a round a game with no date yet is still in (steps 2.160, 2.181). */
@@ -126,6 +128,22 @@ export async function planPublication(
   for (const g of placed) {
     if (!foundTeams.has(g.homeTeamId) || !foundTeams.has(g.awayTeamId)) {
       blockers.push({ code: 'unknown-team', gameId: g.id });
+    }
+  }
+  // No new game for a team that has left the league (S-87): the admin removes the game
+  // from the draft or undoes the mark. A published game of such a team only moves.
+  const added = new Set(summary.gamesAdded);
+  const fresh = placed.filter((g) => added.has(g.id));
+  const left = new Set(
+    fresh.length === 0
+      ? []
+      : await store.leftTeamsOfSeason(seasonId, [
+          ...new Set(fresh.flatMap((g) => [g.homeTeamId, g.awayTeamId])),
+        ]),
+  );
+  for (const g of fresh) {
+    if (left.has(g.homeTeamId) || left.has(g.awayTeamId)) {
+      blockers.push({ code: 'team-left', gameId: g.id });
     }
   }
   const places = new Map<string, Awaited<ReturnType<typeof checkSlotPlace>>>();

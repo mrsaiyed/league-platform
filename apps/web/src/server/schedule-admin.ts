@@ -15,6 +15,8 @@ export type ScheduleTeam = {
   readonly id: string;
   readonly name: string;
   readonly removed: boolean;
+  /** Has left the league (S-87): offered for no new game. */
+  readonly left: boolean;
 };
 
 /**

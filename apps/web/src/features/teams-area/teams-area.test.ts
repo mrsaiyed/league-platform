@@ -302,7 +302,7 @@ describe('answers in the address', () => {
         lines: [
           'This team has played 3 games.',
           'It has 2 games without a result yet: Round 6, Sun, Nov 22; Round 7, Sun, Nov 29.',
-          'If the team has left the league, record this week’s games as forfeited in Games, and remove its later games from the schedule in Schedule. Either way the team stays, with the games it played.',
+          'If the team has left the league, mark it so above, under “If this team leaves the league”: it stays, with the games it played, and its games still to come are yours to forfeit or cancel in Games.',
         ],
       });
       expect(ways(panel)).toEqual(['games', 'schedule']);

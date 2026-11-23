@@ -14,6 +14,8 @@ import type { ImportRecord, ImportScoresTx } from './ports.ts';
 import type { SeasonNames } from './read-fixtures.ts';
 
 export type MemoryImports = {
+  /** Teams marked as having left the league (S-87). */
+  leftTeamIds?: string[];
   status: string;
   grants: Grant[];
   activity: ActivityEntry[];
@@ -195,6 +197,8 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
         loadSchedule: async () => structuredClone(s.schedule),
         teamsOfSeason: async (_season, ids) =>
           ids.filter((t) => s.names.teams.some((x) => x.id === t)),
+        leftTeamsOfSeason: async (_season, ids) =>
+          ids.filter((t) => (s.leftTeamIds ?? []).includes(t)),
         findVenue: async (id) => {
           const venue = s.names.venues.find((v) => v.id === id);
           return venue === undefined

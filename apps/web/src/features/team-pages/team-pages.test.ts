@@ -104,9 +104,17 @@ describe('the team cards', () => {
     seedText: '1',
     recordText: '1-0',
     divisionName,
+    left: false,
   });
   const html = (cards: Parameters<typeof TeamCards>[0]['cards']) =>
     renderToStaticMarkup(createElement(TeamCards, { cards }));
+
+  it('mark a team that has left the league, and only that one (S-87)', () => {
+    const text = html([{ ...card('comets', null), left: true }, card('rockets', null)]);
+    expect(text).toContain('data-team-left="comets"');
+    expect(text).not.toContain('data-team-left="rockets"');
+    expect(text).toContain('Left the league');
+  });
 
   it('say nothing about divisions in a league that has none', () => {
     const text = html([card('comets', null), card('rockets', null)]);

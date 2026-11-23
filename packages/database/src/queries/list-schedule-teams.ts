@@ -8,6 +8,8 @@ export type ScheduleTeamRow = {
   readonly name: string;
   /** In the bin: not offered for a new game, only named. */
   readonly removed: boolean;
+  /** Has left the league (S-87): not offered for a new game, only named. */
+  readonly left: boolean;
 };
 
 export async function listScheduleTeams(
@@ -16,11 +18,16 @@ export async function listScheduleTeams(
 ): Promise<readonly ScheduleTeamRow[]> {
   const rows = await transactionOf(scope)
     .selectFrom('teams')
-    .select(['id', 'name', 'deleted_at'])
+    .select(['id', 'name', 'deleted_at', 'left_at'])
     .where('league_id', '=', scope.leagueId)
     .where('season_id', '=', seasonId)
     .orderBy('name')
     .orderBy('id')
     .execute();
-  return rows.map((row) => ({ id: row.id, name: row.name, removed: row.deleted_at !== null }));
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    removed: row.deleted_at !== null,
+    left: row.left_at !== null,
+  }));
 }

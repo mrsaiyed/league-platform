@@ -94,7 +94,7 @@ export const enAdminSettings = {
   'seasonSettings.ask.yes': 'Yes, save and move them',
   'seasonSettings.cancel': 'Cancel',
   'seasonSettings.coinFlipKept':
-    'Then a coin flip, which is not in use yet: teams still level after the others stay level for now.',
+    'Then a coin flip: teams still level after the others share a place until you record a flip in Standings and stats.',
   'seasonSettings.column.losses': 'Losses (L)',
   'seasonSettings.column.played': 'Games played (GP)',
   'seasonSettings.column.point-difference': 'Point difference (DIFF)',

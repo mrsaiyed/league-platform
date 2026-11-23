@@ -233,6 +233,12 @@ export async function TeamPage({
         ]}
         lead={<Emblem name={head.team.name} color={head.team.color} size="large" />}
       >
+        {/* S-87: a team that has left the league keeps its page and results, marked so. */}
+        {head.team.left ? (
+          <p className="ui-notice" data-team-left={head.team.slug}>
+            {t('team.left')}
+          </p>
+        ) : null}
         {/* What a signed-in member is told of their own team is read after the page, for
             them alone (TeamMine, step 2.168), on the current season's page only: the page is
             the same for everyone. Once it has answered or failed, and for everyone else, the

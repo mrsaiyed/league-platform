@@ -8,6 +8,7 @@ import {
   getBoxScoreSheet,
   listEarlierGames,
   listGamesNeedingResult as listGamesNeedingResultCommand,
+  listLaterGames,
   listMyGames,
   listPostponedGames as listPostponedGamesCommand,
   listScorekeepers,
@@ -373,6 +374,13 @@ registerCommandCase(getBoxScoreSheet, harnessTx, {
 // The seeded upcoming game is a week past the seed's dates, so these cases bring the
 // target's upcoming game to within the hour first (in the run's own rolled-back
 // transaction; another league's scope changes nothing), to have one to list.
+// Three weeks ahead: past the week, among the later games (step 2.56).
+const pushTargetGameLater = (scope: LeagueScope, target: LeagueRecords) =>
+  sql`update games set starts_at = now() + interval '21 days'
+      where league_id = ${scope.leagueId} and id = ${target.upcomingGameId}`.execute(
+    transactionOf(scope),
+  );
+
 const bringTargetGameNear = (scope: LeagueScope, target: LeagueRecords) =>
   sql`update games set starts_at = now() + interval '1 hour'
       where league_id = ${scope.leagueId} and id = ${target.upcomingGameId}`.execute(
@@ -591,6 +599,15 @@ registerIsolationCase({
   run: async (scope, target) => {
     await bringTargetGameNear(scope, target);
     return runAsApp(listMyGames, harnessTx, scope, {});
+  },
+});
+
+registerIsolationCase({
+  subject: listLaterGames,
+  name: "list the scope's account's later games after pushing the target's upcoming game weeks ahead",
+  run: async (scope, target) => {
+    await pushTargetGameLater(scope, target);
+    return runAsApp(listLaterGames, harnessTx, scope, {});
   },
 });
 

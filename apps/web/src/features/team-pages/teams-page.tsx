@@ -54,7 +54,16 @@ export function TeamCards({
                 : []),
             ]}
             way={t('team.roster')}
-            mark={marks === undefined ? undefined : <TeamMark address={marks} slug={card.slug} />}
+            mark={
+              <>
+                {card.left ? (
+                  <p data-team-left={card.slug}>
+                    <span className="ui-badge">{t('teams.left')}</span>
+                  </p>
+                ) : null}
+                {marks === undefined ? null : <TeamMark address={marks} slug={card.slug} />}
+              </>
+            }
           />
         </li>
       ))}

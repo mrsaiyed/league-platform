@@ -10,7 +10,13 @@
 // the league of the session; the team names through the schedule's ports. Every form is a
 // plain post that works with scripts off; a refusal keeps what was typed and marks the box
 // (record 067); "Saved" is said at the top of the list, where the browser lands.
-import { leagueUrl, listAdjustments, type SeasonAdjustment } from '@srleagues/core';
+import {
+  leagueUrl,
+  listAdjustments,
+  type LevelSet,
+  type SeasonAdjustment,
+  type SeasonCoinFlip,
+} from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { randomUUID } from 'node:crypto';
 import { commandContextOf } from '../../server/context.ts';
@@ -25,7 +31,9 @@ import {
   addAdjustmentAction,
   awardGameAction,
   overturnResultAction,
+  recordCoinFlipAction,
   removeAdjustmentAction,
+  removeCoinFlipAction,
 } from './actions.ts';
 import { adjustmentProblemKey } from './adjustment-answers.ts';
 import { changesText, gameName } from './adjustment-text.ts';
@@ -35,6 +43,8 @@ import {
   awardGameAnchor,
   overturnResultAnchor,
   adjustmentsListAnchor,
+  coinFlipsAnchor,
+  levelSetAnchor,
   standingsAreaAddress,
 } from './standings-address.ts';
 
@@ -83,7 +93,7 @@ export async function StandingsAreaPage({
   ]);
   const notice = takeNotice(context, 'standings');
   const nameOf = (teamId: string) => teams.find((x) => x.id === teamId)?.name ?? '';
-  const hidden = (more: Readonly<Record<string, string>> = {}) => ({
+  const hidden = (more: Readonly<Record<string, string>> = {}): Hidden => ({
     league: addressee.slug,
     season: seasonId,
     seasonSlug: asked ?? '',
@@ -91,6 +101,9 @@ export async function StandingsAreaPage({
     [requestTokenField]: randomUUID(),
   });
   const adjustments = listed.ok ? listed.value.adjustments : [];
+  const levelSets = listed.ok ? listed.value.levelSets : [];
+  const unusedFlips = listed.ok ? listed.value.unusedFlips : [];
+  const names = (teamIds: readonly string[]) => teamIds.map(nameOf).join(', ');
   const options = (listed.ok ? listed.value.teams : [])
     .map((team) => ({ value: team.teamId, label: nameOf(team.teamId) }))
     .sort((a, b) => a.label.localeCompare(b.label));
@@ -122,7 +135,9 @@ export async function StandingsAreaPage({
         aria-labelledby="adjustments-title"
       >
         <h2 id="adjustments-title">{t('adminStandings.list')}</h2>
-        {notice === undefined || notice.thing !== seasonId ? null : (
+        {notice === undefined ||
+        notice.thing !== seasonId ||
+        !['added', 'removed'].includes(notice.said) ? null : (
           <SaidLine kind={notice.said === 'removed' ? 'removed' : 'saved'}>
             <p>
               {t(
@@ -155,6 +170,54 @@ export async function StandingsAreaPage({
               hidden={hidden({ adjustment: a.id })}
             />
           ))
+        )}
+      </section>
+      <section id={coinFlipsAnchor} className="staff-panel" aria-labelledby="coin-flips-title">
+        <h2 id="coin-flips-title">{t('adminStandings.flip.title')}</h2>
+        {notice === undefined ||
+        notice.thing !== seasonId ||
+        !['flip-saved', 'flip-removed'].includes(notice.said) ? null : (
+          <SaidLine kind={notice.said === 'flip-removed' ? 'removed' : 'saved'}>
+            <p>
+              {t(
+                notice.said === 'flip-removed'
+                  ? 'adminStandings.flip.said.removed'
+                  : 'adminStandings.flip.said.saved',
+                { what: notice.name ?? '' },
+              )}
+            </p>
+          </SaidLine>
+        )}
+        <p className="staff-quiet">{t('adminStandings.flip.intro')}</p>
+        {levelSets.length === 0 ? (
+          <p className="staff-quiet">{t('adminStandings.flip.none')}</p>
+        ) : (
+          levelSets.map((set) => (
+            <LevelSetPart
+              key={set.teamIds.join('-')}
+              set={set}
+              nameOf={nameOf}
+              permalink={`${page}#${levelSetAnchor(set.teamIds)}`}
+              hidden={(more) => hidden({ teams: set.teamIds.join(','), ...more })}
+            />
+          ))
+        )}
+        {unusedFlips.length === 0 ? null : (
+          <>
+            <h3>{t('adminStandings.flip.unused')}</h3>
+            <p className="staff-quiet">{t('adminStandings.flip.unusedHelp')}</p>
+            {unusedFlips.map((flip) => (
+              <div key={flip.id} className="admin-adjustment" data-unused-flip={flip.id}>
+                <FlipLine flip={flip} names={names(flip.teamIds)} />
+                <RemoveFlip
+                  flip={flip}
+                  names={names(flip.teamIds)}
+                  permalink={`${page}#${coinFlipsAnchor}`}
+                  hidden={hidden({ teams: flip.teamIds.join(','), flip: flip.id })}
+                />
+              </div>
+            ))}
+          </>
         )}
       </section>
       <section
@@ -267,6 +330,142 @@ export async function StandingsAreaPage({
         )}
       </section>
     </main>
+  );
+}
+
+type Hidden = Readonly<Record<string, string>>;
+
+/** How the flip was made and when, and its note. */
+function FlipLine({ flip, names }: { readonly flip: SeasonCoinFlip; readonly names: string }) {
+  const date = flip.recordedAt.slice(0, 10);
+  return (
+    <>
+      <h3 dir="auto">{names}</h3>
+      <p data-flip-made={flip.method}>
+        {t(flip.method === 'drawn' ? 'adminStandings.flip.drawn' : 'adminStandings.flip.byHand', {
+          date,
+        })}
+      </p>
+      {flip.note === null ? null : <p dir="auto">{flip.note}</p>}
+    </>
+  );
+}
+
+function RemoveFlip({
+  flip,
+  names,
+  permalink,
+  hidden,
+}: {
+  readonly flip: SeasonCoinFlip;
+  readonly names: string;
+  readonly permalink: string;
+  readonly hidden: Hidden;
+}) {
+  return (
+    <div data-kind="danger" data-remove-flip={flip.id}>
+      <ListForm
+        name="remove-coin-flip"
+        label={t('adminStandings.flip.remove.label', { teams: names })}
+        action={removeCoinFlipAction}
+        permalink={permalink}
+        hidden={hidden}
+        fields={[
+          reasonField(
+            'reason',
+            t('adminStandings.field.removeReasonHelp'),
+            t('adminStandings.field.removeReason'),
+          ),
+        ]}
+        confirm={t('adminStandings.flip.remove.confirm')}
+        button={t('adminStandings.flip.remove.submit')}
+        kind="danger"
+      />
+    </div>
+  );
+}
+
+/** One set of teams level after every tiebreaker: its order, and the forms to set it. */
+function LevelSetPart({
+  set,
+  nameOf,
+  permalink,
+  hidden,
+}: {
+  readonly set: LevelSet;
+  readonly nameOf: (teamId: string) => string;
+  readonly permalink: string;
+  readonly hidden: (more?: Hidden) => Hidden;
+}) {
+  const order = set.flip?.teamIds ?? set.teamIds;
+  const names = order.map(nameOf).join(', ');
+  const options = set.teamIds.map((id) => ({ value: id, label: nameOf(id) }));
+  const note: ListField = {
+    kind: 'text',
+    name: 'note',
+    label: t('adminStandings.flip.note'),
+    value: '',
+    required: false,
+    maxLength: 500,
+    help: t('adminStandings.flip.noteHelp'),
+  };
+  return (
+    <div
+      id={levelSetAnchor(set.teamIds)}
+      className="admin-adjustment"
+      data-level-set={set.teamIds.map(nameOf).join(',')}
+      data-flipped={set.flip === null ? 'no' : 'yes'}
+    >
+      {set.flip === null ? (
+        <>
+          <h3 dir="auto">{names}</h3>
+          <p>{t('adminStandings.flip.level')}</p>
+        </>
+      ) : (
+        <FlipLine flip={set.flip} names={names} />
+      )}
+      <div data-flip-form="by-hand">
+        <ListForm
+          name="record-coin-flip"
+          label={t('adminStandings.flip.record', { teams: names })}
+          action={recordCoinFlipAction}
+          permalink={permalink}
+          hidden={hidden({ method: 'by-hand' })}
+          fields={[
+            ...order.map(
+              (teamId, i): ListField => ({
+                kind: 'select',
+                name: `place${i + 1}`,
+                label: t('adminStandings.flip.place', { place: String(i + 1) }),
+                value: teamId,
+                options,
+              }),
+            ),
+            note,
+          ]}
+          button={t('adminStandings.flip.submit')}
+        />
+      </div>
+      <div data-flip-form="drawn">
+        <ListForm
+          name="draw-coin-flip"
+          label={t('adminStandings.flip.drawLabel', { teams: names })}
+          action={recordCoinFlipAction}
+          permalink={permalink}
+          hidden={hidden({ method: 'drawn' })}
+          fields={[{ ...note, help: t('adminStandings.flip.drawHelp') }]}
+          button={t('adminStandings.flip.drawSubmit')}
+        />
+      </div>
+      {set.flip === null ? null : (
+        <RemoveFlip
+          flip={set.flip}
+          names={names}
+          permalink={permalink}
+          hidden={hidden({ flip: set.flip.id })}
+        />
+      )}
+    </div>
   );
 }
 

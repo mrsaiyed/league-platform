@@ -24,6 +24,31 @@ export const enAdminStandings = {
   'adminStandings.field.winner': 'Awarded to',
   'adminStandings.field.wins': 'Wins',
   'adminStandings.field.winsHelp': 'A whole number. Put a minus sign in front to take away.',
+  'adminStandings.flip.byHand': 'Ordered by a coin flip recorded on {date}.',
+  'adminStandings.flip.drawHelp':
+    'We pick the order at random, fairly, and say so under the table.',
+  'adminStandings.flip.drawLabel': 'Flip a coin for {teams}',
+  'adminStandings.flip.drawSubmit': 'Flip for us',
+  'adminStandings.flip.drawn': 'Ordered by a coin flip we made for you on {date}.',
+  'adminStandings.flip.intro':
+    'These teams are level after every tiebreaker, so they share a place. Flip a coin at the table and record who goes first, or let us flip for you. You can change it or take it off.',
+  'adminStandings.flip.level': 'Level now: they share a place until a coin flip is recorded.',
+  'adminStandings.flip.none': 'No teams are level after every tiebreaker this season.',
+  'adminStandings.flip.note': 'Note (optional)',
+  'adminStandings.flip.noteHelp': 'Who flipped, or anything worth keeping with it.',
+  'adminStandings.flip.place': 'Place {place}',
+  'adminStandings.flip.record': 'Record the order of {teams}',
+  'adminStandings.flip.remove.confirm': 'Yes, take this coin flip off',
+  'adminStandings.flip.remove.label': 'Take off the coin flip for {teams}',
+  'adminStandings.flip.remove.submit': 'Take the coin flip off',
+  'adminStandings.flip.said.removed':
+    'Taken off: the coin flip for {what}. The table is worked out again.',
+  'adminStandings.flip.said.saved': 'Saved: a coin flip for {what}. The table is worked out again.',
+  'adminStandings.flip.submit': 'Save this order',
+  'adminStandings.flip.title': 'Teams level after every tiebreaker',
+  'adminStandings.flip.unused': 'Coin flips no longer in use',
+  'adminStandings.flip.unusedHelp':
+    'Results have changed since: the teams each flip names are no longer level as that set, so it orders nobody now, and taking it off changes nothing in the public table.',
   'adminStandings.gamePlayed': '+1 game played',
   'adminStandings.intro':
     'The table is worked out from the results. An adjustment changes a team’s line with a reason, which the public table shows as a footnote.',
@@ -45,6 +70,7 @@ export const enAdminStandings = {
     'That would take a team’s count below zero, or change nothing the table shows. Nothing was saved.',
   'adminStandings.problem.adjustment-not-found':
     'That adjustment has already been taken off. The list has been brought up to date.',
+  'adminStandings.problem.flip-not-found': 'That coin flip has already been taken off.',
   'adminStandings.problem.game-already-overturned':
     'That result has already been overturned. Nothing more was saved.',
   'adminStandings.problem.game-has-no-winner': 'That game has no winner to overturn.',
@@ -57,12 +83,15 @@ export const enAdminStandings = {
     'Type at least one change: wins, losses, ties or points.',
   'adminStandings.problem.number-too-big':
     'That is too big a change. Wins, losses and ties go from -{count} to {count}, points from -{points} to {points}.',
+  'adminStandings.problem.place-twice': 'Put each team in one place only.',
   'adminStandings.problem.reason-missing': 'Say why, in a few words. It is kept with the change.',
   'adminStandings.problem.reason-too-long': 'Keep the reason to 500 letters or fewer.',
   'adminStandings.problem.same-team': 'Choose two different teams.',
   'adminStandings.problem.season-not-found':
     'That season is no longer there. Open Standings and stats again.',
   'adminStandings.problem.team-not-found': 'Choose one of this season’s teams.',
+  'adminStandings.problem.teams-not-level':
+    'These teams are no longer level after every tiebreaker. Look at the list again.',
   'adminStandings.problem.unknown': 'That could not be done just now. Try again.',
   'adminStandings.publicLink': 'See the public table',
   'adminStandings.remove.confirm': 'Yes, take this adjustment off',
