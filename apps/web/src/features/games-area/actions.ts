@@ -24,6 +24,7 @@
 // asks again. A forfeit, a postponement and a cancellation take the same two steps (step
 // 2.158, callOffAction); a cancelled game is put back in one, with a reason chosen.
 import { gameAnchor, leagueUrl, type CommandContext } from '@srleagues/core';
+import { newDateAnchor } from './waiting-anchor.ts';
 import { refresh } from 'next/cache';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -34,7 +35,7 @@ import { t } from '../../server/messages.ts';
 import { questionKeyOf, questionTimesHere } from '../../server/question-times.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere, type NoticeScreen } from '../../server/saved-notice.ts';
-import { callOffStep, choiceOf } from './call-off-step.ts';
+import { callOffStep, choiceOf, newDateNow } from './call-off-step.ts';
 import {
   sheetScoresId,
   typedOf,
@@ -215,9 +216,14 @@ async function act(
             ? 'putBackPostponed'
             : 'putBack';
     leaveNotice(context, 'games', gameId, said, result.putBack?.clashes);
+    // Postponed with its new date given at once (S-49): to its "Give it a new date".
+    const place =
+      action === 'postpone' && fields['newDate'] === newDateNow
+        ? newDateAnchor(gameId)
+        : gameAnchor(gameId);
     // Sent from another screen (a game's own page): to the list, where "Saved" is.
-    if (fields['then'] === 'games') return redirect(`${list}#${gameAnchor(gameId)}`);
-    await showSaved(`${list}#${gameAnchor(gameId)}`);
+    if (fields['then'] === 'games') return redirect(`${list}#${place}`);
+    await showSaved(`${list}#${place}`);
     return untouched;
   }
   if (result.ok) return redirect(list);

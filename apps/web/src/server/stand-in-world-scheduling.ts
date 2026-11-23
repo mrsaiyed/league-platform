@@ -186,6 +186,10 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
               courtId: courtNamed(slot.venueId, slot.court)?.id ?? null,
             }),
         ...(change.captureMode === undefined ? {} : { captureMode: change.captureMode }),
+        // A postponed game given a new slot is scheduled again (T-326), as the database does.
+        ...(change.status !== undefined && game.status === 'postponed'
+          ? { status: change.status }
+          : {}),
         version: game.version + 1,
       });
       return true;

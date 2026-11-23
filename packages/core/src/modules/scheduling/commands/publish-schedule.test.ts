@@ -105,6 +105,26 @@ describe('publishing the schedule', () => {
     expect(db.state.inserted.map((g) => g.id)).toEqual([gameUuid(7), gameUuid(8)]);
   });
 
+  it('schedules a postponed game again on the new slot the draft gave it (T-326)', async () => {
+    const { db, deps, as } = world([{ kind: 'move-game', gameId: gameUuid(1), to: slot }], {
+      schedule: {
+        rounds: [
+          { id: roundUuid(1), number: 1, label: 'Week 1', date: '2026-10-04' },
+          { id: roundUuid(2), number: 2, label: 'Week 2', date: '2026-10-11' },
+        ],
+        games: [game(1, { status: 'postponed' })],
+      },
+    });
+    const result = await publishSchedule(as(ownerId), input, deps);
+    expect(result.ok).toBe(true);
+    expect(db.state.updated).toEqual([
+      {
+        gameId: gameUuid(1),
+        change: { slot: expect.objectContaining({ date: '2026-10-11' }), status: 'scheduled' },
+      },
+    ]);
+  });
+
   it('creates, moves and bins games, edits rounds and writes revision 2', async () => {
     const { db, deps, as } = world(fullDraft, {
       seasonRules: undefined,

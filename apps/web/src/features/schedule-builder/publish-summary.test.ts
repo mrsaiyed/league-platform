@@ -96,7 +96,7 @@ describe('publishWarnings (S-53, S-62)', () => {
       teams,
     );
     expect(said).toEqual([
-      'Owls are booked twice on Sun, Nov 29 at 6:00 PM.',
+      'Owls: booked twice on Sun, Nov 29 at 6:00 PM.',
       'Main Gym, Court 1 is booked twice on Sun, Nov 29 at 6:00 PM.',
       '1 game is outside its round: Owls at Bears, Sun, Jan 31.',
     ]);

@@ -64,6 +64,35 @@ describe('applyDraftChange (P7 §4.3)', () => {
     expect(moved.clashes).toEqual([{ kind: 'skipped-date', gameId: 'g1', date: '2026-10-12' }]);
   });
 
+  it('makes a postponed game given a new slot a game to be played, clashes and all (T-326)', () => {
+    const s = baseState();
+    const waiting: ScheduleState = {
+      ...s,
+      games: s.games.map((g) => (g.id === 'g1' ? { ...g, status: 'postponed' as const } : g)),
+    };
+    const g2 = s.games.find((g) => g.id === 'g2');
+    if (g2 === undefined) throw new Error('no g2');
+    const moved = ok(
+      applyDraftChange(
+        waiting,
+        {
+          kind: 'move-game',
+          gameId: 'g1',
+          to: {
+            roundId: g2.roundId,
+            date: g2.date,
+            time: g2.time,
+            venueId: g2.venueId,
+            court: g2.court,
+          },
+        },
+        [],
+      ),
+    );
+    expect(moved.state.games.find((g) => g.id === 'g1')?.status).toBe('scheduled');
+    expect(moved.clashes.length).toBeGreaterThan(0);
+  });
+
   it('refuses to move an unknown game', () => {
     const r = applyDraftChange(
       baseState(),

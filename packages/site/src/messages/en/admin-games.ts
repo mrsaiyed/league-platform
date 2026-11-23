@@ -94,8 +94,10 @@ export const enAdminGames = {
   'admin.games.callOff.restore': 'Put it back',
   'admin.games.callOff.yes.cancel': 'Yes, cancel it',
   'admin.games.callOff.yes.forfeit': 'Yes, record the forfeit',
-  'admin.games.callOff.yes.postpone': 'Yes, postpone it',
+  'admin.games.callOff.yes.postpone': 'Yes, postpone it, decide the new date later',
   'admin.games.callOff.yes.restore': 'Yes, put it back on its date',
+  // Postponing offers the new date at once (S-49): to the game's "Give it a new date".
+  'admin.games.callOff.yesNewDate.postpone': 'Yes, postpone it and give it a new date now',
   'admin.games.cancel': 'Cancel the game',
   'admin.games.confirm.ask': '{result}. Make this final?',
   'admin.games.confirm.early': '{result}. This game is set for {when}. Make it final now?',
@@ -270,6 +272,7 @@ export const enAdminGames = {
   'admin.games.toEarlier': 'Earlier games',
   'admin.games.toLater': 'Later games',
   'admin.games.toScorekeepers': 'Scorekeepers',
+  'admin.games.toWaiting': 'Waiting for a new date',
   'admin.games.today': 'Today, {time}',
   'admin.games.todayEmpty': 'No more games today.',
   'admin.games.todayTitle': 'Today',
@@ -277,12 +280,12 @@ export const enAdminGames = {
   // A game the live tracker has recorded plays of is ended there (S-46).
   'admin.games.tracked':
     'Plays are being recorded for this game in the tracker, so it is ended there, not by typing a score.',
-  // Postponed games, each until it is given a new date (P7 §4 "Also", step 2.158). Giving
-  // the new date from the list is step 2.53's; until then the note promises nothing.
+  // Postponed games, each until it is given a new date (P7 §4 "Also", step 2.158); each
+  // is given one here (step 2.53).
   'admin.games.waiting.empty': 'No game is waiting for a new date.',
   'admin.games.waiting.link': 'See the games waiting for a new date',
   'admin.games.waiting.note':
-    'Postponed games, oldest first. Each waits here until it is given a new date.',
+    'Postponed games, oldest first. Give each a new date here; it waits here until the schedule with its new date is published.',
   'admin.games.waiting.title': 'Waiting for a new date',
   'admin.games.weekEmpty': 'No more games in the next six days.',
   'admin.games.weekTitle': 'This week',

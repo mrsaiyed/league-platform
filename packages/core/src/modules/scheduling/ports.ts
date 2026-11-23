@@ -114,6 +114,8 @@ export type NewPublishedGame = {
 export type PublishedGameChange = {
   readonly slot?: Pick<NewPublishedGame, 'roundId' | 'date' | 'time' | 'venueId' | 'court'>;
   readonly captureMode?: NewPublishedGame['captureMode'];
+  /** A postponed game the publication gives a new slot is scheduled again (T-326). */
+  readonly status?: 'scheduled';
 };
 
 /** A round a publication creates (step 2.160), with the number the draft gave it. */

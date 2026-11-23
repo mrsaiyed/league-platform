@@ -23,7 +23,6 @@ import {
   seasonSettingsAddress,
   visibilityAnchor,
 } from '../season-settings/index.ts';
-import { waitingListAnchor } from '../games-area/index.ts';
 import { StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { venuesAddress } from '../venues-area/index.ts';
@@ -41,6 +40,8 @@ import {
   swapGamesAction,
 } from './actions.ts';
 import { backToTeamOf, backToTeamParam, removeTeamPanelAnchor } from './back-to-team.ts';
+import { PlaceSelect } from './place-select.tsx';
+import { waitingListAnchor } from './waiting-anchor.ts';
 import {
   clockText,
   dayText,
@@ -133,6 +134,7 @@ export async function ScheduleBuilderPage({
   // spreadsheet. "Review and publish" sits beside "Draft in progress", in the bar that stays
   // in view, and the box is at the top of the grid (step 2.53).
   const binLink = await binLinkFor(addressee, context, 'games');
+  const waitingHref = `${leagueUrl(addressee, 'admin-area', { area: 'games' })}#${waitingListAnchor}`;
   const headActions = () => (
     <div className="staff-actions">
       <a className="ui-button" href={importLinkOf(addressee)}>
@@ -140,6 +142,10 @@ export async function ScheduleBuilderPage({
       </a>
       <a className="ui-button" href={venuesAddress(addressee)}>
         {t('schedule.admin.venuesLink')}
+      </a>
+      {/* The postponed games, to give each a new date (step 2.53, S-49). */}
+      <a className="ui-button" href={waitingHref} data-to-waiting="">
+        {t('schedule.admin.toWaitingHead')}
       </a>
       {binLink === undefined ? null : (
         <a className="ui-button" href={binLink}>
@@ -250,7 +256,7 @@ export async function ScheduleBuilderPage({
     version: draft.draft?.version ?? null,
     draftId: draft.draft?.id ?? null,
     fromTeam: fromTeam?.id ?? null,
-    waitingHref: `${leagueUrl(addressee, 'admin-area', { area: 'games' })}#${waitingListAnchor}`,
+    waitingHref,
     gameHref: (gameId) => leagueUrl(addressee, 'admin-area', { area: 'games', subpath: [gameId] }),
   };
   const preview =
@@ -492,30 +498,6 @@ function Field({ label, children }: { readonly label: string; readonly children:
       <span>{label}</span>
       {children}
     </label>
-  );
-}
-
-function PlaceSelect({
-  venues,
-  value,
-}: {
-  readonly venues: readonly VenueWithCourts[];
-  readonly value: string;
-}) {
-  return (
-    <select name="place" defaultValue={value}>
-      <option value="">{t('schedule.admin.noPlaceOption')}</option>
-      {venues.flatMap((v) => [
-        <option key={v.id} value={`${v.id}|`}>
-          {t('schedule.admin.venueOnly', { venue: v.name })}
-        </option>,
-        ...v.courts.map((c) => (
-          <option key={c.id} value={`${v.id}|${c.name}`}>
-            {t('schedule.admin.venueCourt', { venue: v.name, court: c.name })}
-          </option>
-        )),
-      ])}
-    </select>
   );
 }
 

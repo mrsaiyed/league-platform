@@ -113,7 +113,7 @@ if (built) {
     const askText = (await ask.count()) === 1 ? await ask.innerText() : '';
     note(
       'the question names the clash and asks "Publish anyway?"',
-      askText.includes(`${a} are booked twice on`) &&
+      askText.includes(`${a}: booked twice on`) &&
         askText.includes('at 7:00 AM') &&
         askText.includes('Publish anyway?'),
       askText,

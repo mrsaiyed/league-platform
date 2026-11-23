@@ -59,7 +59,8 @@ import { readReopenViews } from './read-reopen-views.ts';
 import { ReopenLine } from './reopen-line.tsx';
 import { SavedLine, type SavedKind } from './saved-line.tsx';
 import { shownTeamNames } from './shown-team-names.ts';
-import { waitingListAnchor as waitingAnchor } from './waiting-anchor.ts';
+import { newDateAnchor, waitingListAnchor as waitingAnchor } from './waiting-anchor.ts';
+import { NewDateForm, readNewDates, type NewDates } from '../schedule-builder/index.ts';
 
 /** What the words of a saved notice read of the game it names. */
 type NamedGame = Pick<
@@ -422,23 +423,31 @@ function Part({
 /**
  * "Waiting for a new date" (step 2.158): every postponed game, soonest first, as its card
  * (the Postponed pill and the date it was to be played). Cancelling it is offered on its
- * card where it is listed by its day or its earlier round; giving it a new date from here
- * is step 2.53's; until then the part's note promises nothing.
+ * card where it is listed by its day or its earlier round; "Give it a new date" is here,
+ * for whoever may edit its season's schedule (step 2.53, S-49), at the place postponing
+ * leads to when the new date is given at once.
  */
 function WaitingList({
   games,
   scene,
   names,
+  newDates,
 }: {
   readonly games: readonly PostponedGame[];
   readonly scene: ListScene;
   readonly names: GameNames;
+  readonly newDates: NewDates;
 }) {
   if (games.length === 0) return <EmptyPanel text={t('admin.games.waiting.empty')} />;
   return (
     <ul className="admin-game-list ui-list" data-waiting-list="">
       {games.map((game) => (
-        <li key={game.id} className="admin-game" data-waiting-game={game.id}>
+        <li
+          key={game.id}
+          id={newDateAnchor(game.id)}
+          className="admin-game"
+          data-waiting-game={game.id}
+        >
           <div className="admin-game-panel">
             <GameCard
               marks="emblem"
@@ -448,6 +457,12 @@ function WaitingList({
               whenText={gameWhenText(game.startsAt, scene.times)}
               labels={scene.labels}
             />
+            {(() => {
+              const newDate = newDates.get(game.id);
+              return newDate === undefined ? null : (
+                <NewDateForm gameId={game.id} newDate={newDate} />
+              );
+            })()}
           </div>
         </li>
       ))}
@@ -488,6 +503,12 @@ export async function GamesPage({
   // Every postponed game, until it gets a new date (P7 §4 "Also", step 2.158): for whoever
   // may read the schedule (the command's own rule); for anyone else the part is not drawn.
   const postponed = await listPostponedGames(context, {}, ports.games.deps);
+  const newDates = await readNewDates(
+    league,
+    addressee,
+    context,
+    postponed.ok ? postponed.value : [],
+  );
   // Every scheduled game after this week (step 2.56), by team or all, when asked for: a
   // team is asked for only when it has later games, else nothing is shown.
   const laterAll = await listLaterGames(context, {}, ports.games.deps);
@@ -577,6 +598,11 @@ export async function GamesPage({
         <a className="ui-more" href={`${list}#later`} data-to-later="">
           {t('admin.games.toLater')}
         </a>
+        {postponed.ok ? (
+          <a className="ui-more" href={`${list}#${waitingAnchor}`} data-to-waiting="">
+            {t('admin.games.toWaiting')}
+          </a>
+        ) : null}
         {/* Who scores which game (step 2.56): for those who manage games somewhere. */}
         {holder !== undefined &&
         (holder.isOwner || holder.grants.some((g) => roleHasPermission(g.role, 'games.manage'))) ? (
@@ -632,7 +658,12 @@ export async function GamesPage({
           {postponed.ok ? (
             <div id={waitingAnchor}>
               <Section title={t('admin.games.waiting.title')} note={t('admin.games.waiting.note')}>
-                <WaitingList games={postponed.value} scene={scene} names={names} />
+                <WaitingList
+                  games={postponed.value}
+                  scene={scene}
+                  names={names}
+                  newDates={newDates}
+                />
               </Section>
             </div>
           ) : null}

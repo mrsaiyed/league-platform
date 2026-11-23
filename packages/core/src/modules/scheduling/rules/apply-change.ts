@@ -109,7 +109,17 @@ export function applyDraftChange(
       }
       const bad = badSlot(to);
       if (bad) return bad;
-      const games = state.games.map((g) => (g.id === change.gameId ? { ...g, ...slotOf(to) } : g));
+      // A postponed game given a new slot is a game to be played again (P7 §4 "Also", S-49,
+      // T-326): it holds its place from here, so the clash rules see it as any other game.
+      const games = state.games.map((g) =>
+        g.id === change.gameId
+          ? {
+              ...g,
+              ...slotOf(to),
+              ...(g.status === 'postponed' ? { status: 'scheduled' as const } : {}),
+            }
+          : g,
+      );
       return done({ ...state, games }, [change.gameId]);
     }
     case 'swap-games': {

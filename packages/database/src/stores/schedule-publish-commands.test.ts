@@ -461,6 +461,41 @@ describe('publishing against the database', () => {
     expect(stages.rows).toEqual([{ type: 'regular', name: 'Regular season' }]);
   });
 
+  it('schedules a postponed game again on its new slot, and leaves a cancelled one called off (T-326)', async () => {
+    const s = await season();
+    const postponed = await s.game(s.teams.a, s.teams.b, {
+      starts_at: '2026-12-07T00:30:00Z',
+      status: 'postponed',
+    });
+    const moved = await moveDraftGame(
+      s.as,
+      {
+        ...basis(s),
+        gameId: postponed,
+        roundId: s.round2,
+        date: '2026-12-13',
+        time: '19:00',
+        venueId: s.venueId,
+        court: 'Court B',
+      },
+      deps,
+    );
+    expect(moved.ok).toBe(true);
+    const draft = await draftState(s);
+    const before = await gameRow(postponed);
+    expect(
+      await publishSchedule(
+        s.as,
+        { seasonId: s.seasonId, basedOnRevision: 1, draftId: draft.id, version: draft.version },
+        deps,
+      ),
+    ).toMatchObject({ ok: true });
+    const row = await gameRow(postponed);
+    expect(row.status).toBe('scheduled');
+    expect(row.court_name).toBe('Court B');
+    expect(row.version).toBeGreaterThan(before.version);
+  });
+
   it('never moves, removes or re-records a live or decided game', async () => {
     const s = await season();
     const final = await s.game(s.teams.a, s.teams.b, {

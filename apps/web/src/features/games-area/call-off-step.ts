@@ -61,3 +61,6 @@ export function callOffStep(
   const askedAt = yes ? (known ?? now) : now;
   return { kind: 'ask', act, askedAt, readyInMs: Math.max(0, askRestMs - (now - askedAt)) };
 }
+
+/** Postponing's second "Yes" sends this as `newDate` (S-49): postponed, then to its new date. */
+export const newDateNow = 'now';

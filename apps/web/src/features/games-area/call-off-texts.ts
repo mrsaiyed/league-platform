@@ -83,6 +83,7 @@ export function callOffTexts(
             postpone: {
               button: t('admin.games.postpone'),
               yes: t('admin.games.callOff.yes.postpone'),
+              yesNewDate: t('admin.games.callOff.yesNewDate.postpone'),
               no: t('admin.games.callOff.no.postpone'),
               ask: t(
                 lineups
