@@ -9,11 +9,16 @@ import {
   noOffers,
   offerWhich,
   pageScoringOffers,
+  scoringOfferReply,
   type OfferWords,
   type PageOffers,
   type ScoringOffer,
+  type ScoringOfferReply,
   type SharedScoringOffers,
 } from './scoring-offers.ts';
+
+/** "Correct this result" and where it leads, as the private read gave it. */
+export type Pencil = NonNullable<ScoringOfferReply['pencil']>;
 
 /** A game a button can be offered on: one still to be played or being played. */
 export const mayBeOffered = (status: string): boolean =>
@@ -82,6 +87,65 @@ export function GameOffer({
   return (
     <p className="ui-page-sub" data-game-offer="">
       <OfferButton offer={offer} words={known.words} />
+    </p>
+  );
+}
+
+/** A game the pencil can be offered on: one decided. */
+export const mayBeCorrected = (status: string): boolean =>
+  status === 'final' || status === 'forfeit';
+
+/** The pencil's one private read: "Correct this result" for this game, or nothing. */
+export async function readPencil(address: string, gameId: string): Promise<Pencil | null> {
+  const query = new URLSearchParams({ correct: gameId });
+  const response = await fetch(`${address}?${query.toString()}`, {
+    credentials: 'same-origin',
+    cache: 'no-store',
+    headers: { accept: 'application/json' },
+  }).catch(() => null);
+  if (response === null || !response.ok) return null;
+  const parsed = scoringOfferReply.safeParse(await response.json().catch(() => null));
+  const pencil = parsed.success ? parsed.data.pencil : undefined;
+  return pencil !== undefined && pencil.gameId === gameId ? pencil : null;
+}
+
+/**
+ * The public pencil (step 2.56, H5; P4 §1): on a decided game's page, "Correct this result"
+ * for the signed-in person who may reopen it, leading to its reopen form in Games, as the
+ * games list offers it (step 2.154). Drawn on this device only after the page has arrived,
+ * from the private read, so the page itself is the same for everyone; nothing until then,
+ * and nothing with scripts off.
+ */
+export function GameCorrection({
+  address,
+  gameId,
+  status,
+  read = readPencil,
+}: {
+  readonly address: string;
+  readonly gameId: string;
+  readonly status: string;
+  readonly read?: (address: string, gameId: string) => Promise<Pencil | null>;
+}) {
+  const decided = mayBeCorrected(status);
+  const [pencil, setPencil] = useState<Pencil | null>(null);
+  useEffect(() => {
+    setPencil(null);
+    if (!decided) return undefined;
+    let live = true;
+    void read(address, gameId).then((found) => {
+      if (live) setPencil(found);
+    });
+    return () => {
+      live = false;
+    };
+  }, [address, gameId, decided, read]);
+  if (!decided || pencil === null) return null;
+  return (
+    <p className="ui-page-sub" data-game-pencil="">
+      <a className="ui-button" href={pencil.href}>
+        {pencil.label}
+      </a>
     </p>
   );
 }

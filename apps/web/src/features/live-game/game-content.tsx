@@ -17,7 +17,7 @@ import {
   type PlayPeriodView,
 } from './build-game.ts';
 import { webLiveAddress } from '../live-updates/index.ts';
-import { GameOffer, scoringAddressOf } from '../schedule-pages/index.ts';
+import { GameCorrection, GameOffer, scoringAddressOf } from '../schedule-pages/index.ts';
 import { LiveGameView } from './live-game-view.tsx';
 import { GameNumbersDrawn } from './game-numbers-drawn.tsx';
 import { gameNumbersView } from './game-numbers-view.ts';
@@ -102,6 +102,13 @@ export function GameContent({ view }: { readonly view: GameView }) {
         {/* "Score this game" or "Enter the score", drawn on the device of a signed-in person
             who may, after the page; the page itself is the same for everyone (step 2.153). */}
         <GameOffer
+          address={scoringAddressOf(view.leagueId)}
+          gameId={view.snapshot.gameId}
+          status={view.status}
+        />
+        {/* The public pencil (step 2.56, H5): "Correct this result" on a decided game, for
+            whoever may reopen it, drawn the same way, after the page. */}
+        <GameCorrection
           address={scoringAddressOf(view.leagueId)}
           gameId={view.snapshot.gameId}
           status={view.status}

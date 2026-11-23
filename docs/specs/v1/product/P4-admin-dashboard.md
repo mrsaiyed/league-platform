@@ -11,7 +11,7 @@ The admin lives at `oursite.com/{league}/admin`. This file describes every area 
 - The **dashboard** is lists and tools: registrations, people, teams, the schedule builder, games, settings. It is designed fresh. The founder does not like Faraj's current admin screens, so the dashboard does not copy them.
 - **Edit site** shows the public site itself with an edit handle on every section. You change the thing where you see it ([P5](P5-site-customization.md)). Faraj's current admin edits in place like this, and the founder wants that kept.
 
-There is also a shortcut between them. When a signed-in admin browses the public site, a small pencil appears on things they are allowed to change (a score, a team name, a news post). Clicking it opens the right editor. It is faster than hunting through menus.
+There is also a shortcut between them. When a signed-in admin browses the public site, a small pencil appears on things they are allowed to change (a score, a team name, a news post). Clicking it opens the right editor. It is faster than hunting through menus. The first pencil built (step 2.56) is on a decided game's public page: "Correct this result", for whoever may reopen that game, leading to the same correction as the Games list. It is drawn on the person's own device after the page has arrived, from a private read, so the page anyone is served never carries it.
 
 **A-2 (agreed): everything works on a phone.** Organizers run leagues from the gym. Game-day tasks (entering a score, moving a game, messaging teams) are designed for a phone first. The schedule builder and site editor are more comfortable on a laptop but must be usable on a phone.
 
