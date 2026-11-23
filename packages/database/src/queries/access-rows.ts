@@ -28,6 +28,7 @@ export const invitationColumns = [
   'scope_id',
   'invited_by_account_id',
   'expires_at',
+  'accepted_by_account_id',
 ] as const;
 
 /** An invitation's state by the database's own clock, so no caller's clock decides expiry. */
@@ -88,6 +89,7 @@ type InvitationRow = {
   scope_id: string | null;
   invited_by_account_id: string | null;
   expires_at: Date;
+  accepted_by_account_id: string | null;
   status: string;
 };
 
@@ -100,6 +102,7 @@ export function invitationFromRow(row: InvitationRow): Invitation {
     status: statusOf(row.status),
     invitedByAccountId: row.invited_by_account_id,
     expiresAt: row.expires_at.toISOString(),
+    acceptedByAccountId: row.accepted_by_account_id,
   };
 }
 

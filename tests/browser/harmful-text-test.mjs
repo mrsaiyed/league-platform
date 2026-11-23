@@ -143,6 +143,8 @@ const FIELDS = {
     'stat.fg1.{id}': 'a box score is typed',
     'stat.fouls.{id}': 'a box score is typed',
   },
+  // League settings → Admins (step 2.97): the address an invitation is sent to.
+  '/[league]/admin/settings/admins': { email: 'the email boxes' },
   '/signin': { email: 'the email boxes' },
   '/signup': { email: 'the email boxes' },
   '/signin/forgot': { email: 'the email boxes' },
@@ -424,7 +426,9 @@ if (browser) {
   // Step 2.168: the made-up coach (Amal Nasser, the coach token's person) is put on the attack
   // team's roster too, so the coach's own "my teams" read (/my-team) answers with its name.
   await step("the coach is put on the attack team's roster", async () => {
-    await page.goto(origin + teamAdmin);
+    // The refused jersey number's page may still be finishing its own navigation (it aborted
+    // this one once on the lane of step 2.97): once more if so, as the next step does.
+    await page.goto(origin + teamAdmin).catch(() => page.goto(origin + teamAdmin));
     const form = page.locator('form', {
       has: page.getByRole('button', { name: 'Add to the roster', exact: true }),
     });
@@ -591,10 +595,14 @@ if (browser) {
   });
 
   await step('the email boxes refuse the attack as text', async () => {
-    // As a visitor: a signed-in person is told they are signed in there, with no email box
-    // (step 2.163, L10). This context is closed after this step.
-    await context.clearCookies();
-    for (const address of ['/signin', '/signup', '/signin/forgot']) {
+    // First the Admins page's invitation (step 2.97), as the owner whose page this is; then
+    // the three sign-in addresses as a visitor: a signed-in person is told they are signed in
+    // there, with no email box (step 2.163, L10). The cookies are cleared only between the
+    // two, and this context is closed after this step.
+    const asOwner = ['/north-valley/admin/settings/admins'];
+    const asVisitor = ['/signin', '/signup', '/signin/forgot'];
+    for (const address of [...asOwner, ...asVisitor]) {
+      if (address === asVisitor[0]) await context.clearCookies();
       await page.goto(origin + address);
       const form = page.locator('form', { has: page.locator('input[name=email]') }).first();
       await form.evaluate((element) => {
@@ -738,11 +746,14 @@ const ROUTES = {
   '/[league]/admin/season': () => '/north-valley/admin/season',
   '/[league]/admin/season/divisions': () => '/north-valley/admin/season/divisions',
   '/[league]/admin/settings': () => '/north-valley/admin/settings',
+  '/[league]/admin/settings/admins': () => '/north-valley/admin/settings/admins',
   '/[league]/admin/site': () => '/north-valley/admin/site',
   '/[league]/admin/standings': () => '/north-valley/admin/standings',
   '/[league]/admin/teams': () => '/north-valley/admin/teams',
   '/[league]/admin/teams/[team]': () => teamAdmin,
   '/[league]/games/[game]': () => `/north-valley/games/${liveGame}`,
+  // The invitation's accept page (step 2.97): no link held, so the one "does not work" page.
+  '/[league]/invitation': () => '/north-valley/invitation',
   '/[league]/my': () => '/north-valley/my',
   '/[league]/news': () => '/north-valley/news',
   // A news post's and a player's pages are still the site's placeholders (any address shows
@@ -782,6 +793,9 @@ const ANSWERS = {
   '/standalone.css': [null],
   // Its answer sends the browser on to Google: only its first answer is read, never followed.
   '/signin/google': [null],
+  // An invitation's link (step 2.97), with the attack as its token: it forwards to the
+  // accept page and draws nothing; only its first answer and our own forward are read.
+  '/[league]/invitation/[token]': [null, owner],
 };
 
 /** Decodes the few entities a server's HTML uses in attribute values. */
@@ -1093,7 +1107,11 @@ async function walkEveryRoute() {
   await step('every answer route holds the attack only as data', async () => {
     let carried = false;
     for (const { route, source } of answerRoutes) {
-      const address = `${route.replace('[leagueId]', leagueId).replace('[game]', liveGame)}${
+      const address = `${route
+        .replace('[leagueId]', leagueId)
+        .replace('[league]', 'north-valley')
+        .replace('[token]', encodeURIComponent(typed.query))
+        .replace('[game]', liveGame)}${
         route.endsWith('/staff-numbers')
           ? `?page=team&season=${encodeURIComponent(typed.query)}&team=${encodeURIComponent(typed.query)}`
           : ''

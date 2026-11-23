@@ -7,6 +7,7 @@
 //     signIn, signUp
 //   activity.ts: activity
 //   admin.ts: admin
+//   admin-access.ts: adminAccess, invitation
 //   admin-divisions.ts: adminDivisions
 //   admin-games.ts: admin.games, admin.boxScore, admin.myGames
 //   admin-import.ts: admin.import
@@ -28,6 +29,7 @@
 import { enAccount } from './en/account.ts';
 import { enActivity } from './en/activity.ts';
 import { enAdmin } from './en/admin.ts';
+import { enAdminAccess } from './en/admin-access.ts';
 import { enAdminDivisions } from './en/admin-divisions.ts';
 import { enAdminGames } from './en/admin-games.ts';
 import { enAdminImport } from './en/admin-import.ts';
@@ -49,6 +51,7 @@ export const en = {
   ...enAccount,
   ...enActivity,
   ...enAdmin,
+  ...enAdminAccess,
   ...enAdminDivisions,
   ...enAdminGames,
   ...enAdminImport,

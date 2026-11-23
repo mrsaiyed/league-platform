@@ -59,6 +59,23 @@ export async function SettingsPage({
   return (
     <main className="admin-settings">
       <PageHead title={t('admin.area.settings')} sub={t('adminSettings.intro')} />
+      {/* Who helps run the league (step 2.97): its own page, one row that leads to it. */}
+      <ul className="staff-rows settings-admins">
+        <li className="staff-row">
+          <span className="staff-row-words">
+            <a
+              className="staff-row-link"
+              href={leagueUrl(view.context.league, 'admin-area', {
+                area: 'settings',
+                subpath: ['admins'],
+              })}
+            >
+              {t('adminAccess.title')}
+            </a>
+            <span className="staff-row-facts">{t('adminAccess.fromSettings')}</span>
+          </span>
+        </li>
+      </ul>
       {problem === undefined ? null : (
         <p className="ui-notice" data-kind="error" role="alert">
           {t(problem)}

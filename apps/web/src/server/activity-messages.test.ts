@@ -11,6 +11,7 @@ const reads = new Set([
   'access.list_access',
   'access.list_activity',
   'access.my_access',
+  'access.read_invitation',
   'leagues.list_divisions',
   'leagues.list_bin',
   'people.get_person',
