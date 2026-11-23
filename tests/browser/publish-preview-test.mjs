@@ -138,7 +138,7 @@ if (built) {
       if ((await link.count()) === 0) continue;
       await page.goto(new URL((await link.first().getAttribute('href')) ?? '', origin).href);
       const text = await page.locator('main').innerText();
-      note(`the added game ${id} has its game number`, /Game \d+/.test(text), text.slice(0, 200));
+      note(`the added game ${id} has its game number`, /game \d+/i.test(text), text.slice(0, 200));
     }
   } catch (error) {
     failures.push(`${at}: ${whatWentWrong(error)}`);

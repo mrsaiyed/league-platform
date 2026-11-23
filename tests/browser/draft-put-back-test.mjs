@@ -404,12 +404,13 @@ if (built) {
       );
       const boxDiscard = publishBox.getByRole('button', { name: 'Discard the draft' });
       check(
-        'the publish box says the same in one calm sentence, its "Discard the draft" the same one tap',
+        // Step 2.53: the box is that one calm sentence alone; the one tap is in the bar above.
+        'the publish box says the same in one calm sentence, with nothing beside it',
         (await publishBox.innerText()).includes('so there is nothing to publish.') &&
           !(await publishBox.innerText()).includes('Publishing will add 0') &&
           (await publishBox.locator('[data-kind="error"]').count()) === 0 &&
           (await publishBox.getByRole('button', { name: 'Publish this schedule' }).count()) === 0 &&
-          (await boxDiscard.count()) === 1 &&
+          (await boxDiscard.count()) === 0 &&
           (await publishBox.locator('details.admin-discard').count()) === 0,
       );
       check(
