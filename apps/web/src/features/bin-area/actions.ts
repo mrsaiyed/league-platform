@@ -16,6 +16,8 @@ import {
   restoreVenue,
 } from '@srleagues/core';
 import { redirect } from 'next/navigation';
+import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
+import { gameBackSaid } from './bin-view.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -77,12 +79,25 @@ export async function bringBackAction(form: FormData): Promise<never> {
   if (result === undefined) return redirect(bin);
   if (result.done.ok) {
     // A game brought back is a schedule change (A-19): the page says its revision, the
-    // teams and people it reaches (A-7) and how many games now share its time.
+    // teams and people it reaches (A-7) and names the games now at its time. They are
+    // kept on the server for the next page, never in the address, so a crafted link
+    // cannot make the notice say a revision that was not made.
     const game = 'revision' in result.done.value ? result.done.value : undefined;
-    const said =
-      game === undefined || game.revision === null
-        ? ''
-        : `&revision=${game.revision}&teams=${game.teamCount}&people=${game.peopleCount}&clashes=${game.clashes.length}`;
+    const holder = noticeHolderOf(context);
+    if (game !== undefined && game.revision !== null && holder !== undefined) {
+      savedNoticesHere().leave(holder, {
+        screen: 'bin',
+        thing: id,
+        said: gameBackSaid({
+          revision: game.revision,
+          teams: game.teamCount,
+          people: game.peopleCount,
+        }),
+        name: game.seasonId,
+        ...(game.clashes.length === 0 ? {} : { about: game.clashes.map((c) => c.id) }),
+      });
+    }
+    const said = '';
     return redirect(`${bin}?back=${kind}&id=${id}${said}`);
   }
   const why = encodeURIComponent(`${result.name}.${result.done.error.code}`);

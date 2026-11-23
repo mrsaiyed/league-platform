@@ -227,6 +227,12 @@ if (built) {
       /revision \d+, reaching 2 teams and \d+ people/.test(gameBackText),
       gameBackText,
     );
+    // The notice says only what the restore left on the server: a crafted address shows none.
+    await page.goto(`${binAddress}?back=game&id=${gameId}&revision=99&teams=9&people=999`);
+    note(
+      'a crafted address cannot make the bin say a revision (A-19)',
+      (await page.locator('[data-bin-game-back]').count()) === 0,
+    );
 
     at = 'a second team of the same name while the first is in the bin';
     const larks = `Larks ${run}`;
@@ -240,7 +246,7 @@ if (built) {
     const refusedText = await binRow(page, larks).innerText();
     note(
       'bringing the first back is refused with one sentence naming the other (A-19)',
-      refusedText.includes(`The team ${larks} of the same season now has this name.`) &&
+      refusedText.includes(`Another team of the same season, ${larks} (short name`) &&
         refusedText.includes('Rename one of them first'),
       refusedText,
     );

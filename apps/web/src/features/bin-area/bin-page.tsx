@@ -6,7 +6,7 @@
 // and someone who may bring back nothing is refused. A refusal to bring something back is said beside it,
 // with what to do first (a game held back by its team names the team and leads to its
 // line); what was brought back is said at the top, with the way to it.
-import { leagueUrl, listBinPart } from '@srleagues/core';
+import { getScheduleDraft, leagueUrl, listBinPart } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { forbidden } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -14,6 +14,7 @@ import { commandContextOf } from '../../server/context.ts';
 import type { LeagueTimes } from '../../server/game-when.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
+import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffNotice } from '../staff/index.ts';
 import { problemKey } from '../teams-area/answer.ts';
 import { bringBackAction } from './actions.ts';
@@ -21,6 +22,8 @@ import { binAnchors } from './bin-anchors.ts';
 import {
   binKindsShown,
   binView,
+  clashWords,
+  gameBackOf,
   nameTakenBy,
   teamsInBinWords,
   type BinKindShown,
@@ -66,14 +69,20 @@ export async function BinPage({
   const refusedTeam = listed.value.items.find(
     (item) => item.id === refusedId && item.kind === 'team',
   );
+  const why = one(query['why']) ?? '';
+  // A second team of the same name, or of the same short name (A-19): either refusal
+  // names that team, the one holding the full name or the one holding the short name.
+  const shortTaken = why.endsWith('.team-short-name-taken');
   const takenBy =
     refusedTeam === undefined ||
     refusedTeam.seasonId === null ||
-    // A second team of the same name takes its short name too (A-19): either refusal
-    // names that team when there is one.
-    !/\.team-(short-)?name-taken$/.test(one(query['why']) ?? '')
+    !(shortTaken || why.endsWith('.team-name-taken'))
       ? undefined
-      : nameTakenBy(refusedTeam, await ports.adminTeams.teams(context, refusedTeam.seasonId));
+      : nameTakenBy(
+          refusedTeam,
+          await ports.adminTeams.teams(context, refusedTeam.seasonId),
+          shortTaken,
+        );
   const back = one(query['back']);
   const backId = one(query['id']) ?? '';
   const backTo = (kind: string): string | undefined => {
@@ -91,7 +100,7 @@ export async function BinPage({
     return leagueUrl(here, 'admin-area', { area: 'schedule' });
   };
   const heldByTeam = (row: BinRow) =>
-    row.teamsInBin.length > 0 && (one(query['why']) ?? '').endsWith('.game-part-in-bin');
+    row.teamsInBin.length > 0 && why.endsWith('.game-part-in-bin');
 
   const Row = ({ row }: { readonly row: BinRow }) => (
     <li id={`bin-${row.id}`} className="staff-row" data-bin={row.kind}>
@@ -108,7 +117,10 @@ export async function BinPage({
               ? teamsInBinWords(row.teamsInBin, myTeams, 'refusal')
               : takenBy !== undefined
                 ? // A second team of the same name (A-19): which one, and what to do.
-                  t('admin.bin.nameTakenBy', { name: takenBy.name })
+                  t(shortTaken ? 'admin.bin.shortNameTakenBy' : 'admin.bin.nameTakenBy', {
+                    name: takenBy.name,
+                    slug: takenBy.slug,
+                  })
                 : t('admin.bin.notBack', { problem: t(refusal) })}
             {!heldByTeam(row)
               ? null
@@ -175,21 +187,29 @@ export async function BinPage({
   const backKind = binKindsShown.find((kind) => kind === back);
   const backHref = backKind === undefined ? undefined : backTo(backKind);
   // A game brought back is a schedule change (A-19): its revision, who it reaches (A-7)
-  // and the games now at its time, as the action passed them on.
-  const count = (name: string) => {
-    const said = one(query[name]) ?? '';
-    return /^[0-9]{1,6}$/.test(said) ? Number(said) : undefined;
-  };
-  const gameRevision = count('revision');
-  const gameBack =
-    backKind !== 'game' || gameRevision === undefined
+  // and the games now at its time, named. Only what the restore itself left on the server
+  // for this person is said, never numbers from the address.
+  const holder = noticeHolderOf(context);
+  const left =
+    backKind !== 'game' || holder === undefined
       ? undefined
-      : {
-          revision: gameRevision,
-          teams: count('teams') ?? 0,
-          people: count('people') ?? 0,
-          clashes: count('clashes') ?? 0,
-        };
+      : savedNoticesHere().take(holder, 'bin');
+  const gameBack = left === undefined || left.thing !== backId ? undefined : gameBackOf(left.said);
+  const clashIds = gameBack === undefined ? [] : (left?.about ?? []);
+  const seasonId = left?.name;
+  const clashes =
+    clashIds.length === 0 || seasonId === undefined
+      ? []
+      : await (async () => {
+          const draft = await getScheduleDraft(context, { seasonId }, ports.scheduleAdmin.deps);
+          const teams = await ports.scheduleAdmin.teamsOf(here.id, seasonId);
+          const names = Object.fromEntries(teams.map((team) => [team.id, team.name]));
+          const games = draft.ok ? draft.value.published.games : [];
+          return clashIds.map((id) => {
+            const game = games.find((g) => g.id === id);
+            return { id, words: game === undefined ? undefined : clashWords(game, names, locale) };
+          });
+        })();
   const nothing = binKindsShown.every((kind) => rows[kind].length === 0);
   return (
     <main className="admin-teams">
@@ -205,10 +225,28 @@ export async function BinPage({
           {gameBack === undefined ? null : (
             <p data-bin-game-back={gameBack.revision}>
               {t('admin.bin.gameBack', gameBack)}
-              {gameBack.clashes === 0 ? null : (
-                <> {t.plural('admin.bin.gameBackClashes', gameBack.clashes)}</>
+              {clashes.length === 0 ? null : (
+                <> {t.plural('admin.bin.gameBackClashes', clashes.length)}</>
               )}
             </p>
+          )}
+          {clashes.length === 0 ? null : (
+            <>
+              <ul>
+                {clashes.map((clash) =>
+                  clash.words === undefined ? null : (
+                    <li key={clash.id} data-bin-game-clash={clash.id} dir="auto">
+                      {clash.words}
+                    </li>
+                  ),
+                )}
+              </ul>
+              <p>
+                <a href={leagueUrl(here, 'admin-area', { area: 'schedule' })}>
+                  {t('admin.bin.gameBackCheck')}
+                </a>
+              </p>
+            </>
           )}
         </StaffNotice>
       )}

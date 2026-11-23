@@ -23,6 +23,7 @@ export const noticeScreens = [
   'season',
   'standings',
   'scorekeepers',
+  'bin',
 ] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 

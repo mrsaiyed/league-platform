@@ -53,12 +53,12 @@ export type MemoryBin = {
   people: Record<string, number>;
 };
 
-/** A league-wide grant of `role` to `accountId`, in force. */
-export const grantOf = (accountId: string, role: Role): Grant => ({
+/** A grant of `role` to `accountId`, in force: league-wide, or at one program's (`program`). */
+export const grantOf = (accountId: string, role: Role, program?: string): Grant => ({
   id: `g-${accountId}`,
   accountId,
   role,
-  scope: { type: 'league' },
+  scope: program === undefined ? { type: 'league' } : { type: 'program', id: program },
   grantedByAccountId: null,
   revokedAt: null,
 });
@@ -138,7 +138,7 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
           return t === undefined
             ? undefined
             : {
-                seasonId,
+                seasonId: t.season ?? seasonId,
                 binned: t.binnedAt !== null,
                 status: t.status ?? 'scheduled',
                 partInBin: t.partInBin === true,

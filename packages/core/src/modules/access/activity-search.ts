@@ -33,7 +33,12 @@ const matches: Readonly<Record<ActivityKind, ActivityMatch>> = {
   teams: { modules: ['teams'], also: ['leagues.restore_team'], except: [] },
   people: { modules: ['people'], also: ['leagues.restore_person'], except: [] },
   games: { modules: ['games'], also: ['leagues.restore_game', importedScores], except: [] },
-  schedule: { modules: ['scheduling', 'imports'], also: [], except: [importedScores] },
+  schedule: {
+    modules: ['scheduling', 'imports'],
+    // A game back from the bin is a schedule revision too (A-19).
+    also: ['leagues.restore_game'],
+    except: [importedScores],
+  },
   standings: { modules: ['standings'], also: [], except: [] },
   settings: { modules: ['leagues'], also: [], except: binRestores },
   access: { modules: ['access'], also: [], except: [] },

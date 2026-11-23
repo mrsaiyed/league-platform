@@ -36,6 +36,8 @@ export type RestoreGameError = {
 
 export type RestoredGame = {
   readonly gameId: string;
+  /** Its season: where the screen reads the games now at its time to name them. */
+  readonly seasonId: string;
   /** The schedule revision that brought it back; null when it was not in the bin. */
   readonly revision: number | null;
   readonly teamCount: number;
@@ -65,6 +67,7 @@ export const restoreGame = defineCommand({
     if (!game.binned) {
       return ok({
         gameId: input.gameId,
+        seasonId: game.seasonId,
         revision: null,
         teamCount: 0,
         peopleCount: 0,
@@ -118,6 +121,7 @@ export const restoreGame = defineCommand({
     });
     return ok({
       gameId: input.gameId,
+      seasonId: game.seasonId,
       revision,
       teamCount: teams.length,
       peopleCount,

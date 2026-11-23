@@ -47,10 +47,15 @@ export async function AdminsPage({ league }: { readonly league: string }) {
   if (!listed.ok) return forbidden();
   const [names, activity, clock] = await Promise.all([
     ports.adminAccess.namesOf(here.id),
-    // The newest page of the log; the page lists its changes to who has access. Read where
+    // The newest page of the log's access entries (A-6: kind 'access', so a busy league's
+    // other entries never push them out). Read where
     // the activity log page reads it (the bin's transaction: access and the log), so the
     // made-up world shows its own log here too, not the access stand-in's empty one.
-    searchActivity(context, { limit: activityPageLimit }, ports.adminPeople.putBack),
+    searchActivity(
+      context,
+      { limit: activityPageLimit, kind: 'access' },
+      ports.adminPeople.putBack,
+    ),
     ports.publicSchedule.clockOf(here.id),
   ]);
   const shown = adminsView({

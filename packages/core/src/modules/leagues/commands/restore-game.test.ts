@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { grantOf, memoryBin, ownerId, teamId } from '../memory-bin.test-helper.ts';
+import {
+  grantOf,
+  memoryBin,
+  otherSeasonId,
+  ownerId,
+  seasonId,
+  teamId,
+} from '../memory-bin.test-helper.ts';
 import { restoreGame } from './restore-game.ts';
 
 const binnedAt = '2026-01-01T00:00:00.000Z';
@@ -25,7 +32,14 @@ describe('restoreGame', () => {
     });
     expect(await restoreGame(as(ownerId), { gameId: id }, deps)).toEqual({
       ok: true,
-      value: { gameId: id, revision: 4, teamCount: 2, peopleCount: 20, clashes: [{ id: 'g2' }] },
+      value: {
+        gameId: id,
+        seasonId,
+        revision: 4,
+        teamCount: 2,
+        peopleCount: 20,
+        clashes: [{ id: 'g2' }],
+      },
     });
     expect(db.state.revisions.at(-1)).toMatchObject({
       number: 4,
@@ -96,6 +110,47 @@ describe('restoreGame', () => {
     expect(await restoreGame(as('reg'), { gameId: id }, deps)).toMatchObject({
       error: { code: 'not-allowed' },
     });
+    expect(await restoreGame(as('sch'), { gameId: id }, deps)).toMatchObject({ ok: true });
+  });
+
+  it('rolls back when the revision number was taken meanwhile: the game stays in the bin', async () => {
+    // The newest revision read is 2 while a publish at the same moment wrote 3.
+    const { db, deps, as } = memoryBin({
+      things: [{ id, kind: 'game', name: 'A v B', binnedAt, status: 'scheduled' }],
+      revisions: [
+        { number: 3, summary: {} },
+        { number: 2, summary: {} },
+      ],
+    });
+    expect(await restoreGame(as(ownerId), { gameId: id }, deps)).toEqual({
+      ok: false,
+      error: { code: 'revision-out-of-date' },
+    });
+    expect(db.state.things[0]?.binnedAt).toBe(binnedAt);
+    expect(db.state.revisions).toHaveLength(2);
+    expect(db.state.activity).toEqual([]);
+  });
+
+  it("refuses a scheduler of one program another program's game, and lets them their own", async () => {
+    const other = teamId(8);
+    const { db, deps, as } = memoryBin({
+      things: [
+        { id, kind: 'game', name: 'A v B', binnedAt, status: 'scheduled' },
+        {
+          id: other,
+          kind: 'game',
+          name: 'C v D',
+          binnedAt,
+          status: 'scheduled',
+          season: otherSeasonId,
+        },
+      ],
+      grants: [grantOf('sch', 'scheduler', 'p1')],
+    });
+    expect(await restoreGame(as('sch'), { gameId: other }, deps)).toMatchObject({
+      error: { code: 'not-allowed' },
+    });
+    expect(db.state.things[1]?.binnedAt).toBe(binnedAt);
     expect(await restoreGame(as('sch'), { gameId: id }, deps)).toMatchObject({ ok: true });
   });
 });

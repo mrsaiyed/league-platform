@@ -89,3 +89,4 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.26: the refused-result test of clear-page-cache covers only a refusal before the event; a job rolled back after a later failure rests on leagues-store.test.ts.
 - 2.60: there is no league error.tsx, so a league page's server error shows without the site notice.
 - 2.60: site.notice has no protective order, so an archived or suspended league cannot add or remove its notice (R-26).
+- 2.77 (review Low): `leagues.restore_game` counts the restored game in its schedule revision's `gamesAdded: 1` and `gameIds.added`, so a future revision history would call it a new game; count it only in `restoredFromBin`, or say in T-220 that "added" includes "restored".
