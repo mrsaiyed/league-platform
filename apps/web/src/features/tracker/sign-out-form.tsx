@@ -39,8 +39,8 @@ export function SignOutForm({
   waitingQuestion,
   children,
 }: {
-  /** The server's sign-out action. */
-  readonly action: () => Promise<void>;
+  /** The server's sign-out action: the form's fields say where the person is (step 2.163). */
+  readonly action: (form: FormData) => Promise<void>;
   readonly waitingQuestion: WaitingQuestion;
   readonly children: ReactNode;
 }) {
@@ -83,12 +83,15 @@ export function SignOutForm({
 export function SignOutLink({
   action,
   waitingQuestion,
+  fields = {},
   href,
   className,
   children,
 }: {
-  readonly action: () => Promise<void>;
+  readonly action: (form: FormData) => Promise<void>;
   readonly waitingQuestion: WaitingQuestion;
+  /** What the form tells the action: where the person is, and that it is a staff page. */
+  readonly fields?: Readonly<Record<string, string>>;
   /** The account page: where the link leads with scripts off. */
   readonly href: string;
   readonly className: string;
@@ -110,7 +113,11 @@ export function SignOutLink({
   };
   return (
     <>
-      <form ref={form} action={action} hidden />
+      <form ref={form} action={action} hidden>
+        {Object.entries(fields).map(([name, value]) => (
+          <input key={name} type="hidden" name={name} value={value} />
+        ))}
+      </form>
       <a className={className} href={href} onClick={onClick}>
         {children}
       </a>

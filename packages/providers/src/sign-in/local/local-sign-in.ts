@@ -322,7 +322,9 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
         const proof = token();
         const expiresAt = now().getTime() + settings.proofValidMinutes * minute;
         proofs.set(proof, { email: email.data, expiresAt });
-        return ok({ proof, proofExpiresAt: new Date(expiresAt) });
+        // Said only now, to the holder of the mailbox (R-31).
+        const accountExists = accounts.has(email.data);
+        return ok({ proof, proofExpiresAt: new Date(expiresAt), accountExists });
       }
       pending.attemptsLeft--;
       guessesPerNetwork.recordFailure(network);

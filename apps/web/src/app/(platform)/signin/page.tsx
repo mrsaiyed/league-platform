@@ -1,4 +1,5 @@
 import {
+  AlreadySignedIn,
   BotCheckField,
   EmailField,
   NextField,
@@ -11,19 +12,28 @@ import { webPorts } from '../../../server/container.ts';
 import { t } from '../../../server/messages.ts';
 import { googleAction, signInAction } from '../../../server/sign-in/actions.ts';
 import { safeReturnPath } from '../../../server/sign-in/device.ts';
-import { botCheckOnPage } from '../../../server/sign-in/next-visit.ts';
+import { botCheckOnPage, googleSetUp } from '../../../server/sign-in/next-visit.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
 import { returnLeagueOf } from '../../../server/sign-in/return-league.ts';
+import { typedEmailOfThisRequest } from '../../../server/sign-in/this-screen.ts';
+import { signedInPerson } from '../../../server/signed-in-leagues.ts';
 
 // Email and password, or Google (R-2, T-67). The same screen whether or not the
 // address has an account (T-68). Opened from a league's page, it names the league and
 // leads back to that page (step 2.127); "Forgot your password?" keeps the page to come
 // back to as well. A league this person may not see is not named (return-league.ts).
+// Since step 2.163: a signed-in person is told they are (L10); after a refused try the
+// address typed is filled in again (M28: from this device's own cookie, never the address
+// bar); a lock-out gives the wait in minutes and says "Forgot your password?" gets them in
+// now; "Continue with Google" is drawn only where Google is set up (M27).
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const next = safeReturnPath(search['next']);
-  // Not on the test copy (step 2.205): an account made with Google holds a real address.
-  const google = !(await webPorts()).testCopy;
+  const person = await signedInPerson();
+  if (person.kind === 'signed-in') return <AlreadySignedIn email={person.email} next={next} />;
+  // Drawn only where Google is set up (M27), and not on the test copy (step 2.205): an
+  // account made with Google holds a real address.
+  const google = googleSetUp() && !(await webPorts()).testCopy;
   const from = await returnLeagueOf(next);
   const botCheck = await botCheckOnPage();
   return (
@@ -31,12 +41,14 @@ export default async function Page({ searchParams }: SearchProps) {
       title="page.signIn"
       intro={from === null ? undefined : t('signIn.fromLeague', { league: from.name })}
       search={search}
+      forgotHint
+      google={google}
     >
       <form action={signInAction}>
         <NextField next={next} />
-        <EmailField />
+        <EmailField value={await typedEmailOfThisRequest()} />
         <PasswordField />
-        <BotCheckField {...botCheck} action="sign-in" />
+        <BotCheckField {...botCheck} action="sign-in" google={google} />
         <SubmitButton words="signIn.submit" />
       </form>
       <p>

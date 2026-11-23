@@ -6,6 +6,7 @@ import {
   DesignStyle,
   headerSeason,
   LeagueNotice,
+  SignedOutNotice,
   MyTeamEntry,
   signInHrefFrom,
   SiteFooter,
@@ -54,7 +55,8 @@ async function MyTeamOfPerson({
  * (U-8) is the signed-in person's own, drawn for this request only (account-menu.ts); it is
  * on the admin's pages and the scoring page too, which sit under this layout. Here it has
  * "My team" for someone with a team of the season (step 2.168), so their teams are read
- * for a signed-in person only.
+ * for a signed-in person only. A page the person has just signed out from says "You are
+ * signed out." under the header (R-30).
  */
 export default async function LeagueLayout({
   children,
@@ -115,6 +117,7 @@ export default async function LeagueLayout({
         current={current}
         season={season}
       />
+      <SignedOutNotice path={path} signedIn={account !== null} />
       <LeagueNotice status={view.context.league.status} />
       <div className="site-body" id="content">
         {children}
