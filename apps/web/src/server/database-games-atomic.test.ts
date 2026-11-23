@@ -115,11 +115,33 @@ describe('a result and its standings, on the database ports', () => {
       w.ports.games.deps,
     );
     expect(reopened).toMatchObject({ ok: true });
+    const markOf = () =>
+      database.withTransaction(w.db, w.asOwner, (scope) =>
+        database.findGameCorrectedDate(scope, gameId),
+      );
+    const finalAgain = async (homeScore: number, awayScore: number) =>
+      recordFinalScore(
+        w.asOwner,
+        { gameId, version: await w.versionOf(gameId), homeScore, awayScore },
+        w.ports.games.deps,
+      );
+    // S-8 (step 2.56): no mark while the game is reopened, none when it ends again with
+    // the same score (a slip undone), and the date once a final differs.
+    expect(await markOf()).toBeUndefined();
+    await finalAgain(70, 64);
+    expect(await markOf()).toBeUndefined();
+    await reopenGame(
+      admin,
+      { gameId, version: await w.versionOf(gameId), reason: 'Wrong way round' },
+      w.ports.games.deps,
+    );
+    await finalAgain(64, 70);
     const kept = await database.withTransaction(w.db, w.asOwner, async (scope) => ({
       on: await database.findGameCorrectedDate(scope, gameId),
       log: await database.activityLogStore(scope).list(20, undefined, { type: 'league' }),
     }));
     expect(kept.on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(kept.log.filter((e) => e.action === 'games.reopen_game')).toHaveLength(2);
     expect(kept.log).toContainEqual(
       expect.objectContaining({
         action: 'games.reopen_game',

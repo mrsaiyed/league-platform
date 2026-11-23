@@ -29,6 +29,7 @@ export {
   type ScoringOffers,
 } from './commands/list-scoring-offers.ts';
 export { needsResult, oldestFirst, type ResultFacts } from './needs-result.ts';
+export { correctedMarkDate, type MarkCorrection, type MarkResult } from './corrected-mark.ts';
 export { earlierRoundKey, parseEarlierRoundKey } from './earlier-round-key.ts';
 export {
   earlierRoundsOf,

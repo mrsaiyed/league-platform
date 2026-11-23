@@ -280,7 +280,7 @@ describe('the public reads against the database (S-22, T-87)', () => {
     await pglite.query(
       `insert into game_corrections (league_id, game_id, account_id, reason, before, after, created_at)
        values ($1, $2, (select owner_account_id from leagues where id = $1), 'later fix',
-         '{"version": 1, "homeScore": 52}', '{"version": 1, "homeScore": 52}', '2030-12-07T03:30:00Z')`,
+         '{"version": 1, "homeScore": 48}', '{"version": 1, "homeScore": 52}', '2030-12-07T03:30:00Z')`,
       [a.leagueId, a.gameId],
     );
     const page = await withTransaction(leagues.db, { leagueId: a.leagueId }, (scope) =>
