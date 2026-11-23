@@ -50,6 +50,8 @@ describe('getConfig and the tracker’s project', () => {
     vi.stubEnv('TRUSTED_PROXY', 'one');
     vi.stubEnv('SUPABASE_URL', 'https://made-up.supabase.example.test');
     vi.stubEnv('SUPABASE_SECRET_KEY', 'made-up-supabase-secret-key');
+    vi.stubEnv('TURNSTILE_SITE_KEY', 'made-up-turnstile-site-key');
+    vi.stubEnv('TURNSTILE_SECRET_KEY', 'made-up-turnstile-secret-key');
     vi.stubEnv('PLATFORM_DATABASE_URL', `postgres://made-up:made-up-pw@db.${ref}.supabase.co/x`);
     // A made-up folder whose own supabase/site.json names another project.
     const decoy = new URL(

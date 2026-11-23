@@ -407,7 +407,10 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
           sessionId: made.sessionId,
         },
       });
-      return ok({ proof, proofExpiresAt });
+      // Said only now, to the holder of the mailbox (R-31): setPassword's own rule for
+      // "password-changed" rather than "account-created".
+      const accountExists = await store.accounts.accountExists(made.user.id);
+      return ok({ proof, proofExpiresAt, accountExists });
     },
 
     async setPassword({ proof, password, device }) {

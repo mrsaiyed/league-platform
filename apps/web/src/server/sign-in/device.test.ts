@@ -1,9 +1,15 @@
 // The device's name, the network a request comes from, the place to go after
 // signing in, and the password-again rule (T-70).
 import { describe, expect, it } from 'vitest';
-import { deviceLabel, networkAddressOf, safeReturnPath, unknownNetwork } from './device.ts';
+import {
+  deviceLabel,
+  networkAddressOf,
+  outsideCloudflareRangesLine,
+  safeReturnPath,
+  unknownNetwork,
+} from './device.ts';
 import { needsPasswordAgain } from './password-again.ts';
-import { problemOf, screenUrl } from './problems.ts';
+import { noticeOf, problemOf, screenUrl, withNotice } from './problems.ts';
 
 describe('deviceLabel', () => {
   it('names common browsers and systems', () => {
@@ -27,16 +33,77 @@ describe('deviceLabel', () => {
 });
 
 describe('networkAddressOf', () => {
+  /** The request headers a browser and the proxies in front of the app sent. */
+  const sent = (forwardedFor: string | null, cloudflareSays?: string) =>
+    new Headers({
+      ...(forwardedFor === null ? {} : { 'x-forwarded-for': forwardedFor }),
+      ...(cloudflareSays === undefined ? {} : { 'cf-connecting-ip': cloudflareSays }),
+    });
+  // Made-up visitors (documentation ranges) and a Cloudflare server (its published range).
+  const visitor = '192.0.2.10';
+  const cloudflareServer = '104.16.0.1';
+
   it('believes no forwarded address by default: everyone shares one key', () => {
-    expect(networkAddressOf('192.0.2.10', 'none')).toBe(unknownNetwork);
-    expect(networkAddressOf('6.6.6.6, 192.0.2.10', 'none')).toBe(unknownNetwork);
+    expect(networkAddressOf(sent(visitor), 'none')).toBe(unknownNetwork);
+    expect(networkAddressOf(sent(`6.6.6.6, ${visitor}`), 'none')).toBe(unknownNetwork);
+    expect(networkAddressOf(sent(cloudflareServer, visitor), 'none')).toBe(unknownNetwork);
   });
 
   it('behind one trusted proxy, believes only its entry, the last one', () => {
-    expect(networkAddressOf('6.6.6.6, 192.0.2.10', 'one')).toBe('192.0.2.10');
-    expect(networkAddressOf('::ffff:127.0.0.1', 'one')).toBe('::ffff:127.0.0.1');
-    expect(networkAddressOf('192.0.2.10, not-an-address', 'one')).toBe(unknownNetwork);
-    expect(networkAddressOf(null, 'one')).toBe(unknownNetwork);
+    expect(networkAddressOf(sent(`6.6.6.6, ${visitor}`), 'one')).toBe(visitor);
+    expect(networkAddressOf(sent('::ffff:127.0.0.1'), 'one')).toBe('::ffff:127.0.0.1');
+    expect(networkAddressOf(sent(`${visitor}, not-an-address`), 'one')).toBe(unknownNetwork);
+    expect(networkAddressOf(sent(null), 'one')).toBe(unknownNetwork);
+    // CF-Connecting-IP means nothing to `one`.
+    expect(networkAddressOf(sent(cloudflareServer, visitor), 'one')).toBe(cloudflareServer);
+  });
+
+  it('behind Cloudflare, keys each visitor by the address Cloudflare names, not by Cloudflare', () => {
+    // As Cloudflare in front of the host's proxy sends it: the visitor's claim, Cloudflare's
+    // own entry for the visitor, and the host's entry for Cloudflare's server, last.
+    const through = sent(`6.6.6.6, ${visitor}, ${cloudflareServer}`, visitor);
+    expect(networkAddressOf(through, 'cloudflare')).toBe(visitor);
+    const other = sent(`${'198.51.100.7'}, ${'162.158.1.2'}`, '198.51.100.7');
+    expect(networkAddressOf(other, 'cloudflare')).toBe('198.51.100.7');
+    // An IPv6 visitor, and Cloudflare's IPv6 server.
+    const six = sent('2001:db8:1:2::5, 2606:4700:10::1', '2001:db8:1:2::5');
+    expect(networkAddressOf(six, 'cloudflare')).toBe('2001:db8:1:2::5');
+  });
+
+  it('writes one fixed line, with no address, when CF-Connecting-IP comes from outside the ranges', () => {
+    const lines: string[] = [];
+    const warn = (line: string) => lines.push(line);
+    // From outside the listed ranges (a spoof, or a range the list lacks): one fixed line.
+    expect(networkAddressOf(sent('203.0.113.9', visitor), 'cloudflare', warn)).toBe('203.0.113.9');
+    expect(lines).toEqual([outsideCloudflareRangesLine]);
+    expect(outsideCloudflareRangesLine).not.toMatch(/\d+\.\d+|:[0-9a-f]*:/i);
+    // Through Cloudflare, with no such header, or with another setting: nothing is written.
+    networkAddressOf(sent(`${visitor}, ${cloudflareServer}`, visitor), 'cloudflare', warn);
+    networkAddressOf(sent('203.0.113.9'), 'cloudflare', warn);
+    networkAddressOf(sent('203.0.113.9', visitor), 'one', warn);
+    expect(lines).toHaveLength(1);
+  });
+
+  it('refuses CF-Connecting-IP as a spoof on a request that did not come through Cloudflare', () => {
+    // Straight to the host's own address: the host's entry is the sender, who wrote the header.
+    const spoofed = sent(`${cloudflareServer}, 203.0.113.9`, visitor);
+    expect(networkAddressOf(spoofed, 'cloudflare')).toBe('203.0.113.9');
+    // Writing a Cloudflare address into X-Forwarded-For too does not help: only the last
+    // entry, the host's, is read.
+    const claimed = sent(`${cloudflareServer}, 203.0.113.9`, cloudflareServer);
+    expect(networkAddressOf(claimed, 'cloudflare')).toBe('203.0.113.9');
+    // Each new value of the header gives the same key: it cannot reset the count.
+    for (const claim of ['198.51.100.1', '198.51.100.2', '2001:db8::1']) {
+      expect(networkAddressOf(sent('203.0.113.9', claim), 'cloudflare')).toBe('203.0.113.9');
+    }
+  });
+
+  it('behind Cloudflare, fails closed when its header is missing or not one address', () => {
+    for (const said of [undefined, '', 'not-an-address', `${visitor}, 198.51.100.1`]) {
+      expect(networkAddressOf(sent(cloudflareServer, said), 'cloudflare')).toBe(unknownNetwork);
+    }
+    expect(networkAddressOf(sent(null, visitor), 'cloudflare')).toBe(unknownNetwork);
+    expect(networkAddressOf(sent('not-an-address', visitor), 'cloudflare')).toBe(unknownNetwork);
   });
 });
 
@@ -78,6 +145,28 @@ describe('problems', () => {
     expect(problemOf({ problem: '<script>' })).toBeUndefined();
     expect(screenUrl('signin', { problem: 'tooManyAttempts', wait: 4.2 })).toBe(
       '/signin?problem=tooManyAttempts&wait=5',
+    );
+  });
+});
+
+describe('notices and waits (step 2.163)', () => {
+  it('reads back only the notices it writes', () => {
+    expect(noticeOf({ notice: 'signedOut' })).toBe('signedOut');
+    expect(noticeOf(new URLSearchParams('notice=codeSentAgain'))).toBe('codeSentAgain');
+    for (const junk of ['toString', '<script>', '', 'signedout']) {
+      expect(noticeOf({ notice: junk }), junk).toBeUndefined();
+    }
+    expect(noticeOf({ notice: ['signedOut', 'signedOut'] })).toBeUndefined();
+  });
+
+  it('puts a notice on a page, keeping its query and place and replacing an old notice', () => {
+    expect(withNotice('/north-valley', 'signedOut')).toBe('/north-valley?notice=signedOut');
+    expect(withNotice('/north-valley/schedule?team=owls#round-3', 'signedOut')).toBe(
+      '/north-valley/schedule?team=owls&notice=signedOut#round-3',
+    );
+    expect(withNotice('/?notice=codeSentAgain', 'signedOut')).toBe('/?notice=signedOut');
+    expect(screenUrl('account', { ask: 'signOutEverywhere' })).toBe(
+      '/account?ask=signOutEverywhere',
     );
   });
 });

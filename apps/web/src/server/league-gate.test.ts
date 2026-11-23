@@ -77,6 +77,34 @@ describe('a live league', () => {
     expect(asOwner.kind === 'show' && asOwner.view.runsTheLeague).toBe(true);
   });
 
+  it('does not offer People to a registrar for one program, whose grant cannot read it', async () => {
+    const session = await ports.identify(standInPeople.registrar.token);
+    const resolved = await resolveLeagueRequest(
+      { host: 'localhost:3000', path: '/quiet-pines/admin/people', session },
+      deps,
+    );
+    if (resolved.kind !== 'league' || resolved.holder === undefined) throw new Error('no league');
+    const holder = resolved.holder;
+    const forOneProgram = {
+      ...resolved,
+      holder: {
+        ...holder,
+        grants: holder.grants.map((g) => ({
+          ...g,
+          scope: { type: 'program' as const, id: '01900000-0000-7000-8000-0000000000c1' },
+        })),
+      },
+    };
+    const people: LeagueWant = { page: 'admin', area: 'people' };
+    // League-wide, People opens; for one program it is "you do not have access", not a
+    // list that "could not be read just now" and records that are "not found".
+    expect(kind(leaguePageOutcome(resolved, people))).toBe('show');
+    const outcome = leaguePageOutcome(forOneProgram, people);
+    expect(outcome.kind).toBe('no-access');
+    const home = leaguePageOutcome(forOneProgram, adminHome);
+    expect(home.kind === 'show' ? home.view.areas : []).not.toContain('people');
+  });
+
   it('opens the tracker only to those who may score', async () => {
     expect(kind(await ask('scheduler', '/north-valley/score/game-1', score))).toBe('show');
     expect(kind(await ask('coach', '/north-valley/score/game-1', score))).toBe('no-access');
@@ -181,11 +209,17 @@ describe('a draft league (U-9, step 2.87)', () => {
   });
 
   it("does not let one league's staff see another league's draft", async () => {
-    expect(kind(await ask('otherAdmin', '/still-waters/admin', adminHome))).toBe('show');
-    for (const who of staffNames.filter((name) => name !== 'owner')) {
-      expect(kind(await ask(who, '/still-waters', site)), who).toBe('not-found');
-      expect(kind(await ask(who, '/still-waters/admin', adminHome)), who).toBe('not-found');
+    // The second draft league (Reed Marsh) is held by no one but its owner.
+    for (const who of [...staffNames.filter((name) => name !== 'owner'), 'otherAdmin'] as const) {
+      expect(kind(await ask(who, '/reed-marsh', site)), who).toBe('not-found');
+      expect(kind(await ask(who, '/reed-marsh/admin', adminHome)), who).toBe('not-found');
     }
+    expect(kind(await ask('visitor', '/reed-marsh', site))).toBe('not-found');
+    expect(kind(await ask('owner', '/reed-marsh/admin', adminHome))).toBe('show');
+    // The empty league starts live (step 2.194): its admin opens its admin area, and a
+    // visitor reads its pages.
+    expect(kind(await ask('otherAdmin', '/still-waters/admin', adminHome))).toBe('show');
+    expect(kind(await ask('visitor', '/still-waters', site))).toBe('show');
     // Their access in the live league opens nothing there either.
     expect(kind(await ask('otherAdmin', '/north-valley/admin', adminHome))).toBe('no-access');
   });

@@ -5,7 +5,12 @@ import { describe, expect, it } from 'vitest';
 import { startingNamePolicy } from '../../server/name-policy-of.ts';
 import { standInPublicStats } from '../../server/stand-in-public-stats.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
-import { homeLeaderLimit, homeLeadersOf, loadHomeLeaders } from './build-home-leaders.ts';
+import {
+  fitHomeLeaders,
+  homeLeaderLimit,
+  homeLeadersOf,
+  loadHomeLeaders,
+} from './build-home-leaders.ts';
 import { loadStatsPage } from './build-stats.ts';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -137,16 +142,19 @@ describe('the home page’s leaders', () => {
     };
     const input = { leagueId: adult, seasonId: season.id };
     const leaders = await loadHomeLeaders(level, settings, input);
-    expect(leaders.map((leader) => leader.label)).toEqual([
-      '01 / Points',
-      '01 / Points',
-      '01 / Points',
-    ]);
+    // Everyone level with the last place comes, not the three with the lowest ids (M2).
+    expect(leaders.length).toBeGreaterThan(homeLeaderLimit);
+    expect(new Set(leaders.map((leader) => leader.label))).toEqual(new Set(['01 / Points']));
     const page = await loadStatsPage(level, settings, { ...input, by: 'average' });
     if ('code' in page) throw new Error(page.code);
     expect(
       page.leaders[0]?.rows.slice(0, 3).map((row) => String(row.cells['player']).slice(0, 2)),
     ).toEqual(['1.', '1.', '1.']);
+    // Where they do not all fit, none of them is drawn, and one line says how many.
+    expect(fitHomeLeaders(leaders, homeLeaderLimit)).toEqual({
+      leaders: [],
+      levelCut: { place: 1, count: leaders.length },
+    });
   });
 
   it('show a person who was taken off, or who asked for initials, as the statistics page does', async () => {

@@ -29,19 +29,25 @@ import {
   moveDraftGame,
   ok,
   previewSchedulePublish,
+  previewSeasonRules,
   publicViewer,
   publishSchedule,
   removeDraftGame,
   removeDraftRound,
   renameDraftRound,
   setDraftRecording,
+  setSeasonRules,
   setSetting,
   swapDraftGames,
   updateSeason,
   type CommandContext,
 } from '@srleagues/core';
 import * as database from '@srleagues/database';
-import type { SessionIdentity, SignInService } from '@srleagues/providers';
+import {
+  createLocalBotCheck,
+  type SessionIdentity,
+  type SignInService,
+} from '@srleagues/providers';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { databasePorts } from './database-ports.ts';
@@ -108,6 +114,7 @@ beforeAll(async () => {
       },
     } as unknown as SignInService,
     signInMail: {} as SignInMail,
+    botCheck: createLocalBotCheck({ appEnv: 'test' }),
     log: () => {},
     warn: () => {},
   });
@@ -296,6 +303,42 @@ describe('League settings and Season settings on the database ports, role by rol
     );
     expect(back).toMatchObject({ ok: true });
   });
+
+  it.each(actors)(
+    "saves a season's rules only as the owner or an admin, standings stores and all: %s",
+    async (actor) => {
+      const before = await seasonNow(winterId);
+      // A change to the standings part, which works the season's standings out again.
+      const tiebreakers =
+        before.rules.tiebreakers[0] === 'points-scored'
+          ? (['head-to-head', 'point-difference'] as const)
+          : (['points-scored', 'head-to-head'] as const);
+      const rules = { ...before.rules, tiebreakers: [...tiebreakers] };
+      const preview = await previewSeasonRules(
+        contextOf(actor),
+        { seasonId: winterId, rules },
+        ports.adminSettings.seasons,
+      );
+      const saved = await setSeasonRules(
+        contextOf(actor),
+        { seasonId: winterId, version: before.version, rules, confirmed: false },
+        ports.adminSettings.seasons,
+      );
+      if (!settingsPeople.includes(actor)) {
+        expect(preview).toEqual({ ok: false, error: { code: 'not-allowed' } });
+        expect(saved).toEqual({ ok: false, error: { code: 'not-allowed' } });
+        expect((await seasonNow(winterId)).rules).toEqual(before.rules);
+        return;
+      }
+      // No game of the season is decided: nothing moves, so it simply saves (S-1).
+      expect(preview).toEqual({ ok: true, value: { gamesDecided: false, moves: [] } });
+      expect(saved).toMatchObject({ ok: true });
+      const after = await seasonNow(winterId);
+      expect(after.rules.tiebreakers).toEqual([...tiebreakers]);
+      expect(after.rulesSaved).toBe(true);
+      expect(after.version).toBeGreaterThan(before.version);
+    },
+  );
 
   it("never finds another league's season, even for its own owner", async () => {
     const maple = made.leagues.find((l) => l.slug === 'maple-street');
@@ -671,9 +714,30 @@ describe('Admin → Schedule on the database ports, role by role', () => {
       'Lakeside Owls',
       'Lakeside Pines',
     ]);
+    expect(named.every((t) => !t.removed)).toBe(true);
     expect(await ports.scheduleAdmin.teamsOf(leagueId, campSeasonId)).toEqual([]);
     expect(await ports.scheduleAdmin.teamsOf(otherLeagueId, winterId)).toEqual([]);
     expect(await ports.scheduleAdmin.teamsOf(leagueId, 'not-an-id')).toEqual([]);
+  });
+
+  it('names a team in the bin too, marked removed, so the grid never shows its id (A-17)', async () => {
+    const asOwner = { leagueId, accountId: accountOf.get('owner') ?? '', requestId: randomUUID() };
+    const kept = await database.withTransaction(db, asOwner, async (scope) => {
+      const id = await database.insertTeam(scope, {
+        seasonId: campSeasonId,
+        divisionId: null,
+        slug: 'binned-wrens',
+        name: 'Binned Wrens',
+        color: null,
+        statsVisibility: 'everyone',
+      });
+      if (typeof id !== 'string' || id.endsWith('-taken')) throw new Error(`no team: ${id}`);
+      await database.setTeamBinned(scope, id, true);
+      return id;
+    });
+    expect(await ports.scheduleAdmin.teamsOf(leagueId, campSeasonId)).toEqual([
+      { id: kept, name: 'Binned Wrens', removed: true },
+    ]);
   });
 
   it.each(actors)('runs each command of the grid only for those it is for: %s', async (actor) => {
@@ -842,7 +906,7 @@ describe('Admin → Schedule on the database ports, role by role', () => {
     );
     expect(done).toMatchObject({ ok: true });
     const after = await campView();
-    expect(after.draft?.changeCount).toBe((before.draft?.changeCount ?? 0) + 1);
+    expect(after.draft?.savedEdits).toBe((before.draft?.savedEdits ?? 0) + 1);
     expect(after.result.rounds.map((r) => r.label)).toContain('Camp week 1');
   });
 

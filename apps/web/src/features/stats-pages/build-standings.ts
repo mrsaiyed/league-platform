@@ -3,14 +3,16 @@
 // (S-10), and one note for each group of level teams saying what they are level on and
 // what orders them (S-9; step 2.195). A note is marked beside every team of its group, so
 // each of its words must be true of each of them: it never says one team was "placed
-// above". Every word comes from the message file (T-187). The ranking is core's; this only
-// writes it down.
+// above". For three or more it says exactly what placed each of them, from the engine's
+// own steps (step 2.198, S-74). Every word comes from the message file (T-187). The
+// ranking is core's; this only writes it down.
 import type {
   LevelGroup,
   Standings,
   StandingsLine,
   StandingsTable as CoreTable,
 } from '@srleagues/core';
+import type { TiebreakStep } from '@srleagues/sports';
 import type { StandingsColumn, StandingsFootnote, StandingsRow } from '@srleagues/ui';
 import { locale, t } from '../../server/messages.ts';
 
@@ -20,7 +22,16 @@ export type StandingsTableView = {
   readonly columns: readonly StandingsColumn[];
   readonly rows: readonly StandingsRow[];
   readonly footnotes: readonly StandingsFootnote[];
+  /**
+   * The same notes for the home page's small table (step 2.198, the lead's answer (a)): a
+   * level-teams note keeps only its first sentence, who is level and on what, which is true
+   * beside each of them; the reasons are on the standings page. Every other note is whole.
+   */
+  readonly briefFootnotes: readonly StandingsFootnote[];
 };
+
+/** A note, and its first sentence when the home page shows less of it. */
+type Note = { readonly id: string; readonly text: string; readonly brief?: string };
 
 const percent = new Intl.NumberFormat(locale, {
   minimumFractionDigits: 3,
@@ -40,6 +51,8 @@ const winPercentText = (value: number): string =>
     .map((part) => part.value)
     .join('');
 const names = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' });
+/** Each team with its figure, side by side: "Lions 1–0, Tigers 1–1, Bears 0–1". */
+const entries = new Intl.ListFormat(locale, { style: 'short', type: 'unit' });
 
 const tiebreakerNames = {
   'head-to-head': 'standings.tiebreaker.head-to-head',
@@ -51,6 +64,9 @@ const tiebreakerNames = {
 
 type Tiebreaker = keyof typeof tiebreakerNames;
 const isTiebreaker = (value: string): value is Tiebreaker => Object.hasOwn(tiebreakerNames, value);
+
+/** The note of a team no longer in the league, kept in the table for its results (A-17). */
+const removedNote = 'removed-team';
 
 /** The note shared by every group that nothing in the rules separates. */
 const stillTiedId = 'order-still-tied';
@@ -97,6 +113,304 @@ function twoTeamReason(
   }
 }
 
+/** What a tiebreaker that put one team ahead of one other says, with both figures. */
+const aheadOf = {
+  'point-difference': 'standings.level.ahead.point-difference',
+  'points-scored': 'standings.level.ahead.points-scored',
+  'fewest-points-allowed': 'standings.level.ahead.fewest-points-allowed',
+} as const;
+
+/** What a tiebreaker that left them all level says, with the figure they share. */
+const alsoLevelOn = {
+  'point-difference': 'standings.level.alsoLevel.point-difference',
+  'points-scored': 'standings.level.alsoLevel.points-scored',
+  'fewest-points-allowed': 'standings.level.alsoLevel.fewest-points-allowed',
+} as const;
+
+/** What a tiebreaker that ordered three or more says, each team with its figure. */
+const orderedBy = {
+  'point-difference': 'standings.level.order.point-difference',
+  'points-scored': 'standings.level.order.points-scored',
+  'fewest-points-allowed': 'standings.level.order.fewest-points-allowed',
+  'coin-flip': 'standings.level.order.coin-flip',
+} as const;
+
+/** "these three", "these four": a word up to ten, then the number. */
+const numberWords = {
+  3: 'standings.level.number.3',
+  4: 'standings.level.number.4',
+  5: 'standings.level.number.5',
+  6: 'standings.level.number.6',
+  7: 'standings.level.number.7',
+  8: 'standings.level.number.8',
+  9: 'standings.level.number.9',
+  10: 'standings.level.number.10',
+} as const;
+
+const isNumberWord = (n: number): n is keyof typeof numberWords => Object.hasOwn(numberWords, n);
+const countText = (n: number): string => (isNumberWord(n) ? t(numberWords[n]) : whole.format(n));
+
+type Figured = Exclude<Tiebreaker, 'head-to-head' | 'coin-flip'>;
+
+/** A figure as the table writes it: a difference signed, the others whole numbers. */
+const figureText = (by: Figured, value: number | null): string =>
+  by === 'point-difference' ? signed.format(value ?? 0) : whole.format(value ?? 0);
+
+type StepTeam = TiebreakStep['teams'][number];
+
+/**
+ * In a points table head-to-head compares points per game in the games among the level
+ * teams (the engine's `headToHead`), so the note gives what it compared, worked out from the
+ * step's own records and the season's points: "Lions 3 from 1 game, Tigers 6 from 3". When
+ * every team played as many of those games, the points alone: "Lions 4 points, Tigers 2".
+ */
+function pointsAmong(
+  teams: readonly StepTeam[],
+  pointsPer: NonNullable<Standings['pointsPer']>,
+  nameOf: ReadonlyMap<string, string>,
+): { readonly records: string; readonly even: number | null } {
+  const figures = teams.map((team) => {
+    const wins = team.record?.wins ?? 0;
+    const losses = team.record?.losses ?? 0;
+    const ties = team.record?.ties ?? 0;
+    return {
+      teamId: team.teamId,
+      points: wins * pointsPer.win + ties * pointsPer.tie + losses * pointsPer.loss,
+      games: wins + losses + ties,
+    };
+  });
+  const games = figures[0]?.games ?? 0;
+  const even = figures.every((f) => f.games === games) ? games : null;
+  const records = entries.format(
+    figures.map((f, n) =>
+      t('standings.level.entry', {
+        team: nameOf.get(f.teamId) ?? '',
+        figure:
+          even !== null
+            ? n === 0
+              ? t.plural('standings.level.pointsWord', f.points, {
+                  points: whole.format(f.points),
+                })
+              : whole.format(f.points)
+            : n === 0
+              ? t.plural('standings.level.pointsFromGames', f.games, {
+                  points: whole.format(f.points),
+                  games: whole.format(f.games),
+                })
+              : t('standings.level.pointsFrom', {
+                  points: whole.format(f.points),
+                  games: whole.format(f.games),
+                }),
+      }),
+    ),
+  );
+  return { records, even };
+}
+
+/**
+ * The note's sentences after "level on…", from the engine's steps (step 2.198, S-74), so
+ * that what placed each team is said, with its numbers:
+ * - head-to-head on all of them: each team's record in the games among them (in a points
+ *   table, its points and games there, since points per game is what counts), or, when it
+ *   could not apply, who has played none of the others; on some of them, their records
+ *   when it put one ahead, and when it left them level, that it did (two that split their
+ *   games say so), so the next sentence is plainly why;
+ * - another tiebreaker: what it put ahead of what, with the figures, or the figure they
+ *   are all level on, so it is plain why the next one was needed;
+ * - last, the teams nothing separated.
+ * Every team is named in the table's order, which no step contradicts.
+ */
+function stepSentences(
+  steps: readonly TiebreakStep[],
+  members: readonly StandingsLine[],
+  pointsPer: Standings['pointsPer'],
+): string[] {
+  const nameOf = new Map(members.map((line) => [line.team.id, line.team.name]));
+  const position = new Map(members.map((line, n) => [line.team.id, n]));
+  const inTableOrder = <T extends { readonly teamId: string }>(items: readonly T[]): T[] =>
+    [...items].sort((a, b) => (position.get(a.teamId) ?? 0) - (position.get(b.teamId) ?? 0));
+  const named = (items: readonly { readonly teamId: string }[]) =>
+    names.format(inTableOrder(items).map((item) => nameOf.get(item.teamId) ?? ''));
+  const sentences: string[] = [];
+  for (const step of steps) {
+    const teams = inTableOrder(step.teams);
+    const onAll = teams.length === members.length;
+    const apart = teams.some((team) => team.place !== 1);
+    const by = step.tiebreaker;
+    if (by === 'head-to-head') {
+      if (!step.applied) {
+        if (!onAll) continue;
+        const none = teams.filter(
+          (team) =>
+            (team.record?.wins ?? 0) + (team.record?.losses ?? 0) + (team.record?.ties ?? 0) === 0,
+        );
+        sentences.push(
+          none.length === teams.length
+            ? t('standings.level.metNoneOfThem')
+            : t.plural('standings.level.metNone', none.length, { teams: named(none) }),
+        );
+        continue;
+      }
+      const withTies = teams.some((team) => (team.record?.ties ?? 0) > 0);
+      const recordOf = (team: (typeof teams)[number]) =>
+        t(withTies ? 'standings.level.recordTies' : 'standings.level.record', {
+          wins: whole.format(team.record?.wins ?? 0),
+          losses: whole.format(team.record?.losses ?? 0),
+          ties: whole.format(team.record?.ties ?? 0),
+        });
+      const byPoints = pointsPer === null ? null : pointsAmong(teams, pointsPer, nameOf);
+      if (!onAll && !apart) {
+        // Teams that started again among themselves and are still level after the games
+        // among just them: said, so the tiebreaker that follows is plainly why.
+        const [first] = teams;
+        const split =
+          teams.length === 2 &&
+          first !== undefined &&
+          teams.every((team) => (team.record?.wins ?? 0) === (team.record?.losses ?? 0));
+        sentences.push(
+          split
+            ? t('standings.level.split', { teams: named(teams), record: recordOf(first) })
+            : t('standings.level.amongLevel', {
+                teams: named(teams),
+                records:
+                  byPoints?.records ??
+                  entries.format(
+                    teams.map((team) =>
+                      t('standings.level.entry', {
+                        team: nameOf.get(team.teamId) ?? '',
+                        figure: recordOf(team),
+                      }),
+                    ),
+                  ),
+              }),
+        );
+        continue;
+      }
+      if (byPoints !== null) {
+        const each = byPoints.even;
+        const key =
+          each === null
+            ? onAll
+              ? 'standings.level.amongThesePoints'
+              : teams.length === 2
+                ? 'standings.level.betweenPoints'
+                : 'standings.level.amongPoints'
+            : onAll
+              ? 'standings.level.amongThesePointsEven'
+              : teams.length === 2
+                ? 'standings.level.betweenPointsEven'
+                : 'standings.level.amongPointsEven';
+        sentences.push(
+          t(key, {
+            count: countText(teams.length),
+            teams: named(teams),
+            records: byPoints.records,
+            each:
+              each === null
+                ? ''
+                : t.plural('standings.level.gamesEach', each, { games: whole.format(each) }),
+          }),
+        );
+        continue;
+      }
+      const records = entries.format(
+        teams.map((team) =>
+          t('standings.level.entry', {
+            team: nameOf.get(team.teamId) ?? '',
+            figure: recordOf(team),
+          }),
+        ),
+      );
+      if (onAll) {
+        sentences.push(
+          t('standings.level.amongThese', { count: countText(teams.length), records }),
+        );
+      } else {
+        sentences.push(
+          t(teams.length === 2 ? 'standings.level.between' : 'standings.level.among', {
+            teams: named(teams),
+            records,
+          }),
+        );
+      }
+      continue;
+    }
+    // A coin flip none recorded covers: the last sentence says they are still level.
+    if (!step.applied) continue;
+    if (by === 'coin-flip') {
+      const [first, second] = teams;
+      if (teams.length === 2 && first !== undefined && second !== undefined) {
+        sentences.push(
+          t('standings.level.ahead.coin-flip', {
+            team: nameOf.get(first.teamId) ?? '',
+            other: nameOf.get(second.teamId) ?? '',
+          }),
+        );
+      } else {
+        const values = entries.format(teams.map((team) => nameOf.get(team.teamId) ?? ''));
+        sentences.push(t(orderedBy['coin-flip'], { values }));
+      }
+      continue;
+    }
+    // A figure is the team's own, the same in every step: once given, it is not given again
+    // when the teams it left level start the list again among themselves.
+    const told = steps
+      .slice(0, steps.indexOf(step))
+      .some(
+        (earlier) =>
+          earlier.tiebreaker === by &&
+          earlier.applied &&
+          teams.every((team) => earlier.teams.some((e) => e.teamId === team.teamId)),
+      );
+    if (told) continue;
+    if (!apart) {
+      // Teams it leaves level for good are told so once, last.
+      const lines = teams.map((team) => members.find((l) => l.team.id === team.teamId));
+      const forGood = lines.every(
+        (l) => l?.orderedBy === 'still-tied' && l.rank === lines[0]?.rank,
+      );
+      if (forGood) continue;
+      sentences.push(
+        t(alsoLevelOn[by], { teams: named(teams), value: figureText(by, teams[0]?.value ?? 0) }),
+      );
+      continue;
+    }
+    const [first, second] = teams;
+    if (teams.length === 2 && first !== undefined && second !== undefined) {
+      sentences.push(
+        t(aheadOf[by], {
+          team: nameOf.get(first.teamId) ?? '',
+          other: nameOf.get(second.teamId) ?? '',
+          ahead: figureText(by, first.value),
+          behind: figureText(by, second.value),
+        }),
+      );
+      continue;
+    }
+    const values = entries.format(
+      teams.map((team) =>
+        t('standings.level.entry', {
+          team: nameOf.get(team.teamId) ?? '',
+          figure: figureText(by, team.value),
+        }),
+      ),
+    );
+    sentences.push(t(orderedBy[by], { values }));
+  }
+  // Teams that share a place: nothing in the tiebreakers separates them.
+  const ranks = [
+    ...new Set(members.filter((l) => l.orderedBy === 'still-tied').map((l) => l.rank)),
+  ];
+  for (const rank of ranks) {
+    const part = members.filter((l) => l.orderedBy === 'still-tied' && l.rank === rank);
+    if (part.length < 2) continue;
+    sentences.push(
+      t('standings.level.unbroken', { teams: names.format(part.map((l) => l.team.name)) }),
+    );
+  }
+  return sentences;
+}
+
 /** The shared note for teams nothing in the rules separates: true of each, however many. */
 const stillTiedNote = () => ({ id: stillTiedId, text: t('standings.order.still-tied') });
 
@@ -104,14 +418,15 @@ const stillTiedNote = () => ({ id: stillTiedId, text: t('standings.order.still-t
  * The note of the teams of one level group that have played, or the shared "nothing
  * separates them" note when nothing does and they share one place. Written only from the
  * stored rows: what they are level on, with its number, then for two teams what put the
- * first ahead, and otherwise the season's tiebreakers (which one placed which team is not
- * stored; step 2.198).
+ * first ahead; for three or more, the steps the engine kept (step 2.198), and where they
+ * are not known, the season's tiebreakers only.
  */
 function levelNote(
   group: LevelGroup,
   members: readonly StandingsLine[],
   tiebreakers: readonly string[],
-): { readonly id: string | null; readonly text: string } {
+  pointsPer: Standings['pointsPer'],
+): { readonly id: string | null; readonly text: string; readonly brief?: string } {
   const stillTied = members.every((line) => line.orderedBy === 'still-tied');
   if (stillTied && new Set(members.map((line) => line.rank)).size === 1) return stillTiedNote();
   const [first, second] = members;
@@ -126,7 +441,8 @@ function levelNote(
   const join = t('standings.level.sentenceJoin');
   const by = first?.orderedBy ?? '';
   // Head-to-head between two teams that never met (the team they were compared through is
-  // in the bin, so its row is not shown) is not what put one ahead: the general sentence.
+  // not in the table) is not what put one ahead: the general sentence. A team in the bin
+  // kept for its results is in the table, marked, and named here like any other row.
   const met = by !== 'head-to-head' || (group.gamesBetween ?? 0) > 0;
   if (
     first !== undefined &&
@@ -139,9 +455,19 @@ function levelNote(
     return {
       id: null,
       text: [level, twoTeamReason(by, [first, second], group.gamesBetween)].join(join),
+      brief: level,
     };
   }
-  // Three or more (or two whose stored reasons disagree): never which tiebreaker placed whom.
+  // Three or more who have all played, with the engine's own steps: exactly what placed each.
+  if (group.steps !== null && members.length >= 3 && members.length === group.teamIds.length) {
+    return {
+      id: null,
+      text: [level, ...stepSentences(group.steps, members, pointsPer)].join(join),
+      brief: level,
+    };
+  }
+  // Otherwise (rows saved before step 2.198, a team in the bin or one that has not played,
+  // two whose stored reasons disagree): never which tiebreaker placed whom.
   const list = tiebreakerList(tiebreakers);
   const stillLevel = [
     ...new Set(members.filter((l) => l.orderedBy === 'still-tied').map((l) => l.rank)),
@@ -162,23 +488,82 @@ function levelNote(
       t('standings.level.stillLevel', { teams: names.format(part.map((l) => l.team.name)) }),
     );
   }
-  return { id: null, text: sentences.join(join) };
+  return { id: null, text: sentences.join(join), brief: level };
 }
 
-function columnsOf(table: CoreTable, rankBy: Standings['rankBy']): StandingsColumn[] {
-  const anyTies = table.lines.some((line) => line.ties > 0);
-  return [
-    { key: 'played', label: t('standings.col.played') },
-    { key: 'wins', label: t('standings.col.wins') },
-    { key: 'losses', label: t('standings.col.losses') },
-    ...(anyTies ? [{ key: 'ties', label: t('standings.col.ties') }] : []),
-    { key: 'winPercentage', label: t('standings.col.winPercentage') },
-    ...(rankBy === 'points' ? [{ key: 'points', label: t('standings.col.points') }] : []),
-    { key: 'pointsFor', label: t('standings.col.pointsFor') },
-    { key: 'pointsAgainst', label: t('standings.col.pointsAgainst') },
-    { key: 'pointDifference', label: t('standings.col.pointDifference') },
-    { key: 'streak', label: t('standings.col.streak') },
-  ];
+/**
+ * The table's columns by the season's own names (`standings.columns`), with the key each
+ * row's cell has and its heading. "Last five" has no cell: nothing works it out yet, so
+ * Season settings does not offer it, and a season that holds it draws nothing for it.
+ */
+const seasonColumns = {
+  played: { key: 'played', label: 'standings.col.played', narrow: 'left-out' },
+  wins: { key: 'wins', label: 'standings.col.wins', narrow: 'in-view' },
+  losses: { key: 'losses', label: 'standings.col.losses', narrow: 'in-view' },
+  ties: { key: 'ties', label: 'standings.col.ties', narrow: 'in-view' },
+  'win-percentage': {
+    key: 'winPercentage',
+    label: 'standings.col.winPercentage',
+    narrow: 'in-view',
+  },
+  points: { key: 'points', label: 'standings.col.points', narrow: 'in-view' },
+  'points-for': { key: 'pointsFor', label: 'standings.col.pointsFor' },
+  'points-against': { key: 'pointsAgainst', label: 'standings.col.pointsAgainst' },
+  'point-difference': { key: 'pointDifference', label: 'standings.col.pointDifference' },
+  streak: { key: 'streak', label: 'standings.col.streak' },
+} as const;
+type SeasonColumn = keyof typeof seasonColumns;
+const isSeasonColumn = (name: string): name is SeasonColumn => Object.hasOwn(seasonColumns, name);
+
+/** What a season whose rules cannot be read is drawn with: every column with a cell. */
+const everyColumn: readonly SeasonColumn[] = [
+  'played',
+  'wins',
+  'losses',
+  'win-percentage',
+  'points-for',
+  'points-against',
+  'point-difference',
+  'streak',
+];
+
+/**
+ * The columns of every table of one season, as the season chose them, in its order (P7 §1;
+ * step 2.47, the numbers audit's M7): the same in each table, so a column stands in the same
+ * place in every division (a tie in one division gives every table its column). On a phone
+ * the record and what the table is ordered by (W, L, T, and PCT, or the points in a points
+ * table) are in view beside the team; games played is left to the wide layout, and the rest
+ * are reached by scrolling inside the table's box.
+ * The ties column is added when the season left it out and a game of the table was tied
+ * (else W and L do not add up to GP): just after the last column in view on a phone, so
+ * those still come first (the table's own rule). A table ranked by points always holds its
+ * points column: the rules format refuses one without it (T-290).
+ */
+function columnsOf(standings: Standings): StandingsColumn[] {
+  const chosen = standings.columns.filter(isSeasonColumn);
+  const names: SeasonColumn[] = [...(chosen.length === 0 ? everyColumn : chosen)];
+  const anyTies = standings.tables.some((table) => table.lines.some((line) => line.ties > 0));
+  const points = standings.rankBy === 'points';
+  const narrowOf = (name: SeasonColumn): StandingsColumn['narrow'] => {
+    const column = seasonColumns[name];
+    if (name === 'win-percentage' && points) return 'left-out';
+    return 'narrow' in column ? column.narrow : undefined;
+  };
+  if (!names.includes('ties') && anyTies) {
+    const lastInView = names.findLastIndex((name) => narrowOf(name) === 'in-view');
+    const firstScrolled = names.findIndex((name) => narrowOf(name) === undefined);
+    const at =
+      lastInView !== -1 ? lastInView + 1 : firstScrolled === -1 ? names.length : firstScrolled;
+    names.splice(at, 0, 'ties');
+  }
+  return names.map((name): StandingsColumn => {
+    const narrow = narrowOf(name);
+    return {
+      key: seasonColumns[name].key,
+      label: t(seasonColumns[name].label),
+      ...(narrow === undefined ? {} : { narrow }),
+    };
+  });
 }
 
 function cellsOf(line: StandingsLine): Record<string, string | number> {
@@ -224,9 +609,14 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
   }));
   // Each group's notes, in the table's order, and the note each team carries.
   const levelNotes = new Map<string, string>();
-  const mark = (lines: readonly StandingsLine[], note: { id: string; text: string }) => {
+  // The first sentence of each level-teams note that has more, by the note's id.
+  const briefs = new Map<string, string>();
+  const mark = (lines: readonly StandingsLine[], note: Note) => {
     if (lines.length === 0) return;
-    if (!footnotes.some((f) => f.id === note.id)) footnotes.push(note);
+    if (!footnotes.some((f) => f.id === note.id)) {
+      footnotes.push({ id: note.id, text: note.text });
+      if (note.brief !== undefined) briefs.set(note.id, note.brief);
+    }
     for (const line of lines) levelNotes.set(line.team.id, note.id);
   };
   table.levelGroups.forEach((group, n) => {
@@ -242,8 +632,12 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
       });
     }
     if (played.length >= 2) {
-      const note = levelNote(group, played, standings.tiebreakers);
-      mark(played, { id: note.id ?? `level-${n + 1}`, text: note.text });
+      const note = levelNote(group, played, standings.tiebreakers, standings.pointsPer);
+      mark(played, {
+        id: note.id ?? `level-${n + 1}`,
+        text: note.text,
+        ...(note.brief === undefined ? {} : { brief: note.brief }),
+      });
     } else {
       // One team that has played, level with idle ones only: nothing to compare it with,
       // unless nothing in the rules separated it from them.
@@ -255,21 +649,31 @@ function tableView(table: CoreTable, index: number, standings: Standings): Stand
   });
   const rows = table.lines.map((line): StandingsRow => {
     const level = levelNotes.get(line.team.id);
+    // A team in the bin kept for its results (A-17): its row stays, with a quiet note. It is
+    // shown, so it is counted and named in its level group's note like any other row.
+    if (line.team.removed && !footnotes.some((f) => f.id === removedNote)) {
+      footnotes.push({ id: removedNote, text: t('standings.removedTeam') });
+    }
     return {
       id: line.team.id,
       seed: line.seed,
       team: line.team.name,
       color: line.team.color,
       cells: cellsOf(line),
-      notes: [...line.footnotes.map((n) => `adjustment-${n}`), ...(level ? [level] : [])],
+      notes: [
+        ...line.footnotes.map((n) => `adjustment-${n}`),
+        ...(line.team.removed ? [removedNote] : []),
+        ...(level ? [level] : []),
+      ],
     };
   });
   return {
     key: table.division?.id ?? `table-${index}`,
     caption: table.division?.name ?? t('standings.allTeams'),
-    columns: columnsOf(table, standings.rankBy),
+    columns: columnsOf(standings),
     rows,
     footnotes,
+    briefFootnotes: footnotes.map((f) => ({ id: f.id, text: briefs.get(f.id) ?? f.text })),
   };
 }
 

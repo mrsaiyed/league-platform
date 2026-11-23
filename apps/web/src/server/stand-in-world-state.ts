@@ -54,9 +54,14 @@ export type WorldSeason = {
 export type WorldDivision = {
   readonly id: string;
   readonly seasonId: string;
+  /** The division it sits under, or null at the top (as the divisions table, 0007). */
+  readonly parentDivisionId: string | null;
   readonly name: string;
+  /** Lower-case #rrggbb, or null for the league's own colors. */
+  readonly color: string | null;
   readonly sort: number;
   readonly binned: boolean;
+  readonly version: number;
 };
 
 /** A person, with the fields only staff may read, and the account they are, if any. */

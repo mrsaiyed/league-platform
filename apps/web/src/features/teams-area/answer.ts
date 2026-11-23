@@ -63,6 +63,19 @@ const numberShape = /^(0|00|[1-9][0-9]?)$/;
 /** The anchor of a roster line, where a refusal of its leaving date is said. */
 export const entryAnchor = (entryId: string): string => `entry-${entryId}`;
 
+/** The command whose refusals the "Remove this team" panel says beside its button (A-17). */
+export const removeTeamCommand = 'teams.remove_team';
+
+/** The anchor of that panel, where the browser lands after a refusal of it. */
+export const removeTeamAnchor = 'remove-team';
+
+/** The code of a refusal of "Remove this team" in the address, or undefined if there is none. */
+export function removeRefusalOf(query: Query): string | undefined {
+  const word = only(query['problem']);
+  const start = `${removeTeamCommand}.`;
+  return word !== undefined && word.startsWith(start) ? word.slice(start.length) : undefined;
+}
+
 /**
  * The part of the address that carries an answer: `?done=created` or `?problem=...`; a
  * refused leaving date adds its line and what was typed, and the line's anchor.
@@ -77,6 +90,8 @@ export function answerQuery(answer: Answer): string {
     return `?done=${answer.done}&entry=${entry}${number}#${entryAnchor(entry)}`;
   }
   const problem = `?problem=${encodeURIComponent(`${answer.command}.${answer.code}`)}`;
+  // Said in the panel the button is in, where the phone is looking.
+  if (answer.command === removeTeamCommand) return `${problem}#${removeTeamAnchor}`;
   const at = answer.at;
   if (at === undefined || !uuidShape.test(at.entry)) return problem;
   const leftOn = dateShape.test(at.leftOn) ? at.leftOn : '';

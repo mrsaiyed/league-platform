@@ -9,9 +9,22 @@ import { findTransition } from '../league-states.ts';
 import { leagueStatuses, type LeagueStatus } from '../league-values.ts';
 import { mayActAsPlatform, mayChangeLeagueSettings } from '../policy.ts';
 import type { LeaguesTx } from '../ports.ts';
+import { readPublishChecks } from '../queries/read-publish-checks.ts';
+import { firstUnmetCheck, type PublishCheckKey } from '../rules/publish-checks.ts';
 
 export type SetLeagueStatusError = {
-  readonly code: 'illegal-transition' | 'changed-since-read';
+  readonly code:
+    | 'illegal-transition'
+    | 'changed-since-read'
+    // P3 §3's "Must fix" list (step 2.240): publishing a draft waits for each, and the
+    // first one not met is the refusal, each with its own sentence.
+    | 'no-contact-email'
+    | 'privacy-not-chosen';
+};
+
+const unmetCodes: Readonly<Record<PublishCheckKey, SetLeagueStatusError['code']>> = {
+  contactEmail: 'no-contact-email',
+  privacyChosen: 'privacy-not-chosen',
 };
 
 export const setLeagueStatus = defineCommand({
@@ -42,6 +55,12 @@ export const setLeagueStatus = defineCommand({
     if (league.version !== input.version) return fail({ code: 'changed-since-read' });
     if (findTransition(league.status, input.status) === undefined) {
       return fail({ code: 'illegal-transition' });
+    }
+    // Publishing (draft to live) is held back by what must be put right first; bringing
+    // an archived league back is not publishing it anew.
+    if (league.status === 'draft' && input.status === 'live') {
+      const unmet = firstUnmetCheck(await readPublishChecks(tx));
+      if (unmet !== undefined) return fail({ code: unmetCodes[unmet] });
     }
     const version = await tx.leagues.setStatus(input.status, input.version);
     if (version === undefined) return fail({ code: 'changed-since-read' });

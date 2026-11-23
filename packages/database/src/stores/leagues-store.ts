@@ -8,6 +8,7 @@ import {
   findSeason,
   findCurrentLeague,
   findLeagueAudience,
+  findLeagueContactEmail,
   findPublishedDesign,
   findProgramId,
   hasRecordedChild,
@@ -42,6 +43,7 @@ export function leaguesStore(
     setName: (name, version) => updateLeagueName(scope, name, version),
     leagueAudience: () => findLeagueAudience(scope),
     hasRecordedChild: () => hasRecordedChild(scope),
+    leagueContactEmail: () => findLeagueContactEmail(scope),
     isPlatformStaff: async () =>
       scope.accountId !== null && platformStaff.includes(scope.accountId),
     createLeague: (league) => insertLeague(scope, league),

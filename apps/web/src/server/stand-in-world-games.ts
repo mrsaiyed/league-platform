@@ -113,11 +113,18 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       const at = s.games.findIndex((g) => g.id === gameId);
       const found = s.games[at];
       if (found === undefined || found.binned || found.version !== version) return undefined;
+      // As 0021 refuses it: only a final game has an overtime count, of 0 to 18.
+      const overtime = change.overtimePeriods;
+      if (overtime !== null && (change.status !== 'final' || overtime < 0 || overtime > 18)) {
+        throw new Error('The database refuses an overtime count on a game that is not final.');
+      }
       s.games = replacedAt(s.games, at, {
         ...found,
         status: change.status,
         homeScore: change.homeScore,
         awayScore: change.awayScore,
+        // Written with every change of a result, as the database's update does.
+        overtimePeriods: overtime,
         finalizedAt: change.decided ? now().toISOString() : null,
         format: found.format ?? change.format ?? null,
         captureMode: change.captureMode ?? found.captureMode,
@@ -359,10 +366,10 @@ export function worldScoringSessions(s: LeagueWorld): ScoringSessionsStore {
       s.sessions = [...s.sessions, started];
       return started;
     },
-    extend: async (gameId, sessionId, heldUntil) => {
+    extend: async (gameId, sessionId, heldUntil, dueBefore) => {
       const at = s.sessions.findIndex((x) => x.gameId === gameId && x.id === sessionId);
       const found = s.sessions[at];
-      if (found === undefined) return false;
+      if (found === undefined || found.heldUntil >= dueBefore) return false;
       s.sessions = replacedAt(s.sessions, at, { ...found, heldUntil });
       return true;
     },

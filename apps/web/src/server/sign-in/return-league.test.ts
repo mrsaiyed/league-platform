@@ -44,7 +44,8 @@ const hiddenNames = [
   'Quiet Pines League',
   'Closed Gate League',
   'Binned League',
-  'Still Waters League',
+  // The second draft; Still Waters, the empty league, starts live (step 2.194).
+  'Reed Marsh League',
 ];
 const crafted = [
   '/quiet-pines',
@@ -57,7 +58,7 @@ const crafted = [
   '/closed-gate',
   '/closed-gate/admin/settings',
   '/binned-league',
-  '/still-waters/admin',
+  '/reed-marsh/admin',
   '//quiet-pines',
   '/\\quiet-pines',
   '/no-such-league',
@@ -77,23 +78,60 @@ describe('returnLeagueFor (U-9)', () => {
     });
   }
 
-  it('names a league the person may see, and leads back to the page they came from', async () => {
+  it('names a league the person may see, and leads back to its home', async () => {
     const found = await returnLeagueFor(
       safeReturnPath('/north-valley/schedule?team=owls'),
       await factsOf('visitor'),
       deps,
       standInLeagueSites,
     );
-    expect(found).toEqual({
-      name: 'North Valley League',
-      href: '/north-valley/schedule?team=owls',
-    });
+    expect(found).toEqual({ name: 'North Valley League', href: '/north-valley' });
     expect(await named('visitor', '/old-meadow')).toBe('Old Meadow League');
+  });
+
+  it('never leads back to the page that refused the person (review of step 2.157)', async () => {
+    for (const who of ['visitor', 'coach', 'stranger'] as const) {
+      for (const raw of ['/north-valley/admin', '/north-valley/admin/teams']) {
+        const found = await returnLeagueFor(
+          safeReturnPath(raw),
+          await factsOf(who),
+          deps,
+          standInLeagueSites,
+        );
+        expect({ who, raw, found }).toEqual({
+          who,
+          raw,
+          found: { name: 'North Valley League', href: '/north-valley' },
+        });
+      }
+    }
+  });
+
+  it('leads Terms and Privacy back to the page itself, for a league the person may see', async () => {
+    const found = await returnLeagueFor(
+      safeReturnPath('/north-valley/schedule'),
+      await factsOf('visitor'),
+      deps,
+      standInLeagueSites,
+      'page',
+    );
+    expect(found).toEqual({ name: 'North Valley League', href: '/north-valley/schedule' });
+    expect(
+      await returnLeagueFor(
+        safeReturnPath('/quiet-pines/schedule'),
+        await factsOf('visitor'),
+        deps,
+        standInLeagueSites,
+        'page',
+      ),
+    ).toBeNull();
   });
 
   it("names a draft to its own staff only, and never another draft's", async () => {
     expect(await named('scheduler', '/quiet-pines')).toBe('Quiet Pines League');
     expect(await named('otherAdmin', '/quiet-pines')).toBeNull();
+    expect(await named('otherAdmin', '/reed-marsh')).toBeNull();
+    expect(await named('owner', '/reed-marsh')).toBe('Reed Marsh League');
     expect(await named('otherAdmin', '/still-waters')).toBe('Still Waters League');
     expect(await named('owner', '/closed-gate')).toBe('Closed Gate League');
     expect(await named('scorekeeper', '/closed-gate')).toBeNull();

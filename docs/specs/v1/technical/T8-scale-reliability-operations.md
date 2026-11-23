@@ -76,17 +76,18 @@ There are three different kinds of "undo", for three different mistakes.
 ## 6. Releasing changes
 
 1. A change is proposed as a pull request. Automatic checks run ([T9](T9-quality-and-maintainability.md)) and a preview copy of the site is created.
-2. Once approved and merged, it is deployed to **staging** automatically, where a short set of browser tests runs against it.
+2. Once approved and merged, it is deployed to **staging** automatically, where a short set of browser tests runs against it. **T-286** (record 082): staging starts only after its settings, its database login, the sign-in store's role and the sign-in service's email confirmation have each been checked, and every answer of a copy that is not production says "do not index" (a header, the page's own mark and `robots.txt`).
 3. It is promoted to **production** with one action. New copies start, are checked, and take over from the old ones with no downtime.
 
 - **T-156: every release can be reversed in minutes** by promoting the previous version. That works because database changes are always made so that the previous version still runs against them (T-49).
 - **T-157: unfinished features ship switched off** behind our own rollout flags (T-100), so releasing is routine and small.
 - **T-158: no releases while many games are live.** The release step checks how many games are in progress and refuses above a small number unless overridden for an emergency fix.
+- **T-300 (step 2.95, record 101): how this is done on the test copy until the steps above are built.** A person runs the release command at their own terminal with the migration login, which is never a setting on the host, its password typed when asked with the typing hidden, never on the command line: it counts the live games (the limit is 0, and `--go-ahead` overrides it, until T-127 is proved), applies the database changes ("applied on release", T-48) and, only when every one applied, names the commit, which the person then deploys by hand on Render, its automatic deploys off. Reversing (T-156) is deploying the previous commit by hand; the database is never taken back. The procedures are in `docs/operations/`: `releasing-and-going-back.md`, `render-test-copy.md`, `new-test-copy.md`, `rotating-a-secret.md` and `restoring-the-database.md`.
 
 ## 7. Knowing what is happening
 
 - **Errors** from the web app, the worker and visitors' browsers go to Sentry, grouped and deduplicated.
-- **Uptime checks** every minute from outside: our home page, one league page, the health check of the web app, and the worker's heartbeat.
+- **Uptime checks** every minute from outside: our home page, one league page, the health check of the web app, and the worker's heartbeat. **T-286:** the web app's health check answers whether it started and whether its database answers now, within seconds (record 082).
 - **A dashboard** shows: page speed, error rate, database load, oldest waiting job, live connections, email bounce rate.
 - **T-159: alerts go to a phone** for: the site down, error rate spiking, a job waiting over 10 minutes (T-142), database nearly full, bounce rate rising.
 - **A public status page** shows current state and past incidents.
@@ -128,6 +129,8 @@ There are three different kinds of "undo", for three different mistakes.
 `docs/operations/` holds a short, tested procedure for each of: releasing and reversing a release; restoring the database; rotating a secret; suspending and restoring a league; handling a bounce or spam-complaint spike; granting support access; responding to an incident (T-84); and the game-night checklist.
 
 **T-165:** a procedure counts as written only after someone has followed it start to finish.
+
+A procedure that can be rehearsed with made-up data is rehearsed first by a kept command, so the supervised session meets nothing new but what only the real services can show: the new test copy by `npm run rehearse:test-copy` (step 2.207, T-301), which lists at the procedure's top what it cannot show. A rehearsal does not make a procedure followed.
 
 ## 12. When things outside our control fail
 

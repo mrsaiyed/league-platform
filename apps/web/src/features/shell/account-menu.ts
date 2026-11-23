@@ -1,6 +1,8 @@
 // What the account button at the top right of every league page holds (U-8, step 2.127),
 // worked out from what the league's gate already knows of the person: their admin areas
-// here and whether they may score here. Nothing in it leads to a page not built yet.
+// here and whether they may score here; and, from their own teams of the season
+// (team-pages, myTeamsOf), "My team" for anyone with a team (step 2.168). Nothing in it
+// leads to a page not built yet.
 //
 // It is made for one request and drawn into that request's page only. League pages are
 // drawn per request (they read the session cookie), and an answer that carries the
@@ -23,12 +25,24 @@ export type AccountMenu = {
   readonly adminHref: string | null;
   /** Their games to score, for someone who may score here. */
   readonly gamesHref: string | null;
+  /**
+   * Their team's page by way of `/{league}/my`, for someone with a team of the season here
+   * (step 2.168); `several` when they have more than one, which `/my` then shows them.
+   */
+  readonly myTeam: { readonly href: string; readonly several: boolean } | null;
   readonly accountHref: string;
   /**
    * On the scoring page: "Sign out" leaves the open game first, as the tracker's own way
    * out does, and with scripts off is a link to the account page (tracker-sign-out.ts).
    */
   readonly onScoringPage: boolean;
+  /**
+   * What "Sign out" tells the server (step 2.163, R-30): the page the person is on, so
+   * they are left on it, told "You are signed out."; on a staff page (the admin, the
+   * scoring page), which asks a signed-out person to sign in (U-15), also `staff`, so the
+   * sign-in screen says it and brings them back. The server checks the page again.
+   */
+  readonly signOutFields: Readonly<Record<string, string>>;
 };
 
 /** The account button for the person `view` is for, or null for a visitor. */
@@ -36,6 +50,8 @@ export function accountMenuOf(
   view: LeagueView,
   email: string | null,
   path: string,
+  /** How many teams of the season are the person's own here (myTeamsOf). */
+  teams = 0,
 ): AccountMenu | null {
   if (view.context.account === null || email === null) return null;
   const league = view.context.league;
@@ -51,8 +67,13 @@ export function accountMenuOf(
       : onlyScores
         ? leagueUrl(league, 'admin')
         : leagueUrl(league, 'admin-area', { area: 'games' }),
+    myTeam: teams > 0 ? { href: leagueUrl(league, 'my'), several: teams > 1 } : null,
     accountHref: platformUrl('account'),
     onScoringPage: isScoringPage(league, path),
+    signOutFields:
+      isScoringPage(league, path) || isAdminPage(league, path)
+        ? { next: path, staff: 'yes' }
+        : { next: path },
   };
 }
 
@@ -64,6 +85,13 @@ export function isScoringPage(league: LeagueAddressee, path: string): boolean {
   const base = plain(sample.slice(0, sample.length - 'game'.length));
   const at = plain(path);
   return at.startsWith(base) && at.length > base.length;
+}
+
+/** Whether `path` (the address as it arrived) is one of the admin's pages in `league`. */
+export function isAdminPage(league: LeagueAddressee, path: string): boolean {
+  const base = plain(leagueUrl(league, 'admin'));
+  const at = plain(path);
+  return at === base || at.startsWith(`${base}/`);
 }
 
 /** The question asked before signing out with plays waiting, in the page's words. */

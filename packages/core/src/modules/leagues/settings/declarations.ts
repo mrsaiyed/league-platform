@@ -157,7 +157,7 @@ export const playersMayAskForInitials = defineSetting({
 /**
  * The least number of games a player needs to be ranked among the leaders (P7 §6: a rule
  * the league sets). The lead answered the starting value for the founder at step 2.93
- * part 3: 3 games, and the league can change it; 0 ranks everyone. At most 1000, as core's
+ * part 3: 3 games, and the league can change it; 0 sets no minimum. At most 1000, as core's
  * leaders read allows (readStatLeaders). A player below it stays in the full table.
  */
 export const minimumGamesToRank = defineSetting({

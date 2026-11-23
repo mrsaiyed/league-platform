@@ -3,3 +3,5 @@
 *.png binary
 *.jpg binary
 *.webp binary
+# Lanes each add lines at the end of the polish list; keep both sides instead of a conflict at every landing.
+docs/build/polish.md merge=union

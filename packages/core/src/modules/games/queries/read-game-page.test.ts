@@ -1,5 +1,8 @@
+import { defaultSeasonRules } from '@srleagues/contracts';
+import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import { defaultNamePolicy, publicViewer, type Viewer } from '../../people/index.ts';
+import { engineRulesOf } from '../engine-rules.ts';
 import type { GamesReadStore } from '../read-ports.ts';
 import { readGamePage, type GameViewing } from './read-game-page.ts';
 
@@ -23,11 +26,13 @@ const store = (over: Partial<GamesReadStore> = {}): GamesReadStore => ({
           captureMode: 'live',
           homeScore: 52,
           awayScore: 48,
+          overtimePeriods: null,
           finalizedAt: '2026-12-06T19:30:00.000Z',
           binned: false,
           rules: null,
         }
       : undefined,
+  seasonStatistics: async (id) => (id === 's' ? { statKeys: [], rules: null } : undefined),
   teams: async () => [
     { id: home, name: 'Home', slug: 'h', color: null, statsVisibility: 'everyone' },
     { id: away, name: 'Away', slug: 'a', color: null, statsVisibility: 'staff' },
@@ -93,7 +98,13 @@ describe('readGamePage', () => {
     expect(homeBox.players.map((p) => p.name)).toEqual(['Hana Player']);
     expect(awayBox.playerLinesShown).toBe(false);
     expect(awayBox.players).toEqual([]);
-    expect(awayBox.totals).toEqual({ points: 41, fouls: 1 });
+    // The Total's points are the game's score, 48 (S-26 as changed by step 2.196). What
+    // the hidden players' points add to (41) is not handed to this visitor; the team's
+    // coach gets it, below, where the lines show.
+    expect(awayBox.totals).toEqual({ points: 48, fouls: 1 });
+    expect(awayBox.playersPoints).toBeNull();
+    expect(JSON.stringify(page)).not.toContain('41');
+    expect(awayBox.teamTurnovers).toBe(0);
     const text = JSON.stringify(page);
     expect(text).not.toContain(awayPlayer);
     expect(text).not.toContain('Avery');
@@ -120,6 +131,16 @@ describe('readGamePage', () => {
       'Avery Player',
     ]);
     expect(await withLines({ leagueId, leagueAdmin: false, staffOfTeamIds: [home] })).toEqual([]);
+    // The team's coach sees the lines, so is told what they add to beside the score's 48.
+    const coach = await readGamePage(
+      store(),
+      { gameId },
+      viewing({ leagueId, leagueAdmin: false, staffOfTeamIds: [away] }),
+    );
+    expect(coach.ok && coach.value.boxScores[1]).toMatchObject({
+      totals: { points: 48 },
+      playersPoints: 41,
+    });
   });
 
   it('keeps a person who asked to be removed nameless and finds no binned or missing game', async () => {
@@ -141,10 +162,178 @@ describe('readGamePage', () => {
     });
   });
 
+  it("counts case 18's turnover charged to the team in the team's Total: 2, not 1", async () => {
+    const full = { ...defaultSeasonRules(), statistics: 'full' as const };
+    const taps: basketball.Command[] = [
+      { type: 'lineup', side: 'home', playerIds: [homePlayer] },
+      { type: 'lineup', side: 'away', playerIds: [awayPlayer] },
+      { type: 'start' },
+      { type: 'score', side: 'home', playerId: homePlayer, points: 2 },
+      { type: 'team-turnover', side: 'away' },
+      { type: 'turnover', side: 'away', playerId: awayPlayer },
+      { type: 'end' },
+    ];
+    const state = taps.reduce(
+      (s, command, i) => basketball.apply(s, command, { id: `c${i}`, now: 1_000 * (i + 1) }),
+      basketball.newGame(engineRulesOf(full)),
+    );
+    // The lines the server saves from that state: its players' only (live-game.ts, linesOf).
+    const lines = Object.entries(basketball.derive(state).players).map(([personId, line]) => ({
+      teamId: line.side === 'home' ? home : away,
+      personId,
+      jerseyNumber: null,
+      played: line.appeared,
+      secondsPlayed: Math.floor(line.ms / 1000),
+      stats: { points: line.points, fouls: line.fouls, turnovers: line.turnovers },
+    }));
+    const played = store({
+      findGame: async (id) =>
+        id === gameId
+          ? {
+              id,
+              seasonId: 's',
+              homeTeamId: home,
+              awayTeamId: away,
+              startsAt: null,
+              status: 'final',
+              captureMode: 'live',
+              homeScore: 2,
+              awayScore: 0,
+              overtimePeriods: 0,
+              finalizedAt: '2026-12-06T19:30:00.000Z',
+              binned: false,
+              rules: full,
+            }
+          : undefined,
+      seasonStatistics: async () => ({ statKeys: [], rules: full }),
+      state: async () => state,
+      lines: async () => lines,
+    });
+    const r = await readGamePage(played, { gameId }, viewing(publicViewer(leagueId)));
+    if (!r.ok) throw new Error('expected a page');
+    const awayBox = r.value.boxScores[1];
+    // The engine counts 2; the player's line holds 1; the team's own is the other.
+    expect(basketball.derive(state).teams.away.turnovers).toBe(2);
+    expect(lines.reduce((sum, l) => sum + l.stats.turnovers, 0)).toBe(1);
+    expect(awayBox.teamTurnovers).toBe(1);
+    expect(awayBox.totals).toMatchObject({ turnovers: 2, points: 0 });
+    expect(r.value.boxScores[0].totals).toMatchObject({ turnovers: 0, points: 2 });
+    // A season keeping the full set keeps turnovers, so the page may show the column.
+    expect(r.value.game.statKeys).toContain('turnovers');
+    expect(r.value.plays.filter((p) => p.type === 'team-turnover')).toHaveLength(1);
+  });
+
+  it("shows case 40's typed score as the Total's points, and what the players' points add to", async () => {
+    const boxScore = store({
+      findGame: async (id) =>
+        id === gameId
+          ? {
+              id,
+              seasonId: 's',
+              homeTeamId: home,
+              awayTeamId: away,
+              startsAt: null,
+              status: 'final',
+              captureMode: 'box',
+              homeScore: 50,
+              awayScore: 45,
+              overtimePeriods: null,
+              finalizedAt: '2026-12-06T19:30:00.000Z',
+              binned: false,
+              rules: null,
+            }
+          : undefined,
+      state: async () => undefined,
+      lines: async () =>
+        [20, 16, 12].map((points, i) => ({
+          teamId: home,
+          personId: `01900000-0000-7000-8000-00000000f10${i}`,
+          jerseyNumber: String(i + 1),
+          played: true,
+          secondsPlayed: null,
+          stats: { points, fouls: 1 },
+        })),
+    });
+    const r = await readGamePage(boxScore, { gameId }, viewing(publicViewer(leagueId)));
+    if (!r.ok) throw new Error('expected a page');
+    const homeBox = r.value.boxScores[0];
+    expect(r.value.scoreboard.home.score).toBe(50);
+    expect(homeBox.totals).toEqual({ points: 50, fouls: 3 });
+    expect(homeBox.playersPoints).toBe(48);
+    // The other team has no lines: no Total to explain, and none made up.
+    expect(r.value.boxScores[1].totals).toEqual({});
+    expect(r.value.boxScores[1].playersPoints).toBeNull();
+  });
+
+  it("gives the statistics the season keeps today, as the statistics page does, not the game's own fixed rules", async () => {
+    const full = { ...defaultSeasonRules(), statistics: 'full' as const };
+    const keysWith = async (seasonRules: unknown, statKeys: readonly string[]) => {
+      const base = store();
+      const s = store({
+        // The game kept the full set when it was played (S-1); the season may differ now.
+        findGame: async (id) => {
+          const found = await base.findGame(id);
+          return found === undefined ? undefined : { ...found, rules: full };
+        },
+        seasonStatistics: async () => ({ statKeys, rules: seasonRules }),
+      });
+      const r = await readGamePage(s, { gameId }, viewing(publicViewer(leagueId)));
+      return r.ok ? r.value.game.statKeys : undefined;
+    };
+    expect(await keysWith(defaultSeasonRules(), [])).toEqual(['points', 'fg3', 'fg1', 'fouls']);
+    expect(await keysWith(full, [])).toContain('turnovers');
+    expect(await keysWith(null, ['points', 'rebounds'])).toEqual(['points', 'rebounds']);
+  });
+
+  it("keeps a live game's Total at the score its plays add to", async () => {
+    const live = store({
+      findGame: async (id) => {
+        const found = await store().findGame(id);
+        return found === undefined
+          ? undefined
+          : { ...found, status: 'live', homeScore: null, awayScore: null };
+      },
+    });
+    const r = await readGamePage(live, { gameId }, viewing(publicViewer(leagueId)));
+    if (!r.ok) throw new Error('expected a page');
+    expect(r.value.scoreboard.home.score).toBe(2);
+    expect(r.value.boxScores[0].totals['points']).toBe(2);
+    expect(r.value.boxScores[1].totals['points']).toBe(3);
+  });
+
   it('shows a game with no live state and no lines as a score only', async () => {
     const bare = store({ state: async () => undefined, lines: async () => [] });
     const r = await readGamePage(bare, { gameId }, viewing(publicViewer(leagueId)));
     expect(r.ok && r.value.plays).toEqual([]);
     expect(r.ok && r.value.scoreboard.period).toBeNull();
+  });
+
+  it('gives a final game’s overtime periods as its result keeps them, and none for any other (step 2.200)', async () => {
+    const withGame = (status: string, overtimePeriods: number | null) => {
+      const base = store();
+      return store({
+        findGame: async (id) => {
+          const found = await base.findGame(id);
+          return found === undefined ? undefined : { ...found, status, overtimePeriods };
+        },
+      });
+    };
+    const read = async (status: string, count: number | null) => {
+      const r = await readGamePage(
+        withGame(status, count),
+        { gameId },
+        viewing(publicViewer(leagueId)),
+      );
+      return r.ok ? r.value.game.overtimePeriods : 'not found';
+    };
+    // Case 44: won in the first overtime.
+    expect(await read('final', 1)).toBe(1);
+    expect(await read('final', 2)).toBe(2);
+    expect(await read('final', 0)).toBe(0);
+    // Not known: a score typed in, a box score, a game final before the count was kept.
+    expect(await read('final', null)).toBeNull();
+    // Only a final game says it, whatever a store hands over.
+    expect(await read('live', 1)).toBeNull();
+    expect(await read('forfeit', 1)).toBeNull();
   });
 });

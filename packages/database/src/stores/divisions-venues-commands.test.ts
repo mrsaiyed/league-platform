@@ -5,6 +5,7 @@
 // and the queries behind them. Their isolation cases are in ../isolation.
 import type { PGlite } from '@electric-sql/pglite';
 import {
+  countPlaceGames,
   createCourt,
   createDivision,
   createVenue,
@@ -31,8 +32,11 @@ import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import {
   freshSchema,
+  newGame,
   newLeague,
   newSeason,
+  newStage,
+  newTeam,
   one,
   type MadeLeague,
 } from '../schema/schema.test-helper.ts';
@@ -341,5 +345,95 @@ describe('venues and courts', () => {
     expect(
       codeOf(await updateCourt(l.as, { courtId: venue.venueId, version: 1, name: 'x' }, venueDeps)),
     ).toBe('court-not-found');
+  });
+
+  it('counts games played and to come at each venue and court, and holds a court with games to come (step 2.49)', async () => {
+    const l = await league();
+    const venue = value(await createVenue(l.as, { name: 'Main gym' }, venueDeps));
+    const busy = value(
+      await createCourt(l.as, { venueId: venue.venueId, name: 'Court 1' }, venueDeps),
+    );
+    const quiet = value(
+      await createCourt(l.as, { venueId: venue.venueId, name: 'Court 2' }, venueDeps),
+    );
+    const stageId = await newStage(pglite, l.leagueId, l.seasonId);
+    const [home, away] = [
+      await newTeam(pglite, l.leagueId, l.seasonId),
+      await newTeam(pglite, l.leagueId, l.seasonId),
+    ];
+    const game = (court: string, columns: Record<string, unknown>) =>
+      newGame(pglite, {
+        leagueId: l.leagueId,
+        seasonId: l.seasonId,
+        stageId,
+        homeTeamId: home,
+        awayTeamId: away,
+        columns: { venue_id: venue.venueId, court_id: court, ...columns },
+      });
+    const played = {
+      status: 'final',
+      home_score: 50,
+      away_score: 41,
+      finalized_at: '2026-11-01T20:00:00Z',
+    };
+    await game(busy.courtId, { status: 'scheduled', starts_at: '2026-12-06T18:00:00Z' });
+    await game(busy.courtId, played);
+    await game(quiet.courtId, played);
+    // A cancelled game holds nothing.
+    await game(quiet.courtId, { status: 'cancelled', starts_at: '2026-12-13T18:00:00Z' });
+    const counted = value(await countPlaceGames(l.as, {}, venueDeps));
+    expect(counted).toEqual([
+      {
+        venueId: venue.venueId,
+        played: 2,
+        toCome: 1,
+        inDraft: 0,
+        courts: {
+          [busy.courtId]: { played: 1, toCome: 1, inDraft: 0 },
+          [quiet.courtId]: { played: 1, toCome: 0, inDraft: 0 },
+        },
+      },
+    ]);
+    expect(codeOf(await removeCourt(l.as, { courtId: busy.courtId }, venueDeps))).toBe(
+      'court-has-games-to-come',
+    );
+    expect(codeOf(await removeCourt(l.as, { courtId: quiet.courtId }, venueDeps))).toBe('ok');
+  });
+
+  it("leaves another league's games out of a league's count at its venues and courts", async () => {
+    const mine = await league();
+    const theirs = await league();
+    const place = async (l: Made) => {
+      const venue = value(await createVenue(l.as, { name: 'Main gym' }, venueDeps));
+      const court = value(
+        await createCourt(l.as, { venueId: venue.venueId, name: 'Court 1' }, venueDeps),
+      );
+      const stageId = await newStage(pglite, l.leagueId, l.seasonId);
+      await newGame(pglite, {
+        leagueId: l.leagueId,
+        seasonId: l.seasonId,
+        stageId,
+        homeTeamId: await newTeam(pglite, l.leagueId, l.seasonId),
+        awayTeamId: await newTeam(pglite, l.leagueId, l.seasonId),
+        columns: {
+          venue_id: venue.venueId,
+          court_id: court.courtId,
+          status: 'scheduled',
+          starts_at: '2026-12-06T18:00:00Z',
+        },
+      });
+      return { venueId: venue.venueId, courtId: court.courtId };
+    };
+    const at = await place(mine);
+    await place(theirs);
+    expect(value(await countPlaceGames(mine.as, {}, venueDeps))).toEqual([
+      {
+        venueId: at.venueId,
+        played: 0,
+        toCome: 1,
+        inDraft: 0,
+        courts: { [at.courtId]: { played: 0, toCome: 1, inDraft: 0 } },
+      },
+    ]);
   });
 });

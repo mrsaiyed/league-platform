@@ -41,6 +41,7 @@ A change cannot be merged unless all of these pass. They run automatically.
 - Structure rules: imports only in allowed directions (T-21); no league named in code (T-27); no SQL outside `packages/database`; no secrets in browser code (T-30); steps of the worker's jobs that are not commands are named only by the worker (T-226, record 014).
 - Type checking in strict mode.
 - Rule tests and database tests, including the two-league harness (T-65) and the role-by-command matrix.
+- **T-292: database tests on a real PostgreSQL**, beside those on the in-process one: a throw-away server made on the computer from the programs it already has, this computer only, encrypted, with the roles of a hosted database (`npm run test:real-postgres`, [record 092](../../../architecture/decisions/092-a-real-postgresql-for-tests.md)). It fails, never skips, where no PostgreSQL is found. Run on the builder's computer until GitHub's machines have run it; then it joins these checks (step 2.99).
 - The public-field scan (T-81).
 - A build of the web app and worker.
 - The browser journeys (a fast subset on each change; all of them before release).
@@ -113,6 +114,8 @@ Technical choices that are not obvious are written as a page each in `docs/archi
 None contains real people.
 
 _Stage 1 (step 1.21):_ stage 1 seeds two simple made-up leagues (`npm run seed`, data in `packages/database/src/seed/`): different designs, an owner, an admin and other members, one season, divisions, teams and people. The Faraj-like league, the Al-Hadi-like demo league and the generated association above come in later stages, as further entries of the same seed data. Until the design editor exists, a seed league's design is kept in the seed data, not in the database (T-185).
+
+_Stage 2 (step 2.59):_ `npm run seed` loads three leagues. The two of stage 1 have their season under way: divisions, venues, teams, rosters, a published schedule, final scores and one game scored live through the tracker. The third is the demo-like league above, made up and shaped like a large association (not a copy of one): one program, a past 2025–26 season of ten weeks, four districts, 24 teams with results played from each school's strength, every game final, loaded through the product's own fixture import from `supabase/seed/demo-league/fixtures.csv` (which doubles as the template for real results) and put into weeks with the schedule builder's commands, and one team's games scored live, brought in by the tracker transfer from a made-up backup; every other team's players' statistics are for staff only. Only the tracked team and the five it played list players. This is what the league does not yet show as a real association's demo must: the five schools the tracked school played have their players listed on their own team pages, because the tracker's games name them; steps 2.219 (whether a roster is public) and 2.233 (the transfer brings the other side in as its team's totals) must land before a real association's league is loaded. The load reads no clock, so it is the same on any day. The web app's made-up database holds it when asked (`LOCAL_DEMO_LEAGUE=on`), since it adds seconds to every start. The Faraj-like league and the generated association are still to come.
 
 ## 12. What every command records
 

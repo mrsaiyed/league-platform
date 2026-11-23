@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { freshSchema } from '../schema/schema.test-helper.ts';
 import {
   connectCauseOf,
+  serverCodeOf,
   hostOnThisComputer,
   openLeagueMakingTarget,
   supabaseProjectOf,
@@ -114,7 +115,7 @@ describe('openLeagueMakingTarget on a hosted database', () => {
         }),
       ).toEqual({
         ok: false,
-        problem: { kind: 'cannot-connect', login: 'migration', cause: 'timeout' },
+        problem: { kind: 'cannot-connect', login: 'migration', cause: 'timeout', code: null },
       });
       expect(Date.now() - started).toBeLessThan(10_000);
     } finally {
@@ -126,7 +127,7 @@ describe('openLeagueMakingTarget on a hosted database', () => {
     const nobody = 'postgres://made-up:made-up@127.0.0.1:1/none';
     expect(await openLeagueMakingTarget(hosted(nobody, nobody))).toEqual({
       ok: false,
-      problem: { kind: 'cannot-connect', login: 'migration', cause: 'network' },
+      problem: { kind: 'cannot-connect', login: 'migration', cause: 'network', code: null },
     });
   });
 
@@ -238,5 +239,19 @@ describe('what a connection says about itself', () => {
     expect(connectCauseOf(failure('ERR_TLS_CERT_ALTNAME_INVALID'))).toBe('certificate');
     expect(connectCauseOf(new Error('The server does not support SSL connections'))).toBe('ssl');
     expect(connectCauseOf(new Error('something else'))).toBe('unknown');
+    // By the code alone (step 2.203): words that speak of a certificate are not enough.
+    expect(connectCauseOf(new Error('a certificate, in words only'))).toBe('unknown');
+    expect(connectCauseOf(failure('UNABLE_TO_GET_ISSUER_CERT_LOCALLY'))).toBe('certificate');
+    // The server answered with a code of its own: reached, and refused (fix round, 2.203).
+    expect(connectCauseOf(failure('XX000', 'Tenant or user not found'))).toBe('refused');
+    expect(connectCauseOf(failure('53300'))).toBe('refused');
+    expect(serverCodeOf(failure('XX000'))).toBe('XX000');
+    expect(serverCodeOf(failure('53300'))).toBe('53300');
+    // A wrong password is still the login; Node's own codes are not the server's.
+    expect(connectCauseOf(failure('28P01'))).toBe('login');
+    for (const code of ['EPIPE', 'ECONNRESET', 'ETIMEDOUT', 'ERR_TLS_CERT_ALTNAME_INVALID']) {
+      expect(serverCodeOf(failure(code)), code).toBeNull();
+    }
+    expect(serverCodeOf(new Error('no code'))).toBeNull();
   });
 });

@@ -55,18 +55,21 @@ export async function readTeamRecords(
   ]);
   const byTeam = new Map(rows.map((row) => [row.teamId, row]));
   const divisionOrder = new Map(divisions.map((d, i) => [d.id, [d.sort, i] as const]));
-  const records = teams.map((team) =>
-    recordOf(
-      {
-        id: team.id,
-        name: team.name,
-        slug: team.slug,
-        color: team.color,
-        divisionId: team.divisionId,
-      },
-      byTeam.get(team.id),
-    ),
-  );
+  // A team in the bin, kept in the standings for its results, has no page or card (A-17).
+  const records = teams
+    .filter((team) => !team.removed)
+    .map((team) =>
+      recordOf(
+        {
+          id: team.id,
+          name: team.name,
+          slug: team.slug,
+          color: team.color,
+          divisionId: team.divisionId,
+        },
+        byTeam.get(team.id),
+      ),
+    );
   const divisionKey = (r: TeamStanding) =>
     r.team.divisionId === null
       ? [Number.MAX_SAFE_INTEGER, 0]

@@ -47,10 +47,12 @@ describe('the app’s own login', () => {
   });
 
   it('is refused as a superuser or a stranger to app_user, in checkLoginRole’s words', async () => {
-    expect(await appLoginProblems(target('own'))).toContain('it is a superuser');
+    expect(await appLoginProblems(target('own'))).toContain(
+      'postgres is a superuser: alter role postgres nosuperuser',
+    );
     await actAs('made_up_stranger');
     expect(await appLoginProblems(target('own'))).toEqual([
-      'it is not app_user and not a member of app_user',
+      'made_up_stranger is not app_user and cannot become it: grant app_user to made_up_stranger',
     ]);
   });
 });
@@ -77,7 +79,9 @@ describe('probeLogins', () => {
     expect(await probeLogins(target('own'))).toEqual([
       {
         login: 'app',
-        problems: expect.arrayContaining(['it is a superuser']),
+        problems: expect.arrayContaining([
+          'postgres is a superuser: alter role postgres nosuperuser',
+        ]),
       },
     ]);
   });

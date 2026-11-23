@@ -64,7 +64,7 @@ Each item opens the right admin area and ticks itself when done. The checklist i
 
 **Publish** runs a readiness check and shows two lists.
 
-- **Must fix** (blocks publishing): sample data still present; no contact email for the league; for youth leagues, privacy choices not confirmed.
+- **Must fix** (blocks publishing): sample data still present; no contact email for the league; for a league with under-18s (a youth or mixed league, or one where anyone is recorded as a child), privacy choices not confirmed, which means "Names on public pages" has not been saved by the league itself. The sample-data check comes with the step that brings sample data (O-2): until then there is none to find (decided for you at step 2.240, pending). Each item not met refuses publishing with its own sentence saying where it is put right.
 - **Worth a look** (does not block): no teams yet, no schedule yet, registration not opened, no logo.
 
 After publishing they get: the public link, a QR code to print, a ready-made image for sharing in group chats and social media, and a suggested first message to send.

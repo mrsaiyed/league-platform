@@ -24,6 +24,7 @@ import {
 import type * as DatabaseModule from '@srleagues/database';
 import type { DatabaseHandle } from '@srleagues/database';
 import { randomUUID } from 'node:crypto';
+import { coreEventHandlers } from './database-event-handlers.ts';
 import { isDatabaseId } from './database-id.ts';
 import type { ScheduleAdminPorts, ScheduleSeason } from './schedule-admin.ts';
 
@@ -36,8 +37,10 @@ export type ScheduleAdminQueries = Pick<
   | 'schedulingStore'
   | 'accessStore'
   | 'activityLogStore'
+  | 'standingsStore'
+  | 'gamesStore'
   | 'listLeagueSeasons'
-  | 'listSeasonNames'
+  | 'listScheduleTeams'
 >;
 
 export function databaseScheduleAdmin(
@@ -54,21 +57,23 @@ export function databaseScheduleAdmin(
         scheduling: database.schedulingStore(scope),
         access: database.accessStore(scope),
         activity: database.activityLogStore(scope),
+        standings: database.standingsStore(scope),
+        games: database.gamesStore(scope),
       })),
-      // Core's handlers follow results only (the standings): nothing the grid sends.
-      events: [],
+      // Core's handlers follow results only today (the standings), and nothing the grid sends
+      // raises one; given all the same, so the day one does, the database does what the
+      // made-up world does (database-event-handlers.ts).
+      events: coreEventHandlers<SchedulingTx>(),
       log,
       now: () => performance.now(),
     },
-    // The season's teams not in the bin, by name: the names a fixtures file may use
-    // (listSeasonNames, step 2.10's reader), its venues left aside.
+    // The season's teams by name, those in the bin too, marked: a game of a team moved to
+    // the bin before A-17 is named, never shown by its id (step 2.180).
     teamsOf: async (leagueId, seasonId) =>
       isDatabaseId(seasonId)
-        ? (
-            await database.withTransaction(db, { leagueId }, (scope) =>
-              database.listSeasonNames(scope, seasonId),
-            )
-          ).teams
+        ? await database.withTransaction(db, { leagueId }, (scope) =>
+            database.listScheduleTeams(scope, seasonId),
+          )
         : [],
     seasonsOf: async (leagueId, given) => {
       // Only the account is taken from what the caller hands in: what it holds is read

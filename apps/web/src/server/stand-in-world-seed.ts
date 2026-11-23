@@ -84,6 +84,9 @@ type TeamSpec = {
   readonly statsVisibility: 'everyone' | 'staff';
 };
 
+/** The adult league's Owls: their players' numbers are staff only (S-22). */
+export const standInOwlsTeamId = team(3);
+
 export const adultTeams: readonly TeamSpec[] = [
   {
     id: team(1),
@@ -102,7 +105,7 @@ export const adultTeams: readonly TeamSpec[] = [
     statsVisibility: 'everyone',
   },
   {
-    id: team(3),
+    id: standInOwlsTeamId,
     name: 'Owls',
     slug: 'owls',
     color: '#5b3f9a',
@@ -1201,9 +1204,22 @@ function leagueOf(
   let entries = 0;
   for (const spec of seasons) {
     const { rules, ...rest } = spec.season;
-    s.seasons.push({ ...rest, rules, statKeys: [...statKeys], version: 1 });
+    // The empty league's season keeps what a season made today keeps: no statistics of its
+    // own, so its rules' set is shown (step 2.194: its pages showed rebounds, which no game
+    // there can record, and left 3-pointers and free throws out of its box scores).
+    const keeps = spec.season.id === standInSeasonIds.empty ? [] : [...statKeys];
+    s.seasons.push({ ...rest, rules, statKeys: keeps, version: 1 });
     spec.divisions.forEach((d, sort) =>
-      s.divisions.push({ id: d.id, seasonId: spec.season.id, name: d.name, sort, binned: false }),
+      s.divisions.push({
+        id: d.id,
+        seasonId: spec.season.id,
+        parentDivisionId: null,
+        name: d.name,
+        color: null,
+        sort,
+        binned: false,
+        version: 1,
+      }),
     );
     for (const t of spec.teams) {
       const kept: TeamRecord = {
@@ -1287,6 +1303,8 @@ function leagueOf(
         captureMode: g.capture,
         homeScore: g.score?.[0] ?? null,
         awayScore: g.score?.[1] ?? null,
+        // As a game decided before the count was kept (migration 0021): not known.
+        overtimePeriods: null,
         format: decided ? rules : null,
         finalizedAt: decided ? startsAt : null,
         binned: false,

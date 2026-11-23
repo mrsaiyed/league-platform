@@ -22,8 +22,10 @@ const madeUpAccount: AccountMenu = {
   email: 'owner@example.test',
   adminHref: '/north-valley/admin',
   gamesHref: '/north-valley/admin/games',
+  myTeam: null,
   accountHref: '/account',
   onScoringPage: false,
+  signOutFields: { next: '/north-valley' },
 };
 
 describe('league design', () => {
@@ -324,6 +326,24 @@ describe('header, menu and footer', () => {
     expect(html).not.toContain('site-footer-name');
   });
 
+  it('says the test copy is made up where the made-up line stands, only on the test copy (step 2.205)', () => {
+    const plain = renderToStaticMarkup(createElement(SiteFooter));
+    expect(plain).not.toContain(en['footer.testCopy']);
+    expect(plain).not.toContain(en['footer.madeUp']);
+    const testCopy = renderToStaticMarkup(createElement(SiteFooter, { testCopy: true }));
+    expect(testCopy).toContain(
+      `<small class="site-footer-made-up" data-test-copy="">${en['footer.testCopy']}</small>`,
+    );
+    expect(testCopy).not.toContain(en['footer.madeUp']);
+    // One line only, even were both said: the test copy's.
+    const both = renderToStaticMarkup(createElement(SiteFooter, { madeUp: true, testCopy: true }));
+    expect(both).toContain('data-test-copy');
+    expect(both).not.toContain('data-made-up');
+    expect(renderToStaticMarkup(createElement(SiteFooter, { madeUp: true }))).toContain(
+      en['footer.madeUp'],
+    );
+  });
+
   // Step 2.147: the header with presence.
   // The fixed small line "Official league site" was taken out in the second landing of
   // step 2.147's part 2 (the lead's decision): a line of the league's own is a setting
@@ -500,5 +520,17 @@ describe('right to left (T-188)', () => {
     expect(css).not.toMatch(/(?:^|[\s;{])(?:margin|padding|border)-(?:left|right)\b/m);
     expect(css).not.toMatch(/(?:^|[\s;{])(?:left|right)\s*:/m);
     expect(css).not.toMatch(/text-align:\s*(?:left|right)/);
+  });
+});
+
+describe("the league's footer links (step 2.135)", () => {
+  it('opens Terms and Privacy from the page it is on, and our mark leads to our front page', () => {
+    const html = renderToStaticMarkup(createElement(SiteFooter, { from: '/north-valley/teams' }));
+    expect(html).toContain(`href="/terms?from=%2Fnorth-valley%2Fteams"`);
+    expect(html).toContain(`href="/privacy?from=%2Fnorth-valley%2Fteams"`);
+    expect(html).toContain(`<a class="powered-by" href="/">${en['site.poweredBy']}</a>`);
+    const plain = renderToStaticMarkup(createElement(SiteFooter));
+    expect(plain).toContain('href="/terms"');
+    expect(plain).toContain('href="/privacy"');
   });
 });
