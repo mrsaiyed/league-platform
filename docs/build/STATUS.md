@@ -35,12 +35,11 @@ Learned, not yet rules elsewhere: (a) a lane that adds a page, a route, a field,
 
 Every lane's work is on GitHub. Three at a time, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`) | Where it stands                                                                                                                                      | What is left                                                                    |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 2.77-rest              | builder working since 11:25 UTC on 2026-11-23 (the unreliable people-screens test first, then the scoped bin list and the bin's lines)               | push twice, review, fix round, land                                             |
-| 2.56-rest              | part 4 builder working since 11:25 UTC (Overturn a result, Award a game not played, the seed fix, the public pencil, overtime on a typed final)      | push, review, fix, land as a part; then the coin flip and the Games-list points |
-| 2.26-cache-labels      | builder working since 11:25 UTC (T-309 and record 106 given to it; 2.77-rest holds A-18, T-308, record 105; 2.56-rest holds S-85, T-307, record 104) | push, review, fix, land                                                         |
-| 2.191-ci-parallel      | parked                                                                                                                                               | after the first test is in the founder's hands                                  |
+| Lane (branch `lane/…`) | Where it stands                                                                                                                                 | What is left                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 2.77-rest              | builder working since 11:25 UTC on 2026-11-23 (the unreliable people-screens test first, then the scoped bin list and the bin's lines)          | push twice, review, fix round, land                                             |
+| 2.56-rest              | part 4 builder working since 11:25 UTC (Overturn a result, Award a game not played, the seed fix, the public pencil, overtime on a typed final) | push, review, fix, land as a part; then the coin flip and the Games-list points |
+| 2.191-ci-parallel      | parked                                                                                                                                          | after the first test is in the founder's hands                                  |
 
 Next free: STEP 2.241, migration 0024 (2.56-rest may take it), record 107, T-310, S-86, A-19, U-18. Numbers already given out stand with their lanes (in each lane's note).
 
