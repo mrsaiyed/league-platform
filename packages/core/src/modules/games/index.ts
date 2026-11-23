@@ -62,7 +62,11 @@ export {
   type PutBackReason,
   type PutGameBackError,
 } from './commands/put-game-back.ts';
-export { recordFinalScore, type RecordFinalScoreError } from './commands/record-final-score.ts';
+export {
+  maxOvertimePeriods,
+  recordFinalScore,
+  type RecordFinalScoreError,
+} from './commands/record-final-score.ts';
 export { recordForfeit, type RecordForfeitError } from './commands/record-forfeit.ts';
 export {
   setBoxScore,

@@ -73,6 +73,10 @@ export async function runGameAction(
             ...base,
             homeScore: numberOf(fields['homeScore']),
             awayScore: numberOf(fields['awayScore']),
+            // How many overtimes (step 2.56, S-86): empty is "no overtime", not a count.
+            ...((fields['overtime'] ?? '').trim() === ''
+              ? {}
+              : { overtimePeriods: numberOf(fields['overtime']) }),
           },
           deps,
         );

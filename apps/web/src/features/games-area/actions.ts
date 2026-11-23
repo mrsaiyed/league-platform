@@ -148,7 +148,11 @@ export async function finalScoreAction(
   const fields = typedOf(form);
   const { context, list } = await gamesOf(fields);
   const gameId = gameIdOf(fields['gameId']);
-  const typed = { awayScore: fields['awayScore'] ?? '', homeScore: fields['homeScore'] ?? '' };
+  const typed = {
+    awayScore: fields['awayScore'] ?? '',
+    homeScore: fields['homeScore'] ?? '',
+    overtime: fields['overtime'] ?? '',
+  };
   if (gameId === undefined) {
     return refused('game-not-found', typed, [], t(gamesProblemKey('game-not-found')));
   }

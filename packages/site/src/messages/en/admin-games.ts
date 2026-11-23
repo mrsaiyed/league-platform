@@ -184,6 +184,12 @@ export const enAdminGames = {
   'admin.games.otherActions': 'Forfeit, postpone or cancel',
   // A postponed game's panel: a forfeit or cancelling (step 2.158, S-75).
   'admin.games.otherActionsPostponed': 'Forfeit or cancel instead',
+  // Step 2.56 (S-86): a typed final score says whether the game went to overtime.
+  'admin.games.overtime': 'Overtime',
+  // For translators: "_one" has no {count}.
+  'admin.games.overtimeCount_one': 'One overtime',
+  'admin.games.overtimeCount_other': '{count} overtimes',
+  'admin.games.overtimeNone': 'No overtime',
   'admin.games.postpone': 'Postpone',
   // On a postponed game's card: where it waits for its new date (step 2.158).
   'admin.games.postponedWaits': 'This game waits for a new date.',

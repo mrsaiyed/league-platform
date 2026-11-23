@@ -15,6 +15,11 @@ import { useOneSubmit } from './use-one-submit.ts';
 
 export type FinalScoreTexts = {
   readonly enterFinal: string;
+  /** "Overtime" and its choices: none (empty), or how many (step 2.56, S-86). */
+  readonly overtime: {
+    readonly label: string;
+    readonly options: readonly { readonly value: string; readonly label: string }[];
+  };
   readonly save: string;
   /** "Score for Tigers", by box. */
   readonly labels: Readonly<Record<ScoreField, string>>;
@@ -64,6 +69,7 @@ export function FinalScoreBoxes(props: FinalScoreBoxesProps) {
       <>
         <input type="hidden" name="homeScore" value={state.homeScore} />
         <input type="hidden" name="awayScore" value={state.awayScore} />
+        <input type="hidden" name="overtime" value={state.typed['overtime'] ?? ''} />
       </>
     );
     // "No" sends the boxes back exactly as they were typed ("051" stays "051").
@@ -71,6 +77,7 @@ export function FinalScoreBoxes(props: FinalScoreBoxesProps) {
       <>
         <input type="hidden" name="homeScore" value={state.typed['homeScore'] ?? ''} />
         <input type="hidden" name="awayScore" value={state.typed['awayScore'] ?? ''} />
+        <input type="hidden" name="overtime" value={state.typed['overtime'] ?? ''} />
       </>
     );
     return (
@@ -151,6 +158,16 @@ export function FinalScoreBoxes(props: FinalScoreBoxesProps) {
             </label>
           ))}
         </div>
+        <label className="staff-field">
+          <span>{texts.overtime.label}</span>
+          <select name="overtime" defaultValue={typed?.['overtime'] ?? ''}>
+            {texts.overtime.options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
         {problem === undefined ? null : (
           <p id={problemId} className="ui-field-error" role="alert">
             {problem}

@@ -103,7 +103,7 @@ When the regular season ends, the admin creates a **bracket**: choose how many t
 
 ### 5.2 Three ways to record a game
 
-**Final score only.** Two numbers and a tap. For leagues and sports where that is all that is wanted. A game that has plays recorded by the live tracker is refused here too, in a plain sentence, and is ended in the tracker (**S-46**, decided for you); a game set to live tracking that has no plays yet can still be finished with two numbers.
+**Final score only.** Two numbers and a tap. For leagues and sports where that is all that is wanted. A game that has plays recorded by the live tracker is refused here too, in a plain sentence, and is ended in the tracker (**S-46**, decided for you); a game set to live tracking that has no plays yet can still be finished with two numbers. Beside the two numbers, "Overtime" says how many overtime periods the game went to (**S-86**, decided for you): no overtime unless chosen, up to 18; the game then carries the same "Final, OT" mark as one the tracker ended in overtime.
 
 **Box score afterwards.** A grid of players and stats filled in from a paper sheet.
 
