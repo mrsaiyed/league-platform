@@ -220,6 +220,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
       },
       games: {
         leagueSettingRows: async () => [],
+        listSeasonAssignments: async () => ({ games: [], assignments: [] }),
         isAssigned: async () => false,
         assign: async () => false,
         unassign: async () => false,

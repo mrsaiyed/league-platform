@@ -1,6 +1,15 @@
 // The standings module (T2 §3): standings rows and season player totals, worked out
 // from results (T3 §9). Other modules and packages use only what is here.
-export { addAdjustment, type AddAdjustmentError } from './commands/add-adjustment.ts';
+export {
+  addAdjustment,
+  adjustmentLimits,
+  type AddAdjustmentError,
+} from './commands/add-adjustment.ts';
+export {
+  listAdjustments,
+  type ListAdjustmentsError,
+  type SeasonAdjustments,
+} from './commands/list-adjustments.ts';
 export { removeAdjustment, type RemoveAdjustmentError } from './commands/remove-adjustment.ts';
 export { rebuildStandings, type RebuildStandingsError } from './commands/rebuild-standings.ts';
 export {

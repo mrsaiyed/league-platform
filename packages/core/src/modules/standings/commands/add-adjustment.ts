@@ -15,7 +15,10 @@ export type AddAdjustmentError =
   | { readonly code: 'season-not-found' | 'team-not-found' | 'not-allowed' }
   | { readonly code: 'adjustment-not-counted'; readonly reason: string };
 
-const count = z.number().int().min(-1000).max(1000).default(0);
+/** The largest change an adjustment may make, either way (the screen checks the same). */
+export const adjustmentLimits = { count: 1000, points: 10000 } as const;
+
+const count = z.number().int().min(-adjustmentLimits.count).max(adjustmentLimits.count).default(0);
 
 export const addAdjustment = defineCommand({
   name: 'standings.add_adjustment',
@@ -27,7 +30,12 @@ export const addAdjustment = defineCommand({
       wins: count,
       losses: count,
       ties: count,
-      points: z.number().int().min(-10000).max(10000).default(0),
+      points: z
+        .number()
+        .int()
+        .min(-adjustmentLimits.points)
+        .max(adjustmentLimits.points)
+        .default(0),
       reason: z.string().trim().min(1).max(500),
     })
     .refine((a) => a.wins !== 0 || a.losses !== 0 || a.ties !== 0 || a.points !== 0, {
@@ -66,7 +74,15 @@ export const addAdjustment = defineCommand({
     await recordActivity(tx, context, {
       action: 'standings.add_adjustment',
       target: { type: 'season', id: input.seasonId },
-      details: { adjustment: adjustmentId, team: input.teamId },
+      details: {
+        adjustment: adjustmentId,
+        team: input.teamId,
+        reason: input.reason,
+        wins: input.wins,
+        losses: input.losses,
+        ties: input.ties,
+        points: input.points,
+      },
     });
     return ok({ adjustmentId });
   },

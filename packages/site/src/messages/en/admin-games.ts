@@ -236,6 +236,7 @@ export const enAdminGames = {
   'admin.games.scoreOf': 'Score for {team}',
   'admin.games.scorekeeper': 'Scorekeeper: {names}',
   'admin.games.toEarlier': 'Earlier games',
+  'admin.games.toScorekeepers': 'Scorekeepers',
   'admin.games.today': 'Today, {time}',
   'admin.games.todayEmpty': 'No more games today.',
   'admin.games.todayTitle': 'Today',

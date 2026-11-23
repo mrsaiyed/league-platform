@@ -44,6 +44,15 @@ describe('addAdjustment', () => {
     expect(db.state.activity).toEqual([
       expect.objectContaining({ action: 'standings.add_adjustment', targetId: seasonId }),
     ]);
+    expect(db.state.activity[0]?.details).toEqual({
+      adjustment: db.state.adjustments[0]?.id,
+      team: teamId(2),
+      reason: 'Ruling: protest upheld',
+      wins: 1,
+      losses: -1,
+      ties: 0,
+      points: 0,
+    });
   });
 
   it('refuses one the calculation would leave out, saving nothing', async () => {
@@ -138,6 +147,23 @@ describe('removeAdjustment', () => {
     expect(await removeAdjustment(as(ownerId), { seasonId, adjustmentId }, deps)).toEqual({
       ok: false,
       error: { code: 'adjustment-not-found' },
+    });
+  });
+
+  it("keeps the admin's reason for taking it off in the activity log", async () => {
+    const { db, deps, as } = memoryStandings({ games: [decided] });
+    const added = await addAdjustment(as(ownerId), input, deps);
+    if (!added.ok) throw new Error('not added');
+    const { adjustmentId } = added.value;
+    const removed = await removeAdjustment(
+      as(ownerId),
+      { seasonId, adjustmentId, reason: '  Typed in by mistake  ' },
+      deps,
+    );
+    expect(removed.ok).toBe(true);
+    expect(db.state.activity.at(-1)).toMatchObject({
+      action: 'standings.remove_adjustment',
+      details: { adjustment: adjustmentId, reason: 'Typed in by mistake' },
     });
   });
 

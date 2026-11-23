@@ -118,6 +118,10 @@ describe('core’s event handlers on the database', () => {
       'adminSettings.seasons',
       'adminTeams',
       'games',
+      // Admin → Games → Scorekeepers' read, whose access lists the grants (step 2.56).
+      'games.scorekeepersDeps',
+      // The standings adjustments' commands on the games area's stores (step 2.56).
+      'games.standingsDeps',
       'scheduleAdmin',
       'tracker',
     ]);

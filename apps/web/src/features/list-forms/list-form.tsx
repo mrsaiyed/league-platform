@@ -22,6 +22,23 @@ export type ListField =
       readonly help?: string;
     }
   | {
+      /** A whole number (step 2.56: an adjustment's wins or points), typed with the keypad. */
+      readonly kind: 'number';
+      readonly name: string;
+      readonly label: string;
+      readonly value: string;
+      readonly help?: string;
+    }
+  | {
+      /** One of a short list (step 2.56: the team an adjustment is for). */
+      readonly kind: 'select';
+      readonly name: string;
+      readonly label: string;
+      readonly value: string;
+      readonly options: readonly { readonly value: string; readonly label: string }[];
+      readonly help?: string;
+    }
+  | {
       /** A color, and the choice to use the league's own (checked when there is none). */
       readonly kind: 'color';
       readonly name: string;
@@ -121,6 +138,54 @@ export function ListForm({
           );
         }
         const value = typed(field.name) ?? field.value;
+        const help =
+          field.help === undefined ? null : <small className="ui-field-help">{field.help}</small>;
+        if (field.kind === 'select') {
+          return (
+            <div key={field.name} className="admin-field-group">
+              <label className="staff-field">
+                <span>{field.label}</span>
+                <select
+                  key={`${field.name}:${value}`}
+                  name={field.name}
+                  defaultValue={value}
+                  required
+                  {...marked(field.name)}
+                >
+                  {field.options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {help}
+              </label>
+              {wrongField === field.name ? problem : null}
+            </div>
+          );
+        }
+        if (field.kind === 'number') {
+          return (
+            <div key={field.name} className="admin-field-group">
+              <label className="staff-field">
+                <span>{field.label}</span>
+                <input
+                  key={`${field.name}:${value}`}
+                  name={field.name}
+                  // Text, not a number box: a phone's number keypad has no minus sign, and
+                  // a deduction needs one. The server checks the number either way.
+                  type="text"
+                  defaultValue={value}
+                  autoComplete="off"
+                  size={6}
+                  {...marked(field.name)}
+                />
+                {help}
+              </label>
+              {wrongField === field.name ? problem : null}
+            </div>
+          );
+        }
         return (
           <div key={field.name} className="admin-field-group">
             <label className="staff-field">
@@ -147,7 +212,15 @@ export function ListForm({
       {confirm === undefined ? null : (
         <p>
           <label className="staff-check">
-            <input type="checkbox" name="confirm" value="yes" required /> {confirm}
+            <input
+              key={`confirm:${String(typed('confirm') === 'yes')}`}
+              type="checkbox"
+              name="confirm"
+              value="yes"
+              defaultChecked={typed('confirm') === 'yes'}
+              required
+            />{' '}
+            {confirm}
           </label>
         </p>
       )}

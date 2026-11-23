@@ -7,6 +7,7 @@ import {
   addAdjustment,
   gameFinalized,
   gameReopened,
+  listAdjustments,
   rebuildOnGameFinalized,
   rebuildOnGameReopened,
   rebuildStandings,
@@ -168,6 +169,11 @@ registerCommandCase(addAdjustment, harnessTx, {
     wins: 1,
     reason: 'Won by ruling',
   }),
+});
+
+registerCommandCase(listAdjustments, harnessTx, {
+  name: "list the target's season's adjustments",
+  input: (target) => ({ seasonId: target.seasonId }),
 });
 
 registerCommandCase(removeAdjustment, harnessTx, {

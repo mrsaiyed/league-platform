@@ -22,6 +22,7 @@ import {
   listGamesInWindow,
   listGamesNeedingResult,
   listPostponedGames,
+  listSeasonAssignments,
   listSettingValues,
   lockLiveGame,
   replaceGameLines,
@@ -55,6 +56,7 @@ export function gamesStore(scope: LeagueScope): GamesStore {
     },
     // The league level only: no program or season is named, so only the league's row comes back.
     leagueSettingRows: (key) => listSettingValues(scope, key, {}),
+    listSeasonAssignments: (seasonId) => listSeasonAssignments(scope, seasonId),
     isAssigned: (gameId, accountId) => isGameAssigned(scope, gameId, accountId),
     assign: (gameId, accountId) => insertGameAssignment(scope, gameId, accountId),
     unassign: (gameId, accountId) => deleteGameAssignment(scope, gameId, accountId),

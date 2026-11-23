@@ -89,7 +89,7 @@ export const adminAreaReleases = {
   teams: 'released',
   schedule: 'released',
   games: 'released',
-  standings: 'not-built',
+  standings: 'released',
   site: 'not-built',
   messages: 'not-built',
   season: 'released',

@@ -2,7 +2,7 @@
 // one transaction for one league, so none of these take a league id (T-28).
 import type { SeasonRules } from '@srleagues/contracts';
 import type { CommandTx } from '../../command/index.ts';
-import type { AccessReader, ActivityLog } from '../access/index.ts';
+import type { AccessReader, AccessStore, ActivityLog } from '../access/index.ts';
 import type { StoredSetting } from '../leagues/index.ts';
 
 /** A game of a season, in or out of the bin (T3 §8). */
@@ -228,6 +228,12 @@ export type GamesStore = {
   ) => Promise<{ readonly programId: string; readonly rules: unknown } | undefined>;
   /** The league's own stored values of one setting (the league level), as a lookup reads them. */
   readonly leagueSettingRows: (key: string) => Promise<readonly StoredSetting[]>;
+  /**
+   * A season's games still to be decided (not final, forfeit or cancelled), not in the bin,
+   * soonest first (those with no time last), with who is assigned to score each, in the
+   * order they were assigned (step 2.56: Admin → Games → Scorekeepers).
+   */
+  readonly listSeasonAssignments: (seasonId: string) => Promise<SeasonAssignments>;
   /** Whether the account is assigned to score the game (T3 §8 `game_assignments`). */
   readonly isAssigned: (gameId: string, accountId: string) => Promise<boolean>;
   /** Assigns the account to the game: false if it already was. */
@@ -277,11 +283,28 @@ export type GamesStore = {
   ) => Promise<GamesWindow>;
 };
 
+/** One scorekeeper assigned to one game (T3 §8 `game_assignments`). */
+export type GameAssignment = { readonly gameId: string; readonly accountId: string };
+
+/** A season's open games and their assignments, as listSeasonAssignments reads them. */
+export type SeasonAssignments = {
+  readonly games: readonly GameRecord[];
+  readonly assignments: readonly GameAssignment[];
+};
+
 /** A games command's transaction: its store, the access reader and the activity log (A-6). */
 export type GamesTx = CommandTx & {
   readonly games: GamesStore;
   readonly access: AccessReader;
   readonly activity: ActivityLog;
+};
+
+/**
+ * The scorekeepers' read's transaction (step 2.56, T-305): the games one, whose access
+ * also lists the league's grants in force, so the read can say who may be assigned.
+ */
+export type ScorekeepersTx = GamesTx & {
+  readonly access: AccessReader & Pick<AccessStore, 'listGrants'>;
 };
 
 /**

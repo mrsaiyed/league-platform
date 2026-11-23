@@ -109,7 +109,8 @@ const placeholders = [
     [`/${league}/register`, 'register'],
   ]),
 ];
-const adminPlaceholders = ['registration', 'standings', 'site', 'messages'];
+// Standings has its screen since step 2.56, so it is no placeholder now.
+const adminPlaceholders = ['registration', 'site', 'messages'];
 const stranger = 'zqxunknownzqx';
 
 /** Every public address: our own pages, and each page of two live leagues. */

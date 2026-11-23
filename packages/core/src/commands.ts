@@ -29,6 +29,7 @@ import {
   listGamesNeedingResult,
   listMyGames,
   listPostponedGames,
+  listScorekeepers,
   listScoringOffers,
   markNotStarted,
   openScoringSession,
@@ -116,7 +117,12 @@ import {
   updateCourt,
   updateVenue,
 } from './modules/scheduling/index.ts';
-import { addAdjustment, rebuildStandings, removeAdjustment } from './modules/standings/index.ts';
+import {
+  addAdjustment,
+  listAdjustments,
+  rebuildStandings,
+  removeAdjustment,
+} from './modules/standings/index.ts';
 import {
   addToRoster,
   changeRosterEntry,
@@ -165,6 +171,7 @@ export const commands = commandRegistry([
   invite,
   listAccess,
   listActivity,
+  listAdjustments,
   listBin,
   listDivisions,
   listEarlierGames,
@@ -173,6 +180,7 @@ export const commands = commandRegistry([
   listPeople,
   listPostponedGames,
   listRoster,
+  listScorekeepers,
   listScoringOffers,
   listVenues,
   markLeft,

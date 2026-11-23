@@ -38,7 +38,7 @@ describe('unreleasedPageAt', () => {
   });
 
   it('finds the admin’s areas with no screen yet, and only the area itself', () => {
-    for (const area of ['registration', 'standings', 'site', 'messages']) {
+    for (const area of ['registration', 'site', 'messages']) {
       expect(unreleasedPageAt(['north-valley', 'admin', area]), area).toEqual({
         kind: 'admin',
         area,
@@ -47,6 +47,8 @@ describe('unreleasedPageAt', () => {
     expect(unreleasedPageAt(['north-valley', 'admin', 'registration', 'more'])).toBeNull();
     expect(unreleasedPageAt(['north-valley', 'admin', 'people'])).toBeNull();
     expect(unreleasedPageAt(['north-valley', 'admin', 'teams'])).toBeNull();
+    // Standings has its screen since step 2.56.
+    expect(unreleasedPageAt(['north-valley', 'admin', 'standings'])).toBeNull();
     expect(unreleasedPageAt(['north-valley', 'admin', 'no-such-area'])).toBeNull();
   });
 

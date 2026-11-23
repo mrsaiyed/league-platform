@@ -162,6 +162,25 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
         )
         .sort((a, b) => (a.startsAt ?? '~').localeCompare(b.startsAt ?? '~'))
         .map(gameRecordOf),
+    // Step 2.56, as packages/database's listSeasonAssignments reads the same tables.
+    listSeasonAssignments: async (seasonId) => {
+      const games = s.games
+        .filter(
+          (g) =>
+            g.seasonId === seasonId &&
+            !g.binned &&
+            !['final', 'forfeit', 'cancelled'].includes(g.status),
+        )
+        .sort(
+          (a, b) =>
+            (a.startsAt ?? '~').localeCompare(b.startsAt ?? '~') || a.id.localeCompare(b.id),
+        );
+      const ids = new Set(games.map((g) => g.id));
+      return {
+        games: games.map(gameRecordOf),
+        assignments: s.assignments.filter((a) => ids.has(a.gameId)),
+      };
+    },
     // Step 2.158, as packages/database's queries read the same tables.
     statusBeforeCancelled: async (gameId) => {
       const entry = s.activity
