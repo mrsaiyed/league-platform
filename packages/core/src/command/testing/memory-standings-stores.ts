@@ -77,7 +77,12 @@ export function standingsStores(
           (a) => a.id === id && a.seasonId === season && a.binned !== true,
         );
         if (found === undefined) return false;
-        found.binned = true;
+        // The other half of an overturned or awarded game goes with it (T-307).
+        for (const a of s.adjustments) {
+          if (a.id === id || a.pairedWith === id || (found.pairedWith ?? null) === a.id) {
+            a.binned = true;
+          }
+        }
         return true;
       },
       replaceRows: async (season, rows) => {

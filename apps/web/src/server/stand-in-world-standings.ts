@@ -84,7 +84,12 @@ export function worldStandingsStore(s: LeagueWorld): StandingsStore {
       );
       const found = s.adjustments[at];
       if (found === undefined) return false;
-      s.adjustments = replacedAt(s.adjustments, at, { ...found, binned: true });
+      // The other half of an overturned or awarded game goes with it (T-307).
+      const pair = (a: (typeof s.adjustments)[number]) =>
+        a.id === adjustmentId || a.pairedWith === adjustmentId || found.pairedWith === a.id;
+      s.adjustments = s.adjustments.map((a) =>
+        a.seasonId === seasonId && pair(a) ? { ...a, binned: true } : a,
+      );
       return true;
     },
     replaceRows: async (seasonId, rows) => {

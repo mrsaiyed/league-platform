@@ -48,6 +48,8 @@ import {
   type TrackerTx,
   acceptInvitation,
   addAdjustment,
+  awardGame,
+  overturnResult,
   addDraftGame,
   addDraftRound,
   addToRoster,
@@ -1854,6 +1856,36 @@ const adjustmentRows: readonly Row[] = [
       return { seasonId, adjustmentId: added.rows[0]?.id };
     },
     (c, i) => removeAdjustment(c, i, standingsDeps),
+  ),
+  ...gameRows(
+    'standings.overturn_result',
+    'overturn a result',
+    'standings.adjust',
+    async (league, program) => {
+      const game = await gameIn(league, program, {
+        status: 'final',
+        home_score: 50,
+        away_score: 40,
+        finalized_at: '2026-12-06T19:30:00Z',
+      });
+      return { seasonId: game.seasonId, gameId: game.gameId, reason: 'Ineligible player' };
+    },
+    (c, i) => overturnResult(c, i, standingsDeps),
+  ),
+  ...gameRows(
+    'standings.award_game',
+    'award a game not played',
+    'standings.adjust',
+    async (league, program) => {
+      const seasonId = await seasonIn(league, program);
+      return {
+        seasonId,
+        winnerTeamId: await newTeam(pglite, league.leagueId, seasonId),
+        loserTeamId: await newTeam(pglite, league.leagueId, seasonId),
+        reason: 'Not played: awarded',
+      };
+    },
+    (c, i) => awardGame(c, i, standingsDeps),
   ),
 ];
 

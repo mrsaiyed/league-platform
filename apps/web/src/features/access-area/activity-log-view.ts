@@ -130,7 +130,8 @@ const targetKinds: readonly string[] = ['team', 'person', 'game', 'season', 'div
 export function thingOf(entry: ActivityRecord): LogThingAsk | undefined {
   const team = entry.details['team'];
   const adjustment = entry.details['adjustment'];
-  if (entry.action === 'standings.add_adjustment' && typeof team === 'string') {
+  const byTeam = ['standings.add_adjustment', 'standings.overturn_result', 'standings.award_game'];
+  if (byTeam.includes(entry.action) && typeof team === 'string') {
     return { kind: 'team', id: team };
   }
   if (entry.action === 'standings.remove_adjustment' && typeof adjustment === 'string') {

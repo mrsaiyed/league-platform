@@ -580,7 +580,7 @@ const cases = [
       'East',
       'West',
       'Owls',
-      'Played an ineligible player in round 3.',
+      'Round 1 forfeit win over the Otters taken back: the Badgers were short of players too.',
       'The game between them puts Owls ahead.',
     ],
     ['This page is not built yet.', 'Placed above'],

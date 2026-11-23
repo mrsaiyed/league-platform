@@ -9,7 +9,17 @@ export async function listStandingsAdjustments(
 ): Promise<readonly SeasonAdjustment[]> {
   const rows = await transactionOf(scope)
     .selectFrom('standings_adjustments')
-    .select(['id', 'team_id', 'wins', 'losses', 'ties', 'points', 'reason'])
+    .select([
+      'id',
+      'team_id',
+      'wins',
+      'losses',
+      'ties',
+      'points',
+      'reason',
+      'games_played',
+      'paired_with',
+    ])
     .where('league_id', '=', scope.leagueId)
     .where('season_id', '=', seasonId)
     .where('deleted_at', 'is', null)
@@ -23,5 +33,7 @@ export async function listStandingsAdjustments(
     ties: row.ties,
     points: row.points,
     reason: row.reason,
+    gamesPlayed: row.games_played,
+    pairedWith: row.paired_with,
   }));
 }

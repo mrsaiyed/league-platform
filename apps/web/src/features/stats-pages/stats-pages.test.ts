@@ -57,8 +57,10 @@ describe('standings page', () => {
     const views = buildStandingsViews(result.value);
     expect(views.map((v) => v.caption)).toEqual(['East', 'West']);
     const text = renderToStaticMarkup(createElement(StandingsTables, { tables: views }));
-    expect(text).toContain('Played an ineligible player in round 3.');
-    expect(text).toContain('Adjusted by -1 win');
+    expect(text).toContain(
+      'Round 1 forfeit win over the Otters taken back: the Badgers were short of players too.',
+    );
+    expect(text).toContain('Adjusted by -1 win, +1 loss');
     expect(text).toContain('Owls');
     expect(text).toContain('Seed');
   });
@@ -93,7 +95,7 @@ describe('standings page', () => {
     }
     expect(beside(west, 'Otters')).toEqual([]);
     expect(beside(west, 'Badgers')).toEqual([
-      'Adjusted by -1 win. Played an ineligible player in round 3.',
+      'Adjusted by -1 win, +1 loss. Round 1 forfeit win over the Otters taken back: the Badgers were short of players too.',
     ]);
     const text = renderToStaticMarkup(
       createElement(StandingsTables, { tables: [east, west].flatMap((t) => (t ? [t] : [])) }),

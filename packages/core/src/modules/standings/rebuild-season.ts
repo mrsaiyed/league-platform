@@ -26,7 +26,7 @@ import {
   type GamesStore,
   type SeasonResults,
 } from '../games/index.ts';
-import type { StandingsStore, StandingsTx } from './ports.ts';
+import type { SeasonAdjustment, StandingsStore, StandingsTx } from './ports.ts';
 
 export type SeasonRebuilt = {
   /** Standings rows saved: one per team of the season. */
@@ -131,7 +131,32 @@ export async function calculateSeason(
     })),
     coinFlips: [],
   });
-  return { results, games, standings };
+  return { results, games, standings: withAwardedGames(standings, adjustments) };
+}
+
+/**
+ * Adds the games played of a game awarded that was not played (S-85) to the rows its
+ * adjustments changed, so a record still adds up; the calculation counts only games
+ * actually played (packages/sports), which every other adjustment leaves alone.
+ */
+function withAwardedGames(
+  standings: StandingsResult,
+  adjustments: readonly SeasonAdjustment[],
+): StandingsResult {
+  const added = new Map(adjustments.map((a) => [a.id, a.gamesPlayed ?? 0]));
+  if (![...added.values()].some((n) => n !== 0)) return standings;
+  return {
+    ...standings,
+    tables: standings.tables.map((table) => ({
+      ...table,
+      rows: table.rows.map((row) => ({
+        ...row,
+        gamesPlayed:
+          row.gamesPlayed +
+          row.adjustments.reduce((sum, a) => sum + (added.get(a.adjustmentId) ?? 0), 0),
+      })),
+    })),
+  };
 }
 
 /** Rebuilds the season's standings rows and player totals; nothing if it is not here. */

@@ -8,8 +8,11 @@ export {
 export {
   listAdjustments,
   type ListAdjustmentsError,
+  type OverturnableGame,
   type SeasonAdjustments,
 } from './commands/list-adjustments.ts';
+export { awardGame, type AwardGameError } from './commands/award-game.ts';
+export { overturnResult, type OverturnResultError } from './commands/overturn-result.ts';
 export { removeAdjustment, type RemoveAdjustmentError } from './commands/remove-adjustment.ts';
 export { rebuildStandings, type RebuildStandingsError } from './commands/rebuild-standings.ts';
 export {

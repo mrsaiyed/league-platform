@@ -78,6 +78,8 @@ export const enActivity = {
   'activity.scheduling.update_court': 'Changed a court',
   'activity.scheduling.update_venue': 'Changed a venue',
   'activity.standings.add_adjustment': 'Added a standings adjustment',
+  'activity.standings.award_game': 'Awarded a game not played',
+  'activity.standings.overturn_result': 'Overturned a result',
   'activity.standings.rebuild_season': "Worked out a season's standings and totals again",
   'activity.standings.remove_adjustment': 'Removed a standings adjustment',
   'activity.teams.add_to_roster': 'Added a person to a roster',
@@ -129,6 +131,8 @@ export const enActivity = {
   'activityNamed.scheduling.restore_venue': 'Restored the venue {name} from the bin',
   'activityNamed.scheduling.update_venue': 'Changed the venue {name}',
   'activityNamed.standings.add_adjustment': 'Added a standings adjustment for the team {name}',
+  'activityNamed.standings.award_game': 'Awarded a game not played to the team {name}',
+  'activityNamed.standings.overturn_result': 'Overturned a result in favour of the team {name}',
   'activityNamed.standings.rebuild_season':
     'Worked out the standings and totals of the season {name} again',
   'activityNamed.standings.remove_adjustment': 'Removed a standings adjustment for the team {name}',

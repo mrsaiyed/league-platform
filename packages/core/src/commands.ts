@@ -120,7 +120,9 @@ import {
 } from './modules/scheduling/index.ts';
 import {
   addAdjustment,
+  awardGame,
   listAdjustments,
+  overturnResult,
   rebuildStandings,
   removeAdjustment,
 } from './modules/standings/index.ts';
@@ -147,6 +149,7 @@ export const commands = commandRegistry([
   applyFixtureImport,
   applyTrackerCommands,
   assignScorekeeper,
+  awardGame,
   cancelGame,
   cancelInvitation,
   changeDraftRoundDate,
@@ -189,6 +192,7 @@ export const commands = commandRegistry([
   moveDraftGame,
   myAccess,
   openScoringSession,
+  overturnResult,
   postponeGame,
   previewSchedulePublish,
   previewSeasonRules,
