@@ -133,6 +133,15 @@ const FIELDS = {
     mapLink: 'a venue and its court are added',
   },
   '/[league]/admin/season/divisions': { name: 'a division is added' },
+  // Step 2.56: an adjustment's four counts and its reason (the add form's and the remove
+  // form's reason boxes share the name "reason"); a count holding the attack is refused.
+  '/[league]/admin/standings': {
+    wins: 'an adjustment is added and refused',
+    losses: 'an adjustment is added and refused',
+    ties: 'an adjustment is added and refused',
+    points: 'an adjustment is added and refused',
+    reason: 'an adjustment is added and refused',
+  },
   '/[league]/admin/games/[game]': {
     reason: 'a result is reopened',
     awayScore: 'a box score is typed',
@@ -498,6 +507,31 @@ if (browser) {
     );
   });
 
+  await step('an adjustment is added and refused with the attack in its boxes', async () => {
+    await page.goto(`${origin}/north-valley/admin/standings`);
+    const form = page.locator('form[data-form=add-adjustment]');
+    // Refused first: every count holds the attack, which is not a number; it comes back as
+    // typed, beside its box, as text.
+    for (const name of ['wins', 'losses', 'ties', 'points']) {
+      await form.locator(`input[name=${name}]`).fill(typed.reason);
+    }
+    await form.locator('input[name=reason]').fill(typed.reason);
+    await form.getByRole('button', { name: 'Add the adjustment', exact: true }).click();
+    await form.locator('[data-problem=add-adjustment]').waitFor();
+    const refused = await harm(page);
+    note(
+      'the adjustments form, refused with the attack in every box, made no element',
+      refused.made.length === 0 && refused.ran === null && refused.refused.length === 0,
+      [...refused.made, ...refused.refused].join(' | '),
+    );
+    for (const name of ['losses', 'ties', 'points']) {
+      await form.locator(`input[name=${name}]`).fill('');
+    }
+    await form.locator('input[name=wins]').fill('1');
+    await form.getByRole('button', { name: 'Add the adjustment', exact: true }).click();
+    await page.locator('.admin-adjustment', { hasText: typed.reason }).first().waitFor();
+  });
+
   await step('a file whose name, venue and court are the attack is imported', async () => {
     await page.goto(`${origin}/north-valley/admin/schedule/import`);
     const file = [
@@ -653,6 +687,8 @@ if (browser) {
     ['/north-valley/admin/schedule', ['round']],
     ['/north-valley/admin/season/divisions', ['division']],
     ['/north-valley/admin/schedule/venues', ['venueName', 'venueAddress', 'courtName']],
+    ['/north-valley/admin/standings', ['reason']],
+    ['/north-valley/standings', ['reason']],
     ['/north-valley/admin/games', []],
     [boxScore, []],
     // The reopened game's own page: wherever the reason would be shown, it is text.
@@ -738,6 +774,7 @@ const ROUTES = {
   '/[league]/admin/season': () => '/north-valley/admin/season',
   '/[league]/admin/season/divisions': () => '/north-valley/admin/season/divisions',
   '/[league]/admin/settings': () => '/north-valley/admin/settings',
+  '/[league]/admin/standings': () => '/north-valley/admin/standings',
   '/[league]/admin/settings/admins': () => '/north-valley/admin/settings/admins',
   '/[league]/admin/teams': () => '/north-valley/admin/teams',
   '/[league]/admin/teams/[team]': () => teamAdmin,

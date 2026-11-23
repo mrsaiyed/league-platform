@@ -13,6 +13,7 @@
 //   admin-import.ts: admin.import
 //   admin-people.ts: adminPeople
 //   admin-settings.ts: adminSettings, seasonSettings, setting
+//   admin-standings.ts: adminStandings
 //   admin-teams.ts: adminTeams
 //   admin-venues.ts: adminVenues
 //   error.ts: error
@@ -35,6 +36,7 @@ import { enAdminGames } from './en/admin-games.ts';
 import { enAdminImport } from './en/admin-import.ts';
 import { enAdminPeople } from './en/admin-people.ts';
 import { enAdminSettings } from './en/admin-settings.ts';
+import { enAdminStandings } from './en/admin-standings.ts';
 import { enAdminTeams } from './en/admin-teams.ts';
 import { enAdminVenues } from './en/admin-venues.ts';
 import { enError } from './en/error.ts';
@@ -57,6 +59,7 @@ export const en = {
   ...enAdminImport,
   ...enAdminPeople,
   ...enAdminSettings,
+  ...enAdminStandings,
   ...enAdminTeams,
   ...enAdminVenues,
   ...enError,

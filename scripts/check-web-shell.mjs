@@ -710,6 +710,33 @@ const cases = [
     ['Admin areas', noAccess],
     '/signin?next=%2Fnorth-valley%2Fadmin%2Fschedule%2Fvenues',
   ],
+  // Step 2.56: Standings and stats, the season's adjustments, is the owner's and the
+  // admins' (standings.adjust); every other kind of person is refused it or sent to sign in.
+  [
+    'owner',
+    '/north-valley/admin/standings',
+    200,
+    [
+      'Standings and stats',
+      'Add an adjustment',
+      'See the public table',
+      staffFrameAt('/north-valley/admin/standings'),
+      oneHeading,
+    ],
+    [adminPlaceholder],
+  ],
+  ['scheduler', '/north-valley/admin/standings', 403, [noAccess], ['Add an adjustment']],
+  ['scorekeeper', '/north-valley/admin/standings', 403, [noAccess], ['Add an adjustment']],
+  ['coach', '/north-valley/admin/standings', 403, [noAccess], ['Add an adjustment']],
+  ['stranger', '/north-valley/admin/standings', 403, [noAccess], ['Add an adjustment']],
+  [
+    'visitor',
+    '/north-valley/admin/standings',
+    307,
+    [],
+    ['Admin areas', noAccess],
+    '/signin?next=%2Fnorth-valley%2Fadmin%2Fstandings',
+  ],
   [
     'scheduler',
     '/north-valley/admin/games',

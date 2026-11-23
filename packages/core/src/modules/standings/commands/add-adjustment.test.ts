@@ -141,6 +141,23 @@ describe('removeAdjustment', () => {
     });
   });
 
+  it("keeps the admin's reason for taking it off in the activity log", async () => {
+    const { db, deps, as } = memoryStandings({ games: [decided] });
+    const added = await addAdjustment(as(ownerId), input, deps);
+    if (!added.ok) throw new Error('not added');
+    const { adjustmentId } = added.value;
+    const removed = await removeAdjustment(
+      as(ownerId),
+      { seasonId, adjustmentId, reason: '  Typed in by mistake  ' },
+      deps,
+    );
+    expect(removed.ok).toBe(true);
+    expect(db.state.activity.at(-1)).toMatchObject({
+      action: 'standings.remove_adjustment',
+      details: { adjustment: adjustmentId, reason: 'Typed in by mistake' },
+    });
+  });
+
   it("refuses a missing season, another season's adjustment and non-admins", async () => {
     const { deps, as } = memoryStandings({ games: [decided], grants: [schedulerGrant] });
     const added = await addAdjustment(as(ownerId), input, deps);
