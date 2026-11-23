@@ -1,4 +1,4 @@
-// When each open question was first asked (step 2.221; record 094 [placeholder number]),
+// When each open question was first asked (step 2.221; record 094),
 // kept on the server with the asking form's one-time token. A question's "Yes" is taken
 // only once it has been read for long enough (call-off-step.ts); the time it is measured
 // from is this one, never a field of the form: a hand-made post with an old time is asked
