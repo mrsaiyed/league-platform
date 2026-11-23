@@ -591,6 +591,9 @@ if (browser) {
   });
 
   await step('the email boxes refuse the attack as text', async () => {
+    // As a visitor: a signed-in person is told they are signed in there, with no email box
+    // (step 2.163, L10). This context is closed after this step.
+    await context.clearCookies();
     for (const address of ['/signin', '/signup', '/signin/forgot']) {
       await page.goto(origin + address);
       const form = page.locator('form', { has: page.locator('input[name=email]') }).first();

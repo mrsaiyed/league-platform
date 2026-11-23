@@ -83,6 +83,9 @@ export const enAccount = {
   'code.again': 'Send a new code',
   'code.changeAddress': 'Change it',
   'code.label': 'Code',
+  // With no sign-up or reset under way on this device (an old tab): no address to name.
+  'code.sent':
+    'If that address can sign in, we have sent it a code. It works for {minutes} minutes.',
   'code.sentAgain': 'We sent a new code to {email}. Use the newest one.',
   'code.sentAgainReset': 'If {email} has an account, we sent it a new code. Use the newest one.',
   'code.sentReset': 'If {email} has an account, we sent it a code. It works for {minutes} minutes.',

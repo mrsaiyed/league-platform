@@ -19,14 +19,24 @@ import { signedInPerson } from '../../../../server/signed-in-leagues.ts';
 // whether or not it has (T-68). "Wrong address? Change it" goes back to the first screen
 // with the address filled in; "Send a new code" sends one to the same address and comes
 // back here saying so. The address comes from this device's own cookie, never the
-// address bar. With nothing under way (an old tab, Back after the account was made) there
-// is no code to enter: a signed-in person goes to their account, anyone else starts again.
+// address bar. With nothing under way (an old tab, Back after the account was made) a
+// signed-in person goes to their account; anyone else sees the screen as before, naming no
+// address, with a way to start again (the build's behaviour, kept at the merge).
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const flow = await flowOfThisRequest();
   if (flow === undefined) {
     if ((await signedInPerson()).kind === 'signed-in') redirect(platformUrl('account'));
-    redirect(screenUrl('signup', { problem: 'codeExpired' }));
+    return (
+      <SignInScreen title="code.title" intro={t('code.sent', { minutes: 10 })} search={search}>
+        <CodeForm />
+        <p>
+          <a className="ui-button" data-kind="quiet" href={platformUrl('signup')}>
+            {t('code.again')}
+          </a>
+        </p>
+      </SignInScreen>
+    );
   }
   // The code was right already (Back from the password screen): that screen, not this one again.
   if (flow.proof !== undefined) redirect(platformUrl('choosePassword'));
@@ -49,26 +59,33 @@ export default async function Page({ searchParams }: SearchProps) {
           {t('code.changeAddress')}
         </a>
       </p>
-      <form action={enterCodeAction}>
-        <p>
-          <label>
-            {t('code.label')}
-            <input
-              name="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={12}
-              required
-            />
-          </label>
-        </p>
-        <SubmitButton words="code.submit" />
-      </form>
+      <CodeForm />
       {/* A new code to the same address, behind the same check as the first (T4 §6). */}
       <form action={resendCodeAction}>
         <BotCheckField {...botCheck} action={flow.purpose} />
         <SubmitButton words="code.again" />
       </form>
     </SignInScreen>
+  );
+}
+
+/** The code's own box and button. */
+function CodeForm() {
+  return (
+    <form action={enterCodeAction}>
+      <p>
+        <label>
+          {t('code.label')}
+          <input
+            name="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={12}
+            required
+          />
+        </label>
+      </p>
+      <SubmitButton words="code.submit" />
+    </form>
   );
 }

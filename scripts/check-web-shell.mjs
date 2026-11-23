@@ -290,10 +290,11 @@ const cases = [
   ['visitor', '/signup', 200, ['Create your account', 'Email me a code'], ['Continue with Google']],
   // The forgotten-password route is "Choose a new password", with a way back (step 2.163).
   ['visitor', '/signin/forgot', 200, ['Choose a new password', 'Back to sign in']],
-  // With no sign-up or reset under way there is no code to enter and no password to choose
-  // (step 2.163, L10): the first screen again, saying why. The code screen's words, which
-  // name the address the code went to, are checked in a browser (sign-in-says-test.mjs).
-  ['visitor', '/signup/code', 307, [], [], '/signup?problem=codeExpired'],
+  // With no sign-up or reset under way the code screen names no address, as before step
+  // 2.163; there is no password to choose (L10): the first screen again, saying why. The
+  // code screen's words, which name the address the code went to, are checked in a
+  // browser (sign-in-says-test.mjs).
+  ['visitor', '/signup/code', 200, ['Enter your code', 'If that address can sign in']],
   ['visitor', '/signup/password', 307, [], [], '/signup?problem=proofInvalid'],
   // The password again is for a signed-in person: anyone else signs in and comes back.
   ['visitor', '/account/confirm', 307, [], [], '/signin?next=%2Faccount%2Fconfirm'],

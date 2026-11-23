@@ -100,6 +100,8 @@ const origin = `http://localhost:${await freePort()}`;
 if (built) {
   server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
+    // Google set up, so "Continue with Google" is drawn (step 2.163, M27) and can be tapped.
+    GOOGLE_SIGN_IN: 'on',
     PUBLIC_BASE_URL: origin,
     LOCAL_BOT_CHECK: 'made-up-turnstile',
   });

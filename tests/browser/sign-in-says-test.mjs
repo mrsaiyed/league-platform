@@ -320,7 +320,7 @@ async function lockOutWalk(email, getsIn) {
   const screens = [];
   const keep = async () =>
     screens.push(
-      (await mainText(page)).replaceAll(email, '<address>').replace(/\d+ seconds/, 'N seconds'),
+      (await mainText(page)).replaceAll(email, '<address>').replace(/\d+ minutes?/, 'N minutes'),
     );
   const alertText = async () => (await page.locator('main [role=alert]').innerText()).trim();
   /** One try: the page it answers with is a new page (scripts off). */
@@ -357,11 +357,11 @@ async function lockOutWalk(email, getsIn) {
     await keep();
     if (getsIn) {
       note('after every wrong try the address is still in its box (M28)', kept);
+      // The 30-second wait is said in whole minutes, rounded up (record 081): "1 minute".
       note(
-        'from the fifth wrong try, the wait is said in seconds with the way in that does not wait',
-        /^Too many tries\. Please wait \d+ seconds, or tap "Forgot your password\?" to choose a new one now\.$/.test(
-          slowed,
-        ),
+        'from the fifth wrong try, the wait is said in whole minutes with the way in that does not wait',
+        slowed ===
+          'Too many tries. Please wait 1 minute, or tap "Forgot your password?" to choose a new one now.',
         slowed,
       );
       note(

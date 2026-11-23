@@ -14,8 +14,9 @@
 // Production refuses to start before anything is drawn (test-copy-test.mjs proves it),
 // and local work shows no line (made-up-world-test and the unit tests of SiteFooter).
 // "Continue with Google" is not on the test copy's sign-in and sign-up (an account made
-// with Google would hold a real address), and is on them in local work (APP_ENV test on the
-// stand-in, started after the test copy is stopped). An admin adding a person on the test
+// with Google would hold a real address), even with Google set up (GOOGLE_SIGN_IN on, step
+// 2.163), and is on them in local work with Google set up (APP_ENV test on the stand-in,
+// started after the test copy is stopped). An admin adding a person on the test
 // copy is refused a real contact email at that box, nothing saved; a made-up one is saved.
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -73,6 +74,8 @@ const origin = `http://localhost:${port}`;
 const server = built
   ? startNext(['start', '--port', String(port), '--hostname', '127.0.0.1'], {
       APP_ENV: 'staging',
+      // Set up, so its absence is the test copy's own rule (step 2.163, M27).
+      GOOGLE_SIGN_IN: 'on',
       PUBLIC_BASE_URL: origin,
       LOG_LEVEL: 'info',
       TRUSTED_PROXY: 'none',
@@ -311,6 +314,8 @@ if (browser !== null) {
     const local = `http://localhost:${localPort}`;
     const localServer = startNext(['start', '--port', String(localPort)], {
       APP_ENV: 'test',
+      // Google is drawn only where it is set up (step 2.163, M27).
+      GOOGLE_SIGN_IN: 'on',
       PUBLIC_BASE_URL: local,
     });
     const context = await browser.newContext({ viewport: phone });
