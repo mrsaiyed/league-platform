@@ -71,3 +71,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.224 (Low): the roster case's row order rests on where the database stores a rewritten row, not on an ORDER BY (a failure would be a loud SURVIVED, never a silent pass); the arrange step switches off foreign-key triggers (session_replication_role = replica); failureLines has no unit test of its own.
 
 - 2.224 leftovers (review, 2026-11-23): the fence sweep never takes out the league filters inside database functions (game_tracked_past_marker, game_ever_decided, erase_account, take_jobs, access_list_names): sweep the migration functions too; a case's arrange holds all triggers, which also switches off foreign-key checks during arrange; fence-sweep.yml pins its actions by version tag, as ci.yml does.
+
+- 2.56 leftovers (2026-11-23): the activity log could not be checked in a browser on the made-up world (it lists none) until step 2.77 part 2 lands; on a league where any scorekeeper may score any game, assigning only puts the game on their list: say so on the Scorekeepers page.
