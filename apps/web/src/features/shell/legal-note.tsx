@@ -84,7 +84,7 @@ export function LegalNote({
   return (
     <StandalonePage>
       <main className="ui-message ui-page-card legal-note">
-        <p className="ui-kicker">{t('shell.siteName')}</p>
+        <div className="ui-kicker">{t('shell.siteName')}</div>
         <h1>{t(titles[page])}</h1>
         <p>{t('legal.shortVersion')}</p>
         <p data-quiet="">{t('legal.lastChanged')}</p>

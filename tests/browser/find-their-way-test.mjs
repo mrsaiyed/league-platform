@@ -472,7 +472,8 @@ if (browser) {
         "a page not found inside a league keeps the league's colors and title face",
         inLeague.heading === league.heading &&
           inLeague.primary === league.primary &&
-          inLeague.title !== platform.title,
+          inLeague.primary !== platform.primary &&
+          inLeague.title.replace(/["'\s]/g, '') === inLeague.heading.replace(/["'\s]/g, ''),
         JSON.stringify(inLeague),
       );
       await page.goto(`${origin}/north-valley`);

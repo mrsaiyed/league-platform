@@ -32,7 +32,7 @@ export default async function Page({ searchParams }: SearchProps) {
   if (person.kind === 'visitor') {
     return (
       <StandalonePage>
-        <main className="ui-message ui-page-card ui-front front">
+        <main className="ui-message ui-page-card ui-front front" data-front-page="">
           {notice === undefined || notice === 'codeSentAgain' ? null : (
             <p role="status" data-notice="">
               {t(notices[notice])}
