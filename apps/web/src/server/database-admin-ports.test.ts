@@ -736,7 +736,7 @@ describe('Admin → Schedule on the database ports, role by role', () => {
       return id;
     });
     expect(await ports.scheduleAdmin.teamsOf(leagueId, campSeasonId)).toEqual([
-      { id: kept, name: 'Binned Wrens', removed: true },
+      { id: kept, name: 'Binned Wrens', removed: true, left: false },
     ]);
   });
 
