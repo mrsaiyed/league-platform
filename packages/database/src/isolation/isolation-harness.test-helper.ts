@@ -60,6 +60,28 @@ export type IsolationFailure = {
   problem: string;
 };
 
+/**
+ * The failures one a line, each starting with its marker word: LEAK when the case reached
+ * another league (or outside any), UNCHECKED when it could not be run or compared, OTHER
+ * for the rest (a control that proves nothing, a commit). The fence-filter check
+ * (scripts/fence-filter-verdict.mjs) counts a removed filter caught only on a LEAK line.
+ */
+export function failureLines(failures: readonly IsolationFailure[]): string {
+  const marker = ({ run, problem }: IsolationFailure) =>
+    /^could not be (?:checked|compared): /.test(problem)
+      ? 'UNCHECKED'
+      : run !== 'control' &&
+          run !== 'afterwards' &&
+          /^(?:returned ".*" of league |refused naming ".*" of league |changed league .+'s |changed .+, outside any league$|(?:answers|writes) differently once league )/s.test(
+            problem,
+          )
+        ? 'LEAK'
+        : 'OTHER';
+  return failures
+    .map((failure) => `\n${marker(failure)} ${failure.run} ${failure.name}: ${failure.problem}`)
+    .join('');
+}
+
 type Open = (work: (scope: LeagueScope) => Promise<never>) => Promise<never>;
 type Outcome = { returned: unknown } | { refused: unknown };
 type Seen = { outcome: Outcome; after: DatabaseRows | null };

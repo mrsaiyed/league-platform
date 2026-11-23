@@ -5,6 +5,7 @@ import type { DatabaseRows } from './database-rows.test-helper.ts';
 import './isolation-cases.test-helper.ts';
 import {
   committedChanges,
+  failureLines,
   findIsolationFailures,
   readDatabase,
 } from './isolation-harness.test-helper.ts';
@@ -56,7 +57,9 @@ describe('two-league isolation (T-65)', () => {
   });
 
   it.each(groups)('no case of $title reaches another league', async ({ cases }) => {
-    expect(await findIsolationFailures(leagues, cases, { before })).toEqual([]);
+    const failures = await findIsolationFailures(leagues, cases, { before });
+    // Each failure on a line of its own, marked LEAK or UNCHECKED, for the fence-filter check.
+    expect(failures, `${failures.length} failures:${failureLines(failures)}\n`).toEqual([]);
   });
 
   it('leaves the database as it was before the first case: every run rolled back', async () => {

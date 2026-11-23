@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { test } from 'node:test';
+import { verdictOf } from '../scripts/fence-filter-verdict.mjs';
 
 const script = 'scripts/fence-filter-check.mjs';
 const run = (...args) => execFileSync(process.execPath, [script, ...args], { encoding: 'utf8' });
@@ -31,6 +32,41 @@ const gaps = [
   ['insert-schedule-draft.ts#1', 's.league_id = ${scope.leagueId}'],
 ];
 
+/** A group's failure as vitest reports it, its lines marked as the harness marks them. */
+const failureListing = (...lines) =>
+  [
+    `AssertionError: ${lines.length} failures:`,
+    ...lines,
+    ": expected [ { subject: 'listPublicRoster', …(3) } ] to deeply equal []",
+    '    at packages/database/src/isolation/isolation-cases.test.ts:61:73',
+  ].join('\n');
+
+test('a failure is caught only when it lists a leak, never for a case that crashed', () => {
+  const leak = failureListing(
+    'UNCHECKED app the public roster: could not be compared: boom',
+    'LEAK code-only the public roster: returned "bravo team" of league bravo',
+  );
+  assert.deepEqual(verdictOf([leak]), { verdict: 'caught' });
+
+  const crashed = verdictOf([
+    failureListing(
+      'UNCHECKED app the public roster: could not be checked: current transaction is aborted',
+      'UNCHECKED code-only the public roster: could not be compared: column "x" does not exist',
+    ),
+  ]);
+  assert.equal(crashed.verdict, 'error');
+  assert.match(crashed.reason, /^no leak listed, only: UNCHECKED app the public roster: could /);
+  assert.equal(verdictOf([failureListing()]).verdict, 'error');
+
+  const unloaded = verdictOf([
+    'Error: Failed to load url ../queries/list-public-roster.js\n    at loadAndTransform',
+  ]);
+  assert.deepEqual(unloaded, {
+    verdict: 'error',
+    reason: 'Error: Failed to load url ../queries/list-public-roster.js',
+  });
+});
+
 test('the excused list is no longer than reviewed, and each excuse names a filter it finds', () => {
   const excused = run('--excused')
     .split('\n')
@@ -52,7 +88,8 @@ test("it takes out the league filter of each of the audit's confirmed gaps", () 
 test("each of the audit's confirmed gaps is caught, on its cases' assertion", () => {
   const result = spawnSync(process.execPath, [script, '--jobs=3', ...gaps.map(([key]) => key)], {
     encoding: 'utf8',
-    timeout: 8 * 60 * 1000,
+    // About 70 s on a quiet machine; GitHub's are slower and busy.
+    timeout: 12 * 60 * 1000,
   });
   const out = `${result.stdout}${result.stderr}`;
   for (const [key] of gaps) {

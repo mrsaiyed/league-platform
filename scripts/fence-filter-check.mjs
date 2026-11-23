@@ -36,6 +36,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verdictOf } from './fence-filter-verdict.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const casesTest = 'packages/database/src/isolation/isolation-cases.test.ts';
@@ -193,7 +194,7 @@ function makeCopy() {
 
 /**
  * Runs the groups of these subjects in a copy. For each subject: 'passed', 'caught' (its
- * group failed on its assertion), 'missing' (no such group ran) or 'error' (anything
+ * group's assertion listed a leak: fence-filter-verdict.mjs), 'missing' (no such group ran) or 'error' (anything
  * else: a file that would not load, a thrown error, a crash or a timeout).
  */
 function runGroups(dir, subjects) {
@@ -233,11 +234,11 @@ function runGroups(dir, subjects) {
           }
           if (test.status === 'passed') verdicts.set(subject, 'passed');
           else if (test.status !== 'failed') continue;
-          else if (test.failureMessages.every((m) => /^AssertionError\b/.test(m)))
-            verdicts.set(subject, 'caught');
           else {
-            verdicts.set(subject, 'error');
-            why.push(`${test.title}: ${test.failureMessages[0]?.split('\n')[0]}`);
+            // Caught only when a leak is listed: a case that crashed is not caught.
+            const { verdict, reason } = verdictOf(test.failureMessages);
+            verdicts.set(subject, verdict);
+            if (verdict === 'error') why.push(`${test.title}: ${reason}`);
           }
         }
       }
