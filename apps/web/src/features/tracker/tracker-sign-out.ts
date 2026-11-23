@@ -7,7 +7,7 @@
 //
 // The open tracker page registers how it leaves (holdSignOut); every sign-out form asks
 // beforeSignOut what to do. With no game open there is nothing to ask or release.
-import { createTranslator, type Catalog } from '@srleagues/site';
+import { translatorFrom, type Catalog } from '@srleagues/site';
 
 /** What the open tracker page offers a sign-out: its waiting plays, and leaving the game. */
 export type TrackerSignOutHold = {
@@ -74,7 +74,7 @@ export function waitingQuestionOf(locale: string, catalog: Catalog): WaitingQues
 
 /** The question for `waiting` plays, in the language's own plural form. */
 export function waitingQuestionText(words: WaitingQuestion, waiting: number): string {
-  return createTranslator(words.locale, { [words.locale]: words.catalog }).plural(
+  return translatorFrom(words.locale, { [words.locale]: words.catalog }).plural(
     'account.signOutWaiting',
     waiting,
   );

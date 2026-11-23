@@ -5,7 +5,7 @@
 // tracker's own frame and look (docs/build/DESIGN.md section 7; record 064): no public
 // header, menu or footer, the title says the two teams, the day and the time, and there
 // is one way out. The words come from the page, from the message files (T-187).
-import { createTranslator, type Catalog } from '@srleagues/site';
+import { translatorFrom, type Catalog } from '@srleagues/site';
 import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import './court.css';
 import type { CourtBanner } from './court-view.tsx';
@@ -90,7 +90,7 @@ export function TrackerOpening({
   locale,
   catalog,
 }: TrackerOpeningProps) {
-  const t = useMemo(() => createTranslator(locale, { [locale]: catalog }), [locale, catalog]);
+  const t = useMemo(() => translatorFrom(locale, { [locale]: catalog }), [locale, catalog]);
   const [phase, setPhase] = useState<Phase>({ kind: 'preparing' });
   const [storeFailed, setStoreFailed] = useState(false);
   // What the browser says of the network: the saved banner says "No connection" while it
@@ -488,7 +488,7 @@ function Notices({
   busy,
 }: {
   readonly status: TrackerControllerStatus;
-  readonly t: ReturnType<typeof createTranslator>;
+  readonly t: ReturnType<typeof translatorFrom>;
   readonly lists: KeptLists;
   readonly busy: boolean;
 }) {
@@ -627,7 +627,7 @@ function OpenGame({
   onConfirm,
 }: {
   readonly phase: Extract<Phase, { kind: 'open' }>;
-  readonly t: ReturnType<typeof createTranslator>;
+  readonly t: ReturnType<typeof translatorFrom>;
   readonly locale: string;
   readonly busy: boolean;
   /** "Opening the game…", and after a while a word about the connection. */

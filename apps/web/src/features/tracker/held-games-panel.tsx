@@ -5,7 +5,7 @@
 // server cannot see the device's storage, so this part is drawn on the device, and
 // draws nothing where nothing is held or the device has no storage. Dismiss asks first,
 // saying what is lost (dismissQuestion). The words come from the page (T-187).
-import { createTranslator, type Catalog } from '@srleagues/site';
+import { translatorFrom, type Catalog } from '@srleagues/site';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   dismissQuestion,
@@ -29,7 +29,7 @@ export type HeldGamesPanelProps = {
 
 /** The games kept on this device, or nothing. */
 export function HeldGamesPanel({ leagueId, scoreHref, locale, catalog }: HeldGamesPanelProps) {
-  const t = useMemo(() => createTranslator(locale, { [locale]: catalog }), [locale, catalog]);
+  const t = useMemo(() => translatorFrom(locale, { [locale]: catalog }), [locale, catalog]);
   const [games, setGames] = useState<readonly HeldGame[]>([]);
   const [dismissFailed, setDismissFailed] = useState(false);
 
