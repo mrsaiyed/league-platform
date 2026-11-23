@@ -68,6 +68,19 @@ describe('the activity log screen (step 2.77)', () => {
       details: { adjustment: team },
     });
     expect(logLineOf(removed, new Set()).thing).toEqual({ kind: 'adjustment', id: team });
+  });
+
+  it('leads a publish that removed games to the bin while one of them is there', () => {
+    const published = (gamesRemoved: number) =>
+      record({
+        action: 'scheduling.publish_schedule',
+        targetType: 'season',
+        targetId: id,
+        details: { revision: 2, gamesRemoved },
+      });
+    expect(logLineOf(published(1), new Set(), new Set([id])).gamesInBin).toBe(true);
+    expect(logLineOf(published(0), new Set(), new Set([id])).gamesInBin).toBeUndefined();
+    expect(logLineOf(published(1), new Set(), new Set()).gamesInBin).toBeUndefined();
     const grant = record({ action: 'access.revoke_grant', targetType: 'role_grant' });
     expect(logLineOf(grant, new Set()).thing).toBeUndefined();
   });

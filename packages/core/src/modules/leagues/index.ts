@@ -217,6 +217,7 @@ export {
 } from './bin.ts';
 export { binEmptyJob, emptyBin } from './empty-bin.ts';
 export { listBin, type BinList } from './commands/list-bin.ts';
+export { listBinPart, type BinPart } from './commands/list-bin-part.ts';
 export { restoreGame, type RestoreGameError } from './commands/restore-game.ts';
 export { restorePerson, type RestorePersonError } from './commands/restore-person.ts';
 export { restoreTeam, type RestoreTeamError } from './commands/restore-team.ts';

@@ -76,7 +76,9 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 
 - polish-4 leftovers (2026-11-23): the standings name column can take 60% of the box at 360 with seeds and 71% at 320 without (cap it: `min(…, 55cqi)` in table-css.ts near line 640, and check 320 and 360 with and without seeds in web-exit-test.mjs); `brokenNames` in simulated-league-test.mjs should also assert it found names; the footnote marks beside team names are 24 by 24, below the 44 the design asks.
 
-- AN UNRELIABLE TEST (2026-11-23): `tests/browser/people-screens-test.mjs` failed once on GitHub with "coach: the list is refused and holds nothing of the person: 404" and passed twice on the same commit (991fcd1, branch lane/polish-4-again): find why a refusal answered 404 once and make it steady.
-
 - 2.77 leftovers (2026-11-23): no browser check yet for the taken-name link on the bin screen; whether a team named with markup reaches the activity log in the harmful-text browser test is unchecked (a unit test shows it as text); the From/To labels on the activity log are not styled like the picker labels.
+- 2.77: the activity log's bin link on a publish entry is keyed on the season, so an older publish keeps it while another publish's removed game is still in the bin; use the revision's gameIds.removed.
+- 2.77: restore-court answers court-venue-in-bin also when the venue is gone for good; it needs its own code and sentence.
+- 2.77: tests/browser/people-on-database-test.mjs:365 searches whole pages for the ordinary word Sample; lengthen it.
+- 2.77: not seen in a browser: an admin limited to one program in the bin, the 'its round was removed' sentence, restoring a division, venue or court.
 - 2.26: the refused-result test of clear-page-cache covers only a refusal before the event; a job rolled back after a later failure rests on leagues-store.test.ts.

@@ -353,7 +353,7 @@ describe('a game in the bin does not hold its round (step 2.181, S-60)', () => {
     for (const gameId of gameIds) {
       expect(await press('remove-game', { gameId })).toMatchObject({ kind: 'saved' });
     }
-    expect(await press('publish', {})).toEqual({ kind: 'published' });
+    expect(await press('publish', {})).toEqual({ kind: 'published', removed: 2 });
 
     // The round shows no game, and offers the tap: it succeeds.
     const teams = await ports.teamsOf(leagueId, current);
@@ -409,7 +409,7 @@ describe('a game in the bin does not hold its round (step 2.181, S-60)', () => {
     expect(view.result.removedRounds?.map((r) => r.id)).toContain(roundOf);
     const grid = buildGrid(view, await ports.teamsOf(leagueId, current), []);
     expect(grid.looseGames.map((g) => g.id)).toContain(gameId);
-    expect(await press('publish', {})).toEqual({ kind: 'published' });
+    expect(await press('publish', {})).toEqual({ kind: 'published', removed: 1 });
     const published = (await read()).published;
     expect(published.games.find((g) => g.id === gameId)?.roundId).toBeNull();
     expect(published.rounds.map((r) => r.id)).not.toContain(roundOf);

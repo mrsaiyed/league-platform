@@ -26,6 +26,7 @@ import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { momentIn } from '../../server/stand-in-world-clock.ts';
+import { binAnchors } from '../bin-area/index.ts';
 import { StaffTrail } from '../staff/index.ts';
 import { adminsView } from './access-view.ts';
 import {
@@ -101,7 +102,14 @@ export async function ActivityLogPage({
     you: context.accountId,
   }).people;
   const binned = new Set(bin.ok ? bin.value.items.map((item) => item.id) : []);
-  const lines = found.value.entries.map((entry) => logLineOf(entry, binned));
+  const gameSeasons = new Set(
+    bin.ok
+      ? bin.value.items.flatMap((item) =>
+          item.kind === 'game' && item.seasonId !== null ? [item.seasonId] : [],
+        )
+      : [],
+  );
+  const lines = found.value.entries.map((entry) => logLineOf(entry, binned, gameSeasons));
   // What the page's entries point at, named as they are now, in one read (step 2.77).
   const asks = lines.flatMap((line): LogThingAsk[] =>
     line.thing === undefined ? [] : [line.thing],
@@ -273,6 +281,9 @@ export async function ActivityLogPage({
                 )}
                 {line.inBin === undefined ? null : (
                   <a href={`${binPage}#bin-${line.inBin}`}>{t('adminAccess.log.binLink')}</a>
+                )}
+                {line.gamesInBin === undefined ? null : (
+                  <a href={`${binPage}#${binAnchors.games}`}>{t('adminAccess.log.binGamesLink')}</a>
                 )}
               </span>
             </li>
