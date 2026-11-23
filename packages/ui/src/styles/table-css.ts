@@ -443,6 +443,16 @@ export const tableCss = String.raw`
     inline-size: var(--ui-num-col);
     min-inline-size: var(--ui-num-col);
   }
+  /* In a table that goes on, the last column in view stands clear of the far edge's fade:
+     its figures by the fade's whole width, its heading ("3PM", in the small face) by all but
+     a sliver, taking from its other side the room the sorted heading's arrow needs. */
+  .ui-stats td.ui-num {
+    padding-inline-end: max(var(--step-2), min(var(--ui-too-many), var(--step-4)));
+  }
+  .ui-stats th.ui-num {
+    padding-inline: min(var(--ui-few), var(--step-1))
+      max(var(--step-2), min(var(--ui-too-many), var(--step-3)));
+  }
   .ui-stats .ui-team-cell {
     /* A table whose columns all fit beside the name gives the name the rest, and fits. */
     --ui-name-col: max(
@@ -582,13 +592,29 @@ th[aria-sort='descending'] .ui-sort-button::after {
    says how many columns are in view and whether it has places: standings-table.tsx), so
    the columns of every division stand under each other. The page's width decides, not the
    box's, so a laptop's narrow home column keeps its layout. */
+/* Worked out once, on the table, in the table's own face: a cell in a smaller face (the
+   headings) inherits the length rather than working out a narrower one of its own. */
+@property --ui-last-col {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+/* A left-out column's second copy, after the in-view ones, is drawn only there. */
+.ui-standings .ui-moved {
+  display: none;
+}
 @media (max-width: 30rem) {
   .ui-standings[data-narrow] {
     --ui-num-col: calc(var(--step-6) + var(--step-3));
+    /* The last column in view (what the table is ordered by: a percentage such as "1.000",
+       or the points) is wide enough for five figures in the table's own face, whatever that
+       face is, and the fade's width after them, so it never grows past its share and stands
+       half out of the box, and no figure of it is faded. */
+    --ui-last-col: max(var(--ui-num-col), calc(5ch + 6 * var(--step-1)));
     --ui-place-col: calc(var(--step-7) + var(--step-3));
     --ui-name-col: calc(
-      100cqi - var(--ui-seed-col, 0) * var(--ui-place-col) - var(--ui-in-view, 0) *
-        var(--ui-num-col)
+      100cqi - var(--ui-seed-col, 0) * var(--ui-place-col) - (var(--ui-in-view, 1) - 1) *
+        var(--ui-num-col) - var(--ui-last-col)
     );
     /* The name's own words: the column less its two paddings, the shield and its gap. */
     --ui-name-words: calc(
@@ -597,6 +623,9 @@ th[aria-sort='descending'] .ui-sort-button::after {
   }
   .ui-standings[data-narrow] .ui-left-out {
     display: none;
+  }
+  .ui-standings[data-narrow] .ui-moved {
+    display: table-cell;
   }
   .ui-standings[data-narrow] th,
   .ui-standings[data-narrow] td {
@@ -608,6 +637,13 @@ th[aria-sort='descending'] .ui-sort-button::after {
     inline-size: var(--ui-num-col);
     min-inline-size: var(--ui-num-col);
     padding-inline: var(--step-1);
+  }
+  .ui-standings[data-narrow] .ui-num.ui-last-in-view {
+    inline-size: var(--ui-last-col);
+    min-inline-size: var(--ui-last-col);
+    /* Its figures stand clear of the far edge's fade, which lies over it while the table
+       goes on (to the columns reached by scrolling). */
+    padding-inline: var(--step-1) var(--step-4);
   }
   .ui-standings[data-narrow] tr > .ui-num:first-child {
     inline-size: var(--ui-place-col);
