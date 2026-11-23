@@ -108,6 +108,8 @@ describe('core’s event handlers on the database', () => {
     const { moved, notMoved, withoutCommands } = portsWithCommands();
     // Today's: a port that runs commands and is not here is still a stand-in's refusal.
     expect([...moved.keys()].sort()).toEqual([
+      // The Admins page and the accept page (step 2.97): the access module's own commands.
+      'adminAccess',
       'adminPeople',
       'adminPeople.putBack',
       'adminSettings',
