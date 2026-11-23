@@ -21,8 +21,16 @@ const run = (...args) => execFileSync(process.execPath, [script, ...args], { enc
  * findPublicSeason);
  * and 48 files with no league filter of their own (no SQL, inserts the fence checks,
  * reads before any league by design, reads only through other checked query files).
+ * 95 since part 3: 14 filters of one statement whose tables are joined on league_id, so the
+ * others still hold every row (find-table-player #1 to #3, is-person-on-roster #1 and #2,
+ * list-decided-game-lines #1 and #2, list-game-roster #1 to #4, list-teams-of-account #1 to
+ * #3); 17 keyed by ids another league-filtered statement chose, or whose write a composite
+ * foreign key refuses for another league's row (delete-rounds #1 to #3,
+ * insert-published-games #4 to #6, insert-roster-entry #1, insert-table-player #1,
+ * list-season-names #3, list-table-teams #2, list-venues #2, set-current-season #2 and #3,
+ * update-published-game #2, update-season #1 to #3).
  */
-const reviewedExcused = 64;
+const reviewedExcused = 95;
 
 /** The audit's confirmed gaps, by name, each with the start of the filter it takes out. */
 const gaps = [

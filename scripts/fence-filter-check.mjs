@@ -79,6 +79,35 @@ const excused = new Map([
   ['list-season-teams.ts#2', 'keyed by teams.id and season_id, which #1 and #3 hold'],
   ['remove-table-player.ts#4', 'only narrows which entries keep a person #3 holds to the league'],
   ['list-season-teams.ts#3', "#1 keeps the teams to the scope's league; teams_season the rest"],
+  // Step 2.224, part 3: one statement whose tables are joined on league_id (`on x.league_id
+  // = y.league_id`): with any one table's filter taken out, another table's filter and the
+  // join's equality still hold every row to the scope's league.
+  ...joinedOnLeague('find-table-player.ts', 3),
+  ...joinedOnLeague('is-person-on-roster.ts', 2),
+  ...joinedOnLeague('list-decided-game-lines.ts', 2),
+  ...joinedOnLeague('list-game-roster.ts', 4),
+  ...joinedOnLeague('list-teams-of-account.ts', 3),
+  // Step 2.224, part 3: a statement keyed by ids that another league-filtered statement of
+  // the same query chose, or one whose write a composite foreign key refuses for another
+  // league's row (courts_venue, games_court, games_home_team, games_away_team, games_round,
+  // roster_entries_team, seasons_program: each names the league with the key).
+  ['delete-rounds.ts#1', "#2 and #3, the writes it feeds, each name the scope's league again"],
+  ['delete-rounds.ts#2', "keyed by the round ids #1 chose; games_round ties a game's round"],
+  ['delete-rounds.ts#3', "keyed by the round ids #1's league-filtered read chose"],
+  ['insert-published-games.ts#4', 'the home team read for its division; games_home_team refuses'],
+  ['insert-published-games.ts#5', 'the away team read for its division; games_away_team refuses'],
+  ['insert-published-games.ts#6', "a court found at the game's venue; games_court refuses"],
+  ['insert-roster-entry.ts#1', "the sort over the entry's own team; roster_entries_team refuses"],
+  ['insert-table-player.ts#1', "the sort over the entry's own team; roster_entries_team refuses"],
+  ['list-season-names.ts#3', "courts are kept only for the venues #2's league-filtered read found"],
+  ['list-table-teams.ts#2', "a game of #1's teams and season; games_home_team, games_away_team"],
+  ['list-venues.ts#2', "courts are kept only for the venues #1's league-filtered read found"],
+  ['set-current-season.ts#2', 'the program of the season #1 found; seasons_program the rest'],
+  ['set-current-season.ts#3', "keyed by the season id #1's league-filtered read found"],
+  ['update-published-game.ts#2', "a court found at the slot's venue; games_court refuses"],
+  ['update-season.ts#1', "#3, the write, names the scope's league again (and #2)"],
+  ['update-season.ts#2', 'the program of the season #1 found; seasons_program the rest'],
+  ['update-season.ts#3', "keyed by the season id #1's league-filtered read found"],
   // Whole files with no league filter of their own (keyed by the file name alone): the
   // check has nothing to take out, and each says why. A new file with no filter of a
   // known shape and no reason here is a problem of the check, also with --list.
@@ -160,12 +189,22 @@ const excused = new Map([
     'standings-read-store.ts',
   ),
 ]);
-// 4 of the purge, 12 repeated filters and 48 files with no filter of their own (2.224).
-const mostExcused = 64;
+// 4 of the purge, 12 repeated filters and 48 files with no filter of their own (2.224,
+// part 2); 14 filters of statements joined on league_id and 17 statements keyed by another
+// league-filtered statement or held by a composite key (part 3).
+const mostExcused = 95;
 
 /** Whole-file excuses: each file name with the one reason. */
 function wholeFiles(reason, ...files) {
   return files.map((file) => [file, reason]);
+}
+
+/** Every filter #1 to #count of one statement whose tables are joined on league_id. */
+function joinedOnLeague(file, count) {
+  return Array.from({ length: count }, (_, i) => [
+    `${file}#${i + 1}`,
+    "its tables are joined on league_id, so the statement's other league filters hold it",
+  ]);
 }
 
 /** What a league filter looks like, and what is left when it is taken out. */
