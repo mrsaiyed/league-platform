@@ -2,6 +2,7 @@
 // or brings it back. It does not touch the venue's courts: the command refuses to bin
 // a venue with courts (record 019). Bringing it back can hit a name another venue took
 // meanwhile (0007): 'name-taken', and the transaction is then unusable.
+import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { constraintOf } from './constraint-of.ts';
 
@@ -14,7 +15,7 @@ export async function setVenueBinned(
   try {
     const row = await transactionOf(scope)
       .updateTable('venues')
-      .set({ deleted_at: binned ? new Date() : null })
+      .set({ deleted_at: binned ? sql<Date>`now()` : null })
       .where('league_id', '=', scope.leagueId)
       .where('id', '=', venueId)
       .returning('id')

@@ -4,6 +4,7 @@
 // or another team of the season that carries on the same team from other seasons
 // (0008, `teams_one_per_lineage`): 'slug-taken', 'name-taken' or 'lineage-taken', and
 // the transaction is then unusable.
+import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { constraintOf } from './constraint-of.ts';
 
@@ -16,7 +17,7 @@ export async function setTeamBinned(
   try {
     const row = await transactionOf(scope)
       .updateTable('teams')
-      .set({ deleted_at: binned ? new Date() : null })
+      .set({ deleted_at: binned ? sql<Date>`now()` : null })
       .where('league_id', '=', scope.leagueId)
       .where('id', '=', teamId)
       .returning('id')

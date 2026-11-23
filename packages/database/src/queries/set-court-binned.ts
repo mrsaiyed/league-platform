@@ -1,6 +1,7 @@
 // Moves a court of the scope's league to the bin (`deleted_at` set; the row stays, A-5)
 // or brings it back. Bringing it back can hit a name another court of its venue took
 // meanwhile (0007): 'name-taken', and the transaction is then unusable.
+import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { constraintOf } from './constraint-of.ts';
 
@@ -13,7 +14,7 @@ export async function setCourtBinned(
   try {
     const row = await transactionOf(scope)
       .updateTable('courts')
-      .set({ deleted_at: binned ? new Date() : null })
+      .set({ deleted_at: binned ? sql<Date>`now()` : null })
       .where('league_id', '=', scope.leagueId)
       .where('id', '=', courtId)
       .returning('id')

@@ -9,6 +9,7 @@
 // so no line is left for a person in the bin. Run in a savepoint (in-savepoint.ts): a
 // refusal is `failed`, never thrown. Every table is filtered to the league (T-28).
 import type { TablePlayerRefusal } from '@srleagues/core';
+import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { inSavepoint } from './in-savepoint.ts';
 
@@ -38,7 +39,8 @@ export async function removeTablePlayer(
         .execute();
       await tx
         .updateTable('people as p')
-        .set({ deleted_at: new Date() })
+        // The database's clock, as for the bin's other stamps (step 2.224, part 2).
+        .set({ deleted_at: sql<Date>`now()` })
         .where('p.league_id', '=', scope.leagueId)
         .where('p.id', '=', personId)
         .where('p.profile_id', 'is', null)

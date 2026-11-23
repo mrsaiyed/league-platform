@@ -1,0 +1,35 @@
+# The two-league test's whole fence sweep (step 2.224, T-294): every league filter of
+# every query file taken out in turn, in a temporary copy, and the isolation cases
+# expected to notice. It takes 15 to 45 minutes, so it is not part of the gate (ci.yml):
+# it runs by hand and once a week. It needs no secret and reaches nothing outside the
+# runner; it reads the repository and writes only its temporary copies and its log.
+# Compare its log with docs/build/handover/lanes/2.224-sweep.tsv.
+name: Fence sweep
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'
+permissions:
+  contents: read
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Take each league filter out in turn
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/fence-filter-check.mjs --jobs=3 2>&1 | tee "$RUNNER_TEMP/fence-sweep.txt"
+      - name: Keep the sweep's log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fence-sweep
+          path: ${{ runner.temp }}/fence-sweep.txt
