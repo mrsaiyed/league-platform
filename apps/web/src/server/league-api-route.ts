@@ -45,10 +45,16 @@ export async function carriesSignInCookies(): Promise<boolean> {
   return [cookieNames.session, cookieNames.renew].some((name) => jar.has(name));
 }
 
-/** An answer as Next.js sends it; never cached unless the answer says so. */
+/**
+ * An answer as Next.js sends it; never cached unless the answer says so. Every league
+ * answer, in every league and in production too, asks search engines not to index it
+ * (record 107, T-312): a JSON answer is data for our own pages, and some (the game
+ * snapshot) carry players' names at an address a page shows. A page carries the mark in
+ * its head instead (league-search-marks.ts); an answer has no head, so it is the header.
+ */
 export function respond(answer: ApiAnswer): Response {
   return Response.json(answer.body, {
     status: answer.status,
-    headers: { 'Cache-Control': 'no-store', ...answer.headers },
+    headers: { 'Cache-Control': 'no-store', ...answer.headers, 'X-Robots-Tag': 'noindex' },
   });
 }

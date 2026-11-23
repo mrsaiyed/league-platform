@@ -3,10 +3,13 @@
 // engines not to index it (U-10). Not a command: it changes nothing, and a public page
 // reads it with no permission. Both settings are set for the whole league only.
 //
-// The children's rule (U-18): a league whose players are or may be children (youth or
-// mixed) is never indexed, whatever its setting says. Every public page can show a child's name (team, statistics, home and game pages,
-// not only player pages), so the whole league's public site is marked, and no page can be
-// missed. A league whose audience cannot be read is youth (LeaguesStore.leagueAudience).
+// The children's rule (U-18): a league that holds a child is never indexed, whatever its
+// setting says: a youth or mixed league, and an adult league with a child recorded in it
+// (the same test as publish-checks.ts, record 065). It is a safety rule, not the admin's
+// choice: a child's name must not reach a search engine because of the kind of league
+// picked. Every public page can show a child's name (team, statistics, home and game
+// pages, not only player pages), so the whole league's public site is marked, and no page
+// can be missed. A league whose audience cannot be read is youth (leagueAudience).
 import type { Audience } from '../league-values.ts';
 import type { LeaguesStore } from '../ports.ts';
 import type { Setting } from './define-setting.ts';
@@ -21,11 +24,14 @@ export type SiteFacts = {
 };
 
 /** What reading the facts needs: the league's settings and who plays in it. */
-export type SiteFactsStore = Pick<LeaguesStore, 'settingRows' | 'leagueAudience'>;
+export type SiteFactsStore = Pick<
+  LeaguesStore,
+  'settingRows' | 'leagueAudience' | 'hasRecordedChild'
+>;
 
 /** U-18: whether a league's public pages are kept out of search engines whatever it chose. */
-export function childrenKeepOutOfSearch(audience: Audience): boolean {
-  return audience !== 'adult';
+export function childrenKeepOutOfSearch(audience: Audience, hasRecordedChild: boolean): boolean {
+  return audience !== 'adult' || hasRecordedChild;
 }
 
 export async function readSiteFacts(store: SiteFactsStore): Promise<SiteFacts> {
@@ -38,6 +44,7 @@ export async function readSiteFacts(store: SiteFactsStore): Promise<SiteFacts> {
   };
   const notice = (await leagueValue(siteNotice, '')).trim();
   const asked = await leagueValue(siteDoNotIndex, true);
-  const doNotIndex = asked || childrenKeepOutOfSearch(await store.leagueAudience());
+  const doNotIndex =
+    asked || childrenKeepOutOfSearch(await store.leagueAudience(), await store.hasRecordedChild());
   return { notice, doNotIndex };
 }

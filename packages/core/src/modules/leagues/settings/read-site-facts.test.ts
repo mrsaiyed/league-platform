@@ -8,6 +8,7 @@ import { childrenKeepOutOfSearch, readSiteFacts, type SiteFactsStore } from './r
 function store(
   values: Readonly<Record<string, unknown>>,
   audience: Audience = 'adult',
+  recordedChild = false,
 ): SiteFactsStore {
   return {
     settingRows: async (key) => {
@@ -21,6 +22,7 @@ function store(
       return [row];
     },
     leagueAudience: async () => audience,
+    hasRecordedChild: async () => recordedChild,
   };
 }
 
@@ -59,7 +61,26 @@ describe('readSiteFacts (step 2.60, U-10, U-18)', () => {
         doNotIndex: true,
       });
     }
-    expect(childrenKeepOutOfSearch('adult')).toBe(false);
+    expect(childrenKeepOutOfSearch('adult', false)).toBe(false);
+  });
+
+  it('keeps an adult league with a recorded child out of search, whatever it chose', async () => {
+    expect(await readSiteFacts(store({ [siteDoNotIndex.key]: false }, 'adult', true))).toEqual({
+      notice: '',
+      doNotIndex: true,
+    });
+    expect(childrenKeepOutOfSearch('adult', true)).toBe(true);
+  });
+
+  it('leaves an adult league with no recorded child to its own setting', async () => {
+    expect(await readSiteFacts(store({ [siteDoNotIndex.key]: false }, 'adult', false))).toEqual({
+      notice: '',
+      doNotIndex: false,
+    });
+    expect(await readSiteFacts(store({ [siteDoNotIndex.key]: true }, 'adult', false))).toEqual({
+      notice: '',
+      doNotIndex: true,
+    });
   });
 
   it('reads a damaged stored value as the careful answer', async () => {

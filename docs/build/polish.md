@@ -80,3 +80,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 
 - 2.77 leftovers (2026-11-23): no browser check yet for the taken-name link on the bin screen; whether a team named with markup reaches the activity log in the harmful-text browser test is unchecked (a unit test shows it as text); the From/To labels on the activity log are not styled like the picker labels.
 - 2.26: the refused-result test of clear-page-cache covers only a refusal before the event; a job rolled back after a later failure rests on leagues-store.test.ts.
+- 2.60: there is no league error.tsx, so a league page's server error shows without the site notice.
+- 2.60: site.notice has no protective order, so an archived or suspended league cannot add or remove its notice (R-26).

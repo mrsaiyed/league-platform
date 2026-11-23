@@ -1959,6 +1959,11 @@ async function checkSnapshotCache(origin) {
   const labels = visitor.headers.get('cache-tag');
   if (labels !== `league:${northValley},league:${northValley}:game:${liveGame}`)
     problems.push(`a visitor's snapshot is labeled "${labels}"`);
+  // Step 2.60, record 107: no league JSON answer is indexed (league-api-route.ts sets it in
+  // every mode; here the test copy's proxy sets it too, so league-api-route.test.ts is
+  // what shows production's).
+  const robots = visitor.headers.get('x-robots-tag');
+  if (robots !== 'noindex') problems.push(`a visitor's snapshot has x-robots-tag "${robots}"`);
   for (const who of ['owner', 'stranger']) {
     const answer = await fetch(address, { headers: { cookie: `srl_session=${tokens[who]}` } });
     await answer.text();
@@ -2366,9 +2371,11 @@ async function checkSettings(origin) {
  * markup in it, drawn as text) and asked not to be indexed shows the notice on each page,
  * as a named region, and marks each page's head with the league's own robots mark
  * (`noarchive` beside `noindex`: the test copy's own mark has `noindex` on every page, so
- * the league's is told apart by it). (b) The youth league is marked on every page though
- * it set nothing. (c) The same adult league before and after shows neither. The settings
- * go back to the defaults at the end, so the checks after see the world as before.
+ * the league's is told apart by it). (b) The youth league, and the adult league with a
+ * recorded child (north-valley), are marked on every page though they set nothing (U-18).
+ * (c) An adult league with no recorded child (still-waters, the empty league) is marked
+ * only while it asks, and north-valley's notice goes when it is cleared. The settings go
+ * back to the defaults at the end, so the checks after see the world as before.
  */
 async function checkSiteMarks(origin) {
   const problems = [];
@@ -2396,13 +2403,13 @@ async function checkSiteMarks(origin) {
         problems.push(`site marks: ${path} drew the notice as markup`);
     }
   }
-  async function save(key, fields) {
-    const page = '/north-valley/admin/settings';
+  async function save(key, fields, league = 'north-valley') {
+    const page = `/${league}/admin/settings`;
     const html = await (await fetch(origin + page, { headers: as })).text();
     const id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[1];
     const body = new FormData();
     body.set(id ?? '', '');
-    for (const [name, value] of Object.entries({ league: 'north-valley', key, ...fields })) {
+    for (const [name, value] of Object.entries({ league, key, ...fields })) {
       body.set(name, value);
     }
     const response = await fetch(origin + page, {
@@ -2412,14 +2419,17 @@ async function checkSiteMarks(origin) {
       redirect: 'manual',
     });
     const to = response.headers.get('location') ?? '';
-    if (!to.includes('done=')) problems.push(`site marks: saving ${key} answers ${to}`);
+    if (!to.includes('done='))
+      problems.push(`site marks: saving ${key} in ${league} answers ${to}`);
   }
   const more = {
     'north-valley': ['/north-valley/teams/owls', `/north-valley/games/${game(2)}`],
     'harbor-city': ['/harbor-city/teams/comets', '/harbor-city/teams/rockets'],
+    'still-waters': [],
   };
-  await walk('north-valley', { marked: false, withNotice: false });
+  await walk('north-valley', { marked: true, withNotice: false });
   await walk('harbor-city', { marked: true, withNotice: false });
+  await walk('still-waters', { marked: false, withNotice: false });
   const settings = await (
     await fetch(`${origin}/north-valley/admin/settings`, { headers: as })
   ).text();
@@ -2435,7 +2445,11 @@ async function checkSiteMarks(origin) {
   await walk('north-valley', { marked: true, withNotice: true });
   await save('site.notice', { version: '1', intent: 'clear' });
   await save('site.doNotIndex', { version: '1', intent: 'clear' });
-  await walk('north-valley', { marked: false, withNotice: false });
+  await walk('north-valley', { marked: true, withNotice: false });
+  await save('site.doNotIndex', { version: '', value: 'true' }, 'still-waters');
+  await walk('still-waters', { marked: true, withNotice: false });
+  await save('site.doNotIndex', { version: '1', intent: 'clear' }, 'still-waters');
+  await walk('still-waters', { marked: false, withNotice: false });
   return problems;
 }
 

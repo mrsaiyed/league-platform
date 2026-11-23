@@ -187,8 +187,8 @@ export const siteNotice = defineSetting({
 
 /**
  * Whether the league asks search engines not to index its public pages (U-10: any league
- * may). Off to start. A youth or mixed league is never
- * indexed whatever this says (U-18, readSiteFacts). Switching it on shows less, so
+ * may). Off to start. A league that holds a child (youth, mixed, or an adult league with a
+ * recorded child) is never indexed whatever this says (U-18, readSiteFacts). Switching it on shows less, so
  * it works even in an archived or suspended league (R-26).
  */
 export const siteDoNotIndex = defineSetting({
