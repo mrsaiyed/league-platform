@@ -757,6 +757,20 @@
   white-space: normal;
   overflow-wrap: break-word;
 }
+/* On a phone, where one team's grid is shown at a time and it goes on past its box, each
+   count's box stands at its column's start with the far edge's fade's width clear after
+   it, so the last column in view (PTS) is whole and none of its box lies under the fade;
+   the name column gives up a little so that Played, MIN and PTS are still in view at rest. */
+@media (max-width: 47.99rem) {
+  .box-score-grid {
+    --box-count-col: calc(var(--step-7) + var(--step-2) + var(--step-1) + var(--step-4));
+    --box-name-least: 6rem;
+  }
+  .box-score-grid td,
+  .box-score-grid thead th:not(:first-child) {
+    padding-inline: var(--step-1) var(--step-4);
+  }
+}
 /* A count's box: a text box asking for number keys (box-score-sheet-form.tsx says why). */
 .staff .box-score-grid input[inputmode='numeric'] {
   inline-size: calc(var(--step-7) + var(--step-2));
