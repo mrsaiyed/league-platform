@@ -11,16 +11,17 @@
 //   admin, opens its menu and taps every entry. As production draws it, the menu holds only
 //   areas that exist (the local menu without those marked "Not ready"), no entry leads to a
 //   "not ready" panel or to "not found", and the admin's home names nothing still to come; a
-//   registrar, whose areas are all still to come, is told so calmly on a page that passes the
-//   accessibility checks and does not scroll sideways. As local work draws it, every area of
+//   registrar, one of whose areas (Registration) is still to come, finds only People in the
+//   menu on a home that names nothing still to come, passes the accessibility checks and does
+//   not scroll sideways. As local work draws it, every area of
 //   the person's is in the menu, those with no screen marked "Not ready", and each of those
 //   opens its "not ready" panel.
 // - Every public address (each of our own pages, each page of two live leagues with made-up
 //   values), as a visitor, a member and the owner: as production draws it, no answer says
 //   "not built yet" or "not ready", no link drawn leads to a page not built yet, and every
-//   link drawn on those pages leads somewhere that answers; the footer links to neither Terms
-//   nor Privacy, which are not built yet. As local work draws it, every page not built yet
-//   says so, the footer links to both.
+//   link drawn on those pages leads somewhere that answers; the footer links to Terms and
+//   Privacy, built since (step 2.135). As local work draws it, every page not built yet says
+//   so, and the footer links to both too.
 // - As production draws it, the address of each page and area not built yet answers exactly
 //   as an address that does not exist: the same status, headers (but the date and the
 //   length), markup and page data once each name is put in the same place, compared over
@@ -98,20 +99,17 @@ const placeholders = [
   ['/contact', 'contact'],
   ['/find', 'find'],
   ['/help', 'help'],
-  ['/privacy', 'privacy'],
   ['/start', 'start'],
   ['/status', 'status'],
-  ['/terms', 'terms'],
   ['/account/inbox', 'inbox'],
   ...['north-valley', 'harbor-city'].flatMap((league) => [
-    [`/${league}/my`, 'my'],
     [`/${league}/news`, 'news'],
     [`/${league}/news/a-made-up-post`, 'news'],
     [`/${league}/players/a-made-up-player`, 'players'],
     [`/${league}/register`, 'register'],
   ]),
 ];
-const adminPlaceholders = ['registration', 'people', 'standings', 'site', 'messages'];
+const adminPlaceholders = ['registration', 'standings', 'site', 'messages'];
 const stranger = 'zqxunknownzqx';
 
 /** Every public address: our own pages, and each page of two live leagues. */
@@ -125,6 +123,8 @@ const publicAddresses = [
   '/signup/password',
   '/account',
   '/account/confirm',
+  '/terms',
+  '/privacy',
   ...placeholders.filter(([at]) => !/^\/(north-valley|harbor-city)\//.test(at)).map(([at]) => at),
   ...['north-valley', 'harbor-city'].flatMap((league) => [
     `/${league}`,
@@ -305,7 +305,7 @@ try {
     }
   }
 
-  // The registrar, every one of whose areas is still to come, as production draws it.
+  // The registrar, whose Registration is still to come and People built, as production draws it.
   if (servers.production) {
     await step('the registrar’s admin as production draws it', async () => {
       const context = await browser.newContext({ viewport: phone });
@@ -316,8 +316,8 @@ try {
       await page.goto(`${servers.production.origin}/quiet-pines/admin`);
       const main = await page.locator('main').innerText();
       note(
-        'the registrar is told calmly there is nothing to do yet',
-        main.includes(en['admin.home.nothingYet.title']),
+        'the registrar’s home names nothing still to come',
+        !(await page.content()).includes(comingList) && unfinishedIn(main).length === 0,
       );
       const problems = await accessibilityProblems(page);
       note(
@@ -329,13 +329,12 @@ try {
       note('the registrar’s home does not scroll sideways at 390', wide <= phone.width, `${wide}`);
       const menu = await menuOf(page);
       note(
-        'the registrar’s menu is the admin’s home alone',
-        menu.length === 1,
+        'the registrar’s menu is the admin’s home and People',
+        menu.length === 2 &&
+          menu.some((e) => e.name === en['admin.area.people']) &&
+          menu.every((e) => !e.notReady),
         menu.map((e) => e.name).join(', '),
       );
-      await page.locator('main').getByRole('link', { name: en['admin.viewSite'] }).click();
-      await page.waitForURL((url) => url.pathname === '/quiet-pines');
-      note('its one way on opens the league', true);
       await context.close();
     });
   }
@@ -354,7 +353,6 @@ try {
           const label = `${mode}, ${person}, ${address}`;
           if (mode === 'production') {
             note(`${label}: says nothing unfinished`, words.length === 0, words.join(' | '));
-            note(`${label}: links to no Terms or Privacy`, !/href="\/(terms|privacy)"/.test(html));
             for (const href of hrefsIn(html)) {
               const path = href.split(/[?#]/)[0];
               note(
@@ -367,14 +365,10 @@ try {
             if (html.includes(en['shell.notBuilt'])) found.push(address);
             note(`${label}: says it is not built yet`, html.includes(en['shell.notBuilt']));
           }
-          if (
-            mode === 'local' &&
-            response.status === 200 &&
-            /^\/north-valley(\/|$)/.test(address)
-          ) {
+          if (response.status === 200 && /^\/north-valley(\/|$)/.test(address)) {
             note(
               `${label}: the footer links to Terms and Privacy`,
-              /href="\/terms"/.test(html) && /href="\/privacy"/.test(html),
+              /href="\/terms[?"]/.test(html) && /href="\/privacy[?"]/.test(html),
             );
           }
         }
@@ -437,7 +431,6 @@ try {
         [`/north-valley/admin/${area}`, area, null, 'visitor'],
       ]),
       ['/quiet-pines/admin/registration', 'registration', token('registrar'), 'registrar'],
-      ['/quiet-pines/admin/people', 'people', token('registrar'), 'registrar'],
     ];
     for (const [address, word, who, person] of cases) {
       await step(`production: ${address} as the ${person}`, async () => {
@@ -464,7 +457,7 @@ try {
       // pages not built yet at that level, which must be none of them.
       const levels = [
         [`/${stranger}`, null, placeholders.filter(([at]) => !at.includes('-')).map(([, w]) => w)],
-        [`/north-valley/${stranger}`, null, ['my', 'news', 'players', 'register']],
+        [`/north-valley/${stranger}`, null, ['news', 'players', 'register']],
         [`/account/${stranger}`, null, ['inbox']],
         [`/north-valley/admin/${stranger}`, token('owner'), adminPlaceholders],
       ];
