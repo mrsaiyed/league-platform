@@ -103,6 +103,15 @@ registerIsolationCase({
 registerIsolationCase({
   subject: insertScheduleDraft,
   name: "start a draft for the target's season, then for the scope's own after discarding its seeded one",
+  // Step 2.224 (D-M1): the target's own draft is discarded first, inside its own fence, so
+  // an insert that lost its league filter would write a draft into the target's league,
+  // not meet the draft already there and do nothing.
+  arrange: (scope, target) =>
+    transactionOf(scope)
+      .deleteFrom('schedule_drafts')
+      .where('league_id', '=', scope.leagueId)
+      .where('id', '=', target.scheduleDraftId)
+      .execute(),
   run: async (scope, target) => {
     // The target's season: it has a draft already, so a run that can reach it is told so,
     // and one that cannot is told there is no such season, naming nothing of it.

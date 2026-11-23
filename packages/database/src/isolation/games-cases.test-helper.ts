@@ -82,6 +82,7 @@ import {
   registerCommandCase,
   runAsApp,
 } from './command-cases.test-helper.ts';
+import { moveOwnLeagueRowLast, setTargetLeagueApart } from './public-schedule-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import { harnessNow, type LeagueRecords } from './two-leagues.test-helper.ts';
 
@@ -112,6 +113,7 @@ const postponeTargetGame = (scope: LeagueScope, target: LeagueRecords) =>
 registerIsolationCase({
   subject: listPostponedGames,
   name: "list the scope's postponed games after postponing the target's",
+  arrange: postponeTargetGame,
   run: async (scope, target) => {
     await postponeTargetGame(scope, target);
     return listPostponedGames(scope);
@@ -423,12 +425,17 @@ async function postponeTargetGameDaysAgo(scope: LeagueScope, target: LeagueRecor
 registerIsolationCase({
   subject: leagueDayOf,
   name: "read the scope's own league's day, with the target's in the database",
-  run: (scope) => leagueDayOf(scope),
+  arrange: setTargetLeagueApart,
+  run: async (scope) => {
+    await moveOwnLeagueRowLast(scope);
+    return leagueDayOf(scope);
+  },
 });
 
 registerIsolationCase({
   subject: listGamesNeedingResult,
   name: "list the games needing a result after the target's upcoming game's start has passed",
+  arrange: startTargetGameAnHourAgo,
   run: async (scope, target) => {
     await startTargetGameAnHourAgo(scope, target);
     return listGamesNeedingResult(scope, target.memberId, { every: 'all', assigned: 'all' }, 100);
@@ -438,6 +445,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: listEarlierRounds,
   name: "count the earlier rounds after the target's upcoming game was postponed days ago",
+  arrange: postponeTargetGameDaysAgo,
   run: async (scope, target) => {
     await postponeTargetGameDaysAgo(scope, target);
     return listEarlierRounds(scope, target.memberId, { every: 'all', assigned: 'all' }, 100);
@@ -447,6 +455,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: listEarlierRound,
   name: "list the target's round's earlier games after its upcoming game was postponed days ago",
+  arrange: postponeTargetGameDaysAgo,
   run: async (scope, target) => {
     await postponeTargetGameDaysAgo(scope, target);
     return listEarlierRound(
@@ -474,6 +483,7 @@ for (const [reachName, reachOf] of narrowedReaches) {
   registerIsolationCase({
     subject: listGamesNeedingResult,
     name: `list the games needing a result, of ${reachName}, after the target's upcoming game's start has passed`,
+    arrange: startTargetGameAnHourAgo,
     run: async (scope, target) => {
       await startTargetGameAnHourAgo(scope, target);
       return listGamesNeedingResult(scope, target.memberId, reachOf(target), 100);
@@ -482,6 +492,7 @@ for (const [reachName, reachOf] of narrowedReaches) {
   registerIsolationCase({
     subject: listEarlierRounds,
     name: `count the earlier rounds, of ${reachName}, after the target's upcoming game was postponed days ago`,
+    arrange: postponeTargetGameDaysAgo,
     run: async (scope, target) => {
       await postponeTargetGameDaysAgo(scope, target);
       return listEarlierRounds(scope, target.memberId, reachOf(target), 100);
@@ -490,6 +501,7 @@ for (const [reachName, reachOf] of narrowedReaches) {
   registerIsolationCase({
     subject: listEarlierRound,
     name: `list the target's round's earlier games, of ${reachName}, after its upcoming game was postponed days ago`,
+    arrange: postponeTargetGameDaysAgo,
     run: async (scope, target) => {
       await postponeTargetGameDaysAgo(scope, target);
       return listEarlierRound(
@@ -506,6 +518,7 @@ for (const [reachName, reachOf] of narrowedReaches) {
 registerIsolationCase({
   subject: listGamesNeedingResultCommand,
   name: "list the scope's account's games needing a result after the target's start has passed",
+  arrange: startTargetGameAnHourAgo,
   run: async (scope, target) => {
     await startTargetGameAnHourAgo(scope, target);
     return runAsApp(listGamesNeedingResultCommand, harnessTx, scope, {});
@@ -515,6 +528,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: listEarlierGames,
   name: "list the scope's earlier games, asking for the target's round",
+  arrange: postponeTargetGameDaysAgo,
   run: async (scope, target) => {
     await postponeTargetGameDaysAgo(scope, target);
     return runAsApp(listEarlierGames, harnessTx, scope, { round: `r-${target.roundId}` });
@@ -549,6 +563,7 @@ registerCommandCase(listScoringOffers, harnessTx, {
 registerIsolationCase({
   subject: listPostponedGamesCommand,
   name: "list the scope's postponed games after postponing the target's",
+  arrange: postponeTargetGame,
   run: async (scope, target) => {
     await postponeTargetGame(scope, target);
     return runAsApp(listPostponedGamesCommand, harnessTx, scope, {});

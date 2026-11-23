@@ -77,6 +77,7 @@ import {
 import './divisions-venues-cases.test-helper.ts';
 import './games-cases.test-helper.ts';
 import './imports-cases.test-helper.ts';
+import { moveOwnLeagueRowLast, setTargetLeagueApart } from './public-schedule-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import './league-removal-cases.test-helper.ts';
 import './not-started-cases.test-helper.ts';
@@ -110,7 +111,11 @@ registerIsolationCase({
 registerIsolationCase({
   subject: findCurrentLeague,
   name: "read the scope's league",
-  run: (scope) => findCurrentLeague(scope),
+  arrange: setTargetLeagueApart,
+  run: async (scope) => {
+    await moveOwnLeagueRowLast(scope);
+    return findCurrentLeague(scope);
+  },
 });
 
 registerIsolationCase({

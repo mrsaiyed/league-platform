@@ -53,6 +53,8 @@ export type LeagueRecords = MadeLeague & {
   emptyVenueId: string;
   /** A team of the season in the division, with one person on its roster. */
   teamId: string;
+  /** The team's short name, so a case can ask for it without reading it through a fence. */
+  teamSlug: string;
   personId: string;
   /** A person who left the team (so not on a roster now): the child of the shared account. */
   formerPlayerId: string;
@@ -127,6 +129,26 @@ const seededSessionSince = Date.UTC(2026, 11, 13, 18, 0, 0);
  * leases, so whether a lease has run out never depends on when the tests run.
  */
 export const harnessNow = seededSessionSince + 30_000;
+
+/**
+ * Fixes SQL's clock too (step 2.224, D-M1): `now()` named in a query answers harnessNow,
+ * through a function of that name in a schema searched before PostgreSQL's own, so no
+ * case's result depends on the day the tests run. Set before the leagues are seeded, so
+ * what the seed dates from now() (an invitation's expiry, a job's lease) dates from it
+ * too. Column defaults are bound to PostgreSQL's own now() and keep the real time.
+ */
+async function fixClock(pglite: PGlite) {
+  const at = new Date(harnessNow).toISOString();
+  await pglite.exec(`
+    create schema harness_clock;
+    create function harness_clock.now() returns timestamptz
+      language sql stable as $$ select '${at}'::timestamptz $$;
+    grant usage on schema harness_clock to public;
+    grant execute on function harness_clock.now() to public;
+    select set_config('search_path',
+      'harness_clock, ' || current_setting('search_path') || ', pg_catalog', false);
+  `);
+}
 
 /** An account with its own (self) profile. */
 async function person(db: Sql, email: string, first: string, last: string) {
@@ -210,8 +232,10 @@ async function seededLeague(
       [leagueId, ownerId, `Renamed ${m}`],
     ],
     [
+      // The database starts a visit at its own clock (a trigger), not the harness's
+      // (fixClock), and a visit lasts at most an hour from then: so the real clock here.
       `insert into support_access_log (league_id, staff_account_id, reason, ended_at)
-       values ($1, $2, $3, now() + interval '1 hour')`,
+       values ($1, $2, $3, pg_catalog.now() + interval '1 hour')`,
       [leagueId, ownerId, `Asked for help with ${m}`],
     ],
     [
@@ -282,11 +306,12 @@ async function seededLeague(
   // A team in the division with a player on its roster, the member as its coach and
   // an invitation to captain it. The shared account's child is a person in both
   // leagues, each league's own record of them (R-3).
+  const teamSlug = unique(`${m}-team`);
   const teamId = await id(
     pglite,
     `insert into teams (league_id, season_id, division_id, slug, name, color, stats_visibility)
      values ($1, $2, $3, $4, $5, '#1a2b3c', 'staff')`,
-    [leagueId, seasonId, divisionId, unique(`${m}-team`), `Team ${m}`],
+    [leagueId, seasonId, divisionId, teamSlug, `Team ${m}`],
   );
   const personId = await id(
     pglite,
@@ -615,6 +640,7 @@ async function seededLeague(
     courtId,
     emptyVenueId,
     teamId,
+    teamSlug,
     personId,
     formerPlayerId: childPersonId,
     formerRosterEntryId,
@@ -680,6 +706,7 @@ function readyReport(homeTeamId: string, awayTeamId: string, venueId: string) {
 /** A fresh database holding leagues A and B. Close it when done. */
 export async function openTwoLeagues(): Promise<TwoLeagues> {
   const pglite = await freshSchema();
+  await fixClock(pglite);
   const shared = await person(pglite, `${unique('both')}@example.test`, 'Shared', 'Person');
   const childProfileId = await profile(pglite, shared.accountId, 'Shared', 'Child', 'guardian');
   const a = await seededLeague(pglite, 'alpha', shared.accountId, childProfileId);

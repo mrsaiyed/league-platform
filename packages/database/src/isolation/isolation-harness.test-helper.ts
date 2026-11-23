@@ -36,7 +36,7 @@ import { sql, type Transaction } from 'kysely';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import { withFenceSetTo, withUnfencedScope } from '../db/db.test-helper.ts';
 import type { Database } from '../db/schema-types.ts';
-import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
+import { closeScope, openScope, transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { withTransaction } from '../db/with-transaction.ts';
 import {
   changedTables,
@@ -96,6 +96,65 @@ function* textsIn(value: unknown, seen = new Set<object>()): Generator<string> {
   }
 }
 
+const setFence = (trx: Transaction<Database>, leagueId: string, accountId: string) =>
+  sql`select set_config('app.league_id', ${leagueId}, true),
+             set_config('app.account_id', ${accountId}, true)`.execute(trx);
+
+/**
+ * Runs the case's `arrange` inside the target's own fence (the app's role, the database
+ * set to the target's league and its owner), then puts the run's own role and fence
+ * back exactly as they were (step 2.224).
+ */
+async function arrangeInTarget(
+  trx: Transaction<Database>,
+  entry: IsolationCase,
+  target: LeagueRecords,
+): Promise<void> {
+  const arrange = entry.arrange;
+  if (arrange === undefined) return;
+  const { rows } = await sql<{ role: string; login: string; league: string; account: string }>`
+    select current_user as role, session_user as login,
+           coalesce(current_setting('app.league_id', true), '') as league,
+           coalesce(current_setting('app.account_id', true), '') as account`.execute(trx);
+  const was = rows[0];
+  if (was === undefined) throw new Error('arrange: could not read the run’s fence');
+  // The rows' own triggers are held while the target is arranged: the one that stamps
+  // updated_at reads the real clock, so each run's arranged rows would differ from the
+  // reading they are judged by. Row-level security still holds the arrange to the target.
+  await sql`reset role`.execute(trx);
+  await sql`set local session_replication_role = replica`.execute(trx);
+  await sql`set local role app_user`.execute(trx);
+  await setFence(trx, target.leagueId, target.ownerId);
+  const inTarget = openScope(trx, target.leagueId, target.ownerId) as LeagueScope;
+  try {
+    await arrange(inTarget, target);
+  } finally {
+    closeScope(inTarget);
+  }
+  await sql`reset role`.execute(trx);
+  await sql`set local session_replication_role = origin`.execute(trx);
+  if (was.role !== was.login) await sql`set local role ${sql.id(was.role)}`.execute(trx);
+  await setFence(trx, was.league, was.account);
+}
+
+class Arranged {
+  constructor(readonly rows: DatabaseRows) {}
+}
+
+/** The whole database as a case's `arrange` leaves it (read once, then rolled back). */
+async function arrangedReading({ db, b }: TwoLeagues, entry: IsolationCase): Promise<DatabaseRows> {
+  try {
+    return await withUnfencedScope(db, b.leagueId, async (scope) => {
+      const trx = transactionOf(scope);
+      await arrangeInTarget(trx, entry, b);
+      throw new Arranged(await readRows(trx));
+    });
+  } catch (thrown) {
+    if (thrown instanceof Arranged) return thrown.rows;
+    throw new Error(`${entry.name}: arrange failed in the target's own league: ${message(thrown)}`);
+  }
+}
+
 /** Runs one case in one transaction, and rolls it back whatever happens. */
 async function attempt(
   open: Open,
@@ -105,6 +164,7 @@ async function attempt(
 ): Promise<Seen> {
   try {
     return await open(async (scope) => {
+      await arrangeInTarget(transactionOf(scope), entry, target);
       if (prepare !== undefined) await prepare(transactionOf(scope));
       let outcome: Outcome;
       try {
@@ -273,13 +333,12 @@ export async function findIsolationFailures(
   const { db, a, b, sharedAccountId } = leagues;
   const before = options.before ?? (await readDatabase(leagues));
   const markers = new Map([a, b].map((league) => [league.leagueId, league.marker]));
-  const prints = footprints(before, markers);
-  const known = knownIn(before);
-  const footprint = (league: LeagueRecords) => {
-    const found = prints.get(league.leagueId);
-    if (found === undefined) throw new Error(`no footprint for league ${league.marker}`);
-    return found;
-  };
+  const judgedBy = (rows: DatabaseRows) => ({
+    start: rows,
+    prints: footprints(rows, markers),
+    known: knownIn(rows),
+  });
+  const plain = judgedBy(before);
   const asB = { leagueId: b.leagueId, accountId: b.ownerId };
   const asA = { leagueId: a.leagueId, accountId: a.ownerId };
   const shared = { leagueId: a.leagueId, accountId: sharedAccountId };
@@ -305,6 +364,15 @@ export async function findIsolationFailures(
 
   const failures: IsolationFailure[] = [];
   for (const entry of cases) {
+    // A case that arranges the target is judged against the database as arranged: what
+    // its arrange wrote is the target's state before the run, not a change the run made.
+    const { start, prints, known } =
+      entry.arrange === undefined ? plain : judgedBy(await arrangedReading(leagues, entry));
+    const footprint = (league: LeagueRecords) => {
+      const found = prints.get(league.leagueId);
+      if (found === undefined) throw new Error(`no footprint for league ${league.marker}`);
+      return found;
+    };
     for (const { run, open, forbidden } of runs) {
       const fail = (problem: string) =>
         failures.push({ subject: entry.subject.name, name: entry.name, run, problem });
@@ -324,7 +392,7 @@ export async function findIsolationFailures(
         const how = 'returned' in seen.outcome ? 'returned' : 'refused naming';
         if (leaked !== undefined) reached.push(`${how} "${leaked}" of league ${league.marker}`);
         if (seen.after === null) continue;
-        for (const table of changedTables(before, seen.after, league.leagueId)) {
+        for (const table of changedTables(start, seen.after, league.leagueId)) {
           reached.push(`changed league ${league.marker}'s ${table}`);
         }
       }
@@ -368,7 +436,7 @@ export async function findIsolationFailures(
       if (run === 'control') {
         // Changing the target's people (rows outside a league) reaches it too, and
         // so does an answer that depends on the target's rows (a count, say).
-        if (seen.after !== null) reached.push(...changedTables(before, seen.after, outside));
+        if (seen.after !== null) reached.push(...changedTables(start, seen.after, outside));
         if ('refused' in seen.outcome) {
           fail(`refused in the target's own league: ${message(seen.outcome.refused)}`);
         } else if (reached.length === 0 && !(await differs())?.startsWith('answers differently')) {
@@ -377,7 +445,7 @@ export async function findIsolationFailures(
         continue;
       }
       for (const problem of reached) fail(problem);
-      for (const table of seen.after === null ? [] : changedTables(before, seen.after, outside)) {
+      for (const table of seen.after === null ? [] : changedTables(start, seen.after, outside)) {
         fail(`changed ${table}, outside any league`);
       }
       const difference = await differs();

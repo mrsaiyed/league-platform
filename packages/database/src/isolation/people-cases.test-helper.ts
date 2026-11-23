@@ -22,6 +22,7 @@ import {
   updatePerson,
 } from '../queries/index.ts';
 import { harnessTx, registerCommandCase } from './command-cases.test-helper.ts';
+import { moveOwnLeagueRowLast, setTargetLeagueApart } from './public-schedule-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 
 // Queries -----------------------------------------------------------------------------
@@ -73,7 +74,11 @@ registerIsolationCase({
 registerIsolationCase({
   subject: findLeagueAudience,
   name: "read who plays in the scope's league",
-  run: (scope) => findLeagueAudience(scope),
+  arrange: setTargetLeagueApart,
+  run: async (scope) => {
+    await moveOwnLeagueRowLast(scope);
+    return findLeagueAudience(scope);
+  },
 });
 
 registerIsolationCase({
