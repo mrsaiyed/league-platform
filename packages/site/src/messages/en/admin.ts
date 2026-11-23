@@ -41,6 +41,8 @@ export const enAdmin = {
   'admin.bin.people.title': 'Removed people',
   'admin.bin.person.unnamed': 'Someone whose name was erased',
   'admin.bin.sub': 'What was removed from this league, and the way to bring each thing back.',
+  // Beside the refusal when another team took the name (S-83): the way to that team.
+  'admin.bin.takenBy': 'Open the team {name}',
   'admin.bin.team.games':
     'Games played: {played}. Games still to play: {toCome}. They come back with it.',
   'admin.bin.team.rosterInBin':

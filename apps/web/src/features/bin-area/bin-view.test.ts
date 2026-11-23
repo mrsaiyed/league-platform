@@ -1,6 +1,6 @@
 import type { BinListing } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
-import { binView } from './bin-view.ts';
+import { binView, nameTakenBy } from './bin-view.ts';
 
 const at = '2026-11-20T18:00:00.000Z';
 const base = { secondName: null, seasonId: 's-1', binnedAt: at, removedForGoodAt: null };
@@ -44,5 +44,16 @@ describe('what the bin screen shows (step 2.77)', () => {
     expect(view.games[0]?.title).toBe('Hawks against Owls');
     expect(view.games[0]?.facts).toContain('It has no round now, so it comes back with no round.');
     expect([...view.teams, ...view.people]).toEqual([]);
+  });
+});
+
+describe('the team that took a binned team’s name (S-83)', () => {
+  it('is the other team of the season with the same name, whatever its capitals', () => {
+    const teams = [
+      { id: 'x', name: 'Hawks' },
+      { id: 'y', name: ' riverside hawks ' },
+    ];
+    expect(nameTakenBy({ id: 'x', name: 'Riverside Hawks' }, teams)?.id).toBe('y');
+    expect(nameTakenBy({ id: 'y', name: 'Riverside Hawks' }, teams)).toBeUndefined();
   });
 });

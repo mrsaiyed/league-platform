@@ -63,3 +63,15 @@ export function binView(items: readonly BinListing[], times: LeagueTimes): BinVi
     games: rows.filter((r) => r.kind === 'game'),
   };
 }
+
+/**
+ * The live team of the same season that now has a team-in-the-bin's name (S-83), for the
+ * refusal to say which one and lead to it; the same name whatever its capitals and spaces.
+ */
+export function nameTakenBy<T extends { readonly id: string; readonly name: string }>(
+  binned: { readonly id: string; readonly name: string },
+  teams: readonly T[],
+): T | undefined {
+  const same = (a: string) => a.trim().toLowerCase() === binned.name.trim().toLowerCase();
+  return teams.find((team) => team.id !== binned.id && same(team.name));
+}

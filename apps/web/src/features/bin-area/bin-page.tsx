@@ -17,7 +17,7 @@ import { StaffNotice } from '../staff/index.ts';
 import { problemKey } from '../teams-area/answer.ts';
 import { bringBackAction } from './actions.ts';
 import { binAnchors } from './bin-anchors.ts';
-import { binView, type BinKindShown, type BinRow } from './bin-view.ts';
+import { binView, nameTakenBy, type BinKindShown, type BinRow } from './bin-view.ts';
 
 type Query = Readonly<Record<string, string | string[] | undefined>>;
 
@@ -41,6 +41,16 @@ export async function BinPage({
   const rows = binView(listed.value.items, times);
   const refusedId = one(query['not']);
   const refusal = refusedId === undefined ? undefined : problemKey({ problem: one(query['why']) });
+  // Another team took the name (S-83): which one, and the way to it.
+  const refusedTeam = listed.value.items.find(
+    (item) => item.id === refusedId && item.kind === 'team',
+  );
+  const takenBy =
+    refusedTeam === undefined ||
+    refusedTeam.seasonId === null ||
+    !(one(query['why']) ?? '').endsWith('.team-name-taken')
+      ? undefined
+      : nameTakenBy(refusedTeam, await ports.adminTeams.teams(context, refusedTeam.seasonId));
   const back = one(query['back']);
   const backId = one(query['id']) ?? '';
   const backTo = (kind: string): string | undefined => {
@@ -64,6 +74,17 @@ export async function BinPage({
         {refusedId === row.id && refusal !== undefined ? (
           <span className="ui-notice" data-kind="error" role="alert">
             {t('admin.bin.notBack', { problem: t(refusal) })}
+            {takenBy === undefined ? null : (
+              <>
+                {' '}
+                <a
+                  dir="auto"
+                  href={leagueUrl(here, 'admin-area', { area: 'teams', subpath: [takenBy.id] })}
+                >
+                  {t('admin.bin.takenBy', { name: takenBy.name })}
+                </a>
+              </>
+            )}
           </span>
         ) : null}
       </span>
