@@ -5,11 +5,12 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import type { HomeLeader } from '../stats-pages/index.ts';
+import { fitHomeLeaders, type HomeLeader } from '../stats-pages/index.ts';
 import { HomeLeaders } from './home-leaders.tsx';
 
 const leader = (place: string, name: string, team?: HomeLeader['team']): HomeLeader => ({
   id: `p-${place}-${name}`,
+  rank: Number(place),
   label: `${place} / Points`,
   value: '17.0',
   unit: 'per game',
@@ -22,9 +23,13 @@ const three = [
   leader('01', 'نور ح.', { name: 'Rockets', color: null }),
   leader('03', 'A player (name not shown)'),
 ];
-const render = (leaders: readonly HomeLeader[], placing: 'across' | 'beside') =>
+const render = (
+  leaders: readonly HomeLeader[],
+  placing: 'across' | 'beside',
+  levelCut?: { readonly place: number; readonly count: number },
+) =>
   renderToStaticMarkup(
-    createElement(HomeLeaders, { leaders, placing, statsHref: '/x/stats?season=fall' }),
+    createElement(HomeLeaders, { leaders, levelCut, placing, statsHref: '/x/stats?season=fall' }),
   );
 
 describe('the home page’s leaders section', () => {
@@ -36,9 +41,14 @@ describe('the home page’s leaders section', () => {
     expect(html).toContain('<a class="ui-more" href="/x/stats?season=fall">All player stats</a>');
     expect(html).toContain('<ul class="ui-spot-row" data-across="three">');
     expect(html.match(/<article class="ui-spot"/g)).toHaveLength(3);
-    // Only the first card carries the main color.
-    expect(html.match(/data-first="true"/g)).toHaveLength(1);
-    expect(html.indexOf('data-first="true"')).toBeLessThan(html.indexOf('Sam R.'));
+    // Two level for first: no card is drawn as the lone leader's, and a line says so.
+    expect(html).not.toContain('data-first="true"');
+    expect(html).toContain('<p class="home-leaders-level">2 players are level for first.</p>');
+    // With one leader, only the first card carries the main color.
+    const ahead = render([three[0] ?? leader('01', 'Sam R.'), leader('02', 'Ben')], 'across');
+    expect(ahead.match(/data-first="true"/g)).toHaveLength(1);
+    expect(ahead.indexOf('data-first="true"')).toBeLessThan(ahead.indexOf('Sam R.'));
+    expect(ahead).not.toContain('home-leaders-level');
     // The names are titles one level under the section's, each in its own direction, and
     // written exactly as they were given: the page never works a name out itself.
     expect(html).toContain('<h3 class="ui-spot-name" dir="auto">Sam R.</h3>');
@@ -75,6 +85,30 @@ describe('the home page’s leaders section', () => {
     expect(html).not.toContain('<h2');
     expect(html).not.toContain('data-across');
     expect(html.match(/<article class="ui-spot" data-first="true"/g)).toHaveLength(1);
+  });
+
+  it('draws a shared place whole or not at all (the review, M2)', () => {
+    // A 50, B 40, C 30, D 30, all in 3 games: C and D are both third.
+    const four = [leader('01', 'A'), leader('02', 'B'), leader('03', 'C'), leader('03', 'D')];
+    expect(fitHomeLeaders(four, 6).leaders.map((one) => one.name)).toEqual(['A', 'B', 'C', 'D']);
+    expect(fitHomeLeaders(four, 3)).toEqual({
+      leaders: four.slice(0, 2),
+      levelCut: { place: 3, count: 2 },
+    });
+    expect(fitHomeLeaders(four, 2)).toEqual({ leaders: four.slice(0, 2) });
+    // Two level for first and room for one card: neither is drawn as the lone leader.
+    const level = [leader('01', 'A'), leader('01', 'B'), leader('03', 'C')];
+    expect(fitHomeLeaders(level, 1)).toEqual({ leaders: [], levelCut: { place: 1, count: 2 } });
+    expect(fitHomeLeaders(level, 0)).toEqual({ leaders: [] });
+    const html = render([], 'beside', { place: 1, count: 2 });
+    expect(html).toContain(
+      '<p class="home-leaders-level">2 players are level in place 1. <a href="/x/stats?season=fall">All player stats</a></p>',
+    );
+    expect(html).not.toContain('<article');
+    // Five level for first all come, and are drawn as level.
+    const five = ['A', 'B', 'C', 'D', 'E'].map((name) => leader('01', name));
+    expect(fitHomeLeaders(five, 6).leaders).toHaveLength(5);
+    expect(render(five, 'across')).toContain('5 players are level for first.');
   });
 
   it('is not drawn at all with no leaders', () => {

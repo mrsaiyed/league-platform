@@ -1,7 +1,7 @@
 // The rules for a league's short name, the {league} in its address (U-7). The same
 // format the leagues table enforces (0003); the blocked list is checked here only.
 import { z } from 'zod';
-import { blockedShortNames, systemShortNames } from './blocked-short-names.ts';
+import { blockedShortNames, offensiveShortNames, systemShortNames } from './blocked-short-names.ts';
 
 /** 3 to 40 lowercase letters, numbers and hyphens. */
 const shortNamePattern = /^[a-z0-9-]{3,40}$/;
@@ -14,9 +14,21 @@ export function isShortNameFormat(value: string): boolean {
   return shortNamePattern.test(value);
 }
 
-/** Whether nobody may take `slug` as a short name: one of our words, or an offensive one. */
+/**
+ * Whether nobody may take `slug` as a short name: one of our words, or an offensive one.
+ * Our own words are refused only as the whole name (`news-league` is a league's to take);
+ * an offensive word or phrase is refused as the whole name and as any word of it, the
+ * words being what the hyphens part (U-16), so `shit-hoops` is refused but a word that
+ * merely holds one inside it is not.
+ */
 export function isBlockedShortName(slug: string): boolean {
-  return blockedShortNames.has(slug.toLowerCase());
+  const name = slug.toLowerCase();
+  if (blockedShortNames.has(name)) return true;
+  const words = `-${name}-`;
+  for (const offensive of offensiveShortNames) {
+    if (words.includes(`-${offensive}-`)) return true;
+  }
+  return false;
 }
 
 /**

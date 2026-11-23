@@ -65,6 +65,7 @@ export const enActivity = {
   'activity.scheduling.discard_schedule_draft': 'Discarded the schedule draft',
   'activity.scheduling.move_draft_game': 'Moved a game in the schedule draft',
   'activity.scheduling.publish_schedule': 'Published the schedule',
+  'activity.scheduling.put_back_draft_game': 'Put a game back in the schedule draft',
   'activity.scheduling.remove_court': 'Moved a court to the bin',
   'activity.scheduling.remove_draft_game': 'Removed a game in the schedule draft',
   'activity.scheduling.remove_draft_round': 'Removed a round in the schedule draft',

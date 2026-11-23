@@ -95,6 +95,13 @@ export function SortableStatsTable({
         <table
           className="ui-table ui-stats"
           data-fold={foldTeam === undefined ? undefined : 'true'}
+          // How many columns follow the name on a phone (the folded team is not one): a
+          // table they all fit beside the name gives the name the rest (table-css.ts).
+          style={
+            {
+              '--ui-cols': columns.slice(1).filter((c) => c.key !== foldTeam).length,
+            } as CSSProperties
+          }
         >
           <caption dir="auto" className={captionHidden ? 'ui-visually-hidden' : undefined}>
             {caption}

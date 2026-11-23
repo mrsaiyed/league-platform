@@ -16,6 +16,7 @@ export const enAdminSettings = {
   'adminSettings.default': 'Default: {value}',
   'adminSettings.defaultMark': '{choice} (the default)',
   'adminSettings.done.cleared': 'The setting is back to its default.',
+  'adminSettings.done.published': 'The league is published. Visitors can see it now.',
   'adminSettings.done.saved': 'The setting was saved.',
   'adminSettings.field.value': 'Value',
   'adminSettings.groups': 'Groups of settings',
@@ -57,14 +58,109 @@ export const enAdminSettings = {
   'adminSettings.privacy.now.initial': 'Now: everyone is shown by first name and last initial.',
   'adminSettings.privacy.unknownAge':
     'In this league, anyone whose record does not say whether they are a child or an adult is shown as a child, coaches too.',
+  // The Publish part at the top of League settings (step 2.240, U-9, P3 §3): what a draft
+  // means, the "Must fix" list with each item met or not, and the button that asks once.
+  'adminSettings.publish.ask':
+    'Publish this league? Anyone will then be able to see its public pages, and you cannot turn it back into a draft afterwards.',
+  'adminSettings.publish.button': 'Publish',
+  'adminSettings.publish.cancel': 'Not now',
+  'adminSettings.publish.check.contactEmail': 'A contact email for the league',
+  'adminSettings.publish.check.contactEmail.cure':
+    'The contact email is given when the league is made, and no screen changes it yet: ask the people who run SR Leagues, who made the league, to add it.',
+  'adminSettings.publish.check.privacyChosen':
+    'Your privacy choice for young players: how names show on public pages',
+  'adminSettings.publish.check.privacyChosen.cure':
+    'Choose and save "Names on public pages" under Privacy, even to keep how it starts.',
+  'adminSettings.publish.cureLink': 'Go to Privacy',
+  'adminSettings.publish.draft':
+    'This league is a draft. Only the people who run it can see it: anyone else who opens its pages is told they were not found.',
+  'adminSettings.publish.live': 'This league is published. Anyone can see its public pages.',
+  'adminSettings.publish.met': 'Done',
+  'adminSettings.publish.mustFix': 'Must fix before publishing',
+  'adminSettings.publish.notMet': 'Not done yet',
+  'adminSettings.publish.notReady': 'Put the items above right first, then publish.',
+  'adminSettings.publish.title': 'Publishing',
   'adminSettings.save': 'Save',
   'adminSettings.usingDefault': 'Now: the default.',
   'adminSettings.usingOwn': 'Now: set for this league.',
   'adminSettings.yes': 'Yes',
+  'seasonSettings.ask.after':
+    "Nothing is saved until you say yes. The change is written in the league's activity log.",
+  'seasonSettings.ask.moves_one': 'Saving these rules moves 1 team in the standings of {season}:',
+  'seasonSettings.ask.moves_other':
+    'Saving these rules moves {count} teams in the standings of {season}:',
+  'seasonSettings.ask.no': 'No, change the rules',
+  'seasonSettings.ask.yes': 'Yes, save and move them',
+  'seasonSettings.cancel': 'Cancel',
+  'seasonSettings.coinFlipKept':
+    'Then a coin flip, which is not in use yet: teams still level after the others stay level for now.',
+  'seasonSettings.column.losses': 'Losses (L)',
+  'seasonSettings.column.played': 'Games played (GP)',
+  'seasonSettings.column.point-difference': 'Point difference (DIFF)',
+  'seasonSettings.column.points': 'Points (PTS)',
+  'seasonSettings.column.points-against': 'Points allowed (PA)',
+  'seasonSettings.column.points-for': 'Points scored (PF)',
+  'seasonSettings.column.streak': 'Streak (STRK)',
+  'seasonSettings.column.ties': 'Ties (T)',
+  'seasonSettings.column.win-percentage': 'Win percentage (PCT)',
+  'seasonSettings.column.wins': 'Wins (W)',
+  'seasonSettings.divisions': 'Divisions',
   'seasonSettings.done.hidden': '{season} is hidden from visitors again.',
   'seasonSettings.done.shown': 'Visitors can see {season} now.',
   'seasonSettings.done.shownLeagueHidden':
     '{season} is shown. Visitors will see it once the league is published.',
+  'seasonSettings.field.allowTies': 'Ties',
+  'seasonSettings.field.bonusFouls': 'Bonus from team foul number',
+  'seasonSettings.field.clockMode': 'Clock',
+  'seasonSettings.field.columns': 'Columns the public table shows',
+  'seasonSettings.field.columns.help':
+    'In this order. The points column is only for a table ranked by points, and such a table always shows it.',
+  'seasonSettings.field.datesHelp': 'Leave a day empty if it is not settled yet.',
+  'seasonSettings.field.doubleBonusFouls': 'Double bonus from team foul number',
+  'seasonSettings.field.doubleBonusFouls.help': 'Leave it empty for no double bonus.',
+  'seasonSettings.field.endsOn': 'Last day',
+  'seasonSettings.field.forfeitInDifference': 'Count forfeit scores in point difference',
+  'seasonSettings.field.forfeitLoser': 'Score of the team that forfeited',
+  'seasonSettings.field.forfeitWinner': 'Score of the team that did not forfeit',
+  'seasonSettings.field.fullTimeouts': 'Full timeouts',
+  'seasonSettings.field.lastMinutes': 'With a running clock: stop clock in the last minutes',
+  'seasonSettings.field.lastMinutes.help': 'Minutes. Leave it empty for none.',
+  'seasonSettings.field.mercyLead': 'With a stop clock: running clock once a team leads by',
+  'seasonSettings.field.mercyLead.help': 'Points. Leave it empty for no mercy rule.',
+  'seasonSettings.field.name': 'Season name',
+  'seasonSettings.field.overtimeMinutes': 'Minutes of each overtime',
+  'seasonSettings.field.overtimeTimeouts': 'Timeouts in each overtime',
+  'seasonSettings.field.periodMinutes': 'Minutes in each half or quarter',
+  'seasonSettings.field.periods': 'Game format',
+  'seasonSettings.field.playerFoulLimit': 'Personal fouls that put a player out',
+  'seasonSettings.field.playerFoulLimit.help': 'Leave it empty for no limit.',
+  'seasonSettings.field.points.help': 'Used when the table ranks by points.',
+  'seasonSettings.field.pointsPerLoss': 'Points for a loss',
+  'seasonSettings.field.pointsPerTie': 'Points for a tie',
+  'seasonSettings.field.pointsPerWin': 'Points for a win',
+  'seasonSettings.field.rankBy': 'Rank teams by',
+  'seasonSettings.field.recording': 'How games are recorded',
+  'seasonSettings.field.recording.help':
+    'Each game added to the schedule from now on starts this way, and Schedule can set a game otherwise. Games already on the schedule keep theirs.',
+  'seasonSettings.field.shortTimeouts': 'Short timeouts',
+  'seasonSettings.field.startsOn': 'First day',
+  'seasonSettings.field.statistics': 'Statistics kept',
+  'seasonSettings.field.statistics.help':
+    'The box score sheet asks for these. Live tracking keeps at least points and fouls.',
+  'seasonSettings.field.stopClockScope': 'Those last minutes are of',
+  'seasonSettings.field.tiebreaker1': 'First tiebreaker',
+  'seasonSettings.field.tiebreaker2': 'Second tiebreaker',
+  'seasonSettings.field.tiebreaker3': 'Third tiebreaker',
+  'seasonSettings.field.tiebreaker4': 'Fourth tiebreaker',
+  'seasonSettings.field.tiebreakers': 'When teams are level',
+  'seasonSettings.field.tiebreakers.help':
+    'They are tried in this order. Head-to-head counts the games the level teams played against each other.',
+  'seasonSettings.field.timeoutsCarry':
+    'Unused timeouts carry over to the next half and to overtime',
+  'seasonSettings.field.timeoutsPer': 'Timeouts are given',
+  'seasonSettings.field.uniqueJerseys': 'Each player on a team wears a different number',
+  'seasonSettings.field.uniqueJerseys.help':
+    'A number already worn on the team is refused, with a sentence naming who wears it.',
   'seasonSettings.hide': 'Hide it again',
   'seasonSettings.hideAsk':
     'Hide {season} from visitors? Its teams, schedule, results and standings disappear from the public site, and its address shows "Page not found". Nothing is deleted, and you can show it again.',
@@ -77,11 +173,105 @@ export const enAdminSettings = {
   // Admin → Season settings (step 2.182, A-18): its first panel, who can see a season.
   // Step 2.47 builds the season's name, dates and rules around it.
   'seasonSettings.intro': 'Settle how a season runs, and when visitors can see it.',
+  'seasonSettings.legend.forfeits': 'Forfeits',
+  'seasonSettings.legend.fouls': 'Fouls',
+  'seasonSettings.legend.timeouts': 'Timeouts',
+  'seasonSettings.move.join': ', ',
+  'seasonSettings.move.line': '{team}: {changes}.',
+  'seasonSettings.move.lineDivision': '{team} ({division}): {changes}.',
+  'seasonSettings.move.losses': 'losses {from} to {to}',
+  'seasonSettings.move.pointDifference': 'point difference {from} to {to}',
+  'seasonSettings.move.points': 'standings points {from} to {to}',
+  'seasonSettings.move.pointsAgainst': 'points allowed {from} to {to}',
+  'seasonSettings.move.pointsFor': 'points scored {from} to {to}',
+  'seasonSettings.move.rank': 'place {from} to {to}',
+  'seasonSettings.move.seed': 'seed {from} to {to}',
+  'seasonSettings.move.ties': 'ties {from} to {to}',
+  'seasonSettings.move.wins': 'wins {from} to {to}',
   'seasonSettings.noSeason': 'This league has no season yet.',
+  'seasonSettings.notInUse': 'Not in use yet',
+  'seasonSettings.notInUse.help': 'Nothing checks these yet, so they cannot be changed here.',
+  'seasonSettings.notSavedYet':
+    'This season uses the starting rules: none of its own are saved yet.',
+  'seasonSettings.option.allowTies.no': 'Not allowed: a level game goes to overtime',
+  'seasonSettings.option.allowTies.yes': 'Allowed',
+  'seasonSettings.option.clockMode.running': 'Running clock: it keeps running through fouls',
+  'seasonSettings.option.clockMode.stop': 'Stop clock: it stops by itself when a foul is recorded',
+  'seasonSettings.option.periods.2': 'Two halves',
+  'seasonSettings.option.periods.4': 'Four quarters',
+  'seasonSettings.option.rankBy.points': 'Points for each win, tie and loss',
+  'seasonSettings.option.rankBy.win-percentage': 'Win percentage',
+  'seasonSettings.option.recording.box-score': 'Box score entered after the game',
+  'seasonSettings.option.recording.final-score': 'Final score only',
+  'seasonSettings.option.recording.live':
+    'Live tracking: a scorekeeper records each play during the game',
+  'seasonSettings.option.statistics.full':
+    'All of those, with rebounds, assists, steals, blocks and turnovers',
+  'seasonSettings.option.statistics.points-fouls': 'Points and fouls',
+  'seasonSettings.option.statistics.points-only': 'Points only',
+  'seasonSettings.option.statistics.standard': 'Points, 3-pointers, free throws, fouls and minutes',
+  'seasonSettings.option.stopClockScope.game': 'The game',
+  'seasonSettings.option.stopClockScope.half': 'Each half',
+  'seasonSettings.option.stopClockScope.period': 'Each half or quarter',
+  'seasonSettings.option.timeoutsPer.game': 'For the whole game',
+  'seasonSettings.option.timeoutsPer.half': 'For each half',
+  'seasonSettings.part.game.about':
+    'How a game is played. The tracker follows these; games not started yet follow a change, and a game already played keeps the rules it was played under.',
+  'seasonSettings.part.game.change': 'Change the game rules',
+  'seasonSettings.part.game.save': 'Save the game rules',
+  'seasonSettings.part.game.saved': 'Saved: the game rules. Games not started yet follow them.',
+  'seasonSettings.part.game.title': 'Game rules',
+  'seasonSettings.part.name.about': 'What the season is called, and when it runs.',
+  'seasonSettings.part.name.change': 'Change the name and dates',
+  'seasonSettings.part.name.save': 'Save the name and dates',
+  'seasonSettings.part.name.saved': 'Saved: the name and dates.',
+  'seasonSettings.part.name.title': 'Name and dates',
+  'seasonSettings.part.recording.about': 'How results come in, and which numbers are kept.',
+  'seasonSettings.part.recording.change': 'Change how games are recorded',
+  'seasonSettings.part.recording.save': 'Save how games are recorded',
+  'seasonSettings.part.recording.saved': 'Saved: how games are recorded and the statistics kept.',
+  'seasonSettings.part.recording.title': 'Games and statistics',
+  'seasonSettings.part.rosters.about': 'The rules for the players on each team.',
+  'seasonSettings.part.rosters.change': 'Change the roster rules',
+  'seasonSettings.part.rosters.save': 'Save the roster rules',
+  'seasonSettings.part.rosters.saved': 'Saved: the roster rules.',
+  'seasonSettings.part.rosters.title': 'Rosters',
+  'seasonSettings.part.standings.about':
+    'How the table ranks teams, what it shows, and what decides between level teams.',
+  'seasonSettings.part.standings.change': 'Change the standings rules',
+  'seasonSettings.part.standings.save': 'Save the standings rules',
+  'seasonSettings.part.standings.saved':
+    'Saved: the standings rules. The table has been worked out again from them.',
+  'seasonSettings.part.standings.title': 'Standings',
+  'seasonSettings.preset.high-school': 'High school',
+  'seasonSettings.preset.high-school.about':
+    'Four 8-minute quarters, stop clock, bonus from the 5th foul',
+  'seasonSettings.preset.now': 'Saved now: the {preset} rules.',
+  'seasonSettings.preset.own': "Saved now: the league's own game rules.",
+  'seasonSettings.preset.rec-league': 'Rec league',
+  'seasonSettings.preset.rec-league.about':
+    'Two 20-minute halves, running clock, bonus from the 7th foul',
+  'seasonSettings.preset.use': 'Use {preset}',
+  'seasonSettings.presetFilled':
+    'Filled in from the {preset} preset. Check the boxes: nothing is saved until you save.',
+  'seasonSettings.presets': 'Start from a preset',
+  'seasonSettings.presets.help':
+    'A preset fills in the game rules below. Nothing is saved until you save.',
+  'seasonSettings.readOnly':
+    "This league cannot be changed now, so its seasons' settings are shown as they are.",
+  'seasonSettings.refused.boxes': 'Not saved: the marked boxes need a change.',
+  'seasonSettings.refused.changed-since-read':
+    'Someone else saved this season while you were changing it. The other parts of the page now show what they saved; the boxes here still hold what you typed. Saving again replaces what they saved with what is in these boxes.',
+  'seasonSettings.refused.not-allowed':
+    "Only the league's owner or an admin can change Season settings.",
   'seasonSettings.refused.not-hidden':
     'That season is not hidden any more, so nothing was changed. The page shows it as it is now.',
   'seasonSettings.refused.not-shown':
     'That season is over or already hidden, so nothing was changed. The page shows it as it is now.',
+  'seasonSettings.refused.other': 'That could not be saved, and nothing was changed. Try again.',
+  'seasonSettings.refused.season-not-found': 'That season is not there any more.',
+  'seasonSettings.rulesUpgraded':
+    "This season's rules were saved in an older form, and anything that could not be kept was left out. Check them, and save each part you change.",
   'seasonSettings.seasonName': 'Season: {name}',
   'seasonSettings.seasonNotFound': 'That season was not found, so this page shows {name}.',
   'seasonSettings.show': 'Show this season to visitors',
@@ -91,6 +281,73 @@ export const enAdminSettings = {
     'Show {season} to visitors? Once the league is published, they will see its teams, schedule and results.',
   'seasonSettings.showNo': 'No, keep it hidden',
   'seasonSettings.showYes': 'Yes, show it',
+  'seasonSettings.teamFouls.form':
+    'Team fouls start again each half with halves, and each quarter with quarters, as the tracker counts them.',
+  'seasonSettings.teamFouls.half': 'Team fouls start again each half, as the tracker counts them.',
+  'seasonSettings.teamFouls.quarter':
+    'Team fouls start again each quarter, as the tracker counts them.',
+  'seasonSettings.term.clock': 'Clock',
+  'seasonSettings.term.coinFlip': 'Coin flip',
+  'seasonSettings.term.columns': 'Columns',
+  'seasonSettings.term.dates': 'Dates',
+  'seasonSettings.term.forfeits': 'Forfeits',
+  'seasonSettings.term.format': 'Game format',
+  'seasonSettings.term.fouls': 'Fouls',
+  'seasonSettings.term.name': 'Name',
+  'seasonSettings.term.preset': 'Preset',
+  'seasonSettings.term.rankBy': 'Ranked by',
+  'seasonSettings.term.recording': 'How games are recorded',
+  'seasonSettings.term.rosterLimits': 'Smallest and largest roster',
+  'seasonSettings.term.rosterLock': 'Rosters lock',
+  'seasonSettings.term.statistics': 'Statistics kept',
+  'seasonSettings.term.tiebreakers': 'When teams are level',
+  'seasonSettings.term.ties': 'Ties',
+  'seasonSettings.term.timeouts': 'Timeouts',
+  'seasonSettings.term.uniqueJerseys': 'A different number for each player',
+  'seasonSettings.tiebreaker.fewest-points-allowed': 'Fewest points allowed',
+  'seasonSettings.tiebreaker.head-to-head': 'Head-to-head',
+  'seasonSettings.tiebreaker.none': 'None',
+  'seasonSettings.tiebreaker.point-difference': 'Point difference',
+  'seasonSettings.tiebreaker.points-scored': 'Points scored',
+  'seasonSettings.value.clock.running': 'Running clock',
+  'seasonSettings.value.clock.runningLast':
+    'Running clock, with a stop clock in the last {minutes} minutes of {scope}',
+  'seasonSettings.value.clock.stop': 'Stop clock',
+  'seasonSettings.value.clock.stopMercy':
+    'Stop clock, then a running clock once a team leads by {lead}',
+  'seasonSettings.value.dates': '{from} to {to}',
+  'seasonSettings.value.datesFrom': 'From {from}',
+  'seasonSettings.value.datesNone': 'Not set yet',
+  'seasonSettings.value.datesTo': 'Until {to}',
+  'seasonSettings.value.forfeits': 'Recorded {winner}–{loser}, {counted}',
+  'seasonSettings.value.forfeits.counted': 'counted in point difference',
+  'seasonSettings.value.forfeits.notCounted': 'not counted in point difference',
+  'seasonSettings.value.format.2':
+    'Two halves of {minutes} minutes; overtime of {overtime} minutes',
+  'seasonSettings.value.format.4':
+    'Four quarters of {minutes} minutes; overtime of {overtime} minutes',
+  'seasonSettings.value.fouls': 'Bonus at {bonus} team fouls, {double}; {limit}',
+  'seasonSettings.value.fouls.double': 'double bonus at {double}',
+  'seasonSettings.value.fouls.limit': 'a player is out at {limit} fouls',
+  'seasonSettings.value.fouls.noDouble': 'no double bonus',
+  'seasonSettings.value.fouls.noLimit': 'no foul limit',
+  'seasonSettings.value.no': 'No',
+  'seasonSettings.value.noLimits': 'No limits',
+  'seasonSettings.value.noLock': 'No lock',
+  'seasonSettings.value.noTiebreakers': 'Nothing: they share a place',
+  'seasonSettings.value.presetNone': "None: the league's own game rules",
+  'seasonSettings.value.rankBy.points':
+    'Points: {win} for a win, {tie} for a tie, {loss} for a loss',
+  'seasonSettings.value.rosterLimits': '{min} to {max} players',
+  'seasonSettings.value.rosterMax': 'At most {max} players',
+  'seasonSettings.value.rosterMin': 'At least {min} players',
+  'seasonSettings.value.timeouts':
+    '{full} full and {short} short {per}; {overtime} in each overtime; {carry}',
+  'seasonSettings.value.timeouts.carry': 'unused ones carry over',
+  'seasonSettings.value.timeouts.noCarry': 'unused ones do not carry over',
+  'seasonSettings.value.timeouts.per.game': 'for the game',
+  'seasonSettings.value.timeouts.per.half': 'each half',
+  'seasonSettings.value.yes': 'Yes',
   'seasonSettings.visibility.hidden': 'Only the people who run the league can see {season}.',
   'seasonSettings.visibility.leagueHidden':
     'Visitors cannot see this league until it is published, so they will see this season only after that.',
@@ -100,6 +357,37 @@ export const enAdminSettings = {
   'seasonSettings.visibility.shownLeagueHidden':
     '{season} is shown, but visitors cannot see this league until it is published.',
   'seasonSettings.visibility.title': 'Who can see this season',
+  'seasonSettings.wrong.choice': '{label}: choose one of the choices.',
+  'seasonSettings.wrong.date': '{label}: a day, written year-month-day.',
+  'seasonSettings.wrong.datesOrder': 'The last day cannot be before the first day.',
+  'seasonSettings.wrong.doubleBonusAfterBonus': 'The double bonus must start after the bonus.',
+  'seasonSettings.wrong.forfeitWinnerMore':
+    'The team that did not forfeit must score more than the team that forfeited.',
+  'seasonSettings.wrong.lastMinutesLong':
+    "The stop clock's last minutes cannot be longer than a half or quarter.",
+  'seasonSettings.wrong.liveNeedsFouls':
+    'Live tracking records fouls as well: keep at least points and fouls, or record games another way.',
+  'seasonSettings.wrong.minutes': '{label}: minutes from {min} to {max}.',
+  'seasonSettings.wrong.minutesOrEmpty': '{label}: minutes from {min} to {max}, or empty for none.',
+  'seasonSettings.wrong.name': 'Give the season a name, of up to 120 characters.',
+  'seasonSettings.wrong.noColumns': 'Tick at least one column.',
+  'seasonSettings.wrong.number': '{label}: a whole number from {min} to {max}.',
+  'seasonSettings.wrong.numberOrEmpty':
+    '{label}: a whole number from {min} to {max}, or empty for none.',
+  'seasonSettings.wrong.pointsColumn':
+    'A table ranked by points shows the points column: tick Points (PTS), or rank by win percentage.',
+  'seasonSettings.wrong.pointsColumnUnranked':
+    'Only a table ranked by points has a points column: untick Points (PTS), or rank by points.',
+  'seasonSettings.wrong.pointsOrder':
+    'A win must be worth at least a tie, and a tie at least a loss.',
+  'seasonSettings.wrong.rules':
+    'These rules cannot be saved as they are. Check each box and save again.',
+  'seasonSettings.wrong.tiebreakerTwice':
+    '{label}: each tiebreaker can be chosen once. Choose another, or None.',
+  'seasonSettings.wrong.tiesColumn':
+    'Ties are not allowed, so the table has no ties column: untick Ties (T), or allow ties.',
+  'seasonSettings.wrong.uniqueJerseys':
+    "A team of this season already has two players wearing one number. Change one of them on the team's page first, then switch this on.",
   'setting.games.scorekeeperReopenMinutes.label':
     'Minutes after a game ends during which the scorekeeper who ended it may reopen it from the tracker, with a reason, if they tapped End game too soon. 0 means never. After that, only an admin can reopen it.',
   'setting.games.whoMayScore.label':
@@ -129,7 +417,7 @@ export const enAdminSettings = {
   'setting.privacy.publicNames.option.hidden':
     'Hidden for everyone, adults and children: no names. A player appears by jersey number, like "#12", on team and game pages, and as "A player (name not shown)" in the statistics. People who know the team can still tell who a number is.',
   'setting.statistics.minimumGamesToRank.label':
-    'Games a player must have played to be ranked among the leaders. 0 ranks everyone. A player with fewer still shows in the full table.',
+    'Games in which a statistic must be recorded for a player to be ranked on its leaders board. 0 sets no minimum. A player with fewer still shows in the full table.',
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
   'setting.teams.startingStatsLevel.label':

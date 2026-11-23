@@ -47,6 +47,7 @@ export const madeUpRosters: DeviceRosters = {
     ],
   },
   uniqueJerseys: true,
+  allowTies: false,
 };
 
 const state = { sequence: 3, state: basketball.newGame(basketball.HALVES, 0) };

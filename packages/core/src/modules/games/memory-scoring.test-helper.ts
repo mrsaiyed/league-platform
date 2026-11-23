@@ -29,6 +29,8 @@ export type MemoryScoringOptions = {
   readonly beforeStart?: (state: MemoryScoring) => void;
   /** Runs just before a session is ended: another request ending it first. */
   readonly beforeEnd?: (state: MemoryScoring) => void;
+  /** Runs each time a session's lease is written (T-295: counts the writes). */
+  readonly onExtend?: () => void;
   /** The stand-in's lock of one game, held until the transaction ends; none by default. */
   readonly lockGame?: (gameId: string) => Promise<void>;
 };
@@ -73,10 +75,11 @@ export function sessionsOf(
       s.sessions.push(started);
       return started;
     },
-    extend: async (gameId, sessionId, heldUntil) => {
+    extend: async (gameId, sessionId, heldUntil, dueBefore) => {
       const at = s.sessions.findIndex((x) => x.gameId === gameId && x.id === sessionId);
       const found = s.sessions[at];
-      if (found === undefined) return false;
+      if (found === undefined || found.heldUntil >= dueBefore) return false;
+      options.onExtend?.();
       s.sessions[at] = { ...found, heldUntil };
       return true;
     },

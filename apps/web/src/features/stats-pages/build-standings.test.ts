@@ -4,7 +4,7 @@
 // the page's own builder: the very tables the first test's walk ends on. Each test reads
 // the words beside the LOWER team of a level group, where the old note said "placed above".
 import { defaultSeasonRules, type SeasonRules } from '@srleagues/contracts';
-import { readStandings, type StandingsReadStore } from '@srleagues/core';
+import { levelDocument, readStandings, type StandingsReadStore } from '@srleagues/core';
 import { calculateStandings, type CoinFlip, type StandingsAdjustment } from '@srleagues/sports';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -25,8 +25,11 @@ type StoredRow = Awaited<ReturnType<StandingsReadStore['standingsRows']>>[number
 /**
  * One table of made-up teams (their names are their ids) after these games, as the page
  * draws it: the engine's rows, stored and read back as the database gives them. `binned`
- * teams are in the bin since the table was worked out (their rows stay, as they do until
- * the standings are rebuilt); `stored` changes the stored rows by hand.
+ * teams are in the bin since the table was worked out and left out of the season's teams
+ * (their rows stay, as they do until the standings are rebuilt); `kept` teams are in the
+ * bin but kept for their results, marked `removed`, as the season's teams list one with a
+ * result in a game not in the bin (A-17, step 2.180); `stored` changes the stored rows by
+ * hand.
  */
 async function tableAfter(
   teams: readonly string[],
@@ -36,6 +39,7 @@ async function tableAfter(
     readonly adjustments?: readonly StandingsAdjustment[];
     readonly coinFlips?: readonly CoinFlip[];
     readonly binned?: readonly string[];
+    readonly kept?: readonly string[];
     readonly stored?: (rows: StoredRow[]) => StoredRow[];
   } = {},
 ): Promise<Made> {
@@ -73,6 +77,7 @@ async function tableAfter(
           color: null,
           divisionId: null,
           statsVisibility: 'everyone',
+          removed: (options.kept ?? []).includes(name),
         })),
     divisions: async () => [],
     standingsRows: async () =>
@@ -92,6 +97,7 @@ async function tableAfter(
           streakResult: row.streak?.result ?? null,
           streakLength: row.streak?.length ?? null,
           decidedBy: row.decidedBy,
+          level: levelDocument(row.level),
         })),
       ),
     adjustments: async () =>
@@ -118,6 +124,7 @@ async function tableAfter(
         awayTeamId: game.awayTeamId,
       })),
     teamStatTotals: async () => [],
+    teamTurnoverGames: async () => [],
     people: async () => [],
   };
   const read = await readStandings(store, { seasonId });
@@ -140,12 +147,23 @@ function notesBeside({ view }: Made, team: string): string[] {
   return (row.notes ?? []).map((id) => view.footnotes.find((f) => f.id === id)?.text ?? '');
 }
 
-/** The note about level teams beside a team: there is one at most. */
+/** The invisible word joiner that holds a record's dash to its numbers (step 2.198). */
+const joiner = '⁠';
+
+/** A note as written here: a record's dash held to its numbers, as the page draws it. */
+const held = (text: string) => text.replace(/(\d)–(?=\d)/g, `$1${joiner}–${joiner}`);
+
+/**
+ * The note about level teams beside a team: there is one at most. Read as a person reads
+ * it, without the invisible joiners (the page's own text is checked by drawnBeside).
+ */
 function levelNoteBeside(made: Made, team: string): string | undefined {
   const row = made.view.rows.find((r) => r.team === team);
-  const ids = (row?.notes ?? []).filter((id) => !id.startsWith('adjustment-'));
+  const ids = (row?.notes ?? []).filter(
+    (id) => !id.startsWith('adjustment-') && id !== 'removed-team',
+  );
   expect(ids.length).toBeLessThanOrEqual(1);
-  return made.view.footnotes.find((f) => f.id === ids[0])?.text;
+  return made.view.footnotes.find((f) => f.id === ids[0])?.text.replaceAll(joiner, '');
 }
 
 /** No sentence anywhere that only the first of a group could be told. */
@@ -284,22 +302,29 @@ describe('the note beside each team of the standings', () => {
     nothingPlacedAbove(made);
   });
 
-  it('three level in a circle (case 31): Cedar, last, reads what they are level on and the tiebreakers', async () => {
-    const made = await tableAfter(
-      ['Ash', 'Birch', 'Cedar'],
-      [
-        ['Ash', 50, 'Birch', 45],
-        ['Birch', 60, 'Cedar', 50],
-        ['Cedar', 42, 'Ash', 40],
-      ],
-    );
+  // Step 2.198: the games among them went round in a circle, so point difference decided.
+  it('three level in a circle (case 31): Cedar, last, reads the games among them, then point difference', async () => {
+    const games: readonly Game[] = [
+      ['Ash', 50, 'Birch', 45],
+      ['Birch', 60, 'Cedar', 50],
+      ['Cedar', 42, 'Ash', 40],
+    ];
+    const made = await tableAfter(['Ash', 'Birch', 'Cedar'], games);
     expect(order(made)).toEqual(['Birch', 'Ash', 'Cedar']);
     const note =
-      'Birch, Ash, and Cedar are level on win percentage (.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
+      'Birch, Ash, and Cedar are level on win percentage (.500). In the games among these three: Birch 1–1, Ash 1–1, Cedar 1–1. By point difference: Birch +5, Ash +3, Cedar -8.';
     for (const team of ['Birch', 'Ash', 'Cedar']) expect(levelNoteBeside(made, team)).toBe(note);
     expect(made.view.footnotes).toHaveLength(1);
-    drawnBeside(made, 'Cedar', note);
+    drawnBeside(made, 'Cedar', held(note));
     nothingPlacedAbove(made);
+    // Rows saved before step 2.198 keep no steps: the note says only what they can bear.
+    const before = await tableAfter(['Ash', 'Birch', 'Cedar'], games, {
+      stored: (rows) => rows.map((row) => ({ ...row, level: null })),
+    });
+    const general =
+      'Birch, Ash, and Cedar are level on win percentage (.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.';
+    for (const team of ['Birch', 'Ash', 'Cedar'])
+      expect(levelNoteBeside(before, team)).toBe(general);
   });
 
   it('a team with no games (case 34): Cedar at 0–0 has not played; Birch at 0–1 carries no level note', async () => {
@@ -331,7 +356,8 @@ describe('the note beside each team of the standings', () => {
   });
 
   // The independent review's run (item 1): A, B and C level at .500, A beat C and C beat B,
-  // A and B never met. With C in the bin its row is not shown, and A and B look like a pair
+  // A and B never met. With C in the bin and left out of the season's teams (the next test
+  // has it kept for its results, A-17) its row is not shown, and A and B look like a pair
   // head-to-head separated: they never played, so the note may not say it was the games
   // between them.
   it('never says the games between two teams that never met put one ahead', async () => {
@@ -353,6 +379,33 @@ describe('the note beside each team of the standings', () => {
     expect(made.html).not.toContain('between them');
   });
 
+  // Step 2.180 (A-17): a team in the bin with results kept is shown, marked, and its row
+  // holds its place. So it is one of the level teams: the note counts and names it, as it
+  // names only teams the reader can see, and it carries the bin's note besides.
+  it('counts and names a team in the bin kept for its results, shown with its mark', async () => {
+    const games: readonly Game[] = [
+      ['Ash', 50, 'Cedar', 40],
+      ['Cedar', 50, 'Birch', 40],
+      ['Xeno', 50, 'Ash', 40],
+      ['Birch', 50, 'Yew', 40],
+    ];
+    const teams = ['Ash', 'Birch', 'Cedar', 'Xeno', 'Yew'];
+    const whole = await tableAfter(teams, games);
+    const made = await tableAfter(teams, games, { kept: ['Cedar'] });
+    expect(order(made)).toEqual(['Xeno', 'Ash', 'Cedar', 'Birch', 'Yew']);
+    expect(made.view.rows.map((r) => r.seed)).toEqual(whole.view.rows.map((r) => r.seed));
+    const note = levelNoteBeside(made, 'Cedar');
+    expect(note).toBe(levelNoteBeside(whole, 'Cedar'));
+    expect(note).toMatch(/^Ash, Cedar,? and Birch are level/);
+    expect(levelNoteBeside(made, 'Ash')).toBe(note);
+    expect(levelNoteBeside(made, 'Birch')).toBe(note);
+    const removedNote = made.view.footnotes.find((f) => f.id === 'removed-team')?.text;
+    expect(removedNote).toBeDefined();
+    expect(notesBeside(made, 'Cedar')).toContain(removedNote);
+    expect(notesBeside(made, 'Ash')).not.toContain(removedNote);
+    nothingPlacedAbove(made);
+  });
+
   // Item 5: four teams at 1–1; head-to-head puts two above two, and nothing separates
   // either pair. They are not all in one place, so not "level with another team" alone.
   it('four level whom head-to-head split two above two, each pair still level', async () => {
@@ -368,8 +421,10 @@ describe('the note beside each team of the standings', () => {
       ],
     );
     expect(order(made)).toEqual(['Xeno', 'Ash', 'Birch', 'Cedar', 'Dogwood', 'Yew']);
+    // Step 2.198: the games among them, and nothing more for the two pairs, whose figures
+    // are all level.
     const note =
-      'Ash, Birch, Cedar, and Dogwood are level on win percentage (.500). The season’s tiebreakers set their order as far as they can: head-to-head, then point difference, then points scored. Ash and Birch are still level after all of them, so they are shown in a fixed order. Cedar and Dogwood are still level after all of them, so they are shown in a fixed order.';
+      'Ash, Birch, Cedar, and Dogwood are level on win percentage (.500). In the games among these four: Ash 1–0, Birch 1–0, Cedar 0–1, Dogwood 0–1. Nothing in the season’s tiebreakers separates Ash and Birch yet, so they are shown in a fixed order. Nothing in the season’s tiebreakers separates Cedar and Dogwood yet, so they are shown in a fixed order.';
     for (const team of ['Ash', 'Birch', 'Cedar', 'Dogwood']) {
       expect(levelNoteBeside(made, team)).toBe(note);
     }
@@ -471,9 +526,452 @@ describe('the note beside each team of the standings', () => {
       ],
     );
     expect(order(made)).toEqual(['Wren', 'Ash', 'Birch', 'Cedar', 'Zed']);
+    expect(made.html).not.toContain('also level');
+    // Step 2.198: they never met one another, point difference put Ash first, and the
+    // other two are level on every figure.
     const note =
-      'Ash, Birch, and Cedar are level on win percentage (.500). The season’s tiebreakers set their order as far as they can: head-to-head, then point difference, then points scored. Birch and Cedar are still level after all of them, so they are shown in a fixed order.';
+      'Ash, Birch, and Cedar are level on win percentage (.500). Head-to-head does not count here: none of them has played another. By point difference: Ash +5, Birch 0, Cedar 0. Nothing in the season’s tiebreakers separates Birch and Cedar yet, so they are shown in a fixed order.';
     for (const team of ['Ash', 'Birch', 'Cedar']) expect(levelNoteBeside(made, team)).toBe(note);
     nothingPlacedAbove(made);
+  });
+});
+
+describe('the columns the season chose (step 2.47; the numbers audit M7)', () => {
+  const games: readonly Game[] = [
+    ['Ash', 50, 'Birch', 40],
+    ['Birch', 45, 'Cedar', 44],
+  ];
+  const withColumns = (columns: SeasonRules['standings']['columns'], more = {}): SeasonRules => ({
+    ...defaultSeasonRules(),
+    ...more,
+    standings: { ...defaultSeasonRules().standings, columns },
+  });
+  const keys = (made: Made) => made.view.columns.map((c) => c.key);
+
+  it('draws the chosen columns in the season’s own order, and no other', async () => {
+    const made = await tableAfter(['Ash', 'Birch', 'Cedar'], games, {
+      rules: withColumns(['wins', 'losses', 'point-difference', 'played', 'streak']),
+    });
+    expect(keys(made)).toEqual(['wins', 'losses', 'pointDifference', 'played', 'streak']);
+    // The headings, and nothing of a column left out.
+    expect(made.html).toContain('>DIFF<');
+    expect(made.html).not.toContain('>PF<');
+    expect(made.html).not.toContain('>PCT<');
+  });
+
+  it('draws the starting columns for a season on the starting rules', async () => {
+    const made = await tableAfter(['Ash', 'Birch', 'Cedar'], games);
+    expect(keys(made)).toEqual(['played', 'wins', 'losses', 'winPercentage', 'pointDifference']);
+  });
+
+  it('draws nothing for "last five", which nothing works out yet', async () => {
+    const made = await tableAfter(['Ash', 'Birch', 'Cedar'], games, {
+      rules: withColumns(['played', 'last-five', 'wins']),
+    });
+    expect(keys(made)).toEqual(['played', 'wins']);
+  });
+
+  it('adds the ties column after the last column in view when a game was tied', async () => {
+    const made = await tableAfter(['Ash', 'Birch'], [['Ash', 40, 'Birch', 40]], {
+      rules: withColumns(['played', 'wins', 'losses', 'win-percentage'], { allowTies: true }),
+    });
+    expect(keys(made)).toEqual(['played', 'wins', 'losses', 'winPercentage', 'ties']);
+  });
+
+  // The table's rule: the columns in view on a phone come first among those drawn there.
+  it('keeps the phone’s columns first, with and without a tie, and in a points table', async () => {
+    const flags = (made: Made) => made.view.columns.map((c) => `${c.key}:${c.narrow ?? 'scroll'}`);
+    const chosen: SeasonRules['standings']['columns'] = [
+      'played',
+      'wins',
+      'losses',
+      'win-percentage',
+      'point-difference',
+      'streak',
+    ];
+    const plain = await tableAfter(['Ash', 'Birch', 'Cedar'], games, {
+      rules: withColumns(chosen, { allowTies: true }),
+    });
+    expect(flags(plain)).toEqual([
+      'played:left-out',
+      'wins:in-view',
+      'losses:in-view',
+      'winPercentage:in-view',
+      'pointDifference:scroll',
+      'streak:scroll',
+    ]);
+    const tied = await tableAfter(['Ash', 'Birch'], [['Ash', 40, 'Birch', 40]], {
+      rules: withColumns(chosen, { allowTies: true }),
+    });
+    expect(flags(tied)).toEqual([
+      'played:left-out',
+      'wins:in-view',
+      'losses:in-view',
+      'winPercentage:in-view',
+      'ties:in-view',
+      'pointDifference:scroll',
+      'streak:scroll',
+    ]);
+    const rules = defaultSeasonRules();
+    const pointsTable = await tableAfter(['Ash', 'Birch'], [['Ash', 40, 'Birch', 40]], {
+      rules: {
+        ...rules,
+        allowTies: true,
+        standings: {
+          ...rules.standings,
+          rankBy: 'points',
+          columns: ['played', 'wins', 'losses', 'points', 'win-percentage', 'point-difference'],
+        },
+      },
+    });
+    expect(flags(pointsTable)).toEqual([
+      'played:left-out',
+      'wins:in-view',
+      'losses:in-view',
+      'points:in-view',
+      'ties:in-view',
+      'winPercentage:left-out',
+      'pointDifference:scroll',
+    ]);
+  });
+});
+
+// Step 2.198 (S-74; the numbers audit's M4 and cases 31 to 33 and 46; the reader's own
+// example): for three or more level teams the note says exactly what placed each of them,
+// from the steps the engine kept: their records in the games among them, then what
+// separated those still level, with both figures. One note, true beside each of them.
+describe('the note for three or more level teams', () => {
+  /** The one note beside each of these teams, the same for all of them. */
+  function sharedNote(made: Made, teams: readonly string[]): string | undefined {
+    const notes = teams.map((team) => levelNoteBeside(made, team));
+    for (const note of notes) expect(note).toBe(notes[0]);
+    nothingPlacedAbove(made);
+    return notes[0];
+  }
+
+  it('case 46 (North Valley, West): the Lions, who beat the Bears, and the Tigers by point difference', async () => {
+    const made = await tableAfter(
+      ['Otters', 'Badgers', 'Lions', 'Tigers', 'Hawks', 'Bears'],
+      [
+        ['Tigers', 55, 'Hawks', 48],
+        ['Bears', 60, 'Badgers', 52],
+        ['Hawks', 51, 'Tigers', 47],
+        ['Otters', 58, 'Lions', 49],
+        ['Lions', 50, 'Bears', 44],
+      ],
+    );
+    expect(order(made)).toEqual(['Otters', 'Lions', 'Tigers', 'Hawks', 'Bears', 'Badgers']);
+    const note =
+      'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Tigers and Hawks split their games with each other (1–1). Point difference puts Tigers ahead of Hawks: +3 against -3.';
+    expect(sharedNote(made, ['Lions', 'Tigers', 'Hawks', 'Bears'])).toBe(note);
+    // On the page each record's dash is held to its numbers, so "0–1" never breaks in two.
+    drawnBeside(made, 'Bears', held(note));
+    expect(made.html).toContain(`Bears 0${joiner}–${joiner}1.`);
+    expect(notesBeside(made, 'Otters')).toEqual([]);
+    expect(notesBeside(made, 'Badgers')).toEqual([]);
+    // With the Bears in the bin, the three shown are not the four the engine compared:
+    // the note claims only what the rows can bear.
+    const binned = await tableAfter(
+      ['Otters', 'Badgers', 'Lions', 'Tigers', 'Hawks', 'Bears'],
+      [
+        ['Tigers', 55, 'Hawks', 48],
+        ['Bears', 60, 'Badgers', 52],
+        ['Hawks', 51, 'Tigers', 47],
+        ['Otters', 58, 'Lions', 49],
+        ['Lions', 50, 'Bears', 44],
+      ],
+      { binned: ['Bears'] },
+    );
+    expect(sharedNote(binned, ['Lions', 'Tigers', 'Hawks'])).toBe(
+      'Lions, Tigers, and Hawks are level on win percentage (.500). The season’s tiebreakers set their order: head-to-head, then point difference, then points scored.',
+    );
+  });
+
+  it('the reader’s four: head-to-head, which put B third, is named, then what split each pair', async () => {
+    // A beat B, D beat C, all four 1–1. B has the best point difference of the four.
+    const made = await tableAfter(
+      ['A', 'B', 'C', 'D', 'E', 'F'],
+      [
+        ['A', 60, 'B', 55],
+        ['E', 51, 'A', 50],
+        ['D', 45, 'C', 40],
+        ['E', 41, 'D', 40],
+        ['B', 80, 'F', 60],
+        ['C', 50, 'F', 45],
+      ],
+    );
+    expect(order(made)).toEqual(['E', 'A', 'D', 'B', 'C', 'F']);
+    expect(sharedNote(made, ['A', 'D', 'B', 'C'])).toBe(
+      'A, D, B, and C are level on win percentage (.500). In the games among these four: A 1–0, D 1–0, B 0–1, C 0–1. A and D are also level on point difference (+4). Points scored puts A ahead of D: 110 against 85. Point difference puts B ahead of C: +15 against 0.',
+    );
+  });
+
+  it('case 32: head-to-head orders all three, and the note gives their records', async () => {
+    const made = await tableAfter(
+      ['Ash', 'Birch', 'Cedar', 'Dogwood', 'Elm'],
+      [
+        ['Ash', 50, 'Birch', 40],
+        ['Ash', 50, 'Cedar', 40],
+        ['Birch', 50, 'Cedar', 40],
+        ['Elm', 50, 'Ash', 40],
+        ['Dogwood', 50, 'Ash', 40],
+        ['Elm', 50, 'Birch', 40],
+        ['Birch', 50, 'Dogwood', 40],
+        ['Cedar', 50, 'Elm', 40],
+        ['Cedar', 50, 'Dogwood', 40],
+        ['Elm', 50, 'Dogwood', 40],
+      ],
+    );
+    expect(order(made)).toEqual(['Elm', 'Ash', 'Birch', 'Cedar', 'Dogwood']);
+    expect(sharedNote(made, ['Ash', 'Birch', 'Cedar'])).toBe(
+      'Ash, Birch, and Cedar are level on win percentage (.500). In the games among these three: Ash 2–0, Birch 1–1, Cedar 0–2.',
+    );
+  });
+
+  it('case 33: two never met, head-to-head counts and leaves all three level, point difference orders them', async () => {
+    const made = await tableAfter(
+      ['Ash', 'Birch', 'Cedar'],
+      [
+        ['Ash', 50, 'Cedar', 45],
+        ['Cedar', 50, 'Ash', 45],
+        ['Birch', 41, 'Cedar', 40],
+        ['Cedar', 50, 'Birch', 40],
+      ],
+    );
+    expect(order(made)).toEqual(['Cedar', 'Ash', 'Birch']);
+    expect(sharedNote(made, ['Cedar', 'Ash', 'Birch'])).toBe(
+      'Cedar, Ash, and Birch are level on win percentage (.500). In the games among these three: Cedar 2–2, Ash 1–1, Birch 1–1. By point difference: Cedar +9, Ash 0, Birch -9.',
+    );
+  });
+
+  it('says who has played none of the others when head-to-head cannot count', async () => {
+    const made = await tableAfter(
+      ['Ash', 'Birch', 'Cedar', 'Dogwood', 'Elm'],
+      [
+        ['Ash', 50, 'Birch', 40],
+        ['Birch', 50, 'Ash', 45],
+        ['Cedar', 50, 'Dogwood', 40],
+        ['Elm', 60, 'Cedar', 40],
+      ],
+    );
+    expect(order(made)).toEqual(['Elm', 'Ash', 'Birch', 'Cedar', 'Dogwood']);
+    expect(sharedNote(made, ['Ash', 'Birch', 'Cedar'])).toBe(
+      'Ash, Birch, and Cedar are level on win percentage (.500). Head-to-head does not count here: Cedar has played none of the others. By point difference: Ash +5, Birch -5, Cedar -10.',
+    );
+  });
+
+  it('in a points table gives the records with their ties', async () => {
+    const rules: SeasonRules = {
+      ...defaultSeasonRules(),
+      // Three points a win, one a tie.
+      standings: {
+        ...defaultSeasonRules().standings,
+        rankBy: 'points',
+        pointsPerWin: 3,
+        columns: [...defaultSeasonRules().standings.columns, 'points'],
+      },
+      allowTies: true,
+    };
+    const made = await tableAfter(
+      ['Ash', 'Birch', 'Cedar', 'Zed'],
+      [
+        ['Ash', 40, 'Birch', 40],
+        ['Cedar', 50, 'Ash', 45],
+        ['Birch', 40, 'Cedar', 40],
+        ['Ash', 50, 'Zed', 40],
+        ['Birch', 30, 'Zed', 30],
+        ['Zed', 35, 'Birch', 35],
+      ],
+      { rules },
+    );
+    expect(order(made)).toEqual(['Cedar', 'Birch', 'Ash', 'Zed']);
+    expect(sharedNote(made, ['Cedar', 'Birch', 'Ash'])).toBe(
+      'Cedar, Birch, and Ash are level on points (4). In the games among these three (2 games each): Cedar 4 points, Birch 2, Ash 1.',
+    );
+  });
+
+  it('in a points table gives the points per game head-to-head compared (the fix round’s F1)', async () => {
+    const rules: SeasonRules = {
+      ...defaultSeasonRules(),
+      standings: {
+        ...defaultSeasonRules().standings,
+        rankBy: 'points',
+        pointsPerWin: 3,
+        columns: [...defaultSeasonRules().standings.columns, 'points'],
+      },
+    };
+    const made = await tableAfter(
+      ['A', 'B', 'C', 'X'],
+      [
+        ['A', 50, 'C', 40],
+        ['A', 50, 'C', 40],
+        ['B', 50, 'A', 40],
+        ['B', 50, 'X', 40],
+        ['C', 50, 'X', 40],
+        ['C', 50, 'X', 40],
+      ],
+      { rules },
+    );
+    expect(order(made)).toEqual(['B', 'A', 'C', 'X']);
+    expect(sharedNote(made, ['B', 'A', 'C'])).toBe(
+      'B, A, and C are level on points (6). In the games among these three, by points per game: B 3 from 1 game, A 6 from 3, C 0 from 2.',
+    );
+    // The home page keeps only the first sentence, unchanged.
+    expect(made.view.briefFootnotes.map((note) => note.text)).toContain(
+      'B, A, and C are level on points (6).',
+    );
+  });
+
+  it('says when teams that start again are still level between themselves (the fix round’s F2)', async () => {
+    const made = await tableAfter(
+      ['A', 'B', 'C', 'X', 'Y'],
+      [
+        ['A', 50, 'B', 40],
+        ['A', 50, 'C', 40],
+        ['B', 50, 'C', 40],
+        ['C', 52, 'B', 40],
+        ['X', 50, 'A', 40],
+        ['X', 50, 'A', 40],
+        ['B', 50, 'Y', 30],
+        ['C', 50, 'Y', 40],
+      ],
+    );
+    expect(sharedNote(made, ['A', 'B', 'C'])).toBe(
+      'A, B, and C are level on win percentage (.500). In the games among these three: A 2–0, B 1–2, C 1–2. B and C split their games with each other (1–1). Point difference puts B ahead of C: +8 against +2.',
+    );
+  });
+
+  it('names fewest points allowed and a coin flip among three with each team', async () => {
+    const circle: readonly Game[] = [
+      ['Ash', 40, 'Cedar', 30],
+      ['Cedar', 50, 'Birch', 45],
+      ['Birch', 45, 'Ash', 44],
+    ];
+    const allowed = await tableAfter(['Ash', 'Birch', 'Cedar'], circle, {
+      rules: { ...defaultSeasonRules(), tiebreakers: ['fewest-points-allowed'] },
+    });
+    expect(sharedNote(allowed, ['Ash', 'Cedar', 'Birch'])).toBe(
+      'Ash, Cedar, and Birch are level on win percentage (.500). By fewest points allowed: Ash 75, Cedar 85, Birch 94.',
+    );
+    const flipped = await tableAfter(['Ash', 'Birch', 'Cedar'], circle, {
+      rules: { ...defaultSeasonRules(), tiebreakers: ['coin-flip'] },
+      coinFlips: [['Cedar', 'Ash', 'Birch']],
+    });
+    expect(sharedNote(flipped, ['Cedar', 'Ash', 'Birch'])).toBe(
+      'Cedar, Ash, and Birch are level on win percentage (.500). A coin flip puts them in this order: Cedar, Ash, Birch.',
+    );
+  });
+});
+
+// The lead's answer (a) to step 2.198: the home page's small table keeps each level note's
+// first sentence, who is level and on what; the standings page keeps the whole note.
+describe('the home page’s form of each note', () => {
+  /** The home page's note beside a team, beside its standings-page note. */
+  function bothBeside({ view }: Made, team: string): { brief: string[]; whole: string[] } {
+    const row = view.rows.find((r) => r.team === team);
+    if (row === undefined) throw new Error(`no row for ${team}`);
+    const text = (notes: StandingsTableView['footnotes'], id: string) =>
+      (notes.find((f) => f.id === id)?.text ?? '').replaceAll(joiner, '');
+    return {
+      brief: (row.notes ?? []).map((id) => text(view.briefFootnotes, id)),
+      whole: (row.notes ?? []).map((id) => text(view.footnotes, id)),
+    };
+  }
+
+  /** Every team's home note is its whole note's start and names the team it stands by. */
+  function trueBesideEach(made: Made): void {
+    expect(made.view.briefFootnotes.map((f) => f.id)).toEqual(made.view.footnotes.map((f) => f.id));
+    for (const row of made.view.rows) {
+      const { brief, whole } = bothBeside(made, row.team);
+      brief.forEach((note, n) => {
+        expect(whole[n]?.startsWith(note)).toBe(true);
+        if (note.includes(' level on ')) expect(note).toContain(row.team);
+      });
+    }
+  }
+
+  it('four level (case 46): the home page says who is level and on what; the standings page the whole note', async () => {
+    const made = await tableAfter(
+      ['Otters', 'Badgers', 'Lions', 'Tigers', 'Hawks', 'Bears'],
+      [
+        ['Tigers', 55, 'Hawks', 48],
+        ['Bears', 60, 'Badgers', 52],
+        ['Hawks', 51, 'Tigers', 47],
+        ['Otters', 58, 'Lions', 49],
+        ['Lions', 50, 'Bears', 44],
+      ],
+    );
+    for (const team of ['Lions', 'Tigers', 'Hawks', 'Bears']) {
+      expect(bothBeside(made, team)).toEqual({
+        brief: ['Lions, Tigers, Hawks, and Bears are level on win percentage (.500).'],
+        whole: [
+          'Lions, Tigers, Hawks, and Bears are level on win percentage (.500). In the games among these four: Lions 1–0, Tigers 1–1, Hawks 1–1, Bears 0–1. Tigers and Hawks split their games with each other (1–1). Point difference puts Tigers ahead of Hawks: +3 against -3.',
+        ],
+      });
+    }
+    trueBesideEach(made);
+  });
+
+  it('two level (case 7): the first sentence on the home page, the reason on the standings page', async () => {
+    const made = await tableAfter(['Ravens', 'Wolves'], [game1, game2]);
+    expect(bothBeside(made, 'Ravens')).toEqual({
+      brief: ['Wolves and Ravens are level on win percentage (.500).'],
+      whole: [
+        'Wolves and Ravens are level on win percentage (.500). Point difference puts Wolves ahead: +4 against -4.',
+      ],
+    });
+    trueBesideEach(made);
+  });
+
+  it('every other case keeps a note true beside each team: in the bin, not played, two still level, points', async () => {
+    const binned = await tableAfter(
+      ['Otters', 'Badgers', 'Lions', 'Tigers', 'Hawks', 'Bears'],
+      [
+        ['Tigers', 55, 'Hawks', 48],
+        ['Bears', 60, 'Badgers', 52],
+        ['Hawks', 51, 'Tigers', 47],
+        ['Otters', 58, 'Lions', 49],
+        ['Lions', 50, 'Bears', 44],
+      ],
+      { binned: ['Bears'] },
+    );
+    expect(bothBeside(binned, 'Hawks').brief).toEqual([
+      'Lions, Tigers, and Hawks are level on win percentage (.500).',
+    ]);
+    trueBesideEach(binned);
+    const reader = await tableAfter(
+      ['A', 'B', 'C', 'D', 'E', 'F'],
+      [
+        ['A', 60, 'B', 55],
+        ['E', 51, 'A', 50],
+        ['D', 45, 'C', 40],
+        ['E', 41, 'D', 40],
+        ['B', 80, 'F', 60],
+        ['C', 50, 'F', 45],
+      ],
+    );
+    trueBesideEach(reader);
+    const idle = await tableAfter(['Wolves', 'Ravens', 'Hawks'], [game1]);
+    trueBesideEach(idle);
+    const points = await tableAfter(
+      ['Ash', 'Birch', 'Cedar'],
+      [
+        ['Ash', 40, 'Cedar', 30],
+        ['Cedar', 50, 'Birch', 45],
+        ['Birch', 45, 'Ash', 44],
+      ],
+      {
+        rules: {
+          ...defaultSeasonRules(),
+          standings: {
+            ...defaultSeasonRules().standings,
+            rankBy: 'points',
+            pointsPerWin: 3,
+            columns: [...defaultSeasonRules().standings.columns, 'points'],
+          },
+        },
+      },
+    );
+    trueBesideEach(points);
   });
 });

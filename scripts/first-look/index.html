@@ -1,0 +1,1008 @@
+<title>SR Leagues first look</title>
+<meta name="claude:viewport-fit-sides" content="cover" />
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+/>
+<style>
+  /* Layout: a contact sheet. One reading column for words; picture grids break wider. Thumbnails show the top of each screen; a tap opens the whole screen. */
+  :root {
+    --bg: #f3f5f9;
+    --surface: #ffffff;
+    --fg: #141b2b;
+    --muted: #566079;
+    --line: #d7dce8;
+    --accent: #1c4fb3;
+    --accent-ink: #ffffff;
+    --warm: #b4521f;
+    --shade: rgba(10, 16, 30, 0.95);
+    --display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    --body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --bg: #0e1320;
+      --surface: #171e2f;
+      --fg: #e9edf6;
+      --muted: #9aa5bd;
+      --line: #2a3349;
+      --accent: #7ea6ff;
+      --accent-ink: #0b1020;
+      --warm: #f0a070;
+      --shade: rgba(3, 6, 12, 0.96);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme='dark'] {
+    --bg: #0e1320;
+    --surface: #171e2f;
+    --fg: #e9edf6;
+    --muted: #9aa5bd;
+    --line: #2a3349;
+    --accent: #7ea6ff;
+    --accent-ink: #0b1020;
+    --warm: #f0a070;
+    --shade: rgba(3, 6, 12, 0.96);
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 56px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+  .read {
+    max-width: 66ch;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(1.9rem, 6vw, 2.8rem);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 14px;
+    text-wrap: balance;
+  }
+  h2 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.45rem;
+    line-height: 1.2;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  p {
+    margin: 0 0 12px;
+  }
+  .eyebrow {
+    font-size: 0.74rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--warm);
+    font-weight: 600;
+    margin: 0 0 10px;
+  }
+  .lede {
+    font-size: 1.06rem;
+    color: var(--fg);
+  }
+  .muted {
+    color: var(--muted);
+  }
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .facts li {
+    background: var(--surface);
+    box-shadow: 0 0 0 0.5px var(--line);
+    padding: 14px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .facts b {
+    font-family: var(--display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .facts span {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.3;
+  }
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 18px 14px;
+  }
+  .dark-set {
+    grid-template-columns: repeat(auto-fill, minmax(148px, 220px));
+  }
+  .shot {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+  .shot.wide {
+    grid-column: span 2;
+  }
+  .open {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface);
+    cursor: zoom-in;
+    aspect-ratio: 390/600;
+  }
+  .shot.wide .open {
+    aspect-ratio: 1280/640;
+    max-width: 100%;
+  }
+  .dark-set .open {
+    aspect-ratio: 390/844;
+  }
+  .open img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+  }
+  .open:focus-visible,
+  .viewer button:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+  figcaption {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.84rem;
+    line-height: 1.35;
+  }
+  figcaption strong {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  figcaption span {
+    color: var(--muted);
+  }
+  .list {
+    margin: 0;
+    padding-left: 1.15em;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .list li::marker {
+    color: var(--warm);
+  }
+  .note {
+    border-left: 3px solid var(--warm);
+    padding: 2px 0 2px 14px;
+  }
+  .viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    background: var(--shade);
+    display: flex;
+    flex-direction: column;
+  }
+  .viewer header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+      10px max(12px, env(safe-area-inset-left, 0px));
+    color: #fff;
+  }
+  .viewer header strong {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1rem;
+  }
+  .viewer button {
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    padding: 8px 12px;
+    cursor: pointer;
+    min-height: 40px;
+  }
+  .viewer .pane {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 max(12px, env(safe-area-inset-right, 0px))
+      calc(16px + env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+    text-align: center;
+  }
+  .viewer .pane img {
+    max-width: min(100%, 1280px);
+    height: auto;
+    border-radius: 8px;
+  }
+  .viewer .pane img.phone {
+    max-width: min(100%, 430px);
+  }
+  footer {
+    font-size: 0.84rem;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+</style>
+<div class="wrap">
+  <header class="read">
+    <p class="eyebrow">SR Leagues &middot; 22 November 2026</p>
+    <h1>A first look at the product, with a whole season played in it</h1>
+    <p class="lede">
+      These are real pictures of the product as it runs today. Nothing is drawn or mocked. The
+      league in them is made up: 24 schools in 4 divisions, whose season was played from empty to
+      its final tables by one command, through the same screens and rules a real league would use.
+    </p>
+    <p class="muted">
+      Tap any picture to see the whole screen. Most are at a phone's width, because that is where
+      parents and scorekeepers will be.
+    </p>
+  </header>
+  <ul class="facts" aria-label="The made-up season in numbers">
+    <li><b>24</b><span>teams in 4 divisions</span></li>
+    <li><b>120</b><span>games scheduled over 10 rounds</span></li>
+    <li><b>116</b><span>ended with a result</span></li>
+    <li><b>6</b><span>scored live, play by play</span></li>
+    <li><b>12</b><span>postponed, cancelled, forfeited or corrected along the way</span></li>
+    <li><b>1</b><span>went to overtime</span></li>
+    <li><b>11 of 11</b><span>checks of the numbers hold</span></li>
+  </ul>
+  <section>
+    <div class="read">
+      <h2>What a visitor sees</h2>
+      <p class="muted">
+        The league's public site: a parent, a player or anyone with the link, signed out.
+      </p>
+    </div>
+    <div class="grid">
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/01-home-phone.jpg"
+          data-title="The league&#x27;s home"
+          aria-label="Open the full picture: The league&#x27;s home"
+        >
+          <img
+            src="img/01-home-phone.jpg"
+            alt="The league&#x27;s home"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>The league&#x27;s home</strong
+          ><span
+            >What a parent sees first: the season in four numbers, games still waiting for a date,
+            the latest results and the tables.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/03-schedule-phone.jpg"
+          data-title="The schedule"
+          aria-label="Open the full picture: The schedule"
+        >
+          <img src="img/03-schedule-phone.jpg" alt="The schedule" loading="lazy" decoding="async" />
+        </button>
+        <figcaption>
+          <strong>The schedule</strong
+          ><span
+            >Every round, with filters for one round or one team. Round 2 is open and marks its
+            postponed game.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/04-standings-phone.jpg"
+          data-title="The standings"
+          aria-label="Open the full picture: The standings"
+        >
+          <img
+            src="img/04-standings-phone.jpg"
+            alt="The standings"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>The standings</strong
+          ><span
+            >One table for each division. Under Divisions 1 and 3 a note says exactly why tied teams
+            sit in that order.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/06-statistics-phone.jpg"
+          data-title="The statistics"
+          aria-label="Open the full picture: The statistics"
+        >
+          <img
+            src="img/06-statistics-phone.jpg"
+            alt="The statistics"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>The statistics</strong
+          ><span
+            >The leaders, then every player. Leaders are empty here because nobody has the 3 scored
+            games the league&#x27;s setting asks for.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/07-team-phone.jpg"
+          data-title="A team&#x27;s page"
+          aria-label="Open the full picture: A team&#x27;s page"
+        >
+          <img
+            src="img/07-team-phone.jpg"
+            alt="A team&#x27;s page"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>A team&#x27;s page</strong
+          ><span
+            >Kestrelmark Academy, first in Division 1 at 9 and 1: its roster and every result.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/08-typed-final-phone.jpg"
+          data-title="A game with a typed score"
+          aria-label="Open the full picture: A game with a typed score"
+        >
+          <img
+            src="img/08-typed-final-phone.jpg"
+            alt="A game with a typed score"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>A game with a typed score</strong
+          ><span
+            >Fernquill STEM 71, Sablewynd Collegiate 35. Only the final score was entered, so it
+            says no statistics were recorded.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/09-tracked-box-score-phone.jpg"
+          data-title="A game scored live: box score"
+          aria-label="Open the full picture: A game scored live: box score"
+        >
+          <img
+            src="img/09-tracked-box-score-phone.jpg"
+            alt="A game scored live: box score"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>A game scored live: box score</strong
+          ><span
+            >Cobaltine STEM 46, Marrowbrook Academy 49, scored tap by tap. Each player&#x27;s
+            points, threes, free throws and fouls.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/10-play-by-play-phone.jpg"
+          data-title="The same game, play by play"
+          aria-label="Open the full picture: The same game, play by play"
+        >
+          <img
+            src="img/10-play-by-play-phone.jpg"
+            alt="The same game, play by play"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>The same game, play by play</strong
+          ><span>Every play in order with the running score, quarter by quarter.</span>
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/11-overtime-phone.jpg"
+          data-title="The overtime game"
+          aria-label="Open the full picture: The overtime game"
+        >
+          <img
+            src="img/11-overtime-phone.jpg"
+            alt="The overtime game"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>The overtime game</strong
+          ><span
+            >Marked &quot;Final, OT&quot;: Ironwhistle STEM 44, Pebblewick Academy 38, with the
+            overtime plays.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/12-postponed-phone.jpg"
+          data-title="A postponed game"
+          aria-label="Open the full picture: A postponed game"
+        >
+          <img
+            src="img/12-postponed-phone.jpg"
+            alt="A postponed game"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>A postponed game</strong
+          ><span
+            >Still waiting for its new date. It says when it was set for and shows both teams&#x27;
+            records.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/13-forfeit-phone.jpg"
+          data-title="A forfeit"
+          aria-label="Open the full picture: A forfeit"
+        >
+          <img src="img/13-forfeit-phone.jpg" alt="A forfeit" loading="lazy" decoding="async" />
+        </button>
+        <figcaption>
+          <strong>A forfeit</strong
+          ><span>Marked &quot;Forfeit&quot;, 20 to 0, with the line that says who forfeited.</span>
+        </figcaption>
+      </figure>
+      <figure class="shot wide">
+        <button
+          type="button"
+          class="open"
+          data-full="img/02-home-wide.jpg"
+          data-title="The home on a laptop"
+          aria-label="Open the full picture: The home on a laptop"
+        >
+          <img
+            src="img/02-home-wide.jpg"
+            alt="The home on a laptop"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>The home on a laptop</strong
+          ><span
+            >The same page on a wide screen: matchups, results and all four divisions on one
+            page.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot wide">
+        <button
+          type="button"
+          class="open"
+          data-full="img/05-standings-wide.jpg"
+          data-title="The standings on a laptop"
+          aria-label="Open the full picture: The standings on a laptop"
+        >
+          <img
+            src="img/05-standings-wide.jpg"
+            alt="The standings on a laptop"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>The standings on a laptop</strong
+          ><span>All four divisions with every column, and the latest results below.</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+  <section>
+    <div class="read">
+      <h2>What the league's admin sees</h2>
+      <p class="muted">Signed in as the made-up league's owner.</p>
+    </div>
+    <div class="grid">
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/20-admin-home-phone.jpg"
+          data-title="The admin&#x27;s first page"
+          aria-label="Open the full picture: The admin&#x27;s first page"
+        >
+          <img
+            src="img/20-admin-home-phone.jpg"
+            alt="The admin&#x27;s first page"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>The admin&#x27;s first page</strong
+          ><span
+            >Where a league&#x27;s admin lands: enter results, then People, Teams, Schedule, Games
+            and the settings.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/21-admin-games-phone.jpg"
+          data-title="Games"
+          aria-label="Open the full picture: Games"
+        >
+          <img src="img/21-admin-games-phone.jpg" alt="Games" loading="lazy" decoding="async" />
+        </button>
+        <figcaption>
+          <strong>Games</strong
+          ><span
+            >What needs a result comes first, then today, this week, and the games waiting for a new
+            date.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/22-admin-game-phone.jpg"
+          data-title="One game in the admin"
+          aria-label="Open the full picture: One game in the admin"
+        >
+          <img
+            src="img/22-admin-game-phone.jpg"
+            alt="One game in the admin"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>One game in the admin</strong
+          ><span
+            >A final game. To correct it the admin reopens it and gives a reason, which is kept in
+            the log.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/24-admin-teams-phone.jpg"
+          data-title="Teams"
+          aria-label="Open the full picture: Teams"
+        >
+          <img src="img/24-admin-teams-phone.jpg" alt="Teams" loading="lazy" decoding="async" />
+        </button>
+        <figcaption>
+          <strong>Teams</strong
+          ><span>The 24 teams with their divisions, and the form that adds one.</span>
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/25-admin-roster-phone.jpg"
+          data-title="One team&#x27;s roster"
+          aria-label="Open the full picture: One team&#x27;s roster"
+        >
+          <img
+            src="img/25-admin-roster-phone.jpg"
+            alt="One team&#x27;s roster"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>One team&#x27;s roster</strong
+          ><span
+            >The team&#x27;s details, who may see its players&#x27; numbers, and each player&#x27;s
+            jersey number and role.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/26-admin-people-phone.jpg"
+          data-title="People"
+          aria-label="Open the full picture: People"
+        >
+          <img src="img/26-admin-people-phone.jpg" alt="People" loading="lazy" decoding="async" />
+        </button>
+        <figcaption>
+          <strong>People</strong
+          ><span>Everyone in the league in one searchable list, each with their team.</span>
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/27-admin-person-phone.jpg"
+          data-title="One person&#x27;s record"
+          aria-label="Open the full picture: One person&#x27;s record"
+        >
+          <img
+            src="img/27-admin-person-phone.jpg"
+            alt="One person&#x27;s record"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>One person&#x27;s record</strong
+          ><span>Name, private details only staff see, child or adult, and their team.</span>
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/28-admin-settings-phone.jpg"
+          data-title="League settings"
+          aria-label="Open the full picture: League settings"
+        >
+          <img
+            src="img/28-admin-settings-phone.jpg"
+            alt="League settings"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>League settings</strong
+          ><span
+            >Each setting shows what it is now and what the default is. The league decides, not
+            us.</span
+          >
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/28b-admin-season-phone.jpg"
+          data-title="Season settings"
+          aria-label="Open the full picture: Season settings"
+        >
+          <img
+            src="img/28b-admin-season-phone.jpg"
+            alt="Season settings"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>Season settings</strong
+          ><span>Who can see the season, with one button to hide it again.</span>
+        </figcaption>
+      </figure>
+      <figure class="shot wide">
+        <button
+          type="button"
+          class="open"
+          data-full="img/23-schedule-builder-wide.jpg"
+          data-title="The schedule builder"
+          aria-label="Open the full picture: The schedule builder"
+        >
+          <img
+            src="img/23-schedule-builder-wide.jpg"
+            alt="The schedule builder"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>The schedule builder</strong
+          ><span
+            >On a laptop: the season&#x27;s rounds with their games, edited as a draft and then
+            published.</span
+          >
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+  <section>
+    <div class="read">
+      <h2>The scoring screen on game night</h2>
+      <p class="muted">
+        A scorekeeper's phone at the table. The clock reads 20:00 in these because the picture
+        script never started it; scoring works either way.
+      </p>
+    </div>
+    <div class="grid dark-set">
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/30-scoring-pick-fives-phone.jpg"
+          data-title="Before tip-off"
+          aria-label="Open the full picture: Before tip-off"
+        >
+          <img
+            src="img/30-scoring-pick-fives-phone.jpg"
+            alt="Before tip-off"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>Before tip-off</strong
+          ><span>Picking each team&#x27;s starting five. Hawks are set, Bears have 3 of 5.</span>
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/31-scoring-pad-phone.jpg"
+          data-title="Mid-game"
+          aria-label="Open the full picture: Mid-game"
+        >
+          <img src="img/31-scoring-pad-phone.jpg" alt="Mid-game" loading="lazy" decoding="async" />
+        </button>
+        <figcaption>
+          <strong>Mid-game</strong
+          ><span>Hawks 8, Bears 5. Tap a player, then the play. Undo is always one tap away.</span>
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/32-end-game-question-phone.jpg"
+          data-title="Ending the game"
+          aria-label="Open the full picture: Ending the game"
+        >
+          <img
+            src="img/32-end-game-question-phone.jpg"
+            alt="Ending the game"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+        <figcaption>
+          <strong>Ending the game</strong
+          ><span>It asks first, says the score, and warns that time is still on the clock.</span>
+        </figcaption>
+      </figure>
+      <figure class="shot">
+        <button
+          type="button"
+          class="open"
+          data-full="img/33-final-panel-phone.jpg"
+          data-title="Final"
+          aria-label="Open the full picture: Final"
+        >
+          <img src="img/33-final-panel-phone.jpg" alt="Final" loading="lazy" decoding="async" />
+        </button>
+        <figcaption>
+          <strong>Final</strong
+          ><span
+            >&quot;Hawks won, 8 to 5&quot;, saved and counted in the standings. It can be reopened
+            for 30 minutes.</span
+          >
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+  <section class="read">
+    <h2>What is not right yet</h2>
+    <p>
+      You should see these from me before you find them yourself. They are on the list and will be
+      fixed.
+    </p>
+    <ul class="list">
+      <li>
+        <strong>Standings on a phone.</strong> Only games, wins and losses fit. Win percentage and
+        points need a sideways swipe, and the four tables are not the same width.
+      </li>
+      <li>
+        <strong>Statistics on a phone.</strong> The player table runs off the right edge and needs a
+        swipe.
+      </li>
+      <li>
+        <strong>A game's box score in the admin, on a phone.</strong> Player names are cut short and
+        the last column is clipped.
+      </li>
+      <li>
+        <strong>A team's roster in the admin, on a phone.</strong> Each player is a whole form, so
+        the page is very long.
+      </li>
+      <li>
+        <strong>A person's record.</strong> The box for adding them to another team sits right under
+        their current team and reads as if it were the current one.
+      </li>
+      <li>
+        <strong>Four admin areas say "Coming".</strong> Registration, Standings and stats, Site and
+        Messages are not built yet. That is true, not a glitch.
+      </li>
+    </ul>
+    <p class="note muted">
+      One thing that is the simulator and not the product: in the made-up games every quarter's
+      plays stop with four minutes left. That is how the script spaces its taps.
+    </p>
+  </section>
+  <section class="read">
+    <h2>Trying it with your own hands</h2>
+    <p>
+      Pictures only go so far. The practice site has to run on a computer; the cloud machine that
+      builds it cannot hand out a link.
+    </p>
+    <ul class="list">
+      <li>
+        <strong>On your own computer.</strong> Open the Claude desktop app, share a folder under
+        Settings, Claude Code, Remote Control, and tell the lead in the chat "start the practice
+        site on my computer". The rest is done for you. The first test is ready for exactly this:
+        one made-up league from empty to a final table, with one game scored live, in about half an
+        hour.
+      </li>
+      <li>
+        <strong>Online.</strong> A practice copy that needs no set-up is the next line of work after
+        the first test.
+      </li>
+    </ul>
+  </section>
+  <footer>
+    Every picture is the running product with made-up data, taken on 22 November 2026 from the build
+    branch. No real person, team or league appears in them.
+  </footer>
+</div>
+<div
+  class="viewer"
+  id="viewer"
+  hidden
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="viewer-title"
+>
+  <header>
+    <strong id="viewer-title"></strong><button type="button" id="viewer-prev">Previous</button
+    ><button type="button" id="viewer-next">Next</button
+    ><button type="button" id="viewer-close">Close</button>
+  </header>
+  <div class="pane" id="viewer-pane"><img id="viewer-img" alt="" /></div>
+</div>
+<script>
+  (function () {
+    var opens = [].slice.call(document.querySelectorAll('.open')),
+      v = document.getElementById('viewer'),
+      img = document.getElementById('viewer-img'),
+      title = document.getElementById('viewer-title'),
+      pane = document.getElementById('viewer-pane'),
+      at = -1,
+      last = null;
+    function show(i) {
+      at = (i + opens.length) % opens.length;
+      var b = opens[at];
+      img.src = b.getAttribute('data-full');
+      img.alt = b.getAttribute('data-title');
+      img.className = b.closest('.wide') ? '' : 'phone';
+      title.textContent = b.getAttribute('data-title');
+      v.hidden = false;
+      pane.scrollTop = 0;
+      document.documentElement.style.overflow = 'hidden';
+      document.getElementById('viewer-close').focus();
+    }
+    function close() {
+      v.hidden = true;
+      document.documentElement.style.overflow = '';
+      if (last) last.focus();
+    }
+    opens.forEach(function (b, i) {
+      b.addEventListener('click', function () {
+        last = b;
+        show(i);
+      });
+    });
+    document.getElementById('viewer-close').addEventListener('click', close);
+    document.getElementById('viewer-prev').addEventListener('click', function () {
+      show(at - 1);
+    });
+    document.getElementById('viewer-next').addEventListener('click', function () {
+      show(at + 1);
+    });
+    v.addEventListener('click', function (e) {
+      if (e.target === pane) close();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (v.hidden) return;
+      if (e.key === 'Escape') close();
+      if (e.key === 'ArrowLeft') show(at - 1);
+      if (e.key === 'ArrowRight') show(at + 1);
+    });
+  })();
+</script>

@@ -26,6 +26,7 @@ import {
   type AccessReader,
   type ActivityLog,
   type Audience,
+  type BinTx,
   type Clock,
   type CommandContext,
   type CommandLogLine,
@@ -42,6 +43,7 @@ import {
   type TransactionRunner,
 } from '@srleagues/core';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { worldBinStore } from './stand-in-world-bin.ts';
 import { worldGamesStore, worldLiveGames, worldScoringSessions } from './stand-in-world-games.ts';
 import { deepFreeze } from './stand-in-world-rows.ts';
 import { worldImportsStore, worldSchedulingStore } from './stand-in-world-scheduling.ts';
@@ -56,7 +58,8 @@ export type WorldTx = TrackerTx &
   PeopleTx &
   SchedulingTx &
   ImportScoresTx &
-  LeaguesTx;
+  LeaguesTx &
+  BinTx;
 
 /** What every area's transaction has: the core handlers find the rest of the world from it. */
 type AnyAreaTx = CommandTx & { readonly activity: ActivityLog };
@@ -161,6 +164,7 @@ export function madeUpWorld(options: WorldOptions): World {
       standings: worldStandingsStore(s),
       teams: worldTeamsStore(s, now),
       people: worldPeopleStore(s, now),
+      bin: worldBinStore(s),
       scheduling: worldSchedulingStore(s),
       imports: worldImportsStore(s, now),
       ...worldLeaguesStores(s, access, now),

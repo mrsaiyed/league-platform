@@ -33,14 +33,11 @@ const platformPlaceholders: Partial<Readonly<Record<PlatformPage, TextKey>>> = {
   find: 'page.find',
   help: 'page.help',
   inbox: 'page.inbox',
-  privacy: 'page.privacy',
   start: 'page.start',
   status: 'page.status',
-  terms: 'page.terms',
 };
 
 const leaguePlaceholders: Partial<Readonly<Record<LeaguePage, TextKey>>> = {
-  my: 'nav.my',
   news: 'nav.news',
   'news-post': 'page.newsPost',
   player: 'page.player',

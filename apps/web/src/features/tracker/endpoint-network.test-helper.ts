@@ -4,6 +4,8 @@
 // for. The network can be down (nothing reaches the server) or lose answers (the server
 // does the work, the answer never comes back).
 import { standInLeagues } from '../../server/stand-in-ports.ts';
+import { markNotStartedRequest } from '../../server/not-started-endpoint.ts';
+import { reopenOfferRequest, reopenTrackedGameRequest } from '../../server/reopen-game-endpoint.ts';
 import { scoringSessionRequest } from '../../server/scoring-session-endpoint.ts';
 import { sendTrackerCommands } from '../../server/tracker-commands-endpoint.ts';
 import { trackerWorld, type Person } from '../../server/tracker-endpoints.test-helper.ts';
@@ -44,9 +46,10 @@ export function endpointNetwork(options: EndpointNetworkOptions = {}): EndpointN
   const reached: string[] = [];
 
   async function answer(person: Person, url: string, init: RequestInit | undefined) {
-    const match = /^\/api\/v1\/leagues\/([^/]+)\/games\/([^/]+)\/(commands|session|state)$/.exec(
-      url,
-    );
+    const match =
+      /^\/api\/v1\/leagues\/([^/]+)\/games\/([^/]+)\/(commands|session|state|reopen|not-started)$/.exec(
+        url,
+      );
     if (match === null) return { status: 404, body: { error: 'not-found' } };
     const [, leagueId = '', game = '', part = ''] = match;
     const body: unknown = init?.body === undefined ? undefined : JSON.parse(String(init.body));
@@ -67,6 +70,30 @@ export function endpointNetwork(options: EndpointNetworkOptions = {}): EndpointN
       }
       case 'session':
         return scoringSessionRequest(context, game, body, world.tracker);
+      // The scoring screen's two doors (step 2.37; game-doors.ts).
+      case 'reopen': {
+        if (init?.method !== 'POST') return reopenOfferRequest(context, game, world.tracker);
+        const outcome = await reopenTrackedGameRequest(
+          context,
+          game,
+          body,
+          world.tracker,
+          world.publishPlays,
+        );
+        await outcome.afterwards?.();
+        return outcome.answer;
+      }
+      case 'not-started': {
+        const outcome = await markNotStartedRequest(
+          context,
+          game,
+          body,
+          world.tracker,
+          world.publishPlays,
+        );
+        await outcome.afterwards?.();
+        return outcome.answer;
+      }
       default:
         return trackerStateRequest(context, game, world.tracker);
     }

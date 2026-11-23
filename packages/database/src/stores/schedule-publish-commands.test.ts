@@ -535,6 +535,55 @@ describe('publishing against the database', () => {
     });
   });
 
+  it("refuses in words, changing nothing, an added game whose id another league's game has (step 2.185)", async () => {
+    const s = await season();
+    const other = await season();
+    const theirs = await other.game(other.teams.a, other.teams.b, {
+      starts_at: '2026-12-07T00:30:00Z',
+    });
+    expect(
+      await addDraftGame(
+        s.as,
+        {
+          ...basis(s),
+          gameId: theirs,
+          homeTeamId: s.teams.a,
+          awayTeamId: s.teams.b,
+          roundId: s.round1,
+          date: '2026-12-06',
+          time: '18:00',
+          venueId: s.venueId,
+          court: null,
+        },
+        deps,
+      ),
+    ).toMatchObject({ ok: true });
+    // The preview cannot see another league's game; publishing finds the id taken.
+    const preview = await previewSchedulePublish(s.as, { seasonId: s.seasonId }, deps);
+    expect(preview).toMatchObject({ ok: true, value: { canPublish: true } });
+    const draft = await draftState(s);
+    expect(
+      await publishSchedule(
+        s.as,
+        { seasonId: s.seasonId, basedOnRevision: 1, draftId: draft.id, version: draft.version },
+        deps,
+      ),
+    ).toEqual({ ok: false, error: { code: 'game-id-taken' } });
+    // Rolled back: the draft is still there, no revision 2, and their game is as it was.
+    expect(await draftState(s)).toEqual(draft);
+    const revisions = await pglite.query<{ n: number }>(
+      'select count(*)::int as n from schedule_revisions where league_id = $1',
+      [s.leagueId],
+    );
+    expect(revisions.rows[0]?.n).toBe(1);
+    const row = await one<{ league_id: string; deleted_at: Date | null }>(
+      pglite,
+      'select league_id, deleted_at from games where id = $1',
+      [theirs],
+    );
+    expect(row).toEqual({ league_id: other.leagueId, deleted_at: null });
+  });
+
   it('adds rounds numbered after the others and removes an empty one, as the preview said (step 2.160)', async () => {
     const s = await season();
     const week3 = randomUUID();

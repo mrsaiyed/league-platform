@@ -27,11 +27,11 @@ import { Emblem } from '@srleagues/ui';
 import type { ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
 import type { LeagueView } from '../../server/league-gate.ts';
-import { leagueSites, siteOf } from '../../server/league-site.ts';
+import { siteOfThisRequest } from '../../server/league-site.ts';
 import { requestPath, signedInEmail } from '../../server/load-league-page.ts';
 import { t, type TextKey } from '../../server/messages.ts';
 import { shownHere } from '../../server/releases.ts';
-import { accountMenuOf, displayStylesheet, footerPagesOf, SiteFooter } from '../shell/index.ts';
+import { accountMenuOf, displayStylesheet, SiteFooter } from '../shell/index.ts';
 import { CloseWhenLeft } from './close-when-left.tsx';
 import { staffPlaceAt } from './staff-area.ts';
 import { StaffFoot, StaffNav } from './staff-nav.tsx';
@@ -60,7 +60,14 @@ const statuses: Readonly<
 };
 
 /** A league that is not public, as a pill that opens the whole sentence (U-9). */
-function StaffStatus({ status }: { readonly status: LeagueStatus }) {
+function StaffStatus({
+  status,
+  publishAt,
+}: {
+  readonly status: LeagueStatus;
+  /** Where a draft is published, for those who may open League settings (step 2.240). */
+  readonly publishAt: string | null;
+}) {
   const found = statuses[status];
   return found === null ? null : (
     <details className="staff-status" data-status={status}>
@@ -69,7 +76,15 @@ function StaffStatus({ status }: { readonly status: LeagueStatus }) {
           {t(found.pill)}
         </span>
       </summary>
-      <p className="staff-status-says">{t(found.says)}</p>
+      <p className="staff-status-says">
+        {t(found.says)}
+        {status === 'draft' && publishAt !== null ? (
+          <>
+            {' '}
+            <a href={publishAt}>{t('shell.draftNoticePublish')}</a>
+          </>
+        ) : null}
+      </p>
     </details>
   );
 }
@@ -83,7 +98,7 @@ export async function StaffFrame({
   readonly children: ReactNode;
 }) {
   const league = view.context.league;
-  const site = await siteOf(league, await leagueSites());
+  const site = await siteOfThisRequest(league.id, league.slug);
   const path = await requestPath();
   const shown = shownHere();
   const areas = view.areas.filter(shown.adminArea);
@@ -91,6 +106,12 @@ export async function StaffFrame({
   const account = accountMenuOf(view, await signedInEmail(), path);
   const home = leagueUrl(league, 'admin');
   const notPublic = statuses[league.status];
+  // A draft's notice points to where it is published, for those who may open League
+  // settings (step 2.240); the command decides who may publish.
+  const publishAt = view.areas.includes('settings')
+    ? `${leagueUrl(league, 'admin-area', { area: 'settings' })}#publish`
+    : null;
+  const ports = await webPorts();
   const menu = (
     <>
       <StaffNav league={league} areas={areas} current={place} />
@@ -115,7 +136,7 @@ export async function StaffFrame({
             )}
           </span>
         </a>
-        <StaffStatus status={league.status} />
+        <StaffStatus status={league.status} publishAt={publishAt} />
         <details className="staff-menu">
           <summary>
             <span className="staff-menu-icon" aria-hidden="true" />
@@ -145,7 +166,7 @@ export async function StaffFrame({
               <span className="staff-side-label">{t('admin.title')}</span>
             </span>
           </a>
-          <StaffStatus status={league.status} />
+          <StaffStatus status={league.status} publishAt={publishAt} />
           {menu}
         </div>
       </aside>
@@ -153,7 +174,7 @@ export async function StaffFrame({
         <div className="staff-body" id="content">
           {children}
         </div>
-        <SiteFooter madeUp={(await webPorts()).madeUpWorld} pages={footerPagesOf(shown)} />
+        <SiteFooter from={path} madeUp={ports.madeUpWorld} testCopy={ports.testCopy} />
       </div>
     </div>
   );

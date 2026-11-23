@@ -8,6 +8,7 @@
 // the account. The rule of what the person may see of each (U-9) is not here: core's
 // myLeagues applies it to these rows, on the stand-in and on the database alike.
 import type { AccessReader, AccountLeagueRow, LeagueStatus } from '@srleagues/core';
+import { standInStatusOf } from './stand-in-league-states.ts';
 import type { World } from './stand-in-world.ts';
 
 type MadeUpLeague = {
@@ -73,7 +74,7 @@ export function standInMyLeagues(
         // The league's own name, as the database's leagues.name: the cast's, which its
         // pages show too (stand-in-league-sites.ts).
         name: league.name,
-        status: league.status,
+        status: standInStatusOf(league),
         isOwner,
         roles,
         leagueWideRoles,

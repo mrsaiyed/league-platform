@@ -2,6 +2,7 @@
 // used as a login fit for the app (T-60), behind the league fence like a hosted one.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { checkLoginRole } from '../db/check-login-role.ts';
+import { checkSignInStoreLogin } from '../db/check-sign-in-store-login.ts';
 import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import { withTransaction } from '../db/with-transaction.ts';
@@ -34,6 +35,8 @@ describe('madeUpDatabase', () => {
 
   it('is used as a login the app accepts at start-up', async () => {
     expect(await checkLoginRole(db)).toEqual([]);
+    // It reaches the sign-in store as a hosted login must (record 052).
+    expect(await checkSignInStoreLogin(db)).toEqual([]);
   });
 
   it('keeps each league behind its fence', async () => {

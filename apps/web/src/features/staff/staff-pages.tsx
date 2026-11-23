@@ -151,41 +151,6 @@ export async function AdminArea({
 }
 
 /**
- * "You do not have access" inside the admin, for someone the admin is open to who asked
- * for a part of it that is not theirs (a scheduler at Teams). It is drawn inside the
- * admin's frame, in the league's own workspace, as "not found" is (docs/build/DESIGN.md
- * section 4, lines 19 and 20): its one clear way on is the admin's home, and switching
- * accounts is a second, quieter link. Who gets this, and not the plain screen of
- * SR Leagues' own, is decided by the refusal page (app/forbidden.tsx).
- */
-export function StaffRefused({
-  league,
-  email,
-  switchHref,
-}: {
-  readonly league: LeagueAddressee;
-  /** The address the person is signed in with. */
-  readonly email: string;
-  /** Signing in as someone else, and coming back to the address that was refused. */
-  readonly switchHref: string;
-}) {
-  return (
-    <MessagePage
-      title={t('access.noAccess.title')}
-      action={{ href: leagueUrl(league, 'admin'), label: t('admin.backToAdmin') }}
-    >
-      <p>{t('access.noAccess.body')}</p>
-      <p>{t('access.noAccess.signedInAs', { email })}</p>
-      <p>
-        <a className="ui-button" data-kind="quiet" href={switchHref}>
-          {t('access.noAccess.switch')}
-        </a>
-      </p>
-    </MessagePage>
-  );
-}
-
-/**
  * "Not found" inside the admin: a team, a game or an area that is not there. The admin's
  * frame is around it, and its one way on is the admin's home.
  */

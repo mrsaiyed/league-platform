@@ -28,12 +28,15 @@ import {
   createTeam,
   leagueScope,
   publishSiteDesign,
+  publicNames,
   setLeagueStatus,
+  setSetting,
   type AccessTx,
   type CommandContext,
   type CommandDeps,
   type LeaguesTx,
   type PeopleTx,
+  type Scope,
   type TeamsTx,
 } from '@srleagues/core';
 import { commandTransaction } from '../db/command-transaction.ts';
@@ -51,6 +54,7 @@ import {
   teamsStore,
 } from '../stores/index.ts';
 import { seedLeagues, seedStaff, type SeedLeague } from './seed-data.ts';
+import { SeedPartlyLoaded } from './seed-partly-loaded.ts';
 
 export type SeededLeague = {
   readonly slug: string;
@@ -123,9 +127,7 @@ async function loadLeague(
   ]);
   if (existing.rows[0] !== undefined) {
     if (!(await holdsEverything(pglite, existing.rows[0].id, league))) {
-      throw new Error(
-        `The seed league ${league.slug} is only partly loaded (an earlier load stopped part-way). Start again from a fresh database.`,
-      );
+      throw new SeedPartlyLoaded(league.slug);
     }
     return { slug: league.slug, leagueId: existing.rows[0].id, created: false };
   }
@@ -147,6 +149,7 @@ async function loadLeague(
         timeZone: league.timeZone,
         audience: league.audience,
         ownerAccountId: ownerId,
+        contactEmail: `hello@${league.slug}.example.test`,
         sportKey: 'basketball',
         firstSeason: { ...league.season },
       },
@@ -163,17 +166,32 @@ async function loadLeague(
       deps.leagues,
     ),
   );
+  // Publishing waits for a youth or mixed league's privacy choice (step 2.240): the
+  // made-up owner keeps the names setting as it starts, so nothing shown changes. This is
+  // the seed acting as the made-up owner, so that the must-fix check is met; it is not a
+  // real person's confirmation of the choice.
+  if (league.audience !== 'adult') {
+    must(
+      'privacy choice',
+      await setSetting(
+        as(ownerId),
+        { level: 'league', key: publicNames.key, value: publicNames.default, version: null },
+        deps.leagues,
+      ),
+    );
+  }
   must(
     'league status',
     await setLeagueStatus(as(ownerId), { status: 'live', version: created.version }, deps.leagues),
   );
+  const teamIds = new Map<string, string>();
   for (const division of league.divisions) {
     const { divisionId } = must(
       'division',
       await createDivision(as(ownerId), { seasonId, name: division.name }, deps.leagues),
     );
     for (const team of division.teams) {
-      must(
+      const { teamId } = must(
         'team',
         await createTeam(
           as(ownerId),
@@ -181,6 +199,7 @@ async function loadLeague(
           deps.teams,
         ),
       );
+      teamIds.set(team.shortName, teamId);
     }
   }
   for (const person of league.people) {
@@ -209,11 +228,21 @@ async function loadLeague(
     if (member.program !== undefined && programId === undefined) {
       throw new Error(`Seeding failed at role: ${league.slug} has no program ${member.program}.`);
     }
-    await withTransaction(db, { leagueId, accountId: ownerId }, (scope) =>
-      accessStore(scope).createGrant({
+    const teamId = member.team === undefined ? undefined : teamIds.get(member.team);
+    if (member.team !== undefined && teamId === undefined) {
+      throw new Error(`Seeding failed at role: ${league.slug} has no team ${member.team}.`);
+    }
+    const scope: Scope =
+      teamId !== undefined
+        ? { type: 'team', id: teamId }
+        : programId !== undefined
+          ? { type: 'program', id: programId }
+          : leagueScope;
+    await withTransaction(db, { leagueId, accountId: ownerId }, (tx) =>
+      accessStore(tx).createGrant({
         accountId: memberId,
         role: member.role,
-        scope: programId === undefined ? leagueScope : { type: 'program', id: programId },
+        scope,
         grantedByAccountId: ownerId,
       }),
     );

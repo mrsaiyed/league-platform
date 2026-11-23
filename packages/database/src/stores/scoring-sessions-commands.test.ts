@@ -241,11 +241,11 @@ describe('scoring sessions on the database (T6 §5, T-116)', () => {
     );
     const firstSession =
       opened.ok && opened.value.status === 'held-by-you' ? opened.value.sessionId : '';
-    advance(60);
+    advance(61);
     expect(
       await renewScoringSession(l.as(l.first), { gameId: l.gameId, sessionId: firstSession }, deps),
     ).toMatchObject({
-      value: { status: 'held-by-you', expiresAt: startOfTest + 60_000 + leaseMs },
+      value: { status: 'held-by-you', expiresAt: startOfTest + 61_000 + leaseMs },
     });
     advance(119);
     const phone = { gameId: l.gameId, deviceId: 'phone' };
@@ -284,6 +284,28 @@ describe('scoring sessions on the database (T6 §5, T-116)', () => {
       },
     });
     expect((await l.sessions())[0]?.held_until.getTime()).toBe(startOfTest + 600_000 + leaseMs);
+  });
+
+  it('a check with more than 95 s of the lease left writes nothing; under it, it writes once (T-295, fix round A)', async () => {
+    const l = await leagueWithGame();
+    const opened = await openScoringSession(
+      l.as(l.first),
+      { gameId: l.gameId, deviceId: 'tablet' },
+      deps,
+    );
+    const sessionId =
+      opened.ok && opened.value.status === 'held-by-you' ? opened.value.sessionId : '';
+    const check = () => renewScoringSession(l.as(l.first), { gameId: l.gameId, sessionId }, deps);
+    const heldUntil = async () => (await l.sessions())[0]?.held_until.getTime();
+    advance(24);
+    expect(await check()).toMatchObject({ value: { expiresAt: startOfTest + leaseMs } });
+    expect(await heldUntil()).toBe(startOfTest + leaseMs);
+    advance(2);
+    expect(await check()).toMatchObject({ value: { expiresAt: startOfTest + 26_000 + leaseMs } });
+    expect(await heldUntil()).toBe(startOfTest + 26_000 + leaseMs);
+    advance(5);
+    await check();
+    expect(await heldUntil()).toBe(startOfTest + 26_000 + leaseMs);
   });
 
   it('leaving the game frees it at once', async () => {

@@ -275,7 +275,7 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
    */
   async function call(
     what: string,
-    method: 'GET' | 'POST' | 'PUT',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     path: string,
     bearer: string,
     body?: Json,
@@ -411,6 +411,21 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
      */
     async settings() {
       return call('settings', 'GET', '/settings', admin);
+    },
+
+    /**
+     * Removes a user and its sessions (`DELETE /admin/users/{id}`). The adapter never
+     * calls it: only the sign-in service check (step 2.206) does, to remove the one
+     * made-up user it makes.
+     */
+    async deleteUser(userId: string) {
+      const answer = await call(
+        'delete user',
+        'DELETE',
+        `/admin/users/${encodeURIComponent(userId)}`,
+        admin,
+      );
+      return mapAnswer(answer, () => null);
     },
 
     /** Where to send the browser for Google: Supabase's authorize address, with our PKCE challenge. */

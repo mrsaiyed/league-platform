@@ -176,11 +176,29 @@ describe('what each seeded league holds', () => {
         league.members
           .map((m) => ({
             email: m.email,
-            scope_type: m.program === undefined ? 'league' : 'program',
+            scope_type:
+              m.team !== undefined ? 'team' : m.program === undefined ? 'league' : 'program',
             program: m.program ?? '',
           }))
           .sort((a, b) => a.email.localeCompare(b.email)),
       );
+    }
+  });
+
+  it("gives a coach's role to the one team the data names (step 2.46)", async () => {
+    const coaches = seedLeagues.flatMap((l) =>
+      l.members.filter((m) => m.team !== undefined).map((m) => ({ league: l.slug, ...m })),
+    );
+    expect(coaches.length).toBeGreaterThan(0);
+    for (const coach of coaches) {
+      const rows = await pglite.query<{ team: string; role: string }>(
+        `select t.slug as team, g.role from role_grants g join accounts a on a.id = g.account_id
+         join leagues l on l.id = g.league_id
+         join teams t on t.league_id = g.league_id and t.id = g.scope_id
+         where l.slug = $1 and a.email = $2 and g.scope_type = 'team' and g.revoked_at is null`,
+        [coach.league, coach.email],
+      );
+      expect(rows.rows, coach.email).toEqual([{ team: coach.team, role: coach.role }]);
     }
   });
 

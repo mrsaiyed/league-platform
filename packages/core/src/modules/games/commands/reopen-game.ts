@@ -64,7 +64,12 @@ export const reopenGame = defineCommand({
       },
       after: { version: 1 as const, ...after },
     });
-    const updated = await tx.games.setResult(game.id, { ...after, decided: false }, input.version);
+    // A game reopened is not final: it loses its overtime count until it ends again.
+    const updated = await tx.games.setResult(
+      game.id,
+      { ...after, decided: false, overtimePeriods: null },
+      input.version,
+    );
     if (updated === undefined) return fail({ code: 'changed-since-read' });
     await recordActivity(tx, context, {
       action: 'games.reopen_game',

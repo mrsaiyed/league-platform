@@ -12,10 +12,10 @@
 // nothing.
 //
 // What this does not prove: what Next.js itself sends over the network for these addresses
-// (the status line, the markup, the page data it streams, its headers). Neither mode can
-// start today (record 055), so no server can be asked; when staging can serve, the pages
-// and the posted action are to be compared byte for byte with an unknown address in
-// staging and in production mode (record 075, "Not done yet").
+// (the status line, the markup, the page data it streams, its headers). Since step 2.93's
+// last part, tests/browser/test-copy-test.mjs compares those byte for byte with an
+// unknown address in staging, where the app now serves (record 082); production still
+// refuses to start, so nothing of it can be asked over the network.
 //
 // In local and test both pages are drawn from the tools of the made-up ports, and refused
 // as an unknown address when the ports carry none or the request was not made here.
@@ -34,6 +34,8 @@ const settings = {
   PLATFORM_DATABASE_URL: 'postgres://app:made-up-password@localhost:5432/league_local',
   SUPABASE_URL: 'https://made-up-project.supabase.example.test',
   SUPABASE_SECRET_KEY: 'made-up-supabase-key',
+  TURNSTILE_SITE_KEY: 'made-up-turnstile-site-key',
+  TURNSTILE_SECRET_KEY: 'made-up-turnstile-secret-key',
   RESEND_API_KEY: 'made-up-resend-key',
   EMAIL_FROM: 'hello@example.test',
   TRUSTED_PROXY: 'one',
@@ -65,6 +67,7 @@ function portsCarrying(localTools: LocalTools | null): object {
   const target: Record<string, unknown> = {
     localTools,
     madeUpWorld: false,
+    databaseCheck: async () => true,
     answers: () => true,
     newRequestId: () => 'made-up-request',
     findLeague: async () => undefined,
@@ -321,6 +324,7 @@ describe.each(['local', 'test'])('in %s', (appEnv) => {
   // gets "not found" from both pages and the action, and no tool is used.
   it('both pages and the action answer "not found" to a request not made on this computer', async () => {
     for (const more of [
+      { 'cf-connecting-ip': '192.168.1.40' },
       { host: '192.168.1.20:3000' },
       { 'x-forwarded-for': '192.168.1.30' },
       { 'x-forwarded-host': 'leagues.example.com' },

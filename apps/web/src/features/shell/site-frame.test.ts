@@ -8,11 +8,10 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { siteOf } from '../../server/league-site.ts';
-import { shownWhen } from '../../server/releases.ts';
 import { standInLeagueSites } from '../../server/stand-in-league-sites.ts';
 import { standInLeagues } from '../../server/stand-in-ports.ts';
 import { DesignStyle } from './design-style.tsx';
-import { footerPagesOf, SiteFooter } from './site-footer.tsx';
+import { SiteFooter } from './site-footer.tsx';
 import type { AccountMenu } from './account-menu.ts';
 import { SiteHeader } from './site-header.tsx';
 
@@ -23,6 +22,7 @@ const madeUpAccount: AccountMenu = {
   email: 'owner@example.test',
   adminHref: '/north-valley/admin',
   gamesHref: '/north-valley/admin/games',
+  myTeam: null,
   accountHref: '/account',
   onScoringPage: false,
 };
@@ -325,18 +325,22 @@ describe('header, menu and footer', () => {
     expect(html).not.toContain('site-footer-name');
   });
 
-  // Step 2.140: a page not built yet is no page in staging and production; nothing leads to it.
-  it('links only to the footer pages it is given, and draws no empty list of links', () => {
-    const one = renderToStaticMarkup(createElement(SiteFooter, { pages: ['privacy'] }));
-    expect(one).toContain('href="/privacy"');
-    expect(one).not.toContain('href="/terms"');
-    const none = renderToStaticMarkup(createElement(SiteFooter, { pages: [] }));
-    expect(none).not.toContain('<nav');
-    expect(none).not.toContain(en['footer.terms']);
-    expect(none).toContain('Powered by SR Leagues');
-    expect(footerPagesOf(shownWhen(true))).toEqual(['terms', 'privacy']);
-    // Neither is built yet (server/releases.ts): staging and production link to neither.
-    expect(footerPagesOf(shownWhen(false))).toEqual([]);
+  it('says the test copy is made up where the made-up line stands, only on the test copy (step 2.205)', () => {
+    const plain = renderToStaticMarkup(createElement(SiteFooter));
+    expect(plain).not.toContain(en['footer.testCopy']);
+    expect(plain).not.toContain(en['footer.madeUp']);
+    const testCopy = renderToStaticMarkup(createElement(SiteFooter, { testCopy: true }));
+    expect(testCopy).toContain(
+      `<small class="site-footer-made-up" data-test-copy="">${en['footer.testCopy']}</small>`,
+    );
+    expect(testCopy).not.toContain(en['footer.madeUp']);
+    // One line only, even were both said: the test copy's.
+    const both = renderToStaticMarkup(createElement(SiteFooter, { madeUp: true, testCopy: true }));
+    expect(both).toContain('data-test-copy');
+    expect(both).not.toContain('data-made-up');
+    expect(renderToStaticMarkup(createElement(SiteFooter, { madeUp: true }))).toContain(
+      en['footer.madeUp'],
+    );
   });
 
   // Step 2.147: the header with presence.
@@ -515,5 +519,17 @@ describe('right to left (T-188)', () => {
     expect(css).not.toMatch(/(?:^|[\s;{])(?:margin|padding|border)-(?:left|right)\b/m);
     expect(css).not.toMatch(/(?:^|[\s;{])(?:left|right)\s*:/m);
     expect(css).not.toMatch(/text-align:\s*(?:left|right)/);
+  });
+});
+
+describe("the league's footer links (step 2.135)", () => {
+  it('opens Terms and Privacy from the page it is on, and our mark leads to our front page', () => {
+    const html = renderToStaticMarkup(createElement(SiteFooter, { from: '/north-valley/teams' }));
+    expect(html).toContain(`href="/terms?from=%2Fnorth-valley%2Fteams"`);
+    expect(html).toContain(`href="/privacy?from=%2Fnorth-valley%2Fteams"`);
+    expect(html).toContain(`<a class="powered-by" href="/">${en['site.poweredBy']}</a>`);
+    const plain = renderToStaticMarkup(createElement(SiteFooter));
+    expect(plain).toContain('href="/terms"');
+    expect(plain).toContain('href="/privacy"');
   });
 });

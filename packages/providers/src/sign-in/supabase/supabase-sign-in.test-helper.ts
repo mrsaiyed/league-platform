@@ -5,10 +5,7 @@ import type { Result } from '@srleagues/core';
 import type { SignInDevice } from '../sign-in-service.ts';
 import { createSignInCodeCapture } from '../local/code-capture.ts';
 import { sampleLeakedPasswords } from '../local/leaked-passwords.ts';
-import {
-  createFakeSupabaseAuth,
-  type FakeSupabaseAuthOptions,
-} from './fake-supabase-auth.test-helper.ts';
+import { createFakeSupabaseAuth, type FakeSupabaseAuthOptions } from './fake-supabase-auth.ts';
 import { createMemorySignInStore } from './memory-sign-in-store.ts';
 import type { SupabaseSignInStore } from './sign-in-store.ts';
 import { createSupabaseSignIn, type SupabaseSignInOptions } from './supabase-sign-in.ts';

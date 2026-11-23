@@ -42,10 +42,10 @@ export function isLocalOrTestHost(address: string): boolean {
  * Which requests are answered on made-up data (step 2.152, review 2 M1). Only one
  * addressed by its Host header to this computer's own names, or to the one `.test` name
  * PUBLIC_BASE_URL gives (review 2 L1), and carrying no sign of having been passed on by
- * another server: no Forwarded or Via header, no X-Forwarded-Host other than its own Host,
- * no X-Forwarded-For other than the loopback address Next.js itself writes. A program on
- * this computer that passes requests on and removes those headers is not told apart: the
- * loopback address is what keeps other computers out.
+ * another server: no CF-Connecting-IP, Forwarded or Via header, no X-Forwarded-Host other
+ * than its own Host, no X-Forwarded-For other than the loopback address Next.js itself
+ * writes. A program on this computer that passes requests on and removes those headers is
+ * not told apart: the loopback address is what keeps other computers out.
  */
 export function answersOnlyHere(publicBaseUrl: string): (headers: Headers) => boolean {
   const ownTestName = hostnameOf(publicBaseUrl);
@@ -54,7 +54,10 @@ export function answersOnlyHere(publicBaseUrl: string): (headers: Headers) => bo
     if (!plainHost.test(host)) return false;
     const name = hostnameOf(`http://${host}`);
     if (!isThisComputer(name) && !(name.endsWith('.test') && name === ownTestName)) return false;
-    if (headers.has('forwarded') || headers.has('via')) return false;
+    // CF-Connecting-IP is written by Cloudflare passing a request on (record 081).
+    if (headers.has('cf-connecting-ip') || headers.has('forwarded') || headers.has('via')) {
+      return false;
+    }
     const forwardedHost = headers.get('x-forwarded-host');
     if (forwardedHost !== null && forwardedHost !== host) return false;
     const forwardedFor = headers.get('x-forwarded-for');

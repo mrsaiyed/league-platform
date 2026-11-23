@@ -5,17 +5,17 @@ import { unreleasedPageAt } from './unreleased-page.ts';
 
 describe('unreleasedPageAt', () => {
   it('finds our own pages not built yet by their whole address', () => {
-    expect(unreleasedPageAt(['terms'])).toEqual({
+    expect(unreleasedPageAt(['find'])).toEqual({
       kind: 'platform',
-      page: 'terms',
-      title: 'page.terms',
+      page: 'find',
+      title: 'page.find',
     });
     expect(unreleasedPageAt(['account', 'inbox'])).toEqual({
       kind: 'platform',
       page: 'inbox',
       title: 'page.inbox',
     });
-    for (const word of ['find', 'start', 'help', 'contact', 'status', 'privacy']) {
+    for (const word of ['find', 'start', 'help', 'contact', 'status']) {
       expect(unreleasedPageAt([word])?.kind, word).toBe('platform');
     }
   });
@@ -34,18 +34,18 @@ describe('unreleasedPageAt', () => {
     expect(unreleasedPageAt(['north-valley', 'players', 'p1'])).toMatchObject({
       title: 'page.player',
     });
-    expect(unreleasedPageAt(['north-valley', 'my'])).toMatchObject({ title: 'nav.my' });
     expect(unreleasedPageAt(['north-valley', 'news'])).toMatchObject({ title: 'nav.news' });
   });
 
   it('finds the admin’s areas with no screen yet, and only the area itself', () => {
-    for (const area of ['registration', 'people', 'standings', 'site', 'messages']) {
+    for (const area of ['registration', 'standings', 'site', 'messages']) {
       expect(unreleasedPageAt(['north-valley', 'admin', area]), area).toEqual({
         kind: 'admin',
         area,
       });
     }
-    expect(unreleasedPageAt(['north-valley', 'admin', 'people', 'more'])).toBeNull();
+    expect(unreleasedPageAt(['north-valley', 'admin', 'registration', 'more'])).toBeNull();
+    expect(unreleasedPageAt(['north-valley', 'admin', 'people'])).toBeNull();
     expect(unreleasedPageAt(['north-valley', 'admin', 'teams'])).toBeNull();
     expect(unreleasedPageAt(['north-valley', 'admin', 'no-such-area'])).toBeNull();
   });
@@ -63,7 +63,10 @@ describe('unreleasedPageAt', () => {
       ['signin'],
       ['signin', 'kept-emails'],
       ['account'],
-      ['terms', 'more'],
+      ['find', 'more'],
+      ['terms'],
+      ['privacy'],
+      ['north-valley', 'my'],
       ['Terms'],
     ]) {
       expect(unreleasedPageAt(address), address.join('/')).toBeNull();

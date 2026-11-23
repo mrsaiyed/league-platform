@@ -50,8 +50,8 @@ export const platformPageReleases = {
   help: 'not-built',
   contact: 'not-built',
   status: 'not-built',
-  privacy: 'not-built',
-  terms: 'not-built',
+  privacy: 'released',
+  terms: 'released',
 } as const satisfies Record<PlatformPage, Release>;
 
 /** A league's pages (league-url.ts). The admin's areas are in the list below. */
@@ -65,7 +65,7 @@ export const leaguePageReleases = {
   player: 'not-built',
   game: 'released',
   register: 'not-built',
-  my: 'not-built',
+  my: 'released',
   news: 'not-built',
   'news-post': 'not-built',
   awards: 'not-built',
@@ -83,7 +83,7 @@ export const leaguePageReleases = {
 /** The admin's areas (league-url.ts), in the menu's order. Its home is always there. */
 export const adminAreaReleases = {
   registration: 'not-built',
-  people: 'not-built',
+  people: 'released',
   teams: 'released',
   schedule: 'released',
   games: 'released',

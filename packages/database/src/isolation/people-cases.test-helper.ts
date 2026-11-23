@@ -3,6 +3,7 @@
 // isolation-cases.test-helper.ts, which registers the rest.
 import {
   createPerson,
+  getPerson,
   listPeople as listPeopleCommand,
   removePerson,
   setNameRequest,
@@ -10,6 +11,7 @@ import {
 } from '@srleagues/core';
 import {
   findLeagueAudience,
+  findLeagueContactEmail,
   findPerson,
   findPersonIsMinor,
   hasRecordedChild,
@@ -75,6 +77,12 @@ registerIsolationCase({
 });
 
 registerIsolationCase({
+  subject: findLeagueContactEmail,
+  name: "read how people reach the scope's league",
+  run: (scope) => findLeagueContactEmail(scope),
+});
+
+registerIsolationCase({
   subject: hasRecordedChild,
   name: "ask whether anyone in the scope's league is recorded as a child",
   run: (scope) => hasRecordedChild(scope),
@@ -91,6 +99,11 @@ registerIsolationCase({
 registerCommandCase(createPerson, harnessTx, {
   name: 'add a person',
   input: () => ({ firstName: 'Harness', lastName: 'Person', contactEmail: 'h@example.test' }),
+});
+
+registerCommandCase(getPerson, harnessTx, {
+  name: "read the target's person, with the sensitive fields",
+  input: (target) => ({ personId: target.personId }),
 });
 
 registerCommandCase(updatePersonCommand, harnessTx, {

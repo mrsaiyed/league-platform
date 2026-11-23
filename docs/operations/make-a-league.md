@@ -12,7 +12,7 @@ It makes one league in draft. The league's first season is made in the same step
 
 The owner needs no account yet. One is made for their email address, and it becomes theirs the first time they sign in with that address. **The tool sends nothing to anyone.** Tell the owner yourself to sign up with exactly that address.
 
-Nothing can publish the league yet: it stays in draft until part 2 of step 2.125 is built.
+The league stays in draft, "not found" to visitors who are signed out, until its owner publishes it in League settings, in the Publishing part at the top. Its "Must fix before publishing" list asks first for a contact email (this tool always gives one, `--contact-email`) and, for a league with players under 18, that "Names on public pages" is saved under Privacy, even unchanged; then "Publish" asks once. Its first season starts hidden, so even the owner's league home says "There is no season to show yet" until the owner, in Season settings, taps "Show this season to visitors" and "Yes" (found by `npm run rehearse:test-copy`, step 2.207).
 
 Before it makes anything it shows the whole plan, including exactly which database it reached, and asks. Afterwards it reads back what it made from the database and prints it, so nobody has to query the database by hand.
 
@@ -54,8 +54,8 @@ A database counts as "on this computer" only when its address names `localhost`.
 ### Before the day
 
 1. **Know beforehand how a wrong league will be removed.** Read "Remove a league made by mistake" below. It works only while nothing has been added to the league.
-2. **Check "Confirm email" is on, and give the app's login the sign-in store.** In the test copy project's dashboard, under Authentication, then Sign In / Providers, then Email, "Confirm email" must be on. If it is off, the first person to sign up with the owner's address takes the league. The web app checks this itself when it starts in staging and production (step 2.115): with it off, or when the sign-in service cannot be asked, it refuses to start and says what to turn on and where (and, when it could not ask, why: no answer in time, not reached, the key refused, and so on). Then, in the SQL editor (which runs as the migration login), run `grant sign_in_store to app_login;` once, so the app's login can reach the sign-in store ([record 052](../architecture/decisions/052-accounts-on-the-real-database.md)). Neither is a setting the app can make for you.
-3. **Apply the migrations fully** to the test copy ([applying migrations](apply-migrations.md)).
+2. **Check "Confirm email" is on, and give the app's login the sign-in store.** In the test copy project's dashboard, under Authentication, then Sign In / Providers, then Email, "Confirm email" must be on. If it is off, the first person to sign up with the owner's address takes the league. The web app checks this itself when it starts in staging and production (step 2.115): with it off, or when the sign-in service cannot be asked, it refuses to start and says what to turn on and where (and, when it could not ask, why: no answer in time, not reached, the key refused, and so on). Then, in the SQL editor (which runs as the migration login), run `grant sign_in_store to app_login;` once, so the app's login can reach the sign-in store ([record 052](../architecture/decisions/052-accounts-on-the-real-database.md)). Neither is a setting the app can make for you, and the web app checks both when it starts: without the grant it refuses and names the line to run ([record 082](../architecture/decisions/082-how-the-test-copy-starts.md)).
+3. **Apply the migrations fully** to the test copy: with the release command, step 3 of [setting up a new test copy](new-test-copy.md) ([applying migrations](apply-migrations.md) says what it runs).
 
 ### A practice run on the test copy
 
@@ -71,7 +71,7 @@ A database counts as "on this computer" only when its address names `localhost`.
 
    ```sh
    read -rs MIGRATION_DATABASE_URL; echo; read -rs PLATFORM_DATABASE_URL; echo
-   MIGRATION_DATABASE_URL="$MIGRATION_DATABASE_URL" PLATFORM_DATABASE_URL="$PLATFORM_DATABASE_URL" MIGRATION_DATABASE_CA=./supabase-ca.crt npm run league:make -- --hosted --as founder@example.test
+   MIGRATION_DATABASE_URL="$MIGRATION_DATABASE_URL" PLATFORM_DATABASE_URL="$PLATFORM_DATABASE_URL" MIGRATION_DATABASE_CA=./staging-ca.crt npm run league:make -- --hosted --as founder@example.test
    unset MIGRATION_DATABASE_URL PLATFORM_DATABASE_URL
    ```
 
@@ -82,7 +82,7 @@ A database counts as "on this computer" only when its address names `localhost`.
    ```powershell
    $env:MIGRATION_DATABASE_URL = [Net.NetworkCredential]::new('', (Read-Host -AsSecureString 'Migration login address')).Password
    $env:PLATFORM_DATABASE_URL = [Net.NetworkCredential]::new('', (Read-Host -AsSecureString 'App login address')).Password
-   $env:MIGRATION_DATABASE_CA = '.\supabase-ca.crt'; npm run league:make -- --hosted --as founder@example.test
+   $env:MIGRATION_DATABASE_CA = '.\staging-ca.crt'; npm run league:make -- --hosted --as founder@example.test
    Remove-Item Env:MIGRATION_DATABASE_URL, Env:PLATFORM_DATABASE_URL, Env:MIGRATION_DATABASE_CA
    ```
 
@@ -149,7 +149,7 @@ These are still missing before this is used for a real league with real children
 - a restore of the database, tried once;
 - the release procedure;
 - the removal tried once on the test copy (step 4 of the practice run does it);
-- part 2 of step 2.125, so "who plays" can be corrected and the league published;
+- part 2 of step 2.125, so "who plays" and the contact email can be corrected (publishing is built, step 2.240);
 - step 2.133: until it is built, a league that has been used in any way cannot be deleted by anyone, its owner included;
 - step 2.114: until it is built, a person on a roster cannot be erased;
 - the founder's legal sign-off on holding children's data.

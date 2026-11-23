@@ -1,4 +1,5 @@
 import {
+  BotCheckField,
   EmailField,
   NextField,
   PasswordField,
@@ -6,9 +7,11 @@ import {
   SubmitButton,
   type SearchProps,
 } from '../../../features/sign-in/index.ts';
+import { webPorts } from '../../../server/container.ts';
 import { t } from '../../../server/messages.ts';
 import { googleAction, signInAction } from '../../../server/sign-in/actions.ts';
 import { safeReturnPath } from '../../../server/sign-in/device.ts';
+import { botCheckOnPage } from '../../../server/sign-in/next-visit.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
 import { returnLeagueOf } from '../../../server/sign-in/return-league.ts';
 
@@ -19,7 +22,10 @@ import { returnLeagueOf } from '../../../server/sign-in/return-league.ts';
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const next = safeReturnPath(search['next']);
+  // Not on the test copy (step 2.205): an account made with Google holds a real address.
+  const google = !(await webPorts()).testCopy;
   const from = await returnLeagueOf(next);
+  const botCheck = await botCheckOnPage();
   return (
     <SignInScreen
       title="page.signIn"
@@ -30,6 +36,7 @@ export default async function Page({ searchParams }: SearchProps) {
         <NextField next={next} />
         <EmailField />
         <PasswordField />
+        <BotCheckField {...botCheck} action="sign-in" />
         <SubmitButton words="signIn.submit" />
       </form>
       <p>
@@ -37,11 +44,15 @@ export default async function Page({ searchParams }: SearchProps) {
           {t('signIn.forgot')}
         </a>
       </p>
-      <p>{t('signIn.or')}</p>
-      <form action={googleAction}>
-        <NextField next={next} />
-        <SubmitButton words="signIn.google" />
-      </form>
+      {google ? (
+        <>
+          <p>{t('signIn.or')}</p>
+          <form action={googleAction}>
+            <NextField next={next} />
+            <SubmitButton words="signIn.google" />
+          </form>
+        </>
+      ) : null}
       <p>
         <a className="ui-button" data-kind="quiet" href={screenUrl('signup', { next })}>
           {t('signIn.createAccount')}

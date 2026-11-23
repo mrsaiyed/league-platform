@@ -36,6 +36,8 @@ const hosted = {
   SUPABASE_URL: 'https://made-up-project.supabase.example.test',
   SUPABASE_SECRET_KEY: 'made-up-supabase-key',
   RESEND_API_KEY: 'made-up-resend-key',
+  TURNSTILE_SITE_KEY: 'made-up-turnstile-site-key',
+  TURNSTILE_SECRET_KEY: 'made-up-turnstile-secret-key',
 };
 
 describe('which modes draw pages not built yet', () => {
@@ -82,6 +84,7 @@ describe('which modes draw pages not built yet', () => {
 
   it('names the areas with a screen today, and the pages that are placeholders', () => {
     expect(adminAreas.filter(isReadyArea)).toEqual([
+      'people',
       'teams',
       'schedule',
       'games',
@@ -98,10 +101,8 @@ describe('which modes draw pages not built yet', () => {
       'find',
       'help',
       'inbox',
-      'privacy',
       'start',
       'status',
-      'terms',
     ]);
     expect(notBuilt(leaguePageReleases)).toEqual([
       'awards',
@@ -109,7 +110,6 @@ describe('which modes draw pages not built yet', () => {
       'draft',
       'invitation',
       'media',
-      'my',
       'news',
       'news-post',
       'page',
@@ -166,6 +166,26 @@ describe('the routes', () => {
       if (release === 'not-built' && routeOf(address).length > 0) found.push(`admin ${area}`);
     }
     expect(found).toEqual([]);
+  });
+
+  // The list is the one place (step 2.140): an area of the admin built with a route of its
+  // own but left out of the list, or left "not-built" there, would be missing from the menu
+  // of a live league. This fails until the area is named in adminAreaReleases as released.
+  it('every folder of the admin is an area the list names and releases', () => {
+    const named: readonly string[] = adminAreas;
+    const folders = [
+      ...new Set(
+        all
+          .filter((r) => r[0] === '[league]' && r[1] === 'admin' && r.length > 2)
+          .map((r) => r[2] ?? '')
+          .filter((folder) => !folder.startsWith('[')),
+      ),
+    ].sort();
+    expect(folders.length).toBeGreaterThan(0);
+    for (const folder of folders) {
+      expect(named, `admin/${folder} is not an area of the list`).toContain(folder);
+      expect(adminAreaReleases[folder as AdminArea], `admin/${folder}`).toBe('released');
+    }
   });
 
   it('every area of the admin that is released has its route, and so do the released pages', () => {
