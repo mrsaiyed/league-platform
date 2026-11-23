@@ -8,6 +8,7 @@ import {
   type QueuedJob,
   type TransactionRunner,
 } from '@srleagues/core';
+import { createPageCacheOff } from '@srleagues/providers';
 import { describe, expect, it } from 'vitest';
 import { BadImportJobError, runImport } from './import-job.ts';
 import { jobHandlers } from './job-handlers.ts';
@@ -115,10 +116,12 @@ describe('the imports.run job', () => {
       email: { send: async () => ({ id: 'x' }) } as never,
       siteOrigin: 'https://leagues.example.test',
       sendingAddress: 'leagues@mail.example.test',
+      pageCache: createPageCacheOff(),
     };
-    expect(Object.keys(jobHandlers(email))).toEqual(['email.send']);
+    expect(Object.keys(jobHandlers(email))).toEqual(['email.send', 'cache.clear']);
     expect(Object.keys(jobHandlers({ ...email, importsTransaction: transaction }))).toEqual([
       'email.send',
+      'cache.clear',
       'imports.run',
     ]);
   });

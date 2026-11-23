@@ -16,7 +16,7 @@ import {
   type Job,
   type QueuedJob,
 } from '@srleagues/core';
-import { captureEmail } from '@srleagues/providers';
+import { captureEmail, createPageCacheOff } from '@srleagues/providers';
 import { describe, expect, it } from 'vitest';
 import {
   BadJobDataError,
@@ -40,9 +40,13 @@ async function invited(email: EmailSender = captureEmail()) {
     made.deps,
   );
   if (!result.ok) throw new Error('not invited');
-  const handler = jobHandlers({ transaction: made.transaction, email, siteOrigin, sendingAddress })[
-    'email.send'
-  ];
+  const handler = jobHandlers({
+    transaction: made.transaction,
+    email,
+    siteOrigin,
+    sendingAddress,
+    pageCache: createPageCacheOff(),
+  })['email.send'];
   if (handler === undefined) throw new Error('no email.send handler');
   const [recorded] = made.db.jobs;
   if (recorded === undefined) throw new Error('no job recorded');

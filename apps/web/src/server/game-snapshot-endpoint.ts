@@ -12,9 +12,14 @@
 // (proxy.ts, renew-session.ts), and an answer that sets cookies must never be kept by
 // a shared cache, which would hand one person's session to the next viewer.
 //
+// A shared answer is labeled with its league and its game (step 2.26, cache-headers.ts), so
+// the worker's `cache.clear` drops it the moment the game is decided or reopened.
+//
 // The game and the league's name settings are read in one snapshot (gameReadsOf, record
 // 076), so a name is shown by the settings as they stood when the game was read.
 import { mayOpenLeague, publicViewer, readGameSnapshot } from '@srleagues/core';
+import { gamePageLabel, leagueLabel } from '@srleagues/providers';
+import { longestSharedSeconds, notKept, sharedFor } from './cache-headers.ts';
 import { isGameIdFormat, type ApiAnswer, type LeagueApiRequest } from './league-api.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
@@ -49,8 +54,8 @@ export async function gameSnapshot(
   return {
     status: 200,
     body: read.value,
-    headers: {
-      'Cache-Control': shared ? 'public, max-age=0, s-maxage=2' : 'private, no-store',
-    },
+    headers: shared
+      ? sharedFor(longestSharedSeconds, [leagueLabel(league.id), gamePageLabel(league.id, game)])
+      : notKept,
   };
 }

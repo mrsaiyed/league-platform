@@ -1400,6 +1400,22 @@ const spoofs = [
   ['owner', '/favicon-ico/admin/settings', '/quiet-pines/admin/settings'],
 ];
 
+/**
+ * Nothing personal is ever cached (T-66, step 2.26): every page, for every kind of person in
+ * `cases` (a visitor included, since the page a visitor gets carries the account button that
+ * a signed-in person's would fill), answers `private` and `no-store` and carries no cache
+ * label, so no shared cache in front of the site keeps it. Only the game snapshot and the
+ * two stylesheets may be shared (checkSnapshotCache below, checkStylesheets).
+ */
+function keptByOthers(label, response) {
+  const kept = response.headers.get('cache-control') ?? '';
+  const problems = [];
+  if (!/\bprivate\b/.test(kept) || !/\bno-store\b/.test(kept) || /public|s-maxage/.test(kept))
+    problems.push(`${label}: cache-control "${kept}" may let a shared cache keep it`);
+  if (response.headers.has('cache-tag')) problems.push(`${label}: carries a cache label`);
+  return problems;
+}
+
 const failures = [];
 
 // The shell's own settings never reach the servers (T-201): made-up stand-ins for real
@@ -1465,6 +1481,7 @@ try {
     if (!response.headers.get('permissions-policy')?.includes('camera=()')) {
       failures.push(`${label}: no permissions-policy`);
     }
+    failures.push(...keptByOthers(label, response));
     if (to !== undefined) {
       const location = response.headers.get('location') ?? '';
       if (new URL(location, origin).pathname + new URL(location, origin).search !== to) {
@@ -1533,6 +1550,7 @@ try {
   }
   failures.push(...(await sameAsNoLeague(origin)));
   failures.push(...(await scoringSameAsNoLeague(origin)));
+  failures.push(...(await checkSnapshotCache(origin)));
   failures.push(...(await checkStaffNumbers(origin)));
   failures.push(...(await checkStylesheets(origin)));
   failures.push(...(await checkScriptPolicy(origin)));
@@ -1924,6 +1942,30 @@ async function checkStaffNumbers(origin) {
  * compared with no league's, status, body and every header but the date and the length.
  * The draft league's owner gets the ordinary answer.
  */
+/**
+ * The game snapshot is the one league answer a shared cache keeps (T-119, step 2.26): to a
+ * visitor of a live league, for 2 seconds, labeled with its league and its game so a final
+ * clears it. To anyone carrying a sign-in cookie it is private and unlabeled.
+ */
+async function checkSnapshotCache(origin) {
+  const problems = [];
+  const address = `${origin}/api/v1/leagues/${northValley}/games/${liveGame}/snapshot`;
+  const visitor = await fetch(address);
+  await visitor.text();
+  const shared = visitor.headers.get('cache-control');
+  if (shared !== 'public, max-age=0, s-maxage=2')
+    problems.push(`a visitor's snapshot is sent with cache-control "${shared}"`);
+  const labels = visitor.headers.get('cache-tag');
+  if (labels !== `league:${northValley},league:${northValley}:game:${liveGame}`)
+    problems.push(`a visitor's snapshot is labeled "${labels}"`);
+  for (const who of ['owner', 'stranger']) {
+    const answer = await fetch(address, { headers: { cookie: `srl_session=${tokens[who]}` } });
+    await answer.text();
+    problems.push(...keptByOthers(`the ${who}'s snapshot`, answer));
+  }
+  return problems;
+}
+
 async function scoringSameAsNoLeague(origin) {
   const leagueOf = (n) => `01900000-0000-7000-8000-${n.toString(16).padStart(12, '0')}`;
   const leagues = {

@@ -1,6 +1,7 @@
 // Games, leagues and standings import each other's index files in a ring (games ->
 // leagues -> standings -> games). Whichever is loaded first must still work: the
 // events they share live in a leaf file, so nothing is read before it is defined.
+// The standings module has four handlers: two rebuild the season, two clear its pages (step 2.26).
 import { describe, expect, it, vi } from 'vitest';
 
 describe('module load order', () => {
@@ -9,7 +10,7 @@ describe('module load order', () => {
     const games = await import('./games/index.ts');
     const standings = await import('./standings/index.ts');
     expect(games.gameFinalized).toBe('games.finalized');
-    expect(standings.standingsHandlers).toHaveLength(2);
+    expect(standings.standingsHandlers).toHaveLength(4);
   });
 
   it('loads standings first, then games', async () => {
@@ -17,7 +18,7 @@ describe('module load order', () => {
     const standings = await import('./standings/index.ts');
     const games = await import('./games/index.ts');
     expect(games.gameReopened).toBe('games.reopened');
-    expect(standings.standingsHandlers).toHaveLength(2);
+    expect(standings.standingsHandlers).toHaveLength(4);
   });
 
   it('loads leagues first, then games and standings', async () => {
@@ -26,6 +27,6 @@ describe('module load order', () => {
     const games = await import('./games/index.ts');
     const standings = await import('./standings/index.ts');
     expect(games.gameFinalized).toBe('games.finalized');
-    expect(standings.standingsHandlers).toHaveLength(2);
+    expect(standings.standingsHandlers).toHaveLength(4);
   });
 });
