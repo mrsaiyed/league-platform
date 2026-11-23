@@ -108,15 +108,23 @@ if (built) {
         const box =
           (await boxCount.count()) === 1 ? await boxCount.getAttribute('data-publish-count') : '0';
         const boxText = (await publishBox.count()) === 1 ? await publishBox.innerText() : '';
-        const summary = /add (\d+), move (\d+), remove (\d+), and change how (\d+)/.exec(boxText);
+        // Step 2.53: the box names each game it changes, and gives a recording or round
+        // line only when something of that kind changes.
+        const games = await publishBox.locator('[data-publish-game]').count();
+        const recorded = /(\d+) games? changes? how/.exec(boxText);
         const rounds =
           /Rounds added: (\d+)\. Rounds removed: (\d+)\. Rounds renamed: (\d+)\. Round dates changed: (\d+)\./.exec(
             boxText,
           );
         const sum =
-          summary === null || rounds === null
+          box === '0'
             ? ''
-            : String([...summary.slice(1), ...rounds.slice(1)].reduce((a, n) => a + Number(n), 0));
+            : String(
+                [games, recorded?.[1] ?? 0, ...(rounds === null ? [] : rounds.slice(1))].reduce(
+                  (a, n) => a + Number(n),
+                  0,
+                ),
+              );
         // A draft that changes nothing: one calm sentence in the box, no zeros, no red.
         const calm =
           boxText.includes(

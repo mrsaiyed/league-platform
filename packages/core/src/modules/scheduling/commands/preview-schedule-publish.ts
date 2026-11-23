@@ -8,6 +8,7 @@ import { mayPreviewPublish } from '../policy.ts';
 import { planPublication, type PublishBlocker } from '../publish-plan.ts';
 import type { SchedulingTx } from '../ports.ts';
 import type { Clash } from '../rules/schedule-types.ts';
+import { publishGameChanges, type PublishGameChange } from '../rules/publish-game-changes.ts';
 import { publishChangeCount, type PublishSummary } from '../rules/summarize-publish.ts';
 
 export type SchedulePublishPreview = {
@@ -16,6 +17,8 @@ export type SchedulePublishPreview = {
   readonly version: number;
   readonly basedOnRevision: number | null;
   readonly summary: PublishSummary;
+  /** Each game added, moved or removed, with its old and new place, for the summary to name (step 2.53). */
+  readonly games: readonly PublishGameChange[];
   /** How many things publishing would change: the grid's draft line says the same (step 2.185). */
   readonly toPublish: number;
   readonly teamCount: number;
@@ -49,6 +52,7 @@ export const previewSchedulePublish = defineCommand({
       version: plan.draft.version,
       basedOnRevision: plan.draft.basedOnRevision,
       summary: plan.summary,
+      games: publishGameChanges(plan.published, plan.result, plan.summary),
       toPublish: publishChangeCount(plan.summary),
       teamCount: plan.summary.teamsAffected.length,
       peopleCount: plan.peopleAffected,

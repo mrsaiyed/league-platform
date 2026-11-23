@@ -74,7 +74,7 @@ A grid of rounds and slots (Faraj's "Edit Full Schedule" view). Drag a game to a
 
 ### 4.4 Publish
 
-The schedule is a draft until published. After that, every change is also a draft: the admin makes edits, sees a summary ("3 games moved, 4 teams and 38 people affected"), and publishes. Affected people are notified ([P8](P8-notifications.md)).
+The schedule is a draft until published. After that, every change is also a draft: the admin makes edits, sees a summary ("3 games moved, 4 teams and 38 people affected"), and publishes. Affected people are notified ([P8](P8-notifications.md)). The summary names each game that is added, moves or is removed, with its old and new day and time, and asks before publishing about anything still odd: a standing clash ("Owls are booked twice on Nov 29 at 6:00 PM. Publish anyway?") or a game outside its round, neither of which stops the publish (**S-53**, **S-62**); a blocker names its game and links to it. The draft's count and "Review and publish" stay in view down the grid, and publishing is one tap from the summary. A game added to a published schedule gets the season's next game number when it is published (**S-90**, decided for you).
 
 ### Also
 

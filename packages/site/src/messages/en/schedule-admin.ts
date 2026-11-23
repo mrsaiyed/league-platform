@@ -15,6 +15,13 @@ export const enScheduleAdmin = {
   'schedule.admin.addRoundNote':
     'The round goes after the others. Its games default to this date. Nobody else sees it until you publish.',
   'schedule.admin.addRoundSubmit': 'Add round',
+  'schedule.admin.ask.court': '{place} is booked twice on {date} at {time}.',
+  'schedule.admin.ask.outsideGame': '{game}, {date}',
+  'schedule.admin.ask.outside_one': '{count} game is outside its round: {games}.',
+  'schedule.admin.ask.outside_other': '{count} games are outside their rounds: {games}.',
+  'schedule.admin.ask.skipped': '{game} is on {date}, a date the league skips.',
+  'schedule.admin.ask.team': '{team} are booked twice on {date} at {time}.',
+  'schedule.admin.askAnyway': 'Publish anyway?',
   'schedule.admin.askToShow': "Ask the league's owner or an admin to show it.",
   'schedule.admin.away': 'Away team',
   // The way back to the team whose "Remove this team" led here (step 2.180).
@@ -145,13 +152,26 @@ export const enScheduleAdmin = {
   'schedule.admin.publishClashes_other': '{count} clashes are still in the schedule.',
   'schedule.admin.publishCount_one': 'Publishing makes {count} change.',
   'schedule.admin.publishCount_other': 'Publishing makes {count} changes.',
+  'schedule.admin.publishGame.added': 'New: {game}, {when}.',
+  'schedule.admin.publishGame.changed': 'Changed: {game}.',
+  'schedule.admin.publishGame.moved': 'Moved: {game}, from {from} to {to}.',
+  'schedule.admin.publishGame.removed': 'Removed: {game}, was {when}.',
+  'schedule.admin.publishGames': 'What changes',
   'schedule.admin.publishNothing':
     'The draft is the same as the published schedule, so there is nothing to publish.',
+  'schedule.admin.publishReach':
+    'It reaches {teams} teams and {people} people. New games get their game number when published.',
+  'schedule.admin.publishRecorded_one': '{count} game changes how it is recorded.',
+  'schedule.admin.publishRecorded_other': '{count} games change how they are recorded.',
   'schedule.admin.publishRounds':
     'Rounds added: {added}. Rounds removed: {removed}. Rounds renamed: {renamed}. Round dates changed: {dates}.',
   'schedule.admin.publishSubmit': 'Publish this schedule',
   'schedule.admin.publishSummary':
     'Publishing will add {added}, move {moved}, remove {removed}, and change how {recorded} are recorded. It reaches {teams} teams and {people} people.',
+  'schedule.admin.publishUnknownGame': 'A game',
+  'schedule.admin.publishUnknownTeam': 'a team no longer in the season',
+  'schedule.admin.publishWhen': '{date} at {time}',
+  'schedule.admin.publishWhenNoTime': '{date}, no time yet',
   'schedule.admin.published': 'The schedule is published. Visitors can see it now.',
   'schedule.admin.publishedBothHidden':
     'The schedule is published, but visitors cannot see this league until it is published, and {season} is hidden from them too.',

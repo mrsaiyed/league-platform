@@ -28,6 +28,7 @@ export {
   summarizePublish,
   type PublishSummary,
 } from './rules/summarize-publish.ts';
+export { publishGameChanges, type PublishGameChange } from './rules/publish-game-changes.ts';
 export { generatePairings, maxTimesEachPair } from './rules/generate-pairings.ts';
 export { fairnessReport } from './rules/fairness-report.ts';
 export { placeSchedule, strictRules } from './rules/place-schedule.ts';

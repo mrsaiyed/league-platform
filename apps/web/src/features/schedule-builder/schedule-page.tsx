@@ -65,6 +65,7 @@ import type { SavedDetail } from './run-schedule-action.ts';
 import { importLinkOf } from './import-link.ts';
 import { addRoundProblemOf, noticeOf, whyNotSaved } from './notice.ts';
 import { publishedNotice } from './published-notice.ts';
+import { publishLines, publishWarnings, type PublishLine } from './publish-summary.ts';
 import { RoundFacts, RoundRemoval, roundIsEmpty } from './round-parts.tsx';
 import { ScheduleHeading } from './schedule-heading.tsx';
 import { seasonControls } from './season-controls.ts';
@@ -129,10 +130,10 @@ export async function ScheduleBuilderPage({
     ports.scheduleAdmin.teamsOf(addressee.id, season.id),
   ]);
   // What the page lets you do, at the top right of its head: bring games in from a
-  // spreadsheet and, while a draft is waiting, go to "Review and publish" (the box itself
-  // is at the foot of the grid; its place is step 2.53's).
+  // spreadsheet. "Review and publish" sits beside "Draft in progress", in the bar that stays
+  // in view, and the box is at the top of the grid (step 2.53).
   const binLink = await binLinkFor(addressee, context, 'games');
-  const headActions = (reviewHref: string | null) => (
+  const headActions = () => (
     <div className="staff-actions">
       <a className="ui-button" href={importLinkOf(addressee)}>
         {t('schedule.admin.importLink')}
@@ -145,24 +146,10 @@ export async function ScheduleBuilderPage({
           {t('admin.bin.link.games')}
         </a>
       )}
-      {reviewHref === null ? null : (
-        <a className="ui-button" data-kind="main" href={reviewHref}>
-          {t('schedule.admin.reviewPublish')}
-        </a>
-      )}
     </div>
   );
-  const heading = (
-    top: ReactNode,
-    firstRound: ReactNode = null,
-    reviewHref: string | null = null,
-  ) => (
-    <ScheduleHeading
-      seasons={seasons}
-      season={season}
-      action={action}
-      actions={headActions(reviewHref)}
-    >
+  const heading = (top: ReactNode, firstRound: ReactNode = null) => (
+    <ScheduleHeading seasons={seasons} season={season} action={action} actions={headActions()}>
       {firstRound}
       {top}
     </ScheduleHeading>
@@ -321,16 +308,21 @@ export async function ScheduleBuilderPage({
       ? { node: here.node, asks: here.asks === true }
       : undefined;
 
+  // Nothing to review while the draft changes nothing (step 2.185): its line says so.
+  const reviewHref =
+    draft.draft !== null && toPublish > 0 && !blocked && (basis.canEdit || basis.canPublish)
+      ? '#publish-heading'
+      : null;
+  const changes = preview !== undefined && preview.ok ? preview.value.games : [];
+  const lines = publishLines(changes, teams);
+  const warnings =
+    preview !== undefined && preview.ok
+      ? publishWarnings(preview.value.clashes, grid.allGames, teams)
+      : [];
+
   return (
     <main className="admin-schedule">
-      {heading(
-        top,
-        firstRound,
-        // Nothing to review while the draft changes nothing (step 2.185): its line says so.
-        draft.draft !== null && toPublish > 0 && !blocked && (basis.canEdit || basis.canPublish)
-          ? '#publish-heading'
-          : null,
-      )}
+      {heading(top, firstRound)}
       {fromTeam === undefined ? null : (
         // Back to the team "Remove this team" sent the person here from (step 2.180).
         <p className="staff-buttons" data-back-to-team={fromTeam.id}>
@@ -347,7 +339,8 @@ export async function ScheduleBuilderPage({
       {draft.draft !== null ? (
         // What publishing would change, counted as the publish box counts it (step 2.161):
         // a game removed and put back as it was is no change.
-        <div className="admin-schedule-draft" data-draft-count={toPublish}>
+        // It stays in view down the grid, so the count is where the person is (step 2.53).
+        <div className="admin-schedule-draft" data-draft-bar="" data-draft-count={toPublish}>
           <StaffPill kind="wait">{t('schedule.admin.draftPill')}</StaffPill>
           <span>
             {toPublish === 0
@@ -361,6 +354,11 @@ export async function ScheduleBuilderPage({
               <a href="#publish-heading">{t('schedule.admin.draftBlockedWhy')}</a>
             </span>
           ) : null}
+          {reviewHref === null ? null : (
+            <a className="ui-button" data-kind="main" data-review-publish="" href={reviewHref}>
+              {t('schedule.admin.reviewPublish')}
+            </a>
+          )}
           {/* A draft that changes nothing loses nothing when thrown away: one tap, here. */}
           {toPublish === 0 && basis.canEdit ? <DiscardSame basis={basis} /> : null}
         </div>
@@ -406,6 +404,38 @@ export async function ScheduleBuilderPage({
           </ul>
         </section>
       )}
+      {draft.draft === null || !(basis.canEdit || basis.canPublish) ? null : (
+        <section aria-labelledby="publish-heading" className="staff-panel admin-publish">
+          <h2 id="publish-heading">{t('schedule.admin.publish')}</h2>
+          {!basis.canPublish || preview === undefined || !preview.ok ? null : (
+            <PublishPanel
+              preview={preview.value}
+              basis={basis}
+              count={toPublish}
+              gameName={gameName}
+              lines={lines}
+              warnings={warnings}
+            />
+          )}
+          {/* Throwing the draft away is apart from publishing it, and looks like neither.
+              A draft that changes nothing: the box is one calm sentence, and the one tap
+              that throws it away is in the bar above (step 2.53). */}
+          {!basis.canEdit || toPublish === 0 ? null : (
+            <details className="admin-discard">
+              <summary>{t('schedule.admin.discard')}</summary>
+              <form action={discardAction} className="staff-form">
+                <p className="ui-field-help">{t('schedule.admin.discardNote')}</p>
+                <BasisFields basis={basis} />
+                <p className="staff-buttons">
+                  <button type="submit" className="ui-button" data-kind="danger">
+                    {t('schedule.admin.discardSubmit')}
+                  </button>
+                </p>
+              </form>
+            </details>
+          )}
+        </section>
+      )}
       {savedAt({ afterRound: null })}
       {grid.rounds.map((round) => (
         <Fragment key={round.id}>
@@ -435,37 +465,6 @@ export async function ScheduleBuilderPage({
         saved={savedAt({ round: null })}
         savedGame={savedGame}
       />
-      {draft.draft === null || !(basis.canEdit || basis.canPublish) ? null : (
-        <section aria-labelledby="publish-heading" className="staff-panel admin-publish">
-          <h2 id="publish-heading">{t('schedule.admin.publish')}</h2>
-          {!basis.canPublish || preview === undefined || !preview.ok ? null : (
-            <PublishPanel
-              preview={preview.value}
-              basis={basis}
-              count={toPublish}
-              gameName={gameName}
-            />
-          )}
-          {/* Throwing the draft away is apart from publishing it, and looks like neither.
-              A draft that changes nothing loses nothing: the same one tap as at the top. */}
-          {!basis.canEdit ? null : toPublish === 0 ? (
-            <DiscardSame basis={basis} />
-          ) : (
-            <details className="admin-discard">
-              <summary>{t('schedule.admin.discard')}</summary>
-              <form action={discardAction} className="staff-form">
-                <p className="ui-field-help">{t('schedule.admin.discardNote')}</p>
-                <BasisFields basis={basis} />
-                <p className="staff-buttons">
-                  <button type="submit" className="ui-button" data-kind="danger">
-                    {t('schedule.admin.discardSubmit')}
-                  </button>
-                </p>
-              </form>
-            </details>
-          )}
-        </section>
-      )}
     </main>
   );
 }
@@ -1416,6 +1415,8 @@ function PublishPanel({
   basis,
   count,
   gameName,
+  lines,
+  warnings,
 }: {
   readonly preview: {
     readonly summary: {
@@ -1431,6 +1432,7 @@ function PublishPanel({
     readonly teamCount: number;
     readonly peopleCount: number;
     readonly clashes: readonly unknown[];
+    readonly games: readonly unknown[];
     readonly blockers: readonly { readonly code: string; readonly gameId?: string }[];
     readonly canPublish: boolean;
   };
@@ -1439,6 +1441,10 @@ function PublishPanel({
   readonly count: number;
   /** A game's name, for a blocker about it; undefined when it is not on the page. */
   readonly gameName: (gameId: string) => string | undefined;
+  /** Each game publishing adds, moves or removes, named (step 2.53). */
+  readonly lines: readonly PublishLine[];
+  /** Each clash and game outside its round, said in the question; never a blocker (S-62). */
+  readonly warnings: readonly string[];
 }) {
   const s = preview.summary;
   // "Nothing to publish" is said once, calmly, in place of a row of zeros (step 2.185).
@@ -1478,28 +1484,51 @@ function PublishPanel({
       <p data-publish-count={count}>
         <strong>{t.plural('schedule.admin.publishCount', count)}</strong>
       </p>
-      <p>
-        {t('schedule.admin.publishSummary', {
-          added: s.gamesAdded.length,
-          moved: s.gamesMoved.length,
-          removed: s.gamesRemoved.length,
-          recorded: s.gamesRecordingChanged.length,
+      {lines.length === 0 ? null : (
+        <>
+          <h3>{t('schedule.admin.publishGames')}</h3>
+          <ul data-publish-games="">
+            {lines.map((line) => (
+              <li key={line.gameId} data-publish-game={line.gameId} data-change={line.kind}>
+                <a href={`#${gameAnchor(line.gameId)}`}>{line.text}</a>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {s.gamesRecordingChanged.length === 0 ? null : (
+        <p>{t.plural('schedule.admin.publishRecorded', s.gamesRecordingChanged.length)}</p>
+      )}
+      {s.roundsAdded.length +
+        s.roundsRemoved.length +
+        s.roundsRenamed.length +
+        s.roundsDateChanged.length ===
+      0 ? null : (
+        <p>
+          {t('schedule.admin.publishRounds', {
+            added: s.roundsAdded.length,
+            removed: s.roundsRemoved.length,
+            renamed: s.roundsRenamed.length,
+            dates: s.roundsDateChanged.length,
+          })}
+        </p>
+      )}
+      <p data-publish-reach="">
+        {t('schedule.admin.publishReach', {
           teams: preview.teamCount,
           people: preview.peopleCount,
         })}
       </p>
-      <p>
-        {t('schedule.admin.publishRounds', {
-          added: s.roundsAdded.length,
-          removed: s.roundsRemoved.length,
-          renamed: s.roundsRenamed.length,
-          dates: s.roundsDateChanged.length,
-        })}
-      </p>
-      {preview.clashes.length === 0 ? null : (
-        <p className="ui-notice">
-          {t.plural('schedule.admin.publishClashes', preview.clashes.length)}
-        </p>
+      {warnings.length === 0 || blockers.length > 0 ? null : (
+        // A question, not a refusal: the admin may mean it (S-53, S-62).
+        <div className="ui-notice" data-publish-ask="">
+          {warnings.map((w, i) => (
+            <p key={i}>{w}</p>
+          ))}
+          <p>
+            <strong>{t('schedule.admin.askAnyway')}</strong>
+          </p>
+        </div>
       )}
       {blocked}
       {preview.canPublish ? (

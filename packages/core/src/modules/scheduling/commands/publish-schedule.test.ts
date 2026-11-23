@@ -84,6 +84,27 @@ const fullDraft: DraftChange[] = [
 ];
 
 describe('publishing the schedule', () => {
+  it('hands the new games to the store in the order of their date and time, to be numbered (step 2.53)', async () => {
+    const { db, deps, as } = world([
+      {
+        kind: 'add-game',
+        game: game(8, { date: '2026-10-12', homeTeamId: teamUuid(1), awayTeamId: teamUuid(3) }),
+      },
+      {
+        kind: 'add-game',
+        game: game(7, {
+          date: '2026-10-11',
+          time: '20:00',
+          homeTeamId: teamUuid(2),
+          awayTeamId: teamUuid(4),
+        }),
+      },
+    ]);
+    const result = await publishSchedule(as(ownerId), input, deps);
+    expect(result.ok).toBe(true);
+    expect(db.state.inserted.map((g) => g.id)).toEqual([gameUuid(7), gameUuid(8)]);
+  });
+
   it('creates, moves and bins games, edits rounds and writes revision 2', async () => {
     const { db, deps, as } = world(fullDraft, {
       seasonRules: undefined,

@@ -126,6 +126,11 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       ).size,
     insertPublishedGames: async (seasonId, games) => {
       const added: WorldGame[] = [];
+      // The season's next game number, in the order given, as on the database (step 2.53).
+      let top = Math.max(
+        0,
+        ...s.games.filter((x) => x.seasonId === seasonId).map((x) => x.number ?? 0),
+      );
       for (const g of games) {
         // A game id a game of this league's world has already is not made a second time.
         // This world holds one league only, so it cannot meet the database's case of an id
@@ -153,7 +158,7 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
           binned: false,
           version: 1,
           roundId: g.roundId,
-          number: null,
+          number: (top += 1),
           localDate: g.date,
           localTime: g.time,
           venueId: g.venueId,
