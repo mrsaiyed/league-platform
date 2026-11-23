@@ -686,6 +686,11 @@ html:has(.staff) {
 .staff .ui-button[data-kind='quiet'] {
   background: transparent;
 }
+/* A question's "Yes" not ready yet (step 2.221): it takes no tap until the wait is over. */
+.staff .ui-button[data-resting] {
+  border-style: dashed;
+  cursor: progress;
+}
 /* A button that opens a form to add something. */
 .staff .ui-button[data-icon='plus']::before {
   content: '';

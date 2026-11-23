@@ -11,17 +11,19 @@
 // start), its choice stays where it was (shown, not to be changed), the panel's other
 // controls stay where they were (shown, not to be used), and the question and its "Yes"
 // come after all of them. Whatever the question's length or the width, the spot just
-// touched holds "No" (or the empty end of its row). With scripts on, "Yes" also takes no
-// tap for its first half second; and the server takes a "Yes" sent within `askRestMs` of
-// the question as a question again (call-off-step.ts), which holds with scripts off too,
-// where the browser lands on a page drawn anew.
+// touched holds "No" (or the empty end of its row). The server takes a "Yes" sent within
+// `askRestMs` of the question as a question again, keeping the question's first time
+// (call-off-step.ts, step 2.221), which holds with scripts off too, where the browser lands
+// on a page drawn anew. With scripts on, "Yes" is drawn as not ready (aria-disabled) and
+// takes no tap for as long as the server says it would not take it (`readyInMs`), then
+// takes the first tap: a tap too soon does nothing and never starts the wait again.
 //
 // The question and a refusal are the answer to a post, drawn from what was posted (T-271,
 // record 067): with scripts on, in place; with scripts off, in the page the post answers,
 // at the game's place on the list (the form's permalink), the panel open. A change that
 // works sends the browser to the list again, where "Saved" is said beside the game. Words
 // come from the server, from the message files (T-187).
-import { useActionState, useEffect, useId, useRef, type FormEvent } from 'react';
+import { useActionState, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { untouched, type CallOffAct, type CallOffState } from './form-state.ts';
 import { useOneSubmit } from './use-one-submit.ts';
 
@@ -68,19 +70,29 @@ const choiceField: Partial<Record<CallOffAct, string>> = {
   restore: 'reason',
 };
 
-/** "Yes" takes no tap for this long after it is drawn (ms), with scripts on. */
-const yesRestMs = 500;
-
 export function CallOffForms(props: CallOffFormsProps) {
   const { action, permalink, hidden, texts } = props;
   const [state, dispatch, pending] = useActionState(action, untouched, permalink);
   const onSubmit = useOneSubmit(pending, state);
   const id = useId();
-  const drawnAt = useRef(0);
-  useEffect(() => {
-    drawnAt.current = Date.now();
-  }, [state]);
   const asked = state.kind === 'ask' ? state : undefined;
+  // When "Yes" takes a tap (this page's clock), and whether it is drawn as not ready yet.
+  // Only from the server's answer: a question asked again keeps its first time there, so
+  // its `readyInMs` is what is left of the wait, never the whole wait again.
+  const readyAt = useRef(0);
+  const [resting, setResting] = useState(false);
+  const readyInMs = asked?.readyInMs;
+  useLayoutEffect(() => {
+    if (readyInMs === undefined || readyInMs <= 0) {
+      readyAt.current = 0;
+      setResting(false);
+      return;
+    }
+    readyAt.current = performance.now() + readyInMs;
+    setResting(true);
+    const timer = setTimeout(() => setResting(false), readyInMs);
+    return () => clearTimeout(timer);
+  }, [state, readyInMs]);
   const refused = state.kind === 'refused' ? state : undefined;
   const refusedAct = refused?.typed['act'];
   const problemId = `${id}-problem`;
@@ -197,8 +209,9 @@ export function CallOffForms(props: CallOffFormsProps) {
     const chosen = field === undefined ? '' : (asked.typed[field] ?? '');
     const said = typeof words.ask === 'string' ? words.ask : (words.ask[chosen] ?? '');
     const onYes = (event: FormEvent<HTMLFormElement>) => {
-      // The second tap of a double tap, on a "Yes" just drawn: not taken.
-      if (Date.now() - drawnAt.current < yesRestMs) {
+      // The second tap of a double tap, on a "Yes" not ready yet: not taken, and the wait
+      // goes on from where it was.
+      if (performance.now() < readyAt.current) {
         event.preventDefault();
         return;
       }
@@ -228,13 +241,14 @@ export function CallOffForms(props: CallOffFormsProps) {
           <input type="hidden" name="act" value={asked.act} />
           <input type="hidden" name="step" value="confirm" />
           <input type="hidden" name="confirmed" value="yes" />
-          <input type="hidden" name="askedAt" value={String(asked.askedAt)} />
           {field === undefined ? null : <input type="hidden" name={field} value={chosen} />}
           <button
             type="submit"
             className="ui-button"
             // Putting a postponement back is no loss: the main kind; the others take away.
             data-kind={asked.act === 'restore' ? 'main' : 'danger'}
+            // Not ready yet: drawn so, and takes no tap (onYes); ready once the wait is over.
+            {...(resting ? { 'aria-disabled': true, 'data-resting': '' } : {})}
           >
             {words.yes}
           </button>

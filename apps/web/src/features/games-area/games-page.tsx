@@ -44,7 +44,7 @@ import { dayHeadingText, earlierRoundText } from './game-day-text.ts';
 import { gamesSections } from './games-sections.ts';
 import { readReopenViews } from './read-reopen-views.ts';
 import { ReopenLine } from './reopen-line.tsx';
-import { SavedLine } from './saved-line.tsx';
+import { SavedLine, type SavedKind } from './saved-line.tsx';
 import { waitingListAnchor as waitingAnchor } from './waiting-anchor.ts';
 
 /** What the words of a saved notice read of the game it names. */
@@ -101,7 +101,16 @@ function noticeText(
   return savedWords(said, game) + clash;
 }
 
+/** A notice that says a change was not made: the game was called off meanwhile (step 2.221). */
+const notDoneKeys: readonly TextKey[] = [
+  'admin.games.error.game-now-cancelled',
+  'admin.games.error.game-now-postponed',
+];
+const notDoneOf = (said: string) => notDoneKeys.find((k) => k === `admin.games.error.${said}`);
+
 function savedWords(said: string, game: NamedGame | undefined): string {
+  const notDone = notDoneOf(said);
+  if (notDone !== undefined) return t(notDone);
   if (said === 'reopen') {
     return t(
       game?.hasPlays === true ? 'admin.games.done.reopenTracked' : 'admin.games.done.reopen',
@@ -303,7 +312,9 @@ type ListScene = {
   readonly now: number;
   readonly labels: ReturnType<typeof displayLabels>['game'];
   /** The game a notice is about, and its words, when it is on the page. */
-  readonly saved: { readonly row: GameRowView; readonly text: string } | undefined;
+  readonly saved:
+    | { readonly row: GameRowView; readonly text: string; readonly kind: SavedKind }
+    | undefined;
   readonly reopenedId: string | undefined;
   /** "Waiting for a new date" on this page, when it is shown to this person. */
   readonly waitingHref: string | undefined;
@@ -325,7 +336,9 @@ function GameList({
     <ul className="admin-game-list ui-list">
       {rows.map((game) => (
         <li key={game.id} id={gameAnchor(game.id)} className="admin-game">
-          {saved !== undefined && game === saved.row ? <SavedLine text={saved.text} /> : null}
+          {saved !== undefined && game === saved.row ? (
+            <SavedLine text={saved.text} kind={saved.kind} />
+          ) : null}
           {/* One panel a game: its card, then who scores it and what may be done to it. */}
           <div className="admin-game-panel">
             <GameCard
@@ -486,6 +499,8 @@ export async function GamesPage({
     if (named !== undefined) others.push(gameText(named));
   }
   const saved = notice === undefined ? undefined : noticeText(notice, aboutRow ?? offPage, others);
+  const savedKind: SavedKind =
+    notice !== undefined && notDoneOf(notice.said) !== undefined ? 'error' : 'saved';
   const scene: ListScene = {
     league,
     here: addressee,
@@ -493,7 +508,9 @@ export async function GamesPage({
     now: nowOf(clock),
     labels: displayLabels(t).game,
     saved:
-      aboutRow === undefined || saved === undefined ? undefined : { row: aboutRow, text: saved },
+      aboutRow === undefined || saved === undefined
+        ? undefined
+        : { row: aboutRow, text: saved, kind: savedKind },
     reopenedId: notice?.said === 'reopen' ? notice.thing : undefined,
     waitingHref: postponed.ok
       ? `${leagueUrl(addressee, 'admin-area', { area: 'games' })}#${waitingAnchor}`
@@ -516,7 +533,9 @@ export async function GamesPage({
           {t('admin.games.toEarlier')}
         </a>
       </PageHead>
-      {saved === undefined || aboutRow !== undefined ? null : <SavedLine text={saved} />}
+      {saved === undefined || aboutRow !== undefined ? null : (
+        <SavedLine text={saved} kind={savedKind} />
+      )}
       {games.some((g) => !g.scorable) ? (
         <p className="ui-notice">{t('admin.games.notScorable')}</p>
       ) : null}

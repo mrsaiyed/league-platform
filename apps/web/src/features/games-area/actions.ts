@@ -31,6 +31,7 @@ import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
+import { questionKeyOf, questionTimesHere } from '../../server/question-times.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere, type NoticeScreen } from '../../server/saved-notice.ts';
 import { callOffStep, choiceOf } from './call-off-step.ts';
@@ -216,6 +217,15 @@ async function act(
     return untouched;
   }
   if (result.ok) return redirect(list);
+  // Called off by someone else meanwhile (step 2.221): the game is drawn again as it is now,
+  // which may take away the panel this form is in, and its sentence with it. So it is left
+  // as a notice and said beside the game, as "Saved" is, never in the form.
+  if (gameId !== undefined && calledOffMeanwhile.includes(result.code)) {
+    leaveNotice(context, 'games', gameId, result.code);
+    if (fields['then'] === 'games') return redirect(`${list}#${gameAnchor(gameId)}`);
+    await showSaved(`${list}#${gameAnchor(gameId)}`);
+    return untouched;
+  }
   // A team not in the game, or a reason not on the list, is the form's one field: marked,
   // and said as that field's own sentence (a choice sent tampered with, step 2.158).
   const fieldWrong =
@@ -228,6 +238,9 @@ async function act(
       : result.code;
   return refused(code, fields, fieldWrong ? [field] : [], t(gamesProblemKey(code)));
 }
+
+/** A change refused because the game was called off since the form was drawn. */
+const calledOffMeanwhile: readonly string[] = ['game-now-cancelled', 'game-now-postponed'];
 
 /** The form's one choice left empty: refused beside it, nothing sent to the command. */
 function notChosen(fields: TypedFields, field: string, code: string): Refused {
@@ -244,16 +257,26 @@ function notChosen(fields: TypedFields, field: string, code: string): Refused {
 export async function callOffAction(_state: CallOffState, form: FormData): Promise<CallOffState> {
   const fields = typedOf(form);
   // The page check (loadLeaguePage) runs first, whatever the step.
-  await gamesOf(fields);
-  const step = callOffStep(fields, Date.now());
+  const { context } = await gamesOf(fields);
+  // The question's first time, kept with the asking form's token (step 2.221), never the
+  // form's own: a "Yes" too soon keeps it, and a hand-made "Yes" with no question asks.
+  const times = questionTimesHere();
+  const key = questionKeyOf(context, fields);
+  const step = callOffStep(fields, Date.now(), times.of(key));
   if (step === undefined) {
     return refused('game-not-found', fields, [], t(gamesProblemKey('game-not-found')));
   }
-  if (step.kind === 'back') return untouched;
+  if (step.kind === 'back') {
+    times.forget(key);
+    return untouched;
+  }
   if (step.kind === 'refused') return notChosen(fields, step.field, step.code);
   if (step.kind === 'ask') {
-    return { kind: 'ask', act: step.act, typed: fields, askedAt: step.askedAt };
+    times.keep(key, step.askedAt);
+    const { act: asked, askedAt, readyInMs } = step;
+    return { kind: 'ask', act: asked, typed: fields, askedAt, readyInMs };
   }
+  times.forget(key);
   const action: GameAction = step.act === 'restore' ? 'putBack' : step.act;
   return act(action, fields, choiceOf[step.act]?.field);
 }

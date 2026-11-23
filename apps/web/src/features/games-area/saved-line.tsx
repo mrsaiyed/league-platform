@@ -7,7 +7,16 @@
 // thing's place (the address's #…), where it already is.
 import { useEffect, useRef } from 'react';
 
-export function SavedLine({ text }: { readonly text: string }) {
+/** "Saved"; or, for a change not made (the game called off meanwhile, step 2.221), why not. */
+export type SavedKind = 'saved' | 'error';
+
+export function SavedLine({
+  text,
+  kind = 'saved',
+}: {
+  readonly text: string;
+  readonly kind?: SavedKind;
+}) {
   const ref = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     const line = ref.current;
@@ -20,7 +29,12 @@ export function SavedLine({ text }: { readonly text: string }) {
     }
   }, [text]);
   return (
-    <p ref={ref} className="ui-notice" data-kind="saved" role="status">
+    <p
+      ref={ref}
+      className="ui-notice"
+      data-kind={kind}
+      role={kind === 'error' ? 'alert' : 'status'}
+    >
       {text}
     </p>
   );
