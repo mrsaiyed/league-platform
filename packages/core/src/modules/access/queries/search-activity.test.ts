@@ -93,6 +93,11 @@ describe('searchActivity', () => {
     expect(activityKindOf('leagues.restore_person')).toBe('people');
     expect(activityKindOf('leagues.set_setting')).toBe('settings');
     expect(activityKindOf('access.revoke_grant')).toBe('access');
+    // Step 2.56's entries: an adjustment is standings, a scorekeeper's assignment a game's.
+    expect(activityKindOf('standings.add_adjustment')).toBe('standings');
+    expect(activityKindOf('standings.remove_adjustment')).toBe('standings');
+    expect(activityKindOf('games.assign_scorekeeper')).toBe('games');
+    expect(activityKindOf('games.unassign_scorekeeper')).toBe('games');
   });
 
   it("is the owner's and the league's admins' only: not a program's admin, nor other roles", async () => {

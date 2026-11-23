@@ -1,5 +1,6 @@
 import type { ActivityRecord } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
+import { t, type TextKey } from '../../server/messages.ts';
 import { dayAfter, logAskedOf, logLineOf, logQueryOf } from './activity-log-view.ts';
 
 const id = '01900000-0000-7000-8000-000000000001';
@@ -63,5 +64,22 @@ describe('the activity log screen (step 2.77)', () => {
       reason: 'Gym reopened',
       values: { reason: 'Gym reopened', was: 'cancelled', now: 'scheduled' },
     });
+  });
+
+  it("says step 2.56's adjustments and scorekeepers in a sentence, with the reason", () => {
+    const sentences: Record<string, string> = {
+      'standings.add_adjustment': 'Added a standings adjustment',
+      'standings.remove_adjustment': 'Removed a standings adjustment',
+      'games.assign_scorekeeper': 'Assigned a scorekeeper to a game',
+      'games.unassign_scorekeeper': 'Took a scorekeeper off a game',
+    };
+    for (const [action, sentence] of Object.entries(sentences)) {
+      const line = logLineOf(
+        record({ action, summary: `activity.${action}`, details: { reason: 'Forfeit' } }),
+        new Set(),
+      );
+      expect(t(line.summary as TextKey, line.values)).toBe(sentence);
+      expect(line.reason).toBe('Forfeit');
+    }
   });
 });
