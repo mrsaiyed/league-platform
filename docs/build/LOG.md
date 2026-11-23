@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-23 00:17 UTC — Step 2.46 landed (2026-11-23, the fourth lead): a team's own coach or captain and the league's owner and admins get the player lines a league hides, through a signed-in answer route; everyone else gets nothing (S-80, decided for the founder: the narrower reading of who is staff; T-287). Picked up after five days, six conflicts merged, one review at high effort (no High; one Medium: two teams that both hide their players, each coach asking about the other, is now proved at the database), a hint of the team's setting removed from a visitor's page, GitHub passed twice on ee8eafe.
+
 - 2026-11-22 23:57 UTC — Step 2.49 landed (2026-11-23, the fourth lead): screens for divisions (add, rename, color, order, remove) and for venues and their courts; picked up after five days, merged twice (the second time over 2.47), one review (no High; one Medium: a scorekeeper and a signed-out visitor are now proved kept out), the harmful-text test opens both screens and types into them, the whole browser chain run in the lane, GitHub passed twice on b2e812e.
 
 - 2026-11-22 23:55 UTC — Step 2.207 landed (2026-11-23, the fourth lead): npm run rehearse:test-copy follows new-test-copy.md on a real PostgreSQL with a certificate, in staging mode, to the walk's final table (60 checks, 51 s cold), with the two expected refusals; scripts/check-test-copy.mjs (read-only, no secret, 10 lines; T-302); eight faults in the pages cured. One review (one High: nothing in the product publishes a league, so a signed-out visitor gets not found: step 2.240 was opened for it; three Mediums fixed), GitHub passed twice on a5ac3d7. T-301, T-302.

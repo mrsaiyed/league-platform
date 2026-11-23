@@ -29,7 +29,7 @@ export {
   type StatsVisibility,
   type TeamStatsSetting,
 } from './rules/stats-shown.ts';
-export { publicViewer, type Viewer } from './rules/viewer.ts';
+export { publicViewer, signedInViewer, type Viewer } from './rules/viewer.ts';
 export { createPerson, type CreatePersonError } from './commands/create-person.ts';
 export { getPerson, type GetPersonError } from './commands/get-person.ts';
 export { listPeople } from './commands/list-people.ts';

@@ -78,7 +78,7 @@ import {
   standInMemberAccountId,
   standInStaffSignIns,
 } from './stand-in-sign-ins.ts';
-import { madeUpLeagues } from './stand-in-world-seed.ts';
+import { madeUpLeagues, standInOwlsTeamId } from './stand-in-world-seed.ts';
 import { madeUpWorld } from './stand-in-world.ts';
 import { binTeamOfFirstLeague } from './stand-in-world-binned-team.ts';
 import { answersOnlyHere, isLocalOrTestHost } from './this-computer.ts';
@@ -134,6 +134,11 @@ const grants = [
   grantOf(13, scorekeeper.accountId, 'scorekeeper', standInLeagues.archived.id),
   // A scheduler with a long address, in the first league only (step 2.157).
   grantOf(14, standInPeople.longAddress.accountId, 'scheduler', standInLeagues.live.id),
+  // The Owls' coach, by a role on that one team (stand-in-world-seed.ts, adultTeams).
+  grantOf(15, standInPeople.teamCoach.accountId, 'coach', standInLeagues.live.id, {
+    type: 'team',
+    id: standInOwlsTeamId,
+  }),
 ];
 
 const leagues: readonly (typeof standInLeagues)[keyof typeof standInLeagues][] =

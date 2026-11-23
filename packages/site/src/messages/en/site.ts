@@ -363,6 +363,10 @@ export const enSite = {
   'stats.recordedNotRanked_other':
     'A statistic recorded in fewer than {count} games is not ranked yet, so a column may be topped by a player on no leaders board.',
   'stats.showBy': 'Show',
+  // Above the numbers a signed-in coach, captain or admin sees beyond the public's (step 2.46).
+  'stats.staffNumbers.text':
+    "The players' numbers of {teams} are shown only to the team's staff and the league's admins. Visitors see the team's totals only, so please keep these to yourself.",
+  'stats.staffNumbers.title': 'Not public: shown to you as staff',
   // With the tables, when a team's total is not its players' numbers added up (step 2.196).
   'stats.teamTotalsCountTeam':
     "A team's totals count what was charged to the team and the final scores as entered, so they can differ from what its players' numbers add up to.",

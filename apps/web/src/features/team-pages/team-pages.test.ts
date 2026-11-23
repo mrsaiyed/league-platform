@@ -28,7 +28,13 @@ import {
   loadTeamStats,
 } from './build-team.ts';
 import { chooseMyTeam, leagueHomeStayUrl, teamIdsFromGrants } from './start-page.ts';
-import { resultsBesideRoster, RosterSections, TeamStatsSection } from './team-page.tsx';
+import { staffNumbersAddress } from '../staff-numbers/index.ts';
+import {
+  resultsBesideRoster,
+  RosterSections,
+  TeamStatsPart,
+  TeamStatsSection,
+} from './team-page.tsx';
 import { TeamCards } from './teams-page.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -269,6 +275,38 @@ describe('a team page', () => {
   it('is not there for a team of another season', async () => {
     const s = await season(youth);
     expect(await loadTeamHead(stats.readStoreOf(youth), youth, s.id, 'falcons')).toBeUndefined();
+  });
+
+  it('sets up the staff request only on a hidden team page that shows totals (step 2.46)', async () => {
+    const s = await season(adult);
+    const store = stats.readStoreOf(adult);
+    const settings = await stats.settingsOf(adult);
+    /** What the page sends a visitor for the part: the props a client part is given. */
+    const sent = async (slug: string) => {
+      const head = await loadTeamHead(store, adult, s.id, slug);
+      const teamId = head?.teamId ?? '';
+      const team = await loadTeamStats(store, settings, {
+        leagueId: adult,
+        seasonId: s.id,
+        teamId,
+      });
+      expect(team?.playerLinesShown, slug).toBe(false);
+      const staffAddress = staffNumbersAddress(
+        { id: adult },
+        { page: 'team', season: s.id, team: teamId },
+      );
+      const part = team === undefined ? null : TeamStatsPart({ stats: team, staffAddress });
+      return { text: JSON.stringify(part), staffAddress };
+    };
+    // The Owls keep their players back and have totals: the request is set up.
+    const owls = await sent('owls');
+    expect(owls.text).toContain(owls.staffAddress);
+    // The Bears keep theirs back too but have nothing recorded: no trace of the request,
+    // not its address, not the staff-numbers endpoint at all.
+    const bears = await sent('bears');
+    expect(bears.text).not.toContain(bears.staffAddress);
+    expect(bears.text).not.toContain('staff-numbers');
+    expect(owls.text).toContain('staff-numbers');
   });
 
   it('shows only the totals of a team whose players numbers are staff only (S-22)', async () => {

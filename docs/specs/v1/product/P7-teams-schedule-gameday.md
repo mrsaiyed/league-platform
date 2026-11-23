@@ -202,6 +202,7 @@ Forfeiting, postponing and cancelling each ask once, naming the game, before any
   - It covers individual numbers: box score lines, season totals, stat leaders, and players' names in the play-by-play.
   - Scores, results and standings stay visible to everyone, because a game belongs to both teams. Where a team's numbers are hidden from a viewer, the box score shows that team's total only.
   - "Everyone" and "staff only" are built with the first statistics pages (stage 2). The two middle levels need registered members, so they arrive with accounts (stage 4).
+  - **S-80 (decided for you, step 2.46): who "the team's staff and the league's admins" are on the website.** The league's owner and its admins of the whole league, and a person with a coach or captain role on that very team. Nobody else: not a coach or captain role on another team or at another level, not an admin limited to one program, not someone listed as coach on the roster without that role, and not a scorekeeper or scheduler. They see the team's player lines on the statistics page (its leaders included, for them only; the public's ranks do not change), the team's page and a game's box score and plays, marked "Not public: shown to you as staff". The league home's leaders and the live scoreboard stay as the public sees them, for everyone.
 
 ## 7. Awards
 

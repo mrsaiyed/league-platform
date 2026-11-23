@@ -14,7 +14,8 @@ import { buildStandingsViews } from './build-standings.ts';
 import { loadStatsPage, parseBy, statLabel, type StatsPageData } from './build-stats.ts';
 import { chooseSeason } from './choose-season.ts';
 import { StandingsTables } from './standings-page.tsx';
-import { StatsTables } from './stats-page.tsx';
+import { StatsTables, StatsTablesPart } from './stats-page.tsx';
+import { staffNumbersAddress } from '../staff-numbers/index.ts';
 
 const adult = '01900000-0000-7000-8000-000000000001';
 const youth = '01900000-0000-7000-8000-000000000002';
@@ -630,5 +631,23 @@ describe('statistics page', () => {
   it('names a statistic it has words for, and shows the key of one it has not', () => {
     expect(statLabel('rebounds').short).toBe('REB');
     expect(statLabel('deflections').full).toBe('deflections');
+  });
+});
+
+describe('the staff request on the statistics page (step 2.46)', () => {
+  const staffAddress = staffNumbersAddress(
+    { id: adult },
+    { page: 'stats', season: 'a-season', by: 'total' },
+  );
+  /** What the page sends a visitor for the part: the props a client part is given. */
+  const sent = (totalsNoteTeams: readonly string[]) =>
+    JSON.stringify(
+      StatsTablesPart({ data: { totalsNoteTeams }, staffAddress, children: 'tables' }),
+    );
+
+  it('is set up only when a hidden team has totals on the page', () => {
+    expect(sent(['Owls'])).toContain(staffAddress);
+    // A hidden team with nothing recorded is not in the totals note: no trace of the request.
+    expect(sent([])).toBe(JSON.stringify('tables'));
   });
 });
