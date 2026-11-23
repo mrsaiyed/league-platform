@@ -13,7 +13,7 @@ export default async function Page({ searchParams }: SearchProps) {
   return (
     <LegalNote
       page="privacy"
-      back={await returnLeagueOf(from)}
+      back={await returnLeagueOf(from, 'page')}
       from={from}
       contactEmail={getConfig().CONTACT_EMAIL}
     />

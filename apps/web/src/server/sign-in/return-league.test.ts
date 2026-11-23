@@ -107,6 +107,26 @@ describe('returnLeagueFor (U-9)', () => {
     }
   });
 
+  it('leads Terms and Privacy back to the page itself, for a league the person may see', async () => {
+    const found = await returnLeagueFor(
+      safeReturnPath('/north-valley/schedule'),
+      await factsOf('visitor'),
+      deps,
+      standInLeagueSites,
+      'page',
+    );
+    expect(found).toEqual({ name: 'North Valley League', href: '/north-valley/schedule' });
+    expect(
+      await returnLeagueFor(
+        safeReturnPath('/quiet-pines/schedule'),
+        await factsOf('visitor'),
+        deps,
+        standInLeagueSites,
+        'page',
+      ),
+    ).toBeNull();
+  });
+
   it("names a draft to its own staff only, and never another draft's", async () => {
     expect(await named('scheduler', '/quiet-pines')).toBe('Quiet Pines League');
     expect(await named('otherAdmin', '/quiet-pines')).toBeNull();

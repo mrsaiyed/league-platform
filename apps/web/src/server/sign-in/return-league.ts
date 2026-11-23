@@ -7,7 +7,9 @@
 // "Back to {league}" leads to the league's home, never to the page to come back to: that
 // page may be the very one that refused the person (an admin page, a coach's "Use another
 // account"), and Back must not lead to the refusal again (review of step 2.157). Signing in
-// still brings the person to the page they were going to (`next`).
+// still brings the person to the page they were going to (`next`). Terms and Privacy are
+// the exception (`to: 'page'`): opened from a league page's footer, a reader who was only
+// reading that page goes back to it, scripts on or off (step 2.135).
 import { leagueUrl } from '@srleagues/core';
 import { getConfig } from '../config.ts';
 import { webPorts } from '../container.ts';
@@ -19,9 +21,12 @@ import { thisRequestFacts } from '../this-request.ts';
 export type ReturnLeague = {
   /** The league's own name, as its pages show it. */
   readonly name: string;
-  /** The way back: the league's home. */
+  /** The way back: the league's home, or for Terms and Privacy the page itself. */
   readonly href: string;
 };
+
+/** Where "Back to {league}" leads: the league's home, or the page the person came from. */
+export type ReturnTo = 'home' | 'page';
 
 /**
  * The league of `next` (a path already checked by safeReturnPath) for the person of
@@ -32,21 +37,27 @@ export async function returnLeagueFor(
   facts: RequestFacts,
   deps: GateDeps,
   sites: LeagueSiteLookup,
+  to: ReturnTo = 'home',
 ): Promise<ReturnLeague | null> {
   if (next === null) return null;
   const resolved = await resolveLeagueRequest({ ...facts, path: next }, deps);
   if (resolved.kind !== 'league') return null;
   const league = resolved.context.league;
-  return { name: (await siteOf(league, sites)).name, href: leagueUrl(league, 'home') };
+  const href = to === 'page' ? next : leagueUrl(league, 'home');
+  return { name: (await siteOf(league, sites)).name, href };
 }
 
 /** The league of `next` for the person of this request. */
-export async function returnLeagueOf(next: string | null): Promise<ReturnLeague | null> {
+export async function returnLeagueOf(
+  next: string | null,
+  to: ReturnTo = 'home',
+): Promise<ReturnLeague | null> {
   if (next === null) return null;
   return returnLeagueFor(
     next,
     await thisRequestFacts(),
     { ...(await webPorts()), siteOrigin: getConfig().PUBLIC_BASE_URL },
     await leagueSites(),
+    to,
   );
 }
