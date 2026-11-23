@@ -17,6 +17,7 @@ import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.
 import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
 import { keptRows, notAppliedRows, type KeptRow } from './kept-plays.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
+import { registerTrackerWorker } from './tracker-worker-registration.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
 import {
   isOffline,
@@ -63,6 +64,11 @@ export type TrackerOpeningProps = {
   readonly locale: string;
   /** The tracker's own messages (tracker-catalog.ts). */
   readonly catalog: Catalog;
+  /**
+   * The league's tracker worker (step 2.38, T-115), registered so the tracker reopens with
+   * no signal; null where none is wanted (the development server).
+   */
+  readonly workerHref?: string | null;
 };
 
 type Phase =
@@ -89,8 +95,12 @@ export function TrackerOpening({
   mayCorrect = false,
   locale,
   catalog,
+  workerHref = null,
 }: TrackerOpeningProps) {
   const t = useMemo(() => translatorFrom(locale, { [locale]: catalog }), [locale, catalog]);
+  useEffect(() => {
+    if (workerHref !== null) void registerTrackerWorker(workerHref);
+  }, [workerHref]);
   const [phase, setPhase] = useState<Phase>({ kind: 'preparing' });
   const [storeFailed, setStoreFailed] = useState(false);
   // What the browser says of the network: the saved banner says "No connection" while it

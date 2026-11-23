@@ -49,6 +49,8 @@ import { trackerRostersReply } from '../../server/tracker-rosters-reply.ts';
 import { notScoredBecause, scoresOnly } from './my-games.ts';
 import { trackerCatalog } from './tracker-catalog.ts';
 import { TrackerOpening } from './tracker-opening.tsx';
+import { isDevelopmentServer } from '../../server/config.ts';
+import { trackerHeadOf } from './tracker-install.ts';
 
 export async function TrackerPage({
   league,
@@ -114,24 +116,32 @@ export async function TrackerPage({
   // The account button of step 2.127, in the tracker's own frame (DESIGN.md section 7,
   // line 11): a shared tablet is signed out from here, leaving the game first.
   const menu = accountMenuOf(view, await signedInEmail(), trackerHref);
+  // Installable, and opens with no signal once loaded (step 2.38, T-115): React puts the
+  // manifest's link and the frame's colour in the page's head.
+  const head = trackerHeadOf(here, read.value.gameId);
   return (
-    <TrackerOpening
-      leagueId={here.id}
-      accountId={context.accountId}
-      gameId={read.value.gameId}
-      rosters={deviceRosters(trackerRostersReply(read.value), names.teams)}
-      when={when}
-      watchHref={leagueUrl(here, 'game', { game: read.value.gameId })}
-      backHref={backHref}
-      accountHref={platformUrl('account')}
-      account={menu === null ? null : <AccountButton account={menu} />}
-      signInHref={signInFirstUrl(trackerHref, { problem: 'signInAgain' })}
-      // Whoever works in more areas than scoring may correct games: only the words of
-      // the Mark not started question follow from it. The league stays the judge (S-40).
-      mayCorrect={!scoresOnly(view.areas)}
-      locale={locale}
-      catalog={trackerCatalog(catalogs[locale] ?? en)}
-    />
+    <>
+      <link rel="manifest" href={head.manifestHref} />
+      <meta name="theme-color" content={head.colour} />
+      <TrackerOpening
+        leagueId={here.id}
+        accountId={context.accountId}
+        gameId={read.value.gameId}
+        rosters={deviceRosters(trackerRostersReply(read.value), names.teams)}
+        when={when}
+        watchHref={leagueUrl(here, 'game', { game: read.value.gameId })}
+        backHref={backHref}
+        accountHref={platformUrl('account')}
+        account={menu === null ? null : <AccountButton account={menu} />}
+        signInHref={signInFirstUrl(trackerHref, { problem: 'signInAgain' })}
+        // Whoever works in more areas than scoring may correct games: only the words of
+        // the Mark not started question follow from it. The league stays the judge (S-40).
+        mayCorrect={!scoresOnly(view.areas)}
+        locale={locale}
+        catalog={trackerCatalog(catalogs[locale] ?? en)}
+        workerHref={isDevelopmentServer() ? null : head.workerHref}
+      />
+    </>
   );
 }
 

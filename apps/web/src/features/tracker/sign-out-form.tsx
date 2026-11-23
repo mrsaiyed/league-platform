@@ -12,6 +12,7 @@
 // while plays wait.
 import { useRef, type FormEvent, type MouseEvent, type ReactNode } from 'react';
 import { forgetOpenedGamesOnDevice } from './indexeddb-opened-game-storage.ts';
+import { forgetTrackerPagesOnDevice } from './tracker-worker-registration.ts';
 import {
   beforeSignOut,
   trackerSignOutHold,
@@ -30,7 +31,15 @@ async function readyToSignOut(question: WaitingQuestion): Promise<boolean> {
   const plan = await beforeSignOut(trackerSignOutHold(), (waiting) =>
     window.confirm(waitingQuestionText(question, waiting)),
   );
-  if (plan.go && plan.clearKeptGames) await atMost(forgetOpenedGamesOnDevice(), clearingWaitMs);
+  // Signing out also deletes the tracker pages the device kept (step 2.38, T-115).
+  if (plan.go) {
+    const clearing = [forgetTrackerPagesOnDevice()];
+    if (plan.clearKeptGames) clearing.push(forgetOpenedGamesOnDevice());
+    await atMost(
+      Promise.all(clearing).then(() => undefined),
+      clearingWaitMs,
+    );
+  }
   return plan.go;
 }
 

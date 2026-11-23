@@ -19,6 +19,12 @@ export type HeldGame = {
   readonly lastTapAt: number;
   /** The two teams' names, while the device still keeps the game's rosters; else null. */
   readonly teams: { readonly home: string; readonly away: string } | null;
+  /**
+   * Present when nothing on the device says which league the plays were made in (plays
+   * kept before the league was, with no rosters left): the game is listed in every league
+   * and its line says it may belong to another league of this device.
+   */
+  readonly leagueUnknown?: true;
 };
 
 /**
@@ -53,6 +59,7 @@ export function heldGames(
         game === undefined || game.leagueId !== leagueId
           ? null
           : { home: game.rosters.home.name, away: game.rosters.away.name },
+      ...(madeIn === undefined ? { leagueUnknown: true as const } : {}),
     });
   }
   return held.sort((a, b) => b.lastTapAt - a.lastTapAt);
@@ -82,7 +89,11 @@ export function heldGameWords(
     ...(game.notSaved > 0 ? [t.plural('tracker.held.notSaved', game.notSaved)] : []),
   ];
   const name =
-    game.teams === null ? t('tracker.held.someGame') : t('tracker.held.game', game.teams);
+    game.teams !== null
+      ? t('tracker.held.game', game.teams)
+      : game.leagueUnknown === true
+        ? t('tracker.held.someGameAnyLeague')
+        : t('tracker.held.someGame');
   return { name, counts };
 }
 

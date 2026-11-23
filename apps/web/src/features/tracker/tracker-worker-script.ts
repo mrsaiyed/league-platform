@@ -1,0 +1,166 @@
+// The text of the worker that keeps the tracker on the device (step 2.38, T-115, T-127),
+// served at the league's tracker-worker address (app/[league]/score/tracker-worker.js).
+// Its rules are the functions of tracker-worker-rules.ts, written in as their own text,
+// so what the tests prove is what the browser runs; the rest is the browser's plumbing.
+//
+// How it behaves:
+// - it reaches only the league's tracker pages (its scope), and keeps only what
+//   keptAddressOf allows: those pages and the built code and styles they load;
+// - a page: while a game is open on the device, the kept copy at once if there is one;
+//   otherwise the network, and the kept copy when the network does not answer;
+// - code: kept by address (each built file's address names its content), so it is
+//   answered from the device first;
+// - a new worker (a release that changed the code) takes over, and the code kept for
+//   earlier releases is let go, only when no game is open on the device (T-127). Until
+//   then the kept pages keep opening with the code they were kept with;
+// - "open on the device" is read from the tracker's own store of opened games
+//   (indexeddb-opened-game-storage.ts), which closing the game and signing out clear.
+//   The worker never creates that store: if it is not there, no game is open.
+// Signing out deletes everything kept here (forgetTrackerPagesOnDevice).
+import { openedGamesDatabaseName, openedGamesStoreName } from './indexeddb-opened-game-storage.ts';
+import {
+  codeMarkOf,
+  keptAddressOf,
+  mayKeepAnswer,
+  mayReplaceStored,
+  pageAnswerPlan,
+  trackerKeptPrefix,
+  trackerWorkerUpdateMessage,
+} from './tracker-worker-rules.ts';
+
+const glue = `
+const scope = self.registration.scope;
+const mark = new URL(self.location.href).searchParams.get('code') || 'none';
+const prefix = names.kept + scope + ' ';
+const current = prefix + mark;
+
+function gamesOpen() {
+  return new Promise((resolve) => {
+    let asking;
+    try {
+      asking = indexedDB.open(names.database);
+    } catch (error) {
+      resolve(null);
+      return;
+    }
+    // No such store yet: no game was ever opened here. Never create it (abort the upgrade).
+    asking.onupgradeneeded = () => asking.transaction.abort();
+    asking.onerror = () => resolve(asking.error && asking.error.name === 'AbortError' ? 0 : null);
+    asking.onblocked = () => resolve(null);
+    asking.onsuccess = () => {
+      const db = asking.result;
+      db.onversionchange = () => db.close();
+      if (!db.objectStoreNames.contains(names.games)) {
+        db.close();
+        resolve(0);
+        return;
+      }
+      try {
+        const counting = db.transaction(names.games, 'readonly').objectStore(names.games).count();
+        counting.onsuccess = () => {
+          db.close();
+          resolve(counting.result);
+        };
+        counting.onerror = () => {
+          db.close();
+          resolve(null);
+        };
+      } catch (error) {
+        db.close();
+        resolve(null);
+      }
+    };
+  });
+}
+
+async function letGoOfEarlier() {
+  if (!mayReplaceStored(await gamesOpen())) return;
+  const all = await caches.keys();
+  await Promise.all(
+    all.filter((name) => name.startsWith(prefix) && name !== current).map((name) => caches.delete(name)),
+  );
+}
+
+async function keep(key, answer) {
+  const box = await caches.open(current);
+  await box.put(key, answer);
+}
+
+function keptIn(key) {
+  return caches.keys().then(async (all) => {
+    // The newest kept copy of this scope first.
+    for (const name of all.filter((n) => n.startsWith(prefix)).reverse()) {
+      const found = await (await caches.open(name)).match(key);
+      if (found) return found;
+    }
+    return undefined;
+  });
+}
+
+async function answerPage(request, key) {
+  const open = await gamesOpen();
+  const kept = await keptIn(key);
+  const plan = pageAnswerPlan(open, kept !== undefined);
+  if (plan.first === 'kept' && kept) return kept;
+  try {
+    const answer = await fetch(request);
+    if (plan.keepNetworkAnswer && mayKeepAnswer(answer)) {
+      await keep(key, answer.clone());
+      if (mayReplaceStored(open)) await letGoOfEarlier();
+    }
+    return answer;
+  } catch (error) {
+    if (kept) return kept;
+    throw error;
+  }
+}
+
+async function answerCode(request, key) {
+  const kept = await keptIn(key);
+  if (kept) return kept;
+  const answer = await fetch(request);
+  if (mayKeepAnswer(answer)) await keep(key, answer.clone());
+  return answer;
+}
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    gamesOpen().then((open) => (mayReplaceStored(open) ? self.skipWaiting() : undefined)),
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(letGoOfEarlier().then(() => self.clients.claim()));
+});
+
+self.addEventListener('message', (event) => {
+  if (!event.data || event.data.type !== names.updateMessage) return;
+  event.waitUntil(
+    gamesOpen().then((open) => (mayReplaceStored(open) ? self.skipWaiting() : undefined)),
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const request = event.request;
+  const kept = keptAddressOf({ url: request.url, method: request.method, mode: request.mode }, scope);
+  if (kept === null) return;
+  event.respondWith(kept.kind === 'page' ? answerPage(request, kept.key) : answerCode(request, kept.key));
+});
+`;
+
+/** The worker's whole script. */
+export function trackerWorkerScript(): string {
+  const names = {
+    kept: trackerKeptPrefix,
+    database: openedGamesDatabaseName,
+    games: openedGamesStoreName,
+    updateMessage: trackerWorkerUpdateMessage,
+  };
+  const rules = { codeMarkOf, keptAddressOf, mayKeepAnswer, mayReplaceStored, pageAnswerPlan };
+  return [
+    "'use strict';",
+    `const names = ${JSON.stringify(names)};`,
+    ...Object.entries(rules).map(([name, rule]) => `const ${name} = (${String(rule)});`),
+    glue,
+  ].join('\n');
+}

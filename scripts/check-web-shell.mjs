@@ -1067,7 +1067,35 @@ const cases = [
   // else, another league's admin included (U-6). Hawks v Bears is live; Lions v Tigers is
   // the scorekeeper's; game 3 is assigned to nobody (any scorekeeper may score it).
   ['scheduler', `/north-valley/score/${liveGame}`, 200, ['Score a game', 'Bears at Hawks']],
-  ['scorekeeper', `/north-valley/score/${liveGame}`, 200, ['Bears at Hawks', 'Opening the game']],
+  [
+    'scorekeeper',
+    `/north-valley/score/${liveGame}`,
+    200,
+    ['Bears at Hawks', 'Opening the game', 'rel="manifest"', 'name="theme-color"'],
+  ],
+  // The tracker on the home screen and with no signal (step 2.38): its manifest and its
+  // worker are the same for everyone and every league, and read nothing of the league.
+  ...['visitor', 'scorekeeper', 'coach'].flatMap((who) => [
+    [
+      who,
+      `/north-valley/score/manifest.webmanifest?game=${liveGame}`,
+      200,
+      [
+        '"display":"standalone"',
+        '"scope":"/north-valley/score/"',
+        `"start_url":"/north-valley/score/${liveGame}"`,
+      ],
+      ['North Valley'],
+    ],
+    [who, '/north-valley/score/tracker-worker.js', 200, ['keptAddressOf', 'mayReplaceStored']],
+  ]),
+  [
+    'visitor',
+    '/north-valley/score/manifest.webmanifest?game=nope',
+    200,
+    ['"scope":"/north-valley/score/"'],
+    ['start_url'],
+  ],
   ['scorekeeper', `/north-valley/score/${unassignedGame}`, 200, ['Lions at Hawks']],
   ['owner', `/north-valley/score/${liveGame}`, 200, ['Bears at Hawks']],
   ['coach', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],

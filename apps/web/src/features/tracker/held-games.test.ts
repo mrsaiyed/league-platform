@@ -124,3 +124,26 @@ describe('what a held game says', () => {
     expect(heldGameHref(`/a/score/${heldGameMark}`, 'g 1')).toBe('/a/score/g%201');
   });
 });
+
+describe('a held game whose league the device does not know (step 2.38, part 2)', () => {
+  const t = createTranslator('en');
+  const play = (gameId: string): QueuedCommand =>
+    ({ command: { at: 5 }, gameId, state: 'waiting' }) as unknown as QueuedCommand;
+
+  it('is listed in every league, and its line says it may belong to another league', () => {
+    const [listed] = heldGames([play('old-game')], 'league-a', () => undefined);
+    expect(listed?.leagueUnknown).toBe(true);
+    if (listed === undefined) return;
+    expect(heldGameWords(listed, t).name).toBe(
+      'A game scored on this device: it may belong to another league on this device',
+    );
+    const known: HeldGame = {
+      gameId: 'old-game',
+      waiting: 1,
+      notSaved: 0,
+      lastTapAt: 5,
+      teams: null,
+    };
+    expect(heldGameWords(known, t).name).toBe('A game scored on this device');
+  });
+});

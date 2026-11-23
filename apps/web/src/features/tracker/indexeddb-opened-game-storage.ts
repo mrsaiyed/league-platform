@@ -26,6 +26,8 @@ import {
 
 export const openedGamesDatabaseName = 'srleagues-tracker-games';
 const gamesStore = 'games';
+/** The store of opened games, which the tracker's worker reads to tell whether a game is open (step 2.38). */
+export const openedGamesStoreName = gamesStore;
 const deviceStore = 'device';
 const deviceKey = 'device-id';
 

@@ -4,6 +4,8 @@
 // A comment above a key is about that key or, from before the split, about the keys
 // that followed it in the one file there was.
 export const enTracker = {
+  'tracker.app.name': 'Courtside scoring',
+  'tracker.app.shortName': 'Scoring',
   'tracker.back': 'Back to your games',
   'tracker.bench.comesInFor': 'Who comes in for {player}?',
   'tracker.bench.everyoneOn': 'Everyone is on the court.',
@@ -185,6 +187,8 @@ export const enTracker = {
   'tracker.held.open': 'Open to send',
   'tracker.held.openToSee': 'Open to see',
   'tracker.held.someGame': 'A game scored on this device',
+  'tracker.held.someGameAnyLeague':
+    'A game scored on this device: it may belong to another league on this device',
   'tracker.held.title': 'Kept on this device',
   'tracker.held.waiting_one': '{count} play waiting to send',
   'tracker.held.waiting_other': '{count} plays waiting to send',
