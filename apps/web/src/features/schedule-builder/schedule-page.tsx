@@ -177,6 +177,9 @@ export async function ScheduleBuilderPage({
           mayShow: mayShowSeason(holder, season, addressee.status),
         })
       : undefined;
+  const removedCount = Number(firstValue(search['removed']) ?? '0');
+  const publishedToBin =
+    Number.isInteger(removedCount) && removedCount > 0 && removedCount < 10000 ? removedCount : 0;
   const plainNotice =
     published !== undefined ? (
       <div
@@ -187,6 +190,17 @@ export async function ScheduleBuilderPage({
         data-published=""
       >
         <p>{published.text}</p>
+        {publishedToBin === 0 ? null : (
+          <p data-published-to-bin={publishedToBin}>
+            {t.plural('schedule.admin.publishedToBin', publishedToBin)}
+            {binLink === undefined ? null : (
+              <>
+                {' '}
+                <a href={binLink}>{t('schedule.admin.publishedToBinLink')}</a>
+              </>
+            )}
+          </p>
+        )}
         {published.next === undefined ? null : published.next.kind === 'link' ? (
           <p>
             <a href={`${seasonSettingsAddress(addressee, season.slug)}#${visibilityAnchor}`}>

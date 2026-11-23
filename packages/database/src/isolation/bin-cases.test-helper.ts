@@ -7,7 +7,7 @@
 // target's own fence, so it is there in every run; the same writes in `run` go through
 // the run's own fence, and in another league's scope find nothing of the target, which a
 // query with its league filter taken out would then not reach either.
-import { listBin, restoreGame, restorePerson, restoreTeam } from '@srleagues/core';
+import { listBin, listBinPart, restoreGame, restorePerson, restoreTeam } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
   findActivityTargets,
@@ -209,6 +209,16 @@ registerIsolationCase({
   run: async (scope, target) => {
     await setVenueBinned(scope, target.emptyVenueId, true);
     return runAsApp(listBin, harnessTx, scope, {});
+  },
+});
+
+registerIsolationCase({
+  subject: listBinPart,
+  name: "list one's part of the bin after the target's empty venue went there",
+  arrange: binTargetsParts,
+  run: async (scope, target) => {
+    await setVenueBinned(scope, target.emptyVenueId, true);
+    return runAsApp(listBinPart, harnessTx, scope, {});
   },
 });
 

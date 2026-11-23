@@ -32,6 +32,7 @@ export const enAdminAccess = {
   // The activity log's screen (step 2.77, A-6): filters, paging, and what an entry adds.
   'adminAccess.log.any': 'Anyone',
   'adminAccess.log.anyKind': 'Everything',
+  'adminAccess.log.binGamesLink': 'Games it removed are in the bin: bring one back',
   'adminAccess.log.binLink': 'It is in the bin: bring it back',
   'adminAccess.log.clear': 'Show everything',
   'adminAccess.log.dateUnclear':

@@ -50,6 +50,14 @@ export type BinDetails = {
   readonly startsAt?: string | null;
   /** A game: true when it has no round, so it comes back with none (S-60). */
   readonly withoutRound?: boolean;
+  /** A game: its teams that are in the bin themselves, so it cannot come back before them. */
+  readonly teamsInBin?: readonly { readonly id: string; readonly name: string }[];
+  /** A team, a division or a game: its season's name, so two of one name can be told apart. */
+  readonly seasonName?: string;
+  /** A team: its division's name, or null with none. */
+  readonly divisionName?: string | null;
+  /** A court: its venue's name. */
+  readonly venueName?: string;
 };
 
 /**

@@ -217,6 +217,8 @@ if (browser) {
           (await game.locator('input[type=number]:visible').count()) === 2,
       );
       await tallEnough(page, 'the boxes open');
+      // Step 2.56 (S-86): a typed final can say it went to overtime.
+      await game.getByLabel('Overtime').selectOption('1');
       await typeAndSave(page, finalScoreGame, { Tigers: 47, Lions: 51 });
       const question = game.locator('[data-question]');
       note(
@@ -241,7 +243,8 @@ if (browser) {
       note(
         '"No, change the score" opens the boxes again with what was typed',
         (await game.getByLabel('Score for Tigers').inputValue()) === '47' &&
-          (await game.getByLabel('Score for Lions').inputValue()) === '51',
+          (await game.getByLabel('Score for Lions').inputValue()) === '51' &&
+          (await game.getByLabel('Overtime').inputValue()) === '1',
       );
       await typeAndSave(page, finalScoreGame, { Tigers: 47, Lions: 51 });
       await sayYes(page, finalScoreGame);
@@ -253,8 +256,9 @@ if (browser) {
       );
       note('"Saved" is on the screen at 390 wide without scrolling', await seenWhole(saved));
       note(
-        'the game is final with the score saved',
-        (await game.getByText('Final', { exact: true }).count()) === 1,
+        'the game is final with the score saved, marked as gone to overtime (step 2.56)',
+        (await game.getByText('Final, OT', { exact: true }).count()) === 1,
+        (await game.textContent()) ?? '',
       );
 
       // A game days ahead: the question says so first; a double tap on save only asks.
@@ -478,6 +482,8 @@ if (browser) {
       await page.keyboard.type('30');
       await page.keyboard.press('Tab');
       await page.keyboard.type('28');
+      // Past "Overtime" (step 2.56), left at no overtime, to the save button.
+      await page.keyboard.press('Tab');
       await page.keyboard.press('Tab');
       await page.keyboard.press('Enter');
       await gameOn(page, laterGame).locator('[data-question]').waitFor();

@@ -130,7 +130,8 @@ const targetKinds: readonly string[] = ['team', 'person', 'game', 'season', 'div
 export function thingOf(entry: ActivityRecord): LogThingAsk | undefined {
   const team = entry.details['team'];
   const adjustment = entry.details['adjustment'];
-  if (entry.action === 'standings.add_adjustment' && typeof team === 'string') {
+  const byTeam = ['standings.add_adjustment', 'standings.overturn_result', 'standings.award_game'];
+  if (byTeam.includes(entry.action) && typeof team === 'string') {
     return { kind: 'team', id: team };
   }
   if (entry.action === 'standings.remove_adjustment' && typeof adjustment === 'string') {
@@ -158,12 +159,19 @@ export type LogLine = {
   readonly seasonStatus?: string;
   /** The removed thing's id, while it is still in the bin. */
   readonly inBin?: string;
+  /** A publish that removed games, while one of its season's removed games is in the bin. */
+  readonly gamesInBin?: true;
   /** What the entry points at, to be named in its sentence when it can still be found. */
   readonly thing?: LogThingAsk;
 };
 
 /** An entry as the page draws it; `binned` is the ids of what is in the bin now. */
-export function logLineOf(entry: ActivityRecord, binned: ReadonlySet<string>): LogLine {
+export function logLineOf(
+  entry: ActivityRecord,
+  binned: ReadonlySet<string>,
+  /** The seasons with a removed game in the bin (a publish's removals lead there). */
+  gameSeasonsInBin: ReadonlySet<string> = new Set(),
+): LogLine {
   const values: Record<string, string> = {};
   for (const [key, value] of Object.entries(entry.details)) {
     if (value !== null) values[key] = String(value);
@@ -184,6 +192,12 @@ export function logLineOf(entry: ActivityRecord, binned: ReadonlySet<string>): L
       ? { seasonStatus: status }
       : {}),
     ...(removal && target !== null && binned.has(target) ? { inBin: target } : {}),
+    ...(entry.action === 'scheduling.publish_schedule' &&
+    Number(entry.details['gamesRemoved'] ?? 0) > 0 &&
+    target !== null &&
+    gameSeasonsInBin.has(target)
+      ? { gamesInBin: true as const }
+      : {}),
     ...(thing === undefined ? {} : { thing }),
   };
 }

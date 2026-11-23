@@ -7,9 +7,11 @@ import {
   asApp,
   freshSchema,
   newDivision,
+  newGame,
   newLeague,
   newPerson,
   newSeason,
+  newStage,
   newTeam,
   refused,
   type Sql,
@@ -236,6 +238,43 @@ describe('standings adjustments (S-10)', () => {
         tx.query('delete from standings_adjustments where id = $1', [id]),
       ),
     ).rejects.toMatchObject(refused.privilege);
+  });
+
+  it('pair within their own season, name a game of their league, and keep both (0024)', async () => {
+    const s = await season();
+    const team = await newTeam(db, s.leagueId, s.seasonId);
+    const { rows } = await adjust(db, s, team, { wins: -1, losses: 1 });
+    const first = rows[0]?.id;
+    const otherSeason = await newSeason(db, s.leagueId, s.defaultProgramId);
+    const elsewhere = await newTeam(db, s.leagueId, otherSeason);
+    await expect(
+      adjust(db, { ...s, seasonId: otherSeason }, elsewhere, { wins: 1, paired_with: first }),
+    ).rejects.toMatchObject(refusedBy('standings_adjustments_pair', refused.foreignKey));
+    const other = await season();
+    const away = await newTeam(db, other.leagueId, other.seasonId);
+    const stageId = await newStage(db, other.leagueId, other.seasonId);
+    const foreignGame = await newGame(db, {
+      leagueId: other.leagueId,
+      seasonId: other.seasonId,
+      stageId,
+      homeTeamId: away,
+      awayTeamId: await newTeam(db, other.leagueId, other.seasonId),
+    });
+    await expect(adjust(db, s, team, { points: 1, game_id: foreignGame })).rejects.toMatchObject(
+      refusedBy('standings_adjustments_game', refused.foreignKey),
+    );
+    const second = await newTeam(db, s.leagueId, s.seasonId);
+    const paired = await adjust(db, s, second, { wins: 1, losses: -1, paired_with: first });
+    await expect(
+      adjust(db, s, second, { wins: 1, losses: -1, paired_with: first }),
+    ).rejects.toMatchObject({ ...refused.unique, constraint: 'standings_adjustments_paired_with' });
+    for (const set of ['paired_with = null', 'games_played = 1', `game_id = '${foreignGame}'`]) {
+      await expect(
+        asApp(db, { league: s.leagueId }, (tx) =>
+          tx.query(`update standings_adjustments set ${set} where id = $1`, [paired.rows[0]?.id]),
+        ),
+      ).rejects.toMatchObject(refused.restrict);
+    }
   });
 });
 

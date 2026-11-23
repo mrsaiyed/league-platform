@@ -76,9 +76,16 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 
 - polish-4 leftovers (2026-11-23): the standings name column can take 60% of the box at 360 with seeds and 71% at 320 without (cap it: `min(…, 55cqi)` in table-css.ts near line 640, and check 320 and 360 with and without seeds in web-exit-test.mjs); `brokenNames` in simulated-league-test.mjs should also assert it found names; the footnote marks beside team names are 24 by 24, below the 44 the design asks.
 
-- AN UNRELIABLE TEST (2026-11-23): `tests/browser/people-screens-test.mjs` failed once on GitHub with "coach: the list is refused and holds nothing of the person: 404" and passed twice on the same commit (991fcd1, branch lane/polish-4-again): find why a refusal answered 404 once and make it steady.
-
 - 2.77 leftovers (2026-11-23): no browser check yet for the taken-name link on the bin screen; whether a team named with markup reaches the activity log in the harmful-text browser test is unchecked (a unit test shows it as text); the From/To labels on the activity log are not styled like the picker labels.
+- 2.77: the activity log's bin link on a publish entry is keyed on the season, so an older publish keeps it while another publish's removed game is still in the bin; use the revision's gameIds.removed.
+- 2.77: restore-court answers court-venue-in-bin also when the venue is gone for good; it needs its own code and sentence.
+- 2.77: tests/browser/people-on-database-test.mjs:365 searches whole pages for the ordinary word Sample; lengthen it.
+- 2.77: not seen in a browser: an admin limited to one program in the bin, the 'its round was removed' sentence, restoring a division, venue or court.
+
+- AN UNRELIABLE TEST, NOT SEEN AGAIN (2026-11-23): `be-made-up-person` (a sign-in test under `apps/web/src/server`) failed once under load in lane 2.56 and passed alone; `npx vitest run apps/web/src/server` then passed twice in a row (77 files, 1129 tests). Watch for it under load.
+
+- 2.56: an award is not linked to a scheduled game; if that game is played later it counts twice (S-85 says so): link it or warn.
+- 2.56: the public-pencil browser test covers only a league where scorekeepers cannot reopen; add one inside a tracker reopen window, and an admin limited to another program.
 - 2.26: the refused-result test of clear-page-cache covers only a refusal before the event; a job rolled back after a later failure rests on leagues-store.test.ts.
 - 2.60: there is no league error.tsx, so a league page's server error shows without the site notice.
 - 2.60: site.notice has no protective order, so an archived or suspended league cannot add or remove its notice (R-26).

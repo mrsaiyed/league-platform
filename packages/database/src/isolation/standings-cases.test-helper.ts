@@ -5,10 +5,12 @@
 // isolation-cases.test-helper.ts.
 import {
   addAdjustment,
+  awardGame,
   clearLeagueOnSettingChanged,
   clearLeagueOnStatusChanged,
   clearPagesOnGameFinalized,
   clearPagesOnGameReopened,
+  overturnResult,
   gameFinalized,
   gameReopened,
   leagueSettingChanged,
@@ -174,6 +176,21 @@ registerCommandCase(addAdjustment, harnessTx, {
     teamId: target.teamId,
     wins: 1,
     reason: 'Won by ruling',
+  }),
+});
+
+registerCommandCase(overturnResult, harnessTx, {
+  name: "overturn the result of the target's game",
+  input: (target) => ({ seasonId: target.seasonId, gameId: target.gameId, reason: 'Ruling' }),
+});
+
+registerCommandCase(awardGame, harnessTx, {
+  name: "award the target's team a game not played",
+  input: (target) => ({
+    seasonId: target.seasonId,
+    winnerTeamId: target.teamId,
+    loserTeamId: target.opponentId,
+    reason: 'Not played: awarded',
   }),
 });
 

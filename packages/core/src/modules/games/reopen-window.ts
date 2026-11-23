@@ -31,7 +31,9 @@ export type ReopenNotOffered =
   | 'not-ended-by-tracker'
   | 'scorekeepers-may-not-reopen'
   | 'not-ended-by-you'
-  | 'reopen-time-over';
+  | 'reopen-time-over'
+  /** It could be reopened, but an overturn rules on its result (S-85). */
+  | 'result-overturned';
 
 export type ReopenWhen =
   | { readonly when: 'always' }
@@ -62,6 +64,7 @@ export async function reopenOffer(
   if (readState(saved.state).status !== 'final') return no('not-ended-by-tracker');
   const endedBy = (await tx.liveGames.findLastEnd(game.id))?.accountId ?? null;
   if (await mayChangeGames(context, tx, 'games.correct', await gameScope(tx, game.id))) {
+    if (game.overturned === true) return no('result-overturned', endedBy);
     return { reopen: { when: 'always' }, endedBy };
   }
   const rows = await tx.games.leagueSettingRows(scorekeeperReopenMinutes.key);
@@ -71,5 +74,6 @@ export async function reopenOffer(
   const ago = await tx.liveGames.endedAgo(game.id);
   const left = minutes * minuteMs - (ago ?? Number.POSITIVE_INFINITY);
   if (left < 0) return no('reopen-time-over', endedBy);
+  if (game.overturned === true) return no('result-overturned', endedBy);
   return { reopen: { when: 'until', until: tx.clock.now() + left }, endedBy };
 }

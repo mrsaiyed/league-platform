@@ -172,6 +172,7 @@ export async function gamesWorld(counts: GamesWorldOptions) {
       teams: database.teamsStore(scope),
       games: database.gamesStore(scope),
       standings: database.standingsStore(scope),
+      scoringSessions: database.scoringSessionsStore(scope),
     })),
     events: eventHandlers,
     log: () => {},

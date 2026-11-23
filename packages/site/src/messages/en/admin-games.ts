@@ -25,6 +25,8 @@ export const enAdminGames = {
     'Say why the game needs correcting (up to 1000 characters) to reopen it.',
   'admin.boxScore.error.reopen-time-over':
     'Your time to reopen this game is over. Ask a league admin or a scheduler.',
+  'admin.boxScore.error.result-overturned':
+    'This result was overturned. Take the overturn off in Standings and stats first.',
   'admin.boxScore.help':
     'Copy the paper score sheet. Tick each player who played; a player with any number filled in counts as played. Leave a whole column empty if the sheet did not keep that number; it then does not count in that player’s averages. In a column you fill in, an empty box counts as 0.',
   'admin.boxScore.jersey': '#{number}',
@@ -184,6 +186,12 @@ export const enAdminGames = {
   'admin.games.otherActions': 'Forfeit, postpone or cancel',
   // A postponed game's panel: a forfeit or cancelling (step 2.158, S-75).
   'admin.games.otherActionsPostponed': 'Forfeit or cancel instead',
+  // Step 2.56 (S-86): a typed final score says whether the game went to overtime.
+  'admin.games.overtime': 'Overtime',
+  // For translators: "_one" has no {count}.
+  'admin.games.overtimeCount_one': 'One overtime',
+  'admin.games.overtimeCount_other': '{count} overtimes',
+  'admin.games.overtimeNone': 'No overtime',
   'admin.games.postpone': 'Postpone',
   // On a postponed game's card: where it waits for its new date (step 2.158).
   'admin.games.postponedWaits': 'This game waits for a new date.',
@@ -214,6 +222,8 @@ export const enAdminGames = {
   'admin.games.reopenUntil':
     'You ended this game in the tracker, so you can reopen it until {time}.',
   'admin.games.reopenWho.admins': 'Only a league admin or a scheduler can reopen this game.',
+  'admin.games.reopenWho.overturned':
+    'This result was overturned. Take the overturn off in Standings and stats first.',
   'admin.games.reopenWho.time-over':
     'Your time to reopen this game is over. Only a league admin or a scheduler can reopen it now.',
   'admin.games.result': '{away} {awayScore}, {home} {homeScore}',

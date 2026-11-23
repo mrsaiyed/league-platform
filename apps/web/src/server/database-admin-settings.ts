@@ -33,6 +33,7 @@ export type AdminSettingsQueries = Pick<
   | 'activityLogStore'
   | 'standingsStore'
   | 'gamesStore'
+  | 'scoringSessionsStore'
 >;
 
 /** What Season settings' commands run in: the leagues' stores and the standings' (step 2.47). */
@@ -53,6 +54,7 @@ export function databaseAdminSettings(
     activity: database.activityLogStore(scope),
     standings: database.standingsStore(scope),
     games: database.gamesStore(scope),
+    scoringSessions: database.scoringSessionsStore(scope),
   }));
   const now = () => performance.now();
   return {

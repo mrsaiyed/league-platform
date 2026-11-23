@@ -156,6 +156,10 @@ export const enScheduleAdmin = {
   'schedule.admin.publishedPill': 'Published',
   'schedule.admin.publishedSeasonHidden':
     'The schedule is published, but visitors cannot see {season} yet.',
+  // The games a publish removed went to the bin (step 2.77): the way to bring one back.
+  'schedule.admin.publishedToBinLink': 'Bring it back',
+  'schedule.admin.publishedToBin_one': 'Moved to the bin: {count} removed game.',
+  'schedule.admin.publishedToBin_other': 'Moved to the bin: {count} removed games.',
   'schedule.admin.putBack': 'Put it back',
   'schedule.admin.putBackInDraft': 'Put it back in the draft',
   'schedule.admin.putBackNamed': 'Put it back in the draft: {game}',
@@ -203,9 +207,9 @@ export const enScheduleAdmin = {
   'schedule.admin.removedInDraftNoRound':
     'Removed in this draft, from {round}, which the draft removes too. Put it back and it comes back here, with no round.',
   'schedule.admin.removedPublished':
-    'Nothing public changes until you publish. Put it back now and it is exactly as it was. After you publish, it cannot be brought back from here yet.',
+    'Nothing public changes until you publish. Put it back now and it is exactly as it was. After you publish, it is moved to the bin, and can be brought back from there.',
   'schedule.admin.removedPublishedNoRound':
-    'Nothing public changes until you publish. Put it back now and it is as it was, under "Games with no round". After you publish, it cannot be brought back from here yet.',
+    'Nothing public changes until you publish. Put it back now and it is as it was, under "Games with no round". After you publish, it is moved to the bin, and can be brought back from there.',
   // A removed game that has started, been decided or called off since (step 2.185).
   'schedule.admin.removedSince.cancelled':
     'Removed in this draft, and cancelled since: publishing still removes it. Putting it back in the draft keeps it in the schedule, still cancelled; the game itself is put back from its page in Games.',

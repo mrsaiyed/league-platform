@@ -223,7 +223,9 @@ if (browser) {
       await openGames(page);
       const game = gameOn(page, laterGame);
       await game.getByText('Forfeit, postpone or cancel').click();
-      const forfeit = game.locator('form', { has: page.locator('select') });
+      // The forfeit form by what it is (the page marks it), not as "the form with a choice":
+      // since step 2.56 the typed final score has one too (its overtime choice).
+      const forfeit = game.locator('form[data-call-off-act="forfeit"]');
       const team = forfeit.getByLabel('Team that forfeits');
       // Since step 2.158 the choice starts empty: a reset would empty it again.
       await team.selectOption({ label: 'Bears' });

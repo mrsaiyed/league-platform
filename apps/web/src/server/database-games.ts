@@ -87,6 +87,7 @@ export function databaseStandingsDeps(
       access: database.accessStore(scope),
       activity: database.activityLogStore(scope),
       standings: database.standingsStore(scope),
+      scoringSessions: database.scoringSessionsStore(scope),
     })),
     events: coreEventHandlers<StandingsTx>(),
     log: options.log,

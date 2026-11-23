@@ -42,6 +42,8 @@ export const enError = {
     'Say in a few words why the game is being reopened (up to 1000 characters). It is kept in the game’s corrections, never shown publicly.',
   'error.games.reopen_tracked_game.reopen-time-over':
     'It is too long since this game ended for a scorekeeper to reopen it. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.result-overturned':
+    'This result was overturned. Take the overturn off in Standings and stats first.',
   'error.games.reopen_tracked_game.scorekeepers-may-not-reopen':
     'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
   'error.games.take_over_scoring.game-closed':
@@ -101,6 +103,10 @@ export const enError = {
   'error.leagues.clear_setting.changed-since-read':
     'Someone else changed this setting while you were looking, so it was not put back to the default. The page now shows the latest value.',
   'error.leagues.clear_setting.unknown-setting': 'That setting does not exist.',
+  'error.leagues.restore_division.division-name-taken':
+    'Another division of the season now has this name. Rename one of them in Divisions, then bring this one back.',
+  'error.leagues.restore_division.division-parent-in-bin':
+    'The division it sits in is in the bin. Bring that division back first.',
   'error.leagues.restore_game.game-not-found': 'That game is not there.',
   'error.leagues.restore_game.game-not-restorable':
     'A game that was played cannot be restored. Correct it instead.',
@@ -162,6 +168,12 @@ export const enError = {
   'error.people.update_person.person-not-found': 'That person is not in the league list.',
   'error.people.update_person.sensitive-fields-not-allowed':
     'You are not allowed to change those details.',
+  'error.scheduling.restore_court.court-name-taken':
+    'Another court of the venue now has this name. Rename one of them in Venues, then bring this one back.',
+  'error.scheduling.restore_court.court-venue-in-bin':
+    'Its venue is in the bin. Bring the venue back first.',
+  'error.scheduling.restore_venue.venue-name-taken':
+    'Another venue now has this name. Rename one of them in Venues, then bring this one back.',
   'error.short-name-needed':
     'A short name could not be made from this name. Type a short name: lower-case letters and numbers, with single hyphens.',
   'error.teams.add_new_person.already-on-team':

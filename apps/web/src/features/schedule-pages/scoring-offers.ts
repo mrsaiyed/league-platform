@@ -26,6 +26,11 @@ export const scoringOfferReply = z.object({
     }),
   ),
   words: z.object({ score: z.string(), enter: z.string(), which: z.string() }).optional(),
+  /**
+   * Asked with `correct={id}` only (the public game page): "Correct this result" for the
+   * person who may reopen that decided game, and where it leads (step 2.56, H5).
+   */
+  pencil: z.object({ gameId: z.string(), href: ownAddress, label: z.string() }).optional(),
 });
 export type ScoringOfferReply = z.infer<typeof scoringOfferReply>;
 export type ScoringOffer = ScoringOfferReply['games'][number];

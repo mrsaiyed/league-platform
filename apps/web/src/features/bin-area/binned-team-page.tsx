@@ -19,7 +19,7 @@ export async function binnedTeamPage(
   const listed = await listBin(context, {}, ports.adminPeople.putBack);
   if (!listed.ok) return undefined;
   const clock = await ports.publicSchedule.clockOf(league.id);
-  const row = binView(listed.value.items, { locale, timeZone: clock.timeZone }).teams.find(
+  const row = binView(listed.value.items, { locale, timeZone: clock.timeZone }).team.find(
     (team) => team.id === teamId,
   );
   if (row === undefined) return undefined;

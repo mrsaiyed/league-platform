@@ -47,6 +47,7 @@ import {
   jobsStore,
   leaguesStore,
   schedulingStore,
+  scoringSessionsStore,
   standingsStore,
   teamsStore,
 } from '../stores/index.ts';
@@ -217,6 +218,7 @@ export async function putSeedSeasonsUnderWay(
         scheduling: schedulingStore(scope),
         games: gamesStore(scope),
         standings: standingsStore(scope),
+        scoringSessions: scoringSessionsStore(scope),
         teams: teamsStore(scope),
       })),
       events: eventHandlers,

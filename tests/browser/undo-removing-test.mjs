@@ -47,6 +47,11 @@ const player = 'Marcus Oyelaran';
 const wrens = { team: 'Wrens', people: ['Robin Wrenly', 'Sparrow Wrenly'] };
 /** Words that would promise a way back from the bin, which no screen offers yet. */
 const promises = /can be brought back|can be restored|restore it|bring it back from/i;
+// The one way back a screen does offer (step 2.77): a published game removed in the draft
+// goes to the bin when the draft is published, and the bin's "Bring it back" restores it.
+// This test checks that at its end: it publishes such a removal and finds the button.
+const offered = ['After you publish, it is moved to the bin, and can be brought back from there.'];
+let promisedFromBin = false;
 
 if (built) {
   const origin = `http://localhost:${await freePort()}`;
@@ -72,7 +77,11 @@ if (built) {
       return publicPage.locator('main').innerText();
     };
     const promisesNothing = async (label) => {
-      const text = await page.locator('main').innerText();
+      let text = await page.locator('main').innerText();
+      for (const sentence of offered) {
+        if (text.includes(sentence)) promisedFromBin = true;
+        text = text.split(sentence).join('');
+      }
       const found = text.match(promises);
       note(`no way back promised that no screen offers: ${label}`, found === null, found?.[0]);
     };
@@ -394,6 +403,29 @@ if (built) {
       (await page.locator('[data-left-entry]', { hasText: 'Tess Moreno' }).count()) === 0,
     );
     await accessible('a player put back without a number');
+
+    at = 'the way back the removal promised is offered by the bin';
+    note('the removal said a published game goes to the bin when published', promisedFromBin);
+    await openStaffMenu(page);
+    await tap(adminLink('Schedule'), /\/admin\/schedule$/);
+    const toBin = page
+      .locator('li[data-game]', { has: page.locator('summary', { hasText: 'Edit this game' }) })
+      .first();
+    const binnedId = await toBin.getAttribute('data-game');
+    await toBin.locator('summary', { hasText: 'Edit this game' }).click();
+    await tap(
+      toBin.getByRole('button', { name: 'Remove game' }),
+      /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
+    );
+    await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page.getByRole('link', { name: 'Removed games' }), /\/admin\/settings\/bin/);
+    note(
+      'the bin offers "Bring it back" for the published removal, as the schedule said',
+      (await page
+        .locator(`li[id="bin-${binnedId}"]`)
+        .getByRole('button', { name: 'Bring it back' })
+        .count()) === 1,
+    );
     await visitor.close();
   } catch (error) {
     failures.push(`${at}: ${whatWentWrong(error)}`);

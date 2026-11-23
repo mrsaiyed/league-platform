@@ -59,8 +59,13 @@ const tokens = {
   stranger: 'local-stranger-token',
   otherAdmin: 'local-other-admin-token',
 };
+// Every word below is looked for in whole pages, which also hold a script nonce made at
+// random for each answer (24 base64 letters). A three-letter name ("Noa") turned up inside
+// one such nonce now and then, and a refusal that held nothing of the person read as one
+// that did (once on GitHub: "coach: the list is refused ... : 404"). So each word is long
+// enough that no random string carries it.
 const child = {
-  first: 'Noa',
+  first: 'Noavelline',
   last: 'Quellbrook',
   email: 'noa.guardian@example.test',
   born: '2015-03-09',

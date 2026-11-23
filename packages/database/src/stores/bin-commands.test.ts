@@ -186,7 +186,13 @@ describe('the bin: restoring', () => {
     await age('teams', a, 1);
     await age('people', personId, 0);
     const team = value(await listBin(l.as, {}, deps)).items.find((i) => i.id === a);
-    expect(team?.details).toEqual({ gamesPlayed: 1, gamesToCome: 2, rosterInBin: [personId] });
+    expect(team?.details).toEqual({
+      gamesPlayed: 1,
+      gamesToCome: 2,
+      rosterInBin: [personId],
+      seasonName: expect.any(String),
+      divisionName: null,
+    });
   });
 
   it('brings back a person, and a game nobody played, but never a played one', async () => {
@@ -230,7 +236,14 @@ describe('the bin: restoring', () => {
     expect(value(await listBin(l.as, {}, deps)).items[0]?.details).toEqual({
       startsAt: null,
       withoutRound: true,
+      seasonName: expect.any(String),
+      teamsInBin: [],
     });
+    // With its home team in the bin too, the game names the team that must come back first.
+    await age('teams', a, 0);
+    const held = value(await listBin(l.as, {}, deps)).items.find((i) => i.id === planned.id);
+    expect(held?.details?.teamsInBin).toEqual([{ id: a, name: hawks.name }]);
+    await pglite.query(`update teams set deleted_at = null where id = $1`, [a]);
     value(await restoreGame(l.as, { gameId: planned.id }, deps));
     expect(await restoreGame(l.as, { gameId: played.id }, deps)).toMatchObject({
       error: { code: 'game-not-restorable' },

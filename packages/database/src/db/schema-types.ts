@@ -491,6 +491,9 @@ export interface StandingsAdjustmentsTable {
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  games_played: Generated<number>;
+  paired_with: string | null;
+  game_id: string | null;
 }
 
 export interface StandingsRowsTable {

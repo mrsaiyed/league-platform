@@ -1,8 +1,9 @@
 // The made-up world's bin, as far as a screen uses it (step 2.50, step 2.77): what is in
-// the bin (teams, people and games: the kinds the bin screen brings back), finding each
-// and bringing it back, with the same refusals as the database's store (packages/database,
-// bin-store.ts). Divisions, venues and courts are put back from their own screens' notices
-// and are not listed here; the nightly purge is not on the stand-in and says so if asked.
+// the bin (every kind, with what tells two of one name apart), finding teams, people and
+// games and bringing them back, with the same refusals as the database's store
+// (packages/database, bin-store.ts). Divisions, venues and courts are brought back by
+// their own commands on the schedule's and settings' stores; the nightly purge is not on
+// the stand-in and says so if asked.
 // A row was only marked, never changed, so whatever comes back comes back as it was.
 //
 // The stand-in keeps no moment of removal, so a thing's moment is the first time the bin
@@ -29,6 +30,10 @@ export function worldBinStore(s: LeagueWorld): BinStore {
     return at;
   };
   const teamName = (id: string) => s.teams.find((t) => t.id === id)?.name ?? '';
+  const seasonOf = (id: string) => {
+    const name = s.seasons.find((x) => x.id === id)?.name;
+    return name === undefined ? {} : { seasonName: name };
+  };
   const gamePartInBin = (game: LeagueWorld['games'][number]) =>
     s.teams.some((t) => t.binned && (t.id === game.homeTeamId || t.id === game.awayTeamId)) ||
     s.divisions.some((d) => d.binned && d.id === game.divisionId) ||
@@ -57,6 +62,8 @@ export function worldBinStore(s: LeagueWorld): BinStore {
               rosterInBin: s.roster
                 .filter((r) => r.teamId === t.id && r.leftOn === null && offTheList.has(r.personId))
                 .map((r) => r.personId),
+              ...seasonOf(t.seasonId),
+              divisionName: s.divisions.find((d) => d.id === t.divisionId)?.name ?? null,
             },
           };
         });
@@ -81,9 +88,51 @@ export function worldBinStore(s: LeagueWorld): BinStore {
           seasonId: g.seasonId,
           binnedAt: binnedAt(g.id),
           kept: true,
-          details: { startsAt: g.startsAt, withoutRound: g.roundId === null },
+          details: {
+            startsAt: g.startsAt,
+            withoutRound: g.roundId === null,
+            ...seasonOf(g.seasonId),
+            teamsInBin: s.teams
+              .filter((t) => t.binned && (t.id === g.homeTeamId || t.id === g.awayTeamId))
+              .map((t) => ({ id: t.id, name: t.name })),
+          },
         }));
-      return [...teams, ...people, ...games].sort(
+      const divisions: BinnedItem[] = s.divisions
+        .filter((d) => d.binned)
+        .map((d) => ({
+          kind: 'division',
+          id: d.id,
+          name: d.name,
+          secondName: null,
+          seasonId: d.seasonId,
+          binnedAt: binnedAt(d.id),
+          kept: s.games.some((g) => g.divisionId === d.id),
+          details: seasonOf(d.seasonId),
+        }));
+      const venues: BinnedItem[] = s.venues
+        .filter((v) => v.binned)
+        .map((v) => ({
+          kind: 'venue',
+          id: v.id,
+          name: v.name,
+          secondName: null,
+          seasonId: null,
+          binnedAt: binnedAt(v.id),
+          kept: s.games.some((g) => g.venueId === v.id),
+        }));
+      const courts: BinnedItem[] = s.courts
+        .filter((c) => c.binned)
+        .map((c) => ({
+          kind: 'court',
+          id: c.id,
+          name: c.name,
+          secondName: null,
+          seasonId: null,
+          binnedAt: binnedAt(c.id),
+          kept: s.games.some((g) => g.courtId === c.id),
+          details: { venueName: s.venues.find((v) => v.id === c.venueId)?.name ?? '' },
+        }));
+      return [...teams, ...divisions, ...venues, ...courts, ...people, ...games].sort(
         (a, b) => b.binnedAt.localeCompare(a.binnedAt) || a.id.localeCompare(b.id),
       );
     },

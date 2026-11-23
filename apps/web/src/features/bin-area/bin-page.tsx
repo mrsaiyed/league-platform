@@ -1,11 +1,12 @@
 // League settings → Bin (step 2.77, A-5, P4 §5): what was removed from the league, teams,
-// people and games, each with "Bring it back". Reached from where things are removed:
+// divisions, people, games, venues and courts, each with "Bring it back". Reached from where things are removed:
 // "Removed teams and people" on Teams, "Removed games" on Schedule, and the notice right
-// after a removal. Only the owner and the league's admins see it: League settings is
-// refused to anyone else before anything is read (loadLeaguePage), and the bin's own list
-// refuses again (leagues.list_bin). A refusal to bring something back is said beside it,
-// with what to do first; what was brought back is said at the top, with the way to it.
-import { leagueUrl, listBin } from '@srleagues/core';
+// after a removal. The owner and admins see the whole bin; a scheduler, a registrar or an
+// admin of one program sees the part they may bring back (leagues.list_bin_part, T-308),
+// and someone who may bring back nothing is refused. A refusal to bring something back is said beside it,
+// with what to do first (a game held back by its team names the team and leads to its
+// line); what was brought back is said at the top, with the way to it.
+import { leagueUrl, listBinPart } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { forbidden } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -17,7 +18,24 @@ import { StaffNotice } from '../staff/index.ts';
 import { problemKey } from '../teams-area/answer.ts';
 import { bringBackAction } from './actions.ts';
 import { binAnchors } from './bin-anchors.ts';
-import { binView, nameTakenBy, type BinKindShown, type BinRow } from './bin-view.ts';
+import {
+  binKindsShown,
+  binView,
+  nameTakenBy,
+  teamsInBinWords,
+  type BinKindShown,
+  type BinRow,
+} from './bin-view.ts';
+
+/** Each kind's part: its words' key and where it starts. */
+const parts = {
+  team: { words: 'teams', anchor: binAnchors.teams },
+  division: { words: 'divisions', anchor: binAnchors.divisions },
+  person: { words: 'people', anchor: binAnchors.people },
+  game: { words: 'games', anchor: binAnchors.games },
+  venue: { words: 'venues', anchor: binAnchors.venues },
+  court: { words: 'courts', anchor: binAnchors.courts },
+} as const;
 
 type Query = Readonly<Record<string, string | string[] | undefined>>;
 
@@ -30,15 +48,18 @@ export async function BinPage({
   readonly league: string;
   readonly query: Query;
 }) {
-  const view = await loadLeaguePage(league, 'admin', 'settings');
+  const view = await loadLeaguePage(league, 'admin');
   const here = view.context.league;
   const context = commandContextOf(view.context);
   const ports = await webPorts();
-  const listed = await listBin(context, {}, ports.adminPeople.putBack);
-  if (!listed.ok) return forbidden();
+  const listed = await listBinPart(context, {}, ports.adminPeople.putBack);
+  if (!listed.ok || listed.value.kinds.length === 0) return forbidden();
+  const mine = new Set<string>(listed.value.kinds);
   const clock = await ports.publicSchedule.clockOf(here.id);
   const times: LeagueTimes = { locale, timeZone: clock.timeZone };
   const rows = binView(listed.value.items, times);
+  // Teams in this person's own part of the bin: only those are linked to (and theirs to bring back).
+  const myTeams = new Set(rows.team.map((r) => r.id));
   const refusedId = one(query['not']);
   const refusal = refusedId === undefined ? undefined : problemKey({ problem: one(query['why']) });
   // Another team took the name (S-83): which one, and the way to it.
@@ -59,8 +80,16 @@ export async function BinPage({
     if (kind === 'person') {
       return leagueUrl(here, 'admin-area', { area: 'people', subpath: [backId] });
     }
+    if (kind === 'division') {
+      return leagueUrl(here, 'admin-area', { area: 'season', subpath: ['divisions'] });
+    }
+    if (kind === 'venue' || kind === 'court') {
+      return leagueUrl(here, 'admin-area', { area: 'schedule', subpath: ['venues'] });
+    }
     return leagueUrl(here, 'admin-area', { area: 'schedule' });
   };
+  const heldByTeam = (row: BinRow) =>
+    row.teamsInBin.length > 0 && (one(query['why']) ?? '').endsWith('.game-part-in-bin');
 
   const Row = ({ row }: { readonly row: BinRow }) => (
     <li id={`bin-${row.id}`} className="staff-row" data-bin={row.kind}>
@@ -73,7 +102,21 @@ export async function BinPage({
         ))}
         {refusedId === row.id && refusal !== undefined ? (
           <span className="ui-notice" data-kind="error" role="alert">
-            {t('admin.bin.notBack', { problem: t(refusal) })}
+            {heldByTeam(row)
+              ? teamsInBinWords(row.teamsInBin, myTeams, 'refusal')
+              : t('admin.bin.notBack', { problem: t(refusal) })}
+            {!heldByTeam(row)
+              ? null
+              : row.teamsInBin
+                  .filter((team) => myTeams.has(team.id))
+                  .map((team) => (
+                    <span key={team.id}>
+                      {' '}
+                      <a dir="auto" href={`#bin-${team.id}`}>
+                        {t('admin.bin.game.teamInBinLink', { name: team.name })}
+                      </a>
+                    </span>
+                  ))}
             {takenBy === undefined ? null : (
               <>
                 {' '}
@@ -124,10 +167,9 @@ export async function BinPage({
     </section>
   );
 
-  const backKind: BinKindShown | undefined =
-    back === 'team' || back === 'person' || back === 'game' ? back : undefined;
+  const backKind = binKindsShown.find((kind) => kind === back);
   const backHref = backKind === undefined ? undefined : backTo(backKind);
-  const nothing = rows.teams.length + rows.people.length + rows.games.length === 0;
+  const nothing = binKindsShown.every((kind) => rows[kind].length === 0);
   return (
     <main className="admin-teams">
       <PageHead title={t('admin.bin.title')} sub={t('admin.bin.sub')} />
@@ -142,25 +184,26 @@ export async function BinPage({
         </StaffNotice>
       )}
       <p>{t('admin.bin.keep', { days: listed.value.keepDays })}</p>
-      {nothing ? <EmptyPanel text={t('admin.bin.empty')} /> : null}
-      <Part
-        id={binAnchors.teams}
-        title={t('admin.bin.teams.title')}
-        none={t('admin.bin.teams.none')}
-        of={rows.teams}
-      />
-      <Part
-        id={binAnchors.people}
-        title={t('admin.bin.people.title')}
-        none={t('admin.bin.people.none')}
-        of={rows.people}
-      />
-      <Part
-        id={binAnchors.games}
-        title={t('admin.bin.games.title')}
-        none={t('admin.bin.games.none')}
-        of={rows.games}
-      />
+      {nothing ? (
+        <EmptyPanel
+          text={t(
+            binKindsShown.every((kind) => mine.has(kind))
+              ? 'admin.bin.empty'
+              : 'admin.bin.emptyMine',
+          )}
+        />
+      ) : null}
+      {binKindsShown
+        .filter((kind) => mine.has(kind))
+        .map((kind: BinKindShown) => (
+          <Part
+            key={kind}
+            id={parts[kind].anchor}
+            title={t(`admin.bin.${parts[kind].words}.title`)}
+            none={t(`admin.bin.${parts[kind].words}.none`)}
+            of={rows[kind]}
+          />
+        ))}
     </main>
   );
 }

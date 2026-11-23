@@ -1382,11 +1382,14 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
       id: big(0xad, 1),
       seasonId: standInSeasonIds.adultFall,
       teamId: badgers,
+      // The forfeit the Badgers won in round 1 becomes a loss, so their record still adds
+      // up (3 played, 0–3; the numbers audit's M6): a double forfeit, the Otters' loss kept.
       wins: -1,
-      losses: 0,
+      losses: 1,
       ties: 0,
       points: 0,
-      reason: 'Played an ineligible player in round 3.',
+      reason:
+        'Round 1 forfeit win over the Otters taken back: the Badgers were short of players too.',
       binned: false,
     },
   ];
