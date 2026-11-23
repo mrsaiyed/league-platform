@@ -23,6 +23,7 @@ import {
   findTeamGames,
   insertRosterEntry,
   insertTeam,
+  listLeftTeamsOfSeason,
   listRoster,
   listScheduleTeams,
   listStaffSeasonTeams,
@@ -80,6 +81,20 @@ registerIsolationCase({
   subject: listScheduleTeams,
   name: "name the target's season's teams for the schedule grid, those in the bin too",
   run: (scope, target) => listScheduleTeams(scope, target.seasonId),
+});
+
+registerIsolationCase({
+  subject: listLeftTeamsOfSeason,
+  // The target's team marked as left, a fixed time, so there is something to reach.
+  arrange: (scope, target) =>
+    transactionOf(scope)
+      .updateTable('teams')
+      .set({ left_at: '2026-01-01T00:00:00Z' })
+      .where('league_id', '=', scope.leagueId)
+      .where('id', '=', target.teamId)
+      .execute(),
+  name: "say which of the target's season's teams have left the league",
+  run: (scope, target) => listLeftTeamsOfSeason(scope, target.seasonId, [target.teamId]),
 });
 
 registerIsolationCase({
