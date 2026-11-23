@@ -189,7 +189,9 @@ if (world?.browser) {
         page.waitForResponse((r) => new URL(r.url()).pathname.includes('/invitation/')),
         shown.click(),
       ]);
-      await page.waitForURL((url) => url.pathname.startsWith('/north-valley/invitation/'));
+      // Since step 2.97 the link holds its token in a cookie and forwards to the accept
+      // page, whose address holds no secret (record 086).
+      await page.waitForURL((url) => url.pathname === '/north-valley/invitation');
       await page.locator('main').first().waitFor();
       note(
         'following it opens the invitation page, which answers',
