@@ -52,9 +52,13 @@ export const listBinPart = defineCommand({
             (grant) =>
               grant.revokedAt === null &&
               allows(holder, restoreNeeds[kind], grant.scope) &&
-              (bySeason.has(kind) || grant.scope.type === 'league'),
+              (grant.scope.type === 'league' ||
+                (bySeason.has(kind) && grant.scope.type === 'program')),
           )),
     );
+    if (holder === undefined || kinds.length === 0) {
+      return ok({ keepDays: binKeepDays, kinds, items: [] });
+    }
     const scopes = new Map<string, Scope>();
     const scopeOf = async (seasonId: string): Promise<Scope> => {
       const known = scopes.get(seasonId);

@@ -39,6 +39,7 @@ export function binView(items: readonly BinListing[], times: LeagueTimes): BinVi
   const personName = new Map(
     items.filter((i) => i.kind === 'person').map((i) => [i.id, i.name] as const),
   );
+  const teamIds = new Set(items.filter((i) => i.kind === 'team').map((i) => i.id));
   const rows = items.map((item): BinRow => {
     const details = item.details ?? {};
     const season =
@@ -57,10 +58,18 @@ export function binView(items: readonly BinListing[], times: LeagueTimes): BinVi
           toCome: details.gamesToCome ?? 0,
         }),
       );
-      const names = (details.rosterInBin ?? [])
-        .map((id) => personName.get(id) || t('admin.bin.person.unnamed'))
-        .join(', ');
-      if (names !== '') facts.push(t('admin.bin.team.rosterInBin', { names }));
+      // Names only to whoever sees the people's part (all of it, league-wide); else a count.
+      const roster = details.rosterInBin ?? [];
+      if (roster.length > 0 && roster.every((id) => personName.has(id))) {
+        const names = roster
+          .map((id) => personName.get(id) || t('admin.bin.person.unnamed'))
+          .join(', ');
+        facts.push(t('admin.bin.team.rosterInBin', { names }));
+      } else if (roster.length === 1) {
+        facts.push(t('admin.bin.team.rosterInBinOne'));
+      } else if (roster.length > 1) {
+        facts.push(t('admin.bin.team.rosterInBinCount', { count: roster.length }));
+      }
       return { ...row, facts };
     }
     if (item.kind === 'person') {
@@ -76,11 +85,7 @@ export function binView(items: readonly BinListing[], times: LeagueTimes): BinVi
     const facts = [...season, gameWhenText(details.startsAt ?? null, times)];
     if (details.withoutRound === true) facts.push(t('admin.bin.game.noRound'));
     const teamsInBin = details.teamsInBin ?? [];
-    if (teamsInBin.length > 0) {
-      facts.push(
-        t('admin.bin.game.teamInBin', { names: teamsInBin.map((team) => team.name).join(', ') }),
-      );
-    }
+    if (teamsInBin.length > 0) facts.push(teamsInBinWords(teamsInBin, teamIds, 'fact'));
     const title = t('admin.bin.game.name', { home: item.name, away: item.secondName ?? '' });
     return { ...row, title, facts, teamsInBin };
   });
@@ -93,6 +98,41 @@ export function binView(items: readonly BinListing[], times: LeagueTimes): BinVi
     venue: of('venue'),
     court: of('court'),
   };
+}
+
+/**
+ * What holds a game back: its team or two teams in the bin, and what to do. Whoever has
+ * those teams in their own part of the bin (`mine`) brings them back first; anyone else
+ * asks an admin.
+ */
+export function teamsInBinWords(
+  teams: readonly { readonly id: string; readonly name: string }[],
+  mine: ReadonlySet<string>,
+  as: 'fact' | 'refusal',
+): string {
+  const ask = !teams.every((team) => mine.has(team.id));
+  const [first, second] = teams;
+  if (second !== undefined && first !== undefined) {
+    const key =
+      as === 'fact'
+        ? ask
+          ? 'admin.bin.game.teamsInBinAsk'
+          : 'admin.bin.game.teamsInBin'
+        : ask
+          ? 'admin.bin.game.notBackTeamsAsk'
+          : 'admin.bin.game.notBackTeams';
+    return t(key, { first: first.name, second: second.name });
+  }
+  const names = teams.map((team) => team.name).join(', ');
+  const key =
+    as === 'fact'
+      ? ask
+        ? 'admin.bin.game.teamInBinAsk'
+        : 'admin.bin.game.teamInBin'
+      : ask
+        ? 'admin.bin.game.notBackTeamAsk'
+        : 'admin.bin.game.notBackTeam';
+  return t(key, { names });
 }
 
 /**

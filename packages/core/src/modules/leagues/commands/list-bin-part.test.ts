@@ -43,10 +43,16 @@ describe('listBinPart', () => {
     expect(part.kinds).toEqual(['game', 'venue', 'court']);
   });
 
-  it('gives a registrar what removing people and teams lets them restore', async () => {
-    const part = await names([grantOf('r', 'registrar')], 'r');
-    expect(part.names).not.toContain('A v B');
-    expect(part.names).toContain('Ada Lovell');
+  it('gives a registrar what removing people lets them restore: the people only', async () => {
+    expect(await names([grantOf('r', 'registrar')], 'r')).toEqual({
+      kinds: ['person'],
+      names: ['Ada Lovell'],
+    });
+  });
+
+  it("gives a club's admin nothing: their teams are restored at the program", async () => {
+    const clubAdmin: Grant = { ...grantOf('c', 'club_admin'), scope: { type: 'club', id: 'c1' } };
+    expect(await names([clubAdmin], 'c')).toEqual({ kinds: [], names: [] });
   });
 
   it("gives a program's admin only that program's things, nothing league-wide", async () => {

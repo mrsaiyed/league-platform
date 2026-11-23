@@ -38,12 +38,26 @@ export const enAdmin = {
   'admin.bin.divisions.none': 'No removed divisions.',
   'admin.bin.divisions.title': 'Removed divisions',
   'admin.bin.empty': 'Nothing is in the bin.',
+  'admin.bin.emptyMine': 'Nothing you can bring back is in the bin.',
   'admin.bin.game.name': '{home} against {away}',
   'admin.bin.game.noRound': 'It has no round now, so it comes back with no round.',
+  // A game held back by its team(s) in the bin; "Ask" for someone who may not bring them back.
   'admin.bin.game.notBackTeam':
     'Not brought back: its team {names} is in the bin. Bring the team back first.',
+  'admin.bin.game.notBackTeamAsk':
+    'Not brought back: its team {names} is in the bin. Ask an admin to bring the team back.',
+  'admin.bin.game.notBackTeams':
+    'Not brought back: its teams {first} and {second} are in the bin. Bring the teams back first.',
+  'admin.bin.game.notBackTeamsAsk':
+    'Not brought back: its teams {first} and {second} are in the bin. Ask an admin to bring the teams back.',
   'admin.bin.game.teamInBin': 'Its team in the bin: {names}. Bring the team back first.',
+  'admin.bin.game.teamInBinAsk':
+    'Its team in the bin: {names}. Ask an admin to bring the team back.',
   'admin.bin.game.teamInBinLink': 'Go to {name} in the bin',
+  'admin.bin.game.teamsInBin':
+    'Its teams {first} and {second} are in the bin. Bring the teams back first.',
+  'admin.bin.game.teamsInBinAsk':
+    'Its teams {first} and {second} are in the bin. Ask an admin to bring the teams back.',
   'admin.bin.games.none': 'No removed games.',
   'admin.bin.games.title': 'Removed games',
   'admin.bin.inSeason': 'Season: {season}.',
@@ -64,6 +78,10 @@ export const enAdmin = {
     'Games played: {played}. Games still to play: {toCome}. They come back with it.',
   'admin.bin.team.rosterInBin':
     'On its roster and in the bin too: {names}. The team comes back without them on the league list: bring them back as well, under Removed people.',
+  'admin.bin.team.rosterInBinCount':
+    'On its roster and in the bin too: {count} people. The team comes back without them on the league list.',
+  'admin.bin.team.rosterInBinOne':
+    'On its roster and in the bin too: one person. The team comes back without them on the league list.',
   'admin.bin.teamPage.body':
     'This team is in the bin. Bring it back and its roster and games come back with it.',
   'admin.bin.teamPage.title': 'This team is in the bin',

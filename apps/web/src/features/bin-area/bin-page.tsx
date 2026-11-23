@@ -18,7 +18,14 @@ import { StaffNotice } from '../staff/index.ts';
 import { problemKey } from '../teams-area/answer.ts';
 import { bringBackAction } from './actions.ts';
 import { binAnchors } from './bin-anchors.ts';
-import { binKindsShown, binView, nameTakenBy, type BinKindShown, type BinRow } from './bin-view.ts';
+import {
+  binKindsShown,
+  binView,
+  nameTakenBy,
+  teamsInBinWords,
+  type BinKindShown,
+  type BinRow,
+} from './bin-view.ts';
 
 /** Each kind's part: its words' key and where it starts. */
 const parts = {
@@ -51,6 +58,8 @@ export async function BinPage({
   const clock = await ports.publicSchedule.clockOf(here.id);
   const times: LeagueTimes = { locale, timeZone: clock.timeZone };
   const rows = binView(listed.value.items, times);
+  // Teams in this person's own part of the bin: only those are linked to (and theirs to bring back).
+  const myTeams = new Set(rows.team.map((r) => r.id));
   const refusedId = one(query['not']);
   const refusal = refusedId === undefined ? undefined : problemKey({ problem: one(query['why']) });
   // Another team took the name (S-83): which one, and the way to it.
@@ -94,20 +103,20 @@ export async function BinPage({
         {refusedId === row.id && refusal !== undefined ? (
           <span className="ui-notice" data-kind="error" role="alert">
             {heldByTeam(row)
-              ? t('admin.bin.game.notBackTeam', {
-                  names: row.teamsInBin.map((team) => team.name).join(', '),
-                })
+              ? teamsInBinWords(row.teamsInBin, myTeams, 'refusal')
               : t('admin.bin.notBack', { problem: t(refusal) })}
-            {!heldByTeam(row) || !mine.has('team')
+            {!heldByTeam(row)
               ? null
-              : row.teamsInBin.map((team) => (
-                  <span key={team.id}>
-                    {' '}
-                    <a dir="auto" href={`#bin-${team.id}`}>
-                      {t('admin.bin.game.teamInBinLink', { name: team.name })}
-                    </a>
-                  </span>
-                ))}
+              : row.teamsInBin
+                  .filter((team) => myTeams.has(team.id))
+                  .map((team) => (
+                    <span key={team.id}>
+                      {' '}
+                      <a dir="auto" href={`#bin-${team.id}`}>
+                        {t('admin.bin.game.teamInBinLink', { name: team.name })}
+                      </a>
+                    </span>
+                  ))}
             {takenBy === undefined ? null : (
               <>
                 {' '}
@@ -175,7 +184,15 @@ export async function BinPage({
         </StaffNotice>
       )}
       <p>{t('admin.bin.keep', { days: listed.value.keepDays })}</p>
-      {nothing ? <EmptyPanel text={t('admin.bin.empty')} /> : null}
+      {nothing ? (
+        <EmptyPanel
+          text={t(
+            binKindsShown.every((kind) => mine.has(kind))
+              ? 'admin.bin.empty'
+              : 'admin.bin.emptyMine',
+          )}
+        />
+      ) : null}
       {binKindsShown
         .filter((kind) => mine.has(kind))
         .map((kind: BinKindShown) => (

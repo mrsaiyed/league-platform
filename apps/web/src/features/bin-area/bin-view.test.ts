@@ -56,8 +56,58 @@ describe('what the bin screen shows (step 2.77)', () => {
     expect(game?.title).toBe('Hawks against Owls');
     expect(game?.facts[0]).toBe('Season: Winter 2027.');
     expect(game?.facts).toContain('It has no round now, so it comes back with no round.');
-    expect(game?.facts).toContain('Its team in the bin: Hawks. Bring the team back first.');
+    // The team is not in this person's part: they ask an admin.
+    expect(game?.facts).toContain(
+      'Its team in the bin: Hawks. Ask an admin to bring the team back.',
+    );
     expect(game?.teamsInBin).toEqual([{ id: 't-1', name: 'Hawks' }]);
+  });
+
+  it('says both teams of a game in the bin, and to bring them back to whoever may', () => {
+    const team = (id: string, name: string): BinListing => ({
+      ...base,
+      kind: 'team',
+      id,
+      name,
+      kept: true,
+    });
+    const items: BinListing[] = [
+      team('t-1', 'Hawks'),
+      team('t-2', 'Owls'),
+      {
+        ...base,
+        kind: 'game',
+        id: 'g-1',
+        name: 'Hawks',
+        secondName: 'Owls',
+        kept: true,
+        details: {
+          teamsInBin: [
+            { id: 't-1', name: 'Hawks' },
+            { id: 't-2', name: 'Owls' },
+          ],
+        },
+      },
+    ];
+    expect(binView(items, times).game[0]?.facts).toContain(
+      'Its teams Hawks and Owls are in the bin. Bring the teams back first.',
+    );
+  });
+
+  it("counts a team's binned roster, unnamed, for whoever does not see the people", () => {
+    const items: BinListing[] = [
+      {
+        ...base,
+        kind: 'team',
+        id: 't-1',
+        name: 'Hawks',
+        kept: true,
+        details: { rosterInBin: ['p-1', 'p-2'] },
+      },
+    ];
+    expect(binView(items, times).team[0]?.facts).toContain(
+      'On its roster and in the bin too: 2 people. The team comes back without them on the league list.',
+    );
   });
 
   it('lists divisions with their season, venues, and courts with their venue', () => {
