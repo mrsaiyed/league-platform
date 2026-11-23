@@ -13,7 +13,7 @@ import {
   restoreGame,
   restorePerson,
   restoreTeam,
-  type BinTx,
+  type RestoreGameTx,
   type CommandDeps,
   type Job,
   type PeopleTx,
@@ -27,10 +27,12 @@ import { freshSchema, newLeague, newSeason, one } from '../schema/schema.test-he
 import { accessStore } from './access-store.ts';
 import { activityLogStore } from './activity-log-store.ts';
 import { binStore } from './bin-store.ts';
+import { gamesStore } from './games-store.ts';
 import { peopleStore } from './people-store.ts';
+import { schedulingStore } from './scheduling-store.ts';
 import { teamsStore } from './teams-store.ts';
 
-type Tx = BinTx & TeamsTx & PeopleTx;
+type Tx = RestoreGameTx & TeamsTx & PeopleTx;
 
 let pglite: PGlite;
 let db: DatabaseHandle;
@@ -42,6 +44,8 @@ beforeAll(async () => {
   run = commandTransaction(db, (scope) => ({
     jobs: { enqueue: async (_job: Job) => {} },
     bin: binStore(scope),
+    scheduling: schedulingStore(scope),
+    games: gamesStore(scope),
     teams: teamsStore(scope),
     people: peopleStore(scope),
     access: accessStore(scope),
@@ -244,7 +248,8 @@ describe('the bin: restoring', () => {
     const held = value(await listBin(l.as, {}, deps)).items.find((i) => i.id === planned.id);
     expect(held?.details?.teamsInBin).toEqual([{ id: a, name: hawks.name }]);
     await pglite.query(`update teams set deleted_at = null where id = $1`, [a]);
-    value(await restoreGame(l.as, { gameId: planned.id }, deps));
+    // A-19: bringing it back is a schedule change, with a revision of its own.
+    expect(value(await restoreGame(l.as, { gameId: planned.id }, deps)).revision).toBe(1);
     expect(await restoreGame(l.as, { gameId: played.id }, deps)).toMatchObject({
       error: { code: 'game-not-restorable' },
     });
