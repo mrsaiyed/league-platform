@@ -26,12 +26,55 @@ const nameIn =
   (id: string): string =>
     teams.find((x) => x.id === id)?.name ?? t('schedule.admin.publishUnknownTeam');
 
+/** How the page names a place and a round, so a line can say what of a game's slot changed. */
+export type PublishPlaces = {
+  readonly placeOf: (venueId: string | null, court: string | null) => string | null;
+  readonly roundOf: (roundId: string | null) => string | null;
+};
+
+const noPlaces: PublishPlaces = { placeOf: () => null, roundOf: () => null };
+
+type FullSlot = NonNullable<PublishGameChange['after']>;
+
+/**
+ * What of a moved game's slot changed, in words: the time, the place, the round, each only
+ * when it changed. Empty when the slot is the same (a postponed game back on its date).
+ */
+const movedParts = (before: FullSlot, after: FullSlot, places: PublishPlaces): string[] => {
+  const parts: string[] = [];
+  if (before.date !== after.date || before.time !== after.time) {
+    parts.push(
+      t('schedule.admin.publishGame.time', { from: whenText(before), to: whenText(after) }),
+    );
+  }
+  if (before.venueId !== after.venueId || before.court !== after.court) {
+    const named = (s: FullSlot) =>
+      places.placeOf(s.venueId, s.court) ?? s.court ?? t('schedule.admin.noPlace');
+    parts.push(t('schedule.admin.publishGame.place', { from: named(before), to: named(after) }));
+  }
+  if (before.roundId !== after.roundId) {
+    parts.push(
+      t('schedule.admin.publishGame.round', {
+        round: places.roundOf(after.roundId) ?? t('schedule.admin.publishGame.noRound'),
+      }),
+    );
+  }
+  return parts;
+};
+
 /** One line for each game publishing adds, moves or removes, in the order core gives. */
 export function publishLines(
   changes: readonly PublishGameChange[],
   teams: readonly GridTeam[],
+  places: PublishPlaces = noPlaces,
 ): PublishLine[] {
   const name = nameIn(teams);
+  const movedText = (game: string, before: FullSlot, after: FullSlot): string => {
+    const parts = movedParts(before, after, places);
+    return parts.length === 0
+      ? t('schedule.admin.publishGame.backOnDate', { game, when: whenText(after) })
+      : t('schedule.admin.publishGame.moved', { game, what: parts.join(', ') });
+  };
   return changes.map((c) => {
     const game = t('schedule.admin.gameVs', { away: name(c.awayTeamId), home: name(c.homeTeamId) });
     const text =
@@ -40,11 +83,7 @@ export function publishLines(
         : c.kind === 'removed' && c.before !== null
           ? t('schedule.admin.publishGame.removed', { game, when: whenText(c.before) })
           : c.before !== null && c.after !== null
-            ? t('schedule.admin.publishGame.moved', {
-                game,
-                from: whenText(c.before),
-                to: whenText(c.after),
-              })
+            ? movedText(game, c.before, c.after)
             : t('schedule.admin.publishGame.changed', { game });
     return { gameId: c.gameId, kind: c.kind, text };
   });

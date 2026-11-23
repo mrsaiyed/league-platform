@@ -128,8 +128,15 @@ export function applyDraftChange(
       if (!a) return fail({ code: 'unknown-game', gameId: change.gameId });
       if (!b) return fail({ code: 'unknown-game', gameId: change.otherGameId });
       if (a.id === b.id) return fail({ code: 'swap-with-itself', gameId: a.id });
+      // A postponed game swapped into another slot is given a new date, as by a move.
+      const scheduled = (g: ScheduleGame): Partial<ScheduleGame> =>
+        g.status === 'postponed' ? { status: 'scheduled' } : {};
       const games = state.games.map((g) =>
-        g.id === a.id ? { ...g, ...slotOf(b) } : g.id === b.id ? { ...g, ...slotOf(a) } : g,
+        g.id === a.id
+          ? { ...g, ...slotOf(b), ...scheduled(g) }
+          : g.id === b.id
+            ? { ...g, ...slotOf(a), ...scheduled(g) }
+            : g,
       );
       return done({ ...state, games }, [a.id, b.id]);
     }
