@@ -112,8 +112,10 @@ async function noChildInOwnLeague(scope: LeagueScope, target: LeagueRecords) {
       .where('league_id', '=', scope.leagueId)
       .execute();
     await sql`release savepoint no_child_here`.execute(trx);
-  } catch {
+  } catch (error) {
+    // Rolled back, then thrown: the case must not go on quietly in a weaker form.
     await sql`rollback to savepoint no_child_here`.execute(trx);
+    throw error;
   }
 }
 

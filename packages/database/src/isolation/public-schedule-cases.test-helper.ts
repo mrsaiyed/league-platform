@@ -54,7 +54,8 @@ export async function setTargetLeagueApart(inTarget: LeagueScope) {
  * Writes the scope's own league row again (inside the run's rolled-back transaction), so
  * the database keeps it after the other league's: a read that lost its
  * `where id = scope.leagueId` would meet the target's row first and name it. Where the
- * fence refuses the write, nothing is moved and the read goes on.
+ * database refuses the write, it is rolled back to the savepoint and the error thrown, so
+ * the case fails rather than read with the row unmoved.
  */
 export async function moveOwnLeagueRowLast(scope: LeagueScope) {
   const trx = transactionOf(scope);
@@ -66,8 +67,10 @@ export async function moveOwnLeagueRowLast(scope: LeagueScope) {
       .where('id', '=', scope.leagueId)
       .execute();
     await sql`release savepoint move_league_row`.execute(trx);
-  } catch {
+  } catch (error) {
+    // Rolled back, then thrown: the read must not go on quietly with the row unmoved.
     await sql`rollback to savepoint move_league_row`.execute(trx);
+    throw error;
   }
 }
 
