@@ -2,6 +2,7 @@ import { platformUrl } from '@srleagues/core';
 import { redirect } from 'next/navigation';
 import {
   BotCheckField,
+  fieldRefusal,
   SignInScreen,
   SubmitButton,
   type SearchProps,
@@ -30,8 +31,13 @@ export default async function Page({ searchParams }: SearchProps) {
   if (flow === undefined) {
     if ((await signedInPerson()).kind === 'signed-in') redirect(platformUrl('account'));
     return (
-      <SignInScreen title="code.title" intro={t('code.nothingWaiting')} search={search}>
-        <CodeForm />
+      <SignInScreen
+        title="code.title"
+        intro={t('code.nothingWaiting')}
+        search={search}
+        fields={['code']}
+      >
+        <CodeForm search={search} />
         <p>
           <a className="ui-button" data-kind="quiet" href={platformUrl('signup')}>
             {t('code.startAgain')}
@@ -54,6 +60,7 @@ export default async function Page({ searchParams }: SearchProps) {
         sentAgain ? t(reset ? 'code.sentAgainReset' : 'code.sentAgain', words) : undefined
       }
       search={search}
+      fields={['code']}
     >
       <p data-code-address="">
         {t('code.wrongAddress')}{' '}
@@ -61,7 +68,7 @@ export default async function Page({ searchParams }: SearchProps) {
           {t('code.changeAddress')}
         </a>
       </p>
-      <CodeForm />
+      <CodeForm search={search} />
       {/* A new code to the same address, behind the same check as the first (T4 §6). */}
       <form action={resendCodeAction}>
         <BotCheckField {...botCheck} action={flow.purpose} />
@@ -71,8 +78,11 @@ export default async function Page({ searchParams }: SearchProps) {
   );
 }
 
+type SearchOf = Awaited<SearchProps['searchParams']>;
+
 /** The code's own box and button. */
-function CodeForm() {
+function CodeForm({ search }: { readonly search: SearchOf }) {
+  const { input, refusal } = fieldRefusal(search, 'code');
   return (
     <form action={enterCodeAction}>
       <p className="ui-field">
@@ -84,8 +94,10 @@ function CodeForm() {
             autoComplete="one-time-code"
             maxLength={12}
             required
+            {...input}
           />
         </label>
+        {refusal}
       </p>
       <SubmitButton words="code.submit" />
     </form>

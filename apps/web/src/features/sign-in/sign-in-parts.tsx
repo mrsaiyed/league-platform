@@ -5,7 +5,13 @@ import { botCheckDidNotLoad, type BotCheckAction, type BotCheckWidget } from '@s
 import type { ReactNode } from 'react';
 import { webPorts } from '../../server/container.ts';
 import { t, type TextKey } from '../../server/messages.ts';
-import { noticeOf, notices, problemOf, problems } from '../../server/sign-in/problems.ts';
+import {
+  noticeOf,
+  notices,
+  problemOf,
+  problems,
+  type Problem,
+} from '../../server/sign-in/problems.ts';
 import { StandalonePage, TestCopyLine } from '../shell/index.ts';
 import { BotCheckBox } from './bot-check-box.tsx';
 import { ShowPassword } from './show-password.tsx';
@@ -88,6 +94,7 @@ export async function SignInScreen({
   forgotHint = false,
   google = false,
   noticeWords,
+  fields = [],
   children,
 }: {
   readonly title: TextKey;
@@ -99,9 +106,14 @@ export async function SignInScreen({
   readonly google?: boolean;
   /** The words of a notice the screen words itself (the code screen names the address). */
   readonly noticeWords?: string | undefined;
+  /** The fields this screen draws with their own refusal beside them (fieldRefusal). */
+  readonly fields?: readonly SignInField[];
   readonly children: ReactNode;
 }) {
   const problem = problemOf(search);
+  // A refusal of one field this screen draws sits beside that field, not above the form.
+  const field = problem === undefined ? undefined : fieldOfProblem(problem.name);
+  const atTop = field === undefined || !fields.includes(field);
   const notice = noticeOf(search);
   const said =
     noticeWords ??
@@ -122,7 +134,7 @@ export async function SignInScreen({
         {intro === undefined ? null : <p>{intro}</p>}
         {/* Above the form, on the test copy only (step 2.205). */}
         <TestCopyLine shown={testCopy} />
-        {problem === undefined ? null : (
+        {problem === undefined || !atTop ? null : (
           <p
             className="ui-refusal"
             role="alert"
@@ -140,8 +152,55 @@ export async function SignInScreen({
   );
 }
 
+/** The one field a refusal is about, where it is about one (DESIGN.md section 4, line 22). */
+export type SignInField = 'email' | 'password' | 'code';
+const problemFields: Partial<Record<Problem, SignInField>> = {
+  invalidEmail: 'email',
+  onlyMadeUpAddresses: 'email',
+  codeWrong: 'code',
+  codeExpired: 'code',
+  passwordTooShort: 'password',
+  passwordTooLong: 'password',
+  passwordLeaked: 'password',
+  wrongPassword: 'password',
+};
+/** The field `name` is about, or undefined when it is about the whole form. */
+export function fieldOfProblem(name: Problem): SignInField | undefined {
+  return problemFields[name];
+}
+
+/** The refusal of `field` in the address, if the address carries one. */
+function refusalOf(search: Search | undefined, field: SignInField) {
+  const problem = search === undefined ? undefined : problemOf(search);
+  if (problem === undefined || problem.name === 'tooManyAttempts') return undefined;
+  return fieldOfProblem(problem.name) === field ? problem.name : undefined;
+}
+
+/**
+ * A field's own refusal, under its box (step 2.102): the same mark and words the screen
+ * drew above the form before, and the field points at it (`aria-describedby`). Every
+ * screen whose address can carry such a refusal draws the field it is about.
+ */
+export function fieldRefusal(search: Search | undefined, field: SignInField) {
+  const name = refusalOf(search, field);
+  const id = `${field}-refusal`;
+  return {
+    input: name === undefined ? {} : { 'aria-invalid': true, 'aria-describedby': id },
+    refusal:
+      name === undefined ? null : (
+        <span className="ui-refusal" role="alert" id={id} data-sign-in-problem={name}>
+          {t(problems[name])}
+        </span>
+      ),
+  } as const;
+}
+
 /** `value`: the address to fill in again (one typed before, on this device). */
-export function EmailField({ value }: { readonly value?: string | undefined } = {}) {
+export function EmailField({
+  value,
+  search,
+}: { readonly value?: string | undefined; readonly search?: Search } = {}) {
+  const { input, refusal } = fieldRefusal(search, 'email');
   return (
     <p className="ui-field">
       <label>
@@ -153,8 +212,10 @@ export function EmailField({ value }: { readonly value?: string | undefined } = 
           maxLength={254}
           required
           defaultValue={value}
+          {...input}
         />
       </label>
+      {refusal}
     </p>
   );
 }
@@ -164,8 +225,15 @@ export function EmailField({ value }: { readonly value?: string | undefined } = 
  * field has "Show" beside it (L9), drawn once the page's script runs: with scripts off
  * there is nothing it could do, so it is not drawn.
  */
-export function PasswordField({ fresh = false }: { readonly fresh?: boolean }) {
+export function PasswordField({
+  fresh = false,
+  search,
+}: {
+  readonly fresh?: boolean;
+  readonly search?: Search;
+}) {
   const id = fresh ? 'new-password' : 'current-password';
+  const { input, refusal } = fieldRefusal(search, 'password');
   return (
     <p className="ui-field">
       <label htmlFor={id}>{t('signIn.password')}</label>
@@ -178,9 +246,11 @@ export function PasswordField({ fresh = false }: { readonly fresh?: boolean }) {
           minLength={fresh ? 8 : 1}
           maxLength={1024}
           required
+          {...input}
         />
         <ShowPassword field={id} show={t('password.show')} hide={t('password.hide')} />
       </span>
+      {refusal}
     </p>
   );
 }

@@ -33,10 +33,11 @@ export default async function Page({ searchParams }: SearchProps) {
       title={flow.purpose === 'reset' ? 'password.titleReset' : 'password.title'}
       intro={t('password.rules')}
       search={search}
+      fields={['password']}
     >
       {flow.existing === true ? <p data-account-exists="">{t('password.existing')}</p> : null}
       <form action={choosePasswordAction}>
-        <PasswordField fresh />
+        <PasswordField fresh search={search} />
         <SubmitButton words="password.submit" />
       </form>
     </SignInScreen>

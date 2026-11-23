@@ -115,6 +115,11 @@ export const formCardCss = `
 .ui-field-row .ui-button {
   flex: none;
 }
+/* A refusal of one field, under its box (DESIGN.md line 22). */
+.ui-message .ui-field > .ui-refusal {
+  padding-block: var(--step-2);
+  font-size: var(--text-14);
+}
 .ui-form-card :is(button, .ui-button)[data-kind='main'],
 .ui-form-card :is(button, .ui-button)[data-kind='second'] {
   inline-size: 100%;
@@ -199,7 +204,7 @@ export const formCardCss = `
 
 /* Inside the card, a list of cards (the account's leagues) is drawn as rows: the name as
    the way in, what the person is beneath it, and a second way ("Admin") at the far end. */
-.ui-form-card .ui-card-grid {
+:is(.ui-form-card, .ui-page-card) .ui-card-grid {
   display: grid;
   grid-template-columns: none;
   gap: 0;
@@ -207,7 +212,7 @@ export const formCardCss = `
   padding: 0;
   list-style: none;
 }
-.ui-form-card .ui-card-grid > li {
+:is(.ui-form-card, .ui-page-card) .ui-card-grid > li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -217,10 +222,10 @@ export const formCardCss = `
   color: var(--color-muted);
   font-size: var(--text-14);
 }
-.ui-form-card .ui-card-grid > li:first-child {
+:is(.ui-form-card, .ui-page-card) .ui-card-grid > li:first-child {
   border-block-start: 1px solid var(--color-line);
 }
-.ui-form-card .ui-card-grid > li > .ui-button:first-child {
+:is(.ui-form-card, .ui-page-card) .ui-card-grid > li > .ui-button:first-child {
   justify-content: flex-start;
   padding-inline: 0;
   border-color: transparent;
@@ -228,15 +233,15 @@ export const formCardCss = `
   font-size: var(--text-16);
   text-align: start;
 }
-.ui-form-card .ui-card-grid > li > .ui-button:first-child:hover {
+:is(.ui-form-card, .ui-page-card) .ui-card-grid > li > .ui-button:first-child:hover {
   background: transparent;
   text-decoration: underline;
 }
-.ui-form-card .ui-card-grid > li > :not(.ui-button) {
+:is(.ui-form-card, .ui-page-card) .ui-card-grid > li > :not(.ui-button) {
   grid-column: 1;
   padding-block-end: var(--step-2);
 }
-.ui-form-card .ui-card-grid > li > .ui-button:not(:first-child) {
+:is(.ui-form-card, .ui-page-card) .ui-card-grid > li > .ui-button:not(:first-child) {
   grid-column: 2;
   grid-row: 1 / span 2;
 }

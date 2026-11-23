@@ -437,6 +437,56 @@ if (browser) {
     }
   });
 
+  // Step 2.102: SR Leagues' serif titles reach the pages of no league, "not found" among
+  // them; under a league's address, a page not found keeps the league's own look.
+  await step('a page not found keeps the look of where it is', async () => {
+    const { context, page } = await fresh();
+    try {
+      const looks = async () =>
+        page.evaluate(() => {
+          const h1 = document.querySelector('main h1');
+          const root = getComputedStyle(document.documentElement);
+          return {
+            heading: root.getPropertyValue('--font-heading').trim(),
+            primary: root.getPropertyValue('--color-primary').trim(),
+            title: h1 === null ? '' : getComputedStyle(h1).fontFamily,
+          };
+        });
+      await page.goto(`${origin}/north-valley`);
+      const league = await looks();
+      await page.goto(`${origin}/no-such-page-anywhere`);
+      const platform = await looks();
+      note(
+        "a page of no league has SR Leagues' serif title",
+        /gelasio/i.test(platform.title),
+        platform.title,
+      );
+      note(
+        "the league's look is not SR Leagues'",
+        league.heading !== platform.heading || league.primary !== platform.primary,
+        `${league.heading} ${league.primary}`,
+      );
+      await page.goto(`${origin}/north-valley/teams/no-such-team`);
+      const inLeague = await looks();
+      note(
+        "a page not found inside a league keeps the league's colors and title face",
+        inLeague.heading === league.heading &&
+          inLeague.primary === league.primary &&
+          inLeague.title !== platform.title,
+        JSON.stringify(inLeague),
+      );
+      await page.goto(`${origin}/north-valley`);
+      const after = await looks();
+      note(
+        "a league's page after one of SR Leagues' keeps the league's look",
+        after.heading === league.heading && after.primary === league.primary,
+        JSON.stringify(after),
+      );
+    } finally {
+      await context.close();
+    }
+  });
+
   await step(
     'a member of two leagues sees both, and not the draft league they play in',
     async () => {

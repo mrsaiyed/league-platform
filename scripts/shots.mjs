@@ -805,6 +805,14 @@ const overtimePages = [
 const signedInPlatformPages = [
   { name: 'platform-home-signed-in', at: '/' },
   { name: 'platform-account', at: '/account' },
+  // Step 2.102 part 2: "already signed in", and the password again, with its refusal beside
+  // the field.
+  { name: 'platform-signin-already', at: '/signin' },
+  { name: 'platform-confirm', at: '/account/confirm?next=%2Faccount' },
+  {
+    name: 'platform-confirm-refused',
+    at: '/account/confirm?problem=wrongPassword&next=%2Faccount',
+  },
 ];
 // The account button's menu, open, on the first league's home (step 2.127).
 const accountMenuPages = [{ name: 'account-menu-open', at: '', opens: true }];

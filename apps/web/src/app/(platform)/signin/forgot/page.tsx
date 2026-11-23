@@ -29,10 +29,10 @@ export default async function Page({ searchParams }: SearchProps) {
   const typed = flow?.purpose === 'reset' ? flow.email : await typedEmailOfThisRequest();
   const botCheck = await botCheckOnPage();
   return (
-    <SignInScreen title="forgot.title" intro={t('forgot.intro')} search={search}>
+    <SignInScreen title="forgot.title" intro={t('forgot.intro')} search={search} fields={['email']}>
       <form action={forgotPasswordAction}>
         <NextField next={next} />
-        <EmailField value={typed} />
+        <EmailField value={typed} search={search} />
         <BotCheckField {...botCheck} action="reset" />
         <SubmitButton words="signUp.sendCode" />
       </form>

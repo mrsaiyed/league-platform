@@ -5,6 +5,7 @@ export { LocalTime, localWhen, type LocalTimeWords } from './local-time.tsx';
 export {
   BotCheckField,
   EmailField,
+  fieldRefusal,
   NextField,
   OrLine,
   PasswordField,
