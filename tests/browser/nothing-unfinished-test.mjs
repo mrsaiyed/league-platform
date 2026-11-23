@@ -399,14 +399,20 @@ try {
     /** One answer, the made-up word put back as `as` (a page's own word, or itself). */
     const ask = async (address, who, word, as) => {
       const response = await fetchAs(origin, address, who);
-      const put = (text) => text.replaceAll(word, as);
+      // Each answer carries a fresh nonce for its scripts (the content security policy), the
+      // same in every answer's own headers and markup: it is put as one word too.
+      const put = (text) =>
+        text
+          .replaceAll(word, as)
+          .replace(/nonce-[A-Za-z0-9+/=]+/g, 'nonce-N')
+          .replace(/(nonce(?:=|\\?":)\\?")[^"\\]+/g, '$1N');
       const headers = [...response.headers]
         .filter(([name]) => !['date', 'content-length'].includes(name))
         .map(([name, value]) => `${name}: ${put(value)}`)
         .join('\n');
       const pieces = [];
       const markup = put(await response.text()).replace(
-        /<script>self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)<\/script>/g,
+        /<script(?: nonce="[^"]*")?>self\.__next_f\.push\(\[1,("(?:[^"\\]|\\.)*")\]\)<\/script>/g,
         (_, piece) => {
           pieces.push(JSON.parse(piece));
           return '';
@@ -449,7 +455,14 @@ try {
           `${page.headers}\n---\n${none.headers}`,
         );
         note(`${label}: markup`, page.markup === none.markup);
-        note(`${label}: page data`, page.rows !== '' && page.rows === none.rows);
+        const other = new Set(none.rows.split('\n'));
+        note(
+          `${label}: page data`,
+          page.rows !== '' && page.rows === none.rows,
+          page.rows === ''
+            ? 'no page data found'
+            : (page.rows.split('\n').find((row) => !other.has(row)) ?? '').slice(0, 300),
+        );
       });
     }
     await step('production: the routes Next.js lists beside an address', async () => {
