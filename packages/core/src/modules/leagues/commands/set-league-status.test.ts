@@ -120,7 +120,8 @@ describe('setLeagueStatus', () => {
 
     it('does not ask an archived league for them again when it is brought back', async () => {
       const { db, deps, as } = memoryLeagues({ contactEmail: null });
-      if (db.state.league !== undefined) db.state.league = { ...db.state.league, status: 'archived' };
+      if (db.state.league !== undefined)
+        db.state.league = { ...db.state.league, status: 'archived' };
       expect(await setLeagueStatus(as(ownerId), publish, deps)).toMatchObject({ ok: true });
     });
 
