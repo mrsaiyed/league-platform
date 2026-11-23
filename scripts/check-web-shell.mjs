@@ -807,6 +807,20 @@ const cases = [
   ],
   ['scheduler', '/north-valley/admin/settings', 403, [noAccess]],
   ['coach', '/north-valley/admin/settings', 403, [noAccess]],
+  // League settings → Admins → Activity log (step 2.77, A-6): only the owner and the
+  // league's admins open it; everyone else is refused and sees none of its entries.
+  [
+    'owner',
+    '/north-valley/admin/settings/activity',
+    200,
+    ['Activity log', 'What was changed', 'Who', 'Show', oneHeading],
+  ],
+  ['admin', '/quiet-pines/admin/settings/activity', 200, ['Activity log', 'What was changed']],
+  ['scheduler', '/north-valley/admin/settings/activity', 403, [noAccess], ['What was changed']],
+  ['coach', '/north-valley/admin/settings/activity', 403, [noAccess], ['What was changed']],
+  ['stranger', '/north-valley/admin/settings/activity', 403, [noAccess], ['What was changed']],
+  ['scorekeeper', '/north-valley/admin/settings/activity', 403, [noAccess], ['What was changed']],
+  ['registrar', '/quiet-pines/admin/settings/activity', 403, [noAccess], ['What was changed']],
   // League settings → Admins (step 2.97, P4 §4): only someone who may manage access for the
   // whole league (the owner, an admin) opens it; everyone else is refused, and a refused
   // person never sees who has access.

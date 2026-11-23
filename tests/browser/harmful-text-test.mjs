@@ -738,6 +738,7 @@ const ROUTES = {
   '/[league]/admin/season': () => '/north-valley/admin/season',
   '/[league]/admin/season/divisions': () => '/north-valley/admin/season/divisions',
   '/[league]/admin/settings': () => '/north-valley/admin/settings',
+  '/[league]/admin/settings/activity': () => '/north-valley/admin/settings/activity',
   '/[league]/admin/settings/admins': () => '/north-valley/admin/settings/admins',
   '/[league]/admin/settings/bin': () => '/north-valley/admin/settings/bin',
   '/[league]/admin/teams': () => '/north-valley/admin/teams',
