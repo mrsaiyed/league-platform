@@ -65,6 +65,7 @@ const note = (label, ok, detail = '') => {
   if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ''}`);
 };
 const step = async (name, run) => {
+  console.log(Date.now() % 1000000, 'DBG STEP', name);
   try {
     await run();
   } catch (error) {
@@ -181,6 +182,9 @@ async function oneGame(browser) {
     page.on('dialog', (dialog) => void dialog.accept());
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (m) => { if (m.text().startsWith('DBG')) console.log(Date.now() % 1000000, m.text()); });
+    page.on('request', (r) => { if (r.url().includes('/session')) console.log(Date.now() % 1000000, 'DBG REQ', r.postData()); });
+    const mark = (s) => console.log(Date.now() % 1000000, 'DBG STEP', s);
     // The one address typed: the tracker, as a scorekeeper opens it from a link.
     await page.goto(`${origin}${trackerPath()}`);
     const c = court(page);

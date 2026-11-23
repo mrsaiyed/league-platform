@@ -27,6 +27,7 @@ export function createStoringTrackerServer(options: StoringTrackerServerOptions)
       const outcome = await server.loadState(signal);
       if (outcome.kind === 'answer') {
         try {
+          console.log('DBG saveState', outcome.value.sequence, outcome.value.state.recent.length);
           await storage.saveState(gameId, outcome.value);
         } catch (error) {
           onStoreFailed?.(error instanceof QueueError ? error.code : 'storage-write-failed');

@@ -1038,6 +1038,25 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         c.commandId.toLowerCase(),
       ),
     );
+    {
+      const b = new Set(from.state.recent.map((id) => id.toLowerCase()));
+      const s = loaded.value.state.recent.map((id) => id.toLowerCase()).filter((id) => !b.has(id));
+      console.log(
+        'DBG carryOn',
+        JSON.stringify({
+          base: base !== null,
+          fromSeq: from.sequence,
+          fromRecent: from.state.recent.length,
+          nowSeq: loaded.value.sequence,
+          nowRecent: loaded.value.state.recent.length,
+          since: s.length,
+          notOwn: s.filter((id) => !own.has(id)).map((id) => id.slice(0, 8)),
+          made: made.length,
+          onTop: options.kept?.scoring?.onTop.length,
+          stale: stale.length,
+        }),
+      );
+    }
     if (!nobodyElseScored(from, loaded.value, own)) return 'taken';
     await queue.carryOn(
       stale.map((t) => t.command.commandId),
@@ -1116,6 +1135,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     failures = 0;
     if (opened.kind === 'rejected') return readOnly(reasonOfStatus(opened.httpStatus));
     const reply = opened.value;
+    console.log('DBG open', reply.status, String(sessionId), reply.status === 'held-by-you' ? reply.sessionId : '');
     if (reply.status !== 'held-by-you') return notHeld(reply);
     return hold(reply.sessionId);
   };
