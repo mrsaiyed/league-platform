@@ -23,8 +23,21 @@ describe('SiteNotice', () => {
 
 describe('leagueRobots (U-10, U-18)', () => {
   it('marks a league that is not to be indexed, and only that one', () => {
-    expect(leagueRobots({ notice: '', doNotIndex: true })).toEqual({ robots: leagueKeepOut });
-    expect(leagueRobots({ notice: 'x', doNotIndex: false })).toEqual({});
+    expect(leagueRobots({ notice: '', doNotIndex: true }, false)).toEqual({
+      robots: leagueKeepOut,
+    });
+    expect(leagueRobots({ notice: 'x', doNotIndex: false }, false)).toEqual({});
     expect(leagueKeepOut).toMatchObject({ index: false, follow: false, noarchive: true });
+  });
+
+  it('leaves the test copy its own mark alone: one tag in the head, the same on every page', () => {
+    // Next.js merges metadata shallowly: a league's `robots` would replace the root's.
+    const root = { title: 'x', robots: { index: false, follow: false } };
+    for (const doNotIndex of [true, false]) {
+      const merged = { ...root, ...leagueRobots({ notice: '', doNotIndex }, true) };
+      expect(merged.robots).toEqual({ index: false, follow: false });
+    }
+    const production = { title: 'x', ...leagueRobots({ notice: '', doNotIndex: true }, false) };
+    expect(production.robots).toBe(leagueKeepOut);
   });
 });

@@ -19,9 +19,17 @@ export const leagueKeepOut = {
   noimageindex: true,
 } as const;
 
-/** What a league's layout adds to its pages' head: the mark, or nothing. */
-export function leagueRobots(facts: SiteFacts): Metadata {
-  return facts.doNotIndex ? { robots: leagueKeepOut } : {};
+/**
+ * What a league's layout adds to its pages' head: the mark, or nothing. Next.js merges a
+ * page's head shallowly, so a league's `robots` replaces the root layout's whole: one tag,
+ * never two. On the test copy the root's own mark (`noindex, nofollow` on every page,
+ * record 082) stands alone, the same on a league's pages as on every other page, so the
+ * league adds nothing there; it is a whole-site promise the test copy's check pins. In
+ * production (no root mark) and on this computer (where the league's mark holds the
+ * root's `noindex, nofollow` and more) the league's mark is the one tag when it asks.
+ */
+export function leagueRobots(facts: SiteFacts, testCopy: boolean): Metadata {
+  return facts.doNotIndex && !testCopy ? { robots: leagueKeepOut } : {};
 }
 
 /**

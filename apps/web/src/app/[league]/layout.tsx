@@ -69,7 +69,10 @@ async function MyTeamOfPerson({
 export async function generateMetadata({ params }: LeagueRouteProps): Promise<Metadata> {
   const view = await leagueView((await params).league, 'site');
   if (view === null) return {};
-  return leagueRobots(await siteFactsOfThisRequest(view.context.league.id));
+  return leagueRobots(
+    await siteFactsOfThisRequest(view.context.league.id),
+    (await webPorts()).testCopy,
+  );
 }
 
 export default async function LeagueLayout({
