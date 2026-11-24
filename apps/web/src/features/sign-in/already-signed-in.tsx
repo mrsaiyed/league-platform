@@ -22,7 +22,8 @@ export function AlreadySignedIn({
 }) {
   return (
     <StandalonePage>
-      <main className="ui-message sign-in">
+      <main className="ui-message ui-form-card sign-in">
+        <p className="ui-kicker">{t('shell.siteName')}</p>
         <h1>{t('signIn.already.title')}</h1>
         <p>{t('signIn.already.body', { email })}</p>
         <a className="ui-button" data-kind="main" href={next ?? platformUrl('account')}>

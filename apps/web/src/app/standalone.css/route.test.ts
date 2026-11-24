@@ -1,5 +1,6 @@
 import { designToCssText, startingDesign } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
+import { platformDesign } from '../../features/shell/index.ts';
 import { GET } from './route.ts';
 
 describe('the stylesheet of pages that belong to no league', () => {
@@ -8,9 +9,14 @@ describe('the stylesheet of pages that belong to no league', () => {
     expect(answer.status).toBe(200);
     expect(answer.headers.get('Content-Type')).toBe('text/css; charset=utf-8');
     const css = await answer.text();
-    expect(css.startsWith(designToCssText(startingDesign('clean-court')))).toBe(true);
+    expect(css.startsWith(designToCssText(platformDesign))).toBe(true);
     expect(css).toContain('.ui-message');
     expect(css).toContain('.ui-standalone');
+  });
+
+  it("is SR Leagues' own look: the neutral design's colors, with a serif for its titles", () => {
+    expect(platformDesign.colors).toEqual(startingDesign('clean-court').colors);
+    expect(platformDesign.fonts.heading).toBe('gelasio');
   });
 
   it('may be kept by the browser, and holds nothing of any one league', async () => {

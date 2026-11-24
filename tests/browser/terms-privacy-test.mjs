@@ -287,7 +287,9 @@ if (browser) {
         page.waitForURL((url) => url.pathname === '/'),
         footerLink(page, 'Powered by SR Leagues').click(),
       ]);
-      await page.getByRole('heading', { level: 1, name: 'SR Leagues' }).waitFor();
+      // Since step 2.102 our name is the front page's kicker, over its two-line title.
+      await page.locator('[data-front-page] .ui-kicker', { hasText: 'SR Leagues' }).waitFor();
+      await page.locator('[data-front-page] h1').waitFor();
       note('"Powered by SR Leagues" is on our front page', true);
     } finally {
       await context.close();

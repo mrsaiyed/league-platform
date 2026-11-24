@@ -2,6 +2,7 @@ import { platformUrl } from '@srleagues/core';
 import { redirect } from 'next/navigation';
 import {
   BotCheckField,
+  fieldRefusal,
   SignInScreen,
   SubmitButton,
   type SearchProps,
@@ -22,8 +23,10 @@ import { signedInPerson } from '../../../../server/signed-in-leagues.ts';
 // address bar. With nothing under way (an old tab, Back after the account was made) a
 // signed-in person goes to their account; anyone else is told nothing is waiting for a
 // code on this device, with a way to start again, and no word of a code sent (step 2.163's
-// fix round). The code box stays; a code typed there is answered the same for every
-// visitor (the first screen, "That code has run out"), naming no address (T-68).
+// fix round). Since step 2.102's fix round it draws no code box and no "Continue", which
+// could not work: "Start again" is its one filled button. A code posted from an old tab is
+// still answered the same for every visitor (the first screen, "That code has run out"),
+// naming no address (T-68).
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const flow = await flowOfThisRequest();
@@ -31,9 +34,8 @@ export default async function Page({ searchParams }: SearchProps) {
     if ((await signedInPerson()).kind === 'signed-in') redirect(platformUrl('account'));
     return (
       <SignInScreen title="code.title" intro={t('code.nothingWaiting')} search={search}>
-        <CodeForm />
         <p>
-          <a className="ui-button" data-kind="quiet" href={platformUrl('signup')}>
+          <a className="ui-button" data-kind="main" href={platformUrl('signup')}>
             {t('code.startAgain')}
           </a>
         </p>
@@ -54,6 +56,7 @@ export default async function Page({ searchParams }: SearchProps) {
         sentAgain ? t(reset ? 'code.sentAgainReset' : 'code.sentAgain', words) : undefined
       }
       search={search}
+      fields={['code']}
     >
       <p data-code-address="">
         {t('code.wrongAddress')}{' '}
@@ -61,21 +64,24 @@ export default async function Page({ searchParams }: SearchProps) {
           {t('code.changeAddress')}
         </a>
       </p>
-      <CodeForm />
+      <CodeForm search={search} />
       {/* A new code to the same address, behind the same check as the first (T4 §6). */}
       <form action={resendCodeAction}>
         <BotCheckField {...botCheck} action={flow.purpose} />
-        <SubmitButton words="code.again" />
+        <SubmitButton words="code.again" kind="second" />
       </form>
     </SignInScreen>
   );
 }
 
+type SearchOf = Awaited<SearchProps['searchParams']>;
+
 /** The code's own box and button. */
-function CodeForm() {
+function CodeForm({ search }: { readonly search: SearchOf }) {
+  const { input, refusal } = fieldRefusal(search, 'code');
   return (
     <form action={enterCodeAction}>
-      <p>
+      <p className="ui-field">
         <label>
           {t('code.label')}
           <input
@@ -84,8 +90,10 @@ function CodeForm() {
             autoComplete="one-time-code"
             maxLength={12}
             required
+            {...input}
           />
         </label>
+        {refusal}
       </p>
       <SubmitButton words="code.submit" />
     </form>

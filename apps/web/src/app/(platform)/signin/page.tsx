@@ -3,6 +3,7 @@ import {
   BotCheckField,
   EmailField,
   NextField,
+  OrLine,
   PasswordField,
   SignInScreen,
   SubmitButton,
@@ -41,13 +42,14 @@ export default async function Page({ searchParams }: SearchProps) {
       title="page.signIn"
       intro={from === null ? undefined : t('signIn.fromLeague', { league: from.name })}
       search={search}
+      fields={['email', 'password']}
       forgotHint
       google={google}
     >
       <form action={signInAction}>
         <NextField next={next} />
-        <EmailField value={await typedEmailOfThisRequest()} />
-        <PasswordField />
+        <EmailField value={await typedEmailOfThisRequest()} search={search} />
+        <PasswordField search={search} />
         <BotCheckField {...botCheck} action="sign-in" google={google} />
         <SubmitButton words="signIn.submit" />
       </form>
@@ -58,10 +60,10 @@ export default async function Page({ searchParams }: SearchProps) {
       </p>
       {google ? (
         <>
-          <p>{t('signIn.or')}</p>
+          <OrLine />
           <form action={googleAction}>
             <NextField next={next} />
-            <SubmitButton words="signIn.google" />
+            <SubmitButton words="signIn.google" kind="second" />
           </form>
         </>
       ) : null}

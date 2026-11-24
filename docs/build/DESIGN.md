@@ -135,7 +135,7 @@ A screen is finished when every line below is true for it, at 390 and at 1280, f
 
 **Sign-in, account and SR Leagues' own pages**
 
-24. A centered card about 420 wide with a clear title, labeled fields and one main button. These pages carry SR Leagues' own neutral look, not a league's.
+24. These pages carry SR Leagues' own look, never a league's (T-325): the neutral design's pale page, white panel and one blue, with a serif for titles, served as `/standalone.css` to every page of no league. A form (sign in, sign up and its steps, the forgotten password, the password again, the account) is a centered card about 420 wide: a blue rule on top, a small "SR Leagues" label over a serif title, labels above full-width fields 44 high, one main button filled blue, quiet links beneath, a refusal about one field drawn under that field. A page to read (the front page, terms, privacy) is the same card made wider for reading; the front page's title is two lines, the second in the blue. A page not built yet and "not found" at an address of no league are the same calm card. A page not found under a league's address that the person may see keeps that league's own look and frame, not SR Leagues'.
 
 **Unchanged rules that still hold**
 
