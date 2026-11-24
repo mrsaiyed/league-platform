@@ -99,6 +99,8 @@ export type BinStore = {
   readonly list: () => Promise<readonly BinnedItem[]>;
   /** The program a season belongs to (where a restore is checked), or undefined. */
   readonly seasonProgramId: (seasonId: string) => Promise<string | undefined>;
+  /** Whether the season is archived, so read-only (O-12, step 2.130). */
+  readonly seasonArchived: (seasonId: string) => Promise<boolean>;
   readonly findTeam: (teamId: string) => Promise<TeamInBin | undefined>;
   readonly findPerson: (personId: string) => Promise<PersonInBin | undefined>;
   readonly findGame: (gameId: string) => Promise<GameInBin | undefined>;

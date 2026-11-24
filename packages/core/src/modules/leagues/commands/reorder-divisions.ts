@@ -4,6 +4,7 @@
 // order. A division whose place already matches is left alone (no new version). The
 // last order saved wins; it is a display order, so there is no version to go stale.
 import { z } from 'zod';
+import { seasonIsArchived } from '../archived-season.ts';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { mayEditLeague, seasonScope } from '../policy.ts';
@@ -16,6 +17,7 @@ export type ReorderDivisionsError = {
 export const reorderDivisions = defineCommand({
   name: 'leagues.reorder_divisions',
   permission: 'divisions.manage',
+  refusedInArchivedSeason: seasonIsArchived,
   input: z.object({
     seasonId: z.uuid(),
     parentDivisionId: z.uuid().optional(),

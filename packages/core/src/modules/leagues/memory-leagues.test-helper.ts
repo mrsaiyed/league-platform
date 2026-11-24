@@ -347,6 +347,9 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           return x.version;
         },
         seasonProgramId: async (seasonId) => s.seasons.find((x) => x.id === seasonId)?.programId,
+        currentSeasonOf: async (programId) =>
+          s.seasons.find((x) => x.programId === programId && x.isCurrent)?.id,
+        copySeasonSetup: async () => ({ divisions: 0, teams: 0, rosterEntries: 0 }),
         setCurrentSeason: async (seasonId) => {
           const season = s.seasons.find((x) => x.id === seasonId);
           if (season === undefined) return false;

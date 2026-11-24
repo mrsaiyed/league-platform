@@ -23,7 +23,7 @@ import {
   seasonSettingsAddress,
   visibilityAnchor,
 } from '../season-settings/index.ts';
-import { StaffPill } from '../staff/index.ts';
+import { ArchivedSeasonNotice, StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { venuesAddress } from '../venues-area/index.ts';
 import {
@@ -156,6 +156,8 @@ export async function ScheduleBuilderPage({
   );
   const heading = (top: ReactNode, firstRound: ReactNode = null) => (
     <ScheduleHeading seasons={seasons} season={season} action={action} actions={headActions()}>
+      {/* An archived season (O-12): read-only, so seasonControls offers no change. */}
+      {season.archived ? <ArchivedSeasonNotice season={season.name} /> : null}
       {firstRound}
       {top}
     </ScheduleHeading>

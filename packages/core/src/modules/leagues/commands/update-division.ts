@@ -1,6 +1,7 @@
 // Renames a division and sets or clears its color (P7 §1). The save names the version
 // it started from and is refused if someone else saved since (T-46).
 import { z } from 'zod';
+import { divisionInArchivedSeason } from '../archived-season.ts';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { divisionColor, divisionName } from '../division-fields.ts';
@@ -14,6 +15,7 @@ export type UpdateDivisionError = {
 export const updateDivision = defineCommand({
   name: 'leagues.update_division',
   permission: 'divisions.manage',
+  refusedInArchivedSeason: divisionInArchivedSeason,
   input: z
     .object({
       divisionId: z.uuid(),

@@ -8,6 +8,7 @@ import {
   findRosterEntry,
   findScheduleDraft,
   findSeasonProgramId,
+  seasonIsArchived,
   findTeam,
   findTeamGames,
   insertRosterEntry,
@@ -51,6 +52,7 @@ export function teamsStore(scope: LeagueScope): TeamsStore {
       return today;
     },
     seasonProgramId: (seasonId) => findSeasonProgramId(scope, seasonId),
+    seasonArchived: (seasonId) => seasonIsArchived(scope, seasonId),
     findDivision: async (divisionId) => {
       const division = await findDivision(scope, divisionId);
       return division === undefined

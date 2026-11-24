@@ -10,6 +10,7 @@ import {
   findSeason,
   findStatusBeforeCancelled,
   gameHasPlays,
+  seasonIsArchived,
   hasBinnedGamePart,
   insertGameAssignment,
   insertGameCorrection,
@@ -64,6 +65,7 @@ export function gamesStore(scope: LeagueScope): GamesStore {
       ];
       return person !== undefined && team !== undefined && (person.binned || team.binned);
     },
+    seasonArchived: (seasonId) => seasonIsArchived(scope, seasonId),
     hasPlays: (gameId) => gameHasPlays(scope, gameId),
     findSeason: async (seasonId) => {
       const season = await findSeason(scope, seasonId);

@@ -136,6 +136,7 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
             return true;
           },
         },
+        seasonArchived: async () => false,
         list: async () =>
           s.things
             .filter((t) => t.binnedAt !== null)

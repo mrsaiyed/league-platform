@@ -10,6 +10,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { mayEditLeague, seasonScope } from '../policy.ts';
 import type { LeaguesTx } from '../ports.ts';
 import { readSeasonRules } from './season-view.ts';
+import { seasonIsArchived } from '../archived-season.ts';
 
 export type SetSeasonRosterSettingsError =
   | {
@@ -21,6 +22,7 @@ export type SetSeasonRosterSettingsError =
 export const setSeasonRosterSettings = defineCommand({
   name: 'leagues.set_season_roster_settings',
   permission: 'season.settings',
+  refusedInArchivedSeason: seasonIsArchived,
   input: z
     .object({
       seasonId: z.uuid(),

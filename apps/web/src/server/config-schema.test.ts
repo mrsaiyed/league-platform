@@ -35,6 +35,7 @@ const valid: Record<ConfigName, string> = {
   LOCAL_SIMULATED_LEAGUE: 'off',
   LOCAL_DESIGN: 'crest-light',
   LOCAL_NOW: '2026-11-15T20:01:00Z',
+  LOCAL_NO_CURRENT_SEASON: 'harbor-city',
   LOCAL_UNRELEASED: 'hidden',
   SESSION_SECRET: longValue('SESSION_SECRET'),
   SUPABASE_URL: 'http://localhost:54321',
@@ -51,8 +52,8 @@ const valid: Record<ConfigName, string> = {
 const names = Object.keys(fields) as ConfigName[];
 /**
  * Every setting, for staging and production: LOCAL_BINNED_TEAM, LOCAL_BOT_CHECK, LOCAL_DATA,
- * LOCAL_DEMO_LEAGUE, LOCAL_DESIGN, LOCAL_NOW and LOCAL_UNRELEASED are for local work and
- * tests only.
+ * LOCAL_DEMO_LEAGUE, LOCAL_DESIGN, LOCAL_NOW, LOCAL_NO_CURRENT_SEASON and LOCAL_UNRELEASED
+ * are for local work and tests only.
  */
 const hosted = {
   ...valid,
@@ -63,6 +64,7 @@ const hosted = {
   LOCAL_SIMULATED_LEAGUE: undefined,
   LOCAL_DESIGN: undefined,
   LOCAL_NOW: undefined,
+  LOCAL_NO_CURRENT_SEASON: undefined,
   LOCAL_UNRELEASED: undefined,
 };
 /** Required in every environment. */
@@ -186,6 +188,7 @@ describe('loadConfig', () => {
       LOCAL_DATA: undefined,
       LOCAL_DESIGN: undefined,
       LOCAL_NOW: undefined,
+      LOCAL_NO_CURRENT_SEASON: undefined,
       LOCAL_UNRELEASED: undefined,
       EMAIL_FROM: undefined,
     });
@@ -511,6 +514,18 @@ describe('loadConfig', () => {
       expect(
         failure({ ...production, APP_ENV: appEnv, LOCAL_BINNED_TEAM: 'badgers' }).invalid,
       ).toEqual(['LOCAL_BINNED_TEAM: invalid, may be set only when APP_ENV is local or test']);
+    }
+  });
+
+  it('takes LOCAL_NO_CURRENT_SEASON in local work and tests only, and only a short name (step 2.130)', () => {
+    const name = 'LOCAL_NO_CURRENT_SEASON';
+    expect(loadConfig(localOnly)[name]).toBeUndefined();
+    expect(loadConfig({ ...localOnly, [name]: 'harbor-city' })[name]).toBe('harbor-city');
+    expect(failure({ ...localOnly, [name]: 'Harbor City' }).invalid.join()).toContain(name);
+    for (const appEnv of ['staging', 'production']) {
+      expect(failure({ ...production, APP_ENV: appEnv, [name]: 'harbor-city' }).invalid).toEqual([
+        `${name}: invalid, may be set only when APP_ENV is local or test`,
+      ]);
     }
   });
 

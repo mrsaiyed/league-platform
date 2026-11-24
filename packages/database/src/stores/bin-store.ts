@@ -14,12 +14,14 @@ import {
   restoreBinnedGame,
   restoreBinnedPerson,
   setTeamBinned,
+  seasonIsArchived,
 } from '../queries/index.ts';
 
 export function binStore(scope: LeagueScope): BinStore {
   return {
     list: () => listBinned(scope),
     seasonProgramId: (seasonId) => findSeasonProgramId(scope, seasonId),
+    seasonArchived: (seasonId) => seasonIsArchived(scope, seasonId),
     findTeam: async (teamId) => {
       const team = await findTeam(scope, teamId);
       if (team === undefined) return undefined;

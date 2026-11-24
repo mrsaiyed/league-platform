@@ -8,12 +8,14 @@ import { defineCommand, type Result } from '../../../command/index.ts';
 import { draftBasis, editDraft, type DraftEditError, type DraftEditValue } from '../draft-edit.ts';
 import { mayEditSchedule } from '../policy.ts';
 import type { SchedulingTx } from '../ports.ts';
+import { seasonArchivedForSchedule } from '../archived-season.ts';
 
 export type AddDraftRoundError = DraftEditError;
 
 export const addDraftRound = defineCommand({
   name: 'scheduling.add_draft_round',
   permission: 'schedule.edit',
+  refusedInArchivedSeason: seasonArchivedForSchedule,
   input: z.object({
     ...draftBasis,
     roundId: z.uuid(),

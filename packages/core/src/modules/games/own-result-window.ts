@@ -15,6 +15,9 @@
 //   games.scorekeeperReopenMinutes (0: never). Who and how long ago are both read inside
 //   the database (`statement_timestamp() - finalized_at`); the device's clock never
 //   counts. Exactly the setting's minutes still counts.
+// - in an archived season, never (O-12, step 2.130, T-381): the door itself is refused
+//   there (games.reopen_own_result), for everyone; whoever may correct games reopens the
+//   game through the admin's door (games.reopen_game), with a reason.
 import type { CommandContext } from '../../command/index.ts';
 import { lookupSetting, scorekeeperReopenMinutes } from '../leagues/index.ts';
 import { isDecided } from './game-fields.ts';
@@ -30,7 +33,9 @@ export type OwnResultNotOffered =
   | 'not-recorded-by-you'
   | 'reopen-time-over'
   /** It could be reopened, but an overturn rules on its result (S-85). */
-  | 'result-overturned';
+  | 'result-overturned'
+  /** Its season is archived (O-12): only the admin's door, a correction with a reason. */
+  | 'season-archived';
 
 export type OwnResultOffer = {
   readonly reopen:
@@ -58,6 +63,7 @@ export async function ownResultOffer(
   // As games.reopen_game tells them apart: a game with a saved state and plays is tracked.
   const saved = await tx.liveGames.findState(game.id);
   if (saved !== undefined && (await tx.games.hasPlays(game.id))) return no('not-recorded-by-hand');
+  if (await tx.games.seasonArchived(game.seasonId)) return no('season-archived');
   if (await mayChangeGames(context, tx, 'games.correct', await gameScope(tx, game.id))) {
     if (game.overturned === true) return no('result-overturned');
     return { reopen: { when: 'always' }, recordedBy };
@@ -116,6 +122,16 @@ export async function ownResultWindows(
   const facts = await tx.liveGames.handResults(gameIds);
   const minutes = await reopenMinutesOf(tx);
   const now = tx.clock.now();
+  // An archived season's games (O-12): read only for the decided games by hand, the ones
+  // the window would offer, so a list of a running season reads no more than before.
+  const archived = new Set<string>();
+  for (const game of facts) {
+    if (!isDecided(game.status) || game.tracked) continue;
+    const found = await tx.games.find(game.gameId);
+    if (found !== undefined && (await tx.games.seasonArchived(found.seasonId))) {
+      archived.add(game.gameId);
+    }
+  }
   for (const game of facts) {
     windows.set(
       game.gameId,
@@ -123,13 +139,15 @@ export async function ownResultWindows(
         ? { when: 'no', code: 'game-not-decided' }
         : game.tracked
           ? { when: 'no', code: 'not-recorded-by-hand' }
-          : scorekeeperWindow({
-              ...game,
-              recordedBy: game.decidedBy,
-              minutes,
-              accountId: context.accountId,
-              now,
-            }),
+          : archived.has(game.gameId)
+            ? { when: 'no', code: 'season-archived' }
+            : scorekeeperWindow({
+                ...game,
+                recordedBy: game.decidedBy,
+                minutes,
+                accountId: context.accountId,
+                now,
+              }),
     );
   }
   return windows;

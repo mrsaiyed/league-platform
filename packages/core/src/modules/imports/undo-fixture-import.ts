@@ -4,6 +4,7 @@
 // to remove the games by hand: removing exactly what the import created is only certain
 // while the draft is as the import left it.
 import { z } from 'zod';
+import { importInArchivedSeason } from './archived-season.ts';
 import { defineCommand, fail, ok, type Result } from '../../command/index.ts';
 import { recordActivity } from '../access/index.ts';
 import { parseDraftDocument } from '../scheduling/index.ts';
@@ -23,6 +24,7 @@ export type UndoFixtureImportError = {
 export const undoFixtureImport = defineCommand({
   name: 'imports.undo_fixture_import',
   permission: 'schedule.import',
+  refusedInArchivedSeason: importInArchivedSeason,
   input: z.object({ importId: z.uuid(), version: z.number().int().positive() }),
   allowed: async (context, input, tx: ImportsTx) => {
     const found = await tx.imports.find(input.importId);

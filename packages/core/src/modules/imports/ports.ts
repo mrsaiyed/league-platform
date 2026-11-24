@@ -43,6 +43,8 @@ export type ImportChange = {
 export type ImportsStore = {
   /** The program a season belongs to, or undefined if the season is not in this league. */
   readonly findSeason: (seasonId: string) => Promise<{ readonly programId: string } | undefined>;
+  /** Whether the season is archived, so read-only (O-12, step 2.130). */
+  readonly seasonArchived: (seasonId: string) => Promise<boolean>;
   /** The season's teams not in the bin, and the league's venues and their courts not in the bin. */
   readonly seasonNames: (seasonId: string) => Promise<SeasonNames>;
   /** Starts an import in `reading`: its id and version (1). */

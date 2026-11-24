@@ -16,3 +16,24 @@ export function mayShowSeason(
     allows(holder, 'season.settings', { type: 'program', id: season.programId })
   );
 }
+
+/**
+ * Whether this person gets "Start a new season" (step 2.130): as for showing a season, at
+ * the program of the season shown, or league-wide when the league has no season yet
+ * (leagues.start_season's own rule; the command checks again).
+ */
+export function mayStartSeason(
+  holder: AccessHolder | undefined,
+  programId: string | undefined,
+  leagueStatus: LeagueStatus,
+): boolean {
+  return (
+    holder !== undefined &&
+    !readOnlyStatuses.includes(leagueStatus) &&
+    allows(
+      holder,
+      'season.settings',
+      programId === undefined ? { type: 'league' } : { type: 'program', id: programId },
+    )
+  );
+}

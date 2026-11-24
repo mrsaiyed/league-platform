@@ -8,6 +8,8 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { binLinkFor } from '../bin-area/index.ts';
+import { startSeasonAddress } from '../season-settings/index.ts';
+import { ArchivedSeasonNotice } from '../staff/index.ts';
 import { t } from '../../server/messages.ts';
 import { createTeamAction } from './actions.ts';
 import {
@@ -43,7 +45,7 @@ export async function TeamsPage({
         title={t('admin.area.teams')}
         sub={season === undefined ? undefined : t('adminTeams.seasonLine', { season: season.name })}
       >
-        {season === undefined ? null : (
+        {season === undefined || season.archived ? null : (
           <a className="ui-button" data-kind="main" data-icon="plus" href={`#${addTeamAnchor}`}>
             {t('adminTeams.create.title')}
           </a>
@@ -59,9 +61,18 @@ export async function TeamsPage({
         binHref={leagueUrl(here, 'admin-area', { area: 'settings', subpath: ['bin'] })}
       />
       {season === undefined ? (
-        <EmptyPanel text={t('adminTeams.noSeason')} />
+        <EmptyPanel
+          text={t('adminTeams.noSeason')}
+          action={{ href: startSeasonAddress(here), label: t('seasonSettings.start.open') }}
+        />
       ) : (
-        await Body({ league: here, context, seasonId: season.id })
+        await Body({
+          league: here,
+          context,
+          seasonId: season.id,
+          archived: season.archived,
+          seasonName: season.name,
+        })
       )}
     </main>
   );
@@ -71,11 +82,16 @@ async function Body({
   league,
   context,
   seasonId,
+  archived,
+  seasonName,
 }: {
   readonly league: { readonly id: string; readonly slug: string };
   /** The session's: the reads answer only someone who may manage the season's teams. */
   readonly context: CommandContext;
   readonly seasonId: string;
+  /** An archived season (O-12): its teams are listed, with no form that would be refused. */
+  readonly archived: boolean;
+  readonly seasonName: string;
 }) {
   const ports = (await webPorts()).adminTeams;
   const [teams, divisions] = await Promise.all([
@@ -85,11 +101,16 @@ async function Body({
   const divisionName = (id: string | null) => divisions.find((d) => d.id === id)?.name;
   return (
     <>
+      {archived ? <ArchivedSeasonNotice season={seasonName} /> : null}
       {teams.length === 0 ? (
-        <EmptyPanel
-          text={t('adminTeams.none')}
-          action={{ href: `#${addTeamAnchor}`, label: t('adminTeams.create.title') }}
-        />
+        archived ? (
+          <EmptyPanel text={t('adminTeams.none')} />
+        ) : (
+          <EmptyPanel
+            text={t('adminTeams.none')}
+            action={{ href: `#${addTeamAnchor}`, label: t('adminTeams.create.title') }}
+          />
+        )
       ) : (
         <ul className="staff-rows">
           {teams.map((team) => {
@@ -122,27 +143,29 @@ async function Body({
           })}
         </ul>
       )}
-      <div id={addTeamAnchor} className="admin-add-team">
-        <Section title={t('adminTeams.create.title')}>
-          <form action={createTeamAction} className="staff-form" data-form="create-team">
-            <LeagueField league={league.slug} />
-            <TextField name="name" label={t('adminTeams.field.name')} required maxLength={120} />
-            <TextField
-              name="shortName"
-              label={t('adminTeams.field.shortName')}
-              hint={t('adminTeams.field.shortNameHint')}
-              maxLength={60}
-            />
-            <ColorFields color={null} />
-            <DivisionField divisions={divisions} value={null} />
-            <p className="staff-buttons">
-              <button type="submit" className="ui-button" data-kind="main">
-                {t('adminTeams.create.submit')}
-              </button>
-            </p>
-          </form>
-        </Section>
-      </div>
+      {archived ? null : (
+        <div id={addTeamAnchor} className="admin-add-team">
+          <Section title={t('adminTeams.create.title')}>
+            <form action={createTeamAction} className="staff-form" data-form="create-team">
+              <LeagueField league={league.slug} />
+              <TextField name="name" label={t('adminTeams.field.name')} required maxLength={120} />
+              <TextField
+                name="shortName"
+                label={t('adminTeams.field.shortName')}
+                hint={t('adminTeams.field.shortNameHint')}
+                maxLength={60}
+              />
+              <ColorFields color={null} />
+              <DivisionField divisions={divisions} value={null} />
+              <p className="staff-buttons">
+                <button type="submit" className="ui-button" data-kind="main">
+                  {t('adminTeams.create.submit')}
+                </button>
+              </p>
+            </form>
+          </Section>
+        </div>
+      )}
     </>
   );
 }

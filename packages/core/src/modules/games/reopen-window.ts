@@ -16,8 +16,9 @@
 //   still counts.
 //
 // O-12 (an archived season changes only by a correction from someone who may correct
-// games): seasons cannot be archived yet. Step 2.130, which archives them, must answer
-// "no" here for a scorekeeper (not for a corrector) in an archived season.
+// games, step 2.130, T-381): in an archived season the answer is "no" (`season-archived`)
+// for a scorekeeper; someone who may correct games still reopens it, with a reason, which
+// is that correction (the reopen writes it), so the season's game can be put right.
 import type { CommandContext } from '../../command/index.ts';
 import { lookupSetting, scorekeeperReopenMinutes } from '../leagues/index.ts';
 import { isDecided } from './game-fields.ts';
@@ -33,7 +34,9 @@ export type ReopenNotOffered =
   | 'not-ended-by-you'
   | 'reopen-time-over'
   /** It could be reopened, but an overturn rules on its result (S-85). */
-  | 'result-overturned';
+  | 'result-overturned'
+  /** Its season is archived (O-12): only someone who may correct games reopens it. */
+  | 'season-archived';
 
 export type ReopenWhen =
   | { readonly when: 'always' }
@@ -67,6 +70,7 @@ export async function reopenOffer(
     if (game.overturned === true) return no('result-overturned', endedBy);
     return { reopen: { when: 'always' }, endedBy };
   }
+  if (await tx.games.seasonArchived(game.seasonId)) return no('season-archived', endedBy);
   const rows = await tx.games.leagueSettingRows(scorekeeperReopenMinutes.key);
   const minutes = lookupSetting(scorekeeperReopenMinutes, rows).value;
   if (minutes === 0) return no('scorekeepers-may-not-reopen', endedBy);

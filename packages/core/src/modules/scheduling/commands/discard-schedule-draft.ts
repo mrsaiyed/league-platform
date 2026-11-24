@@ -6,6 +6,7 @@ import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { mayEditSchedule } from '../policy.ts';
 import type { SchedulingTx } from '../ports.ts';
+import { seasonArchivedForSchedule } from '../archived-season.ts';
 
 export type DiscardScheduleDraftError = {
   readonly code: 'season-not-found' | 'draft-not-found' | 'changed-since-read';
@@ -14,6 +15,7 @@ export type DiscardScheduleDraftError = {
 export const discardScheduleDraft = defineCommand({
   name: 'scheduling.discard_schedule_draft',
   permission: 'schedule.edit',
+  refusedInArchivedSeason: seasonArchivedForSchedule,
   input: z.object({
     seasonId: z.uuid(),
     draftId: z.uuid(),

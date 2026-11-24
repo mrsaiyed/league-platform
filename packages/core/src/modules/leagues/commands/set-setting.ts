@@ -8,6 +8,7 @@
 // counts only if given while the league had children or a recorded child, so there is
 // nothing to confirm yet. Read in the transaction that writes it (see T-402 on the race).
 import { z } from 'zod';
+import { settingAtArchivedSeason } from '../archived-season.ts';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { leagueSettingChanged } from '../events.ts';
@@ -72,6 +73,7 @@ export function setSettingFor(registry: SettingRegistry) {
   return defineCommand({
     name: 'leagues.set_setting',
     permission: 'league.settings',
+    refusedInArchivedSeason: settingAtArchivedSeason,
     input: z.intersection(
       placeFields,
       z.object({

@@ -13,6 +13,7 @@ import { mayPublishSchedule } from '../policy.ts';
 import type { PublishedGameChange, SchedulingTx } from '../ports.ts';
 import { planPublication, type PublishBlocker } from '../publish-plan.ts';
 import type { PublishSummary } from '../rules/summarize-publish.ts';
+import { seasonArchivedForSchedule } from '../archived-season.ts';
 
 export type PublishScheduleError =
   | {
@@ -45,6 +46,7 @@ const listed = (ids: readonly string[]) => (ids.length <= maxListedIds ? ids : u
 export const publishSchedule = defineCommand({
   name: 'scheduling.publish_schedule',
   permission: 'schedule.publish',
+  refusedInArchivedSeason: seasonArchivedForSchedule,
   input: z.object({
     seasonId: z.uuid(),
     basedOnRevision: z.number().int().positive().nullable(),

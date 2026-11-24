@@ -51,6 +51,8 @@ export const enTrackerStates = {
     'A basket, foul or turnover is recorded. Undo them first, then mark the game not started; or a league admin can clear it with a reason.',
   'tracker.notStarted.refused.reason-needed':
     'A basket, foul or turnover is recorded in this game. Say why it needs clearing.',
+  'tracker.notStarted.refused.season-archived':
+    'This season is archived, so this game can no longer be changed here. An admin can still correct it, with a reason.',
   'tracker.notStarted.refused.session-held':
     'Someone else has been scoring this game on another device, and may still be scoring it without a connection. Take the game over first, then try again.',
   'tracker.notStarted.refused.unknown-game': 'This game could not be found.',
@@ -191,6 +193,8 @@ export const enTrackerStates = {
     'This result was overturned. Take the overturn off in Standings and stats first.',
   'tracker.reopen.refused.scorekeepers-may-not-reopen':
     'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
+  'tracker.reopen.refused.season-archived':
+    'This season is archived, so this game can no longer be changed here. An admin can still correct it, with a reason.',
   'tracker.reopen.until': 'You can reopen this game until {time}.',
   'tracker.reopen.working': 'Reopening…',
 } as const;

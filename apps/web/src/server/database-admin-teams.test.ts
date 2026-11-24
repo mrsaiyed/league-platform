@@ -434,6 +434,7 @@ describe('Admin → Teams on the database ports, role by role', () => {
     expect(await ports.adminTeams.currentSeason(ownerOf(leagueId))).toEqual({
       id: seasonId,
       name: 'Winter Season',
+      archived: false,
     });
     expect(
       (await ports.adminTeams.divisions(ownerOf(leagueId), seasonId)).map((d) => d.name),

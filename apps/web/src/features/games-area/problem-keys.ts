@@ -21,6 +21,7 @@ const gamesKeys: readonly TextKey[] = [
   'admin.games.error.game-part-in-bin',
   'admin.games.error.choose-team',
   'admin.games.error.choose-reason',
+  'admin.games.error.season-archived',
 ];
 
 const boxScoreKeys: readonly TextKey[] = [
@@ -36,6 +37,7 @@ const boxScoreKeys: readonly TextKey[] = [
   'admin.boxScore.error.not-recorded-by-you',
   'admin.boxScore.error.not-recorded-by-hand',
   'admin.boxScore.error.scorekeepers-may-not-reopen',
+  'admin.boxScore.error.season-archived',
 ];
 
 // A put back of the sheet refused (step 2.229, T-366), in plain words.

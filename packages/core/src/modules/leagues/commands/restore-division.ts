@@ -4,6 +4,7 @@
 // is still in the bin stays there until the parent is back (`division-parent-in-bin`).
 // Restoring one that is not in the bin changes nothing.
 import { z } from 'zod';
+import { divisionInArchivedSeason } from '../archived-season.ts';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { divisionScope, mayEditLeague } from '../policy.ts';
@@ -16,6 +17,7 @@ export type RestoreDivisionError = {
 export const restoreDivision = defineCommand({
   name: 'leagues.restore_division',
   permission: 'bin.restore',
+  refusedInArchivedSeason: divisionInArchivedSeason,
   input: z.object({ divisionId: z.uuid() }),
   allowed: async (context, input, tx: LeaguesTx) =>
     mayEditLeague(context, tx, 'bin.restore', await divisionScope(tx, input.divisionId)),

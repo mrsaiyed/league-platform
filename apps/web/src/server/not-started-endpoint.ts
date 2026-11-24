@@ -45,8 +45,9 @@ const turnedAway = (body: TrackerRefusal): CommandsOutcome => ({
  * The command's codes as the contract names them. Every code but the missing game's is
  * the contract's own, so a code the command gains later fails the type check here.
  */
-const refusalOf = (code: MarkNotStartedError['code'] | 'not-allowed'): NotStartedRefusal =>
-  code === 'game-not-found' ? 'unknown-game' : code;
+const refusalOf = (
+  code: MarkNotStartedError['code'] | 'not-allowed' | 'season-archived',
+): NotStartedRefusal => (code === 'game-not-found' ? 'unknown-game' : code);
 
 export async function markNotStartedRequest(
   context: LeagueRequestContext,

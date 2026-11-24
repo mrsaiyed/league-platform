@@ -40,3 +40,14 @@ export function divisionsAddress(league: LeagueAddressee, seasonSlug: string): s
   const base = leagueUrl(league, 'admin-area', { area: 'season', subpath: ['divisions'] });
   return `${base}?${new URLSearchParams({ season: seasonSlug }).toString()}`;
 }
+
+/** "Start a new season" (step 2.130): its panel's anchor, where Teams' sentence leads. */
+export const startSeasonAnchor = 'start-season';
+
+/** "Make this the current season" and "Archive" (step 2.130): their panel's anchor. */
+export const seasonStateAnchor = 'season-state';
+
+/** Season settings at "Start a new season", by the one address helper. */
+export function startSeasonAddress(league: LeagueAddressee): string {
+  return `${seasonSettingsAddress(league)}#${startSeasonAnchor}`;
+}

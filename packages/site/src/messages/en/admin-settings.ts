@@ -134,6 +134,15 @@ export const enAdminSettings = {
   'adminSettings.usingDefault': 'Now: the default.',
   'adminSettings.usingOwn': 'Now: set for this league.',
   'adminSettings.yes': 'Yes',
+  'seasonSettings.archive': 'Archive this season',
+  'seasonSettings.archiveAsk':
+    'Archive {season}? Visitors still find it under the season picker, but it becomes read-only: no results, teams, rosters, divisions or settings can be changed in it, and only a correction with a reason changes one of its games. An archived season cannot be un-archived.',
+  'seasonSettings.archiveHidden':
+    '{season} is hidden from visitors, so it cannot be archived: an archived season is shown to visitors and cannot be hidden again. Show it to visitors first if you want to archive it.',
+  'seasonSettings.archiveNo': 'No, keep it open',
+  'seasonSettings.archiveYes': 'Yes, archive it',
+  'seasonSettings.archived':
+    '{season} is archived. Visitors still find it under the season picker. It is read-only: only a correction with a reason changes one of its games, and it cannot be un-archived.',
   'seasonSettings.ask.after':
     "Nothing is saved until you say yes. The change is written in the league's activity log.",
   'seasonSettings.ask.moves_one': 'Saving these rules moves 1 team in the standings of {season}:',
@@ -154,11 +163,23 @@ export const enAdminSettings = {
   'seasonSettings.column.ties': 'Ties (T)',
   'seasonSettings.column.win-percentage': 'Win percentage (PCT)',
   'seasonSettings.column.wins': 'Wins (W)',
+  'seasonSettings.current': "{season} is the current season: the league's pages open on it.",
+  'seasonSettings.currentAsk':
+    "Make {season} the current season? The league's pages open on it from now on, instead of on the season that is current now. Nothing in either season is changed, and you can change it back.",
+  'seasonSettings.currentAskHidden':
+    'Make {season} the current season? Your own admin screens open on it from now on. It is hidden, so visitors go on seeing the newest season that is shown until you show this one. Nothing in either season is changed, and you can change it back.',
+  'seasonSettings.currentHidden':
+    '{season} is the current season: your admin screens open on it. It is hidden, so visitors see the newest season that is shown until you show this one.',
+  'seasonSettings.currentNo': 'No, leave it',
+  'seasonSettings.currentYes': 'Yes, make it current',
   'seasonSettings.divisions': 'Divisions',
+  'seasonSettings.done.archived': '{season} is archived.',
+  'seasonSettings.done.current': '{season} is the current season now.',
   'seasonSettings.done.hidden': '{season} is hidden from visitors again.',
   'seasonSettings.done.shown': 'Visitors can see {season} now.',
   'seasonSettings.done.shownLeagueHidden':
     '{season} is shown. Visitors will see it once the league is published.',
+  'seasonSettings.done.started': '{season} is ready. Visitors cannot see it until you show it.',
   'seasonSettings.field.allowTies': 'Ties',
   'seasonSettings.field.bonusFouls': 'Bonus from team foul number',
   'seasonSettings.field.clockMode': 'Clock',
@@ -226,6 +247,7 @@ export const enAdminSettings = {
   'seasonSettings.legend.forfeits': 'Forfeits',
   'seasonSettings.legend.fouls': 'Fouls',
   'seasonSettings.legend.timeouts': 'Timeouts',
+  'seasonSettings.makeCurrent': 'Make this the current season',
   'seasonSettings.move.join': ', ',
   'seasonSettings.move.line': '{team}: {changes}.',
   'seasonSettings.move.lineDivision': '{team} ({division}): {changes}.',
@@ -239,6 +261,8 @@ export const enAdminSettings = {
   'seasonSettings.move.ties': 'ties {from} to {to}',
   'seasonSettings.move.wins': 'wins {from} to {to}',
   'seasonSettings.noSeason': 'This league has no season yet.',
+  'seasonSettings.noSeasonStart': 'This league has no current season yet. Start one below.',
+  'seasonSettings.notCurrent': '{season} is not the current season.',
   'seasonSettings.notInUse': 'Not in use yet',
   'seasonSettings.notInUse.help': 'Nothing checks these yet, so they cannot be changed here.',
   'seasonSettings.notSavedYet':
@@ -309,11 +333,14 @@ export const enAdminSettings = {
     'A preset fills in the game rules below. Nothing is saved until you save.',
   'seasonSettings.readOnly':
     "This league cannot be changed now, so its seasons' settings are shown as they are.",
+  'seasonSettings.readOnlyNotice':
+    '{season} is archived. It can be read but not changed; a game in it is changed only by a correction with a reason.',
   'seasonSettings.refused.boxes': 'Not saved: the marked boxes need a change.',
   'seasonSettings.refused.changed-since-read':
     'Someone else saved this season while you were changing it. The other parts of the page now show what they saved; the boxes here still hold what you typed. Saving again replaces what they saved with what is in these boxes.',
   'seasonSettings.refused.not-allowed':
     "Only the league's owner or an admin can change Season settings.",
+  'seasonSettings.refused.not-archivable': 'That season is archived already. Nothing was changed.',
   'seasonSettings.refused.not-hidden':
     'That season is not hidden any more, so nothing was changed. The page shows it as it is now.',
   'seasonSettings.refused.not-shown':
@@ -331,6 +358,29 @@ export const enAdminSettings = {
     'Show {season} to visitors? Once the league is published, they will see its teams, schedule and results.',
   'seasonSettings.showNo': 'No, keep it hidden',
   'seasonSettings.showYes': 'Yes, show it',
+  'seasonSettings.start.about':
+    'Copied from {season}: its game rules, the statistics kept and its divisions. Not copied: its games, results, standings and schedule.',
+  'seasonSettings.start.aboutFresh':
+    'This league has no current season, so nothing is copied: the new season starts from the usual game rules.',
+  'seasonSettings.start.carry': 'Teams',
+  'seasonSettings.start.carry.nothing': 'Start fresh, with no teams',
+  'seasonSettings.start.carry.teams': 'Bring the teams, with empty rosters',
+  'seasonSettings.start.carry.teams-and-rosters': 'Bring the teams and their rosters',
+  'seasonSettings.start.carryHelp':
+    'A team brought along is the same team across seasons. A team or player that left, or is in the bin, is not brought.',
+  'seasonSettings.start.endsOn': 'Last day (you can leave it empty)',
+  'seasonSettings.start.hidden':
+    'The new season starts hidden from visitors and is not the current season until you make it so.',
+  'seasonSettings.start.name': 'Name',
+  'seasonSettings.start.nameHelp': 'For example Winter 2027.',
+  'seasonSettings.start.open': 'Start a new season',
+  'seasonSettings.start.slug': 'Short name',
+  'seasonSettings.start.slugHelp':
+    "Used in the season's web address: lowercase letters, numbers and dashes, for example winter-2027.",
+  'seasonSettings.start.startsOn': 'First day (you can leave it empty)',
+  'seasonSettings.start.submit': 'Start the season',
+  'seasonSettings.start.title': 'Start a new season',
+  'seasonSettings.state.title': 'Current and archived',
   'seasonSettings.teamFouls.form':
     'Team fouls start again each half with halves, and each quarter with quarters, as the tracker counts them.',
   'seasonSettings.teamFouls.half': 'Team fouls start again each half, as the tracker counts them.',

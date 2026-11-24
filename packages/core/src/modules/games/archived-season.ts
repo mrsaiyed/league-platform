@@ -1,0 +1,83 @@
+// The games module's half of "an archived season is read-only" (O-12, step 2.130,
+// T-377, T-381). Nothing in an archived season's games changes except through an admin's
+// correction with a reason (games.reopen_game, games.put_sheet_back, S-7, T-380), which
+// name no check here; a tracked game's reopen is refused there for a scorekeeper only, by
+// its own rule (reopen-window.ts). Two checks, each named by the commands they guard; the
+// command framework refuses with `season-archived`:
+// - gameInArchivedSeason: always refused there (a scorekeeper's own reopen, S-36; mark
+//   not started, S-40; scorekeepers, postponing, cancelling, the game's rules).
+// - gameInArchivedSeasonNotReopened: entering a result, and the tracker's work, refused
+//   unless a correction is open on the game: reopened by a correction with a reason and
+//   not decided again since (T-381), and then only for someone who may correct games at
+//   the game's place (games.correct, O-12, T-389): a scorekeeper is refused. A correction
+//   left open stays the correcting admin's to finish, archived or not. Once its result is entered again the game is final,
+//   and read-only again; a game corrected before the season was archived is no exception.
+import type { CommandContext } from '../../command/index.ts';
+import {
+  accessOfAccount,
+  allows,
+  readOnlyLeagueStatuses,
+  type AccessHolder,
+  type Scope,
+} from '../access/index.ts';
+import { isDecided } from './game-fields.ts';
+import { gameScope } from './policy.ts';
+import type { GameRecord, GamesStore, GamesTx } from './ports.ts';
+
+type ArchiveReader = {
+  readonly games: Pick<GamesStore, 'find' | 'seasonArchived' | 'correctionsNewestFirst'>;
+};
+
+export async function gameInArchivedSeason(
+  input: { readonly gameId: string },
+  tx: ArchiveReader,
+): Promise<boolean> {
+  const game = await tx.games.find(input.gameId);
+  return game !== undefined && (await tx.games.seasonArchived(game.seasonId));
+}
+
+/**
+ * Whether a correction is open on the game: its newest correction reopened it (left it
+ * undecided) and it is not decided again since. A put back leaves it decided: not open.
+ */
+export async function correctionOpenOn(
+  game: Pick<GameRecord, 'id' | 'status'>,
+  tx: ArchiveReader,
+): Promise<boolean> {
+  if (isDecided(game.status)) return false;
+  const [newest] = await tx.games.correctionsNewestFirst(game.id);
+  return newest !== undefined && !isDecided(newest.after.status);
+}
+
+/**
+ * The one rule for entering a result and the tracker's work in an archived season (O-12,
+ * T-381, T-389), used by the commands' check below and by every page that offers scoring
+ * (the games lists, myGamesOf; the public pages' offers, listScoringOffers), so a page
+ * never offers what the commands refuse: refused unless a correction is open on the game
+ * and the holder may correct games at its place (`scope`, the game's program) while the
+ * league is not archived or suspended. False for a game of a season that is not archived.
+ */
+export async function archivedSeasonRefusesScoring(
+  game: Pick<GameRecord, 'id' | 'status' | 'seasonId'>,
+  tx: GamesTx,
+  holder: AccessHolder | undefined,
+  scope: Scope,
+): Promise<boolean> {
+  if (!(await tx.games.seasonArchived(game.seasonId))) return false;
+  if (!(await correctionOpenOn(game, tx))) return true;
+  if (holder === undefined || !allows(holder, 'games.correct', scope)) return true;
+  const status = await tx.access.leagueStatus();
+  return status === undefined || readOnlyLeagueStatuses.includes(status);
+}
+
+export async function gameInArchivedSeasonNotReopened(
+  input: { readonly gameId: string },
+  tx: GamesTx,
+  context: CommandContext,
+): Promise<boolean> {
+  const game = await tx.games.find(input.gameId);
+  if (game === undefined) return false;
+  const holder =
+    context.accountId === null ? undefined : await accessOfAccount(tx, context.accountId);
+  return archivedSeasonRefusesScoring(game, tx, holder, await gameScope(tx, game.id));
+}

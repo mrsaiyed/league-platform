@@ -8,6 +8,7 @@ import { recordActivity } from '../../access/index.ts';
 import { mayAdjustStandings } from '../policy.ts';
 import type { StandingsTx } from '../ports.ts';
 import { rebuildSeason } from '../rebuild-season.ts';
+import { unexplainedInArchivedSeason } from '../archived-season.ts';
 
 export type RemoveCoinFlipError = { readonly code: 'season-not-found' | 'flip-not-found' };
 
@@ -20,6 +21,8 @@ export const removeCoinFlip = defineCommand({
     reason: z.string().trim().min(1).max(500).optional(),
   }),
   allowed: (context, input, tx: StandingsTx) => mayAdjustStandings(context, tx, input.seasonId),
+  refusedInArchivedSeason: (input, tx) =>
+    unexplainedInArchivedSeason(input.seasonId, input.reason, tx),
   run: async ({
     context,
     input,

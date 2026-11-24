@@ -114,6 +114,18 @@ async function throughTheDoor(
   const { status } = outcome.answer;
   if (status === 403) return { ok: false, code: 'not-allowed' };
   if (status === 404) return { ok: false, code: 'unknown-game' };
+  // The game's season is archived (O-12, T-389): the door's own refusal, never `damaged`
+  // (T-390).
+  const said: unknown = outcome.answer.body;
+  if (
+    status === 409 &&
+    typeof said === 'object' &&
+    said !== null &&
+    'error' in said &&
+    said.error === 'season-archived'
+  ) {
+    return { ok: false, code: 'season-archived' };
+  }
   const reply = CommandReply.safeParse(outcome.answer.body);
   // The reader checked every command against its version's shape: the door turning one
   // away whole means the copy is not as the door reads it.
@@ -159,6 +171,8 @@ async function takeTheGame(
       return { ok: false, code: 'reopen-first' };
     case 'game-postponed':
       return { ok: false, code: 'game-not-live' };
+    case 'season-archived':
+      return { ok: false, code: 'season-archived' };
   }
 }
 

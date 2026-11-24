@@ -37,6 +37,26 @@ describe('updateSeason', () => {
     expect(db.state.activity[0]?.details).toMatchObject({ status: 'active' });
   });
 
+  it('refuses to archive a hidden season (season-hidden, T-388): it would be shown with no way back', async () => {
+    const hidden = seasons.map((x) => ({ ...x, status: 'draft' as const }));
+    const { db, deps, as } = memoryLeagues({ seasons: hidden });
+    expect(
+      await updateSeason(as(ownerId), { seasonId: id(2), version: 1, status: 'completed' }, deps),
+    ).toEqual({ ok: false, error: { code: 'season-hidden' } });
+    expect(db.state.seasons[1]).toMatchObject({ status: 'draft' });
+    expect(db.state.activity).toEqual([]);
+    // Shown first, it may then be archived here too.
+    const shown = await updateSeason(
+      as(ownerId),
+      { seasonId: id(2), version: 1, status: 'active' },
+      deps,
+    );
+    expect(shown).toEqual({ ok: true, value: { version: 2 } });
+    expect(
+      await updateSeason(as(ownerId), { seasonId: id(2), version: 2, status: 'completed' }, deps),
+    ).toEqual({ ok: true, value: { version: 3 } });
+  });
+
   it('gives a version conflict to the second of two admins saving the same season (A-8)', async () => {
     const { db, deps, as } = memoryLeagues({ seasons });
     const first = await updateSeason(as(ownerId), { seasonId: id(1), version: 1, name: 'A' }, deps);

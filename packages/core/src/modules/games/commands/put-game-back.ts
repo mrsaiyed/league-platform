@@ -25,6 +25,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { gameVersion } from '../game-fields.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { GameAtSameTime, GamesTx } from '../ports.ts';
+import { gameInArchivedSeason } from '../archived-season.ts';
 
 /** Why a game called off is put back, from a fixed list: the screen picks the words. */
 export const putBackReasons = ['cancelledByMistake', 'willBePlayed', 'wrongGame', 'other'] as const;
@@ -49,6 +50,7 @@ export type PutGameBack = {
 export const putGameBack = defineCommand({
   name: 'games.put_game_back',
   permission: 'games.results',
+  refusedInArchivedSeason: gameInArchivedSeason,
   input: z.object({
     gameId: z.uuid(),
     version: gameVersion,

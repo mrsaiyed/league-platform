@@ -109,7 +109,10 @@ export type StandingsStore = {
  */
 export type StandingsTx = CommandTx & {
   readonly standings: StandingsStore;
-  readonly games: Pick<GamesStore, 'findSeason' | 'listDecided' | 'listDecidedLines'>;
+  readonly games: Pick<
+    GamesStore,
+    'findSeason' | 'listDecided' | 'listDecidedLines' | 'seasonArchived'
+  >;
   readonly scoringSessions: Pick<ScoringSessionsStore, 'lockGame'>;
   readonly access: AccessReader;
   readonly activity: ActivityLog;

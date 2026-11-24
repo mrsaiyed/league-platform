@@ -27,7 +27,7 @@ import { requestTokenField } from '../../server/same-request.ts';
 import type { SavedNotice } from '../../server/saved-notice.ts';
 import { ListForm, SaidLine, takeNotice, type ListField } from '../list-forms/index.ts';
 import { seasonSettingsAddress } from '../season-settings/index.ts';
-import { StaffNotice, StaffTrail } from '../staff/index.ts';
+import { ArchivedSeasonNotice, StaffNotice, StaffTrail } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import {
   createDivisionAction,
@@ -129,10 +129,14 @@ export async function DivisionsPage({
         title={t('adminDivisions.title')}
         sub={`${t('adminDivisions.intro')} ${t('seasonSettings.seasonName', { name: season.name })}`}
       >
-        <a className="ui-button" data-kind="main" data-icon="plus" href={`#${addDivisionAnchor}`}>
-          {t('adminDivisions.add.title')}
-        </a>
+        {season.archived ? null : (
+          <a className="ui-button" data-kind="main" data-icon="plus" href={`#${addDivisionAnchor}`}>
+            {t('adminDivisions.add.title')}
+          </a>
+        )}
       </PageHead>
+      {/* An archived season (O-12): its divisions are listed, with no form to change one. */}
+      {season.archived ? <ArchivedSeasonNotice season={season.name} /> : null}
       {seasons.length < 2 ? null : (
         <div className="admin-season-pick">
           <OptionPicker
@@ -165,6 +169,8 @@ export async function DivisionsPage({
           <StaffNotice kind="refused">
             <p>{t(divisionProblemKey(listed.error.code))}</p>
           </StaffNotice>
+        ) : top.length === 0 && season.archived ? (
+          <EmptyPanel text={t('adminDivisions.none')} />
         ) : top.length === 0 ? (
           <EmptyPanel
             text={t('adminDivisions.none')}
@@ -172,19 +178,37 @@ export async function DivisionsPage({
           />
         ) : null}
       </div>
-      {top.flatMap((division) => [panel(division), ...under(division).map(panel)])}
-      <section id={addDivisionAnchor} className="staff-panel" aria-labelledby="add-division-title">
-        <h2 id="add-division-title">{t('adminDivisions.add.title')}</h2>
-        <ListForm
-          name="add"
-          label={t('adminDivisions.add.title')}
-          action={createDivisionAction}
-          permalink={`${page}#${addDivisionAnchor}`}
-          hidden={hidden()}
-          fields={divisionFields({ name: '', color: null })}
-          button={t('adminDivisions.add.submit')}
-        />
-      </section>
+      {season.archived ? (
+        <ul className="staff-rows" data-divisions-read-only="">
+          {top
+            .flatMap((division) => [division, ...under(division)])
+            .map((division) => (
+              <li key={division.id} className="staff-row" dir="auto">
+                {division.name}
+              </li>
+            ))}
+        </ul>
+      ) : (
+        top.flatMap((division) => [panel(division), ...under(division).map(panel)])
+      )}
+      {season.archived ? null : (
+        <section
+          id={addDivisionAnchor}
+          className="staff-panel"
+          aria-labelledby="add-division-title"
+        >
+          <h2 id="add-division-title">{t('adminDivisions.add.title')}</h2>
+          <ListForm
+            name="add"
+            label={t('adminDivisions.add.title')}
+            action={createDivisionAction}
+            permalink={`${page}#${addDivisionAnchor}`}
+            hidden={hidden()}
+            fields={divisionFields({ name: '', color: null })}
+            button={t('adminDivisions.add.submit')}
+          />
+        </section>
+      )}
     </main>
   );
 }

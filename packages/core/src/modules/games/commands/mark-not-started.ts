@@ -49,6 +49,7 @@ import type { GameRecord, TrackerTx } from '../ports.ts';
 import { holdsRecordedPlays } from '../recorded-plays.ts';
 import { lowerId, scorerOf } from '../scoring-session.ts';
 import { rulesBeforeStartOf } from '../season-rules-of.ts';
+import { gameInArchivedSeason } from '../archived-season.ts';
 
 export type MarkNotStartedError = {
   readonly code:
@@ -104,6 +105,7 @@ export const markNotStarted = defineCommand({
   name: 'games.mark_not_started',
   // Whoever may score the game; with plays recorded, `games.correct` (S-40).
   permission: 'games.score',
+  refusedInArchivedSeason: gameInArchivedSeason,
   input: z.object({
     gameId: lowerId,
     /** The sequence number of the last play the asker has seen (the tracker's state's). */
