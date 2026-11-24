@@ -1302,8 +1302,20 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     let waiting: QueuedCommand[];
     let stale: KeptTap[];
     let setAside: KeptTap[];
+    let taken: BatchCommand[];
     try {
       const list = await storage.list(gameId);
+      // Shown taps the storage no longer holds were taken by the server (sent from the
+      // kept scoring before opening was answered, say): saved, so still counted until a
+      // loaded state has them, though the base is older (T-329, step 2.61 seed 66).
+      const stored = new Set(list.map((entry) => entry.command.commandId));
+      const inBase = new Set((base?.state.recent ?? []).map((id) => id.toLowerCase()));
+      taken = made.filter(
+        (c) =>
+          !stored.has(c.commandId) &&
+          !refusedIds.has(c.commandId) &&
+          !inBase.has(c.commandId.toLowerCase()),
+      );
       waiting = list.filter((entry) => entry.state === 'waiting');
       setAside = keptIn(list, 'not-saved');
       stale = waiting.filter((entry) => !madeUnder(entry)).map(keptTap);
@@ -1337,8 +1349,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     }
     // Not scoring, so every tap of this device's the server lacks is waiting in the
     // queue: the game shown is rebuilt from it, so what will be sent is what is shown
-    // (one hidden when the game was lost, say, then kept on opening again into it).
-    made = waiting.filter(madeUnder).map((entry) => entry.command);
+    // (one hidden when the game was lost, say, then kept on opening again into it), on
+    // top of those the server took that the base lacks: the kept scoring never drops a
+    // tap its kept state does not have (T-329).
+    made = [...taken, ...waiting.filter(madeUnder).map((entry) => entry.command)];
     // Listed as not saved: what was listed before, what the storage holds as not saved,
     // and the stale taps. A tap still to be sent is never listed (one listed when its
     // setting aside failed, then sent on opening again into the session it was made under).
