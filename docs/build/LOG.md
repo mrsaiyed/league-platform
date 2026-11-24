@@ -4,6 +4,8 @@ Moved out of `STATUS.md` on 2026-11-22 so that the status stays short (USAGE.md,
 
 ## Entries
 
+- 2026-11-24 03:04 UTC — Step 2.102 landed (ninth lead; T-325): the platform's own pages (front page, terms, privacy, the sign-in family, account pages) wear SR Leagues' own look; a league's not-found page keeps the league's look; design review with a walk in a browser at 320 and 390 wide (no High, one Medium fixed: the code screen with nothing waiting; wrong-password fields marked and focused; card styles scoped). GitHub passed lane and twin on 4f9241e after a merge with 2.38 (the tracker page). Not checked: the account-problem page in a browser, a real right-to-left language, a screen reader.
+
 - 2026-11-24 02:01 UTC — Step 2.38 landed (ninth lead; T-317 to T-322, T-327, T-328, S-88): the tracker installs and scores with no signal; four come-and-go faults fixed by cause (offline taps no longer listed 'not saved', scoring kept with every tap, sign-out waits for the worker to forget); review at high effort (no High, three Medium fixed): what a device keeps belongs to one person (T-327), nobody is stuck on a refused version (T-328), a lost game's kept scoring is cleared; confirming look proved each fix by taking it out. GitHub passed lane and twin on 0ce320a. Not checked: Safari, a real phone.
 
 - 2026-11-24 01:41 UTC — Step 2.53 landed (ninth lead; T-323, T-324, T-326, S-90, A-21): the publish summary names what changed (court, venue, round), a postponed game is never stuck (take back a drafted date; Put it back removes a drafted move), 'Give it a new date now' only for who may edit the schedule, a calm 'published already'. Reviewed (no High, five Medium fixed); GitHub passed lane and twin on 90fa374.
