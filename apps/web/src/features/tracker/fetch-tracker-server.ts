@@ -5,7 +5,12 @@
 // status, and so is a state the engine cannot read, so the controller never rebuilds the
 // game on one. A refusal is the server's word only in its own shape at its own status
 // (`ownTrackerRefusal`): a filter's 403 page never stops scoring.
-import { SessionReply, TrackerGameState, ownTrackerRefusal } from '@srleagues/contracts';
+import {
+  SessionReply,
+  TrackerGameState,
+  TrackerRosters,
+  ownTrackerRefusal,
+} from '@srleagues/contracts';
 import { leagueApiUrl } from '@srleagues/core';
 import { basketball } from '@srleagues/sports';
 import type { ServerOutcome, ServerState, TrackerServer } from './tracker-server.ts';
@@ -30,7 +35,7 @@ const engineReads = (state: basketball.GameState): boolean => {
 
 export function createFetchTrackerServer(options: FetchTrackerServerOptions): TrackerServer {
   const { leagueId, gameId, fetch = globalThis.fetch.bind(globalThis) } = options;
-  const address = (part: 'session' | 'state') =>
+  const address = (part: 'session' | 'state' | 'rosters') =>
     leagueApiUrl({ id: leagueId }, ['games', gameId, part]);
 
   /** The response and its body as JSON, or null when nothing came back. */
@@ -94,6 +99,16 @@ export function createFetchTrackerServer(options: FetchTrackerServerOptions): Tr
         return { kind: 'answer', value };
       }
       return turnedAway<ServerState>(answer);
+    },
+
+    async loadRosters(signal) {
+      const answer = await call(address('rosters'), { method: 'GET', signal });
+      if (answer === null) return unanswered;
+      if (answer.status === 200) {
+        const read = TrackerRosters.safeParse(answer.body);
+        return read.success ? { kind: 'answer', value: read.data } : unanswered;
+      }
+      return turnedAway<TrackerRosters>(answer);
     },
   };
 }

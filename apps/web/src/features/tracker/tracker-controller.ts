@@ -54,14 +54,23 @@ import {
   type ReopenRefusalCode,
   type SessionReply,
   type SessionRequest,
+  TablePlayerCommand,
   type TrackerCommand,
 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { againCommandId } from './again-command-id.ts';
 import type { CommandTransport } from './command-transport.ts';
+import { refreshedRosters } from './device-rosters.ts';
 import type { GameDoors } from './game-doors.ts';
 import { mayEnterAgain } from './kept-plays.ts';
-import type { DeviceScoring } from './opened-game-storage.ts';
+import type { DeviceRosters, DeviceScoring } from './opened-game-storage.ts';
+import {
+  deviceProblem,
+  playerChangesIn,
+  withChanges,
+  type DeviceProblem,
+  type PlayerChange,
+} from './roster-changes.ts';
 import {
   QueueError,
   keptTap,
@@ -186,7 +195,40 @@ export type TrackerControllerStatus = {
    * `now()` is the device's time.
    */
   readonly clockErrorMs: number | null;
+  /**
+   * The game's two rosters as the Players panel lists them (step 2.118): the rosters the
+   * device keeps (the page's, or the last fetched) with every change of players this
+   * device has waiting on top, so a reload with no signal lists what was typed. Null when
+   * the controller was given no rosters.
+   */
+  readonly rosters: DeviceRosters | null;
 };
+
+/** A change of players asked for (step 2.118): it has every promise a tap has. */
+export type PlayersResult =
+  | {
+      readonly ok: true;
+      readonly commandIds: readonly string[];
+      /** The player each change names, in order: a new player's id for an add. */
+      readonly playerIds: readonly string[];
+    }
+  | { readonly ok: false; readonly reason: 'not-scoring' }
+  /** `changes[index]` does not fit the contract (a number that is not one): nothing stored. */
+  | { readonly ok: false; readonly reason: 'invalid'; readonly index: number }
+  /** The device's own no, as the server would say it (S-37, S-45): nothing stored. */
+  | {
+      readonly ok: false;
+      readonly reason: 'rule';
+      readonly index: number;
+      readonly problem: DeviceProblem;
+    }
+  /** The storage failed after `stored` of the changes were kept (they stay, in order). */
+  | {
+      readonly ok: false;
+      readonly reason: 'storage';
+      readonly code: QueueErrorCode;
+      readonly stored: number;
+    };
 
 export type TapResult =
   | { readonly ok: true; readonly commandId: string }
@@ -300,6 +342,18 @@ export type TrackerControllerOptions = {
    * not score on under the lost session (step 2.38, review M3).
    */
   readonly forgetScoring?: () => Promise<void>;
+  /**
+   * The game's rosters (step 2.118): those the page brought, those the device kept for
+   * this account (started from when opening gets no answer, so a reload with no signal
+   * keeps what an earlier fetch had), and where each fetched one is kept.
+   */
+  readonly rosters?: {
+    readonly page: DeviceRosters;
+    readonly kept?: DeviceRosters | null;
+    readonly keep?: (rosters: DeviceRosters) => Promise<void>;
+  };
+  /** A new player's id: a random (version 4) UUID, as the contract wants. */
+  readonly newPlayerId?: () => string;
 };
 
 export type TrackerController = {
@@ -307,6 +361,15 @@ export type TrackerController = {
   start(): Promise<void>;
   /** Applies a tap at once, stores it, and lets the queue send it (T-114). */
   tap(input: TapInput): Promise<TapResult>;
+  /**
+   * Adds, renumbers, renames or takes off players at the table (step 2.118), in order:
+   * each change is a command with every promise a tap has (timed by the server's time,
+   * checked against the contract and the rules, stored before it is shown, refused when
+   * not scoring, listed not saved on a loss), in the same queue, in order with the taps.
+   * Several changes (a line of numbers) are checked together: one that is not right
+   * stores none.
+   */
+  changePlayers(changes: readonly PlayerChange[]): Promise<PlayersResult>;
   /** Takes the game from the holder shown, after the scorekeeper confirmed (T6 §5). */
   takeOver(): Promise<TakeOverResult>;
   /**
@@ -493,6 +556,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     server,
     clock = browserClock,
     newCommandId = lowerUuid,
+    newPlayerId = lowerUuid,
     random = Math.random,
     retry = defaultRetryTiming,
     requestTimeoutMs = 15_000,
@@ -592,6 +656,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     queue: queue.status(),
     now: serverNow,
     clockErrorMs: null,
+    rosters: options.rosters?.page ?? null,
   };
 
   const update = (change: Partial<TrackerControllerStatus>): void => {
@@ -787,6 +852,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     base = state;
     sessionId = scoring.sessionId;
     keptSession = scoring.sessionId;
+    // The rosters this device last kept for this account, not the page's copy, which a
+    // worker may have kept from before a fetch (step 2.118).
+    const keptRosters = options.rosters?.kept;
+    if (keptRosters !== undefined && keptRosters !== null) keepRosters(keptRosters);
     showGame();
     update({ mode: { kind: 'scoring' } });
   };
@@ -909,6 +978,119 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     await queue.forget(saved).catch(() => undefined);
   };
 
+  // --- The rosters (step 2.118): kept, fetched, and listed with the waiting changes. ---
+
+  /** The rosters the device keeps: the page's, a fetched one, with changes taken since. */
+  let storedRosters: DeviceRosters | null = options.rosters?.page ?? null;
+  /** Fetches of the rosters begun so far: a change taken is laid on those begun before. */
+  let rosterAsks = 0;
+  /** Changes the server took, each with the fetches begun when it was taken. */
+  let takenSince: { readonly command: TablePlayerCommand; readonly asks: number }[] = [];
+  let keepingRosters: Promise<void> = Promise.resolve();
+
+  /** The kept rosters with this device's waiting changes on top: what is listed. */
+  const showRosters = (): void => {
+    if (storedRosters === null) return;
+    const waiting = playerChangesIn(queue.status().waitingTaps);
+    update({ rosters: withChanges(storedRosters, waiting, gameId) });
+  };
+  const keepRosters = (rosters: DeviceRosters): void => {
+    storedRosters = rosters;
+    const keep = options.rosters?.keep;
+    // Best effort, one after another: the changes themselves are in the queue.
+    if (keep !== undefined)
+      keepingRosters = keepingRosters.then(() => keep(rosters)).catch(() => undefined);
+    showRosters();
+  };
+
+  /**
+   * An add listed as not saved whose player the server's rosters have was taken though
+   * its answer never came back: it is saved, and leaves the list and the storage.
+   */
+  const addsTakenIn = (rosters: DeviceRosters, list: readonly KeptTap[]): string[] => {
+    const onServer = new Set(
+      [...rosters.home.players, ...rosters.away.players].map((p) => p.personId.toLowerCase()),
+    );
+    return playerChangesIn(list)
+      .filter((c) => c.input.type === 'add-player' && onServer.has(c.input.playerId.toLowerCase()))
+      .map((c) => c.commandId);
+  };
+
+  let fetchingRosters: Promise<DeviceRosters | null> | null = null;
+  let fetchRostersAgain = false;
+  /**
+   * Fetches the rosters (on opening, taking over, after a loss, after a refused change,
+   * back online): kept, with the changes taken since the fetch began laid on them. One
+   * at a time; asked again meanwhile, it fetches once more. The rosters fetched, or null.
+   */
+  const refreshRosters = (): Promise<DeviceRosters | null> => {
+    const load = server.loadRosters?.bind(server);
+    if (load === undefined || storedRosters === null || stopped) return Promise.resolve(null);
+    if (fetchingRosters !== null) {
+      fetchRostersAgain = true;
+      return fetchingRosters;
+    }
+    const run = async (): Promise<DeviceRosters | null> => {
+      let fetched: DeviceRosters | null = null;
+      do {
+        fetchRostersAgain = false;
+        rosterAsks += 1;
+        const asks = rosterAsks;
+        const outcome = await ask((signal) => load(signal));
+        if (outcome.kind !== 'answer' || storedRosters === null || stopped) continue;
+        fetched = refreshedRosters(storedRosters, outcome.value);
+        takenSince = takenSince.filter((t) => t.asks >= asks);
+        keepRosters(
+          withChanges(
+            fetched,
+            takenSince.map((t) => t.command),
+            gameId,
+          ),
+        );
+        const saved = addsTakenIn(fetched, current.notSaved);
+        if (saved.length > 0) {
+          update({ notSaved: withoutTaps(current.notSaved, new Set(saved)) });
+          await queue.forget(saved).catch(() => undefined);
+        }
+      } while (fetchRostersAgain);
+      return fetched;
+    };
+    const running = track(run()).finally(() => {
+      fetchingRosters = null;
+    });
+    fetchingRosters = running;
+    return running;
+  };
+
+  // The queue's changes of players: one taken is laid on the kept rosters; a refused one
+  // has the rosters fetched again (the server's are the truth).
+  let seenWaitingChanges: TablePlayerCommand[] = [];
+  const seenRefusedChanges = new Set<string>();
+  queue.subscribe((status) => {
+    const waiting = playerChangesIn(status.waitingTaps);
+    const stillWaiting = new Set(waiting.map((c) => c.commandId));
+    const refused = new Set(status.refused.map((r) => r.command.commandId));
+    const listed = new Set(current.notSaved.map((t) => t.command.commandId));
+    // Gone from the waiting ones, neither refused nor listed as not saved: taken. (One
+    // set aside unlisted would be taken for saved until the next fetch puts it right.)
+    const taken = seenWaitingChanges.filter(
+      (c) =>
+        !stillWaiting.has(c.commandId) && !refused.has(c.commandId) && !listed.has(c.commandId),
+    );
+    seenWaitingChanges = waiting;
+    const refusedNow = status.refused.filter(
+      (r) => isTablePlayerCommand(r.command) && !seenRefusedChanges.has(r.command.commandId),
+    );
+    for (const r of refusedNow) seenRefusedChanges.add(r.command.commandId);
+    if (taken.length > 0 && storedRosters !== null) {
+      takenSince = [...takenSince, ...taken.map((command) => ({ command, asks: rosterAsks }))];
+      keepRosters(withChanges(storedRosters, taken, gameId));
+    } else {
+      showRosters();
+    }
+    if (refusedNow.length > 0) void refreshRosters();
+  });
+
   /**
    * The game was lost (T6 §5): what this device had not sent is listed as not saved,
    * added to what was listed before, and set aside in the storage so it is never sent
@@ -924,12 +1106,21 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const held = await storage.list(gameId).catch(() => null);
     if (!stillLost()) return;
     if (held !== null) {
-      const waiting = keptIn(held, 'waiting');
-      const unsent = new Set(waiting.map((t) => t.command.commandId));
+      // An add the server took whose answer was lost is checked against its rosters
+      // before it is called not saved (step 2.118); unanswered, it is listed.
+      const unsentAll = keptIn(held, 'waiting');
+      const adds = playerChangesIn(unsentAll).some((c) => c.input.type === 'add-player');
+      const rosters = adds ? await refreshRosters() : null;
+      if (!stillLost()) return;
+      const takenAdds = new Set(rosters === null ? [] : addsTakenIn(rosters, unsentAll));
+      const waiting = unsentAll.filter((t) => !takenAdds.has(t.command.commandId));
+      const unsent = new Set(unsentAll.map((t) => t.command.commandId));
       made = made.filter((c) => !unsent.has(c.commandId));
       listNotSaved(withTaps(withTaps(current.notSaved, keptIn(held, 'not-saved')), waiting));
       // If this fails they are still listed, and never sent under another session.
-      if (waiting.length > 0) await queue.setAside([...unsent]).catch(() => undefined);
+      if (unsent.size > 0) await queue.setAside([...unsent]).catch(() => undefined);
+      // Saved after all: never sent again, never listed.
+      if (takenAdds.size > 0) await queue.forget([...takenAdds]).catch(() => undefined);
       if (!stillLost()) return;
     }
     showGame();
@@ -1390,6 +1581,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // Waiting to ask again: ask now.
     askAgainNow();
     if (sessionId !== null) void track(renew());
+    // Players added on another device meanwhile (step 2.118).
+    void refreshRosters();
     // Shown final: is it still? Asked now, not at the next look (T-295).
     if (looksFinal()) void track(checkFinal());
   };
@@ -1626,14 +1819,99 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       return { ok: true, commandId: command.commandId };
     });
 
+  /**
+   * Changes of players (step 2.118), with the promises of `tapWith`: in the one-at-a-time
+   * lock taps take, timed by the server's time, checked against the contract and the
+   * rules before anything is stored, stored before they are listed, and on a loss while
+   * they were stored listed as not saved and set aside, never lost silently.
+   */
+  const changeWith = (changes: readonly PlayerChange[]): Promise<PlayersResult> =>
+    serially(async (): Promise<PlayersResult> => {
+      const game = current.game;
+      const shown = current.rosters;
+      if (
+        current.mode.kind !== 'scoring' ||
+        game === null ||
+        base === null ||
+        throughDoor ||
+        shown === null
+      ) {
+        return { ok: false, reason: 'not-scoring' };
+      }
+      const commands: TablePlayerCommand[] = [];
+      let rosters = shown;
+      for (const [index, change] of changes.entries()) {
+        const input =
+          change.type === 'add-player' ? { ...change, playerId: newPlayerId() } : change;
+        const read = TablePlayerCommand.safeParse({
+          commandId: newCommandId(),
+          at: serverNow(),
+          input,
+        });
+        if (!read.success) return { ok: false, reason: 'invalid', index };
+        const problem = deviceProblem(rosters, read.data.input, game);
+        if (problem !== null) return { ok: false, reason: 'rule', index, problem };
+        rosters = withChanges(rosters, [read.data], gameId);
+        commands.push(read.data);
+      }
+      const under = sessionId;
+      const kept = commands.map((command) => ({ command, moment: momentIn(game, command.at) }));
+      let stored = 0;
+      for (const { command, moment } of kept) {
+        try {
+          await queue.enqueue(command, moment);
+        } catch (thrown) {
+          const code = thrown instanceof QueueError ? thrown.code : 'storage-write-failed';
+          showRosters();
+          return { ok: false, reason: 'storage', code, stored };
+        }
+        stored += 1;
+      }
+      const mode = modeNow();
+      const keptLikeTheRest = mode.kind === 'read-only' && !losesTheGame(mode.reason, true);
+      if ((mode.kind !== 'scoring' || sessionId !== under) && !keptLikeTheRest) {
+        // Lost while they were stored: as for a tap, the answer to a batch already out
+        // is waited for, and what is still waiting is listed and set aside.
+        await queue.idle();
+        const list = await storage.list(gameId).catch(() => null);
+        const stateOf = (id: string) =>
+          list === null ? 'waiting' : list.find((e) => e.command.commandId === id)?.state;
+        const listed = new Set(current.notSaved.map((t) => t.command.commandId));
+        const unsent = kept.filter(
+          (k) => stateOf(k.command.commandId) === 'waiting' && !listed.has(k.command.commandId),
+        );
+        if (unsent.length > 0) listNotSaved(withTaps(current.notSaved, unsent));
+        const aside = kept
+          .map((k) => k.command.commandId)
+          .filter((id) => stateOf(id) !== undefined);
+        if (aside.length > 0) await queue.setAside(aside).catch(() => undefined);
+        showRosters();
+        return { ok: false, reason: 'not-scoring' };
+      }
+      showRosters();
+      return {
+        ok: true,
+        commandIds: commands.map((c) => c.commandId),
+        playerIds: commands.map((c) => c.input.playerId),
+      };
+    });
+
   const controller: TrackerController = {
     async start() {
       if (stopped) return;
+      // The rosters are fetched on opening (step 2.118), beside the session and state.
+      void refreshRosters();
       await track(begin());
+      // The waiting changes the queue read are listed on the rosters at once.
+      showRosters();
     },
 
     tap(input) {
       return tapWith(input, newCommandId());
+    },
+
+    changePlayers(changes) {
+      return changeWith(changes);
     },
 
     async takeOver() {
@@ -1672,6 +1950,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       }
       // What was made under the session that lost the game is never sent under this one.
       await track(hold(reply.sessionId));
+      // The other device may have added players (step 2.118).
+      void refreshRosters();
       return { ok: true };
     },
 

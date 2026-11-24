@@ -9,6 +9,7 @@ import { reopenOfferRequest, reopenTrackedGameRequest } from '../../server/reope
 import { scoringSessionRequest } from '../../server/scoring-session-endpoint.ts';
 import { sendTrackerCommands } from '../../server/tracker-commands-endpoint.ts';
 import { trackerWorld, type Person } from '../../server/tracker-endpoints.test-helper.ts';
+import { trackerRostersRequest } from '../../server/tracker-rosters-endpoint.ts';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import type { ApiAnswer } from '../../server/league-api.ts';
 import type { TrackerPorts } from '../../server/tracker-ports.ts';
@@ -47,7 +48,7 @@ export function endpointNetwork(options: EndpointNetworkOptions = {}): EndpointN
 
   async function answer(person: Person, url: string, init: RequestInit | undefined) {
     const match =
-      /^\/api\/v1\/leagues\/([^/]+)\/games\/([^/]+)\/(commands|session|state|reopen|not-started)$/.exec(
+      /^\/api\/v1\/leagues\/([^/]+)\/games\/([^/]+)\/(commands|session|state|rosters|reopen|not-started)$/.exec(
         url,
       );
     if (match === null) return { status: 404, body: { error: 'not-found' } };
@@ -94,6 +95,8 @@ export function endpointNetwork(options: EndpointNetworkOptions = {}): EndpointN
         await outcome.afterwards?.();
         return outcome.answer;
       }
+      case 'rosters':
+        return trackerRostersRequest(context, game, world.tracker);
       default:
         return trackerStateRequest(context, game, world.tracker);
     }

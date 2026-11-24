@@ -378,6 +378,31 @@ export const enTracker = {
   // A player the game has and this device's rosters do not (added at another table).
   'tracker.player.unknown': 'Player not on this device’s list',
   'tracker.player.unlistedShort': 'Not listed',
+  // The Players panel (step 2.118): why the panel takes no change now, and why a change
+  // of players was said no to, by the device or the server (record 058, S-37, S-45).
+  'tracker.players.readOnly.device':
+    'This device is not scoring the game, so players cannot be changed here.',
+  'tracker.players.readOnly.final': 'This game is over, so its players cannot be changed here.',
+  'tracker.players.refused.game-over': 'This game is over, so its players cannot be changed here.',
+  'tracker.players.refused.has-lines':
+    'This player has a line in another game, so they stay on the team.',
+  'tracker.players.refused.has-plays':
+    'This player has plays in this game, so they stay on its list and its box score.',
+  'tracker.players.refused.in-box-score':
+    'This player has a line in this game’s box score, entered by hand, so they stay on its list.',
+  'tracker.players.refused.jersey-taken':
+    'Another player on this team wears that number, and this season wants a different number for each player.',
+  'tracker.players.refused.name-not-readable': 'That name is too long to keep.',
+  'tracker.players.refused.needs-name-or-number': 'A player needs a number or a name.',
+  'tracker.players.refused.not-on-team': 'That player is no longer on this team.',
+  'tracker.players.refused.not-saved': 'This change could not be saved. Try it again.',
+  'tracker.players.refused.on-team-roster':
+    'This player is on the team’s own roster: a league admin changes their name or takes them off.',
+  'tracker.players.refused.player-id-taken': 'This player could not be added. Add them again.',
+  'tracker.players.refused.player-not-added':
+    'This player was not added, so the plays that name them were not saved.',
+  'tracker.players.refused.reviewed':
+    'A league admin has checked this player: the admin changes their name or takes them off now.',
   'tracker.pregame.players_one': '{team}: {count} player',
   'tracker.pregame.players_other': '{team}: {count} players',
   'tracker.pregame.title': 'Before tip-off',

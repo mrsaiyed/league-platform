@@ -192,6 +192,7 @@ export async function openTrackerGame(
   let confirmed: GameFormat | null;
   let picks: LineupPicks;
   let keptGame: { readonly state: ServerState | null; readonly scoring: DeviceScoring | null };
+  let earlierRosters: DeviceRosters | null = null;
   try {
     // Checked after each wait, just before the next write: a sign-out made meanwhile
     // has its clearing come after, so no rosters come back once it has cleared.
@@ -201,6 +202,9 @@ export async function openTrackerGame(
     if (letGo()) return letGoOf;
     await storage.games.forgetOthers(owner, openedAt - openedGameKeepMs);
     if (letGo()) return letGoOf;
+    // The rosters kept before this opening (a fetch may have had more than the page's
+    // copy, which a worker kept earlier): started from when opening gets no answer.
+    earlierRosters = (await storage.games.find(gameId))?.rosters ?? null;
     await storage.games.saveRosters(owner, rosters, openedAt);
     deviceId = await storage.games.deviceId(options.newDeviceId);
     const kept = await storage.games.find(gameId);
@@ -214,6 +218,7 @@ export async function openTrackerGame(
     keptGame = ours
       ? { state: kept.state, scoring: kept.scoring ?? null }
       : { state: null, scoring: null };
+    if (!ours) earlierRosters = null;
     picks = kept?.lineupPicks ?? noLineupPicks;
   } catch (error) {
     return { ok: false, code: codeOf(error) };
@@ -234,6 +239,12 @@ export async function openTrackerGame(
     // The device lost the game: what it kept of its scoring goes, so a reload with no
     // signal does not score on under the lost session (step 2.38, review M3).
     forgetScoring: () => games.saveScoring(gameId, null),
+    // The Players panel's rosters (step 2.118): each fetched one is kept on the device.
+    rosters: {
+      page: rosters,
+      kept: earlierRosters,
+      keep: (fetched) => games.saveRosters(owner, fetched, now()),
+    },
     transport: options.transport,
     ...(options.doors === undefined ? {} : { doors: options.doors }),
     server: createStoringTrackerServer({
