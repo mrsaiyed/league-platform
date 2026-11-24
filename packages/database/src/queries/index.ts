@@ -177,6 +177,8 @@ export { saveGameState } from './save-game-state.ts';
 export { listGamePlayers } from './list-game-players.ts';
 export { saveGameLines } from './save-game-lines.ts';
 export { findLastGameEnd } from './find-last-game-end.ts';
+export { findGameDecidedBy } from './find-game-decided-by.ts';
+export { listHandResults } from './list-hand-results.ts';
 export { findGameEndedAgo } from './find-game-ended-ago.ts';
 export { findGameEvent } from './find-game-event.ts';
 export { findTablePlayer } from './find-table-player.ts';

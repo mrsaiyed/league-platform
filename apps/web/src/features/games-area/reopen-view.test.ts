@@ -1,6 +1,6 @@
-import type { GameReopenOffer } from '@srleagues/core';
+import type { GameReopenOffer, OwnResultOffer } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
-import { reopenViewOf } from './reopen-view.ts';
+import { reopenViewOf, sheetReopenViewOf } from './reopen-view.ts';
 
 /** The tracker's answer, as games.read_reopen_offer gives it. */
 const no = (offer: GameReopenOffer) => offer;
@@ -41,5 +41,59 @@ describe('what a final game says about putting it right (step 2.154)', () => {
     }
     const open = no({ reopen: { when: 'no', code: 'game-not-decided' }, endedBy: null });
     expect(reopenViewOf(open, true)).toEqual({ kind: 'none' });
+  });
+});
+
+describe('a result recorded by hand, for the scorekeeper who recorded it (step 2.177, S-52)', () => {
+  const byHand = no({ reopen: { when: 'no', code: 'not-ended-by-tracker' }, endedBy: null });
+  const own = (reopen: OwnResultOffer['reopen']): OwnResultOffer => ({ reopen, recordedBy: 'a' });
+
+  it('offers their own door until the minutes run out', () => {
+    expect(reopenViewOf(byHand, false, own({ when: 'until', until: 5000 }))).toEqual({
+      kind: 'correct',
+      door: 'own',
+      until: 5000,
+    });
+    expect(reopenViewOf(undefined, false, own({ when: 'until', until: 5000 }))).toMatchObject({
+      door: 'own',
+    });
+  });
+
+  it('says who can once the minutes are over, for someone else’s entry, and when overturned', () => {
+    const view = (code: Parameters<typeof own>[0]) => reopenViewOf(byHand, false, own(code));
+    expect(view({ when: 'no', code: 'reopen-time-over' })).toEqual({
+      kind: 'who',
+      because: 'time-over',
+    });
+    for (const code of ['not-recorded-by-you', 'scorekeepers-may-not-reopen'] as const) {
+      expect(view({ when: 'no', code })).toEqual({ kind: 'who', because: 'admins' });
+    }
+    expect(view({ when: 'no', code: 'result-overturned' })).toEqual({
+      kind: 'who',
+      because: 'overturned',
+    });
+  });
+
+  it('keeps the admin’s door for whoever may correct games, whatever the own read says', () => {
+    expect(reopenViewOf(byHand, true, own({ when: 'no', code: 'not-recorded-by-you' }))).toEqual({
+      kind: 'correct',
+      door: 'by-hand',
+      until: null,
+    });
+  });
+
+  it('offers it on the game’s own page too, where the sheet is not locked as tracked', () => {
+    const sheet = {
+      mayReopen: false,
+      mayCorrect: false,
+      locked: 'decided',
+      game: { status: 'final', overturned: false },
+    } as const;
+    expect(sheetReopenViewOf(sheet, undefined, own({ when: 'until', until: 9 }))).toEqual({
+      kind: 'correct',
+      door: 'own',
+      until: 9,
+    });
+    expect(sheetReopenViewOf(sheet, undefined, undefined)).toEqual({ kind: 'none' });
   });
 });

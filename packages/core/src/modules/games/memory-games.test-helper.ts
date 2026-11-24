@@ -41,6 +41,10 @@ export type MemoryGames = {
   /** Games the tracker has recorded plays for. */
   tracked: string[];
   corrections: NewGameCorrection[];
+  /** Who decided each game by hand, as `finalized_by` keeps it (migration 0028). */
+  deciders: Record<string, string | null>;
+  /** How many times a list's facts for the own reopening were read (T-349). */
+  handResultReads: number;
   grants: Grant[];
   activity: ActivityEntry[];
   /** Who is assigned to score which game. */
@@ -182,6 +186,8 @@ export const emptyGames = (): MemoryGames => ({
   roster: [],
   tracked: [],
   corrections: [],
+  deciders: {},
+  handResultReads: 0,
   grants: [],
   activity: [],
   assignments: [],
@@ -229,6 +235,7 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): ScorekeepersTx {
         const at = s.games.findIndex((g) => g.id === id);
         const found = s.games[at];
         if (found === undefined || found.binned || found.version !== version) return undefined;
+        s.deciders[id] = change.decided ? (change.decidedBy ?? null) : null;
         s.games[at] = {
           ...found,
           status: change.status,
@@ -261,7 +268,7 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): ScorekeepersTx {
       },
       givenFormat: async (id) =>
         s.games.some((g) => g.id === id) ? (s.givenFormats[id] ?? null) : undefined,
-      // As the database does it (0026): only a game never started, scheduled or postponed.
+      // As the database does it (0028): only a game never started, scheduled or postponed.
       setGivenFormat: async (id, format, version) => {
         const at = s.games.findIndex((g) => g.id === id);
         const found = s.games[at];

@@ -138,7 +138,10 @@ import {
   renameDraftRound,
   renameShortName,
   renewScoringSession,
+  readOwnResultOffer,
+  readOwnResultOffers,
   reopenGame,
+  reopenOwnResult,
   reopenTrackedGame,
   reorderDivisions,
   reorderRoster,
@@ -1433,7 +1436,52 @@ const gameCommandRows: readonly Row[] = [
     async (league, program) => ({ gameId: await trackedGameEndedIn(league, program) }),
     (c, i) => readReopenOffer(c, i, trackerDeps),
   ),
+  // The scorekeeper's reopening of a result they typed (step 2.177, S-52): whoever may
+  // score it. The matrix's scorekeeper recorded it by hand five minutes ago, by the
+  // database's clock, so they may within the league's 30 minutes; everyone else who
+  // scores here may also correct games, which reopens it at any time.
+  ...gameRows(
+    'games.reopen_own_result',
+    'reopen a result recorded by hand',
+    'games.score',
+    async (league, program) => ({
+      gameId: await handResultRecordedIn(league, program),
+      version: 1,
+      reason: 'Typed into the wrong card',
+    }),
+    (c, i) => reopenOwnResult(c, i, trackerDeps),
+  ),
+  // Whether "Correct this result" is offered, before the tap: whoever may score it. A read.
+  ...gameRows(
+    'games.read_own_result_offer',
+    'see whether a result recorded by hand can be reopened',
+    'games.score',
+    async (league, program) => ({ gameId: await handResultRecordedIn(league, program) }),
+    (c, i) => readOwnResultOffer(c, i, trackerDeps),
+  ),
+  // The same for a whole list, in one read (T-349).
+  // Anyone who scores somewhere may ask, as for games.list_my_games: it says only what is theirs.
+  {
+    command: 'games.read_own_result_offers',
+    name: 'see which results recorded by hand on a list can be reopened',
+    needs: 'games.score',
+    scope: 'program',
+    prepare: async (league) => ({ input: { gameIds: [await handResultRecordedIn(league, true)] } }),
+    run: (c, i) => readOwnResultOffers(c, i, trackerDeps),
+  },
 ];
+
+/** A final score the matrix's scorekeeper typed in five minutes ago (step 2.177, 0028). */
+async function handResultRecordedIn(league: League, program: boolean): Promise<string> {
+  const { gameId } = await gameIn(league, program, {
+    status: 'final',
+    home_score: 50,
+    away_score: 40,
+    finalized_at: new Date(Date.now() - 300_000).toISOString(),
+    finalized_by: league.accountOf('scorekeeper'),
+  });
+  return gameId;
+}
 
 /**
  * A live game of the league's season whose tracker has taken these taps, one event

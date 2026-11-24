@@ -148,6 +148,7 @@ export interface GamesTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
   overtime_periods: number | null;
   given_format: ColumnType<JsonValue | null, JsonObject | null, JsonObject | null>;
+  finalized_by: string | null;
 }
 
 export interface ImportsTable {

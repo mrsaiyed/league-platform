@@ -55,6 +55,17 @@ export async function mayScoreGame(
   return mayScoreUnder(holder, scope, rule, assigned);
 }
 
+/**
+ * Scoring somewhere in the league, while it is not archived or suspended (U-9): for a
+ * read across a list of games whose own doors each check mayScoreGame again (T-349).
+ */
+export async function mayScoreAnywhere(context: CommandContext, tx: GamesTx): Promise<boolean> {
+  if (context.accountId === null) return false;
+  if (!(await hasPermissionAnywhere(context, tx, 'games.score'))) return false;
+  const status = await tx.access.leagueStatus();
+  return status !== undefined && !readOnlyLeagueStatuses.includes(status);
+}
+
 /** Reading the schedule side: the permission held anywhere, in any state of the league. */
 export function mayReadGames(
   context: CommandContext,

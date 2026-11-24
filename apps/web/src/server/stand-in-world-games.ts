@@ -113,6 +113,7 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       const at = s.games.findIndex((g) => g.id === gameId);
       const found = s.games[at];
       if (found === undefined || found.binned || found.version !== version) return undefined;
+      s.deciders = { ...s.deciders, [gameId]: change.decided ? (change.decidedBy ?? null) : null };
       // As 0021 refuses it: only a final game has an overtime count, of 0 to 18.
       const overtime = change.overtimePeriods;
       if (overtime !== null && (change.status !== 'final' || overtime < 0 || overtime > 18)) {
@@ -151,7 +152,7 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
     },
     givenFormat: async (gameId) =>
       s.games.some((g) => g.id === gameId) ? (s.givenFormats?.[gameId] ?? null) : undefined,
-    // As the database does it (0026): only a game never started, scheduled or postponed.
+    // As the database does it (0028): only a game never started, scheduled or postponed.
     setGivenFormat: async (gameId, format, version) => {
       const at = s.games.findIndex((g) => g.id === gameId);
       const found = s.games[at];
@@ -543,6 +544,25 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
       const decidedAt = s.games.find((g) => g.id === gameId)?.finalizedAt ?? null;
       return decidedAt === null ? undefined : Math.max(0, now().getTime() - Date.parse(decidedAt));
     },
+    decidedBy: async (gameId) => s.deciders[gameId] ?? null,
+    // As the database's one read for a list (list-hand-results.ts, T-349), from the same
+    // rows the reads above use.
+    handResults: async (gameIds) =>
+      s.games
+        .filter((g) => gameIds.includes(g.id) && !g.binned)
+        .map((g) => ({
+          gameId: g.id,
+          status: g.status,
+          decidedBy: s.deciders[g.id] ?? null,
+          ago:
+            g.finalizedAt === null
+              ? undefined
+              : Math.max(0, now().getTime() - Date.parse(g.finalizedAt)),
+          overturned: gameRecordOf(g).overturned === true,
+          tracked:
+            s.states.some((x) => x.gameId === g.id) &&
+            (s.playsBefore.includes(g.id) || hasPlaysPastMarker(s.events, g.id)),
+        })),
     findEvent: async (gameId, commandId) => {
       const found = s.events.find((e) => e.gameId === gameId && e.commandId === commandId);
       return found === undefined
