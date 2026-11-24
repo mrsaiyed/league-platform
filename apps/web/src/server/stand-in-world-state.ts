@@ -131,6 +131,8 @@ export type LeagueWorld = {
   drafts: DraftRecord[];
   assignments: { readonly gameId: string; readonly accountId: string }[];
   corrections: (NewGameCorrection & { readonly on: string })[];
+  /** The format each game was given (step 2.119, migration 0026), by game id; absent for none. */
+  givenFormats?: Readonly<Record<string, unknown>>;
   sessions: ScoringSession[];
   states: { readonly gameId: string; readonly seq: number; readonly state: unknown }[];
   events: NewGameEvent[];

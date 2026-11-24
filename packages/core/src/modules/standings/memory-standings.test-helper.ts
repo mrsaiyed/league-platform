@@ -248,6 +248,8 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
       // Scorekeeper assignments play no part in standings: the league keeps the
       // starting choice (any scorekeeper may score) and has none.
       leagueSettingRows: async () => [],
+      givenFormat: async () => null,
+      setGivenFormat: async () => undefined,
       listSeasonAssignments: async () => ({ games: [], assignments: [] }),
       isAssigned: async () => false,
       assign: async () => false,

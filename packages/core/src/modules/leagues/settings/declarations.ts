@@ -7,6 +7,8 @@
 //     A-13: a new league starts with any game and can tighten it. The founder left
 //     that starting value to the lead on 2026-11-13, who kept the recommendation);
 //   - how long after the end the scorekeeper who ended a game may reopen it (S-36);
+//   - whether scorekeepers may change a game's format before it starts (S-35: on to
+//     begin with; an admin may always give a game its own format, step 2.119);
 //   - the statistics level a new team starts with (S-22; S-23, the founder: everyone
 //     can see its players' statistics), and whether teams may choose their own (S-24:
 //     yes, the league can switch it off);
@@ -63,6 +65,21 @@ export const scorekeeperReopenMinutes = defineSetting({
   levels: ['league'],
   permission: 'league.settings',
   label: 'setting.games.scorekeeperReopenMinutes.label',
+});
+
+/**
+ * Whether a scorekeeper at the table may change a game's format before its first play
+ * (P7 §5.1, S-35, decided for you: on to begin with, as Al-Hadi's games are run). Off,
+ * the scorekeeper asks an admin, who may always give a game its own format from the
+ * games area. The games module reads it (game-format.ts, step 2.119).
+ */
+export const scorekeepersMayChangeFormat = defineSetting({
+  key: 'games.scorekeepersMayChangeFormat',
+  type: z.boolean(),
+  default: true,
+  levels: ['league'],
+  permission: 'league.settings',
+  label: 'setting.games.scorekeepersMayChangeFormat.label',
 });
 
 /**
@@ -205,6 +222,7 @@ export const declaredSettings = settingRegistry([
   membersStartPage,
   whoMayScore,
   scorekeeperReopenMinutes,
+  scorekeepersMayChangeFormat,
   startingStatsLevel,
   teamsMayChooseStatsLevel,
   minimumGamesToRank,

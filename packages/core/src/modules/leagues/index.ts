@@ -56,6 +56,7 @@ export {
   whoMayScore,
   whoMayScoreChoices,
   scorekeeperReopenMinutes,
+  scorekeepersMayChangeFormat,
   startingStatsLevel,
   statsLevelChoices,
   teamsMayChooseStatsLevel,
