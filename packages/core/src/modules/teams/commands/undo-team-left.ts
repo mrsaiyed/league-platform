@@ -6,6 +6,7 @@ import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { mayChangeTeams, teamScope } from '../policy.ts';
 import type { TeamsTx } from '../ports.ts';
+import { teamInArchivedSeason } from '../archived-season.ts';
 
 export type UndoTeamLeftError = {
   readonly code: 'team-not-found' | 'changed-since-read';
@@ -14,6 +15,7 @@ export type UndoTeamLeftError = {
 export const undoTeamLeft = defineCommand({
   name: 'teams.undo_team_left',
   permission: 'teams.manage',
+  refusedInArchivedSeason: teamInArchivedSeason,
   input: z.object({ teamId: z.uuid(), version: z.number().int().positive() }),
   allowed: async (context, input, tx: TeamsTx) =>
     mayChangeTeams(context, tx, await teamScope(tx, input.teamId)),

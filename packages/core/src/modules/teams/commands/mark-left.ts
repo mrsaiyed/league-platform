@@ -10,6 +10,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { entryScope, mayChangeRosters } from '../policy.ts';
 import type { TeamsTx } from '../ports.ts';
 import { rosterDate } from '../roster-fields.ts';
+import { entryInArchivedSeason } from '../archived-season.ts';
 
 export type MarkLeftError = {
   readonly code:
@@ -24,6 +25,7 @@ export type MarkLeftError = {
 export const markLeft = defineCommand({
   name: 'teams.mark_left',
   permission: 'rosters.manage',
+  refusedInArchivedSeason: entryInArchivedSeason,
   input: z.object({
     rosterEntryId: z.uuid(),
     version: z.number().int().positive(),

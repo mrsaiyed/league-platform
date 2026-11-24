@@ -3,8 +3,10 @@
 // rule: in a league where any scorekeeper may score, every game in the person's reach;
 // where only assigned ones may, the games they are assigned to. The owner, admins and
 // schedulers get every game they may score (P4 §4). In an archived or suspended league the
-// games are still listed, but marked not scorable (U-9).
+// games are still listed, but marked not scorable (U-9); so are an archived season's, but
+// while a correction is open, for those who may correct games there (T-389).
 import { accessOfAccount, readOnlyLeagueStatuses, type Scope } from '../access/index.ts';
+import { archivedSeasonRefusesScoring, gameInArchivedSeason } from './archived-season.ts';
 import { recordingOf } from './game-fields.ts';
 import type { GameInWindow, GamesTx } from './ports.ts';
 import { mayScoreUnder, scoringRuleOf } from './scoring-access.ts';
@@ -32,8 +34,24 @@ export type MyGame = {
   readonly recording: ReturnType<typeof recordingOf>;
   /** Whether the person is assigned to score it. */
   readonly assignedToMe: boolean;
-  /** False while the league is archived or suspended: the game is shown, not scorable (U-9). */
+  /**
+   * False while the league is archived or suspended: the game is shown, not scorable (U-9);
+   * and in an archived season unless a correction is open on it and the person may correct
+   * games there, by the commands' own rule (archivedSeasonRefusesScoring, O-12, T-389).
+   */
   readonly scorable: boolean;
+  /**
+   * Its season is archived (O-12), by the commands' own check (gameInArchivedSeason):
+   * postponing, cancelling and putting it back are refused there, a correction open on it
+   * or not, so no page offers them (T-390).
+   */
+  readonly inArchivedSeason: boolean;
+  /**
+   * False while the league is archived or suspended (U-9): nothing is corrected then. An
+   * archived season's decided game stays correctable (O-12, T-381), so its "Correct this
+   * result" is offered whatever `scorable` says.
+   */
+  readonly leagueScores: boolean;
   /**
    * Whether the live tracker has recorded plays of a game still to be decided (scheduled
    * or live), by the store's own rule (plays since its last "not started" marker): such a
@@ -53,6 +71,8 @@ const view = (
   { game, day, assigned, programId }: GameInWindow,
   today: string,
   scorable: boolean,
+  inArchivedSeason: boolean,
+  leagueOpen: boolean,
   hasPlays: boolean,
   forfeitScore: MyGame['forfeitScore'],
 ): MyGame => ({
@@ -72,6 +92,8 @@ const view = (
   recording: recordingOf(game.captureMode),
   assignedToMe: assigned,
   scorable,
+  inArchivedSeason,
+  leagueScores: leagueOpen,
   hasPlays,
   version: game.version,
   forfeitScore,
@@ -115,8 +137,11 @@ export async function myGamesOf(
       seasonRules.set(seasonId, (await tx.games.findSeason(seasonId))?.rules);
     }
     const { forfeit } = rulesOfGame(entry.game.format, seasonRules.get(seasonId));
+    const scope: Scope = { type: 'program', id: entry.programId };
+    const open = scorable && !(await archivedSeasonRefusesScoring(entry.game, tx, holder, scope));
+    const archived = await gameInArchivedSeason({ gameId: entry.game.id }, tx);
     listed.push(
-      view(entry, today, scorable, plays, {
+      view(entry, today, open, archived, scorable, plays, {
         winner: forfeit.winnerScore,
         loser: forfeit.loserScore,
       }),

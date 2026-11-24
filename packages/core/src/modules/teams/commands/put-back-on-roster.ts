@@ -14,6 +14,7 @@ import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { entryScope, mayChangeRosters } from '../policy.ts';
 import type { TeamsTx } from '../ports.ts';
+import { teamInArchivedSeason } from '../archived-season.ts';
 
 export type PutBackOnRosterError = {
   readonly code:
@@ -35,6 +36,7 @@ export type PutBackOnRosterValue = {
 export const putBackOnRoster = defineCommand({
   name: 'teams.put_back_on_roster',
   permission: 'rosters.manage',
+  refusedInArchivedSeason: teamInArchivedSeason,
   input: z.object({
     teamId: z.uuid(),
     rosterEntryId: z.uuid(),

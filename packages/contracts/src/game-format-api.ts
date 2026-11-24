@@ -35,6 +35,8 @@ export const gameFormatRefusals = [
   'under-way',
   /** The game is over (a final score, a box score, or ended at the table). */
   'finished',
+  /** Its season is archived, so read-only (O-12, step 2.130): only a correction with a reason. */
+  'season-archived',
 ] as const;
 export type GameFormatRefusal = (typeof gameFormatRefusals)[number];
 
@@ -47,7 +49,7 @@ const FormatChangeReply = z.union([
   z.strictObject({ may: z.literal(true), as: z.enum(['admin', 'scorekeeper']) }),
   z.strictObject({
     may: z.literal(false),
-    reason: z.enum(['no-permission', 'setting-off', 'under-way', 'finished']),
+    reason: z.enum(['no-permission', 'setting-off', 'under-way', 'finished', 'season-archived']),
   }),
 ]);
 

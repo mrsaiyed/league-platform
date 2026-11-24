@@ -12,6 +12,7 @@ import { flipFor, levelGroups, sameTeams } from '../level-groups.ts';
 import { mayAdjustStandings } from '../policy.ts';
 import type { StandingsTx } from '../ports.ts';
 import { calculateSeason, rebuildSeason } from '../rebuild-season.ts';
+import { unexplainedInArchivedSeason } from '../archived-season.ts';
 
 export type RecordCoinFlipError = {
   readonly code: 'season-not-found' | 'not-allowed' | 'teams-not-level';
@@ -31,6 +32,8 @@ export const recordCoinFlip = defineCommand({
     note: z.string().trim().min(1).max(500).optional(),
   }),
   allowed: (context, input, tx: StandingsTx) => mayAdjustStandings(context, tx, input.seasonId),
+  refusedInArchivedSeason: (input, tx) =>
+    unexplainedInArchivedSeason(input.seasonId, input.note, tx),
   run: async ({ context, input, tx }): Promise<Result<{ flipId: string }, RecordCoinFlipError>> => {
     if ((await tx.games.findSeason(input.seasonId)) === undefined) {
       return fail({ code: 'season-not-found' });

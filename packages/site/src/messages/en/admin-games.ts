@@ -36,6 +36,8 @@ export const enAdminGames = {
     'This result was overturned. Take the overturn off in Standings and stats first.',
   'admin.boxScore.error.scorekeepers-may-not-reopen':
     'This league does not let scorekeepers reopen a result. Only a league admin or a scheduler can.',
+  'admin.boxScore.error.season-archived':
+    "This game's season is archived, so it is read-only. Nothing was saved. Reopen the game with a reason first (a correction).",
   'admin.boxScore.help':
     'Copy the paper score sheet. Tick each player who played; a player with any number filled in counts as played. Leave a whole column empty if the sheet did not keep that number; it then does not count in that player’s averages. In a column you fill in, an empty box counts as 0.',
   'admin.boxScore.jersey': '#{number}',
@@ -195,6 +197,8 @@ export const enAdminGames = {
     'That game is postponed, so it cannot have a score yet. Enter its score once it is played on its new date.',
   'admin.games.error.invalid-input': 'Enter the score as two whole numbers from 0 to 999.',
   'admin.games.error.not-allowed': 'You are not allowed to do that to this game.',
+  'admin.games.error.season-archived':
+    "This game's season is archived, so it is read-only. Nothing was changed. Only a correction with a reason changes it.",
   'admin.games.error.team-not-in-game': 'That team is not in this game.',
   'admin.games.error.tie-not-allowed': 'This season does not allow ties. Enter a winner.',
   'admin.games.error.unknown': 'That did not work. Nothing was changed.',
@@ -280,6 +284,8 @@ export const enAdminGames = {
     'You ended this game in the tracker, so you can reopen it until {time}.',
   'admin.games.reopenUntilOwn': 'You recorded this result, so you can correct it until {time}.',
   'admin.games.reopenWho.admins': 'Only a league admin or a scheduler can reopen this game.',
+  'admin.games.reopenWho.archived':
+    "This game's season is archived. Only a league admin or a scheduler can reopen it, with a reason.",
   'admin.games.reopenWho.overturned':
     'This result was overturned. Take the overturn off in Standings and stats first.',
   'admin.games.reopenWho.time-over':

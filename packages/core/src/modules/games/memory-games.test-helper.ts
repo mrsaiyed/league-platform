@@ -33,7 +33,7 @@ import type {
 
 export type MemoryGames = {
   status: string;
-  seasons: { id: string; programId: string; rules: unknown }[];
+  seasons: { id: string; programId: string; rules: unknown; status?: string }[];
   games: GameRecord[];
   lines: GameLine[];
   /** Players on teams' rosters, by team. */
@@ -331,6 +331,8 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): ScorekeepersTx {
         const ids = new Set(decidedOf(s, season).map((g) => g.id));
         return s.lines.filter((line) => ids.has(line.gameId));
       },
+      seasonArchived: async (seasonId) =>
+        s.seasons.some((x) => x.id === seasonId && x.status === 'completed'),
       findSeason: async (id) => s.seasons.find((x) => x.id === id),
       leagueSettingRows: async (key) => s.settings[key] ?? [],
       isAssigned: async (gameId, accountId) => isAssigned(s, gameId, accountId),

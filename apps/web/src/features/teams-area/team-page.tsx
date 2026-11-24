@@ -18,7 +18,7 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { holdsHere, loadLeaguePage } from '../../server/load-league-page.ts';
 import { binnedTeamPage } from '../bin-area/index.ts';
-import { StaffField, StaffNotice, StaffTrail } from '../staff/index.ts';
+import { ArchivedSeasonNotice, StaffField, StaffNotice, StaffTrail } from '../staff/index.ts';
 import { leagueDayText } from '../../server/game-when.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import {
@@ -110,6 +110,35 @@ export async function TeamPage({
   // S-44: a clash of numbers is marked on both players, for the admin to put right.
   const wornTwice = numbersWornTwice(open);
   const left = lines.filter((line) => line.leftOn !== null);
+  const listUrl = leagueUrl(here, 'admin-area', { area: 'teams' });
+  // An archived season (O-12): the team and its roster are read, and nothing is offered
+  // that the server would refuse.
+  if (season.archived) {
+    return (
+      <main className="admin-teams admin-team">
+        <StaffTrail steps={[{ href: listUrl, label: t('admin.area.teams') }]} here={team.name} />
+        <PageHead title={team.name} sub={t('adminTeams.team.sub')} lead={<Swatch team={team} />} />
+        <ArchivedSeasonNotice season={season.name} />
+        <Section title={t('adminTeams.roster.title')}>
+          {!roster.ok ? (
+            <StaffNotice kind="refused">{t('adminTeams.roster.readFailed')}</StaffNotice>
+          ) : open.length === 0 ? (
+            <p className="staff-quiet">{t('adminTeams.roster.none')}</p>
+          ) : (
+            <ol className="admin-roster">
+              {open.map((line) => (
+                <li key={line.id} id={entryAnchor(line.id)}>
+                  <p className="admin-roster-name">
+                    <strong dir="auto">{nameOf(line)}</strong>
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Section>
+      </main>
+    );
+  }
   // Names only: the page shows no private field, so none is read (T-76).
   const people = await listPeople(
     context,
@@ -131,7 +160,6 @@ export async function TeamPage({
   const readFailed = !roster.ok || (!people.ok && !peopleNotAllowed);
   const onRoster = new Set(open.map((line) => line.personId));
   const available = everyone.filter((person) => !onRoster.has(person.id));
-  const listUrl = leagueUrl(here, 'admin-area', { area: 'teams' });
   const personUrl = view.areas.includes('people')
     ? (personId: string) => leagueUrl(here, 'admin-area', { area: 'people', subpath: [personId] })
     : undefined;

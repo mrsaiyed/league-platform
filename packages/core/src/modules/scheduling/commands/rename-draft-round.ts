@@ -4,12 +4,14 @@ import { defineCommand, type Result } from '../../../command/index.ts';
 import { draftBasis, editDraft, type DraftEditError, type DraftEditValue } from '../draft-edit.ts';
 import { mayEditSchedule } from '../policy.ts';
 import type { SchedulingTx } from '../ports.ts';
+import { seasonArchivedForSchedule } from '../archived-season.ts';
 
 export type RenameDraftRoundError = DraftEditError;
 
 export const renameDraftRound = defineCommand({
   name: 'scheduling.rename_draft_round',
   permission: 'schedule.edit',
+  refusedInArchivedSeason: seasonArchivedForSchedule,
   input: z.object({ ...draftBasis, roundId: z.uuid(), label: z.string().trim().min(1).max(120) }),
   allowed: (context, input, tx: SchedulingTx) => mayEditSchedule(context, tx, input.seasonId),
   run: async ({ context, input, tx }): Promise<Result<DraftEditValue, RenameDraftRoundError>> =>

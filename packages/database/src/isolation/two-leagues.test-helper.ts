@@ -218,7 +218,9 @@ async function seededLeague(
   const seasonSlug = unique(`${m}-season`);
   const seasonId = await id(
     pglite,
-    'insert into seasons (league_id, program_id, slug, name) values ($1, $2, $3, $4)',
+    // Shown to visitors, as a season that runs is (a hidden one cannot be archived, T-388).
+    `insert into seasons (league_id, program_id, slug, name, status)
+     values ($1, $2, $3, $4, 'active')`,
     [leagueId, programId, seasonSlug, `Season ${m}`],
   );
   const member = await person(pglite, `${unique(m)}-member@example.test`, m, 'Member');

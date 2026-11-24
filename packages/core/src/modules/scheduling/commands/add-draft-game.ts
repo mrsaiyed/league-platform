@@ -15,12 +15,14 @@ import {
 } from '../draft-edit.ts';
 import { mayEditSchedule } from '../policy.ts';
 import type { SchedulingTx } from '../ports.ts';
+import { seasonArchivedForSchedule } from '../archived-season.ts';
 
 export type AddDraftGameError = DraftEditError;
 
 export const addDraftGame = defineCommand({
   name: 'scheduling.add_draft_game',
   permission: 'schedule.edit',
+  refusedInArchivedSeason: seasonArchivedForSchedule,
   input: z.object({
     ...draftBasis,
     gameId: z.uuid(),

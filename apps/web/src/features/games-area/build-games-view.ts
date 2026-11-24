@@ -79,6 +79,7 @@ export function buildGameRows(
     // tracker (S-46): no score typed by hand, no forfeit, no paper sheet.
     const open = (status === 'scheduled' || status === 'live') && !game.hasPlays;
     const mayChange = mayChangeResult(holder, game.programId);
+    const callOff = game.scorable && mayChange && !game.inArchivedSeason;
     return {
       id: game.id,
       version: game.version,
@@ -110,12 +111,16 @@ export function buildGameRows(
       // A scheduled game that holds line-ups from a scorer's table (it has "plays" by the
       // store's rule, but is not live) may still be postponed or cancelled: its line-ups
       // are kept, and the question says so (step 2.158).
-      canPostpone: game.scorable && mayChange && status === 'scheduled',
-      canCancel: game.scorable && mayChange && (status === 'scheduled' || status === 'postponed'),
-      canPutBack: game.scorable && mayChange && status === 'cancelled',
-      canRestore: game.scorable && mayChange && status === 'postponed',
+      // None of the four in an archived season, a correction open on the game or not: the
+      // commands refuse them there (gameInArchivedSeason, O-12, T-390).
+      canPostpone: callOff && status === 'scheduled',
+      canCancel: callOff && (status === 'scheduled' || status === 'postponed'),
+      canPutBack: callOff && status === 'cancelled',
+      canRestore: callOff && status === 'postponed',
       forfeitScore: game.forfeitScore,
-      reopen: game.scorable ? reopens.get(game.id) : undefined,
+      // Not only while scorable: an archived season's decided game is still corrected (O-12,
+      // T-381); the view says who may (reopen-view.ts).
+      reopen: game.leagueScores ? reopens.get(game.id) : undefined,
     };
   });
 }

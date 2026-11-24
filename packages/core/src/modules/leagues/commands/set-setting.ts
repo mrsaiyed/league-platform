@@ -5,6 +5,7 @@
 // confirmed it, and the activity entry says so. In an archived or suspended league only
 // a change that shows less of people works (R-26, `protectiveOrder`).
 import { z } from 'zod';
+import { settingAtArchivedSeason } from '../archived-season.ts';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { leagueSettingChanged } from '../events.ts';
@@ -68,6 +69,7 @@ export function setSettingFor(registry: SettingRegistry) {
   return defineCommand({
     name: 'leagues.set_setting',
     permission: 'league.settings',
+    refusedInArchivedSeason: settingAtArchivedSeason,
     input: z.intersection(
       placeFields,
       z.object({

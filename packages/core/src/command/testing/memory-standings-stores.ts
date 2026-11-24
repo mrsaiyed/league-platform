@@ -15,6 +15,8 @@ import type {
 /** The data the standings and results stores read and write. */
 export type StandingsData = {
   seasons: { id: string; programId: string; rules: unknown }[];
+  /** Seasons archived, so read-only (O-12, step 2.130). */
+  archived?: readonly string[];
   teams: (TableTeam & { seasonId: string })[];
   games: GameRecord[];
   lines: GameLine[];
@@ -33,7 +35,10 @@ export type MemoryOptions = {
   readonly failSaving?: Error;
 };
 
-type ReadGames = Pick<StandingsTx['games'], 'findSeason' | 'listDecided' | 'listDecidedLines'>;
+type ReadGames = Pick<
+  StandingsTx['games'],
+  'findSeason' | 'listDecided' | 'listDecidedLines' | 'seasonArchived'
+>;
 
 const byId = <T extends { id: string }>(a: T, b: T) => a.id.localeCompare(b.id);
 
@@ -58,6 +63,8 @@ export function standingsStores(
         return s.lines.filter((l) => ids.has(l.gameId));
       },
       findSeason: async (id) => s.seasons.find((x) => x.id === id),
+      // Seasons archived, so read-only (O-12, step 2.130, T-387).
+      seasonArchived: async (id) => (s.archived ?? []).includes(id),
     },
     standings: {
       lockSeason: async (season) => void s.locked.push(season),

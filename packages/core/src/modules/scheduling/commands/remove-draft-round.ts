@@ -10,12 +10,14 @@ import { draftBasis, editDraft, type DraftEditError, type DraftEditValue } from 
 import { mayEditSchedule } from '../policy.ts';
 import type { SchedulingTx } from '../ports.ts';
 import { roundsStillInUse } from '../round-use.ts';
+import { seasonArchivedForSchedule } from '../archived-season.ts';
 
 export type RemoveDraftRoundError = DraftEditError;
 
 export const removeDraftRound = defineCommand({
   name: 'scheduling.remove_draft_round',
   permission: 'schedule.edit',
+  refusedInArchivedSeason: seasonArchivedForSchedule,
   input: z.object({ ...draftBasis, roundId: z.uuid() }),
   allowed: (context, input, tx: SchedulingTx) => mayEditSchedule(context, tx, input.seasonId),
   run: async ({ context, input, tx }): Promise<Result<DraftEditValue, RemoveDraftRoundError>> =>

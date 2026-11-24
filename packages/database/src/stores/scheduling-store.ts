@@ -18,6 +18,7 @@ import {
   findPlaceGames,
   findScheduleDraft,
   findSeasonProgramId,
+  seasonIsArchived,
   insertScheduleDraft,
   latestScheduleRevision,
   listLeftTeamsOfSeason,
@@ -42,6 +43,7 @@ export function schedulingStore(scope: LeagueScope): SchedulingStore {
       const programId = await findSeasonProgramId(scope, seasonId);
       return programId === undefined ? undefined : { programId };
     },
+    seasonArchived: (seasonId) => seasonIsArchived(scope, seasonId),
     latestRevision: (seasonId) => latestScheduleRevision(scope, seasonId),
     findDraft: (seasonId) => findScheduleDraft(scope, seasonId),
     insertDraft: (seasonId, changes, basedOn) =>

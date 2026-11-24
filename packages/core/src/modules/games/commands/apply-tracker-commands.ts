@@ -77,6 +77,7 @@ import type { GameRecord, NewGameEvent, TrackerTx } from '../ports.ts';
 import { lowerId, scorerOf, sessionStanding } from '../scoring-session.ts';
 import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
 import { applyTablePlayer, tableRefusal, type TableRefusal } from '../table-players.ts';
+import { gameInArchivedSeasonNotReopened } from '../archived-season.ts';
 
 export type ApplyTrackerCommandsError =
   | { readonly code: 'unsupported-protocol-version'; readonly accepted: readonly number[] }
@@ -129,6 +130,7 @@ const messages: Readonly<Record<Exclude<RefusalCode, 'rule' | 'not-allowed'>, st
 export const applyTrackerCommands = defineCommand({
   name: 'games.apply_tracker_commands',
   permission: 'games.score',
+  refusedInArchivedSeason: gameInArchivedSeasonNotReopened,
   // The version is read on its own first: a batch from another version may not match
   // the current shapes at all (ProtocolProbe).
   input: z.looseObject({

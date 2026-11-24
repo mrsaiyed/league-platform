@@ -7,6 +7,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { gameVersion, isDecided } from '../game-fields.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
+import { gameInArchivedSeason } from '../archived-season.ts';
 
 export type PostponeGameError = {
   readonly code:
@@ -19,6 +20,7 @@ export type PostponeGameError = {
 export const postponeGame = defineCommand({
   name: 'games.postpone_game',
   permission: 'games.results',
+  refusedInArchivedSeason: gameInArchivedSeason,
   input: z.object({ gameId: z.uuid(), version: gameVersion }),
   allowed: async (context, input, tx: GamesTx) =>
     mayChangeGames(context, tx, 'games.results', await gameScope(tx, input.gameId)),

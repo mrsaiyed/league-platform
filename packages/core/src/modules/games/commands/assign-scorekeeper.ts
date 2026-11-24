@@ -8,6 +8,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { isClosed } from '../game-fields.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
+import { gameInArchivedSeason } from '../archived-season.ts';
 
 export type AssignScorekeeperError = {
   readonly code: 'game-not-found' | 'game-closed' | 'cannot-score-game' | 'already-assigned';
@@ -16,6 +17,7 @@ export type AssignScorekeeperError = {
 export const assignScorekeeper = defineCommand({
   name: 'games.assign_scorekeeper',
   permission: 'games.manage',
+  refusedInArchivedSeason: gameInArchivedSeason,
   input: z.object({
     gameId: z.uuid(),
     // Lower case, as the database and the grants spell an account's id.

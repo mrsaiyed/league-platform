@@ -129,6 +129,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
       activity: { record: async (entry) => void s.activity.push(entry), list: async () => [] },
       imports: {
         findSeason: async (id) => s.seasons.find((x) => x.id === id),
+        seasonArchived: async () => false,
         seasonNames: async () => s.names,
         insert: async (value) => {
           if (!s.seasons.some((x) => x.id === value.seasonId)) return 'no-season';
@@ -267,6 +268,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
         replaceLines: async () => undefined,
         listRoster: async () => [],
         inBin: async () => false,
+        seasonArchived: async () => false,
         hasPlays: async (gameId) => s.tracked.includes(gameId),
         findSeason: async (id) => {
           const season = s.seasons.find((x) => x.id === id);

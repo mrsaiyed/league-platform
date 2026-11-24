@@ -1,16 +1,23 @@
 // Edits a season's name, dates, state and whether it is the current one (P7 §1). The
 // save names the version it started from and is refused if another admin saved since
 // (A-8, T-46). Before the first game is final a change simply saves (S-1); the preview
-// for later changes belongs to rules, which step 2.25 guards.
+// for later changes belongs to rules, which step 2.25 guards. A hidden season is not
+// archived here (`season-hidden`, T-388), as leagues.archive_season refuses it: archived is
+// a shown state with no way back, so it is shown first.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
-import { seasonStatuses } from '../league-values.ts';
+import { archivedSeasonStatus, hiddenSeasonStatus, seasonStatuses } from '../league-values.ts';
 import { mayEditLeague, seasonScope } from '../policy.ts';
 import type { LeaguesTx, SeasonChange } from '../ports.ts';
+import { seasonIsArchived } from '../archived-season.ts';
 
 export type UpdateSeasonError = {
-  readonly code: 'season-not-found' | 'season-dates-out-of-order' | 'changed-since-read';
+  readonly code:
+    | 'season-not-found'
+    | 'season-dates-out-of-order'
+    | 'changed-since-read'
+    | 'season-hidden';
 };
 
 const day = z.iso.date();
@@ -18,6 +25,7 @@ const day = z.iso.date();
 export const updateSeason = defineCommand({
   name: 'leagues.update_season',
   permission: 'season.settings',
+  refusedInArchivedSeason: seasonIsArchived,
   // The same limits as the seasons table (0003).
   input: z
     .object({
@@ -55,6 +63,9 @@ export const updateSeason = defineCommand({
       input.endsOn !== undefined && input.endsOn !== season.endsOn ? input.endsOn : undefined;
     const status =
       input.status !== undefined && input.status !== season.status ? input.status : undefined;
+    if (status === archivedSeasonStatus && season.status === hiddenSeasonStatus) {
+      return fail({ code: 'season-hidden' });
+    }
     const isCurrent =
       input.current !== undefined && input.current !== season.isCurrent ? input.current : undefined;
     const change: SeasonChange = {

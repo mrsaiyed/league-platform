@@ -13,7 +13,7 @@ import type { RosterEntryRecord, TeamRecord, TeamsTx } from './ports.ts';
 export type MemoryTeams = {
   status: string;
   /** Seasons and the program each belongs to. */
-  seasons: { id: string; programId: string }[];
+  seasons: { id: string; programId: string; status?: string }[];
   divisions: { id: string; seasonId: string; binned: boolean }[];
   teams: TeamRecord[];
   /** People of the league (not merged away), in or out of the bin. */
@@ -311,6 +311,8 @@ export function memoryTeams(state: Partial<MemoryTeams> = {}) {
           return next.version;
         },
         leagueToday: async () => s.today,
+        seasonArchived: async (seasonId) =>
+          s.seasons.some((x) => x.id === seasonId && x.status === 'completed'),
         seasonProgramId: async (id) => s.seasons.find((x) => x.id === id)?.programId,
         findDivision: async (id) => s.divisions.find((d) => d.id === id),
       },

@@ -7,11 +7,11 @@ import { catalogs } from '@srleagues/site';
 import type { TextKey } from '../../server/messages.ts';
 import type { Visibility } from './season-visibility.ts';
 
-export const doneNames = ['shown', 'hidden'] as const;
+export const doneNames = ['shown', 'hidden', 'started', 'current', 'archived'] as const;
 export type DoneName = (typeof doneNames)[number];
 
 /** The screen's own refusals: the wish does not fit the season's state now. */
-export const screenRefusals = ['not-hidden', 'not-shown'] as const;
+export const screenRefusals = ['not-hidden', 'not-shown', 'not-archivable'] as const;
 export type ScreenRefusal = (typeof screenRefusals)[number];
 
 export type Answer =
@@ -48,6 +48,19 @@ export function earnedDone(query: Query, visibility: Visibility): DoneName | und
   const said = doneOf(query);
   if (said === 'shown') return visibility === 'shown' ? said : undefined;
   if (said === 'hidden') return visibility === 'hidden' ? said : undefined;
+  // A season just started is hidden until shown (step 2.130, A-18).
+  if (said === 'started') return visibility === 'hidden' ? said : undefined;
+  return undefined;
+}
+
+/** The same for "current" and "archived" (step 2.130): only when the season, read fresh, is so. */
+export function earnedStateDone(
+  query: Query,
+  season: { readonly isCurrent: boolean; readonly archived: boolean },
+): DoneName | undefined {
+  const said = doneOf(query);
+  if (said === 'current') return season.isCurrent ? said : undefined;
+  if (said === 'archived') return season.archived ? said : undefined;
   return undefined;
 }
 

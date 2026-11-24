@@ -186,6 +186,9 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       localBotCheck: config.LOCAL_BOT_CHECK,
       ...(config.LOCAL_NOW === undefined ? {} : { worldStartsAt: config.LOCAL_NOW }),
       ...(config.LOCAL_BINNED_TEAM === undefined ? {} : { binnedTeam: config.LOCAL_BINNED_TEAM }),
+      ...(config.LOCAL_NO_CURRENT_SEASON === undefined
+        ? {}
+        : { noCurrentSeason: config.LOCAL_NO_CURRENT_SEASON }),
       keptEmailsFolder: deps.keptEmailsFolder ?? null,
     };
     if (config.LOCAL_DATA === 'made-up-database') {

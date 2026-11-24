@@ -8,8 +8,10 @@ export type SeasonControls = { readonly canEdit: boolean; readonly canPublish: b
 
 export function seasonControls(
   holder: AccessHolder | undefined,
-  season: { readonly programId: string },
+  season: { readonly programId: string; readonly archived: boolean },
 ): SeasonControls {
+  // An archived season is read-only for everyone (O-12): its schedule commands refuse.
+  if (season.archived) return { canEdit: false, canPublish: false };
   return {
     canEdit: mayAtSeason(holder, 'schedule.edit', season),
     canPublish: mayAtSeason(holder, 'schedule.publish', season),

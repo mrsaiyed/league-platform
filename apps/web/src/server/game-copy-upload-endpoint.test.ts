@@ -231,6 +231,25 @@ describe('POST …/games/{game}/copy: a copy uploaded from another device (step 
     expect(sent.reply).toEqual({ status: 'refused', code: 'reopen-first' });
   });
 
+  it("refuses a scorekeeper's copy in an archived season as season-archived, never damaged; the owner's open correction takes it (T-389, T-390)", async () => {
+    const world = trackerWorld();
+    await world.tabletEndsHawksBears();
+    await world.archiveSeasonOf(games.hawksBears);
+    const copy = copyOf(theGame());
+    const archived = { status: 'refused', code: 'season-archived' };
+    const scorekeeper = await upload(world, { copy });
+    expect(scorekeeper.status).toBe(409);
+    expect(scorekeeper.reply).toEqual(archived);
+
+    await world.reopenByCorrection(games.hawksBears);
+    const stillRefused = await upload(world, { copy });
+    expect(stillRefused.status).toBe(409);
+    expect(stillRefused.reply).toEqual(archived);
+    const owner = await upload(world, { copy }, { as: 'owner' });
+    expect(owner.status).toBe(200);
+    expect(GameCopyUploadReply.parse(owner.reply).status).not.toBe('refused');
+  });
+
   it('refuses a copy of another game, a damaged file, and a body that is no upload', async () => {
     const world = trackerWorld();
     const huge = await upload(world, { copy: 'x'.repeat(maxGameCopyLength + 1) });

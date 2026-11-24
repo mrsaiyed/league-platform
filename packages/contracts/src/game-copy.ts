@@ -165,6 +165,11 @@ export const gameCopyUploadRefusals = [
   'reopen-first',
   /** Postponed: it cannot be scored now. */
   'game-not-live',
+  /**
+   * Its season is archived (O-12, T-389): only someone who may correct games, through a
+   * correction left open on it, uploads, as the tracker's own door says.
+   */
+  'season-archived',
 ] as const;
 export type GameCopyUploadRefusal = (typeof gameCopyUploadRefusals)[number];
 
@@ -179,6 +184,7 @@ export const gameCopyRefusalStatus: Readonly<Record<GameCopyUploadRefusal, numbe
   'unknown-game': 404,
   'reopen-first': 409,
   'game-not-live': 409,
+  'season-archived': 409,
 };
 
 export const GameCopyUploadReply = z.discriminatedUnion('status', [

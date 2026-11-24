@@ -85,6 +85,7 @@ const typed = {
   // typed through the Divisions and Venues screens' own forms. The map link must be a web
   // address with no spaces, so it carries the attack with no spaces after its start.
   division: attack('division'),
+  seasonName: attack('seasonName'),
   venueName: attack('venueName'),
   venueAddress: attack('venueAddress'),
   mapLink: `https://example.test/${tightAttack('mapLink')}`,
@@ -152,6 +153,11 @@ const FIELDS = {
     name: 'a venue and its court are added',
     address: 'a venue and its court are added',
     mapLink: 'a venue and its court are added',
+  },
+  // Step 2.130: "Start a new season" in Season settings: its name and its short name.
+  '/[league]/admin/season': {
+    name: 'a season is started',
+    slug: 'a season is started',
   },
   '/[league]/admin/season/divisions': { name: 'a division is added' },
   // Step 2.56: an adjustment's four counts and its reason (the add form's and the remove
@@ -530,6 +536,15 @@ if (browser) {
     await form.locator('input[name=name]').fill(typed.division);
     await form.getByRole('button', { name: 'Add the division', exact: true }).click();
     await page.getByRole('heading', { name: typed.division }).first().waitFor();
+  });
+
+  await step('a season is started with the attack as its name', async () => {
+    await page.goto(`${origin}/north-valley/admin/season`);
+    const form = page.locator('form[data-start-season-form]');
+    await form.locator('input[name=name]').fill(typed.seasonName);
+    await form.locator('input[name=slug]').fill('typed-attack-season');
+    await form.getByRole('button', { name: 'Start the season', exact: true }).click();
+    await page.locator('[data-notice=done]', { hasText: typed.seasonName }).waitFor();
   });
 
   await step('a venue and its court are added with the attack in every box', async () => {
@@ -928,6 +943,7 @@ if (browser) {
     ['/north-valley/admin/teams', ['team']],
     [teamAdmin, ['team', 'first', 'last']],
     ['/north-valley/admin/schedule', ['round']],
+    ['/north-valley/admin/season?season=typed-attack-season', ['seasonName']],
     ['/north-valley/admin/season/divisions', ['division']],
     ['/north-valley/admin/schedule/venues', ['venueName', 'venueAddress', 'courtName']],
     ['/north-valley/admin/standings', ['reason']],

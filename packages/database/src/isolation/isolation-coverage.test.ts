@@ -280,6 +280,18 @@ const reachNoLeagueData = new Map<unknown, string>([
     databasePackage.removeLeague,
     "staff tool (step 2.150, record 063): the preview's reads again, then reaches the one league only through removeDraftLeague (own case), in a transaction set to that league and account, where remove_draft_league refuses any other (schema/league-removal.test.ts); then removes that league's owner's account only through removeUnusedAccount; tested two leagues at once in league-making/remove-league.test.ts",
   ],
+  [
+    databasePackage.copySeasonSetup,
+    "reached only through leagues.start_season (own case), after the command found the program's current season in its own league; every read and write names scope.leagueId (step 2.130, T-378)",
+  ],
+  [
+    databasePackage.findCurrentSeasonId,
+    "one id, its read filtered by scope.leagueId; reached only through leagues.start_season (own case); the harness's target season is not current, so a case of its own would reach nothing (step 2.130)",
+  ],
+  [
+    databasePackage.seasonIsArchived,
+    'a yes or no about one season, its read filtered by scope.leagueId; reached through the archived-season checks of the commands that have cases (step 2.130, T-377)',
+  ],
 ]);
 
 /**

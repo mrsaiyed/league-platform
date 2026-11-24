@@ -102,6 +102,27 @@ describe('POST …/games/{game}/session', () => {
     expect(decided.reply.data).toMatchObject({ status: 'refused', code: 'game-not-live' });
   });
 
+  it("says an archived season's game is season-archived first, to a scorekeeper; an open correction lets the owner in (T-389, T-390)", async () => {
+    const world = trackerWorld();
+    await world.tabletEndsHawksBears();
+    await world.archiveSeasonOf(games.hawksBears);
+    const archived = { status: 'refused', code: 'season-archived' };
+    const scorekeeper = await ask(world, { type: 'open', deviceId: 'tablet-2' });
+    expect(scorekeeper.status).toBe(409);
+    expect(scorekeeper.reply.data).toMatchObject(archived);
+    // Final and archived: the owner too, until a correction is open on it.
+    const owner = await ask(world, { type: 'open', deviceId: 'laptop' }, { as: 'owner' });
+    expect(owner.reply.data).toMatchObject(archived);
+
+    await world.reopenByCorrection(games.hawksBears);
+    const stillRefused = await ask(world, { type: 'open', deviceId: 'tablet-2' });
+    expect(stillRefused.status).toBe(409);
+    expect(stillRefused.reply.data).toMatchObject(archived);
+    const corrector = await ask(world, { type: 'open', deviceId: 'laptop' }, { as: 'owner' });
+    expect(corrector.status).toBe(200);
+    expect(corrector.reply.data?.status).not.toBe('refused');
+  });
+
   it('tells each command\'s "no such game" as unknown-game, never as not allowed', async () => {
     const world = trackerWorld();
     const missing = '01900000-0000-7000-8000-0000000fffff';

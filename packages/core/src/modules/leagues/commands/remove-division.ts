@@ -4,6 +4,7 @@
 // first, and nothing goes that they did not choose (record 019). Teams still in the
 // division are treated the same way (step 2.18): `division-has-teams`.
 import { z } from 'zod';
+import { divisionInArchivedSeason } from '../archived-season.ts';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { divisionScope, mayEditLeague } from '../policy.ts';
@@ -16,6 +17,7 @@ export type RemoveDivisionError = {
 export const removeDivision = defineCommand({
   name: 'leagues.remove_division',
   permission: 'divisions.manage',
+  refusedInArchivedSeason: divisionInArchivedSeason,
   input: z.object({ divisionId: z.uuid() }),
   allowed: async (context, input, tx: LeaguesTx) =>
     mayEditLeague(context, tx, 'divisions.manage', await divisionScope(tx, input.divisionId)),

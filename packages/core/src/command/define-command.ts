@@ -71,6 +71,12 @@ export type Command<Value, Err extends CommandError, Tx extends CommandTx> = (<T
 ) => Promise<Result<Value, Err | InvalidInput | NotAllowed>>) & {
   readonly commandName: string;
   readonly permission: string;
+  /** The command's archived-season check, if it names one (the guard test walks these). */
+  readonly archivedSeasonCheck?: (
+    input: never,
+    tx: never,
+    context: CommandContext,
+  ) => Promise<boolean>;
 };
 
 /** The clock, or null if it fails: a broken clock must not stop the log line. */
@@ -86,12 +92,48 @@ function readClock(deps: { readonly now: () => number }): number | null {
 /** The same format command_receipts.command and activity_log.action accept, with a module. */
 const namePattern = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 
+/** A write refused because its season is archived and so read-only (O-12, step 2.130). */
+export type SeasonArchived = { readonly code: 'season-archived' };
+
+/**
+ * True when this write lands in an archived season (O-12, step 2.130, T-377). A command
+ * that writes into a season names one, from its module's archived-season.ts; the
+ * framework then refuses it with `season-archived` once `allowed` has passed (so
+ * nobody learns a season's state from a command they may not run), before `run`. It is
+ * given who acts, for a door only some may use (an open correction, T-389).
+ */
+export type ArchivedSeasonCheck<Schema extends z.ZodType, Tx extends CommandTx> = (
+  input: z.output<Schema>,
+  tx: Tx,
+  context: CommandContext,
+) => Promise<boolean>;
+
 export function defineCommand<
   Schema extends z.ZodType,
   Value,
   Err extends CommandError,
   Tx extends CommandTx,
->(definition: CommandDefinition<Schema, Value, Err, Tx>): Command<Value, Err, Tx> {
+>(
+  definition: CommandDefinition<Schema, Value, Err, Tx> & {
+    readonly refusedInArchivedSeason: ArchivedSeasonCheck<Schema, NoInfer<Tx>>;
+  },
+): Command<Value, Err | SeasonArchived, Tx>;
+export function defineCommand<
+  Schema extends z.ZodType,
+  Value,
+  Err extends CommandError,
+  Tx extends CommandTx,
+>(definition: CommandDefinition<Schema, Value, Err, Tx>): Command<Value, Err, Tx>;
+export function defineCommand<
+  Schema extends z.ZodType,
+  Value,
+  Err extends CommandError,
+  Tx extends CommandTx,
+>(
+  definition: CommandDefinition<Schema, Value, Err, Tx> & {
+    readonly refusedInArchivedSeason?: ArchivedSeasonCheck<Schema, Tx>;
+  },
+): Command<Value, Err | SeasonArchived, Tx> {
   const { name } = definition;
   if (!namePattern.test(name) || name.length > 100) {
     throw new Error(`defineCommand: "${name}" is not a command name like "games.end_game".`);
@@ -105,7 +147,7 @@ export function defineCommand<
     given: CommandContext,
     input: unknown,
     deps: CommandDeps<T>,
-  ): Promise<Result<Value, Err | InvalidInput | NotAllowed>> {
+  ): Promise<Result<Value, Err | SeasonArchived | InvalidInput | NotAllowed>> {
     // Ids in lower case, as the database reads them, for every comparison and the log.
     const context: CommandContext = {
       leagueId: given.leagueId.toLowerCase(),
@@ -144,7 +186,7 @@ export function defineCommand<
     context: CommandContext,
     raw: unknown,
     deps: CommandDeps<T>,
-  ): Promise<Result<Value, Err | InvalidInput | NotAllowed>> {
+  ): Promise<Result<Value, Err | SeasonArchived | InvalidInput | NotAllowed>> {
     const parsed = definition.input.safeParse(raw);
     if (!parsed.success) {
       // Zod's messages can repeat the value; keep only where and which check.
@@ -162,7 +204,7 @@ export function defineCommand<
     };
     // Thrown only to roll the transaction back; caught just below, never seen outside.
     const rollBack = new Error(`${name}: refused, rolling back`);
-    const refused: { error?: Err | NotAllowed } = {};
+    const refused: { error?: Err | SeasonArchived | NotAllowed } = {};
     try {
       const value = await deps.transaction(context, async (given) => {
         // Every job, the command's or a handler's, is for the command's league. The tx
@@ -180,6 +222,11 @@ export function defineCommand<
         };
         if (!(await definition.allowed(context, input, tx))) {
           refused.error = { code: 'not-allowed' };
+          throw rollBack;
+        }
+        const archivedCheck = definition.refusedInArchivedSeason;
+        if (archivedCheck !== undefined && (await archivedCheck(input, tx, context))) {
+          refused.error = { code: 'season-archived' };
           throw rollBack;
         }
         const events: DomainEvent[] = [];
@@ -208,5 +255,11 @@ export function defineCommand<
 
   // Named for the command, so failures and the harness's reports say which one.
   Object.defineProperty(execute, 'name', { value: name });
-  return Object.assign(execute, { commandName: name, permission });
+  const archivedSeasonCheck = definition.refusedInArchivedSeason;
+  return Object.assign(
+    execute,
+    archivedSeasonCheck === undefined
+      ? { commandName: name, permission }
+      : { commandName: name, permission, archivedSeasonCheck },
+  );
 }

@@ -9,6 +9,8 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { binLinkFor } from '../bin-area/index.ts';
+import { startSeasonAddress } from '../season-settings/index.ts';
+import { ArchivedSeasonNotice } from '../staff/index.ts';
 import { t } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
 import { ListForm } from '../list-forms/index.ts';
@@ -38,7 +40,7 @@ export async function TeamsPage({
         title={t('admin.area.teams')}
         sub={season === undefined ? undefined : t('adminTeams.seasonLine', { season: season.name })}
       >
-        {season === undefined ? null : (
+        {season === undefined || season.archived ? null : (
           <a className="ui-button" data-kind="main" data-icon="plus" href={`#${addTeamAnchor}`}>
             {t('adminTeams.create.title')}
           </a>
@@ -54,9 +56,18 @@ export async function TeamsPage({
         binHref={leagueUrl(here, 'admin-area', { area: 'settings', subpath: ['bin'] })}
       />
       {season === undefined ? (
-        <EmptyPanel text={t('adminTeams.noSeason')} />
+        <EmptyPanel
+          text={t('adminTeams.noSeason')}
+          action={{ href: startSeasonAddress(here), label: t('seasonSettings.start.open') }}
+        />
       ) : (
-        await Body({ league: here, context, seasonId: season.id })
+        await Body({
+          league: here,
+          context,
+          seasonId: season.id,
+          archived: season.archived,
+          seasonName: season.name,
+        })
       )}
     </main>
   );
@@ -66,11 +77,16 @@ async function Body({
   league,
   context,
   seasonId,
+  archived,
+  seasonName,
 }: {
   readonly league: { readonly id: string; readonly slug: string };
   /** The session's: the reads answer only someone who may manage the season's teams. */
   readonly context: CommandContext;
   readonly seasonId: string;
+  /** An archived season (O-12): its teams are listed, with no form that would be refused. */
+  readonly archived: boolean;
+  readonly seasonName: string;
 }) {
   const ports = (await webPorts()).adminTeams;
   const [teams, divisions] = await Promise.all([
@@ -80,11 +96,16 @@ async function Body({
   const divisionName = (id: string | null) => divisions.find((d) => d.id === id)?.name;
   return (
     <>
+      {archived ? <ArchivedSeasonNotice season={seasonName} /> : null}
       {teams.length === 0 ? (
-        <EmptyPanel
-          text={t('adminTeams.none')}
-          action={{ href: `#${addTeamAnchor}`, label: t('adminTeams.create.title') }}
-        />
+        archived ? (
+          <EmptyPanel text={t('adminTeams.none')} />
+        ) : (
+          <EmptyPanel
+            text={t('adminTeams.none')}
+            action={{ href: `#${addTeamAnchor}`, label: t('adminTeams.create.title') }}
+          />
+        )
       ) : (
         <ul className="staff-rows">
           {teams.map((team) => {
@@ -117,58 +138,60 @@ async function Body({
           })}
         </ul>
       )}
-      <div id={addTeamAnchor} className="admin-add-team">
-        <Section title={t('adminTeams.create.title')}>
-          {/* Refused, every box keeps what was typed and the wrong one is marked, with its
-              sentence beside it (step 2.155; ../list-forms). */}
-          <ListForm
-            action={createTeamAction}
-            permalink={`${leagueUrl(league, 'admin-area', { area: 'teams' })}#${addTeamAnchor}`}
-            hidden={{ league: league.slug, [requestTokenField]: randomUUID() }}
-            fields={[
-              {
-                kind: 'text',
-                name: 'name',
-                label: t('adminTeams.field.name'),
-                value: '',
-                required: true,
-                maxLength: 120,
-              },
-              {
-                kind: 'text',
-                name: 'shortName',
-                label: t('adminTeams.field.shortName'),
-                value: '',
-                maxLength: 60,
-                help: t('adminTeams.field.shortNameHint'),
-              },
-              {
-                kind: 'color',
-                name: 'color',
-                label: t('adminTeams.field.color'),
-                value: null,
-                ownName: 'useOwnColors',
-                ownLabel: t('adminTeams.field.useOwnColors'),
-              },
-              {
-                kind: 'select',
-                name: 'divisionId',
-                label: t('adminTeams.field.division'),
-                value: '',
-                required: false,
-                options: [
-                  { value: '', label: t('adminTeams.noDivision') },
-                  ...divisions.map((division) => ({ value: division.id, label: division.name })),
-                ],
-              },
-            ]}
-            button={t('adminTeams.create.submit')}
-            kind="main"
-            label={t('adminTeams.create.title')}
-            name="create-team"
-          />
-        </Section>
-      </div>
+      {archived ? null : (
+        <div id={addTeamAnchor} className="admin-add-team">
+          <Section title={t('adminTeams.create.title')}>
+            {/* Refused, every box keeps what was typed and the wrong one is marked, with its
+                sentence beside it (step 2.155; ../list-forms). */}
+            <ListForm
+              action={createTeamAction}
+              permalink={`${leagueUrl(league, 'admin-area', { area: 'teams' })}#${addTeamAnchor}`}
+              hidden={{ league: league.slug, [requestTokenField]: randomUUID() }}
+              fields={[
+                {
+                  kind: 'text',
+                  name: 'name',
+                  label: t('adminTeams.field.name'),
+                  value: '',
+                  required: true,
+                  maxLength: 120,
+                },
+                {
+                  kind: 'text',
+                  name: 'shortName',
+                  label: t('adminTeams.field.shortName'),
+                  value: '',
+                  maxLength: 60,
+                  help: t('adminTeams.field.shortNameHint'),
+                },
+                {
+                  kind: 'color',
+                  name: 'color',
+                  label: t('adminTeams.field.color'),
+                  value: null,
+                  ownName: 'useOwnColors',
+                  ownLabel: t('adminTeams.field.useOwnColors'),
+                },
+                {
+                  kind: 'select',
+                  name: 'divisionId',
+                  label: t('adminTeams.field.division'),
+                  value: '',
+                  required: false,
+                  options: [
+                    { value: '', label: t('adminTeams.noDivision') },
+                    ...divisions.map((division) => ({ value: division.id, label: division.name })),
+                  ],
+                },
+              ]}
+              button={t('adminTeams.create.submit')}
+              kind="main"
+              label={t('adminTeams.create.title')}
+              name="create-team"
+            />
+          </Section>
+        </div>
+      )}
     </>
   );
 }

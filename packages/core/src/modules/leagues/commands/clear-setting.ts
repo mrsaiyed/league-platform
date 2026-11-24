@@ -1,6 +1,7 @@
 // Clears a setting's value at one place, so the lookup falls back to the next level
 // (record 019: "not set" is no row). Written to the activity log like setting one.
 import { z } from 'zod';
+import { settingAtArchivedSeason } from '../archived-season.ts';
 import { recordActivity } from '../../access/index.ts';
 import {
   defineCommand,
@@ -30,6 +31,7 @@ export function clearSettingFor(registry: SettingRegistry) {
   return defineCommand({
     name: 'leagues.clear_setting',
     permission: 'league.settings',
+    refusedInArchivedSeason: settingAtArchivedSeason,
     input: z.intersection(
       placeFields,
       z.object({ key: settingKey, version: z.number().int().positive() }),

@@ -4,6 +4,7 @@
 // A score for a game postponed since is left waiting and counted apart (step 2.158, S-75).
 // Running it again records nothing twice: a score is marked once it is done.
 import { z } from 'zod';
+import { importInArchivedSeason } from './archived-season.ts';
 import { defineCommand, fail, ok, type Result } from '../../command/index.ts';
 import { recordFinalScoreWithin } from '../games/index.ts';
 import { parseCreatedFixtures, type CreatedFixtures } from './import-documents.ts';
@@ -32,6 +33,7 @@ export type ImportedScoresRecorded = {
 export const recordImportedScores = defineCommand({
   name: 'imports.record_imported_scores',
   permission: 'schedule.import',
+  refusedInArchivedSeason: importInArchivedSeason,
   input: z.object({ importId: z.uuid() }),
   allowed: async (context, input, tx: ImportScoresTx) => {
     const found = await tx.imports.find(input.importId);
