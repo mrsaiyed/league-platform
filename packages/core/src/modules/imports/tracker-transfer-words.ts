@@ -288,6 +288,10 @@ function stopLines(words: Words, stop: TransferStop): string[] {
       return [`The game could not be reopened here as the tracker reopened it (${stop.code}).`];
     case 'not-sent':
       return [`The game’s actions could not be sent (${stop.code}).`];
+    case 'statistic-not-kept':
+      return [
+        `This game holds ${stop.statistic}, which the season does not keep, so nothing was moved. To bring the games over, choose a set that keeps ${stop.statistic} in the season’s settings, under “Statistics kept”, and run the transfer again.`,
+      ];
     case 'action-refused':
       return [`Action ${stop.seq} was refused here: ${stop.message}`];
     case 'not-released':

@@ -39,7 +39,9 @@
 //
 // A play of a statistic the season does not keep (a turnover in a season keeping the
 // standard set) is refused, about that tap alone (S-93, step 2.241, T-391): the tracker
-// sets it aside, lists it and sends the rest.
+// sets it aside, lists it and sends the rest. The refusal carries no sentence: the
+// statistic it names is plain data beside the reply (`notKept`), and the server words it
+// from its message files (T-187) before the reply goes out.
 import {
   buildVersionRefusal,
   CommandBatch,
@@ -82,6 +84,15 @@ import { lowerId, scorerOf, sessionStanding } from '../scoring-session.ts';
 import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
 import { keptForScoring, tapNotKept } from '../statistic-of-tap.ts';
 import { applyTablePlayer, tableRefusal, type TableRefusal } from '../table-players.ts';
+
+/**
+ * The reply, and the statistic each play refused for not being kept names, by command
+ * id: there only when some play was. Not the tracker's: the server words those refusals
+ * and sends the reply without it.
+ */
+export type TrackerCommandsApplied = CommandReply & {
+  readonly notKept?: Readonly<Record<string, string>>;
+};
 
 export type ApplyTrackerCommandsError =
   | { readonly code: 'unsupported-protocol-version'; readonly accepted: readonly number[] }
@@ -158,7 +169,7 @@ export const applyTrackerCommands = defineCommand({
     input,
     tx,
     emit,
-  }): Promise<Result<CommandReply, ApplyTrackerCommandsError>> => {
+  }): Promise<Result<TrackerCommandsApplied, ApplyTrackerCommandsError>> => {
     const version = input.protocolVersion;
     const reader = batchReaders[version];
     if (!isAcceptedProtocolVersion(version) || reader === undefined) {
@@ -177,10 +188,15 @@ export const applyTrackerCommands = defineCommand({
     const batch = parsed.data;
     const accountId = scorerOf(context);
     const ids = batch.commands.map((c) => c.commandId.toLowerCase());
-    const reply = (sequence: number, results: CommandResult[]): CommandReply => ({
+    const reply = (
+      sequence: number,
+      results: CommandResult[],
+      notKept: Readonly<Record<string, string>> = {},
+    ): TrackerCommandsApplied => ({
       protocolVersion: version,
       sequence,
       results,
+      ...(Object.keys(notKept).length === 0 ? {} : { notKept }),
     });
     const refuseAll = (code: RefusalCode, message: string, taken: ReadonlySet<string>) =>
       batch.commands.map(
@@ -283,7 +299,7 @@ export const applyTrackerCommands = defineCommand({
     /** Every answer from here on: written down first, in this same transaction. */
     const answer = async (results: CommandResult[]) => {
       await noteAnswer?.();
-      return ok(reply(seq, results));
+      return ok(reply(seq, results, notKept));
     };
 
     const now = tx.clock.now();
@@ -316,6 +332,8 @@ export const applyTrackerCommands = defineCommand({
       batch.knownRefusals?.includes('statistic-not-kept') === true
         ? ('statistic-not-kept' as const)
         : ('rule' as const);
+    /** The statistic of each play refused for not being kept, by command id. */
+    const notKept: Record<string, string> = {};
     const events: NewGameEvent[] = [];
     /** Whether a play was taken: only then is a state saved for a game that has none. */
     let played = false;
@@ -431,12 +449,13 @@ export const applyTrackerCommands = defineCommand({
       const input: TrackerInput = withLowerIds(command.input);
       const platform = platformProblem(input);
       if (platform !== undefined) return refused(platform);
-      const notKept = tapNotKept(input.type, kept);
-      if (notKept !== undefined) {
+      const statistic = tapNotKept(input.type, kept);
+      if (statistic !== undefined) {
+        notKept[command.commandId] = statistic;
         return {
           commandId: command.commandId,
           status: 'refused',
-          reason: { code: notKeptCode, message: `This season does not keep ${notKept}.` },
+          reason: { code: notKeptCode, message: '' },
         };
       }
       const missing = playerNotOnTeam(game, roster, input);

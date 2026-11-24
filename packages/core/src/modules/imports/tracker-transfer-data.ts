@@ -146,6 +146,11 @@ export type TrackerTransferReads = {
   /** Whether the season asks for unique jersey numbers in a team (0008). */
   readonly uniqueJerseys: boolean;
   /**
+   * The statistics the season takes from the tracker's door ("Statistics kept",
+   * keptForScoring): a game holding another is not moved at all (T-392).
+   */
+  readonly statisticsKept: readonly string[];
+  /**
    * People in the league's list (not in the bin) who are on no team's roster now and
    * whose name holds this text: a person a run added just before it was cut off, before
    * they were put on their team, is found again here rather than added twice.

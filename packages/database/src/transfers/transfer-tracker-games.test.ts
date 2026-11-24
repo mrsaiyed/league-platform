@@ -539,6 +539,24 @@ describe('the tracker transfer (step 2.58)', () => {
     expect(await fingerprint(pglite, league.leagueId)).toEqual(start);
   });
 
+  it('moves nothing, people included, while the season does not keep a statistic the games hold (T-392)', async () => {
+    const league = await makeLeague(pglite, 'made-up-not-kept');
+    await pglite.query(
+      `update seasons set rules = jsonb_set(rules, '{statistics}', '"standard"') where id = $1`,
+      [league.seasonId],
+    );
+    const start = await fingerprint(pglite, league.leagueId);
+    const outcome = await run(optionsFor(league, 'made-up-not-kept'));
+    expect(outcome.plan.ready, outcome.planText).toBe(true);
+    expect(outcome.report?.stopped?.stop).toEqual({
+      kind: 'statistic-not-kept',
+      statistic: 'turnovers',
+    });
+    expect(outcome.reportText).toContain('under “Statistics kept”');
+    expect(outcome.report?.added).toEqual([]);
+    expect(await fingerprint(pglite, league.leagueId)).toEqual(start);
+  });
+
   it('carries on after a run cut off part-way, and leaves another league alone', async () => {
     const bystander = await makeLeague(pglite, 'made-up-bystander');
     const league = await makeLeague(pglite, 'made-up-cut-off');

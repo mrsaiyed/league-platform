@@ -1027,7 +1027,7 @@ describe('a play of a statistic the season does not keep (S-93, step 2.241, T-39
       batchOf(commands, knows),
       t.deps,
     );
-    const notKept = { code: 'statistic-not-kept', message: 'This season does not keep turnovers.' };
+    const notKept = { code: 'statistic-not-kept', message: '' };
     expect(reasons(result)).toEqual([
       'accepted',
       'accepted',
@@ -1058,8 +1058,12 @@ describe('a play of a statistic the season does not keep (S-93, step 2.241, T-39
         'accepted',
         'accepted',
         'accepted',
-        { code: 'rule', message: 'This season does not keep turnovers.' },
+        { code: 'rule', message: '' },
       ]);
+      // No sentence from here (T-187): the statistic, for the server to word.
+      expect(result.ok && result.value.notKept).toEqual({
+        [commands[3]?.commandId ?? '']: 'turnovers',
+      });
     }
   });
 

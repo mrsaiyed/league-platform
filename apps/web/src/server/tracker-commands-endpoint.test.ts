@@ -154,6 +154,30 @@ describe('POST …/games/{game}/commands', () => {
     expect(CommandReply.parse(ownLeague.answer.body).sequence).toBe(3);
   });
 
+  it('words the refusal of a statistic the season does not keep, for an old tracker too (T-187)', async () => {
+    for (const fields of [
+      { protocolVersion: 1 },
+      { protocolVersion: 2, knownRefusals: ['statistic-not-kept'] },
+    ]) {
+      const world = trackerWorld();
+      const sessionId = await openSession(world, games.hawksBears);
+      await send(world, { protocolVersion: 1, sessionId, commands: tipOff() });
+      const turnover = tap({ type: 'turnover', side: 'away', playerId: bears[3] });
+      const outcome = await send(world, { ...fields, sessionId, commands: [turnover] });
+      // The protocol's own strict shape: the plain data the module gave is not sent.
+      expect(CommandReply.parse(outcome.answer.body).results).toEqual([
+        {
+          commandId: turnover.commandId,
+          status: 'refused',
+          reason: {
+            code: fields.protocolVersion === 2 ? 'statistic-not-kept' : 'rule',
+            message: 'This season does not keep turnovers.',
+          },
+        },
+      ]);
+    }
+  });
+
   it('answers a retried batch "duplicate", and publishes nothing for it', async () => {
     const world = trackerWorld();
     const sessionId = await openSession(world, games.hawksBears);

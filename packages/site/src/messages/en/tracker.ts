@@ -618,6 +618,10 @@ export const enTracker = {
   'tracker.redo.done': 'Brought back: {play}.',
   'tracker.redo.label': 'Redo {play}',
   'tracker.redo.nothing': 'Redo: nothing to bring back',
+  // The server's refusal of a play of a statistic the season does not keep (S-93, step
+  // 2.241): the tracker lists it with this sentence, an older one included.
+  'tracker.refused.notKept.other': 'This season does not keep this statistic.',
+  'tracker.refused.notKept.turnovers': 'This season does not keep turnovers.',
   // Left the game (an upload of a copy let go of it, step 2.70) with plays this device
   // can still send by "Send these plays" (T-370).
   'tracker.releasedKept_one':
