@@ -178,7 +178,16 @@ const FIELDS = {
   },
   // League settings (step 2.60): the site notice, the one text setting, shown on every
   // public page of the league.
-  '/[league]/admin/settings': { value: 'the site notice is typed' },
+  // League settings → Profile (step 2.125): the name and the city are typed; the short
+  // name, contact email and time zone, held to a pattern by the browser, are posted by hand.
+  '/[league]/admin/settings': {
+    value: 'the site notice is typed',
+    name: "Profile's boxes",
+    slug: "Profile's boxes",
+    contactEmail: "Profile's boxes",
+    city: "Profile's boxes",
+    timeZone: "Profile's boxes",
+  },
   // League settings → Admins (step 2.97): the address an invitation is sent to.
   '/[league]/admin/settings/admins': { email: 'the email boxes' },
   '/signin': { email: 'the email boxes' },
@@ -807,6 +816,75 @@ if (browser) {
       settingsPage.waitForURL(/done=saved/),
       form.locator('button').first().click(),
     ]);
+    await ownerContext.close();
+  });
+
+  // Step 2.125: League settings → Profile's five boxes, in the empty league so the walk's
+  // other pages keep their names. The name and the city are typed, saved and read back as
+  // text on the settings page; the league's home draws no markup; the short name, contact email and time
+  // zone are posted by hand with the attack and refused.
+  await step("Profile's boxes take the attack as text", async () => {
+    const ownerContext = await contextFor(owner);
+    const page = await ownerContext.newPage();
+    const at = `${origin}/still-waters/admin/settings`;
+    const limit = { timeout: 60_000 };
+    const text = attack('profile');
+    const box = (form, name) => page.locator(`form[data-form="${form}"] input[name="${name}"]`);
+    for (const [form, name] of [
+      ['league-name', 'name'],
+      ['league-profile', 'city'],
+    ]) {
+      await page.goto(at, limit);
+      await box(form, name).fill(text);
+      await Promise.all([
+        page.waitForURL(/done=/, limit),
+        page.locator(`form[data-form="${form}"] button`).click(limit),
+      ]);
+      typedInto.add(`/[league]/admin/settings ${name}`);
+    }
+    for (const address of [at, `${origin}/still-waters`]) {
+      await page.goto(address, limit);
+      const ran = await page.evaluate(
+        () => globalThis.__ran ?? document.querySelector('[data-ran]')?.getAttribute('data-ran'),
+      );
+      if (ran !== undefined && ran !== null) throw new Error(`${address} drew Profile as markup`);
+      const shown =
+        address === at
+          ? (await box('league-name', 'name').inputValue(limit)) === text &&
+            (await box('league-profile', 'city').inputValue(limit)) === text
+          : // The stand-in's public pages draw the cast's name (stand-in-league-sites.ts):
+            // the league's home is read only for markup that ran.
+            (await page.locator('body').innerText(limit)) !== '';
+      if (!shown) {
+        throw new Error(`${address} does not show the typed name as text`);
+      }
+    }
+    for (const [form, name] of [
+      ['short-name', 'slug'],
+      ['league-profile', 'contactEmail'],
+      ['league-profile', 'timeZone'],
+    ]) {
+      await page.goto(at, limit);
+      const body = new FormData();
+      for (const [field, value] of await page
+        .locator(`form[data-form="${form}"] input`)
+        .evaluateAll((inputs) =>
+          inputs.filter((i) => i.type !== 'checkbox').map((i) => [i.name, i.value]),
+        )) {
+        if (field !== '') body.set(field, value);
+      }
+      body.set(name, text);
+      const answer = await fetch(at, {
+        method: 'POST',
+        body,
+        headers: { origin, cookie: `srl_session=${owner}` },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(60_000),
+      });
+      const to = answer.headers.get('location') ?? '';
+      if (!to.includes('problem=')) throw new Error(`the attack in ${name} was not refused: ${to}`);
+      typedInto.add(`/[league]/admin/settings ${name}`);
+    }
     await ownerContext.close();
   });
 

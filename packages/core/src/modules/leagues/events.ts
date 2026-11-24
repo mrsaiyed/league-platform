@@ -4,6 +4,10 @@
 export const leagueNameChanged = 'leagues.name_changed';
 export const leagueCreated = 'leagues.created';
 export const leagueShortNameChanged = 'leagues.short_name_changed';
+/** League settings → Profile changed (step 2.125). */
+export const leagueProfileChanged = 'leagues.profile_changed';
+/** Who plays in the league changed (step 2.125). */
+export const leagueAudienceChanged = 'leagues.audience_changed';
 export {
   leagueSettingChanged,
   leagueStatusChanged,

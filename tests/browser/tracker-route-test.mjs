@@ -217,6 +217,11 @@ if (browser) {
       );
       note('the tracker names the game', (await page.getByText('Bears at Hawks').count()) > 0);
       await formatHeading(page).waitFor();
+      // Since step 2.119 the format panel reads the format again, and while it reads it draws
+      // "Confirm and start scoring" in its reading state; when the read lands that button is
+      // replaced, and a measure taken in between finds no button (0px: the gate's failure in
+      // lane 2.125). So the checks below wait, with a limit, for the panel to have read.
+      await page.locator('[data-game-format]').waitFor({ timeout: 15_000 });
       note('the format is shown', (await page.getByText('Overtime periods of').count()) === 1);
       note(
         '"All saved" is not said before anything is entered',
@@ -227,9 +232,13 @@ if (browser) {
         (await page.getByText(signOutHint).count()) === 1 &&
           (await signOutLink(page).count()) === 1,
       );
+      const confirmHeight = await tapHeight(
+        page.getByRole('button', { name: 'Confirm and start scoring' }),
+      );
       note(
         '"Confirm and start scoring" is a tap at least 44px high',
-        (await tapHeight(page.getByRole('button', { name: 'Confirm and start scoring' }))) >= 44,
+        confirmHeight >= 44,
+        String(confirmHeight),
       );
       await accessible(page, 'confirming the format');
       await noSidewaysScroll(page, 'confirming the format');

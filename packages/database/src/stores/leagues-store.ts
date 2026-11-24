@@ -9,6 +9,7 @@ import {
   findCurrentLeague,
   findLeagueAudience,
   findLeagueContactEmail,
+  findLeagueProfile,
   findPublishedDesign,
   findProgramId,
   hasRecordedChild,
@@ -19,7 +20,9 @@ import {
   listSettingValues,
   renameLeagueSlug,
   setCurrentSeason,
+  updateLeagueAudience,
   updateLeagueName,
+  updateLeagueProfile,
   updateLeagueStatus,
   updateSeason,
   type SeasonChangeRow,
@@ -50,6 +53,10 @@ export function leaguesStore(
     renameShortName: (slug, version, forwardMonths) =>
       renameLeagueSlug(scope, slug, version, forwardMonths),
     setStatus: (status: LeagueStatus, version) => updateLeagueStatus(scope, status, version),
+    leagueProfile: () => findLeagueProfile(scope),
+    setProfile: (profile, version) => updateLeagueProfile(scope, profile, version),
+    setAudience: (audience, version, unlist) =>
+      updateLeagueAudience(scope, audience, version, unlist),
     findProgram: async (programId) => {
       const id = await findProgramId(scope, programId);
       return id === undefined ? undefined : { id };

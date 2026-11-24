@@ -58,7 +58,7 @@ import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
 import { standInAdminAccess } from './stand-in-admin-access.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
-import { standInStatusOf } from './stand-in-league-states.ts';
+import { standInAnswersTo, standInNamesOf, standInStatusOf } from './stand-in-league-states.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
 import {
   castId,
@@ -442,7 +442,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     const found = leagues.find((l) => l.id === leagueId && !l.inBin);
     return found === undefined
       ? undefined
-      : { id: found.id, slug: found.slug, status: standInStatusOf(found) };
+      : { id: found.id, slug: standInNamesOf(found).slug, status: standInStatusOf(found) };
   };
   const identify: WebPorts['identify'] = async (accessToken) => {
     const person = people.find((p) => p.token === accessToken);
@@ -514,14 +514,16 @@ export function standInPorts(options: StandInOptions): StandInPorts {
   });
   return {
     findLeague: async (shortName): Promise<FoundLeague | undefined> => {
-      const found = leagues.find((l) => l.slug === shortName || l.formerSlugs.includes(shortName));
+      // A short name given up in League settings forwards as a former one does (step 2.125).
+      const found = leagues.find((l) => standInAnswersTo(l, shortName));
       if (found === undefined) return undefined;
+      const { slug } = standInNamesOf(found);
       return {
         leagueId: found.id,
-        slug: found.slug,
+        slug,
         status: standInStatusOf(found),
         inBin: found.inBin,
-        forwarded: found.slug !== shortName,
+        forwarded: slug !== shortName,
       };
     },
     findLeagueById,
