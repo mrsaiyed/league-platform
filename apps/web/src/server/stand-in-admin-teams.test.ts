@@ -416,7 +416,11 @@ describe('the admin Teams screens over the stand-in', () => {
       jerseyNumber: '33',
       role: 'player',
     });
-    expect(fine.answer).toEqual({ kind: 'done', done: 'added' });
+    // The answer points at the new roster entry, so the page can name who was saved.
+    const roster = value(await listRoster(m.owner, { teamId }, m.ports.deps));
+    const kept = roster.filter((line) => line.jerseyNumber === '33');
+    expect(kept).toHaveLength(1);
+    expect(fine.answer).toEqual({ kind: 'done', done: 'added', at: { entry: kept[0]?.id } });
     expect(await listPeopleCount(m)).toBe(before + 1);
   });
 
