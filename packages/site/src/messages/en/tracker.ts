@@ -396,11 +396,11 @@ export const enTracker = {
     'Use numbers from 0 to 99 (or 00). Type one number with a name, or several numbers with no name.',
   'tracker.players.jump': 'Go to the away team: {team}',
   'tracker.players.name': 'Name (if known)',
-  'tracker.players.numbersWithName':
-    'Several numbers and a name do not go together. Type the numbers alone for a bench, or one number with the name.',
   'tracker.players.number': 'Number',
   'tracker.players.numbers': 'Number, or several numbers',
   'tracker.players.numbersHelp': 'For a whole bench, type the numbers in one line: 3 5 10 12 14.',
+  'tracker.players.numbersWithName':
+    'Several numbers and a name do not go together. Type the numbers alone for a bench, or one number with the name.',
   'tracker.players.open': 'Players',
   'tracker.players.openHelp': 'Add a player for either team, or fix a number or a name.',
   // The Players panel (step 2.118): why the panel takes no change now, and why a change
