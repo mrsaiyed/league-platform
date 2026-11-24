@@ -386,8 +386,12 @@ describe('a play made after the copy was saved, once the copy is uploaded (T-370
     tablet.controller.online();
     await tablet.controller.idle();
     // The copy's plays are on the server, so only the late one is listed, to send by
-    // the scorekeeper's one tap; the copy's go with it, answered as already there.
-    expect(tablet.controller.status().notSaved).toHaveLength(1);
+    // the scorekeeper's one tap; the copy's go with it, answered as already there. Past
+    // the state's 300 recent ids the device cannot tell the older ones are there: they
+    // are listed too, and the send finds them there (T-374).
+    const listed = tablet.controller.status().notSaved.length;
+    if (n <= 120) expect(listed).toBe(1);
+    else expect(listed).toBeGreaterThanOrEqual(1);
     expect(tablet.controller.status().sendNotSaved).toBe('offered');
     let sender = tablet;
     if (reload) {
@@ -396,10 +400,10 @@ describe('a play made after the copy was saved, once the copy is uploaded (T-370
       sender = device(network, 'scorekeeper', 'tablet-1', tablet.storage);
       await sender.controller.start();
       await sender.controller.idle();
-      expect(sender.controller.status().notSaved).toHaveLength(1);
+      expect(sender.controller.status().notSaved).toHaveLength(listed);
       expect(sender.controller.status().sendNotSaved).toBe('offered');
     }
-    expect(await sender.controller.sendNotSaved()).toEqual({ ok: true, saved: 1 });
+    expect(await sender.controller.sendNotSaved()).toEqual({ ok: true, saved: listed });
     await sender.controller.idle();
     expect(await serverScore(network)).toEqual({ home: 2 * n, away: 2 });
     expect(sender.controller.status().notSaved).toEqual([]);
@@ -421,4 +425,15 @@ describe('a play made after the copy was saved, once the copy is uploaded (T-370
   it('is counted once with 120 plays in the copy, more than one batch holds (T-372)', async () => {
     await lateAfterCopy('owner', 120, false);
   });
+
+  // More than the server's state names among its recent plays (300): the taps the server
+  // answered as already there while the tablet had lost the game are all sent along, in
+  // the order they were made, so every batch is explained (T-374).
+  for (const n of [301, 600]) {
+    for (const reload of [false, true]) {
+      it(`is counted once with ${n} plays in the copy${reload ? ', after a reload' : ''} (T-374)`, async () => {
+        await lateAfterCopy('owner', n, reload);
+      });
+    }
+  }
 });
