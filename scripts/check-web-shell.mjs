@@ -2189,6 +2189,21 @@ function pageForms(html) {
   return html.slice(Math.max(0, content >= 0 ? content : html.indexOf('</header>')));
 }
 
+/**
+ * The action of the one League settings form that sets `key`, found by the hidden field
+ * naming its setting, wherever the page draws it (step 2.125, T-352): Profile and the
+ * Publish panel may come before the settings' forms. Undefined unless exactly one form
+ * sets it.
+ */
+function settingFormAction(html, key) {
+  const forms = pageForms(html)
+    .split('<form')
+    .slice(1)
+    .map((form) => form.slice(0, form.indexOf('</form>')))
+    .filter((form) => form.includes('name="key"') && form.includes(`value="${key}"`));
+  return forms.length === 1 ? /name="(\$ACTION_ID_[^"]+)"/.exec(forms[0])?.[1] : undefined;
+}
+
 async function checkTeams(origin) {
   const problems = [];
   const as = (who) => ({ cookie: `srl_session=${tokens[who]}` });
@@ -2363,11 +2378,10 @@ async function checkSettings(origin) {
   const as = (who) => ({ cookie: `srl_session=${tokens[who]}` });
   const page = '/north-valley/admin/settings';
   const pageOf = async (who) => (await fetch(origin + page, { headers: as(who) })).text();
-  async function post(who, index, fields) {
-    const html = await pageOf('owner');
-    const id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
+  async function post(who, fields) {
+    const id = settingFormAction(await pageOf('owner'), fields.key);
     if (id === undefined) {
-      problems.push(`settings: no form ${index}`);
+      problems.push(`settings: no one form sets ${fields.key}`);
       return undefined;
     }
     const body = new FormData();
@@ -2383,7 +2397,7 @@ async function checkSettings(origin) {
     return { status: response.status, to: location.pathname + location.search };
   }
   const key = 'games.whoMayScore';
-  const saved = await post('owner', 1, {
+  const saved = await post('owner', {
     league: 'north-valley',
     key,
     version: '',
@@ -2397,7 +2411,7 @@ async function checkSettings(origin) {
   if (!after.includes('Now: set for this league.') || !after.includes('Go back to the default')) {
     problems.push('the settings page does not show the saved value');
   }
-  const stale = await post('owner', 1, {
+  const stale = await post('owner', {
     league: 'north-valley',
     key,
     version: '',
@@ -2406,7 +2420,7 @@ async function checkSettings(origin) {
   if (!stale?.to.includes('problem=leagues.set_setting.changed-since-read')) {
     problems.push(`a stale version was not refused (${stale?.to})`);
   }
-  const outside = await post('owner', 1, {
+  const outside = await post('owner', {
     league: 'north-valley',
     key,
     version: '1',
@@ -2415,7 +2429,7 @@ async function checkSettings(origin) {
   if (!outside?.to.includes('problem=leagues.set_setting.invalid-value')) {
     problems.push(`a value outside the limits was not refused (${outside?.to})`);
   }
-  const cleared = await post('owner', 1, {
+  const cleared = await post('owner', {
     league: 'north-valley',
     key,
     version: '1',
@@ -2428,7 +2442,7 @@ async function checkSettings(origin) {
     problems.push('the settings page still shows a value after going back to the default');
   }
   // A scheduler may not open the area, so the post is refused and nothing is saved.
-  const refused = await post('scheduler', 1, {
+  const refused = await post('scheduler', {
     league: 'north-valley',
     key,
     version: '',
@@ -2485,7 +2499,8 @@ async function checkSiteMarks(origin) {
   async function save(key, fields, league = 'north-valley') {
     const page = `/${league}/admin/settings`;
     const html = await (await fetch(origin + page, { headers: as })).text();
-    const id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[1];
+    const id = settingFormAction(html, key);
+    if (id === undefined) problems.push(`site marks: no one form sets ${key} in ${league}`);
     const body = new FormData();
     body.set(id ?? '', '');
     for (const [name, value] of Object.entries({ league, key, ...fields })) {

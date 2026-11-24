@@ -91,6 +91,19 @@ export async function SettingsPage({
           {t(good)}
         </p>
       ) : null}
+      {/* Profile (step 2.125) is the first thing in League settings (T-352); the page-step
+          checks find each settings form by the setting it names, not by its place. */}
+      {current === undefined || profile === undefined ? null : (
+        <ProfilePanel
+          league={view.context.league.slug}
+          name={current.name}
+          slug={current.slug}
+          version={current.version}
+          profile={profile}
+          childrenInFull={childrenInFull}
+          mayChange={mayEdit}
+        />
+      )}
       {current === undefined ? null : (
         <PublishPanel
           league={view.context.league.slug}
@@ -119,19 +132,6 @@ export async function SettingsPage({
           </nav>
           <SettingForms rows={rows} league={view.context.league.slug} say={say} notes={notes} />
         </>
-      )}
-      {/* Profile (step 2.125) comes after the settings' forms, which the page-step
-          checks reach by their place on the page. */}
-      {current === undefined || profile === undefined ? null : (
-        <ProfilePanel
-          league={view.context.league.slug}
-          name={current.name}
-          slug={current.slug}
-          version={current.version}
-          profile={profile}
-          childrenInFull={childrenInFull}
-          mayChange={mayEdit}
-        />
       )}
     </main>
   );

@@ -132,6 +132,7 @@ export { leagueTransitions, readOnlyStatuses, type Transition } from './league-s
 export {
   audiences,
   leagueStatuses,
+  listedByDefault,
   offeredSports,
   seasonStatuses,
   type Audience,
