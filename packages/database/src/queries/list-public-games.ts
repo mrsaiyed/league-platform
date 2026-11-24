@@ -6,6 +6,7 @@
 import { sql } from 'kysely';
 import { rulesOfGame, type PublicGame } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
+import { listResultsBeingCorrected } from './list-results-being-corrected.ts';
 
 /** A public game and the round it belongs to, if any. */
 export type PublicGameInRound = PublicGame & { readonly roundId: string | null };
@@ -23,6 +24,12 @@ export async function listPublicGames(
         .onRef('seasons.id', '=', 'games.season_id'),
     )
     .innerJoin('leagues', 'leagues.id', 'games.league_id')
+    // A game with no time yet takes its round's date as its day (step 2.159).
+    .leftJoin('rounds', (join) =>
+      join
+        .onRef('rounds.league_id', '=', 'games.league_id')
+        .onRef('rounds.id', '=', 'games.round_id'),
+    )
     .innerJoin('teams as home', (join) =>
       join
         .onRef('home.league_id', '=', 'games.league_id')
@@ -53,7 +60,9 @@ export async function listPublicGames(
       'games.round_id as round_id',
       'games.game_number as game_number',
       'games.starts_at as starts_at',
-      sql<string | null>`to_char(games.starts_at at time zone leagues.time_zone, 'YYYY-MM-DD')`.as(
+      sql<
+        string | null
+      >`coalesce(to_char(games.starts_at at time zone leagues.time_zone, 'YYYY-MM-DD'), to_char(rounds.date, 'YYYY-MM-DD'))`.as(
         'local_date',
       ),
       'games.status as status',
@@ -94,6 +103,10 @@ export async function listPublicGames(
     .orderBy(sql`games.game_number asc nulls last`)
     .orderBy('games.id')
     .execute();
+  const stood = await listResultsBeingCorrected(
+    scope,
+    rows.filter((row) => row.status !== 'final' && row.status !== 'forfeit').map((row) => row.id),
+  );
   return rows.map((row) => ({
     id: row.id,
     roundId: row.round_id,
@@ -125,5 +138,6 @@ export async function listPublicGames(
         ? null
         : { name: row.venue_name, address: row.venue_address, mapLink: row.venue_map_link },
     courtName: row.court_name,
+    ...(stood.has(row.id) ? { beingCorrected: stood.get(row.id) } : {}),
   }));
 }

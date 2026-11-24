@@ -14,6 +14,8 @@ export type BoxScorePlayer = {
   readonly jersey?: string | null;
   readonly name: string;
   readonly cells: Readonly<Record<string, string | number>>;
+  /** Drawn across the statistics in place of them: "Did not play" (P7 §5.6). */
+  readonly note?: string | undefined;
 };
 
 export type BoxScoreLabels = {
@@ -140,11 +142,17 @@ export function BoxScoreTable({
                   <th scope="row" className="ui-team-cell">
                     <span dir="auto">{p.name}</span>
                   </th>
-                  {columns.map((c) => (
-                    <td key={c.key} className="ui-num">
-                      {valueOrDash(p.cells[c.key], labels.noValue)}
+                  {p.note === undefined ? (
+                    columns.map((c) => (
+                      <td key={c.key} className="ui-num">
+                        {valueOrDash(p.cells[c.key], labels.noValue)}
+                      </td>
+                    ))
+                  ) : (
+                    <td colSpan={columns.length} className="ui-box-note">
+                      {p.note}
                     </td>
-                  ))}
+                  )}
                 </tr>
               ))}
             </tbody>

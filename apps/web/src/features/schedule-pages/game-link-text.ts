@@ -16,6 +16,8 @@ export type GameLinkWords = {
   readonly when: string;
   /** A game whose start has passed with no result yet: {away} {home} {when}. */
   readonly awaiting?: string;
+  /** The state said of a result being corrected: "being corrected". */
+  readonly beingCorrected?: string;
   /** Each state as it is said inside those sentences: "live", "final", "postponed". */
   readonly states: Readonly<Record<Exclude<GameStatus, 'scheduled'>, string>>;
 };
@@ -30,6 +32,8 @@ type LinkedGame = {
   readonly whenText: string;
   /** Its start has passed with no result yet (build-schedule.ts). */
   readonly awaiting?: boolean | undefined;
+  /** A result being corrected (build-schedule.ts): said as "being corrected", not as final. */
+  readonly held?: boolean | undefined;
 };
 
 /**
@@ -50,9 +54,11 @@ export function gameLinkText(game: LinkedGame, words: GameLinkWords): string {
     return fill(sentence, { ...teams, when: game.whenText });
   }
   const state =
-    game.status === 'final' && game.finalSaid !== undefined
-      ? game.finalSaid
-      : words.states[game.status];
+    game.held === true && words.beingCorrected !== undefined
+      ? words.beingCorrected
+      : game.status === 'final' && game.finalSaid !== undefined
+        ? game.finalSaid
+        : words.states[game.status];
   const played = game.status === 'live' || game.status === 'final' || game.status === 'forfeit';
   return played && game.home.score !== null && game.away.score !== null
     ? fill(words.score, {

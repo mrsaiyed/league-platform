@@ -22,7 +22,8 @@ export const enSchedule = {
   // ("Schedule", "Standings") stay for the menu and the browser's tab.
   'schedule.heading': 'Every game, every round.',
   'schedule.lead': 'Scores as they come in, and everything still to be played.',
-  'schedule.link.awaiting': '{away} against {home}, {when}, awaiting the result',
+  'schedule.link.awaiting': '{away} against {home}, {when}, awaiting the score',
+  'schedule.link.beingCorrected': 'being corrected',
   'schedule.link.cancelled': 'cancelled',
   'schedule.link.final': 'final',
   // The same as the card's link says it to a screen reader, for a game won in overtime.
@@ -65,4 +66,6 @@ export const enSchedule = {
   'schedule.team': 'Team',
   'schedule.title': 'Schedule',
   'schedule.venueCourt': '{venue}, {court}',
+  'schedule.waitingForScore': 'Waiting for a score',
+  'schedule.waitingForScore.kicker': 'Played, no score yet',
 } as const;

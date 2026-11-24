@@ -18,6 +18,7 @@ import {
   type SearchParams,
   type StandingsTableView,
 } from '../stats-pages/index.ts';
+import { BeingCorrectedNote, countBeingCorrected } from './being-corrected-note.tsx';
 import { buildHomeNumbers } from './build-home-numbers.ts';
 import { buildHomeGames } from './build-schedule.ts';
 import { HomeLeaders } from './home-leaders.tsx';
@@ -93,13 +94,13 @@ export async function HomePage({
   const labels = displayLabels(t);
   const askedSeason = asked === undefined || asked === '' ? undefined : asked;
   const hasStandings = tables.some((table) => table.rows.length > 0);
-  const empty = games.recent.length === 0 && games.upcoming.length === 0;
+  const empty =
+    games.recent.length === 0 && games.upcoming.length === 0 && games.awaiting.length === 0;
   // A game being played now comes first: in the hero, under its own heading.
   const live = games.upcoming.filter((game) => game.status === 'live');
   const next = homeNextGames(games.upcoming);
   const results = homeResults(
     games.recent,
-    games.awaiting,
     tables.map((table) => ({ rows: table.rows.length, hasNotes: table.footnotes.length > 0 })),
   );
   const tableHeights = tables
@@ -148,7 +149,10 @@ export async function HomePage({
       <div className="site-column">
         {yourTeam}
         <div className="home-numbers">
-          <StatStrip label={t('home.numbers')} items={buildHomeNumbers(schedule, teamCount)} />
+          <StatStrip
+            label={t('home.numbers')}
+            items={buildHomeNumbers(schedule, clock, teamCount)}
+          />
         </div>
         {empty ? (
           <Section title={t('home.recentResults')} kicker={t('home.results.kicker')}>
@@ -170,6 +174,23 @@ export async function HomePage({
                 over them, so the standings are reached sooner (the stylesheet). */}
             <div className="home-next" data-live={live.length > 0 ? 'true' : undefined}>
               <GameList leagueId={addressee.id} games={next} layout="board" across="two" />
+            </div>
+          </Section>
+        )}
+        {/* A game whose start has passed with no score: a short list of its own, never
+            among the games to come or the results (step 2.159). */}
+        {games.awaiting.length === 0 ? null : (
+          <Section
+            title={t('schedule.waitingForScore')}
+            kicker={t('schedule.waitingForScore.kicker')}
+          >
+            <div className="home-awaiting" data-awaiting-list="">
+              <GameList
+                leagueId={addressee.id}
+                games={games.awaiting}
+                layout="board"
+                across="two"
+              />
             </div>
           </Section>
         )}
@@ -219,6 +240,7 @@ export async function HomePage({
                     );
                   })}
                 </div>
+                <BeingCorrectedNote count={countBeingCorrected(schedule, clock)} />
                 {shortened ? (
                   <p className="home-notes-more">
                     <a href={standingsHref}>{t('home.whyThisOrder')}</a>

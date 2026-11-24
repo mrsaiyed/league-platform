@@ -52,7 +52,11 @@ export function applyUpdate(
   overtime?: OvertimeWords,
 ): GameView {
   if (update === undefined) return game;
-  const { finalPill, finalSaid, ...rest } = game;
+  // A result being corrected stays as it stood until the game is decided again (T-384):
+  // the correction's live taps do not move it.
+  if (game.held === true && update.status !== 'final' && update.status !== 'forfeit') return game;
+  // Once the channel speaks of a game its pill was drawn for, the channel says what it is.
+  const { finalPill, finalSaid, pill: _pill, held: _held, awaiting: _awaiting, ...rest } = game;
   const moved = {
     ...rest,
     status: update.status,
@@ -90,7 +94,6 @@ export function LiveGameList({
   layout = 'rows',
   across = 'two',
   featured = false,
-  awaitingLabel,
   scoringAddress,
   overtimeWords,
 }: {
@@ -106,8 +109,6 @@ export function LiveGameList({
   readonly across?: 'one' | 'two' | 'pair';
   /** The game being played now, picked out from the others. */
   readonly featured?: boolean;
-  /** The quiet word on a game whose start has passed with no result: "Awaiting result". */
-  readonly awaitingLabel?: string;
   readonly labels: GameCardLabels;
   /** A final game's pill and link words for each count of overtime periods (build-schedule.ts). */
   readonly overtimeWords?: OvertimeWords;
@@ -119,7 +120,11 @@ export function LiveGameList({
   const [updates, setUpdates] = useState<Readonly<Record<string, Update>>>({});
   const [spoken, setSpoken] = useState('');
   const watched = games.some(
-    (g) => g.status === 'live' || g.status === 'scheduled' || g.status === 'postponed',
+    (g) =>
+      g.status === 'live' ||
+      g.status === 'scheduled' ||
+      g.status === 'postponed' ||
+      g.held === true,
   );
   useEffect(() => {
     if (!watched) return undefined;
@@ -216,9 +221,7 @@ export function LiveGameList({
                 featured={featured}
                 room={room}
                 action={actionOf(g)}
-                {...(g.awaiting === true && awaitingLabel !== undefined
-                  ? { note: awaitingLabel }
-                  : {})}
+                {...(g.pill === undefined ? {} : { pill: g.pill })}
               />
             </li>
           );

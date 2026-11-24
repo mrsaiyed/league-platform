@@ -1,5 +1,12 @@
 import { leagueUrl } from '@srleagues/core';
-import { EmptyPanel, FilterToolbar, OptionPicker, PageHead, RoundPicker } from '@srleagues/ui';
+import {
+  EmptyPanel,
+  FilterToolbar,
+  OptionPicker,
+  PageHead,
+  RoundPicker,
+  Section,
+} from '@srleagues/ui';
 import { displayLabels } from '@srleagues/site';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -8,7 +15,7 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { buildScheduleView, parseRound } from './build-schedule.ts';
-import { RoundSections } from './schedule-views.tsx';
+import { GameList, RoundSections } from './schedule-views.tsx';
 
 /**
  * `/{league}/schedule`: past rounds closed, the current one open, then the coming ones. The
@@ -97,7 +104,26 @@ export async function SchedulePage({
           }}
         />
       ) : (
-        <RoundSections leagueId={addressee.id} rounds={built.rounds} />
+        <>
+          {/* Games whose start has passed with no score, apart from the rest (step 2.159);
+              each is in its own round too. */}
+          {built.awaiting.length === 0 ? null : (
+            <Section
+              title={t('schedule.waitingForScore')}
+              kicker={t('schedule.waitingForScore.kicker')}
+            >
+              <div data-awaiting-list="">
+                <GameList
+                  leagueId={addressee.id}
+                  games={built.awaiting}
+                  layout="board"
+                  across="two"
+                />
+              </div>
+            </Section>
+          )}
+          <RoundSections leagueId={addressee.id} rounds={built.rounds} />
+        </>
       )}
     </main>
   );

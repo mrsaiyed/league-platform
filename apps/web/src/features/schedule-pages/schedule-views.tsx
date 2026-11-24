@@ -26,6 +26,7 @@ export function gameLinkWords(): GameLinkWords {
     state: t('schedule.link.state', { ...teams, state: '{state}' }),
     when: t('schedule.link.when', { ...teams, when: '{when}' }),
     awaiting: t('schedule.link.awaiting', { ...teams, when: '{when}' }),
+    beingCorrected: t('schedule.link.beingCorrected'),
     states: {
       live: t('schedule.link.live'),
       final: t('schedule.link.final'),
@@ -61,7 +62,6 @@ export function GameList({
       layout={layout}
       across={across}
       featured={featured}
-      awaitingLabel={t('schedule.awaitingResult')}
       scoringAddress={scoringAddressOf(leagueId)}
       labels={displayLabels(t).game}
       linkWords={gameLinkWords()}

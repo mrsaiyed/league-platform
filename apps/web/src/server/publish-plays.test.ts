@@ -48,6 +48,7 @@ function world(publisher: LivePublisher) {
     lines: async () => [],
     people: async () => [],
     correctedOn: async () => undefined,
+    resultBeingCorrected: async () => undefined,
   };
   const warnings: string[] = [];
   const publish = createPlayPublisher({

@@ -1139,10 +1139,16 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
         JSON.stringify(await c.score()),
       );
       await still(page, `${at}, reopened`);
+      // Step 2.159 (S-47): a visitor sees the result as it stood, 7 to 11, held while it is
+      // corrected (game-states-test reads its "Being corrected"), and the standings no
+      // longer count it (S-101).
       const live = await visitor();
       note(
-        `${at}: reopened, a visitor sees it live again and the standings no longer count it`,
-        live.status === 'live' && live.hawks === before.hawks && live.bears === before.bears,
+        `${at}: reopened, a visitor sees the result as it stood and the standings no longer count it`,
+        live.status === 'final' &&
+          live.scores === '7–11' &&
+          live.hawks === before.hawks &&
+          live.bears === before.bears,
         JSON.stringify(live),
       );
       // The next basket is taken and saved.

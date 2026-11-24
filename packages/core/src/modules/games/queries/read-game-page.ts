@@ -13,6 +13,7 @@ import {
   type Viewer,
 } from '../../people/index.ts';
 import { recordingOf } from '../game-fields.ts';
+import type { MarkResult } from '../corrected-mark.ts';
 import { statisticsKept } from '../statistics-kept.ts';
 import { teamOwnCounts } from '../team-own-counts.ts';
 import type {
@@ -115,6 +116,11 @@ export type GamePage = {
     /** The date a final game was last corrected, never the reason (S-7). */
     readonly correctedOn: string | null;
     /**
+     * While a reopen is open, the result as it stood before it (S-47, step 2.159): what the
+     * public is shown, marked "Being corrected". Null when no reopen is open.
+     */
+    readonly beingCorrected: MarkResult | null;
+    /**
      * How many overtime periods a final game had (P7 §5.6), as its result keeps them: 0 in
      * regulation; null when not known (a score typed in, a box score, a game final before
      * the count was kept) and for every game that is not final.
@@ -193,12 +199,13 @@ export async function readGamePage(
 ): Promise<Result<GamePage, ReadGamePageError>> {
   const game = await store.findGame(input.gameId);
   if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
-  const [teamRows, state, lines, correctedOn, season] = await Promise.all([
+  const [teamRows, state, lines, correctedOn, season, stood] = await Promise.all([
     store.teams([game.homeTeamId, game.awayTeamId]),
     store.state(game.id),
     store.lines(game.id),
     store.correctedOn(game.id),
     store.seasonStatistics(game.seasonId),
+    store.resultBeingCorrected(game.id),
   ]);
   const team = (id: string): GamePageTeam | undefined => teamRows.find((t) => t.id === id);
   const home = team(game.homeTeamId);
@@ -370,6 +377,7 @@ export async function readGamePage(
       startsAt: game.startsAt,
       finalizedAt: game.finalizedAt,
       correctedOn: correctedOn ?? null,
+      beingCorrected: stood ?? null,
       overtimePeriods: game.status === 'final' ? game.overtimePeriods : null,
       statKeys: statisticsKept(season?.statKeys ?? [], season?.rules),
     },

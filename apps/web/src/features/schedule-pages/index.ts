@@ -5,12 +5,15 @@ export { GameList, scoringAddressOf } from './schedule-views.tsx';
 // "Score this game" for the signed-in person who may, read after the page (step 2.153).
 export { GameCorrection, GameOffer } from './score-game-button.tsx';
 export { offersAskedAtOnce, type ScoringOfferReply } from './scoring-offers.ts';
-export { LatestResults } from './latest-results.tsx';
+export { LatestResults, StandingsBeingCorrected } from './latest-results.tsx';
+export { BeingCorrectedNote, countBeingCorrected } from './being-corrected-note.tsx';
 export {
   buildHomeGames,
   buildScheduleView,
   comingOrder,
+  gameTruth,
   gameView,
+  hasResult,
   placeOf,
   type GameView,
 } from './build-schedule.ts';

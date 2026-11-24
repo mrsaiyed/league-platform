@@ -251,6 +251,8 @@ describe("a league's clock and one game's facts (step 2.93)", () => {
     const facts = await inLeague((scope) => findPublicGameFacts(scope, seasonId, firstGame));
     expect(facts).toEqual({
       number: 7,
+      // November 1 at 18:00 UTC is that day in Chicago, the league's zone.
+      localDate: '2026-11-01',
       venue: { name: 'North Gym', address: '1 Court St', mapLink: null },
       courtName: null,
       season: { slug: 'fall-2026', isCurrent: true },
@@ -393,5 +395,34 @@ describe('teams and rosters', () => {
   it('shows nothing for a team of a season being set up', async () => {
     const roster = await inLeague((scope) => listPublicRoster(scope, draftTeam, display));
     expect(roster.lines).toEqual([]);
+  });
+});
+
+describe('a game with a day but no time (step 2.159)', () => {
+  it("takes its round's date as its day, in the schedule and in its own facts", async () => {
+    const first = await one<{
+      round_id: string;
+      stage_id: string;
+      home_team_id: string;
+      away_team_id: string;
+    }>(pglite, 'select round_id, stage_id, home_team_id, away_team_id from games where id = $1', [
+      firstGame,
+    ]);
+    const game = await newGame(pglite, {
+      leagueId: league.leagueId,
+      seasonId,
+      stageId: first.stage_id,
+      homeTeamId: first.home_team_id,
+      awayTeamId: first.away_team_id,
+      columns: { round_id: first.round_id, starts_at: null },
+    });
+    // Its round, "Opening week", is dated November 1: the game's day, with no time.
+    const facts = await inLeague((scope) => findPublicGameFacts(scope, seasonId, game));
+    expect(facts?.localDate).toBe('2026-11-01');
+    const listed = (await inLeague((scope) => listPublicGames(scope, seasonId))).find(
+      (g) => g.id === game,
+    );
+    expect(listed?.startsAt).toBeNull();
+    expect(listed?.localDate).toBe('2026-11-01');
   });
 });

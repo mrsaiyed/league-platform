@@ -200,6 +200,10 @@ export const enSite = {
   'standings.adjustment': 'Adjusted by {changes}. {reason}',
   'standings.adjustmentJoin': ', ',
   'standings.allTeams': 'All teams',
+  'standings.beingCorrected_one':
+    '{count} game is being corrected and is not counted until it is finished again.',
+  'standings.beingCorrected_other':
+    '{count} games are being corrected and are not counted until they are finished again.',
   'standings.col.losses': 'L',
   'standings.col.played': 'GP',
   'standings.col.pointDifference': 'DIFF',
