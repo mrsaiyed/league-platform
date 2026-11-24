@@ -414,6 +414,8 @@ export type TrackerController = {
    * waiting to send, and carries on in place with the scheduled game the server now has.
    */
   markNotStarted(reason?: NotStartedReason): Promise<MarkNotStartedResult>;
+  /** The game was given a format before its first play (step 2.119): its state is read again. */
+  formatChanged(): Promise<void>;
   /**
    * The scorekeeper has seen the refused taps: they are dropped for good. `only`: just
    * these (an End game the screen has said was refused), the rest stay listed.
@@ -2094,6 +2096,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
           return { ok: true };
         }),
       );
+    },
+
+    async formatChanged() {
+      if (!stopped && current.mode.kind === 'scoring') await track(load());
     },
 
     markNotStarted(reason) {

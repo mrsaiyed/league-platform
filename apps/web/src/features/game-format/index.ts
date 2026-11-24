@@ -1,0 +1,10 @@
+// One game's own format (step 2.119): the panel and form the tracker's start
+// confirmation and the admin's games area share, its words and its client.
+export {
+  createGameFormatClient,
+  type FormatOutcome,
+  type GameFormatClient,
+} from './format-client.ts';
+export { formatOfValues, valuesOf, type FormatValues } from './format-values.ts';
+export { factLine, factLines, refusalText, summaryOf } from './format-words.ts';
+export { GameFormatForm, GameFormatPanel, type FormatPanelLook } from './game-format-panel.tsx';

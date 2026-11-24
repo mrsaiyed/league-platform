@@ -13,6 +13,7 @@ import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchGameDoors } from './fetch-game-doors.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
+import { TrackerFormatPanel } from './tracker-format-panel.tsx';
 import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.ts';
 import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
 import { keptRows, notAppliedRows, type KeptRow } from './kept-plays.ts';
@@ -462,6 +463,12 @@ export function TrackerOpening({
               onOpenAgain={act((game) => game.controller.openAgain())}
               lists={lists}
               onConfirm={(format) => act((game) => game.confirmFormat(format))()}
+              formatPanel={(fallback) => (
+                <TrackerFormatPanel
+                  {...{ leagueId, gameId, t, locale, fallback }}
+                  onChanged={() => phase.game.controller.formatChanged()}
+                />
+              )}
             />
           ) : null}
           {storeFailedNotice}
@@ -668,6 +675,7 @@ function OpenGame({
   onOpenAgain,
   lists,
   onConfirm,
+  formatPanel,
 }: {
   readonly phase: Extract<Phase, { kind: 'open' }>;
   readonly t: ReturnType<typeof translatorFrom>;
@@ -682,6 +690,8 @@ function OpenGame({
   /** The plays kept on this device, play by play (step 2.37, part 2). */
   readonly lists: KeptLists;
   readonly onConfirm: (format: GameFormat) => void;
+  /** Every rule and "Change the format" (step 2.119), the device's lines meanwhile. */
+  readonly formatPanel: (fallback: ReactNode) => ReactNode;
 }) {
   const { status, confirmed } = phase;
   const screen = screenOf(status, confirmed);
@@ -777,12 +787,13 @@ function OpenGame({
         <section className="court-stack" aria-labelledby="tracker-format-title" data-format="">
           <h2 id="tracker-format-title">{t('tracker.format.title')}</h2>
           <p>{t('tracker.format.intro')}</p>
-          <ul className="court-format">
-            {formatLines(screen.format, t, locale).map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-          <p className="court-quiet">{t('tracker.format.wrong')}</p>
+          {formatPanel(
+            <ul className="court-format">
+              {formatLines(screen.format, t, locale).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>,
+          )}
           <button
             type="button"
             className="court-button"
