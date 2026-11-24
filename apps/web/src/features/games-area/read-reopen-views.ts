@@ -1,9 +1,11 @@
 // For each final or forfeited game on a list, what it says about putting it right to the
 // person looking (reopen-view.ts), from the tracker's own read (games.read_reopen_offer,
-// step 2.120) and the person's access (games.correct at the game's program). The doors
+// step 2.120), the read of a result recorded by hand (games.read_own_result_offer, step
+// 2.177) and the person's access (games.correct at the game's program). The doors
 // check everything again when tapped.
 import {
   allows,
+  readOwnResultOffer,
   readReopenOffer,
   type AccessHolder,
   type CommandContext,
@@ -31,10 +33,20 @@ export async function readReopenViews(
   const views = new Map<string, ReopenView>();
   for (const game of games.filter((g) => decided(g.status))) {
     const offer = await readReopenOffer(context, { gameId: game.id }, deps);
-    views.set(
-      game.id,
-      reopenViewOf(offer.ok ? offer.value : undefined, mayCorrectAt(holder, game.programId)),
-    );
+    const tracker = offer.ok ? offer.value : undefined;
+    const mayCorrect = mayCorrectAt(holder, game.programId);
+    // Recorded by hand, for someone who may not correct games: their own door, if it is
+    // theirs and the minutes run (step 2.177, S-52).
+    const byHand =
+      tracker === undefined ||
+      (tracker.reopen.when === 'no' && tracker.reopen.code === 'not-ended-by-tracker');
+    const own =
+      byHand && !mayCorrect
+        ? await readOwnResultOffer(context, { gameId: game.id }, deps).then((o) =>
+            o.ok ? o.value : undefined,
+          )
+        : undefined;
+    views.set(game.id, reopenViewOf(tracker, mayCorrect, own));
   }
   return views;
 }

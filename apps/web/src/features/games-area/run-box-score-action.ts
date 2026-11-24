@@ -9,6 +9,7 @@
 import {
   getBoxScoreSheet,
   reopenGame,
+  reopenOwnResult,
   reopenTrackedGame,
   setBoxScore,
   type CommandContext,
@@ -62,7 +63,10 @@ export async function runBoxScoreAction(
             },
             deps,
           )
-        : await reopenGame(context, { gameId, version, reason: fields['reason'] }, deps);
+        : fields['door'] === 'own'
+          ? // A result they recorded by hand, within the league's minutes (step 2.177, S-52).
+            await reopenOwnResult(context, { gameId, version, reason: fields['reason'] }, deps)
+          : await reopenGame(context, { gameId, version, reason: fields['reason'] }, deps);
     if (reopened.ok) return { ok: true };
     // The admin's door sent twice (a double tap on "Reopen to correct"): the first reopened
     // it, the second is refused as changed or not decided. The game is already where this

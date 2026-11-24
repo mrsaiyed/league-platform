@@ -22,7 +22,11 @@ export function ReopenLine({
   return (
     <p data-reopen="correct">
       {view.until === null ? null : (
-        <>{t('admin.games.reopenUntil', { time: clockTimeText(view.until, times) })} </>
+        <>
+          {t(view.door === 'own' ? 'admin.games.reopenUntilOwn' : 'admin.games.reopenUntil', {
+            time: clockTimeText(view.until, times),
+          })}{' '}
+        </>
       )}
       <a className="ui-button" href={href}>
         {t('admin.games.correct')}
