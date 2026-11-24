@@ -434,11 +434,13 @@ export const SessionReply = z.discriminatedUnion('status', [
   }),
   /**
    * Not opened: the person may not score it, there is no such game, or it cannot be
-   * scored now (decided, cancelled or postponed).
+   * scored now (decided, cancelled or postponed), or its season is archived and no
+   * correction by someone who may correct games is open on it (O-12, T-389, T-390): said
+   * before anything else about the game.
    */
   z.strictObject({
     status: z.literal('refused'),
-    code: z.enum(['not-allowed', 'unknown-game', 'game-not-live']),
+    code: z.enum(['not-allowed', 'unknown-game', 'game-not-live', 'season-archived']),
     sentAt: Ms,
   }),
 ]);

@@ -1363,7 +1363,12 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
           gameWasLost,
         );
       case 'refused':
-        return readOnly(reply.code, gameWasLost);
+        // An archived season's game cannot be scored now: the tracker says so as for a
+        // game that is over (T-390).
+        return readOnly(
+          reply.code === 'season-archived' ? 'game-not-live' : reply.code,
+          gameWasLost,
+        );
     }
   };
 

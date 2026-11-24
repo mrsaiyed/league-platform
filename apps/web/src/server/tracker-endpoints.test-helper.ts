@@ -2,9 +2,17 @@
 // stand-in's leagues, people and games, a request made as one of them through one
 // league's address, and a publisher that keeps what it was asked to publish.
 import type { LeagueScoreMessage, LiveMessage } from '@srleagues/contracts';
-import { leagueApiUrl, type AccessHolder } from '@srleagues/core';
+import {
+  applyTrackerCommands,
+  getSeason,
+  leagueApiUrl,
+  openScoringSession,
+  reopenGame,
+  updateSeason,
+  type AccessHolder,
+} from '@srleagues/core';
 import type { LivePublisher } from '@srleagues/providers';
-import type { LeagueRequestContext } from './context.ts';
+import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { resolveLeagueApi } from './league-api.ts';
 import { createPlayPublisher } from './publish-plays.ts';
 import { standInPlayerId } from './stand-in-games.ts';
@@ -93,7 +101,81 @@ export function trackerWorld() {
         });
   }
 
-  return { ports, tracker, published, warnings, publishPlays, contextAs, holderOf };
+  /** The owner's command context, as the server's session gives it. */
+  const asOwner = async () => commandContextOf(await contextAs('owner', 'live', ['seasons']));
+
+  /** The game as the server holds it now. */
+  async function gameRecord(gameId: string) {
+    const game = await tracker.deps.transaction(await asOwner(), (tx) => tx.games.find(gameId));
+    if (game === undefined) throw new Error('no such game');
+    return game;
+  }
+
+  /** The owner archives the game's season (O-12, step 2.130). */
+  async function archiveSeasonOf(gameId: string) {
+    const owner = await asOwner();
+    const { seasonId } = await gameRecord(gameId);
+    const season = await getSeason(owner, { seasonId }, ports.adminSettings.deps);
+    if (!season.ok) throw new Error(season.error.code);
+    const archived = await updateSeason(
+      owner,
+      { seasonId, version: season.value.version, status: 'completed' },
+      ports.adminSettings.deps,
+    );
+    if (!archived.ok) throw new Error(archived.error.code);
+  }
+
+  /** The scorekeeper's tablet plays Hawks v Bears to the end: final. */
+  async function tabletEndsHawksBears() {
+    const gameId = games.hawksBears;
+    const scorer = commandContextOf(await contextAs('scorekeeper', 'live', ['games', gameId]));
+    const opened = await openScoringSession(scorer, { gameId, deviceId: 'tablet-1' }, tracker.deps);
+    if (!opened.ok || opened.value.status !== 'held-by-you') throw new Error('not opened');
+    const sent = await applyTrackerCommands(
+      scorer,
+      {
+        gameId,
+        protocolVersion: 2,
+        sessionId: opened.value.sessionId,
+        commands: [
+          tap({ type: 'lineup', side: 'home', playerIds: hawks }),
+          tap({ type: 'lineup', side: 'away', playerIds: bears }),
+          tap({ type: 'start' }),
+          tap({ type: 'score', side: 'home', playerId: hawks[0], points: 2 }),
+          tap({ type: 'end' }),
+        ],
+      },
+      tracker.deps,
+    );
+    if (!sent.ok || sent.value.results.some((r) => r.status !== 'accepted')) {
+      throw new Error('not ended');
+    }
+    if ((await gameRecord(gameId)).status !== 'final') throw new Error('not final');
+  }
+
+  /** The owner reopens the game by a correction with a reason, and leaves it open (T-381). */
+  async function reopenByCorrection(gameId: string) {
+    const { version } = await gameRecord(gameId);
+    const reopened = await reopenGame(
+      await asOwner(),
+      { gameId, version, reason: 'A basket was given to the wrong team' },
+      tracker.deps,
+    );
+    if (!reopened.ok) throw new Error(reopened.error.code);
+  }
+
+  return {
+    ports,
+    tracker,
+    published,
+    warnings,
+    publishPlays,
+    contextAs,
+    holderOf,
+    archiveSeasonOf,
+    tabletEndsHawksBears,
+    reopenByCorrection,
+  };
 }
 
 let commandNumber = 0;
