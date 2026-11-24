@@ -179,6 +179,7 @@ export { changeTablePlayer } from './change-table-player.ts';
 export { listRefusedAdds } from './list-refused-adds.ts';
 export { removeTablePlayer } from './remove-table-player.ts';
 export { findLastEventSeq } from './find-last-event-seq.ts';
+export { listGameEventsAfter } from './list-game-events-after.ts';
 export { listTableTeams } from './list-table-teams.ts';
 export { listStandingsAdjustments } from './list-standings-adjustments.ts';
 export { insertStandingsAdjustment } from './insert-standings-adjustment.ts';

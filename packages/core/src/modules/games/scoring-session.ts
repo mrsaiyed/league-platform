@@ -2,8 +2,11 @@
 // a scoring session: a lease held by one account on one device, renewed by the
 // tracker while it is open and running out about two minutes after the last renewal.
 //
-// - A game with no session, or whose session's lease has run out, is free: whoever
-//   opens it next takes it, and the lapsed session is ended.
+// - A game with no session is free: whoever opens it next takes it. A game not yet
+//   under way (not live) whose session's lease has run out is free too, and the lapsed
+//   session is ended. A game under way (live, a reopened one included) is never given
+//   away by a lapse (S-42, T-336): whoever else opens it is told who holds it and when
+//   that device was last heard from, and takes it only by taking over.
 // - A session whose lease ran out but which nobody has taken still belongs to its
 //   device: renewing or reopening it on that device carries on with the same session,
 //   so taps it queued while offline are still its own (record 036).
@@ -34,6 +37,13 @@ export type ScoringHolder = {
   readonly accountId: string;
   /** When the holder's session began: what a takeover must name (T-116). */
   readonly since: number;
+  /**
+   * When the holder's device was last heard from, by the server's clock (S-42, T-336):
+   * the last time its lease was written, so up to about half a minute early.
+   */
+  readonly lastHeardAt: number;
+  /** The holder is the asking account itself, on another device: told here, never by names. */
+  readonly sameAccount: boolean;
 };
 
 /** Every answer about a session carries `sentAt`, the server's time, so the tracker can allow for its own clock. */
@@ -74,22 +84,42 @@ export function scorerOf(context: CommandContext): string {
 export async function scorableGame(
   tx: ScoringTx,
   gameId: string,
-): Promise<Result<string, ScorableGameError>> {
+): Promise<Result<ScorableGame, ScorableGameError>> {
   const game = await tx.games.find(gameId);
   if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
   if (isClosed(game.status)) return fail({ code: 'game-closed' });
   if (game.status === 'postponed') return fail({ code: 'game-postponed' });
-  return ok(game.id);
+  return ok({ id: game.id, underWay: game.status === 'live' });
 }
+
+/**
+ * A game that can be opened, and whether it is under way (T-336): live on the server,
+ * which a reopened game is again. One not yet started is opened without a question.
+ */
+export type ScorableGame = { readonly id: string; readonly underWay: boolean };
 
 export const isOwnSession = (session: ScoringSession, device: ScoringDevice) =>
   session.accountId === device.accountId && session.deviceId === device.deviceId;
 
 export const hasLapsed = (session: ScoringSession, now: number) => session.heldUntil <= now;
 
-export const heldByOther = (session: ScoringSession, now: number): ScoringSessionReply => ({
+/**
+ * Who holds the game, as `askedBy` (the account opening it) is told (S-42): when the
+ * holder's device was last heard from, its lease's last writing (never before the
+ * session began), and whether it is `askedBy` itself on another device.
+ */
+export const heldByOther = (
+  session: ScoringSession,
+  now: number,
+  askedBy: string,
+): ScoringSessionReply => ({
   status: 'held-by-other',
-  holder: { accountId: session.accountId, since: session.since },
+  holder: {
+    accountId: session.accountId,
+    since: session.since,
+    lastHeardAt: Math.max(session.since, session.heldUntil - leaseMs),
+    sameAccount: session.accountId === askedBy,
+  },
   sentAt: now,
 });
 
@@ -140,7 +170,7 @@ export async function keepSession(
   if (current?.id === session.id) return held(current.heldUntil);
   return current === undefined
     ? { status: 'ended', reason: 'released', sentAt: now }
-    : heldByOther(current, now);
+    : heldByOther(current, now, session.accountId);
 }
 
 /**
@@ -168,7 +198,7 @@ export async function claimGame(
       sentAt: now,
     };
   }
-  return answerFromHolder(tx, gameId, now);
+  return answerFromHolder(tx, gameId, now, device.accountId);
 }
 
 /** Who holds the game now, after a write found the session changed under it. */
@@ -176,27 +206,34 @@ async function answerFromHolder(
   tx: ScoringTx,
   gameId: string,
   now: number,
+  askedBy: string,
 ): Promise<ScoringSessionReply> {
   const holder = await tx.scoringSessions.findForGame(gameId);
   return holder === undefined
     ? { status: 'ended', reason: 'released', sentAt: now }
-    : heldByOther(holder, now);
+    : heldByOther(holder, now, askedBy);
 }
 
 /**
  * Opens the game for the device: carries on with its own session, takes the game if
- * it is free (no session, or one whose lease has run out), or says who holds it.
+ * it is free (no session, or one whose lease has run out on a game not under way), or
+ * says who holds it. A game under way is never given away by a lapse (S-42, T-336):
+ * the holder is named, with when their device was last heard from, and only a
+ * takeover takes it.
  */
 export async function openFor(
   tx: ScoringTx,
-  gameId: string,
+  game: ScorableGame,
   device: ScoringDevice,
   now: number,
 ): Promise<ScoringSessionReply> {
+  const gameId = game.id;
   const current = await tx.scoringSessions.findForGame(gameId);
   if (current === undefined) return claimGame(tx, gameId, device, now);
   if (isOwnSession(current, device)) return keepSession(tx, current, now);
-  if (!hasLapsed(current, now)) return heldByOther(current, now);
+  if (game.underWay || !hasLapsed(current, now)) {
+    return heldByOther(current, now, device.accountId);
+  }
   // Lapsed: end it only if it is still lapsed, so a renewal that just landed wins.
   await tx.scoringSessions.end(gameId, current.id, now);
   return claimGame(tx, gameId, device, now);

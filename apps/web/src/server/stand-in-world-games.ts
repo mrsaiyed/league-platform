@@ -611,5 +611,11 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
         })),
     lastEventSeq: async (gameId) =>
       Math.max(0, ...s.events.filter((e) => e.gameId === gameId).map((e) => e.seq)),
+    eventsAfter: async (gameId, afterSeq, limit) =>
+      s.events
+        .filter((e) => e.gameId === gameId && e.seq > afterSeq)
+        .sort((a, b) => a.seq - b.seq)
+        .slice(0, limit)
+        .map((e) => ({ seq: e.seq, commandId: e.commandId, type: e.type, accountId: e.accountId })),
   };
 }

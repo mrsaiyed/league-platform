@@ -182,6 +182,14 @@ export const CommandBatch = z.strictObject({
    * Left out by a tracker opened before (T-127).
    */
   accountId: Id.optional(),
+  /**
+   * "Send these plays" (S-43, T-335): these plays were listed as not saved, and the
+   * server's game stood at this sequence when they were made. Sent only by the
+   * scorekeeper's own action, never by the queue. The server takes them, whoever holds
+   * the game now, only if nothing was recorded since but these plays themselves and an
+   * End or a reopen by the same account; otherwise each is refused `game-moved`.
+   */
+  notSavedSince: z.number().int().nonnegative().optional(),
   commands: commandList(BatchCommand),
 });
 export type CommandBatch = z.infer<typeof CommandBatch>;
@@ -266,6 +274,7 @@ export const refusalCodes = [
   'game-not-live', // the game has not started, or is final
   'unknown-game',
   'not-allowed', // the person may not score this game
+  'game-moved', // "send these plays": something was recorded since they were made (S-43)
 ] as const;
 export const RefusalCode = z.enum(refusalCodes);
 export type RefusalCode = z.infer<typeof RefusalCode>;
@@ -392,7 +401,18 @@ export const SessionRequest = z.discriminatedUnion('type', [
 ]);
 export type SessionRequest = z.infer<typeof SessionRequest>;
 
-const Holder = z.strictObject({ displayName: z.string().max(120), since: Ms });
+/**
+ * Who holds the game, as the takeover question names them (S-42, T-336). `lastHeardAt`
+ * is when the holder's device was last heard from (server time); `sameAccount` is the
+ * server's own mark that the holder is the asking account on another device, never
+ * told by comparing names. Both optional, so a tracker reads a server from before.
+ */
+const Holder = z.strictObject({
+  displayName: z.string().max(120),
+  since: Ms,
+  lastHeardAt: Ms.optional(),
+  sameAccount: z.literal(true).optional(),
+});
 
 export const SessionReply = z.discriminatedUnion('status', [
   /** This device holds the game until `expiresAt` (server time, ms). `sentAt` is server time on every reply. */

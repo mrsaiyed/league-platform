@@ -142,7 +142,12 @@ describe('takeOverScoring (T6 §5, S-5, T-116)', () => {
       ok: true,
       value: {
         status: 'held-by-other',
-        holder: { accountId: scorekeeperId, since: startOfTest },
+        holder: {
+          accountId: scorekeeperId,
+          since: startOfTest,
+          lastHeardAt: startOfTest,
+          sameAccount: false,
+        },
         sentAt: startOfTest + 30_000,
       },
     });
@@ -150,7 +155,7 @@ describe('takeOverScoring (T6 §5, S-5, T-116)', () => {
     expect(db.state.activity).toEqual([]);
   });
 
-  it('simply opens a game that is free by then, or whose lease ran out, with nothing logged', async () => {
+  it('simply opens a game that is free by then, or not yet started and its lease ran out, with nothing logged', async () => {
     const free = memoryScoring({ games: [game(1)], grants });
     expect(await takeOverScoring(free.as(schedulerId), takeOver(), free.deps)).toMatchObject({
       value: { status: 'held-by-you', sessionId: sessionUuid(1) },
@@ -191,5 +196,46 @@ describe('takeOverScoring (T6 §5, S-5, T-116)', () => {
       await takeOverScoring(as(schedulerId), { ...takeOver(), gameId: gameUuid(2) }, deps),
     ).toEqual({ ok: false, error: { code: 'game-closed' } });
     expect(db.state.sessions.map((s) => s.id)).toEqual([sessionUuid(1)]);
+  });
+});
+
+describe('takeOverScoring: a game under way whose holder went quiet (S-42, T-336)', () => {
+  it('takes it only on "yes, take over", ends the holder and logs the takeover', async () => {
+    const league = memoryScoring({ games: [game(1, { status: 'live' })], grants });
+    await openScoringSession(league.as(scorekeeperId), tablet, league.deps);
+    league.clock.advance(600);
+    const now = startOfTest + 600_000;
+    expect(await takeOverScoring(league.as(schedulerId), takeOver(), league.deps)).toEqual({
+      ok: true,
+      value: {
+        status: 'held-by-you',
+        sessionId: sessionUuid(2),
+        expiresAt: now + leaseMs,
+        sentAt: now,
+      },
+    });
+    expect(
+      await renewScoringSession(
+        league.as(scorekeeperId),
+        { gameId: gameUuid(1), sessionId: sessionUuid(1) },
+        league.deps,
+      ),
+    ).toEqual({ ok: true, value: { status: 'ended', reason: 'taken-over', sentAt: now } });
+    expect(league.db.state.activity).toEqual([
+      expect.objectContaining({
+        action: 'games.take_over_scoring',
+        details: expect.objectContaining({ takenFromAccountId: scorekeeperId }),
+      }),
+    ]);
+  });
+
+  it('takes nothing from a quiet holder other than the one the scorekeeper was shown', async () => {
+    const league = memoryScoring({ games: [game(1, { status: 'live' })], grants });
+    await openScoringSession(league.as(scorekeeperId), tablet, league.deps);
+    league.clock.advance(600);
+    expect(
+      await takeOverScoring(league.as(schedulerId), takeOver(startOfTest - 1), league.deps),
+    ).toMatchObject({ ok: true, value: { status: 'held-by-other' } });
+    expect(league.db.state.sessions.map((s) => s.id)).toEqual([sessionUuid(1)]);
   });
 });

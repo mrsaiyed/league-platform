@@ -39,7 +39,7 @@ export const renewScoringSession = defineCommand({
     const game = await scorableGame(tx, input.gameId);
     if (!game.ok) return game;
     const now = tx.clock.now();
-    const standing = await sessionStanding(tx, game.value, input.sessionId, scorerOf(context));
+    const standing = await sessionStanding(tx, game.value.id, input.sessionId, scorerOf(context));
     if (!standing.held) return ok({ status: 'ended', reason: standing.reason, sentAt: now });
     const kept = await keepSession(tx, standing.session, now);
     // Ended by another request between reading it and renewing it.

@@ -376,6 +376,14 @@ export type ScoringTx = GamesTx & {
   readonly clock: Clock;
 };
 
+/** One of a game's events as "send these plays" weighs it (T-335): which, what kind, by whom. */
+export type GameEventMark = {
+  readonly seq: number;
+  readonly commandId: string;
+  readonly type: string;
+  readonly accountId: string | null;
+};
+
 /** A game's saved engine state (T3 §8 `game_states`): the last event it applied, and the document. */
 export type SavedGameState = { readonly seq: number; readonly state: unknown };
 
@@ -555,6 +563,15 @@ export type LiveGamesStore = {
   readonly refusedAdds: (gameId: string) => Promise<readonly RefusedAdd[]>;
   /** The sequence number of the game's last event, its plays and its changes of players; 0 if none. */
   readonly lastEventSeq: (gameId: string) => Promise<number>;
+  /**
+   * The game's events after `afterSeq`, oldest first, at most `limit` of them: what
+   * "send these plays" looks through to tell whether the game moved (S-43, T-335).
+   */
+  readonly eventsAfter: (
+    gameId: string,
+    afterSeq: number,
+    limit: number,
+  ) => Promise<readonly GameEventMark[]>;
 };
 
 /** The tracker's commands' transaction (step 2.29): the scoring one and the live game. */

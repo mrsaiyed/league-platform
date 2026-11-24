@@ -70,6 +70,7 @@ import {
   type TrackerInput,
 } from '../live-game.ts';
 import { finishTrackedGame, liveResultOf } from '../finish-tracked-game.ts';
+import { gameMovedSince } from '../game-moved-since.ts';
 import { gameScope, mayChangeGames, mayScoreGame } from '../policy.ts';
 import type { GameRecord, NewGameEvent, TrackerTx } from '../ports.ts';
 import { lowerId, scorerOf, sessionStanding } from '../scoring-session.ts';
@@ -121,6 +122,7 @@ const messages: Readonly<Record<Exclude<RefusalCode, 'rule' | 'not-allowed'>, st
   'session-not-held': 'This device no longer holds the game.',
   'game-not-live': 'This game cannot be scored now.',
   'unknown-game': 'There is no such game.',
+  'game-moved': 'Something was recorded in this game since these plays were made.',
 };
 
 export const applyTrackerCommands = defineCommand({
@@ -201,13 +203,26 @@ export const applyTrackerCommands = defineCommand({
     if (!isPlayable(game)) {
       return ok(reply(seq, refuseAll('game-not-live', messages['game-not-live'], taken)));
     }
-    const standing = await sessionStanding(tx, gameId, batch.sessionId.toLowerCase(), accountId);
     // The device says whose taps these are (T-327): only the session's own account's are
     // taken. The stated maker can only refuse a batch, never let one in.
     const otherMaker =
       batch.accountId !== undefined && batch.accountId.toLowerCase() !== accountId.toLowerCase();
-    if (!standing.held || otherMaker) {
-      return ok(reply(seq, refuseAll('session-not-held', messages['session-not-held'], taken)));
+    if (batch.notSavedSince === undefined) {
+      const standing = await sessionStanding(tx, gameId, batch.sessionId.toLowerCase(), accountId);
+      if (!standing.held || otherMaker) {
+        return ok(reply(seq, refuseAll('session-not-held', messages['session-not-held'], taken)));
+      }
+    } else {
+      // "Send these plays" (S-43, T-335): the scorekeeper's own tap, whoever holds the
+      // game now, taken only if the game has not moved since they were made.
+      if (otherMaker) {
+        return ok(reply(seq, refuseAll('session-not-held', messages['session-not-held'], taken)));
+      }
+      const own = new Set(ids);
+      const since = batch.notSavedSince;
+      if (await gameMovedSince(tx, { gameId, since, last: seq, own, accountId })) {
+        return ok(reply(seq, refuseAll('game-moved', messages['game-moved'], taken)));
+      }
     }
 
     const now = tx.clock.now();
