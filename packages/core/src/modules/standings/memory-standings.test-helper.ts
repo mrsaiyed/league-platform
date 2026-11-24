@@ -169,6 +169,10 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     start: async () => undefined,
     extend: async () => false,
     end: async () => false,
+    lose: async () => false,
+    heard: async () => undefined,
+    findLost: async () => undefined,
+    sent: async () => undefined,
   });
   const noLiveGames: LiveGamesStore = {
     findState: async () => undefined,

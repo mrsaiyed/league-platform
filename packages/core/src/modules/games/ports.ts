@@ -368,6 +368,38 @@ export type ScoringSessionsStore = {
    * by then, so a session renewed a moment ago is kept. False if nothing was ended.
    */
   readonly end: (gameId: string, sessionId: string, lapsedBy?: number) => Promise<boolean>;
+  /**
+   * Takes the game from its session `sessionId` (a takeover, or a lapse given away, T-335):
+   * as `end`, it holds nothing from then on, but the server keeps whose it was and where it
+   * was last heard (`LostScoringSession`), for "Send these plays". `at` is when, on the
+   * server's clock. With `lapsedBy`, only if its lease had run out by then. False if
+   * nothing was taken.
+   */
+  readonly lose: (
+    gameId: string,
+    sessionId: string,
+    at: number,
+    lapsedBy?: number,
+  ) => Promise<boolean>;
+  /**
+   * The game's sequence the server answered the game's session `sessionId` with while it
+   * held the game (T-335). A session starts heard at the game's last event then.
+   */
+  readonly heard: (gameId: string, sessionId: string, seq: number) => Promise<void>;
+  /** The game's session `sessionId` the game was taken from, if the server keeps it. */
+  readonly findLost: (gameId: string, sessionId: string) => Promise<LostScoringSession | undefined>;
+  /** The game's sequence after a batch of lost session `sessionId`'s kept plays was taken. */
+  readonly sent: (gameId: string, sessionId: string, seq: number) => Promise<void>;
+};
+
+/** What the server keeps of a session the game was taken from (T-335). */
+export type LostScoringSession = {
+  readonly id: string;
+  readonly accountId: string;
+  /** The game's sequence when the server last answered it while it held the game. */
+  readonly heardSeq: number;
+  /** The game's sequence after the last batch of its kept plays the server took. */
+  readonly sentSeq?: number;
 };
 
 /** The scoring session commands' transaction: the games one, the sessions and the clock. */

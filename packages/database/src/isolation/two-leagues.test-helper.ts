@@ -91,6 +91,8 @@ export type LeagueRecords = MadeLeague & {
   scoringSessionId: string;
   /** When that session began (ms): what taking the game over from it names. */
   scoringSessionSince: number;
+  /** A session the upcoming game was taken from, kept by the server (0026, T-335). */
+  lostScoringSessionId: string;
   /** A player added at the final game's scorer's table, waiting for the admin's review (S-6). */
   walkUpRosterEntryId: string;
   /** That walk-up's person. */
@@ -516,6 +518,19 @@ async function seededLeague(
       new Date(scoringSessionSince + 120_000).toISOString(),
     ],
   );
+  const lostScoringSessionId = await id(
+    pglite,
+    `insert into scoring_sessions (league_id, game_id, account_id, device_id, created_at, held_until, heard_seq, lost_at)
+     values ($1, $2, $3, $4, $5, $6, 2, $6)`,
+    [
+      leagueId,
+      upcomingGameId,
+      member.accountId,
+      `${m}-old-tablet`,
+      new Date(scoringSessionSince - 600_000).toISOString(),
+      new Date(scoringSessionSince - 480_000).toISOString(),
+    ],
+  );
   const walkUpPersonId = await id(
     pglite,
     `insert into people (league_id, first_name, last_name) values ($1, $2, 'Walk-up')`,
@@ -686,6 +701,7 @@ async function seededLeague(
     playerGameStatsId,
     scoringSessionId,
     scoringSessionSince,
+    lostScoringSessionId,
     walkUpRosterEntryId,
     walkUpPersonId,
     standingsRowId,

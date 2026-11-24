@@ -12,6 +12,8 @@ import { scoringSessionColumns, scoringSessionSummary } from './scoring-session-
 export async function insertScoringSession(
   scope: LeagueScope,
   session: NewScoringSession,
+  /** Where the session starts heard (T-335): the game's last event's sequence now. */
+  heardSeq = 0,
 ): Promise<ScoringSession | undefined> {
   const row = await transactionOf(scope)
     .insertInto('scoring_sessions')
@@ -22,8 +24,12 @@ export async function insertScoringSession(
       device_id: session.deviceId,
       created_at: new Date(session.since),
       held_until: new Date(session.heldUntil),
+      heard_seq: heardSeq,
     })
-    .onConflict((conflict) => conflict.columns(['league_id', 'game_id']).doNothing())
+    // One holding session per game; those the game was taken from are kept beside it (0026).
+    .onConflict((conflict) =>
+      conflict.columns(['league_id', 'game_id']).where('lost_at', 'is', null).doNothing(),
+    )
     .returning(scoringSessionColumns)
     .executeTakeFirst();
   return row === undefined ? undefined : scoringSessionSummary(row);

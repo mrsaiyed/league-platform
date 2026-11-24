@@ -234,8 +234,9 @@ export async function openFor(
   if (game.underWay || !hasLapsed(current, now)) {
     return heldByOther(current, now, device.accountId);
   }
-  // Lapsed: end it only if it is still lapsed, so a renewal that just landed wins.
-  await tx.scoringSessions.end(gameId, current.id, now);
+  // Lapsed: taken only if it is still lapsed, so a renewal that just landed wins. The
+  // server keeps where it last heard it, for "Send these plays" (T-335).
+  await tx.scoringSessions.lose(gameId, current.id, now, now);
   return claimGame(tx, gameId, device, now);
 }
 

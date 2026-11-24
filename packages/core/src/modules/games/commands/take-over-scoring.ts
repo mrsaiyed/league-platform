@@ -64,7 +64,8 @@ export const takeOverScoring = defineCommand({
     }
     // Another request may have ended it a moment ago (a takeover of its own, or the
     // holder leaving): then this one displaced nobody, and logs nothing.
-    const displaced = await tx.scoringSessions.end(gameId, current.id);
+    // The server keeps where it last heard the displaced session (T-335).
+    const displaced = await tx.scoringSessions.lose(gameId, current.id, now);
     const reply = await claimGame(tx, gameId, device, now);
     if (displaced && reply.status === 'held-by-you') {
       await recordActivity(tx, context, {

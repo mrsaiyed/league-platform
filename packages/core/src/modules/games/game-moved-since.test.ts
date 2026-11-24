@@ -45,6 +45,25 @@ const send = (t: Tracker, commands: TrackerCommand[], since: number, accountId =
     t.deps,
   );
 
+/** One play the phone's scorekeeper records while holding the game, under `commandId`. */
+const phonePlay = (t: Tracker, phoneSession: string, commandId: string) =>
+  applyTrackerCommands(
+    t.as(otherScorekeeperId),
+    {
+      gameId,
+      protocolVersion: 2,
+      sessionId: phoneSession,
+      commands: [
+        {
+          commandId,
+          at: t.clock.now(),
+          input: { type: 'score', side: 'home', playerId: homeIds[1] ?? '', points: 3 },
+        },
+      ],
+    },
+    t.deps,
+  );
+
 /** Tip-off and a basket saved from the tablet; then `who` takes the game over on a phone. */
 async function takenOver(who = otherScorekeeperId) {
   // The tablet's session is the first started: a new one is told apart from it.
@@ -195,6 +214,86 @@ describe('send these plays (S-43, T-335)', () => {
       error: { code: 'not-allowed' },
     });
     expect(t.db.state.events).toHaveLength(since);
+  });
+
+  // The fix round (step 2.148): the server decides where the plays can have been made.
+  it('the worst night: the phone records while the tablet is still offline; the tablet’s waiting batch is answered first, so its device knows the later sequence; sending is refused and the score stays', async () => {
+    const { t, since, plays, phoneSession } = await takenOver();
+    expect(statuses(await phonePlay(t, phoneSession, playUuid(97)))).toEqual(['accepted']);
+    // The tablet's waiting batch is answered "not held", with the game's sequence now.
+    const answered = await applyTrackerCommands(
+      t.as(scorekeeperId),
+      { gameId, protocolVersion: 2, sessionId, commands: plays.slice(0, 3) },
+      t.deps,
+    );
+    const told = answered.ok ? answered.value.sequence : -1;
+    expect(told).toBe(since + 1);
+    const score = t.db.state.games.find((g) => g.id === gameId)?.homeScore;
+    // Named with that sequence, as the device took it before this fix, or honestly.
+    expect(statuses(await send(t, plays, told))).toEqual(plays.map(() => 'game-moved'));
+    expect(statuses(await send(t, plays, since))).toEqual(plays.map(() => 'game-moved'));
+    expect(t.db.state.events).toHaveLength(since + 1);
+    expect(t.db.state.games.find((g) => g.id === gameId)?.homeScore).toBe(score);
+  });
+
+  it('refuses a sequence before the one the server last answered the tablet with, and one after it', async () => {
+    const { t, since, plays, phoneSession } = await takenOver();
+    // Lower: the tablet's own saved basket lies after it, and is not one of these plays.
+    expect(statuses(await send(t, plays, since - 1))).toEqual(plays.map(() => 'game-moved'));
+    // Higher: the phone's play is the game's last event, so nothing lies after it.
+    expect(statuses(await phonePlay(t, phoneSession, playUuid(97)))).toEqual(['accepted']);
+    expect(statuses(await send(t, plays, since + 1))).toEqual(plays.map(() => 'game-moved'));
+    expect(t.db.state.events).toHaveLength(since + 1);
+  });
+
+  it('refuses a scorekeeper who never held the game, even naming the holder’s own session', async () => {
+    const t = setUp({ started: 1 });
+    await tap(t, [
+      { type: 'lineup', side: 'home', playerIds: homeIds },
+      { type: 'lineup', side: 'away', playerIds: awayIds },
+      { type: 'start' },
+    ]);
+    const since = sequenceOf(t);
+    const plays = twentyPlays(t);
+    // The tablet still holds the game: the phone's scorekeeper sends past it.
+    expect(statuses(await send(t, plays, since, otherScorekeeperId))).toEqual(
+      plays.map(() => 'game-moved'),
+    );
+    expect(t.db.state.events).toHaveLength(since);
+  });
+
+  it('does not look past another account’s play that carries one of the batch’s command ids', async () => {
+    const { t, since, plays, phoneSession } = await takenOver();
+    const forged = plays[0]?.commandId ?? '';
+    expect(statuses(await phonePlay(t, phoneSession, forged))).toEqual(['accepted']);
+    expect(statuses(await send(t, plays, since))).toEqual([
+      'duplicate',
+      ...plays.slice(1).map(() => 'game-moved'),
+    ]);
+    expect(t.db.state.events).toHaveLength(since + 1);
+  });
+
+  it('takes a long list in several batches, one answer lost and the batch sent again, each play once', async () => {
+    const { t, since, plays } = await takenOver();
+    const [first, second] = [plays.slice(0, 10), plays.slice(10)];
+    // The first batch is taken, but its answer never reaches the tablet: sent again.
+    expect(statuses(await send(t, first, since))).toEqual(first.map(() => 'accepted'));
+    expect(statuses(await send(t, first, since))).toEqual(first.map(() => 'duplicate'));
+    // The second names the same sequence: the first batch's plays are not "moved".
+    expect(statuses(await send(t, second, since))).toEqual(second.map(() => 'accepted'));
+    expect(statuses(await send(t, plays, since))).toEqual(plays.map(() => 'duplicate'));
+    const after = t.db.state.events.filter((e) => e.seq > since);
+    expect(after.map((e) => e.commandId)).toEqual(plays.map((c) => c.commandId));
+  });
+
+  it('writes the send in the activity log as plays sent after a takeover', async () => {
+    const { t, since, plays } = await takenOver();
+    await send(t, plays, since);
+    expect(t.db.state.activity.at(-1)).toMatchObject({
+      action: 'games.apply_tracker_commands',
+      actorAccountId: scorekeeperId,
+      details: { gameId, change: 'sent-after-takeover', events: 20 },
+    });
   });
 
   it('a version 1 batch cannot ask for it', async () => {

@@ -169,6 +169,7 @@ export type {
   Clock,
   NewScoringSession,
   ScoringSession,
+  LostScoringSession,
   ScoringSessionsStore,
   ScoringTx,
 } from './ports.ts';

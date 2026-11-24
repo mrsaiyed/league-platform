@@ -110,11 +110,19 @@ async function leagueWithGame() {
   const sessions = async () =>
     (
       await pglite.query<{ id: string; account_id: string; device_id: string; held_until: Date }>(
-        'select id, account_id, device_id, held_until from scoring_sessions where game_id = $1',
+        // The sessions holding the game: one the game was taken from is kept beside them (0026).
+        'select id, account_id, device_id, held_until from scoring_sessions where game_id = $1 and lost_at is null',
         [gameId],
       )
     ).rows;
-  return { ...l, gameId, first, second, as, sessions };
+  const lostSessions = async () =>
+    (
+      await pglite.query<{ id: string; account_id: string; heard_seq: number }>(
+        'select id, account_id, heard_seq from scoring_sessions where game_id = $1 and lost_at is not null',
+        [gameId],
+      )
+    ).rows;
+  return { ...l, gameId, first, second, as, sessions, lostSessions };
 }
 
 describe('scoring sessions on the database (T6 §5, T-116)', () => {
@@ -207,6 +215,10 @@ describe('scoring sessions on the database (T6 §5, T-116)', () => {
     const rows = await l.sessions();
     expect(rows).toEqual([expect.objectContaining({ account_id: l.second, device_id: 'phone' })]);
     expect(rows[0]?.id).not.toBe(firstSession);
+    // The server keeps whose the lost session was and where it last heard it (T-335).
+    expect(await l.lostSessions()).toEqual([
+      { id: firstSession, account_id: l.first, heard_seq: 0 },
+    ]);
     expect(
       await renewScoringSession(l.as(l.first), { gameId: l.gameId, sessionId: firstSession }, deps),
     ).toEqual({ ok: true, value: { status: 'ended', reason: 'taken-over', sentAt: now } });

@@ -299,7 +299,11 @@ const trackerTxOf = (
     ...gamesTxOf(s, jobs),
     clock,
     // The session commands take the same lock, so a takeover and a batch race for real.
-    scoringSessions: sessionsOf(s, lock === undefined ? {} : { lockGame: lock }),
+    scoringSessions: sessionsOf(s, {
+      ...(lock === undefined ? {} : { lockGame: lock }),
+      lastEventSeq: (gameId) =>
+        Math.max(0, ...s.events.filter((e) => e.gameId === gameId).map((e) => e.seq)),
+    }),
     // The stand-in's database keeps the test's clock.
     liveGames: liveGamesOf(s, clock.now),
   });

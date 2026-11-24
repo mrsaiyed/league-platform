@@ -96,8 +96,9 @@ describe('openTwoLeagues', () => {
         ...(await texts('select file_name as t from imports where league_id = $1', [leagueId])),
       ];
       // 25 since step 2.160 gave the season a second, empty round; 26 since step 2.181 gave
-      // it a third, whose only game is in the bin; 28 since step 2.56 gave it two level teams.
-      expect(found.length).toBe(28);
+      // it a third, whose only game is in the bin; 28 since step 2.56 gave it two level teams;
+      // 29 since step 2.148 kept a session its upcoming game was taken from (0026).
+      expect(found.length).toBe(29);
       for (const text of found) expect(text.toLowerCase()).toContain(marker);
     }
     const shared = await texts(
@@ -171,7 +172,9 @@ describe('openTwoLeagues', () => {
       expect(own?.get('game_events')?.sort()).toEqual([...league.gameEventIds].sort());
       expect(own?.get('game_states')).toEqual([league.gameStateId]);
       expect(own?.get('player_game_stats')).toEqual([league.playerGameStatsId]);
-      expect(own?.get('scoring_sessions')).toEqual([league.scoringSessionId]);
+      expect(own?.get('scoring_sessions')?.sort()).toEqual(
+        [league.scoringSessionId, league.lostScoringSessionId].sort(),
+      );
       expect(own?.get('roster_entries')).toContain(league.walkUpRosterEntryId);
       expect(own?.get('standings_rows')).toEqual([league.standingsRowId]);
       expect(own?.get('standings_adjustments')).toEqual([league.standingsAdjustmentId]);
