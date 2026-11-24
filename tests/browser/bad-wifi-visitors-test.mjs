@@ -25,6 +25,12 @@
 // the clash on both players for the admin (the season's unique rule waits for the admin's
 // confirming, step 2.71).
 //
+// A refused add under the cuts (step 2.242, T-356, T-357): "77 Ry Refused" is given an id
+// the server refuses (one not made by a device, version 7), before the tab is opened again
+// with signal. The server counts the refusal in its sequence; the device must take it for
+// its own, so nothing else is ever listed not saved because of it: at the end the refused
+// add is the only thing not saved, and nothing is listed.
+//
 // At the end the score and box score on the screen and the box score folded from the
 // server's plays must equal the one counted from the script, the added players included,
 // and the server must hold each added player with the number and name typed.
@@ -84,6 +90,8 @@ const added = [
   [23, 'Bo', 'Guest'],
 ];
 const twin = [8, 'Cy', 'Twin'];
+/** The add the server refuses (step 2.242): the id the device gives it is not version 4. */
+const refusedAdd = { line: '77', name: 'Ry Refused', id: '018f0000-0000-7000-8000-000000000077' };
 
 /** The game: adds, the lineups, the clash, and plays [side, jersey, what]. */
 const script = [
@@ -94,6 +102,7 @@ const script = [
   ['home', 5, 'p2'],
   ['away', 4, 'p3'],
   ['away', 16, 'p2'],
+  ['refused'],
   ['home', 9, 'foul'],
   ['away', 8, 'p2'],
   ['away', 23, 'foul'],
@@ -295,6 +304,15 @@ async function oneGame(browser) {
       hasTouch: true,
     });
     await context.addCookies([{ ...scorekeeper, url: origin }]);
+    // The next id the page makes, once asked, is one the server refuses (step 2.242).
+    await context.addInitScript((id) => {
+      const real = globalThis.crypto.randomUUID.bind(globalThis.crypto);
+      globalThis.crypto.randomUUID = () => {
+        if (globalThis.__refuseNextId !== true) return real();
+        globalThis.__refuseNextId = false;
+        return id;
+      };
+    }, refusedAdd.id);
     const errors = [];
     let page;
     let c;
@@ -310,7 +328,10 @@ async function oneGame(browser) {
       return c.open();
     };
     const away = () => panel.locator('[data-players-team="away"]');
-    const rows = () => away().locator('[data-player-row]');
+    // The refused add's row (shown while it waits) is not one of the visitors counted.
+    const rows = () =>
+      away().locator(`[data-player-row]:not([data-player-row="${refusedAdd.id}"])`);
+    const refusedGroups = () => panel.locator('[data-players-refused-player]');
     const openPanel = async () => {
       if (await panel.isVisible()) return;
       await c.more.click();
@@ -329,7 +350,10 @@ async function oneGame(browser) {
         .filter({ has: page.locator('[data-player-clash]') })
         .count(),
       waiting: await away().locator('[data-player-row][data-waiting]').count(),
-      refused: await panel.locator('[data-players-refused]').count(),
+      // Refused, other than the add refused on purpose.
+      refused: await refusedGroups()
+        .and(panel.locator(`:not([data-players-refused-player="${refusedAdd.id}"])`))
+        .count(),
     });
 
     // The three ways the connection goes, as in bad-wifi-test.mjs.
@@ -504,6 +528,26 @@ async function oneGame(browser) {
               for (const jersey of side === 'home' ? starters : awayStarters)
                 idOf[`${side} ${jersey}`] = await c.tile(side, jersey).getAttribute('data-player');
             log(`step ${n}: both lineups set`);
+          } else if (what === 'refused') {
+            await openPanel();
+            await page.evaluate(() => (globalThis.__refuseNextId = true));
+            await away().locator('[data-players-line="away"]').fill(refusedAdd.line);
+            await away().locator('[data-players-name="away"]').fill(refusedAdd.name);
+            await away().locator('[data-players-add="away"]').click();
+            // Listed while it waits, or refused already: either way the device made it.
+            await until(
+              async () =>
+                (await away().locator(`[data-player-row="${refusedAdd.id}"]`).count()) +
+                (await panel.locator(`[data-players-refused-player="${refusedAdd.id}"]`).count()),
+              (n) => n > 0,
+              'the add to be refused was neither listed nor refused',
+            );
+            note(
+              'the page gave the add the id the server refuses',
+              (await page.evaluate(() => globalThis.__refuseNextId)) === false,
+            );
+            await closePanel();
+            log(`step ${n}: "${refusedAdd.line} ${refusedAdd.name}" added, to be refused`);
           } else if (what === 'clash') {
             // S-44 with no signal: #8 is worn; a late arrival given 8 is taken and marked.
             await openPanel();
@@ -558,22 +602,37 @@ async function oneGame(browser) {
       setAnswersLost(false);
       setSlow(false);
       await setOffline(false);
-      // Until all is saved or something is refused (a refusal never ends in "saved", and
-      // its own check below then names it): a limit, never a pass on a timeout.
+      // Until nothing waits: the add refused on purpose then says the one play not saved,
+      // and any other refusal is named by its own check below. A limit, never a pass on a
+      // timeout.
       await openPanel();
       const settled = await until(
         async () => ({
-          saved: await c.root.locator('[data-saved-banner][data-state="saved"]').count(),
-          refused: await panel.locator('[data-players-refused]').count(),
+          waiting: await c.root.locator('[data-saved-banner][data-state="waiting"]').count(),
+          banner: (await c.root.locator('[data-saved-banner]').allTextContents()).join(' | '),
+          own: await panel.locator(`[data-players-refused-player="${refusedAdd.id}"]`).count(),
+          refused: await refusedGroups().count(),
         }),
-        (s) => s.saved > 0 || s.refused > 0,
-        'with the signal back, neither all saved nor anything refused',
+        (s) => s.waiting === 0 && s.own === 1,
+        'with the signal back, still waiting, or the add to be refused not refused',
         90_000,
       );
-      log(settled.saved > 0 ? 'everything saved' : 'something refused');
-      note('with the signal back everything is saved', settled.saved > 0, JSON.stringify(settled));
-      const listed = await page.locator('[data-kept-list], [data-not-applied-list]').count();
-      note('nothing is listed not saved or not applied', listed === 0, `${listed} lists`);
+      log('nothing waiting; the add refused');
+      note(
+        'with the signal back everything is saved but the add refused on purpose (step 2.242)',
+        settled.refused === 1 && settled.banner.includes('1 play not saved'),
+        JSON.stringify(settled),
+      );
+      // The add refused on purpose is listed as not applied, as any refusal is; nothing
+      // else is listed, and no play is listed not saved because of it (step 2.242). The
+      // one refusal the panel names by its id above is that add's.
+      const kept = await page.locator('[data-kept-list]').count();
+      const notApplied = await page.locator('[data-not-applied-play]').allTextContents();
+      note(
+        'nothing is listed not saved, and only the add refused on purpose is listed not applied',
+        kept === 0 && notApplied.length === 1 && settled.own === 1 && settled.refused === 1,
+        JSON.stringify({ kept, notApplied }),
+      );
       const says = await until(
         panelSays,
         (s) => s.waiting === 0,

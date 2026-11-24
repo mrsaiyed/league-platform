@@ -10,7 +10,8 @@
 // `data-players-line`, `data-players-name`, `data-players-add`, `data-player-row`,
 // `data-player-fix`, `data-player-number`, `data-player-name-box`, `data-player-save`,
 // `data-player-takeoff`, `data-player-reason`, `data-players-said`, `data-players-close`,
-// `data-players-refused`, `data-players-read-only`, `data-players-open`.
+// `data-players-refused`, `data-players-refused-player`, `data-players-read-only`,
+// `data-players-open`.
 import type { Translate } from '@srleagues/site';
 import { isTablePlayerCommand } from '@srleagues/contracts';
 import { useEffect, useRef, type RefObject } from 'react';
@@ -161,7 +162,12 @@ export function PlayersSheet(props: PlayersSheetProps) {
         {panel.refused.length === 0 ? null : (
           <div className="court-players-refused" data-players-refused="" role="alert">
             {panel.refused.map((group) => (
-              <div key={group.playerId} className="court-notice" data-kind="error">
+              <div
+                key={group.playerId}
+                className="court-notice"
+                data-kind="error"
+                data-players-refused-player={group.playerId}
+              >
                 <p>
                   <strong>{refusedLabel(group, props.rosters, t)}</strong> {t(group.key)}
                 </p>
