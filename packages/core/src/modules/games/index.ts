@@ -96,6 +96,12 @@ export { markNotStarted, type MarkNotStartedError } from './commands/mark-not-st
 export { hasPlaysPastMarker } from './plays-past-marker.ts';
 export { reopenTrackedGame, type ReopenTrackedGameError } from './commands/reopen-tracked-game.ts';
 export { readReopenOffer, type ReadReopenOfferError } from './commands/read-reopen-offer.ts';
+export { reopenOwnResult, type ReopenOwnResultError } from './commands/reopen-own-result.ts';
+export {
+  readOwnResultOffer,
+  type ReadOwnResultOfferError,
+} from './commands/read-own-result-offer.ts';
+export type { OwnResultNotOffered, OwnResultOffer } from './own-result-window.ts';
 export type {
   ReopenNotOffered as GameReopenNotOffered,
   ReopenOffer as GameReopenOffer,
