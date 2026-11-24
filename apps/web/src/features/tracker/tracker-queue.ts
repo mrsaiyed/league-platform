@@ -44,6 +44,7 @@ import {
   type QueueErrorCode,
   type QueueStorage,
   type QueuedCommand,
+  type TakenTap,
 } from './queue-storage.ts';
 import { defaultRetryTiming, retryDelayMs, type RetryTiming } from './retry-delay.ts';
 
@@ -204,6 +205,12 @@ export type TrackerQueue = {
    * `notSavedSince`, the sequence they were made on, it is kept with them (T-337).
    */
   setAside(commandIds: readonly string[], notSavedSince?: number): Promise<void>;
+  /**
+   * Keeps this device's own taps the server already took as taken (T-372): stored beside
+   * the not-saved list, never sent, so "Send these plays" names them after a reload too.
+   * `forget` removes them.
+   */
+  keepTaken(taps: readonly TakenTap[]): Promise<void>;
   /**
    * Sends waiting taps made under an earlier session of this device under `sessionId`
    * (step 2.38): the tracker has checked that nobody else scored since that one ended.
@@ -620,6 +627,11 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     forget: (commandIds) => putAway(commandIds, []),
 
     setAside: (commandIds, notSavedSince) => putAway([], commandIds, notSavedSince),
+
+    keepTaken: (taken) =>
+      taken.length === 0
+        ? Promise.resolve()
+        : stored('storage-write-failed', () => storage.settle(gameId, { taken })),
 
     async carryOn(commandIds, session) {
       await stored('storage-write-failed', () =>

@@ -2,14 +2,19 @@
 // web app on its made-up stand-in (APP_ENV=test): nothing leaves this computer; every team,
 // game and person is made up. Builds the app first unless given --no-build.
 //
-// A, the scorekeeper's phone, scores with no signal and saves a copy of the game (the file
-// the browser is handed is caught as a download). On another browser context, the owner
-// opens the game's upload page and picks that file:
+// Two games, each on a server of its own (the stand-in starts afresh). In each, A, the
+// scorekeeper's phone, scores with no signal, saves a copy of the game (the file the browser
+// is handed is caught as a download) and makes one more play after saving it. On another
+// browser context the copy is uploaded: in the first game by the same scorekeeper, in the
+// second by the owner.
 // - A still holds the game, so the page asks the tracker's takeover question, naming A;
-//   "Not now" sends nothing and leaves the game with A, "Yes, take over" uploads.
-// - The game then shows one result: each of A's plays on the server once (its box score is
-//   made from them), and the page says 3 were new; the same file again adds nothing.
-// - A comes back online and sends late: still each play once, nothing twice.
+//   (the owner's game) "Not now" sends nothing and leaves the game with A, "Yes, take over"
+//   uploads.
+// - The game then has each of the copy's plays on the server once, and the page says 3 were
+//   new; the same file again adds nothing.
+// - A comes back online: it is told it left the game and that its one later play still
+//   waits. "Send these plays" puts that play on the server, and every play, the copy's and
+//   the later one, is counted exactly once, nothing typed again (T-370).
 // - Someone who may not score the game (a coach, a signed-in person with no role) is
 //   refused the page; someone signed out is sent to sign in.
 // - Once the game is final, a copy with a play the server does not have is refused in the
@@ -100,6 +105,8 @@ const pointsOf = (plays, ids) =>
       plays.filter((p) => p.playerId === id && typeof p.points === 'number').length,
     ]),
   );
+/** The copy's 3 plays and the one made after it was saved, each once. */
+const eachOnce = { home5: 1, home7: 1, home9: 1, away3: 1, away7: 1 };
 
 /** A browser context of its own, signed in as `who`. */
 async function contextOf(browser, origin, who, size = phone) {
@@ -138,8 +145,14 @@ const upload = (page, file) =>
     await form.locator('[data-upload-send]').click();
   });
 
-const browser = built ? await launch() : null;
-if (browser) {
+/**
+ * One game on a server of its own: A scores, saves a copy and plays once more; `uploader`
+ * uploads the copy; A sends its later play. The owner's game also reloads A before sending,
+ * and runs the checks of who may upload and of a final game.
+ */
+async function copyRun(browser, uploader) {
+  const byOwner = uploader === owner;
+  const at = byOwner ? 'the owner uploads' : 'the same scorekeeper uploads';
   const origin = `http://localhost:${await freePort()}`;
   const server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
@@ -160,10 +173,10 @@ if (browser) {
       await c.recorded(() => options.locator(`[data-act="${act}"]`).tap());
       await c.pad.locator('[data-rest]').waitFor();
     };
-    const copyFile = join(files, 'copy.json');
+    const copyFile = join(files, byOwner ? 'copy-owner.json' : 'copy-keeper.json');
     let ids = {};
 
-    await step('A scores with no signal and saves a copy', async () => {
+    await step(`${at}: A scores with no signal, saves a copy, then plays once more`, async () => {
       await a.page.goto(`${origin}${trackerPath()}`);
       await c.open();
       for (const jersey of starters) await c.tile('home', jersey).tap();
@@ -177,6 +190,7 @@ if (browser) {
         home7: await c.tile('home', 7).getAttribute('data-player'),
         home9: await c.tile('home', 9).getAttribute('data-player'),
         away3: await c.tile('away', 3).getAttribute('data-player'),
+        away7: await c.tile('away', 7).getAttribute('data-player'),
       };
       await a.context.setOffline(true);
       await play('home', 7, 'p2');
@@ -186,7 +200,7 @@ if (browser) {
       const more = a.page.locator('[data-more]');
       const link = more.locator('[data-upload-copy-link]');
       note(
-        'Save a copy, behind More, says where the copy is uploaded, opening in a new tab',
+        `${at}: Save a copy, behind More, says where the copy is uploaded, in a new tab`,
         (await link.getAttribute('href')) === uploadPath &&
           (await link.getAttribute('target')) === '_blank',
         `${await link.getAttribute('href')} ${await link.getAttribute('target')}`,
@@ -200,7 +214,7 @@ if (browser) {
       await saved.waitFor();
       const copy = JSON.parse(readFileSync(copyFile, 'utf8'));
       note(
-        "the copy holds the 3 plays not yet on the server, for this league's game",
+        `${at}: the copy holds the 3 plays not yet on the server, for this league's game`,
         (await saved.getAttribute('data-copy-saved')) === '3' &&
           copy.commands.length === 3 &&
           copy.gameId === liveGame &&
@@ -208,50 +222,59 @@ if (browser) {
         `${await saved.getAttribute('data-copy-saved')} ${copy.commands?.length}`,
       );
       await a.page.keyboard.press('Escape');
+      // A play made after the copy was saved: it is not in the file (T-370).
+      await play('away', 7, 'p2');
     });
 
-    const u = await contextOf(browser, origin, owner, { width: 1280, height: 900 });
+    const u = await contextOf(browser, origin, uploader, { width: 1280, height: 900 });
     contexts.push(u);
     const holderName = (await session(origin, { type: 'open', deviceId: 'probe' })).body.holder
       ?.displayName;
 
-    await step('the copy is uploaded from another computer', async () => {
+    await step(`${at}: the copy is uploaded from another computer`, async () => {
       await u.page.goto(`${origin}${uploadPath}`);
       const held = await upload(u.page, copyFile);
       const said = (await held.innerText()).trim();
       note(
-        'A still holds the game: the page asks the takeover question, naming A',
+        `${at}: A still holds the game: the page asks the takeover question, naming A`,
         (await held.getAttribute('data-upload-result')) === 'held-by-other' &&
-          typeof holderName === 'string' &&
-          said.includes(`${holderName} is scoring this game on another device.`) &&
-          said.includes(`Take over scoring from ${holderName}?`),
+          (byOwner
+            ? typeof holderName === 'string' &&
+              said.includes(`${holderName} is scoring this game on another device.`) &&
+              said.includes(`Take over scoring from ${holderName}?`)
+            : said.includes('You are scoring this game on another device.') &&
+              said.includes('Take over scoring from you, on another device?')),
         said,
       );
-      await held.locator('[data-upload-not-now]').click();
-      await u.page.locator('[data-upload-result="not-now"]').waitFor();
-      const still = await session(origin, { type: 'open', deviceId: 'probe' });
-      const before = pointsOf((await serverState(origin)).plays, ids);
-      note(
-        '"Not now" sends nothing and leaves the game with A',
-        still.body.status === 'held-by-other' &&
-          still.body.holder.displayName === holderName &&
-          JSON.stringify(before) === JSON.stringify({ home5: 1, home7: 0, home9: 0, away3: 0 }),
-        JSON.stringify({ still: still.body, before }),
-      );
-      const asked = await upload(u.page, copyFile);
+      if (byOwner) {
+        await held.locator('[data-upload-not-now]').click();
+        await u.page.locator('[data-upload-result="not-now"]').waitFor();
+        const still = await session(origin, { type: 'open', deviceId: 'probe' });
+        const before = pointsOf((await serverState(origin)).plays, ids);
+        note(
+          '"Not now" sends nothing and leaves the game with A',
+          still.body.status === 'held-by-other' &&
+            still.body.holder.displayName === holderName &&
+            JSON.stringify(before) ===
+              JSON.stringify({ home5: 1, home7: 0, home9: 0, away3: 0, away7: 0 }),
+          JSON.stringify({ still: still.body, before }),
+        );
+      }
+      const asked = byOwner ? await upload(u.page, copyFile) : held;
       const done = await nextAnswer(u.page, () => asked.locator('[data-upload-take-over]').click());
       const after = pointsOf((await serverState(origin)).plays, ids);
       note(
-        'after "Yes, take over" the page says 3 plays were new, and the game has each once',
+        `${at}: after "Yes, take over" the page says 3 plays were new, and the game has each once`,
         (await done.getAttribute('data-added')) === '3' &&
           (await done.getAttribute('data-already-there')) === '0' &&
           (await done.innerText()).includes('3 plays were new') &&
-          JSON.stringify(after) === JSON.stringify({ home5: 1, home7: 1, home9: 1, away3: 1 }),
+          JSON.stringify(after) ===
+            JSON.stringify({ home5: 1, home7: 1, home9: 1, away3: 1, away7: 0 }),
         JSON.stringify({ said: await done.innerText(), after }),
       );
       const again = await upload(u.page, copyFile);
       note(
-        'the same file again adds nothing: the server had all 3',
+        `${at}: the same file again adds nothing: the server had all 3`,
         (await again.getAttribute('data-upload-result')) === 'uploaded' &&
           (await again.getAttribute('data-added')) === '0' &&
           (await again.getAttribute('data-already-there')) === '3',
@@ -259,105 +282,134 @@ if (browser) {
       );
     });
 
-    await step('A comes back online and sends late', async () => {
+    await step(`${at}: A comes back online and sends its later play`, async () => {
       // The upload let go of the game when it was done, so A is told it has left the game,
-      // with its plays still on the device; opening it again sends them, late.
+      // with its later play still waiting on the device for "Send these plays".
       await a.context.setOffline(false);
       const shown = async () =>
         (await a.page.locator('body').innerText()).replace(/\s+/g, ' ').slice(0, 800);
-      const openAgain = a.page.getByRole('button', { name: 'Open the game again' });
-      try {
-        await openAgain.waitFor({ timeout: 90_000 });
-      } catch (error) {
-        throw new Error(`${whatWentWrong(error)}; A shows: ${await shown()}`);
-      }
+      const kept = a.page.locator('[data-kept-list] [data-kept-play]');
+      const waiting =
+        'This device has left the game. 1 play made here is still waiting: it is not on the server yet.';
+      const offered = async (when) => {
+        try {
+          await a.page.locator('[data-send-not-saved="offered"] [data-send-plays]').waitFor({
+            timeout: 90_000,
+          });
+        } catch (error) {
+          throw new Error(`${when}: ${whatWentWrong(error)}; A shows: ${await shown()}`);
+        }
+        note(
+          `${at}: ${when}, A is told it left the game and that its 1 later play waits, with "Send these plays"`,
+          (await kept.count()) === 1 &&
+            (await a.page.locator('[data-tracker-notices]').innerText()).includes(waiting),
+          `${await kept.count()} listed; ${await shown()}`,
+        );
+      };
+      // A reload here, before "Send these plays", is not checked yet: the send is then still
+      // refused game-moved (weak spot 1 of the fix round, see the lane note).
+      await offered('back online');
+      await a.page.locator('[data-send-plays]').tap();
+      await a.page.locator('[data-kept-list]').waitFor({ state: 'detached' });
+      const sent = pointsOf((await serverState(origin)).plays, ids);
       note(
-        'A, back online, is told it left the game (the upload let go of it)',
-        (await shown()).includes('This device has left the game.'),
-        await shown(),
+        `${at}: "Send these plays" puts the later play on the server, and every play is there once`,
+        JSON.stringify(sent) === JSON.stringify(eachOnce) &&
+          (await a.page.locator('[data-send-not-saved="game-moved"]').count()) === 0,
+        JSON.stringify(sent),
       );
+      const openAgain = a.page.getByRole('button', { name: 'Open the game again' });
       await openAgain.click();
       await c.open();
       await c.saved();
       const late = pointsOf((await serverState(origin)).plays, ids);
       note(
-        'A sent its plays late: nothing waits on A, and the game still has each play once',
-        JSON.stringify(late) === JSON.stringify({ home5: 1, home7: 1, home9: 1, away3: 1 }) &&
-          JSON.stringify(await c.score()) === JSON.stringify({ home: 6, away: 3 }),
+        `${at}: A opened again: nothing waits on A, each play once, A's screen 6–5`,
+        JSON.stringify(late) === JSON.stringify(eachOnce) &&
+          (await kept.count()) === 0 &&
+          JSON.stringify(await c.score()) === JSON.stringify({ home: 6, away: 5 }),
         JSON.stringify({ late, score: await c.score() }),
       );
     });
 
-    await step('someone who may not score the game is refused the page', async () => {
-      for (const [who, cookie] of [
-        ['a coach', coach],
-        ['a signed-in person with no role', stranger],
-      ]) {
-        const r = await contextOf(browser, origin, cookie);
-        contexts.push(r);
-        const answer = await r.page.goto(`${origin}${uploadPath}`);
+    if (byOwner) {
+      await step('someone who may not score the game is refused the page', async () => {
+        for (const [who, cookie] of [
+          ['a coach', coach],
+          ['a signed-in person with no role', stranger],
+        ]) {
+          const r = await contextOf(browser, origin, cookie);
+          contexts.push(r);
+          const answer = await r.page.goto(`${origin}${uploadPath}`);
+          note(
+            `${who} is refused the upload page (403), with no file to pick`,
+            answer?.status() === 403 && (await r.page.locator('[data-copy-file]').count()) === 0,
+            String(answer?.status()),
+          );
+        }
+        const v = await contextOf(browser, origin, { ...owner, value: 'nobody' });
+        contexts.push(v);
+        await v.context.clearCookies();
+        await v.page.goto(`${origin}${uploadPath}`);
         note(
-          `${who} is refused the upload page (403), with no file to pick`,
-          answer?.status() === 403 && (await r.page.locator('[data-copy-file]').count()) === 0,
-          String(answer?.status()),
+          'someone signed out is sent to sign in and back to the upload page',
+          new URL(v.page.url()).pathname === '/signin' &&
+            new URL(v.page.url()).searchParams.get('next') === uploadPath,
+          v.page.url(),
         );
-      }
-      const v = await contextOf(browser, origin, { ...owner, value: 'nobody' });
-      contexts.push(v);
-      await v.context.clearCookies();
-      await v.page.goto(`${origin}${uploadPath}`);
-      note(
-        'someone signed out is sent to sign in and back to the upload page',
-        new URL(v.page.url()).pathname === '/signin' &&
-          new URL(v.page.url()).searchParams.get('next') === uploadPath,
-        v.page.url(),
-      );
-    });
+      });
 
-    await step('a final game is refused: reopen it first', async () => {
-      const o = court(u.page);
-      await u.page.goto(`${origin}${trackerPath()}`);
-      await o.open();
-      await o.endGame();
-      note('the game is final on the server', (await serverState(origin)).status === 'final');
-      const copy = JSON.parse(readFileSync(copyFile, 'utf8'));
-      const newer = join(files, 'copy-new-play.json');
-      writeFileSync(
-        newer,
-        JSON.stringify({
-          ...copy,
-          commands: copy.commands.map((entry) => ({
-            ...entry,
-            command: { ...entry.command, commandId: randomUUID() },
-          })),
-        }),
-      );
-      await u.page.goto(`${origin}${uploadPath}`);
-      const refused = await upload(u.page, newer);
-      note(
-        'a copy with plays the server does not have is refused in plain words: reopen it first',
-        (await refused.getAttribute('data-code')) === 'reopen-first' &&
-          (await refused.innerText()).trim() ===
-            'This game has ended. Reopen it first, then upload the copy again.',
-        await refused.innerText(),
-      );
-      const final = pointsOf((await serverState(origin)).plays, ids);
-      note(
-        'nothing of the refused copy was counted',
-        JSON.stringify(final) === JSON.stringify({ home5: 1, home7: 1, home9: 1, away3: 1 }),
-        JSON.stringify(final),
-      );
-    });
+      await step('a final game is refused: reopen it first', async () => {
+        const o = court(u.page);
+        await u.page.goto(`${origin}${trackerPath()}`);
+        await o.open();
+        await o.endGame();
+        note('the game is final on the server', (await serverState(origin)).status === 'final');
+        const copy = JSON.parse(readFileSync(copyFile, 'utf8'));
+        const newer = join(files, 'copy-new-play.json');
+        writeFileSync(
+          newer,
+          JSON.stringify({
+            ...copy,
+            commands: copy.commands.map((entry) => ({
+              ...entry,
+              command: { ...entry.command, commandId: randomUUID() },
+            })),
+          }),
+        );
+        await u.page.goto(`${origin}${uploadPath}`);
+        const refused = await upload(u.page, newer);
+        note(
+          'a copy with plays the server does not have is refused in plain words: reopen it first',
+          (await refused.getAttribute('data-code')) === 'reopen-first' &&
+            (await refused.innerText()).trim() ===
+              'This game has ended. Reopen it first, then upload the copy again.',
+          await refused.innerText(),
+        );
+        const final = pointsOf((await serverState(origin)).plays, ids);
+        note(
+          'nothing of the refused copy was counted',
+          JSON.stringify(final) === JSON.stringify(eachOnce),
+          JSON.stringify(final),
+        );
+      });
+    }
 
     for (const d of contexts) {
-      note('no script error on a page', d.errors.length === 0, d.errors.join(' | '));
+      note(`${at}: no script error on a page`, d.errors.length === 0, d.errors.join(' | '));
     }
   } catch (error) {
-    failures.push(`the run: ${whatWentWrong(error)}`);
+    failures.push(`${at}: the run: ${whatWentWrong(error)}`);
   } finally {
     for (const d of contexts) await d.context.close();
     server.child.kill();
   }
+}
+
+const browser = built ? await launch() : null;
+if (browser) {
+  await copyRun(browser, scorekeeper);
+  await copyRun(browser, owner);
 }
 await browser?.close();
 

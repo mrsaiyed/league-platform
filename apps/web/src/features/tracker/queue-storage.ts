@@ -87,7 +87,21 @@ export type QueuedCommand = {
        */
       readonly notSavedSince?: number;
     }
+  /**
+   * Taken: this device's own tap the server already has (an uploaded copy took it, or it
+   * was answered while the device lost the game), kept beside a not-saved list only so
+   * "Send these plays" still names it as the device's own after a reload (T-372). Never
+   * sent by the queue, never listed, removed with the list.
+   */
+  | { readonly state: 'taken' }
 );
+
+/** A tap kept as taken (T-372): stored as it is if the device no longer holds it. */
+export type TakenTap = {
+  readonly protocolVersion: number;
+  readonly command: BatchCommand;
+  readonly sessionId?: string;
+};
 
 /** What one answer from the server changes, written together or not at all. */
 export type QueueSettlement = {
@@ -103,6 +117,11 @@ export type QueueSettlement = {
    * (step 2.38): its earlier one ended while it was away, and nobody else scored since.
    */
   readonly carryOn?: { readonly commandIds: readonly string[]; readonly sessionId: string };
+  /**
+   * The device's own taps the server already took, kept as `taken` (T-372): a held one
+   * changes state in its place, one no longer held is stored at the end.
+   */
+  readonly taken?: readonly TakenTap[];
 };
 
 /**

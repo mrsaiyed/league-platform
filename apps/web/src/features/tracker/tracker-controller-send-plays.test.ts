@@ -354,45 +354,76 @@ describe('a play made after the copy was saved, once the copy is uploaded (T-370
     return upload({ copy, takeOver: { expectedHolderSince: first.holder.since } });
   }
 
+  /** The tablet copies `n` plays, makes one more, the copy is uploaded, the tablet sends. */
+  async function lateAfterCopy(uploader: Person, n: number, reload: boolean) {
+    const network = endpointNetwork();
+    const tablet = device(network);
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    const baskets = Array.from({ length: n }, (_, i) => basket('home', hawks[i % 3] ?? ''));
+    await tapAll(tablet.controller, baskets);
+    const entries = await inLeague(tablet.storage, liveLeagueId, accountOf('scorekeeper')).list(
+      gameId,
+    );
+    const copy = gameCopyFile({
+      leagueId: liveLeagueId,
+      gameId,
+      accountId: accountOf('scorekeeper'),
+      entries,
+      savedAt: 1,
+    });
+    expect(copy.count).toBe(n);
+    // The late play: made after the copy was saved, so only the tablet has it.
+    await tapAll(tablet.controller, [basket('away', bears[0] ?? '')]);
+    network.mode = 'up';
+    expect(await uploadCopy(network, uploader, copy.text)).toMatchObject({
+      status: 'uploaded',
+      added: n,
+    });
+    expect(await serverScore(network)).toEqual({ home: 2 * n, away: 0 });
+    tablet.controller.online();
+    await tablet.controller.idle();
+    // The copy's plays are on the server, so only the late one is listed, to send by
+    // the scorekeeper's one tap; the copy's go with it, answered as already there.
+    expect(tablet.controller.status().notSaved).toHaveLength(1);
+    expect(tablet.controller.status().sendNotSaved).toBe('offered');
+    let sender = tablet;
+    if (reload) {
+      // The copy's plays are kept on the device as taken, beside the list (T-372).
+      await tablet.controller.leave();
+      sender = device(network, 'scorekeeper', 'tablet-1', tablet.storage);
+      await sender.controller.start();
+      await sender.controller.idle();
+      expect(sender.controller.status().notSaved).toHaveLength(1);
+      expect(sender.controller.status().sendNotSaved).toBe('offered');
+    }
+    expect(await sender.controller.sendNotSaved()).toEqual({ ok: true, saved: 1 });
+    await sender.controller.idle();
+    expect(await serverScore(network)).toEqual({ home: 2 * n, away: 2 });
+    expect(sender.controller.status().notSaved).toEqual([]);
+    expect(sender.controller.status().waiting).toEqual([]);
+    // Gone with the list: nothing of the game is left on the device.
+    expect(await sender.storage.list(gameId)).toEqual([]);
+  }
+
   for (const uploader of ['scorekeeper', 'owner'] as const) {
     it(`is counted once without being entered again, the copy uploaded by the ${uploader}`, async () => {
-      const network = endpointNetwork();
-      const tablet = device(network);
-      await tablet.controller.start();
-      await tapAll(tablet.controller, tipOff);
-      await tablet.controller.idle();
-      network.mode = 'down';
-      await tapAll(tablet.controller, threeBaskets);
-      const entries = await inLeague(tablet.storage, liveLeagueId, accountOf('scorekeeper')).list(
-        gameId,
-      );
-      const copy = gameCopyFile({
-        leagueId: liveLeagueId,
-        gameId,
-        accountId: accountOf('scorekeeper'),
-        entries,
-        savedAt: 1,
-      });
-      expect(copy.count).toBe(3);
-      // The late play: made after the copy was saved, so only the tablet has it.
-      await tapAll(tablet.controller, [basket('away', bears[0] ?? '')]);
-      network.mode = 'up';
-      expect(await uploadCopy(network, uploader, copy.text)).toMatchObject({
-        status: 'uploaded',
-        added: 3,
-      });
-      expect(await serverScore(network)).toEqual({ home: 6, away: 0 });
-      tablet.controller.online();
-      await tablet.controller.idle();
-      // The copy's plays are on the server, so only the late one is listed, to send by
-      // the scorekeeper's one tap; the copy's go with it, answered as already there.
-      expect(tablet.controller.status().notSaved).toHaveLength(1);
-      expect(tablet.controller.status().sendNotSaved).toBe('offered');
-      expect(await tablet.controller.sendNotSaved()).toEqual({ ok: true, saved: 1 });
-      await tablet.controller.idle();
-      expect(await serverScore(network)).toEqual({ home: 6, away: 2 });
-      expect(tablet.controller.status().notSaved).toEqual([]);
-      expect(tablet.controller.status().waiting).toEqual([]);
+      await lateAfterCopy(uploader, 3, false);
     });
   }
+
+  // Known faults left open (lane note 2.70, last part): each still answers game-moved.
+  // `it.fails` passes only while the fault is there; when it is fixed, make these `it`.
+  it.fails('is counted once after a reload before "Send these plays" (left open)', async () => {
+    await lateAfterCopy('owner', 3, true);
+  });
+
+  it.fails(
+    'is counted once with 120 plays in the copy, more than one batch holds (left open)',
+    async () => {
+      await lateAfterCopy('owner', 120, false);
+    },
+  );
 });

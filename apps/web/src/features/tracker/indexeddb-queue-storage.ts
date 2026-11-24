@@ -190,21 +190,45 @@ export async function openIndexedDbQueueStorage(
 
     async settle(
       gameId,
-      { remove = [], refuse = [], notSaved = [], notSavedSince, carryOn }: QueueSettlement,
+      {
+        remove = [],
+        refuse = [],
+        notSaved = [],
+        notSavedSince,
+        carryOn,
+        taken = [],
+      }: QueueSettlement,
     ) {
       const dropped = new Set(remove);
+      const tookIds = new Set(taken.map((t) => t.command.commandId));
       const refusals = new Map(refuse.map((r) => [r.commandId, r.refusal]));
       const setAside = new Set(notSaved);
       const carried = new Set(carryOn?.commandIds ?? []);
-      const empty = dropped.size === 0 && refusals.size === 0 && setAside.size === 0;
+      const empty =
+        dropped.size === 0 && refusals.size === 0 && setAside.size === 0 && tookIds.size === 0;
       if (empty && carried.size === 0) return;
+      // A taken tap the device no longer holds is stored at the end (T-372).
+      const held = new Set<string>();
+      const keepMissing = (commands: IDBObjectStore) => {
+        for (const { protocolVersion, command, sessionId } of taken) {
+          if (held.has(command.commandId)) continue;
+          const madeUnder = sessionId === undefined ? {} : { sessionId };
+          const row: Row = { gameId, protocolVersion, command, ...madeUnder, state: 'taken' };
+          commands.add(row);
+          held.add(command.commandId);
+        }
+      };
       await write(undefined, (commands) => {
         const walk = commands.index(byGame).openCursor(gameId);
         walk.onsuccess = () => {
           const cursor = walk.result;
-          if (cursor === null) return;
+          if (cursor === null) {
+            keepMissing(commands);
+            return;
+          }
           const row = cursor.value as Row;
           const id = row.command.commandId;
+          held.add(id);
           const refusal = refusals.get(id);
           if (dropped.has(id)) cursor.delete();
           else if (refusal !== undefined) cursor.update({ ...row, state: 'refused', refusal });
@@ -212,6 +236,16 @@ export async function openIndexedDbQueueStorage(
             const { refusal: _refusal, ...kept } = row as Row & { refusal?: unknown };
             const since = notSavedSince === undefined ? {} : { notSavedSince };
             cursor.update({ ...kept, state: 'not-saved', ...since });
+          } else if (tookIds.has(id)) {
+            const {
+              refusal: _refusal,
+              notSavedSince: _since,
+              ...kept
+            } = row as Row & {
+              refusal?: unknown;
+              notSavedSince?: unknown;
+            };
+            cursor.update({ ...kept, state: 'taken' });
           } else if (carryOn !== undefined && carried.has(id) && row.state === 'waiting') {
             cursor.update({ ...row, sessionId: carryOn.sessionId });
           }
