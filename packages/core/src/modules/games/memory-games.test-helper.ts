@@ -43,6 +43,8 @@ export type MemoryGames = {
   corrections: NewGameCorrection[];
   /** Who decided each game by hand, as `finalized_by` keeps it (migration 0026). */
   deciders: Record<string, string | null>;
+  /** How many times a list's facts for the own reopening were read (T-349). */
+  handResultReads: number;
   grants: Grant[];
   activity: ActivityEntry[];
   /** Who is assigned to score which game. */
@@ -183,6 +185,7 @@ export const emptyGames = (): MemoryGames => ({
   tracked: [],
   corrections: [],
   deciders: {},
+  handResultReads: 0,
   grants: [],
   activity: [],
   assignments: [],

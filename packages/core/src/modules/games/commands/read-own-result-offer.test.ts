@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { finalGame, gameUuid, ownerId, scorekeeperId } from '../memory-games.test-helper.ts';
 import { startOfTest } from '../memory-scoring.test-helper.ts';
-import { otherScorekeeperId, setUp } from '../reopen-game.test-helper.ts';
+import { endedOnTablet, otherScorekeeperId, setUp } from '../reopen-game.test-helper.ts';
 import { readOwnResultOffer } from './read-own-result-offer.ts';
 
 const gameId = gameUuid(1);
@@ -42,6 +42,18 @@ describe('readOwnResultOffer (step 2.177, S-52)', () => {
         recordedBy: otherScorekeeperId,
       },
     });
+  });
+
+  it('sends a game its tracker ended to the tracker’s own door, even for whoever may correct', async () => {
+    const t = setUp();
+    await endedOnTablet(t);
+    expect(t.db.state.games[0]?.status).toBe('final');
+    for (const who of [scorekeeperId, ownerId]) {
+      expect(await readOwnResultOffer(t.as(who), { gameId }, t.deps)).toEqual({
+        ok: true,
+        value: { reopen: { when: 'no', code: 'not-recorded-by-hand' }, recordedBy: null },
+      });
+    }
   });
 
   it('is always for someone who may correct games', async () => {

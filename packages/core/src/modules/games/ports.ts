@@ -65,6 +65,18 @@ export type GameResultChange = {
   readonly decidedBy?: string | null;
 };
 
+/** One game's facts for the scorekeeper's own reopening, read for a whole list (T-349). */
+export type HandResultFacts = {
+  readonly gameId: string;
+  readonly status: string;
+  /** The account that decided it by hand, or null. */
+  readonly decidedBy: string | null;
+  /** Milliseconds since it was decided, by the database's clock; undefined if it is not. */
+  readonly ago: number | undefined;
+  readonly overturned: boolean;
+  readonly tracked: boolean;
+};
+
 /** A result as a correction keeps it: a versioned document of words and numbers only (T-220). */
 export type GameResultDocument = {
   readonly version: 1;
@@ -527,6 +539,14 @@ export type LiveGamesStore = {
    * decided before 0026 or with no account). Read inside the database, as endedAgo is.
    */
   readonly decidedBy: (gameId: string) => Promise<string | null>;
+  /**
+   * For a list of games (step 2.177, T-349), in one read of the database: each of these
+   * games of the league, with who decided it by hand (as decidedBy), how long ago it was
+   * decided (as endedAgo), whether an overturn rules on it, and whether it is tracked (a
+   * saved state with plays, as games.reopen_game tells them apart). Games not here are
+   * left out.
+   */
+  readonly handResults: (gameIds: readonly string[]) => Promise<readonly HandResultFacts[]>;
   /** The game's event made by this command id: its number, type and sender, or undefined. */
   readonly findEvent: (
     gameId: string,

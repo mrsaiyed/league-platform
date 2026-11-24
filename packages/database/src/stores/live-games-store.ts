@@ -4,6 +4,7 @@ import type { LiveGamesStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
   findGameDecidedBy,
+  listHandResults,
   findGameEndedAgo,
   findGameEvent,
   findLastGameEnd,
@@ -51,6 +52,7 @@ export function liveGamesStore(scope: LeagueScope): LiveGamesStore {
     findLastEnd: (gameId) => findLastGameEnd(scope, gameId),
     endedAgo: (gameId) => findGameEndedAgo(scope, gameId),
     decidedBy: (gameId) => findGameDecidedBy(scope, gameId),
+    handResults: (gameIds) => listHandResults(scope, gameIds),
     findEvent: (gameId, commandId) => findGameEvent(scope, gameId, commandId),
     // The players the scorer's table adds, changes and takes off (record 058).
     findTablePlayer: (teamId, personId) => findTablePlayer(scope, teamId, personId),

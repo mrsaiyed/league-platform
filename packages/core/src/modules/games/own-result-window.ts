@@ -62,13 +62,75 @@ export async function ownResultOffer(
     if (game.overturned === true) return no('result-overturned');
     return { reopen: { when: 'always' }, recordedBy };
   }
+  const minutes = await reopenMinutesOf(tx);
+  const mine = minutes !== 0 && recordedBy !== null && recordedBy === context.accountId;
+  const ago = mine ? await tx.liveGames.endedAgo(game.id) : undefined;
+  const reopen = scorekeeperWindow({
+    minutes,
+    accountId: context.accountId,
+    recordedBy,
+    ago,
+    overturned: game.overturned === true,
+    now: tx.clock.now(),
+  });
+  return { reopen, recordedBy };
+}
+
+async function reopenMinutesOf(tx: TrackerTx): Promise<number> {
   const rows = await tx.games.leagueSettingRows(scorekeeperReopenMinutes.key);
-  const minutes = lookupSetting(scorekeeperReopenMinutes, rows).value;
-  if (minutes === 0) return no('scorekeepers-may-not-reopen');
-  if (recordedBy === null || recordedBy !== context.accountId) return no('not-recorded-by-you');
-  const ago = await tx.liveGames.endedAgo(game.id);
-  const left = minutes * minuteMs - (ago ?? Number.POSITIVE_INFINITY);
-  if (left < 0) return no('reopen-time-over');
-  if (game.overturned === true) return no('result-overturned');
-  return { reopen: { when: 'until', until: tx.clock.now() + left }, recordedBy };
+  return lookupSetting(scorekeeperReopenMinutes, rows).value;
+}
+
+/** The rule's end, for someone who may not correct games: the minutes, whose entry, how long ago. */
+function scorekeeperWindow(facts: {
+  readonly minutes: number;
+  readonly accountId: string | null;
+  readonly recordedBy: string | null;
+  readonly ago: number | undefined;
+  readonly overturned: boolean;
+  readonly now: number;
+}): OwnResultOffer['reopen'] {
+  if (facts.minutes === 0) return { when: 'no', code: 'scorekeepers-may-not-reopen' };
+  if (facts.recordedBy === null || facts.recordedBy !== facts.accountId) {
+    return { when: 'no', code: 'not-recorded-by-you' };
+  }
+  const left = facts.minutes * minuteMs - (facts.ago ?? Number.POSITIVE_INFINITY);
+  if (left < 0) return { when: 'no', code: 'reopen-time-over' };
+  if (facts.overturned) return { when: 'no', code: 'result-overturned' };
+  return { when: 'until', until: facts.now + left };
+}
+
+/**
+ * The same rule for a whole list of games (T-349), for someone who may not correct games
+ * (the list knows that from their access): one read of the games and one of the
+ * league's minutes, however many games the list has. Each game's own door checks
+ * everything again when tapped. Games not in the league are left out.
+ */
+export async function ownResultWindows(
+  context: CommandContext,
+  tx: TrackerTx,
+  gameIds: readonly string[],
+): Promise<ReadonlyMap<string, OwnResultOffer['reopen']>> {
+  const windows = new Map<string, OwnResultOffer['reopen']>();
+  if (gameIds.length === 0) return windows;
+  const facts = await tx.liveGames.handResults(gameIds);
+  const minutes = await reopenMinutesOf(tx);
+  const now = tx.clock.now();
+  for (const game of facts) {
+    windows.set(
+      game.gameId,
+      !isDecided(game.status)
+        ? { when: 'no', code: 'game-not-decided' }
+        : game.tracked
+          ? { when: 'no', code: 'not-recorded-by-hand' }
+          : scorekeeperWindow({
+              ...game,
+              recordedBy: game.decidedBy,
+              minutes,
+              accountId: context.accountId,
+              now,
+            }),
+    );
+  }
+  return windows;
 }

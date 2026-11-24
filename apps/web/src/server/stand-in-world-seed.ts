@@ -1017,6 +1017,8 @@ export type SeedCast = {
   readonly emptyLeague: CastLeague;
   /** Every other made-up league: no seasons yet. */
   readonly otherLeagues: readonly CastLeague[];
+  /** Who typed the seeded results recorded by hand (step 2.177): the leagues' owner. */
+  readonly recorderAccountId: string;
   /** The account that has a roster place in each league (a made-up member). */
   readonly memberAccountId: string;
   /** Who is given games to score: in the adult league, the first two games to the first and
@@ -1542,5 +1544,17 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
   const others = cast.otherLeagues.map((league) =>
     emptyLeagueWorld(league, { audience: 'youth', timeZone: 'UTC' }),
   );
-  return [adult, youth, draft, history, empty, ...others];
+  const leagues = [adult, youth, draft, history, empty, ...others];
+  // A result typed by hand keeps who typed it (`finalized_by`, migration 0026): the
+  // leagues' owner, as a real league's would; a game its tracker ended keeps nobody.
+  for (const league of leagues) {
+    for (const g of league.games) {
+      const tracked =
+        league.playsBefore.includes(g.id) || league.events.some((e) => e.gameId === g.id);
+      if ((g.status === 'final' || g.status === 'forfeit') && !tracked) {
+        league.deciders[g.id] = cast.recorderAccountId;
+      }
+    }
+  }
+  return leagues;
 }

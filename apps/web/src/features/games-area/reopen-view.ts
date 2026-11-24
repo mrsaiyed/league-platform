@@ -33,7 +33,7 @@ export type ReopenView =
  * they recorded it and the league's minutes run, else who can (step 2.177, S-52).
  * `own` is games.read_own_result_offer's answer (undefined when it was not read).
  */
-export function ownReopenViewOf(own: OwnResultOffer | undefined): ReopenView {
+export function ownReopenViewOf(own: Pick<OwnResultOffer, 'reopen'> | undefined): ReopenView {
   const when = own?.reopen;
   if (when?.when === 'until') return { kind: 'correct', door: 'own', until: when.until };
   if (when?.when === 'always') return { kind: 'correct', door: 'own', until: null };
@@ -50,7 +50,7 @@ export function ownReopenViewOf(own: OwnResultOffer | undefined): ReopenView {
 export function reopenViewOf(
   offer: ReopenOffer | undefined,
   mayCorrect: boolean,
-  own?: OwnResultOffer,
+  own?: Pick<OwnResultOffer, 'reopen'>,
 ): ReopenView {
   const when = offer?.reopen;
   if (when?.when === 'always') return { kind: 'correct', door: 'tracked', until: null };
@@ -88,7 +88,7 @@ export function sheetReopenViewOf(
   sheet: SheetFacts,
   offer: ReopenOffer | undefined,
   /** For a result recorded by hand, games.read_own_result_offer's answer (step 2.177). */
-  own?: OwnResultOffer,
+  own?: Pick<OwnResultOffer, 'reopen'>,
 ): ReopenView {
   const view: ReopenView = sheet.mayReopen
     ? { kind: 'correct', door: 'by-hand', until: null }

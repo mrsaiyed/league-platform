@@ -24,6 +24,7 @@ import {
   renewScoringSession,
   reopenGame,
   readOwnResultOffer,
+  readOwnResultOffers,
   readReopenOffer,
   reopenOwnResult,
   reopenTrackedGame,
@@ -42,6 +43,7 @@ import {
   findScoringSession,
   insertScoringSession,
   findGameDecidedBy,
+  listHandResults,
   findGameEndedAgo,
   findGameEvent,
   findLastGameEnd,
@@ -346,6 +348,24 @@ registerIsolationCase({
   run: async (scope, target) => {
     await typedFinal(scope, target.upcomingGameId, target.memberId);
     return runAsApp(readOwnResultOffer, harnessTx, scope, { gameId: target.upcomingGameId });
+  },
+});
+
+registerIsolationCase({
+  subject: readOwnResultOffers,
+  name: "read, for a list, whether results typed by hand for the target's games can be reopened",
+  run: async (scope, target) => {
+    await typedFinal(scope, target.upcomingGameId, target.memberId);
+    return runAsApp(readOwnResultOffers, harnessTx, scope, { gameIds: [target.upcomingGameId] });
+  },
+});
+
+registerIsolationCase({
+  subject: listHandResults,
+  name: "read, for a list, who typed the result of the target's upcoming game and when",
+  run: async (scope, target) => {
+    await typedFinal(scope, target.upcomingGameId, target.memberId);
+    return listHandResults(scope, [target.upcomingGameId]);
   },
 });
 

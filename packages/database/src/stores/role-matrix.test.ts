@@ -136,6 +136,7 @@ import {
   renameShortName,
   renewScoringSession,
   readOwnResultOffer,
+  readOwnResultOffers,
   reopenGame,
   reopenOwnResult,
   reopenTrackedGame,
@@ -1425,6 +1426,16 @@ const gameCommandRows: readonly Row[] = [
     async (league, program) => ({ gameId: await handResultRecordedIn(league, program) }),
     (c, i) => readOwnResultOffer(c, i, trackerDeps),
   ),
+  // The same for a whole list, in one read (T-349).
+  // Anyone who scores somewhere may ask, as for games.list_my_games: it says only what is theirs.
+  {
+    command: 'games.read_own_result_offers',
+    name: 'see which results recorded by hand on a list can be reopened',
+    needs: 'games.score',
+    scope: 'program',
+    prepare: async (league) => ({ input: { gameIds: [await handResultRecordedIn(league, true)] } }),
+    run: (c, i) => readOwnResultOffers(c, i, trackerDeps),
+  },
 ];
 
 /** A final score the matrix's scorekeeper typed in five minutes ago (step 2.177, 0026). */

@@ -53,6 +53,7 @@ const reads = new Set([
   'games.read_tracker_rosters',
   // Whether the device may offer Reopen, before the tap (step 2.120): a read.
   'games.read_own_result_offer',
+  'games.read_own_result_offers',
   'games.read_reopen_offer',
   // A season's standings adjustments and the games' scorekeepers, for their admin
   // screens (step 2.56): reads.
