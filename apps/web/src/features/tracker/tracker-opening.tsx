@@ -13,7 +13,8 @@ import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchGameDoors } from './fetch-game-doors.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
-import { TrackerFormatPanel } from './tracker-format-panel.tsx';
+import type { StartConfirm } from '../game-format/index.ts';
+import { playsFormat, TrackerFormatPanel } from './tracker-format-panel.tsx';
 import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.ts';
 import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
 import { keptRows, notAppliedRows, type KeptRow } from './kept-plays.ts';
@@ -376,6 +377,25 @@ export function TrackerOpening({
     </p>
   ) : null;
 
+  // The server's answer brought another format than this device played (T-344): it plays
+  // the server's now, and says so until the scorekeeper has read it.
+  const formatChangedTo = phase.kind === 'open' ? phase.status.formatChangedTo : null;
+  const formatNotice =
+    formatChangedTo === null ? null : (
+      <p className="court-notice" role="status" data-format-changed-to="">
+        {t('tracker.formatChangedTo', {
+          format: formatLines(formatChangedTo, t, locale).join('; '),
+        })}{' '}
+        <button
+          type="button"
+          className="court-button"
+          onClick={act((game) => game.controller.dismissFormatChanged())}
+        >
+          {t('tracker.formatChangedTo.dismiss')}
+        </button>
+      </p>
+    );
+
   const matchup = t('tracker.matchup', { away: listed.away.name, home: listed.home.name });
 
   // The scoring screen, once this device holds the game and its format is confirmed. And
@@ -392,7 +412,8 @@ export function TrackerOpening({
     const offline = isOffline(phase.status.queue, browserOnline);
     const banner = savedBanner(phase.status.queue, offline, keptOnly(phase.status));
     const notices = trackerNotices(phase.status);
-    const anythingToTell = notices.length > 0 || signIn !== null || storeFailedNotice !== null;
+    const anythingToTell =
+      notices.length > 0 || signIn !== null || storeFailedNotice !== null || formatNotice !== null;
     return (
       <ScoringScreen
         game={phase.game}
@@ -414,6 +435,7 @@ export function TrackerOpening({
             <>
               <Notices status={phase.status} t={t} lists={lists} busy={busy} />
               {signIn}
+              {formatNotice}
               {storeFailedNotice}
             </>
           ) : null
@@ -463,14 +485,15 @@ export function TrackerOpening({
               onOpenAgain={act((game) => game.controller.openAgain())}
               lists={lists}
               onConfirm={(format) => act((game) => game.confirmFormat(format))()}
-              formatPanel={(fallback) => (
+              formatPanel={(fallback, confirm) => (
                 <TrackerFormatPanel
-                  {...{ leagueId, gameId, t, locale, fallback }}
+                  {...{ leagueId, gameId, t, locale, fallback, confirm }}
                   onChanged={() => phase.game.controller.formatChanged()}
                 />
               )}
             />
           ) : null}
+          {formatNotice}
           {storeFailedNotice}
         </section>
         <footer className="court-card-foot">
@@ -691,7 +714,7 @@ function OpenGame({
   readonly lists: KeptLists;
   readonly onConfirm: (format: GameFormat) => void;
   /** Every rule and "Change the format" (step 2.119), the device's lines meanwhile. */
-  readonly formatPanel: (fallback: ReactNode) => ReactNode;
+  readonly formatPanel: (fallback: ReactNode, confirm: StartConfirm) => ReactNode;
 }) {
   const { status, confirmed } = phase;
   const screen = screenOf(status, confirmed);
@@ -793,16 +816,13 @@ function OpenGame({
                 <li key={line}>{line}</li>
               ))}
             </ul>,
+            {
+              label: t('tracker.format.confirm'),
+              busy,
+              playing: playsFormat(screen.format),
+              onStart: () => onConfirm(screen.format),
+            },
           )}
-          <button
-            type="button"
-            className="court-button"
-            data-kind="main"
-            onClick={() => onConfirm(screen.format)}
-            disabled={busy}
-          >
-            {t('tracker.format.confirm')}
-          </button>
         </section>
       ) : null}
     </>

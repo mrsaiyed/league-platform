@@ -102,5 +102,40 @@ describe('tracker controller: the format changed before the first play (step 2.1
     expect(await serverRules(network)).toMatchObject({ periods: 4, periodSeconds: 480 });
     expect(controller.status().game?.rules).toMatchObject({ periods: 4, periodSeconds: 480 });
     expect(controller.status().queue.waiting).toBe(0);
+    // Its own change was said back by the form: nothing more to tell (T-344).
+    expect(controller.status().formatChangedTo).toBeNull();
+  });
+
+  it('takes the rules the server fixed when they changed elsewhere, and says so until dismissed (T-344)', async () => {
+    const network = endpointNetwork();
+    const controller = device(network);
+    await controller.start();
+    expect(controller.status().formatChangedTo).toBeNull();
+
+    // Changed on another device; this one is never told, and starts on halves.
+    await quartersAtTheTable(network);
+    for (const input of tipOff) expect((await controller.tap(input)).ok).toBe(true);
+    await controller.idle();
+    expect(await serverRules(network)).toMatchObject({ periods: 4, periodSeconds: 480 });
+    expect(controller.status().game?.rules).toMatchObject({ periods: 4, periodSeconds: 480 });
+    expect(controller.status().formatChangedTo).toMatchObject({ periods: 4, periodSeconds: 480 });
+
+    await controller.dismissFormatChanged();
+    expect(controller.status().formatChangedTo).toBeNull();
+  });
+
+  it('says so too when the taps waited offline on the old format (T-344)', async () => {
+    const network = endpointNetwork();
+    const controller = device(network);
+    await controller.start();
+    network.mode = 'down';
+    for (const input of tipOff) expect((await controller.tap(input)).ok).toBe(true);
+    expect(controller.status().game?.rules.periods).toBe(2);
+    await quartersAtTheTable(network);
+    network.mode = 'up';
+    controller.online();
+    await controller.idle();
+    expect(controller.status().game?.rules).toMatchObject({ periods: 4, periodSeconds: 480 });
+    expect(controller.status().formatChangedTo).toMatchObject({ periods: 4, periodSeconds: 480 });
   });
 });

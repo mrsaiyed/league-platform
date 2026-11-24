@@ -9,6 +9,7 @@
 import type { GameFormatRules, GameFormatView } from '@srleagues/contracts';
 import type { Translate } from '@srleagues/site';
 import { useEffect, useId, useState, type ReactNode } from 'react';
+import { checkBeforeStart } from './check-before-start.ts';
 import type { GameFormatClient } from './format-client.ts';
 import {
   formatOfValues,
@@ -28,7 +29,19 @@ export type FormatPanelLook = {
   readonly notice: string;
 };
 
-type Said = { readonly kind: 'saved' | 'problem'; readonly text: string } | null;
+type Said = { readonly kind: 'saved' | 'problem' | 'changed'; readonly text: string } | null;
+
+/**
+ * The tracker's "Confirm and start scoring" (T-344): before it starts, the game's format
+ * is read again, and a format changed since it was shown is shown and asked about again.
+ */
+export type StartConfirm = {
+  readonly label: string;
+  readonly busy: boolean;
+  /** Whether the device would play under this format. */
+  readonly playing: (format: GameFormatRules) => boolean;
+  readonly onStart: () => void;
+};
 
 export function GameFormatPanel({
   client,
@@ -37,6 +50,7 @@ export function GameFormatPanel({
   look,
   fallback,
   onChanged,
+  confirm,
   initial = null,
 }: {
   /** The format already read, if the page has it; it is read again all the same. */
@@ -49,11 +63,14 @@ export function GameFormatPanel({
   readonly fallback?: ReactNode;
   /** After a change is saved: the tracker reads the game's state again (the new rules). */
   readonly onChanged?: (view: GameFormatView) => void | Promise<void>;
+  /** At the tracker's start confirmation: the button that starts the game. */
+  readonly confirm?: StartConfirm;
 }) {
   const [view, setView] = useState<GameFormatView | null>(initial);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<Said>(null);
+  const [checking, setChecking] = useState(false);
   const underWayId = `${useId()}-under-way`;
 
   useEffect(() => {
@@ -66,10 +83,43 @@ export function GameFormatPanel({
     };
   }, [client]);
 
+  // With signal, the format is read again first; with none, the game starts on what the
+  // device has (T-344).
+  const start = async (shown: GameFormatRules | null) => {
+    if (confirm === undefined) return;
+    setChecking(true);
+    const check = await checkBeforeStart(client, shown, confirm.playing);
+    setChecking(false);
+    if (check.kind === 'start') {
+      confirm.onStart();
+      return;
+    }
+    setView(check.view);
+    setEditing(false);
+    setSaid({ kind: 'changed', text: t('tracker.formatChange.changedElsewhere') });
+    await onChanged?.(check.view);
+  };
+  const startButton = (shown: GameFormatRules | null) =>
+    confirm === undefined ? null : (
+      <p>
+        <button
+          type="button"
+          className={look.button}
+          data-kind="main"
+          data-format-confirm=""
+          disabled={confirm.busy || checking}
+          onClick={() => void start(shown)}
+        >
+          {confirm.label}
+        </button>
+      </p>
+    );
+
   if (view === null) {
     return (
       <div data-format-reading="">
         {fallback ?? <p className={look.quiet}>{t('tracker.formatChange.reading')}</p>}
+        {startButton(null)}
       </div>
     );
   }
@@ -176,6 +226,7 @@ export function GameFormatPanel({
           onCancel={() => setEditing(false)}
         />
       ) : null}
+      {startButton(view.applies)}
     </div>
   );
 }

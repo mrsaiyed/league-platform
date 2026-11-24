@@ -167,6 +167,8 @@ export const enTracker = {
   // The admin's games area uses the same words.
   'tracker.formatChange.button': 'Change the format',
   'tracker.formatChange.cancel': 'Cancel',
+  'tracker.formatChange.changedElsewhere':
+    'The format of this game was changed. Check it and confirm again.',
   'tracker.formatChange.fact.bonus': 'Bonus from team foul {count}',
   'tracker.formatChange.fact.carry.no': 'Unused timeouts do not carry over',
   'tracker.formatChange.fact.carry.yes': 'Unused timeouts carry over',
@@ -246,6 +248,9 @@ export const enTracker = {
   'tracker.formatChange.summary.stop': 'stop clock',
   'tracker.formatChange.title': "This game's format",
   'tracker.formatChange.underway': 'The game is under way: its format can no longer be changed.',
+  // The server's answer brought another format than the device was playing (T-344).
+  'tracker.formatChangedTo': 'The format of this game was changed. It is now: {format}.',
+  'tracker.formatChangedTo.dismiss': 'OK',
   // Team fouls this period, in each team's box of the scoreboard, and the bonus badge
   // beside the team that shoots it.
   'tracker.fouls.count_one': '{count} foul',
