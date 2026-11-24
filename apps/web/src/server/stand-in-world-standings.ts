@@ -17,7 +17,14 @@ import {
   type StandingsReadStore,
   type StandingsStore,
 } from '@srleagues/core';
-import { setStandInStatus, standInStatusVersion } from './stand-in-league-states.ts';
+import { standInLeagues } from './stand-in-cast.ts';
+import {
+  changeStandInLeague,
+  renameStandInLeague,
+  setStandInStatus,
+  standInNamesOf,
+  standInStatusVersion,
+} from './stand-in-league-states.ts';
 import { minorAt } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
@@ -436,13 +443,19 @@ export function worldLeaguesStores(
   /** The server's clock: the time a saved setting is stamped with. */
   now: () => Date,
 ): { readonly leagues: LeaguesStore; readonly divisions: DivisionsStore } {
+  const everyLeague = Object.values(standInLeagues);
+  const cast = everyLeague.find((l) => l.id === s.leagueId);
+  const namesOf = () => {
+    const names = cast === undefined ? s : standInNamesOf(cast);
+    return { name: names.name, slug: names.slug };
+  };
   const leagues: LeaguesStore = {
     // Who plays in the league and whether anyone in it, not in the bin, is recorded as a
     // child, read from its own rows, so the Privacy settings say what the public pages do
     // (record 065; has-recorded-child.ts reads the people table the same way).
     leagueAudience: async () => s.audience,
     // Every made-up league was made with a contact email of its own (step 2.240).
-    leagueContactEmail: async () => `${s.slug}@example.org`,
+    leagueContactEmail: async () => s.contactEmail,
     // R-28: a child by birth date or by the tick counts.
     hasRecordedChild: async () =>
       s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
@@ -455,19 +468,45 @@ export function worldLeaguesStores(
         ? undefined
         : {
             id: s.leagueId,
-            name: s.name,
-            slug: s.slug,
+            // Its name and short name now: League settings → Profile changes them.
+            ...namesOf(),
             status: known,
             ownerAccountId,
             version: standInStatusVersion(s.leagueId),
           };
     },
-    setName: notYet('leagues.setName'),
+    // Renaming a made-up league (step 2.125): kept beside its state, which the address
+    // lookups read, so the old short name forwards as a former one does.
+    setName: async (name, version) => changeStandInLeague(s.leagueId, version, { name }),
     createLeague: notYet('leagues.createLeague'),
-    renameShortName: notYet('leagues.renameShortName'),
+    renameShortName: async (slug, version) =>
+      cast === undefined ? undefined : renameStandInLeague(cast, everyLeague, slug, version),
     // Publishing a made-up draft (step 2.240): the state is kept beside the cast's
     // (stand-in-league-states.ts), which the access reader and the address lookups read.
     setStatus: async (status, version) => setStandInStatus(s.leagueId, status, version),
+    // League settings → Profile (step 2.125): the world's own row, as the seed made it.
+    leagueProfile: async () => ({
+      contactEmail: s.contactEmail,
+      city: s.city,
+      timeZone: s.timeZone,
+      listed: s.listed,
+      audience: s.audience,
+    }),
+    setProfile: async (profile, version) => {
+      const next = changeStandInLeague(s.leagueId, version);
+      if (next === undefined) return undefined;
+      s.contactEmail = profile.contactEmail ?? s.contactEmail;
+      s.city = profile.city;
+      s.timeZone = profile.timeZone;
+      s.listed = profile.listed;
+      return next;
+    },
+    setAudience: async (audience, version, unlist) => {
+      const next = changeStandInLeague(s.leagueId, version);
+      if (next !== undefined) s.audience = audience;
+      if (next !== undefined && unlist) s.listed = false;
+      return next;
+    },
     createSeason: notYet('leagues.createSeason'),
     findSeason: async (seasonId) => {
       const found = s.seasons.find((x) => x.id === seasonId);

@@ -16,9 +16,16 @@ export const enAdminSettings = {
   'adminSettings.confirmNote': 'Tick this only if you are choosing {choice}:',
   'adminSettings.default': 'Default: {value}',
   'adminSettings.defaultMark': '{choice} (the default)',
+  'adminSettings.done.archived':
+    'The league is archived. Everything in it is kept as it was, and nothing can be changed until it is brought back.',
+  'adminSettings.done.audienceClearedFullNames':
+    'Who plays was saved, and the privacy choices listed are back where a youth league starts. Confirm them again under Privacy; you can widen each one in its own setting.',
   'adminSettings.done.cleared': 'The setting is back to its default.',
   'adminSettings.done.published': 'The league is published. Visitors can see it now.',
+  'adminSettings.done.renamed':
+    'The short name was changed. The old address forwards to the new one for 12 months.',
   'adminSettings.done.saved': 'The setting was saved.',
+  'adminSettings.done.unarchived': 'The league is published again. It can be changed as before.',
   'adminSettings.field.value': 'Value',
   'adminSettings.groups': 'Groups of settings',
   // The admin's League settings screen (step 2.48). The words for each setting itself are
@@ -59,6 +66,43 @@ export const enAdminSettings = {
   'adminSettings.privacy.now.initial': 'Now: everyone is shown by first name and last initial.',
   'adminSettings.privacy.unknownAge':
     'In this league, anyone whose record does not say whether they are a child or an adult is shown as a child, coaches too.',
+  'adminSettings.profile.audience.adult': 'Adults',
+  'adminSettings.profile.audience.mixed': 'Both adults and under-18s',
+  'adminSettings.profile.audience.youth': 'Under-18s',
+  'adminSettings.profile.city': 'City',
+  'adminSettings.profile.confirmTowardAdults':
+    'I confirm that the people whose age we do not know may be shown as adults, with their full names (needed when choosing more adults than now).',
+  'adminSettings.profile.contactEmail': 'Contact email',
+  'adminSettings.profile.listed': 'List the league in the league finder',
+  'adminSettings.profile.name': "The league's name",
+  'adminSettings.profile.readOnly':
+    'This league is archived or suspended, so its profile cannot be changed now.',
+  'adminSettings.profile.save': 'Save',
+  'adminSettings.profile.saveName': 'Save the name',
+  'adminSettings.profile.saveShortName': 'Change the short name',
+  'adminSettings.profile.saveWhoPlays': 'Save who plays',
+  'adminSettings.profile.shortName': 'Short name (in the address)',
+  'adminSettings.profile.shortNameForwards':
+    'If you change it, the old address keeps forwarding to the new one for 12 months.',
+  'adminSettings.profile.timeZone': 'Time zone (for example America/New_York)',
+  'adminSettings.profile.timeZoneMovesGames':
+    'If you change the time zone, the time shown for every game already entered changes with it.',
+  'adminSettings.profile.title': 'Profile',
+  'adminSettings.profile.whoPlays': 'Who plays',
+  'adminSettings.profile.youthResets':
+    'Choosing under-18s or both puts these privacy choices back to where a youth league starts, when you save:',
+  'adminSettings.profile.youthResets.childrenInFull':
+    'Children shown with their full names: back to no.',
+  'adminSettings.profile.youthResets.listing': 'Listed in the league finder: off.',
+  'adminSettings.profile.youthResets.namesChoice':
+    'Names on public pages: your saved choice of full names is cleared, so you confirm it again under Privacy.',
+  'adminSettings.profile.youthResetsAfter':
+    'If the league is published it stays published, and League settings asks you to confirm its privacy choices. You can widen each one again in its own setting.',
+  'adminSettings.publish.archive': 'Archive',
+  'adminSettings.publish.archiveAsk':
+    'Archive this league? Its pages stay up, but nothing in it can be changed until you bring it back.',
+  'adminSettings.publish.archived':
+    'This league is archived. Its pages stay up as they were, and nothing in it can be changed.',
   // The Publish part at the top of League settings (step 2.240, U-9, P3 §3): what a draft
   // means, the "Must fix" list with each item met or not, and the button that asks once.
   'adminSettings.publish.ask':
@@ -66,13 +110,15 @@ export const enAdminSettings = {
   'adminSettings.publish.button': 'Publish',
   'adminSettings.publish.cancel': 'Not now',
   'adminSettings.publish.check.contactEmail': 'A contact email for the league',
-  'adminSettings.publish.check.contactEmail.cure':
-    'The contact email is given when the league is made, and no screen changes it yet: ask the people who run SR Leagues, who made the league, to add it.',
+  'adminSettings.publish.check.contactEmail.cure': 'Add it under Profile on this page.',
   'adminSettings.publish.check.privacyChosen':
     'Your privacy choice for young players: how names show on public pages',
   'adminSettings.publish.check.privacyChosen.cure':
     'Choose and save "Names on public pages" under Privacy, even to keep how it starts.',
+  'adminSettings.publish.confirmPrivacyLive':
+    'Under-18s play in this league, so its privacy choices must be confirmed. The league stays published meanwhile.',
   'adminSettings.publish.cureLink': 'Go to Privacy',
+  'adminSettings.publish.cureLinkProfile': 'Go to Profile',
   'adminSettings.publish.draft':
     'This league is a draft. Only the people who run it can see it: anyone else who opens its pages is told they were not found.',
   'adminSettings.publish.live': 'This league is published. Anyone can see its public pages.',
@@ -81,6 +127,7 @@ export const enAdminSettings = {
   'adminSettings.publish.notMet': 'Not done yet',
   'adminSettings.publish.notReady': 'Put the items above right first, then publish.',
   'adminSettings.publish.title': 'Publishing',
+  'adminSettings.publish.unarchive': 'Un-archive',
   'adminSettings.save': 'Save',
   'adminSettings.usingDefault': 'Now: the default.',
   'adminSettings.usingOwn': 'Now: set for this league.',

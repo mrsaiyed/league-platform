@@ -1031,6 +1031,8 @@ type LeagueFacts = {
   readonly league: CastLeague;
   readonly audience: Audience;
   readonly timeZone: string;
+  /** Where it plays, as League settings → Profile shows it (step 2.125); null is none. */
+  readonly city: string | null;
   /** The fewest games a player needs to be among the leaders (a league setting, P7 §6). */
   readonly minimumGames: number;
   readonly programId: string;
@@ -1356,6 +1358,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
       audience: 'adult',
       timeZone: adultTimeZone,
       minimumGames: 3,
+      city: 'Valley Springs',
       programId: adultProgram,
       venues: adultVenues,
     },
@@ -1429,6 +1432,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
       audience: 'youth',
       timeZone: 'America/Los_Angeles',
       minimumGames: 2,
+      city: 'Harbor Point',
       programId: youthProgram,
       venues: youthVenues,
     },
@@ -1456,6 +1460,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
       audience: 'youth',
       timeZone: 'America/Chicago',
       minimumGames: 0,
+      city: 'Pine Hollow',
       programId: draftProgram,
       venues: draftVenues,
     },
@@ -1492,6 +1497,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
       audience: 'youth',
       timeZone: 'UTC',
       minimumGames: 0,
+      city: 'Meadowbrook',
       programId: historyProgram,
       venues: historyVenues,
     },
@@ -1513,6 +1519,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
       audience: 'adult',
       timeZone: emptyTimeZone,
       minimumGames: minimumGamesToRank.default,
+      city: null,
       programId: madeUp('009a', 4),
       venues: [],
     },

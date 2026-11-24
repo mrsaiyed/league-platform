@@ -2,7 +2,13 @@
 // (record 019: "not set" is no row). Written to the activity log like setting one.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
-import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
+import {
+  defineCommand,
+  fail,
+  ok,
+  type CommandContext,
+  type Result,
+} from '../../../command/index.ts';
 import { leagueSettingChanged } from '../events.ts';
 import type { LeaguesTx } from '../ports.ts';
 import { declaredSettings } from '../settings/declarations.ts';
@@ -62,3 +68,26 @@ export function clearSettingFor(registry: SettingRegistry) {
 }
 
 export const clearSetting = clearSettingFor(declaredSettings);
+
+/**
+ * Clears a league-level value inside another command's transaction, logged as this
+ * command's own clearing, so the settings keep one writer (record 065). Used by
+ * setLeagueAudience (step 2.125), which clears "children in full" when an adult league
+ * brings children in: a clearing only ever shows less (R-26). False if the value moved.
+ */
+export async function clearLeagueValueInside(
+  tx: LeaguesTx,
+  context: CommandContext,
+  key: string,
+  version: number,
+): Promise<boolean> {
+  const setting = declaredSettings.get(key);
+  if (setting === undefined) return false;
+  if (!(await tx.leagues.clearSetting({ level: 'league' }, setting.key, version))) return false;
+  await recordActivity(tx, context, {
+    action: 'leagues.clear_setting',
+    target: { type: 'league', id: context.leagueId },
+    details: { key: setting.key, level: 'league', label: setting.label },
+  });
+  return true;
+}
