@@ -898,6 +898,9 @@ const cases = [
     200,
     [
       'League settings',
+      // Profile (step 2.125), with the short name's forwarding sentence.
+      'Profile',
+      'the old address keeps forwarding to the new one for 12 months',
       adminLink('north-valley', 'people'),
       adminLink('north-valley', 'teams'),
       // Drawn from the declarations (step 2.48): label, default and what it accepts.
