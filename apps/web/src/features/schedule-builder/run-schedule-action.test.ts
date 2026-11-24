@@ -421,7 +421,12 @@ describe('schedule grid', () => {
       recording: 'not-a-mode',
       wasRecording: '',
     });
-    expect(saved).toEqual({ kind: 'refused', code: 'invalid-input', partial: true });
+    expect(saved).toMatchObject({
+      kind: 'refused',
+      code: 'invalid-input',
+      partial: true,
+      at: { form: 'game', gameId: gameId(1) },
+    });
     const view = await read();
     expect(view.result.games.find((g) => g.id === gameId(1))?.time).toBe('11:00');
   });

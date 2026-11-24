@@ -2,7 +2,9 @@
 // (`?done=saved`, `?problem=changed-since-read`); the words themselves are looked up
 // here, so nothing a visitor types into an address can become text on the page.
 import { maxRounds, roundYears } from '@srleagues/core';
+import type { TextKey } from '../../server/messages.ts';
 import { t } from '../../server/messages.ts';
+import type { GameTyped } from './run-schedule-action.ts';
 
 type Search = Readonly<Record<string, string | readonly string[] | undefined>>;
 
@@ -110,6 +112,63 @@ export function whyNotSaved(search: Search): string | undefined {
   if (problem === undefined) return undefined;
   const reason = pick(reasons, first(search['reason']));
   return reason === undefined ? problem() : reason();
+}
+
+/** The boxes of a game's form, by their names. */
+export type GameField =
+  | 'homeTeamId'
+  | 'awayTeamId'
+  | 'roundId'
+  | 'date'
+  | 'time'
+  | 'place'
+  | 'recording';
+
+const gameFieldLabels: Readonly<Record<GameField, TextKey>> = {
+  homeTeamId: 'schedule.admin.home',
+  awayTeamId: 'schedule.admin.away',
+  roundId: 'schedule.admin.roundField',
+  date: 'schedule.admin.date',
+  time: 'schedule.admin.time',
+  place: 'schedule.admin.place',
+  recording: 'schedule.admin.recording',
+};
+
+/** The box a refusal of a game's form is about; 'form' when it is about no one box. */
+function gameFieldOf(search: Search, typed: GameTyped, adding: boolean): GameField | 'form' {
+  const problem = first(search['problem']);
+  const reason = first(search['reason']);
+  const typing = problem === 'invalid-input';
+  if (first(search['partial']) === '1') return 'recording';
+  if (reason === 'invalid-date' || reason === 'date-out-of-range') return 'date';
+  if (typing && typed.date === '') return 'date';
+  if (reason === 'invalid-time' || problem === 'game-without-time') return 'time';
+  if (adding && typing && typed.homeTeamId === '') return 'homeTeamId';
+  if (adding && typing && typed.awayTeamId === '') return 'awayTeamId';
+  if (adding && (reason === 'team-plays-itself' || reason === 'game-exists')) return 'awayTeamId';
+  if (problem === 'unknown-venue' || problem === 'unknown-court') return 'place';
+  if (!adding && reason === 'unknown-round') return 'roundId';
+  return 'form';
+}
+
+/**
+ * Which box of a game's form (its own, or "Add a game") a refusal belongs beside, and the
+ * sentence said there, naming the box (step 2.155); undefined when the address names no
+ * refusal we know.
+ */
+export function gameProblemOf(
+  search: Search,
+  typed: GameTyped,
+  adding: boolean,
+): { readonly field: GameField | 'form'; readonly text: string } | undefined {
+  const why = whyNotSaved(search);
+  if (why === undefined) return undefined;
+  const field = gameFieldOf(search, typed, adding);
+  if (field === 'form') return { field, text: why };
+  return {
+    field,
+    text: t('schedule.admin.fieldRefused', { field: t(gameFieldLabels[field]), why }),
+  };
 }
 
 /** Which field of "Add a round" a refusal belongs beside, and the sentence to say there. */

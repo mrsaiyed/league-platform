@@ -18,10 +18,16 @@ import { redirect } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
+import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
+import { typedOf } from '../list-forms/index.ts';
 import { backToTeamId, backToTeamParam } from './back-to-team.ts';
-import { answerParams, noticeOfAnswer } from './grid-answer.ts';
-import { runScheduleAction, type ScheduleActionKind } from './run-schedule-action.ts';
+import { answerParams, freshAnswer, noticeOfAnswer } from './grid-answer.ts';
+import {
+  runScheduleAction,
+  type ScheduleActionKind,
+  type ScheduleActionOutcome,
+} from './run-schedule-action.ts';
 
 export async function performScheduleAction(
   kind: ScheduleActionKind,
@@ -31,7 +37,12 @@ export async function performScheduleAction(
   const view = await loadLeaguePage(typeof league === 'string' ? league : '', 'admin', 'schedule');
   const ports = await webPorts();
   const context = commandContextOf(view.context);
-  const outcome = await runScheduleAction(kind, form, context, ports.scheduleAdmin.deps);
+  // A second post of the same form for the same button (a double tap) is answered as the
+  // first, so it saves once (step 2.155; server/same-request.ts).
+  const outcome = await sameRequestsHere<ScheduleActionOutcome>().once(
+    requestKeyOf(context, { ...typedOf(form), gridButton: kind }),
+    () => runScheduleAction(kind, form, context, ports.scheduleAdmin.deps),
+  );
   const season = form.get('season');
   const query = new URLSearchParams();
   if (typeof season === 'string' && season !== '') query.set('season', season);
@@ -44,6 +55,10 @@ export async function performScheduleAction(
   const address = `${base}?${query.toString()}`;
   const notice = noticeOfAnswer(outcome);
   const holder = noticeHolderOf(context);
+  // Every other answer that works leaves the notice that lets the grid say it, once.
+  if (notice === undefined && outcome.kind !== 'refused' && holder !== undefined) {
+    savedNoticesHere().leave(holder, { screen: 'schedule', thing: base, said: freshAnswer });
+  }
   if (notice !== undefined && holder !== undefined) {
     savedNoticesHere().leave(holder, { screen: 'schedule', ...notice });
     const asked = await headers();

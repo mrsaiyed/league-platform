@@ -10,7 +10,12 @@
 // it, never shows an old "Removed … Put it back".
 import { gameAnchor } from '@srleagues/core';
 import type { SavedNotice } from '../../server/saved-notice.ts';
-import type { RefusedAt, SavedDetail, ScheduleActionOutcome } from './run-schedule-action.ts';
+import type {
+  GameTyped,
+  RefusedAt,
+  SavedDetail,
+  ScheduleActionOutcome,
+} from './run-schedule-action.ts';
 
 type Search = Readonly<Record<string, string | readonly string[] | undefined>>;
 
@@ -29,6 +34,54 @@ const idOf = (value: string | undefined): string | undefined =>
 export const roundAnchor = (roundId: string): string => `round-${roundId}`;
 export const addRoundAnchor = 'add-round';
 export const savedAnchor = 'saved';
+/** A round's "Add a game" ('': the one under "Games with no round"). */
+export const addGameAnchor = (roundId: string): string =>
+  `add-game-${roundId === '' ? 'none' : roundId}`;
+
+/**
+ * The one-time notice every other answer that works leaves (step 2.155): the grid reads the
+ * address's "Saved" words only while it is there, so a reload, or Back to the page, says
+ * nothing old. The address still says where on the grid.
+ */
+export const freshAnswer = 'answer';
+const answerWords = ['done', 'saved', 'already', 'removed'];
+
+/** The address as the grid reads it: without its answer words once their notice is gone. */
+export function answerShown(search: Search, fresh: boolean): Search {
+  if (fresh) return search;
+  return Object.fromEntries(Object.entries(search).filter(([name]) => !answerWords.includes(name)));
+}
+
+const timeShape = /^\d{2}:\d{2}$/;
+const recordingShape = /^[a-z-]{1,40}$/;
+
+/** A game form's boxes as they ride in the address: ids, a date, a time, a place, a word. */
+function typedQuery(typed: GameTyped): Record<string, string> {
+  return {
+    home: typed.homeTeamId,
+    away: typed.awayTeamId,
+    in: typed.roundId,
+    date: typed.date.slice(0, 10),
+    time: typed.time.slice(0, 5),
+    place: typed.place.slice(0, 120),
+    recording: typed.recording.slice(0, 40),
+  };
+}
+
+function gameTypedOf(search: Search): GameTyped {
+  const date = first(search['date']) ?? '';
+  const time = first(search['time']) ?? '';
+  const recording = first(search['recording']) ?? '';
+  return {
+    homeTeamId: idOf(first(search['home'])) ?? '',
+    awayTeamId: idOf(first(search['away'])) ?? '',
+    roundId: idOf(first(search['in'])) ?? '',
+    date: dateShape.test(date) ? date : '',
+    time: timeShape.test(time) ? time : '',
+    place: (first(search['place']) ?? '').slice(0, 120),
+    recording: recordingShape.test(recording) ? recording : '',
+  };
+}
 
 /** The address's query and anchor for an answer (the caller adds the season). */
 export function answerParams(outcome: ScheduleActionOutcome): {
@@ -41,6 +94,18 @@ export function answerParams(outcome: ScheduleActionOutcome): {
     if (outcome.partial === true) query['partial'] = '1';
     const at = outcome.at;
     if (at === undefined) return { query, hash: '' };
+    if (at.form === 'game') {
+      return {
+        query: { ...query, at: 'game', game: at.gameId, ...typedQuery(at.typed) },
+        hash: `#${gameAnchor(at.gameId)}`,
+      };
+    }
+    if (at.form === 'add-game') {
+      return {
+        query: { ...query, at: 'add-game', ...typedQuery(at.typed) },
+        hash: `#${addGameAnchor(at.typed.roundId)}`,
+      };
+    }
     if (at.form === 'round') {
       return {
         query: { ...query, at: 'round', round: at.roundId },
@@ -186,6 +251,11 @@ export function savedDetailOf(search: Search): SavedDetail | undefined {
 export function refusedAtOf(search: Search): RefusedAt | undefined {
   if (first(search['problem']) === undefined) return undefined;
   const at = first(search['at']);
+  if (at === 'add-game') return { form: 'add-game', typed: gameTypedOf(search) };
+  if (at === 'game') {
+    const gameId = idOf(first(search['game']));
+    return gameId === undefined ? undefined : { form: 'game', gameId, typed: gameTypedOf(search) };
+  }
   if (at === 'round') {
     const roundId = idOf(first(search['round']));
     return roundId === undefined ? undefined : { form: 'round', roundId };

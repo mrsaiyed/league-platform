@@ -109,6 +109,8 @@ export const enScheduleAdmin = {
   'schedule.admin.error.unknown-court': 'That court is not at the chosen venue.',
   'schedule.admin.error.unknown-team': 'One of those teams is not in this season.',
   'schedule.admin.error.unknown-venue': 'That venue is not there.',
+  // A refusal said beside the box of a game's form it is about, naming it (step 2.155).
+  'schedule.admin.fieldRefused': '{field}: {why}',
   'schedule.admin.followRoundDate': 'Move it to {date} too?',
   'schedule.admin.followRoundDateNo': 'No, keep {date}',
   'schedule.admin.followRoundDateYes': 'Yes, move it to {date}',

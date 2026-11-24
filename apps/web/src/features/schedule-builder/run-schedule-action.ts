@@ -75,7 +75,22 @@ export type SavedDetail =
 /** Which form a refusal belongs beside: the new round's, or one round's own. */
 export type RefusedAt =
   | { readonly form: 'add-round'; readonly label: string; readonly date: string }
-  | { readonly form: 'round'; readonly roundId: string };
+  | { readonly form: 'round'; readonly roundId: string }
+  /** A game's own form, with what was typed in it (step 2.155). */
+  | { readonly form: 'game'; readonly gameId: string; readonly typed: GameTyped }
+  /** A round's "Add a game" (its round in `typed.roundId`; '': "Games with no round"). */
+  | { readonly form: 'add-game'; readonly typed: GameTyped };
+
+/** What a game's form held, text only: each goes back into its own box, never shown (T-187). */
+export type GameTyped = {
+  readonly homeTeamId: string;
+  readonly awayTeamId: string;
+  readonly roundId: string;
+  readonly date: string;
+  readonly time: string;
+  readonly place: string;
+  readonly recording: string;
+};
 
 export type ScheduleActionOutcome =
   | { readonly kind: 'saved'; readonly detail?: SavedDetail }
@@ -167,6 +182,17 @@ export async function runScheduleAction(
     court: place.court,
   };
   const gameId = text(form, 'gameId');
+  // A refused game form opens again with every box as it was typed (step 2.155).
+  const typed: GameTyped = {
+    homeTeamId: text(form, 'homeTeamId'),
+    awayTeamId: text(form, 'awayTeamId'),
+    roundId: text(form, 'roundId'),
+    date: slot.date,
+    time: text(form, 'time'),
+    place: text(form, 'place'),
+    recording: text(form, 'recording'),
+  };
+  const gameAt: RefusedAt = { form: 'game', gameId, typed };
 
   switch (kind) {
     case 'add-game': {
@@ -183,7 +209,9 @@ export async function runScheduleAction(
         },
         deps,
       );
-      return done.ok ? { kind: 'saved', detail: { what: 'game-saved', gameId } } : refusal(done);
+      return done.ok
+        ? { kind: 'saved', detail: { what: 'game-saved', gameId } }
+        : { ...refusal(done), at: { form: 'add-game', typed } };
     }
     case 'save-game': {
       // "Take back the new date" on the waiting list (step 2.53 fix round): the game goes
@@ -205,7 +233,7 @@ export async function runScheduleAction(
       let movedSlot = false;
       if (wasSlot !== nowSlot) {
         const moved = await moveDraftGame(context, { ...current, gameId, ...slot }, deps);
-        if (!moved.ok) return refusal(moved);
+        if (!moved.ok) return { ...refusal(moved), at: gameAt };
         current = next(current, moved.value);
         movedSlot = true;
       }
@@ -213,7 +241,9 @@ export async function runScheduleAction(
       if (recording !== '' && recording !== text(form, 'wasRecording')) {
         const set = await setDraftRecording(context, { ...current, gameId, recording }, deps);
         // The move above is already in the draft: say so rather than a plain "not saved".
-        if (!set.ok) return movedSlot ? { ...refusal(set), partial: true } : refusal(set);
+        if (!set.ok) {
+          return { ...refusal(set), at: gameAt, ...(movedSlot ? { partial: true as const } : {}) };
+        }
       }
       // Into another round with the date left as it was: the grid offers the round's date.
       const [wasRound, wasDate] = wasSlot.split('~');

@@ -6,12 +6,15 @@ import { t } from '../../server/messages.ts';
 export function PlaceSelect({
   venues,
   value,
+  marked,
 }: {
   readonly venues: readonly VenueWithCourts[];
   readonly value: string;
+  /** Marks it after a refusal about it (step 2.155). */
+  readonly marked?: { readonly 'aria-invalid'?: true; readonly autoFocus?: true };
 }) {
   return (
-    <select name="place" defaultValue={value} data-place-select="">
+    <select name="place" defaultValue={value} data-place-select="" {...marked}>
       <option value="">{t('schedule.admin.noPlaceOption')}</option>
       {venues.flatMap((v) => [
         <option key={v.id} value={`${v.id}|`}>

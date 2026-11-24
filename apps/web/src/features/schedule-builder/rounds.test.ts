@@ -18,12 +18,13 @@ import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildGrid, dayText, daysAfter } from './build-grid.ts';
 import {
   answerParams,
+  answerShown,
   noticeOfAnswer,
   refusedAtOf,
   savedDetailOf,
   savedDetailOfNotice,
 } from './grid-answer.ts';
-import { addRoundProblemOf, noticeOf, whyNotSaved } from './notice.ts';
+import { addRoundProblemOf, gameProblemOf, noticeOf, whyNotSaved } from './notice.ts';
 import { runScheduleAction, type ScheduleActionKind } from './run-schedule-action.ts';
 
 const leagueId = standInLeagues.live.id;
@@ -465,5 +466,70 @@ describe('a game in the bin does not hold its round (step 2.181, S-60)', () => {
     expect(whyNotSaved(answerParams(refused).query)).toBe(
       'A game with no date yet is still in this round, so it cannot be removed.',
     );
+  });
+});
+
+describe('a refused game form keeps what was typed, and "Saved" is said once (step 2.155)', () => {
+  const team = '11111111-1111-4111-8111-111111111111';
+  const round = '22222222-2222-4222-8222-222222222222';
+  const venue = '33333333-3333-4333-8333-333333333333';
+  const typed = {
+    homeTeamId: team,
+    awayTeamId: team,
+    roundId: round,
+    date: '2026-12-05',
+    time: '18:30',
+    place: `${venue}|Court 1`,
+    recording: 'box-score',
+  };
+
+  it('carries every box back to its own form and names the wrong one', () => {
+    const back = answerParams({
+      kind: 'refused',
+      code: 'change-refused',
+      reason: 'team-plays-itself',
+      at: { form: 'add-game', typed },
+    });
+    expect(back.hash).toBe(`#add-game-${round}`);
+    expect(refusedAtOf(back.query)).toEqual({ form: 'add-game', typed });
+    const problem = gameProblemOf(back.query, typed, true);
+    expect(problem?.field).toBe('awayTeamId');
+    expect(problem?.text.startsWith('Away team: ')).toBe(true);
+  });
+
+  it('puts back nothing that is not the shape of its box', () => {
+    expect(
+      refusedAtOf({
+        problem: 'invalid-input',
+        at: 'game',
+        game: team,
+        date: '5/12',
+        time: 'six',
+        home: 'x',
+        recording: '<b>',
+      }),
+    ).toEqual({
+      form: 'game',
+      gameId: team,
+      typed: {
+        homeTeamId: '',
+        awayTeamId: '',
+        roundId: '',
+        date: '',
+        time: '',
+        place: '',
+        recording: '',
+      },
+    });
+    expect(gameProblemOf({ problem: 'invalid-input' }, { ...typed, date: '' }, false)?.field).toBe(
+      'date',
+    );
+  });
+
+  it('reads the address\'s "Saved" only while its notice is fresh', () => {
+    const address = { done: 'saved', saved: 'game-saved', game: team, season: 's' };
+    expect(answerShown(address, false)).toEqual({ game: team, season: 's' });
+    expect(savedDetailOf(answerShown(address, true))).toEqual({ what: 'game-saved', gameId: team });
+    expect(noticeOf(answerShown({ done: 'published' }, false))).toBeUndefined();
   });
 });
