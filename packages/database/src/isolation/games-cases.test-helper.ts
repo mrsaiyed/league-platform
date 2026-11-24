@@ -71,6 +71,7 @@ import {
   replaceGameLines,
   updateGameResult,
   findLastEventSeq,
+  listGameEventsAfter,
   findTablePlayer,
   insertTablePlayer,
   removeTablePlayer,
@@ -732,6 +733,13 @@ registerIsolationCase({
   subject: findLastEventSeq,
   name: "read the number of the target's final game's last event",
   run: (scope, target) => findLastEventSeq(scope, target.gameId),
+});
+
+// "Send these plays" (step 2.148, T-335): the events after a sequence number.
+registerIsolationCase({
+  subject: listGameEventsAfter,
+  name: "list the target's final game's events after sequence 0",
+  run: (scope, target) => listGameEventsAfter(scope, target.gameId, 0, 10),
 });
 
 registerIsolationCase({

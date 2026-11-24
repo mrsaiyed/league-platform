@@ -135,7 +135,12 @@ describe('scoring sessions on the database (T6 §5, T-116)', () => {
     const winner = rows[0]?.account_id;
     expect(lost[0]).toEqual({
       status: 'held-by-other',
-      holder: { accountId: winner, since: startOfTest },
+      holder: {
+        accountId: winner,
+        since: startOfTest,
+        lastHeardAt: startOfTest,
+        sameAccount: false,
+      },
       sentAt: startOfTest,
     });
     expect(won[0]).toEqual({
