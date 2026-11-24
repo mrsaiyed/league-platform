@@ -38,7 +38,12 @@ export {
 } from './commands/start-season.ts';
 export { archiveSeason, type ArchiveSeasonError } from './commands/archive-season.ts';
 export { seasonIsArchived } from './archived-season.ts';
-export { archivedSeasonStatus, seasonCarryChoices, type SeasonCarry } from './league-values.ts';
+export {
+  archivedSeasonStatus,
+  hiddenSeasonStatus,
+  seasonCarryChoices,
+  type SeasonCarry,
+} from './league-values.ts';
 export type { SeasonSetupCopied, SeasonSetupCopy } from './ports.ts';
 export {
   setLeagueName,

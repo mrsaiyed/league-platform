@@ -32,9 +32,15 @@ export function standInSchedule(world: World): ScheduleAdminPorts {
           isCurrent: s?.currentSeasonId === x.id,
           isPublic: false,
           programId: x.programId,
+          archived: x.status === 'completed',
         }));
       const listed: readonly ScheduleSeason[] = [
-        ...shown.map((x) => ({ ...x, isPublic: true, programId: programOf(x.id) })),
+        ...shown.map((x) => ({
+          ...x,
+          isPublic: true,
+          programId: programOf(x.id),
+          archived: all.some((y) => y.id === x.id && y.status === 'completed'),
+        })),
         ...hidden,
       ];
       // Only what this holder may be told of: the scheduling module's one rule (P4 §4).

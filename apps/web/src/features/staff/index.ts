@@ -2,6 +2,7 @@
 // header and menu, its home, the page of an area with no screen yet, "not found" inside
 // the admin, and the trail, notice, pill and field every admin page is drawn with.
 export { isStaffAddress, staffPlaceAt, type StaffPlace } from './staff-area.ts';
+export { ArchivedSeasonNotice } from './archived-season-notice.tsx';
 export { StaffFrame } from './staff-frame.tsx';
 export {
   StaffField,

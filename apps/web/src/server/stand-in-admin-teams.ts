@@ -33,7 +33,9 @@ export function standInAdminTeams(
     currentSeason: async (context) => {
       const { s, seasons } = await seasonsOf(context);
       const season = seasons.find((x) => x.id === s?.currentSeasonId);
-      return season === undefined ? undefined : { id: season.id, name: season.name };
+      return season === undefined
+        ? undefined
+        : { id: season.id, name: season.name, archived: season.status === 'completed' };
     },
     divisions: async (context, seasonId) =>
       (await mayList(context, seasonId))

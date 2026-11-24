@@ -47,6 +47,7 @@ export type AdminTeamsQueries = Pick<
   | 'standingsStore'
   | 'gamesStore'
   | 'listLeagueSeasons'
+  | 'seasonIsArchived'
   | 'listDivisions'
   | 'listStaffSeasonTeams'
 >;
@@ -80,7 +81,11 @@ export function databaseAdminTeams(
     // and only to someone who may manage its teams.
     currentSeason: async (context) => {
       const current = (await seasonsOf(context)).find((season) => season.isCurrent);
-      return current === undefined ? undefined : { id: current.id, name: current.name };
+      if (current === undefined) return undefined;
+      const archived = await database.withTransaction(db, { leagueId: context.leagueId }, (scope) =>
+        database.seasonIsArchived(scope, current.id),
+      );
+      return { id: current.id, name: current.name, archived };
     },
     // Not in the bin, in order: by their place, then name (list-divisions.ts).
     divisions: async (context, seasonId) =>

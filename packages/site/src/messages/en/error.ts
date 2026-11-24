@@ -193,6 +193,8 @@ export const enError = {
     'Another venue now has this name. Rename one of them in Venues, then bring this one back.',
   'error.season-archived':
     'That season is archived, so it is read-only and nothing was changed. Only a correction with a reason changes one of its games.',
+  'error.season-hidden':
+    'That season is hidden from visitors, so it was not archived: an archived season is shown to visitors and cannot be hidden again. Show it to visitors first, or leave it hidden.',
   'error.short-name-needed':
     'A short name could not be made from this name. Type a short name: lower-case letters and numbers, with single hyphens.',
   'error.teams.add_new_person.already-on-team':

@@ -135,6 +135,8 @@ export const enAdminSettings = {
   'seasonSettings.archive': 'Archive this season',
   'seasonSettings.archiveAsk':
     'Archive {season}? Visitors still find it under the season picker, but it becomes read-only: no results, teams, rosters, divisions or settings can be changed in it, and only a correction with a reason changes one of its games. An archived season cannot be un-archived.',
+  'seasonSettings.archiveHidden':
+    '{season} is hidden from visitors, so it cannot be archived: an archived season is shown to visitors and cannot be hidden again. Show it to visitors first if you want to archive it.',
   'seasonSettings.archiveNo': 'No, keep it open',
   'seasonSettings.archiveYes': 'Yes, archive it',
   'seasonSettings.archived':
@@ -162,6 +164,10 @@ export const enAdminSettings = {
   'seasonSettings.current': "{season} is the current season: the league's pages open on it.",
   'seasonSettings.currentAsk':
     "Make {season} the current season? The league's pages open on it from now on, instead of on the season that is current now. Nothing in either season is changed, and you can change it back.",
+  'seasonSettings.currentAskHidden':
+    'Make {season} the current season? Your own admin screens open on it from now on. It is hidden, so visitors go on seeing the newest season that is shown until you show this one. Nothing in either season is changed, and you can change it back.',
+  'seasonSettings.currentHidden':
+    '{season} is the current season: your admin screens open on it. It is hidden, so visitors see the newest season that is shown until you show this one.',
   'seasonSettings.currentNo': 'No, leave it',
   'seasonSettings.currentYes': 'Yes, make it current',
   'seasonSettings.divisions': 'Divisions',
@@ -325,6 +331,8 @@ export const enAdminSettings = {
     'A preset fills in the game rules below. Nothing is saved until you save.',
   'seasonSettings.readOnly':
     "This league cannot be changed now, so its seasons' settings are shown as they are.",
+  'seasonSettings.readOnlyNotice':
+    '{season} is archived. It can be read but not changed; a game in it is changed only by a correction with a reason.',
   'seasonSettings.refused.boxes': 'Not saved: the marked boxes need a change.',
   'seasonSettings.refused.changed-since-read':
     'Someone else saved this season while you were changing it. The other parts of the page now show what they saved; the boxes here still hold what you typed. Saving again replaces what they saved with what is in these boxes.',

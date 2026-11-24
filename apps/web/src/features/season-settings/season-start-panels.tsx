@@ -2,11 +2,19 @@
 // the current one, with "Make this the current season", and "Archive this season", each
 // asking once on a step of its own (`&ask=current`, `&ask=archive`) and saying in plain
 // words what changes before the season command runs; an archived season says it is
-// read-only and that it cannot be un-archived (S-100), and offers no archive button.
+// read-only and that it cannot be un-archived (S-100), and offers no archive button. A
+// hidden season is not offered Archive (T-388): the panel says to show it first; made
+// current, it says the admin's screens open on it while visitors go on seeing the newest
+// shown season (S-103).
 // "Start a new season": a name, a short name, dates and the one choice of what teams come
 // along, saying what is copied from the current season and what is not (T-378). Both are
 // plain form posts, so they work with no script in the page.
-import { archivedSeasonStatus, seasonCarryChoices, type SeasonView } from '@srleagues/core';
+import {
+  archivedSeasonStatus,
+  hiddenSeasonStatus,
+  seasonCarryChoices,
+  type SeasonView,
+} from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
 import { t, type TextKey } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
@@ -42,8 +50,12 @@ export function SeasonStatePanel({
 }) {
   const name = season.name;
   const archived = season.status === archivedSeasonStatus;
+  const hidden = season.status === hiddenSeasonStatus;
   const wishes = mayChange
-    ? [...(season.isCurrent ? [] : ['current' as const]), ...(archived ? [] : ['archive' as const])]
+    ? [
+        ...(season.isCurrent ? [] : ['current' as const]),
+        ...(archived || hidden ? [] : ['archive' as const]),
+      ]
     : [];
   const wish = wishes.find((w) => w === asked);
   return (
@@ -65,12 +77,22 @@ export function SeasonStatePanel({
         </StaffNotice>
       ) : null}
       <p>
-        {t(season.isCurrent ? 'seasonSettings.current' : 'seasonSettings.notCurrent', {
-          season: name,
-        })}
+        {t(
+          season.isCurrent
+            ? hidden
+              ? 'seasonSettings.currentHidden'
+              : 'seasonSettings.current'
+            : 'seasonSettings.notCurrent',
+          { season: name },
+        )}
       </p>
       {archived ? (
         <p data-season-archived="">{t('seasonSettings.archived', { season: name })}</p>
+      ) : null}
+      {hidden && mayChange ? (
+        <p className="staff-quiet" data-season-archive-hidden="">
+          {t('seasonSettings.archiveHidden', { season: name })}
+        </p>
       ) : null}
       {wish === undefined ? (
         wishes.length === 0 ? null : (
@@ -99,9 +121,14 @@ export function SeasonStatePanel({
           data-season-ask={wish}
         >
           <p id="season-state-ask">
-            {t(wish === 'archive' ? 'seasonSettings.archiveAsk' : 'seasonSettings.currentAsk', {
-              season: name,
-            })}
+            {t(
+              wish === 'archive'
+                ? 'seasonSettings.archiveAsk'
+                : hidden
+                  ? 'seasonSettings.currentAskHidden'
+                  : 'seasonSettings.currentAsk',
+              { season: name },
+            )}
           </p>
           <div className="staff-buttons">
             <form action={changeSeasonAction} className="staff-buttons">
