@@ -159,6 +159,8 @@ async function takeTheGame(
       return { ok: false, code: 'reopen-first' };
     case 'game-postponed':
       return { ok: false, code: 'game-not-live' };
+    case 'season-archived':
+      return { ok: false, code: 'season-archived' };
   }
 }
 

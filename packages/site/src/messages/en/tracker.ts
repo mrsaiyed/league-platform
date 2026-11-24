@@ -89,6 +89,8 @@ export const enTracker = {
   'tracker.copy.refused.other-league': 'This copy is of a game in another league.',
   'tracker.copy.refused.reopen-first':
     'This game has ended. Reopen it first, then upload the copy again.',
+  'tracker.copy.refused.season-archived':
+    'This game’s season is archived: only an admin correcting it can upload its copy.',
   'tracker.copy.refused.unknown-game': 'There is no such game.',
   'tracker.copy.refused.unknown-version':
     'This copy was saved by a newer version of the tracker. Reload this page and try again.',
