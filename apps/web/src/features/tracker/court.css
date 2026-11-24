@@ -3865,3 +3865,15 @@
     white-space: nowrap;
   }
 }
+
+/* An upright phone while starters are picked (step 2.118): with a long bench (seventeen
+   a side, players added at the table) the first team's list pushed the second under the
+   pad. Each team takes half of the teams' place and scrolls by itself there, so both
+   teams' first players and what each still has to pick stay in reach. */
+@media (max-width: 699px) and (orientation: portrait) {
+  .court[data-stage='lineups'] .court-teams > .court-team {
+    flex: 1 1 0;
+    min-block-size: 0;
+    overflow-y: auto;
+  }
+}
