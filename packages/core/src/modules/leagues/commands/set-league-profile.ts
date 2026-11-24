@@ -56,6 +56,8 @@ export const setLeagueProfile = defineCommand({
     tx,
     emit,
   }): Promise<Result<{ version: number; clearedChildrenInFull?: true }, SetLeagueProfileError>> => {
+    // T-403: the league's row first, before anything is read, so guarded saves take turns.
+    await tx.leagues.lockLeague();
     const league = await tx.leagues.currentLeague();
     const before = await tx.leagues.leagueProfile();
     // The policy just read the league in this same transaction.

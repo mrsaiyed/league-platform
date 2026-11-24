@@ -20,6 +20,11 @@ import { clearGuardedValueInside } from './clear-setting.ts';
 
 /** What the put-back reads and writes, for the league of the transaction. */
 export type FirstChildGuard = {
+  /**
+   * T-403: holds the league's own row until the transaction ends. A guarded save calls
+   * it first, before it reads anything, so guarded saves of one league take turns.
+   */
+  readonly lockLeague: () => Promise<void>;
   readonly leagueAudience: () => Promise<Audience>;
   /** Anyone not in the bin recorded as a child, by birth date or the tick (R-28). */
   readonly hasRecordedChild: () => Promise<boolean>;

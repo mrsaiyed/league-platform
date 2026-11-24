@@ -5,7 +5,10 @@
 // initial) until an admin confirms again. A save whose clearing cannot be made rolls
 // back whole: the child is never recorded with the old yes standing.
 import {
+  createPerson,
   publicViewer,
+  removePerson,
+  setLeagueProfile,
   setSetting,
   updatePerson,
   type CommandDeps,
@@ -116,6 +119,43 @@ const confirmChildrenInFull = async () => {
   yesVersion = saved.value.version;
 };
 
+/** Whether the league's own "children in full" yes is saved. */
+const yesSaved = async () =>
+  settingsDeps.transaction(lakeside(), async (tx) =>
+    (await tx.leagues.settingRows('privacy.childrenInFullConfirmed', {})).some(
+      (row) =>
+        row.level === 'league' &&
+        typeof row.document === 'object' &&
+        row.document !== null &&
+        'value' in row.document &&
+        row.document.value === true,
+    ),
+  );
+
+/** Saves lakeside's time zone through leagues.set_profile, the rest of its profile kept. */
+const setTimeZone = async (timeZone: string) => {
+  const now = await settingsDeps.transaction(lakeside(), async (tx) => ({
+    league: await tx.leagues.currentLeague(),
+    profile: await tx.leagues.leagueProfile(),
+  }));
+  if (now.league === undefined || now.profile === undefined) throw new Error('no lakeside');
+  return setLeagueProfile(
+    lakeside(),
+    {
+      contactEmail: now.profile.contactEmail ?? 'lakeside@example.org',
+      city: now.profile.city ?? '',
+      timeZone,
+      listed: now.profile.listed,
+      version: now.league.version,
+    },
+    settingsDeps,
+  );
+};
+
+/** Today's date (yyyy-mm-dd) in a time zone, by this computer's clock. */
+const todayIn = (timeZone: string) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone, dateStyle: 'short' }).format(new Date());
+
 /** Quinn's line on his team's public page, read as the page reads it. */
 const quinnOnTeamPage = async () => {
   const { leagueId } = lakeside();
@@ -166,5 +206,60 @@ describe('the first child an adult league records (S-109, step 2.243)', () => {
     await expect(setQuinnBorn('2012-09-03', stuckDeps)).rejects.toThrow('still saved');
     expect((await quinnNow()).recordedChild).toBe(false);
     expect(await quinnOnTeamPage()).toBe('Quinn Sample');
+  });
+
+  it('a time zone that makes the only adult-by-a-day a child again puts the yes back', async () => {
+    // Kiritimati (UTC+14) is always a day or more ahead of Pago Pago (UTC-11): born 18
+    // years before Kiritimati's today, Quinn is an adult there and a child in Pago Pago.
+    expect(await yesSaved()).toBe(true);
+    const before = await settingsDeps.transaction(lakeside(), (tx) => tx.leagues.leagueProfile());
+    expect(await setTimeZone('Pacific/Kiritimati')).toMatchObject({ ok: true });
+    const [year, month, day] = todayIn('Pacific/Kiritimati').split('-');
+    expect(await setQuinnBorn(`${Number(year) - 18}-${month}-${day}`)).toEqual({
+      ok: true,
+      value: { version: expect.any(Number) },
+    });
+    expect((await quinnNow()).recordedChild).toBe(false);
+    expect(await quinnOnTeamPage()).toBe('Quinn Sample');
+
+    expect(await setTimeZone('Pacific/Pago_Pago')).toEqual({
+      ok: true,
+      value: { version: expect.any(Number), clearedChildrenInFull: true },
+    });
+    expect((await quinnNow()).recordedChild).toBe(true);
+    expect(await yesSaved()).toBe(false);
+    expect(await quinnOnTeamPage()).toBe('Quinn S.');
+
+    // Put back as it was: Quinn an adult, the league's own time zone.
+    expect(await setQuinnBorn('2000-09-03')).toMatchObject({ ok: true });
+    expect(await setTimeZone(before?.timeZone ?? 'UTC')).toMatchObject({ ok: true });
+  });
+
+  it('a new person who is a child, the first, puts the yes back in the same save', async () => {
+    // A yes given while Quinn was a child, then Quinn recorded as an adult: no child.
+    expect(await setQuinnBorn('2012-09-03')).toMatchObject({ ok: true });
+    yesVersion = null;
+    await confirmChildrenInFull();
+    expect(await setQuinnBorn('2000-09-03')).toMatchObject({ ok: true });
+    expect(await yesSaved()).toBe(true);
+
+    const created = await createPerson(
+      lakeside(),
+      { firstName: 'Nell', lastName: 'Newcomb', birthDate: '2013-05-06' },
+      peopleDeps,
+    );
+    expect(created).toEqual({
+      ok: true,
+      value: { personId: expect.any(String), clearedChildrenInFull: true },
+    });
+    expect(await yesSaved()).toBe(false);
+    expect((await quinnNow()).recordedChild).toBe(true);
+
+    // Nell goes to the bin: the league has no recorded child again.
+    if (!created.ok) throw new Error('not created');
+    expect(
+      await removePerson(lakeside(), { personId: created.value.personId }, peopleDeps),
+    ).toMatchObject({ ok: true });
+    expect((await quinnNow()).recordedChild).toBe(false);
   });
 });

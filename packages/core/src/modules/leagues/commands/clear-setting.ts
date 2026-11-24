@@ -99,10 +99,11 @@ export async function clearLeagueValueInside(
 export function leaguesFirstChildGuard(
   leagues: Pick<
     LeaguesStore,
-    'leagueAudience' | 'hasRecordedChild' | 'settingRows' | 'clearSetting'
+    'lockLeague' | 'leagueAudience' | 'hasRecordedChild' | 'settingRows' | 'clearSetting'
   >,
 ): FirstChildGuard {
   return {
+    lockLeague: () => leagues.lockLeague(),
     leagueAudience: () => leagues.leagueAudience(),
     hasRecordedChild: () => leagues.hasRecordedChild(),
     leagueSettingRows: async (key) =>

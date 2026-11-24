@@ -225,6 +225,8 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
         },
         leagueAudience: async () => s.audience,
         hasRecordedChild: async () => s.recordedChild || s.timeZone === s.childOnlyIn,
+        // T-403: one stand-in transaction at a time here, so the lock holds nothing.
+        lockLeague: async () => undefined,
         leagueContactEmail: async () => s.contactEmail,
         leagueProfile: async () =>
           s.league === undefined

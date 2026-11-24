@@ -32,6 +32,8 @@ export const restorePerson = defineCommand({
     tx,
     emit,
   }): Promise<Result<PersonRestored, RestorePersonError>> => {
+    // T-403: the league's row first, before anything is read, so guarded saves take turns.
+    await tx.bin.firstChild.lockLeague();
     const person = await tx.bin.findPerson(input.personId);
     if (person === undefined) return fail({ code: 'person-not-found' });
     if (!person.binned) return ok({ personId: input.personId });

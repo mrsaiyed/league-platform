@@ -17,6 +17,8 @@ export const removePerson = defineCommand({
   input: z.object({ personId: z.uuid() }),
   allowed: (context, _input, tx: PeopleTx) => mayChangePeople(context, tx, 'people.manage'),
   run: async ({ context, input, tx }): Promise<Result<{ personId: string }, RemovePersonError>> => {
+    // T-403: the league's row first, before anything is read, so guarded saves take turns.
+    await tx.people.lockLeague();
     const person = await tx.people.find(input.personId, false);
     if (person === undefined || person.binned) return fail({ code: 'person-not-found' });
     if (await tx.people.isOnRoster(person.id)) return fail({ code: 'person-on-a-roster' });

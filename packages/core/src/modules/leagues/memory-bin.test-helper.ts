@@ -119,6 +119,8 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
       },
       bin: {
         firstChild: {
+          // T-403: one stand-in transaction at a time here, so the lock holds nothing.
+          lockLeague: async () => undefined,
           leagueAudience: async () => s.audience,
           hasRecordedChild: async () =>
             s.things.some((t) => t.kind === 'person' && t.binnedAt === null && t.child === true),
@@ -195,5 +197,5 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
   });
   const deps = testDeps(transaction);
   const as = (accountId: string | null) => ({ leagueId, accountId, requestId: 'r-1' });
-  return { db, deps, as, cutoffOf: binCutoff };
+  return { db, deps, as, cutoffOf: binCutoff, transaction };
 }

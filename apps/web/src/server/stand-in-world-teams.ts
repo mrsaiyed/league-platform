@@ -293,6 +293,8 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
         .filter((r) => r.key === key && r.place.level === 'league')
         .map((r) => ({ level: r.place.level, document: r.document, version: r.version })),
     // S-109, as has-recorded-child.ts and delete-setting-value.ts in the database.
+    // T-403: the stand-in runs one save at a time, so the lock holds nothing.
+    lockLeague: async () => undefined,
     hasRecordedChild: async () =>
       s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
     clearLeagueSetting: async (key, version) => {

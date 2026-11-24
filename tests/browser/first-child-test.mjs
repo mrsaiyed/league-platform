@@ -77,10 +77,19 @@ try {
     await submit(page.locator(`${confirmation} button[type=submit]`).first());
     note(`${label}: the yes is saved`, (await said()) === 'The setting was saved.', await said());
   };
-  const confirmed = async () => {
+  // The saved yes as League settings shows it: 'yes' or 'no' only when the section and
+  // its one tick are on the page, else what is missing (so a vanished section fails).
+  const yesState = async () => {
     await page.goto(settings);
+    const sections = await page.locator(confirmation).count();
     const box = page.locator(`${confirmation} input[type=checkbox]`);
-    return (await box.count()) === 1 && (await box.isChecked());
+    const ticks = await box.count();
+    if (sections !== 1 || ticks !== 1) return `missing: ${sections} section(s), ${ticks} tick(s)`;
+    return (await box.isChecked()) ? 'yes' : 'no';
+  };
+  const yesIs = async (label, wanted) => {
+    const state = await yesState();
+    note(label, state === wanted, state);
   };
   const addPerson = async (first, last, born) => {
     await page.goto(`${origin}/${league}/admin/people`);
@@ -127,13 +136,22 @@ try {
     ),
     await said(),
   );
-  note('and nothing was saved', !(await confirmed()));
+  await page.goto(settings);
+  note(
+    'and the section is still there, with no tick',
+    (await page.locator(confirmation).count()) === 1 &&
+      (await page.locator(`${confirmation} input[type=checkbox]`).count()) === 0,
+  );
 
   at = 'Ada, a child, makes the yes possible; in the bin the yes stays; back, it goes to no';
   const ada = await addPerson('Ada', 'Moss', childBorn);
   note(
     'the first child with no yes saved says nothing of a yes',
     (await firstChildLine().count()) === 0,
+  );
+  await yesIs(
+    'the hand-posted yes saved nothing: with Ada recorded the tick is offered, empty',
+    'no',
   );
   await confirmAgain('with Ada recorded');
   await page.goto(ada);
@@ -145,7 +163,7 @@ try {
     remove.getByRole('button', { name: 'Remove from the league list' }),
     /\/admin\/people(\?|$)/,
   );
-  note('with Ada in the bin the yes stays', await confirmed());
+  await yesIs('with Ada in the bin the yes stays', 'yes');
   await page.goto(`${origin}/${league}/admin/settings/bin`);
   const row = page.locator('li[data-bin]', { hasText: 'Ada Moss' });
   await submit(row.getByRole('button', { name: 'Bring it back' }), /back=person/);
@@ -153,7 +171,7 @@ try {
     "the bin's page says Ada back is the first child and the yes went back",
     (await firstChildLine().innerText()).startsWith(firstChildSaid),
   );
-  note('the yes is back to no', !(await confirmed()));
+  await yesIs('the yes is back to no', 'no');
 
   at = "Ada's birth date made an adult's: the yes, given again, stays";
   await confirmAgain('with Ada back');
@@ -162,7 +180,7 @@ try {
   await details.getByLabel('Date of birth (optional)').fill(adultBorn);
   await details.getByRole('button', { name: 'Save details' }).click();
   await details.getByText('Saved: Ada Moss.').waitFor();
-  note('with no child recorded the yes stays', await confirmed());
+  await yesIs('with no child recorded the yes stays', 'yes');
 
   at = 'Bea, a child by a birth date, is the first child: the yes goes back in the same save';
   await page.goto(`${origin}/${league}/admin/teams`);
@@ -187,8 +205,14 @@ try {
   let shown = await visitor.locator('main').innerText();
   note(
     'the public team page shows Bea as a youth league would, at once',
-    shown.includes('Bea L.') && !shown.includes('Bea Lark'),
+    shown.includes('Bea L.'),
     shown.slice(0, 300),
+  );
+  // Nowhere on the page in full: not in its text, its title or any attribute.
+  note(
+    'and "Bea Lark" is nowhere in the page, its title included',
+    !(await visitor.content()).includes('Bea Lark') && !(await visitor.title()).includes('Lark'),
+    await visitor.title(),
   );
   await page.goto(settings);
   note(
@@ -197,7 +221,7 @@ try {
       'Under-18s play in this league, so its privacy choices must be confirmed.',
     ),
   );
-  note('the yes is no', !(await confirmed()));
+  await yesIs('the yes is no', 'no');
 
   at = 'the owner confirms again: Bea is shown in full';
   await page.goto(settings);

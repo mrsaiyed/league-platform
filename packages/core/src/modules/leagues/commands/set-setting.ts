@@ -93,9 +93,12 @@ export function setSettingFor(registry: SettingRegistry) {
       if (!parsed.success || parsed.data === undefined) return fail({ code: 'invalid-value' });
       const confirming = needsConfirming(setting, parsed.data);
       if (confirming && input.confirmed !== true) return fail({ code: 'confirmation-needed' });
+      const givingYes = setting.key === childrenInFullConfirmed.key && parsed.data === true;
+      // T-403: a yes takes the league's row before it reads who is recorded, so it and a
+      // save that records a first child or puts one in the bin take turns.
+      if (givingYes) await tx.leagues.lockLeague();
       if (
-        setting.key === childrenInFullConfirmed.key &&
-        parsed.data === true &&
+        givingYes &&
         (await tx.leagues.leagueAudience()) === 'adult' &&
         !(await tx.leagues.hasRecordedChild())
       ) {

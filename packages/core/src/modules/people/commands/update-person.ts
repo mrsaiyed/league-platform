@@ -58,6 +58,8 @@ export const updatePerson = defineCommand({
     ),
   allowed: (context, _input, tx: PeopleTx) => mayChangePeople(context, tx, 'people.manage'),
   run: async ({ context, input, tx, emit }): Promise<Result<PersonUpdated, UpdatePersonError>> => {
+    // T-403: the league's row first, before anything is read, so guarded saves take turns.
+    await tx.people.lockLeague();
     const sensitive = await maySeeSensitive(context, tx);
     const touchesSensitive =
       input.contactEmail !== undefined ||

@@ -9,6 +9,7 @@ const yesRow = { level: 'league' as const, document: { version: 1, value: true }
 function guardOf(over: Partial<FirstChildGuard> & { rows?: unknown[][] }) {
   const rows = [...(over.rows ?? [[yesRow]])];
   const guard: FirstChildGuard = {
+    lockLeague: async () => undefined,
     leagueAudience: async () => 'adult',
     hasRecordedChild: async () => true,
     leagueSettingRows: async () => (rows.length > 1 ? rows.shift() : rows[0]) as never,
