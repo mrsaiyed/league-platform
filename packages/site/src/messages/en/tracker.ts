@@ -378,6 +378,68 @@ export const enTracker = {
   // A player the game has and this device's rosters do not (added at another table).
   'tracker.player.unknown': 'Player not on this device’s list',
   'tracker.player.unlistedShort': 'Not listed',
+  // The Players panel (step 2.118, part 2): both teams' players, a line to add one player
+  // or a bench by number, a fix of a number or a name, take off (S-34, S-44, S-45).
+  'tracker.players.add': 'Add',
+  'tracker.players.addFirst': 'Add players',
+  'tracker.players.added_one': '{count} player added.',
+  'tracker.players.added_other': '{count} players added.',
+  'tracker.players.clash': 'Same number as {players}.',
+  'tracker.players.clashLine': 'The number being typed is this player’s too.',
+  'tracker.players.clashTyped':
+    '#{jersey} is already worn by {players}. They can still be added: an admin sorts it out after.',
+  'tracker.players.count_one': '{count} player',
+  'tracker.players.count_other': '{count} players',
+  'tracker.players.fix': 'Fix',
+  'tracker.players.fixDone': 'Close',
+  'tracker.players.invalid':
+    'Use numbers from 0 to 99 (or 00). Type one number with a name, or several numbers with no name.',
+  'tracker.players.jump': 'Go to the away team: {team}',
+  'tracker.players.name': 'Name (if known)',
+  'tracker.players.notANumber':
+    '“{entry}” is not a jersey number. Use numbers from 0 to 99 (or 00).',
+  'tracker.players.number': 'Number',
+  'tracker.players.numbers': 'Number, or several numbers',
+  'tracker.players.numbersHelp': 'For a whole bench, type the numbers in one line: 3 5 10 12 14.',
+  'tracker.players.numbersWithName':
+    'Several numbers and a name do not go together. Type the numbers alone for a bench, or one number with the name.',
+  'tracker.players.open': 'Players',
+  'tracker.players.openHelp': 'Add a player for either team, or fix a number or a name.',
+  // The Players panel (step 2.118): why the panel takes no change now, and why a change
+  // of players was said no to, by the device or the server (record 058, S-37, S-45).
+  'tracker.players.readOnly.device':
+    'This device is not scoring the game, so players cannot be changed here.',
+  'tracker.players.readOnly.final': 'This game is over, so its players cannot be changed here.',
+  'tracker.players.refused.game-over': 'This game is over, so its players cannot be changed here.',
+  'tracker.players.refused.has-lines':
+    'This player has a line in another game, so they stay on the team.',
+  'tracker.players.refused.has-plays':
+    'This player has plays in this game, so they stay on its list and its box score.',
+  'tracker.players.refused.in-box-score':
+    'This player has a line in this game’s box score, entered by hand, so they stay on its list.',
+  'tracker.players.refused.jersey-taken':
+    'Another player on this team wears that number, and this season wants a different number for each player.',
+  'tracker.players.refused.name-not-readable': 'That name is too long to keep.',
+  'tracker.players.refused.needs-name-or-number': 'A player needs a number or a name.',
+  'tracker.players.refused.not-on-team': 'That player is no longer on this team.',
+  'tracker.players.refused.not-saved': 'This change could not be saved. Try it again.',
+  'tracker.players.refused.on-team-roster':
+    'This player is on the team’s own roster: a league admin changes their name or takes them off.',
+  'tracker.players.refused.player-id-taken': 'This player could not be added. Add them again.',
+  'tracker.players.refused.player-not-added':
+    'This player was not added, so the plays that name them were not saved.',
+  'tracker.players.refused.reviewed':
+    'A league admin has checked this player: the admin changes their name or takes them off now.',
+  'tracker.players.refusedPlays_one': '{count} play that names them was not saved.',
+  'tracker.players.refusedPlays_other': '{count} plays that name them were not saved.',
+  'tracker.players.save': 'Save',
+  'tracker.players.saved': 'Saved on this device.',
+  'tracker.players.takeOff': 'Take off the team',
+  'tracker.players.takenOff': 'Taken off.',
+  'tracker.players.title': 'Players',
+  'tracker.players.twice': '{jersey} is typed twice in the line. Type each number once.',
+  'tracker.players.waiting': 'Not sent yet',
+  'tracker.players.wornBy': '{player} wears #{jersey}.',
   'tracker.pregame.players_one': '{team}: {count} player',
   'tracker.pregame.players_other': '{team}: {count} players',
   'tracker.pregame.title': 'Before tip-off',
@@ -388,6 +450,11 @@ export const enTracker = {
   'tracker.queue.allSaved': 'All saved',
   // Signed out or no longer allowed to score (step 2.37, part 2): nothing is on its way,
   // so the plays are kept, never "waiting to send".
+  // Changes of players (the Players panel, step 2.118) are said as changes, not plays.
+  'tracker.queue.keptChangesShort_one': '{count} change kept',
+  'tracker.queue.keptChangesShort_other': '{count} changes kept',
+  'tracker.queue.keptChanges_one': '{count} change of players kept on this device',
+  'tracker.queue.keptChanges_other': '{count} changes of players kept on this device',
   'tracker.queue.keptShort_one': '{count} kept',
   'tracker.queue.keptShort_other': '{count} kept',
   'tracker.queue.kept_one': '{count} play kept on this device',
@@ -407,6 +474,10 @@ export const enTracker = {
   // ones (lying down, where the banner sits beside the scores and takes its width from
   // the teams' names; upright in a browser, where a second line of it would push the
   // players under the pad). "All saved" is said the same.
+  'tracker.queue.waitingChangesShort_one': '{count} change to send',
+  'tracker.queue.waitingChangesShort_other': '{count} changes to send',
+  'tracker.queue.waitingChanges_one': '{count} change of players waiting to send',
+  'tracker.queue.waitingChanges_other': '{count} changes of players waiting to send',
   'tracker.queue.waitingShort_one': '{count} to send',
   'tracker.queue.waitingShort_other': '{count} to send',
   'tracker.queue.waiting_one': '{count} play waiting to send',

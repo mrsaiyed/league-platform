@@ -341,10 +341,14 @@ export function TrackerOpening({
         </a>
       </p>
     ) : null;
+  // The rosters as the controller lists them (step 2.118): the kept ones with this
+  // device's waiting changes on top, so a player added or a number fixed in the Players
+  // panel is on the tiles, the log and these lists at once. The page's until it has some.
+  const listed = phase.kind === 'open' ? (phase.status.rosters ?? rosters) : rosters;
   // The plays the league refused, play by play (step 2.37, part 2).
   const notApplied =
     phase.kind === 'open'
-      ? notAppliedRows(phase.status.notApplied, rosters, phase.status.game?.rules.periods ?? 2, t)
+      ? notAppliedRows(phase.status.notApplied, listed, phase.status.game?.rules.periods ?? 2, t)
       : [];
   const clearNotApplied = act((game) => game.controller.dismissNotApplied());
   // "Enter again" (S-77): a new play now, by the path of a tap; said when not taken.
@@ -353,7 +357,7 @@ export function TrackerOpening({
     onClearNotApplied: clearNotApplied,
     kept:
       phase.kind === 'open'
-        ? keptRows(phase.status.notSaved, rosters, phase.status.game?.rules.periods ?? 2, t)
+        ? keptRows(phase.status.notSaved, listed, phase.status.game?.rules.periods ?? 2, t)
         : [],
     onClearKept: act((game) => game.controller.dismissNotSaved()),
     onEnterAgain: (id) =>
@@ -371,7 +375,7 @@ export function TrackerOpening({
     </p>
   ) : null;
 
-  const matchup = t('tracker.matchup', { away: rosters.away.name, home: rosters.home.name });
+  const matchup = t('tracker.matchup', { away: listed.away.name, home: listed.home.name });
 
   // The scoring screen, once this device holds the game and its format is confirmed. And
   // it stays while the game it shows is final (step 2.37): about half a minute after an
@@ -393,7 +397,9 @@ export function TrackerOpening({
         game={phase.game}
         status={phase.status}
         state={phase.status.game}
-        rosters={rosters}
+        rosters={listed}
+        gameId={gameId}
+        accountId={accountId}
         t={t}
         title={matchup}
         when={when}

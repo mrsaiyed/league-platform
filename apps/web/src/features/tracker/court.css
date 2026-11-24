@@ -2605,6 +2605,125 @@
   user-select: text;
 }
 
+/* The Players panel (step 2.118): opened as More is, as wide as the screen allows; both
+   teams side by side where two columns of 300 fit, stacked where they do not, the list
+   scrolling inside the panel (never sideways). Every box and button is 44 high or more. */
+.court-sheet.court-players-sheet {
+  inline-size: min(100%, 1100px);
+  block-size: 100%;
+}
+/* Close stays in view however far the list is scrolled, and after the phone turns. */
+.court-players-sheet > .court-sheet-head {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background: inherit;
+}
+.court-players-teams {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+  align-items: start;
+}
+/* The jump to the away team, only where the teams are stacked (two columns of 300 and
+   the sheet's edges do not fit). */
+.court-players-jump {
+  align-self: flex-start;
+}
+@media (min-width: 680px) {
+  .court-players-jump {
+    display: none;
+  }
+}
+.court-players-team {
+  scroll-margin-block-start: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-inline-size: 0;
+  padding-block-start: 8px;
+  border-block-start: 4px solid var(--court-dark-edge);
+}
+.court-players-team[data-color='light'] {
+  border-block-start-color: var(--court-light);
+}
+.court-players-team-name {
+  font-size: 18px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.court-players-add,
+.court-players-fix-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.court-players-input {
+  inline-size: 100%;
+  min-block-size: 44px;
+  padding-inline: 10px;
+  border: 2px solid var(--court-line);
+  border-radius: var(--court-radius);
+  background: var(--court-page);
+  color: var(--court-text);
+  font: inherit;
+  font-size: 18px;
+}
+.court-players-input:read-only {
+  color: var(--court-muted);
+  border-style: dashed;
+}
+.court-players-add .court-button,
+.court-players-fix-actions .court-button {
+  min-block-size: 48px;
+}
+.court-players-fix-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.court-players-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.court-players-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-block: 2px;
+  border-block-end: 1px solid var(--court-line);
+}
+.court-players-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-block-size: 48px;
+}
+.court-players-who {
+  flex: 1;
+  min-inline-size: 0;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.court-players-tag {
+  color: var(--court-muted);
+  font-size: 13px;
+}
+.court-button.court-players-fix {
+  min-block-size: 44px;
+  min-inline-size: 64px;
+}
+.court-players-clash {
+  color: var(--court-amber);
+  font-size: 14px;
+}
+
 /* The label that follows the finger while a player is dragged (checklist E2). */
 .court-ghost {
   position: fixed;
@@ -3762,5 +3881,17 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+}
+
+/* An upright phone while starters are picked (step 2.118): with a long bench (seventeen
+   a side, players added at the table) the first team's list pushed the second under the
+   pad. Each team takes half of the teams' place and scrolls by itself there, so both
+   teams' first players and what each still has to pick stay in reach. */
+@media (max-width: 699px) and (orientation: portrait) {
+  .court[data-stage='lineups'] .court-teams > .court-team {
+    flex: 1 1 0;
+    min-block-size: 0;
+    overflow-y: auto;
   }
 }

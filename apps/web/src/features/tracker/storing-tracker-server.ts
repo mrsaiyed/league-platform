@@ -23,6 +23,13 @@ export function createStoringTrackerServer(options: StoringTrackerServerOptions)
   const { gameId, server, storage, onStoreFailed } = options;
   return {
     session: (request, signal) => server.session(request, signal),
+    // The rosters are kept by the controller, which lays its changes on them (step 2.118).
+    ...(server.loadRosters === undefined
+      ? {}
+      : {
+          loadRosters: (signal: AbortSignal) =>
+            server.loadRosters?.(signal) ?? Promise.resolve({ kind: 'unanswered' as const }),
+        }),
     async loadState(signal) {
       const outcome = await server.loadState(signal);
       if (outcome.kind === 'answer') {

@@ -28,7 +28,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { addPlayers, leagueId, liveGame } from './tracker-driver.mjs';
+import { addPlayers, court, leagueId, liveGame } from './tracker-driver.mjs';
 import {
   buildNext,
   freePort,
@@ -73,6 +73,9 @@ const typed = {
   round: attack('round'),
   reason: attack('reason'),
   table: tightAttack('table'),
+  // The tracker's Players panel (step 2.118): a name typed with a number, and a whole line.
+  panelName: attack('panel'),
+  panelLine: attack('line'),
   venue: cellAttack('venue'),
   court: cellAttack('court'),
   // A file's name cannot hold a slash: the browser keeps only what follows the last one.
@@ -166,6 +169,11 @@ const FIELDS = {
   '/signin/forgot': { email: 'the email boxes' },
   // Only while a sign-up is waiting (step 2.102's fix round): typed in the email boxes' step.
   '/signup/code': { code: 'the email boxes' },
+  // The Players panel's boxes have no name: the panel is drawn only once it is opened.
+  '/[league]/score/[game]': {
+    'players-line': "the Players panel's boxes",
+    'players-name': "the Players panel's boxes",
+  },
 };
 
 /**
@@ -244,7 +252,7 @@ function routeOf(pathname) {
 /** What the test cannot reach, by name and why: printed at the end, never silently. */
 const NOT_COVERED = [
   "the draft league's own roles (admin, registrar, editor, club admin, a program's scheduler, another league's admin): not covered, because this test fills only the first league (\"north-valley\") with the attack and they hold no role there",
-  "text a script draws only after a tap (beyond the games list's question, the reopen form and the scorer's table): not covered, because the walk opens each page and reads what it draws on arrival, it does not tap every control",
+  "text a script draws only after a tap (beyond the games list's question, the reopen form, the scorer's table and the Players panel): not covered, because the walk opens each page and reads what it draws on arrival, it does not tap every control",
   'the scorer\'s own Reopen question ("By mistake" beside its reason): not typed into; its reason goes to the reopen answer route, which is posted the attack by hand below',
   'the walk of every route runs with the script policy off (the stronger proof: the page itself keeps the text); the policy on is checked on the pages that show typed text',
 ];
@@ -824,6 +832,43 @@ if (browser) {
   await step('the scorekeeper opens the scoring screen', () =>
     looked(keeper, `/north-valley/score/${liveGame}`, []),
   );
+  await step("the Players panel's boxes are typed as the attack", async () => {
+    const context = await contextFor(keeper);
+    const page = await context.newPage();
+    page.setDefaultTimeout(30_000);
+    try {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(`${origin}/north-valley/score/${liveGame}`);
+      const c = court(page);
+      await c.open();
+      await c.more.click();
+      await page.locator('[data-players-open="more"]').click();
+      const team = page.locator('[data-players-team="home"]');
+      await team.locator('[data-players-line="home"]').fill(typed.panelLine);
+      await team.locator('[data-players-add="home"]').click();
+      await team.locator('[data-players-said="home"]').waitFor();
+      await team.locator('[data-players-line="home"]').fill('56');
+      await team.locator('[data-players-name="home"]').fill(typed.panelName);
+      await team.locator('[data-players-add="home"]').click();
+      await team.locator('[data-player-row]', { hasText: '#56' }).waitFor();
+      await page.waitForTimeout(300);
+      const found = await harm(page);
+      note(
+        'the Players panel: the attack typed in its boxes ran no script and made no element',
+        found.ran === null && found.made.length === 0 && found.scripts === 0,
+        [found.ran, ...found.made].join(' | '),
+      );
+      note('the Players panel: the browser had nothing to refuse', found.refused.length === 0);
+      note(
+        'the Players panel: the name typed is shown as text',
+        found.text.includes("onerror=__ran='panel'"),
+      );
+      typedInto.add('/[league]/score/[game] players-line');
+      typedInto.add('/[league]/score/[game] players-name');
+    } finally {
+      await context.close();
+    }
+  });
   await step("the scorer's table name is shown as typed on the team's admin page", async () => {
     const teams = await (
       await fetch(`${origin}/north-valley/admin/teams`, {

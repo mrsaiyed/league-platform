@@ -23,6 +23,36 @@ describe('saved banner (T6 §4)', () => {
     expect(text(12, 0)).toBe('12 plays waiting to send');
   });
 
+  it('says changes of players as changes, plays as plays, and both counts when both wait (step 2.118)', () => {
+    const change = (n: number) => ({
+      command: {
+        commandId: `00000000-0000-4000-8000-0000000002${String(n).padStart(2, '0')}`,
+        at: 1,
+        input: {
+          type: 'remove-player' as const,
+          side: 'away' as const,
+          playerId: `00000000-0000-4000-8000-0000000003${String(n).padStart(2, '0')}`,
+        },
+      },
+      moment: null,
+    });
+    const play = { command: tap(1), moment: null };
+    const of = (taps: (typeof play | ReturnType<typeof change>)[], keptOnly = false) =>
+      savedBanner({ ...status(taps.length, 0), waitingTaps: taps }, false, keptOnly);
+    const five = [1, 2, 3, 4, 5].map(change);
+    expect(savedBannerText(of(five), t)).toBe('5 changes of players waiting to send');
+    expect(savedBannerText(of([change(1)]), t)).toBe('1 change of players waiting to send');
+    expect(savedBannerText(of([play, play]), t)).toBe('2 plays waiting to send');
+    const both = of([play, change(1), change(2)]);
+    expect(savedBannerText(both, t)).toBe(
+      '1 play waiting to send · 2 changes of players waiting to send',
+    );
+    expect(savedBannerShortLines(both, t)).toEqual(['1 to send', '2 changes to send']);
+    expect(savedBannerText(of([change(1), play], true), t)).toBe(
+      '1 play kept on this device · 1 change of players kept on this device',
+    );
+  });
+
   it('signed out or no longer allowed, never says "waiting to send": the plays are kept (step 2.37, part 2)', () => {
     const kept = savedBanner(status(3, 1), false, true);
     expect(savedBannerText(kept, t)).toBe('3 plays kept on this device · 1 play not saved');

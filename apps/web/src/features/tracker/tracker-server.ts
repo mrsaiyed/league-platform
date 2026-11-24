@@ -2,7 +2,7 @@
 // scoring session (T6 §5, T-116) and the engine's state (T-113, T-253). The taps go
 // through the queue's own transport (command-transport.ts). The browser's version is
 // fetch-tracker-server.ts; nothing here throws, every failure is an outcome.
-import type { SessionReply, SessionRequest } from '@srleagues/contracts';
+import type { SessionReply, SessionRequest, TrackerRosters } from '@srleagues/contracts';
 import type { basketball } from '@srleagues/sports';
 
 /** The engine's state as the server holds it, and the sequence number of its last tap. */
@@ -34,4 +34,10 @@ export interface TrackerServer {
   session(request: SessionRequest, signal: AbortSignal): Promise<ServerOutcome<SessionReply>>;
   /** The engine's state as the server holds it now. */
   loadState(signal: AbortSignal): Promise<ServerOutcome<ServerState>>;
+  /**
+   * The game's two rosters as the server holds them now (record 058, step 2.118), for
+   * the Players panel: a player another device added meanwhile. Left out by a door that
+   * has none (a test's stand-in), and then the device lists the rosters it was given.
+   */
+  loadRosters?(signal: AbortSignal): Promise<ServerOutcome<TrackerRosters>>;
 }

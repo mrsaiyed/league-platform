@@ -156,6 +156,7 @@ export {
   type TrackerRosters,
 } from './commands/read-tracker-rosters.ts';
 export { engineRulesOf, trackerEngineRulesOf, withoutMercyOrLastMinutes } from './engine-rules.ts';
+export { namedInState, splitTableName } from './table-players.ts';
 export { rulesOfGame } from './season-rules-of.ts';
 export {
   leaseMs,
