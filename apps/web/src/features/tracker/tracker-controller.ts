@@ -61,6 +61,7 @@ import { againCommandId } from './again-command-id.ts';
 import type { CommandTransport } from './command-transport.ts';
 import type { GameDoors } from './game-doors.ts';
 import { mayEnterAgain } from './kept-plays.ts';
+import type { DeviceScoring } from './opened-game-storage.ts';
 import {
   QueueError,
   keptTap,
@@ -285,6 +286,20 @@ export type TrackerControllerOptions = {
   readonly renewEveryMs?: number;
   /** Passed on to the queue. */
   readonly queue?: Pick<TrackerQueueOptions, 'batchSize' | 'retry' | 'sendTimeoutMs' | 'reachable'>;
+  /**
+   * What the device kept of the game (step 2.38, finding M5; T-248, T-253): the server's
+   * state as last loaded and how this device was scoring it. When the session gets no
+   * answer on opening, scoring starts from them at once, under the kept session, and
+   * settles with the server once it answers. Left out, opening waits for the server.
+   */
+  readonly kept?: { readonly state: ServerState | null; readonly scoring: DeviceScoring | null };
+  /** Keeps how the device is scoring the game, each time it changes (step 2.38). */
+  readonly keepScoring?: (scoring: DeviceScoring) => Promise<void>;
+  /**
+   * Forgets the kept scoring: the device lost the game, so a reload with no signal does
+   * not score on under the lost session (step 2.38, review M3).
+   */
+  readonly forgetScoring?: () => Promise<void>;
 };
 
 export type TrackerController = {
@@ -686,9 +701,94 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     return state;
   };
 
+  /** The kept scoring, written one after another so an older one never lands last. */
+  let keeping: Promise<void> = Promise.resolve();
+  const keepScoringNow = (): void => {
+    const keep = options.keepScoring;
+    if (keep === undefined || sessionId === null) return;
+    const scoring: DeviceScoring = { sessionId, onTop: [...made] };
+    // Best effort: the taps themselves are in the queue, which says when storage fails.
+    keeping = keeping.then(() => keep(scoring)).catch(() => undefined);
+  };
+  /** After every keeping under way, so a kept scoring never lands after the forgetting. */
+  const forgetScoringNow = (): Promise<void> => {
+    const forget = options.forgetScoring;
+    if (forget === undefined) return Promise.resolve();
+    keeping = keeping.then(() => forget()).catch(() => undefined);
+    return keeping;
+  };
+
   const showGame = (): void => {
     if (base === null) return;
     update({ game: replay(base, made), serverSequence: base.sequence });
+    keepScoringNow();
+  };
+
+  /**
+   * The server did not answer on opening (step 2.38, finding M5): with the state and the
+   * session the device kept, scoring starts from them at once, the kept taps on top,
+   * under the kept session, so a reload with no signal carries on within seconds. The
+   * queue sends under that session as the network allows, and the server takes them if
+   * nobody took the game (T-248); opening goes on being asked, and once answered the
+   * game is settled as on any opening (`hold`, then the server's state; T-253).
+   */
+  let fromDevice = false;
+  /**
+   * The kept session scored under until opening is answered. A send or renewal under it
+   * that the server refuses (it ended while the device was away) decides nothing: the
+   * device's taps are settled by opening (`hold`), which knows whether the server gave
+   * this device a new session or somebody else holds the game. Treated as a loss, the
+   * taps were listed not saved though nobody took the game (step 2.38, part 6).
+   */
+  let keptSession: string | null = null;
+  /** Openings under way (asked, or answered and being settled). */
+  let opening = 0;
+  const settleByOpening = async (): Promise<void> => {
+    if (opening > 0 || stopped) return;
+    clearTimer();
+    return open();
+  };
+  const startFromDevice = async (): Promise<void> => {
+    const kept = options.kept;
+    if (fromDevice || stopped || base !== null || kept === undefined) return;
+    const { state, scoring } = kept;
+    if (state === null || scoring === null || state.state.status === 'final') return;
+    fromDevice = true;
+    let waiting: BatchCommand[];
+    // A kept tap the queue holds as not saved or refused was listed when the game was
+    // lost: it is never counted again on the screen (review M3).
+    let settled: Set<string>;
+    try {
+      const held = await storage.list(gameId);
+      waiting = held
+        .filter(
+          (entry) =>
+            entry.state === 'waiting' &&
+            (entry.sessionId === undefined || entry.sessionId === scoring.sessionId),
+        )
+        .map((entry) => entry.command);
+      settled = new Set(
+        held.filter((entry) => entry.state !== 'waiting').map((entry) => entry.command.commandId),
+      );
+    } catch {
+      return;
+    }
+    if (stopped || base !== null || current.mode.kind !== 'opening') return;
+    const onTop = new Set(scoring.onTop.map((c) => c.commandId));
+    // A kept tap the kept state has already (its load was kept, the scoring not yet) is
+    // not counted twice.
+    const inState = new Set(state.state.recent.map((id) => id.toLowerCase()));
+    made = [...scoring.onTop, ...waiting.filter((c) => !onTop.has(c.commandId))].filter(
+      (c) =>
+        !refusedIds.has(c.commandId) &&
+        !settled.has(c.commandId) &&
+        !inState.has(c.commandId.toLowerCase()),
+    );
+    base = state;
+    sessionId = scoring.sessionId;
+    keptSession = scoring.sessionId;
+    showGame();
+    update({ mode: { kind: 'scoring' } });
   };
 
   const clearTimer = (): void => {
@@ -816,6 +916,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * be scoring it, or the game is over.
    */
   const lost = async (): Promise<void> => {
+    // What the device kept of its scoring under the lost session goes (review M3).
+    await forgetScoringNow();
     // A batch already on its way may still be taken: wait for its answer, so a tap the
     // server took is not listed. Nothing more is sent, as the session is let go.
     await queue.idle();
@@ -928,6 +1030,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       return;
     }
     sessionId = held;
+    keptSession = null;
     resumedAfterNotHeld = 0;
     scheduleRenew();
     const loading = async (): Promise<void> => {
@@ -938,6 +1041,53 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       queue.resume();
     };
     await loading();
+  };
+
+  /**
+   * Whether anybody but this device scored the game between `from`, the state it last
+   * knew, and `now`: every command the server took since is one of `own` (by id, lower
+   * case), and none is missing from the state's recent ones. When that cannot be told
+   * (too many since), somebody may have.
+   */
+  const nobodyElseScored = (
+    from: ServerState,
+    now: ServerState,
+    own: ReadonlySet<string>,
+  ): boolean => {
+    const before = new Set(from.state.recent.map((id) => id.toLowerCase()));
+    const since = now.state.recent.map((id) => id.toLowerCase()).filter((id) => !before.has(id));
+    return now.sequence - from.sequence === since.length && since.every((id) => own.has(id));
+  };
+
+  /**
+   * The server gave this device a new session `held` while taps made under its earlier
+   * one wait (step 2.38): that one ended with the device away (released as the page
+   * reloaded with no signal, say). The server gives a session only to this device and
+   * account, so if nobody else scored since the state the device last knew, the taps
+   * fit the game as it is: they are moved to the new session in the storage and sent,
+   * neither lost nor listed. Otherwise somebody else took the game, and they are listed
+   * as not saved. With no answer, opening is asked again before anything is decided.
+   */
+  const carryOnTaps = async (
+    held: string,
+    stale: readonly KeptTap[],
+  ): Promise<'carried' | 'taken' | 'unanswered'> => {
+    const from = base ?? options.kept?.state ?? null;
+    if (from === null) return 'taken';
+    const loaded = await ask((signal) => server.loadState(signal));
+    if (loaded.kind === 'unanswered') return 'unanswered';
+    if (loaded.kind === 'rejected') return 'taken';
+    const own = new Set(
+      [...made, ...(options.kept?.scoring?.onTop ?? []), ...stale.map((t) => t.command)].map((c) =>
+        c.commandId.toLowerCase(),
+      ),
+    );
+    if (!nobodyElseScored(from, loaded.value, own)) return 'taken';
+    await queue.carryOn(
+      stale.map((t) => t.command.commandId),
+      held,
+    );
+    return 'carried';
   };
 
   /**
@@ -961,10 +1111,27 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       waiting = list.filter((entry) => entry.state === 'waiting');
       setAside = keptIn(list, 'not-saved');
       stale = waiting.filter((entry) => !madeUnder(entry)).map(keptTap);
-      if (stale.length > 0) await queue.setAside(stale.map((t) => t.command.commandId));
     } catch {
       // Not known to be dropped, so nothing may be sent: the session is not used, and
       // its lease runs out unless opening again (into the same session) gets this far.
+      return readOnly('storage-failed');
+    }
+    if (stale.length > 0) {
+      const carried = await carryOnTaps(held, stale).catch(() => 'storage-failed' as const);
+      if (carried === 'storage-failed') return readOnly('storage-failed');
+      // Asked again: the server gives this device the same session while it holds it.
+      if (carried === 'unanswered') return later(open);
+      if (carried === 'carried') {
+        const moved = new Set(stale.map((t) => t.command.commandId));
+        waiting = waiting.map((e) =>
+          moved.has(e.command.commandId) ? { ...e, sessionId: held } : e,
+        );
+        stale = [];
+      }
+    }
+    try {
+      if (stale.length > 0) await queue.setAside(stale.map((t) => t.command.commandId));
+    } catch {
       return readOnly('storage-failed');
     }
     // Not scoring, so every tap of this device's the server lacks is waiting in the
@@ -983,9 +1150,22 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** Opens the game: asks for the session, and scores if it is given. */
   const open = async (): Promise<void> => {
-    update({ mode: { kind: 'opening' } });
+    opening += 1;
+    try {
+      await openOnce();
+    } finally {
+      opening -= 1;
+    }
+  };
+
+  const openOnce = async (): Promise<void> => {
+    // Scoring from what the device kept (step 2.38) carries on while opening is asked again.
+    if (!(fromDevice && current.mode.kind === 'scoring')) update({ mode: { kind: 'opening' } });
     const opened = await session({ type: 'open', deviceId });
-    if (opened.kind === 'unanswered') return later(open);
+    if (opened.kind === 'unanswered') {
+      await startFromDevice();
+      return later(open);
+    }
     failures = 0;
     if (opened.kind === 'rejected') return readOnly(reasonOfStatus(opened.httpStatus));
     const reply = opened.value;
@@ -1001,7 +1181,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // Signed out: keep scoring, and keep renewing, which finds the sign-in again (M4).
     if (renewed.kind === 'rejected' && renewed.httpStatus === 401) signedOutWhileScoring();
     if (renewed.kind === 'answer') {
-      if (renewed.value.status !== 'held-by-you') return notHeld(renewed.value);
+      if (renewed.value.status !== 'held-by-you') {
+        return held === keptSession ? settleByOpening() : notHeld(renewed.value);
+      }
       signedInAgain();
     }
     scheduleRenew();
@@ -1015,6 +1197,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     if (reason !== 'check-session') return readOnly(reason);
     const held = sessionId;
     if (held === null) return;
+    // Scoring under the session kept on the device, opening not answered yet: its end
+    // is no loss yet, as the server may give this device a new one (step 2.38).
+    if (held === keptSession) return settleByOpening();
     const renewed = await session({ type: 'renew', sessionId: held });
     if (sessionId !== held) return;
     if (renewed.kind === 'rejected' && renewed.httpStatus === 401) {
@@ -1435,6 +1620,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       }
       made.push(command);
       update({ game: next });
+      // Kept with every tap, not only on a load: a page reloaded with no signal before
+      // the next load reopens on the kept state with this tap on top (step 2.38).
+      keepScoringNow();
       return { ok: true, commandId: command.commandId };
     });
 

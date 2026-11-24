@@ -20,12 +20,15 @@ import { QueueError, type QueueErrorCode } from './queue-storage.ts';
 import {
   stillKept,
   withLineupPicks,
+  withScoring,
   type OpenedGame,
   type OpenedGameStorage,
 } from './opened-game-storage.ts';
 
 export const openedGamesDatabaseName = 'srleagues-tracker-games';
 const gamesStore = 'games';
+/** The store of opened games, which the tracker's worker reads to tell whether a game is open (step 2.38). */
+export const openedGamesStoreName = gamesStore;
 const deviceStore = 'device';
 const deviceKey = 'device-id';
 
@@ -140,6 +143,7 @@ export async function openIndexedDbOpenedGameStorage(
             state: found?.state ?? null,
             confirmedFormat: found?.confirmedFormat ?? null,
             ...(found?.lineupPicks === undefined ? {} : { lineupPicks: found.lineupPicks }),
+            ...(found?.scoring === undefined ? {} : { scoring: found.scoring }),
           };
           store.put(game);
         };
@@ -166,6 +170,9 @@ export async function openIndexedDbOpenedGameStorage(
     },
     confirmFormat(gameId, format) {
       return change(gameId, (game) => ({ ...game, confirmedFormat: format }));
+    },
+    saveScoring(gameId, scoring) {
+      return change(gameId, (game) => withScoring(game, scoring));
     },
     saveLineupPicks(gameId, picks) {
       return change(gameId, (game) => withLineupPicks(game, picks));

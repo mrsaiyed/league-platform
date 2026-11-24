@@ -90,7 +90,8 @@ const keptOnDevice = (page) =>
 /**
  * Puts one play the server has not answered for into the device's queue for `game`, as
  * the queue stores it (indexeddb-queue-storage.ts): the scoring screens that make plays
- * are steps 2.35 to 2.37, so this is how a play is waiting today.
+ * are steps 2.35 to 2.37, so this is how a play is waiting today. Each play keeps the
+ * account that made it (T-327): the one the open tracker page names, so `page` is on it.
  */
 const seedWaitingPlay = (page, game) =>
   page.evaluate(
@@ -118,6 +119,9 @@ const seedWaitingPlay = (page, game) =>
               input: { type: 'remove-player', side: 'home', playerId: crypto.randomUUID() },
             },
             state: 'waiting',
+            accountId: document
+              .querySelector('meta[name="srleagues-account"]')
+              ?.getAttribute('content'),
           });
           tx.oncomplete = () => {
             db.close();
@@ -634,13 +638,13 @@ if (browser) {
       await openMenu(page);
       await link(page, 'Sign in or create an account').click();
       await signIn(page, people.scorekeeper);
-      // A play made while the connection to the server is down stays waiting.
-      await seedWaitingPlay(page, liveGame);
       await context.route('**/commands', (route) => route.abort());
       await openMenu(page);
       await link(page, 'My games to score').click();
       await page.locator(`li[data-game="${liveGame}"] a[href*="/score/"]`).click();
       await gameOpen(page).waitFor();
+      // A play made while the connection to the server is down stays waiting.
+      await seedWaitingPlay(page, liveGame);
       const asked = [];
       let answer = false;
       page.on('dialog', (dialog) => {

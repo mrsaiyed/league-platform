@@ -245,6 +245,18 @@ describe('tracker queue: sending', () => {
     ]);
   });
 
+  it('sends one maker a batch, each batch saying its maker (T-327)', async () => {
+    const { queue, server, storage } = setup({ protocolVersion: 2 });
+    await storage.add(game, { protocolVersion: 2, command: tap(1), accountId: 'account-a' });
+    await storage.add(game, { protocolVersion: 2, command: tap(2), accountId: 'account-b' });
+    await queue.start();
+    await queue.idle();
+    expect(server.received.map((b) => [b.accountId, b.commands.length])).toEqual([
+      ['account-a', 1],
+      ['account-b', 1],
+    ]);
+  });
+
   it('sends at once on wake instead of waiting out the pause', async () => {
     const { queue, server, clock } = setup();
     server.mode = 'down';

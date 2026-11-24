@@ -59,6 +59,17 @@ export type QueuedCommand = {
   readonly sessionId?: string;
   /** Where in the game the tap was made (finding I). Absent on a tap stored before this was kept. */
   readonly moment?: GameMoment;
+  /**
+   * The league the game is in, so "Your games" lists the tap in its own league however
+   * old the game is (step 2.38, T-317). Absent on a tap stored before this was kept.
+   */
+  readonly leagueId?: string;
+  /**
+   * The signed-in account that made the tap (T-321): only that account's tracker sends it
+   * and only that account's "Your games" lists it. Absent on a tap stored before this was
+   * kept, which is listed for whoever is signed in, as it was then.
+   */
+  readonly accountId?: string;
 } & (
   | { readonly state: 'waiting' }
   /** Refused: kept so the scorekeeper can be told, never sent again. */
@@ -77,6 +88,11 @@ export type QueueSettlement = {
   readonly refuse?: readonly { readonly commandId: string; readonly refusal: CommandRefusal }[];
   /** Commands to keep as not saved: never sent again, kept until they are removed. */
   readonly notSaved?: readonly string[];
+  /**
+   * Waiting commands to send under another session of the same device and account
+   * (step 2.38): its earlier one ended while it was away, and nobody else scored since.
+   */
+  readonly carryOn?: { readonly commandIds: readonly string[]; readonly sessionId: string };
 };
 
 /**
@@ -131,10 +147,52 @@ export interface QueueStorage {
       readonly command: BatchCommand;
       readonly sessionId?: string;
       readonly moment?: GameMoment;
+      readonly leagueId?: string;
+      readonly accountId?: string;
     },
   ): Promise<AddResult>;
   /** The game's queue, oldest tap first. */
   list(gameId: string): Promise<readonly QueuedCommand[]>;
   /** Applies one answer in a single write. IDs the queue no longer holds are ignored. */
   settle(gameId: string, settlement: QueueSettlement): Promise<void>;
+}
+
+/**
+ * The queue read across games, for "Your games" (step 2.38, T-317): every tap the device
+ * holds that the server does not have, of any game however old, and letting go of a
+ * game's taps when the scorekeeper dismisses them (S-88). Both storages give it.
+ */
+export interface HeldPlaysStorage {
+  /** Every tap held on the device, of every game, oldest first. */
+  listAll(): Promise<readonly QueuedCommand[]>;
+  /**
+   * Deletes every tap held for the game, in one write: they are never sent. Given an
+   * account, only the taps `madeBy` it (T-321): another account's stay.
+   */
+  forget(gameId: string, accountId?: string | null): Promise<void>;
+}
+
+/** The queue's storage as the browser gives it: a game's queue and the reads across games. */
+export type DeviceQueueStorage = QueueStorage & HeldPlaysStorage;
+
+/**
+ * Whether `entry` is the account's own (T-321, T-327): made by it. Another account's taps
+ * are never sent, listed or dismissed under this one. A tap stored before the maker was
+ * kept is nobody's: never sent, listed to nobody; it goes with the device's 14-day keep.
+ */
+export function madeBy(entry: Pick<QueuedCommand, 'accountId'>, accountId: string | null): boolean {
+  return entry.accountId !== undefined && accountId !== null && entry.accountId === accountId;
+}
+
+/**
+ * `storage` as the signed-in account's own: every tap it stores keeps `leagueId` (T-317)
+ * and `accountId` (T-321), and a game's queue lists only the account's own taps.
+ */
+export function inLeague(storage: QueueStorage, leagueId: string, accountId: string): QueueStorage {
+  return {
+    add: (gameId, entry) => storage.add(gameId, { ...entry, leagueId, accountId }),
+    list: async (gameId) =>
+      (await storage.list(gameId)).filter((entry) => madeBy(entry, accountId)),
+    settle: (gameId, settlement) => storage.settle(gameId, settlement),
+  };
 }

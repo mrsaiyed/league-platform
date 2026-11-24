@@ -4,6 +4,7 @@
 import {
   stillKept,
   withLineupPicks,
+  withScoring,
   type OpenedGame,
   type OpenedGameStorage,
 } from './opened-game-storage.ts';
@@ -35,6 +36,7 @@ export function createMemoryOpenedGameStorage(): OpenedGameStorage {
           rostersSavedAt: savedAt,
           state: found?.state ?? null,
           confirmedFormat: found?.confirmedFormat ?? null,
+          ...(found?.scoring === undefined ? {} : { scoring: found.scoring }),
           ...(found?.lineupPicks === undefined ? {} : { lineupPicks: found.lineupPicks }),
         }),
       );
@@ -52,6 +54,9 @@ export function createMemoryOpenedGameStorage(): OpenedGameStorage {
     },
     async confirmFormat(gameId, format) {
       change(gameId, (game) => ({ ...game, confirmedFormat: format }));
+    },
+    async saveScoring(gameId, scoring) {
+      change(gameId, (game) => withScoring(game, scoring));
     },
     async saveLineupPicks(gameId, picks) {
       change(gameId, (game) => withLineupPicks(game, picks));

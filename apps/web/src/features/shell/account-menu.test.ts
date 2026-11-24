@@ -48,6 +48,7 @@ describe('accountMenuOf', () => {
     expect(accountMenuOf(viewOf(everyArea, true), 'olive@example.test', '/north-valley')).toEqual({
       initial: 'O',
       email: 'olive@example.test',
+      accountId: expect.any(String),
       adminHref: '/north-valley/admin',
       gamesHref: '/north-valley/admin/games',
       myTeam: null,

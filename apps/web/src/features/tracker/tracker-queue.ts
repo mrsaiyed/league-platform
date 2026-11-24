@@ -198,6 +198,11 @@ export type TrackerQueue = {
    */
   setAside(commandIds: readonly string[]): Promise<void>;
   /**
+   * Sends waiting taps made under an earlier session of this device under `sessionId`
+   * (step 2.38): the tracker has checked that nobody else scored since that one ended.
+   */
+  carryOn(commandIds: readonly string[], sessionId: string): Promise<void>;
+  /**
    * Takes waiting taps back before they are sent (step 2.37: "Take back End game"). No
    * batch goes out while this runs: it waits for the one on its way, then drops those of
    * `commandIds` the device still holds waiting and the server cannot have. A tap the
@@ -369,9 +374,17 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     const commands: BatchCommand[] = [];
     for (const entry of waiting) {
       if (entry.protocolVersion !== first.protocolVersion || commands.length === most) break;
+      // One maker a batch (T-327): the server refuses a batch whose maker is not the
+      // account of its session, so another account's tap is never sent under this one.
+      if (entry.accountId !== first.accountId) break;
       commands.push(entry.command);
     }
-    return { protocolVersion: first.protocolVersion, sessionId: session, commands };
+    // The maker is said from version 2 on; a version 1 batch stays as it was (T-127).
+    const maker =
+      first.accountId === undefined || first.protocolVersion < 2
+        ? {}
+        : { accountId: first.accountId };
+    return { protocolVersion: first.protocolVersion, sessionId: session, commands, ...maker };
   };
 
   const send = async (batch: CommandBatch): Promise<TransportOutcome> => {
@@ -575,6 +588,14 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     forget: (commandIds) => putAway(commandIds, []),
 
     setAside: (commandIds) => putAway([], commandIds),
+
+    async carryOn(commandIds, session) {
+      await stored('storage-write-failed', () =>
+        storage.settle(gameId, { carryOn: { commandIds, sessionId: session } }),
+      );
+      await refresh();
+      kick();
+    },
 
     async withdraw(commandIds) {
       withdrawing += 1;
