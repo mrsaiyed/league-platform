@@ -20,4 +20,12 @@ describe('audienceChange', () => {
     expect(audienceChange('youth', 'adult', true).clearsChildrenInFull).toBe(false);
     expect(audienceChange('adult', 'adult', true).clearsChildrenInFull).toBe(false);
   });
+
+  it('says when children come into an adult league, whatever was confirmed (S-96)', () => {
+    expect(audienceChange('adult', 'youth', false).bringsChildrenIn).toBe(true);
+    expect(audienceChange('adult', 'mixed', false).bringsChildrenIn).toBe(true);
+    expect(audienceChange('mixed', 'youth', false).bringsChildrenIn).toBe(false);
+    expect(audienceChange('youth', 'mixed', false).bringsChildrenIn).toBe(false);
+    expect(audienceChange('mixed', 'adult', true).bringsChildrenIn).toBe(false);
+  });
 });

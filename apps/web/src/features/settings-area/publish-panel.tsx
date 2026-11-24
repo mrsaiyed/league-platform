@@ -14,6 +14,25 @@ const cures: Readonly<Record<PublishCheckKey, { href: string; label: TextKey }>>
   privacyChosen: { href: '#settings-privacy', label: 'adminSettings.publish.cureLink' },
 };
 
+/** One item of the "Must fix" list, met or not, with where it is put right. */
+function CheckItem({ check }: { readonly check: PublishCheck }) {
+  const cure = cures[check.key];
+  return (
+    <li data-check={check.key} data-met={check.met ? 'yes' : 'no'}>
+      <span className="staff-pill" data-kind={check.met ? 'good' : 'wait'}>
+        {t(check.met ? 'adminSettings.publish.met' : 'adminSettings.publish.notMet')}
+      </span>{' '}
+      <span>{t(`adminSettings.publish.check.${check.key}` as TextKey)}</span>
+      {check.met ? null : (
+        <span className="publish-cure">
+          {t(`adminSettings.publish.check.${check.key}.cure` as TextKey)}{' '}
+          <a href={cure.href}>{t(cure.label)}</a>
+        </span>
+      )}
+    </li>
+  );
+}
+
 /** The query that opens the question, and the place on the page it comes back to. */
 export const publishAsk = { name: 'publish', value: 'ask' } as const;
 /** The query that asks once before archiving (step 2.125). */
@@ -46,6 +65,9 @@ export function PublishPanel({
 }) {
   if (status !== 'draft' && status !== 'live' && status !== 'archived') return null;
   const ready = checks.every((check) => check.met);
+  // S-96: a published league that children came into keeps its pages up, and is asked
+  // for the same privacy choices a draft youth league must confirm before publishing.
+  const privacyOpen = checks.filter((check) => check.key === 'privacyChosen' && !check.met);
   return (
     <section
       className="staff-panel settings-publish"
@@ -71,6 +93,16 @@ export function PublishPanel({
       ) : status === 'live' ? (
         <>
           <p>{t('adminSettings.publish.live')}</p>
+          {privacyOpen.length === 0 ? null : (
+            <div data-says="confirm-privacy">
+              <p>{t('adminSettings.publish.confirmPrivacyLive')}</p>
+              <ul className="publish-checks">
+                {privacyOpen.map((check) => (
+                  <CheckItem key={check.key} check={check} />
+                ))}
+              </ul>
+            </div>
+          )}
           {!mayPublish ? null : askingArchive ? (
             <form action={changeLeagueStatusAction} className="staff-form" data-form="archive">
               <input type="hidden" name="league" value={league} />
@@ -103,23 +135,9 @@ export function PublishPanel({
           <p>{t('adminSettings.publish.draft')}</p>
           <h3>{t('adminSettings.publish.mustFix')}</h3>
           <ul className="publish-checks">
-            {checks.map((check) => {
-              const cure = cures[check.key];
-              return (
-                <li key={check.key} data-check={check.key} data-met={check.met ? 'yes' : 'no'}>
-                  <span className="staff-pill" data-kind={check.met ? 'good' : 'wait'}>
-                    {t(check.met ? 'adminSettings.publish.met' : 'adminSettings.publish.notMet')}
-                  </span>{' '}
-                  <span>{t(`adminSettings.publish.check.${check.key}` as TextKey)}</span>
-                  {check.met ? null : (
-                    <span className="publish-cure">
-                      {t(`adminSettings.publish.check.${check.key}.cure` as TextKey)}{' '}
-                      <a href={cure.href}>{t(cure.label)}</a>
-                    </span>
-                  )}
-                </li>
-              );
-            })}
+            {checks.map((check) => (
+              <CheckItem key={check.key} check={check} />
+            ))}
           </ul>
           {!mayPublish ? null : !ready ? (
             <p>{t('adminSettings.publish.notReady')}</p>

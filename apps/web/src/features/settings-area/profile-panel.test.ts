@@ -37,7 +37,7 @@ const draw = (over: Partial<Parameters<typeof ProfilePanel>[0]> = {}) =>
       slug: 'north-valley',
       version: 4,
       profile,
-      childrenInFull: false,
+      resets: { childrenInFull: false, namesChoice: false, listing: false },
       mayChange: true,
       ...over,
     }),
@@ -62,18 +62,36 @@ describe('the Profile part of League settings', () => {
     const html = draw();
     expect(html).not.toContain('data-says="confirm-toward-adults"');
     expect(html).not.toContain('data-says="clears-full-names"');
+    expect(html).not.toContain('data-says="youth-resets"');
   });
 
   it('says before saving that bringing children in clears a confirmed "children in full"', () => {
-    const html = draw({ childrenInFull: true });
+    const html = draw({ resets: { childrenInFull: true, namesChoice: false, listing: false } });
     expect(html).toContain('data-says="clears-full-names"');
-    expect(html).toContain(words('adminSettings.profile.clearsFullNames'));
+    expect(html).toContain(words('adminSettings.profile.youthResets.childrenInFull'));
+    expect(html).not.toContain('data-resets="listing"');
+  });
+
+  it('lists every choice bringing children in puts back, before saving (S-96)', () => {
+    const html = draw({ resets: { childrenInFull: true, namesChoice: true, listing: true } });
+    expect(html).toContain(words('adminSettings.profile.youthResets'));
+    for (const key of ['childrenInFull', 'namesChoice', 'listing']) {
+      expect(html).toContain(`data-resets="${key}"`);
+    }
+    expect(html).toContain(words('adminSettings.profile.youthResetsAfter'));
+  });
+
+  it('says before saving that a new time zone moves the shown time of every game', () => {
+    expect(draw()).toContain(words('adminSettings.profile.timeZoneMovesGames'));
   });
 
   it('a youth league offers the tick a move toward adults asks for (R-14)', () => {
-    const html = draw({ profile: { ...profile, audience: 'youth' }, childrenInFull: true });
+    const html = draw({
+      profile: { ...profile, audience: 'youth' },
+      resets: { childrenInFull: true, namesChoice: true, listing: true },
+    });
     expect(html).toContain('data-says="confirm-toward-adults"');
-    expect(html).not.toContain('data-says="clears-full-names"');
+    expect(html).not.toContain('data-says="youth-resets"');
   });
 
   it('draws every field disabled, and says why, where it cannot be changed', () => {

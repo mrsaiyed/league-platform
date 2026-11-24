@@ -1,7 +1,6 @@
 // Admin → League settings (step 2.48, P4 §6, T5 §6): a form for every setting the
 // product declares at the league level, drawn from the declarations (T-98).
 import {
-  holdsChildrenInFull,
   leagueUrl,
   listLeagueSettings,
   mayChangeLeagueSettings,
@@ -9,6 +8,7 @@ import {
   readNamePolicy,
   readPrivacyFacts,
   readPublishChecks,
+  readYouthResets,
 } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { commandContextOf } from '../../server/context.ts';
@@ -43,7 +43,7 @@ export async function SettingsPage({
   const view = await loadLeaguePage(league, 'admin', 'settings');
   const { adminSettings, publicSchedule } = await webPorts();
   const context = commandContextOf(view.context);
-  const { rows, facts, policy, current, checks, mayPublish, profile, childrenInFull, mayEdit } =
+  const { rows, facts, policy, current, checks, mayPublish, profile, resets, mayEdit } =
     await adminSettings.deps.transaction(context, async (tx) => ({
       rows: await listLeagueSettings(tx),
       facts: await readPrivacyFacts(tx),
@@ -54,7 +54,7 @@ export async function SettingsPage({
       mayPublish: await mayChangeLeagueSettings(context, tx),
       // League settings → Profile (step 2.125).
       profile: await tx.leagues.leagueProfile(),
-      childrenInFull: await holdsChildrenInFull(tx),
+      resets: await readYouthResets(tx),
       mayEdit: await mayEditLeague(context, tx),
     }));
   const { timeZone } = await publicSchedule.clockOf(view.context.league.id);
@@ -100,7 +100,7 @@ export async function SettingsPage({
           slug={current.slug}
           version={current.version}
           profile={profile}
-          childrenInFull={childrenInFull}
+          resets={resets}
           mayChange={mayEdit}
         />
       )}

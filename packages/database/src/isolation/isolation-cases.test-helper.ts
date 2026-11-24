@@ -165,7 +165,7 @@ registerIsolationCase({
 registerIsolationCase({
   subject: updateLeagueAudience,
   name: "change who plays in the scope's league (step 2.125)",
-  run: (scope) => updateLeagueAudience(scope, 'adult', 1),
+  run: (scope) => updateLeagueAudience(scope, 'adult', 1, true),
 });
 
 // Commands -----------------------------------------------------------------------

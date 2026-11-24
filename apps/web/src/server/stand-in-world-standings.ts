@@ -501,9 +501,10 @@ export function worldLeaguesStores(
       s.listed = profile.listed;
       return next;
     },
-    setAudience: async (audience, version) => {
+    setAudience: async (audience, version, unlist) => {
       const next = changeStandInLeague(s.leagueId, version);
       if (next !== undefined) s.audience = audience;
+      if (next !== undefined && unlist) s.listed = false;
       return next;
     },
     createSeason: notYet('leagues.createSeason'),

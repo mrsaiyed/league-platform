@@ -19,7 +19,7 @@ export const enAdminSettings = {
   'adminSettings.done.archived':
     'The league is archived. Everything in it is kept as it was, and nothing can be changed until it is brought back.',
   'adminSettings.done.audienceClearedFullNames':
-    'Who plays was saved. Children are no longer shown with their full names: confirm it again under Privacy if their parents agreed.',
+    'Who plays was saved, and the privacy choices listed are back where a youth league starts. Confirm them again under Privacy; you can widen each one in its own setting.',
   'adminSettings.done.cleared': 'The setting is back to its default.',
   'adminSettings.done.published': 'The league is published. Visitors can see it now.',
   'adminSettings.done.renamed':
@@ -70,8 +70,6 @@ export const enAdminSettings = {
   'adminSettings.profile.audience.mixed': 'Both adults and under-18s',
   'adminSettings.profile.audience.youth': 'Under-18s',
   'adminSettings.profile.city': 'City',
-  'adminSettings.profile.clearsFullNames':
-    'This league shows children with their full names. Choosing under-18s or both clears that back to no when you save: you can confirm it again under Privacy.',
   'adminSettings.profile.confirmTowardAdults':
     'I confirm that the people whose age we do not know may be shown as adults, with their full names (needed when choosing more adults than now).',
   'adminSettings.profile.contactEmail': 'Contact email',
@@ -87,8 +85,19 @@ export const enAdminSettings = {
   'adminSettings.profile.shortNameForwards':
     'If you change it, the old address keeps forwarding to the new one for 12 months.',
   'adminSettings.profile.timeZone': 'Time zone (for example America/New_York)',
+  'adminSettings.profile.timeZoneMovesGames':
+    'If you change the time zone, the time shown for every game already entered changes with it.',
   'adminSettings.profile.title': 'Profile',
   'adminSettings.profile.whoPlays': 'Who plays',
+  'adminSettings.profile.youthResets':
+    'Choosing under-18s or both puts these privacy choices back to where a youth league starts, when you save:',
+  'adminSettings.profile.youthResets.childrenInFull':
+    'Children shown with their full names: back to no.',
+  'adminSettings.profile.youthResets.listing': 'Listed in the league finder: off.',
+  'adminSettings.profile.youthResets.namesChoice':
+    'Names on public pages: your saved choice of full names is cleared, so you confirm it again under Privacy.',
+  'adminSettings.profile.youthResetsAfter':
+    'If the league is published it stays published, and League settings asks you to confirm its privacy choices. You can widen each one again in its own setting.',
   'adminSettings.publish.archive': 'Archive',
   'adminSettings.publish.archiveAsk':
     'Archive this league? Its pages stay up, but nothing in it can be changed until you bring it back.',
@@ -106,6 +115,8 @@ export const enAdminSettings = {
     'Your privacy choice for young players: how names show on public pages',
   'adminSettings.publish.check.privacyChosen.cure':
     'Choose and save "Names on public pages" under Privacy, even to keep how it starts.',
+  'adminSettings.publish.confirmPrivacyLive':
+    'Under-18s now play in this league, so its privacy choices were put back to where a youth league starts. The league stays published: confirm its privacy choices.',
   'adminSettings.publish.cureLink': 'Go to Privacy',
   'adminSettings.publish.cureLinkProfile': 'Go to Profile',
   'adminSettings.publish.draft':

@@ -38,8 +38,10 @@ export {
 } from './commands/set-league-name.ts';
 export {
   holdsChildrenInFull,
+  readYouthResets,
   setLeagueAudience,
   type LeagueAudienceSaved,
+  type YouthResets,
   type SetLeagueAudienceError,
 } from './commands/set-league-audience.ts';
 export { setLeagueProfile, type SetLeagueProfileError } from './commands/set-league-profile.ts';

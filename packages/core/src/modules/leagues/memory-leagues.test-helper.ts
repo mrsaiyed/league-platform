@@ -244,11 +244,12 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           s.listed = profile.listed;
           return next;
         },
-        setAudience: async (audience, version) => {
+        setAudience: async (audience, version, unlist) => {
           const next = bump(version);
           if (next === undefined || s.league === undefined) return undefined;
           s.league = { ...s.league, version: next };
           s.audience = audience;
+          if (unlist) s.listed = false;
           return next;
         },
         isPlatformStaff: async () => accountId !== null && s.staff.includes(accountId),

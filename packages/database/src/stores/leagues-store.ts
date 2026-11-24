@@ -55,7 +55,8 @@ export function leaguesStore(
     setStatus: (status: LeagueStatus, version) => updateLeagueStatus(scope, status, version),
     leagueProfile: () => findLeagueProfile(scope),
     setProfile: (profile, version) => updateLeagueProfile(scope, profile, version),
-    setAudience: (audience, version) => updateLeagueAudience(scope, audience, version),
+    setAudience: (audience, version, unlist) =>
+      updateLeagueAudience(scope, audience, version, unlist),
     findProgram: async (programId) => {
       const id = await findProgramId(scope, programId);
       return id === undefined ? undefined : { id };

@@ -35,7 +35,13 @@ describe('setLeagueAudience', () => {
       await setLeagueAudience(owner, { audience: 'adult', confirmed: true, version: 3 }, deps),
     ).toEqual({
       ok: true,
-      value: { audience: 'adult', version: 4, clearedChildrenInFull: false },
+      value: {
+        audience: 'adult',
+        version: 4,
+        clearedChildrenInFull: false,
+        clearedNamesChoice: false,
+        unlisted: false,
+      },
     });
     expect(db.state.audience).toBe('adult');
     expect(db.state.activity).toMatchObject([
@@ -55,7 +61,13 @@ describe('setLeagueAudience', () => {
     const { db, deps } = setUp('adult', true);
     expect(await setLeagueAudience(owner, { audience: 'mixed', version: 3 }, deps)).toEqual({
       ok: true,
-      value: { audience: 'mixed', version: 4, clearedChildrenInFull: true },
+      value: {
+        audience: 'mixed',
+        version: 4,
+        clearedChildrenInFull: true,
+        clearedNamesChoice: false,
+        unlisted: false,
+      },
     });
     expect(db.state.settings.filter((row) => row.key === key)).toEqual([]);
     // The clearing is logged as a clearing of its own (one writer, record 065).
@@ -68,6 +80,62 @@ describe('setLeagueAudience', () => {
     ]);
   });
 
+  // S-96: children coming into an adult league put back a youth league's starting
+  // choices in the same save, whether the league is a draft or already published.
+  for (const status of ['draft', 'live'] as const) {
+    it(`puts back the youth starting choices in a ${status} league (S-96)`, async () => {
+      const { db, deps } = setUp('adult', true);
+      if (db.state.league !== undefined) db.state.league = { ...db.state.league, status };
+      db.state.listed = true;
+      db.state.settings.push({
+        place: { level: 'league' },
+        key: 'privacy.publicNames',
+        document: { version: 1, value: 'fullName' },
+        version: 5,
+      });
+      expect(await setLeagueAudience(owner, { audience: 'mixed', version: 3 }, deps)).toEqual({
+        ok: true,
+        value: {
+          audience: 'mixed',
+          version: 4,
+          clearedChildrenInFull: true,
+          clearedNamesChoice: true,
+          unlisted: true,
+        },
+      });
+      expect(db.state.settings).toEqual([]);
+      expect(db.state.listed).toBe(false);
+      expect(db.state.league?.status).toBe(status);
+      expect(db.state.activity.map((entry) => entry.action)).toEqual([
+        'leagues.clear_setting',
+        'leagues.clear_setting',
+        'leagues.set_audience',
+      ]);
+    });
+  }
+
+  it('keeps a saved names choice that already shows less than the start (T-353)', async () => {
+    const { db, deps } = setUp('adult');
+    db.state.settings.push({
+      place: { level: 'league' },
+      key: 'privacy.publicNames',
+      document: { version: 1, value: 'hidden' },
+      version: 5,
+    });
+    expect(await setLeagueAudience(owner, { audience: 'youth', version: 3 }, deps)).toMatchObject({
+      ok: true,
+      value: { clearedNamesChoice: false },
+    });
+    expect(db.state.settings).toHaveLength(1);
+  });
+
+  it('puts nothing back when the league already had children', async () => {
+    const { db, deps } = setUp('mixed');
+    db.state.listed = true;
+    await setLeagueAudience(owner, { audience: 'youth', version: 3 }, deps);
+    expect(db.state.listed).toBe(true);
+  });
+
   it('keeps "children in full" when the league already had children', async () => {
     const { db, deps } = setUp('mixed', true);
     await setLeagueAudience(owner, { audience: 'youth', version: 3 }, deps);
@@ -78,7 +146,13 @@ describe('setLeagueAudience', () => {
     const { db, deps } = setUp('youth');
     expect(await setLeagueAudience(owner, { audience: 'youth', version: 3 }, deps)).toEqual({
       ok: true,
-      value: { audience: 'youth', version: 3, clearedChildrenInFull: false },
+      value: {
+        audience: 'youth',
+        version: 3,
+        clearedChildrenInFull: false,
+        clearedNamesChoice: false,
+        unlisted: false,
+      },
     });
     expect(db.state.activity).toEqual([]);
   });

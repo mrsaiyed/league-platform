@@ -5,6 +5,12 @@
 // result says so (R-14, R-29). What the change does is worked out by audienceChange,
 // which the screen reads first so it can say it before the save. The owner and admins
 // change it (U-14); not in an archived or suspended league (U-9).
+//
+// S-96: bringing children into an adult league also puts back, in the same transaction,
+// the other choices a youth league confirms before publishing (P3 section 3): a saved
+// "full names" is cleared, so "Names on public pages" must be confirmed again (a
+// published league stays published and League settings asks for it), and the listing
+// goes off (U-10). A saved initials or hidden already shows less and is kept (T-353).
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -14,7 +20,7 @@ import { mayEditLeague } from '../policy.ts';
 import type { LeaguesTx, StoredSettingRow } from '../ports.ts';
 import { audienceChange } from '../rules/audience-change.ts';
 import { clearLeagueValueInside } from './clear-setting.ts';
-import { childrenInFullConfirmed } from '../settings/declarations.ts';
+import { childrenInFullConfirmed, publicNames } from '../settings/declarations.ts';
 
 export type SetLeagueAudienceError = {
   readonly code: 'changed-since-read' | 'confirmation-needed';
@@ -25,6 +31,10 @@ export type LeagueAudienceSaved = {
   readonly version: number;
   /** The confirmed "children in full" was cleared back to no by this change. */
   readonly clearedChildrenInFull: boolean;
+  /** A saved "full names" was cleared, to be confirmed again (S-96). */
+  readonly clearedNamesChoice: boolean;
+  /** The league was taken out of the finder (S-96, U-10). */
+  readonly unlisted: boolean;
 };
 
 /** The league's own saved "children in full" row when it says yes, else undefined. */
@@ -42,6 +52,33 @@ async function confirmedChildrenInFull(tx: LeaguesTx): Promise<StoredSettingRow 
 /** Whether the league holds a saved, confirmed "children in full" (for the screen). */
 export async function holdsChildrenInFull(tx: LeaguesTx): Promise<boolean> {
   return (await confirmedChildrenInFull(tx)) !== undefined;
+}
+
+/** The league's own saved "Names on public pages" row when it says full names. */
+async function savedNamesInFull(tx: LeaguesTx): Promise<StoredSettingRow | undefined> {
+  const rows = await tx.leagues.settingRows(publicNames.key, {});
+  return rows.find((row) => {
+    if (row.level !== 'league') return false;
+    const document = row.document;
+    return typeof document === 'object' && document !== null && 'value' in document
+      ? document.value === 'fullName'
+      : false;
+  });
+}
+
+/** What bringing children into this league would put back (S-96), for the screen. */
+export type YouthResets = {
+  readonly childrenInFull: boolean;
+  readonly namesChoice: boolean;
+  readonly listing: boolean;
+};
+
+export async function readYouthResets(tx: LeaguesTx): Promise<YouthResets> {
+  return {
+    childrenInFull: (await confirmedChildrenInFull(tx)) !== undefined,
+    namesChoice: (await savedNamesInFull(tx)) !== undefined,
+    listing: (await tx.leagues.leagueProfile())?.listed === true,
+  };
 }
 
 export const setLeagueAudience = defineCommand({
@@ -71,6 +108,8 @@ export const setLeagueAudience = defineCommand({
         audience: input.audience,
         version: league.version,
         clearedChildrenInFull: false,
+        clearedNamesChoice: false,
+        unlisted: false,
       });
     }
     const saved = await confirmedChildrenInFull(tx);
@@ -89,10 +128,18 @@ export const setLeagueAudience = defineCommand({
       );
       if (!cleared) return fail({ code: 'changed-since-read' });
     }
-    const version = await tx.leagues.setAudience(input.audience, input.version);
+    const names = change.bringsChildrenIn ? await savedNamesInFull(tx) : undefined;
+    if (names !== undefined) {
+      const cleared = await clearLeagueValueInside(tx, context, publicNames.key, names.version);
+      // A clearing may already have been made: undo the whole step (a throw rolls it back).
+      if (!cleared) throw new Error('leagues.set_audience: the names choice moved.');
+    }
+    const unlisted = change.bringsChildrenIn && profile.listed;
+    const clearedSome = change.clearsChildrenInFull || names !== undefined;
+    const version = await tx.leagues.setAudience(input.audience, input.version, unlisted);
     if (version === undefined) {
       // Moved after the clearing: undo the whole step (a thrown error rolls it back).
-      if (change.clearsChildrenInFull) throw new Error('leagues.set_audience: the league moved.');
+      if (clearedSome) throw new Error('leagues.set_audience: the league moved.');
       return fail({ code: 'changed-since-read' });
     }
     await recordActivity(tx, context, {
@@ -102,6 +149,8 @@ export const setLeagueAudience = defineCommand({
         audience: input.audience,
         ...(change.needsConfirming ? { confirmed: true } : {}),
         ...(change.clearsChildrenInFull ? { clearedChildrenInFull: true } : {}),
+        ...(names !== undefined ? { clearedNamesChoice: true } : {}),
+        ...(unlisted ? { unlisted: true } : {}),
       },
     });
     emit({ type: leagueAudienceChanged, leagueId: context.leagueId });
@@ -112,10 +161,15 @@ export const setLeagueAudience = defineCommand({
         key: childrenInFullConfirmed.key,
       });
     }
+    if (names !== undefined) {
+      emit({ type: leagueSettingChanged, leagueId: context.leagueId, key: publicNames.key });
+    }
     return ok({
       audience: input.audience,
       version,
       clearedChildrenInFull: change.clearsChildrenInFull,
+      clearedNamesChoice: names !== undefined,
+      unlisted,
     });
   },
 });

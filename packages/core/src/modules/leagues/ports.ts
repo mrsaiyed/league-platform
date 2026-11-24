@@ -147,8 +147,15 @@ export type LeaguesStore = {
     profile: LeagueProfileChange,
     version: number,
   ) => Promise<number | undefined>;
-  /** Sets who plays at `version`: the new version, or undefined if it moved. */
-  readonly setAudience: (audience: Audience, version: number) => Promise<number | undefined>;
+  /**
+   * Sets who plays at `version`, and with `unlist` takes the league out of the finder in
+   * the same write (S-96): the new version, or undefined if it moved.
+   */
+  readonly setAudience: (
+    audience: Audience,
+    version: number,
+    unlist: boolean,
+  ) => Promise<number | undefined>;
   /** The program with this id, or the default program when none is given. */
   readonly findProgram: (
     programId: string | undefined,

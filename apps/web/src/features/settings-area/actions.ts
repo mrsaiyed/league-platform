@@ -107,7 +107,12 @@ export async function saveLeagueAudienceAction(form: FormData): Promise<never> {
     };
     const result = await setLeagueAudience(context, input, ports.deps);
     if (!result.ok) return refused(setLeagueAudience.commandName, result.error.code);
-    return done(result.value.clearedChildrenInFull ? 'audienceClearedFullNames' : 'saved');
+    const { clearedChildrenInFull, clearedNamesChoice, unlisted } = result.value;
+    return done(
+      clearedChildrenInFull || clearedNamesChoice || unlisted
+        ? 'audienceClearedFullNames'
+        : 'saved',
+    );
   });
 }
 

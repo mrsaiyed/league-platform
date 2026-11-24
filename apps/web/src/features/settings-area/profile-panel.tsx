@@ -7,8 +7,16 @@
 // Who plays: the screen says what a change does before it is saved, from the same rule
 // the command follows (audienceChange): a move toward adults asks for the tick (R-14),
 // and a move that brings children into an adult league that shows children in full says
-// that this is cleared back to no (R-14, R-29).
-import { audienceChange, audiences, type Audience, type LeagueProfile } from '@srleagues/core';
+// that this is cleared back to no (R-14, R-29). It lists every choice that a move
+// bringing children in puts back to a youth league's start (S-96): "children in full",
+// a saved "full names" (to be confirmed again) and the listing.
+import {
+  audienceChange,
+  audiences,
+  type Audience,
+  type LeagueProfile,
+  type YouthResets,
+} from '@srleagues/core';
 import { t, type TextKey } from '../../server/messages.ts';
 import {
   renameShortNameAction,
@@ -20,12 +28,18 @@ import {
 /** The place on the page the Profile part is, for links that cure a "Must fix" item. */
 export const profilePlace = 'settings-profile';
 
-/** Whether any choice of who plays from here asks for the tick, or clears full names. */
-function choicesFrom(from: Audience, childrenInFull: boolean) {
+/** The choices put back, in the order the screen lists them (S-96). */
+const resetOrder = ['childrenInFull', 'namesChoice', 'listing'] as const;
+
+/** Whether any choice of who plays from here asks for the tick, and what it puts back. */
+function choicesFrom(from: Audience, resets: YouthResets) {
   const others = audiences.filter((to) => to !== from);
+  const bringsChildrenIn = others.some(
+    (to) => audienceChange(from, to, resets.childrenInFull).bringsChildrenIn,
+  );
   return {
-    asks: others.some((to) => audienceChange(from, to, childrenInFull).needsConfirming),
-    clears: others.some((to) => audienceChange(from, to, childrenInFull).clearsChildrenInFull),
+    asks: others.some((to) => audienceChange(from, to, resets.childrenInFull).needsConfirming),
+    putsBack: bringsChildrenIn ? resetOrder.filter((key) => resets[key]) : [],
   };
 }
 
@@ -35,7 +49,7 @@ export function ProfilePanel({
   slug,
   version,
   profile,
-  childrenInFull,
+  resets,
   mayChange,
 }: {
   /** The route's `[league]` value, for the forms. */
@@ -44,13 +58,13 @@ export function ProfilePanel({
   readonly slug: string;
   readonly version: number;
   readonly profile: LeagueProfile;
-  /** The league holds a saved, confirmed "children in full" (R-29). */
-  readonly childrenInFull: boolean;
+  /** What bringing children in would put back to a youth league's start (S-96). */
+  readonly resets: YouthResets;
   /** The owner or an admin, in a league that is not read-only (U-9, U-14). */
   readonly mayChange: boolean;
 }) {
   const disabled = !mayChange;
-  const { asks, clears } = choicesFrom(profile.audience, childrenInFull);
+  const { asks, putsBack } = choicesFrom(profile.audience, resets);
   const hidden = (
     <>
       <input type="hidden" name="league" value={league} />
@@ -126,6 +140,9 @@ export function ProfilePanel({
             disabled={disabled}
           />
         </label>
+        <p className="staff-row-facts" data-says="time-zone-moves-games">
+          {t('adminSettings.profile.timeZoneMovesGames')}
+        </p>
         <label>
           <input
             type="checkbox"
@@ -157,11 +174,23 @@ export function ProfilePanel({
             </label>
           ))}
         </fieldset>
-        {clears ? (
-          <p className="ui-notice" data-kind="warning" data-says="clears-full-names">
-            {t('adminSettings.profile.clearsFullNames')}
-          </p>
-        ) : null}
+        {putsBack.length === 0 ? null : (
+          <div className="ui-notice" data-kind="warning" data-says="youth-resets">
+            <p>{t('adminSettings.profile.youthResets')}</p>
+            <ul>
+              {putsBack.map((key) => (
+                <li
+                  key={key}
+                  data-resets={key}
+                  {...(key === 'childrenInFull' ? { 'data-says': 'clears-full-names' } : {})}
+                >
+                  {t(`adminSettings.profile.youthResets.${key}` as TextKey)}
+                </li>
+              ))}
+            </ul>
+            <p>{t('adminSettings.profile.youthResetsAfter')}</p>
+          </div>
+        )}
         {asks ? (
           <label data-says="confirm-toward-adults">
             <input type="checkbox" name="confirmed" value="yes" disabled={disabled} />{' '}

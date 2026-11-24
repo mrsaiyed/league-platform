@@ -7,6 +7,12 @@
 // 2026-11-14). Moving away from adults while the league holds a saved, confirmed "full
 // names" for children would apply it to the new children: the change clears that
 // setting back to the league's starting value (no) instead (step 2.162's builder).
+//
+// S-96 (step 2.125 fix round): any move that brings children into an adult league (to
+// under-18s or both) also puts back the other privacy choices a youth league confirms
+// before publishing (P3 section 3): a saved "full names" choice is cleared (the start, so
+// it must be confirmed again) and the listing goes off (U-10's youth start). A saved
+// choice that already shows less than the start is kept: a clearing never shows more.
 import type { Audience } from '../league-values.ts';
 
 /** From the fewest adults shown in full to the most. */
@@ -17,6 +23,8 @@ export type AudienceChange = {
   readonly needsConfirming: boolean;
   /** Saving it clears the confirmed "children in full" back to no. */
   readonly clearsChildrenInFull: boolean;
+  /** Children come into an adult league: the youth starting choices are put back (S-96). */
+  readonly bringsChildrenIn: boolean;
 };
 
 export function audienceChange(
@@ -27,5 +35,6 @@ export function audienceChange(
   return {
     needsConfirming: towardAdults[to] > towardAdults[from],
     clearsChildrenInFull: from === 'adult' && to !== 'adult' && childrenInFullConfirmed,
+    bringsChildrenIn: from === 'adult' && to !== 'adult',
   };
 }
