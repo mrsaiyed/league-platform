@@ -25,6 +25,7 @@ Two things to know before reading:
    - **2.242 The device tells its own commands from somebody else's by their IDs** (added 2026-11-24, found while finishing 2.61; built right after 2.148). Why: after players are added at the table, a phone can wrongly list its taps as not saved.
 4. **2.70 Save a copy and upload it.** Why: the rescue when a phone never gets signal or loses what it stored; nothing counts twice. (unsure: the offline queue already covers most bad-signal nights; this is the backup for the worst one.)
 5. **2.119 The game format at the table.** Why: when officials say "tonight is played differently" (shorter game, other clock), the scorer can set it. Once it lands, step 2.68 is ticked (list C). (unsure: needed only if Faraj ever changes a game's format on the night; it is common in rec leagues.)
+   - **2.241 The scoring screen offers only the statistics the season keeps** (added 2026-11-24 from S-93, decided for the founder). Why: a turnover button whose taps appear nowhere misleads the scorekeeper. (unsure: it could wait; it is small.)
 6. **2.177 A scorekeeper undoes a final score they typed themselves.** Why: brought in by 2.229, which works on the same commands and screen and must come after it.
 7. **2.229 A correction keeps what it replaces.** Why: today saving a corrected game again can delete every player's line in it; a correction must never lose data.
 8. **2.65 Correcting a tracked game in a grid.** Why: lets an admin fix a live-scored game afterwards so the play list still explains the final numbers. (unsure: a scorer can already reopen the game in the tracker; this is the practical way for an admin.)
@@ -151,7 +152,7 @@ Two things to know before reading:
 
 ## C. Not to be built: replaced, or probably done already (2 steps)
 
-- **2.68 Each game gets its season's rules** — the step says itself it is replaced by 2.122 (done) and 2.119 (list A): tick it when 2.119 lands.
+- **2.68 Each game gets its season's rules** — the step says itself it is replaced by 2.122 (done) and 2.119 (list A): tick it when 2.119 lands. TICKED 2026-11-24.
 - **2.89 Games area: real standings and a browser test** — probably done by other steps: the database-backed games and the standings that move when a score is saved came with 2.93's last part (`apps/web/src/server/database-games.ts`, `database-event-handlers.ts`), and the league's own time came with 2.33 and 2.165. Check that a browser test sees standings move after a final score and a forfeit (the games-area and standings tests are the place); if one does, tick it; if not, that test is the only thing left and it belongs at the top of list A.
 
 ---
