@@ -370,6 +370,11 @@ export const tableCss = String.raw`
 .ui-no-value {
   color: var(--color-muted);
 }
+/* A box score's row of a player who did not play says so in one cell across its numbers,
+   in the same quiet color as a cell with nothing to show (step 2.159). */
+.ui-box-score td.ui-box-note {
+  color: var(--color-muted);
+}
 /* The column a table is sorted by is picked out quietly: its numbers are heavier, and its
    heading is in the text color with the arrow of its direction. */
 .ui-stats td[data-sorted='true'] {

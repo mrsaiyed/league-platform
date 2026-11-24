@@ -4,7 +4,9 @@
 // A comment above a key is about that key or, from before the split, about the keys
 // that followed it in the one file there was.
 export const enGame = {
+  'game.awaitingScore': 'Awaiting score',
   'game.back': 'Schedule',
+  'game.beingCorrected': 'Being corrected',
   'game.boxScores': 'Box scores',
   'game.cancelled': 'This game has been cancelled.',
   'game.col.play': 'Play',
@@ -13,6 +15,8 @@ export const enGame = {
   // the score after a basket, away team first as on the board above it.
   'game.col.time': 'Time',
   'game.corrected': 'Corrected on {date}',
+  'game.didNotPlay': 'Did not play',
+  'game.endedOn': 'Ended {day}',
   'game.finalScoreOnly': 'Only the final score was recorded for this game.',
   'game.forfeit': 'This game was decided by forfeit.',
   'game.forfeitBy': '{team} forfeited this game.',
@@ -25,6 +29,7 @@ export const enGame = {
   'game.newerPlays': 'Show newer plays',
   'game.noDate': 'Date to be announced',
   'game.noPlays': 'No plays have been recorded yet.',
+  'game.noScoreYet': 'No score has been entered yet.',
   'game.noStats': 'No statistics were recorded for this game.',
   'game.notStarted': 'This game has not started yet.',
   // In place of a team's box score when nothing was recorded for it (a box score typed for
@@ -89,7 +94,7 @@ export const enGame = {
   'game.teams': 'The two teams',
   // A game's page (step 2.45, P7 §5.3). Words with {braces} are filled on the device too.
   'game.title': '{away} at {home}',
-  'game.wasSetFor': 'It was set for {when}',
+  'game.wasSetFor': 'Was set for {when}',
   'stat.assists': 'Assists',
   'stat.assists.short': 'AST',
   'stat.blocks': 'Blocks',

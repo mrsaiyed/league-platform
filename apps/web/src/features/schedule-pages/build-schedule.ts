@@ -4,8 +4,11 @@
 // the message file (T-187); nothing here reads anything.
 import {
   leagueUrl,
+  publicGameState,
   type LeagueAddressee,
   type PublicGame,
+  type PublicGameState,
+  type PublicGameTruth,
   type PublicSchedule,
 } from '@srleagues/core';
 import { finalLinkState, finalPillOf } from '@srleagues/site';
@@ -60,6 +63,17 @@ export type GameView = {
    * a quiet word of its own instead of standing among the coming games as one of them.
    */
   readonly awaiting?: boolean;
+  /**
+   * The pill a card draws in place of its state's own (step 2.159): "Awaiting score" for a
+   * game waiting for its score, "Being corrected" for a result being corrected. Left out
+   * for every other game, whose state's own pill says it.
+   */
+  readonly pill?: string;
+  /**
+   * A decided game reopened for correction (S-47, T-384): its card shows the result as it
+   * stood and does not follow the correction's live taps, until the game is decided again.
+   */
+  readonly held?: boolean;
 };
 
 export type RoundView = {
@@ -152,6 +166,29 @@ export function placeOf(game: Pick<PublicGame, 'venue' | 'courtName'>): string |
     : t('schedule.venueCourt', { venue: game.venue.name, court: game.courtName });
 }
 
+/**
+ * The one public truth of a game (publicGameState, T-382): what every public page says it
+ * is, from its facts and the league's clock. A list read does not keep when a game ended.
+ */
+export function gameTruth(game: PublicGame, clock: LeagueClock): PublicGameTruth {
+  return publicGameState(
+    {
+      status: game.status,
+      startsAt: game.startsAt,
+      localDate: game.localDate,
+      homeScore: game.homeScore,
+      awayScore: game.awayScore,
+      finalizedAt: null,
+      beingCorrected: game.beingCorrected,
+    },
+    clock,
+  );
+}
+
+/** A game the lists show with a result: decided, or being corrected (its result as it stood). */
+export const hasResult = (state: PublicGameState): boolean =>
+  state === 'final' || state === 'forfeit' || state === 'being-corrected';
+
 export function gameView(
   game: PublicGame,
   clock: LeagueClock,
@@ -164,16 +201,23 @@ export function gameView(
   const overtime = status === 'final' ? game.overtimePeriods : null;
   const finalPill = finalPillOf(t, overtime);
   const finalSaid = finalLinkState(t, overtime);
-  const awaiting =
-    status === 'scheduled' &&
-    (game.startsAt !== null
-      ? Date.parse(game.startsAt) <= Date.parse(clock.now)
-      : day !== null && day < clock.today);
+  const truth = gameTruth(game, clock);
+  const awaiting = truth.state === 'awaiting-score';
+  // Being corrected: the result as it stood, drawn as that result with its own pill.
+  const stood = truth.state === 'being-corrected' ? truth.result : null;
   return {
     id: game.id,
-    home: { name: game.homeTeam.name, score: game.homeScore, color: game.homeTeam.color },
-    away: { name: game.awayTeam.name, score: game.awayScore, color: game.awayTeam.color },
-    status,
+    home: {
+      name: game.homeTeam.name,
+      score: stood === null ? game.homeScore : stood.home,
+      color: game.homeTeam.color,
+    },
+    away: {
+      name: game.awayTeam.name,
+      score: stood === null ? game.awayScore : stood.away,
+      color: game.awayTeam.color,
+    },
+    status: stood === null ? status : stood.decided,
     ...(finalPill === undefined ? {} : { finalPill }),
     ...(finalSaid === undefined ? {} : { finalSaid }),
     periods: game.periods,
@@ -189,7 +233,8 @@ export function gameView(
     // Every game has a page, whatever its state, and its card leads there.
     detailsHref: leagueUrl(league, 'game', { game: game.id, season: seasonSlug }),
     teamSlugs: [game.homeTeam.slug, game.awayTeam.slug],
-    ...(awaiting ? { awaiting: true } : {}),
+    ...(awaiting ? { awaiting: true, pill: t('game.awaitingScore') } : {}),
+    ...(stood === null ? {} : { held: true, pill: t('game.beingCorrected') }),
   };
 }
 
@@ -237,6 +282,11 @@ export type ScheduleView = {
   readonly teamOptions: readonly { readonly value: string; readonly label: string }[];
   /** The season has no published game at all. */
   readonly seasonIsEmpty: boolean;
+  /**
+   * The games shown whose start has passed with no score, latest first: listed apart, in a
+   * short list of their own over the rounds, as well as in their own round (step 2.159).
+   */
+  readonly awaiting: readonly GameView[];
 };
 
 export function buildScheduleView(
@@ -259,6 +309,7 @@ export function buildScheduleView(
     choices.team === undefined ||
     g.homeTeam.slug === choices.team ||
     g.awayTeam.slug === choices.team;
+  const startOf = new Map(everyGame.map((g) => [g.id, lastTime(g)]));
   const views = (games: readonly PublicGame[]) =>
     games.filter(keep).map((g) => gameView(g, clock, league, schedule.season.slug));
   const oneRound = schedule.rounds.some((r) => r.number === choices.round)
@@ -291,6 +342,10 @@ export function buildScheduleView(
     });
   }
   const unplaced = oneRound === undefined ? views(schedule.unplacedGames) : [];
+  const shownGames = [...rounds.flatMap((r) => r.games), ...unplaced];
+  const awaiting = shownGames
+    .filter((g) => g.awaiting === true)
+    .sort((a, b) => (startOf.get(b.id) ?? 0) - (startOf.get(a.id) ?? 0));
   if (unplaced.length > 0) {
     rounds.push({
       key: 'other-games',
@@ -315,6 +370,7 @@ export function buildScheduleView(
         .map(([value, label]) => ({ value, label })),
     ],
     seasonIsEmpty: everyGame.length === 0,
+    awaiting,
   };
 }
 
@@ -322,14 +378,14 @@ export type HomeGames = {
   readonly recent: readonly GameView[];
   readonly upcoming: readonly GameView[];
   /**
-   * Games still marked to be played whose start has passed, latest first: the home page
-   * lists them with its results, each saying it is waiting for one, and never among the
-   * games to come.
+   * Games whose start has passed with no score, latest first: the home page lists them in
+   * a short list of their own, "Waiting for a score", never among the games to come and
+   * never among the results (step 2.159).
    */
   readonly awaiting: readonly GameView[];
 };
 
-/** How many games waiting for a result the home page lists above its results. */
+/** How many games waiting for a score the home page lists. */
 export const homeAwaitingSize = 2;
 
 /** When a game is, for ordering: its start, else noon of its day, else nothing (undefined). */
@@ -394,14 +450,17 @@ export function buildHomeGames(
 ): HomeGames {
   const everyGame = [...schedule.rounds.flatMap((r) => r.games), ...schedule.unplacedGames];
   const view = (g: PublicGame) => gameView(g, clock, league, schedule.season.slug);
+  const truthOf = new Map(everyGame.map((g) => [g.id, gameTruth(g, clock).state]));
+  const stateOf = (g: PublicGame): PublicGameState => truthOf.get(g.id) ?? 'upcoming';
+  // A recent result has a result: decided, or being corrected (the result as it stood).
   const recent = everyGame
-    .filter((g) => g.status === 'final' || g.status === 'forfeit')
+    .filter((g) => hasResult(stateOf(g)))
     .sort((a, b) => lastTime(b) - lastTime(a))
     .slice(0, homeListSize)
     .map(view);
   const order = comingOrder(clock);
   const coming = everyGame
-    .filter((g) => g.status === 'live' || g.status === 'scheduled')
+    .filter((g) => stateOf(g) === 'live' || stateOf(g) === 'upcoming')
     .sort(order)
     .slice(0, homeListSize);
   const postponed = everyGame
@@ -409,10 +468,9 @@ export function buildHomeGames(
     .sort(order)
     .slice(0, homeListSize);
   const awaiting = everyGame
-    .filter((g) => g.status === 'scheduled')
+    .filter((g) => stateOf(g) === 'awaiting-score')
     .sort((a, b) => lastTime(b) - lastTime(a))
-    .map(view)
-    .filter((g) => g.awaiting === true)
-    .slice(0, homeAwaitingSize);
+    .slice(0, homeAwaitingSize)
+    .map(view);
   return { recent, upcoming: [...coming, ...postponed].map(view), awaiting };
 }

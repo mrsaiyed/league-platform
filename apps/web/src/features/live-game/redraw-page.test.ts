@@ -86,6 +86,19 @@ describe('drawing a game page again', () => {
     expect(x.reloads()).toBe(2);
   });
 
+  it('reloads again at one sequence number when the game has reached another status', async () => {
+    // A by-hand correction saves no play: reopened (live) and ended again (final) at 4.
+    const x = device({});
+    redrawPage({ gameId: 'g', sequence: 4, status: 'live' }, x.d);
+    await x.fire();
+    redrawPage({ gameId: 'g', sequence: 4, status: 'final' }, x.d);
+    await x.fire();
+    expect(x.reloads()).toBe(2);
+    redrawPage({ gameId: 'g', sequence: 4, status: 'final' }, x.d); // came back stale
+    await x.fire();
+    expect(x.reloads()).toBe(2);
+  });
+
   it('still reloads when the session storage refuses', async () => {
     const x = device({ storage: 'refuses' });
     redrawPage({ gameId: 'g', sequence: 4 }, x.d);

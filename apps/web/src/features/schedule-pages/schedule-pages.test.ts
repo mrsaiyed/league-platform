@@ -172,7 +172,7 @@ describe('schedule', () => {
     expect(said('scheduled')).toMatch(/^Herons against Falcons, [A-Z][a-z]{2}, [A-Z][a-z]{2} \d/);
     // The made-up game nobody scored, three days before the world's today (step 2.156).
     expect(said('scheduled', true)).toBe(
-      'Badgers against Herons, Tue, Nov 10, 7:00 PM, awaiting the result',
+      'Badgers against Herons, Tue, Nov 10, 7:00 PM, awaiting the score',
     );
     // A live one with a score, a game with no day yet, a cancelled one, and a live one
     // whose score is not kept.
@@ -337,8 +337,10 @@ describe('upcoming games', () => {
       rounds: [],
       unplacedGames: [postponed, overdue, undated, next],
     };
-    const ids = buildHomeGames(changed, clock, addressee).upcoming.map((g) => g.id);
-    expect(ids).toEqual([next.id, 'overdue', 'no-day', 'off']);
+    const home = buildHomeGames(changed, clock, addressee);
+    // A game whose day has passed with no score is not a coming game: it waits apart.
+    expect(home.upcoming.map((g) => g.id)).toEqual([next.id, 'no-day', 'off']);
+    expect(home.awaiting.map((g) => g.id)).toEqual(['overdue']);
   });
 
   it("lists tonight's game ahead of one earlier today that has no result yet, by the league's own clock", async () => {
@@ -383,10 +385,11 @@ describe('upcoming games', () => {
       'no-day',
       'postponed',
     ]);
-    const home = buildHomeGames(changed, clock, addressee).upcoming.map((g) => g.id);
-    expect(home[0]).toBe('tonight');
-    expect(home.indexOf('tonight')).toBeLessThan(home.indexOf('earlier-today'));
-    expect(home.at(-1)).toBe('postponed');
+    const built = buildHomeGames(changed, clock, addressee);
+    const home = built.upcoming.map((g) => g.id);
+    expect(home).toEqual(['tonight', 'today-no-time', 'tomorrow', 'no-day', 'postponed']);
+    // The two whose start has passed with no score wait apart, the latest first.
+    expect(built.awaiting.map((g) => g.id)).toEqual(['earlier-today', 'yesterday']);
     // An hour later tonight's game has started with no result: tomorrow's is the next one.
     const later = { ...clock, now: '2026-11-14T04:30:00.000Z' };
     expect([...games].sort(comingOrder(later)).map((g) => g.id)).toEqual([
@@ -402,7 +405,9 @@ describe('upcoming games', () => {
 
   it('keeps postponed games from taking a coming game its place in the list', async () => {
     const { clock, schedule, everyGame } = await upcomingOf();
-    const next = everyGame.find((g) => g.status === 'scheduled');
+    const next = everyGame.find(
+      (g) => g.status === 'scheduled' && (g.localDate ?? '') > clock.today,
+    );
     if (next === undefined) throw new Error('no coming game');
     const many = Array.from({ length: 8 }, (_, i) => ({ ...next, id: `g${i}` }));
     const off = Array.from({ length: 8 }, (_, i) => ({

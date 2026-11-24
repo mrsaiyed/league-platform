@@ -472,6 +472,7 @@ describe('a team page', () => {
     expect(buildTeamGames(undefined, 'falcons', clock, addressee)).toEqual({
       upcoming: [],
       results: [],
+      awaiting: [],
     });
   });
 
@@ -517,10 +518,14 @@ describe('a team page', () => {
         game('tonight', '2026-11-14T04:00:00.000Z'),
       ],
     };
-    expect(buildTeamGames(changed, 'herons', clock, addressee).upcoming.map((g) => g.id)).toEqual([
-      'tonight',
-      'earlier-today',
+    // The game earlier today with no score is not on the schedule after tonight's: it waits
+    // apart, in its own list, with the same pill as its own page (step 2.159).
+    const games = buildTeamGames(changed, 'herons', clock, addressee);
+    expect(games.upcoming.map((g) => g.id)).toEqual(['tonight']);
+    expect(games.awaiting.map((g) => [g.id, g.pill])).toEqual([
+      ['earlier-today', 'Awaiting score'],
     ]);
+    expect(games.results).toEqual([]);
   });
 });
 

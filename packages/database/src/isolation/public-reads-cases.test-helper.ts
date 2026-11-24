@@ -23,6 +23,7 @@ import {
   listPeopleForDisplay,
   listPlayerSeasonTotals,
   listPlayerTeamLinks,
+  listResultsBeingCorrected,
   listSeasonDivisions,
   listSeasonStatKeys,
   listSeasonTeams,
@@ -132,6 +133,39 @@ registerIsolationCase({
         ${JSON.stringify({ version: 1, status: 'scheduled', homeScore: null, awayScore: null })}::jsonb,
         '2026-11-20T18:00:00Z', '2026-11-20T18:00:00Z')`.execute(transactionOf(inTarget)),
   run: (scope, target) => findGameCorrectedDate(scope, target.gameId),
+});
+// The target's final game reopened and not decided again: the game back to live, and the
+// reopen's correction (before: the result as it stood, a forfeit 20 to 0 no row of the
+// target holds) inside the target's own fence, so a query with its league filter taken out
+// would answer with another league's result (step 2.159, the fence check). Its time is
+// later than the seed's own correction of that game (stamped by the real clock), so it is
+// the game's latest correction, the one a reopen's result is read from.
+const reopenTargetGame = async (inTarget: LeagueScope, target: LeagueRecords) => {
+  await transactionOf(inTarget)
+    .updateTable('games')
+    .set({ status: 'live', finalized_at: null })
+    .where('league_id', '=', inTarget.leagueId)
+    .where('id', '=', target.gameId)
+    .execute();
+  await sql`insert into game_corrections
+      (id, league_id, game_id, account_id, reason, before, after, at, created_at)
+      values ('01900000-0000-7000-8000-00000000d159', ${inTarget.leagueId},
+        ${target.gameId}, ${target.ownerId}, 'Harness reopening',
+        ${JSON.stringify({ version: 1, status: 'forfeit', homeScore: 20, awayScore: 0 })}::jsonb,
+        ${JSON.stringify({ version: 1, status: 'live', homeScore: null, awayScore: null })}::jsonb,
+        '2030-01-01T18:00:00Z', '2030-01-01T18:00:00Z')`.execute(transactionOf(inTarget));
+};
+registerIsolationCase({
+  subject: gamesReadStore,
+  name: "read the result the target's reopened game stood at",
+  arrange: reopenTargetGame,
+  run: (scope, target) => gamesReadStore(scope).resultBeingCorrected(target.gameId),
+});
+registerIsolationCase({
+  subject: listResultsBeingCorrected,
+  name: "list the results the target's reopened games stood at",
+  arrange: reopenTargetGame,
+  run: (scope, target) => listResultsBeingCorrected(scope, [target.gameId]),
 });
 registerIsolationCase({
   subject: listGameTeams,

@@ -23,7 +23,13 @@ import type { StatRow, StatsColumn } from '@srleagues/ui';
 import type { LeagueClock } from '../../server/public-schedule.ts';
 import type { PublicStatsSettings } from '../../server/public-stats.ts';
 import { locale, t } from '../../server/messages.ts';
-import { comingOrder, gameView, type GameView } from '../schedule-pages/index.ts';
+import {
+  comingOrder,
+  gameTruth,
+  gameView,
+  hasResult,
+  type GameView,
+} from '../schedule-pages/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
 
 export type TeamCard = {
@@ -152,6 +158,8 @@ export function rosterRow(line: PublicRosterLine, index: number): RosterRowView 
 export type TeamGames = {
   readonly upcoming: readonly GameView[];
   readonly results: readonly GameView[];
+  /** Games whose start has passed with no score, latest first: a list of their own (2.159). */
+  readonly awaiting: readonly GameView[];
 };
 
 const timeOf = (g: PublicGame): number | undefined =>
@@ -168,25 +176,26 @@ export function buildTeamGames(
   clock: LeagueClock,
   league: LeagueAddressee,
 ): TeamGames {
-  if (schedule === undefined) return { upcoming: [], results: [] };
+  if (schedule === undefined) return { upcoming: [], results: [], awaiting: [] };
   const mine = [...schedule.rounds.flatMap((r) => r.games), ...schedule.unplacedGames].filter(
     (g) => g.homeTeam.slug === teamSlug || g.awayTeam.slug === teamSlug,
   );
-  const decided = (g: PublicGame) => g.status === 'final' || g.status === 'forfeit';
+  // The one truth of each game (T-382), as on its own page, the home page and the schedule.
+  const states = new Map(mine.map((g) => [g.id, gameTruth(g, clock).state]));
+  const decided = (g: PublicGame) => hasResult(states.get(g.id) ?? 'upcoming');
+  const latest = (a: PublicGame, b: PublicGame) =>
+    (timeOf(b) ?? Number.NEGATIVE_INFINITY) - (timeOf(a) ?? Number.NEGATIVE_INFINITY);
   const view = (g: PublicGame) => gameView(g, clock, league, schedule.season.slug);
-  const results = mine
-    .filter(decided)
-    .sort(
-      (a, b) => (timeOf(b) ?? Number.NEGATIVE_INFINITY) - (timeOf(a) ?? Number.NEGATIVE_INFINITY),
-    )
-    .map(view);
+  const results = mine.filter(decided).sort(latest).map(view);
+  const waiting = (g: PublicGame) => states.get(g.id) === 'awaiting-score';
+  const awaiting = mine.filter(waiting).sort(latest).map(view);
   // The next game the team can go to comes first; a postponed game, which has no day to
   // come, comes last (comingOrder), never first on the strength of its old date.
   const upcoming = mine
-    .filter((g) => !decided(g) && g.status !== 'cancelled')
+    .filter((g) => !decided(g) && !waiting(g) && g.status !== 'cancelled')
     .sort(comingOrder(clock))
     .map(view);
-  return { upcoming, results };
+  return { upcoming, results, awaiting };
 }
 
 export type TeamStatsView = {

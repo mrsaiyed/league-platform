@@ -2,6 +2,7 @@ import { leagueUrl, type LeagueAddressee } from '@srleagues/core';
 import { Section } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
 import { t } from '../../server/messages.ts';
+import { BeingCorrectedNote, countBeingCorrected } from './being-corrected-note.tsx';
 import { buildHomeGames, type GameView } from './build-schedule.ts';
 import { GameList } from './schedule-views.tsx';
 
@@ -38,6 +39,23 @@ export function LatestResultsSection({
  * on the standings page, so the page does not end on a table (how the table got to be as
  * it is). Kept current from the league's live channel, as every list of games is.
  */
+/**
+ * The line under the standings page's tables while a game of the season is being corrected
+ * and so is not counted in them (step 2.159, S-105); nothing otherwise.
+ */
+export async function StandingsBeingCorrected({
+  addressee,
+  season,
+}: {
+  readonly addressee: { readonly id: string };
+  readonly season: { readonly id: string };
+}) {
+  const { publicSchedule } = await webPorts();
+  const clock = await publicSchedule.clockOf(addressee.id);
+  const schedule = await publicSchedule.scheduleOf(addressee.id, season.id, clock.today);
+  return <BeingCorrectedNote count={countBeingCorrected(schedule, clock)} />;
+}
+
 export async function LatestResults({
   addressee,
   season,
