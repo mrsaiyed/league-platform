@@ -54,6 +54,8 @@ export const enAdminImport = {
     'The report of this import cannot be read. Upload the file again.',
   'admin.import.error.revision-out-of-date':
     'The schedule was published after the draft was started. Open the schedule, then try again.',
+  'admin.import.error.season-archived':
+    'That season is archived, so it is read-only: nothing can be imported into it, and nothing was changed.',
   'admin.import.error.season-not-found': 'That season is not there any more.',
   'admin.import.error.team-left':
     'A team named in the file has left the league since, so no game is made for it. Undo “Left the league” on the team’s page, or take its games out of the file and upload it again.',

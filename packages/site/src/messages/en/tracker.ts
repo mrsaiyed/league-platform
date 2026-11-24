@@ -152,6 +152,7 @@ export const enTracker = {
   'tracker.final.title': 'Final',
   'tracker.final.won': '{team} won, {high}–{low}',
   'tracker.floor.title': 'On court',
+  'tracker.format.archived': "This game's season is archived, so its game rules cannot be changed.",
   'tracker.format.clock.running': 'Running clock: the clock keeps going through fouls and timeouts',
   'tracker.format.clock.stop': 'Stop clock: fouls and timeouts stop the clock',
   'tracker.format.confirm': 'Confirm and start scoring',

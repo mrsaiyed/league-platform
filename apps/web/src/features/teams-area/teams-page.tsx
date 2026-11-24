@@ -8,6 +8,7 @@ import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { binLinkFor } from '../bin-area/index.ts';
+import { startSeasonAddress } from '../season-settings/index.ts';
 import { t } from '../../server/messages.ts';
 import { createTeamAction } from './actions.ts';
 import {
@@ -59,7 +60,10 @@ export async function TeamsPage({
         binHref={leagueUrl(here, 'admin-area', { area: 'settings', subpath: ['bin'] })}
       />
       {season === undefined ? (
-        <EmptyPanel text={t('adminTeams.noSeason')} />
+        <EmptyPanel
+          text={t('adminTeams.noSeason')}
+          action={{ href: startSeasonAddress(here), label: t('seasonSettings.start.open') }}
+        />
       ) : (
         await Body({ league: here, context, seasonId: season.id })
       )}

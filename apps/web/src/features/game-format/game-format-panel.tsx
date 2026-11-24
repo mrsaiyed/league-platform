@@ -226,6 +226,11 @@ export function GameFormatPanel({
       {!change.may && change.reason === 'setting-off' ? (
         <p className={look.quiet}>{t('tracker.format.wrong')}</p>
       ) : null}
+      {!change.may && change.reason === 'season-archived' ? (
+        <p className={look.quiet} data-format-archived="">
+          {t('tracker.format.archived')}
+        </p>
+      ) : null}
       {offered && !editing ? (
         <p>
           <button

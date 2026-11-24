@@ -13,7 +13,13 @@
 // hidden ones only to someone who may see them, `mayListSeason`), and the one season is
 // read through the season command's own read (getSeason, `season.settings`), in the
 // league of the session: a season of another league is never found (T-28).
-import { getSeason, isLeagueHidden, readOnlyStatuses, type SeasonView } from '@srleagues/core';
+import {
+  archivedSeasonStatus,
+  getSeason,
+  isLeagueHidden,
+  readOnlyStatuses,
+  type SeasonView,
+} from '@srleagues/core';
 import { displayLabels } from '@srleagues/site';
 import { EmptyPanel, OptionPicker, PageHead } from '@srleagues/ui';
 import { randomUUID } from 'node:crypto';
@@ -26,11 +32,12 @@ import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffNotice, StaffPill, StaffTrail } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { changeVisibilityAction, savePartAction } from './actions.ts';
-import { earnedDone, problemKey } from './answer.ts';
-import { mayShowSeason } from './may-show-season.ts';
+import { earnedDone, earnedStateDone, problemKey } from './answer.ts';
+import { mayShowSeason, mayStartSeason } from './may-show-season.ts';
 import { PartForm } from './part-form.tsx';
 import { partFacts, partGroups, partTexts } from './part-words.ts';
 import { panelWords } from './panel-words.ts';
+import { SeasonStatePanel, StartSeasonPanel } from './season-start-panels.tsx';
 import {
   isSeasonPart,
   nameFields,
@@ -74,11 +81,31 @@ export async function SeasonSettingsPage({
   const chosen = named ?? chooseSeason(seasons, undefined);
   const season = seasons.find((s) => s.id === chosen?.id);
   const top = <PageHead title={t('admin.area.season')} sub={t('seasonSettings.intro')} />;
+  // Which panel a refusal in the address belongs to (step 2.130): the start form's, the
+  // current-and-archived panel's, else the visibility panel's.
+  const problemWord = firstValue(search['problem']) ?? '';
+  const problemAt = problemWord.startsWith('leagues.start_season.')
+    ? 'start'
+    : /^leagues\.(set_current_season|archive_season)\./.test(problemWord) ||
+        problemWord === 'not-archivable'
+      ? 'state'
+      : 'visibility';
+  const problemFor = (panel: typeof problemAt) =>
+    problemAt === panel ? problemKey(search) : undefined;
+  // "Start a new season" (step 2.130): copies from the current season, if there is one.
+  const current = seasons.find((s) => s.isCurrent);
+  const mayStart = mayStartSeason(holder, season?.programId, addressee.status);
+  const start = mayStart ? (
+    <StartSeasonPanel league={league} copiedFrom={current?.name} problem={problemFor('start')} />
+  ) : null;
   if (season === undefined) {
     return (
       <main className="admin-season">
         {top}
-        <EmptyPanel text={t('seasonSettings.noSeason')} />
+        <EmptyPanel
+          text={t(mayStart ? 'seasonSettings.noSeasonStart' : 'seasonSettings.noSeason')}
+        />
+        {start}
       </main>
     );
   }
@@ -136,6 +163,20 @@ export async function SeasonSettingsPage({
             mayChange={mayChange}
             gameUnderWay={gameUnderWay}
             search={search}
+            problem={problemFor('visibility')}
+          />
+          <SeasonStatePanel
+            season={read.value}
+            league={league}
+            base={seasonSettingsAddress(addressee)}
+            back={seasonSettingsAddress(addressee, season.slug)}
+            mayChange={mayChange}
+            asked={firstValue(search['ask'])}
+            said={earnedStateDone(search, {
+              isCurrent: read.value.isCurrent,
+              archived: read.value.status === archivedSeasonStatus,
+            })}
+            problem={problemFor('state')}
           />
           {readOnlyStatuses.includes(addressee.status) ? (
             <p className="staff-quiet">{t('seasonSettings.readOnly')}</p>
@@ -163,6 +204,7 @@ export async function SeasonSettingsPage({
               </a>
             </p>
           ) : null}
+          {start}
         </>
       ) : (
         <StaffNotice kind="refused">
@@ -303,6 +345,7 @@ function VisibilityPanel({
   mayChange,
   gameUnderWay,
   search,
+  problem,
 }: {
   readonly season: SeasonView;
   /** This page's address with no query: where the "ask" form goes. */
@@ -316,6 +359,8 @@ function VisibilityPanel({
   /** Whether a game of the season is being scored now (read only while hiding is asked). */
   readonly gameUnderWay: boolean;
   readonly search: SearchParams;
+  /** A refusal that belongs to this panel, as words. */
+  readonly problem: TextKey | undefined;
 }) {
   const name = season.name;
   const visibility = visibilityOf(season.status);
@@ -329,7 +374,6 @@ function VisibilityPanel({
   const wish = mayChange ? wishOf(season.status) : undefined;
   const asked = firstValue(search['ask']);
   const said = earnedDone(search, visibility);
-  const problem = problemKey(search);
   return (
     <section className="staff-panel" id={visibilityAnchor} aria-labelledby="who-can-see-title">
       <h2 id="who-can-see-title">{t('seasonSettings.visibility.title')}</h2>
@@ -341,7 +385,11 @@ function VisibilityPanel({
       {problem === undefined && said !== undefined ? (
         <StaffNotice kind="saved" data={{ 'data-notice': 'done' }}>
           <p>
-            {said === 'shown' ? words.shown : t('seasonSettings.done.hidden', { season: name })}
+            {said === 'shown'
+              ? words.shown
+              : said === 'started'
+                ? t('seasonSettings.done.started', { season: name })
+                : t('seasonSettings.done.hidden', { season: name })}
           </p>
         </StaffNotice>
       ) : null}

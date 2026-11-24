@@ -13,6 +13,8 @@ const problemKeys: readonly TextKey[] = [
   'admin.import.error.not-allowed',
   'admin.import.error.invalid-input',
   'admin.import.error.no-file',
+  // An archived season is read-only (O-12, step 2.130).
+  'admin.import.error.season-archived',
   'admin.import.error.no-season',
   'admin.import.error.season-not-found',
   'admin.import.error.file-too-large',

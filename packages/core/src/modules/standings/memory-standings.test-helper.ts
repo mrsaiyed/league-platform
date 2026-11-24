@@ -56,6 +56,8 @@ export type MemoryStandings = {
   totals: Record<string, PlayerSeasonTotals[]>;
   /** Seasons locked, in order. */
   locked: string[];
+  /** Seasons archived, so read-only (O-12, step 2.130). */
+  archived?: string[];
 };
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -229,7 +231,6 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
       list: async () => [],
     },
     games: {
-      seasonArchived: async () => false,
       find: async (id) => s.games.find((g) => g.id === id),
       lockGame: async (id) => s.games.some((g) => g.id === id),
       setResult: async (id, change, version) => {

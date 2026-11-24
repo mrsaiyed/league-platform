@@ -74,6 +74,15 @@ describe('a result recorded by hand, for the scorekeeper who recorded it (step 2
     });
   });
 
+  it('says the season is archived, for their own entry and the tracker’s read (step 2.130)', () => {
+    expect(reopenViewOf(byHand, false, own({ when: 'no', code: 'season-archived' }))).toEqual({
+      kind: 'who',
+      because: 'archived',
+    });
+    const tracked = no({ reopen: { when: 'no', code: 'season-archived' }, endedBy: 'a' });
+    expect(reopenViewOf(tracked, false)).toEqual({ kind: 'who', because: 'archived' });
+  });
+
   it('keeps the admin’s door for whoever may correct games, whatever the own read says', () => {
     expect(reopenViewOf(byHand, true, own({ when: 'no', code: 'not-recorded-by-you' }))).toEqual({
       kind: 'correct',
