@@ -287,6 +287,7 @@ export const enTracker = {
   'tracker.held.waiting_one': '{count} play waiting to send',
   'tracker.held.waiting_other': '{count} plays waiting to send',
   'tracker.heldByOther': '{name} is scoring this game on another device.',
+  'tracker.heldBySelf': 'You are scoring this game on another device.',
   'tracker.hint.players':
     'Tap a player, then +1, +2, +3, Foul or Turnover. −Foul takes back that player’s latest foul.',
   'tracker.hint.saved':
@@ -322,6 +323,10 @@ export const enTracker = {
   'tracker.keptList.readAloud':
     'Only the device scoring the game can enter these again. Read them out to whoever is scoring it now.',
   'tracker.keptList.title': 'Not saved',
+  // When the device holding the game was last heard from (S-42), on the server's clock.
+  'tracker.lastHeardNow': 'That device was last heard from less than a minute ago.',
+  'tracker.lastHeard_one': 'That device was last heard from {count} minute ago.',
+  'tracker.lastHeard_other': 'That device was last heard from {count} minutes ago.',
   // On the page that replaces the scoring screen when the device stops scoring (taken
   // over, signed out, no longer allowed) in the very moment a tap was made.
   'tracker.lastTapNotRecorded':
@@ -625,6 +630,11 @@ export const enTracker = {
   // Which one came back: its period and the time it was taken at.
   'tracker.say.untimeoutOf': 'Timeout taken back: {team}, {period} {clock}.',
   'tracker.seeWhoIsScoring': 'See who is scoring',
+  // "Send these plays" (S-43): only by the scorekeeper's tap, and only while nothing was recorded since.
+  'tracker.sendNotSaved.gameMoved':
+    'These plays could not be sent: something was recorded in this game since they were made. Each one must be entered again on the device scoring the game.',
+  'tracker.sendNotSaved.send': 'Send these plays',
+  'tracker.sendNotSaved.sending': 'Sending…',
   'tracker.sharedDevice.link': 'Sign out on your account page',
   'tracker.sharedDevice.text': 'On a shared phone or tablet, sign out when you finish.',
   'tracker.signIn': 'Sign in',
@@ -652,7 +662,10 @@ export const enTracker = {
   'tracker.takeOver': 'Take over scoring',
   'tracker.takeOverNo': 'Not now',
   'tracker.takeOverQuestion':
-    'Take over scoring from {name}? Their device stops scoring. Plays it has not sent yet will not be saved and must be entered again.',
+    'Take over scoring from {name}? Their device stops scoring. Plays it has not sent yet can be sent from it only until something is recorded here; after that they must be entered again.',
+  // The same account on another device, told by the server's mark (S-42), never by names.
+  'tracker.takeOverQuestionSelf':
+    'Take over scoring from you, on another device? That device stops scoring. Plays it has not sent yet can be sent from it only until something is recorded here; after that they must be entered again.',
   'tracker.takeOverYes': 'Yes, take over',
   'tracker.team.dark': 'dark',
   'tracker.team.light': 'light',

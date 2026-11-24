@@ -70,6 +70,33 @@ describe("the activity log's sentences (step 2.77)", () => {
     );
   });
 
+  it('says plays sent after a takeover as that, not as a change of players (step 2.148)', () => {
+    const sent = (change: string) =>
+      line({
+        action: 'games.apply_tracker_commands',
+        summary: 'activity.games.apply_tracker_commands',
+        targetType: 'game',
+        details: { gameId: team, change, events: 3 },
+      });
+    const game = named({
+      kind: 'game',
+      id: team,
+      homeName: 'Hawks',
+      awayName: 'Owls',
+      startsAt: '2026-12-06T03:00:00.000Z',
+    });
+    expect(logSentenceOf(sent('sent-after-takeover'), '', named(), times)).toBe(
+      'Sent plays listed as not saved after another device took over scoring (plays recorded: 3)',
+    );
+    expect(logSentenceOf(sent('sent-after-takeover'), '', game, times)).toBe(
+      'Sent plays of the game Hawks against Owls on Dec 5, 2026 listed as not saved after another device took over scoring (plays recorded: 3)',
+    );
+    // A change with no words of its own keeps the command's sentence.
+    expect(logSentenceOf(sent('added'), '', game, times)).toBe(
+      "Changed a team's players at the scorer's table",
+    );
+  });
+
   it('gives every "Who" choice its roles, and numbers two that would read the same', () => {
     const person = (accountId: string, more: Partial<PersonLine>): PersonLine => ({
       accountId,

@@ -37,6 +37,10 @@ import {
   deleteGameAssignment,
   deleteScoringSession,
   extendScoringSession,
+  findLostScoringSession,
+  loseScoringSession,
+  setLostScoringSessionSent,
+  setScoringSessionHeard,
   findScoringSession,
   insertScoringSession,
   findGameEndedAgo,
@@ -71,6 +75,7 @@ import {
   replaceGameLines,
   updateGameResult,
   findLastEventSeq,
+  listGameEventsAfter,
   findTablePlayer,
   insertTablePlayer,
   removeTablePlayer,
@@ -683,6 +688,36 @@ registerIsolationCase({
     deleteScoringSession(scope, target.upcomingGameId, target.scoringSessionId),
 });
 
+// "Send these plays" (step 2.148, T-335): what the server keeps of a session it took the
+// game from (0027).
+registerIsolationCase({
+  subject: loseScoringSession,
+  name: "take the target's upcoming game from its session, keeping it",
+  run: (scope, target) =>
+    loseScoringSession(scope, target.upcomingGameId, target.scoringSessionId, harnessNow),
+});
+
+registerIsolationCase({
+  subject: setScoringSessionHeard,
+  name: "note where the session scoring the target's upcoming game was last heard",
+  run: (scope, target) =>
+    setScoringSessionHeard(scope, target.upcomingGameId, target.scoringSessionId, 3),
+});
+
+registerIsolationCase({
+  subject: findLostScoringSession,
+  name: "read the lost session of the target's upcoming game",
+  run: (scope, target) =>
+    findLostScoringSession(scope, target.upcomingGameId, target.lostScoringSessionId),
+});
+
+registerIsolationCase({
+  subject: setLostScoringSessionSent,
+  name: "note how far the lost session of the target's upcoming game sent its plays",
+  run: (scope, target) =>
+    setLostScoringSessionSent(scope, target.upcomingGameId, target.lostScoringSessionId, 3),
+});
+
 registerCommandCase(openScoringSession, harnessTx, {
   name: "open the target's upcoming game to score",
   input: (target) => ({ gameId: target.upcomingGameId, deviceId: 'harness-device' }),
@@ -732,6 +767,13 @@ registerIsolationCase({
   subject: findLastEventSeq,
   name: "read the number of the target's final game's last event",
   run: (scope, target) => findLastEventSeq(scope, target.gameId),
+});
+
+// "Send these plays" (step 2.148, T-335): the events after a sequence number.
+registerIsolationCase({
+  subject: listGameEventsAfter,
+  name: "list the target's final game's events after sequence 0",
+  run: (scope, target) => listGameEventsAfter(scope, target.gameId, 0, 10),
 });
 
 registerIsolationCase({
