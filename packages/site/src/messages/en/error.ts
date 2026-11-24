@@ -46,6 +46,8 @@ export const enError = {
     'This result was overturned. Take the overturn off in Standings and stats first.',
   'error.games.reopen_tracked_game.scorekeepers-may-not-reopen':
     'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.season-archived':
+    'This game’s season is archived, so it is read-only and the game was not reopened. A league admin can still correct its result, with a reason.',
   'error.games.take_over_scoring.game-closed':
     'That game is already decided or cancelled. Reopen it first to correct it.',
   'error.games.take_over_scoring.game-not-found': 'That game is not there.',
