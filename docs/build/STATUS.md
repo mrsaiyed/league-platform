@@ -46,10 +46,9 @@ Learned, not yet rules elsewhere: (a) a lane that adds a page, a route, a field,
 
 Every lane's work is on GitHub. Three at a time, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`) | Where it stands                                                                                                               | What is left                                                                                                                           |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| 2.191-ci-parallel      | parked                                                                                                                        | after the first test is in the founder's hands                                                                                         |
-| 2.130-new-season       | built, reviewed (three High), fixed twice, confirmed; its last fix helper reported; pushed twice at e3e1499c; no helper in it | one helper more (the Handover part, item 2: a possible fault on two paths, the browser tests not yet run); then push twice, wait, land |
+| Lane (branch `lane/…`) | Where it stands | What is left                                   |
+| ---------------------- | --------------- | ---------------------------------------------- |
+| 2.191-ci-parallel      | parked          | after the first test is in the founder's hands |
 
 Next free: STEP 2.245, migration 0030, T-391 (T-375 and T-390 were given out and may be unused), S-106 (S-104 was given out and may be unused; S-106 is meant for the founder’s answer about the three game rules), A-22, U-19. Numbers already given out stand with their lanes (in each lane’s note).
 
