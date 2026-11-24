@@ -14,6 +14,7 @@ import {
 } from '../../server/sign-in/problems.ts';
 import { StandalonePage, TestCopyLine } from '../shell/index.ts';
 import { BotCheckBox } from './bot-check-box.tsx';
+import { FocusRefusal } from './focus-refusal.tsx';
 import { ShowPassword } from './show-password.tsx';
 
 /**
@@ -138,6 +139,8 @@ export async function SignInScreen({
           <p
             className="ui-refusal"
             role="alert"
+            id={formRefusalId}
+            tabIndex={-1}
             data-sign-in-problem={problem.name}
             data-ask={problem.name in asksToSignIn ? '' : undefined}
           >
@@ -147,6 +150,7 @@ export async function SignInScreen({
           </p>
         )}
         {children}
+        {problem === undefined ? null : <FocusRefusal />}
       </main>
     </StandalonePage>
   );
@@ -164,6 +168,17 @@ const problemFields: Partial<Record<Problem, SignInField>> = {
   passwordLeaked: 'password',
   wrongPassword: 'password',
 };
+/**
+ * A refusal about the whole form that still names fields (step 2.102's fix round): it sits
+ * above the form, and each field it names is marked wrong and points at it. "Wrong email
+ * or password" cannot say which one, so it marks both.
+ */
+const problemMarks: Partial<Record<Problem, readonly SignInField[]>> = {
+  wrongEmailOrPassword: ['email', 'password'],
+};
+/** The id of the refusal drawn above the form. */
+const formRefusalId = 'form-refusal';
+
 /** The field `name` is about, or undefined when it is about the whole form. */
 export function fieldOfProblem(name: Problem): SignInField | undefined {
   return problemFields[name];
@@ -176,14 +191,27 @@ function refusalOf(search: Search | undefined, field: SignInField) {
   return fieldOfProblem(problem.name) === field ? problem.name : undefined;
 }
 
+/** Whether the refusal above the form, in the address, names `field`. */
+function markedByFormRefusal(search: Search | undefined, field: SignInField): boolean {
+  const problem = search === undefined ? undefined : problemOf(search);
+  return problem !== undefined && (problemMarks[problem.name]?.includes(field) ?? false);
+}
+
 /**
  * A field's own refusal, under its box (step 2.102): the same mark and words the screen
  * drew above the form before, and the field points at it (`aria-describedby`). Every
- * screen whose address can carry such a refusal draws the field it is about.
+ * screen whose address can carry such a refusal draws the field it is about. A field a
+ * refusal above the form names is marked too, pointing at that refusal.
  */
 export function fieldRefusal(search: Search | undefined, field: SignInField) {
   const name = refusalOf(search, field);
   const id = `${field}-refusal`;
+  if (name === undefined && markedByFormRefusal(search, field)) {
+    return {
+      input: { 'aria-invalid': true, 'aria-describedby': formRefusalId },
+      refusal: null,
+    } as const;
+  }
   return {
     input: name === undefined ? {} : { 'aria-invalid': true, 'aria-describedby': id },
     refusal:

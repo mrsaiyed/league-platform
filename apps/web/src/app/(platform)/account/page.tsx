@@ -53,7 +53,9 @@ export default async function Page({ searchParams }: SearchProps) {
   return (
     <StandalonePage>
       <main className="ui-message ui-form-card account">
-        {/* Who is signed in, above everything else (step 2.127), in the kicker's place. */}
+        {/* Our name as the kicker, like every other card (step 2.102's fix round), and who
+            is signed in under it, above everything else (step 2.127). */}
+        <p className="ui-kicker">{t('shell.siteName')}</p>
         <p className="account-who">{t('account.signedInAs', { email: who.email })}</p>
         <h1>{t('page.account')}</h1>
         <h2>{t('account.leagues')}</h2>

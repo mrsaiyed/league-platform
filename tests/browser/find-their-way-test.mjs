@@ -267,6 +267,20 @@ if (browser) {
           await noSidewaysScroll(other, name);
           await tallEnough(other, 'main', name);
         }
+        // With nothing waiting, the code screen has no code box: "Start again" is its one
+        // filled button (step 2.102's fix round).
+        await other.goto(`${origin}/signup/code`);
+        const waiting = {
+          boxes: await other.locator('main input[name=code]').count(),
+          filled: await other.locator('main .ui-button[data-kind=main]').allInnerTexts(),
+        };
+        note(
+          'with nothing waiting the code screen offers only "Start again", filled',
+          waiting.boxes === 0 &&
+            waiting.filled.length === 1 &&
+            waiting.filled[0]?.trim() === 'Start again',
+          JSON.stringify(waiting),
+        );
         await other.goto(`${origin}/signin?problem=backToYourGame`);
         const kept = await other.locator('[data-sign-in-problem=backToYourGame]').innerText();
         note(
@@ -337,6 +351,29 @@ if (browser) {
           (await page
             .locator('main [role=alert]', { hasText: 'Wrong email or password.' })
             .count()) === 1 && (await link(page, 'Back to North Valley League').count()) === 1,
+        );
+        // Step 2.102's fix round: both fields are marked wrong, pointing at the refusal, and
+        // the keyboard is on the first of them.
+        const marked = await page.evaluate(() => {
+          const alert = document.querySelector('main [role=alert]');
+          const fields = [
+            ...document.querySelectorAll('main input[name=email], main input[name=password]'),
+          ];
+          return {
+            fields: fields.length,
+            marked: fields.every(
+              (f) =>
+                f.getAttribute('aria-invalid') === 'true' &&
+                alert !== null &&
+                f.getAttribute('aria-describedby') === alert.id,
+            ),
+            focused: document.activeElement?.getAttribute('name') ?? null,
+          };
+        });
+        note(
+          'after a wrong password both fields are marked wrong, tied to the refusal, and focus is on the email',
+          marked.fields === 2 && marked.marked && marked.focused === 'email',
+          JSON.stringify(marked),
         );
         await signIn(page, people.owner);
         note(

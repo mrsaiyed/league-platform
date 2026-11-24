@@ -23,23 +23,19 @@ import { signedInPerson } from '../../../../server/signed-in-leagues.ts';
 // address bar. With nothing under way (an old tab, Back after the account was made) a
 // signed-in person goes to their account; anyone else is told nothing is waiting for a
 // code on this device, with a way to start again, and no word of a code sent (step 2.163's
-// fix round). The code box stays; a code typed there is answered the same for every
-// visitor (the first screen, "That code has run out"), naming no address (T-68).
+// fix round). Since step 2.102's fix round it draws no code box and no "Continue", which
+// could not work: "Start again" is its one filled button. A code posted from an old tab is
+// still answered the same for every visitor (the first screen, "That code has run out"),
+// naming no address (T-68).
 export default async function Page({ searchParams }: SearchProps) {
   const search = await searchParams;
   const flow = await flowOfThisRequest();
   if (flow === undefined) {
     if ((await signedInPerson()).kind === 'signed-in') redirect(platformUrl('account'));
     return (
-      <SignInScreen
-        title="code.title"
-        intro={t('code.nothingWaiting')}
-        search={search}
-        fields={['code']}
-      >
-        <CodeForm search={search} />
+      <SignInScreen title="code.title" intro={t('code.nothingWaiting')} search={search}>
         <p>
-          <a className="ui-button" data-kind="quiet" href={platformUrl('signup')}>
+          <a className="ui-button" data-kind="main" href={platformUrl('signup')}>
             {t('code.startAgain')}
           </a>
         </p>

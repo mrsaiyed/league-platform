@@ -99,3 +99,7 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.77 (review Low): `leagues.restore_game` counts the restored game in its schedule revision's `gamesAdded: 1` and `gameIds.added`, so a future revision history would call it a new game; count it only in `restoredFromBin`, or say in T-220 that "added" includes "restored".
 
 - 2.56: head-to-head tiebreakers read an overturned game as played (packages/sports/src/standings/order-teams.ts): needs the build plan's leave to change packages/sports
+- 2.102 (review Low): choose-password stops a password under 8 with the browser's own bubble (`minLength`, `sign-in-parts.tsx`), in the browser's words; drop `minLength` and let the server's refusal under the field say it (T-187).
+- 2.102 (review Low): `scripts/shots.mjs --measure` measures league pages only (`publicPage`), so it cannot measure SR Leagues' own pages; let it take the platform pictures too.
+- 2.102 (review Low): SR Leagues' own look (`platformDesign`, T-325) has no dark version: with a dark preference its pages draw light; add one or say in T-325 that there is none.
+- 2.102 (review Low, league frame): the league frame's footer links "Terms" (36) and "Privacy" (43) are under 44 wide at 320 and 390; give them a 44 minimum width.

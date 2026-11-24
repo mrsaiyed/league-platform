@@ -9,7 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { t } from '../../server/messages.ts';
 import { problems } from '../../server/sign-in/problems.ts';
-import { BotCheckField, needsScriptsWords, problemWords } from './sign-in-parts.tsx';
+import { BotCheckField, fieldRefusal, needsScriptsWords, problemWords } from './sign-in-parts.tsx';
 
 const draw = (
   widget: Parameters<typeof BotCheckField>[0]['widget'],
@@ -99,5 +99,27 @@ describe('the words that offer "Continue with Google" (M27)', () => {
         expect(t(problemWords(name, false))).not.toContain('Continue with Google');
       }
     }
+  });
+});
+
+describe('fieldRefusal (step 2.102)', () => {
+  it('marks both fields after "Wrong email or password", pointing at the refusal above the form', () => {
+    const search = { problem: 'wrongEmailOrPassword' };
+    for (const field of ['email', 'password'] as const) {
+      expect(fieldRefusal(search, field)).toEqual({
+        input: { 'aria-invalid': true, 'aria-describedby': 'form-refusal' },
+        refusal: null,
+      });
+    }
+  });
+
+  it('keeps a one-field refusal under its own field, and leaves the others unmarked', () => {
+    const search = { problem: 'wrongPassword' };
+    expect(fieldRefusal(search, 'password').input).toEqual({
+      'aria-invalid': true,
+      'aria-describedby': 'password-refusal',
+    });
+    expect(fieldRefusal(search, 'email')).toEqual({ input: {}, refusal: null });
+    expect(fieldRefusal({}, 'email')).toEqual({ input: {}, refusal: null });
   });
 });

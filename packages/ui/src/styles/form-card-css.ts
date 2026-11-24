@@ -64,22 +64,23 @@ export const formCardCss = `
 
 /* A sign-in screen's word that only asks to sign in (back to a game kept on this device):
    calm, in the main color, with an arrow mark, not drawn as refused. */
-.ui-message .ui-refusal[data-ask] {
+.ui-form-card .ui-refusal[data-ask] {
   border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-panel));
   color: var(--color-text);
 }
-.ui-message .ui-refusal[data-ask]::before {
+.ui-form-card .ui-refusal[data-ask]::before {
   content: '\\2192';
   content: '\\2192' / '';
   background: var(--color-primary);
   color: var(--color-on-primary);
 }
-[dir='rtl'] .ui-message .ui-refusal[data-ask]::before {
+[dir='rtl'] .ui-form-card .ui-refusal[data-ask]::before {
   transform: scaleX(-1);
 }
 
-/* A form: its fields one under another, the button at the foot. */
+/* A form: its fields one under another, the button at the foot. Every rule here is scoped
+   to the card, so none reaches a league or admin page that loads the same stylesheet. */
 .ui-form-card form {
   display: grid;
   gap: var(--step-4);
@@ -88,35 +89,35 @@ export const formCardCss = `
 .ui-form-card form > * {
   margin: 0;
 }
-.ui-field {
+.ui-form-card .ui-field {
   display: grid;
   gap: var(--step-2);
 }
-.ui-field label {
+.ui-form-card .ui-field label {
   display: grid;
   gap: var(--step-2);
   color: var(--color-text);
   font-size: var(--text-14);
   font-weight: 600;
 }
-.ui-root .ui-field input {
+.ui-root .ui-form-card .ui-field input {
   inline-size: 100%;
   font-size: var(--text-16);
 }
-.ui-field-row {
+.ui-form-card .ui-field-row {
   display: flex;
   align-items: stretch;
   gap: var(--step-2);
 }
-.ui-root .ui-field-row input {
+.ui-root .ui-form-card .ui-field-row input {
   flex: 1 1 auto;
   min-inline-size: 0;
 }
-.ui-field-row .ui-button {
+.ui-form-card .ui-field-row .ui-button {
   flex: none;
 }
 /* A refusal of one field, under its box (DESIGN.md line 22). */
-.ui-message .ui-field > .ui-refusal {
+.ui-form-card .ui-field > .ui-refusal {
   padding-block: var(--step-2);
   font-size: var(--text-14);
 }
