@@ -207,6 +207,30 @@ if (browser) {
       const form = page.locator('[data-format-form]');
       await form.waitFor();
       await formFits(page, 'the tracker form');
+      // While the form is open the game cannot be started: what is typed is never lost.
+      const confirm = page.getByRole('button', { name: 'Confirm and start scoring' });
+      const closeFirst = page.locator('[data-format-close-first]');
+      note(
+        'while the form is open "Confirm and start scoring" waits, saying to save or close the form first',
+        (await confirm.isDisabled()) &&
+          (await closeFirst.innerText()).trim() === 'Save or close the format form first.',
+        `${await confirm.isDisabled()} ${await closeFirst.count()}`,
+      );
+      await form.locator('input[name=minutes]').fill('9');
+      await form.getByRole('button', { name: 'Cancel' }).click();
+      await form.waitFor({ state: 'detached', timeout: 30_000 });
+      const unsaved = await formatOf(tableGame);
+      note(
+        'closed with unsaved typing, nothing starts and nothing is saved: the confirmation waits, ready',
+        (await page.locator('[data-format]').isVisible()) &&
+          (await confirm.isEnabled()) &&
+          (await closeFirst.count()) === 0 &&
+          unsaved.source === 'season' &&
+          unsaved.periods === 2,
+        JSON.stringify({ ...unsaved, view: undefined }),
+      );
+      await panel.locator('[data-format-change]:not([disabled])').click();
+      await form.waitFor();
       await form.locator('select[name=periods]').selectOption('4');
       await form.locator('input[name=minutes]').fill('8');
       await form.locator('select[name=teamFoulsReset]').selectOption('period');
@@ -278,6 +302,20 @@ if (browser) {
         'on the device the team fouls are reset by the quarter: no bonus in Q2',
         (await c.root.locator('[data-bonus]').count()) === 0,
       );
+      // The clock follows: it runs down from the quarter's 8:00, for a moment, then stops.
+      await c.startClock();
+      await page.waitForFunction(
+        () => /^7:[0-5]\d$/.test(document.querySelector('[data-clock-time]')?.textContent ?? ''),
+        null,
+        { timeout: 30_000 },
+      );
+      await c.pauseClock();
+      const ran = await c.clockText();
+      note(
+        "on the device the clock runs down from 8:00 in Q2, not from the season's half",
+        /^7:[0-5]\d$/.test(ran) && (await periodShown(page)) === 'Q2',
+        ran,
+      );
       await c.saved();
       const state = await serverGame(tableGame);
       note(
@@ -285,7 +323,9 @@ if (browser) {
         state.rules.periods === 4 &&
           state.rules.periodSeconds === 480 &&
           state.rules.bonusFouls === 2 &&
-          state.clock.remainingMs === 480_000 &&
+          state.clock.remainingMs < 480_000 &&
+          state.clock.remainingMs > 420_000 &&
+          !state.clock.running &&
           state.plays.some((p) => p.period === 2),
         JSON.stringify({ rules: state.rules, clock: state.clock, plays: state.plays.length }),
       );

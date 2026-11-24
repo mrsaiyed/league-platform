@@ -43,6 +43,22 @@ export type StartConfirm = {
   readonly onStart: () => void;
 };
 
+/**
+ * Whether "Confirm and start scoring" may be tapped, and whether to say why not: while
+ * the form is open it waits until the form is saved or closed, so nothing typed is lost
+ * by starting (the review's second point).
+ */
+export function startWaits(state: {
+  readonly editing: boolean;
+  readonly busy: boolean;
+  readonly checking: boolean;
+}): { readonly disabled: boolean; readonly closeFirst: boolean } {
+  return {
+    disabled: state.editing || state.busy || state.checking,
+    closeFirst: state.editing,
+  };
+}
+
 export function GameFormatPanel({
   client,
   t,
@@ -72,6 +88,7 @@ export function GameFormatPanel({
   const [said, setSaid] = useState<Said>(null);
   const [checking, setChecking] = useState(false);
   const underWayId = `${useId()}-under-way`;
+  const closeFirstId = `${useId()}-close-first`;
 
   useEffect(() => {
     let live = true;
@@ -99,6 +116,7 @@ export function GameFormatPanel({
     setSaid({ kind: 'changed', text: t('tracker.formatChange.changedElsewhere') });
     await onChanged?.(check.view);
   };
+  const waits = startWaits({ editing, busy: busy || (confirm?.busy ?? false), checking });
   const startButton = (shown: GameFormatRules | null) =>
     confirm === undefined ? null : (
       <p>
@@ -107,11 +125,18 @@ export function GameFormatPanel({
           className={look.button}
           data-kind="main"
           data-format-confirm=""
-          disabled={confirm.busy || checking}
+          disabled={waits.disabled}
+          aria-describedby={waits.closeFirst ? closeFirstId : undefined}
           onClick={() => void start(shown)}
         >
           {confirm.label}
         </button>
+        {waits.closeFirst ? (
+          <span id={closeFirstId} className={look.quiet} data-format-close-first="">
+            {' '}
+            {t('tracker.formatChange.closeFirst')}
+          </span>
+        ) : null}
       </p>
     );
 

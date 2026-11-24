@@ -169,6 +169,7 @@ export const enTracker = {
   'tracker.formatChange.cancel': 'Cancel',
   'tracker.formatChange.changedElsewhere':
     'The format of this game was changed. Check it and confirm again.',
+  'tracker.formatChange.closeFirst': 'Save or close the format form first.',
   'tracker.formatChange.fact.bonus': 'Bonus from team foul {count}',
   'tracker.formatChange.fact.carry.no': 'Unused timeouts do not carry over',
   'tracker.formatChange.fact.carry.yes': 'Unused timeouts carry over',

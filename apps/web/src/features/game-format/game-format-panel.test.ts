@@ -14,7 +14,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { GameFormatClient } from './format-client.ts';
-import { GameFormatForm, GameFormatPanel } from './game-format-panel.tsx';
+import { GameFormatForm, GameFormatPanel, startWaits } from './game-format-panel.tsx';
 
 const t = createTranslator('en', { en });
 const rules = seasonRulesPreset('rec-league');
@@ -86,5 +86,40 @@ describe('the format panel', () => {
     expect(html.match(/<input/g)?.length).toBe(11);
     expect(html.match(/<select/g)?.length).toBe(6);
     expect(html).toContain('Save for this game only');
+  });
+});
+
+describe('"Confirm and start scoring" in the panel (T-344)', () => {
+  const confirm = {
+    label: 'Confirm and start scoring',
+    busy: false,
+    playing: () => true,
+    onStart: () => undefined,
+  };
+  const drawn = (initial: GameFormatView | null) =>
+    renderToStaticMarkup(
+      createElement(GameFormatPanel, { client, t, locale: 'en', look, initial, confirm }),
+    );
+
+  it('is there while the format is read and once it is, ready to tap with the form closed', () => {
+    for (const html of [drawn(null), drawn(view({ may: true, as: 'scorekeeper' }))]) {
+      expect(html).toMatch(/<button[^>]*data-format-confirm=""[^>]*>Confirm and start scoring</);
+      expect(html).not.toMatch(/data-format-confirm=""[^>]*disabled/);
+      expect(html).not.toContain('data-format-close-first');
+    }
+  });
+
+  it('waits while the form is open, saying to save or close it first', () => {
+    expect(startWaits({ editing: true, busy: false, checking: false })).toEqual({
+      disabled: true,
+      closeFirst: true,
+    });
+    expect(startWaits({ editing: false, busy: false, checking: false })).toEqual({
+      disabled: false,
+      closeFirst: false,
+    });
+    expect(startWaits({ editing: false, busy: false, checking: true }).disabled).toBe(true);
+    expect(startWaits({ editing: false, busy: true, checking: false }).disabled).toBe(true);
+    expect(t('tracker.formatChange.closeFirst')).toBe('Save or close the format form first.');
   });
 });

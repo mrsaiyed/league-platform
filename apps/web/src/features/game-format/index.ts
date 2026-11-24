@@ -11,6 +11,7 @@ export { factLine, factLines, formatWords, refusalText, summaryOf } from './form
 export {
   GameFormatForm,
   GameFormatPanel,
+  startWaits,
   type FormatPanelLook,
   type StartConfirm,
 } from './game-format-panel.tsx';
