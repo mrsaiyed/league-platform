@@ -303,6 +303,79 @@ describe("tracker controller: the device's rosters", () => {
     expect(jerseys(tablet.controller, 'away')).toContain('51');
   });
 
+  it.each([
+    [
+      'a fix',
+      (id: string): PlayerChange => ({
+        type: 'change-player',
+        side: 'away',
+        playerId: id,
+        jersey: '18',
+      }),
+    ],
+    [
+      'a take-off',
+      (id: string): PlayerChange => ({ type: 'remove-player', side: 'away', playerId: id }),
+    ],
+  ])('checks %s whose answer was lost against the rosters too', async (_, change) => {
+    const network = endpointNetwork();
+    let cut = false;
+    const tablet = await opened(network, { tapsCut: () => cut });
+    const added = await tablet.controller.changePlayers(addNumbers('81'));
+    await tablet.controller.idle();
+    if (!added.ok) throw new Error(added.reason);
+    const made = change(added.playerIds[0] ?? '');
+    // The server takes it, but its answer never comes back.
+    network.mode = 'answers-lost';
+    await tablet.controller.changePlayers([made]);
+    await tablet.controller.idle();
+    expect(tablet.controller.status().queue.waiting).toBe(1);
+    cut = true;
+    network.mode = 'up';
+    const laptop = await opened(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    tablet.controller.online();
+    await tablet.controller.idle();
+    expect(tablet.controller.status().mode.kind).not.toBe('scoring');
+    expect(tablet.controller.status().notSaved).toEqual([]);
+    expect(await tablet.storage.list(gameId)).toEqual([]);
+    expect(jerseys(tablet.controller, 'away')).not.toContain('81');
+    if (made.type === 'change-player') expect(jerseys(tablet.controller, 'away')).toContain('18');
+  });
+
+  it('never shows a stale add set aside on opening again as saved (review of 2.118, M1)', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const tablet = await opened(network, { storage });
+    // Made with no signal, then the tab closes: the add waits under the old session.
+    network.mode = 'down';
+    await tablet.controller.changePlayers(addNumbers('71'));
+    await tablet.controller.leave();
+    network.mode = 'up';
+    // The laptop takes the game, adds a player of its own, and leaves it.
+    const laptop = await opened(network, { as: 'owner', deviceId: 'laptop' });
+    await laptop.controller.takeOver();
+    await laptop.controller.idle();
+    await laptop.controller.changePlayers([
+      { type: 'add-player', side: 'home', jersey: '99', name: '' },
+    ]);
+    await laptop.controller.idle();
+    await laptop.controller.leave();
+    // Opened again into a new session: the add is set aside and listed, never saved.
+    const again = device(network, await serverRosters(network), { storage });
+    await again.controller.start();
+    await again.controller.idle();
+    const status = again.controller.status();
+    expect(status.notSaved.map((t) => t.command.input)).toMatchObject([
+      { type: 'add-player', jersey: '71' },
+    ]);
+    expect(jerseys(again.controller, 'away')).not.toContain('71');
+    expect((await serverRosters(network)).away.players.map((p) => p.jerseyNumber)).not.toContain(
+      '71',
+    );
+  });
+
   it('fetches them again after a refused change, and when back online', async () => {
     const network = endpointNetwork();
     // An id already someone's: the server refuses the add (player-id-taken).

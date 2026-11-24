@@ -143,6 +143,27 @@ export const withChanges = (
   gameId: string,
 ): DeviceRosters => changes.reduce((r, c) => withChange(r, c.input, gameId), rosters);
 
+/**
+ * Whether the rosters already show a change (the server's, after an answer was lost): an
+ * add whose player is there, a fix the player already wears, a take-off whose player is
+ * gone or has left. Such a change was taken, so it is never called not saved.
+ */
+export function changeIsIn(rosters: DeviceRosters, input: TablePlayerInput): boolean {
+  const find = (r: DeviceRosters) =>
+    teamOn(r, input.side).players.find((p) => sameId(p.personId, input.playerId));
+  const player = find(rosters);
+  if (input.type === 'add-player') return player !== undefined;
+  if (input.type === 'remove-player') return player === undefined || player.left;
+  if (player === undefined) return false;
+  const after = find(withChange(rosters, input, ''));
+  return (
+    after !== undefined &&
+    after.jerseyNumber === player.jerseyNumber &&
+    after.firstName === player.firstName &&
+    after.lastName === player.lastName
+  );
+}
+
 /** The changes of players among `taps`, in their order. */
 export const playerChangesIn = (taps: readonly KeptTap[]): TablePlayerCommand[] =>
   taps.map((t) => t.command).filter(isTablePlayerCommand);

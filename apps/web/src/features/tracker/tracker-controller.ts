@@ -65,6 +65,7 @@ import type { GameDoors } from './game-doors.ts';
 import { mayEnterAgain } from './kept-plays.ts';
 import type { DeviceRosters, DeviceScoring } from './opened-game-storage.ts';
 import {
+  changeIsIn,
   deviceProblem,
   playerChangesIn,
   withChanges,
@@ -1004,17 +1005,15 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   };
 
   /**
-   * An add listed as not saved whose player the server's rosters have was taken though
-   * its answer never came back: it is saved, and leaves the list and the storage.
+   * A change of players listed as not saved that the server's rosters already show (an
+   * add whose player is there, a fix they wear, a take-off whose player is gone) was
+   * taken though its answer never came back: it is saved, and leaves the list and the
+   * storage.
    */
-  const addsTakenIn = (rosters: DeviceRosters, list: readonly KeptTap[]): string[] => {
-    const onServer = new Set(
-      [...rosters.home.players, ...rosters.away.players].map((p) => p.personId.toLowerCase()),
-    );
-    return playerChangesIn(list)
-      .filter((c) => c.input.type === 'add-player' && onServer.has(c.input.playerId.toLowerCase()))
+  const changesTakenIn = (rosters: DeviceRosters, list: readonly KeptTap[]): string[] =>
+    playerChangesIn(list)
+      .filter((c) => changeIsIn(rosters, c.input))
       .map((c) => c.commandId);
-  };
 
   let fetchingRosters: Promise<DeviceRosters | null> | null = null;
   let fetchRostersAgain = false;
@@ -1047,7 +1046,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
             gameId,
           ),
         );
-        const saved = addsTakenIn(fetched, current.notSaved);
+        const saved = changesTakenIn(fetched, current.notSaved);
         if (saved.length > 0) {
           update({ notSaved: withoutTaps(current.notSaved, new Set(saved)) });
           await queue.forget(saved).catch(() => undefined);
@@ -1065,17 +1064,22 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   // The queue's changes of players: one taken is laid on the kept rosters; a refused one
   // has the rosters fetched again (the server's are the truth).
   let seenWaitingChanges: TablePlayerCommand[] = [];
+  /** The stale changes `hold` sets aside before it lists them: never counted as taken. */
+  const settingAside = new Set<string>();
   const seenRefusedChanges = new Set<string>();
   queue.subscribe((status) => {
     const waiting = playerChangesIn(status.waitingTaps);
     const stillWaiting = new Set(waiting.map((c) => c.commandId));
     const refused = new Set(status.refused.map((r) => r.command.commandId));
     const listed = new Set(current.notSaved.map((t) => t.command.commandId));
-    // Gone from the waiting ones, neither refused nor listed as not saved: taken. (One
-    // set aside unlisted would be taken for saved until the next fetch puts it right.)
+    // Gone from the waiting ones, neither refused, nor listed as not saved, nor being set
+    // aside to be listed (`hold`): taken.
     const taken = seenWaitingChanges.filter(
       (c) =>
-        !stillWaiting.has(c.commandId) && !refused.has(c.commandId) && !listed.has(c.commandId),
+        !stillWaiting.has(c.commandId) &&
+        !refused.has(c.commandId) &&
+        !listed.has(c.commandId) &&
+        !settingAside.has(c.commandId),
     );
     seenWaitingChanges = waiting;
     const refusedNow = status.refused.filter(
@@ -1106,13 +1110,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const held = await storage.list(gameId).catch(() => null);
     if (!stillLost()) return;
     if (held !== null) {
-      // An add the server took whose answer was lost is checked against its rosters
-      // before it is called not saved (step 2.118); unanswered, it is listed.
+      // A change of players the server took whose answer was lost (an add, a fix, a
+      // take-off) is checked against its rosters before it is called not saved (step
+      // 2.118); unanswered, it is listed.
       const unsentAll = keptIn(held, 'waiting');
-      const adds = playerChangesIn(unsentAll).some((c) => c.input.type === 'add-player');
-      const rosters = adds ? await refreshRosters() : null;
+      const changes = playerChangesIn(unsentAll).length > 0;
+      const rosters = changes ? await refreshRosters() : null;
       if (!stillLost()) return;
-      const takenAdds = new Set(rosters === null ? [] : addsTakenIn(rosters, unsentAll));
+      const takenAdds = new Set(rosters === null ? [] : changesTakenIn(rosters, unsentAll));
       const waiting = unsentAll.filter((t) => !takenAdds.has(t.command.commandId));
       const unsent = new Set(unsentAll.map((t) => t.command.commandId));
       made = made.filter((c) => !unsent.has(c.commandId));
@@ -1320,9 +1325,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         stale = [];
       }
     }
+    // Set aside, then listed: meanwhile the queue's listener must not take a stale change
+    // of players for one taken (review M1 of step 2.118).
+    const staleIds = stale.map((t) => t.command.commandId);
+    for (const id of staleIds) settingAside.add(id);
     try {
-      if (stale.length > 0) await queue.setAside(stale.map((t) => t.command.commandId));
+      if (stale.length > 0) await queue.setAside(staleIds);
     } catch {
+      for (const id of staleIds) settingAside.delete(id);
       return readOnly('storage-failed');
     }
     // Not scoring, so every tap of this device's the server lacks is waiting in the
@@ -1335,6 +1345,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const sent = new Set(made.map((c) => c.commandId));
     const listed = withTaps(withTaps(current.notSaved, setAside), stale);
     listNotSaved(withoutTaps(listed, sent));
+    for (const id of staleIds) settingAside.delete(id);
     // Loading the state then drops any of them the server has after all (M1).
     return scoreWith(held);
   };
