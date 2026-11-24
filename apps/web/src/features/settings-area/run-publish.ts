@@ -6,6 +6,7 @@
 // draft is published here: the same form posted for an archived (or suspended) league is
 // refused, as bringing an archived league back is not this button's work.
 import {
+  mayChangeLeagueSettings,
   setLeagueStatus,
   type CommandContext,
   type CommandDeps,
@@ -13,14 +14,28 @@ import {
 } from '@srleagues/core';
 import { done, refused, type Answer } from './answer.ts';
 
+/**
+ * The league as it is now, and whether this person may change its state at all: a post
+ * that would change nothing is told "done" only by someone who could have made it
+ * (step 2.125 fix round); anyone else is refused as the command refuses them.
+ */
+async function leagueFor(context: CommandContext, deps: CommandDeps<LeaguesTx>) {
+  return deps.transaction(context, async (tx) => ({
+    league: await tx.leagues.currentLeague(),
+    may: await mayChangeLeagueSettings(context, tx),
+  }));
+}
+
+const notAllowed = (): Answer => refused(setLeagueStatus.commandName, 'not-allowed');
+
 export async function runPublish(
   context: CommandContext,
   deps: CommandDeps<LeaguesTx>,
   /** The version of the league the person was looking at (A-8); NaN when garbled. */
   version: number,
 ): Promise<Answer> {
-  const league = await deps.transaction(context, (tx) => tx.leagues.currentLeague());
-  if (league?.status === 'live') return done('published');
+  const { league, may } = await leagueFor(context, deps);
+  if (league?.status === 'live') return may ? done('published') : notAllowed();
   if (league !== undefined && league.status !== 'draft') {
     return refused(setLeagueStatus.commandName, 'illegal-transition');
   }
@@ -41,8 +56,8 @@ export async function runArchive(
   version: number,
 ): Promise<Answer> {
   const answer = to === 'archived' ? 'archived' : 'unarchived';
-  const league = await deps.transaction(context, (tx) => tx.leagues.currentLeague());
-  if (league?.status === to) return done(answer);
+  const { league, may } = await leagueFor(context, deps);
+  if (league?.status === to) return may ? done(answer) : notAllowed();
   if (to === 'live' && league?.status !== 'archived') {
     return refused(setLeagueStatus.commandName, 'illegal-transition');
   }

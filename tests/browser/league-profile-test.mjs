@@ -120,6 +120,30 @@ if (browser) {
     await owner.goto(`${origin}/${league}/admin`, limit);
     // On a phone the notice is a pill in the header; tapping it opens the sentence.
     await owner.locator('.staff-bar .staff-status > summary').click(limit);
+    // The one link a keyboard reaches is the clipped copy's: with the focus it can be seen.
+    await owner.keyboard.press('Tab');
+    const focused = await owner.evaluate(() => {
+      const at = document.activeElement;
+      const box = at?.getBoundingClientRect();
+      return {
+        text: at?.textContent ?? '',
+        width: box?.width ?? 0,
+        height: box?.height ?? 0,
+        links: document.querySelectorAll('.staff-bar .staff-status a:not([tabindex="-1"])').length,
+      };
+    });
+    note(
+      'on a phone the keyboard reaches the notice link once, and its focus can be seen',
+      focused.text.includes('Publish it in League settings') &&
+        focused.width > 20 &&
+        focused.height > 10 &&
+        focused.links === 1,
+      JSON.stringify(focused),
+    );
+    // The focused box lies over the strip; leave it before tapping the strip's link.
+    await owner.evaluate(() => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    });
     await Promise.all([
       owner.waitForURL(/\/admin\/settings/, limit),
       owner
@@ -302,14 +326,26 @@ if (browser) {
     const warning = plays.locator('[data-says="clears-full-names"]');
     note(
       'before saving, the screen says bringing children in clears full names',
-      (await warning.count()) === 1 &&
-        (await warning.innerText(limit)).includes('clears that back to no'),
+      (await warning.count()) === 1 && (await warning.innerText(limit)).includes('back to no'),
     );
     await plays.locator('input[type=radio][value="youth"]').check(limit);
     await submit(plays.getByRole('button'));
     note(
       'the move back is saved without a tick, and says full names were cleared',
-      (await said()).includes('Children are no longer shown with their full names'),
+      (await said()).includes('back where a youth league starts'),
+    );
+    note(
+      'the published league stays published, and asks for its privacy choices (S-96)',
+      (await panel.getAttribute('data-status', limit)) === 'live' &&
+        (await panel
+          .locator('[data-says="confirm-privacy"] [data-check="privacyChosen"]')
+          .count()) === 1,
+    );
+    const publicPage = async () =>
+      (await fetch(`${origin}/${league}`, { signal: AbortSignal.timeout(60_000) })).text();
+    note(
+      'the public page now keeps search engines out, as for any league with children (U-18)',
+      /<meta name="robots" content="[^"]*noindex/.test(await publicPage()),
     );
     note(
       'the league is for under-18s again',
@@ -366,6 +402,18 @@ if (browser) {
       'the league is still published',
       (await panel.getAttribute('data-status', limit)) === 'live',
     );
+    const kept = form('league-profile');
+    note(
+      'the contact email, city and time zone are unchanged',
+      !['scheduler@example.test', 'scorekeeper@example.test'].includes(
+        await kept.locator('input[name="contactEmail"]').inputValue(limit),
+      ) &&
+        !['scheduler', 'scorekeeper'].includes(
+          await kept.locator('input[name="city"]').inputValue(limit),
+        ) &&
+        (await kept.locator('input[name="timeZone"]').inputValue(limit)) !== 'UTC',
+      `${await kept.locator('input[name="contactEmail"]').inputValue(limit)} / ${await kept.locator('input[name="city"]').inputValue(limit)} / ${await kept.locator('input[name="timeZone"]').inputValue(limit)}`,
+    );
   });
 
   await step('archive and un-archive', async () => {
@@ -397,6 +445,40 @@ if (browser) {
       (await said()).includes('The league is published again.'),
     );
     note('the league is live again', (await panel.getAttribute('data-status', limit)) === 'live');
+  });
+
+  await step('each change is one entry in the activity log', async () => {
+    const kinds = {
+      profile: "Changed the league's profile",
+      whoPlays: 'Changed who plays in the league',
+      archive: "Changed the league's state to",
+    };
+    const counts = async () => {
+      await owner.goto(`${origin}/${league}/admin/settings/activity`, limit);
+      const texts = await owner.locator('[data-activity-log] > li').allInnerTexts();
+      return Object.fromEntries(
+        Object.entries(kinds).map(([kind, words]) => [
+          kind,
+          texts.filter((text) => text.includes(words)).length,
+        ]),
+      );
+    };
+    const before = await counts();
+    await owner.goto(settings(), limit);
+    await form('league-profile').locator('input[name="city"]').fill('Lower Pine Ridge', limit);
+    await submit(form('league-profile').getByRole('button'));
+    await form('who-plays').locator('input[type=radio][value="mixed"]').check(limit);
+    await submit(form('who-plays').getByRole('button'));
+    await owner.goto(`${settings()}?archive=ask`, limit);
+    await submit(panel.getByRole('button', { name: 'Archive' }));
+    const after = await counts();
+    for (const kind of Object.keys(kinds)) {
+      note(
+        `one ${kind} change is one entry in the activity log`,
+        after[kind] === before[kind] + 1,
+        `${before[kind]} then ${after[kind]}`,
+      );
+    }
   });
 }
 

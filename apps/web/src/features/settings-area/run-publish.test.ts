@@ -194,4 +194,17 @@ describe('runArchive', () => {
     ).toMatchObject({ kind: 'refused' });
     expect(standInStatusOf({ id: leagueId, status: 'draft' })).toBe('live');
   });
+
+  it('never tells a scheduler "done" for a league already in the state asked', async () => {
+    const ports = standIn('adult');
+    await chooseNames(ports);
+    await runPublish(as(ownerId), ports.deps, 1);
+    const version = await versionOf(ports);
+    const refusedHere = { kind: 'refused', command: 'leagues.set_status', code: 'not-allowed' };
+    expect(await runArchive(as(schedulerId), ports.deps, 'live', version)).toEqual(refusedHere);
+    expect(await runPublish(as(schedulerId), ports.deps, version)).toEqual(refusedHere);
+    expect(await runArchive(as(ownerId), ports.deps, 'live', version)).toMatchObject({
+      kind: 'done',
+    });
+  });
 });
