@@ -149,6 +149,7 @@ Two things to know before reading:
 - **2.142 Retiring the old trackers** — only after the stage ends, never during a season.
 - **2.143 A list of known shortcuts** — documents only.
 - **2.191 GitHub's checks in parallel** — makes the build faster, not the product.
+- **2.244 A play that came in through a copy upload is marked by the server** (added 2026-11-24, from 2.70; not in the counts above) — closes a gap that needs a tampered app on an account that already has scoring permission; nothing is lost or counted twice meanwhile.
 
 ---
 
