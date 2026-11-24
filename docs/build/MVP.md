@@ -1,10 +1,10 @@
 # The MVP lists: APPROVED by the founder on 2026-11-24
 
-Made on 2026-11-24 at the founder's request ("mvp done earlier while you still work as long as needed on the rest"). Until the founder says yes, this is a proposal. APPROVED: on 2026-11-24 at about 20:43 UTC the founder wrote in the founder’s window, after the day’s note: “Not sure wym by mvp lists but sure”. The window then told them in two plain lines what the lists are, so they can still object. In the same message, about whether Faraj uses a mercy rule, a running clock and fouls that reset each half: “Faraj I’m not sure but anyways those rules should be decided by admin at league creation time and changed at season through admin acc if needed.” So each of the three is a setting the league’s admin chooses when the league is made and can change for a season (steps 2.69 and 2.123 on list B build them; the lead records the decision in DECISIONS.md with these words).
+Made on 2026-11-24 at the founder's request ("mvp done earlier while you still work as long as needed on the rest"). APPROVED: on 2026-11-24 at about 20:43 UTC the founder wrote in the founder’s window, after the day’s note: “Not sure wym by mvp lists but sure”. The window then told them in two plain lines what the lists are, so they can still object. In the same message, about whether Faraj uses a mercy rule, a running clock and fouls that reset each half: “Faraj I’m not sure but anyways those rules should be decided by admin at league creation time and changed at season through admin acc if needed.” So each of the three is a setting the league’s admin chooses when the league is made and can change for a season (recorded as S-106, Agreed; steps 2.69, 2.123 and 2.245 build them and moved to list A on 2026-11-24, after the game-night steps).
 
-# What Faraj League needs first: the 94 open steps of stage 2, sorted
+# What Faraj League needs first: the 95 open steps of stage 2, sorted
 
-**Summary.** Of the 94 steps not yet done in `docs/build/STAGE-2.md`: **38 are needed before Faraj League can run a real season** on the platform (list A, in the order to build them), **54 can wait** until after that (list B), and **2 should not be built at all** because other steps already did or will do their work (list C). 38 + 54 + 2 = 94.
+**Summary.** Of the 95 steps not yet done in `docs/build/STAGE-2.md`: **41 are needed before Faraj League can run a real season** on the platform (list A, in the order to build them), **52 can wait** until after that (list B), and **2 should not be built at all** because other steps already did or will do their work (list C). 41 + 52 + 2 = 95 (step 2.245 was added on 2026-11-24).
 
 How this was judged: a step is in A when, without it, a real season cannot be run safely: people sign in; teams, rosters, schedule, results, standings and public pages work; a game can be scored courtside with bad signal and corrected afterwards; Faraj's old data comes over; children's records and private data are safe; the legal must-haves hold (terms, privacy, consent, deleting a person); and the site can be published, backed up, restored and watched. Everything that serves other leagues or sports, is a convenience, polish, a second way of doing something, or paperwork for the build, is in B. "(unsure: ...)" marks a call that could go the other way.
 
@@ -31,6 +31,7 @@ Two things to know before reading:
 8. **2.65 Correcting a tracked game in a grid.** Why: lets an admin fix a live-scored game afterwards so the play list still explains the final numbers. (unsure: a scorer can already reopen the game in the tracker; this is the practical way for an admin.)
 9. **2.155 A refused save keeps what was typed.** Why: today one mistake empties every box, for example twelve players' points copied from a paper score sheet.
 10. **2.159 A game's page tells the truth in every state.** Why: today a game with no score yet says "has not started" and sits under "Upcoming"; parents read this on game night.
+    - **2.69 Running-clock switch and the mercy rule in the tracker**, **2.123 Team fouls that reset each half** and **2.245 The three game rules are asked when a league is made** (moved from list B and added on 2026-11-24, S-106, the founder: "those rules should be decided by admin at league creation time and changed at season through admin acc if needed"). Why: Faraj's admin must be able to answer the question when the league is made, and the tracker must then follow the answer.
 
 ### Faraj's league, seasons and old data
 
@@ -84,8 +85,6 @@ Two things to know before reading:
 ### For other leagues, other sports, schools and the association demo
 
 - **2.63 Review of the demo cut** — it is the review for the association (TCSAAL) demo, and its long "needs" list would pull a dozen waiting steps in. A review of list A should be held before Faraj goes live instead. (unsure)
-- **2.69 Running-clock switch and the mercy rule in the tracker** — only for leagues that use them. (unsure: needed if Faraj plays a running clock or a mercy rule)
-- **2.123 Team fouls that reset each half** — only for leagues that count the bonus by the half. (unsure: needed if Faraj does)
 - **2.169 No leaders card for fouls in youth leagues** — youth leagues; a settings question.
 - **2.219 Whether a team's roster is public, set by the league** — for school associations; names already follow the league's rule.
 - **2.232 A team with no roster listed says so truly** — for the association demo, where most schools have no roster.

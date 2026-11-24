@@ -4,6 +4,7 @@
 // with their rule, tables in their frame two across on a laptop, and calm panels where
 // there is nothing to list.
 import type { GameSnapshot } from '@srleagues/contracts';
+import type { PublicGameTruth } from '@srleagues/core';
 import { Section, TeamCard } from '@srleagues/ui';
 import { t } from '../../server/messages.ts';
 import {
@@ -12,6 +13,7 @@ import {
   gameWords,
   liveGameLabels,
   statusNote,
+  truthPill,
   type BoxScoresView,
   type GameBoard,
   type PlayPeriodView,
@@ -28,6 +30,8 @@ export type GameView = {
   readonly title: string;
   /** The game's own status: the snapshot calls a postponed or cancelled game "scheduled". */
   readonly status: string;
+  /** The game's one public truth (publicGameState, step 2.159), as every public page reads it. */
+  readonly truth: PublicGameTruth;
   /** Null: a postponed or cancelled game with no date. */
   readonly start: string | null;
   readonly corrected: string | null;
@@ -69,14 +73,21 @@ export type GameTeamCard = {
 
 /** The page's content, drawn from what the server worked out. Nothing here reads anything. */
 export function GameContent({ view }: { readonly view: GameView }) {
-  const arrivedFinal = view.snapshot.status === 'final';
+  // A game being corrected is drawn as the result stood, and held there (S-47).
+  const stood = view.truth.state === 'being-corrected' ? view.truth.result : null;
+  const initial: GameSnapshot =
+    stood === null
+      ? view.snapshot
+      : { ...view.snapshot, status: 'final', score: { home: stood.home, away: stood.away } };
+  const arrivedFinal = initial.status === 'final';
   const pending = ['scheduled', 'postponed', 'cancelled'].includes(view.status);
   const numbers = (
     <GameNumbersDrawn
       view={gameNumbersView({
         boxScores: view.boxScores,
         plays: view.plays,
-        live: view.snapshot.status === 'live',
+        // A game being corrected is drawn as it stood: no live plays section (T-384).
+        live: initial.status === 'live',
         selfAddress: view.selfAddress,
       })}
     />
@@ -119,18 +130,19 @@ export function GameContent({ view }: { readonly view: GameView }) {
         gameId={view.snapshot.gameId}
         snapshotAddress={view.snapshotAddress}
         liveAddress={webLiveAddress}
-        initial={view.snapshot}
+        initial={initial}
+        held={stood !== null}
         showPlayers={!arrivedFinal}
         words={gameWords()}
-        labels={liveGameLabels(view.status)}
+        labels={liveGameLabels(view.status, view.truth.state)}
         board={{
           ...view.board,
-          stateText: boardStateText(view.status),
+          stateText: truthPill(view.truth.state) ?? boardStateText(view.status),
           noteText:
-            view.status === 'forfeit'
+            view.status === 'forfeit' || stood?.decided === 'forfeit'
               ? forfeitNote(
-                  { name: view.snapshot.teams.away.name, score: view.snapshot.score.away },
-                  { name: view.snapshot.teams.home.name, score: view.snapshot.score.home },
+                  { name: view.snapshot.teams.away.name, score: initial.score.away },
+                  { name: view.snapshot.teams.home.name, score: initial.score.home },
                 )
               : (statusNote(view.status) ?? undefined),
         }}

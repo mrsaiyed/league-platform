@@ -3,6 +3,7 @@
 // finished game's box scores, and "corrected" with the date and never the reason (S-7).
 import {
   defaultNamePolicy,
+  publicGameState,
   publicViewer,
   readGamePage,
   readGameSnapshot,
@@ -35,12 +36,15 @@ import {
   correctedText,
   forfeitNote,
   gameTitle,
+  gameTruthOf,
+  shownParts,
   gameWords,
   startText,
   titleLine,
+  truthLine,
 } from './build-game.ts';
 import { GameContent, type GameView } from './game-content.tsx';
-import { latestPlayText, redrawsFor } from './live-game-view.tsx';
+import { latestPlayText, redrawsFor, redrawsWhileHeld } from './live-game-view.tsx';
 import type { ViewerGame } from './viewer-state.ts';
 
 const viewing = {
@@ -97,6 +101,8 @@ async function viewOf(world: ReturnType<typeof trackerWorld>, gameId: string) {
     leagueId: liveLeagueId,
     title: gameTitle(page.value),
     status: page.value.game.status,
+    // Read on a clock before every game here, so a game still to play is upcoming.
+    truth: gameTruthOf(page.value, { now: '2000-01-01T00:00:00.000Z', today: '2000-01-01' }),
     start: startText(page.value.game.startsAt, 'UTC', page.value.game.status),
     corrected: correctedText(snapshot.value.correctedOn),
     snapshot: snapshot.value,
@@ -201,7 +207,7 @@ describe('a game page', () => {
     ] as const) {
       const html = draw({ ...view, status, start: startText(when, 'UTC', status) });
       expect(html).toContain(says);
-      expect(html).toContain('It was set for');
+      expect(html).toContain('Was set for');
       expect(html).not.toContain('This game has not started yet.');
       expect(html).not.toContain('Starts ');
       expect(startText(null, 'UTC', status)).toBeNull();
@@ -234,7 +240,7 @@ describe('a game page', () => {
     expect(boardWhen(when, 'UTC', 'scheduled')).toEqual({ day: 'Fri, Nov 20', time: '6:00 PM' });
     // Every other game keeps its line.
     expect(titleLine(when, 'UTC', 'final')).toMatch(/^Played /);
-    expect(titleLine(when, 'UTC', 'postponed')).toMatch(/^It was set for /);
+    expect(titleLine(when, 'UTC', 'postponed')).toMatch(/^Was set for /);
     // Drawn: a live game's page has its title and then the board, nothing between.
     const world = trackerWorld();
     await scoreHawksBears(world);
@@ -255,6 +261,7 @@ describe('a game page', () => {
     if (listed === undefined) throw new Error('no listed game');
     expect(await publicSchedule.gameFactsOf(liveLeagueId, season, listed.id)).toEqual({
       number: listed.number,
+      localDate: listed.localDate,
       venue: listed.venue,
       courtName: listed.courtName,
       season: { slug: 'fall-2026', isCurrent: true },
@@ -809,5 +816,127 @@ describe('a game page', () => {
       ],
     } as unknown as GamePage;
     expect(buildBoxScores(page)).toEqual({ kind: 'no-stats' });
+  });
+
+  describe('the one truth in every state (step 2.159)', () => {
+    it('a page held at the result as it stood is drawn again only once the game is final again', () => {
+      expect(redrawsWhileHeld({ sequence: 4 }, { status: 'live', sequence: 9 })).toBe(false);
+      expect(redrawsWhileHeld({ sequence: 4 }, { status: 'scheduled', sequence: 9 })).toBe(false);
+      // A correction by hand, ended again: no play saved, the same sequence, final again.
+      expect(redrawsWhileHeld({ sequence: 4 }, { status: 'final', sequence: 4 })).toBe(true);
+      // An older snapshot (a cached one) is not news.
+      expect(redrawsWhileHeld({ sequence: 4 }, { status: 'final', sequence: 3 })).toBe(false);
+      expect(redrawsWhileHeld({ sequence: 4 }, { status: 'final', sequence: 5 })).toBe(true);
+    });
+
+    // Saturday, November 14 at 10:00 AM in New York.
+    const setFor = '2026-11-14T15:00:00.000Z';
+    const zone = 'America/New_York';
+    const later = { now: '2026-11-21T15:00:00.000Z', today: '2026-11-21' };
+    const facts = { startsAt: setFor, homeScore: null, awayScore: null, finalizedAt: null };
+
+    it('a past game with no score is awaiting it, never "has not started yet"', async () => {
+      const world = trackerWorld();
+      const { view } = await viewOf(world, games.lionsTigers);
+      const truth = publicGameState({ ...facts, status: 'scheduled' }, later);
+      expect(truth.state).toBe('awaiting-score');
+      const start = truthLine(setFor, zone, truth);
+      expect(start).toBe('Was set for Saturday, November 14 at 10:00 AM');
+      const html = draw({ ...view, status: 'scheduled', truth, start, board: undefined });
+      expect(html).toContain('Awaiting score');
+      expect(html).toContain('Was set for Saturday, November 14 at 10:00 AM');
+      expect(html).toContain('No score has been entered yet.');
+      expect(html).not.toContain('has not started yet');
+      expect(html).not.toContain('Starts ');
+    });
+
+    it('a forfeit says when it was set for, never "Played", and has no box scores', async () => {
+      const world = trackerWorld();
+      const { view } = await viewOf(world, games.lionsTigers);
+      const truth = publicGameState(
+        { ...facts, status: 'forfeit', homeScore: 20, awayScore: 0 },
+        later,
+      );
+      const start = truthLine(setFor, zone, truth);
+      expect(start).toBe('Was set for Saturday, November 14 at 10:00 AM');
+      const { page } = await viewOf(world, games.lionsTigers);
+      const parts = shownParts(truth.state);
+      expect(parts.boxScores).toBe(false);
+      const html = draw({
+        ...view,
+        status: 'forfeit',
+        truth,
+        start,
+        boxScores: parts.boxScores ? buildBoxScores(page) : null,
+      });
+      expect(html).not.toContain('Played');
+      expect(html).not.toContain('Box scores');
+      expect(html).toContain('Forfeit');
+    });
+
+    it('a finished game shows the day it ended, not its planned time', () => {
+      const truth = publicGameState(
+        {
+          ...facts,
+          status: 'final',
+          homeScore: 40,
+          awayScore: 38,
+          finalizedAt: '2026-11-15T02:30:00.000Z',
+        },
+        later,
+      );
+      // 02:30 UTC on the 15th is the evening of the 14th in New York.
+      expect(truthLine(setFor, zone, truth)).toBe('Ended Saturday, November 14');
+    });
+
+    it('a game being corrected shows the result as it stood, marked "Being corrected" (S-47)', async () => {
+      const world = trackerWorld();
+      await scoreHawksBears(world);
+      const { view, page } = await viewOf(world, games.hawksBears);
+      // A tracked game reopened: live again, the board held at 40 to 38.
+      const truth = publicGameState(
+        {
+          ...facts,
+          status: 'live',
+          homeScore: 2,
+          awayScore: 0,
+          beingCorrected: { status: 'final', homeScore: 40, awayScore: 38 },
+        },
+        later,
+      );
+      const html = draw({
+        ...view,
+        // The snapshot is live again too: what a scorekeeper's reopen leaves (step 2.159).
+        snapshot: { ...view.snapshot, status: 'live' },
+        status: 'live',
+        truth,
+        start: truthLine(setFor, zone, truth),
+        boxScores: shownParts(truth.state).boxScores ? buildBoxScores(page) : null,
+        plays: shownParts(truth.state).plays ? view.plays : [],
+      });
+      expect(shownParts(truth.state)).toEqual({ boxScores: false, plays: false });
+      // A final game, by the same rule, shows both.
+      expect(shownParts('final')).toEqual({ boxScores: true, plays: true });
+      expect(html).toContain('Being corrected');
+      expect(html).toContain('>40<');
+      expect(html).toContain('>38<');
+      expect(html).toContain('data-live-status="final"');
+      expect(html).not.toContain('has not started yet');
+      expect(html).not.toContain('Latest play');
+      // No plays while it is corrected, not even the live game's empty "Play by play".
+      expect(html).not.toContain('Play by play');
+      expect(html).not.toContain('Show newer plays');
+    });
+
+    it('a player who did not play reads "Did not play"', async () => {
+      const world = trackerWorld();
+      await scoreHawksBears(world);
+      const { page } = await viewOf(world, games.hawksBears);
+      const [box] = page.boxScores;
+      const benched = { ...box, players: box.players.map((p) => ({ ...p, played: false })) };
+      const boxes = buildBoxScores({ ...page, boxScores: [benched, page.boxScores[1]] });
+      const players = boxes.kind === 'tables' ? boxes.tables.flatMap((x) => x.players ?? []) : [];
+      expect(players.some((p) => p.note === 'Did not play')).toBe(true);
+    });
   });
 });

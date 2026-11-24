@@ -20,7 +20,7 @@ describe('the home page in numbers', () => {
     const schedule = await schedules.scheduleOf(adult, season.id, clock.today);
     if (schedule === undefined) throw new Error('no schedule');
     const games = [...schedule.rounds.flatMap((r) => r.games), ...schedule.unplacedGames];
-    const numbers = buildHomeNumbers(schedule, 9);
+    const numbers = buildHomeNumbers(schedule, clock, 9);
     expect(numbers.map((n) => n.key)).toEqual(['teams', 'played', 'toPlay', 'rounds']);
     const value = (key: string) => Number(numbers.find((n) => n.key === key)?.value);
     expect(value('teams')).toBe(9);
@@ -49,7 +49,7 @@ describe('the home page in numbers', () => {
       unplacedGames: [],
     };
     const games = finished.rounds.flatMap((r) => r.games);
-    const numbers = buildHomeNumbers(finished, 9);
+    const numbers = buildHomeNumbers(finished, clock, 9);
     expect(numbers.map((n) => n.key)).toEqual(['teams', 'played', 'scored', 'rounds']);
     const value = (key: string) => numbers.find((n) => n.key === key)?.value;
     expect(value('played')).toBe(String(games.length));
@@ -80,7 +80,7 @@ describe('the home page in numbers', () => {
     const games = finished.rounds.flatMap((r) => r.games);
     const forfeits = games.filter((g) => g.status === 'forfeit').length;
     expect(forfeits).toBeGreaterThan(0);
-    const numbers = buildHomeNumbers(finished, 9);
+    const numbers = buildHomeNumbers(finished, clock, 9);
     const value = (key: string) => numbers.find((n) => n.key === key)?.value;
     expect(value('played')).toBe(String(games.length));
     expect(value('scored')).toBe(
@@ -94,7 +94,7 @@ describe('the home page in numbers', () => {
         games: round.games.map((g) => ({ ...g, status: 'forfeit', homeScore: 20, awayScore: 0 })),
       })),
     };
-    expect(buildHomeNumbers(allForfeits, 9).map((n) => n.key)).toEqual([
+    expect(buildHomeNumbers(allForfeits, clock, 9).map((n) => n.key)).toEqual([
       'teams',
       'played',
       'toPlay',
@@ -109,7 +109,7 @@ describe('the home page in numbers', () => {
     const schedule = await schedules.scheduleOf(adult, season.id, clock.today);
     if (schedule === undefined) throw new Error('no schedule');
     const empty = { ...schedule, rounds: [], unplacedGames: [] };
-    expect(buildHomeNumbers(empty, 0).map((n) => n.key)).toEqual([
+    expect(buildHomeNumbers(empty, clock, 0).map((n) => n.key)).toEqual([
       'teams',
       'played',
       'toPlay',
@@ -137,8 +137,51 @@ describe('the home page in numbers', () => {
       unplacedGames: [],
     });
     const toPlay = (left: number) =>
-      buildHomeNumbers(leaving(left), 9).find((n) => n.key === 'toPlay');
+      buildHomeNumbers(leaving(left), clock, 9).find((n) => n.key === 'toPlay');
     expect(toPlay(1)).toMatchObject({ value: '1', label: 'Game to play' });
     expect(toPlay(2)).toMatchObject({ value: '2', label: 'Games to play' });
+  });
+});
+
+describe('the home page in numbers tells the one truth (step 2.159)', () => {
+  it('counts a game waiting for its score as played, and a game being corrected as its page shows it', async () => {
+    const season = (await stats.seasonsOf(adult))[0];
+    if (season === undefined) throw new Error('no season');
+    const clock = await schedules.clockOf(adult);
+    const schedule = await schedules.scheduleOf(adult, season.id, clock.today);
+    if (schedule === undefined) throw new Error('no schedule');
+    const past = new Date(Date.parse(clock.now) - 3_600_000).toISOString();
+    // The first game of each round started an hour ago and waits for its score; the second
+    // is being corrected (it stood 50 to 40); every other game ended 50 to 40.
+    const mixed = {
+      ...schedule,
+      rounds: schedule.rounds.map((round) => ({
+        ...round,
+        games: round.games.map((g, n) =>
+          n === 0
+            ? { ...g, status: 'scheduled', startsAt: past, homeScore: null, awayScore: null }
+            : n === 1
+              ? {
+                  ...g,
+                  status: 'live',
+                  homeScore: null,
+                  awayScore: null,
+                  beingCorrected: { status: 'final', homeScore: 50, awayScore: 40 },
+                }
+              : { ...g, status: 'final', homeScore: 50, awayScore: 40, beingCorrected: undefined },
+        ),
+      })),
+      unplacedGames: [],
+    };
+    const games = mixed.rounds.flatMap((r) => r.games);
+    const awaiting = mixed.rounds.filter((r) => r.games.length > 0).length;
+    const numbers = buildHomeNumbers(mixed, clock, 9);
+    // Nothing is left to play, so the third number is the points scored.
+    expect(numbers.map((n) => n.key)).toEqual(['teams', 'played', 'scored', 'rounds']);
+    const value = (key: string) => numbers.find((n) => n.key === key)?.value;
+    expect(value('played')).toBe(String(games.length));
+    expect(value('scored')).toBe(
+      new Intl.NumberFormat('en').format((games.length - awaiting) * 90),
+    );
   });
 });

@@ -226,6 +226,7 @@ function gameStore(status: 'live' | 'final'): GameSnapshotStore {
           visibility: p.nameRequest,
         })),
     correctedOn: async () => undefined,
+    resultBeingCorrected: async () => undefined,
   };
 }
 

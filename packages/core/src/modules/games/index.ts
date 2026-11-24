@@ -36,7 +36,21 @@ export {
   type ScoringOffers,
 } from './commands/list-scoring-offers.ts';
 export { needsResult, oldestFirst, type ResultFacts } from './needs-result.ts';
-export { correctedMarkDate, type MarkCorrection, type MarkResult } from './corrected-mark.ts';
+export {
+  correctedMarkDate,
+  resultBeingCorrected,
+  type MarkCorrection,
+  type MarkResult,
+} from './corrected-mark.ts';
+export {
+  publicGameState,
+  publicGameStates,
+  type PublicGameClock,
+  type PublicGameFacts,
+  type PublicGameResult,
+  type PublicGameState,
+  type PublicGameTruth,
+} from './public-game-state.ts';
 export { earlierRoundKey, parseEarlierRoundKey } from './earlier-round-key.ts';
 export {
   earlierRoundsOf,

@@ -7,7 +7,7 @@ import { seasonsOfLeague } from '../../server/league-seasons.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { myTeamCookieName } from '../../server/my-team-cookie.ts';
-import { GameList } from '../schedule-pages/index.ts';
+import { BeingCorrectedNote, countBeingCorrected, GameList } from '../schedule-pages/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import {
   buildRoster,
@@ -233,6 +233,8 @@ export async function TeamPage({
         ]}
         lead={<Emblem name={head.team.name} color={head.team.color} size="large" />}
       >
+        {/* S-105: the record leaves out a game of this team being corrected; one line says so. */}
+        <BeingCorrectedNote count={countBeingCorrected(schedule, clock, head.team.slug)} />
         {/* S-87: a team that has left the league keeps its page and results, marked so. */}
         {head.team.left ? (
           <p className="ui-notice" data-team-left={head.team.slug}>
@@ -295,6 +297,22 @@ export async function TeamPage({
               />
             )}
           </Section>
+          {/* A game whose start has passed with no score: a list of its own (step 2.159). */}
+          {games.awaiting.length === 0 ? null : (
+            <Section
+              title={t('schedule.waitingForScore')}
+              kicker={t('schedule.waitingForScore.kicker')}
+            >
+              <div data-awaiting-list="">
+                <GameList
+                  leagueId={addressee.id}
+                  games={games.awaiting}
+                  layout="board"
+                  across="pair"
+                />
+              </div>
+            </Section>
+          )}
           {resultsBeside ? results : null}
         </div>
         <div className="team-roster">

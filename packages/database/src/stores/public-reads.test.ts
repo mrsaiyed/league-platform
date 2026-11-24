@@ -290,6 +290,60 @@ describe('the public reads against the database (S-22, T-87)', () => {
     expect(page.ok && page.value.game.correctedOn).toBe('2030-12-06');
   });
 
+  it('shows a reopened game as it stood until it is decided again, and only in its own league (S-47)', async () => {
+    const { a, b, pglite } = leagues;
+    const read = (leagueId: string) =>
+      withTransaction(leagues.db, { leagueId }, (scope) =>
+        readGamePage(gamesReadStore(scope), { gameId: a.gameId }, viewing(publicViewer(leagueId))),
+      );
+    const before = await read(a.leagueId);
+    if (!before.ok) throw new Error('The game is not there.');
+    expect(before.value.game.beingCorrected).toBeNull();
+    const row = await pglite.query<{ status: string; home_score: number; away_score: number }>(
+      `select status, home_score, away_score from games where id = $1`,
+      [a.gameId],
+    );
+    const stood = row.rows[0];
+    if (stood === undefined) throw new Error('The game is not there.');
+    const owner = `(select owner_account_id from leagues where id = '${a.leagueId}')`;
+    const result = `"status": "${stood.status}", "homeScore": ${stood.home_score}, "awayScore": ${stood.away_score}`;
+    // A reopen by hand, as games.reopen_game writes it: the correction (dated after every
+    // other this file writes, so it is the latest), then the game back to scheduled with its
+    // scores cleared, in one transaction.
+    await pglite.exec(`begin;
+      insert into game_corrections (league_id, game_id, account_id, reason, before, after, created_at)
+        values ('${a.leagueId}', '${a.gameId}', ${owner}, 'reopened',
+          '{"version": 1, ${result}}',
+          '{"version": 1, "status": "scheduled", "homeScore": null, "awayScore": null}',
+          '2031-01-01T12:00:00Z');
+      update games set status = 'scheduled', home_score = null, away_score = null, finalized_at = null
+        where id = '${a.gameId}';
+      commit;`);
+    try {
+      const open = await read(a.leagueId);
+      expect(open.ok && open.value.game.beingCorrected).toEqual({
+        status: stood.status,
+        homeScore: stood.home_score,
+        awayScore: stood.away_score,
+      });
+      expect(open.ok && open.value.game.status).toBe('scheduled');
+      // Another league reads nothing of it.
+      const other = await withTransaction(leagues.db, { leagueId: b.leagueId }, (scope) =>
+        gamesReadStore(scope).resultBeingCorrected(a.gameId),
+      );
+      expect(other).toBeUndefined();
+    } finally {
+      // Ended again with the same result: ending writes no correction (only a reopen does).
+      await pglite.query(
+        `update games set status = $2, home_score = $3, away_score = $4, finalized_at = now()
+          where id = $1`,
+        [a.gameId, stood.status, stood.home_score, stood.away_score],
+      );
+    }
+    const ended = await read(a.leagueId);
+    expect(ended.ok && ended.value.game.beingCorrected).toBeNull();
+  });
+
   it('finds nothing at all of a season that is still being set up', async () => {
     const { a, pglite } = leagues;
     try {

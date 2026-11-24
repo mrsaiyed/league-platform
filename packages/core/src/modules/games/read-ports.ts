@@ -1,5 +1,6 @@
 // What the public game page needs from storage (step 2.40). packages/database supplies
 // it, bound to one league (T-28). Rows of words and numbers only (T-29, T-81).
+import type { MarkResult } from './corrected-mark.ts';
 
 export type GamePageTeam = {
   readonly id: string;
@@ -68,6 +69,11 @@ export type GamesReadStore = {
   readonly people: (personIds: readonly string[]) => Promise<readonly GamePersonRecord[]>;
   /** The date (YYYY-MM-DD) of the game's latest correction, never its reason (S-7). */
   readonly correctedOn: (gameId: string) => Promise<string | undefined>;
+  /**
+   * The result as it stood while the game is being corrected: what its open reopen took
+   * back (S-47, step 2.159); undefined when no reopen is open (resultBeingCorrected).
+   */
+  readonly resultBeingCorrected: (gameId: string) => Promise<MarkResult | undefined>;
 };
 
 /**

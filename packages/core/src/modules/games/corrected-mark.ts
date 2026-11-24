@@ -90,3 +90,20 @@ export function correctedMarkDate(
   });
   return marked;
 }
+
+/**
+ * The result a game shows while it is being corrected (S-47, step 2.159): what the latest
+ * reopen took back, read from that correction's `before`, while the game is not decided
+ * again. Undefined when the game is decided (a put back, or ended again), when it has no
+ * correction, or when the latest one took back no decided result. Every reopen counts, an
+ * admin's and a scorekeeper's own (T-383); "Take back End game" writes no correction.
+ */
+export function resultBeingCorrected(
+  corrections: readonly MarkCorrection[],
+  game: { readonly status: string },
+): MarkResult | undefined {
+  if (isDecided(game.status)) return undefined;
+  const latest = corrections.at(-1);
+  if (latest === undefined || isPutBack(latest)) return undefined;
+  return isDecided(latest.before.status ?? '') ? latest.before : undefined;
+}

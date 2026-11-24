@@ -72,6 +72,12 @@ export type LiveGameViewProps = {
   readonly labels: LiveGameLabels;
   /** What the scoreboard shows beside the scores: the teams' colors, when and where. */
   readonly board?: LiveGameBoard | undefined;
+  /**
+   * A game being corrected (S-47, step 2.159): `initial` carries the result as it stood,
+   * and the board keeps it, whatever the correction does meanwhile, until the game is
+   * decided again; only then is the page drawn again (redrawsWhileHeld).
+   */
+  readonly held?: boolean | undefined;
 };
 
 /** The scoreboard's facts that do not change while the game is played. */
@@ -118,6 +124,21 @@ export function redrawsFor(
   if (arrived.status === 'final') return now.status !== 'final'; // reopened
   // Ended, or marked not started (S-40): either way its plays are no longer the page's.
   return arrived.status === 'live' && now.status !== 'live';
+}
+
+/**
+ * Whether a page held at the result as it stood (a game being corrected) must be drawn
+ * again: only once the game is final again. A tracked correction's own taps are not news
+ * to the public (S-47). A correction made by hand and ended again saves no play, so its
+ * snapshot (fetched every 30 seconds while the page is open, follow-game.ts) comes back
+ * final at the same sequence number the page arrived at: that is news too. A page is held
+ * only while the game is not decided, so a final snapshot no older than it is the end.
+ */
+export function redrawsWhileHeld(
+  arrived: Pick<GameSnapshot, 'sequence'>,
+  now: Pick<ViewerGame, 'status' | 'sequence'>,
+): boolean {
+  return now.sequence >= arrived.sequence && now.status === 'final';
 }
 
 /**
@@ -193,6 +214,7 @@ export function LiveGameView({
   words,
   labels,
   board,
+  held,
 }: LiveGameViewProps) {
   const [followed, setFollowed] = useState<FollowedGame>(() => ({
     game: { ...initial, playersAsOfSequence: initial.sequence },
@@ -221,18 +243,25 @@ export function LiveGameView({
     return () => handle.close();
   }, [leagueId, gameId, snapshotAddress, liveAddress, initial]);
 
-  const game = followed.game;
-  const redraw = redrawsFor(initial, game);
-  const sequence = useRef(game.sequence);
+  const game =
+    held === true ? { ...initial, playersAsOfSequence: initial.sequence } : followed.game;
+  const redraw =
+    held === true ? redrawsWhileHeld(initial, followed.game) : redrawsFor(initial, followed.game);
+  const sequence = useRef(followed.game.sequence);
+  const status = useRef(followed.game.status);
   useEffect(() => {
-    sequence.current = game.sequence;
+    sequence.current = followed.game.sequence;
+    status.current = followed.game.status;
   });
   useEffect(() => {
     // The server reads the same store the change came from, so the page drawn again
     // arrives at least this new. Spread over a few seconds, only when the page answers,
-    // and once per sequence number (redraw-page.ts).
+    // and once per sequence number and status (redraw-page.ts).
     if (!redraw) return undefined;
-    return redrawPage({ gameId, sequence: sequence.current }, browserRedrawDevice);
+    return redrawPage(
+      { gameId, sequence: sequence.current, status: status.current },
+      browserRedrawDevice,
+    );
   }, [redraw, gameId]);
   const serverNow = deviceNow === null ? initial.sentAt : deviceNow + followed.offsetMs;
   const running = game.status === 'live' && clockIsRunning(game.clock, serverNow);

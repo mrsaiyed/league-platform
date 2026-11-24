@@ -25,7 +25,14 @@ import {
   trackerWorld,
 } from '../../server/tracker-endpoints.test-helper.ts';
 import { GameList, gameView } from '../schedule-pages/index.ts';
-import { boardFinalPill, buildBoxScores, buildPlays, gameTitle, gameWords } from './build-game.ts';
+import {
+  boardFinalPill,
+  buildBoxScores,
+  buildPlays,
+  gameTitle,
+  gameTruthOf,
+  gameWords,
+} from './build-game.ts';
 import { GameContent, type GameView } from './game-content.tsx';
 
 type World = ReturnType<typeof trackerWorld>;
@@ -102,6 +109,7 @@ async function pageHtml(world: World) {
     leagueId: liveLeagueId,
     title: gameTitle(page.value),
     status: page.value.game.status,
+    truth: gameTruthOf(page.value, { now: new Date().toISOString(), today: '2000-01-01' }),
     start: null,
     corrected: null,
     snapshot: snapshot.value,

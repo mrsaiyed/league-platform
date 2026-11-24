@@ -28,8 +28,10 @@ import {
   buildPlays,
   correctedText,
   gameTitle,
+  gameTruthOf,
+  shownParts,
   gameWords,
-  titleLine,
+  truthLine,
 } from './build-game.ts';
 import { GameContent } from './game-content.tsx';
 
@@ -74,7 +76,19 @@ export async function GamePage({
     page.value.game.id,
   );
   const place = listed === undefined ? undefined : placeOf(listed);
-  const when = boardWhen(page.value.game.startsAt, clock.timeZone, page.value.game.status);
+  // The game's one public truth, as the home page, the schedule and a team's page read it
+  // (step 2.159): a game whose start has passed with no score is awaiting it, a reopened
+  // game shows the result as it stood (S-47).
+  // A game with a day and no time is read with its day, as the schedule's lists read it.
+  const truth = gameTruthOf(page.value, clock, listed?.localDate ?? null);
+  // Only a game still to come says its day on the board.
+  const when =
+    truth.state === 'upcoming'
+      ? boardWhen(page.value.game.startsAt, clock.timeZone, page.value.game.status)
+      : undefined;
+  // A forfeit has no box scores (P7 §5.6), and a game being corrected shows its result as
+  // it stood, not the sheet or plays the correction is changing (T-384).
+  const parts = shownParts(truth.state);
   // A game still to come, or put off, ends with its two teams and their records. Read only
   // for such a game: never for one under way, whose page is read again and again.
   const pending = ['scheduled', 'postponed', 'cancelled'].includes(page.value.game.status);
@@ -94,13 +108,14 @@ export async function GamePage({
         leagueId: addressee.id,
         title: gameTitle(page.value),
         status: page.value.game.status,
-        start: titleLine(page.value.game.startsAt, clock.timeZone, page.value.game.status),
+        truth,
+        start: truthLine(page.value.game.startsAt, clock.timeZone, truth),
         corrected: correctedText(snapshot.value.correctedOn ?? page.value.game.correctedOn),
         snapshot: snapshot.value,
         snapshotAddress: leagueApiUrl(addressee, ['games', snapshot.value.gameId, 'snapshot']),
         selfAddress: leagueUrl(addressee, 'game', { game: snapshot.value.gameId }),
-        boxScores: snapshot.value.status === 'final' ? buildBoxScores(page.value) : null,
-        plays: buildPlays(page.value, words),
+        boxScores: parts.boxScores ? buildBoxScores(page.value) : null,
+        plays: parts.plays ? buildPlays(page.value, words) : [],
         // Back to the schedule the game is on: an earlier season's, when it is one of those.
         scheduleAddress: leagueUrl(
           addressee,

@@ -2,8 +2,10 @@
 // record 051), with care: every viewer of a game sees the same change at the same moment,
 // so each waits a random 0 to 5 seconds first, then asks for the page and reloads only
 // if the page answers; otherwise the scoreboard already drawn keeps working. A page
-// reloads at most once for any one sequence number, so a stale cached page cannot make
-// it reload over and over.
+// reloads at most once for any one sequence number and status, so a stale cached page
+// cannot make it reload over and over. The status counts because a correction made by
+// hand saves no play: a game reopened and ended again stays at one sequence number, and
+// the page redrawn when it was reopened must still be drawn again when it ends (T-386).
 
 /** What redrawing needs from the device, so tests can stand in for it. */
 export type RedrawDevice = {
@@ -22,6 +24,8 @@ export type RedrawOptions = {
   readonly gameId: string;
   /** The sequence number the game is at, the one this reload is for. */
   readonly sequence: number;
+  /** The game's status at that number (live, final…): a new status there reloads again. */
+  readonly status?: string;
   /** The longest random wait. Default 5 s. */
   readonly spreadMs?: number;
 };
@@ -36,9 +40,12 @@ function readRedrawn(device: RedrawDevice, gameId: string): string | null {
   }
 }
 
-function rememberRedrawn(device: RedrawDevice, gameId: string, sequence: number): void {
+const redrawnMark = ({ sequence, status }: RedrawOptions) =>
+  status === undefined ? String(sequence) : `${sequence}:${status}`;
+
+function rememberRedrawn(device: RedrawDevice, gameId: string, mark: string): void {
   try {
-    device.storage()?.setItem(storageKey(gameId), String(sequence));
+    device.storage()?.setItem(storageKey(gameId), mark);
   } catch {
     // Not remembered: the page still reloads, and only the loop guard is lost.
   }
@@ -46,7 +53,8 @@ function rememberRedrawn(device: RedrawDevice, gameId: string, sequence: number)
 
 /** Starts the redraw; the function returned cancels it if it has not happened yet. */
 export function redrawPage(options: RedrawOptions, device: RedrawDevice): () => void {
-  if (readRedrawn(device, options.gameId) === String(options.sequence)) return () => {};
+  const mark = redrawnMark(options);
+  if (readRedrawn(device, options.gameId) === mark) return () => {};
   const spreadMs = options.spreadMs ?? 5_000;
   let cancelled = false;
   const handle = device.setTimeout(
@@ -56,7 +64,7 @@ export function redrawPage(options: RedrawOptions, device: RedrawDevice): () => 
         .catch(() => false)
         .then((ok) => {
           if (cancelled || !ok) return;
-          rememberRedrawn(device, options.gameId, options.sequence);
+          rememberRedrawn(device, options.gameId, mark);
           device.reload();
         });
     },
