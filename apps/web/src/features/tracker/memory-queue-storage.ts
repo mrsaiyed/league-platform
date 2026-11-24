@@ -45,7 +45,10 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
     async list(gameId) {
       return structuredClone(held.filter((entry) => entry.gameId === gameId));
     },
-    async settle(gameId, { remove = [], refuse = [], notSaved = [], notSavedSince, carryOn }: QueueSettlement) {
+    async settle(
+      gameId,
+      { remove = [], refuse = [], notSaved = [], notSavedSince, carryOn }: QueueSettlement,
+    ) {
       const carried = new Set(carryOn?.commandIds ?? []);
       const dropped = new Set(remove);
       const refusals = new Map(refuse.map((r) => [r.commandId, r.refusal]));

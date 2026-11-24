@@ -188,7 +188,10 @@ export async function openIndexedDbQueueStorage(
       });
     },
 
-    async settle(gameId, { remove = [], refuse = [], notSaved = [], notSavedSince, carryOn }: QueueSettlement) {
+    async settle(
+      gameId,
+      { remove = [], refuse = [], notSaved = [], notSavedSince, carryOn }: QueueSettlement,
+    ) {
       const dropped = new Set(remove);
       const refusals = new Map(refuse.map((r) => [r.commandId, r.refusal]));
       const setAside = new Set(notSaved);
