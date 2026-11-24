@@ -223,7 +223,7 @@ export const applyTrackerCommands = defineCommand({
     } else {
       // "Send these plays" (S-43, T-335): the scorekeeper's own tap, whoever holds the
       // game now, taken only from the account whose session the game was taken from
-      // (the server keeps it, 0026), and only if the game has not moved since the server
+      // (the server keeps it, 0027), and only if the game has not moved since the server
       // last answered that session. All of it under this game's lock (above), so no
       // batch or takeover of this game can come between the check and the write.
       if (otherMaker) {

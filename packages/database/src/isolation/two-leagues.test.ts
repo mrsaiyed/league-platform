@@ -97,7 +97,7 @@ describe('openTwoLeagues', () => {
       ];
       // 25 since step 2.160 gave the season a second, empty round; 26 since step 2.181 gave
       // it a third, whose only game is in the bin; 28 since step 2.56 gave it two level teams;
-      // 29 since step 2.148 kept a session its upcoming game was taken from (0026).
+      // 29 since step 2.148 kept a session its upcoming game was taken from (0027).
       expect(found.length).toBe(29);
       for (const text of found) expect(text.toLowerCase()).toContain(marker);
     }

@@ -110,7 +110,7 @@ async function leagueWithGame() {
   const sessions = async () =>
     (
       await pglite.query<{ id: string; account_id: string; device_id: string; held_until: Date }>(
-        // The sessions holding the game: one the game was taken from is kept beside them (0026).
+        // The sessions holding the game: one the game was taken from is kept beside them (0027).
         'select id, account_id, device_id, held_until from scoring_sessions where game_id = $1 and lost_at is null',
         [gameId],
       )

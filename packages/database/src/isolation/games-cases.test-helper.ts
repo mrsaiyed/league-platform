@@ -689,7 +689,7 @@ registerIsolationCase({
 });
 
 // "Send these plays" (step 2.148, T-335): what the server keeps of a session it took the
-// game from (0026).
+// game from (0027).
 registerIsolationCase({
   subject: loseScoringSession,
   name: "take the target's upcoming game from its session, keeping it",

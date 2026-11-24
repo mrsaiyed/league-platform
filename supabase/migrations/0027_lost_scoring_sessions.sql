@@ -1,5 +1,5 @@
--- 0026: what the server keeps of a scoring session another took the game from (step
--- 2.148, fix round; S-43, T-335). (Becomes 0027 if another lane's 0026 lands first.)
+-- 0027: what the server keeps of a scoring session another took the game from (step
+-- 2.148, fix round; S-43, T-335).
 --
 -- "Send these plays" lets a scorekeeper whose device lost the game send the plays it
 -- kept, when nothing was recorded since they were made. The server must not believe

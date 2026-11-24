@@ -137,7 +137,7 @@ export type LeagueWorld = {
   sessions: ScoringSession[];
   /** Where each session was last heard (T-335), by session id, as heard_seq keeps it. */
   sessionsHeard: Record<string, number>;
-  /** The sessions a game was taken from, as the database keeps them (0026, T-335). */
+  /** The sessions a game was taken from, as the database keeps them (0027, T-335). */
   lostSessions: (LostScoringSession & { readonly gameId: string })[];
   states: { readonly gameId: string; readonly seq: number; readonly state: unknown }[];
   events: NewGameEvent[];

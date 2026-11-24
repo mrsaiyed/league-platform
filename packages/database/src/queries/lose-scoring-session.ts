@@ -1,6 +1,6 @@
 // Takes a game of the scope's league from its scoring session (T-116, T-335): a takeover,
 // or a lapse given away. Unlike deleteScoringSession the row is kept, marked lost, so it
-// holds nothing from then on (find, extend and the one-per-game rule pass it by, 0026)
+// holds nothing from then on (find, extend and the one-per-game rule pass it by, 0027)
 // while the server still knows whose it was and where it was last heard, for "Send
 // these plays". With `lapsedBy`, only if its lease had run out by then. False if nothing
 // was taken.

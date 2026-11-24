@@ -21,7 +21,7 @@ export type MemoryScoring = MemoryGames & {
   sessions: ScoringSession[];
   /** Where each session was last heard (T-335), by session id: 0 unless a batch said. */
   heard: Record<string, number>;
-  /** The sessions the game was taken from, kept as the database keeps them (0026). */
+  /** The sessions the game was taken from, kept as the database keeps them (0027). */
   lost: (LostScoringSession & { readonly gameId: string })[];
   /** How many sessions were ever started: each new one gets the next id. */
   started: number;

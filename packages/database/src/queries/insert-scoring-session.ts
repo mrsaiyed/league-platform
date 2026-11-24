@@ -26,7 +26,7 @@ export async function insertScoringSession(
       held_until: new Date(session.heldUntil),
       heard_seq: heardSeq,
     })
-    // One holding session per game; those the game was taken from are kept beside it (0026).
+    // One holding session per game; those the game was taken from are kept beside it (0027).
     .onConflict((conflict) =>
       conflict.columns(['league_id', 'game_id']).where('lost_at', 'is', null).doNothing(),
     )

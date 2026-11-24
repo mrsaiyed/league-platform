@@ -1,4 +1,4 @@
-// A scoring session a game of the scope's league was taken from (T-335, 0026): whose it
+// A scoring session a game of the scope's league was taken from (T-335, 0027): whose it
 // was, where the server last heard it, and how far "Send these plays" took its kept
 // plays. Undefined for a session that holds the game, ended another way, or is not there.
 import type { LostScoringSession } from '@srleagues/core';

@@ -91,7 +91,7 @@ export type LeagueRecords = MadeLeague & {
   scoringSessionId: string;
   /** When that session began (ms): what taking the game over from it names. */
   scoringSessionSince: number;
-  /** A session the upcoming game was taken from, kept by the server (0026, T-335). */
+  /** A session the upcoming game was taken from, kept by the server (0027, T-335). */
   lostScoringSessionId: string;
   /** A player added at the final game's scorer's table, waiting for the admin's review (S-6). */
   walkUpRosterEntryId: string;
