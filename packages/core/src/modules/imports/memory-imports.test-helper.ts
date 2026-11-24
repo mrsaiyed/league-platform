@@ -224,6 +224,8 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
       },
       games: {
         leagueSettingRows: async () => [],
+        givenFormat: async () => null,
+        setGivenFormat: async () => undefined,
         listSeasonAssignments: async () => ({ games: [], assignments: [] }),
         isAssigned: async () => false,
         assign: async () => false,

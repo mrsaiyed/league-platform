@@ -41,7 +41,7 @@ export type MemoryGames = {
   /** Games the tracker has recorded plays for. */
   tracked: string[];
   corrections: NewGameCorrection[];
-  /** Who decided each game by hand, as `finalized_by` keeps it (migration 0026). */
+  /** Who decided each game by hand, as `finalized_by` keeps it (migration 0027). */
   deciders: Record<string, string | null>;
   /** How many times a list's facts for the own reopening were read (T-349). */
   handResultReads: number;
@@ -51,6 +51,8 @@ export type MemoryGames = {
   assignments: { gameId: string; accountId: string }[];
   /** The league's stored setting values, by key (the league level only). */
   settings: Record<string, StoredSetting[]>;
+  /** The format each game was given (step 2.119, 0026), by game id; null or absent for none. */
+  givenFormats: Record<string, unknown>;
   /** The league's today (YYYY-MM-DD); the stand-in's league keeps UTC. */
   today: string;
   /**
@@ -190,6 +192,7 @@ export const emptyGames = (): MemoryGames => ({
   activity: [],
   assignments: [],
   settings: {},
+  givenFormats: {},
   today: '2026-12-06',
   now: '2026-12-06T12:00:00.000Z',
   rounds: {},
@@ -261,6 +264,20 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): ScorekeepersTx {
           format: null,
           version: found.version + 1,
         };
+        return found.version + 1;
+      },
+      givenFormat: async (id) =>
+        s.games.some((g) => g.id === id) ? (s.givenFormats[id] ?? null) : undefined,
+      // As the database does it (0027): only a game never started, scheduled or postponed.
+      setGivenFormat: async (id, format, version) => {
+        const at = s.games.findIndex((g) => g.id === id);
+        const found = s.games[at];
+        if (found === undefined || found.binned || found.version !== version) return undefined;
+        if (found.format !== null || !['scheduled', 'postponed'].includes(found.status)) {
+          return undefined;
+        }
+        s.givenFormats[id] = format === null ? null : structuredClone(format);
+        s.games[at] = { ...found, version: found.version + 1 };
         return found.version + 1;
       },
       addCorrection: async (correction) => void s.corrections.push(correction),

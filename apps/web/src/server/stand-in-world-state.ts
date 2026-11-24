@@ -131,7 +131,9 @@ export type LeagueWorld = {
   drafts: DraftRecord[];
   assignments: { readonly gameId: string; readonly accountId: string }[];
   corrections: (NewGameCorrection & { readonly on: string })[];
-  /** Who decided each game by hand, as `finalized_by` keeps it (migration 0026). */
+  /** The format each game was given (step 2.119, migration 0026), by game id; absent for none. */
+  givenFormats?: Readonly<Record<string, unknown>>;
+  /** Who decided each game by hand, as `finalized_by` keeps it (migration 0027). */
   deciders: Record<string, string | null>;
   sessions: ScoringSession[];
   states: { readonly gameId: string; readonly seq: number; readonly state: unknown }[];

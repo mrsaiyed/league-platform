@@ -391,6 +391,8 @@ export const enAdminSettings = {
     "A team of this season already has two players wearing one number. Change one of them on the team's page first, then switch this on.",
   'setting.games.scorekeeperReopenMinutes.label':
     'Minutes after a game ends during which the scorekeeper who ended it may reopen it from the tracker, with a reason, if they tapped End game too soon. 0 means never. After that, only an admin can reopen it.',
+  'setting.games.scorekeepersMayChangeFormat.label':
+    "Scorekeepers may change a game's format before it starts. When this is off, they ask an admin, who can always give a game its own format from Games.",
   'setting.games.whoMayScore.label':
     'Which games a scorekeeper may score: any game, or only the games they are assigned to',
   'setting.games.whoMayScore.option.anyScorekeeper': 'Any game',

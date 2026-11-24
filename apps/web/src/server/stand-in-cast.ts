@@ -104,7 +104,7 @@ export const standInSeedCast: SeedCast = {
   otherLeagues: [standInLeagues.suspended, standInLeagues.inBin, standInLeagues.otherDraft],
   // The made-up coach has a roster place on a team of each league.
   memberAccountId: standInPeople.coach.accountId,
-  // Who typed the seeded results recorded by hand (step 2.177, migration 0026).
+  // Who typed the seeded results recorded by hand (step 2.177, migration 0027).
   recorderAccountId: standInPeople.owner.accountId,
   assignees: [standInPeople.scorekeeper.accountId, standInPeople.owner.accountId],
   draftAssignees: [standInPeople.admin.accountId, standInPeople.scorekeeper.accountId],

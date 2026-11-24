@@ -4,6 +4,7 @@ import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
   deleteGameAssignment,
   findGame,
+  findGameGivenFormat,
   findSeason,
   findStatusBeforeCancelled,
   gameHasPlays,
@@ -27,6 +28,7 @@ import {
   lockLiveGame,
   replaceGameLines,
   updateGameNotStarted,
+  updateGameGivenFormat,
   updateGameResult,
 } from '../queries/index.ts';
 
@@ -37,6 +39,9 @@ export function gamesStore(scope: LeagueScope): GamesStore {
     lockGame: (gameId) => lockLiveGame(scope, gameId),
     setResult: (gameId, change, version) => updateGameResult(scope, gameId, change, version),
     markNotStarted: (gameId, version) => updateGameNotStarted(scope, gameId, version),
+    givenFormat: (gameId) => findGameGivenFormat(scope, gameId),
+    setGivenFormat: (gameId, format, version) =>
+      updateGameGivenFormat(scope, gameId, format, version),
     addCorrection: (correction) => insertGameCorrection(scope, correction),
     listPostponed: (seasonId) => listPostponedGames(scope, seasonId),
     statusBeforeCancelled: (gameId) => findStatusBeforeCancelled(scope, gameId),

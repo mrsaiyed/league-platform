@@ -150,6 +150,20 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       });
       return found.version + 1;
     },
+    givenFormat: async (gameId) =>
+      s.games.some((g) => g.id === gameId) ? (s.givenFormats?.[gameId] ?? null) : undefined,
+    // As the database does it (0027): only a game never started, scheduled or postponed.
+    setGivenFormat: async (gameId, format, version) => {
+      const at = s.games.findIndex((g) => g.id === gameId);
+      const found = s.games[at];
+      if (found === undefined || found.binned || found.version !== version) return undefined;
+      if (found.format !== null || !['scheduled', 'postponed'].includes(found.status)) {
+        return undefined;
+      }
+      s.givenFormats = { ...s.givenFormats, [gameId]: format };
+      s.games = replacedAt(s.games, at, { ...found, version: found.version + 1 });
+      return found.version + 1;
+    },
     addCorrection: async (correction) => {
       s.corrections = [...s.corrections, { ...correction, on: dayIn(now(), s.timeZone) }];
     },

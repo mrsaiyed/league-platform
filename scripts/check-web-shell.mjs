@@ -797,6 +797,29 @@ const cases = [
     ['Box score: Tigers at Lions', staffFrameAt('/north-valley/admin/games'), oneHeading],
     [adminPlaceholder],
   ],
+  // A game's own format in the games area (step 2.119): every rule of a game not under way,
+  // from its season, with "Change the format"; a game under way has the button greyed (the
+  // stand-in's game under way was seeded with no format fixed, so its source is not checked).
+  [
+    'owner',
+    `/north-valley/admin/games/${game(3)}`,
+    200,
+    [
+      'data-admin-format=',
+      'data-format-source="season"',
+      'data-format-facts=',
+      'data-format-change=""',
+      'Change the format',
+    ],
+    [adminPlaceholder, 'data-format-source="fixed"', 'data-format-change="" disabled'],
+  ],
+  [
+    'owner',
+    `/north-valley/admin/games/${game(2)}`,
+    200,
+    ['data-admin-format=', 'data-format-facts=', 'data-format-change="" disabled=""'],
+    [adminPlaceholder, 'data-format-season='],
+  ],
   // A scheduler at an area that is not theirs is refused inside the admin's own frame,
   // which is open to them: their own areas in its menu, and the way back to its home
   // (step 2.103). Another league's admin, which is not open to them, shows them no frame.

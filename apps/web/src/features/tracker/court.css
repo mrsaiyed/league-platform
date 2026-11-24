@@ -2334,6 +2334,39 @@
   -webkit-user-select: text;
   user-select: text;
 }
+/* "Change the format" at the start confirmation (step 2.119): each box under its words,
+   drawn as the court's own field, 44 high and as wide as the panel. */
+.court-stack[data-format-form] p {
+  margin: 0;
+}
+.court-stack[data-format-form] label {
+  display: block;
+  margin-block-end: 4px;
+}
+.court-stack[data-format-form] input[type='checkbox'] + label {
+  display: inline;
+  margin-inline-start: 8px;
+}
+.court-stack[data-format-form] input[type='checkbox'] {
+  inline-size: 24px;
+  block-size: 24px;
+  vertical-align: middle;
+}
+.court-stack[data-format-form] input:not([type='checkbox']),
+.court-stack[data-format-form] select {
+  inline-size: 100%;
+  block-size: 44px;
+  margin: 0;
+  padding-block: 0;
+  padding-inline: 10px;
+  border: 2px solid var(--court-dark-edge);
+  border-radius: var(--court-radius);
+  background: var(--court-page);
+  color: var(--court-text);
+  color-scheme: dark;
+  font: inherit;
+  font-size: 16px;
+}
 /* The final panel (J4): "Final", who won and the score, large; whether the league has
    the result; and the way back in the lowest band. */
 .court-final-result {

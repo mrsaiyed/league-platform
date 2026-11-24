@@ -125,3 +125,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.118 (review Low): the panel read-only when the game is final is tried in unit tests only, not in a browser.
 
 - 2.61 (last part): bad-wifi-test.mjs still logs 'reached the server' for a failed fetch (:301, :312); after hold's rebuild the screen is not redrawn nor the kept scoring saved until the next state (tracker-controller.ts about :1374); no unit test shows an add or play by somebody else is still caught when the device has its own adds (goes with step 2.242).
+
+- 2.119: the 0026 trigger lets one update set status live and given_format together (no path does); an admin changing the format with the setting off is tested in core only; checklist B1 to B4 is nowhere in the spec (the form follows P7 §1's season-rule rows); a cancelled game is given the reason 'under way'; before the start the device compares only periods, lengths and clock mode with the server's format, not fouls and timeouts; the role matrix covers only a scheduled game for the three format commands.

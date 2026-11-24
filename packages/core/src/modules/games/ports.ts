@@ -1,6 +1,6 @@
 // What the games module needs from storage. packages/database supplies it, bound to
 // one transaction for one league, so none of these take a league id (T-28).
-import type { SeasonRules } from '@srleagues/contracts';
+import type { GameFormatRules, SeasonRules } from '@srleagues/contracts';
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, AccessStore, ActivityLog } from '../access/index.ts';
 import type { StoredSetting } from '../leagues/index.ts';
@@ -59,7 +59,7 @@ export type GameResultChange = {
   /** How the game is now recorded (final, box or live), when that changes with the result. */
   readonly captureMode?: 'final' | 'box' | 'live';
   /**
-   * The account that decided it by hand (step 2.177, migration 0026), kept while the game
+   * The account that decided it by hand (step 2.177, migration 0027), kept while the game
    * stays decided; left out or null for a tracker's end, or a change that undecides it.
    */
   readonly decidedBy?: string | null;
@@ -211,6 +211,22 @@ export type GamesStore = {
    * in the bin, not live or moved on.
    */
   readonly markNotStarted: (gameId: string, version: number) => Promise<number | undefined>;
+  /**
+   * The format the game was GIVEN (step 2.119, migration 0026) as stored: null when it has
+   * none, undefined when the game is not in this league. Kept apart from `format`, the
+   * rules fixed at its start, so marking it not started returns it to this one.
+   */
+  readonly givenFormat: (gameId: string) => Promise<unknown>;
+  /**
+   * Gives the game its own format, or takes it away (null), if it is still at `version`,
+   * not in the bin, scheduled or postponed and with no rules fixed: the new version, else
+   * undefined.
+   */
+  readonly setGivenFormat: (
+    gameId: string,
+    format: GameFormatRules | null,
+    version: number,
+  ) => Promise<number | undefined>;
   /** Writes the correction row (S-7) in this transaction; the database needs it to change a decided game. */
   readonly addCorrection: (correction: NewGameCorrection) => Promise<void>;
   /** Postponed games not in the bin, soonest first, of one season or all. */
@@ -534,9 +550,9 @@ export type LiveGamesStore = {
    */
   readonly endedAgo: (gameId: string) => Promise<number | undefined>;
   /**
-   * Who decided the game's present result by hand (step 2.177, migration 0026): the
+   * Who decided the game's present result by hand (step 2.177, migration 0027): the
    * account, or null when nobody did (its tracker ended it, it is not decided, it was
-   * decided before 0026 or with no account). Read inside the database, as endedAgo is.
+   * decided before 0027 or with no account). Read inside the database, as endedAgo is.
    */
   readonly decidedBy: (gameId: string) => Promise<string | null>;
   /**

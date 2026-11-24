@@ -1,5 +1,5 @@
 // For a games list (step 2.177, T-349), in one statement: each of these games of the
-// scope's league with who decided it by hand (`finalized_by`, migration 0026), how long
+// scope's league with who decided it by hand (`finalized_by`, migration 0027), how long
 // ago by the database's own clock (as find-game-ended-ago.ts), whether an overturn not in
 // the bin rules on it (as find-game.ts) and whether it is tracked: a saved state and
 // plays past the tracker's marker (as find-saved-game-state.ts and game-has-plays.ts).

@@ -24,7 +24,7 @@ export async function updateGameResult(
       // Written with every change of a result, so no old count outlives it (0021).
       overtime_periods: change.overtimePeriods,
       finalized_at: change.decided ? sql<Date>`now()` : null,
-      // Who decided it by hand (0026): with every change, so it names this result only.
+      // Who decided it by hand (0027): with every change, so it names this result only.
       finalized_by: change.decided ? (change.decidedBy ?? null) : null,
       ...(change.captureMode === undefined ? {} : { capture_mode: change.captureMode }),
       ...(change.format === undefined
