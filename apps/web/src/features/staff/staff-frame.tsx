@@ -59,6 +59,37 @@ const statuses: Readonly<
   suspended: { pill: 'admin.status.suspended', says: 'shell.suspendedNotice' },
 };
 
+/**
+ * The link from a draft's notice to Publish, and from an archived league's to Un-archive,
+ * in League settings (steps 2.240, 2.125). Drawn in the pill's sentence and in the phone's
+ * strip, the copy a phone shows: there it is out of the tab order, as the strip is hidden
+ * from screen readers, which meet the pill's own link.
+ */
+function StatusLink({
+  status,
+  publishAt,
+  inStrip = false,
+}: {
+  readonly status: LeagueStatus;
+  readonly publishAt: string | null;
+  readonly inStrip?: boolean;
+}) {
+  const words =
+    status === 'draft'
+      ? t('shell.draftNoticePublish')
+      : status === 'archived'
+        ? t('shell.archivedNoticeUnarchive')
+        : null;
+  return words === null || publishAt === null ? null : (
+    <>
+      {' '}
+      <a href={publishAt} tabIndex={inStrip ? -1 : undefined}>
+        {words}
+      </a>
+    </>
+  );
+}
+
 /** A league that is not public, as a pill that opens the whole sentence (U-9). */
 function StaffStatus({
   status,
@@ -78,19 +109,7 @@ function StaffStatus({
       </summary>
       <p className="staff-status-says">
         {t(found.says)}
-        {status === 'draft' && publishAt !== null ? (
-          <>
-            {' '}
-            <a href={publishAt}>{t('shell.draftNoticePublish')}</a>
-          </>
-        ) : null}
-        {/* An archived league points to Un-archive the same way (step 2.125). */}
-        {status === 'archived' && publishAt !== null ? (
-          <>
-            {' '}
-            <a href={publishAt}>{t('shell.archivedNoticeUnarchive')}</a>
-          </>
-        ) : null}
+        <StatusLink status={status} publishAt={publishAt} />
       </p>
     </details>
   );
@@ -158,6 +177,7 @@ export async function StaffFrame({
       {notPublic === null ? null : (
         <p className="staff-status-band" data-status={league.status} aria-hidden="true">
           {t(notPublic.says)}
+          <StatusLink status={league.status} publishAt={publishAt} inStrip />
         </p>
       )}
       {/* The side's dark ground runs the height of the page; what it holds stays on the
