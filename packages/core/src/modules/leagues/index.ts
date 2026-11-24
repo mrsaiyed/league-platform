@@ -36,7 +36,15 @@ export {
   type ChangedSinceRead,
   type LeagueName,
 } from './commands/set-league-name.ts';
+export {
+  holdsChildrenInFull,
+  setLeagueAudience,
+  type LeagueAudienceSaved,
+  type SetLeagueAudienceError,
+} from './commands/set-league-audience.ts';
+export { setLeagueProfile, type SetLeagueProfileError } from './commands/set-league-profile.ts';
 export { setLeagueStatus, type SetLeagueStatusError } from './commands/set-league-status.ts';
+export { audienceChange, type AudienceChange } from './rules/audience-change.ts';
 export {
   publishSiteDesign,
   type PublishedSiteDesign,
@@ -98,7 +106,7 @@ export { readPrivacyFacts, type PrivacyFacts } from './settings/read-privacy-fac
 export { readPublishChecks } from './queries/read-publish-checks.ts';
 // Whether the person may change the league's settings: the League settings screen draws
 // its Publish button by it (step 2.240); the commands check it themselves.
-export { mayChangeLeagueSettings } from './policy.ts';
+export { mayChangeLeagueSettings, mayEditLeague } from './policy.ts';
 export {
   firstUnmetCheck,
   publishCheckKeys,
@@ -155,6 +163,8 @@ export type {
   DivisionsStore,
   DraftLeagueRemoval,
   DraftLeagueRemovalAsked,
+  LeagueProfile,
+  LeagueProfileChange,
   LeagueRecord,
   LeagueRemovalFinding,
   LeagueRemovalStore,

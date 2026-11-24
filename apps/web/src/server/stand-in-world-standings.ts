@@ -468,6 +468,9 @@ export function worldLeaguesStores(
     // Publishing a made-up draft (step 2.240): the state is kept beside the cast's
     // (stand-in-league-states.ts), which the access reader and the address lookups read.
     setStatus: async (status, version) => setStandInStatus(s.leagueId, status, version),
+    leagueProfile: notYet('leagues.leagueProfile'),
+    setProfile: notYet('leagues.setProfile'),
+    setAudience: notYet('leagues.setAudience'),
     createSeason: notYet('leagues.createSeason'),
     findSeason: async (seasonId) => {
       const found = s.seasons.find((x) => x.id === seasonId);

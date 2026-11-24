@@ -13,6 +13,21 @@ export type SettingPlace =
   | { readonly level: 'program'; readonly programId: string }
   | { readonly level: 'season'; readonly seasonId: string };
 
+/**
+ * What League settings → Profile changes besides the name and short name (step 2.125
+ * part 2): how people reach the league, where it plays, its clock, and whether it is
+ * listed in `/find` (U-10). The same limits as the leagues table (0003, 0014).
+ */
+export type LeagueProfileChange = {
+  readonly contactEmail: string | null;
+  readonly city: string | null;
+  readonly timeZone: string;
+  readonly listed: boolean;
+};
+
+/** The profile as it is kept, with who plays in the league (record 065). */
+export type LeagueProfile = LeagueProfileChange & { readonly audience: Audience };
+
 /** A stored value at a place, as it is kept: `{version, value}`, and the row's own version. */
 export type StoredSettingRow = {
   readonly level: SettingLevel;
@@ -125,6 +140,15 @@ export type LeaguesStore = {
   ) => Promise<number | 'taken' | undefined>;
   /** Sets the state at `version`: the new version, or undefined. */
   readonly setStatus: (status: LeagueStatus, version: number) => Promise<number | undefined>;
+  /** The league's profile (step 2.125), or undefined if it is in the bin or out of sight. */
+  readonly leagueProfile: () => Promise<LeagueProfile | undefined>;
+  /** Sets the profile at `version`: the new version, or undefined if it moved. */
+  readonly setProfile: (
+    profile: LeagueProfileChange,
+    version: number,
+  ) => Promise<number | undefined>;
+  /** Sets who plays at `version`: the new version, or undefined if it moved. */
+  readonly setAudience: (audience: Audience, version: number) => Promise<number | undefined>;
   /** The program with this id, or the default program when none is given. */
   readonly findProgram: (
     programId: string | undefined,

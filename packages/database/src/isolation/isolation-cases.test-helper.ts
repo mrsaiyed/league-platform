@@ -25,7 +25,9 @@ import {
   revokeGrant,
   searchActivity,
   setCurrentSeason as setCurrentSeasonCommand,
+  setLeagueAudience,
   setLeagueName,
+  setLeagueProfile,
   publicNames,
   setLeagueStatus,
   setSetting,
@@ -67,7 +69,9 @@ import {
   revokeRoleGrant,
   setCurrentSeason,
   settleJob,
+  updateLeagueAudience,
   updateLeagueName,
+  updateLeagueProfile,
   updateLeagueStatus,
   writeSettingValue,
 } from '../queries/index.ts';
@@ -147,11 +151,44 @@ registerIsolationCase({
   run: (scope) => updateLeagueName(scope, 'Renamed by the harness', 1),
 });
 
+registerIsolationCase({
+  subject: updateLeagueProfile,
+  name: "change the scope's league's profile (step 2.125)",
+  run: (scope) =>
+    updateLeagueProfile(
+      scope,
+      { contactEmail: 'harness@example.org', city: 'Harness town', timeZone: 'UTC', listed: true },
+      1,
+    ),
+});
+
+registerIsolationCase({
+  subject: updateLeagueAudience,
+  name: "change who plays in the scope's league (step 2.125)",
+  run: (scope) => updateLeagueAudience(scope, 'adult', 1),
+});
+
 // Commands -----------------------------------------------------------------------
 
 registerCommandCase(setLeagueName, harnessTx, {
   name: "set the league's name as its owner",
   input: () => ({ name: 'Renamed by the harness', version: 1 }),
+});
+
+registerCommandCase(setLeagueProfile, harnessTx, {
+  name: "change the league's profile as its owner (step 2.125)",
+  input: () => ({
+    contactEmail: 'harness@example.org',
+    city: 'Harness town',
+    timeZone: 'UTC',
+    listed: true,
+    version: 1,
+  }),
+});
+
+registerCommandCase(setLeagueAudience, harnessTx, {
+  name: 'change who plays in the league as its owner (step 2.125)',
+  input: () => ({ audience: 'adult' as const, confirmed: true, version: 1 }),
 });
 
 registerCommandCase(renameShortName, harnessTx, {

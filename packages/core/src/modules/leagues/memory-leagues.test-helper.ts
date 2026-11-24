@@ -65,6 +65,10 @@ export type MemoryLeagues = {
   recordedChild: boolean;
   /** How people reach the league; given unless a test says otherwise. */
   contactEmail: string | null;
+  /** Where the league plays, its clock and its listing (step 2.125's Profile). */
+  city: string | null;
+  timeZone: string;
+  listed: boolean;
   activity: ActivityEntry[];
   /** The season's teams, results, adjustments and saved standings (the standings module's). */
   standing: Omit<StandingsData, 'seasons'>;
@@ -120,6 +124,9 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
     audience: 'youth',
     recordedChild: false,
     contactEmail: 'hello@example.org',
+    city: null,
+    timeZone: 'America/New_York',
+    listed: false,
     activity: [],
     standing: {
       teams: [],
@@ -217,6 +224,33 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
         leagueAudience: async () => s.audience,
         hasRecordedChild: async () => s.recordedChild,
         leagueContactEmail: async () => s.contactEmail,
+        leagueProfile: async () =>
+          s.league === undefined
+            ? undefined
+            : {
+                contactEmail: s.contactEmail,
+                city: s.city,
+                timeZone: s.timeZone,
+                listed: s.listed,
+                audience: s.audience,
+              },
+        setProfile: async (profile, version) => {
+          const next = bump(version);
+          if (next === undefined || s.league === undefined) return undefined;
+          s.league = { ...s.league, version: next };
+          s.contactEmail = profile.contactEmail;
+          s.city = profile.city;
+          s.timeZone = profile.timeZone;
+          s.listed = profile.listed;
+          return next;
+        },
+        setAudience: async (audience, version) => {
+          const next = bump(version);
+          if (next === undefined || s.league === undefined) return undefined;
+          s.league = { ...s.league, version: next };
+          s.audience = audience;
+          return next;
+        },
         isPlatformStaff: async () => accountId !== null && s.staff.includes(accountId),
         createLeague: async (league) => {
           if (s.league !== undefined) return 'league-exists';

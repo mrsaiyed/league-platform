@@ -154,7 +154,9 @@ import {
   setBoxScore,
   setCurrentSeason,
   setDraftRecording,
+  setLeagueAudience,
   setLeagueName,
+  setLeagueProfile,
   setLeagueStatus,
   setNameRequest,
   setSeasonRosterSettings,
@@ -2114,6 +2116,29 @@ const rows: readonly Row[] = [
     needs: 'league.settings',
     prepare: async () => ({ input: { name: 'Renamed', version: 1 } }),
     run: (c, i) => setLeagueName(c, i, leaguesDeps),
+  },
+  // League settings → Profile (step 2.125): the owner and admins (U-14).
+  {
+    command: 'leagues.set_profile',
+    name: "change the league's contact email, city, time zone and listing",
+    needs: 'league.settings',
+    prepare: async () => ({
+      input: {
+        contactEmail: 'matrix@example.org',
+        city: 'Matrix town',
+        timeZone: 'UTC',
+        listed: true,
+        version: 1,
+      },
+    }),
+    run: (c, i) => setLeagueProfile(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.set_audience',
+    name: 'change who plays in the league',
+    needs: 'league.settings',
+    prepare: async () => ({ input: { audience: 'adult', confirmed: true, version: 1 } }),
+    run: (c, i) => setLeagueAudience(c, i, leaguesDeps),
   },
   {
     command: 'leagues.rename_short_name',
