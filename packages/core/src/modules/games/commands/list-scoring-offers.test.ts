@@ -68,6 +68,27 @@ describe('listScoringOffers', () => {
     });
   });
 
+  it('offers a game of an archived season while a correction is open, only to someone who may correct games there (T-389)', async () => {
+    const reopened = {
+      gameId: gameUuid(1),
+      accountId: ownerId,
+      reason: 'The score was wrong',
+      before: { version: 1, status: 'final', homeScore: 50, awayScore: 48 },
+      after: { version: 1, status: 'scheduled', homeScore: null, awayScore: null },
+    } as const;
+    const { deps, as, db } = memoryGames({ games, grants, corrections: [reopened] });
+    db.state.seasons = db.state.seasons.map((x) => ({ ...x, status: 'completed' }));
+    const ids = async (account: string) => {
+      const result = await listScoringOffers(as(account), { gameIds: every }, deps);
+      return result.ok ? result.value.games.map((g) => g.gameId) : result.error.code;
+    };
+    expect(await ids(ownerId)).toEqual([gameUuid(1)]);
+    expect(await ids(schedulerId)).toEqual([gameUuid(1)]);
+    // A scorekeeper, the league's or the program's, is refused there (season-archived).
+    expect(await ids(scorekeeperId)).toEqual([]);
+    expect(await ids(programScorekeeperId)).toEqual([]);
+  });
+
   it('offers the games still to be decided, in the order asked, with how each is recorded', async () => {
     expect(await offers(scorekeeperId, [gameUuid(3), ...every])).toEqual([
       { gameId: gameUuid(3), recording: 'box-score' },

@@ -13,8 +13,15 @@
 //   left open stays the correcting admin's to finish, archived or not. Once its result is entered again the game is final,
 //   and read-only again; a game corrected before the season was archived is no exception.
 import type { CommandContext } from '../../command/index.ts';
+import {
+  accessOfAccount,
+  allows,
+  readOnlyLeagueStatuses,
+  type AccessHolder,
+  type Scope,
+} from '../access/index.ts';
 import { isDecided } from './game-fields.ts';
-import { gameScope, mayChangeGames } from './policy.ts';
+import { gameScope } from './policy.ts';
 import type { GameRecord, GamesStore, GamesTx } from './ports.ts';
 
 type ArchiveReader = {
@@ -42,13 +49,35 @@ export async function correctionOpenOn(
   return newest !== undefined && !isDecided(newest.after.status);
 }
 
+/**
+ * The one rule for entering a result and the tracker's work in an archived season (O-12,
+ * T-381, T-389), used by the commands' check below and by every page that offers scoring
+ * (the games lists, myGamesOf; the public pages' offers, listScoringOffers), so a page
+ * never offers what the commands refuse: refused unless a correction is open on the game
+ * and the holder may correct games at its place (`scope`, the game's program) while the
+ * league is not archived or suspended. False for a game of a season that is not archived.
+ */
+export async function archivedSeasonRefusesScoring(
+  game: Pick<GameRecord, 'id' | 'status' | 'seasonId'>,
+  tx: GamesTx,
+  holder: AccessHolder | undefined,
+  scope: Scope,
+): Promise<boolean> {
+  if (!(await tx.games.seasonArchived(game.seasonId))) return false;
+  if (!(await correctionOpenOn(game, tx))) return true;
+  if (holder === undefined || !allows(holder, 'games.correct', scope)) return true;
+  const status = await tx.access.leagueStatus();
+  return status === undefined || readOnlyLeagueStatuses.includes(status);
+}
+
 export async function gameInArchivedSeasonNotReopened(
   input: { readonly gameId: string },
   tx: GamesTx,
   context: CommandContext,
 ): Promise<boolean> {
   const game = await tx.games.find(input.gameId);
-  if (game === undefined || !(await tx.games.seasonArchived(game.seasonId))) return false;
-  if (!(await correctionOpenOn(game, tx))) return true;
-  return !(await mayChangeGames(context, tx, 'games.correct', await gameScope(tx, game.id)));
+  if (game === undefined) return false;
+  const holder =
+    context.accountId === null ? undefined : await accessOfAccount(tx, context.accountId);
+  return archivedSeasonRefusesScoring(game, tx, holder, await gameScope(tx, game.id));
 }

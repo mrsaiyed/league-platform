@@ -173,6 +173,36 @@ describe('listMyGames', () => {
     }
   });
 
+  it("marks an archived season's games not scorable, but while a correction is open for those who may correct games (T-389)", async () => {
+    const reopened = {
+      gameId: gameUuid(1),
+      accountId: ownerId,
+      reason: 'The score was wrong',
+      before: { version: 1, status: 'final', homeScore: 50, awayScore: 48 },
+      after: { version: 1, status: 'scheduled', homeScore: null, awayScore: null },
+    } as const;
+    const { deps, as, db } = memoryGames({ games, grants, corrections: [reopened] });
+    db.state.seasons = db.state.seasons.map((x) =>
+      x.id === otherSeasonId ? x : { ...x, status: 'completed' },
+    );
+    const scorable = async (account: string) => {
+      const result = await listMyGames(as(account), {}, deps);
+      return result.ok && result.value.games.map((g) => [g.id.slice(-1), g.scorable]);
+    };
+    expect(await scorable(scorekeeperId)).toEqual([
+      ['8', false],
+      ['1', false],
+      ['7', true],
+      ['2', false],
+    ]);
+    expect(await scorable(ownerId)).toEqual([
+      ['8', false],
+      ['1', true],
+      ['7', true],
+      ['2', false],
+    ]);
+  });
+
   it('refuses anyone who scores nowhere, a removed scorekeeper at once, and a visitor', async () => {
     expect(await listed(editorId)).toBe('not-allowed');
     const revoked: Grant = { ...scorekeeperGrant, revokedAt: '2026-12-06T17:00:00.000Z' };
