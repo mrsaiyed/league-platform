@@ -199,3 +199,6 @@ export function clashWords(
     ? t('admin.bin.gameBackClash', words)
     : t('admin.bin.gameBackClashCourt', { ...words, court: game.court });
 }
+
+/** What the bin's page is left when a person back from it was the first child (S-109). */
+export const firstChildSaid = 'firstChild';

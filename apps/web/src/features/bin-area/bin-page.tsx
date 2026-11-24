@@ -23,6 +23,7 @@ import {
   binKindsShown,
   binView,
   clashWords,
+  firstChildSaid,
   gameBackOf,
   nameTakenBy,
   teamsInBinWords,
@@ -191,10 +192,15 @@ export async function BinPage({
   // for this person is said, never numbers from the address.
   const holder = noticeHolderOf(context);
   const left =
-    backKind !== 'game' || holder === undefined
+    (backKind !== 'game' && backKind !== 'person') || holder === undefined
       ? undefined
       : savedNoticesHere().take(holder, 'bin');
-  const gameBack = left === undefined || left.thing !== backId ? undefined : gameBackOf(left.said);
+  const gameBack =
+    left === undefined || left.thing !== backId || backKind !== 'game'
+      ? undefined
+      : gameBackOf(left.said);
+  const firstChild =
+    backKind === 'person' && left?.thing === backId && left.said === firstChildSaid;
   const clashIds = gameBack === undefined ? [] : (left?.about ?? []);
   const seasonId = left?.name;
   const clashes =
@@ -222,6 +228,7 @@ export async function BinPage({
               <a href={backHref}>{t(`admin.bin.backLink.${backKind}`)}</a>
             )}
           </p>
+          {firstChild ? <p data-says="first-child">{t('adminPeople.firstChild')}</p> : null}
           {gameBack === undefined ? null : (
             <p data-bin-game-back={gameBack.revision}>
               {t('admin.bin.gameBack', gameBack)}

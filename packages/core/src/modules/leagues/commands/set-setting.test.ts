@@ -541,3 +541,39 @@ describe('getSetting', () => {
     expect(await read({ programId })).toEqual({ value: 20, source: 'program' });
   });
 });
+
+describe('"children in full" in an adult league (S-109, T-402)', () => {
+  const yes = {
+    level: 'league',
+    key: 'privacy.childrenInFullConfirmed',
+    value: true,
+    version: null,
+    confirmed: true,
+  };
+  const league = (audience: 'adult' | 'youth' | 'mixed', recordedChild: boolean) =>
+    memoryLeagues({ audience, recordedChild });
+
+  it('refuses the yes while no child is recorded, and writes and logs nothing', async () => {
+    const m = league('adult', false);
+    expect(await setSetting(m.as(ownerId), yes, m.deps)).toEqual({
+      ok: false,
+      error: { code: 'no-child-recorded' },
+    });
+    expect(m.db.state.settings).toEqual([]);
+    expect(m.db.state.activity).toEqual([]);
+  });
+
+  it('takes the yes once a child is recorded, and in a league for children', async () => {
+    for (const m of [league('adult', true), league('youth', false), league('mixed', false)]) {
+      expect(await setSetting(m.as(ownerId), yes, m.deps)).toMatchObject({ ok: true });
+      expect(m.db.state.settings.map((row) => row.document.value)).toEqual([true]);
+    }
+  });
+
+  it('still takes a no in an adult league with no child', async () => {
+    const m = league('adult', false);
+    expect(
+      await setSetting(m.as(ownerId), { ...yes, value: false, confirmed: undefined }, m.deps),
+    ).toMatchObject({ ok: true });
+  });
+});
