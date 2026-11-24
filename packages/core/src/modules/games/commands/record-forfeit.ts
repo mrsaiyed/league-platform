@@ -14,12 +14,14 @@ import { gameVersion } from '../game-fields.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
+import { gameInArchivedSeasonUncorrected } from '../archived-season.ts';
 
 export type RecordForfeitError = DecideGameError;
 
 export const recordForfeit = defineCommand({
   name: 'games.record_forfeit',
   permission: 'games.results',
+  refusedInArchivedSeason: gameInArchivedSeasonUncorrected,
   input: z.object({
     gameId: z.uuid(),
     version: gameVersion,

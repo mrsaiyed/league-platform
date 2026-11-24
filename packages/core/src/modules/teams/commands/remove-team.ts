@@ -12,6 +12,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { mayChangeTeams, teamScope } from '../policy.ts';
 import type { TeamsTx } from '../ports.ts';
 import { teamGamesOf } from '../team-games.ts';
+import { teamInArchivedSeason } from '../archived-season.ts';
 
 export type RemoveTeamError =
   | { readonly code: 'team-not-found' }
@@ -23,6 +24,7 @@ export type RemoveTeamError =
 export const removeTeam = defineCommand({
   name: 'teams.remove_team',
   permission: 'teams.manage',
+  refusedInArchivedSeason: teamInArchivedSeason,
   input: z.object({ teamId: z.uuid() }),
   allowed: async (context, input, tx: TeamsTx) =>
     mayChangeTeams(context, tx, await teamScope(tx, input.teamId)),

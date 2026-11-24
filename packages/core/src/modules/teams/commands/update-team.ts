@@ -9,6 +9,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { mayChangeTeams, teamScope } from '../policy.ts';
 import type { TeamChange, TeamsTx } from '../ports.ts';
 import { teamColor, teamName, teamSlug } from '../team-fields.ts';
+import { teamInArchivedSeason } from '../archived-season.ts';
 
 export type UpdateTeamError = {
   readonly code:
@@ -22,6 +23,7 @@ export type UpdateTeamError = {
 export const updateTeam = defineCommand({
   name: 'teams.update_team',
   permission: 'teams.manage',
+  refusedInArchivedSeason: teamInArchivedSeason,
   input: z
     .object({
       teamId: z.uuid(),

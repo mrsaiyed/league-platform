@@ -229,6 +229,7 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
       list: async () => [],
     },
     games: {
+      seasonArchived: async () => false,
       find: async (id) => s.games.find((g) => g.id === id),
       lockGame: async (id) => s.games.some((g) => g.id === id),
       setResult: async (id, change, version) => {

@@ -112,6 +112,13 @@ export { renewInvitationLink } from './renew-invitation-link.ts';
 export { replaceInvitationLink } from './replace-invitation-link.ts';
 export { revokeRoleGrant } from './revoke-role-grant.ts';
 export { setCurrentSeason } from './set-current-season.ts';
+export {
+  copySeasonSetup,
+  type SeasonSetupCopiedRow,
+  type SeasonSetupCopyRow,
+} from './copy-season-setup.ts';
+export { findCurrentSeasonId } from './find-current-season-id.ts';
+export { seasonIsArchived } from './season-is-archived.ts';
 export { settleJob, type JobSettlement } from './settle-job.ts';
 export { takeJobs, type NoLeagueScope, type TakenJob } from './take-jobs.ts';
 export { updateSeason, type SeasonChangeRow } from './update-season.ts';

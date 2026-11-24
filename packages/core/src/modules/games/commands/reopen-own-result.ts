@@ -27,6 +27,7 @@ import { ownResultOffer, type OwnResultNotOffered } from '../own-result-window.t
 import { mayScoreGame } from '../policy.ts';
 import { sheetToKeep } from '../kept-sheet.ts';
 import type { TrackerTx } from '../ports.ts';
+import { gameInArchivedSeason } from '../archived-season.ts';
 
 export type ReopenOwnResultError =
   | { readonly code: 'game-not-found' | 'changed-since-read' | 'not-allowed' }
@@ -41,6 +42,7 @@ export type ReopenOwnResultError =
 export const reopenOwnResult = defineCommand({
   name: 'games.reopen_own_result',
   permission: 'games.score',
+  refusedInArchivedSeason: gameInArchivedSeason,
   input: z.object({ gameId: z.uuid(), version: gameVersion, reason: correctionReason }),
   allowed: (context, input, tx: TrackerTx) => mayScoreGame(context, tx, input.gameId),
   run: async ({

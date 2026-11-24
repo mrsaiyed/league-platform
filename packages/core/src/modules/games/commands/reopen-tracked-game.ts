@@ -33,6 +33,7 @@ import { mayScoreGame } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
 import { reopenOffer, type ReopenNotOffered } from '../reopen-window.ts';
 import { lowerId, scorerOf } from '../scoring-session.ts';
+import { gameInArchivedSeason } from '../archived-season.ts';
 
 export type ReopenTrackedGameError =
   | { readonly code: 'game-not-found' | 'changed-since-read' }
@@ -48,6 +49,7 @@ const tapSequence = z.number().int().positive();
 export const reopenTrackedGame = defineCommand({
   name: 'games.reopen_tracked_game',
   permission: 'games.score',
+  refusedInArchivedSeason: gameInArchivedSeason,
   input: z.object({
     gameId: lowerId,
     requestId: lowerId,

@@ -54,6 +54,8 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
       const found = season(seasonId);
       return found === undefined ? undefined : { programId: found.programId };
     },
+    seasonArchived: async (seasonId) =>
+      s.seasons.some((x) => x.id === seasonId && x.status === 'completed'),
     latestRevision: async (seasonId) => {
       const numbers = s.revisions.filter((r) => r.seasonId === seasonId).map((r) => r.number);
       return numbers.length === 0 ? null : Math.max(...numbers);

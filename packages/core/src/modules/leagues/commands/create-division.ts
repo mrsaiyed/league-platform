@@ -7,6 +7,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { divisionColor, divisionName, divisionSort } from '../division-fields.ts';
 import { mayEditLeague, seasonScope } from '../policy.ts';
 import type { LeaguesTx } from '../ports.ts';
+import { seasonIsArchived } from '../archived-season.ts';
 
 export type CreateDivisionError = {
   readonly code: 'season-not-found' | 'parent-not-found' | 'division-name-taken';
@@ -15,6 +16,7 @@ export type CreateDivisionError = {
 export const createDivision = defineCommand({
   name: 'leagues.create_division',
   permission: 'divisions.manage',
+  refusedInArchivedSeason: seasonIsArchived,
   input: z.object({
     seasonId: z.uuid(),
     parentDivisionId: z.uuid().optional(),

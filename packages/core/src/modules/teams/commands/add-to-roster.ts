@@ -11,6 +11,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { mayChangeRosters, teamScope } from '../policy.ts';
 import type { TeamsTx } from '../ports.ts';
 import { jerseyNumber, rosterDate, rosterRole } from '../roster-fields.ts';
+import { teamInArchivedSeason } from '../archived-season.ts';
 
 export type AddToRosterError = {
   readonly code: 'team-not-found' | 'person-not-found' | 'already-on-team' | 'jersey-taken';
@@ -19,6 +20,7 @@ export type AddToRosterError = {
 export const addToRoster = defineCommand({
   name: 'teams.add_to_roster',
   permission: 'rosters.manage',
+  refusedInArchivedSeason: teamInArchivedSeason,
   input: z.object({
     teamId: z.uuid(),
     personId: z.uuid(),

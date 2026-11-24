@@ -188,6 +188,8 @@ export function worldTeamsStore(s: LeagueWorld, now: () => Date): TeamsStore {
     },
     // The league's today in its own zone, by the world's own clock (as the games store's).
     leagueToday: async () => dayIn(now(), s.timeZone),
+    seasonArchived: async (seasonId) =>
+      s.seasons.some((x) => x.id === seasonId && x.status === 'completed'),
     seasonProgramId: async (id) => s.seasons.find((x) => x.id === id)?.programId,
     findDivision: async (id) => {
       const d = s.divisions.find((x) => x.id === id);

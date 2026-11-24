@@ -561,6 +561,8 @@ export function worldLeaguesStores(
       s.seasons = replacedAt(s.seasons, at, { ...found, ...fields, version: version + 1 });
       return version + 1;
     },
+    currentSeasonOf: notYet('leagues.currentSeasonOf'),
+    copySeasonSetup: notYet('leagues.copySeasonSetup'),
     setCurrentSeason: notYet('leagues.setCurrentSeason'),
     latestSiteReleaseNumber: notYet('leagues.latestSiteReleaseNumber'),
     publishSiteRelease: notYet('leagues.publishSiteRelease'),

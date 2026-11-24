@@ -294,6 +294,8 @@ export type GamesStore = {
    */
   readonly inBin: (entry: GameRosterEntry) => Promise<boolean>;
   /** Whether the tracker has recorded any play of the game (T3 §8 `game_events`). */
+  /** Whether the season is archived, so read-only (O-12, step 2.130); false if not here. */
+  readonly seasonArchived: (seasonId: string) => Promise<boolean>;
   readonly hasPlays: (gameId: string) => Promise<boolean>;
   /** The program a season belongs to and its rules as stored, or undefined if it is not here. */
   readonly findSeason: (

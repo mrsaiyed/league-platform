@@ -15,12 +15,14 @@ import {
   type ScorableGameError,
   type ScoringSessionReply,
 } from '../scoring-session.ts';
+import { gameInArchivedSeasonUncorrected } from '../archived-season.ts';
 
 export type OpenScoringSessionError = ScorableGameError;
 
 export const openScoringSession = defineCommand({
   name: 'games.open_scoring_session',
   permission: 'games.score',
+  refusedInArchivedSeason: gameInArchivedSeasonUncorrected,
   input: z.object({ gameId: lowerId, deviceId: deviceIdField }),
   allowed: (context, input, tx: ScoringTx) => mayScoreGame(context, tx, input.gameId),
   run: async ({

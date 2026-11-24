@@ -158,6 +158,8 @@ import {
   searchActivity,
   setBoxScore,
   setCurrentSeason,
+  startSeason,
+  archiveSeason,
   setDraftRecording,
   setLeagueAudience,
   setLeagueName,
@@ -2316,6 +2318,25 @@ const rows: readonly Row[] = [
       },
     }),
     run: (c, i) => setCurrentSeason(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.start_season',
+    name: 'start a new season of the default program (step 2.130)',
+    needs: 'season.settings',
+    prepare: async () => ({ input: { slug: 'next', name: 'Next', carry: 'teams' } }),
+    run: (c, i) => startSeason(c, i, leaguesDeps),
+  },
+  {
+    command: 'leagues.archive_season',
+    name: 'archive a season of the default program (step 2.130)',
+    needs: 'season.settings',
+    prepare: async (league) => ({
+      input: {
+        seasonId: await newSeason(pglite, league.leagueId, league.defaultProgramId),
+        version: 1,
+      },
+    }),
+    run: (c, i) => archiveSeason(c, i, leaguesDeps),
   },
   {
     command: 'leagues.get_season',

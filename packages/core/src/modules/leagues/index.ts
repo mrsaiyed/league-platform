@@ -32,6 +32,15 @@ export { readSeasonRules, type SeasonView } from './commands/season-view.ts';
 export { renameShortName, type RenameShortNameError } from './commands/rename-short-name.ts';
 export { setCurrentSeason, type SetCurrentSeasonError } from './commands/set-current-season.ts';
 export {
+  startSeason,
+  type StartSeasonError,
+  type StartSeasonValue,
+} from './commands/start-season.ts';
+export { archiveSeason, type ArchiveSeasonError } from './commands/archive-season.ts';
+export { seasonIsArchived } from './archived-season.ts';
+export { archivedSeasonStatus, seasonCarryChoices, type SeasonCarry } from './league-values.ts';
+export type { SeasonSetupCopied, SeasonSetupCopy } from './ports.ts';
+export {
   setLeagueName,
   type ChangedSinceRead,
   type LeagueName,

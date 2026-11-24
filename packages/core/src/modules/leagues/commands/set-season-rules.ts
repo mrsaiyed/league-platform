@@ -31,6 +31,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { mayEditLeague, seasonScope } from '../policy.ts';
 import type { LeaguesTx } from '../ports.ts';
 import { readSeasonRules } from './season-view.ts';
+import { seasonIsArchived } from '../archived-season.ts';
 
 export type SetSeasonRulesError =
   | { readonly code: 'season-not-found' | 'changed-since-read' | 'unique-jerseys-clash' }
@@ -46,6 +47,7 @@ function changedParts(before: SeasonRules, after: SeasonRules): string[] {
 export const setSeasonRules = defineCommand({
   name: 'leagues.set_season_rules',
   permission: 'season.settings',
+  refusedInArchivedSeason: seasonIsArchived,
   input: z.object({
     seasonId: z.uuid(),
     version: z.number().int().positive(),

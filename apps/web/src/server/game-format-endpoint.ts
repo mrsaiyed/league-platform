@@ -40,6 +40,7 @@ type Failed =
   | GiveGameFormatError
   | ClearGameFormatError
   | { readonly code: 'not-allowed' }
+  | { readonly code: 'season-archived' }
   | {
       readonly code: 'invalid-input';
       readonly issues: readonly { readonly path: string; readonly problem: string }[];

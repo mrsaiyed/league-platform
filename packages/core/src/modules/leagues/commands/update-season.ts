@@ -8,6 +8,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { seasonStatuses } from '../league-values.ts';
 import { mayEditLeague, seasonScope } from '../policy.ts';
 import type { LeaguesTx, SeasonChange } from '../ports.ts';
+import { seasonIsArchived } from '../archived-season.ts';
 
 export type UpdateSeasonError = {
   readonly code: 'season-not-found' | 'season-dates-out-of-order' | 'changed-since-read';
@@ -18,6 +19,7 @@ const day = z.iso.date();
 export const updateSeason = defineCommand({
   name: 'leagues.update_season',
   permission: 'season.settings',
+  refusedInArchivedSeason: seasonIsArchived,
   // The same limits as the seasons table (0003).
   input: z
     .object({

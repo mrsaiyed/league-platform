@@ -12,6 +12,7 @@ import {
 import { mayEditSchedule, mayTakeBackPutBack } from '../policy.ts';
 import type { SchedulingTx } from '../ports.ts';
 import type { DraftChange, ScheduleState } from '../rules/schedule-types.ts';
+import { seasonArchivedForSchedule } from '../archived-season.ts';
 
 export type MoveDraftGameError = DraftEditError;
 
@@ -63,6 +64,7 @@ const afterPutBackCheck =
 export const moveDraftGame = defineCommand({
   name: 'scheduling.move_draft_game',
   permission: 'schedule.edit',
+  refusedInArchivedSeason: seasonArchivedForSchedule,
   input: z.object({
     ...draftBasis,
     gameId: z.uuid(),

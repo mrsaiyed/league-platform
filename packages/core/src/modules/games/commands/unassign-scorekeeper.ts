@@ -8,12 +8,14 @@ import { hasPermission, recordActivity, scopeDetails } from '../../access/index.
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { gameScope } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
+import { gameInArchivedSeason } from '../archived-season.ts';
 
 export type UnassignScorekeeperError = { readonly code: 'game-not-found' | 'not-assigned' };
 
 export const unassignScorekeeper = defineCommand({
   name: 'games.unassign_scorekeeper',
   permission: 'games.manage',
+  refusedInArchivedSeason: gameInArchivedSeason,
   input: z.object({
     gameId: z.uuid(),
     accountId: z.uuid().transform((id) => id.toLowerCase()),

@@ -20,6 +20,7 @@ import { mayScoreGame } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
 import { hasLapsed, lowerId, scorerOf } from '../scoring-session.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
+import { gameInArchivedSeasonUncorrected } from '../archived-season.ts';
 
 export type EndTrackedGameError = {
   readonly code:
@@ -37,6 +38,7 @@ export type EndTrackedGameError = {
 export const endTrackedGame = defineCommand({
   name: 'games.end_tracked_game',
   permission: 'games.score',
+  refusedInArchivedSeason: gameInArchivedSeasonUncorrected,
   input: z.object({ gameId: lowerId, version: gameVersion }),
   // Whoever may score this game, by the league's setting (P4 §4).
   allowed: (context, input, tx: TrackerTx) => mayScoreGame(context, tx, input.gameId),

@@ -20,6 +20,8 @@ import {
   listSettingValues,
   renameLeagueSlug,
   setCurrentSeason,
+  copySeasonSetup,
+  findCurrentSeasonId,
   updateLeagueAudience,
   updateLeagueName,
   updateLeagueProfile,
@@ -77,6 +79,8 @@ export function leaguesStore(
       return updateSeason(scope, seasonId, row, version);
     },
     seasonProgramId: (seasonId) => findSeasonProgramId(scope, seasonId),
+    currentSeasonOf: (programId) => findCurrentSeasonId(scope, programId),
+    copySeasonSetup: (copy) => copySeasonSetup(scope, copy),
     setCurrentSeason: (seasonId) => setCurrentSeason(scope, seasonId),
     settingRows: (key, places) => listSettingValues(scope, key, places),
     writeSetting: (place, key, document, version) =>

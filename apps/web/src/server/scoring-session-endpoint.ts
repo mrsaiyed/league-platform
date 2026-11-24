@@ -68,6 +68,8 @@ const refusalOf = (code: Exclude<SessionCommandError['code'], 'invalid-input'>):
       return 'unknown-game';
     case 'game-closed':
     case 'game-postponed':
+    // Its season is archived and the game has no correction (O-12, step 2.130).
+    case 'season-archived':
       return 'game-not-live';
   }
 };

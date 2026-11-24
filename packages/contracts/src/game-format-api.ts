@@ -35,6 +35,8 @@ export const gameFormatRefusals = [
   'under-way',
   /** The game is over (a final score, a box score, or ended at the table). */
   'finished',
+  /** Its season is archived, so read-only (O-12, step 2.130): only a correction with a reason. */
+  'season-archived',
 ] as const;
 export type GameFormatRefusal = (typeof gameFormatRefusals)[number];
 

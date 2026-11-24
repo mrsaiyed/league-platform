@@ -12,6 +12,7 @@ import { mayChangeTeams, teamScope } from '../policy.ts';
 import { teamsMayChooseLevel } from '../stats-level-settings.ts';
 import type { TeamsTx } from '../ports.ts';
 import { teamStatsVisibility } from '../team-fields.ts';
+import { teamInArchivedSeason } from '../archived-season.ts';
 
 export type SetTeamStatsVisibilityError = {
   readonly code: 'team-not-found' | 'changed-since-read' | 'teams-may-not-choose';
@@ -20,6 +21,7 @@ export type SetTeamStatsVisibilityError = {
 export const setTeamStatsVisibility = defineCommand({
   name: 'teams.set_stats_visibility',
   permission: 'teams.manage',
+  refusedInArchivedSeason: teamInArchivedSeason,
   input: z.object({
     teamId: z.uuid(),
     version: z.number().int().positive(),

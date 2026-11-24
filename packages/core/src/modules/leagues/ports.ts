@@ -101,6 +101,24 @@ export type SeasonChange = {
   readonly rules?: SeasonRules;
 };
 
+/** What "Start a new season" copies from one season into another (step 2.130, T-378). */
+export type SeasonSetupCopy = {
+  readonly fromSeasonId: string;
+  readonly toSeasonId: string;
+  /** Carry the teams, each keeping its lineage. */
+  readonly teams: boolean;
+  /** Carry their rosters too (only with the teams). */
+  readonly rosters: boolean;
+};
+
+/** How many of each "Start a new season" copied. */
+export type SeasonSetupCopied = {
+  readonly divisions: number;
+  readonly settings: number;
+  readonly teams: number;
+  readonly rosterEntries: number;
+};
+
 export type LeaguesStore = {
   /** The transaction's league, or undefined if it is in the bin or out of sight. */
   readonly currentLeague: () => Promise<LeagueRecord | undefined>;
@@ -180,6 +198,10 @@ export type LeaguesStore = {
   ) => Promise<number | 'unique-jerseys-clash' | undefined>;
   /** Makes the season the current one of its program, and no other: false if it is not found. */
   readonly setCurrentSeason: (seasonId: string) => Promise<boolean>;
+  /** The id of the program's current season, not in the bin, or undefined (step 2.130). */
+  readonly currentSeasonOf: (programId: string) => Promise<string | undefined>;
+  /** Copies a season's setup, and its teams and rosters if asked, into a new one (T-378). */
+  readonly copySeasonSetup: (copy: SeasonSetupCopy) => Promise<SeasonSetupCopied>;
   /**
    * The stored values of one key at the league, and at the program and season given:
    * at most one row per place.
