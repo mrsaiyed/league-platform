@@ -456,33 +456,26 @@ async function oneGame(browser) {
           !next.active.includes('code=next-release'),
         JSON.stringify({ games, ...next }),
       );
-      // The game closed on the device: nothing in its store of opened games.
+      // No tracker page with a game in progress is open now (T-324): the page leaves the
+      // tracker for the league's home, out of the worker's reach, and comes back after.
+      const tracker = page.url();
+      await page.goto(tracker.slice(0, tracker.indexOf('/score/')));
       const after = await page.evaluate(async () => {
-        await new Promise((done) => {
-          const asking = indexedDB.open('srleagues-tracker-games');
-          asking.onsuccess = () => {
-            const db = asking.result;
-            const tx = db.transaction('games', 'readwrite');
-            tx.objectStore('games').clear();
-            tx.oncomplete = () => {
-              db.close();
-              done();
-            };
-          };
-        });
-        const registration = await navigator.serviceWorker.getRegistration();
-        registration.waiting?.postMessage({ type: 'srleagues-tracker-update' });
+        const all = await navigator.serviceWorker.getRegistrations();
+        const registration = all.find((r) => r.scope.includes('/score/'));
+        registration?.waiting?.postMessage({ type: 'srleagues-tracker-update' });
         for (
           let tries = 0;
-          tries < 40 && !registration.active?.scriptURL.includes('next-release');
+          tries < 40 && !registration?.active?.scriptURL.includes('next-release');
           tries += 1
         ) {
           await new Promise((done) => setTimeout(done, 250));
         }
-        return registration.active?.scriptURL ?? null;
+        return registration?.active?.scriptURL ?? null;
       });
+      await page.goto(tracker);
       note(
-        'once no game is open on the device, the new release takes over',
+        'once no tracker page with a game in progress is open, the new release takes over',
         after !== null && after.includes('code=next-release'),
         String(after),
       );
