@@ -384,6 +384,8 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     // Its send is tried while the signal is still down (each tap's account is read with
     // the queue, T-321, which takes the send a moment longer to start).
     await again.controller.idle();
+    const keptScoring = (await device.games.find(gameId))?.scoring ?? null;
+    expect(keptScoring?.onTop.map((c) => c.input.type)).toContain('score');
     // Meanwhile someone else takes the game on another device.
     network.mode = 'up';
     const other = await open(network, 'owner');
@@ -409,6 +411,17 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     ).toHaveLength(1);
     network.mode = 'up';
     await third.controller.leave();
+    // Had the forgetting not landed (it fails quietly), the kept scoring comes back with
+    // no signal, but the basket listed not saved is never counted on the screen again.
+    await device.games.saveScoring(gameId, keptScoring);
+    network.mode = 'down';
+    const fourth = await open(network, 'scorekeeper', device, createManualClock());
+    expect(fourth.controller.status().mode).toEqual({ kind: 'scoring' });
+    expect(
+      basketball.derive(fourth.controller.status().game ?? basketball.newGame()).teams.home.score,
+    ).toBe(0);
+    network.mode = 'up';
+    await fourth.controller.leave();
     await again.controller.leave();
     await other.controller.leave();
   });
