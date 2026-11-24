@@ -27,6 +27,12 @@ export async function findPublicGameFacts(
         .onRef('seasons.id', '=', 'games.season_id'),
     )
     .innerJoin('leagues', 'leagues.id', 'games.league_id')
+    // A game with no time yet takes its round's date as its day (step 2.159).
+    .leftJoin('rounds', (join) =>
+      join
+        .onRef('rounds.league_id', '=', 'games.league_id')
+        .onRef('rounds.id', '=', 'games.round_id'),
+    )
     .leftJoin('venues', (join) =>
       join
         .onRef('venues.league_id', '=', 'games.league_id')
@@ -40,7 +46,9 @@ export async function findPublicGameFacts(
     .select([
       'games.game_number as game_number',
       // The game's day in the league's zone, as the public schedule reads it.
-      sql<string | null>`to_char(games.starts_at at time zone leagues.time_zone, 'YYYY-MM-DD')`.as(
+      sql<
+        string | null
+      >`coalesce(to_char(games.starts_at at time zone leagues.time_zone, 'YYYY-MM-DD'), to_char(rounds.date, 'YYYY-MM-DD'))`.as(
         'local_date',
       ),
       'venues.name as venue_name',

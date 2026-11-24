@@ -18,6 +18,7 @@ import {
   type SearchParams,
   type StandingsTableView,
 } from '../stats-pages/index.ts';
+import { BeingCorrectedNote, countBeingCorrected } from './being-corrected-note.tsx';
 import { buildHomeNumbers } from './build-home-numbers.ts';
 import { buildHomeGames } from './build-schedule.ts';
 import { HomeLeaders } from './home-leaders.tsx';
@@ -148,7 +149,10 @@ export async function HomePage({
       <div className="site-column">
         {yourTeam}
         <div className="home-numbers">
-          <StatStrip label={t('home.numbers')} items={buildHomeNumbers(schedule, teamCount)} />
+          <StatStrip
+            label={t('home.numbers')}
+            items={buildHomeNumbers(schedule, clock, teamCount)}
+          />
         </div>
         {empty ? (
           <Section title={t('home.recentResults')} kicker={t('home.results.kicker')}>
@@ -236,6 +240,7 @@ export async function HomePage({
                     );
                   })}
                 </div>
+                <BeingCorrectedNote count={countBeingCorrected(schedule, clock)} />
                 {shortened ? (
                   <p className="home-notes-more">
                     <a href={standingsHref}>{t('home.whyThisOrder')}</a>

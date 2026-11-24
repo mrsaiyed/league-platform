@@ -24,6 +24,12 @@ export async function listPublicGames(
         .onRef('seasons.id', '=', 'games.season_id'),
     )
     .innerJoin('leagues', 'leagues.id', 'games.league_id')
+    // A game with no time yet takes its round's date as its day (step 2.159).
+    .leftJoin('rounds', (join) =>
+      join
+        .onRef('rounds.league_id', '=', 'games.league_id')
+        .onRef('rounds.id', '=', 'games.round_id'),
+    )
     .innerJoin('teams as home', (join) =>
       join
         .onRef('home.league_id', '=', 'games.league_id')
@@ -54,7 +60,9 @@ export async function listPublicGames(
       'games.round_id as round_id',
       'games.game_number as game_number',
       'games.starts_at as starts_at',
-      sql<string | null>`to_char(games.starts_at at time zone leagues.time_zone, 'YYYY-MM-DD')`.as(
+      sql<
+        string | null
+      >`coalesce(to_char(games.starts_at at time zone leagues.time_zone, 'YYYY-MM-DD'), to_char(rounds.date, 'YYYY-MM-DD'))`.as(
         'local_date',
       ),
       'games.status as status',

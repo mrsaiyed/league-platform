@@ -904,6 +904,8 @@ describe('a game page', () => {
       );
       const html = draw({
         ...view,
+        // The snapshot is live again too: what a scorekeeper's reopen leaves (step 2.159).
+        snapshot: { ...view.snapshot, status: 'live' },
         status: 'live',
         truth,
         start: truthLine(setFor, zone, truth),
@@ -919,6 +921,9 @@ describe('a game page', () => {
       expect(html).toContain('data-live-status="final"');
       expect(html).not.toContain('has not started yet');
       expect(html).not.toContain('Latest play');
+      // No plays while it is corrected, not even the live game's empty "Play by play".
+      expect(html).not.toContain('Play by play');
+      expect(html).not.toContain('Show newer plays');
     });
 
     it('a player who did not play reads "Did not play"', async () => {

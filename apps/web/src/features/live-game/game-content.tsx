@@ -86,7 +86,8 @@ export function GameContent({ view }: { readonly view: GameView }) {
       view={gameNumbersView({
         boxScores: view.boxScores,
         plays: view.plays,
-        live: view.snapshot.status === 'live',
+        // A game being corrected is drawn as it stood: no live plays section (T-384).
+        live: initial.status === 'live',
         selfAddress: view.selfAddress,
       })}
     />

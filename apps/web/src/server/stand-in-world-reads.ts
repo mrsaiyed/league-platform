@@ -94,7 +94,11 @@ function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
     id: game.id,
     number: game.number,
     startsAt: game.startsAt,
-    localDate: game.startsAt === null ? null : dayIn(new Date(game.startsAt), s.timeZone),
+    // A game with no time yet takes its round's date as its day (step 2.159).
+    localDate:
+      game.startsAt === null
+        ? (s.rounds.find((r) => r.id === game.roundId)?.date ?? null)
+        : dayIn(new Date(game.startsAt), s.timeZone),
     status: game.status,
     homeTeam: team(game.homeTeamId),
     awayTeam: team(game.awayTeamId),

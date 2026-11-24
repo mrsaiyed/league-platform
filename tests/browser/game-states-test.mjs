@@ -11,7 +11,15 @@
 //   result; an awaiting game's page says "Awaiting score" and never "has not started yet";
 //   a forfeit's page has no "Played" and no "Box scores";
 // - a game reopened shows the result as it stood, marked "Being corrected", and ended
-//   again, the new result, on every page.
+//   again, the new result, on every page; while it lasts the standings page, the home page
+//   and its team's page say in one line that it is not counted (S-105);
+// - the scores compared are the ones this test typed or the league fixed, never read back
+//   from the game's own page: the seed's final (50 to 44) and forfeit (20 to 0), typed
+//   finals, a live game's points tapped on the scoring screen;
+// - on the scoring screen, a tracked game: "Take back End game" before the result was sent
+//   is no reopen (it stays live); ended, then reopened by its scorekeeper, its page shows
+//   the earlier score "Being corrected" with no plays and no box score; ended again, the
+//   new result; reopened again, the latest result "Being corrected".
 //
 // The world's games are made and changed by taps in the admin's games area (owner and
 // scorekeeper sessions), as corrected-mark-test.mjs and own-result-test.mjs do.
@@ -24,6 +32,14 @@ import {
   waitFor,
   worldAtNoon,
 } from './web-browser-kit.mjs';
+import {
+  addPlayers,
+  court,
+  liveGame,
+  scorekeeper,
+  starters,
+  trackerPath,
+} from './tracker-driver.mjs';
 
 const failures = [];
 const checked = [];
@@ -47,7 +63,6 @@ const games = {
   upcoming: { id: tracked(3), team: 'hawks' }, // Lions at Hawks, tomorrow
   awaiting: { id: listed(20), team: 'herons' }, // Badgers at Herons, three days ago, no score
   live: { id: tracked(2), team: 'hawks' }, // Bears at Hawks, under way
-  final: { id: listed(6), team: 'owls' }, // Otters at Owls, finished two hours ago
   forfeit: { id: listed(1), team: 'badgers' }, // Otters at Badgers
   postponed: { id: listed(3), team: 'otters' }, // Herons at Otters
   cancelled: { id: tracked(4), team: 'tigers' }, // Bears at Tigers, cancelled here
@@ -334,21 +349,14 @@ if (browser) {
     );
   });
   await step('live', async () => {
-    const own = await gamePage(games.live.id);
-    await sameEverywhere('live', games.live, 'Live', own.score);
+    // No play is tapped yet: its board reads 0-0 (the scoring step below taps points).
+    await sameEverywhere('live', games.live, 'Live', '0-0');
     const live = await readPublic('/north-valley', (page) => cardsOf(page, games.live.id));
     note('the home page shows the live game', live.length > 0);
   });
-  await step('final', async () => {
-    const own = await gamePage(games.final.id);
-    await sameEverywhere('final', games.final, 'Final', own.score);
-    note('a final game shows a score', /^\d+-\d+$/.test(own.score), own.score);
-    note("a final game's page says the day it ended", own.text.includes('Ended '));
-  });
   await step('forfeit', async () => {
-    const own = await gamePage(games.forfeit.id);
-    await sameEverywhere('forfeit', games.forfeit, 'Forfeit', own.score);
-    note('a forfeit shows a score', /^\d+-\d+$/.test(own.score), own.score);
+    // The seed's forfeit: the Badgers (home) given it 20 to 0 over the Otters.
+    const own = await sameEverywhere('forfeit', games.forfeit, 'Forfeit', '0-20');
     note(
       'a forfeit\'s page has no "Box scores" and no "Played"',
       !own.text.includes('Box scores') && !/\bPlayed\b/.test(own.text),
@@ -367,6 +375,40 @@ if (browser) {
     await sameEverywhere('cancelled', games.cancelled, 'Cancelled', '');
   });
 
+  /** The line on a game being corrected (S-105) on the standings, home and team pages. */
+  const oneLine = '1 game is being corrected and is not counted until it is finished again.';
+  async function notesSay(label, team, shown) {
+    const pages = [
+      ['standings page', '/north-valley/standings'],
+      ['home page', '/north-valley'],
+      [`${team} page`, `/north-valley/teams/${team}`],
+    ];
+    for (const [name, path] of pages) {
+      const lines = await readPublic(path, (page) =>
+        page.evaluate(() =>
+          [...document.querySelectorAll('main [data-being-corrected-note]')].map((e) =>
+            (e.textContent ?? '').trim(),
+          ),
+        ),
+      );
+      note(
+        `${label}: the ${name} ${shown ? 'says one game is not counted' : 'has no line on a game being corrected'}`,
+        shown ? lines.length === 1 && lines[0] === oneLine : lines.length === 0,
+        JSON.stringify(lines),
+      );
+    }
+  }
+  /** The game's page while it is corrected: no plays and no box score; ended, its plays. */
+  function partsSay(label, own, corrected) {
+    note(
+      `${label}: the game's page ${corrected ? 'has no "Play by play" and no "Box scores"' : 'shows "Play by play"'}`,
+      corrected
+        ? !own.text.includes('Play by play') && !own.text.includes('Box scores')
+        : own.text.includes('Play by play'),
+      own.text.slice(0, 400),
+    );
+  }
+
   const lions = (score) => ({ name: 'Lions', score });
   const bears = (score) => ({ name: 'Bears', score });
   const tigers = (score) => ({ name: 'Tigers', score });
@@ -374,7 +416,15 @@ if (browser) {
   await step('being corrected by an admin, then ended again', async () => {
     const { context, page } = await signedIn('local-owner-token');
     try {
-      await sameEverywhere('final before the admin reopens it', games.byAdmin, 'Final', '50-44');
+      // The seed's final, 50 to 44 (stand-in-world-seed.ts), stated here, not read back.
+      const before = await sameEverywhere(
+        'final before the admin reopens it',
+        games.byAdmin,
+        'Final',
+        '50-44',
+      );
+      note("a final game's page says the day it ended", before.text.includes('Ended '));
+      await notesSay('before the admin reopens it', games.byAdmin.team, false);
       await reopen(page, games.byAdmin.id, lions());
       await sameEverywhere(
         'reopened by an admin: the result as it stood',
@@ -382,6 +432,7 @@ if (browser) {
         correctedWord,
         '50-44',
       );
+      await notesSay('reopened by an admin', games.byAdmin.team, true);
       await makeFinal(page, games.byAdmin.id, lions(52), bears(44));
       await sameEverywhere(
         'ended again by the admin: the new result',
@@ -389,6 +440,7 @@ if (browser) {
         'Final',
         '52-44',
       );
+      await notesSay('ended again by the admin', games.byAdmin.team, false);
     } finally {
       await context.close();
     }
@@ -417,6 +469,110 @@ if (browser) {
       await context.close();
     }
   });
+
+  // A tracked game on the scoring screen (steps 2.36, 2.37): the live game, Bears at Hawks.
+  await step(
+    'a tracked game on the scoring screen: take back, end, reopen, end, reopen',
+    async () => {
+      if (games.live.id !== liveGame) throw new Error("the live game is not the tracker's game");
+      await addPlayers(origin);
+      const context = await browser.newContext({ viewport: phone });
+      await context.addCookies([{ ...scorekeeper, url: origin }]);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(30_000);
+        await page.goto(`${origin}${trackerPath()}`);
+        const c = court(page);
+        await c.open();
+        await c.pick('home', starters);
+        await c.pick('away', starters);
+        await c.startClock();
+        await c.play('home', 11, 'p3');
+        await c.saved();
+        await c.play('away', 3, 'p2');
+        await c.saved();
+        const live = await sameEverywhere('live, the points tapped', games.live, 'Live', '2-3');
+        partsSay('live, the points tapped', live, false);
+
+        // Ended with the network off, then taken back before the result was ever sent.
+        await context.setOffline(true);
+        await c.banner.filter({ hasText: /No connection/ }).waitFor();
+        await c.fromMore('more-end');
+        await c.endAsk.waitFor();
+        await c.answer('yes').click();
+        await c.pad.locator('[data-final="not-sent"]').waitFor();
+        await c.finalButton('take-back').click();
+        await c.pad.locator('[data-final="not-sent"]').waitFor({ state: 'hidden' });
+        await context.setOffline(false);
+        await page.evaluate(() => window.dispatchEvent(new Event('online')));
+        await c.banner.filter({ hasText: /No connection/ }).waitFor({ state: 'hidden' });
+        await sameEverywhere(
+          '"Take back End game" before it was sent: no reopen',
+          games.live,
+          'Live',
+          '2-3',
+        );
+        await notesSay('"Take back End game" before it was sent', games.live.team, false);
+
+        const end = async () => {
+          await c.fromMore('more-end');
+          await c.endAsk.waitFor();
+          await c.answer('yes').click();
+          await c.pad.locator('[data-final="saved"]').waitFor();
+        };
+        const reopenHere = async () => {
+          await c.finalButton('reopen').click();
+          await c.reopenAsk.waitFor();
+          await c.reopenAsk.locator('[data-reopen-mistake]').click();
+          await c.answer('yes').click();
+          await c.said.filter({ hasText: /live again/ }).waitFor();
+        };
+        await end();
+        const ended = await sameEverywhere(
+          'ended on the scoring screen',
+          games.live,
+          'Final',
+          '2-3',
+        );
+        partsSay('ended on the scoring screen', ended, false);
+        await notesSay('ended on the scoring screen', games.live.team, false);
+
+        await reopenHere();
+        const first = await sameEverywhere(
+          'reopened on the scoring screen: the score as it stood',
+          games.live,
+          correctedWord,
+          '2-3',
+        );
+        partsSay('reopened on the scoring screen', first, true);
+        await notesSay('reopened on the scoring screen', games.live.team, true);
+
+        await c.play('home', 5, 'p2');
+        await c.saved();
+        await end();
+        const again = await sameEverywhere(
+          'ended again on the scoring screen',
+          games.live,
+          'Final',
+          '2-5',
+        );
+        partsSay('ended again on the scoring screen', again, false);
+        await notesSay('ended again on the scoring screen', games.live.team, false);
+
+        await reopenHere();
+        const second = await sameEverywhere(
+          'reopened again: the latest result as it stood',
+          games.live,
+          correctedWord,
+          '2-5',
+        );
+        partsSay('reopened again', second, true);
+        await notesSay('reopened again', games.live.team, true);
+      } finally {
+        await context.close();
+      }
+    },
+  );
 }
 
 await browser?.close();
