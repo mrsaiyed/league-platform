@@ -56,12 +56,19 @@ export function logSentenceOf(
     found === undefined || found.kind !== thingKindOf(line, found)
       ? undefined
       : thingNameOf(found, times);
-  const namedKey = line.summary.replace(/^activity\./, 'activityNamed.');
+  // A change with words of its own (`activityChange.`, step 2.148) reads as itself.
+  const change = line.values['change'];
+  const changeKey =
+    change === undefined
+      ? undefined
+      : `${line.summary.replace(/^activity\./, 'activityChange.')}.${change}`;
+  const summary = changeKey !== undefined && isTextKey(changeKey) ? changeKey : line.summary;
+  const namedKey = summary.replace(/^(activity|activityChange)\./, '$1Named.');
   try {
-    if (name !== undefined && namedKey !== line.summary && isTextKey(namedKey)) {
+    if (name !== undefined && namedKey !== summary && isTextKey(namedKey)) {
       return t(namedKey, { ...values, name });
     }
-    return t(line.summary as TextKey, values);
+    return t(summary as TextKey, values);
   } catch {
     return t('activity.leagues.set_setting');
   }
