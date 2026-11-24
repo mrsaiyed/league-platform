@@ -29,6 +29,7 @@ import {
 } from './queue-banner.ts';
 import { ScoringScreen } from './scoring-screen.tsx';
 import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controller.ts';
+import { LastHeard, SendNotSaved, takeOverQuestionText } from './take-over-parts.tsx';
 import { showsFinalPanel, trackerNoticeText, trackerNotices } from './tracker-notice.ts';
 import { inLeague } from './queue-storage.ts';
 import { holdSignOut, waitingOnDevice } from './tracker-sign-out.ts';
@@ -360,6 +361,9 @@ export function TrackerOpening({
         ? keptRows(phase.status.notSaved, listed, phase.status.game?.rules.periods ?? 2, t)
         : [],
     onClearKept: act((game) => game.controller.dismissNotSaved()),
+    onSendNotSaved: act(async (game) => {
+      await game.controller.sendNotSaved();
+    }),
     onEnterAgain: (id) =>
       void act(async (game) => {
         const result = await game.controller.enterAgain(id);
@@ -512,6 +516,8 @@ type KeptLists = {
   readonly kept: readonly KeptRow[];
   /** The scorekeeper has seen them: the list goes only by this deliberate tap. */
   readonly onClearKept: () => void;
+  /** "Send these plays", the scorekeeper's own tap (S-43, T-335). */
+  readonly onSendNotSaved: () => void;
   /** "Enter again" on one play, while this device holds the game (S-77). */
   readonly onEnterAgain: (id: string) => void;
   /** The last "Enter again" was not taken: the game as it stands does not take it. */
@@ -582,6 +588,14 @@ function Notices({
             </li>
           ))}
         </ol>
+        {name === 'kept' ? (
+          <SendNotSaved
+            offer={status.sendNotSaved}
+            busy={busy}
+            onSend={lists.onSendNotSaved}
+            t={t}
+          />
+        ) : null}
         <p>
           <button type="button" className="court-button" onClick={onClear} disabled={busy}>
             {clear}
@@ -692,6 +706,19 @@ function OpenGame({
   useEffect(() => {
     if (screen.kind !== 'held-by-other') setAskingTakeOver(false);
   }, [screen.kind]);
+  // Who holds the game and when their device was last heard from (S-42): the minutes
+  // are read again every quarter minute while the question stands.
+  const holder = status.mode.kind === 'held-by-other' ? status.mode.holder : null;
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (holder === null) return;
+    const timer = window.setInterval(() => setTick((n) => n + 1), 15_000);
+    return () => window.clearInterval(timer);
+  }, [holder]);
+  const lastHeard =
+    holder === null ? null : (
+      <LastHeard lastHeardAt={holder.lastHeardAt} now={status.now()} t={t} />
+    );
   const banner = savedBanner(status.queue, false, keptOnly(status));
   // Before the scoring screen, "All saved" would say nothing: the banner is shown only
   // when taps are waiting, refused or cannot be stored.
@@ -712,6 +739,7 @@ function OpenGame({
       <Notices status={status} t={t} lists={lists} busy={busy} />
       {signIn}
       {screen.kind === 'opening' ? openingText : null}
+      {screen.kind === 'held-by-other' && !askingTakeOver ? lastHeard : null}
       {screen.kind === 'held-by-other' && !askingTakeOver ? (
         <p>
           <button
@@ -727,7 +755,13 @@ function OpenGame({
       ) : null}
       {screen.kind === 'held-by-other' && askingTakeOver ? (
         <section className="court-stack" aria-labelledby="tracker-take-over" data-take-over="">
-          <p id="tracker-take-over">{t('tracker.takeOverQuestion', { name: screen.name })}</p>
+          <p id="tracker-take-over">
+            {takeOverQuestionText(
+              { name: screen.name, sameAccount: holder?.sameAccount === true },
+              t,
+            )}
+          </p>
+          {lastHeard}
           <p className="court-row">
             <button
               type="button"
