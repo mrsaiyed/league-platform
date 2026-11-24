@@ -22,7 +22,12 @@
 // cannot be granted until those tables exist (0004). Their permissions are tested
 // in core (modules/access/policy.test.ts), and they join this matrix with the
 // clubs and teams step.
-import { defaultSeasonRules, startingDesign } from '@srleagues/contracts';
+import {
+  defaultSeasonRules,
+  formatOfRules,
+  seasonRulesPreset,
+  startingDesign,
+} from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
@@ -113,6 +118,9 @@ import {
   putBackOnRoster,
   readInvitation,
   putGameBack,
+  clearGameFormat,
+  giveGameFormat,
+  readGameFormat,
   readReopenOffer,
   readTrackerRosters,
   readTrackerState,
@@ -1399,6 +1407,33 @@ const gameCommandRows: readonly Row[] = [
     'games.score',
     async (league, program) => ({ gameId: await trackedGameEndedIn(league, program) }),
     (c, i) => readReopenOffer(c, i, trackerDeps),
+  ),
+  // One game's own format before it starts (step 2.119): whoever may score the game, the
+  // league letting scorekeepers by default; and the read the form is drawn from.
+  ...gameRows(
+    'games.give_game_format',
+    'give a game its own format',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      version: 1,
+      format: formatOfRules(seasonRulesPreset('high-school')),
+    }),
+    (c, i) => giveGameFormat(c, i, trackerDeps),
+  ),
+  ...gameRows(
+    'games.clear_game_format',
+    "put a game back on its season's format",
+    'games.score',
+    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId, version: 1 }),
+    (c, i) => clearGameFormat(c, i, trackerDeps),
+  ),
+  ...gameRows(
+    'games.read_game_format',
+    "see a game's format",
+    'games.score',
+    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId }),
+    (c, i) => readGameFormat(c, i, trackerDeps),
   ),
 ];
 
