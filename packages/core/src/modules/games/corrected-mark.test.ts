@@ -90,6 +90,27 @@ describe('correctedMarkDate (S-8: the mark only when the next final differs)', (
       expect(correctedMarkDate(corrections, final(50, 40))).toBe('2030-12-04');
     });
 
+    // T-368: a put back looks back past reopens whose save kept no lines, so it undoes
+    // the whole slip: those reopens are part of it and mark nothing.
+    it('leaves no mark when a put back undoes a chain of reopens', () => {
+      const corrections = [
+        { on: '2030-12-06', before: final(50, 40), after: reopened, keptSheet: true },
+        { on: '2030-12-07', before: final(52, 48), after: reopened, keptSheet: false },
+        {
+          on: '2030-12-08',
+          before: { status: 'forfeit', homeScore: 20, awayScore: 0 },
+          after: final(50, 40),
+          keptSheet: false,
+        },
+      ];
+      expect(correctedMarkDate(corrections, final(50, 40))).toBeUndefined();
+      const later = [
+        ...corrections,
+        { on: '2030-12-09', before: final(50, 40), after: reopened, keptSheet: true },
+      ];
+      expect(correctedMarkDate(later, final(51, 40))).toBe('2030-12-09');
+    });
+
     it('marks a later reopen after the put back as any other', () => {
       const corrections = [
         { on: '2030-12-06', before: final(50, 40), after: reopened },

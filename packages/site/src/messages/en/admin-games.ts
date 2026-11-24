@@ -65,6 +65,12 @@ export const enAdminGames = {
     'Something newer was saved on this game, so the sheet can no longer be put back as it was.',
   'admin.boxScore.putBackError.no-sheet-kept':
     'Something newer was saved on this game, so the sheet can no longer be put back as it was.',
+  // Step 2.229 fix round: a sheet that names a player purged from the bin since, and a game
+  // scored live on the tracker since its reopen (its plays stay), are not put back.
+  'admin.boxScore.putBackError.player-gone':
+    'A player on the kept sheet has since been deleted from the league for good, so the sheet can no longer be put back as it was.',
+  'admin.boxScore.putBackError.scored-live':
+    'This game was scored live since it was reopened, so its plays decide its sheet: the old sheet can no longer be put back.',
   'admin.boxScore.putBackError.put-back-reason':
     'Say why the sheet goes back (up to 1000 characters) to put it back.',
   'admin.boxScore.putBackHelp':

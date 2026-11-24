@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
-import { sheetPutBackRefusal, type SheetPutBackRefusal } from '../sheet-put-back-rule.ts';
+import { sheetPutBackRuling, type SheetPutBackRefusal } from '../sheet-put-back-rule.ts';
 
 export type SheetPutBackOffer =
   | { readonly offered: true }
@@ -23,7 +23,16 @@ export const readSheetPutBackOffer = defineCommand({
   run: async ({ input, tx }): Promise<Result<SheetPutBackOffer, ReadSheetPutBackOfferError>> => {
     const game = await tx.games.find(input.gameId);
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
-    const code = sheetPutBackRefusal(game, await tx.games.newestCorrection(game.id));
-    return ok(code === undefined ? { offered: true } : { offered: false, code });
+    const ruling = sheetPutBackRuling(
+      game,
+      {
+        hasPlays: await tx.games.hasPlays(game.id),
+        hasLines: (await tx.liveGames.lines(game.id)).length > 0,
+      },
+      await tx.games.correctionsNewestFirst(game.id),
+    );
+    return ok(
+      ruling.refusal === undefined ? { offered: true } : { offered: false, code: ruling.refusal },
+    );
   },
 });

@@ -252,8 +252,8 @@ export type GamesStore = {
   ) => Promise<number | undefined>;
   /** Writes the correction row (S-7) in this transaction; the database needs it to change a decided game. */
   readonly addCorrection: (correction: NewGameCorrection) => Promise<void>;
-  /** The game's newest correction (by when it was written, then id), or undefined (step 2.229). */
-  readonly newestCorrection: (gameId: string) => Promise<StoredGameCorrection | undefined>;
+  /** The game's corrections, newest first (by when written, then id; step 2.229, T-368). */
+  readonly correctionsNewestFirst: (gameId: string) => Promise<readonly StoredGameCorrection[]>;
   /** Postponed games not in the bin, soonest first, of one season or all. */
   readonly listPostponed: (seasonId?: string) => Promise<readonly GameRecord[]>;
   /**

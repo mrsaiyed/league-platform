@@ -251,7 +251,8 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
       // Standings never meet a game marked not started: it was only live (S-40).
       markNotStarted: async () => undefined,
       addCorrection: async (correction) => void s.corrections.push(correction),
-      newestCorrection: async (gameId) => s.corrections.filter((c) => c.gameId === gameId).at(-1),
+      correctionsNewestFirst: async (gameId) =>
+        s.corrections.filter((c) => c.gameId === gameId).reverse(),
       listPostponed: async () => [],
       statusBeforeCancelled: async () => undefined,
       partInBin: async () => false,

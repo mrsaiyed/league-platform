@@ -116,6 +116,8 @@ const putBackSaid: readonly string[] = [
   'newer-save',
   'no-sheet-kept',
   'game-not-decided',
+  'scored-live',
+  'player-gone',
 ];
 
 /** Refusals answered without drawing the screen again (see `refused`). */

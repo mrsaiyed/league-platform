@@ -84,13 +84,16 @@ async function openSheet(page) {
   await page.locator('main [data-sheet-team]').first().waitFor();
 }
 
-/** A public page's text, read signed out. */
-async function publicText(path) {
+/**
+ * A public page's text, read signed out, once the page asked for is shown: `mark` finds
+ * that page's own mark (its heading), so two equal error pages can never compare equal.
+ */
+async function publicText(path, mark) {
   const context = await browser.newContext({ viewport: wide });
   try {
     const page = await context.newPage();
     await page.goto(`${origin}${path}`);
-    await page.locator('main').waitFor();
+    await mark(page).waitFor();
     return (await page.locator('main').textContent()) ?? '';
   } finally {
     await context.close();
@@ -99,8 +102,12 @@ async function publicText(path) {
 
 const everything = async (page) => ({
   grid: JSON.stringify(await gridOf(page)),
-  standings: await publicText('/north-valley/standings'),
-  stats: await publicText('/north-valley/stats'),
+  standings: await publicText('/north-valley/standings', (p) =>
+    p.getByRole('heading', { level: 1, name: 'The standings.' }),
+  ),
+  stats: await publicText('/north-valley/stats', (p) =>
+    p.getByRole('heading', { level: 1, name: 'By the numbers.' }),
+  ),
 });
 
 /** How many entries of the owner's activity log match each act. */
@@ -193,7 +200,9 @@ async function roundTrip(page, label, saveAgain, act) {
   note(`${label}: the standings are as before the reopen`, after.standings === before.standings);
   note(`${label}: the totals are as before the reopen`, after.stats === before.stats);
   note(`${label}: no offer once put back`, (await form.count()) === 0);
-  const text = await publicText(`/north-valley/games/${game}`);
+  const text = await publicText(`/north-valley/games/${game}`, (p) =>
+    p.locator('main.game-page h1'),
+  );
   note(`${label}: the public page reads no "Corrected" mark (S-98)`, !/Corrected/.test(text), text);
   note(`${label}: the reasons are never public`, !text.includes('The sheet was right'));
   const actsAfter = await actCounts(page);

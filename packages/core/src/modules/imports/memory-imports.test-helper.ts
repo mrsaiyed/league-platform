@@ -256,7 +256,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
         },
         markNotStarted: async () => undefined,
         addCorrection: async () => undefined,
-        newestCorrection: async () => undefined,
+        correctionsNewestFirst: async () => [],
         listPostponed: async () => [],
         statusBeforeCancelled: async () => undefined,
         partInBin: async () => false,

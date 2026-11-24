@@ -81,7 +81,7 @@ import {
   listSeasonAssignments,
   replaceGameLines,
   updateGameResult,
-  findNewestGameCorrection,
+  listGameCorrectionsNewestFirst,
   findLastEventSeq,
   listGameEventsAfter,
   findTablePlayer,
@@ -346,8 +346,8 @@ registerIsolationCase({
 });
 
 registerIsolationCase({
-  subject: findNewestGameCorrection,
-  name: "read the newest correction of the target's upcoming game",
+  subject: listGameCorrectionsNewestFirst,
+  name: "read the corrections of the target's upcoming game, newest first",
   // A reopen's correction of the game, inside the target's own fence (fixed id, dates and
   // documents), so a query with its league filter taken out would find it from another
   // league (the fence check, step 2.229).
@@ -359,7 +359,7 @@ registerIsolationCase({
         ${JSON.stringify({ version: 1, status: 'final', homeScore: 50, awayScore: 40 })}::jsonb,
         ${JSON.stringify({ version: 1, status: 'scheduled', homeScore: null, awayScore: null })}::jsonb,
         '2026-11-20T18:00:00Z', '2026-11-20T18:00:00Z')`.execute(transactionOf(inTarget)),
-  run: (scope, target) => findNewestGameCorrection(scope, target.upcomingGameId),
+  run: (scope, target) => listGameCorrectionsNewestFirst(scope, target.upcomingGameId),
 });
 
 registerIsolationCase({

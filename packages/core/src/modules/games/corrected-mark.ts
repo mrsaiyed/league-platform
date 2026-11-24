@@ -17,7 +17,10 @@
 // read as the end of that reopen: the reopen's next final is the result the put back left,
 // and the put back marks nothing of its own. So a put back that returns the result to what
 // it was before the reopen leaves no mark from that reopen, while an earlier correction that
-// did change the result keeps its mark and date.
+// did change the result keeps its mark and date. A put back restores the sheet of the
+// newest reopen that kept one, looking back past reopens whose save kept no lines (T-368):
+// it ends that reopen, and the reopens between are part of the slip and mark nothing.
+// Where no correction says whether it kept a sheet, the put back ends the reopen before it.
 import { isDecided } from './game-fields.ts';
 
 /** A game's result as a correction keeps it, or as the game holds it now. */
@@ -34,6 +37,8 @@ export type MarkCorrection = {
   readonly before: MarkResult;
   /** The result the correction left: undecided for a reopen, decided for a put back (S-98). */
   readonly after?: MarkResult | undefined;
+  /** Whether its "before" kept a sheet (T-365): the reopen a later put back restores. */
+  readonly keptSheet?: boolean | undefined;
 };
 
 const isPutBack = (correction: MarkCorrection) =>
@@ -49,18 +54,32 @@ export function correctedMarkDate(
   corrections: readonly MarkCorrection[],
   game: MarkResult & { readonly status: string },
 ): string | undefined {
+  // Each put back ends the reopen it undid; it and the reopens between mark nothing.
+  const endedBy = new Map<number, MarkResult | undefined>();
+  const part = new Set<number>();
+  corrections.forEach((correction, at) => {
+    if (!isPutBack(correction)) return;
+    let undid = at - 1;
+    while (undid >= 0) {
+      const earlier = corrections[undid];
+      if (earlier !== undefined && !isPutBack(earlier) && earlier.keptSheet === true) break;
+      undid -= 1;
+    }
+    if (undid < 0) undid = at - 1;
+    for (let k = undid + 1; k <= at; k += 1) part.add(k);
+    if (undid >= 0) endedBy.set(undid, correction.after);
+  });
   let marked: string | undefined;
   corrections.forEach((correction, index) => {
-    if (isPutBack(correction)) return;
+    if (part.has(index)) return;
     const next = corrections[index + 1];
-    const nextFinal =
-      next === undefined
+    const nextFinal = endedBy.has(index)
+      ? endedBy.get(index)
+      : next === undefined
         ? isDecided(game.status)
           ? game
           : undefined
-        : isPutBack(next)
-          ? next.after
-          : next.before;
+        : next.before;
     if (nextFinal !== undefined && !sameResult(correction.before, nextFinal))
       marked = correction.on;
   });

@@ -43,6 +43,8 @@ const putBackKeys: readonly TextKey[] = [
   'admin.boxScore.putBackError.game-not-decided',
   'admin.boxScore.putBackError.newer-save',
   'admin.boxScore.putBackError.no-sheet-kept',
+  'admin.boxScore.putBackError.player-gone',
+  'admin.boxScore.putBackError.scored-live',
   'admin.boxScore.putBackError.put-back-reason',
 ];
 

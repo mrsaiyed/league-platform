@@ -53,7 +53,14 @@ describe('why a change in the games area was refused, as words', () => {
   });
 
   it('words a put back of the sheet refused by its own sentences (step 2.229)', () => {
-    for (const code of ['newer-save', 'no-sheet-kept', 'game-not-decided', 'put-back-reason']) {
+    for (const code of [
+      'newer-save',
+      'no-sheet-kept',
+      'game-not-decided',
+      'put-back-reason',
+      'scored-live',
+      'player-gone',
+    ]) {
       expect(putBackProblemKey(code), code).toBe(`admin.boxScore.putBackError.${code}`);
       expect(en[putBackProblemKey(code)], code).not.toContain(code);
     }

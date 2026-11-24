@@ -31,6 +31,7 @@ import {
   listTeamStatTotals,
   listTeamTurnoverGames,
 } from '../queries/index.ts';
+import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import { gamesReadStore, standingsReadStore } from '../stores/index.ts';
 import type { LeagueRecords } from './two-leagues.test-helper.ts';
@@ -119,6 +120,17 @@ registerIsolationCase({
 registerIsolationCase({
   subject: findGameCorrectedDate,
   name: "find the date the target's final game was corrected",
+  // A correction of the game that changed its result, inside the target's own fence (fixed
+  // id, dates and documents), so a query with its league filter taken out would read a
+  // date from another league (the fence check, step 2.229 fix round).
+  arrange: (inTarget, target) =>
+    sql`insert into game_corrections
+      (id, league_id, game_id, account_id, reason, before, after, at, created_at)
+      values ('01900000-0000-7000-8000-00000000d229', ${inTarget.leagueId},
+        ${target.gameId}, ${target.ownerId}, 'Harness correcting',
+        ${JSON.stringify({ version: 1, status: 'forfeit', homeScore: 20, awayScore: 0 })}::jsonb,
+        ${JSON.stringify({ version: 1, status: 'scheduled', homeScore: null, awayScore: null })}::jsonb,
+        '2026-11-20T18:00:00Z', '2026-11-20T18:00:00Z')`.execute(transactionOf(inTarget)),
   run: (scope, target) => findGameCorrectedDate(scope, target.gameId),
 });
 registerIsolationCase({

@@ -125,7 +125,7 @@ export { findGame } from './find-game.ts';
 export { findGameGivenFormat } from './find-game-given-format.ts';
 export { gameSummary } from './game-summary.ts';
 export { insertGameCorrection } from './insert-game-correction.ts';
-export { findNewestGameCorrection } from './find-newest-game-correction.ts';
+export { listGameCorrectionsNewestFirst } from './list-game-corrections-newest-first.ts';
 export { listPostponedGames } from './list-postponed-games.ts';
 export { listSeasonAssignments } from './list-season-assignments.ts';
 export { findStatusBeforeCancelled } from './find-status-before-cancelled.ts';

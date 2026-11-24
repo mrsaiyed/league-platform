@@ -185,26 +185,72 @@ describe('a correction keeps the sheet it replaces (step 2.229)', () => {
     expect(stored).toContain(personId(21));
   });
 
-  it('is refused once something newer has been saved on the game', async () => {
+  // T-368 (fix round): a second reopen does not hide the kept sheet. The builder's test
+  // here asserted `no-sheet-kept` after reopen, final, reopen, final; the rule now looks
+  // back past reopens whose save recorded no lines.
+  it('looks back past a second reopen: final, reopen, forfeit, put back', async () => {
     const w = setUp();
-    await enteredAndReopened(w);
-    const final = (homeScore: number) =>
-      recordFinalScore(
-        w.as(ownerId),
-        { gameId: gameId(1), version: versionOf(w), homeScore, awayScore: 48 },
-        w.deps,
-      );
+    const before = await enteredAndReopened(w);
+    const reopen = () =>
+      reopenGame(w.as(ownerId), { gameId: gameId(1), version: versionOf(w), reason }, w.deps);
     const putBack = () =>
       putSheetBack(w.as(ownerId), { gameId: gameId(1), version: versionOf(w), reason }, w.deps);
-    expect(await final(50)).toMatchObject({ ok: true });
-    // Reopened again and saved again: the newest correction holds no sheet.
+    expect(
+      await recordFinalScore(
+        w.as(ownerId),
+        { gameId: gameId(1), version: versionOf(w), homeScore: 50, awayScore: 48 },
+        w.deps,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(await reopen()).toMatchObject({ ok: true });
+    // The second reopen is truthful: the game had no lines, so it keeps no sheet.
+    expect(w.db.state.corrections[1]?.before.sheet).toBeUndefined();
+    expect(await putBack()).toEqual({ ok: false, error: { code: 'game-not-decided' } });
+    expect(
+      await recordForfeit(
+        w.as(ownerId),
+        { gameId: gameId(1), version: versionOf(w), forfeitingTeamId: teamId(2) },
+        w.deps,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(await putBack()).toMatchObject({ ok: true });
+    const after = snapshot(w);
+    expect(after.lines).toEqual(before.lines);
+    expect(after.rows).toEqual(before.rows);
+    expect(after.totals).toEqual(before.totals);
+    expect(after.game).toMatchObject({ status: 'final', homeScore: 41, awayScore: 45 });
+    expect(await putBack()).toEqual({ ok: false, error: { code: 'newer-save' } });
+  });
+
+  it('does not look back past a save that recorded lines', async () => {
+    const w = setUp();
+    await enteredAndReopened(w);
+    const final = () =>
+      recordFinalScore(
+        w.as(ownerId),
+        { gameId: gameId(1), version: versionOf(w), homeScore: 50, awayScore: 48 },
+        w.deps,
+      );
+    expect(await final()).toMatchObject({ ok: true });
     expect(
       await reopenGame(w.as(ownerId), { gameId: gameId(1), version: versionOf(w), reason }, w.deps),
     ).toMatchObject({ ok: true });
-    expect(await putBack()).toEqual({ ok: false, error: { code: 'game-not-decided' } });
-    expect(await final(52)).toMatchObject({ ok: true });
-    expect(await putBack()).toEqual({ ok: false, error: { code: 'no-sheet-kept' } });
-    expect(linesOf(w, 1)).toEqual([]);
+    // Reopened again and a new sheet typed: that save recorded lines of its own.
+    const typed = sheet(1, 1, 2, versionOf(w));
+    const lines = [typed.lines[0], typed.lines[2]].flatMap((l) => (l === undefined ? [] : [l]));
+    expect(
+      await setBoxScore(w.as(ownerId), { ...typed, homeScore: 20, awayScore: 45, lines }, w.deps),
+    ).toMatchObject({ ok: true });
+    const typedLines = linesOf(w, 1);
+    expect(typedLines).toHaveLength(2);
+    expect(
+      await putSheetBack(
+        w.as(ownerId),
+        { gameId: gameId(1), version: versionOf(w), reason },
+        w.deps,
+      ),
+    ).toEqual({ ok: false, error: { code: 'newer-save' } });
+    expect(linesOf(w, 1)).toEqual(typedLines);
   });
 
   it('is done once: a second put back, or one from an old page, is refused', async () => {

@@ -11,7 +11,8 @@
 // changed (T-45). It is offered only while the newest correction is the reopen that kept
 // the sheet and the game has been saved once since: once something newer is saved on
 // the game (a put back is itself one; reopening it again writes a newer correction), it
-// is refused in plain words. It carries the game's version (T-46), so a double tap or
+// is refused in plain words. It restores the newest kept sheet with no save of lines or
+// plays since (T-368, sheet-put-back-rule.ts), so a second reopen does not hide it. It carries the game's version (T-46), so a double tap or
 // an old page is refused before anything is written. Who may: as for reopening a game
 // (`games.correct`, the game's scope).
 import { z } from 'zod';
@@ -22,10 +23,16 @@ import { correctionReason, gameVersion } from '../game-fields.ts';
 import { sheetToKeep } from '../kept-sheet.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
-import { sheetPutBackRefusal, type SheetPutBackRefusal } from '../sheet-put-back-rule.ts';
+import { sheetPutBackRuling, type SheetPutBackRefusal } from '../sheet-put-back-rule.ts';
 
 export type PutSheetBackError = {
-  readonly code: 'game-not-found' | 'changed-since-read' | 'not-allowed' | SheetPutBackRefusal;
+  readonly code:
+    | 'game-not-found'
+    | 'changed-since-read'
+    | 'not-allowed'
+    /** A person the kept sheet names is no longer in the league (purged from the bin). */
+    | 'player-gone'
+    | SheetPutBackRefusal;
 };
 
 export const putSheetBack = defineCommand({
@@ -45,13 +52,25 @@ export const putSheetBack = defineCommand({
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
     if (game.version !== input.version) return fail({ code: 'changed-since-read' });
     if (context.accountId === null) return fail({ code: 'not-allowed' });
-    const newest = await tx.games.newestCorrection(game.id);
-    const refusal = sheetPutBackRefusal(game, newest);
-    if (refusal !== undefined || newest === undefined) {
-      return fail({ code: refusal ?? 'no-sheet-kept' });
+    const ruling = sheetPutBackRuling(
+      game,
+      {
+        hasPlays: await tx.games.hasPlays(game.id),
+        hasLines: (await tx.liveGames.lines(game.id)).length > 0,
+      },
+      await tx.games.correctionsNewestFirst(game.id),
+    );
+    if (ruling.refusal !== undefined) return fail({ code: ruling.refusal });
+    const kept = ruling.restore;
+    // A person or roster entry the sheet names may have been purged from the bin since
+    // (T-220 keeps only the id): refused in plain words, not on the database's link. The
+    // rosters list those who left too (R-17), so a player who left still comes back.
+    const roster = new Set(
+      (await tx.games.listRoster(game.id)).map((p) => `${p.teamId} ${p.personId}`),
+    );
+    if (kept.sheet.lines.some((line) => !roster.has(`${line.teamId} ${line.personId}`))) {
+      return fail({ code: 'player-gone' });
     }
-    const kept = newest.before;
-    if (kept.sheet === undefined) return fail({ code: 'no-sheet-kept' });
     const replaced = await sheetToKeep(tx, game);
     await tx.games.addCorrection({
       gameId: game.id,
