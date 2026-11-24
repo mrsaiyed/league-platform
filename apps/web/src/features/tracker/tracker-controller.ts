@@ -1025,6 +1025,35 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   /** The last session this device held: the batch names it, though the server goes by the sequence. */
   let lastHeldSession: string | null = null;
 
+  /**
+   * Keeps waiting taps as not saved, with the sequence the list was made on when it is
+   * known, so "Send these plays" is still offered after a reload (T-337).
+   */
+  const putAside = (commandIds: readonly string[]): Promise<void> =>
+    queue.setAside(commandIds, notSavedSince ?? undefined);
+
+  /**
+   * After a reload: the sequence the kept list was made on, and the session it was made
+   * under, as the storage kept them with it (T-337). The earliest any of them names, so a
+   * send is refused rather than a play counted twice; unknown when one names none.
+   */
+  const restoreNotSavedSince = (held: readonly QueuedCommand[]): void => {
+    const kept = held.filter((entry) => entry.state === 'not-saved');
+    if (kept.length === 0 || current.notSaved.length > 0) return;
+    let since: number | null = null;
+    let session: string | null = null;
+    for (const entry of kept) {
+      if (entry.state !== 'not-saved' || entry.notSavedSince === undefined) return;
+      if (entry.sessionId === undefined) return;
+      if (since === null || entry.notSavedSince < since) {
+        since = entry.notSavedSince;
+        session = entry.sessionId;
+      }
+    }
+    notSavedSince = since;
+    lastHeldSession ??= session;
+  };
+
   /** Lists `list` as not saved, and says whether "Send these plays" is offered for it. */
   const showNotSaved = (list: readonly KeptTap[]): void => {
     if (list.length === 0) notSavedSince = null;
@@ -1202,7 +1231,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       }
       listNotSaved(withTaps(withTaps(current.notSaved, keptNotSaved), waiting));
       // If this fails they are still listed, and never sent under another session.
-      if (unsent.size > 0) await queue.setAside([...unsent]).catch(() => undefined);
+      if (unsent.size > 0) await putAside([...unsent]).catch(() => undefined);
       // Saved after all: never sent again, never listed.
       if (takenAdds.size > 0) await queue.forget([...takenAdds]).catch(() => undefined);
       if (!stillLost()) return;
@@ -1449,7 +1478,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const staleIds = stale.map((t) => t.command.commandId);
     for (const id of staleIds) settingAside.add(id);
     try {
-      if (stale.length > 0) await queue.setAside(staleIds);
+      if (stale.length > 0) await putAside(staleIds);
     } catch {
       for (const id of staleIds) settingAside.delete(id);
       return readOnly('storage-failed');
@@ -1657,6 +1686,18 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     judgeOffline();
   };
 
+  /** Loads the server's state again while scoring, trying later until it comes (T-113). */
+  const loadAgain = async (): Promise<void> => {
+    update({ reloading: true });
+    const reload = async (): Promise<void> => {
+      if (current.mode.kind !== 'scoring') return update({ reloading: false });
+      if (!(await load())) return later(reload);
+      failures = 0;
+      update({ reloading: false });
+    };
+    await reload();
+  };
+
   queue.subscribe((status) => {
     watchOffline(status);
     // The time of the last save, on the server's clock (L1).
@@ -1682,14 +1723,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         made = made.filter((c) => !refusedIds.has(c.commandId));
         showGame();
       });
-      update({ reloading: true });
-      const reload = async (): Promise<void> => {
-        if (current.mode.kind !== 'scoring') return update({ reloading: false });
-        if (!(await load())) return later(reload);
-        failures = 0;
-        update({ reloading: false });
-      };
-      void track(reload());
+      void track(loadAgain());
     } else if (
       tookBatch &&
       base !== null &&
@@ -1698,6 +1732,18 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     ) {
       if (settling) settleAgain = true;
       else void track(settle());
+    } else if (
+      tookBatch &&
+      base !== null &&
+      current.mode.kind === 'scoring' &&
+      status.sequence !== null &&
+      status.sequence - base.sequence > made.length
+    ) {
+      // The server's game moved by more than this device's own taps since the state it is
+      // built on (T-338): plays sent by another scorekeeper's "Send these plays" while this
+      // device held the game. It is loaded again, as after a refusal, so the next taps
+      // count on top of them and the screen never builds on a stale game.
+      void track(loadAgain());
     }
     // The server has this device's End: the final game's look starts now (fix round B).
     if (cancelFinalCheck === null && !checkingFinal && endedHere()) scheduleFinalCheck();
@@ -1730,7 +1776,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       // still this device's (T-114, T-248); otherwise they are listed as not saved.
       const held = await storage.list(gameId);
       made = tapsIn(held, 'waiting');
-      // Listed as not saved before the reload, and not dismissed: still listed.
+      // Listed as not saved before the reload, and not dismissed: still listed, and
+      // "Send these plays" still offered when the list kept what it was made on (T-337).
+      restoreNotSavedSince(held);
       listNotSaved(withTaps(current.notSaved, keptIn(held, 'not-saved')));
     } catch {
       // Never left opening for good: read-only with a reason, and `openAgain` tries again.
@@ -1940,7 +1988,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
             listNotSaved(withTaps(current.notSaved, [{ command, moment }]));
           }
         }
-        await queue.setAside([command.commandId]).catch(() => undefined);
+        await putAside([command.commandId]).catch(() => undefined);
         return { ok: false, reason: 'not-scoring' };
       }
       made.push(command);
@@ -2016,7 +2064,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         const aside = kept
           .map((k) => k.command.commandId)
           .filter((id) => stateOf(id) !== undefined);
-        if (aside.length > 0) await queue.setAside(aside).catch(() => undefined);
+        if (aside.length > 0) await putAside(aside).catch(() => undefined);
         showRosters();
         return { ok: false, reason: 'not-scoring' };
       }

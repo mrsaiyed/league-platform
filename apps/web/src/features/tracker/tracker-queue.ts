@@ -194,9 +194,10 @@ export type TrackerQueue = {
   forget(commandIds: readonly string[]): Promise<void>;
   /**
    * Keeps waiting taps as not saved: never sent, still stored until `forget`, so the
-   * list survives a reload (T6 §5). A halt is cleared as `forget` clears it.
+   * list survives a reload (T6 §5). A halt is cleared as `forget` clears it. Given
+   * `notSavedSince`, the sequence they were made on, it is kept with them (T-337).
    */
-  setAside(commandIds: readonly string[]): Promise<void>;
+  setAside(commandIds: readonly string[], notSavedSince?: number): Promise<void>;
   /**
    * Sends waiting taps made under an earlier session of this device under `sessionId`
    * (step 2.38): the tracker has checked that nobody else scored since that one ended.
@@ -357,8 +358,16 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     remove: readonly string[],
     refuse: readonly RefusedEntry[],
     notSaved: readonly string[] = [],
+    notSavedSince?: number,
   ): Promise<void> =>
-    stored('storage-write-failed', () => storage.settle(gameId, { remove, refuse, notSaved }));
+    stored('storage-write-failed', () =>
+      storage.settle(gameId, {
+        remove,
+        refuse,
+        notSaved,
+        ...(notSavedSince === undefined ? {} : { notSavedSince }),
+      }),
+    );
 
   const nextBatch = (list: readonly QueuedCommand[], session: string): CommandBatch | null => {
     // A tap made under another session is never sent under this one (T6 §5, record 049):
@@ -522,8 +531,12 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
   };
 
   /** Drops taps, or keeps them as not saved; either way they are never sent. */
-  const putAway = async (remove: readonly string[], notSaved: readonly string[]) => {
-    await settle(remove, [], notSaved);
+  const putAway = async (
+    remove: readonly string[],
+    notSaved: readonly string[],
+    notSavedSince?: number,
+  ) => {
+    await settle(remove, [], notSaved, notSavedSince);
     for (const id of [...remove, ...notSaved]) unsure.delete(id);
     const list = await refresh();
     // Nothing left for the halt to hold back: the queue is free again.
@@ -587,7 +600,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
 
     forget: (commandIds) => putAway(commandIds, []),
 
-    setAside: (commandIds) => putAway([], commandIds),
+    setAside: (commandIds, notSavedSince) => putAway([], commandIds, notSavedSince),
 
     async carryOn(commandIds, session) {
       await stored('storage-write-failed', () =>
