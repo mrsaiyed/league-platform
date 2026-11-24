@@ -1,7 +1,7 @@
 // The words the shared display pieces in packages/ui need, taken from the message file
 // (T-187). packages/ui holds no words of its own, so a page passes these in. The shapes
 // match packages/ui's label types; the web app checks that when it passes them.
-import type { Translate } from './messages.ts';
+import type { Translate } from './translate.ts';
 
 /**
  * What a final game's pill says when it went to overtime (P7 §5.6): "Final, OT" for one,

@@ -10,8 +10,10 @@
 // game first as the tracker's own ways out do (tracker-sign-out.ts): it asks when plays
 // are waiting to be sent, releases the scoring session, and keeps the games on the device
 // while plays wait.
-import { useRef, type FormEvent, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useRef, type FormEvent, type MouseEvent, type ReactNode } from 'react';
+import { clearDeviceAccount, markSignedInHere } from './device-account.ts';
 import { forgetOpenedGamesOnDevice } from './indexeddb-opened-game-storage.ts';
+import { forgetTrackerPagesOnDevice } from './tracker-worker-registration.ts';
 import {
   beforeSignOut,
   trackerSignOutHold,
@@ -30,20 +32,49 @@ async function readyToSignOut(question: WaitingQuestion): Promise<boolean> {
   const plan = await beforeSignOut(trackerSignOutHold(), (waiting) =>
     window.confirm(waitingQuestionText(question, waiting)),
   );
-  if (plan.go && plan.clearKeptGames) await atMost(forgetOpenedGamesOnDevice(), clearingWaitMs);
+  // Signing out also deletes the tracker pages the device kept (step 2.38, T-115).
+  if (plan.go) {
+    // Nobody is signed in here once this is sent (T-327).
+    const clearing = [forgetTrackerPagesOnDevice(), clearDeviceAccount()];
+    if (plan.clearKeptGames) clearing.push(forgetOpenedGamesOnDevice());
+    await atMost(
+      Promise.all(clearing).then(() => undefined),
+      clearingWaitMs,
+    );
+  }
   return plan.go;
+}
+
+/**
+ * Writes `accountId` on the device as the one signed in here, once this page has loaded
+ * (T-327). A page with this form came from the network: the tracker's own scoring page,
+ * which may be a kept copy, uses SignOutLink and marks the device once the server
+ * answers its opening (open-tracker-game.ts). When the mark was another person's, their
+ * kept pages and kept games are forgotten; their plays waiting to be sent stay, hidden.
+ */
+function useDeviceAccountMark(accountId: string | undefined): void {
+  useEffect(() => {
+    if (accountId === undefined) return;
+    void markSignedInHere(accountId, async () => {
+      await Promise.all([forgetTrackerPagesOnDevice(), forgetOpenedGamesOnDevice()]);
+    });
+  }, [accountId]);
 }
 
 export function SignOutForm({
   action,
   waitingQuestion,
+  accountId,
   children,
 }: {
   /** The server's sign-out action: the form's fields say where the person is (step 2.163). */
   readonly action: (form: FormData) => Promise<void>;
   readonly waitingQuestion: WaitingQuestion;
+  /** The signed-in account, marked on the device as the one signed in here (T-327). */
+  readonly accountId?: string;
   readonly children: ReactNode;
 }) {
+  useDeviceAccountMark(accountId);
   // 'clearing' while the games are cleared; 'cleared' for the one sending that follows.
   const stage = useRef<'idle' | 'clearing' | 'cleared'>('idle');
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {

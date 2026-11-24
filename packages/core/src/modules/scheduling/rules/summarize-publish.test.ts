@@ -192,3 +192,77 @@ describe('what the summary counts is what publishing writes (step 2.185)', () =>
     expect(publishChangeCount(summarizePublish(played, back.state))).toBe(0);
   });
 });
+
+describe('a postponed game is never stuck in the draft (step 2.53 fix round)', () => {
+  const waiting = () => {
+    const s = baseState();
+    return {
+      ...s,
+      games: s.games.map((g) => (g.id === 'g1' ? { ...g, status: 'postponed' as const } : g)),
+    };
+  };
+  const slotOf = (id: string, s: ReturnType<typeof waiting>) => {
+    const g = s.games.find((x) => x.id === id);
+    if (g === undefined) throw new Error(`no ${id}`);
+    const { roundId, date, time, venueId, court } = g;
+    return { roundId, date, time, venueId, court };
+  };
+
+  it('counts its own old slot as its new date: publishing makes it scheduled', () => {
+    const published = waiting();
+    const result = applyDraft(
+      published,
+      [{ kind: 'move-game', gameId: 'g1', to: slotOf('g1', published) }],
+      [],
+    );
+    expect(result.state.games.find((g) => g.id === 'g1')?.status).toBe('scheduled');
+    const summary = summarizePublish(published, result.state);
+    expect(summary.gamesMoved).toEqual(['g1']);
+    expect(publishChangeCount(summary)).toBe(1);
+  });
+
+  it('makes a postponed game swapped into another slot scheduled, as a move does', () => {
+    const published = waiting();
+    const result = applyDraft(
+      published,
+      [{ kind: 'swap-games', gameId: 'g1', otherGameId: 'g2' }],
+      [],
+    );
+    expect(result.rejected).toEqual([]);
+    const g1 = result.state.games.find((g) => g.id === 'g1');
+    expect(g1?.status).toBe('scheduled');
+    expect(g1?.date).toBe(slotOf('g2', published).date);
+    expect(result.state.games.find((g) => g.id === 'g2')?.status).toBe('scheduled');
+  });
+
+  it('takes a drafted new date back: the game is as published, nothing to publish', () => {
+    const published = waiting();
+    const result = applyDraft(
+      published,
+      [
+        { kind: 'move-game', gameId: 'g1', to: { ...slotOf('g2', published), time: '21:00' } },
+        { kind: 'take-back-date', gameId: 'g1', to: slotOf('g1', published), status: 'postponed' },
+      ],
+      [],
+    );
+    expect(result.rejected).toEqual([]);
+    expect(result.state.games.find((g) => g.id === 'g1')).toEqual(
+      published.games.find((g) => g.id === 'g1'),
+    );
+    expect(publishChangeCount(summarizePublish(published, result.state))).toBe(0);
+  });
+
+  it('after "Put it back on its date", a take-back drops the drafted move', () => {
+    // The game is scheduled again in the published schedule; the take-back copies that.
+    const published = baseState();
+    const result = applyDraft(
+      published,
+      [
+        { kind: 'move-game', gameId: 'g1', to: { ...slotOf('g1', waiting()), time: '21:00' } },
+        { kind: 'take-back-date', gameId: 'g1', to: slotOf('g1', waiting()), status: 'scheduled' },
+      ],
+      [],
+    );
+    expect(publishChangeCount(summarizePublish(published, result.state))).toBe(0);
+  });
+});

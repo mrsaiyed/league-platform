@@ -131,6 +131,10 @@ export const publishSchedule = defineCommand({
             }
           : {}),
         ...(recording === undefined ? {} : { captureMode: recording }),
+        // A postponed game given a new slot in the draft is played on it (T-326, S-49).
+        ...(moved && old.status === 'postponed' && game.status === 'scheduled'
+          ? { status: 'scheduled' as const }
+          : {}),
       };
       if (!(await store.updatePublishedGame(input.seasonId, id, change))) {
         return fail({ code: 'game-already-started', gameId: id });

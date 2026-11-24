@@ -49,6 +49,9 @@ import { trackerRostersReply } from '../../server/tracker-rosters-reply.ts';
 import { notScoredBecause, scoresOnly } from './my-games.ts';
 import { trackerCatalog } from './tracker-catalog.ts';
 import { TrackerOpening } from './tracker-opening.tsx';
+import { isDevelopmentServer } from '../../server/config.ts';
+import { trackerHeadOf } from './tracker-install.ts';
+import { trackerAccountMetaName } from './tracker-worker-rules.ts';
 
 export async function TrackerPage({
   league,
@@ -61,11 +64,17 @@ export async function TrackerPage({
 }) {
   const view = await loadLeaguePage(league, 'score', null, { problem: 'signInToScore' });
   const here = view.context.league;
+  // The account this page is made for, in its head (T-321): the worker shows a kept copy
+  // of a tracker page only while the same account is signed in.
+  const signedInAs = commandContextOf(view.context).accountId;
+  const accountMark =
+    signedInAs === null ? null : <meta name={trackerAccountMetaName} content={signedInAs} />;
   const backHref = scoresOnly(view.areas)
     ? leagueUrl(here, 'admin')
     : leagueUrl(here, 'admin-area', { area: 'games' });
   const refusal = (message: TextKey, enter?: { readonly href: string }) => (
     <LeagueLook league={here}>
+      {accountMark}
       <TrackerRefusal
         message={message}
         backHref={backHref}
@@ -114,24 +123,33 @@ export async function TrackerPage({
   // The account button of step 2.127, in the tracker's own frame (DESIGN.md section 7,
   // line 11): a shared tablet is signed out from here, leaving the game first.
   const menu = accountMenuOf(view, await signedInEmail(), trackerHref);
+  // Installable, and opens with no signal once loaded (step 2.38, T-115): React puts the
+  // manifest's link and the frame's colour in the page's head.
+  const head = trackerHeadOf(here, read.value.gameId);
   return (
-    <TrackerOpening
-      leagueId={here.id}
-      accountId={context.accountId}
-      gameId={read.value.gameId}
-      rosters={deviceRosters(trackerRostersReply(read.value), names.teams)}
-      when={when}
-      watchHref={leagueUrl(here, 'game', { game: read.value.gameId })}
-      backHref={backHref}
-      accountHref={platformUrl('account')}
-      account={menu === null ? null : <AccountButton account={menu} />}
-      signInHref={signInFirstUrl(trackerHref, { problem: 'backToYourGame' })}
-      // Whoever works in more areas than scoring may correct games: only the words of
-      // the Mark not started question follow from it. The league stays the judge (S-40).
-      mayCorrect={!scoresOnly(view.areas)}
-      locale={locale}
-      catalog={trackerCatalog(catalogs[locale] ?? en)}
-    />
+    <>
+      <link rel="manifest" href={head.manifestHref} />
+      <meta name="theme-color" content={head.colour} />
+      {accountMark}
+      <TrackerOpening
+        leagueId={here.id}
+        accountId={context.accountId}
+        gameId={read.value.gameId}
+        rosters={deviceRosters(trackerRostersReply(read.value), names.teams)}
+        when={when}
+        watchHref={leagueUrl(here, 'game', { game: read.value.gameId })}
+        backHref={backHref}
+        accountHref={platformUrl('account')}
+        account={menu === null ? null : <AccountButton account={menu} />}
+        signInHref={signInFirstUrl(trackerHref, { problem: 'backToYourGame' })}
+        // Whoever works in more areas than scoring may correct games: only the words of
+        // the Mark not started question follow from it. The league stays the judge (S-40).
+        mayCorrect={!scoresOnly(view.areas)}
+        locale={locale}
+        catalog={trackerCatalog(catalogs[locale] ?? en)}
+        workerHref={isDevelopmentServer() ? null : head.workerHref}
+      />
+    </>
   );
 }
 

@@ -161,6 +161,8 @@ export async function planPublication(
 
   const rules = upgradeSeasonRules(await store.seasonRules(seasonId));
   const defaultRecording = rules.ok ? rules.rules.recording : 'live';
+  // In the order of their date and time: the store numbers them in this order, after the
+  // season's highest game number (step 2.53, S-90).
   const newGames: NewPublishedGame[] = summary.gamesAdded.flatMap((id) => {
     const g = after.get(id);
     if (g === undefined || g.time === null) return [];
@@ -178,6 +180,10 @@ export async function planPublication(
       },
     ];
   });
+  newGames.sort(
+    (a, b) =>
+      `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`) || a.id.localeCompare(b.id),
+  );
 
   return {
     draft,

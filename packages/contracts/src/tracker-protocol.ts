@@ -176,6 +176,12 @@ export const CommandBatchV1 = z.strictObject({
 export const CommandBatch = z.strictObject({
   protocolVersion: z.number().int().min(1),
   sessionId: Id,
+  /**
+   * The account the device kept these taps for (T-327). The session decides who scores:
+   * a batch whose maker is not its session's account is refused, never taken under it.
+   * Left out by a tracker opened before (T-127).
+   */
+  accountId: Id.optional(),
   commands: commandList(BatchCommand),
 });
 export type CommandBatch = z.infer<typeof CommandBatch>;

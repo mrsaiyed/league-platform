@@ -4,6 +4,8 @@
 // A comment above a key is about that key or, from before the split, about the keys
 // that followed it in the one file there was.
 export const enTracker = {
+  'tracker.app.name': 'Courtside scoring',
+  'tracker.app.shortName': 'Scoring',
   'tracker.back': 'Back to your games',
   'tracker.bench.comesInFor': 'Who comes in for {player}?',
   'tracker.bench.everyoneOn': 'Everyone is on the court.',
@@ -166,6 +168,30 @@ export const enTracker = {
   'tracker.fouls.count_other': '{count} fouls',
   'tracker.fouls.thisPeriod_one': '{count} team foul this period',
   'tracker.fouls.thisPeriod_other': '{count} team fouls this period',
+  'tracker.held.dismiss': 'Dismiss',
+  'tracker.held.dismissFailed': 'This device could not dismiss them. Try again.',
+  'tracker.held.dismissNotSaved_one':
+    'Dismiss the play not saved? Its list is deleted from this device. The league never had it.',
+  'tracker.held.dismissNotSaved_other':
+    'Dismiss the {count} plays not saved? Their list is deleted from this device. The league never had them.',
+  'tracker.held.dismissWaiting_one':
+    'Dismiss {count} play that was never sent? It is deleted from this device and the league will never get it, unless someone enters it again.',
+  'tracker.held.dismissWaiting_other':
+    'Dismiss {count} plays that were never sent? They are deleted from this device and the league will never get them, unless someone enters them again.',
+  'tracker.held.game': '{home} v {away}',
+  'tracker.held.intro':
+    'These games have plays on this device that the league does not have. Open a game to send them, or dismiss them.',
+  'tracker.held.lastTap': 'Last play {when}',
+  'tracker.held.notSaved_one': '{count} play not saved',
+  'tracker.held.notSaved_other': '{count} plays not saved',
+  'tracker.held.open': 'Open to send',
+  'tracker.held.openToSee': 'Open to see',
+  'tracker.held.someGame': 'A game scored on this device',
+  'tracker.held.someGameAnyLeague':
+    'A game scored on this device: it may belong to another league on this device',
+  'tracker.held.title': 'Kept on this device',
+  'tracker.held.waiting_one': '{count} play waiting to send',
+  'tracker.held.waiting_other': '{count} plays waiting to send',
   'tracker.heldByOther': '{name} is scoring this game on another device.',
   'tracker.hint.players':
     'Tap a player, then +1, +2, +3, Foul or Turnover. −Foul takes back that player’s latest foul.',

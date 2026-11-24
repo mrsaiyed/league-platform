@@ -3,7 +3,7 @@
 // IndexedDB one in indexeddb-queue-storage.test.ts on a stand-in database (record 024).
 import type { BatchCommand, TrackerCommand } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
-import type { QueueStorage } from './queue-storage.ts';
+import type { DeviceQueueStorage } from './queue-storage.ts';
 
 const game = '00000000-0000-4000-8000-0000000000a1';
 const other = '00000000-0000-4000-8000-0000000000a2';
@@ -21,7 +21,7 @@ export const tap = (n: number): TrackerCommand => ({
 const ids = (list: readonly { command: BatchCommand }[]) =>
   list.map((entry) => entry.command.commandId);
 
-export function queueStorageContract(name: string, make: () => Promise<QueueStorage>): void {
+export function queueStorageContract(name: string, make: () => Promise<DeviceQueueStorage>): void {
   describe(`${name} (queue storage contract)`, () => {
     it('keeps taps in the order they were added, per game', async () => {
       const storage = await make();
@@ -141,6 +141,73 @@ export function queueStorageContract(name: string, make: () => Promise<QueueStor
       await storage.add(other, { protocolVersion: 1, command: tap(5) });
       await storage.settle(game, { remove: [commandId(5)] });
       expect(ids(await storage.list(other))).toEqual([commandId(5)]);
+    });
+
+    it('lists every game it holds taps for, with the league each was made in (step 2.38)', async () => {
+      const storage = await make();
+      await storage.add(game, { protocolVersion: 1, command: tap(1), leagueId: 'league-1' });
+      await storage.add(other, { protocolVersion: 1, command: tap(2) });
+      await storage.add(game, { protocolVersion: 1, command: tap(3), leagueId: 'league-1' });
+      await storage.settle(game, {
+        refuse: [
+          {
+            commandId: commandId(3),
+            refusal: { code: 'rule', message: 'Player is not on the court.' },
+          },
+        ],
+      });
+      const all = await storage.listAll();
+      expect(all.map((e) => [e.gameId, e.leagueId, e.state])).toEqual([
+        [game, 'league-1', 'waiting'],
+        [other, undefined, 'waiting'],
+        [game, 'league-1', 'refused'],
+      ]);
+    });
+
+    it('moves waiting taps, and only waiting ones, to another session (step 2.38)', async () => {
+      const storage = await make();
+      await storage.add(game, { protocolVersion: 1, command: tap(1), sessionId: 'session-1' });
+      await storage.add(game, { protocolVersion: 1, command: tap(2), sessionId: 'session-1' });
+      await storage.add(game, { protocolVersion: 1, command: tap(3), sessionId: 'session-1' });
+      await storage.add(other, { protocolVersion: 1, command: tap(4), sessionId: 'session-1' });
+      await storage.settle(game, { notSaved: [commandId(2)] });
+      const moved = [commandId(1), commandId(2), commandId(4)];
+      await storage.settle(game, { carryOn: { commandIds: moved, sessionId: 'session-2' } });
+      expect((await storage.list(game)).map((e) => [e.sessionId, e.state])).toEqual([
+        ['session-2', 'waiting'],
+        ['session-1', 'not-saved'],
+        ['session-1', 'waiting'],
+      ]);
+      expect((await storage.list(other)).map((e) => e.sessionId)).toEqual(['session-1']);
+    });
+
+    it('keeps the account that made each tap, and forgets only that account’s (T-321)', async () => {
+      const storage = await make();
+      await storage.add(game, { protocolVersion: 1, command: tap(1), accountId: 'account-1' });
+      await storage.add(game, { protocolVersion: 1, command: tap(2), accountId: 'account-2' });
+      await storage.add(game, { protocolVersion: 1, command: tap(3) });
+      await storage.settle(game, { notSaved: [commandId(1)] });
+      expect((await storage.list(game)).map((e) => [e.accountId, e.state])).toEqual([
+        ['account-1', 'not-saved'],
+        ['account-2', 'waiting'],
+        [undefined, 'waiting'],
+      ]);
+      // Dismissed by account 1: its own go; account 2's stays, and so does the older one,
+      // which is nobody's (T-327): never sent, listed to nobody.
+      await storage.forget(game, 'account-1');
+      expect(ids(await storage.listAll())).toEqual([commandId(2), commandId(3)]);
+    });
+
+    it("forgets one game's taps, and only that game's (S-88)", async () => {
+      const storage = await make();
+      await storage.add(game, { protocolVersion: 1, command: tap(1) });
+      await storage.add(other, { protocolVersion: 1, command: tap(2) });
+      await storage.add(game, { protocolVersion: 1, command: tap(3) });
+      await storage.forget(game);
+      expect(ids(await storage.list(game))).toEqual([]);
+      expect(ids(await storage.listAll())).toEqual([commandId(2)]);
+      // A forgotten tap's command ID may be stored again, as new.
+      expect(await storage.add(game, { protocolVersion: 1, command: tap(1) })).toBe('added');
     });
 
     it('hands out copies, not what it holds', async () => {

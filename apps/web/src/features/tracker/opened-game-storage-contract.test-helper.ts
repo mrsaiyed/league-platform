@@ -135,6 +135,34 @@ export function openedGameStorageContract(
       expect(await storage.find(game)).toBeUndefined();
     });
 
+    it('keeps how the device was scoring through opening again, and clears it with the game (step 2.38)', async () => {
+      const storage = await make();
+      const scoring = {
+        sessionId: '00000000-0000-4000-8000-0000000000d1',
+        onTop: [
+          {
+            commandId: '00000000-0000-4000-8000-0000000000d2',
+            at: 5,
+            input: { type: 'start' as const },
+          },
+        ],
+      };
+      // Nothing is kept for a game whose rosters the device does not hold.
+      await storage.saveScoring(other, scoring);
+      expect(await storage.find(other)).toBeUndefined();
+      await storage.saveRosters(owner, madeUpRosters, 10);
+      expect((await storage.find(game))?.scoring).toBeUndefined();
+      await storage.saveScoring(game, scoring);
+      await storage.saveState(game, state);
+      // Opening again (a reload) stores the rosters anew and keeps the scoring.
+      await storage.saveRosters(owner, madeUpRosters, 20);
+      expect((await storage.find(game))?.scoring).toEqual(scoring);
+      expect((await storage.find(game))?.state).toEqual(state);
+      // Signing out clears it with the game.
+      await storage.forgetAll();
+      expect(await storage.find(game)).toBeUndefined();
+    });
+
     it('gives what it holds as a copy', async () => {
       const storage = await make();
       await storage.saveRosters(owner, madeUpRosters, 10);

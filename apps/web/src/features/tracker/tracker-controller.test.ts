@@ -17,6 +17,7 @@ import { endpointNetwork, type EndpointNetwork } from './endpoint-network.test-h
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
+import type { DeviceScoring } from './opened-game-storage.ts';
 import type { KeptTap, QueueStorage } from './queue-storage.ts';
 import { createTrackerController, type TapInput } from './tracker-controller.ts';
 import {
@@ -25,7 +26,7 @@ import {
   flush,
   type ManualClock,
 } from './tracker-queue.test-helper.ts';
-import type { TrackerServer } from './tracker-server.ts';
+import type { ServerState, TrackerServer } from './tracker-server.ts';
 
 const gameId = games.hawksBears;
 const minute = 60_000;
@@ -49,7 +50,12 @@ function device(
     signedIn = () => as,
     sendTaps = (send) => send,
     askServer = (ask) => ask,
+    kept,
+    keepScoring,
   }: {
+    /** What the device kept of the game, as a page reloaded finds it (step 2.38). */
+    kept?: { readonly state: ServerState | null; readonly scoring: DeviceScoring | null };
+    keepScoring?: (scoring: DeviceScoring) => Promise<void>;
     game?: string;
     as?: Person;
     /** Who the device is signed in as at each request, when that changes in a test. */
@@ -83,6 +89,8 @@ function device(
       gameId: game,
       fetch: askServer(fetch),
     }),
+    ...(kept === undefined ? {} : { kept }),
+    ...(keepScoring === undefined ? {} : { keepScoring }),
   });
   return { controller, storage, clock };
 }
@@ -236,6 +244,168 @@ describe('tracker controller: offline and reconnecting (T6 §4)', () => {
     expect(second.controller.status().queue.waiting).toBe(0);
     expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 3 });
     expect(second.controller.status().mode).toEqual({ kind: 'scoring' });
+  });
+
+  /**
+   * Step 2.38's fault: a page reloaded with no signal, its session ended meanwhile (the
+   * leaving page's release reached the server, say), was given a new session on opening
+   * before its waiting taps were sent, and listed them as not saved though nobody took
+   * the game. The same device and account carry on; only somebody else's taking the
+   * game lists them.
+   */
+  async function reloadedAway(meanwhile: 'lapsed' | 'released' | 'taken' | 'scored-and-left') {
+    const serverClock = createManualClock(1_900_000_000_000);
+    const onTheServer = vi.spyOn(Date, 'now').mockImplementation(() => serverClock.now());
+    onTestFinished(() => onTheServer.mockRestore());
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    let keptScoring: DeviceScoring | null = null;
+    const first = device(network, {
+      storage,
+      keepScoring: (scoring) => {
+        keptScoring = scoring;
+        return Promise.resolve();
+      },
+    });
+    await first.controller.start();
+    await tapAll(first.controller, tipOff);
+    await first.controller.idle();
+    // What the page kept on the device: the server's state as it last loaded it.
+    const keptState: ServerState = await serverGame(network);
+    network.mode = 'down';
+    await tapAll(first.controller, [basket('home', hawks[0] ?? '')]);
+    await first.controller.leave();
+    network.mode = 'up';
+    const kept = keptScoring as DeviceScoring | null;
+    if (kept === null) throw new Error('nothing kept');
+    // Away longer than the lease, on the server's clock.
+    await serverClock.advance(5 * minute);
+    if (meanwhile === 'released') {
+      const asTablet = createFetchTrackerServer({
+        leagueId: liveLeagueId,
+        gameId,
+        fetch: network.fetchAs('scorekeeper'),
+      });
+      const released = await asTablet.session(
+        { type: 'release', sessionId: kept.sessionId },
+        new AbortController().signal,
+      );
+      expect(released.kind).toBe('answer');
+    }
+    if (meanwhile === 'taken' || meanwhile === 'scored-and-left') {
+      const laptop = device(network, { as: 'owner', deviceId: 'laptop' });
+      await laptop.controller.start();
+      await laptop.controller.idle();
+      expect(laptop.controller.status().mode).toEqual({ kind: 'scoring' });
+      if (meanwhile === 'scored-and-left') {
+        await tapAll(laptop.controller, [basket('away', bears[0] ?? '', 3)]);
+        await laptop.controller.idle();
+        await laptop.controller.leave();
+        await laptop.controller.idle();
+      }
+    }
+    // The page reloads: the server answers opening before any tap is sent.
+    const second = device(network, { storage, kept: { state: keptState, scoring: kept } });
+    await second.controller.start();
+    await second.controller.idle();
+    return { network, second, status: second.controller.status() };
+  }
+
+  it.each(['lapsed', 'released'] as const)(
+    'carries on after a reload when its session %s and nobody else scored',
+    async (meanwhile) => {
+      const { network, status } = await reloadedAway(meanwhile);
+      expect(status.notSaved).toEqual([]);
+      expect(status.queue.waiting).toBe(0);
+      expect(status.mode).toEqual({ kind: 'scoring' });
+      expect(scoreOf(status.game)).toEqual({ home: 2, away: 0 });
+      expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 0 });
+      // Sent once: the server took it once.
+      expect((await serverGame(network)).sequence).toBe(3);
+    },
+  );
+
+  it('lists the waiting taps as not saved when somebody else holds the game', async () => {
+    const { network, status } = await reloadedAway('taken');
+    expect(status.notSaved.map((t) => t.command.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    expect(status.queue.waiting).toBe(0);
+    expect(status.mode.kind).toBe('held-by-other');
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 0 });
+  });
+
+  it('lists them as not saved when somebody else scored and let the game go', async () => {
+    const { network, status } = await reloadedAway('scored-and-left');
+    expect(status.notSaved.map((t) => t.command.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    expect(status.queue.waiting).toBe(0);
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 3 });
+  });
+
+  /**
+   * Step 2.38, part 6: a tap saved, then the page reloaded with no signal before the next
+   * load; the leaving page's release reached the server. Reopened from what the device
+   * kept, two taps more, and the network back.
+   */
+  async function reloadedRightAfterATap(
+    stateKept: 'before-the-tap' | 'with-it' = 'before-the-tap',
+  ) {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    let keptScoring: DeviceScoring | null = null;
+    const first = device(network, {
+      storage,
+      keepScoring: (scoring) => {
+        keptScoring = scoring;
+        return Promise.resolve();
+      },
+    });
+    await first.controller.start();
+    await tapAll(first.controller, tipOff);
+    await first.controller.idle();
+    // What the device kept of the server's state: its last load, before the tap.
+    let keptState: ServerState = await serverGame(network);
+    await tapAll(first.controller, [basket('home', hawks[0] ?? '')]);
+    // The reload comes before the load that follows the tap's saving is kept: the
+    // scoring kept is the one as of the tap (the state too, or the load's, with it).
+    const kept = keptScoring as DeviceScoring | null;
+    await first.controller.idle();
+    expect(first.controller.status().queue.waiting).toBe(0);
+    if (stateKept === 'with-it') keptState = await serverGame(network);
+    await first.controller.leave();
+    expect(network.reached).toContain('POST session:release');
+    if (kept === null) throw new Error('nothing kept');
+    network.mode = 'down';
+    const second = device(network, { storage, kept: { state: keptState, scoring: kept } });
+    await second.controller.start();
+    return { network, second };
+  }
+
+  it('keeps each tap on the device at once: reopened with no signal, the score has it', async () => {
+    const { second } = await reloadedRightAfterATap();
+    expect(second.controller.status().mode).toEqual({ kind: 'scoring' });
+    // Without it: 0-0, the kept state being older than the tap (fault c).
+    expect(scoreOf(second.controller.status().game)).toEqual({ home: 2, away: 0 });
+    // A kept state that has the tap already counts it once.
+    const withIt = await reloadedRightAfterATap('with-it');
+    expect(scoreOf(withIt.second.controller.status().game)).toEqual({ home: 2, away: 0 });
+  });
+
+  it('sends the taps made since under the new session, though a send under the ended one was refused first', async () => {
+    const { network, second } = await reloadedRightAfterATap();
+    await tapAll(second.controller, [
+      basket('home', hawks[1] ?? ''),
+      basket('away', bears[0] ?? '', 3),
+    ]);
+    network.mode = 'up';
+    // The queue sends under the kept session, which the release ended: refused. Opening
+    // gives this device a new session; nobody else scored, so the taps carry on (fault a).
+    second.controller.online();
+    await second.controller.idle();
+    const status = second.controller.status();
+    expect(status.notSaved).toEqual([]);
+    expect(status.queue.waiting).toBe(0);
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 4, away: 3 });
   });
 });
 

@@ -919,6 +919,10 @@ const ROUTES = {
 const ANSWERS = {
   '/api/v1/health': [null],
   '/api/v1/live': [null, keeper],
+  // The tracker kept on the device (step 2.38): its manifest names the league, its
+  // worker the pages it keeps; asked signed out and as the scorekeeper.
+  '/[league]/score/manifest.webmanifest': [null, keeper],
+  '/[league]/score/tracker-worker.js': [null, keeper],
   '/api/v1/leagues/[leagueId]/games/[game]/commands': [keeper, owner],
   '/api/v1/leagues/[leagueId]/games/[game]/not-started': [keeper, owner],
   '/api/v1/leagues/[leagueId]/games/[game]/reopen': [keeper, owner],

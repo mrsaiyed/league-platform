@@ -152,12 +152,22 @@ async function tapToCallOff(game, button) {
   await game.getByRole('button', { name: button, exact: true }).click();
 }
 const questionOf = (game) => game.locator('[data-call-off-ask]');
+/** The question's "Yes" (its own mark: "Yes, postpone it and give it a new date now" is not it). */
+const yesOf = (game) => questionOf(game).locator('[data-call-off-yes]');
+/** The "No" drawn in the asked button's place. */
+const noOf = (game) => game.locator('[data-call-off-no]');
+
+/** Postponing's "Yes" for a schedule editor (the people here are), beside "… give it a new date now". */
+const postponeYes = 'Yes, postpone it, decide the new date later';
 
 /** The question's "Yes", once it has been read (the server takes a sooner one as a double tap). */
 async function sayYes(game, name) {
   await questionOf(game).waitFor();
   await game.page().waitForTimeout(readTheQuestion);
-  await game.getByRole('button', { name }).click();
+  const yes = yesOf(game);
+  const said = ((await yes.textContent()) ?? '').trim();
+  if (said !== name) throw new Error(`the question's "Yes" says "${said}", not "${name}"`);
+  await yes.click();
 }
 
 async function accessible(page, label) {
@@ -170,14 +180,19 @@ async function accessible(page, label) {
   note(`no sideways scrolling: ${label}`, width <= inner, `${width} > ${inner}`);
 }
 
-/** The question's two buttons are each at least 44 high. */
+/** The question's answers ("No", "Yes" and, for a schedule editor postponing, "Yes … give it
+ *  a new date now") are each at least 44 high. */
 async function answersTallEnough(game, label) {
-  const heights = await game
-    .locator('[data-call-off-act] button:not([disabled]), [data-call-off-ask] button')
-    .evaluateAll((buttons) => buttons.map((b) => b.getBoundingClientRect().height));
+  const answers = game.locator(
+    '[data-call-off-no], [data-call-off-yes], [data-call-off-ask] [data-postpone-new-date]',
+  );
+  const expected = 2 + (await game.locator('[data-call-off-ask] [data-postpone-new-date]').count());
+  const heights = await answers.evaluateAll((buttons) =>
+    buttons.map((b) => b.getBoundingClientRect().height),
+  );
   note(
     `the question's answers are at least 44 high: ${label}`,
-    heights.length === 2 && heights.every((h) => h >= 44),
+    heights.length === expected && heights.every((h) => h >= 44),
     heights.join(', '),
   );
 }
@@ -235,8 +250,8 @@ async function spotAfterOneTap(page, game, target, touch, label) {
   await spot.tap();
   await questionOf(game).waitFor();
   const held = await spot.holds();
-  const no = await game.getByRole('button', { name: /^No, / }).boundingBox();
-  const yes = await questionOf(game).getByRole('button').boundingBox();
+  const no = await noOf(game).boundingBox();
+  const yes = await yesOf(game).boundingBox();
   const at = (box) => (box === null ? '-' : `${Math.round(box.x)},${Math.round(box.y)}`);
   places.push(`${label}: touched ${at(before)}; No ${at(no)}; Yes ${at(yes)}`);
   return held;
@@ -358,9 +373,7 @@ if (browser) {
       const game = gameNamed(page, 'Owls', 'Badgers');
       await tapToCallOff(game, 'Postpone');
       await questionOf(gameNamed(page, 'Owls', 'Badgers')).waitFor();
-      await gameNamed(page, 'Owls', 'Badgers')
-        .getByRole('button', { name: 'Yes, postpone it' })
-        .click();
+      await yesOf(gameNamed(page, 'Owls', 'Badgers')).click();
       await page.waitForLoadState('load');
       note(
         'scripts off: a "Yes" sent at once is taken as a second tap, and asks again',
@@ -392,7 +405,7 @@ if (browser) {
         await questionOf(game).waitFor({ state: 'detached' });
         note('"No" leaves the game as it was', (await statusOf(game)) === 'scheduled');
         await tapToCallOff(game, 'Postpone');
-        await sayYes(game, 'Yes, postpone it');
+        await sayYes(game, postponeYes);
         const saved = game.getByRole('status');
         await saved.waitFor();
         note(
@@ -435,7 +448,7 @@ if (browser) {
         note(
           "the grid's sentence for a postponed game says where it waits for its new date",
           (await sentence.count()) >= 1 &&
-            words.includes('It waits in Games, under “Waiting for a new date”') &&
+            words.includes('Give it a new date in Games, under “Waiting for a new date”') &&
             !words.includes('It is left as it is here.'),
           words,
         );
@@ -484,7 +497,7 @@ if (browser) {
       await openGames(two.page);
       const there = gameOn(two.page, tigersAtLions);
       await tapToCallOff(there, 'Postpone');
-      await sayYes(there, 'Yes, postpone it');
+      await sayYes(there, postponeYes);
       await there.getByRole('status').waitFor();
       await game.getByRole('button', { name: 'Yes, make it final' }).click();
       const refusal = game.getByRole('alert');
@@ -595,7 +608,7 @@ if (browser) {
         const savedSaying = (words) =>
           game().getByRole('status').filter({ hasText: words }).waitFor();
         await tapToCallOff(game(), 'Postpone');
-        await sayYes(game(), 'Yes, postpone it');
+        await sayYes(game(), postponeYes);
         await savedSaying('is postponed');
         const instead = panelOf(game(), 'Forfeit or cancel instead');
         await openPanel(instead);
@@ -868,7 +881,7 @@ if (browser) {
         const bears = () => gameOn(page, bearsAtTigers);
         await openGames(page);
         await tapToCallOff(bears(), 'Postpone');
-        await sayYes(bears(), 'Yes, postpone it');
+        await sayYes(bears(), postponeYes);
         await bears().getByRole('status').waitFor();
         const restoreReady = async () => {
           await openGames(page);
@@ -929,7 +942,7 @@ if (browser) {
       await openPanel(game().locator('details[data-call-off]').last());
       await postpone().click();
       await questionOf(game()).waitFor();
-      const yes = await questionOf(game()).getByRole('button').boundingBox();
+      const yes = await yesOf(game()).boundingBox();
       if (yes === null) throw new Error('"Yes" is not on the screen');
       // "Postpone" moved to that very spot, and tapped twice there.
       await openGames(page);
@@ -1009,7 +1022,7 @@ if (browser) {
       await tapToCallOff(game(), 'Postpone');
       await questionOf(game()).waitFor();
       await handMade(questionOf(game()).locator('form'));
-      await questionOf(game()).getByRole('button', { name: 'Yes, postpone it' }).click();
+      await yesOf(game()).click();
       await page.waitForLoadState('load');
       note(
         'the question\'s "Yes" sent at once with a minute-old time is asked again',
@@ -1041,7 +1054,7 @@ if (browser) {
         await tapToCallOff(other(), 'Cancel the game');
         await sayYes(other(), 'Yes, cancel it');
         await other().getByRole('status').waitFor();
-        await sayYes(game(), 'Yes, postpone it');
+        await sayYes(game(), postponeYes);
         const said = game().getByRole('alert').filter({
           hasText: 'Someone cancelled this game meanwhile, so nothing else was changed.',
         });
@@ -1073,14 +1086,17 @@ if (browser) {
       await openGames(page);
       const game = gameNamed(page, 'Owls', 'Badgers');
       await tapToCallOff(game, 'Postpone');
-      const yes = questionOf(game).getByRole('button', { name: 'Yes, postpone it' });
+      const yes = yesOf(game);
       await yes.waitFor();
       const said = questionOf(game).locator('[data-ready-said]');
       const restingBox = await yes.boundingBox();
       const restingSaid = (await said.textContent()) ?? '';
       const restingLive = await said.getAttribute('aria-live');
       const restingDisabled = await yes.getAttribute('aria-disabled');
-      await page.locator('[data-resting]').waitFor({ state: 'detached', timeout: 3000 });
+      // Every answer of the question rests and becomes ready together ("Yes" and "… a new date now").
+      await page.waitForFunction(() => document.querySelector('[data-resting]') === null, null, {
+        timeout: 3000,
+      });
       const readyBox = await yes.boundingBox();
       note(
         'while "Yes" is not ready it is aria-disabled and the polite live region says nothing',
@@ -1115,7 +1131,7 @@ if (browser) {
       await openGames(page);
       const game = gameNamed(page, 'Owls', 'Badgers');
       await tapToCallOff(game, 'Postpone');
-      const yes = questionOf(game).getByRole('button', { name: 'Yes, postpone it' });
+      const yes = yesOf(game);
       await yes.waitFor();
       const drawn = Date.now();
       const notReady = (await yes.getAttribute('aria-disabled')) === 'true';

@@ -134,7 +134,8 @@ if (built) {
       .innerText();
     note(
       'the publish summary removes the two games',
-      before.includes('remove 2'),
+      // The summary since step 2.53: the count, then one "Removed:" line a game.
+      before.includes('Publishing makes 2 changes.') && before.split('Removed: ').length - 1 === 2,
       before.slice(0, 300),
     );
     await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);

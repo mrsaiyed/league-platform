@@ -77,6 +77,9 @@ export const leaguePageReleases = {
   admin: 'released',
   'admin-area': 'released',
   score: 'released',
+  // The tracker on the home screen and with no signal (step 2.38).
+  'tracker-manifest': 'released',
+  'tracker-worker': 'released',
   // Accepting an invitation: the email's link and the page it leads to (step 2.97).
   invitation: 'released',
   'invitation-held': 'released',

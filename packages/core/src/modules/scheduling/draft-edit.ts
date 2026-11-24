@@ -92,14 +92,15 @@ export async function editDraft(args: {
     version: number | null;
     draftId: string | null;
   };
-  change: DraftChange;
+  /** The change, or how to make it from the published schedule (a take-back copies it). */
+  change: DraftChange | ((published: ScheduleState) => DraftChange | DraftEditError);
   /**
    * Further checks on what the change names, run once the basis is known to be current,
    * on the schedule as the draft so far leaves it (and as it is published).
    */
   check?: (sofar: ScheduleState, published: ScheduleState) => Promise<DraftEditError | undefined>;
 }): Promise<Result<DraftEditValue, DraftEditError>> {
-  const { context, tx, input, change } = args;
+  const { context, tx, input } = args;
   const store = tx.scheduling;
   if ((await store.findSeason(input.seasonId)) === undefined) {
     return fail({ code: 'season-not-found' });
@@ -129,6 +130,9 @@ export async function editDraft(args: {
   const refused = await args.check?.(sofar, published);
   if (refused !== undefined) return fail(refused);
 
+  const made = typeof args.change === 'function' ? args.change(published) : args.change;
+  if ('code' in made) return fail(made);
+  const change: DraftChange = made;
   const applied = applyDraftChange(sofar, change, []);
   if (!applied.ok) return fail({ code: 'change-refused', reason: applied.error });
 

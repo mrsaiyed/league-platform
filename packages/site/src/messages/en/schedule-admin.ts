@@ -15,6 +15,14 @@ export const enScheduleAdmin = {
   'schedule.admin.addRoundNote':
     'The round goes after the others. Its games default to this date. Nobody else sees it until you publish.',
   'schedule.admin.addRoundSubmit': 'Add round',
+  'schedule.admin.ask.court': '{place} is booked twice on {date} at {time}.',
+  'schedule.admin.ask.outsideGame': '{game}, {date}',
+  'schedule.admin.ask.outside_one': '{count} game is outside its round: {games}.',
+  'schedule.admin.ask.outside_other': '{count} games are outside their rounds: {games}.',
+  'schedule.admin.ask.skipped': '{game} is on {date}, a date the league skips.',
+  // Built around a team's name, so it reads right for any name ("Owls", "Team Ali").
+  'schedule.admin.ask.team': '{team}: booked twice on {date} at {time}.',
+  'schedule.admin.askAnyway': 'Publish anyway?',
   'schedule.admin.askToShow': "Ask the league's owner or an admin to show it.",
   'schedule.admin.away': 'Away team',
   // The way back to the team whose "Remove this team" led here (step 2.180).
@@ -111,7 +119,7 @@ export const enScheduleAdmin = {
   'schedule.admin.gameLocked':
     'This game has started or been decided, so it cannot be edited here.',
   'schedule.admin.gamePostponed':
-    'This game is postponed. It waits in Games, under “Waiting for a new date”, until it is given one.',
+    'This game is postponed. Give it a new date in Games, under “Waiting for a new date”.',
   'schedule.admin.gameVs': '{away} at {home}',
   'schedule.admin.gameWhen': '{date}, {time}',
   'schedule.admin.gameWhere': '{venue}, {court}',
@@ -121,6 +129,15 @@ export const enScheduleAdmin = {
   'schedule.admin.intro':
     'Build the schedule here, round by round. Every change is saved to a draft that only you and the other schedulers see. Nothing reaches the public site until you publish it.',
   'schedule.admin.moveToRoundDate': 'Move it to {date}',
+  // "Give it a new date" on Games' "Waiting for a new date" (step 2.53, S-49, T-326).
+  'schedule.admin.newDate.inDraft':
+    'New date in the schedule draft: {when}. It counts once the schedule is published.',
+  'schedule.admin.newDate.note':
+    'The new date goes into the schedule draft, checked for clashes like any change, and reaches everyone when the schedule is published.',
+  'schedule.admin.newDate.publish': 'Review and publish the schedule',
+  'schedule.admin.newDate.save': 'Give it this date',
+  'schedule.admin.newDate.takeBack': 'Take back the new date',
+  'schedule.admin.newDate.title': 'Give it a new date',
   'schedule.admin.noDate': 'no date',
   'schedule.admin.noDraft': 'There is no draft yet. You are looking at the published schedule.',
   'schedule.admin.noDraftHidden':
@@ -145,14 +162,34 @@ export const enScheduleAdmin = {
   'schedule.admin.publishClashes_other': '{count} clashes are still in the schedule.',
   'schedule.admin.publishCount_one': 'Publishing makes {count} change.',
   'schedule.admin.publishCount_other': 'Publishing makes {count} changes.',
+  'schedule.admin.publishGame.added': 'New: {game}, {when}.',
+  'schedule.admin.publishGame.backOnDate':
+    'Back on its date: {game}, {when}. Publishing makes it scheduled again.',
+  'schedule.admin.publishGame.changed': 'Changed: {game}.',
+  'schedule.admin.publishGame.moved': 'Moved: {game}, {what}.',
+  'schedule.admin.publishGame.noRound': 'no round',
+  'schedule.admin.publishGame.place': '{to} instead of {from}',
+  'schedule.admin.publishGame.removed': 'Removed: {game}, was {when}.',
+  'schedule.admin.publishGame.round': 'now in {round}',
+  'schedule.admin.publishGame.time': 'from {from} to {to}',
+  'schedule.admin.publishGames': 'What changes',
   'schedule.admin.publishNothing':
     'The draft is the same as the published schedule, so there is nothing to publish.',
+  'schedule.admin.publishReach':
+    'It reaches {teams} teams and {people} people. New games get their game number when published.',
+  'schedule.admin.publishRecorded_one': '{count} game changes how it is recorded.',
+  'schedule.admin.publishRecorded_other': '{count} games change how they are recorded.',
   'schedule.admin.publishRounds':
     'Rounds added: {added}. Rounds removed: {removed}. Rounds renamed: {renamed}. Round dates changed: {dates}.',
   'schedule.admin.publishSubmit': 'Publish this schedule',
   'schedule.admin.publishSummary':
     'Publishing will add {added}, move {moved}, remove {removed}, and change how {recorded} are recorded. It reaches {teams} teams and {people} people.',
+  'schedule.admin.publishUnknownGame': 'A game',
+  'schedule.admin.publishUnknownTeam': 'a team no longer in the season',
+  'schedule.admin.publishWhen': '{date} at {time}',
+  'schedule.admin.publishWhenNoTime': '{date}, no time yet',
   'schedule.admin.published': 'The schedule is published. Visitors can see it now.',
+  'schedule.admin.publishedAlready': 'This was published already: nothing more to do.',
   'schedule.admin.publishedBothHidden':
     'The schedule is published, but visitors cannot see this league until it is published, and {season} is hidden from them too.',
   'schedule.admin.publishedLeagueHidden':
@@ -280,6 +317,8 @@ export const enScheduleAdmin = {
   'schedule.admin.title': 'Schedule',
   'schedule.admin.toPutBack': 'Put it back from its page in Games',
   'schedule.admin.toWaiting': 'See the games waiting for a new date',
+  // In the schedule's head (step 2.53): the postponed games, to give each a new date.
+  'schedule.admin.toWaitingHead': 'Games waiting for a new date',
   // A game's team the season's list does not hold: words, never its id (step 2.180).
   'schedule.admin.unknownTeam': 'Team not in this season',
   'schedule.admin.venueCourt': '{venue}: {court}',

@@ -61,3 +61,17 @@ export function callOffStep(
   const askedAt = yes ? (known ?? now) : now;
   return { kind: 'ask', act, askedAt, readyInMs: Math.max(0, askRestMs - (now - askedAt)) };
 }
+
+/** Postponing's second "Yes" sends this as `newDate` (S-49): postponed, then to its new date. */
+export const newDateNow = 'now';
+
+/**
+ * Postponing's "give it a new date now" sent by someone who may not edit the schedule (step
+ * 2.53 fix round): refused, nothing changed, as the answer is not offered to them either.
+ */
+export function newDateRefused(
+  fields: Readonly<Record<string, string | undefined>>,
+  mayGiveNewDates: boolean,
+): boolean {
+  return fields['newDate'] === newDateNow && !mayGiveNewDates;
+}
