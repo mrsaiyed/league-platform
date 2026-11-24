@@ -10,10 +10,19 @@ import {
   testDeps,
 } from '../../command/testing/memory-transaction.ts';
 import { emptyGames, gamesTxOf, leagueId, type MemoryGames } from './memory-games.test-helper.ts';
-import type { ScoringSession, ScoringSessionsStore, ScoringTx } from './ports.ts';
+import type {
+  LostScoringSession,
+  ScoringSession,
+  ScoringSessionsStore,
+  ScoringTx,
+} from './ports.ts';
 
 export type MemoryScoring = MemoryGames & {
   sessions: ScoringSession[];
+  /** Where each session was last heard (T-335), by session id: 0 unless a batch said. */
+  heard: Record<string, number>;
+  /** The sessions the game was taken from, kept as the database keeps them (0027). */
+  lost: (LostScoringSession & { readonly gameId: string })[];
   /** How many sessions were ever started: each new one gets the next id. */
   started: number;
 };
@@ -33,6 +42,8 @@ export type MemoryScoringOptions = {
   readonly onExtend?: () => void;
   /** The stand-in's lock of one game, held until the transaction ends; none by default. */
   readonly lockGame?: (gameId: string) => Promise<void>;
+  /** The game's last event's sequence, where a session starts heard; 0 by default. */
+  readonly lastEventSeq?: (gameId: string) => number;
 };
 
 export function testClock() {
@@ -48,6 +59,8 @@ export function testClock() {
 export const initialScoring = (state: Partial<MemoryScoring>): MemoryScoring => ({
   ...emptyGames(),
   sessions: [],
+  heard: {},
+  lost: [],
   started: 0,
   ...state,
 });
@@ -73,6 +86,7 @@ export function sessionsOf(
       s.started += 1;
       const started = { ...session, id: sessionUuid(s.started) };
       s.sessions.push(started);
+      s.heard[started.id] = options.lastEventSeq?.(session.gameId) ?? 0;
       return started;
     },
     extend: async (gameId, sessionId, heldUntil, dueBefore) => {
@@ -90,6 +104,32 @@ export function sessionsOf(
       if (lapsedBy !== undefined && found.heldUntil > lapsedBy) return false;
       s.sessions = s.sessions.filter((x) => x !== found);
       return true;
+    },
+    lose: async (gameId, sessionId, _at, lapsedBy) => {
+      options.beforeEnd?.(s);
+      const found = s.sessions.find((x) => x.gameId === gameId && x.id === sessionId);
+      if (found === undefined) return false;
+      if (lapsedBy !== undefined && found.heldUntil > lapsedBy) return false;
+      s.sessions = s.sessions.filter((x) => x !== found);
+      const heardSeq = s.heard[found.id] ?? 0;
+      s.lost.push({ id: found.id, gameId, accountId: found.accountId, heardSeq });
+      return true;
+    },
+    heard: async (gameId, sessionId, seq) => {
+      if (s.sessions.some((x) => x.gameId === gameId && x.id === sessionId)) {
+        s.heard[sessionId] = seq;
+      }
+    },
+    findLost: async (gameId, sessionId) => {
+      const found = s.lost.find((x) => x.gameId === gameId && x.id === sessionId);
+      if (found === undefined) return undefined;
+      const { id, accountId, heardSeq, sentSeq } = found;
+      return { id, accountId, heardSeq, ...(sentSeq === undefined ? {} : { sentSeq }) };
+    },
+    sent: async (gameId, sessionId, seq) => {
+      s.lost = s.lost.map((x) =>
+        x.gameId === gameId && x.id === sessionId ? { ...x, sentSeq: seq } : x,
+      );
     },
   };
 }

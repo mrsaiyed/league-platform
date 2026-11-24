@@ -98,6 +98,13 @@ export const enActivity = {
   'activity.teams.set_stats_visibility': "Changed who sees a team's players' numbers",
   'activity.teams.undo_team_left': 'Took off a team’s mark of having left the league',
   'activity.teams.update_team': 'Changed a team',
+  // An entry whose details name a `change` the command's own sentence does not fit (step
+  // 2.148): `activityChange.` the command's name and the change; {events} is how many plays
+  // the server recorded. Its sentence naming the thing is under `activityChangeNamed.`.
+  'activityChange.games.apply_tracker_commands.sent-after-takeover':
+    'Sent plays listed as not saved after another device took over scoring (plays recorded: {events})',
+  'activityChangeNamed.games.apply_tracker_commands.sent-after-takeover':
+    'Sent plays of the game {name} listed as not saved after another device took over scoring (plays recorded: {events})',
   // The same sentences naming the thing the entry points at, as it is named now (step
   // 2.77): {name} is a team's, a season's, a division's, a venue's, a person's as the
   // People page writes it, or a game's (adminAccess.log.gameName). Without one, the

@@ -78,7 +78,15 @@ export type QueuedCommand = {
    * Not saved: made under a session that lost the game, so never sent (T6 §5). Kept
    * until the scorekeeper has seen the list, so a reload does not lose it.
    */
-  | { readonly state: 'not-saved' }
+  | {
+      readonly state: 'not-saved';
+      /**
+       * The sequence of the server's state the tap was made on, when the device knew it
+       * as the game was lost (T-335, T-337): kept with the list, so "Send these plays" is
+       * still offered after a reload, to the account that made the tap only (T-327).
+       */
+      readonly notSavedSince?: number;
+    }
 );
 
 /** What one answer from the server changes, written together or not at all. */
@@ -88,6 +96,8 @@ export type QueueSettlement = {
   readonly refuse?: readonly { readonly commandId: string; readonly refusal: CommandRefusal }[];
   /** Commands to keep as not saved: never sent again, kept until they are removed. */
   readonly notSaved?: readonly string[];
+  /** The sequence the `notSaved` taps were made on, kept with each of them (T-337). */
+  readonly notSavedSince?: number;
   /**
    * Waiting commands to send under another session of the same device and account
    * (step 2.38): its earlier one ended while it was away, and nobody else scored since.

@@ -4,7 +4,9 @@
 // it turns read-only. The scorekeeper confirmed taking it from one holder: if the
 // game has changed hands since (`expectedHolderSince` no longer matches), nothing is
 // taken and the new holder is shown, to confirm again. A game that is free by then
-// is simply opened. A takeover is written to the activity log (A-6).
+// is simply opened, and so is one not under way whose holder's lease ran out. A game
+// under way is taken here only (S-42, T-336), its holder's lease run out or not. A
+// takeover is written to the activity log (A-6).
 import { z } from 'zod';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
 import { recordActivity, scopeDetails } from '../../access/index.ts';
@@ -47,18 +49,23 @@ export const takeOverScoring = defineCommand({
     await tx.scoringSessions.lockGame(input.gameId);
     const game = await scorableGame(tx, input.gameId);
     if (!game.ok) return game;
-    const gameId = game.value;
+    const gameId = game.value.id;
     const device = { accountId: scorerOf(context), deviceId: input.deviceId };
     const now = tx.clock.now();
     const current = await tx.scoringSessions.findForGame(gameId);
-    // Free, lapsed or already this device's: the same as opening it.
-    if (current === undefined || hasLapsed(current, now) || isOwnSession(current, device)) {
-      return ok(await openFor(tx, gameId, device, now));
+    // Free, already this device's, or lapsed on a game not under way: as opening it.
+    const lapsedNotUnderWay =
+      current !== undefined && !game.value.underWay && hasLapsed(current, now);
+    if (current === undefined || lapsedNotUnderWay || isOwnSession(current, device)) {
+      return ok(await openFor(tx, game.value, device, now));
     }
-    if (current.since !== input.expectedHolderSince) return ok(heldByOther(current, now));
+    if (current.since !== input.expectedHolderSince) {
+      return ok(heldByOther(current, now, device.accountId));
+    }
     // Another request may have ended it a moment ago (a takeover of its own, or the
     // holder leaving): then this one displaced nobody, and logs nothing.
-    const displaced = await tx.scoringSessions.end(gameId, current.id);
+    // The server keeps where it last heard the displaced session (T-335).
+    const displaced = await tx.scoringSessions.lose(gameId, current.id, now);
     const reply = await claimGame(tx, gameId, device, now);
     if (displaced && reply.status === 'held-by-you') {
       await recordActivity(tx, context, {

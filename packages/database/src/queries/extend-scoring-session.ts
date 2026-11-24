@@ -18,6 +18,7 @@ export async function extendScoringSession(
     .where('league_id', '=', scope.leagueId)
     .where('game_id', '=', gameId)
     .where('id', '=', sessionId)
+    .where('lost_at', 'is', null)
     .where('held_until', '<', new Date(dueBefore))
     .returning('id')
     .executeTakeFirst();

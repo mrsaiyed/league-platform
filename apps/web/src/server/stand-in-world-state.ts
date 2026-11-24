@@ -18,6 +18,7 @@ import type {
   PersonRecord,
   PersonSensitiveFields,
   RosterEntryRecord,
+  LostScoringSession,
   ScoringSession,
   SeasonAdjustment,
   SeasonCoinFlip,
@@ -136,6 +137,10 @@ export type LeagueWorld = {
   /** Who decided each game by hand, as `finalized_by` keeps it (migration 0027). */
   deciders: Record<string, string | null>;
   sessions: ScoringSession[];
+  /** Where each session was last heard (T-335), by session id, as heard_seq keeps it. */
+  sessionsHeard: Record<string, number>;
+  /** The sessions a game was taken from, as the database keeps them (0027, T-335). */
+  lostSessions: (LostScoringSession & { readonly gameId: string })[];
   states: { readonly gameId: string; readonly seq: number; readonly state: unknown }[];
   events: NewGameEvent[];
   /** Box score lines, with the number worn: the tracker's and the grid's, one table. */
@@ -180,6 +185,8 @@ export function emptyLeagueWorld(
     corrections: [],
     deciders: {},
     sessions: [],
+    sessionsHeard: {},
+    lostSessions: [],
     states: [],
     events: [],
     lines: [],

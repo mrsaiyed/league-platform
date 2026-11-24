@@ -93,6 +93,19 @@ export function queueStorageContract(name: string, make: () => Promise<DeviceQue
       expect('sessionId' in (list[2] ?? {})).toBe(false);
     });
 
+    it('keeps the sequence taps set aside as not saved were made on, with each of them (T-337)', async () => {
+      const storage = await make();
+      await storage.add(game, { protocolVersion: 1, command: tap(1) });
+      await storage.add(game, { protocolVersion: 1, command: tap(2) });
+      await storage.add(game, { protocolVersion: 1, command: tap(3) });
+      await storage.settle(game, { notSaved: [commandId(1), commandId(2)], notSavedSince: 41 });
+      await storage.settle(game, { notSaved: [commandId(3)] });
+      const since = (await storage.list(game)).map((e) =>
+        e.state === 'not-saved' ? (e.notSavedSince ?? 'unknown') : e.state,
+      );
+      expect(since).toEqual([41, 41, 'unknown']);
+    });
+
     it('keeps taps set aside as not saved, in their place, until they are removed', async () => {
       const storage = await make();
       const session = '00000000-0000-4000-8000-0000000000c1';

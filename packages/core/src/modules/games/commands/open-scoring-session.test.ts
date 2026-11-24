@@ -60,19 +60,24 @@ describe('openScoringSession (T6 §5, T-116)', () => {
       ok: true,
       value: {
         status: 'held-by-other',
-        holder: { accountId: scorekeeperId, since: startOfTest },
+        holder: {
+          accountId: scorekeeperId,
+          since: startOfTest,
+          lastHeardAt: startOfTest,
+          sameAccount: false,
+        },
         sentAt: startOfTest + 30_000,
       },
     });
     expect(db.state.sessions.map((s) => s.id)).toEqual([sessionUuid(1)]);
   });
 
-  it('treats the same account on another device as someone else holding it', async () => {
+  it('treats the same account on another device as another holder, marked as the same account by the server', async () => {
     const { deps, as } = league();
     await openScoringSession(as(scorekeeperId), tablet, deps);
     expect(await openScoringSession(as(scorekeeperId), phone, deps)).toMatchObject({
       ok: true,
-      value: { status: 'held-by-other', holder: { accountId: scorekeeperId } },
+      value: { status: 'held-by-other', holder: { accountId: scorekeeperId, sameAccount: true } },
     });
   });
 
@@ -87,7 +92,7 @@ describe('openScoringSession (T6 §5, T-116)', () => {
     expect(db.state.sessions).toHaveLength(1);
   });
 
-  it('frees a game whose lease has run out: the next device takes it with a new session', async () => {
+  it('frees a game not yet started whose lease has run out: the next device takes it with a new session', async () => {
     const { db, deps, as, clock } = league();
     await openScoringSession(as(scorekeeperId), tablet, deps);
     clock.advance(119);
@@ -139,7 +144,12 @@ describe('openScoringSession (T6 §5, T-116)', () => {
       ok: true,
       value: {
         status: 'held-by-other',
-        holder: { accountId: winner[0]?.accountId, since: startOfTest },
+        holder: {
+          accountId: winner[0]?.accountId,
+          since: startOfTest,
+          lastHeardAt: startOfTest,
+          sameAccount: false,
+        },
         sentAt: startOfTest,
       },
     });
@@ -187,7 +197,12 @@ describe('openScoringSession (T6 §5, T-116)', () => {
       ok: true,
       value: {
         status: 'held-by-other',
-        holder: { accountId: schedulerId, since: startOfTest },
+        holder: {
+          accountId: schedulerId,
+          since: startOfTest,
+          lastHeardAt: startOfTest,
+          sameAccount: false,
+        },
         sentAt: startOfTest,
       },
     });
@@ -246,5 +261,76 @@ describe('openScoringSession (T6 §5, T-116)', () => {
         await openScoringSession(as(scorekeeperId), { gameId: gameUuid(1), deviceId }, deps),
       ).toMatchObject({ ok: false, error: { code: 'invalid-input' } });
     }
+  });
+});
+
+describe('openScoringSession: a game under way is never given away without the question (S-42, T-336)', () => {
+  // Live on the server: a game whose first plays reached it, or one reopened (live again).
+  const underWay = () => memoryScoring({ games: [game(1, { status: 'live' })], grants });
+
+  it('a device silent for ten minutes is not displaced: the next scorekeeper is asked, with when it was last heard from', async () => {
+    const { db, deps, as, clock } = underWay();
+    await openScoringSession(as(scorekeeperId), tablet, deps);
+    clock.advance(30);
+    // The tablet is heard from once more (its lease is written again), then goes quiet.
+    await openScoringSession(as(scorekeeperId), tablet, deps);
+    clock.advance(600);
+    expect(await openScoringSession(as(schedulerId), phone, deps)).toEqual({
+      ok: true,
+      value: {
+        status: 'held-by-other',
+        holder: {
+          accountId: scorekeeperId,
+          since: startOfTest,
+          lastHeardAt: startOfTest + 30_000,
+          sameAccount: false,
+        },
+        sentAt: startOfTest + 630_000,
+      },
+    });
+    expect(db.state.sessions).toEqual([
+      expect.objectContaining({ id: sessionUuid(1), accountId: scorekeeperId, deviceId: 'tablet' }),
+    ]);
+  });
+
+  it('the same account on another device is asked too, marked as the same account by the server', async () => {
+    const { db, deps, as, clock } = underWay();
+    await openScoringSession(as(scorekeeperId), tablet, deps);
+    clock.advance(600);
+    expect(await openScoringSession(as(scorekeeperId), phone, deps)).toMatchObject({
+      ok: true,
+      value: { status: 'held-by-other', holder: { accountId: scorekeeperId, sameAccount: true } },
+    });
+    expect(db.state.sessions.map((s) => s.id)).toEqual([sessionUuid(1)]);
+  });
+
+  it('the same device and account carries straight on, however long it was silent', async () => {
+    const { db, deps, as, clock } = underWay();
+    await openScoringSession(as(scorekeeperId), tablet, deps);
+    clock.advance(600);
+    expect(await openScoringSession(as(scorekeeperId), tablet, deps)).toMatchObject({
+      ok: true,
+      value: { status: 'held-by-you', sessionId: sessionUuid(1) },
+    });
+    expect(db.state.sessions).toHaveLength(1);
+  });
+
+  it('a game not yet started opens without the question once its holder has lapsed', async () => {
+    const { deps, as, clock } = league();
+    await openScoringSession(as(scorekeeperId), tablet, deps);
+    clock.advance(600);
+    expect(await openScoringSession(as(schedulerId), phone, deps)).toMatchObject({
+      value: { status: 'held-by-you', sessionId: sessionUuid(2) },
+    });
+  });
+
+  it('still refuses whoever may not score it', async () => {
+    const { deps, as, clock } = underWay();
+    await openScoringSession(as(scorekeeperId), tablet, deps);
+    clock.advance(600);
+    expect(await openScoringSession(as(editorId), phone, deps)).toMatchObject({
+      ok: false,
+      error: { code: 'not-allowed' },
+    });
   });
 });

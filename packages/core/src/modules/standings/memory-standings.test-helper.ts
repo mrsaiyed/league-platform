@@ -169,6 +169,10 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     start: async () => undefined,
     extend: async () => false,
     end: async () => false,
+    lose: async () => false,
+    heard: async () => undefined,
+    findLost: async () => undefined,
+    sent: async () => undefined,
   });
   const noLiveGames: LiveGamesStore = {
     findState: async () => undefined,
@@ -201,6 +205,7 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
       throw new Error('No game is tracked in the standings tests.');
     },
     lastEventSeq: async () => 0,
+    eventsAfter: async () => [],
     refusedAdds: async () => [],
   };
   const transaction = memoryTransaction(db, (s, jobs): TrackerTx & StandingsTx => ({

@@ -393,6 +393,9 @@ export interface ScoringSessionsTable {
   version: Generated<number>;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  heard_seq: Generated<number>;
+  lost_at: ColumnType<Date | null, Date | string | null, Date | string | null>;
+  sent_seq: number | null;
 }
 
 export interface SeasonPlayerTotalsTable {

@@ -14,7 +14,7 @@ import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controll
 export type TrackerNotice =
   | { readonly key: `tracker.readOnly.${ReadOnlyReason}` }
   | { readonly key: 'tracker.heldByOther'; readonly name: string }
-  | { readonly key: 'tracker.signedOut' | 'tracker.reopen.doneElsewhere' }
+  | { readonly key: 'tracker.signedOut' | 'tracker.reopen.doneElsewhere' | 'tracker.heldBySelf' }
   | {
       readonly key:
         | 'tracker.notApplied'
@@ -62,7 +62,12 @@ export function trackerNotices(
   if (mode.kind === 'held-by-other') {
     // Reopened from here: said first, in place of a final panel no longer shown (M3).
     if (mode.reopened === true) notices.push({ key: 'tracker.reopen.doneElsewhere' });
-    notices.push({ key: 'tracker.heldByOther', name: mode.holder.displayName });
+    // The same account on another device, by the server's mark (S-42), never by names.
+    notices.push(
+      mode.holder.sameAccount === true
+        ? { key: 'tracker.heldBySelf' }
+        : { key: 'tracker.heldByOther', name: mode.holder.displayName },
+    );
   }
   if (mode.kind === 'scoring' && status.signedOut) {
     notices.push(

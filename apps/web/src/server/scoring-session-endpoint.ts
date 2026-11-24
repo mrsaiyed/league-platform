@@ -136,7 +136,14 @@ async function replyOf(
   const name = await ports.displayNameOf(leagueId, reply.holder.accountId);
   return {
     status: 'held-by-other',
-    holder: { displayName: name.slice(0, 120), since: reply.holder.since },
+    // The takeover question's facts (S-42): when the device was last heard from, and the
+    // server's own mark for the same account on another device, never a comparison of names.
+    holder: {
+      displayName: name.slice(0, 120),
+      since: reply.holder.since,
+      lastHeardAt: reply.holder.lastHeardAt,
+      ...(reply.holder.sameAccount ? { sameAccount: true } : {}),
+    },
     sentAt: reply.sentAt,
   };
 }

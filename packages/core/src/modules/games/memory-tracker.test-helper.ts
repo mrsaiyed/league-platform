@@ -81,6 +81,7 @@ function tablePlayersOf(
   | 'changeTablePlayer'
   | 'removeTablePlayer'
   | 'lastEventSeq'
+  | 'eventsAfter'
   | 'refusedAdds'
 > {
   const split = (entryId: string) => {
@@ -206,6 +207,12 @@ function tablePlayersOf(
         })),
     lastEventSeq: async (gameId) =>
       Math.max(0, ...s.events.filter((e) => e.gameId === gameId).map((e) => e.seq)),
+    eventsAfter: async (gameId, afterSeq, limit) =>
+      s.events
+        .filter((e) => e.gameId === gameId && e.seq > afterSeq)
+        .sort((a, b) => a.seq - b.seq)
+        .slice(0, limit)
+        .map((e) => ({ seq: e.seq, commandId: e.commandId, type: e.type, accountId: e.accountId })),
   };
 }
 
@@ -311,7 +318,11 @@ const trackerTxOf = (
     ...gamesTxOf(s, jobs),
     clock,
     // The session commands take the same lock, so a takeover and a batch race for real.
-    scoringSessions: sessionsOf(s, lock === undefined ? {} : { lockGame: lock }),
+    scoringSessions: sessionsOf(s, {
+      ...(lock === undefined ? {} : { lockGame: lock }),
+      lastEventSeq: (gameId) =>
+        Math.max(0, ...s.events.filter((e) => e.gameId === gameId).map((e) => e.seq)),
+    }),
     // The stand-in's database keeps the test's clock.
     liveGames: liveGamesOf(s, clock.now),
   });

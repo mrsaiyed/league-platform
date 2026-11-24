@@ -350,7 +350,7 @@ if (browser) {
       // One tap only asks: the game is not taken until the owner says yes (T6 §5).
       await owner.page
         .getByText(
-          'Take over scoring from Sam Scorekeeper? Their device stops scoring. Plays it has not sent yet will not be saved',
+          'Take over scoring from Sam Scorekeeper? Their device stops scoring. Plays it has not sent yet can be sent from it only until something is recorded here',
         )
         .waitFor();
       note(
@@ -672,6 +672,7 @@ if (browser) {
       await scoringScreen(page)
         .or(formatHeading(page))
         .or(page.getByText('is scoring this game on another device.'))
+        .or(page.getByText('You are scoring this game on another device.'))
         .waitFor();
       note('a game is kept on the device before signing out', (await gamesKeptOnDevice(page)) > 0);
       await Promise.all([

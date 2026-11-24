@@ -79,6 +79,16 @@ describe('activity log messages', () => {
     expect(keys.filter((key) => !written.includes(key))).toEqual([]);
   });
 
+  it('has words for plays sent after a takeover, and change words only for commands that write (step 2.148)', () => {
+    const sent = 'games.apply_tracker_commands.sent-after-takeover';
+    expect(Object.hasOwn(en, `activityChange.${sent}`)).toBe(true);
+    expect(Object.hasOwn(en, `activityChangeNamed.${sent}`)).toBe(true);
+    const writes = new Set([...commands.keys()].filter((name) => !reads.has(name)));
+    const changeKeys = Object.keys(en).filter((key) => /^activityChange(Named)?\./.test(key));
+    const commandOf = (key: string) => key.split('.').slice(1, 3).join('.');
+    expect(changeKeys.filter((key) => !writes.has(commandOf(key)))).toEqual([]);
+  });
+
   it('has words for the label of every declared setting (T-98, T-187)', () => {
     for (const setting of declaredSettings.all()) {
       expect(Object.hasOwn(en, setting.label), setting.label).toBe(true);

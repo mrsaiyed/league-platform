@@ -398,6 +398,9 @@ export function worldScoringSessions(s: LeagueWorld): ScoringSessionsStore {
       if (current(session.gameId) !== undefined) return undefined;
       const started: ScoringSession = { ...session, id: newId() };
       s.sessions = [...s.sessions, started];
+      // Heard at the game's last event when it begins (insert-scoring-session.ts).
+      const seqs = s.events.filter((e) => e.gameId === session.gameId).map((e) => e.seq);
+      s.sessionsHeard = { ...s.sessionsHeard, [started.id]: Math.max(0, ...seqs) };
       return started;
     },
     extend: async (gameId, sessionId, heldUntil, dueBefore) => {
@@ -413,6 +416,34 @@ export function worldScoringSessions(s: LeagueWorld): ScoringSessionsStore {
       if (lapsedBy !== undefined && found.heldUntil > lapsedBy) return false;
       s.sessions = s.sessions.filter((x) => x !== found);
       return true;
+    },
+    lose: async (gameId, sessionId, _at, lapsedBy) => {
+      const found = s.sessions.find((x) => x.gameId === gameId && x.id === sessionId);
+      if (found === undefined) return false;
+      if (lapsedBy !== undefined && found.heldUntil > lapsedBy) return false;
+      s.sessions = s.sessions.filter((x) => x !== found);
+      const heardSeq = s.sessionsHeard[found.id] ?? 0;
+      s.lostSessions = [
+        ...s.lostSessions,
+        { id: found.id, gameId, accountId: found.accountId, heardSeq },
+      ];
+      return true;
+    },
+    heard: async (gameId, sessionId, seq) => {
+      if (current(gameId)?.id === sessionId) {
+        s.sessionsHeard = { ...s.sessionsHeard, [sessionId]: seq };
+      }
+    },
+    findLost: async (gameId, sessionId) => {
+      const found = s.lostSessions.find((x) => x.gameId === gameId && x.id === sessionId);
+      if (found === undefined) return undefined;
+      const { id, accountId, heardSeq, sentSeq } = found;
+      return { id, accountId, heardSeq, ...(sentSeq === undefined ? {} : { sentSeq }) };
+    },
+    sent: async (gameId, sessionId, seq) => {
+      s.lostSessions = s.lostSessions.map((x) =>
+        x.gameId === gameId && x.id === sessionId ? { ...x, sentSeq: seq } : x,
+      );
     },
   };
 }
@@ -645,5 +676,11 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
         })),
     lastEventSeq: async (gameId) =>
       Math.max(0, ...s.events.filter((e) => e.gameId === gameId).map((e) => e.seq)),
+    eventsAfter: async (gameId, afterSeq, limit) =>
+      s.events
+        .filter((e) => e.gameId === gameId && e.seq > afterSeq)
+        .sort((a, b) => a.seq - b.seq)
+        .slice(0, limit)
+        .map((e) => ({ seq: e.seq, commandId: e.commandId, type: e.type, accountId: e.accountId })),
   };
 }
