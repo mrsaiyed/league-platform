@@ -3,4 +3,5 @@
 export { answerSaved, answerSavedAt, refusedWith, takeNotice } from './answer.ts';
 export { typedOf, untouched, type FormState, type TypedFields } from './form-state.ts';
 export { ListForm, type ListField, type ListFormProps } from './list-form.tsx';
+export { MarkedFocus } from './marked-focus.tsx';
 export { SaidLine } from './said-line.tsx';

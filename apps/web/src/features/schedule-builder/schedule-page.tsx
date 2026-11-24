@@ -24,6 +24,7 @@ import {
   seasonSettingsAddress,
   visibilityAnchor,
 } from '../season-settings/index.ts';
+import { MarkedFocus } from '../list-forms/index.ts';
 import { StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { venuesAddress } from '../venues-area/index.ts';
@@ -60,6 +61,7 @@ import {
   addRoundAnchor,
   answerShown,
   freshAnswer,
+  swapAnchor,
   refusedAtOf,
   roundAnchor,
   savedAnchor,
@@ -102,6 +104,8 @@ type Basis = {
   readonly gameHref: (gameId: string) => string;
   /** A game form's refusal, said beside it with every box as typed (step 2.155). */
   readonly refused: GameRefusal | undefined;
+  /** A refused "Swap with", said beside its game. */
+  readonly swapRefused: SwapRefusal | undefined;
 };
 
 /** A refused game form: which, what was typed, the box it is about and the sentence. */
@@ -110,6 +114,9 @@ type GameRefusal = {
   readonly field: GameField | 'form';
   readonly text: string;
 };
+
+/** A refused "Swap with": the game it was asked on, the one chosen, and why. */
+type SwapRefusal = { readonly gameId: string; readonly otherGameId: string; readonly text: string };
 
 const recordings = ['final-score', 'box-score', 'live'] as const;
 
@@ -288,6 +295,16 @@ export async function ScheduleBuilderPage({
       : gameProblemOf(search, gameAt.typed, gameAt.form === 'add-game');
   const gameRefusal: GameRefusal | undefined =
     gameAt === undefined || gameProblem === undefined ? undefined : { at: gameAt, ...gameProblem };
+  // A refused "Swap with" is said beside the game it was asked on, if it is on the page.
+  const swapAt =
+    refusedAt?.form === 'swap' && grid.allGames.some((g) => g.id === refusedAt.gameId && g.editable)
+      ? refusedAt
+      : undefined;
+  const swapWhy = swapAt === undefined ? undefined : whyNotSaved(search);
+  const swapRefusal: SwapRefusal | undefined =
+    swapAt === undefined || swapWhy === undefined
+      ? undefined
+      : { gameId: swapAt.gameId, otherGameId: swapAt.otherGameId, text: swapWhy };
   const basis: Basis = {
     ...seasonControls(holder, season),
     league,
@@ -299,6 +316,7 @@ export async function ScheduleBuilderPage({
     fromTeam: fromTeam?.id ?? null,
     waitingHref,
     refused: gameRefusal,
+    swapRefused: swapRefusal,
     gameHref: (gameId) => leagueUrl(addressee, 'admin-area', { area: 'games', subpath: [gameId] }),
   };
   const preview =
@@ -328,7 +346,10 @@ export async function ScheduleBuilderPage({
   };
   const saidBeside =
     basis.canEdit &&
-    (besideRound !== undefined || besideAdd !== undefined || gameRefusal !== undefined);
+    (besideRound !== undefined ||
+      besideAdd !== undefined ||
+      gameRefusal !== undefined ||
+      swapRefusal !== undefined);
   const roundName = (r: GridRound) =>
     t('schedule.admin.round', { number: r.number, label: r.label });
   // "Saved", said beside what was saved (A-4); at the top only when that is not on the page.
@@ -985,6 +1006,7 @@ function GameItem({
       ? basis.refused
       : undefined;
   const boxes = gameBoxes(refused);
+  const swapRefused = basis.swapRefused?.gameId === game.id ? basis.swapRefused : undefined;
   return (
     <li id={gameAnchor(game.id)} data-game={game.id} data-clash={game.clashed ? 'yes' : 'no'}>
       {/* One row a game: its two teams' marks and names, then its day, time and place. */}
@@ -1043,7 +1065,7 @@ function GameItem({
           <p className="staff-quiet">{t('schedule.admin.gameLocked')}</p>
         )
       ) : (
-        <details open={refused === undefined ? undefined : true}>
+        <details open={refused === undefined && swapRefused === undefined ? undefined : true}>
           <summary>{t('schedule.admin.edit')}</summary>
           <form action={saveGameAction} className="staff-form admin-slot-form">
             {boxes.top}
@@ -1119,11 +1141,29 @@ function GameItem({
             </p>
           </form>
           {others.length === 0 ? null : (
-            <form action={swapGamesAction} className="staff-form">
+            <form action={swapGamesAction} className="staff-form" id={swapAnchor(game.id)}>
+              {swapRefused === undefined ? null : <MarkedFocus within={swapAnchor(game.id)} />}
               <BasisFields basis={basis} />
               <input type="hidden" name="gameId" value={game.id} />
-              <Field label={t('schedule.admin.swapWith')}>
-                <select name="otherGameId" defaultValue="" required>
+              <Field
+                label={t('schedule.admin.swapWith')}
+                wrong={
+                  swapRefused === undefined
+                    ? undefined
+                    : t('schedule.admin.fieldRefused', {
+                        field: t('schedule.admin.swapWith'),
+                        why: swapRefused.text,
+                      })
+                }
+              >
+                <select
+                  name="otherGameId"
+                  defaultValue={swapRefused?.otherGameId ?? ''}
+                  required
+                  {...(swapRefused === undefined
+                    ? {}
+                    : { 'aria-invalid': true as const, autoFocus: true as const })}
+                >
                   <option value="">{t('schedule.admin.swapChoose')}</option>
                   {others.map((o) => (
                     <option key={o.id} value={o.id}>

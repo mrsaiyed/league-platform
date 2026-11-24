@@ -528,8 +528,19 @@ describe('a refused game form keeps what was typed, and "Saved" is said once (st
 
   it('reads the address\'s "Saved" only while its notice is fresh', () => {
     const address = { done: 'saved', saved: 'game-saved', game: team, season: 's' };
-    expect(answerShown(address, false)).toEqual({ game: team, season: 's' });
+    expect(answerShown(address, false)).toEqual({ season: 's' });
     expect(savedDetailOf(answerShown(address, true))).toEqual({ what: 'game-saved', gameId: team });
     expect(noticeOf(answerShown({ done: 'published' }, false))).toBeUndefined();
+  });
+
+  it("reads a refusal's words only while its notice is fresh, a refused swap beside its game", () => {
+    const address = { problem: 'stale-version', at: 'swap', game: team, other: team, season: 's' };
+    expect(answerShown(address, false)).toEqual({ season: 's' });
+    expect(refusedAtOf(answerShown(address, false))).toBeUndefined();
+    expect(refusedAtOf(answerShown(address, true))).toEqual({
+      form: 'swap',
+      gameId: team,
+      otherGameId: team,
+    });
   });
 });

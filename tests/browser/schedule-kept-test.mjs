@@ -127,6 +127,16 @@ async function journey(browser, origin, scripts) {
     const newName = scripts ? 'Opening night' : 'Opening night two';
     await roundHere.locator('input[name=label]').fill(newName);
 
+    // And a fourth, whose "Swap with" for the same game is drawn now, another game chosen.
+    const staleSwap = await context.newPage();
+    staleSwap.setDefaultTimeout(60_000);
+    await staleSwap.goto(`${origin}${schedule}`);
+    const swapLine = staleSwap.locator(`li[data-game="${gameId}"]`);
+    await swapLine.locator('summary', { hasText: 'Edit this game' }).click();
+    const swapBox = () => staleSwap.locator(`li[data-game="${gameId}"] select[name=otherGameId]`);
+    const swapChoice = await swapBox().locator('option').nth(1).getAttribute('value');
+    await swapBox().selectOption(swapChoice ?? '');
+
     // Put right and tapped twice: one game, "Saved" beside it.
     const games = () => page.locator(`section[data-round="${roundId}"] li[data-game]`).count();
     const before = await games();
@@ -184,6 +194,46 @@ async function journey(browser, origin, scripts) {
     note(`${how}: the name box is marked`, (await nameBox.getAttribute('aria-invalid')) === 'true');
     const nameSaid = (await nameProblem.innerText()).trim();
     note(`${how}: the sentence beside it names it`, nameSaid.startsWith('Round name: '), nameSaid);
+    // The "Swap with" from before: refused beside that game, not at the top, as chosen.
+    const swapButton = swapLine.getByRole('button', { name: 'Swap', exact: true });
+    if (scripts) await swapButton.click();
+    else await Promise.all([staleSwap.waitForEvent('load'), swapButton.click()]);
+    const swapProblem = staleSwap.locator(`li[data-game="${gameId}"] [data-notice=problem]`);
+    await swapProblem.waitFor({ timeout: 15_000 });
+    const swapSaid = (await swapProblem.innerText()).trim();
+    note(
+      `${how}: the refused swap is said beside its game`,
+      swapSaid.startsWith('Swap places with: '),
+      swapSaid,
+    );
+    const swapTop = await staleSwap
+      .locator('[data-notice=problem], .ui-notice[role=alert]')
+      .evaluateAll((els) => els.filter((el) => el.closest('li[data-game]') === null).length);
+    note(`${how}: the refused swap is not said at the top`, swapTop === 0, String(swapTop));
+    note(`${how}: the game chosen is kept`, (await swapBox().inputValue()) === swapChoice);
+    note(
+      `${how}: the swap box is marked`,
+      (await swapBox().getAttribute('aria-invalid')) === 'true',
+    );
+    if (scripts) {
+      note(
+        `${how}: the focus is on the marked box`,
+        await swapBox().evaluate((el) => document.activeElement === el),
+      );
+    }
+    note(
+      `${how}: the refused swap is on the screen without scrolling`,
+      await onScreen(swapProblem),
+    );
+    // A refusal's words are said once: a reload of either refused page says nothing old.
+    await staleSwap.reload();
+    await staleSwap.locator('section[data-round]').first().waitFor();
+    const swapAgain = await staleSwap.locator('[data-notice=problem]').count();
+    note(`${how}: a reload repeats no refusal`, swapAgain === 0, String(swapAgain));
+    note(
+      `${how}: a reload keeps no refused choice`,
+      (await swapBox().count()) === 0 || (await swapBox().inputValue()) === '',
+    );
     const problems = await accessibilityProblems(stale);
     note(`${how}: accessibility of the refused game`, problems.length === 0, problems.join('; '));
   } finally {

@@ -85,7 +85,9 @@ export type RefusedAt =
   /** A game's own form, with what was typed in it (step 2.155). */
   | { readonly form: 'game'; readonly gameId: string; readonly typed: GameTyped }
   /** A round's "Add a game" (its round in `typed.roundId`; '': "Games with no round"). */
-  | { readonly form: 'add-game'; readonly typed: GameTyped };
+  | { readonly form: 'add-game'; readonly typed: GameTyped }
+  /** A game's "Swap with", with the game chosen in it (step 2.155). */
+  | { readonly form: 'swap'; readonly gameId: string; readonly otherGameId: string };
 
 /** What a game's form held, text only: each goes back into its own box, never shown (T-187). */
 export type GameTyped = {
@@ -312,7 +314,9 @@ export async function runScheduleAction(
       const otherGameId = text(form, 'otherGameId');
       if (otherGameId === '') return invalid;
       const done = await swapDraftGames(context, { ...basis, gameId, otherGameId }, deps);
-      return done.ok ? { kind: 'saved', detail: { what: 'game-saved', gameId } } : refusal(done);
+      return done.ok
+        ? { kind: 'saved', detail: { what: 'game-saved', gameId } }
+        : { ...refusal(done), at: { form: 'swap', gameId, otherGameId } };
     }
     case 'rename-round':
     case 'change-round-date': {

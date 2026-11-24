@@ -34,6 +34,8 @@ const idOf = (value: string | undefined): string | undefined =>
 export const roundAnchor = (roundId: string): string => `round-${roundId}`;
 export const addRoundAnchor = 'add-round';
 export const savedAnchor = 'saved';
+/** A game's "Swap with" form. */
+export const swapAnchor = (gameId: string): string => `swap-${gameId}`;
 /** A round's "Add a game" ('': the one under "Games with no round"). */
 export const addGameAnchor = (roundId: string): string =>
   `add-game-${roundId === '' ? 'none' : roundId}`;
@@ -44,9 +46,34 @@ export const addGameAnchor = (roundId: string): string =>
  * nothing old. The address still says where on the grid.
  */
 export const freshAnswer = 'answer';
-const answerWords = ['done', 'saved', 'already', 'removed'];
+// A refusal's words too: what it was, which form, and what was typed in it.
+const answerWords = [
+  'done',
+  'saved',
+  'already',
+  'removed',
+  'after',
+  'problem',
+  'reason',
+  'partial',
+  'at',
+  'game',
+  'other',
+  'round',
+  'label',
+  'home',
+  'away',
+  'in',
+  'date',
+  'time',
+  'place',
+  'recording',
+];
 
-/** The address as the grid reads it: without its answer words once their notice is gone. */
+/**
+ * The address as the grid reads it: without its answer words once their notice is gone, a
+ * refusal's as much as a save's.
+ */
 export function answerShown(search: Search, fresh: boolean): Search {
   if (fresh) return search;
   return Object.fromEntries(Object.entries(search).filter(([name]) => !answerWords.includes(name)));
@@ -98,6 +125,12 @@ export function answerParams(outcome: ScheduleActionOutcome): {
       return {
         query: { ...query, at: 'game', game: at.gameId, ...typedQuery(at.typed) },
         hash: `#${gameAnchor(at.gameId)}`,
+      };
+    }
+    if (at.form === 'swap') {
+      return {
+        query: { ...query, at: 'swap', game: at.gameId, other: at.otherGameId },
+        hash: `#${swapAnchor(at.gameId)}`,
       };
     }
     if (at.form === 'add-game') {
@@ -261,6 +294,11 @@ export function refusedAtOf(search: Search): RefusedAt | undefined {
   if (at === 'game') {
     const gameId = idOf(first(search['game']));
     return gameId === undefined ? undefined : { form: 'game', gameId, typed: gameTypedOf(search) };
+  }
+  if (at === 'swap') {
+    const gameId = idOf(first(search['game']));
+    if (gameId === undefined) return undefined;
+    return { form: 'swap', gameId, otherGameId: idOf(first(search['other'])) ?? '' };
   }
   if (at === 'round') {
     const roundId = idOf(first(search['round']));

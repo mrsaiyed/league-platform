@@ -55,8 +55,8 @@ export async function performScheduleAction(
   const address = `${base}?${query.toString()}`;
   const notice = noticeOfAnswer(outcome);
   const holder = noticeHolderOf(context);
-  // Every other answer that works leaves the notice that lets the grid say it, once.
-  if (notice === undefined && outcome.kind !== 'refused' && holder !== undefined) {
+  // Every other answer, a refusal too, leaves the notice that lets the grid say it, once.
+  if (notice === undefined && holder !== undefined) {
     savedNoticesHere().leave(holder, { screen: 'schedule', thing: base, said: freshAnswer });
   }
   if (notice !== undefined && holder !== undefined) {
