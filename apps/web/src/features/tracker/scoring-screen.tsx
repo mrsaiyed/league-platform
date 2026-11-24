@@ -1570,14 +1570,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
               {props.slots?.moreStart}
             </>
           ),
-        // The way to the Players panel: on a team with nobody, before tip-off, behind More.
+        // The way to the Players panel: on a team with nobody, and behind More. Not in the
+        // pad before tip-off: an upright phone has no room there for it and the pad's words.
         noPlayers: (side) => players.button(side),
-        pregame: (
-          <>
-            {players.button('pregame')}
-            {props.slots?.pregame}
-          </>
-        ),
         more: (
           <>
             {players.button('more')}
