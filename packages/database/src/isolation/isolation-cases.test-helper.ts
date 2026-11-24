@@ -84,6 +84,7 @@ import './imports-cases.test-helper.ts';
 import { moveOwnLeagueRowLast, setTargetLeagueApart } from './public-schedule-cases.test-helper.ts';
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import './league-removal-cases.test-helper.ts';
+import './game-format-cases.test-helper.ts';
 import './not-started-cases.test-helper.ts';
 import './people-cases.test-helper.ts';
 import './public-reads-cases.test-helper.ts';

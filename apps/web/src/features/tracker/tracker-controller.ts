@@ -63,7 +63,13 @@ import type { CommandTransport } from './command-transport.ts';
 import { refreshedRosters } from './device-rosters.ts';
 import type { GameDoors } from './game-doors.ts';
 import { mayEnterAgain } from './kept-plays.ts';
-import type { DeviceRosters, DeviceScoring } from './opened-game-storage.ts';
+import { sameData } from '../game-format/index.ts';
+import {
+  formatOf,
+  type DeviceRosters,
+  type DeviceScoring,
+  type GameFormat,
+} from './opened-game-storage.ts';
 import {
   changeIsIn,
   deviceProblem,
@@ -203,6 +209,12 @@ export type TrackerControllerStatus = {
    * the controller was given no rosters.
    */
   readonly rosters: DeviceRosters | null;
+  /**
+   * The format this device plays now, when an answer of the server brought rules other
+   * than those it was playing (T-344): the format was changed elsewhere, or taps waited
+   * offline on the old one. Said until `dismissFormatChanged`; null otherwise.
+   */
+  readonly formatChangedTo: GameFormat | null;
 };
 
 /** A change of players asked for (step 2.118): it has every promise a tap has. */
@@ -414,6 +426,10 @@ export type TrackerController = {
    * waiting to send, and carries on in place with the scheduled game the server now has.
    */
   markNotStarted(reason?: NotStartedReason): Promise<MarkNotStartedResult>;
+  /** The game was given a format before its first play (step 2.119): its state is read again. */
+  formatChanged(): Promise<void>;
+  /** The scorekeeper has read that the format was changed (T-344). */
+  dismissFormatChanged(): Promise<void>;
   /**
    * The scorekeeper has seen the refused taps: they are dropped for good. `only`: just
    * these (an End game the screen has said was refused), the rest stay listed.
@@ -658,6 +674,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     now: serverNow,
     clockErrorMs: null,
     rosters: options.rosters?.page ?? null,
+    formatChangedTo: null,
   };
 
   const update = (change: Partial<TrackerControllerStatus>): void => {
@@ -1210,7 +1227,12 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
           !refusedIds.has(c.commandId) &&
           (!madeBefore.has(c.commandId) || waiting === null || waiting.has(c.commandId)),
       );
+      const playing = base?.state.rules;
       base = loaded.value;
+      // The server's rules are taken at once; told when they are not those played (T-344).
+      if (playing !== undefined && !sameData(playing, base.state.rules)) {
+        update({ formatChangedTo: formatOf(base.state.rules) });
+      }
       showGame();
     });
     // A tap listed as not saved that the state has is saved after all (finding M1).
@@ -2125,6 +2147,16 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
           return { ok: true };
         }),
       );
+    },
+
+    async formatChanged() {
+      if (!stopped && current.mode.kind === 'scoring') await track(load());
+      // Changed on this device: its form has said so already (T-344).
+      if (current.formatChangedTo !== null) update({ formatChangedTo: null });
+    },
+
+    async dismissFormatChanged() {
+      if (current.formatChangedTo !== null) update({ formatChangedTo: null });
     },
 
     markNotStarted(reason) {

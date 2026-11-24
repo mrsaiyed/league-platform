@@ -4,7 +4,13 @@
 // format, or the starting set while the season has none saved (as the leagues module
 // reads them, step 2.5). A format that cannot be read in the current version falls back
 // to the season's rules.
-import { defaultSeasonRules, upgradeSeasonRules, type SeasonRules } from '@srleagues/contracts';
+import {
+  defaultSeasonRules,
+  parseGameFormat,
+  rulesWithFormat,
+  upgradeSeasonRules,
+  type SeasonRules,
+} from '@srleagues/contracts';
 import type { GameRecord, GamesStore, GamesTx } from './ports.ts';
 
 /** A season's rules as stored, read in the current format; the starting set if unreadable or none. */
@@ -35,11 +41,28 @@ export async function seasonRulesOf(
   return readSeasonRules(season?.rules);
 }
 
-/** The rules this game is played under: its own if it has them, else its season's. */
+/**
+ * The rules a game would start under now (step 2.119): its season's as they stand, with the
+ * format it was GIVEN in place of the season's, if it was given one that reads. What marking
+ * it not started returns it to, whatever rules were fixed when it started.
+ */
+export async function rulesBeforeStartOf(
+  tx: { readonly games: Pick<GamesStore, 'findSeason' | 'givenFormat'> },
+  game: Pick<GameRecord, 'id' | 'seasonId'>,
+): Promise<SeasonRules> {
+  const season = await seasonRulesOf(tx, game.seasonId);
+  const given = parseGameFormat(await tx.games.givenFormat(game.id));
+  return given === null ? season : rulesWithFormat(season, given);
+}
+
+/**
+ * The rules this game is played under: those fixed at its start if it has them, else the
+ * rules it would start under now (rulesBeforeStartOf).
+ */
 export async function effectiveRulesOf(tx: GamesTx, game: GameRecord): Promise<SeasonRules> {
   if (game.format !== null && game.format !== undefined) {
     const own = upgradeSeasonRules(game.format);
     if (own.ok) return own.rules;
   }
-  return seasonRulesOf(tx, game.seasonId);
+  return rulesBeforeStartOf(tx, game);
 }

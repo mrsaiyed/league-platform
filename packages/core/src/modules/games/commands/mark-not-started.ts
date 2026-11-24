@@ -48,7 +48,7 @@ import { gameScope, mayChangeGames, mayScoreGame } from '../policy.ts';
 import type { GameRecord, TrackerTx } from '../ports.ts';
 import { holdsRecordedPlays } from '../recorded-plays.ts';
 import { lowerId, scorerOf } from '../scoring-session.ts';
-import { seasonRulesOf } from '../season-rules-of.ts';
+import { rulesBeforeStartOf } from '../season-rules-of.ts';
 
 export type MarkNotStartedError = {
   readonly code:
@@ -143,13 +143,14 @@ export const markNotStarted = defineCommand({
       if (input.reason === undefined) return fail({ code: 'reason-needed' });
     }
 
-    // The engine's own reset, then the season's rules as they stand (S-1 does not
-    // apply to a game never played): what the next batch would make of it anyway.
+    // The engine's own reset, then the rules it would start under now (S-1 does not
+    // apply to a game never played): the format it was given (step 2.119), else the
+    // season's rules as they stand; what the next batch would make of it anyway.
     const commandId = crypto.randomUUID();
-    const seasonRules = engineRulesOf(await seasonRulesOf(tx, game.seasonId));
+    const startRules = engineRulesOf(await rulesBeforeStartOf(tx, game));
     const state = withCurrentRules(
       basketball.apply(before, { type: 'reset' }, { id: commandId, now }),
-      seasonRules,
+      startRules,
     );
     const sequence = last + 1;
     await tx.liveGames.addEvents([
