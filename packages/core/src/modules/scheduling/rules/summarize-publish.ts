@@ -42,7 +42,9 @@ export function summarizePublish(published: ScheduleState, draft: ScheduleState)
     if (!old) {
       gamesAdded.push(id);
       addTeams(g);
-    } else if (!sameSlot(old, g)) {
+    } else if (!sameSlot(old, g) || (old.status === 'postponed' && g.status === 'scheduled')) {
+      // A postponed game given its own old slot as the new date is played again on its
+      // date: publishing makes it scheduled, so it is a change like a move (step 2.53).
       gamesMoved.push(id);
       addTeams(old);
       addTeams(g);

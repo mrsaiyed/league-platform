@@ -493,6 +493,43 @@ describe('schedule draft commands', () => {
   });
 });
 
+describe('taking back a drafted new date (step 2.53 fix round)', () => {
+  it('puts a postponed game back as published, and refuses a game that is played', async () => {
+    const w = world({
+      schedule: {
+        rounds: [{ id: roundUuid(1), number: 1, label: 'Week 1', date: '2026-10-04' }],
+        games: [game(1, { status: 'postponed' }), game(2, { status: 'final', court: 'Court 2' })],
+      },
+    });
+    const moved = await moveDraftGame(
+      w.as(ownerId),
+      { ...basis(), gameId: gameUuid(1), ...slot, roundId: roundUuid(1) },
+      w.deps,
+    );
+    expect(moved).toMatchObject({ ok: true });
+    const back = await moveDraftGame(
+      w.as(ownerId),
+      { ...basis(1), gameId: gameUuid(1), ...slot, roundId: null, takeBack: true },
+      w.deps,
+    );
+    expect(back).toMatchObject({ ok: true, value: { version: 2 } });
+    const view = await getScheduleDraft(w.as(ownerId), { seasonId }, w.deps);
+    if (!view.ok) throw new Error('refused');
+    expect(view.value.toPublish).toBe(0);
+    expect(view.value.result.games.find((g) => g.id === gameUuid(1))).toMatchObject({
+      status: 'postponed',
+      date: '2026-10-04',
+      roundId: roundUuid(1),
+    });
+    const played = await moveDraftGame(
+      w.as(ownerId),
+      { ...basis(2), gameId: gameUuid(2), ...slot, takeBack: true },
+      w.deps,
+    );
+    expect(played).toMatchObject({ ok: false, error: { code: 'change-refused' } });
+  });
+});
+
 describe("the draft's count of what publishing would change (step 2.185)", () => {
   /** The draft view's count and the publish preview's, read as the grid reads them. */
   const counts = async (w: ReturnType<typeof world>) => {

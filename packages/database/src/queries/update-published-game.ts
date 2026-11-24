@@ -1,7 +1,8 @@
 // Changes a game of the scope's league that a publication moves or re-records (P7 §4.4).
 // A game that is live or decided is never changed here: false then, as for a game that is
 // not in the season or is in the bin. A time is read in the league's own time zone and a
-// court is found by name at its venue.
+// court is found by name at its venue. A postponed game given a new slot is scheduled again
+// (T-326): only a postponed one, so a cancelled game moved in a draft stays called off.
 import type { PublishedGameChange } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -26,6 +27,11 @@ export async function updatePublishedGame(
     .updateTable('games')
     .set({
       ...(change.captureMode === undefined ? {} : { capture_mode: change.captureMode }),
+      ...(change.status === undefined
+        ? {}
+        : {
+            status: sql<string>`case when status = 'postponed' then ${change.status} else status end`,
+          }),
       ...(slot === undefined
         ? {}
         : {

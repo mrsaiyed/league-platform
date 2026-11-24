@@ -25,6 +25,12 @@ const game = slot.extend({
 const change = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('add-game'), game }),
   z.strictObject({ kind: z.literal('move-game'), gameId: text, to: slot }),
+  z.strictObject({
+    kind: z.literal('take-back-date'),
+    gameId: text,
+    to: slot,
+    status: z.enum(['scheduled', 'postponed']),
+  }),
   z.strictObject({ kind: z.literal('swap-games'), gameId: text, otherGameId: text }),
   z.strictObject({ kind: z.literal('remove-game'), gameId: text }),
   z.strictObject({ kind: z.literal('put-back-game'), gameId: text }),

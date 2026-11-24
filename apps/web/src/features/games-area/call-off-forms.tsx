@@ -25,6 +25,7 @@
 // come from the server, from the message files (T-187).
 import { useActionState, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { untouched, type CallOffAct, type CallOffState } from './form-state.ts';
+import { newDateNow } from './call-off-step.ts';
 import { useOneSubmit } from './use-one-submit.ts';
 
 /** A change's own choice: the team that forfeits, or why a game is put back. */
@@ -40,6 +41,8 @@ export type CallOffActTexts = {
   readonly button: string;
   readonly ask: string | Readonly<Record<string, string>>;
   readonly yes: string;
+  /** Postponing's second "Yes" (S-49): postponed, then to its "Give it a new date". */
+  readonly yesNewDate?: string;
   readonly no: string;
   readonly choice?: CallOffChoice;
 };
@@ -194,7 +197,7 @@ export function CallOffForms(props: CallOffFormsProps) {
   /** A form's button: its own, or, while it is asked about, "No" in its very place. */
   const buttonOf = (act: CallOffAct, words: CallOffActTexts, isAsked: boolean, waiting: boolean) =>
     isAsked ? (
-      <button type="submit" className="ui-button" aria-describedby={questionId}>
+      <button type="submit" className="ui-button" aria-describedby={questionId} data-call-off-no="">
         {words.no}
       </button>
     ) : (
@@ -256,11 +259,25 @@ export function CallOffForms(props: CallOffFormsProps) {
             className="ui-button"
             // Putting a postponement back is no loss: the main kind; the others take away.
             data-kind={asked.act === 'restore' ? 'main' : 'danger'}
+            data-call-off-yes=""
             // Not ready yet: drawn so, and takes no tap (onYes); ready once the wait is over.
             {...(resting ? { 'aria-disabled': true, 'data-resting': '' } : {})}
           >
             {words.yes}
           </button>
+          {words.yesNewDate === undefined ? null : (
+            <button
+              type="submit"
+              className="ui-button"
+              name="newDate"
+              value={newDateNow}
+              data-kind="main"
+              data-postpone-new-date=""
+              {...(resting ? { 'aria-disabled': true, 'data-resting': '' } : {})}
+            >
+              {words.yesNewDate}
+            </button>
+          )}
         </form>
         {/* Drawn empty with the question, so the sentence put in it later is heard. Not a
             "status" role: the game's "Saved" is the game's one status. */}

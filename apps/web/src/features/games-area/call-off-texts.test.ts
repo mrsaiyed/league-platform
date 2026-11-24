@@ -28,3 +28,17 @@ describe('the forfeit after line-ups (step 2.56)', () => {
     expect(Object.keys(texts.acts.forfeit?.ask ?? {})).toEqual(['away', 'home']);
   });
 });
+
+describe("postponing's two answers (step 2.53 fix round)", () => {
+  it('offers "give it a new date now" only to whoever may edit the schedule', () => {
+    const plain = callOffTexts(game, { forfeit: false, postpone: true, cancel: false });
+    expect(plain.acts.postpone?.yesNewDate).toBeUndefined();
+    const editor = callOffTexts(game, {
+      forfeit: false,
+      postpone: true,
+      cancel: false,
+      newDate: true,
+    });
+    expect(editor.acts.postpone?.yesNewDate).toBe(t('admin.games.callOff.yesNewDate.postpone'));
+  });
+});

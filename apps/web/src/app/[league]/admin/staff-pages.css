@@ -48,6 +48,18 @@
   margin-block: 0 var(--step-4);
   font-size: var(--text-14);
 }
+/* The draft's bar stays in view down the grid, so its count and "Review and publish" are
+   where the person is (step 2.53). It wraps at phone width, never scrolls sideways. */
+.staff .admin-schedule-draft[data-draft-bar] {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  padding: var(--step-2) var(--step-3);
+  background: var(--color-background);
+  border-block-end: 1px solid var(--color-line);
+  max-inline-size: 100%;
+  box-sizing: border-box;
+}
 .admin-schedule > .ui-notice,
 .admin-schedule > .staff-panel,
 .admin-season > .ui-notice,

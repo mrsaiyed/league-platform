@@ -5,6 +5,9 @@
 // (teams of the season, court at the venue) still holds, so a wrong id raises. A game whose
 // id a game already has, in any league, is not made (games ids are one set for every
 // league): the count made says so, and the command refuses in words rather than raising.
+// Each gets the season's next game number, after the highest any of its games holds or held
+// (one in the bin included, so a number is never given twice), in the order given: the plan
+// orders them by date and time (step 2.53, S-90).
 import type { NewPublishedGame } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -35,7 +38,8 @@ export async function insertPublishedGames(
     .where('season_id', '=', seasonId)
     .where('type', '=', 'regular')
     .executeTakeFirstOrThrow();
-  const rows = games.map((g) => ({
+  const rows = games.map((g, i) => ({
+    n: i + 1,
     id: g.id,
     round_id: g.roundId,
     home_team_id: g.homeTeamId,
@@ -48,7 +52,8 @@ export async function insertPublishedGames(
   }));
   const made = await sql<{ id: string }>`
     insert into games (id, league_id, season_id, stage_id, division_id, round_id,
-      home_team_id, away_team_id, starts_at, venue_id, court_id, status, capture_mode)
+      home_team_id, away_team_id, starts_at, venue_id, court_id, status, capture_mode,
+      game_number)
     select g.id, ${scope.leagueId}, ${seasonId}, ${stage.id},
       (select case when h.division_id = a.division_id then h.division_id end
          from teams h, teams a
@@ -60,10 +65,13 @@ export async function insertPublishedGames(
       (select c.id from courts c
         where c.league_id = ${scope.leagueId} and c.venue_id = g.venue_id
           and c.name = g.court and c.deleted_at is null),
-      'scheduled', g.capture_mode
+      'scheduled', g.capture_mode,
+      case when top.n + g.n <= 100000 then top.n + g.n end
     from jsonb_to_recordset(${JSON.stringify(rows)}::jsonb)
-      as g(id uuid, round_id uuid, home_team_id uuid, away_team_id uuid, day text,
-           clock text, venue_id uuid, court text, capture_mode text)
+      as g(n integer, id uuid, round_id uuid, home_team_id uuid, away_team_id uuid, day text,
+           clock text, venue_id uuid, court text, capture_mode text),
+      (select coalesce(max(x.game_number), 0) as n from games x
+        where x.league_id = ${scope.leagueId} and x.season_id = ${seasonId}) as top
     on conflict (id) do nothing
     returning id`.execute(trx);
   return made.rows.length;

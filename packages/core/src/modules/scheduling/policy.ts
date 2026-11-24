@@ -91,6 +91,23 @@ export async function mayEditSchedule(
 }
 
 /**
+ * Taking back a drafted new date after "Put it back on its date" (step 2.53 fix round):
+ * whoever may put a game back may (`games.results` at the season's program, the put-back's
+ * own rule), as may a schedule editor; not while the league is archived or suspended.
+ */
+export async function mayTakeBackPutBack(
+  context: CommandContext,
+  tx: SchedulingTx,
+  seasonId: string,
+): Promise<boolean> {
+  if (await mayEditSchedule(context, tx, seasonId)) return true;
+  const scope = await seasonScope(tx, seasonId);
+  if (!(await hasPermission(context, tx, 'games.results', scope))) return false;
+  const status = await tx.access.leagueStatus();
+  return status !== undefined && !readOnlyLeagueStatuses.includes(status);
+}
+
+/**
  * Publishing a season's schedule (P4 §3 `schedule.publish`): at the season's program; not
  * while the league is archived or suspended (U-9).
  */

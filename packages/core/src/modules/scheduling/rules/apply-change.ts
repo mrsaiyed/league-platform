@@ -109,7 +109,26 @@ export function applyDraftChange(
       }
       const bad = badSlot(to);
       if (bad) return bad;
-      const games = state.games.map((g) => (g.id === change.gameId ? { ...g, ...slotOf(to) } : g));
+      // A postponed game given a new slot is a game to be played again (P7 §4 "Also", S-49,
+      // T-326): it holds its place from here, so the clash rules see it as any other game.
+      const games = state.games.map((g) =>
+        g.id === change.gameId
+          ? {
+              ...g,
+              ...slotOf(to),
+              ...(g.status === 'postponed' ? { status: 'scheduled' as const } : {}),
+            }
+          : g,
+      );
+      return done({ ...state, games }, [change.gameId]);
+    }
+    case 'take-back-date': {
+      if (!find(change.gameId)) return fail({ code: 'unknown-game', gameId: change.gameId });
+      // The draft's new date taken back (step 2.53): the game is again as it is published,
+      // its slot and its status, so publishing changes nothing of it.
+      const games = state.games.map((g) =>
+        g.id === change.gameId ? { ...g, ...slotOf(change.to), status: change.status } : g,
+      );
       return done({ ...state, games }, [change.gameId]);
     }
     case 'swap-games': {
@@ -118,8 +137,15 @@ export function applyDraftChange(
       if (!a) return fail({ code: 'unknown-game', gameId: change.gameId });
       if (!b) return fail({ code: 'unknown-game', gameId: change.otherGameId });
       if (a.id === b.id) return fail({ code: 'swap-with-itself', gameId: a.id });
+      // A postponed game swapped into another slot is given a new date, as by a move.
+      const scheduled = (g: ScheduleGame): Partial<ScheduleGame> =>
+        g.status === 'postponed' ? { status: 'scheduled' } : {};
       const games = state.games.map((g) =>
-        g.id === a.id ? { ...g, ...slotOf(b) } : g.id === b.id ? { ...g, ...slotOf(a) } : g,
+        g.id === a.id
+          ? { ...g, ...slotOf(b), ...scheduled(g) }
+          : g.id === b.id
+            ? { ...g, ...slotOf(a), ...scheduled(g) }
+            : g,
       );
       return done({ ...state, games }, [a.id, b.id]);
     }

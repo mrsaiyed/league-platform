@@ -223,7 +223,7 @@ const reviewedFiles = new Map(
     ['delete-rounds.ts', 3, '#1:e138b693 #2:0327236f #3:af2d161c'],
     ['find-table-player.ts', 3, '#1:25235fe9 #2:9f5402e5 #3:c6fdbf4f'],
     ['games-for-lists.ts', 5, '#2:737306aa #3:53141c2d #4:25c7777a #5:4ea42f7d'],
-    ['insert-published-games.ts', 6, '#4:c7893d9a #5:57bc3665 #6:ad4483e8'],
+    ['insert-published-games.ts', 7, '#4:c7893d9a #5:57bc3665 #6:06f4d20d'],
     ['insert-roster-entry.ts', 1, '#1:95defd5a'],
     ['insert-table-player.ts', 1, '#1:1e47bf4f'],
     ['is-person-on-roster.ts', 2, '#1:bd91ec9f #2:075519b6'],

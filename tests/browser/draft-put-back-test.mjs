@@ -108,15 +108,23 @@ if (built) {
         const box =
           (await boxCount.count()) === 1 ? await boxCount.getAttribute('data-publish-count') : '0';
         const boxText = (await publishBox.count()) === 1 ? await publishBox.innerText() : '';
-        const summary = /add (\d+), move (\d+), remove (\d+), and change how (\d+)/.exec(boxText);
+        // Step 2.53: the box names each game it changes, and gives a recording or round
+        // line only when something of that kind changes.
+        const games = await publishBox.locator('[data-publish-game]').count();
+        const recorded = /(\d+) games? changes? how/.exec(boxText);
         const rounds =
           /Rounds added: (\d+)\. Rounds removed: (\d+)\. Rounds renamed: (\d+)\. Round dates changed: (\d+)\./.exec(
             boxText,
           );
         const sum =
-          summary === null || rounds === null
+          box === '0'
             ? ''
-            : String([...summary.slice(1), ...rounds.slice(1)].reduce((a, n) => a + Number(n), 0));
+            : String(
+                [games, recorded?.[1] ?? 0, ...(rounds === null ? [] : rounds.slice(1))].reduce(
+                  (a, n) => a + Number(n),
+                  0,
+                ),
+              );
         // A draft that changes nothing: one calm sentence in the box, no zeros, no red.
         const calm =
           boxText.includes(
@@ -396,12 +404,13 @@ if (built) {
       );
       const boxDiscard = publishBox.getByRole('button', { name: 'Discard the draft' });
       check(
-        'the publish box says the same in one calm sentence, its "Discard the draft" the same one tap',
+        // Step 2.53: the box is that one calm sentence alone; the one tap is in the bar above.
+        'the publish box says the same in one calm sentence, with nothing beside it',
         (await publishBox.innerText()).includes('so there is nothing to publish.') &&
           !(await publishBox.innerText()).includes('Publishing will add 0') &&
           (await publishBox.locator('[data-kind="error"]').count()) === 0 &&
           (await publishBox.getByRole('button', { name: 'Publish this schedule' }).count()) === 0 &&
-          (await boxDiscard.count()) === 1 &&
+          (await boxDiscard.count()) === 0 &&
           (await publishBox.locator('details.admin-discard').count()) === 0,
       );
       check(
@@ -500,7 +509,8 @@ if (built) {
         for (const [button, yes, words] of [
           [
             'Postpone',
-            'Yes, postpone it',
+            // A schedule editor's "Yes" (beside "… give it a new date now").
+            'Yes, postpone it, decide the new date later',
             'Removed in this draft, and postponed since: publishing still removes it. Putting it back in the draft keeps it in the schedule, still waiting in Games for a new date.',
           ],
           [
@@ -528,7 +538,8 @@ if (built) {
           await page.waitForTimeout(1000);
           await Promise.all([
             page.waitForEvent('load'),
-            listed.getByRole('button', { name: yes }).click(),
+            // The question's own "Yes" (its mark), said in these words.
+            listed.locator('[data-call-off-yes]', { hasText: yes }).click(),
           ]);
           await page.goto(`${origin}/north-valley/admin/schedule`);
           const calledText = await calledRow.innerText();

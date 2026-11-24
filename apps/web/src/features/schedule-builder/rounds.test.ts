@@ -270,6 +270,30 @@ describe('rounds an owner can make (step 2.160)', () => {
     });
   });
 
+  it('says a second tap of "Publish" calmly: published already (step 2.53 fix round)', async () => {
+    const first = setup();
+    for (const week of weeks) await first.press('add-round', week);
+    const view = await first.read();
+    const sent = new FormData();
+    for (const [k, v] of Object.entries({
+      seasonId,
+      basedOnRevision: view.latestRevision === null ? '' : String(view.latestRevision),
+      version: String(view.draft?.version ?? ''),
+      draftId: view.draft?.id ?? '',
+    })) {
+      sent.set(k, v);
+    }
+    const again = new FormData();
+    for (const [k, v] of sent.entries()) again.set(k, v);
+    expect(await runScheduleAction('publish', sent, context, first.ports.deps)).toEqual({
+      kind: 'published',
+    });
+    expect(await runScheduleAction('publish', again, context, first.ports.deps)).toEqual({
+      kind: 'published',
+      already: true,
+    });
+  });
+
   it('publishes the new rounds', async () => {
     const { read, press } = setup();
     for (const week of weeks) await press('add-round', week);

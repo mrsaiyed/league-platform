@@ -64,7 +64,13 @@ function forfeitTexts(game: CallOffGame): CallOffActTexts {
  */
 export function callOffTexts(
   game: CallOffGame,
-  offers: { readonly forfeit: boolean; readonly postpone: boolean; readonly cancel: boolean },
+  offers: {
+    readonly forfeit: boolean;
+    readonly postpone: boolean;
+    readonly cancel: boolean;
+    /** Postponing's "give it a new date now": only for whoever may edit the schedule (step 2.53). */
+    readonly newDate?: boolean;
+  },
 ): CallOffTexts {
   const named = gameNamed(game);
   const lineups = game.status === 'scheduled' && game.hasPlays;
@@ -83,6 +89,9 @@ export function callOffTexts(
             postpone: {
               button: t('admin.games.postpone'),
               yes: t('admin.games.callOff.yes.postpone'),
+              ...(offers.newDate === true
+                ? { yesNewDate: t('admin.games.callOff.yesNewDate.postpone') }
+                : {}),
               no: t('admin.games.callOff.no.postpone'),
               ask: t(
                 lineups
