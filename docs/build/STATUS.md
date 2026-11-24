@@ -47,7 +47,6 @@ Every lane's work is on GitHub. Three at a time, by short helpers on the lead's 
 
 | Lane (branch `lane/…`) | Where it stands                          | What is left                                                                                    |
 | ---------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 2.53-publish           | fix round cut off by a restart (8de6140) | the fix round again, the whole chain, push, land                                                |
 | 2.38-offline           | debugging cut off by a restart (091802b) | the four faults of the offline test, the whole chain, review (high), fix round, confirming look |
 | 2.102-look             | builder 2 cut off by a restart (7547b30) | take stock, finish SR Leagues' own pages, the whole chain, design review, fix round             |
 | 2.191-ci-parallel      | parked                                   | after the first test is in the founder's hands                                                  |
