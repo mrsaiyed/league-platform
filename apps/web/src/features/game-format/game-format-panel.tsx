@@ -87,18 +87,23 @@ export function GameFormatPanel({
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<Said>(null);
   const [checking, setChecking] = useState(false);
+  const [readFailed, setReadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const underWayId = `${useId()}-under-way`;
   const closeFirstId = `${useId()}-close-first`;
 
   useEffect(() => {
     let live = true;
     void client.read().then((outcome) => {
-      if (live && outcome.kind === 'format') setView(outcome.view);
+      if (!live) return;
+      // Not read: said so, with "Try again", never left on "reading".
+      setReadFailed(outcome.kind !== 'format');
+      if (outcome.kind === 'format') setView(outcome.view);
     });
     return () => {
       live = false;
     };
-  }, [client]);
+  }, [client, attempt]);
 
   // With signal, the format is read again first; with none, the game starts on what the
   // device has (T-344).
@@ -143,7 +148,19 @@ export function GameFormatPanel({
   if (view === null) {
     return (
       <div data-format-reading="">
-        {fallback ?? <p className={look.quiet}>{t('tracker.formatChange.reading')}</p>}
+        {readFailed ? (
+          <FormatReadFailed
+            t={t}
+            look={look}
+            fallback={fallback}
+            onRetry={() => {
+              setReadFailed(false);
+              setAttempt((n) => n + 1);
+            }}
+          />
+        ) : (
+          (fallback ?? <p className={look.quiet}>{t('tracker.formatChange.reading')}</p>)
+        )}
         {startButton(null)}
       </div>
     );
@@ -182,10 +199,15 @@ export function GameFormatPanel({
 
   const { change } = view;
   // Absent when this person may not change it at all; greyed once the game is under way.
-  const offered = change.may || change.reason === 'under-way';
+  const offered = change.may || change.reason === 'under-way' || change.reason === 'finished';
+  // A game that is over says so, not that it follows a format that could still change.
+  const finished = !change.may && change.reason === 'finished';
+  const source = finished && view.source !== 'fixed' ? 'finished' : view.source;
   return (
     <div data-game-format="" data-format-source={view.source}>
-      <p className={look.quiet}>{t(`tracker.formatChange.source.${view.source}`)}</p>
+      <p className={look.quiet} data-format-source-line={source}>
+        {t(`tracker.formatChange.source.${source}`)}
+      </p>
       <ul className={look.list} data-format-facts="">
         {factLines(view.facts, t, locale).map((line) => (
           <li key={line}>{line}</li>
@@ -222,7 +244,7 @@ export function GameFormatPanel({
           {change.may ? null : (
             <span id={underWayId} className={look.quiet}>
               {' '}
-              {t('tracker.formatChange.underway')}
+              {t(finished ? 'tracker.formatChange.finished' : 'tracker.formatChange.underway')}
             </span>
           )}
           {change.may && change.as === 'admin' && view.given !== null ? (
@@ -253,6 +275,31 @@ export function GameFormatPanel({
       ) : null}
       {startButton(view.applies)}
     </div>
+  );
+}
+
+/** The format could not be read: what the page already has, the reason, and "Try again". */
+export function FormatReadFailed({
+  t,
+  look,
+  fallback,
+  onRetry,
+}: {
+  readonly t: Translate;
+  readonly look: FormatPanelLook;
+  readonly fallback?: ReactNode;
+  readonly onRetry: () => void;
+}) {
+  return (
+    <>
+      {fallback}
+      <p className={look.notice} data-kind="error" role="alert" data-format-read-failed="">
+        {t('tracker.formatChange.readFailed')}{' '}
+        <button type="button" className={look.button} data-format-retry="" onClick={onRetry}>
+          {t('tracker.formatChange.retry')}
+        </button>
+      </p>
+    </>
   );
 }
 

@@ -163,6 +163,16 @@ describe('giving one game its own format (step 2.119)', () => {
     expect(t.db.state.givenFormats[gameId]).toEqual(quarters);
   });
 
+  it('refuses both, as finished, once the game is over', async () => {
+    const t = setUp();
+    const game = t.db.state.games.find((g) => g.id === gameId);
+    if (game === undefined) throw new Error('no game');
+    Object.assign(game, { status: 'final' });
+    expect(await give(t, scorekeeperId)).toEqual({ ok: false, error: { code: 'finished' } });
+    expect(await give(t, schedulerId)).toEqual({ ok: false, error: { code: 'finished' } });
+    expect(t.db.state.givenFormats[gameId]).toBeUndefined();
+  });
+
   it('refuses both once the game is under way', async () => {
     const t = setUp();
     await tap(t, [...lineups, { type: 'start' }]);

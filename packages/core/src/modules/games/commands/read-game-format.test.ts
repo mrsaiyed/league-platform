@@ -176,4 +176,20 @@ describe("reading a game's format (step 2.119)", () => {
     });
     expect(await read(t, strangerId)).toMatchObject({ ok: false, error: { code: 'not-allowed' } });
   });
+
+  it('says a game that is over is finished, not under way, though no format was ever fixed', async () => {
+    const t = setUp();
+    // Decided by a final score: it never went live at the table, so nothing was fixed.
+    const game = gameOf(t);
+    if (game === undefined) throw new Error('no game');
+    for (const status of ['final', 'forfeit']) {
+      Object.assign(game, { status });
+      for (const as of [schedulerId, scorekeeperId]) {
+        expect(await read(t, as)).toMatchObject({
+          ok: true,
+          value: { source: 'season', change: { may: false, reason: 'finished' } },
+        });
+      }
+    }
+  });
 });

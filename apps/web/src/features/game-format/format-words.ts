@@ -81,6 +81,7 @@ export function summaryOf(format: GameFormatRules, t: Translate, locale: string)
 export function refusalText(code: GameFormatRefusal, t: Translate): string {
   const k = 'tracker.formatChange';
   if (code === 'under-way') return t(`${k}.underway`);
+  if (code === 'finished') return t(`${k}.finished`);
   if (code === 'setting-off') return t(`${k}.refused.setting`);
   if (code === 'changed-since-read') return t(`${k}.refused.changed`);
   return t(`${k}.refused.other`);

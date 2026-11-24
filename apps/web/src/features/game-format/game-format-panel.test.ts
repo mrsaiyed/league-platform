@@ -14,7 +14,12 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { GameFormatClient } from './format-client.ts';
-import { GameFormatForm, GameFormatPanel, startWaits } from './game-format-panel.tsx';
+import {
+  FormatReadFailed,
+  GameFormatForm,
+  GameFormatPanel,
+  startWaits,
+} from './game-format-panel.tsx';
 
 const t = createTranslator('en', { en });
 const rules = seasonRulesPreset('rec-league');
@@ -121,5 +126,31 @@ describe('"Confirm and start scoring" in the panel (T-344)', () => {
     expect(startWaits({ editing: false, busy: false, checking: true }).disabled).toBe(true);
     expect(startWaits({ editing: false, busy: true, checking: false }).disabled).toBe(true);
     expect(t('tracker.formatChange.closeFirst')).toBe('Save or close the format form first.');
+  });
+});
+
+describe("a game that is over, and a format not read (the review's lows)", () => {
+  it("says the game is finished, not under way, and not that it follows its season's format", () => {
+    const html = panel(view({ may: false, reason: 'finished' }));
+    expect(html).toContain('The game is finished. These were its rules.');
+    expect(html).toContain('The game is finished: its format can no longer be changed.');
+    expect(html).not.toContain('under way');
+    expect(html).not.toContain('follows its season&#x27;s format');
+    expect(html).toMatch(/data-format-change=""[^>]*disabled/);
+  });
+
+  it('offers "Try again" when the format could not be read, under what the page has', () => {
+    const html = renderToStaticMarkup(
+      createElement(FormatReadFailed, {
+        t,
+        look,
+        fallback: createElement('ul', { 'data-device-lines': '' }),
+        onRetry: () => undefined,
+      }),
+    );
+    expect(html).toContain('data-device-lines');
+    expect(html).toContain('The format could not be read.');
+    expect(html).toMatch(/<button[^>]*data-format-retry=""[^>]*>Try again</);
+    expect(html).not.toContain('Reading the format');
   });
 });

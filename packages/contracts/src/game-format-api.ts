@@ -33,6 +33,8 @@ export const gameFormatRefusals = [
   'setting-off',
   /** The first play or clock tap has happened: the format is fixed (B3). */
   'under-way',
+  /** The game is over (a final score, a box score, or ended at the table). */
+  'finished',
 ] as const;
 export type GameFormatRefusal = (typeof gameFormatRefusals)[number];
 
@@ -45,7 +47,7 @@ const FormatChangeReply = z.union([
   z.strictObject({ may: z.literal(true), as: z.enum(['admin', 'scorekeeper']) }),
   z.strictObject({
     may: z.literal(false),
-    reason: z.enum(['no-permission', 'setting-off', 'under-way']),
+    reason: z.enum(['no-permission', 'setting-off', 'under-way', 'finished']),
   }),
 ]);
 

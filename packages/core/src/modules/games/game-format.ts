@@ -3,17 +3,19 @@
 // before the game is under way, from the games area. Whoever may score the game may too,
 // at the table before the first play, while the league's setting "Scorekeepers may change
 // a game's format before it starts" is on (it is to begin with). Once the game is under
-// way both are refused: its rules are then fixed (S-1). Everything is read in the
-// command's own transaction (T-75).
+// way both are refused: its rules are then fixed (S-1); a game that is over (a final
+// score or a box score, or ended at the table) is refused as finished, not as under way.
+// Everything is read in the command's own transaction (T-75).
 import type { CommandContext } from '../../command/index.ts';
 import { hasPermissionAnywhere } from '../access/index.ts';
 import { lookupSetting, scorekeepersMayChangeFormat } from '../leagues/index.ts';
+import { isDecided } from './game-fields.ts';
 import { readState } from './live-game.ts';
 import { mayChangeGames, mayScoreGame, seasonScope } from './policy.ts';
 import type { GameRecord, GamesTx, TrackerTx } from './ports.ts';
 
 /** Why this person may not change the game's format now. */
-export type FormatRefusal = 'no-permission' | 'setting-off' | 'under-way';
+export type FormatRefusal = 'no-permission' | 'setting-off' | 'under-way' | 'finished';
 
 /** Whether this person may change the game's format now, and as whom; else why not. */
 export type FormatChange =
@@ -63,6 +65,7 @@ export async function formatChangeOf(
 ): Promise<FormatChange> {
   const as = await mayReachFormat(context, tx, game);
   if (as === undefined) return { may: false, reason: 'no-permission' };
+  if (isDecided(game.status)) return { may: false, reason: 'finished' };
   if (as === 'scorekeeper' && !(await scorekeepersMayChangeFormatOf(tx))) {
     return { may: false, reason: 'setting-off' };
   }

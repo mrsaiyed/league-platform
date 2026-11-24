@@ -211,6 +211,7 @@ export const enTracker = {
   'tracker.formatChange.field.short': 'Short timeouts',
   'tracker.formatChange.field.stop': 'Stop clock in the last seconds (empty for none)',
   'tracker.formatChange.field.timeouts': 'Timeouts are counted',
+  'tracker.formatChange.finished': 'The game is finished: its format can no longer be changed.',
   'tracker.formatChange.invalid':
     'Some of these numbers do not fit together. Check them and save again.',
   'tracker.formatChange.offline': 'Not saved: there is no connection. Try again.',
@@ -230,16 +231,19 @@ export const enTracker = {
   'tracker.formatChange.preset.high-school': 'High school',
   'tracker.formatChange.preset.rec-league': 'Recreation league',
   'tracker.formatChange.preset.season': "The season's format",
+  'tracker.formatChange.readFailed': 'The format could not be read.',
   'tracker.formatChange.reading': 'Reading the format…',
   'tracker.formatChange.refused.changed':
     'The game changed since this was read. Look at the format again and change it again.',
   'tracker.formatChange.refused.other': 'This format could not be saved.',
   'tracker.formatChange.refused.setting':
     "The league does not let scorekeepers change a game's format. Ask a league admin.",
+  'tracker.formatChange.retry': 'Try again',
   'tracker.formatChange.save': 'Save for this game only',
   'tracker.formatChange.saved': 'Saved for this game only: {summary}.',
   'tracker.formatChange.saved.season': "This game follows the season's format again: {summary}.",
   'tracker.formatChange.season': "Use the season's format",
+  'tracker.formatChange.source.finished': 'The game is finished. These were its rules.',
   'tracker.formatChange.source.fixed': 'Fixed when the game started.',
   'tracker.formatChange.source.given': 'This game has its own format.',
   'tracker.formatChange.source.season': "This game follows its season's format.",

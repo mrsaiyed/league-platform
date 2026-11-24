@@ -9,6 +9,7 @@ export {
 export { formatOfValues, valuesOf, type FormatValues } from './format-values.ts';
 export { factLine, factLines, formatWords, refusalText, summaryOf } from './format-words.ts';
 export {
+  FormatReadFailed,
   GameFormatForm,
   GameFormatPanel,
   startWaits,
