@@ -13,6 +13,7 @@
 // `data-players-refused`, `data-players-read-only`, `data-players-open`.
 import type { Translate } from '@srleagues/site';
 import { isTablePlayerCommand } from '@srleagues/contracts';
+import { useEffect, useRef, type RefObject } from 'react';
 import { playerLabel } from './engine-words.ts';
 import type { DevicePlayer, DeviceRosters } from './opened-game-storage.ts';
 import {
@@ -85,10 +86,51 @@ function refusedLabel(group: RefusedGroup, rosters: DeviceRosters, t: Translate)
   return playerLabel(player, t);
 }
 
+/**
+ * A modal sheet that behaves as one (review of 2.118, M2): focus moves into it on opening
+ * (the first add line, else Close), everything behind is inert while it is open, and on
+ * shutting focus goes back to what opened it (or More, when that has gone). After the
+ * phone turns, the box being typed in is scrolled back into view.
+ */
+function useModal(wrap: RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const here = wrap.current;
+    if (here === null) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const made: Element[] = [];
+    for (let node: Element = here; node.parentElement !== null; node = node.parentElement) {
+      for (const sibling of node.parentElement.children) {
+        if (sibling === node || sibling.hasAttribute('inert')) continue;
+        sibling.setAttribute('inert', '');
+        made.push(sibling);
+      }
+    }
+    here.querySelector<HTMLElement>('[data-players-line], [data-players-close]')?.focus();
+    const onTurn = () => {
+      const typing = document.activeElement;
+      if (typing instanceof HTMLElement && here.contains(typing)) {
+        typing.scrollIntoView({ block: 'nearest' });
+      }
+    };
+    window.addEventListener('resize', onTurn);
+    return () => {
+      window.removeEventListener('resize', onTurn);
+      for (const element of made) element.removeAttribute('inert');
+      const back =
+        opener?.isConnected === true
+          ? opener
+          : document.querySelector<HTMLElement>('.court-more-button');
+      back?.focus();
+    };
+  }, [wrap]);
+}
+
 export function PlayersSheet(props: PlayersSheetProps) {
   const { t, panel, on } = props;
+  const wrap = useRef<HTMLDivElement>(null);
+  useModal(wrap);
   return (
-    <div className="court-sheet-wrap court-players-wrap" data-players-panel="">
+    <div ref={wrap} className="court-sheet-wrap court-players-wrap" data-players-panel="">
       <div className="court-scrim" onClick={on.close} />
       <div
         className="court-sheet court-players-sheet"

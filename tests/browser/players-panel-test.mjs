@@ -156,10 +156,13 @@ async function scorekeeperPhone(browser, origin) {
   const panel = page.locator('[data-players-panel]');
   const team = (side) => panel.locator(`[data-players-team="${side}"]`);
   const rows = (side) => team(side).locator('[data-player-row]');
-  const add = async (side, line, name = '') => {
+  const add = async (side, line, name = '', { double = false } = {}) => {
     await team(side).locator(`[data-players-line="${side}"]`).fill(line);
     await team(side).locator(`[data-players-name="${side}"]`).fill(name);
-    await team(side).locator(`[data-players-add="${side}"]`).click();
+    const button = team(side).locator(`[data-players-add="${side}"]`);
+    // A double tap: the second must be ignored, never a second copy of the line.
+    if (double) await button.dblclick();
+    else await button.click();
   };
   const openPanel = async () => {
     if (await panel.isVisible()) return;
@@ -193,6 +196,8 @@ async function scorekeeperPhone(browser, origin) {
     errors,
   };
 }
+
+let lastPublic = '';
 
 /** The public game page's words, read by a visitor with no account. */
 async function publicWords(browser, origin) {
@@ -332,14 +337,17 @@ async function withSignal(browser) {
     });
 
     await step('seventeen a side at four sizes', async () => {
-      await add('away', '20 21 22 23 24 25 26 27 28 29 30 31');
+      await add('away', '20 21 22 23 24 25 26 27 28 29 30 31', '', { double: true });
       await add('home', '60 61 62 63 64 65 66 67 68 69 70');
       await until(
         page,
         async () => [await rows('home').count(), await rows('away').count()],
-        ([h, a]) => h === 17 && a === 17,
+        ([h, a]) => h === 17 && a >= 17,
         'not seventeen a side',
       );
+      await page.waitForTimeout(1500);
+      const twice = await rows('away').count();
+      note('a double tap on Add stores the line once (one of each)', twice === 17, `${twice}`);
       await measure(s);
     });
 
@@ -360,11 +368,15 @@ async function withSignal(browser) {
       note("#12's basket is in the log", /#12\b/.test(log), log.slice(0, 300));
       const shown = await until(
         page,
-        () => publicWords(browser, origin),
-        (t) => /#12\b/.test(t),
-        'the public page never showed #12',
-      ).catch((e) => String(e));
-      note("#12's basket is on the public game page", /#12\b/.test(shown), shown.slice(0, 300));
+        async () => (lastPublic = await publicWords(browser, origin)),
+        (t) => /Bears 2\b/.test(t) && /numbers are not public/.test(t),
+        'the public page never showed the Bears at 2',
+      ).catch(() => null);
+      note(
+        "#12's basket reaches the public game page as the Bears' 2, their numbers kept private",
+        shown !== null && !/#12\b/.test(shown),
+        shown?.slice(0, 300) ?? `timed out: ${lastPublic.slice(0, 300)}`,
+      );
     });
 
     await step('another device sees the added players', async () => {
@@ -410,19 +422,29 @@ async function withSignal(browser) {
       );
       const shown = await until(
         page,
-        () => publicWords(browser, origin),
-        (t) => /#41\b/.test(t),
-        'the public page never showed #41',
-      ).catch((e) => String(e));
+        async () => (lastPublic = await publicWords(browser, origin)),
+        (t) => /Bears 7\b/.test(t),
+        'the public page never showed the Bears at 7',
+      ).catch(() => null);
       note(
-        'the corrected number is on the public game page',
-        /#41\b/.test(shown) && !/#14\b/.test(shown),
-        shown.slice(0, 300),
+        'the three plays of the corrected player reach the public game page, no number shown',
+        shown !== null && !/#41\b/.test(shown) && !/#14\b/.test(shown),
+        shown?.slice(0, 300) ?? `timed out: ${lastPublic.slice(0, 300)}`,
       );
     });
 
     await step('a take-off refused with its reason', async () => {
       await s.openPanel();
+      const inPanel = () =>
+        page.evaluate(() =>
+          Boolean(document.querySelector('[data-players-panel]')?.contains(document.activeElement)),
+        );
+      const movedIn = await inPanel();
+      for (let i = 0; i < 25; i += 1) await page.keyboard.press('Tab');
+      note(
+        'focus moves into the panel on opening and stays inside it (what is behind is inert)',
+        movedIn && (await inPanel()),
+      );
       const own = await s.rowOf('home', 3);
       await panel.locator(`[data-player-fix="${own}"]`).click();
       const reason = await words(panel.locator(`[data-player-reason="${own}"]`));
@@ -444,7 +466,105 @@ async function withSignal(browser) {
       );
       await page.keyboard.press('Escape');
       await panel.waitFor({ state: 'detached' });
+      note(
+        'Escape shuts the panel and focus goes back to More',
+        await page.evaluate(
+          () => document.activeElement?.classList.contains('court-more-button') === true,
+        ),
+      );
     });
+    await step(
+      'a second screen sees the players; the server refuses a take-off (S-45)',
+      async () => {
+        const home3 = await s.rowOf('home', 3);
+        // The owner's own screen, in a browser of its own: it takes the game over.
+        const context = await browser.newContext({ viewport: { width: 1180, height: 820 } });
+        try {
+          await context.addCookies([{ ...owner, url: origin }]);
+          const other = await context.newPage();
+          other.setDefaultTimeout(30_000);
+          await other.goto(`${origin}${trackerPath()}`);
+          const c2 = court(other);
+          await c2.open();
+          note(
+            'a second screen shows the added players on its tiles (#12, #41)',
+            (await c2.tile('away', 12).count()) > 0 && (await c2.tile('away', 41).count()) > 0,
+          );
+          await c2.more.click();
+          await other.locator('[data-players-open="more"]').click();
+          const away = other.locator(
+            '[data-players-panel] [data-players-team="away"] [data-player-row]',
+          );
+          const listed = await until(
+            other,
+            () => away.count(),
+            (n) => n === 17,
+            'the second screen lists the added visitors',
+          ).catch(() => null);
+          note(
+            'a second screen lists the seventeen visitors on its panel',
+            listed === 17,
+            `${listed}`,
+          );
+        } finally {
+          await context.close();
+        }
+        // The take-off sent straight to the server, by a device that holds the game.
+        const ask = async (body) => {
+          const answer = await fetch(
+            `${origin}/api/v1/leagues/${leagueId}/games/${liveGame}/session`,
+            {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                cookie: `${owner.name}=${owner.value}`,
+                origin,
+              },
+              body: JSON.stringify(body),
+            },
+          );
+          return answer.json();
+        };
+        let held = await ask({ type: 'open', deviceId: 'made-up-check-device' });
+        if (held.status === 'held-by-other') {
+          held = await ask({
+            type: 'take-over',
+            deviceId: 'made-up-check-device',
+            confirmed: true,
+            expectedHolderSince: held.holder.since,
+          });
+        }
+        const sent = await fetch(
+          `${origin}/api/v1/leagues/${leagueId}/games/${liveGame}/commands`,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              cookie: `${owner.name}=${owner.value}`,
+              origin,
+            },
+            body: JSON.stringify({
+              protocolVersion: 2,
+              sessionId: held.sessionId,
+              commands: [
+                {
+                  commandId: crypto.randomUUID(),
+                  at: Date.now(),
+                  input: { type: 'remove-player', side: 'home', playerId: home3 },
+                },
+              ],
+            }),
+          },
+        );
+        const text = await sent.text();
+        const result = sent.ok ? JSON.parse(text).results?.[0] : null;
+        note(
+          "the server refuses a take-off of a league's own player sent straight to it (S-45)",
+          result?.status === 'refused' && result.reason?.problem !== undefined,
+          `${sent.status} ${text.slice(0, 300)}`,
+        );
+      },
+    );
     note(
       'no script error on the page (with the signal)',
       s.errors.length === 0,
@@ -561,11 +681,15 @@ async function withoutSignal(browser) {
       note("#12's basket is in the log", /#12\b/.test(await s.logText()));
       const shown = await until(
         page,
-        () => publicWords(browser, origin),
-        (t) => /#12\b/.test(t),
-        'the public page never showed #12',
-      ).catch((e) => String(e));
-      note("#12's basket reached the public game page", /#12\b/.test(shown), shown.slice(0, 300));
+        async () => (lastPublic = await publicWords(browser, origin)),
+        (t) => /Bears 2\b/.test(t) && /numbers are not public/.test(t),
+        'the public page never showed the Bears at 2',
+      ).catch(() => null);
+      note(
+        "#12's basket reached the public game page as the Bears' 2",
+        shown !== null && !/#12\b/.test(shown),
+        shown?.slice(0, 300) ?? `timed out: ${lastPublic.slice(0, 300)}`,
+      );
     });
     note('no script error on the page (no signal)', s.errors.length === 0, s.errors.join(' | '));
   } finally {
