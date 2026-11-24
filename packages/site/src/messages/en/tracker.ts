@@ -72,6 +72,36 @@ export const enTracker = {
   'tracker.clockSheet.title': 'Clock and period',
   // A time longer than the period being played: "H1 is 20:00 long: type 20:00 or less."
   'tracker.clockSheet.tooLong': '{period} is {length} long: type {length} or less.',
+  // "Save a copy" behind More (S-5, T-129, step 2.70): what the copy is for.
+  'tracker.copy.explain':
+    'Saves a file on this device with the plays not yet on the server. If this device cannot get back online, open the file on another phone or computer to upload it. Nothing is counted twice.',
+  'tracker.copy.failed':
+    'The copy could not be saved: this device’s storage did not answer. Try again.',
+  // Why an uploaded file was not taken (step 2.70): the upload page words these.
+  'tracker.copy.refused.damaged':
+    'This copy is damaged: it was cut short or changed. Save a new copy on the scoring device if you can.',
+  'tracker.copy.refused.game-not-live': 'This game is postponed: it cannot be scored now.',
+  'tracker.copy.refused.not-a-copy':
+    'This file is not a copy of a game. Pick the file saved by “Save a copy”.',
+  'tracker.copy.refused.not-allowed': 'You may not score this game, so you cannot upload its copy.',
+  'tracker.copy.refused.other-game':
+    'This copy is of another game. Open that game’s upload page instead.',
+  'tracker.copy.refused.other-league': 'This copy is of a game in another league.',
+  'tracker.copy.refused.reopen-first':
+    'This game has ended. Reopen it first, then upload the copy again.',
+  'tracker.copy.refused.unknown-game': 'There is no such game.',
+  'tracker.copy.refused.unknown-version':
+    'This copy was saved by a newer version of the tracker. Reload this page and try again.',
+  'tracker.copy.save': 'Save a copy',
+  'tracker.copy.savedNone':
+    'Copy saved. Every play is already on the server, so it holds nothing to upload.',
+  'tracker.copy.saved_one':
+    'Copy saved on this device, with {count} play not yet on the server. Keep the file until the play is sent.',
+  'tracker.copy.saved_other':
+    'Copy saved on this device, with {count} plays not yet on the server. Keep the file until they are sent.',
+  // After several minutes offline with plays waiting (T6 §4, T-129).
+  'tracker.copy.suggest':
+    'To be safe, save a copy of the game now: if this device cannot get back online, the copy can be uploaded from another phone or computer.',
   'tracker.court.close': 'Close',
   'tracker.court.controls': 'Clock and undo',
   'tracker.court.more': 'More',
