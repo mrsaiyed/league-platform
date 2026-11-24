@@ -1299,26 +1299,12 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // A batch the old session sent may still be on its way, and be taken: wait for its
     // answer first, so a tap the server took is never listed (finding M1), as `lost` does.
     await queue.idle();
-    let waiting: QueuedCommand[];
     let stale: KeptTap[];
     let setAside: KeptTap[];
-    let taken: BatchCommand[];
     try {
       const list = await storage.list(gameId);
-      // Shown taps the storage no longer holds were taken by the server (sent from the
-      // kept scoring before opening was answered, say): saved, so still counted until a
-      // loaded state has them, though the base is older (T-329, step 2.61 seed 66).
-      const stored = new Set(list.map((entry) => entry.command.commandId));
-      const inBase = new Set((base?.state.recent ?? []).map((id) => id.toLowerCase()));
-      taken = made.filter(
-        (c) =>
-          !stored.has(c.commandId) &&
-          !refusedIds.has(c.commandId) &&
-          !inBase.has(c.commandId.toLowerCase()),
-      );
-      waiting = list.filter((entry) => entry.state === 'waiting');
       setAside = keptIn(list, 'not-saved');
-      stale = waiting.filter((entry) => !madeUnder(entry)).map(keptTap);
+      stale = list.filter((entry) => entry.state === 'waiting' && !madeUnder(entry)).map(keptTap);
     } catch {
       // Not known to be dropped, so nothing may be sent: the session is not used, and
       // its lease runs out unless opening again (into the same session) gets this far.
@@ -1329,13 +1315,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       if (carried === 'storage-failed') return readOnly('storage-failed');
       // Asked again: the server gives this device the same session while it holds it.
       if (carried === 'unanswered') return later(open);
-      if (carried === 'carried') {
-        const moved = new Set(stale.map((t) => t.command.commandId));
-        waiting = waiting.map((e) =>
-          moved.has(e.command.commandId) ? { ...e, sessionId: held } : e,
-        );
-        stale = [];
-      }
+      // Carried: the storage holds them under `held` now, read again below.
+      if (carried === 'carried') stale = [];
     }
     // Set aside, then listed: meanwhile the queue's listener must not take a stale change
     // of players for one taken (review M1 of step 2.118).
@@ -1347,12 +1328,43 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       for (const id of staleIds) settingAside.delete(id);
       return readOnly('storage-failed');
     }
-    // Not scoring, so every tap of this device's the server lacks is waiting in the
-    // queue: the game shown is rebuilt from it, so what will be sent is what is shown
-    // (one hidden when the game was lost, say, then kept on opening again into it), on
-    // top of those the server took that the base lacks: the kept scoring never drops a
-    // tap its kept state does not have (T-329).
-    made = [...taken, ...waiting.filter(madeUnder).map((entry) => entry.command)];
+    // Every tap of this device's the server lacks is waiting in the queue: the game shown
+    // is rebuilt from it, so what will be sent is what is shown (one hidden when the game
+    // was lost, say, then kept on opening again into it), on top of those the server took
+    // that the base lacks: the kept scoring never drops a tap its kept state does not
+    // have (T-329). Scoring from the kept state, taps go on being made meanwhile, so it is
+    // rebuilt in the lock taps run in, from the storage read again (T-331, step 2.61 seeds
+    // 2024 and 5): a tap stored but not yet laid on the game finishes first and is counted
+    // once, never by both; a tap made since under the ended session is judged like the
+    // rest (`hold` again), never left unsent; and from here on taps are made under `held`.
+    const rebuilt = await serially(async (): Promise<'rebuilt' | 'judge-again' | 'failed'> => {
+      let list: readonly QueuedCommand[];
+      try {
+        list = await storage.list(gameId);
+      } catch {
+        return 'failed';
+      }
+      const waiting = list.filter((entry) => entry.state === 'waiting');
+      if (waiting.some((entry) => !madeUnder(entry))) return 'judge-again';
+      // Shown taps the storage no longer holds were taken by the server (sent from the
+      // kept scoring before opening was answered, say): saved, so still counted until a
+      // loaded state has them, though the base is older (T-329, step 2.61 seed 66).
+      const stored = new Set(list.map((entry) => entry.command.commandId));
+      const inBase = new Set((base?.state.recent ?? []).map((id) => id.toLowerCase()));
+      const taken = made.filter(
+        (c) =>
+          !stored.has(c.commandId) &&
+          !refusedIds.has(c.commandId) &&
+          !inBase.has(c.commandId.toLowerCase()),
+      );
+      made = [...taken, ...waiting.map((entry) => entry.command)];
+      sessionId = held;
+      return 'rebuilt';
+    });
+    if (rebuilt !== 'rebuilt') {
+      for (const id of staleIds) settingAside.delete(id);
+      return rebuilt === 'failed' ? readOnly('storage-failed') : hold(held);
+    }
     // Listed as not saved: what was listed before, what the storage holds as not saved,
     // and the stale taps. A tap still to be sent is never listed (one listed when its
     // setting aside failed, then sent on opening again into the session it was made under).
