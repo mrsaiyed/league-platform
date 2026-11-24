@@ -125,7 +125,12 @@ async function deviceOf(browser, origin, who, clock = false) {
 const button = (page, name) => page.getByRole('button', { name, exact: true });
 
 async function oneRun(browser, run) {
-  const at = run === 'send' ? 'nothing recorded between' : 'a play recorded between';
+  const at =
+    run === 'send'
+      ? 'nothing recorded between'
+      : run === 'worst'
+        ? 'B recorded while A was offline'
+        : 'a play recorded between';
   const origin = `http://localhost:${await freePort()}`;
   const server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
@@ -150,6 +155,7 @@ async function oneRun(browser, run) {
       home9: await a.c.tile('home', 9).getAttribute('data-player'),
       away3: await a.c.tile('away', 3).getAttribute('data-player'),
     };
+    const away5 = await a.c.tile('away', 5).getAttribute('data-player');
 
     // A scores with no signal.
     await a.context.setOffline(true);
@@ -201,6 +207,14 @@ async function oneRun(browser, run) {
       await button(b.page, 'Yes, take over').tap();
       await b.c.open();
     });
+
+    if (run === 'worst') {
+      // The plan's worst night (fix round): B records while A is still offline.
+      await step(`${at}: B records a play before A is heard from`, async () => {
+        await b.play('away', 5, 'p2');
+        await b.c.saved();
+      });
+    }
 
     await step(`${at}: A returns to "taken over", its plays not saved`, async () => {
       await a.context.setOffline(false);
@@ -286,8 +300,10 @@ async function oneRun(browser, run) {
       });
     } else {
       await step(`${at}: the server refuses, and each play is entered again`, async () => {
-        await b.play('away', 5, 'p2');
-        await b.c.saved();
+        if (run !== 'worst') {
+          await b.play('away', 5, 'p2');
+          await b.c.saved();
+        }
         await a.page.locator('[data-send-plays]').tap();
         await a.page.locator('[data-send-not-saved="game-moved"]').waitFor();
         const plays = await serverPlays(origin);
@@ -297,6 +313,11 @@ async function oneRun(browser, run) {
             (await a.page.locator('[data-kept-list] [data-kept-play]').count()) === 3 &&
             (await a.page.locator('[data-send-plays]').count()) === 0,
           JSON.stringify(plays.length),
+        );
+        note(
+          `${at}: the server's box score has B's play once`,
+          pointsBy(plays, away5) === 1,
+          JSON.stringify(pointsBy(plays, away5)),
         );
         await button(a.page, 'See who is scoring').tap();
         await button(a.page, 'Take over scoring').tap();
@@ -324,6 +345,7 @@ const browser = built ? await launch() : null;
 if (browser) {
   await step('the first run', () => oneRun(browser, 'send'));
   await step('the second run', () => oneRun(browser, 'moved'));
+  await step('the third run', () => oneRun(browser, 'worst'));
 }
 await browser?.close();
 
