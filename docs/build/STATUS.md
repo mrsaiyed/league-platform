@@ -45,11 +45,10 @@ Learned, not yet rules elsewhere: (a) a lane that adds a page, a route, a field,
 
 Every lane's work is on GitHub. Three at a time, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`) | Where it stands                          | What is left                                                                                    |
-| ---------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| 2.38-offline           | debugging cut off by a restart (091802b) | the four faults of the offline test, the whole chain, review (high), fix round, confirming look |
-| 2.102-look             | builder 2 cut off by a restart (7547b30) | take stock, finish SR Leagues' own pages, the whole chain, design review, fix round             |
-| 2.191-ci-parallel      | parked                                   | after the first test is in the founder's hands                                                  |
+| Lane (branch `lane/…`) | Where it stands                          | What is left                                                                        |
+| ---------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------- |
+| 2.102-look             | builder 2 cut off by a restart (7547b30) | take stock, finish SR Leagues' own pages, the whole chain, design review, fix round |
+| 2.191-ci-parallel      | parked                                   | after the first test is in the founder's hands                                      |
 
 Next free: STEP 2.241, migration 0026, record 108 (103 to 105 were never used), T-329 (T-310, T-311 and T-315 were never used; T-327 and A-20 are lane 2.102's, T-328 lane 2.38's), S-91, A-22, U-19. Numbers already given out stand with their lanes (in each lane's note).
 
