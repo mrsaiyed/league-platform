@@ -1242,17 +1242,21 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   /**
    * Whether anybody but this device scored the game between `from`, the state it last
    * knew, and `now`: every command the server took since is one of `own` (by id, lower
-   * case), and none is missing from the state's recent ones. When that cannot be told
-   * (too many since), somebody may have.
+   * case), and none is missing from the state's recent ones but at most `ownUnseen`:
+   * this device's changes of players the server took, which count in its sequence but
+   * never show in the state's plays (T-331). When that cannot be told (too many since),
+   * somebody may have.
    */
   const nobodyElseScored = (
     from: ServerState,
     now: ServerState,
     own: ReadonlySet<string>,
+    ownUnseen: number,
   ): boolean => {
     const before = new Set(from.state.recent.map((id) => id.toLowerCase()));
     const since = now.state.recent.map((id) => id.toLowerCase()).filter((id) => !before.has(id));
-    return now.sequence - from.sequence === since.length && since.every((id) => own.has(id));
+    const unseen = now.sequence - from.sequence - since.length;
+    return unseen >= 0 && unseen <= ownUnseen && since.every((id) => own.has(id));
   };
 
   /**
@@ -1267,18 +1271,26 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   const carryOnTaps = async (
     held: string,
     stale: readonly KeptTap[],
+    stored: ReadonlySet<string>,
   ): Promise<'carried' | 'taken' | 'unanswered'> => {
     const from = base ?? options.kept?.state ?? null;
     if (from === null) return 'taken';
     const loaded = await ask((signal) => server.loadState(signal));
     if (loaded.kind === 'unanswered') return 'unanswered';
     if (loaded.kind === 'rejected') return 'taken';
-    const own = new Set(
-      [...made, ...(options.kept?.scoring?.onTop ?? []), ...stale.map((t) => t.command)].map((c) =>
-        c.commandId.toLowerCase(),
-      ),
-    );
-    if (!nobodyElseScored(from, loaded.value, own)) return 'taken';
+    const ownCommands = [
+      ...made,
+      ...(options.kept?.scoring?.onTop ?? []),
+      ...stale.map((t) => t.command),
+    ];
+    const own = new Set(ownCommands.map((c) => c.commandId.toLowerCase()));
+    // This device's changes of players on top that the storage no longer holds: taken.
+    const ownUnseen = new Set(
+      ownCommands
+        .filter((c) => isTablePlayerCommand(c) && !stored.has(c.commandId))
+        .map((c) => c.commandId),
+    ).size;
+    if (!nobodyElseScored(from, loaded.value, own, ownUnseen)) return 'taken';
     await queue.carryOn(
       stale.map((t) => t.command.commandId),
       held,
@@ -1299,43 +1311,26 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // A batch the old session sent may still be on its way, and be taken: wait for its
     // answer first, so a tap the server took is never listed (finding M1), as `lost` does.
     await queue.idle();
-    let waiting: QueuedCommand[];
     let stale: KeptTap[];
     let setAside: KeptTap[];
-    let taken: BatchCommand[];
+    let stored: Set<string>;
     try {
       const list = await storage.list(gameId);
-      // Shown taps the storage no longer holds were taken by the server (sent from the
-      // kept scoring before opening was answered, say): saved, so still counted until a
-      // loaded state has them, though the base is older (T-329, step 2.61 seed 66).
-      const stored = new Set(list.map((entry) => entry.command.commandId));
-      const inBase = new Set((base?.state.recent ?? []).map((id) => id.toLowerCase()));
-      taken = made.filter(
-        (c) =>
-          !stored.has(c.commandId) &&
-          !refusedIds.has(c.commandId) &&
-          !inBase.has(c.commandId.toLowerCase()),
-      );
-      waiting = list.filter((entry) => entry.state === 'waiting');
+      stored = new Set(list.map((entry) => entry.command.commandId));
       setAside = keptIn(list, 'not-saved');
-      stale = waiting.filter((entry) => !madeUnder(entry)).map(keptTap);
+      stale = list.filter((entry) => entry.state === 'waiting' && !madeUnder(entry)).map(keptTap);
     } catch {
       // Not known to be dropped, so nothing may be sent: the session is not used, and
       // its lease runs out unless opening again (into the same session) gets this far.
       return readOnly('storage-failed');
     }
     if (stale.length > 0) {
-      const carried = await carryOnTaps(held, stale).catch(() => 'storage-failed' as const);
+      const carried = await carryOnTaps(held, stale, stored).catch(() => 'storage-failed' as const);
       if (carried === 'storage-failed') return readOnly('storage-failed');
       // Asked again: the server gives this device the same session while it holds it.
       if (carried === 'unanswered') return later(open);
-      if (carried === 'carried') {
-        const moved = new Set(stale.map((t) => t.command.commandId));
-        waiting = waiting.map((e) =>
-          moved.has(e.command.commandId) ? { ...e, sessionId: held } : e,
-        );
-        stale = [];
-      }
+      // Carried: the storage holds them under `held` now, read again below.
+      if (carried === 'carried') stale = [];
     }
     // Set aside, then listed: meanwhile the queue's listener must not take a stale change
     // of players for one taken (review M1 of step 2.118).
@@ -1347,12 +1342,43 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       for (const id of staleIds) settingAside.delete(id);
       return readOnly('storage-failed');
     }
-    // Not scoring, so every tap of this device's the server lacks is waiting in the
-    // queue: the game shown is rebuilt from it, so what will be sent is what is shown
-    // (one hidden when the game was lost, say, then kept on opening again into it), on
-    // top of those the server took that the base lacks: the kept scoring never drops a
-    // tap its kept state does not have (T-329).
-    made = [...taken, ...waiting.filter(madeUnder).map((entry) => entry.command)];
+    // Every tap of this device's the server lacks is waiting in the queue: the game shown
+    // is rebuilt from it, so what will be sent is what is shown (one hidden when the game
+    // was lost, say, then kept on opening again into it), on top of those the server took
+    // that the base lacks: the kept scoring never drops a tap its kept state does not
+    // have (T-329). Scoring from the kept state, taps go on being made meanwhile, so it is
+    // rebuilt in the lock taps run in, from the storage read again (T-331, step 2.61 seeds
+    // 2024 and 5): a tap stored but not yet laid on the game finishes first and is counted
+    // once, never by both; a tap made since under the ended session is judged like the
+    // rest (`hold` again), never left unsent; and from here on taps are made under `held`.
+    const rebuilt = await serially(async (): Promise<'rebuilt' | 'judge-again' | 'failed'> => {
+      let list: readonly QueuedCommand[];
+      try {
+        list = await storage.list(gameId);
+      } catch {
+        return 'failed';
+      }
+      const waiting = list.filter((entry) => entry.state === 'waiting');
+      if (waiting.some((entry) => !madeUnder(entry))) return 'judge-again';
+      // Shown taps the storage no longer holds were taken by the server (sent from the
+      // kept scoring before opening was answered, say): saved, so still counted until a
+      // loaded state has them, though the base is older (T-329, step 2.61 seed 66).
+      const storedNow = new Set(list.map((entry) => entry.command.commandId));
+      const inBase = new Set((base?.state.recent ?? []).map((id) => id.toLowerCase()));
+      const taken = made.filter(
+        (c) =>
+          !storedNow.has(c.commandId) &&
+          !refusedIds.has(c.commandId) &&
+          !inBase.has(c.commandId.toLowerCase()),
+      );
+      made = [...taken, ...waiting.map((entry) => entry.command)];
+      sessionId = held;
+      return 'rebuilt';
+    });
+    if (rebuilt !== 'rebuilt') {
+      for (const id of staleIds) settingAside.delete(id);
+      return rebuilt === 'failed' ? readOnly('storage-failed') : hold(held);
+    }
     // Listed as not saved: what was listed before, what the storage holds as not saved,
     // and the stale taps. A tap still to be sent is never listed (one listed when its
     // setting aside failed, then sent on opening again into the session it was made under).
@@ -1913,6 +1939,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         showRosters();
         return { ok: false, reason: 'not-scoring' };
       }
+      // On top of the base like a tap (the engine skips them), and kept with the scoring:
+      // a reload that judges the taps of an ended session knows them as this device's own,
+      // or its own add looks like somebody else's scoring (T-331, step 2.61 seed 5).
+      made.push(...commands);
+      keepScoringNow();
       showRosters();
       return {
         ok: true,
