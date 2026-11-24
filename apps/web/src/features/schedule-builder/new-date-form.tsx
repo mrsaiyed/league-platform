@@ -129,10 +129,10 @@ export async function mayGiveNewDates(
 }
 
 /**
- * "Put it back on its date" while the draft gives the game a new date (step 2.53 fix round):
- * the drafted move is taken back too, so publishing does not move the game later. Only for
- * whoever may edit the season's schedule (the command's own rule); for anyone else, and when
- * the draft does not move the game, nothing is done and the move stays for the publisher.
+ * "Put it back on its date" while the draft gives the game a new date (step 2.53 fix round,
+ * the lead's decision): the drafted move is taken back too, so publishing does not move the
+ * game later, whoever put it back (the server's own rule: whoever may put a game back may).
+ * When there is no draft or it does not move the game, the server changes nothing.
  */
 export async function takeBackNewDate(
   context: CommandContext,
@@ -140,23 +140,20 @@ export async function takeBackNewDate(
   gameId: string,
 ): Promise<void> {
   const deps = (await webPorts()).scheduleAdmin.deps;
-  const drafted = await getScheduleDraft(context, { seasonId }, deps);
-  if (!drafted.ok || drafted.value.draft === null) return;
-  if (!drafted.value.summary.gamesMoved.includes(gameId)) return;
   await moveDraftGame(
     context,
     {
       seasonId,
-      basedOnRevision: drafted.value.latestRevision,
-      version: drafted.value.draft.version,
-      draftId: drafted.value.draft.id,
+      basedOnRevision: null,
+      version: null,
+      draftId: null,
       gameId,
       roundId: null,
       date: '',
       time: null,
       venueId: null,
       court: null,
-      takeBack: true,
+      afterPutBack: true,
     },
     deps,
   );

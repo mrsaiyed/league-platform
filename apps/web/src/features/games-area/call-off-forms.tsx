@@ -197,7 +197,7 @@ export function CallOffForms(props: CallOffFormsProps) {
   /** A form's button: its own, or, while it is asked about, "No" in its very place. */
   const buttonOf = (act: CallOffAct, words: CallOffActTexts, isAsked: boolean, waiting: boolean) =>
     isAsked ? (
-      <button type="submit" className="ui-button" aria-describedby={questionId}>
+      <button type="submit" className="ui-button" aria-describedby={questionId} data-call-off-no="">
         {words.no}
       </button>
     ) : (
@@ -259,6 +259,7 @@ export function CallOffForms(props: CallOffFormsProps) {
             className="ui-button"
             // Putting a postponement back is no loss: the main kind; the others take away.
             data-kind={asked.act === 'restore' ? 'main' : 'danger'}
+            data-call-off-yes=""
             // Not ready yet: drawn so, and takes no tap (onYes); ready once the wait is over.
             {...(resting ? { 'aria-disabled': true, 'data-resting': '' } : {})}
           >
