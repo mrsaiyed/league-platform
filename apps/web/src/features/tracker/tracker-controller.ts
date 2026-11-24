@@ -1043,6 +1043,13 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   let takenOfList: KeptTap['command'][] = [];
   /** The last session this device held: the batch names it, though the server goes by the sequence. */
   let lastHeldSession: string | null = null;
+  /** The session the list was made under (T-373): named by its send, not one taken since. */
+  let listSession: string | null = null;
+  /** Keeps taps of the list the server took as taken, so a reload still sends them (T-373). */
+  const keepTaken = (taps: readonly KeptTap['command'][]): Promise<void> =>
+    queue
+      .keepTaken(taps.map((command) => ({ protocolVersion: trackerProtocolVersion, command })))
+      .catch(() => undefined);
 
   /**
    * Keeps waiting taps as not saved, with the sequence the list was made on when it is
@@ -1070,12 +1077,18 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       }
     }
     notSavedSince = since;
-    lastHeldSession ??= session;
+    listSession = session;
+    takenOfList = tapsIn(held, 'taken');
   };
 
   /** Lists `list` as not saved, and says whether "Send these plays" is offered for it. */
   const showNotSaved = (list: readonly KeptTap[]): void => {
-    if (list.length === 0) [notSavedSince, takenOfList] = [null, []];
+    if (list.length === 0) {
+      // Taken taps are kept only beside a list: gone with it (T-373).
+      const gone = takenOfList.map((c) => c.commandId);
+      [notSavedSince, takenOfList, listSession] = [null, [], null];
+      if (gone.length > 0) void queue.forget(gone).catch(() => undefined);
+    }
     const was = current.sendNotSaved;
     const sendNotSaved: SendNotSavedOffer =
       list.length === 0 || notSavedSince === null ? 'none' : was === 'none' ? 'offered' : was;
@@ -1093,11 +1106,13 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       .map((t) => t.command.commandId)
       .filter((id) => taken.has(id.toLowerCase()));
     if (saved.length === 0) return;
-    takenOfList.push(
-      ...current.notSaved.filter((t) => saved.includes(t.command.commandId)).map((t) => t.command),
-    );
+    const took = current.notSaved
+      .filter((t) => saved.includes(t.command.commandId))
+      .map((t) => t.command);
+    takenOfList.push(...took);
     showNotSaved(withoutTaps(current.notSaved, new Set(saved)));
-    await queue.forget(saved).catch(() => undefined);
+    if (current.notSaved.length > 0) await keepTaken(took);
+    else await queue.forget(saved).catch(() => undefined);
   };
 
   // --- The rosters (step 2.118): kept, fetched, and listed with the waiting changes. ---
@@ -1250,6 +1265,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       const keptNotSaved = keptIn(held, 'not-saved');
       if (current.notSaved.length === 0 && keptNotSaved.length === 0 && waiting.length > 0) {
         notSavedSince = madeOn;
+        listSession = lastHeldSession;
       }
       listNotSaved(withTaps(withTaps(current.notSaved, keptNotSaved), waiting));
       // If this fails they are still listed, and never sent under another session.
@@ -1266,7 +1282,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // This device's taps the server took since its base go with "Send these plays" (T-370).
     const took = new Set(loaded.value.state.recent.map((id) => id.toLowerCase()));
     if (current.notSaved.length > 0) {
-      takenOfList.push(...made.filter((c) => took.has(c.commandId.toLowerCase())));
+      const answered = made.filter((c) => took.has(c.commandId.toLowerCase()));
+      takenOfList.push(...answered);
+      await keepTaken(answered);
     }
     base = loaded.value;
     made = [];
@@ -2359,12 +2377,16 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
     async sendNotSaved() {
       const since = notSavedSince;
-      const named = lastHeldSession;
+      const named = listSession ?? lastHeldSession;
       if (current.sendNotSaved !== 'offered' || since === null || named === null) {
         return { ok: false, reason: 'not-offered' };
       }
       update({ sendNotSaved: 'sending' });
-      const plays = [...takenOfList, ...current.notSaved.map((t) => t.command)];
+      // In the server's own order (T-372): it looks past them batch by batch, in order.
+      const order = new Map((base?.state.recent ?? []).map((id, i) => [id.toLowerCase(), i]));
+      const at = (c: KeptTap['command']) => order.get(c.commandId.toLowerCase()) ?? -1;
+      const inOrder = [...takenOfList].sort((a, b) => at(a) - at(b));
+      const plays = [...inOrder, ...current.notSaved.map((t) => t.command)];
       const alreadyTaken = new Set(takenOfList.map((c) => c.commandId));
       let saved = 0;
       for (let i = 0; i < plays.length; i += maxCommandsPerBatch) {
@@ -2396,7 +2418,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         }
       }
       // Any the engine refused stay listed, to enter again; sending them again would not help.
-      [notSavedSince, takenOfList] = [null, []];
+      const gone = takenOfList.map((c) => c.commandId);
+      [notSavedSince, takenOfList, listSession] = [null, [], null];
+      if (gone.length > 0) await track(queue.forget(gone)).catch(() => undefined);
       update({ sendNotSaved: 'none' });
       void track(showServerGame());
       return { ok: true, saved };

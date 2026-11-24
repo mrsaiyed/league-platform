@@ -210,12 +210,11 @@ export async function openIndexedDbQueueStorage(
       // A taken tap the device no longer holds is stored at the end (T-372).
       const held = new Set<string>();
       const keepMissing = (commands: IDBObjectStore) => {
-        for (const { protocolVersion, command, sessionId } of taken) {
-          if (held.has(command.commandId)) continue;
-          const madeUnder = sessionId === undefined ? {} : { sessionId };
-          const row: Row = { gameId, protocolVersion, command, ...madeUnder, state: 'taken' };
+        for (const tap of taken) {
+          if (held.has(tap.command.commandId)) continue;
+          const row: Row = { gameId, ...tap, state: 'taken' };
           commands.add(row);
-          held.add(command.commandId);
+          held.add(tap.command.commandId);
         }
       };
       await write(undefined, (commands) => {

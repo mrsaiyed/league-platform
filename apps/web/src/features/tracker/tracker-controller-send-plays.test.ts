@@ -414,16 +414,11 @@ describe('a play made after the copy was saved, once the copy is uploaded (T-370
     });
   }
 
-  // Known faults left open (lane note 2.70, last part): each still answers game-moved.
-  // `it.fails` passes only while the fault is there; when it is fixed, make these `it`.
-  it.fails('is counted once after a reload before "Send these plays" (left open)', async () => {
+  it('is counted once after a reload before "Send these plays" (T-373)', async () => {
     await lateAfterCopy('owner', 3, true);
   });
 
-  it.fails(
-    'is counted once with 120 plays in the copy, more than one batch holds (left open)',
-    async () => {
-      await lateAfterCopy('owner', 120, false);
-    },
-  );
+  it('is counted once with 120 plays in the copy, more than one batch holds (T-372)', async () => {
+    await lateAfterCopy('owner', 120, false);
+  });
 });

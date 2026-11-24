@@ -93,13 +93,10 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
       });
       // A taken tap the device no longer holds is stored at the end (T-372).
       const holds = new Set(held.map((entry) => entry.command.commandId));
-      for (const { protocolVersion, command, sessionId } of taken) {
-        if (holds.has(command.commandId)) continue;
-        const madeUnder = sessionId === undefined ? {} : { sessionId };
-        held.push(
-          structuredClone({ gameId, protocolVersion, command, ...madeUnder, state: 'taken' }),
-        );
-        holds.add(command.commandId);
+      for (const tap of taken) {
+        if (holds.has(tap.command.commandId)) continue;
+        held.push(structuredClone({ gameId, ...tap, state: 'taken' }));
+        holds.add(tap.command.commandId);
       }
     },
     async listAll() {

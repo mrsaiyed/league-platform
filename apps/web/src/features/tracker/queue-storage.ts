@@ -101,6 +101,9 @@ export type TakenTap = {
   readonly protocolVersion: number;
   readonly command: BatchCommand;
   readonly sessionId?: string;
+  /** The league and the maker, as `inLeague` stores them, so the maker still lists it (T-373). */
+  readonly leagueId?: string;
+  readonly accountId?: string;
 };
 
 /** What one answer from the server changes, written together or not at all. */
@@ -222,6 +225,12 @@ export function inLeague(storage: QueueStorage, leagueId: string, accountId: str
     add: (gameId, entry) => storage.add(gameId, { ...entry, leagueId, accountId }),
     list: async (gameId) =>
       (await storage.list(gameId)).filter((entry) => madeBy(entry, accountId)),
-    settle: (gameId, settlement) => storage.settle(gameId, settlement),
+    settle: (gameId, { taken, ...settlement }) =>
+      storage.settle(
+        gameId,
+        taken === undefined
+          ? settlement
+          : { ...settlement, taken: taken.map((tap) => ({ ...tap, leagueId, accountId })) },
+      ),
   };
 }

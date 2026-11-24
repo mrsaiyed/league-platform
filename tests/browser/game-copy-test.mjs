@@ -14,7 +14,8 @@
 //   new; the same file again adds nothing.
 // - A comes back online: it is told it left the game and that its one later play still
 //   waits. "Send these plays" puts that play on the server, and every play, the copy's and
-//   the later one, is counted exactly once, nothing typed again (T-370).
+//   the later one, is counted exactly once, nothing typed again (T-370); in the owner's
+//   game A reloads first, and it is still so (T-373).
 // - Someone who may not score the game (a coach, a signed-in person with no role) is
 //   refused the page; someone signed out is sent to sign in.
 // - Once the game is final, a copy with a play the server does not have is refused in the
@@ -306,9 +307,26 @@ async function copyRun(browser, uploader) {
           `${await kept.count()} listed; ${await shown()}`,
         );
       };
-      // A reload here, before "Send these plays", is not checked yet: the send is then still
-      // refused game-moved (weak spot 1 of the fix round, see the lane note).
       await offered('back online');
+      if (byOwner) {
+        // T-373: A reloads before "Send these plays". Nobody holds the game, so A opens it
+        // again; the list and the copy's plays kept as taken are read back, and the send
+        // still names the session the list was made under.
+        await a.page.reload();
+        await c.open();
+        try {
+          await a.page.locator('[data-send-not-saved="offered"] [data-send-plays]').waitFor({
+            timeout: 90_000,
+          });
+        } catch (error) {
+          throw new Error(`after a reload: ${whatWentWrong(error)}; A shows: ${await shown()}`);
+        }
+        note(
+          `${at}: after a reload A still lists its 1 later play, with "Send these plays"`,
+          (await kept.count()) === 1,
+          `${await kept.count()} listed; ${await shown()}`,
+        );
+      }
       await a.page.locator('[data-send-plays]').tap();
       await a.page.locator('[data-kept-list]').waitFor({ state: 'detached' });
       const sent = pointsOf((await serverState(origin)).plays, ids);
@@ -318,13 +336,15 @@ async function copyRun(browser, uploader) {
           (await a.page.locator('[data-send-not-saved="game-moved"]').count()) === 0,
         JSON.stringify(sent),
       );
-      const openAgain = a.page.getByRole('button', { name: 'Open the game again' });
-      await openAgain.click();
-      await c.open();
+      if (!byOwner) {
+        // Left the game: opened again. After the reload A already holds it.
+        await a.page.getByRole('button', { name: 'Open the game again' }).click();
+        await c.open();
+      }
       await c.saved();
       const late = pointsOf((await serverState(origin)).plays, ids);
       note(
-        `${at}: A opened again: nothing waits on A, each play once, A's screen 6–5`,
+        `${at}: A scoring again: nothing waits on A, each play once, A's screen 6–5`,
         JSON.stringify(late) === JSON.stringify(eachOnce) &&
           (await kept.count()) === 0 &&
           JSON.stringify(await c.score()) === JSON.stringify({ home: 6, away: 5 }),
