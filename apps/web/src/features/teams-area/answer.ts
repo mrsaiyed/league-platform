@@ -8,7 +8,6 @@ import type { TextKey } from '../../server/messages.ts';
 
 /** What went well, each with a message `adminTeams.done.<name>`. */
 export const doneNames = [
-  'created',
   'updated',
   'statsSaved',
   'removed',
@@ -79,7 +78,7 @@ export function removeRefusalOf(query: Query): string | undefined {
 }
 
 /**
- * The part of the address that carries an answer: `?done=created` or `?problem=...`; a
+ * The part of the address that carries an answer: `?done=updated` or `?problem=...`; a
  * refused leaving date adds its line and what was typed, and the line's anchor.
  */
 export function answerQuery(answer: Answer): string {

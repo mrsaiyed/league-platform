@@ -36,7 +36,6 @@ export const enAdminTeams = {
   'adminTeams.create.submit': 'Add team',
   'adminTeams.create.title': 'Add a team',
   'adminTeams.done.added': 'The player was added to the roster.',
-  'adminTeams.done.created': 'The team was added.',
   'adminTeams.done.entrySaved': 'The number and role were saved.',
   'adminTeams.done.left': 'The player was marked as having left.',
   'adminTeams.done.moved': 'The roster order was saved.',

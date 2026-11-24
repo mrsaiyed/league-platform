@@ -100,6 +100,11 @@ if (built) {
         p.getByRole('button', { name: 'Add team' }),
         /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
       );
+      // The save is proved by the page itself: the new team's page says so (2.155).
+      await p
+        .getByRole('status')
+        .filter({ hasText: `Saved: ${name} was added to the season.` })
+        .waitFor({ timeout: 10_000 });
     };
 
     at = 'enough teams are added for a second page of the log';

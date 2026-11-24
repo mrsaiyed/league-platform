@@ -444,6 +444,11 @@ if (browser) {
       form.getByRole('button', { name: 'Add team' }),
       /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
     );
+    // The save is proved by the page itself: the new team's page says so (2.155).
+    await page
+      .getByRole('status')
+      .filter({ hasText: 'was added to the season.' })
+      .waitFor({ timeout: 10_000 });
     teamAdmin = new URL(page.url()).pathname;
   });
 
@@ -613,6 +618,11 @@ if (browser) {
         create.getByRole('button', { name: 'Add team' }),
         /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
       );
+      // The save is proved by the page itself: the new team's page says so (2.155).
+      await page
+        .getByRole('status')
+        .filter({ hasText: `Saved: ${name} was added to the season.` })
+        .waitFor({ timeout: 10_000 });
     }
     await page.goto(`${origin}/north-valley/admin/standings`);
     const set = page.locator('[data-level-set*="Level Partner"]');

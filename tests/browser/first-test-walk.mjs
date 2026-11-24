@@ -132,6 +132,11 @@ export async function walkFirstTest(o) {
         page.getByRole('button', { name: 'Add team' }),
         /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
       );
+      // The save is proved by the page itself: the new team's page says so (2.155).
+      await page
+        .getByRole('status')
+        .filter({ hasText: `Saved: ${name} was added to the season.` })
+        .waitFor({ timeout: 10_000 });
       if (name === 'Ravens') say(3, await mainText(page));
       if (from === null) continue;
       const headings = await page.locator('main h2').allInnerTexts();
