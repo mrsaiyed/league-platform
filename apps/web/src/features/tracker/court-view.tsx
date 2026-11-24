@@ -144,7 +144,9 @@ export type CourtViewProps = {
   readonly noticesIn?: 'top' | 'pad';
   /**
    * The season keeps turnovers (S-93, step 2.241): only then are the turnover button, the
-   * team-turnover button, the turnovers chip and its hint drawn. Absent: they are.
+   * team-turnover button, the turnovers chip and its hint drawn. Absent: they are. Where
+   * it keeps none, a team with turnovers recorded while they were kept still gets its chip
+   * and its list, to take them back (T-394), with no button adding one.
    */
   readonly turnovers?: boolean;
   readonly pad: PadMode;
@@ -407,7 +409,7 @@ function Team(props: CourtViewProps & { readonly team: TeamPanel }) {
               <span className="court-caret" aria-hidden="true" />
             </button>
           ) : null}
-          {props.turnovers === false ? null : (
+          {props.turnovers === false && team.turnovers === 0 ? null : (
             <button
               type="button"
               className="court-chip"
@@ -660,7 +662,8 @@ function Pad(props: CourtViewProps) {
         )}
       </p>
       {tile !== undefined ? <PlayerPad {...props} tile={tile} /> : null}
-      {pad.kind === 'turnovers' && props.turnovers !== false ? (
+      {pad.kind === 'turnovers' &&
+      (props.turnovers !== false || view.teams[pad.side].turnovers > 0) ? (
         <TurnoversPad {...props} team={view.teams[pad.side]} />
       ) : null}
       {pad.kind === 'bench' ? (
@@ -1023,15 +1026,17 @@ function TurnoversPad(props: CourtViewProps & { readonly team: TeamPanel }) {
           )}
         </ul>
       )}
-      <button
-        type="button"
-        className="court-opt court-opt-team-turnover"
-        data-act="team-turnover"
-        title={t('tracker.turnovers.addTeamHelp')}
-        onClick={() => on.teamTurnover(team.side)}
-      >
-        {t('tracker.turnovers.addTeam')}
-      </button>
+      {props.turnovers === false ? null : (
+        <button
+          type="button"
+          className="court-opt court-opt-team-turnover"
+          data-act="team-turnover"
+          title={t('tracker.turnovers.addTeamHelp')}
+          onClick={() => on.teamTurnover(team.side)}
+        >
+          {t('tracker.turnovers.addTeam')}
+        </button>
+      )}
     </div>
   );
 }

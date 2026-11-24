@@ -576,6 +576,30 @@ describe('turnovers (checklist D9, G1, G2)', () => {
     expect(refused !== undefined && 'input' in refused && refused.input.type).toBe('turnover');
   });
 
+  it('still offers taking back turnovers recorded while they were kept, with no button adding one (T-394)', async () => {
+    const device = await turnoversKept();
+    await device.tipOff();
+    await device.option(h2, 'turnover');
+    await device.taken({ type: 'team-turnover', side: 'home' });
+    // The admin turns turnovers off: the device reads rosters keeping none.
+    const turnovers = false;
+    const atRest = drawn(device.view(), { turnovers });
+    expect(tagWith(atRest, 'data-turnovers="home"')).toContain('aria-expanded="false"');
+    expect(atRest).toContain('>2 turnovers<');
+    expect(atRest).not.toContain('data-turnovers="away"');
+    const list = padDrawn(
+      drawn(device.view(), { pad: { kind: 'turnovers', side: 'home' }, turnovers }),
+    );
+    expect(list).toContain(`data-turnovers-of="${h2}"`);
+    expect(list).toContain('data-act="unturnover"');
+    expect(list).toContain('data-act="team-unturnover"');
+    expect(list).not.toContain('data-act="team-turnover"');
+    const tapped = drawn(device.view(), { pad: { kind: 'player', playerId: h2 }, turnovers });
+    expect(padDrawn(tapped)).not.toContain('data-act="turnover"');
+    await device.taken({ type: 'unturnover', side: 'home', playerId: h2 });
+    expect((await device.onServer()).teams.home.turnovers).toBe(1);
+  });
+
   it('counts a player’s turnovers in the team’s chip, lists them, and takes one back', async () => {
     const device = await turnoversKept();
     await device.tipOff();

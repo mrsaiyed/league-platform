@@ -4,9 +4,19 @@ import { describe, expect, it } from 'vitest';
 import { keptForScoring, statisticOfTap, tapNotKept } from './statistic-of-tap.ts';
 
 describe('the statistic a tap records', () => {
-  it('is turnovers for a player’s or the team’s turnover and for taking one back', () => {
-    for (const type of ['turnover', 'unturnover', 'team-turnover', 'team-unturnover']) {
+  it('is turnovers for a player’s or the team’s turnover', () => {
+    for (const type of ['turnover', 'team-turnover']) {
       expect(statisticOfTap(type), type).toBe('turnovers');
+    }
+  });
+
+  it('is none for taking a turnover back, always taken (T-394)', () => {
+    for (const type of ['unturnover', 'team-unturnover']) {
+      expect(statisticOfTap(type), type).toBeUndefined();
+      expect(
+        tapNotKept(type, keptForScoring(seasonRulesPreset('high-school'))),
+        type,
+      ).toBeUndefined();
     }
   });
 

@@ -2,15 +2,16 @@
 // and the server takes, a play only of a statistic the season keeps ("Statistics kept",
 // P7 §1). Points and fouls are kept in every season that tracks games live (a season
 // keeping points only cannot track live), so only the turnovers, a player's and the
-// team's, and the taps that take one back, name a statistic a season may not keep.
-// Every other tap (line-ups, the clock, timeouts, substitutions) is no statistic.
+// team's, name a statistic a season may not keep. A tap that takes one back records no
+// statistic and is always taken (T-394): a turnover recorded while turnovers were kept
+// can be undone after the admin turns them off (the engine refuses a take-back with
+// nothing to take back). Every other tap (line-ups, the clock, timeouts, substitutions)
+// is no statistic.
 import { statisticsKept } from './statistics-kept.ts';
 
 const statisticOf: Readonly<Record<string, string>> = {
   turnover: 'turnovers',
-  unturnover: 'turnovers',
   'team-turnover': 'turnovers',
-  'team-unturnover': 'turnovers',
 };
 
 /** The statistic a tap of this type records, or undefined for a tap that records none. */
