@@ -40,6 +40,7 @@ import {
   openScoringSession,
   readTrackerState,
   releaseScoringSession,
+  statisticOfTap,
   takeOverScoring,
   type ScoringSessionReply,
 } from '@srleagues/core';
@@ -108,6 +109,8 @@ async function throughTheDoor(
   const body = {
     protocolVersion: batch[0]?.protocolVersion ?? 0,
     sessionId,
+    // Named so a play of a statistic the season does not keep is told apart (T-395).
+    knownRefusals: ['statistic-not-kept' as const],
     commands: batch.map((c) => c.command),
   };
   const outcome = await sendTrackerCommands(context, game, body, ports, publish);
@@ -250,6 +253,7 @@ export async function uploadGameCopy(
   let added = 0;
   let alreadyThere = commands.length - fresh.length;
   let notTaken = 0;
+  const notKept = new Map<string, number>();
   let saved = false;
   try {
     for (const batch of copyBatches(fresh)) {
@@ -259,17 +263,29 @@ export async function uploadGameCopy(
         continue;
       }
       saved ||= door.saved;
+      const typeOf = new Map(batch.map((c) => [c.command.commandId, c.command.input.type]));
       for (const r of door.reply.results) {
         if (r.status === 'accepted') added += 1;
         else if (r.status === 'duplicate') alreadyThere += 1;
-        else notTaken += 1;
+        else if (r.reason.code === 'statistic-not-kept') {
+          const statistic = statisticOfTap(typeOf.get(r.commandId) ?? '') ?? 'other';
+          notKept.set(statistic, (notKept.get(statistic) ?? 0) + 1);
+        } else notTaken += 1;
       }
     }
   } finally {
     await letGo(context, game, sessionId, ports);
   }
+  const kept = [...notKept].map(([statistic, count]) => ({ statistic, count }));
+  const reply: GameCopyUploadReply = {
+    status: 'uploaded',
+    added,
+    alreadyThere,
+    notTaken,
+    ...(kept.length === 0 ? {} : { notKept: kept }),
+  };
   return {
-    answer: { status: 200, body: { status: 'uploaded', added, alreadyThere, notTaken } },
+    answer: { status: 200, body: reply },
     afterwards: saved ? () => publish(leagueId, game) : null,
   };
 }

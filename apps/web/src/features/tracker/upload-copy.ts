@@ -4,6 +4,7 @@
 import {
   GameCopyUploadReply,
   maxGameCopyLength,
+  type GameCopyNotKept,
   type GameCopyUpload,
   type GameCopyUploadRefusal,
 } from '@srleagues/contracts';
@@ -25,6 +26,8 @@ export type UploadView =
       readonly added: number;
       readonly alreadyThere: number;
       readonly notTaken: number;
+      /** Plays of a statistic the season does not keep, by statistic (T-395). */
+      readonly notKept?: readonly GameCopyNotKept[];
     }
   /** Another device holds the game: the takeover question, with what to send if agreed. */
   | {
@@ -65,6 +68,7 @@ export function uploadViewOf(status: number, body: unknown, copy: string): Uploa
         added: r.added,
         alreadyThere: r.alreadyThere,
         notTaken: r.notTaken,
+        ...(r.notKept === undefined ? {} : { notKept: r.notKept }),
       };
     }
     if (r.status === 'held-by-other') {
@@ -85,12 +89,18 @@ export function uploadedLines(
   view: Extract<UploadView, { kind: 'uploaded' }>,
   t: Translate,
 ): string[] {
-  const { added, alreadyThere, notTaken } = view;
-  if (added + alreadyThere + notTaken === 0) return [t('tracker.upload.empty')];
+  const { added, alreadyThere, notTaken, notKept = [] } = view;
+  const notKeptCount = notKept.reduce((sum, n) => sum + n.count, 0);
+  if (added + alreadyThere + notTaken + notKeptCount === 0) return [t('tracker.upload.empty')];
   return [
     t('tracker.upload.done'),
     added === 0 ? t('tracker.upload.addedNone') : t.plural('tracker.upload.added', added),
     ...(alreadyThere === 0 ? [] : [t.plural('tracker.upload.alreadyThere', alreadyThere)]),
     ...(notTaken === 0 ? [] : [t.plural('tracker.upload.notTaken', notTaken)]),
+    ...notKept.map((n) =>
+      n.statistic === 'turnovers'
+        ? t.plural('tracker.upload.notKept.turnovers', n.count)
+        : t.plural('tracker.upload.notKept.other', n.count),
+    ),
   ];
 }

@@ -814,6 +814,14 @@ export const enTracker = {
     'Pick the file saved by “Save a copy” on the scoring device. Its plays are sent to the server; any the server already has are skipped, so nothing is counted twice.',
   'tracker.upload.link': 'Upload a copy of this game',
   'tracker.upload.noFile': 'Pick the copy’s file first.',
+  'tracker.upload.notKept.other_one':
+    '{count} play was not taken: this season does not keep its statistic. An admin can change that in “Statistics kept”.',
+  'tracker.upload.notKept.other_other':
+    '{count} plays were not taken: this season does not keep their statistic. An admin can change that in “Statistics kept”.',
+  'tracker.upload.notKept.turnovers_one':
+    '{count} turnover was not taken: this season does not keep turnovers. An admin can change that in “Statistics kept”.',
+  'tracker.upload.notKept.turnovers_other':
+    '{count} turnovers were not taken: this season does not keep turnovers. An admin can change that in “Statistics kept”.',
   'tracker.upload.notNow': 'Nothing was uploaded. The game stays with that device.',
   'tracker.upload.notTaken_one':
     '{count} play was not taken: the game’s rules refused it, or another device took the game while the copy was being sent.',

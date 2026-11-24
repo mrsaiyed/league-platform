@@ -130,7 +130,13 @@ export async function runPartSave(
   if (!reading.ok) return wrongBoxes(reading.wrong, typed);
   const saved = await setSeasonRules(
     context,
-    { seasonId, version, rules: reading.value, confirmed: step === 'confirm' },
+    {
+      seasonId,
+      version,
+      rules: reading.value,
+      confirmed: step === 'confirm',
+      statisticsSaved: part === 'recording',
+    },
     deps.seasons,
   );
   if (saved.ok) return { kind: 'saved', part, seasonId, seasonSlug: season.slug };

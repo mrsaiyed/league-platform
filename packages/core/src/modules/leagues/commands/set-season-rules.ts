@@ -52,6 +52,11 @@ export const setSeasonRules = defineCommand({
     rules: SeasonRules,
     /** The admin has seen what the change moves and agrees (S-1). */
     confirmed: z.boolean().default(false),
+    /**
+     * The admin saved "Statistics kept" (the settings page's recording part): the season's
+     * own named list gives way even when the choice is the one already saved (T-393).
+     */
+    statisticsSaved: z.boolean().default(false),
   }),
   allowed: async (context, input, tx: LeaguesTx & StandingsTx) =>
     mayEditLeague(context, tx, 'season.settings', await seasonScope(tx, input.seasonId)),
@@ -65,7 +70,14 @@ export const setSeasonRules = defineCommand({
     if (season.version !== input.version) return fail({ code: 'changed-since-read' });
     const before = readSeasonRules(season.rules);
     const changed = changedParts(before.rules, input.rules);
-    if (before.saved && changed.length === 0) return ok({ version: season.version });
+    if (before.saved && changed.length === 0) {
+      if (!input.statisticsSaved) return ok({ version: season.version });
+      // Nothing else to save, so nothing moves in the standings: only the list gives way.
+      const emptied = await tx.leagues.updateSeason(season.id, { statKeys: [] }, input.version);
+      return emptied === undefined || emptied === 'unique-jerseys-clash'
+        ? fail({ code: 'changed-since-read' })
+        : ok({ version: emptied });
+    }
     // Hold the season's standings first, so the preview is worked out one after the
     // other with any result being saved at the same time, and not from a stale table.
     await tx.standings.lockSeason(season.id);
@@ -75,9 +87,10 @@ export const setSeasonRules = defineCommand({
     if (moves.length > 0 && !input.confirmed) return fail({ code: 'confirmation-needed', moves });
     // The admin's "Statistics kept" is what the season keeps from now on, for the scoring
     // screen and the public pages alike: a named list the season held gives way (T-393).
-    const change = changed.includes('statistics')
-      ? { rules: input.rules, statKeys: [] }
-      : { rules: input.rules };
+    const change =
+      changed.includes('statistics') || input.statisticsSaved
+        ? { rules: input.rules, statKeys: [] }
+        : { rules: input.rules };
     const updated = await tx.leagues.updateSeason(season.id, change, input.version);
     if (updated === 'unique-jerseys-clash') return fail({ code: 'unique-jerseys-clash' });
     if (updated === undefined) return fail({ code: 'changed-since-read' });

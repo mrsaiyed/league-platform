@@ -161,7 +161,7 @@ describe('saving "Statistics kept" empties the season\'s own named list (T-393)'
       )
     ).stat_keys;
 
-  it('empties the list when the statistics change, and keeps it when they do not', async () => {
+  it('empties the list when the statistics change or are saved again, and keeps it otherwise', async () => {
     const l = await newLeague(pglite);
     const seasonId = await newSeason(pglite, l.leagueId, l.defaultProgramId);
     await pglite.query(`update seasons set stat_keys = '{points,rebounds,fouls}' where id = $1`, [
@@ -184,6 +184,15 @@ describe('saving "Statistics kept" empties the season\'s own named list (T-393)'
     const kept = { ...rules, statistics: 'standard-turnovers' as const };
     const second = { seasonId, version: await versionOf(), rules: kept };
     expect(await setSeasonRules(ctx, second, deps)).toMatchObject({ ok: true });
+    expect(await statKeysOf(seasonId)).toEqual([]);
+
+    // "Statistics kept" saved with the choice already saved: the list gives way all the same.
+    await pglite.query(`update seasons set stat_keys = '{points,fouls}' where id = $1`, [seasonId]);
+    const same = { seasonId, version: await versionOf(), rules: kept };
+    expect(await setSeasonRules(ctx, same, deps)).toMatchObject({ ok: true });
+    expect(await statKeysOf(seasonId)).toEqual(['points', 'fouls']);
+    const saved = { ...same, version: await versionOf(), statisticsSaved: true };
+    expect(await setSeasonRules(ctx, saved, deps)).toMatchObject({ ok: true });
     expect(await statKeysOf(seasonId)).toEqual([]);
   });
 });
