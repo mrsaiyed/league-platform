@@ -3,6 +3,7 @@
 // (apps/web/src/server) over the web app's made-up stand-in, as the person it is made
 // for. The network can be down (nothing reaches the server) or lose answers (the server
 // does the work, the answer never comes back).
+import { trackerChangesHeader } from '@srleagues/contracts';
 import { standInLeagues } from '../../server/stand-in-ports.ts';
 import { markNotStartedRequest } from '../../server/not-started-endpoint.ts';
 import { reopenOfferRequest, reopenTrackedGameRequest } from '../../server/reopen-game-endpoint.ts';
@@ -97,8 +98,11 @@ export function endpointNetwork(options: EndpointNetworkOptions = {}): EndpointN
       }
       case 'rosters':
         return trackerRostersRequest(context, game, world.tracker);
-      default:
-        return trackerStateRequest(context, game, world.tracker);
+      default: {
+        // The tracker of this release asks for the changes of players too (T-356).
+        const asked = new Headers(init?.headers).get(trackerChangesHeader) === '1';
+        return trackerStateRequest(context, game, world.tracker, asked);
+      }
     }
   }
 

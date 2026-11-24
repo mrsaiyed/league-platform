@@ -83,6 +83,23 @@ describe('send these plays (S-43)', () => {
     expect(drawn('offered', true)).toContain('disabled');
   });
 
+  it('says the device could not tell whether somebody else scored, and offers no send (step 2.242, T-358)', () => {
+    const told = (offer: 'none' | 'offered' | 'sending' | 'game-moved') =>
+      renderToStaticMarkup(
+        createElement(SendNotSaved, { offer, busy: false, onSend: none, t, cannotTell: true }),
+      );
+    const said =
+      'This device could not tell whether somebody else scored in this game since these plays were made, so it did not send them. A play is never counted twice.';
+    expect(told('none')).toContain('data-cannot-tell=""');
+    expect(text(told('none'))).toBe(said);
+    // Before (review M1): "Send these plays" beside it; the server refused it nearly always.
+    expect(told('offered')).not.toContain('data-send-plays');
+    expect(text(told('offered'))).toBe(said);
+    expect(told('sending')).not.toContain('<button');
+    expect(told('game-moved')).not.toContain('<button');
+    expect(drawn('offered')).not.toContain('data-cannot-tell');
+  });
+
   it('once the server refused them, offers no button and says each is entered again', () => {
     expect(drawn('game-moved')).not.toContain('<button');
     expect(text(drawn('game-moved'))).toBe(

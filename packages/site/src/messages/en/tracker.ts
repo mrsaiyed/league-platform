@@ -669,6 +669,9 @@ export const enTracker = {
   'tracker.say.untimeoutOf': 'Timeout taken back: {team}, {period} {clock}.',
   'tracker.seeWhoIsScoring': 'See who is scoring',
   // "Send these plays" (S-43): only by the scorekeeper's tap, and only while nothing was recorded since.
+  // The device could not tell whose the commands since were (step 2.242, T-357).
+  'tracker.sendNotSaved.cannotTell':
+    'This device could not tell whether somebody else scored in this game since these plays were made, so it did not send them. A play is never counted twice.',
   'tracker.sendNotSaved.gameMoved':
     'These plays could not be sent: something was recorded in this game since they were made. Each one must be entered again on the device scoring the game.',
   'tracker.sendNotSaved.send': 'Send these plays',

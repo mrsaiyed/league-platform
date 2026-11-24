@@ -635,6 +635,7 @@ function Notices({
         {name === 'kept' ? (
           <SendNotSaved
             offer={status.sendNotSaved}
+            cannotTell={status.cannotTell}
             busy={busy}
             onSend={lists.onSendNotSaved}
             t={t}

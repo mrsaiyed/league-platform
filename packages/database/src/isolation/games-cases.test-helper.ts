@@ -23,7 +23,9 @@ import {
   releaseScoringSession,
   renewScoringSession,
   reopenGame,
+  putSheetBack,
   readOwnResultOffer,
+  readSheetPutBackOffer,
   readOwnResultOffers,
   readReopenOffer,
   reopenOwnResult,
@@ -79,6 +81,7 @@ import {
   listSeasonAssignments,
   replaceGameLines,
   updateGameResult,
+  listGameCorrectionsNewestFirst,
   findLastEventSeq,
   listGameEventsAfter,
   findTablePlayer,
@@ -288,6 +291,84 @@ registerIsolationCase({
 registerCommandCase(reopenGame, harnessTx, {
   name: "reopen the target's final game",
   input: (target) => ({ gameId: target.gameId, version: 1, reason: 'Harness reopening' }),
+});
+
+// Putting a sheet back (step 2.229, T-366): in the run's own scope the target's upcoming
+// game is given a line of its player and a final typed by hand, reopened (its correction
+// keeps the line, T-365) and decided again with no lines; in the target's league its
+// owner may correct games, so the sheet goes back; anywhere else every step finds no
+// game, so it is refused or finds nothing, and no correction of the target is read.
+const keptSheetOf = async (
+  scope: Parameters<typeof updateGameResult>[0],
+  target: LeagueRecords,
+) => {
+  const gameId = target.upcomingGameId;
+  await replaceGameLines(scope, gameId, [
+    {
+      gameId,
+      teamId: target.teamId,
+      personId: target.personId,
+      jerseyNumber: null,
+      played: true,
+      secondsPlayed: null,
+      stats: { points: 7 },
+    },
+  ]);
+  await typedFinal(scope, gameId, target.memberId);
+  await runAsApp(reopenGame, harnessTx, scope, { gameId, version: 2, reason: 'Harness reopening' });
+  await replaceGameLines(scope, gameId, []);
+  await updateGameResult(
+    scope,
+    gameId,
+    {
+      status: 'final',
+      homeScore: 52,
+      awayScore: 40,
+      decided: true,
+      overtimePeriods: null,
+      decidedBy: target.memberId,
+    },
+    3,
+  );
+};
+
+registerIsolationCase({
+  subject: putSheetBack,
+  name: "put back the sheet a correction of the target's upcoming game kept",
+  run: async (scope, target) => {
+    await keptSheetOf(scope, target);
+    return runAsApp(putSheetBack, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      version: 4,
+      reason: 'Harness putting back',
+    });
+  },
+});
+
+registerIsolationCase({
+  subject: listGameCorrectionsNewestFirst,
+  name: "read the corrections of the target's upcoming game, newest first",
+  // A reopen's correction of the game, inside the target's own fence (fixed id, dates and
+  // documents), so a query with its league filter taken out would find it from another
+  // league (the fence check, step 2.229).
+  arrange: (inTarget, target) =>
+    sql`insert into game_corrections
+      (id, league_id, game_id, account_id, reason, before, after, at, created_at)
+      values ('01900000-0000-7000-8000-00000000c229', ${inTarget.leagueId},
+        ${target.upcomingGameId}, ${target.ownerId}, 'Harness reopening',
+        ${JSON.stringify({ version: 1, status: 'final', homeScore: 50, awayScore: 40 })}::jsonb,
+        ${JSON.stringify({ version: 1, status: 'scheduled', homeScore: null, awayScore: null })}::jsonb,
+        '2026-11-20T18:00:00Z', '2026-11-20T18:00:00Z')`.execute(transactionOf(inTarget)),
+  run: (scope, target) => listGameCorrectionsNewestFirst(scope, target.upcomingGameId),
+});
+
+registerIsolationCase({
+  subject: readSheetPutBackOffer,
+  name: "read whether the sheet a correction of the target's upcoming game kept can be put back",
+  run: async (scope, target) => {
+    await keptSheetOf(scope, target);
+    return runAsApp(readSheetPutBackOffer, harnessTx, scope, { gameId: target.upcomingGameId });
+  },
 });
 
 // The scorekeeper's way back from End game (step 2.120): the target's final game was

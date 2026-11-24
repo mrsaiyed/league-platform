@@ -370,6 +370,24 @@ html:has(.staff) {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+/* The clipped copy holds the one link a keyboard reaches (the strip's copy is hidden from
+   screen readers, its link out of the tab order): while that link has the focus, the copy
+   is drawn as a box under the bar, so the focus can be seen (step 2.125 fix round). */
+.staff .staff-bar .staff-status-says:focus-within {
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  z-index: 2;
+  inline-size: min(20rem, calc(100vw - 2 * var(--step-4)));
+  block-size: auto;
+  padding-block: var(--step-3);
+  padding-inline: var(--step-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-small);
+  overflow: visible;
+  clip-path: none;
+  background: var(--color-panel);
+  white-space: normal;
+}
 .staff .staff-status-band {
   display: none;
   margin: 0;

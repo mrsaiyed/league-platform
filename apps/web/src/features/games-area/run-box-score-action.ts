@@ -1,5 +1,6 @@
 // One change from the box score grid: save the sheet, or reopen a final game to correct
-// it (S-7), by the door the page offered (reopen-view.ts). The form's words become a games command's input, and the command runs with
+// it (S-7), by the door the page offered (reopen-view.ts), or put a reopened box score
+// back as the reopen kept it (step 2.229, T-366). The form's words become a games command's input, and the command runs with
 // the context the server worked out from the session (T-23). The sheet is read again
 // first, so the grid is read against the players and columns the game has now.
 //
@@ -8,6 +9,8 @@
 // known as the same request before it gets here (server/same-request.ts, record 067).
 import {
   getBoxScoreSheet,
+  putSheetBack,
+  readSheetPutBackOffer,
   reopenGame,
   reopenOwnResult,
   reopenTrackedGame,
@@ -18,7 +21,7 @@ import {
 } from '@srleagues/core';
 import { readBoxScoreForm, wrongBoxScoreFields, type BoxScoreFields } from './box-score-form.ts';
 
-export const boxScoreActions = ['save', 'reopen'] as const;
+export const boxScoreActions = ['save', 'reopen', 'put-back'] as const;
 export type BoxScoreAction = (typeof boxScoreActions)[number];
 
 export function isBoxScoreAction(value: unknown): value is BoxScoreAction {
@@ -47,6 +50,21 @@ export async function runBoxScoreAction(
 ): Promise<BoxScoreActionResult> {
   const gameId = fields['gameId'];
   const version = versionOf(fields['version']);
+  if (action === 'put-back') {
+    // With the version seen (T-46): a double tap or an old page is refused, never written
+    // twice. Its one typed field is the reason, so input it refuses is the reason.
+    const back = await putSheetBack(context, { gameId, version, reason: fields['reason'] }, deps);
+    if (back.ok) return { ok: true };
+    if (back.error.code === 'invalid-input') return { ok: false, code: 'put-back-reason' };
+    // A page drawn before something newer was saved carries an old version: said as what
+    // happened (something newer saved, the game reopened), not only "someone changed it",
+    // when the put back is no longer offered at all.
+    if (back.error.code === 'changed-since-read') {
+      const now = await readSheetPutBackOffer(context, { gameId }, deps);
+      if (now.ok && !now.value.offered) return { ok: false, code: now.value.code };
+    }
+    return { ok: false, code: back.error.code };
+  }
   if (action === 'reopen') {
     // A game its tracker ended is reopened through the tracker's own door (step 2.120),
     // which also lets the scorekeeper who ended it do so within the league's minutes; the

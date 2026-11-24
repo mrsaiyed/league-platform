@@ -2,6 +2,8 @@
 import type { GamesStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
 import {
+  findPerson,
+  findTeam,
   deleteGameAssignment,
   findGame,
   findGameGivenFormat,
@@ -11,6 +13,7 @@ import {
   hasBinnedGamePart,
   insertGameAssignment,
   insertGameCorrection,
+  listGameCorrectionsNewestFirst,
   isGameAssigned,
   listDecidedGameLines,
   listDecidedGames,
@@ -43,6 +46,7 @@ export function gamesStore(scope: LeagueScope): GamesStore {
     setGivenFormat: (gameId, format, version) =>
       updateGameGivenFormat(scope, gameId, format, version),
     addCorrection: (correction) => insertGameCorrection(scope, correction),
+    correctionsNewestFirst: (gameId) => listGameCorrectionsNewestFirst(scope, gameId),
     listPostponed: (seasonId) => listPostponedGames(scope, seasonId),
     statusBeforeCancelled: (gameId) => findStatusBeforeCancelled(scope, gameId),
     partInBin: (gameId) => hasBinnedGamePart(scope, gameId),
@@ -52,6 +56,14 @@ export function gamesStore(scope: LeagueScope): GamesStore {
     listLines: (gameId) => listGameLines(scope, gameId),
     replaceLines: (gameId, lines) => replaceGameLines(scope, gameId, lines),
     listRoster: (gameId) => listGameRoster(scope, gameId),
+    // Both still in the league, one of them in the bin: a restore brings the player back.
+    inBin: async ({ teamId, personId }) => {
+      const [person, team] = [
+        await findPerson(scope, personId, false),
+        await findTeam(scope, teamId),
+      ];
+      return person !== undefined && team !== undefined && (person.binned || team.binned);
+    },
     hasPlays: (gameId) => gameHasPlays(scope, gameId),
     findSeason: async (seasonId) => {
       const season = await findSeason(scope, seasonId);

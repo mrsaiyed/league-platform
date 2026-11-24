@@ -281,6 +281,8 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): ScorekeepersTx {
         return found.version + 1;
       },
       addCorrection: async (correction) => void s.corrections.push(correction),
+      correctionsNewestFirst: async (gameId) =>
+        s.corrections.filter((c) => c.gameId === gameId).reverse(),
       ...boxScoreStores(s),
       listPostponed: async (season) =>
         s.games

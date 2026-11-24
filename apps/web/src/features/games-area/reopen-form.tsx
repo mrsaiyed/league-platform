@@ -10,27 +10,37 @@ import { useOneSubmit } from './use-one-submit.ts';
 export type ReopenFormProps = {
   readonly action: (state: FormState, form: FormData) => Promise<FormState>;
   readonly permalink: string;
+  /** Which form it is, for its mark: reopening, or putting the sheet back (step 2.229). */
+  readonly kind?: 'reopen' | 'put-back';
   /** The form's hidden values: league, game, version, door, and so on. */
   readonly hidden: Readonly<Record<string, string>>;
   readonly texts: {
     /** Until when this person may reopen it, when there is a limit. */
     readonly until?: string;
+    /** What the form does, said above it. */
+    readonly help?: string;
     readonly reason: string;
     readonly reopen: string;
   };
 };
 
-export function ReopenForm({ action, permalink, hidden, texts }: ReopenFormProps) {
+export function ReopenForm({ action, permalink, hidden, texts, kind = 'reopen' }: ReopenFormProps) {
   const [state, dispatch, pending] = useActionState(action, untouched, permalink);
   const onSubmit = useOneSubmit(pending, state);
   const problemId = `${useId()}-problem`;
   const refused = state.kind === 'refused' ? state : undefined;
   const wrong = refused?.wrong.includes('reason') === true;
   return (
-    <form action={dispatch} onSubmit={onSubmit} className="staff-form" data-reopen-form="">
+    <form
+      action={dispatch}
+      onSubmit={onSubmit}
+      className="staff-form"
+      {...(kind === 'reopen' ? { 'data-reopen-form': '' } : { 'data-put-back-form': '' })}
+    >
       {Object.entries(hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
+      {texts.help === undefined ? null : <p>{texts.help}</p>}
       {texts.until === undefined ? null : <p>{texts.until}</p>}
       <label className="staff-field">
         <span>{texts.reason}</span>

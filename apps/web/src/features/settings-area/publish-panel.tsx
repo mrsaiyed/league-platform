@@ -5,16 +5,38 @@
 // posts to publishLeagueAction, which runs the command with its own checks again.
 import type { LeagueStatus, PublishCheck, PublishCheckKey } from '@srleagues/core';
 import { t, type TextKey } from '../../server/messages.ts';
-import { publishLeagueAction } from './actions.ts';
+import { changeLeagueStatusAction, publishLeagueAction } from './actions.ts';
 
 /** Where each item is put right on this page, when it can be put right here. */
-const cures: Readonly<Record<PublishCheckKey, string | null>> = {
-  contactEmail: null,
-  privacyChosen: '#settings-privacy',
+const cures: Readonly<Record<PublishCheckKey, { href: string; label: TextKey }>> = {
+  // League settings → Profile (step 2.125).
+  contactEmail: { href: '#settings-profile', label: 'adminSettings.publish.cureLinkProfile' },
+  privacyChosen: { href: '#settings-privacy', label: 'adminSettings.publish.cureLink' },
 };
+
+/** One item of the "Must fix" list, met or not, with where it is put right. */
+function CheckItem({ check }: { readonly check: PublishCheck }) {
+  const cure = cures[check.key];
+  return (
+    <li data-check={check.key} data-met={check.met ? 'yes' : 'no'}>
+      <span className="staff-pill" data-kind={check.met ? 'good' : 'wait'}>
+        {t(check.met ? 'adminSettings.publish.met' : 'adminSettings.publish.notMet')}
+      </span>{' '}
+      <span>{t(`adminSettings.publish.check.${check.key}` as TextKey)}</span>
+      {check.met ? null : (
+        <span className="publish-cure">
+          {t(`adminSettings.publish.check.${check.key}.cure` as TextKey)}{' '}
+          <a href={cure.href}>{t(cure.label)}</a>
+        </span>
+      )}
+    </li>
+  );
+}
 
 /** The query that opens the question, and the place on the page it comes back to. */
 export const publishAsk = { name: 'publish', value: 'ask' } as const;
+/** The query that asks once before archiving (step 2.125). */
+export const archiveAsk = { name: 'archive', value: 'ask' } as const;
 export const publishPlace = 'publish';
 
 export function PublishPanel({
@@ -25,6 +47,7 @@ export function PublishPanel({
   checks,
   mayPublish,
   asking,
+  askingArchive,
 }: {
   /** The route's `[league]` value, for the form. */
   readonly league: string;
@@ -37,9 +60,14 @@ export function PublishPanel({
   readonly mayPublish: boolean;
   /** Whether the person pressed Publish and is being asked. */
   readonly asking: boolean;
+  /** Whether the person pressed Archive and is being asked (step 2.125). */
+  readonly askingArchive: boolean;
 }) {
-  if (status !== 'draft' && status !== 'live') return null;
+  if (status !== 'draft' && status !== 'live' && status !== 'archived') return null;
   const ready = checks.every((check) => check.met);
+  // S-96: a published league that children came into keeps its pages up, and is asked
+  // for the same privacy choices a draft youth league must confirm before publishing.
+  const privacyOpen = checks.filter((check) => check.key === 'privacyChosen' && !check.met);
   return (
     <section
       className="staff-panel settings-publish"
@@ -48,35 +76,68 @@ export function PublishPanel({
       data-status={status}
     >
       <h2 id="publish-title">{t('adminSettings.publish.title')}</h2>
-      {status === 'live' ? (
-        <p>{t('adminSettings.publish.live')}</p>
+      {status === 'archived' ? (
+        <>
+          <p>{t('adminSettings.publish.archived')}</p>
+          {mayPublish ? (
+            <form action={changeLeagueStatusAction} className="staff-form" data-form="unarchive">
+              <input type="hidden" name="league" value={league} />
+              <input type="hidden" name="version" value={version} />
+              <input type="hidden" name="to" value="live" />
+              <button type="submit" className="ui-button" data-kind="main">
+                {t('adminSettings.publish.unarchive')}
+              </button>
+            </form>
+          ) : null}
+        </>
+      ) : status === 'live' ? (
+        <>
+          <p>{t('adminSettings.publish.live')}</p>
+          {privacyOpen.length === 0 ? null : (
+            <div data-says="confirm-privacy">
+              <p>{t('adminSettings.publish.confirmPrivacyLive')}</p>
+              <ul className="publish-checks">
+                {privacyOpen.map((check) => (
+                  <CheckItem key={check.key} check={check} />
+                ))}
+              </ul>
+            </div>
+          )}
+          {!mayPublish ? null : askingArchive ? (
+            <form action={changeLeagueStatusAction} className="staff-form" data-form="archive">
+              <input type="hidden" name="league" value={league} />
+              <input type="hidden" name="version" value={version} />
+              <input type="hidden" name="to" value="archived" />
+              <p role="alert">{t('adminSettings.publish.archiveAsk')}</p>
+              <p className="staff-buttons">
+                <button type="submit" className="ui-button" data-kind="main">
+                  {t('adminSettings.publish.archive')}
+                </button>{' '}
+                <a className="ui-button" data-kind="quiet" href={`${address}#${publishPlace}`}>
+                  {t('adminSettings.publish.cancel')}
+                </a>
+              </p>
+            </form>
+          ) : (
+            <p className="staff-buttons">
+              <a
+                className="ui-button"
+                data-kind="quiet"
+                href={`${address}?${archiveAsk.name}=${archiveAsk.value}#${publishPlace}`}
+              >
+                {t('adminSettings.publish.archive')}
+              </a>
+            </p>
+          )}
+        </>
       ) : (
         <>
           <p>{t('adminSettings.publish.draft')}</p>
           <h3>{t('adminSettings.publish.mustFix')}</h3>
           <ul className="publish-checks">
-            {checks.map((check) => {
-              const cure = cures[check.key];
-              return (
-                <li key={check.key} data-check={check.key} data-met={check.met ? 'yes' : 'no'}>
-                  <span className="staff-pill" data-kind={check.met ? 'good' : 'wait'}>
-                    {t(check.met ? 'adminSettings.publish.met' : 'adminSettings.publish.notMet')}
-                  </span>{' '}
-                  <span>{t(`adminSettings.publish.check.${check.key}` as TextKey)}</span>
-                  {check.met ? null : (
-                    <span className="publish-cure">
-                      {t(`adminSettings.publish.check.${check.key}.cure` as TextKey)}
-                      {cure === null ? null : (
-                        <>
-                          {' '}
-                          <a href={cure}>{t('adminSettings.publish.cureLink')}</a>
-                        </>
-                      )}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
+            {checks.map((check) => (
+              <CheckItem key={check.key} check={check} />
+            ))}
           </ul>
           {!mayPublish ? null : !ready ? (
             <p>{t('adminSettings.publish.notReady')}</p>

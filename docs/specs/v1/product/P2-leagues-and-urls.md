@@ -133,6 +133,8 @@ Inside a league, a program or custom page cannot use a name the site already use
 
 **U-14 (decided for you, November 14): the owner and any admin publish, archive and un-archive the league**, and change its name, its short name and whether it is listed (U-10) under League settings → Profile. Admins have the owner's access except for three things (O-7), and none of these is one of them. Only we suspend, as U-9 says.
 
+As built in step 2.125: League settings → Profile changes the name, the short name (the old one forwarding for 12 months), the contact email (never emptied), city, time zone, the listing and who plays (S-95); the staff pages' notice of a draft links to Publish and an archived league's to Un-archive, on a phone in the strip under the header too. An archived league's public pages stay up, read-only (U-9). See [P4](P4-admin-dashboard.md) section 6.
+
 **U-10 (agreed): being listed in `/find` is the league's choice**, on by default for adult leagues and off by default for youth leagues. Any league can also ask search engines not to index it: a setting in League settings, off to start (step 2.60). A league that holds a child (youth or mixed, or an adult league with a child recorded in it) is never indexed, whatever it chose (U-18, decided for you). A league can also carry a short notice in its admin's own words at the top of every public page, such as "Unofficial demo" (F-10, step 2.60).
 
 ## 7. One person, many leagues

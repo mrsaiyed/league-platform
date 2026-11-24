@@ -246,7 +246,10 @@ export function worldGameSnapshot(
       const game = s?.games.find((g) => g.id === gameId);
       if (s === undefined || game === undefined) return undefined;
       return correctedMarkDate(
-        s.corrections.filter((c) => c.gameId === gameId),
+        s.corrections
+          .filter((c) => c.gameId === gameId)
+          // Which reopen a put back undid (T-368), as find-game-corrected-date.ts reads it.
+          .map((c) => ({ ...c, keptSheet: c.before.sheet !== undefined })),
         game,
       );
     },

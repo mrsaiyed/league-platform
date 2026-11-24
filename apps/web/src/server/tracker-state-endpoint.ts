@@ -6,7 +6,9 @@
 // (record 039):
 //
 // - 200 with the state and its sequence number, never cached: it names every player
-//   by id, a team that shows its numbers to staff only included.
+//   by id, a team that shows its numbers to staff only included. With `withChanges`
+//   (the tracker's `X-Tracker-Changes: 1`, step 2.242, T-356), also the IDs of the last changes
+//   of players; a tracker of an earlier release never asks, and is answered as before.
 // - 401 signed-out: no session cookie, or one that ended.
 // - 403 not-allowed: may not score this game.
 // - 404 not-found: no such game in this league, one of another league asked for
@@ -16,7 +18,7 @@
 // nothing else as the server's word.
 import {
   trackerRefusalStatus,
-  type TrackerGameState,
+  type TrackerGameStateWithChanges,
   type TrackerRefusal,
 } from '@srleagues/contracts';
 import { readTrackerState } from '@srleagues/core';
@@ -33,6 +35,7 @@ export async function trackerStateRequest(
   context: LeagueRequestContext,
   game: string,
   ports: Pick<TrackerPorts, 'deps'>,
+  withChanges = false,
 ): Promise<ApiAnswer> {
   if (context.account === null) return refuse({ error: 'signed-out' });
   if (!isGameIdFormat(game)) return refuse({ error: 'not-found' });
@@ -40,6 +43,9 @@ export async function trackerStateRequest(
   if (!result.ok) {
     return refuse({ error: result.error.code === 'not-allowed' ? 'not-allowed' : 'not-found' });
   }
-  const body: TrackerGameState = result.value;
+  const { changes, ...state } = result.value;
+  const body: TrackerGameStateWithChanges = withChanges
+    ? { ...state, changes: [...changes] }
+    : state;
   return { status: 200, body, headers: { 'Cache-Control': 'private, no-store' } };
 }

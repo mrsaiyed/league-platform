@@ -1132,3 +1132,8 @@
   margin-block-start: var(--step-1);
   font-size: var(--text-14);
 }
+/* League settings → Profile, who plays (step 2.125 fix round): one choice to a line, so
+   on a phone a radio button never sits at the end of the line before its own words. */
+.settings-profile fieldset label {
+  display: block;
+}
