@@ -202,10 +202,12 @@ if (built) {
       const form = page.locator('form', { has: page.locator('input[name=firstName]') });
       await form.locator('input[name=firstName]').fill(first);
       await form.locator('input[name=lastName]').fill(last);
-      await tap(
-        form.getByRole('button', { name: 'Add the person and put them on the roster' }),
-        /done=added/,
-      );
+      await form.getByRole('button', { name: 'Add the person and put them on the roster' }).click();
+      await page
+        .locator('[data-said-on] [role=status]', {
+          hasText: `Saved: ${first} ${last} was added to`,
+        })
+        .waitFor({ timeout: 10_000 });
     }
     const listed = (name) =>
       page

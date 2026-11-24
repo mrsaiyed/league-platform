@@ -478,6 +478,8 @@ if (browser) {
       page.waitForLoadState('load'),
       again.getByRole('button', { name: 'Add the person and put them on the roster' }).click(),
     ]);
+    // Step 2.155: refused in the form itself, the number box marked.
+    await again.locator('input[name=jerseyNumber][aria-invalid=true]').waitFor({ timeout: 10_000 });
     const found = await harm(page);
     note(
       'a refused jersey number made no element',

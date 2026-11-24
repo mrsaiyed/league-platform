@@ -50,13 +50,7 @@ import {
   saveTeamStatsAction,
   undoTeamLeftAction,
 } from './actions.ts';
-import {
-  LeagueField,
-  Notice,
-  Section,
-  StatsVisibilityField,
-  Swatch,
-} from './parts.tsx';
+import { LeagueField, Notice, Section, StatsVisibilityField, Swatch } from './parts.tsx';
 
 import { ListForm, SaidLine, takeNotice } from '../list-forms/index.ts';
 import { requestTokenField } from '../../server/same-request.ts';

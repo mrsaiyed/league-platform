@@ -121,11 +121,12 @@ if (built) {
     const form = page.locator('form', { has: page.locator('input[name=firstName]') });
     await form.locator('input[name=firstName]').fill(kites.first);
     await form.locator('input[name=lastName]').fill(kites.last);
-    await tap(
-      page,
-      form.getByRole('button', { name: 'Add the person and put them on the roster' }),
-      /done=added/,
-    );
+    await form.getByRole('button', { name: 'Add the person and put them on the roster' }).click();
+    await page
+      .locator('[data-said-on] [role=status]', {
+        hasText: `Saved: ${kites.first} ${kites.last} was added to`,
+      })
+      .waitFor({ timeout: 10_000 });
     await removeTeamHere(page);
     const said = page.locator('main [role=status]').first();
     note(

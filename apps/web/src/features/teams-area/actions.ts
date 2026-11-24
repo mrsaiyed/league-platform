@@ -86,6 +86,11 @@ async function answerTeamForm(
   const answer = result.answer;
   if (answer.kind === 'refused') {
     const refusal = teamFormRefusal(formName, answer.command, answer.code, fields, result.issues);
+    // Not allowed: said where it was tapped. Drawn again, the page would no longer offer
+    // the form (step 2.157), and the sentence would go with it.
+    if (answer.code === 'not-allowed') {
+      return { kind: 'refused', code: answer.code, typed: fields, wrong: [], said: refusal.said };
+    }
     return refusedWith(answer.code, fields, refusal.wrong, refusal.said);
   }
   const teamId = (fields['team'] ?? '').toLowerCase();

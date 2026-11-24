@@ -115,10 +115,12 @@ if (built) {
       await form.locator('input[name=firstName]').fill(p.first);
       await form.locator('input[name=lastName]').fill(p.last);
       await form.locator('input[name=jerseyNumber]').fill(p.number);
-      await tap(
-        form.getByRole('button', { name: 'Add the person and put them on the roster' }),
-        /done=/,
-      );
+      await form.getByRole('button', { name: 'Add the person and put them on the roster' }).click();
+      await page
+        .locator('[data-said-on] [role=status]', {
+          hasText: `Saved: ${p.first} ${p.last} was added to`,
+        })
+        .waitFor({ timeout: 10_000 });
     }
     const roster = await page.locator('main').innerText();
     note(

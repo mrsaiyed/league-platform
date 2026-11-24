@@ -154,11 +154,14 @@ export async function walkFirstTest(o) {
         await form.getByLabel('First name').fill(first);
         await form.getByLabel('Last name').fill(name);
         await form.getByLabel('Jersey number (0 to 99, or 00)').fill(String(from + n));
-        await tap(
-          page,
-          form.getByRole('button', { name: 'Add the person and put them on the roster' }),
-          /done=/,
-        );
+        await form
+          .getByRole('button', { name: 'Add the person and put them on the roster' })
+          .click();
+        await page
+          .locator('[data-said-on] [role=status]', {
+            hasText: `Saved: ${first} ${name} was added to`,
+          })
+          .waitFor({ timeout: 10_000 });
       }
       const roster = await mainText(page);
       note(
