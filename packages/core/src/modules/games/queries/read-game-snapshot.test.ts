@@ -111,6 +111,7 @@ function store(
     ],
     people: async (ids) => ids.map(person),
     correctedOn: async () => undefined,
+    resultBeingCorrected: async () => undefined,
   };
 }
 

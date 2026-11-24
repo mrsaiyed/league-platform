@@ -7,6 +7,7 @@
 // people only through the one name function (T-81). Nothing here changes the world.
 import {
   correctedMarkDate,
+  resultBeingCorrected,
   lookupSetting,
   membersStartPage,
   minimumGamesToRank,
@@ -250,6 +251,16 @@ export function worldGameSnapshot(
           .filter((c) => c.gameId === gameId)
           // Which reopen a put back undid (T-368), as find-game-corrected-date.ts reads it.
           .map((c) => ({ ...c, keptSheet: c.before.sheet !== undefined })),
+        game,
+      );
+    },
+    // The result as it stood while a reopen is open (S-47), as on the database.
+    resultBeingCorrected: async (gameId) => {
+      const s = await read();
+      const game = s?.games.find((g) => g.id === gameId);
+      if (s === undefined || game === undefined) return undefined;
+      return resultBeingCorrected(
+        s.corrections.filter((c) => c.gameId === gameId),
         game,
       );
     },

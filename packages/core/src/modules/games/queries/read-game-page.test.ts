@@ -78,6 +78,7 @@ const store = (over: Partial<GamesReadStore> = {}): GamesReadStore => ({
       visibility: 'none',
     })),
   correctedOn: async () => '2026-12-07',
+  resultBeingCorrected: async () => undefined,
   ...over,
 });
 

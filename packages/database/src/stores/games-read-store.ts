@@ -7,6 +7,7 @@ import {
   findGame,
   findSeason,
   findGameCorrectedDate,
+  findGameResultBeingCorrected,
   findGameState,
   findSavedGameState,
   listGamePlayerLines,
@@ -53,5 +54,6 @@ export function gamesReadStore(scope: LeagueScope): GameSnapshotStore {
     lines: (gameId) => listGamePlayerLines(scope, gameId),
     people: (personIds) => listPeopleForDisplay(scope, personIds),
     correctedOn: (gameId) => findGameCorrectedDate(scope, gameId),
+    resultBeingCorrected: (gameId) => findGameResultBeingCorrected(scope, gameId),
   };
 }

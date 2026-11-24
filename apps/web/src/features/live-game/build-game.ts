@@ -1,7 +1,14 @@
 // What a game's page shows, worked out on the server from the step 2.40 game page and
 // the step 2.32 snapshot, both read as a visitor (step 2.45; P7 §5.3; S-7, S-22). Only
 // words and numbers leave here; the page and its live part draw them.
-import type { GamePage, PlayLine } from '@srleagues/core';
+import {
+  publicGameState,
+  type GamePage,
+  type PlayLine,
+  type PublicGameClock,
+  type PublicGameState,
+  type PublicGameTruth,
+} from '@srleagues/core';
 import type { BoxScoreColumn, BoxScorePlayer, FinalPill, PlayRow } from '@srleagues/ui';
 import { displayLabels, finalPillOf } from '@srleagues/site';
 import { locale, t } from '../../server/messages.ts';
@@ -79,14 +86,15 @@ export function statusNote(status: string): string | null {
   return status === 'forfeit' ? t('game.forfeit') : null;
 }
 
-/** The live part's words, for a game whose own status is `status`. */
-export function liveGameLabels(status: string): LiveGameLabels {
+/** The live part's words, for a game whose own status is `status` and public state `state`. */
+export function liveGameLabels(status: string, state?: PublicGameState): LiveGameLabels {
   const labels = displayLabels(t);
   return {
     region: t('game.region'),
     regionLive: t('game.live'),
     spokenScore: t('game.spokenScore'),
-    notStarted: notStartedText(status),
+    // A game whose start has passed with no score has not "not started" (step 2.159).
+    notStarted: state === 'awaiting-score' ? t('game.noScoreYet') : notStartedText(status),
     teamFouls: t('game.teamFouls'),
     latestPlay: t('game.latestPlay'),
     playersHidden: t('game.playersHidden'),
@@ -146,6 +154,69 @@ export function titleLine(
   // (boardWhen), where it is the board's own middle. A line over the board said it twice.
   if (status === 'scheduled') return null;
   return startText(startsAt, timeZone, status);
+}
+
+/**
+ * The line under the title, from the game's one public truth (publicGameState, step 2.159):
+ * none for a game under way or still to come (the board says its day); "Ended Saturday,
+ * November 14" for a final game whose end is known; "Was set for …" for every other game
+ * whose start has passed, a forfeit and a game awaiting its score or being corrected
+ * among them, and for a final game whose end is not known. None with no planned time.
+ */
+export function truthLine(
+  startsAt: string | null,
+  timeZone: string,
+  truth: PublicGameTruth,
+): string | null {
+  if (truth.state === 'live' || truth.state === 'upcoming') return null;
+  if (truth.state === 'final' && truth.endedAt !== null) {
+    const day = new Intl.DateTimeFormat(locale, {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      timeZone,
+    }).format(new Date(truth.endedAt));
+    return t('game.endedOn', { day });
+  }
+  if (startsAt === null) return null;
+  const when = new Intl.DateTimeFormat(locale, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone,
+  }).format(new Date(startsAt));
+  return t('game.wasSetFor', { when });
+}
+
+/**
+ * The game's one public truth (publicGameState, step 2.159), from what its page read: its
+ * day with no time, when it has one, is the published schedule's (`localDate`).
+ */
+export const gameTruthOf = (
+  page: GamePage,
+  clock: PublicGameClock,
+  localDate: string | null = null,
+): PublicGameTruth =>
+  publicGameState(
+    {
+      status: page.game.status,
+      startsAt: page.game.startsAt,
+      localDate,
+      homeScore: page.scoreboard.home.score,
+      awayScore: page.scoreboard.away.score,
+      finalizedAt: page.game.finalizedAt,
+      beingCorrected: page.game.beingCorrected,
+    },
+    clock,
+  );
+
+/** The board's pill of a state only the public truth knows; undefined for every other. */
+export function truthPill(state: PublicGameState): string | undefined {
+  if (state === 'awaiting-score') return t('game.awaitingScore');
+  if (state === 'being-corrected') return t('game.beingCorrected');
+  return undefined;
 }
 
 /**
@@ -252,6 +323,8 @@ export function buildBoxScores(page: GamePage): BoxScoresView {
             jersey: p.jersey,
             name: boxScoreName(t('game.jerseyOnly'), t('game.nameNotShown'), p),
             cells: p.stats,
+            // A rostered player who never entered (P7 §5.6) reads so, not a row of dashes.
+            ...(p.played ? {} : { note: t('game.didNotPlay') }),
           }))
         : null,
       totals: box.totals,

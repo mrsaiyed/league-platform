@@ -72,6 +72,12 @@ export type LiveGameViewProps = {
   readonly labels: LiveGameLabels;
   /** What the scoreboard shows beside the scores: the teams' colors, when and where. */
   readonly board?: LiveGameBoard | undefined;
+  /**
+   * A game being corrected (S-47, step 2.159): `initial` carries the result as it stood,
+   * and the board keeps it, whatever the correction does meanwhile, until the game is
+   * decided again; only then is the page drawn again (redrawsWhileHeld).
+   */
+  readonly held?: boolean | undefined;
 };
 
 /** The scoreboard's facts that do not change while the game is played. */
@@ -118,6 +124,18 @@ export function redrawsFor(
   if (arrived.status === 'final') return now.status !== 'final'; // reopened
   // Ended, or marked not started (S-40): either way its plays are no longer the page's.
   return arrived.status === 'live' && now.status !== 'live';
+}
+
+/**
+ * Whether a page held at the result as it stood (a game being corrected) must be drawn
+ * again: only once the game is final again, by a newer message or snapshot. A tracked
+ * correction's own taps are not news to the public (S-47).
+ */
+export function redrawsWhileHeld(
+  arrived: Pick<GameSnapshot, 'sequence'>,
+  now: Pick<ViewerGame, 'status' | 'sequence'>,
+): boolean {
+  return now.sequence > arrived.sequence && now.status === 'final';
 }
 
 /**
@@ -193,6 +211,7 @@ export function LiveGameView({
   words,
   labels,
   board,
+  held,
 }: LiveGameViewProps) {
   const [followed, setFollowed] = useState<FollowedGame>(() => ({
     game: { ...initial, playersAsOfSequence: initial.sequence },
@@ -221,11 +240,13 @@ export function LiveGameView({
     return () => handle.close();
   }, [leagueId, gameId, snapshotAddress, liveAddress, initial]);
 
-  const game = followed.game;
-  const redraw = redrawsFor(initial, game);
-  const sequence = useRef(game.sequence);
+  const game =
+    held === true ? { ...initial, playersAsOfSequence: initial.sequence } : followed.game;
+  const redraw =
+    held === true ? redrawsWhileHeld(initial, followed.game) : redrawsFor(initial, followed.game);
+  const sequence = useRef(followed.game.sequence);
   useEffect(() => {
-    sequence.current = game.sequence;
+    sequence.current = followed.game.sequence;
   });
   useEffect(() => {
     // The server reads the same store the change came from, so the page drawn again
