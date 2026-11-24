@@ -3,13 +3,14 @@
 // minutes read on the screen are known:
 //
 // - a scorekeeper saves a wrong final score in Games, reads that they can correct it until
-//   half past twelve, taps "Correct this result", gives a reason, taps "Reopen to correct"
-//   twice (a double tap) and saves the right score: the public page shows the right score,
+//   half past twelve, taps "Correct this result"; the reopen form, with a reason, is sent
+//   to the server twice at once with the same version (a double tap on a slow phone), and
+//   both are answered "reopened"; they save the right score: the public page shows it,
 //   and the league's own activity log, read by the owner, holds ONE entry of it;
 // - for a score another person typed (seeded, typed by the owner), and for a forfeit a
 //   scheduler records by hand, they read who can, and a reopen sent to the server directly
 //   (the reopen form of their own game, pointed at the other game) is refused and changes
-//   nothing;
+//   nothing: the games' public pages read as before, and no reopen naming them is logged;
 // - after the minutes (the owner sets the league's minutes to 1; the page is read again
 //   for at most 90 seconds), they read that their time is over and who can.
 //
@@ -132,17 +133,76 @@ async function textOf(path, token) {
   }
 }
 
-/** The owner's activity log: how many entries carry this text (the server's own record). */
+/**
+ * The owner's activity log: how many entries carry this text, or pass this test (the
+ * server's own record).
+ */
 async function entriesWith(text) {
   const page = await textOf('/north-valley/admin/settings/activity', 'local-owner-token');
   try {
     await page.locator('[data-activity-log]').waitFor();
     const entries = page.locator('[data-activity-log] li[data-entry]');
     const all = await entries.allTextContents();
+    const matches = typeof text === 'function' ? text : (e) => e.includes(text);
     return {
-      count: all.filter((e) => e.includes(text)).length,
+      count: all.filter(matches).length,
       first: all.slice(0, 3).join(' | '),
     };
+  } finally {
+    await page.context().close();
+  }
+}
+
+/**
+ * The reopen form of the scorekeeper's own game, read with scripts off (a plain form),
+ * drawn twice (each drawing has a request token of its own, the same version). All at
+ * once: the first drawing posted twice (a double tap: the same request, which the server
+ * runs once) and the second posted once (another request with the same version: only the
+ * version check answers it). Each answer's status and where it sends the browser.
+ */
+async function sendTwice(why) {
+  const { context, page } = await signedIn('local-scorekeeper-token', false);
+  const drawn = async () => {
+    await page.goto(`${origin}/north-valley/admin/games/${mine}`);
+    const form = page.locator('form', { has: page.getByLabel(reasonLabel) });
+    await form.waitFor();
+    await page.getByLabel(reasonLabel).fill(why);
+    return form.evaluate((f) => {
+      const button = [...f.querySelectorAll('button')].find(
+        (b) => b.textContent.trim() === 'Reopen to correct',
+      );
+      const fields = [...new FormData(f, button)].map(([k, v]) => [k, String(v)]);
+      return { action: f.action, fields };
+    });
+  };
+  try {
+    const first = await drawn();
+    const second = await drawn();
+    const versions = [first, second].map((d) => d.fields.find(([k]) => k === 'version')?.[1]);
+    if (versions[0] === undefined || versions[0] !== versions[1]) {
+      throw new Error(`the two drawings differ in version: ${versions.join(', ')}`);
+    }
+    const post = (sent) =>
+      context.request.post(sent.action, {
+        headers: { origin },
+        multipart: Object.fromEntries(sent.fields),
+        maxRedirects: 0,
+      });
+    const answers = await Promise.all([post(first), post(first), post(second)]);
+    return answers.map((a) => ({
+      status: a.status(),
+      to: new URL(a.headers()['location'] ?? '/none', origin).pathname,
+    }));
+  } finally {
+    await context.close();
+  }
+}
+
+/** What the public page of a game says, read signed out (the server's result). */
+async function publicResult(id) {
+  const page = await textOf(`/north-valley/games/${id}`);
+  try {
+    return (await page.locator('main').textContent()) ?? '';
   } finally {
     await page.context().close();
   }
@@ -175,17 +235,19 @@ if (browser) {
       ]);
       const form = page.locator('form', { has: page.getByLabel(reasonLabel) });
       note("the game's page says until when too", untilOwn.test((await form.textContent()) ?? ''));
-      await page.getByLabel(reasonLabel).fill(reason);
-      // A double tap on "Reopen to correct".
-      await Promise.all([
-        page.waitForURL((url) => url.pathname === '/north-valley/admin/games', { timeout: 30_000 }),
-        page.getByRole('button', { name: 'Reopen to correct' }).dblclick(),
-      ]);
-      await row(page, mine).getByLabel('Score for Tigers').waitFor();
+      // A double tap on a slow phone: the reopen form, with the same version, sent to the
+      // server twice at once (two requests, not one the page holds back).
+      const twice = await sendTwice(reason);
+      note(
+        'all three requests are answered "reopened" (the later ones as the server answers a repeat)',
+        twice.every((a) => a.status === 303 && a.to === '/north-valley/admin/games'),
+        JSON.stringify(twice),
+      );
+      await openGames(page);
       await saveFinal(page, 49, 51);
       // The reason is kept with the correction, not in the log (as for an admin's reopen).
       const log = await entriesWith(reopened);
-      note('a double tap writes one activity entry', log.count === 1, JSON.stringify(log));
+      note('a double request writes one activity entry', log.count === 1, JSON.stringify(log));
       const pub = await textOf(`/north-valley/games/${mine}`);
       const words = (await pub.locator('main').textContent()) ?? '';
       await pub.context().close();
@@ -212,8 +274,13 @@ if (browser) {
       // The question is read before "Yes" (a sooner tap is taken as a double tap).
       await page.waitForTimeout(1000);
       await game.locator('[data-call-off-yes]').click();
-      await game.getByRole('link', { name: 'Correct this result' }).waitFor();
-      note('the scheduler, who may correct games, is offered the forfeit', true);
+      const offer = game.getByRole('link', { name: 'Correct this result' });
+      await offer.waitFor();
+      note(
+        'the scheduler, who may correct games, is offered the forfeit once, with no time limit',
+        (await offer.count()) === 1 && !/until \d/.test((await game.textContent()) ?? ''),
+        (await game.textContent()) ?? '',
+      );
     } finally {
       await context.close();
     }
@@ -245,6 +312,8 @@ if (browser) {
     'a reopen sent straight to the server for someone else’s result is refused',
     async () => {
       // Scripts off: the form posts as a plain form, so what it sends is what is changed.
+      const resultsBefore = new Map();
+      for (const id of [othersGame, forfeitGame]) resultsBefore.set(id, await publicResult(id));
       const { context, page } = await signedIn('local-scorekeeper-token', false);
       try {
         for (const id of [othersGame, forfeitGame]) {
@@ -270,7 +339,19 @@ if (browser) {
             (await row(page, id).textContent()) ?? '',
           );
         }
-        const log = await entriesWith(sneaked);
+        // The results the server shows publicly are the ones it had before the requests.
+        for (const id of [othersGame, forfeitGame]) {
+          const now = await publicResult(id);
+          note(
+            `the public page of ${id === othersGame ? 'the final score' : 'the forfeit'} is unchanged`,
+            now === resultsBefore.get(id),
+            `${resultsBefore.get(id)} -> ${now}`,
+          );
+        }
+        // Activity entries hold no reason: count the reopens that name either game.
+        const log = await entriesWith(
+          (e) => e.includes('Reopened') && e.includes('Lions') && /Bears|Hawks/.test(e),
+        );
         note('the direct requests wrote no activity entry', log.count === 0, JSON.stringify(log));
       } finally {
         await context.close();
