@@ -1031,6 +1031,8 @@ const ANSWERS = {
   '/[league]/score/manifest.webmanifest': [null, keeper],
   '/[league]/score/tracker-worker.js': [null, keeper],
   '/api/v1/leagues/[leagueId]/games/[game]/commands': [keeper, owner],
+  // A game's format (step 2.119): every rule, read at the tracker's start and in Games.
+  '/api/v1/leagues/[leagueId]/games/[game]/format': [keeper, owner],
   '/api/v1/leagues/[leagueId]/games/[game]/not-started': [keeper, owner],
   '/api/v1/leagues/[leagueId]/games/[game]/reopen': [keeper, owner],
   '/api/v1/leagues/[leagueId]/games/[game]/rosters': [keeper, owner],
