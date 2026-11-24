@@ -21,6 +21,7 @@ export type TrackerNotice =
         | 'tracker.notSaved'
         | 'tracker.signedOutKept'
         | 'tracker.notAllowedKept'
+        | 'tracker.releasedKept'
         | 'tracker.offlineLong';
       readonly count: number;
     };
@@ -45,15 +46,24 @@ export function trackerNotices(
   status: Pick<
     TrackerControllerStatus,
     'mode' | 'game' | 'notApplied' | 'notSaved' | 'signedOut' | 'waiting' | 'offlineLong'
-  >,
+  > &
+    Partial<Pick<TrackerControllerStatus, 'sendNotSaved'>>,
 ): readonly TrackerNotice[] {
   const notices: TrackerNotice[] = [];
   const { mode } = status;
   const kept = status.waiting.length;
+  // Left the game with plays "Send these plays" can still send (T-370): said as waiting.
+  const leftWithPlays =
+    mode.kind === 'read-only' &&
+    mode.reason === 'released' &&
+    status.notSaved.length > 0 &&
+    status.sendNotSaved === 'offered';
   if (mode.kind === 'read-only') {
     // Taken off the game with plays still on the device: they are kept, not saved.
     if (mode.reason === 'not-allowed' && kept > 0) {
       notices.push({ key: 'tracker.notAllowedKept', count: kept });
+    } else if (leftWithPlays) {
+      notices.push({ key: 'tracker.releasedKept', count: status.notSaved.length });
     } else if (!showsFinalPanel(status)) {
       // (A game this device shows final says so in its final panel, not here.)
       notices.push({ key: `tracker.readOnly.${mode.reason}` });
@@ -76,7 +86,7 @@ export function trackerNotices(
   }
   // Several minutes with no connection and plays waiting (T6 §4): they are only here.
   if (status.offlineLong && kept > 0) notices.push({ key: 'tracker.offlineLong', count: kept });
-  if (status.notSaved.length > 0) {
+  if (status.notSaved.length > 0 && !leftWithPlays) {
     notices.push({ key: 'tracker.notSaved', count: status.notSaved.length });
   }
   // An End game the league did not take (a level score in a season with no ties) is said

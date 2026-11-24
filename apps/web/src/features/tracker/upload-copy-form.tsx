@@ -5,11 +5,18 @@
 // words, and, when another device holds the game, the tracker's own takeover question
 // (S-42): only "Yes, take over" posts again, naming the holder agreed to. The words come
 // from the page (T-187); the route is built by the one address helper.
+import { maxGameCopyLength } from '@srleagues/contracts';
 import { leagueApiUrl } from '@srleagues/core';
 import { translatorFrom, type Catalog } from '@srleagues/site';
 import { useMemo, useRef, useState } from 'react';
 import { LastHeard, takeOverQuestionText } from './take-over-parts.tsx';
-import { uploadBody, uploadedLines, uploadViewOf, type UploadView } from './upload-copy.ts';
+import {
+  fileTooLarge,
+  uploadBody,
+  uploadedLines,
+  uploadViewOf,
+  type UploadView,
+} from './upload-copy.ts';
 
 export type UploadCopyFormProps = {
   readonly leagueId: string;
@@ -63,11 +70,20 @@ export function UploadCopyForm({ leagueId, gameId, locale, catalog }: UploadCopy
       setView({ kind: 'no-file' });
       return;
     }
+    // Too large to be a copy: said before the file is read (step 2.70, fix round).
+    if (fileTooLarge(picked.size)) {
+      setView({ kind: 'too-large' });
+      return;
+    }
     let copy: string;
     try {
       copy = await picked.text();
     } catch {
       setView({ kind: 'unreadable' });
+      return;
+    }
+    if (copy.length > maxGameCopyLength) {
+      setView({ kind: 'too-large' });
       return;
     }
     setView({ kind: 'sending' });
@@ -202,11 +218,13 @@ function UploadAnswer({
               ? 'tracker.upload.noFile'
               : view.kind === 'unreadable'
                 ? 'tracker.upload.unreadable'
-                : view.kind === 'not-now'
-                  ? 'tracker.upload.notNow'
-                  : view.kind === 'signed-out'
-                    ? 'tracker.upload.signedOut'
-                    : 'tracker.upload.failed',
+                : view.kind === 'too-large'
+                  ? 'tracker.upload.tooLarge'
+                  : view.kind === 'not-now'
+                    ? 'tracker.upload.notNow'
+                    : view.kind === 'signed-out'
+                      ? 'tracker.upload.signedOut'
+                      : 'tracker.upload.failed',
           )}
         </p>
       );

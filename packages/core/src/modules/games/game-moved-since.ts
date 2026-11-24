@@ -2,8 +2,9 @@
 // saved were made. The device names the sequence it last had from the server while it
 // held the game (`notSavedSince`), and the server bounds it by where it last answered
 // that session itself (`heard`): a device never names a later one. The game has not
-// moved if every event the server took after it is the sender's own and one of these
-// very plays (a batch whose answer was lost, or a second send), a play of an earlier
+// moved if every event the server took after it is one of these very plays, whoever
+// recorded it (a batch whose answer was lost, a second send, or an uploaded copy of the
+// device's, T-370), or the sender's own and a play of an earlier
 // batch of the same list (`sent`), or an End or a reopen (step 2.148: an End and a
 // reopen by the scorekeeper are not "someone recorded something in between").
 // Anything else, a play from another device, a change of players, a marking not
@@ -48,14 +49,14 @@ export async function gameMovedSince(
   if (events.length !== last - since) return true;
   const sender = accountId.toLowerCase();
   return events.some((event) => {
-    // Only the sender's own: another account's play with one of these ids is not theirs.
+    // One of these very plays (an answer lost, a second send, or a copy of the device's
+    // uploaded, T-370), whoever recorded it: its id is taken, so it answers duplicate and
+    // stays as it was recorded. Naming another's play as one's own counts nothing twice
+    // and drops nothing; it only lets in plays any scorekeeper could send by taking over.
+    if (own.has(event.commandId.toLowerCase())) return false;
+    // Otherwise only the sender's own: an End or a reopen by the sender, or a play of an
+    // earlier batch of this same list the server took.
     if (event.accountId?.toLowerCase() !== sender) return true;
-    // One of these very plays (an answer lost, or a second send), an End or a reopen by
-    // the sender, or a play of an earlier batch of this same list the server took.
-    return !(
-      own.has(event.commandId.toLowerCase()) ||
-      scorekeepersOwn.has(event.type) ||
-      (sent !== undefined && event.seq <= sent)
-    );
+    return !(scorekeepersOwn.has(event.type) || (sent !== undefined && event.seq <= sent));
   });
 }

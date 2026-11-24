@@ -27,6 +27,7 @@ import {
   GameCopyUpload,
   gameCopyRefusalStatus,
   maxCommandsPerBatch,
+  maxGameCopyLength,
   readGameCopy,
   trackerRefusalStatus,
   CommandReply,
@@ -65,6 +66,13 @@ const refused = (code: GameCopyUploadRefusal): CommandsOutcome =>
   answer(gameCopyRefusalStatus[code], { status: 'refused', code } satisfies GameCopyUploadReply);
 const turnedAway = (body: TrackerRefusal): CommandsOutcome =>
   answer(trackerRefusalStatus[body.error], body);
+/** A body or a copy too large to be one, answered so the page can say so (413). */
+export const copyTooLarge = (): CommandsOutcome => answer(413, { error: 'too-large' });
+const tooLong = (body: unknown): boolean => {
+  const copy: unknown =
+    typeof body === 'object' && body !== null && 'copy' in body ? body.copy : null;
+  return typeof copy === 'string' && copy.length > maxGameCopyLength;
+};
 
 /** The copy's commands in batches the door takes: one protocol version each, in order. */
 export function copyBatches(commands: readonly GameCopyCommand[]): GameCopyCommand[][] {
@@ -154,6 +162,33 @@ async function takeTheGame(
   }
 }
 
+/**
+ * Lets go of the upload's session. The plays are saved whatever happens here, so a release
+ * that fails changes nothing of the answer: it is written down, and the session's lease
+ * runs out by itself (T-371).
+ */
+async function letGo(
+  context: LeagueRequestContext,
+  game: string,
+  sessionId: string,
+  ports: UploadPorts,
+): Promise<void> {
+  const commandContext = commandContextOf(context);
+  try {
+    await releaseScoringSession(commandContext, { gameId: game, sessionId }, ports.deps);
+  } catch {
+    ports.deps.log({
+      command: 'games.upload_game_copy',
+      requestId: commandContext.requestId,
+      leagueId: commandContext.leagueId,
+      accountId: commandContext.accountId,
+      durationMs: null,
+      outcome: 'failed',
+      errorCode: 'release-failed',
+    });
+  }
+}
+
 export async function uploadGameCopy(
   context: LeagueRequestContext,
   game: string,
@@ -165,7 +200,9 @@ export async function uploadGameCopy(
   if (context.account === null) return turnedAway({ error: 'signed-out' });
   if (!isGameIdFormat(game)) return refused('unknown-game');
   const upload = GameCopyUpload.safeParse(body);
-  if (!upload.success) return turnedAway({ error: 'invalid-input', issues: [] });
+  if (!upload.success) {
+    return tooLong(body) ? copyTooLarge() : turnedAway({ error: 'invalid-input', issues: [] });
+  }
   const leagueId = context.league.id;
   const read = readGameCopy(upload.data.copy, { leagueId, gameId: game });
   if (!read.ok) return refused(read.problem);
@@ -229,7 +266,7 @@ export async function uploadGameCopy(
       }
     }
   } finally {
-    await releaseScoringSession(commandContextOf(context), { gameId: game, sessionId }, ports.deps);
+    await letGo(context, game, sessionId, ports);
   }
   return {
     answer: { status: 200, body: { status: 'uploaded', added, alreadyThere, notTaken } },

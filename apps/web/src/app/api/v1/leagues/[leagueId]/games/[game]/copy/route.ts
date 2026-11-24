@@ -5,6 +5,7 @@
 // the people watching (T-117).
 import { after } from 'next/server';
 import {
+  copyTooLarge,
   maxCopyUploadBytes,
   uploadGameCopy,
 } from '../../../../../../../../server/game-copy-upload-endpoint.ts';
@@ -24,6 +25,11 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   const endpoint = await leagueEndpoint(['games', game, 'copy']);
   if (!endpoint.ok) return respond(refusalAnswer(endpoint.refusal));
   const { context, ports } = endpoint;
+  // Said too large before it is read, so the page can say so in plain words.
+  const declared = Number(request.headers.get('content-length') ?? '0');
+  if (Number.isFinite(declared) && declared > maxCopyUploadBytes) {
+    return respond(copyTooLarge().answer);
+  }
   const outcome = await uploadGameCopy(
     context,
     game,

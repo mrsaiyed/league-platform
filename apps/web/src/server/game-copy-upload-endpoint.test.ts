@@ -2,9 +2,10 @@ import {
   BatchCommand,
   CommandReply,
   GameCopyUploadReply,
+  maxGameCopyLength,
   writeGameCopy,
 } from '@srleagues/contracts';
-import { readTrackerState } from '@srleagues/core';
+import { readTrackerState, type CommandLogLine } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { commandContextOf } from './context.ts';
 import { uploadGameCopy } from './game-copy-upload-endpoint.ts';
@@ -115,6 +116,48 @@ describe('POST …/games/{game}/copy: a copy uploaded from another device (step 
     expect(await sequenceOf(world)).toBe(4);
   });
 
+  it('a release that fails after the plays were saved still answers the counts and tells the watchers (T-371)', async () => {
+    const world = trackerWorld();
+    const tablet = await tabletOpens(world);
+    const real = world.tracker.deps.transaction;
+    // Ending any session but the tablet's (the takeover ends that one) fails: the release.
+    const transaction: typeof real = (context, work) =>
+      real(context, (tx) =>
+        work({
+          ...tx,
+          scoringSessions: {
+            ...tx.scoringSessions,
+            end: async (game, session) => {
+              if (session !== tablet) throw new Error('the release failed');
+              return tx.scoringSessions.end(game, session);
+            },
+          },
+        }),
+      );
+    const lines: CommandLogLine[] = [];
+    const log = (line: CommandLogLine) => void lines.push(line);
+    const tracker = { ...world.tracker, deps: { ...world.tracker.deps, transaction, log } };
+    const copy = copyOf(theGame());
+    const ask = async (body: unknown) => {
+      const context = await world.contextAs('scorekeeper', 'live', [
+        'games',
+        games.hawksBears,
+        'copy',
+      ]);
+      return uploadGameCopy(context, games.hawksBears, body, tracker, world.publishPlays);
+    };
+    const first = GameCopyUploadReply.parse((await ask({ copy })).answer.body);
+    if (first.status !== 'held-by-other') throw new Error(first.status);
+    const outcome = await ask({ copy, takeOver: { expectedHolderSince: first.holder.since } });
+    expect(outcome.answer).toEqual({
+      status: 200,
+      body: { status: 'uploaded', added: 4, alreadyThere: 0, notTaken: 0 },
+    });
+    expect(outcome.afterwards).not.toBeNull();
+    expect(await sequenceOf(world)).toBe(4);
+    expect(lines).toContainEqual(expect.objectContaining({ errorCode: 'release-failed' }));
+  });
+
   it('the tablet first, the copy late: nothing added, and the tablet keeps the game', async () => {
     const world = trackerWorld();
     const session = await tabletOpens(world);
@@ -190,6 +233,8 @@ describe('POST …/games/{game}/copy: a copy uploaded from another device (step 
 
   it('refuses a copy of another game, a damaged file, and a body that is no upload', async () => {
     const world = trackerWorld();
+    const huge = await upload(world, { copy: 'x'.repeat(maxGameCopyLength + 1) });
+    expect([huge.status, huge.reply]).toEqual([413, { error: 'too-large' }]);
     const other = await upload(world, { copy: copyOf(theGame(), games.lionsTigers) });
     expect(other.status).toBe(422);
     expect(other.reply).toEqual({ status: 'refused', code: 'other-game' });

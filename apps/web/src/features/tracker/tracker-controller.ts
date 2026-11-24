@@ -1039,6 +1039,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * when unknown (listed before a reload), when "Send these plays" is not offered.
    */
   let notSavedSince: number | null = null;
+  /** Plays of that list the server took meanwhile (an uploaded copy): sent along, as own (T-370). */
+  let takenOfList: KeptTap['command'][] = [];
   /** The last session this device held: the batch names it, though the server goes by the sequence. */
   let lastHeldSession: string | null = null;
 
@@ -1073,7 +1075,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** Lists `list` as not saved, and says whether "Send these plays" is offered for it. */
   const showNotSaved = (list: readonly KeptTap[]): void => {
-    if (list.length === 0) notSavedSince = null;
+    if (list.length === 0) [notSavedSince, takenOfList] = [null, []];
     const was = current.sendNotSaved;
     const sendNotSaved: SendNotSavedOffer =
       list.length === 0 || notSavedSince === null ? 'none' : was === 'none' ? 'offered' : was;
@@ -1091,6 +1093,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       .map((t) => t.command.commandId)
       .filter((id) => taken.has(id.toLowerCase()));
     if (saved.length === 0) return;
+    takenOfList.push(
+      ...current.notSaved.filter((t) => saved.includes(t.command.commandId)).map((t) => t.command),
+    );
     showNotSaved(withoutTaps(current.notSaved, new Set(saved)));
     await queue.forget(saved).catch(() => undefined);
   };
@@ -1258,6 +1263,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     if (loaded.kind !== 'answer' || !stillLost()) return;
     await dropTaken(loaded.value);
     if (!stillLost()) return;
+    // This device's taps the server took since its base go with "Send these plays" (T-370).
+    const took = new Set(loaded.value.state.recent.map((id) => id.toLowerCase()));
+    if (current.notSaved.length > 0) {
+      takenOfList.push(...made.filter((c) => took.has(c.commandId.toLowerCase())));
+    }
     base = loaded.value;
     made = [];
     showGame();
@@ -2354,7 +2364,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         return { ok: false, reason: 'not-offered' };
       }
       update({ sendNotSaved: 'sending' });
-      const plays = current.notSaved.map((t) => t.command);
+      const plays = [...takenOfList, ...current.notSaved.map((t) => t.command)];
+      const alreadyTaken = new Set(takenOfList.map((c) => c.commandId));
       let saved = 0;
       for (let i = 0; i < plays.length; i += maxCommandsPerBatch) {
         const batch: CommandBatch = {
@@ -2373,7 +2384,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         const results = sent.value.results;
         const taken = results
           .filter((r) => r.status === 'accepted' || r.status === 'duplicate')
-          .map((r) => r.commandId);
+          .map((r) => r.commandId)
+          .filter((id) => !alreadyTaken.has(id));
         saved += taken.length;
         // On the server now: off the list and out of the storage (if that fails they
         // stay listed, and sending them again only answers duplicates).
@@ -2384,7 +2396,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         }
       }
       // Any the engine refused stay listed, to enter again; sending them again would not help.
-      notSavedSince = null;
+      [notSavedSince, takenOfList] = [null, []];
       update({ sendNotSaved: 'none' });
       void track(showServerGame());
       return { ok: true, saved };

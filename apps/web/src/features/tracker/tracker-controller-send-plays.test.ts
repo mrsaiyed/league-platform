@@ -4,9 +4,10 @@
 // not saved after a takeover are sent only by the scorekeeper's "Send these plays",
 // taken only when nothing was recorded since, and otherwise stay listed to be entered
 // again (S-43, T-335).
-import { TrackerGameState } from '@srleagues/contracts';
+import { GameCopyUploadReply, TrackerGameState } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it, vi } from 'vitest';
+import { uploadGameCopy } from '../../server/game-copy-upload-endpoint.ts';
 import { standInPeople } from '../../server/stand-in-cast.ts';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import {
@@ -19,6 +20,7 @@ import {
 import { endpointNetwork, type EndpointNetwork } from './endpoint-network.test-helper.ts';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
+import { gameCopyFile } from './game-copy-on-device.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
 import { inLeague, type QueueStorage } from './queue-storage.ts';
 import { createTrackerController, type TapInput } from './tracker-controller.ts';
@@ -330,4 +332,67 @@ describe('the device holding the game after plays were sent (T-338)', () => {
     expect(shown(laptop.controller)).toEqual({ home: 6, away: 108 });
     expect(laptop.controller.status().waiting).toEqual([]);
   });
+});
+
+// Step 2.70, fix round (T-370): a play made on the tablet after its copy was saved,
+// once an upload of the copy took the game, by the same scorekeeper or the owner.
+describe('a play made after the copy was saved, once the copy is uploaded (T-370)', () => {
+  async function uploadCopy(network: EndpointNetwork, as: Person, copy: string) {
+    const upload = async (body: unknown) => {
+      const context = await network.world.contextAs(as, 'live', ['games', gameId, 'copy']);
+      const outcome = await uploadGameCopy(
+        context,
+        gameId,
+        body,
+        network.world.tracker,
+        network.world.publishPlays,
+      );
+      return GameCopyUploadReply.parse(outcome.answer.body);
+    };
+    const first = await upload({ copy });
+    if (first.status !== 'held-by-other') return first;
+    return upload({ copy, takeOver: { expectedHolderSince: first.holder.since } });
+  }
+
+  for (const uploader of ['scorekeeper', 'owner'] as const) {
+    it(`is counted once without being entered again, the copy uploaded by the ${uploader}`, async () => {
+      const network = endpointNetwork();
+      const tablet = device(network);
+      await tablet.controller.start();
+      await tapAll(tablet.controller, tipOff);
+      await tablet.controller.idle();
+      network.mode = 'down';
+      await tapAll(tablet.controller, threeBaskets);
+      const entries = await inLeague(tablet.storage, liveLeagueId, accountOf('scorekeeper')).list(
+        gameId,
+      );
+      const copy = gameCopyFile({
+        leagueId: liveLeagueId,
+        gameId,
+        accountId: accountOf('scorekeeper'),
+        entries,
+        savedAt: 1,
+      });
+      expect(copy.count).toBe(3);
+      // The late play: made after the copy was saved, so only the tablet has it.
+      await tapAll(tablet.controller, [basket('away', bears[0] ?? '')]);
+      network.mode = 'up';
+      expect(await uploadCopy(network, uploader, copy.text)).toMatchObject({
+        status: 'uploaded',
+        added: 3,
+      });
+      expect(await serverScore(network)).toEqual({ home: 6, away: 0 });
+      tablet.controller.online();
+      await tablet.controller.idle();
+      // The copy's plays are on the server, so only the late one is listed, to send by
+      // the scorekeeper's one tap; the copy's go with it, answered as already there.
+      expect(tablet.controller.status().notSaved).toHaveLength(1);
+      expect(tablet.controller.status().sendNotSaved).toBe('offered');
+      expect(await tablet.controller.sendNotSaved()).toEqual({ ok: true, saved: 1 });
+      await tablet.controller.idle();
+      expect(await serverScore(network)).toEqual({ home: 6, away: 2 });
+      expect(tablet.controller.status().notSaved).toEqual([]);
+      expect(tablet.controller.status().waiting).toEqual([]);
+    });
+  }
 });

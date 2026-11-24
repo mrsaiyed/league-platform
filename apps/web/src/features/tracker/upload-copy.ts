@@ -3,6 +3,7 @@
 // checks the file itself (game-copy-upload-endpoint.ts); the page only hands it over.
 import {
   GameCopyUploadReply,
+  maxGameCopyLength,
   type GameCopyUpload,
   type GameCopyUploadRefusal,
 } from '@srleagues/contracts';
@@ -16,6 +17,8 @@ export type UploadView =
   | { readonly kind: 'ready' }
   | { readonly kind: 'no-file' }
   | { readonly kind: 'unreadable' }
+  /** Too large to be a copy: said before it is read, or by the server (413). */
+  | { readonly kind: 'too-large' }
   | { readonly kind: 'sending' }
   | {
       readonly kind: 'uploaded';
@@ -35,6 +38,12 @@ export type UploadView =
   | { readonly kind: 'refused'; readonly code: GameCopyUploadRefusal }
   | { readonly kind: 'signed-out' }
   | { readonly kind: 'failed' };
+
+/**
+ * Whether a file of `bytes` is too large to be a copy, before it is read: a copy's text
+ * has at most `maxGameCopyLength` characters, each at most 3 bytes as UTF-8.
+ */
+export const fileTooLarge = (bytes: number): boolean => bytes > maxGameCopyLength * 3;
 
 /** The body of one upload: the file's text and, once agreed, whom the game is taken from. */
 export function uploadBody(copy: string, takeOverFrom?: { readonly since: number }): string {
@@ -65,6 +74,7 @@ export function uploadViewOf(status: number, body: unknown, copy: string): Uploa
   }
   // The league's own refusals, before the upload is read (league-api.ts).
   if (status === 401) return { kind: 'signed-out' };
+  if (status === 413) return { kind: 'too-large' };
   if (status === 403) return { kind: 'refused', code: 'not-allowed' };
   if (status === 404) return { kind: 'refused', code: 'unknown-game' };
   return { kind: 'failed' };

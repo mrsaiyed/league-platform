@@ -618,6 +618,12 @@ export const enTracker = {
   'tracker.redo.done': 'Brought back: {play}.',
   'tracker.redo.label': 'Redo {play}',
   'tracker.redo.nothing': 'Redo: nothing to bring back',
+  // Left the game (an upload of a copy let go of it, step 2.70) with plays this device
+  // can still send by "Send these plays" (T-370).
+  'tracker.releasedKept_one':
+    'This device has left the game. {count} play made here is still waiting: it is not on the server yet. Send it with “Send these plays” below, then open the game again to keep scoring.',
+  'tracker.releasedKept_other':
+    'This device has left the game. {count} plays made here are still waiting: they are not on the server yet. Send them with “Send these plays” below, then open the game again to keep scoring.',
   // The bonus horn's sentence: a muted tablet is the normal case in a gym.
   'tracker.say.bonus.1': 'Bonus: {team}.',
   'tracker.say.bonus.2': 'Double bonus: {team}.',
@@ -810,6 +816,8 @@ export const enTracker = {
   'tracker.upload.sending': 'Uploading…',
   'tracker.upload.signedOut': 'You are signed out. Sign in again, then upload the copy.',
   'tracker.upload.title': 'Upload a copy of the game',
+  'tracker.upload.tooLarge':
+    'This file is too large to be a copy of a game. Pick the file “Save a copy” wrote on the scoring device.',
   'tracker.upload.unreadable': 'This file could not be opened on this device. Pick it again.',
   'tracker.where.bench': 'bench',
   'tracker.where.floor': 'on court',

@@ -44,6 +44,9 @@ describe('the upload page of a copy of a game', () => {
     });
     expect(uploadViewOf(404, null, copy)).toEqual({ kind: 'refused', code: 'unknown-game' });
     expect(uploadViewOf(502, null, copy)).toEqual({ kind: 'failed' });
+    // A body too large for the server, in its own words (step 2.70, fix round).
+    expect(uploadViewOf(413, { error: 'too-large' }, copy)).toEqual({ kind: 'too-large' });
+    expect(uploadViewOf(413, null, copy)).toEqual({ kind: 'too-large' });
     expect(uploadViewOf(200, { status: 'uploaded', added: -1 }, copy)).toEqual({ kind: 'failed' });
   });
 
