@@ -125,6 +125,7 @@ import { createTileDrag, type TileDrag } from './tile-drag.ts';
 import { createTileMarks, type MarkKind, type TileMark, type TileMarks } from './tile-marks.ts';
 import type { TapInput, TapResult, TrackerControllerStatus } from './tracker-controller.ts';
 import { useEndGame } from './use-end-game.ts';
+import { usePlayersPanel } from './use-players-panel.tsx';
 
 export type ScoringScreenProps = {
   readonly game: OpenedTrackerGame;
@@ -154,6 +155,8 @@ export type ScoringScreenProps = {
   readonly mayCorrect?: boolean;
   /** The device knows it has no connection (queue-banner.ts): an End just tapped waits. */
   readonly offline?: boolean;
+  /** The game's id: what is typed in the Players panel is kept on the device under it. */
+  readonly gameId?: string;
 };
 
 /** How long the latest sentence stays (checklist I5). */
@@ -458,6 +461,17 @@ export function ScoringScreen(props: ScoringScreenProps) {
   // The view holds each player's minutes as of the game's latest tap; the clock's ticker
   // writes them on from there, so the view is not worked out again as the clock runs.
   const view = useMemo(() => scoringView(state, rosters, picks), [state, rosters, picks]);
+  // The Players panel (step 2.118): it reads the same rosters the tiles do.
+  const players = usePlayersPanel({
+    controller,
+    status,
+    state,
+    rosters,
+    t,
+    banner: props.banner.text,
+    draftsFor: props.gameId ?? `${rosters.home.teamId}.${rosters.away.teamId}`,
+    onOpen: () => setMoreOpen(false),
+  });
   // The options of a player the game no longer shows are not left open.
   const pad = padFor(view, padMode);
   // --- The clock (step 2.36). ---
@@ -1556,8 +1570,17 @@ export function ScoringScreen(props: ScoringScreenProps) {
               {props.slots?.moreStart}
             </>
           ),
+        // The way to the Players panel: on a team with nobody, before tip-off, behind More.
+        noPlayers: (side) => players.button(side),
+        pregame: (
+          <>
+            {players.button('pregame')}
+            {props.slots?.pregame}
+          </>
+        ),
         more: (
           <>
+            {players.button('more')}
             <MoreLog t={t} log={log} on={plays} />
             {state.status === 'live' ? <MoreNotStarted t={t} on={end.on} /> : null}
             {props.slots?.more}
@@ -1567,6 +1590,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       account={props.account ?? null}
     >
       {logOpen ? <PlayLogSheet t={t} log={log} on={plays} /> : null}
+      {players.sheet}
       {draggedTile === undefined ? null : (
         <div
           className="court-ghost"

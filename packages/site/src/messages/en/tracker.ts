@@ -378,6 +378,28 @@ export const enTracker = {
   // A player the game has and this device's rosters do not (added at another table).
   'tracker.player.unknown': 'Player not on this device’s list',
   'tracker.player.unlistedShort': 'Not listed',
+  // The Players panel (step 2.118, part 2): both teams' players, a line to add one player
+  // or a bench by number, a fix of a number or a name, take off (S-34, S-44, S-45).
+  'tracker.players.add': 'Add',
+  'tracker.players.addFirst': 'Add players',
+  'tracker.players.added_one': '{count} player added.',
+  'tracker.players.added_other': '{count} players added.',
+  'tracker.players.clash': 'Same number as {players}.',
+  'tracker.players.clashLine': 'The number being typed is this player’s too.',
+  'tracker.players.clashTyped':
+    '#{jersey} is already worn by {players}. They can still be added: an admin sorts it out after.',
+  'tracker.players.count_one': '{count} player',
+  'tracker.players.count_other': '{count} players',
+  'tracker.players.fix': 'Fix',
+  'tracker.players.fixDone': 'Close',
+  'tracker.players.invalid':
+    'Use numbers from 0 to 99 (or 00). Type one number with a name, or several numbers with no name.',
+  'tracker.players.name': 'Name (if known)',
+  'tracker.players.number': 'Number',
+  'tracker.players.numbers': 'Number, or several numbers',
+  'tracker.players.numbersHelp': 'For a whole bench, type the numbers in one line: 3 5 10 12 14.',
+  'tracker.players.open': 'Players',
+  'tracker.players.openHelp': 'Add a player for either team, or fix a number or a name.',
   // The Players panel (step 2.118): why the panel takes no change now, and why a change
   // of players was said no to, by the device or the server (record 058, S-37, S-45).
   'tracker.players.readOnly.device':
@@ -403,6 +425,15 @@ export const enTracker = {
     'This player was not added, so the plays that name them were not saved.',
   'tracker.players.refused.reviewed':
     'A league admin has checked this player: the admin changes their name or takes them off now.',
+  'tracker.players.refusedPlays_one': '{count} play that names them was not saved.',
+  'tracker.players.refusedPlays_other': '{count} plays that name them were not saved.',
+  'tracker.players.save': 'Save',
+  'tracker.players.saved': 'Saved on this device.',
+  'tracker.players.takeOff': 'Take off the team',
+  'tracker.players.takenOff': 'Taken off.',
+  'tracker.players.title': 'Players',
+  'tracker.players.waiting': 'Not sent yet',
+  'tracker.players.wornBy': '{player} wears #{jersey}.',
   'tracker.pregame.players_one': '{team}: {count} player',
   'tracker.pregame.players_other': '{team}: {count} players',
   'tracker.pregame.title': 'Before tip-off',

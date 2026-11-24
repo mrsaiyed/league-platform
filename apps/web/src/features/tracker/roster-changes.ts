@@ -19,13 +19,16 @@ import {
   type TablePlayerProblem,
 } from '@srleagues/contracts';
 import { namedInState, splitTableName } from '@srleagues/core';
-import type { MessageKey } from '@srleagues/site';
+import type { MessageKey, Translate } from '@srleagues/site';
 import type { basketball } from '@srleagues/sports';
 import type { DevicePlayer, DeviceRosters, DeviceTeam } from './opened-game-storage.ts';
 import type { KeptTap } from './queue-storage.ts';
 import type { RefusedCommand } from './tracker-queue.ts';
 
 export type PlayerSide = 'home' | 'away';
+
+/** A key worded with no count: what each refusal and reason here is. */
+export type WordKey = Parameters<Translate>[0];
 
 /** A change of players as the panel asks for it: the device makes a new player's id. */
 export type PlayerChange =
@@ -39,7 +42,7 @@ export const playerProblemKey = (problem: TablePlayerProblem) =>
 /** What the device says no to itself, as the server would (its rules, table-players.ts). */
 export type DeviceProblem = {
   readonly problem: TablePlayerProblem;
-  readonly key: MessageKey;
+  readonly key: WordKey;
   /** For a number already worn where the season wants unique numbers (S-37). */
   readonly wornBy?: { readonly playerId: string; readonly jersey: string };
 };
@@ -211,7 +214,7 @@ export type RefusedGroup = {
   readonly playerId: string;
   /** The refused change; null when only plays naming the player are left in the list. */
   readonly change: RefusedCommand | null;
-  readonly key: MessageKey;
+  readonly key: WordKey;
   readonly plays: readonly RefusedCommand[];
 };
 
@@ -220,7 +223,7 @@ export type PlayersPanel = {
   readonly away: PanelTeam;
   readonly uniqueJerseys: boolean;
   /** Null while the panel takes changes; else why not, as a message key. */
-  readonly readOnly: { readonly reason: 'final' | 'device'; readonly key: MessageKey } | null;
+  readonly readOnly: { readonly reason: 'final' | 'device'; readonly key: WordKey } | null;
   readonly refused: readonly RefusedGroup[];
 };
 
