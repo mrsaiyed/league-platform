@@ -7,13 +7,16 @@
 import type { PGlite } from '@electric-sql/pglite';
 import {
   applyFixtureImport,
+  applyTrackerCommands,
   archiveSeason,
   clearSetting,
   putSheetBack,
   readGameFormat,
   readOwnResultOffer,
   readOwnResultOffers,
+  openScoringSession,
   recordFinalScore,
+  recordForfeit,
   recordImportedScores,
   removeDivision,
   reopenGame,
@@ -21,6 +24,7 @@ import {
   restoreDivision,
   restoreGame,
   restoreTeam,
+  setBoxScore,
   setSetting,
   startFixtureImport,
   undoFixtureImport,
@@ -38,6 +42,7 @@ import { createDatabase } from '../db/create-database.ts';
 import type { DatabaseHandle } from '../db/database-handle.ts';
 import {
   freshSchema,
+  newAccount,
   newDivision,
   newGame,
   newLeague,
@@ -104,6 +109,8 @@ async function aSeason() {
   const seasonId = await newSeason(pglite, league.leagueId, league.defaultProgramId, {
     isCurrent: true,
   });
+  // Shown to visitors: a hidden season cannot be archived (T-388).
+  await pglite.query(`update seasons set status = 'active' where id = $1`, [seasonId]);
   const divisionId = await newDivision(pglite, league.leagueId, seasonId, { name: 'East' });
   const home = await newTeam(pglite, league.leagueId, seasonId, { divisionId });
   const away = await newTeam(pglite, league.leagueId, seasonId);
@@ -167,6 +174,43 @@ describe('a game in an archived season changes only while a correction is open o
     expect(
       await one(pglite, 'select status, home_score from games where id = $1', [s.final]),
     ).toEqual({ status: 'final', home_score: 53 });
+  });
+});
+
+describe("an admin's open correction lets in only those who may correct games (O-12, T-389)", () => {
+  it('refuses a scorekeeper the result, box score, forfeit, tracker and scoring session; takes the admin', async () => {
+    const s = await aSeason();
+    const scorer = await newAccount(pglite);
+    await pglite.query(
+      `insert into role_grants (league_id, account_id, role, scope_type) values ($1, $2, 'scorekeeper', 'league')`,
+      [s.league.leagueId, scorer],
+    );
+    const keeper = as(s.league.leagueId, scorer);
+    await s.archive();
+    const reopened = await reopenGame(
+      s.owner,
+      { gameId: s.final, version: await versionOf('games', s.final), reason: 'Wrong score' },
+      deps,
+    );
+    if (!reopened.ok) throw new Error(reopened.error.code);
+    const version = await versionOf('games', s.final);
+    const score = { gameId: s.final, version, homeScore: 52, awayScore: 40 };
+    expect(await recordFinalScore(keeper, score, deps)).toEqual(refused);
+    expect(await setBoxScore(keeper, { ...score, lines: [] }, deps)).toEqual(refused);
+    expect(
+      await applyTrackerCommands(keeper, { gameId: s.final, protocolVersion: 1 }, deps),
+    ).toEqual(refused);
+    expect(
+      await openScoringSession(keeper, { gameId: s.final, deviceId: 'tablet-1' }, deps),
+    ).toEqual(refused);
+    // A scorekeeper may never record a forfeit (games.results): refused before the season.
+    expect(
+      (await recordForfeit(keeper, { gameId: s.final, version, forfeitingTeamId: s.away }, deps))
+        .ok,
+    ).toBe(false);
+    expect(await versionOf('games', s.final)).toBe(version);
+    // The admin who may correct finishes the correction.
+    expect((await recordFinalScore(s.owner, score, deps)).ok).toBe(true);
   });
 });
 

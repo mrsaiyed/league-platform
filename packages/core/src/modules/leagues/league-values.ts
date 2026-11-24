@@ -8,6 +8,9 @@ export type LeagueStatus = (typeof leagueStatuses)[number];
 export const seasonStatuses = ['draft', 'active', 'completed'] as const;
 export type SeasonStatus = (typeof seasonStatuses)[number];
 
+/** A hidden season (A-18): still being set up, which visitors do not see. */
+export const hiddenSeasonStatus = 'draft' satisfies SeasonStatus;
+
 /** An archived season (step 2.130, O-12, T-376): over, still shown, read-only. */
 export const archivedSeasonStatus = 'completed' satisfies SeasonStatus;
 

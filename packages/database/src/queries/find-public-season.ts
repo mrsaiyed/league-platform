@@ -1,5 +1,7 @@
 // The season a public page shows (P2 §4): the one with this id, the one `?season=` names, or, with none, the
-// current season of the program (the league's default program unless one is given).
+// current season of the program (the league's default program unless one is given) while it is shown, and
+// otherwise the program's most recent shown season, newest first as listPublicSeasons lists them (S-103: an
+// admin may make a hidden season current to prepare it; visitors go on seeing the shown one).
 // Only running and finished seasons count; one still being set up is not there at all.
 import { sql } from 'kysely';
 import type { PublicSeasonChoice } from '@srleagues/core';
@@ -41,7 +43,10 @@ export async function findPublicSeason(
     else query = query.where('programs.is_default', '=', true);
     query =
       which.seasonSlug === undefined
-        ? query.where('seasons.is_current', '=', true)
+        ? query
+            .orderBy(sql`seasons.is_current desc`)
+            .orderBy(sql`seasons.starts_on desc nulls last`)
+            .orderBy('seasons.name')
         : query.where('seasons.slug', '=', which.seasonSlug);
   }
   const row = await query.orderBy('seasons.id').executeTakeFirst();

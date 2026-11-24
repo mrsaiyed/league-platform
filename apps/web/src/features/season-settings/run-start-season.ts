@@ -1,6 +1,7 @@
 // What "Start the season" does (step 2.130), apart from the page check and the redirect
 // (actions.ts): the form's fields as leagues.start_season takes them, an empty date left
-// out. The command checks every field; its refusal is answered by its own words. The
+// out, in the program the form names (the shown season's: the one the admin is working
+// in), or the league's default one when there is no season yet. The command checks every field; its refusal is answered by its own words. The
 // context comes from the session, never from the form (T-23).
 import {
   seasonCarryChoices,
@@ -31,12 +32,14 @@ export async function runStartSeason(
   const slug = typed(fields['slug']);
   const startsOn = typed(fields['startsOn']);
   const endsOn = typed(fields['endsOn']);
+  const programId = typed(fields['programId']);
   if (carry === undefined || slug === undefined) {
     return { answer: refusedBy(startSeason.commandName, 'invalid-input'), seasonSlug: undefined };
   }
   const result = await startSeason(
     context,
     {
+      ...(programId === undefined ? {} : { programId }),
       slug,
       name: fields['name'] ?? '',
       carry,

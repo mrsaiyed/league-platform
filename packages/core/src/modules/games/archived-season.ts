@@ -8,10 +8,14 @@
 //   not started, S-40; scorekeepers, postponing, cancelling, the game's rules).
 // - gameInArchivedSeasonNotReopened: entering a result, and the tracker's work, refused
 //   unless a correction is open on the game: reopened by a correction with a reason and
-//   not decided again since (T-381). Once its result is entered again the game is final,
+//   not decided again since (T-381), and then only for someone who may correct games at
+//   the game's place (games.correct, O-12, T-389): a scorekeeper is refused. A correction
+//   left open stays the correcting admin's to finish, archived or not. Once its result is entered again the game is final,
 //   and read-only again; a game corrected before the season was archived is no exception.
+import type { CommandContext } from '../../command/index.ts';
 import { isDecided } from './game-fields.ts';
-import type { GameRecord, GamesStore } from './ports.ts';
+import { gameScope, mayChangeGames } from './policy.ts';
+import type { GameRecord, GamesStore, GamesTx } from './ports.ts';
 
 type ArchiveReader = {
   readonly games: Pick<GamesStore, 'find' | 'seasonArchived' | 'correctionsNewestFirst'>;
@@ -40,9 +44,11 @@ export async function correctionOpenOn(
 
 export async function gameInArchivedSeasonNotReopened(
   input: { readonly gameId: string },
-  tx: ArchiveReader,
+  tx: GamesTx,
+  context: CommandContext,
 ): Promise<boolean> {
   const game = await tx.games.find(input.gameId);
   if (game === undefined || !(await tx.games.seasonArchived(game.seasonId))) return false;
-  return !(await correctionOpenOn(game, tx));
+  if (!(await correctionOpenOn(game, tx))) return true;
+  return !(await mayChangeGames(context, tx, 'games.correct', await gameScope(tx, game.id)));
 }

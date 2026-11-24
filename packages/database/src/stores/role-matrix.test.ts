@@ -2330,12 +2330,15 @@ const rows: readonly Row[] = [
     command: 'leagues.archive_season',
     name: 'archive a season of the default program (step 2.130)',
     needs: 'season.settings',
-    prepare: async (league) => ({
-      input: {
-        seasonId: await newSeason(pglite, league.leagueId, league.defaultProgramId),
-        version: 1,
-      },
-    }),
+    prepare: async (league) => {
+      const seasonId = await newSeason(pglite, league.leagueId, league.defaultProgramId);
+      // Shown to visitors: a hidden season cannot be archived (T-388).
+      const shown = await pglite.query<{ version: number }>(
+        `update seasons set status = 'active' where id = $1 returning version`,
+        [seasonId],
+      );
+      return { input: { seasonId, version: shown.rows[0]?.version ?? 1 } };
+    },
     run: (c, i) => archiveSeason(c, i, leaguesDeps),
   },
   {

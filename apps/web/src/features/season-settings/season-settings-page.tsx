@@ -92,11 +92,20 @@ export async function SeasonSettingsPage({
       : 'visibility';
   const problemFor = (panel: typeof problemAt) =>
     problemAt === panel ? problemKey(search) : undefined;
-  // "Start a new season" (step 2.130): copies from the current season, if there is one.
-  const current = seasons.find((s) => s.isCurrent);
-  const mayStart = mayStartSeason(holder, season?.programId, addressee.status);
+  // "Start a new season" (step 2.130): in the shown season's program, copying that
+  // program's current season, if it has one.
+  const programId = season?.programId;
+  const current = seasons.find(
+    (s) => s.isCurrent && (programId === undefined || s.programId === programId),
+  );
+  const mayStart = mayStartSeason(holder, programId, addressee.status);
   const start = mayStart ? (
-    <StartSeasonPanel league={league} copiedFrom={current?.name} problem={problemFor('start')} />
+    <StartSeasonPanel
+      league={league}
+      programId={programId}
+      copiedFrom={current?.name}
+      problem={problemFor('start')}
+    />
   ) : null;
   if (season === undefined) {
     return (

@@ -6,15 +6,20 @@
 // Archived is the state a season already had for "over and still shown", `completed`
 // (T-376). Being the current season is a mark, not content: archiving leaves it as it is
 // (S-99), and "Make this the current season" still works on an archived season. There is
-// no way back to running in v1 (S-100). Names the version it started from (A-8, T-46).
+// no way back to running in v1 (S-100). A hidden season is refused (`season-hidden`,
+// T-388): archived is a shown state, so archiving one would show it to visitors, and an
+// archived season can no longer be hidden; show it first, or leave it hidden. Names the
+// version it started from (A-8, T-46).
 import { z } from 'zod';
 import { leagueScope, recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
-import { archivedSeasonStatus } from '../league-values.ts';
+import { archivedSeasonStatus, hiddenSeasonStatus } from '../league-values.ts';
 import { mayEditLeague, programScope } from '../policy.ts';
 import type { LeaguesTx } from '../ports.ts';
 
-export type ArchiveSeasonError = { readonly code: 'season-not-found' | 'changed-since-read' };
+export type ArchiveSeasonError = {
+  readonly code: 'season-not-found' | 'changed-since-read' | 'season-hidden';
+};
 
 export const archiveSeason = defineCommand({
   name: 'leagues.archive_season',
@@ -34,6 +39,7 @@ export const archiveSeason = defineCommand({
     const season = await tx.leagues.findSeason(input.seasonId);
     if (season === undefined) return fail({ code: 'season-not-found' });
     if (season.version !== input.version) return fail({ code: 'changed-since-read' });
+    if (season.status === hiddenSeasonStatus) return fail({ code: 'season-hidden' });
     if (season.status === archivedSeasonStatus) {
       return ok({ seasonId: season.id, version: season.version });
     }

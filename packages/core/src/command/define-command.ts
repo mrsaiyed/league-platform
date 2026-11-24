@@ -71,6 +71,12 @@ export type Command<Value, Err extends CommandError, Tx extends CommandTx> = (<T
 ) => Promise<Result<Value, Err | InvalidInput | NotAllowed>>) & {
   readonly commandName: string;
   readonly permission: string;
+  /** The command's archived-season check, if it names one (the guard test walks these). */
+  readonly archivedSeasonCheck?: (
+    input: never,
+    tx: never,
+    context: CommandContext,
+  ) => Promise<boolean>;
 };
 
 /** The clock, or null if it fails: a broken clock must not stop the log line. */
@@ -93,11 +99,13 @@ export type SeasonArchived = { readonly code: 'season-archived' };
  * True when this write lands in an archived season (O-12, step 2.130, T-377). A command
  * that writes into a season names one, from its module's archived-season.ts; the
  * framework then refuses it with `season-archived` once `allowed` has passed (so
- * nobody learns a season's state from a command they may not run), before `run`.
+ * nobody learns a season's state from a command they may not run), before `run`. It is
+ * given who acts, for a door only some may use (an open correction, T-389).
  */
 export type ArchivedSeasonCheck<Schema extends z.ZodType, Tx extends CommandTx> = (
   input: z.output<Schema>,
   tx: Tx,
+  context: CommandContext,
 ) => Promise<boolean>;
 
 export function defineCommand<
@@ -217,7 +225,7 @@ export function defineCommand<
           throw rollBack;
         }
         const archivedCheck = definition.refusedInArchivedSeason;
-        if (archivedCheck !== undefined && (await archivedCheck(input, tx))) {
+        if (archivedCheck !== undefined && (await archivedCheck(input, tx, context))) {
           refused.error = { code: 'season-archived' };
           throw rollBack;
         }
@@ -247,5 +255,11 @@ export function defineCommand<
 
   // Named for the command, so failures and the harness's reports say which one.
   Object.defineProperty(execute, 'name', { value: name });
-  return Object.assign(execute, { commandName: name, permission });
+  const archivedSeasonCheck = definition.refusedInArchivedSeason;
+  return Object.assign(
+    execute,
+    archivedSeasonCheck === undefined
+      ? { commandName: name, permission }
+      : { commandName: name, permission, archivedSeasonCheck },
+  );
 }

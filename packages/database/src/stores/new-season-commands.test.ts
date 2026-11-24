@@ -32,6 +32,7 @@ import {
   newDivision,
   newGame,
   newLeague,
+  newProgram,
   newPerson,
   newRosterEntry,
   newSeason,
@@ -88,11 +89,11 @@ async function lastSeason() {
   const seasonId = await newSeason(pglite, league.leagueId, league.defaultProgramId, {
     isCurrent: true,
   });
-  await pglite.query(`update seasons set rules = $2::jsonb, stat_keys = $3 where id = $1`, [
-    seasonId,
-    JSON.stringify(defaultSeasonRules()),
-    ['points'],
-  ]);
+  // A season that ran, shown to visitors (a hidden one cannot be archived, T-388).
+  await pglite.query(
+    `update seasons set status = 'active', rules = $2::jsonb, stat_keys = $3 where id = $1`,
+    [seasonId, JSON.stringify(defaultSeasonRules()), ['points']],
+  );
   await pglite.query(
     `insert into setting_values (league_id, level, season_id, key, value)
      values ($1, 'season', $2, 'madeup.key', '{"version":1,"value":3}')`,
@@ -186,6 +187,40 @@ describe('starting a new season (step 2.130)', () => {
       copied: { divisions: 0, teams: 0, rosterEntries: 0 },
     });
     expect((await start(owner, 'fresh', 'nothing')).ok).toBe(false);
+  });
+
+  it("starts the season in the program it names, copying that program's current season and teams", async () => {
+    const { league, owner, seasonId } = await lastSeason();
+    const programB = await newProgram(pglite, league.leagueId);
+    const seasonB = await newSeason(pglite, league.leagueId, programB, { isCurrent: true });
+    await newTeam(pglite, league.leagueId, seasonB);
+    const before = await pglite.query(
+      'select id, status, is_current from seasons where program_id = $1 order by id',
+      [league.defaultProgramId],
+    );
+    const started = await startSeason(
+      owner,
+      { programId: programB, slug: 'b-next', name: 'B next', carry: 'teams' },
+      deps,
+    );
+    if (!started.ok) throw new Error(started.error.code);
+    expect(started.value.copiedFromSeasonId).toBe(seasonB);
+    expect(started.value.copied.teams).toBe(1);
+    expect(
+      await one(pglite, 'select program_id from seasons where id = $1', [started.value.seasonId]),
+    ).toEqual({ program_id: programB });
+    // The default program's seasons are as they were: none added, its current one kept.
+    expect(
+      (
+        await pglite.query(
+          'select id, status, is_current from seasons where program_id = $1 order by id',
+          [league.defaultProgramId],
+        )
+      ).rows,
+    ).toEqual(before.rows);
+    expect(await one(pglite, 'select is_current from seasons where id = $1', [seasonId])).toEqual({
+      is_current: true,
+    });
   });
 
   it('lets another league neither start a season in this program nor archive this season', async () => {
@@ -300,5 +335,26 @@ describe('an archived season is read-only (O-12)', () => {
     expect(
       await one(pglite, 'select status, home_score from games where id = $1', [s.final]),
     ).toEqual({ status: 'final', home_score: 51 });
+  });
+});
+
+describe('a hidden season cannot be archived (T-388)', () => {
+  it('refuses season-hidden and leaves it hidden from visitors', async () => {
+    const league = await newLeague(pglite);
+    const owner = as(league.leagueId, league.ownerId);
+    const hidden = await newSeason(pglite, league.leagueId, league.defaultProgramId);
+    const row = await one<{ status: string; version: number }>(
+      pglite,
+      'select status, version from seasons where id = $1',
+      [hidden],
+    );
+    expect(row.status).toBe('draft');
+    expect(await archiveSeason(owner, { seasonId: hidden, version: row.version }, deps)).toEqual({
+      ok: false,
+      error: { code: 'season-hidden' },
+    });
+    expect(await one(pglite, 'select status from seasons where id = $1', [hidden])).toEqual({
+      status: 'draft',
+    });
   });
 });

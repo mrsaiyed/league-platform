@@ -129,11 +129,14 @@ export function SeasonStatePanel({
 
 export function StartSeasonPanel({
   league,
+  programId,
   copiedFrom,
   problem,
 }: {
   /** The route's `[league]` value, which the form's post finds the page by. */
   readonly league: string;
+  /** The program the new season is started in; undefined for the league's default one. */
+  readonly programId: string | undefined;
   /** The current season's name, which the new one copies; undefined when there is none. */
   readonly copiedFrom: string | undefined;
   readonly problem: TextKey | undefined;
@@ -159,6 +162,9 @@ export function StartSeasonPanel({
       <p className="staff-quiet">{t('seasonSettings.start.hidden')}</p>
       <form action={startSeasonAction} className="staff-form" data-start-season-form="">
         <input type="hidden" name="league" value={league} />
+        {programId === undefined ? null : (
+          <input type="hidden" name="programId" value={programId} />
+        )}
         <input type="hidden" name={requestTokenField} value={randomUUID()} />
         <p>
           <label className="staff-field">
