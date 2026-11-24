@@ -152,6 +152,28 @@ registerCommandCase(createPerson, harnessTx, {
   input: () => ({ firstName: 'Harness', lastName: 'Person', contactEmail: 'h@example.test' }),
 });
 
+// S-109 (step 2.243): recording a child may put the league's "children in full" back;
+// only ever the scope's own league's, whatever the target holds.
+registerCommandCase(createPerson, harnessTx, {
+  name: 'add a child, which may put back the confirmation of its own league only',
+  input: () => ({
+    firstName: 'Harness',
+    lastName: 'Child',
+    birthDate: '2015-01-02',
+    isMinor: true,
+  }),
+});
+
+registerCommandCase(updatePersonCommand, harnessTx, {
+  name: "record the target's person as a child",
+  input: (target) => ({
+    personId: target.personId,
+    version: 1,
+    birthDate: '2015-01-02',
+    isMinor: true,
+  }),
+});
+
 registerCommandCase(getPerson, harnessTx, {
   name: "read the target's person, with the sensitive fields",
   input: (target) => ({ personId: target.personId }),
