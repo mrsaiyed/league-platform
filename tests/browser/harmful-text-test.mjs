@@ -105,6 +105,22 @@ const typed = {
  * back as harmlessly as what is kept.
  */
 const POSTED = 'posted by hand';
+/** "Change the format" (step 2.119): its ten typed boxes, drawn only once it is opened. */
+const FORMAT_BOXES = [
+  'minutes',
+  'overtimeMinutes',
+  'stopLastSeconds',
+  'mercyLead',
+  'bonusFouls',
+  'doubleBonusFouls',
+  'playerFoulLimit',
+  'fullTimeouts',
+  'shortTimeouts',
+  'overtimeTimeouts',
+];
+const formatBoxes = Object.fromEntries(
+  FORMAT_BOXES.map((name) => [name, "the format form's boxes are typed"]),
+);
 const FIELDS = {
   '/[league]/admin/teams': { name: 'a team is added', shortName: 'a team is added' },
   '/[league]/admin/teams/[team]': {
@@ -158,6 +174,7 @@ const FIELDS = {
     'stat.fg3.{id}': 'a box score is typed',
     'stat.fg1.{id}': 'a box score is typed',
     'stat.fouls.{id}': 'a box score is typed',
+    ...formatBoxes,
   },
   // League settings (step 2.60): the site notice, the one text setting, shown on every
   // public page of the league.
@@ -173,6 +190,7 @@ const FIELDS = {
   '/[league]/score/[game]': {
     'players-line': "the Players panel's boxes",
     'players-name': "the Players panel's boxes",
+    ...formatBoxes,
   },
 };
 
@@ -869,6 +887,50 @@ if (browser) {
       await context.close();
     }
   });
+  // Step 2.119: "Change the format" at the tracker's start and in the games area, each of the
+  // form's ten typed boxes typed the attack; Save says the format is not one it can keep.
+  const formatGame = '01900000-0000-7000-8000-006a00000003'; // Lions at Hawks, no plays
+  for (const [who, cookie, address, route] of [
+    ['the scorekeeper', keeper, `/north-valley/score/${formatGame}`, '/[league]/score/[game]'],
+    ['the owner', owner, `/north-valley/admin/games/${formatGame}`, '/[league]/admin/games/[game]'],
+  ]) {
+    await step(`${who}: the format form's boxes are typed as the attack`, async () => {
+      const context = await contextFor(cookie);
+      const page = await context.newPage();
+      page.setDefaultTimeout(30_000);
+      try {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto(origin + address);
+        await page.locator('[data-game-format] [data-format-change]:not([disabled])').click();
+        const form = page.locator('[data-format-form]');
+        await form.waitFor();
+        const boxes = form.locator('input:not([type=checkbox])');
+        const names = await boxes.evaluateAll((els) => els.map((el) => el.getAttribute('name')));
+        for (const name of names) {
+          await form.locator(`input[name="${name}"]`).fill(attack(`format-${name}`));
+        }
+        await form.locator('[data-format-save]').click();
+        await form.locator('[role=alert]').waitFor();
+        await page.waitForTimeout(300);
+        const found = await harm(page);
+        note(
+          `${who}: the format form's ${names.length} boxes typed the attack ran no script and made no element`,
+          names.length === FORMAT_BOXES.length &&
+            found.ran === null &&
+            found.made.length === 0 &&
+            found.scripts === 0,
+          [names.join(','), found.ran, ...found.made].join(' | '),
+        );
+        note(
+          `${who}: the format form: the browser had nothing to refuse`,
+          found.refused.length === 0,
+        );
+        for (const name of names) typedInto.add(`${route} ${name}`);
+      } finally {
+        await context.close();
+      }
+    });
+  }
   await step("the scorer's table name is shown as typed on the team's admin page", async () => {
     const teams = await (
       await fetch(`${origin}/north-valley/admin/teams`, {
