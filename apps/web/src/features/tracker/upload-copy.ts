@@ -1,0 +1,86 @@
+// The upload page of a copy of a game (step 2.70, S-5, T-129), without React: what the
+// page posts to the copy's route, and how it reads the answer. The server reads and
+// checks the file itself (game-copy-upload-endpoint.ts); the page only hands it over.
+import {
+  GameCopyUploadReply,
+  type GameCopyUpload,
+  type GameCopyUploadRefusal,
+} from '@srleagues/contracts';
+import type { Translate } from '@srleagues/site';
+
+/** Who holds the game, as the upload's answer names them. */
+export type UploadHolder = Extract<GameCopyUploadReply, { status: 'held-by-other' }>['holder'];
+
+/** What the upload page shows. */
+export type UploadView =
+  | { readonly kind: 'ready' }
+  | { readonly kind: 'no-file' }
+  | { readonly kind: 'unreadable' }
+  | { readonly kind: 'sending' }
+  | {
+      readonly kind: 'uploaded';
+      readonly added: number;
+      readonly alreadyThere: number;
+      readonly notTaken: number;
+    }
+  /** Another device holds the game: the takeover question, with what to send if agreed. */
+  | {
+      readonly kind: 'held-by-other';
+      readonly holder: UploadHolder;
+      readonly sentAt: number;
+      readonly copy: string;
+    }
+  /** "Not now": nothing was sent and the game stays with the other device. */
+  | { readonly kind: 'not-now' }
+  | { readonly kind: 'refused'; readonly code: GameCopyUploadRefusal }
+  | { readonly kind: 'signed-out' }
+  | { readonly kind: 'failed' };
+
+/** The body of one upload: the file's text and, once agreed, whom the game is taken from. */
+export function uploadBody(copy: string, takeOverFrom?: { readonly since: number }): string {
+  const body: GameCopyUpload =
+    takeOverFrom === undefined
+      ? { copy }
+      : { copy, takeOver: { expectedHolderSince: takeOverFrom.since } };
+  return JSON.stringify(body);
+}
+
+/** The page's view of the server's answer: its status and its body as JSON (null if none). */
+export function uploadViewOf(status: number, body: unknown, copy: string): UploadView {
+  const reply = GameCopyUploadReply.safeParse(body);
+  if (reply.success) {
+    const r = reply.data;
+    if (r.status === 'uploaded') {
+      return {
+        kind: 'uploaded',
+        added: r.added,
+        alreadyThere: r.alreadyThere,
+        notTaken: r.notTaken,
+      };
+    }
+    if (r.status === 'held-by-other') {
+      return { kind: 'held-by-other', holder: r.holder, sentAt: r.sentAt, copy };
+    }
+    return { kind: 'refused', code: r.code };
+  }
+  // The league's own refusals, before the upload is read (league-api.ts).
+  if (status === 401) return { kind: 'signed-out' };
+  if (status === 403) return { kind: 'refused', code: 'not-allowed' };
+  if (status === 404) return { kind: 'refused', code: 'unknown-game' };
+  return { kind: 'failed' };
+}
+
+/** The result's lines: done, then what was new, what the server had, what was not taken. */
+export function uploadedLines(
+  view: Extract<UploadView, { kind: 'uploaded' }>,
+  t: Translate,
+): string[] {
+  const { added, alreadyThere, notTaken } = view;
+  if (added + alreadyThere + notTaken === 0) return [t('tracker.upload.empty')];
+  return [
+    t('tracker.upload.done'),
+    added === 0 ? t('tracker.upload.addedNone') : t.plural('tracker.upload.added', added),
+    ...(alreadyThere === 0 ? [] : [t.plural('tracker.upload.alreadyThere', alreadyThere)]),
+    ...(notTaken === 0 ? [] : [t.plural('tracker.upload.notTaken', notTaken)]),
+  ];
+}

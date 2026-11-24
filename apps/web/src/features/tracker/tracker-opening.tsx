@@ -51,6 +51,8 @@ export type TrackerOpeningProps = {
   readonly when: string | null;
   /** The league's public page of this game, opened beside the tracker (checklist A4). */
   readonly watchHref: string;
+  /** The game's upload page of a copy (step 2.70), built by the address helper. */
+  readonly uploadHref: string;
   /** Where "back to your games" goes, leaving the game. */
   readonly backHref: string;
   /** The account page, where a shared device is signed out (and its kept games cleared). */
@@ -95,6 +97,7 @@ export function TrackerOpening({
   rosters,
   when,
   watchHref,
+  uploadHref,
   backHref,
   accountHref,
   account = null,
@@ -419,7 +422,7 @@ export function TrackerOpening({
     const banner = savedBanner(phase.status.queue, offline, keptOnly(phase.status));
     const notices = trackerNotices(phase.status);
     // "Save a copy" (step 2.70): behind More always, suggested after minutes offline.
-    const copyProps = { leagueId, gameId, accountId, t };
+    const copyProps = { leagueId, gameId, accountId, uploadHref, t };
     const suggestCopy = suggestsCopy(phase.status);
     const anythingToTell =
       notices.length > 0 ||

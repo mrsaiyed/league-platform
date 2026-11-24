@@ -102,6 +102,8 @@ export const enTracker = {
   // After several minutes offline with plays waiting (T6 §4, T-129).
   'tracker.copy.suggest':
     'To be safe, save a copy of the game now: if this device cannot get back online, the copy can be uploaded from another phone or computer.',
+  'tracker.copy.where':
+    'Cannot get back online? Sign in on another phone or computer and upload the copy there:',
   'tracker.court.close': 'Close',
   'tracker.court.controls': 'Clock and undo',
   'tracker.court.more': 'More',
@@ -781,6 +783,34 @@ export const enTracker = {
   'tracker.undo.label': 'Undo {play}',
   'tracker.undo.nothing': 'Undo: nothing to take back',
   'tracker.unknownGame': 'We could not find that game.',
+  // The upload page of a copy of a game (step 2.70): any phone or computer, signed in.
+  'tracker.upload.addedNone': 'No play in the copy was new.',
+  'tracker.upload.added_one': '{count} play was new: it is saved now.',
+  'tracker.upload.added_other': '{count} plays were new: they are saved now.',
+  'tracker.upload.alreadyThere_one':
+    'The server already had {count} play, so it was not counted again.',
+  'tracker.upload.alreadyThere_other':
+    'The server already had {count} plays, so they were not counted again.',
+  'tracker.upload.back': 'Back to your games',
+  'tracker.upload.done': 'The copy is uploaded.',
+  'tracker.upload.empty': 'The copy held no plays: there was nothing to send.',
+  'tracker.upload.failed':
+    'The copy could not be uploaded: the server did not answer. Check the connection and try again. Uploading it again never counts a play twice.',
+  'tracker.upload.file': 'The copy’s file',
+  'tracker.upload.intro':
+    'Pick the file saved by “Save a copy” on the scoring device. Its plays are sent to the server; any the server already has are skipped, so nothing is counted twice.',
+  'tracker.upload.link': 'Upload a copy of this game',
+  'tracker.upload.noFile': 'Pick the copy’s file first.',
+  'tracker.upload.notNow': 'Nothing was uploaded. The game stays with that device.',
+  'tracker.upload.notTaken_one':
+    '{count} play was not taken: the game’s rules refused it, or another device took the game while the copy was being sent.',
+  'tracker.upload.notTaken_other':
+    '{count} plays were not taken: the game’s rules refused them, or another device took the game while the copy was being sent.',
+  'tracker.upload.send': 'Upload the copy',
+  'tracker.upload.sending': 'Uploading…',
+  'tracker.upload.signedOut': 'You are signed out. Sign in again, then upload the copy.',
+  'tracker.upload.title': 'Upload a copy of the game',
+  'tracker.upload.unreadable': 'This file could not be opened on this device. Pick it again.',
   'tracker.where.bench': 'bench',
   'tracker.where.floor': 'on court',
 } as const;

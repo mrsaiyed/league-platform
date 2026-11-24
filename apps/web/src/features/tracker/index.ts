@@ -36,5 +36,6 @@ export {
   type TrackerSignOutHold,
 } from './tracker-sign-out.ts';
 export { TrackerGameNotFound, TrackerPage } from './tracker-page.tsx';
+export { UploadCopyPage } from './upload-copy-page.tsx';
 export { trackerHeadOf, trackerManifestAnswer, trackerWorkerAnswer } from './tracker-install.ts';
 export { forgetTrackerPagesOnDevice } from './tracker-worker-registration.ts';

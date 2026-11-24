@@ -12,6 +12,8 @@ export type SaveCopyProps = {
   readonly leagueId: string;
   readonly gameId: string;
   readonly accountId: string;
+  /** The game's upload page, built by the address helper (step 2.70). */
+  readonly uploadHref: string;
   readonly t: Translate;
 };
 
@@ -31,7 +33,7 @@ function download(text: string, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-function useSaveCopy({ leagueId, gameId, accountId }: Omit<SaveCopyProps, 't'>) {
+function useSaveCopy({ leagueId, gameId, accountId }: Omit<SaveCopyProps, 't' | 'uploadHref'>) {
   const [saved, setSaved] = useState<Saved | null>(null);
   const [busy, setBusy] = useState(false);
   const save = async () => {
@@ -92,6 +94,7 @@ export function SaveCopy(props: SaveCopyProps) {
       </p>
       <p className="court-quiet">{props.t('tracker.copy.explain')}</p>
       <SavedLine saved={saved} t={props.t} />
+      <WhereToUpload href={props.uploadHref} t={props.t} />
     </div>
   );
 }
@@ -114,6 +117,22 @@ export function SaveCopySuggestion(props: SaveCopyProps) {
         </button>
       </p>
       <SavedLine saved={saved} t={props.t} />
+      <WhereToUpload href={props.uploadHref} t={props.t} />
     </div>
+  );
+}
+
+/**
+ * Where the copy is uploaded, for the scorekeeper to open on another phone or computer. It
+ * opens in a new tab, so a tap on it never leaves the game on this screen.
+ */
+function WhereToUpload({ href, t }: { readonly href: string; readonly t: Translate }) {
+  return (
+    <p className="court-quiet" data-copy-upload-where="">
+      {t('tracker.copy.where')}{' '}
+      <a href={href} target="_blank" rel="noopener" data-upload-copy-link="">
+        {t('tracker.upload.link')}
+      </a>
+    </p>
   );
 }

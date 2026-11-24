@@ -1016,6 +1016,9 @@ const ROUTES = {
   '/[league]/my': () => '/north-valley/my',
   '/[league]/schedule': () => '/north-valley/schedule',
   '/[league]/score/[game]': () => `/north-valley/score/${liveGame}`,
+  // The upload of a copy of a game (step 2.70): its one field is a file, read by the page's
+  // script and never posted by a form.
+  '/[league]/score/[game]/upload': () => `/north-valley/score/${liveGame}/upload`,
   '/[league]/standings': () => '/north-valley/standings',
   '/[league]/stats': () => '/north-valley/stats',
   '/[league]/teams': () => '/north-valley/teams',
