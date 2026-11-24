@@ -20,6 +20,7 @@ import {
   bearsNames,
   games,
   hawks,
+  keepingTurnovers,
   liveLeagueId,
   tap,
   trackerWorld,
@@ -736,7 +737,8 @@ describe('a game page', () => {
     });
 
     it("a game scored on the tablet with a team turnover: every Total adds up from the page, and the season's team totals count it", async () => {
-      const world = trackerWorld();
+      // The season's "Statistics kept" keeps turnovers, so the tablet's are taken (S-93).
+      const world = trackerWorld({ deps: keepingTurnovers });
       const teamTurnoversOf = async (seasonId: string) =>
         world.ports.publicStats.statisticsOf(liveLeagueId, async ({ store }) => {
           const table = await readStatisticsTable(store, { seasonId, viewing });

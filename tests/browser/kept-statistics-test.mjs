@@ -8,6 +8,7 @@
 //   draws the turnover button, a tapped turnover is saved, and once the game is ended the
 //   public box score (drawn only for a final game; a live game's page shows points and
 //   fouls) has a turnovers column counting it, on the player's line and in the Total.
+// Builds the app first unless given --no-build, so it never runs on an old build.
 import { randomUUID } from 'node:crypto';
 import {
   addPlayers,
@@ -20,7 +21,7 @@ import {
   starters,
   trackerPath,
 } from './tracker-driver.mjs';
-import { freePort, launch, startNext, waitFor } from './web-browser-kit.mjs';
+import { buildNext, freePort, launch, startNext, waitFor } from './web-browser-kit.mjs';
 
 /** How long a tap may take to show on the screen, or the game to be saved as ended. */
 const tapLimit = 10_000;
@@ -39,6 +40,11 @@ const step = async (what, work) => {
     failures.push(`${what}: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
+
+if (!process.argv.includes('--no-build') && !(await buildNext())) {
+  console.error('Kept statistics browser test: next build failed or took over 10 minutes');
+  process.exit(1);
+}
 
 const origin = `http://localhost:${await freePort()}`;
 const server = startNext(['start', '--port', new URL(origin).port], {
