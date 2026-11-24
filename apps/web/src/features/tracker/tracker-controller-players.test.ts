@@ -56,6 +56,8 @@ function device(
     kept?: DeviceRosters;
     keep?: (r: DeviceRosters) => Promise<void>;
     playerId?: () => string;
+    /** While true, the taps' sends reach nothing (the session and rosters still do). */
+    tapsCut?: () => boolean;
   } = {},
 ) {
   const { as = 'scorekeeper', storage = createMemoryQueueStorage(), deviceId = 'tablet-1' } = extra;
@@ -70,7 +72,14 @@ function device(
     newCommandId,
     newPlayerId: extra.playerId ?? newPlayerId,
     random: () => 1,
-    transport: createFetchCommandTransport({ leagueId: liveLeagueId, gameId, fetch }),
+    transport: createFetchCommandTransport({
+      leagueId: liveLeagueId,
+      gameId,
+      fetch: (input, init) =>
+        extra.tapsCut?.() === true
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : fetch(input, init),
+    }),
     server: createFetchTrackerServer({ leagueId: liveLeagueId, gameId, fetch }),
     rosters: {
       page,
@@ -271,12 +280,16 @@ describe("tracker controller: the device's rosters", () => {
 
   it('checks an add whose answer was lost against the rosters before calling it not saved', async () => {
     const network = endpointNetwork();
-    const tablet = await opened(network);
+    let cut = false;
+    const tablet = await opened(network, { tapsCut: () => cut });
     // The server takes the add, but its answer never comes back.
     network.mode = 'answers-lost';
     await tablet.controller.changePlayers(addNumbers('51'));
     await tablet.controller.idle();
     expect(tablet.controller.status().queue.waiting).toBe(1);
+    // Its next send reaches nothing, so the loss is learnt before the server's
+    // duplicate answer could say it was taken.
+    cut = true;
     network.mode = 'up';
     const laptop = await opened(network, { as: 'owner', deviceId: 'laptop' });
     await laptop.controller.takeOver();
