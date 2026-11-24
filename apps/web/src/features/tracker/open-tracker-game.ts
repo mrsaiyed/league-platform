@@ -103,7 +103,7 @@ export type OpenTrackerGameOptions = {
    */
   readonly letGo?: () => boolean;
   /**
-   * Who the device says is signed in here (device-account.ts, T-323). What the device kept
+   * Who the device says is signed in here (device-account.ts, T-327). What the device kept
    * of the game (its state and scoring) is scored from with no signal only when this is
    * the account opening it: someone else may have signed in on another page since. Left
    * out: the account opening (tests).
@@ -111,7 +111,7 @@ export type OpenTrackerGameOptions = {
   readonly deviceAccount?: () => Promise<string | null>;
   /**
    * Called once the server has answered with the game's state: the page reached the
-   * network signed in as `accountId`, so the device's mark is written (T-323).
+   * network signed in as `accountId`, so the device's mark is written (T-327).
    */
   readonly markSignedIn?: (accountId: string) => Promise<void>;
   /** A new device id, used only the first time this device opens a game. */
@@ -158,7 +158,7 @@ export type OpenTrackerGameResult =
 const codeOf = (error: unknown): QueueErrorCode =>
   error instanceof QueueError ? error.code : 'storage-unavailable';
 
-/** `server`, calling `mark` once, the first time the game's state is answered (T-323). */
+/** `server`, calling `mark` once, the first time the game's state is answered (T-327). */
 function markingOnAnswer(
   server: TrackerServer,
   mark: () => Promise<void> | undefined,
@@ -205,7 +205,7 @@ export async function openTrackerGame(
     deviceId = await storage.games.deviceId(options.newDeviceId);
     const kept = await storage.games.find(gameId);
     confirmed = kept?.confirmedFormat ?? null;
-    // Kept for this very account, and the device says it is the one signed in here (T-323).
+    // Kept for this very account, and the device says it is the one signed in here (T-327).
     const here = await (options.deviceAccount ?? (async () => accountId))();
     const ours =
       kept?.accountId === accountId &&

@@ -23,7 +23,7 @@ export type AccountMenu = {
   readonly email: string;
   /**
    * The account's id, from the server's session: written on the device as the one signed
-   * in here (DeviceAccountMark, T-323). An id, never a secret.
+   * in here (DeviceAccountMark, T-327). An id, never a secret.
    */
   readonly accountId: string;
   /** The admin's home, for someone with an area of the admin here who does more than score. */

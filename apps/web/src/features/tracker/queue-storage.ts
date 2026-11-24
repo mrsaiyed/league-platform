@@ -176,7 +176,7 @@ export interface HeldPlaysStorage {
 export type DeviceQueueStorage = QueueStorage & HeldPlaysStorage;
 
 /**
- * Whether `entry` is the account's own (T-321, T-323): made by it. Another account's taps
+ * Whether `entry` is the account's own (T-321, T-327): made by it. Another account's taps
  * are never sent, listed or dismissed under this one. A tap stored before the maker was
  * kept is nobody's: never sent, listed to nobody; it goes with the device's 14-day keep.
  */

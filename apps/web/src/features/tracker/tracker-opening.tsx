@@ -189,7 +189,7 @@ export function TrackerOpening({
         // Signed out or left while opening: nothing more is kept and no session taken.
         letGo: () => gone || leaving.current,
         // With no signal, what the device kept is scored from only for the one marked
-        // signed in here; once the server answers, this account is (T-323).
+        // signed in here; once the server answers, this account is (T-327).
         deviceAccount: () => readDeviceAccount(),
         markSignedIn: async (account) => {
           await writeDeviceAccount(account);

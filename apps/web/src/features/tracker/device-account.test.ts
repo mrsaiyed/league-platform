@@ -19,7 +19,7 @@ const tap = {
   input: { type: 'score' as const, side: 'home' as const, playerId: player, points: 2 as const },
 };
 
-describe('who is signed in on this device (T-323)', () => {
+describe('who is signed in on this device (T-327)', () => {
   it('keeps one id, written by a signed-in page and deleted by signing out', async () => {
     const factory = new IDBFactory();
     expect(await readDeviceAccount(factory)).toBeNull();
@@ -49,7 +49,7 @@ describe('who is signed in on this device (T-323)', () => {
   });
 });
 
-describe('"Reload" on "update needed" (T-323, review M2)', () => {
+describe('"Reload" on "update needed" (T-328, review M2)', () => {
   it('lets each worker go of what it kept, and the plays waiting stay for the new release to send', async () => {
     const factory = new IDBFactory();
     const before = inLeague(await openIndexedDbQueueStorage(factory), 'league-1', 'account-1');

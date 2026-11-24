@@ -1,4 +1,4 @@
-// Who is signed in on this device (step 2.38, T-323): a small mark, an account id and no
+// Who is signed in on this device (step 2.38, T-327): a small mark, an account id and no
 // secret, in the device's own database, so the worker that keeps the tracker and the
 // tracker itself can tell, with no signal, whose kept pages and games may be shown.
 //
@@ -15,7 +15,7 @@ export const deviceAccountDatabaseName = 'srleagues-device-account';
 export const deviceAccountStoreName = 'mark';
 const markKey = 'signed-in';
 
-/** Whether a mark that was `previous` and is now `next` is another person's (T-323). */
+/** Whether a mark that was `previous` and is now `next` is another person's (T-327). */
 export function anotherPerson(previous: string | null, next: string): boolean {
   return previous !== null && previous.toLowerCase() !== next.toLowerCase();
 }

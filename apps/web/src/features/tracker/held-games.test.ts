@@ -26,7 +26,7 @@ const row = (
   extra: {
     readonly leagueId?: string;
     readonly accountId?: string;
-    /** Stored before the maker was kept with each play: nobody's (T-323). */
+    /** Stored before the maker was kept with each play: nobody's (T-327). */
     readonly noMaker?: true;
     readonly state?: 'waiting' | 'not-saved';
   } = {},
@@ -105,7 +105,7 @@ describe('the games this device holds plays for (step 2.38, S-88)', () => {
       row('shared', 2, { leagueId: league, accountId: account }),
       row('shared', 3, { leagueId: league, accountId: otherAccount }),
       row('theirs', 4, { leagueId: league, accountId: otherAccount }),
-      // Stored before the account was kept with each play: nobody's, listed to nobody (T-323).
+      // Stored before the account was kept with each play: nobody's, listed to nobody (T-327).
       row('before', 5, { leagueId: league, noMaker: true }),
     ];
     const kept = new Map([

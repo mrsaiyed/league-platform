@@ -34,7 +34,7 @@ async function readyToSignOut(question: WaitingQuestion): Promise<boolean> {
   );
   // Signing out also deletes the tracker pages the device kept (step 2.38, T-115).
   if (plan.go) {
-    // Nobody is signed in here once this is sent (T-323).
+    // Nobody is signed in here once this is sent (T-327).
     const clearing = [forgetTrackerPagesOnDevice(), clearDeviceAccount()];
     if (plan.clearKeptGames) clearing.push(forgetOpenedGamesOnDevice());
     await atMost(
@@ -47,7 +47,7 @@ async function readyToSignOut(question: WaitingQuestion): Promise<boolean> {
 
 /**
  * Writes `accountId` on the device as the one signed in here, once this page has loaded
- * (T-323). A page with this form came from the network: the tracker's own scoring page,
+ * (T-327). A page with this form came from the network: the tracker's own scoring page,
  * which may be a kept copy, uses SignOutLink and marks the device once the server
  * answers its opening (open-tracker-game.ts). When the mark was another person's, their
  * kept pages and kept games are forgotten; their plays waiting to be sent stay, hidden.
@@ -70,7 +70,7 @@ export function SignOutForm({
   /** The server's sign-out action: the form's fields say where the person is (step 2.163). */
   readonly action: (form: FormData) => Promise<void>;
   readonly waitingQuestion: WaitingQuestion;
-  /** The signed-in account, marked on the device as the one signed in here (T-323). */
+  /** The signed-in account, marked on the device as the one signed in here (T-327). */
   readonly accountId?: string;
   readonly children: ReactNode;
 }) {

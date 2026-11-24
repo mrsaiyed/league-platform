@@ -138,7 +138,7 @@ describe("the tracker worker's script (step 2.38)", () => {
     expect(script).toContain('asking.transaction.abort()');
   });
 
-  it('counts only tracker pages open now, their game in progress (T-323)', () => {
+  it('counts only tracker pages open now, their game in progress (T-328)', () => {
     const script = trackerWorkerScript();
     expect(script).toContain('"queueDatabase":"srleagues-tracker-queue"');
     expect(script).toContain('"queue":"commands"');
@@ -150,7 +150,7 @@ describe("the tracker worker's script (step 2.38)", () => {
     expect(script).toContain('if (open.length === 0) return 0;');
   });
 
-  it('"Reload" on "update needed": the kept pages and files go, a waiting worker takes over, the plays stay (T-323)', async () => {
+  it('"Reload" on "update needed": the kept pages and files go, a waiting worker takes over, the plays stay (T-328)', async () => {
     const boxes = new Map<string, Map<string, unknown>>([
       ['srleagues-tracker https://site.test/north/score/ abc', new Map([['page', 1]])],
       ['srleagues-tracker https://site.test/south/score/ xyz', new Map([['page', 2]])],

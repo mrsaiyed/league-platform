@@ -11,7 +11,7 @@ const tap = (n: number) => ({
 });
 
 describe('the taps of one account (T-321)', () => {
-  it('counts a tap as the account’s own only when it made it; one kept with no maker is nobody’s (T-323)', () => {
+  it('counts a tap as the account’s own only when it made it; one kept with no maker is nobody’s (T-327)', () => {
     expect(madeBy({ accountId: 'account-1' }, 'account-1')).toBe(true);
     expect(madeBy({ accountId: 'account-1' }, 'account-2')).toBe(false);
     expect(madeBy({ accountId: 'account-1' }, null)).toBe(false);

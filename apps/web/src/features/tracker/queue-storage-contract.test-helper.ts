@@ -193,7 +193,7 @@ export function queueStorageContract(name: string, make: () => Promise<DeviceQue
         [undefined, 'waiting'],
       ]);
       // Dismissed by account 1: its own go; account 2's stays, and so does the older one,
-      // which is nobody's (T-323): never sent, listed to nobody.
+      // which is nobody's (T-327): never sent, listed to nobody.
       await storage.forget(game, 'account-1');
       expect(ids(await storage.listAll())).toEqual([commandId(2), commandId(3)]);
     });

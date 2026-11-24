@@ -374,7 +374,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     const commands: BatchCommand[] = [];
     for (const entry of waiting) {
       if (entry.protocolVersion !== first.protocolVersion || commands.length === most) break;
-      // One maker a batch (T-323): the server refuses a batch whose maker is not the
+      // One maker a batch (T-327): the server refuses a batch whose maker is not the
       // account of its session, so another account's tap is never sent under this one.
       if (entry.accountId !== first.accountId) break;
       commands.push(entry.command);

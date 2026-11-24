@@ -40,7 +40,7 @@ const newDevice = (): Device => ({
 
 /**
  * Each person's made-up account id, the one the server's session has: the device keeps
- * their games and taps under it, and each batch says it (T-323).
+ * their games and taps under it, and each batch says it (T-327).
  */
 const accountOf = (as: Person) =>
   as === 'visitor' ? '00000000-0000-4000-8000-0000000000ff' : standInPeople[as].accountId;
@@ -413,7 +413,7 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     await other.controller.leave();
   });
 
-  it('with no signal, scores from what the device kept only for the person marked signed in here (T-323, review M1)', async () => {
+  it('with no signal, scores from what the device kept only for the person marked signed in here (T-327, review M1)', async () => {
     const network = endpointNetwork();
     const device = newDevice();
     const first = await open(network, 'scorekeeper', device, createManualClock());
@@ -445,7 +445,7 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     for (const game of [someoneElse, nobody, same, first]) await game.controller.leave();
   });
 
-  it('never sends a tap kept for another person, and marks the device once the server answers (T-323)', async () => {
+  it('never sends a tap kept for another person, and marks the device once the server answers (T-327)', async () => {
     const network = endpointNetwork();
     const device = newDevice();
     const first = await open(network, 'scorekeeper', device, createManualClock());

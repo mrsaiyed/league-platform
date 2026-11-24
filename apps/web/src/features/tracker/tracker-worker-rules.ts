@@ -74,7 +74,7 @@ export function mayKeepAnswer(answer: WorkerAnswer): boolean {
 }
 
 /**
- * The update rule (T-127, T-323): the stored tracker is replaced only when no tracker
+ * The update rule (T-127, T-328): the stored tracker is replaced only when no tracker
  * page with a game in progress is open now. `gamesOpen` is how many such pages there are
  * (`gamesHoldingBack`), or null when the worker cannot tell, which counts as one open: a
  * release must never interrupt a game being scored.
@@ -93,7 +93,7 @@ export type KeptGameRecord = {
 export type QueuedPlayRecord = { readonly gameId: string; readonly state: string };
 
 /**
- * How many tracker pages open now hold a release back (T-127, T-323). `openGames` are
+ * How many tracker pages open now hold a release back (T-127, T-328). `openGames` are
  * the games of the tracker pages open in a window at this moment; stored data alone
  * holds nothing back, so a game kept for 14 days never keeps a scorer on an old release.
  * An open page holds it back while its game is in progress: not final, or with plays of
@@ -124,7 +124,7 @@ export function gamesHoldingBack(
 }
 
 /**
- * Who the device says is signed in here (T-323): the account id of the one record of the
+ * Who the device says is signed in here (T-327): the account id of the one record of the
  * device's mark (`device-account.ts`), or null when there is none. An id, never a secret.
  */
 export function deviceAccountOf(records: readonly unknown[] | null): string | null {
@@ -189,7 +189,7 @@ export function signedInFrom(
 }
 
 /**
- * Whether a kept tracker page may be shown (T-321, T-323): it belongs to the account that
+ * Whether a kept tracker page may be shown (T-321, T-327): it belongs to the account that
  * made it. Never when it names no account; never when the network says another account,
  * or nobody, is signed in now. When the network did not say (no signal), only when the
  * device's own mark of who is signed in here (`deviceAccountOf`) names the same account:
@@ -249,7 +249,7 @@ export const trackerWorkerKeepMessage = 'srleagues-tracker-keep';
 export const trackerWorkerUpdateMessage = 'srleagues-tracker-update';
 
 /**
- * What "Reload" sends each worker when the server says the tracker is too old (T-323):
+ * What "Reload" sends each worker when the server says the tracker is too old (T-328):
  * delete every kept page and file of this scope once a copy being written has landed, a
  * waiting worker takes over at once, then answer on the message's port. The reload that
  * follows then opens the new release from the network. The plays waiting on the device

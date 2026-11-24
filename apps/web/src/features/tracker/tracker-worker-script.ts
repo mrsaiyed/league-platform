@@ -14,10 +14,10 @@
 // - code: kept by address (each built file's address names its content), so it is
 //   answered from the device first;
 // - with no signal, a kept page is shown only to the account the device's mark says is
-//   signed in here (device-account.ts, T-323): someone may have signed in elsewhere;
+//   signed in here (device-account.ts, T-327): someone may have signed in elsewhere;
 // - a new worker (a release that changed the code) takes over, and the code kept for
 //   earlier releases is let go, only when no tracker page with a game in progress is
-//   open now (T-127, T-323, gamesHoldingBack): a page open in a window whose game, in the
+//   open now (T-127, T-328, gamesHoldingBack): a page open in a window whose game, in the
 //   tracker's store of opened games (indexeddb-opened-game-storage.ts), is not final, or
 //   has plays waiting in the queue (indexeddb-queue-storage.ts), or is not stored yet.
 //   Stored data alone holds nothing back. The worker never creates either store;
@@ -113,7 +113,7 @@ async function gamesOpen() {
   return gamesHoldingBack(open, games, queued);
 }
 
-// Who the device says is signed in here (T-323), or null.
+// Who the device says is signed in here (T-327), or null.
 async function deviceAccount() {
   return deviceAccountOf(await readAll(names.accountDatabase, names.accountStore));
 }
@@ -147,7 +147,7 @@ async function forgetEverything() {
   await Promise.all(all.filter((name) => name.startsWith(names.kept)).map((name) => caches.delete(name)));
 }
 
-// "Reload" on "update needed" (T-323): this scope's kept pages and files go once the copy
+// "Reload" on "update needed" (T-328): this scope's kept pages and files go once the copy
 // under way has landed, so the reload opens the new release; keeping goes on after.
 async function letGoForRelease() {
   await writing;

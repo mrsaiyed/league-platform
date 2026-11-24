@@ -96,7 +96,7 @@ export async function forgetTrackerPagesOnDevice(): Promise<void> {
   }
 }
 
-/** The part of the browser that "Reload" on "update needed" uses (T-323). */
+/** The part of the browser that "Reload" on "update needed" uses (T-328). */
 export type ReleaseBrowser = {
   readonly registrations: () => Promise<readonly ServiceWorkerRegistration[]>;
   readonly ask: (worker: ServiceWorker, type: string) => Promise<void>;
@@ -115,7 +115,7 @@ const thisBrowser = (): ReleaseBrowser | null =>
       };
 
 /**
- * "Reload" when the server says this tracker is too old (T-323): each worker lets go of
+ * "Reload" when the server says this tracker is too old (T-328): each worker lets go of
  * every page and file it kept (a waiting one takes over), so the reload that follows
  * opens the new release from the network and nobody is held on a refused version. Only
  * the kept pages and files go: the plays waiting on the device live in its own storage,

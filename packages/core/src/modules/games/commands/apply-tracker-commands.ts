@@ -202,7 +202,7 @@ export const applyTrackerCommands = defineCommand({
       return ok(reply(seq, refuseAll('game-not-live', messages['game-not-live'], taken)));
     }
     const standing = await sessionStanding(tx, gameId, batch.sessionId.toLowerCase(), accountId);
-    // The device says whose taps these are (T-323): only the session's own account's are
+    // The device says whose taps these are (T-327): only the session's own account's are
     // taken. The stated maker can only refuse a batch, never let one in.
     const otherMaker =
       batch.accountId !== undefined && batch.accountId.toLowerCase() !== accountId.toLowerCase();

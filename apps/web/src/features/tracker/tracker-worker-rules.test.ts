@@ -98,7 +98,7 @@ describe('the update rule (T-127): the stored tracker is replaced only when no g
   });
 });
 
-describe('which pages hold a release back (T-127, T-323): a game in progress open now', () => {
+describe('which pages hold a release back (T-127, T-328): a game in progress open now', () => {
   const live = { gameId: 'g1', state: { state: { status: 'live' } } };
   const final = { gameId: 'g2', state: { state: { status: 'final' } } };
   const notLoaded = { gameId: 'g3', state: null };
@@ -133,7 +133,7 @@ describe('which pages hold a release back (T-127, T-323): a game in progress ope
   });
 });
 
-describe('who the device says is signed in here (T-323)', () => {
+describe('who the device says is signed in here (T-327)', () => {
   it('reads the account id of the mark, never anything else', () => {
     expect(deviceAccountOf([{ accountId: 'account-1' }])).toBe('account-1');
     expect(deviceAccountOf([])).toBeNull();

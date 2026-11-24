@@ -456,7 +456,7 @@ async function oneGame(browser) {
           !next.active.includes('code=next-release'),
         JSON.stringify({ games, ...next }),
       );
-      // No tracker page with a game in progress is open now (T-324): the page leaves the
+      // No tracker page with a game in progress is open now (T-328): the page leaves the
       // tracker for the league's home, out of the worker's reach, and comes back after.
       const tracker = page.url();
       await page.goto(tracker.slice(0, tracker.indexOf('/score/')));

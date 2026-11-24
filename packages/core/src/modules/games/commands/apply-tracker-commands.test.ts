@@ -422,7 +422,7 @@ describe('one scorer at a time (T-116, T6 §5)', () => {
     });
   });
 
-  it('refuses a batch whose stated maker is not the account of its session: the session decides (T-323)', async () => {
+  it('refuses a batch whose stated maker is not the account of its session: the session decides (T-327)', async () => {
     const t = setUp({ sessions: [holdingSession()] });
     const asV2 = { protocolVersion: 2 };
     // Taps the device kept for another person are never taken under this session.
