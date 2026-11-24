@@ -306,13 +306,18 @@ const cases = [
   // was sent (step 2.163's fix round); there is no password to choose (L10): the first
   // screen again, saying why, or a signed-in person's account. The code screen's words,
   // which name the address the code went to, are checked in a browser
-  // (sign-in-says-test.mjs).
+  // (sign-in-says-test.mjs). It draws no code box and no "Continue" that could not work:
+  // "Start again" is its one filled button (step 2.102's fix round).
   [
     'visitor',
     '/signup/code',
     200,
-    ['Enter your code', 'Nothing is waiting for a code on this device.', 'Start again'],
-    ['we have sent', 'We sent'],
+    [
+      'Enter your code',
+      'Nothing is waiting for a code on this device.',
+      'data-kind="main" href="/signup">Start again',
+    ],
+    ['we have sent', 'We sent', 'name="code"', '>Continue<'],
   ],
   ['visitor', '/signup/password', 307, [], [], '/signup?problem=proofInvalid'],
   ['visitor', '/signup?problem=proofInvalid', 200, ['That took too long. Start again.']],

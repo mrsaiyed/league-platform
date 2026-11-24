@@ -4,13 +4,14 @@
 // written into them: it would put a second copy of the styles, and the neutral design's
 // colors, into every league's pages. They link to this address instead, and the browser
 // keeps it. Made from the same design values and pieces as a league's pages (T-90).
-import { designToCssText, startingDesign } from '@srleagues/site';
+import { designToCssText } from '@srleagues/site';
 import { displayCss } from '@srleagues/ui';
+import { platformDesign } from '../../features/shell/index.ts';
 
 export const dynamic = 'force-static';
 
 export function GET(): Response {
-  return new Response(designToCssText(startingDesign('clean-court')) + displayCss, {
+  return new Response(designToCssText(platformDesign) + displayCss, {
     headers: {
       'Content-Type': 'text/css; charset=utf-8',
       'Cache-Control': 'public, max-age=3600',

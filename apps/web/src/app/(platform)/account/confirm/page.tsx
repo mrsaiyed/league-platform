@@ -31,16 +31,22 @@ export default async function Page({ searchParams }: SearchProps) {
   // account made with Google holds a real address.
   const google = googleSetUp() && !(await webPorts()).testCopy;
   return (
-    <SignInScreen title="confirm.title" intro={t('confirm.intro')} search={search} google={google}>
+    <SignInScreen
+      title="confirm.title"
+      intro={t('confirm.intro')}
+      search={search}
+      google={google}
+      fields={['password']}
+    >
       <form action={confirmPasswordAction}>
         <NextField next={next} />
-        <PasswordField />
+        <PasswordField search={search} />
         <SubmitButton words="confirm.submit" />
       </form>
       {google ? (
         <form action={googleAction}>
           <NextField next={next} />
-          <SubmitButton words="confirm.google" />
+          <SubmitButton words="confirm.google" kind="second" />
         </form>
       ) : null}
     </SignInScreen>

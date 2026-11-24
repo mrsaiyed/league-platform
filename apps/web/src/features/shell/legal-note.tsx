@@ -83,10 +83,11 @@ export function LegalNote({
 }) {
   return (
     <StandalonePage>
-      <main className="ui-message legal-note">
+      <main className="ui-message ui-page-card legal-note">
+        <div className="ui-kicker">{t('shell.siteName')}</div>
         <h1>{t(titles[page])}</h1>
         <p>{t('legal.shortVersion')}</p>
-        <p>{t('legal.lastChanged')}</p>
+        <p data-quiet="">{t('legal.lastChanged')}</p>
         {sections[page].map((section) => (
           <section key={section.title}>
             <h2>{t(section.title)}</h2>
@@ -106,18 +107,20 @@ export function LegalNote({
             </p>
           )}
         </section>
-        <p>
-          <a className="ui-button" data-kind="quiet" href={legalNoteHref(other[page], from)}>
-            {t(readOther[page])}
-          </a>
-        </p>
-        {back === null ? null : (
+        <div className="ui-ways">
           <p>
-            <a className="ui-button" data-kind="quiet" href={back.href}>
-              {t('legal.backTo', { league: back.name })}
+            <a className="ui-button" data-kind="quiet" href={legalNoteHref(other[page], from)}>
+              {t(readOther[page])}
             </a>
           </p>
-        )}
+          {back === null ? null : (
+            <p>
+              <a className="ui-button" data-kind="quiet" href={back.href}>
+                {t('legal.backTo', { league: back.name })}
+              </a>
+            </p>
+          )}
+        </div>
       </main>
     </StandalonePage>
   );

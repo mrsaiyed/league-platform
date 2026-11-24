@@ -27,7 +27,7 @@ export { refusalScreenOf, type RefusalScreen } from './refusal-screen.ts';
 export { SignedOutNotice } from './signed-out-notice.tsx';
 export { SiteFooter } from './site-footer.tsx';
 export { AccountButton, MyTeamEntry, SignOutFields, SiteHeader } from './site-header.tsx';
-export { StandalonePage } from './standalone-page.tsx';
+export { platformDesign, StandalonePage } from './standalone-page.tsx';
 export { TestCopyLine } from './test-copy-line.tsx';
 
 /** What Next.js gives every page and layout under `[league]`. */

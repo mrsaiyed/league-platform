@@ -1,7 +1,18 @@
+import { neutralStartingDesign, startingDesign } from '@srleagues/site';
 import type { ReactNode } from 'react';
 
 /** Where the stylesheet of these pages is served (src/app/standalone.css/route.ts). */
 export const standaloneStylesheet = '/standalone.css';
+
+/**
+ * SR Leagues' own look (step 2.102, T-325): the neutral starting design's colors, with a
+ * serif for its titles (DESIGN.md section 3: "a serif for every title"). The pages that belong to no
+ * league take their look from it (src/app/standalone.css/route.ts); a league never sees it.
+ */
+export const platformDesign = {
+  ...startingDesign(neutralStartingDesign),
+  fonts: { ...startingDesign(neutralStartingDesign).fonts, heading: 'gelasio' },
+} as const;
 
 /**
  * The frame of a page that belongs to no league: "not found" and "you do not have access".
