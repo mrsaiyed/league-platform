@@ -5,10 +5,14 @@
 // who may not correct games; it says nothing about the admin's door. Whoever may score
 // somewhere in the league may ask; it says only what is theirs: until when, or why not.
 // Each game's own door (games.reopen_own_result) checks everything again when tapped.
+// A game they may not score (unassigned since they typed it, say) is left out where the
+// answer would offer a time, as the read for one game refuses it: only such an answer
+// opens a door, and they are the few they recorded within the minutes, so the list still
+// reads once for the rest. Games in the bin are left out (list-hand-results.ts).
 import { z } from 'zod';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
 import { ownResultWindows, type OwnResultOffer } from '../own-result-window.ts';
-import { mayScoreAnywhere } from '../policy.ts';
+import { mayScoreAnywhere, mayScoreGame } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
 
 export type OwnResultWindow = {
@@ -24,6 +28,11 @@ export const readOwnResultOffers = defineCommand({
   allowed: (context, _input, tx: TrackerTx) => mayScoreAnywhere(context, tx),
   run: async ({ context, input, tx }): Promise<Result<readonly OwnResultWindow[], never>> => {
     const windows = await ownResultWindows(context, tx, [...new Set(input.gameIds)]);
-    return ok([...windows].map(([gameId, reopen]) => ({ gameId, reopen })));
+    const answers: OwnResultWindow[] = [];
+    for (const [gameId, reopen] of windows) {
+      if (reopen.when !== 'no' && !(await mayScoreGame(context, tx, gameId))) continue;
+      answers.push({ gameId, reopen });
+    }
+    return ok(answers);
   },
 });

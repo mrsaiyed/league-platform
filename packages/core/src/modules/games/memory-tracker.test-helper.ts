@@ -276,7 +276,7 @@ export function liveGamesOf(s: MemoryTracker, databaseNow: () => number): LiveGa
     handResults: async (gameIds) => {
       s.handResultReads += 1;
       return s.games
-        .filter((g) => gameIds.includes(g.id))
+        .filter((g) => gameIds.includes(g.id) && !g.binned)
         .map((g) => ({
           gameId: g.id,
           status: g.status,

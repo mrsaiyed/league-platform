@@ -504,7 +504,7 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
     // rows the reads above use.
     handResults: async (gameIds) =>
       s.games
-        .filter((g) => gameIds.includes(g.id))
+        .filter((g) => gameIds.includes(g.id) && !g.binned)
         .map((g) => ({
           gameId: g.id,
           status: g.status,

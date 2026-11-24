@@ -543,8 +543,8 @@ export type LiveGamesStore = {
    * For a list of games (step 2.177, T-349), in one read of the database: each of these
    * games of the league, with who decided it by hand (as decidedBy), how long ago it was
    * decided (as endedAgo), whether an overturn rules on it, and whether it is tracked (a
-   * saved state with plays, as games.reopen_game tells them apart). Games not here are
-   * left out.
+   * saved state with plays, as games.reopen_game tells them apart). Games not here, and
+   * games in the bin, are left out.
    */
   readonly handResults: (gameIds: readonly string[]) => Promise<readonly HandResultFacts[]>;
   /** The game's event made by this command id: its number, type and sender, or undefined. */

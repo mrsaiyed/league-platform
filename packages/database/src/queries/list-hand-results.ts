@@ -52,6 +52,8 @@ export async function listHandResults(
     )
     .where('league_id', '=', scope.leagueId)
     .where('id', 'in', [...gameIds])
+    // A game in the bin is not offered (as the read for one game refuses it).
+    .where('deleted_at', 'is', null)
     .execute();
   return rows.map((row) => ({
     gameId: row.id,

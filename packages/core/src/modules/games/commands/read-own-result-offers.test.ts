@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { finalGame, game, gameUuid, scorekeeperId } from '../memory-games.test-helper.ts';
+import {
+  finalGame,
+  game,
+  gameUuid,
+  scorekeeperId,
+  scoringRule,
+} from '../memory-games.test-helper.ts';
 import { startOfTest } from '../memory-scoring.test-helper.ts';
 import { endedOnTablet, otherScorekeeperId, setUp } from '../reopen-game.test-helper.ts';
 import { readOwnResultOffer } from './read-own-result-offer.ts';
@@ -74,6 +80,32 @@ describe('readOwnResultOffers (step 2.177, T-349)', () => {
       ok: true,
       value: [{ gameId: gameUuid(1), reopen: { when: 'no', code: 'not-recorded-by-hand' } }],
     });
+  });
+
+  it('offers no time for a game they may no longer score, as the read for one game', async () => {
+    // Only assigned scorekeepers score, and they were unassigned after typing game 1.
+    const t = setUp({
+      ...list().db.state,
+      settings: scoringRule('assignedOnly'),
+      assignments: [{ gameId: gameUuid(2), accountId: scorekeeperId }],
+    });
+    const result = await readOwnResultOffers(t.as(scorekeeperId), { gameIds: ids }, t.deps);
+    expect(result.ok && result.value.map((w) => w.gameId)).toEqual(ids.slice(1));
+    const one = await readOwnResultOffer(t.as(scorekeeperId), { gameId: ids[0] ?? '' }, t.deps);
+    expect(one.ok).toBe(false);
+  });
+
+  it('leaves out a game in the bin', async () => {
+    const t = setUp({
+      games: [
+        finalGame(1, { finalizedAt: at(5), binned: true }),
+        finalGame(2, { finalizedAt: at(5) }),
+      ],
+      deciders: { [gameUuid(1)]: scorekeeperId, [gameUuid(2)]: scorekeeperId },
+      sessions: [],
+    });
+    const result = await readOwnResultOffers(t.as(scorekeeperId), { gameIds: ids }, t.deps);
+    expect(result.ok && result.value.map((w) => w.gameId)).toEqual([gameUuid(2)]);
   });
 
   it('is refused to someone who may score nowhere', async () => {
