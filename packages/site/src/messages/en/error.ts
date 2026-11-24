@@ -244,6 +244,8 @@ export const enError = {
   'error.teams.set_stats_visibility.team-not-found': 'That team is not there.',
   'error.teams.set_stats_visibility.teams-may-not-choose':
     'This league decides who sees the numbers; teams may not choose.',
+  'error.teams.update_team.changed-since-read':
+    'Someone else changed this team since you opened this page, so it was not saved. What you typed is kept, and beside each box that differs is what is saved now. Save again to replace it with yours.',
   'error.teams.update_team.division-not-found': 'That division is not there.',
   'error.teams.update_team.team-name-taken': 'Another team of this season already has that name.',
   'error.teams.update_team.team-not-found': 'That team is not there.',

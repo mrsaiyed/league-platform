@@ -160,9 +160,16 @@ export function gameProblemOf(
   search: Search,
   typed: GameTyped,
   adding: boolean,
-): { readonly field: GameField | 'form'; readonly text: string } | undefined {
+):
+  | { readonly field: GameField | 'form'; readonly text: string; readonly changed?: true }
+  | undefined {
   const why = whyNotSaved(search);
   if (why === undefined) return undefined;
+  // Someone else changed the draft meanwhile (T-399): said at the top of the game's form,
+  // and beside each box what is saved now where it differs from what was typed.
+  if (!adding && first(search['problem']) === 'changed-since-read') {
+    return { field: 'form', text: t('schedule.admin.gameChangedMeanwhile'), changed: true };
+  }
   const field = gameFieldOf(search, typed, adding);
   if (field === 'form') return { field, text: why };
   return {

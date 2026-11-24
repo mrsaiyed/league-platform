@@ -113,6 +113,8 @@ type GameRefusal = {
   readonly at: Extract<RefusedAt, { readonly form: 'game' | 'add-game' }>;
   readonly field: GameField | 'form';
   readonly text: string;
+  /** Someone else changed the draft meanwhile: what is saved now is said beside the boxes. */
+  readonly changed?: true;
 };
 
 /** A refused "Swap with": the game it was asked on, the one chosen, and why. */
@@ -582,10 +584,13 @@ function Field({
   label,
   children,
   wrong,
+  now,
 }: {
   readonly label: string;
   readonly children: ReactNode;
   readonly wrong?: string | undefined;
+  /** What is saved now, after someone else changed it meanwhile (T-399). */
+  readonly now?: ReactNode;
 }) {
   return (
     <>
@@ -593,6 +598,7 @@ function Field({
         <span>{label}</span>
         {children}
       </label>
+      {now}
       {wrong === undefined ? null : (
         <p className="ui-field-error" role="alert" data-notice="problem">
           {wrong}
@@ -615,6 +621,11 @@ type GameBoxes = {
   readonly wrong: (name: GameField) => string | undefined;
   /** The sentence at the top of the form when the refusal is about no one box. */
   readonly top: ReactNode;
+  /**
+   * After a refusal because someone else changed the draft (T-399): "Saved now: …" beside
+   * the box, when what is saved differs from what was typed; else nothing.
+   */
+  readonly now: (name: keyof GameTyped, saved: string, shown: () => string) => ReactNode;
 };
 
 function gameBoxes(refused: GameRefusal | undefined): GameBoxes {
@@ -628,7 +639,23 @@ function gameBoxes(refused: GameRefusal | undefined): GameBoxes {
           {refused.text}
         </p>
       ),
+    now: (name, saved, shown) =>
+      refused?.changed !== true || refused.at.typed[name] === saved ? null : (
+        <small className="ui-field-help" data-saved-now={name}>
+          {t('schedule.admin.savedNow')} {shown()}
+        </small>
+      ),
   };
+}
+
+/** A place as its box shows it: the venue, and the court if there is one. */
+function placeShown(venues: readonly VenueWithCourts[], value: string): string {
+  const [venueId, court = ''] = value.split('|');
+  const venue = venues.find((v) => v.id === venueId);
+  if (venue === undefined) return t('schedule.admin.noPlaceOption');
+  return court === ''
+    ? t('schedule.admin.venueOnly', { venue: venue.name })
+    : t('schedule.admin.venueCourt', { venue: venue.name, court });
 }
 
 function RecordingSelect({
@@ -1077,7 +1104,15 @@ function GameItem({
               value={[game.roundId ?? '', game.date, game.time ?? '', game.place].join('~')}
             />
             <input type="hidden" name="wasRecording" value={game.recording ?? ''} />
-            <Field label={t('schedule.admin.roundField')} wrong={boxes.wrong('roundId')}>
+            <Field
+              label={t('schedule.admin.roundField')}
+              wrong={boxes.wrong('roundId')}
+              now={boxes.now('roundId', game.roundId ?? '', () =>
+                round === undefined
+                  ? t('schedule.admin.noRound')
+                  : t('schedule.admin.round', { number: round.number, label: round.label }),
+              )}
+            >
               <select
                 name="roundId"
                 defaultValue={boxes.value('roundId', game.roundId ?? '')}
@@ -1091,7 +1126,11 @@ function GameItem({
                 ))}
               </select>
             </Field>
-            <Field label={t('schedule.admin.date')} wrong={boxes.wrong('date')}>
+            <Field
+              label={t('schedule.admin.date')}
+              wrong={boxes.wrong('date')}
+              now={boxes.now('date', game.date, () => game.date)}
+            >
               <input
                 type="date"
                 name="date"
@@ -1100,7 +1139,13 @@ function GameItem({
                 {...boxes.mark('date')}
               />
             </Field>
-            <Field label={t('schedule.admin.time')} wrong={boxes.wrong('time')}>
+            <Field
+              label={t('schedule.admin.time')}
+              wrong={boxes.wrong('time')}
+              now={boxes.now('time', game.time ?? '', () =>
+                game.time === null ? t('schedule.admin.savedNowNothing') : game.time,
+              )}
+            >
               <input
                 type="time"
                 name="time"
@@ -1108,14 +1153,26 @@ function GameItem({
                 {...boxes.mark('time')}
               />
             </Field>
-            <Field label={t('schedule.admin.place')} wrong={boxes.wrong('place')}>
+            <Field
+              label={t('schedule.admin.place')}
+              wrong={boxes.wrong('place')}
+              now={boxes.now('place', game.place, () => placeShown(venues, game.place))}
+            >
               <PlaceSelect
                 venues={venues}
                 value={boxes.value('place', game.place)}
                 marked={boxes.mark('place')}
               />
             </Field>
-            <Field label={t('schedule.admin.recording')} wrong={boxes.wrong('recording')}>
+            <Field
+              label={t('schedule.admin.recording')}
+              wrong={boxes.wrong('recording')}
+              now={boxes.now('recording', game.recording ?? '', () =>
+                game.recording === null || game.recording === undefined
+                  ? t('schedule.admin.recording.rules')
+                  : t(`schedule.admin.recording.${game.recording}`),
+              )}
+            >
               <RecordingSelect
                 value={game.recording}
                 {...(refused === undefined ? {} : { typed: refused.at.typed.recording })}

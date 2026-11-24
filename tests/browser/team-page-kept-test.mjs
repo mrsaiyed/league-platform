@@ -8,7 +8,14 @@
 //   on the screen beside the form, and a reload says nothing old;
 // - "Someone not in the list yet" given a number that is not one is refused: both names
 //   are kept, the number box is marked and named; put right and tapped twice, one player
-//   is added, said on their new line on the screen, and a reload says nothing old.
+//   is added, said on their new line on the screen, and a reload says nothing old;
+// - "Team details" saved after someone else renamed the team in another tab is refused
+//   (T-399): the sentence says someone else changed it, the name is kept as typed and
+//   "Saved now: <their name>" stands beside the name box (and beside no box that is the
+//   same); tapped again, it is saved;
+// - with scripts off, "Add team" and "Someone not in the list yet" posted twice by request
+//   with the same one-time token (a double tap the browser let through) make one team and
+//   one player.
 // `--no-build` serves the build already here.
 import {
   accessibilityProblems,
@@ -41,6 +48,66 @@ const onScreen = async (locator) => {
   const box = await locator.boundingBox();
   return box !== null && box.y >= 0 && box.y + box.height <= phone.height;
 };
+
+/** Sends a form as drawn, twice, by request: the same one-time token both times. */
+async function postTwice(page, origin, form) {
+  const fields = await form.evaluate((element) =>
+    Object.fromEntries([...new FormData(element).entries()].map(([k, v]) => [k, String(v)])),
+  );
+  const statuses = [];
+  for (let i = 0; i < 2; i += 1) {
+    const response = await page.request.post(page.url(), {
+      multipart: fields,
+      headers: { origin },
+      maxRedirects: 0,
+    });
+    statuses.push(response.status());
+  }
+  return { statuses, token: fields['requestToken'] ?? '' };
+}
+
+/** A double tap the browser let through makes one player and one team (scripts off). */
+async function postedTwice(page, origin, how, linesNow) {
+  const player = page.locator('form[data-form=new-player]');
+  await player.locator('input[name=firstName]').fill('Twice');
+  await player.locator('input[name=lastName]').fill('Posted');
+  const sent = await postTwice(page, origin, player);
+  note(`${how}: the new player's form carries a one-time token`, sent.token !== '');
+  note(
+    `${how}: both posts of the new player answered`,
+    sent.statuses.every((s) => s === 303),
+    String(sent.statuses),
+  );
+  await page.reload();
+  const lines = await page.locator('ol.admin-roster > li').count();
+  const named = await page.locator('ol.admin-roster > li', { hasText: 'Twice Posted' }).count();
+  note(
+    `${how}: posted twice, one player`,
+    lines === linesNow + 1 && named === 1,
+    `${linesNow} then ${lines}, ${named} named`,
+  );
+
+  await page.goto(`${origin}/north-valley/admin/teams`);
+  const links = page.locator('main a[href*="/north-valley/admin/teams/"]');
+  const teamsBefore = await links.count();
+  const create = page.locator('form[data-form=create-team]');
+  await create.locator('input[name=name]').fill('Posted Twice');
+  const made = await postTwice(page, origin, create);
+  note(`${how}: "Add team" carries a one-time token`, made.token !== '');
+  note(
+    `${how}: both posts of "Add team" answered`,
+    made.statuses.every((s) => s === 303),
+    String(made.statuses),
+  );
+  await page.reload();
+  const teamsAfter = await links.count();
+  const twice = await page.locator('main a', { hasText: 'Posted Twice' }).count();
+  note(
+    `${how}: posted twice, one team`,
+    teamsAfter === teamsBefore + 1 && twice === 1,
+    `${teamsBefore} then ${teamsAfter}, ${twice} named`,
+  );
+}
 
 async function journey(browser, origin, scripts) {
   const how = scripts ? 'scripts on' : 'scripts off';
@@ -131,6 +198,48 @@ async function journey(browser, origin, scripts) {
       (await page.locator('main', { hasText: 'Saved: the details of' }).count()) === 0,
     );
 
+    // Someone else renames the team in another tab while this page is open (T-399).
+    const stale = page.locator('form[data-form=team-details]');
+    const tab = await context.newPage();
+    await tab.goto(page.url());
+    const theirs = scripts ? 'Meanwhile One' : 'Meanwhile Two';
+    const tabDetails = tab.locator('form[data-form=team-details]');
+    await tabDetails.locator('input[name=name]').fill(theirs);
+    await Promise.all([
+      scripts ? Promise.resolve() : tab.waitForEvent('load'),
+      tabDetails.getByRole('button', { name: 'Save team details' }).click(),
+    ]);
+    await tab
+      .locator('#team-details [role=status]', { hasText: `Saved: the details of ${theirs}.` })
+      .waitFor({ timeout: 15_000 });
+    await tab.close();
+    const mineInstead = scripts ? 'Mine Instead One' : 'Mine Instead Two';
+    await stale.locator('input[name=name]').fill(mineInstead);
+    await send(stale.getByRole('button', { name: 'Save team details' }));
+    const changedProblem = stale.locator('[data-problem]', { hasText: 'Someone else changed' });
+    await changedProblem.waitFor({ timeout: 15_000 });
+    note(
+      `${how}: a team changed meanwhile keeps the name as typed`,
+      (await stale.locator('input[name=name]').inputValue()) === mineInstead,
+    );
+    const nowName = stale.locator('[data-saved-now=name]');
+    note(
+      `${how}: beside the name box is what is saved now`,
+      (await nowName.count()) === 1 &&
+        (await nowName.innerText()).trim() === `Saved now: ${theirs}`,
+      (await nowName.count()) === 1 ? await nowName.innerText() : 'none',
+    );
+    note(
+      `${how}: no "Saved now" beside a box that is the same`,
+      (await stale.locator('[data-saved-now]').count()) === 1,
+      String(await stale.locator('[data-saved-now]').count()),
+    );
+    await send(stale.getByRole('button', { name: 'Save team details' }));
+    await page
+      .locator('#team-details [role=status]', { hasText: `Saved: the details of ${mineInstead}.` })
+      .waitFor({ timeout: 15_000 });
+    note(`${how}: tapped again after seeing both, it is saved`, true);
+
     // A new player given a number that is not one (the roster takes 0 to 99, or 00).
     const worn = 'ab';
     const lines = () => page.locator('ol.admin-roster > li').count();
@@ -189,6 +298,7 @@ async function journey(browser, origin, scripts) {
       `${how}: a reload says nothing old about the player`,
       (await page.locator('main', { hasText: 'was added to' }).count()) === 0,
     );
+    if (!scripts) await postedTwice(page, origin, how, after);
   } finally {
     await context.close();
   }

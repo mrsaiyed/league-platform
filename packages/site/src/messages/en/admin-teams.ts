@@ -181,6 +181,8 @@ export const enAdminTeams = {
     '{name} is back on the roster with no number: someone else on the team now wears {number}. Give them a number.',
   // Beside the team's details, once, after they were saved (step 2.155).
   'adminTeams.saved.details': 'Saved: the details of {name}.',
+  'adminTeams.savedNow': 'Saved now:',
+  'adminTeams.savedNowNothing': '(nothing)',
   'adminTeams.seasonLine': 'Teams of {season}',
   'adminTeams.stats.everyone': 'Everyone',
   'adminTeams.stats.staff': "Only the team's staff and the league's admins",

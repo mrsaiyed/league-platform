@@ -18,7 +18,16 @@ export type FormState =
       readonly wrong: readonly string[];
       /** Why, as a sentence from the message files. */
       readonly said: string;
+      /**
+       * Someone else changed the thing since the page was drawn (T-399): the words that
+       * say, beside each box whose saved value now differs from what was typed, what is
+       * saved now. Left out for every other refusal.
+       */
+      readonly savedNow?: SavedNowWords;
     };
+
+/** "Saved now:", and what it says when nothing is saved in that box. */
+export type SavedNowWords = { readonly label: string; readonly nothing: string };
 
 export const untouched: FormState = { kind: 'untouched' };
 

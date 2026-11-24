@@ -78,7 +78,7 @@ What each role sees is trimmed to what they can use. A scorekeeper who opens the
 
 **A-7: changes the public will feel are previewed before they go out.** Publishing a schedule change shows which games move and how many people will be notified, and asks for confirmation.
 
-**A-8: two admins editing the same thing do not silently overwrite each other.** The second person to save is told it changed, shown the latest version, and can reapply their edit.
+**A-8: two admins editing the same thing do not silently overwrite each other.** The second person to save is told it changed, shown the latest version, and can reapply their edit. On a form, what they typed stays in the boxes, and beside each box whose saved value now differs is what is saved now ("Saved now: …"); saving again replaces it, made knowing both (T-399).
 
 **A-9: the public never sees half-finished work.** Schedule edits, site edits and registration form edits are drafts until published.
 

@@ -8,7 +8,9 @@
 // - put right and tapped twice, one game is added, "Saved" names it beside it on the
 //   screen without scrolling, never "Someone else changed…", and a reload says nothing old;
 // - a game's own form sent after the draft moved on is refused beside that game, with the
-//   time as typed still in its box; so is a round's new name, beside its box, marked.
+//   time as typed still in its box, the sentence saying someone else changed the draft and
+//   "Saved now: <the time saved>" beside the time box only (T-399); so is a round's new
+//   name, beside its box, marked.
 // `--no-build` serves the build already here.
 import {
   accessibilityProblems,
@@ -116,6 +118,11 @@ async function journey(browser, origin, scripts) {
     const gameId = await gameLine.getAttribute('data-game');
     await gameLine.locator('summary', { hasText: 'Edit this game' }).click();
     const staleTime = scripts ? '07:15' : '07:45';
+    const timeSaved = await gameLine
+      .locator('form')
+      .first()
+      .locator('input[name=time]')
+      .inputValue();
     await gameLine.locator('form').first().locator('input[name=time]').fill(staleTime);
 
     // And a third, whose form for the first round's name is drawn now too.
@@ -181,6 +188,25 @@ async function journey(browser, origin, scripts) {
     note(
       `${how}: the time typed is still in its box`,
       (await line.locator('form').first().locator('input[name=time]').inputValue()) === staleTime,
+    );
+    const changedSaid = (await refused.innerText()).trim();
+    note(
+      `${how}: the stale save says someone else changed the draft`,
+      changedSaid.startsWith('Someone else changed the schedule draft'),
+      changedSaid,
+    );
+    const nowTime = line.locator('[data-saved-now=time]');
+    note(
+      `${how}: beside the time box is the time saved now`,
+      (await nowTime.count()) === 1 &&
+        (await nowTime.innerText()).trim() ===
+          `Saved now: ${timeSaved === '' ? '(nothing)' : timeSaved}`,
+      (await nowTime.count()) === 1 ? await nowTime.innerText() : 'none',
+    );
+    note(
+      `${how}: no "Saved now" beside the game's boxes that are the same`,
+      (await line.locator('[data-saved-now]').count()) === 1,
+      String(await line.locator('[data-saved-now]').count()),
     );
     // The round's name from before: refused beside its box, as typed, the box marked.
     const rename = roundHere.getByRole('button', { name: 'Rename round' });

@@ -116,6 +116,8 @@ export const enScheduleAdmin = {
   'schedule.admin.followRoundDateYes': 'Yes, move it to {date}',
   // A game called off, in the grid: where it goes on from (step 2.158).
   'schedule.admin.gameCancelled': 'This game is cancelled, so it is not edited here.',
+  'schedule.admin.gameChangedMeanwhile':
+    'Someone else changed the schedule draft since you opened this page, so this game was not saved. What you typed is kept, and beside each box that differs is what is saved now. Save again to replace it with yours.',
   'schedule.admin.gameDetails': '{when}, {place}',
   'schedule.admin.gameDetailsRecording': '{when}, {place}, {recording}',
   'schedule.admin.gameLocked':
@@ -301,6 +303,8 @@ export const enScheduleAdmin = {
   'schedule.admin.savedGameRemovedRoundGone':
     'Removed: {game}, {round}. {round} has since been removed from the draft.',
   'schedule.admin.savedGameRound': 'Saved to the draft: {game} is now in {round}.',
+  'schedule.admin.savedNow': 'Saved now:',
+  'schedule.admin.savedNowNothing': '(nothing)',
   'schedule.admin.savedRound': 'Saved to the draft: {round}.',
   'schedule.admin.savedRoundAdded':
     'Saved to the draft: {round} was added. It is not public until you publish.',

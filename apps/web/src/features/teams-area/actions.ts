@@ -91,7 +91,14 @@ async function answerTeamForm(
     if (answer.code === 'not-allowed') {
       return { kind: 'refused', code: answer.code, typed: fields, wrong: [], said: refusal.said };
     }
-    return refusedWith(answer.code, fields, refusal.wrong, refusal.said);
+    // Someone else changed the team since the page was drawn (T-399): what was typed is
+    // kept, and the page drawn again says beside each box what is saved now, so the next
+    // tap saves over it knowing both.
+    const savedNow =
+      answer.code === 'changed-since-read'
+        ? { label: t('adminTeams.savedNow'), nothing: t('adminTeams.savedNowNothing') }
+        : undefined;
+    return refusedWith(answer.code, fields, refusal.wrong, refusal.said, savedNow);
   }
   const teamId = (fields['team'] ?? '').toLowerCase();
   const page = leagueUrl(view.context.league, 'admin-area', {
