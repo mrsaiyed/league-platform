@@ -1,6 +1,6 @@
-# The MVP lists: PROPOSED, waiting for the founder to approve
+# The MVP lists: APPROVED by the founder on 2026-11-24
 
-Made on 2026-11-24 at the founder's request ("mvp done earlier while you still work as long as needed on the rest"). Until the founder says yes, this is a proposal.
+Made on 2026-11-24 at the founder's request ("mvp done earlier while you still work as long as needed on the rest"). Until the founder says yes, this is a proposal. APPROVED: on 2026-11-24 at about 20:43 UTC the founder wrote in the founder’s window, after the day’s note: “Not sure wym by mvp lists but sure”. The window then told them in two plain lines what the lists are, so they can still object. In the same message, about whether Faraj uses a mercy rule, a running clock and fouls that reset each half: “Faraj I’m not sure but anyways those rules should be decided by admin at league creation time and changed at season through admin acc if needed.” So each of the three is a setting the league’s admin chooses when the league is made and can change for a season (steps 2.69 and 2.123 on list B build them; the lead records the decision in DECISIONS.md with these words).
 
 # What Faraj League needs first: the 94 open steps of stage 2, sorted
 
