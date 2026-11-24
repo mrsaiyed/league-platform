@@ -22,12 +22,7 @@
 // cannot be granted until those tables exist (0004). Their permissions are tested
 // in core (modules/access/policy.test.ts), and they join this matrix with the
 // clubs and teams step.
-import {
-  defaultSeasonRules,
-  formatOfRules,
-  seasonRulesPreset,
-  startingDesign,
-} from '@srleagues/contracts';
+import { defaultSeasonRules, formatOfRules, startingDesign } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { createHash, randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
@@ -65,6 +60,7 @@ import {
   cancelInvitation,
   changeDraftRoundDate,
   changeRosterEntry,
+  clearGameFormat,
   clearSettingFor,
   commands,
   countPlaceGames,
@@ -87,6 +83,7 @@ import {
   getPerson,
   getScheduleDraft,
   getSeason,
+  giveGameFormat,
   invite,
   listAccess,
   listActivity,
@@ -116,11 +113,9 @@ import {
   publishSiteDesign,
   putBackDraftGame,
   putBackOnRoster,
+  readGameFormat,
   readInvitation,
   putGameBack,
-  clearGameFormat,
-  giveGameFormat,
-  readGameFormat,
   readReopenOffer,
   readTrackerRosters,
   readTrackerState,
@@ -1384,6 +1379,36 @@ const gameCommandRows: readonly Row[] = [
         : result;
     },
   ),
+  // One game's own format (step 2.119, S-35, T-341): an admin of its games (`games.manage`:
+  // owner, admin, scheduler) before it is under way, or whoever may score it before the
+  // first play while the league lets scorekeepers (on to begin with). Each game is
+  // scheduled and never opened at the table, so every one of them may.
+  ...gameRows(
+    'games.give_game_format',
+    'give one game its own format',
+    'games.score',
+    async (league, program) => ({
+      gameId: (await gameIn(league, program)).gameId,
+      version: 1,
+      format: formatOfRules(defaultSeasonRules()),
+    }),
+    (c, i) => giveGameFormat(c, i, trackerDeps),
+  ),
+  ...gameRows(
+    'games.clear_game_format',
+    'take back the format one game was given',
+    'games.score',
+    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId, version: 1 }),
+    (c, i) => clearGameFormat(c, i, trackerDeps),
+  ),
+  // The format screens' read: the same people; nothing changes.
+  ...gameRows(
+    'games.read_game_format',
+    'read the format of one game',
+    'games.score',
+    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId }),
+    (c, i) => readGameFormat(c, i, trackerDeps),
+  ),
   // The scorekeeper's reopening of a game they ended (step 2.120, S-36): whoever may
   // score it. The game was ended from the tracker five minutes ago, by the database's
   // clock, by the matrix's scorekeeper, so the scorekeeper may within the league's 30
@@ -1407,33 +1432,6 @@ const gameCommandRows: readonly Row[] = [
     'games.score',
     async (league, program) => ({ gameId: await trackedGameEndedIn(league, program) }),
     (c, i) => readReopenOffer(c, i, trackerDeps),
-  ),
-  // One game's own format before it starts (step 2.119): whoever may score the game, the
-  // league letting scorekeepers by default; and the read the form is drawn from.
-  ...gameRows(
-    'games.give_game_format',
-    'give a game its own format',
-    'games.score',
-    async (league, program) => ({
-      gameId: (await gameIn(league, program)).gameId,
-      version: 1,
-      format: formatOfRules(seasonRulesPreset('high-school')),
-    }),
-    (c, i) => giveGameFormat(c, i, trackerDeps),
-  ),
-  ...gameRows(
-    'games.clear_game_format',
-    "put a game back on its season's format",
-    'games.score',
-    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId, version: 1 }),
-    (c, i) => clearGameFormat(c, i, trackerDeps),
-  ),
-  ...gameRows(
-    'games.read_game_format',
-    "see a game's format",
-    'games.score',
-    async (league, program) => ({ gameId: (await gameIn(league, program)).gameId }),
-    (c, i) => readGameFormat(c, i, trackerDeps),
   ),
 ];
 
