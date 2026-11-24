@@ -58,7 +58,18 @@ export {
   type SetSettingError,
   type SettingSaved,
 } from './commands/set-setting.ts';
-export { clearSetting, clearSettingFor, type ClearSettingError } from './commands/clear-setting.ts';
+export {
+  clearSetting,
+  clearSettingFor,
+  leaguesFirstChildGuard,
+  type ClearSettingError,
+} from './commands/clear-setting.ts';
+export {
+  confirmedChildrenInFullRow,
+  putBackOnFirstChild,
+  watchForFirstChild,
+  type FirstChildGuard,
+} from './commands/put-back-on-first-child.ts';
 export {
   declaredSettings,
   membersStartPage,

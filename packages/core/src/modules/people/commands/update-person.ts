@@ -2,8 +2,11 @@
 // may see them, R-16) contact email, birth date and minor or not; null clears one.
 // The save names the version it started from and is refused if someone else saved
 // since (T-46). The activity entry names the fields changed, never their values.
+// S-109 (step 2.243): a change that records an adult league's first child puts a
+// confirmed "children in full" back to no in the same save, and the result says so.
 import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
+import { putBackOnFirstChild, watchForFirstChild } from '../../leagues/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import {
   birthDateAfter,
@@ -21,6 +24,12 @@ export type UpdatePersonError = {
     | 'changed-since-read'
     | 'sensitive-fields-not-allowed'
     | 'invalid-input';
+};
+
+export type PersonUpdated = {
+  readonly version: number;
+  /** Present when this change recorded the adult league's first child (S-109). */
+  readonly clearedChildrenInFull?: true;
 };
 
 export const updatePerson = defineCommand({
@@ -48,7 +57,7 @@ export const updatePerson = defineCommand({
       { path: ['firstName'] },
     ),
   allowed: (context, _input, tx: PeopleTx) => mayChangePeople(context, tx, 'people.manage'),
-  run: async ({ context, input, tx }): Promise<Result<{ version: number }, UpdatePersonError>> => {
+  run: async ({ context, input, tx, emit }): Promise<Result<PersonUpdated, UpdatePersonError>> => {
     const sensitive = await maySeeSensitive(context, tx);
     const touchesSensitive =
       input.contactEmail !== undefined ||
@@ -87,6 +96,7 @@ export const updatePerson = defineCommand({
         : {}),
     };
     if (Object.keys(change).length === 0) return ok({ version: person.version });
+    const watching = await watchForFirstChild(tx.people);
     const updated = await tx.people.update(person.id, change, input.version);
     if (updated === undefined) return fail({ code: 'changed-since-read' });
     await recordActivity(tx, context, {
@@ -94,6 +104,7 @@ export const updatePerson = defineCommand({
       target: { type: 'person', id: person.id },
       details: { changed: Object.keys(change).join(',') },
     });
-    return ok({ version: updated });
+    const putBack = await putBackOnFirstChild(tx.people, tx, context, emit, watching);
+    return ok({ version: updated, ...(putBack ? { clearedChildrenInFull: true as const } : {}) });
   },
 });

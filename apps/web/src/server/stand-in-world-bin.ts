@@ -11,6 +11,7 @@
 import type { BinnedItem, BinStore } from '@srleagues/core';
 import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld } from './stand-in-world-state.ts';
+import { worldPeopleStore } from './stand-in-world-teams.ts';
 
 const notYet = (name: string) => async (): Promise<never> => {
   throw new Error(`Not on the stand-in yet: ${name}.`);
@@ -22,7 +23,7 @@ const neverPlayed = ['scheduled', 'postponed', 'cancelled'];
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-export function worldBinStore(s: LeagueWorld): BinStore {
+export function worldBinStore(s: LeagueWorld, now: () => Date = () => new Date()): BinStore {
   const seenAt = new Map<string, string>();
   const binnedAt = (id: string) => {
     const at = seenAt.get(id) ?? new Date().toISOString();
@@ -172,6 +173,8 @@ export function worldBinStore(s: LeagueWorld): BinStore {
       s.teams = replacedAt(s.teams, at, { ...team, binned: false, version: team.version + 1 });
       return true;
     },
+    // S-109: read and cleared as the people store does (one writer, record 065).
+    firstChild: worldPeopleStore(s, now),
     restorePerson: async (personId) => {
       const at = s.people.findIndex((p) => p.id === personId);
       const found = s.people[at];

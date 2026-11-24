@@ -7,6 +7,7 @@ import {
 } from '../../command/testing/memory-transaction.ts';
 import type { ActivityEntry, Grant, Role } from '../access/index.ts';
 import { binCutoff, type BinCounts, type RestoreGameTx } from './bin.ts';
+import { childrenInFullConfirmed } from './settings/declarations.ts';
 
 export const leagueId = '01900000-0000-7000-8000-000000000001';
 export const ownerId = '01900000-0000-7000-8000-0000000000a1';
@@ -38,6 +39,8 @@ type Thing = {
     | 'game-number-taken';
   /** A game's other games at its time now (the clash check, A-19). */
   clashesWith?: string[];
+  /** A person recorded as a child (R-28), for the first-child put-back (S-109). */
+  child?: boolean;
 };
 
 export type MemoryBin = {
@@ -51,6 +54,9 @@ export type MemoryBin = {
   revisions: { number: number; summary: unknown }[];
   /** People on each team's roster, as the A-7 count reads them. */
   people: Record<string, number>;
+  /** Who plays, and the league's saved "children in full" (S-109; adults and none to start). */
+  audience: 'youth' | 'mixed' | 'adult';
+  childrenInFull: boolean;
 };
 
 /** A grant of `role` to `accountId`, in force: league-wide, or at one program's (`program`). */
@@ -72,6 +78,8 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
     activity: [],
     revisions: [],
     people: {},
+    audience: 'adult',
+    childrenInFull: false,
     ...state,
   });
   const transaction = memoryTransaction(db, (s, jobs): RestoreGameTx => {
@@ -110,6 +118,22 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
         clashesOf: async (id) => (find(id)?.clashesWith ?? []).map((other) => ({ id: other })),
       },
       bin: {
+        firstChild: {
+          leagueAudience: async () => s.audience,
+          hasRecordedChild: async () =>
+            s.things.some((t) => t.kind === 'person' && t.binnedAt === null && t.child === true),
+          leagueSettingRows: async (key) =>
+            key === childrenInFullConfirmed.key && s.childrenInFull
+              ? [{ level: 'league', document: { version: 1, value: true }, version: 1 }]
+              : [],
+          clearLeagueSetting: async (key, version) => {
+            if (key !== childrenInFullConfirmed.key || !s.childrenInFull || version !== 1) {
+              return false;
+            }
+            s.childrenInFull = false;
+            return true;
+          },
+        },
         list: async () =>
           s.things
             .filter((t) => t.binnedAt !== null)

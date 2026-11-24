@@ -6,9 +6,11 @@ import {
   findLeagueToday,
   findPerson,
   findPersonIsMinor,
+  hasRecordedChild,
   insertPerson,
   isPersonOnRoster,
   listPeople,
+  deleteSettingValue,
   listSettingValues,
   setPersonBinned,
   updatePerson,
@@ -37,5 +39,9 @@ export function peopleStore(scope: LeagueScope): PeopleStore {
     },
     leagueSettingRows: async (key) =>
       (await listSettingValues(scope, key, {})).filter((row) => row.level === 'league'),
+    // S-109: the same reading and clearing as the leagues store's (one writer, record 065).
+    hasRecordedChild: () => hasRecordedChild(scope),
+    clearLeagueSetting: (key, version) =>
+      deleteSettingValue(scope, { level: 'league' }, key, version),
   };
 }

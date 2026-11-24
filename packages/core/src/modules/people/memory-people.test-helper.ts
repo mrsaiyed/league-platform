@@ -184,6 +184,13 @@ export function memoryPeople(state: Partial<MemoryPeople> = {}) {
           Object.hasOwn(s.settings, key)
             ? [{ level: 'league', document: { version: 1, value: s.settings[key] }, version: 1 }]
             : [],
+        hasRecordedChild: async () =>
+          s.people.some((p) => !p.binned && isMinorOn(p.sensitiveFields, s.today) === true),
+        clearLeagueSetting: async (key, version) => {
+          if (!Object.hasOwn(s.settings, key) || version !== 1) return false;
+          delete s.settings[key];
+          return true;
+        },
       },
     };
   });

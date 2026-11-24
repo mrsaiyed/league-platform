@@ -3,6 +3,7 @@
 // supplies it, bound to one transaction for one league (T-28).
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
+import type { FirstChildGuard } from './commands/put-back-on-first-child.ts';
 
 /** How long a removed thing stays in the bin before the nightly job removes it for good (T-51). */
 export const binKeepDays = 30;
@@ -125,6 +126,8 @@ export type BinStore = {
    * a history). How many of each went.
    */
   readonly purge: (cutoff: Date) => Promise<BinCounts>;
+  /** What a restore reads and writes when it brings back the league's first child (S-109). */
+  readonly firstChild: FirstChildGuard;
 };
 
 /** A bin command's transaction: its store, the access reader and the activity log (A-6). */

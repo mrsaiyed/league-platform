@@ -1,6 +1,7 @@
 // The leagues module's bin store (core's BinStore), bound to one league scope.
 import type { BinStore } from '@srleagues/core';
 import type { LeagueScope } from '../db/transaction-scope.ts';
+import { peopleStore } from './people-store.ts';
 import {
   findDivision,
   findGame,
@@ -50,6 +51,8 @@ export function binStore(scope: LeagueScope): BinStore {
       return restored;
     },
     restorePerson: (personId) => restoreBinnedPerson(scope, personId),
+    // S-109: read and cleared as the people store does (one writer, record 065).
+    firstChild: peopleStore(scope),
     restoreGame: (gameId) => restoreBinnedGame(scope, gameId),
     purge: (cutoff) => purgeBinned(scope, cutoff),
   };

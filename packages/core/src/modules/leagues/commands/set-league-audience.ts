@@ -20,6 +20,7 @@ import { mayEditLeague } from '../policy.ts';
 import type { LeaguesTx, StoredSettingRow } from '../ports.ts';
 import { audienceChange } from '../rules/audience-change.ts';
 import { clearLeagueValueInside } from './clear-setting.ts';
+import { confirmedChildrenInFullRow } from './put-back-on-first-child.ts';
 import { childrenInFullConfirmed, publicNames } from '../settings/declarations.ts';
 
 export type SetLeagueAudienceError = {
@@ -39,14 +40,7 @@ export type LeagueAudienceSaved = {
 
 /** The league's own saved "children in full" row when it says yes, else undefined. */
 async function confirmedChildrenInFull(tx: LeaguesTx): Promise<StoredSettingRow | undefined> {
-  const rows = await tx.leagues.settingRows(childrenInFullConfirmed.key, {});
-  return rows.find((row) => {
-    if (row.level !== 'league') return false;
-    const document = row.document;
-    return typeof document === 'object' && document !== null && 'value' in document
-      ? document.value === true
-      : false;
-  });
+  return confirmedChildrenInFullRow(await tx.leagues.settingRows(childrenInFullConfirmed.key, {}));
 }
 
 /** Whether the league holds a saved, confirmed "children in full" (for the screen). */

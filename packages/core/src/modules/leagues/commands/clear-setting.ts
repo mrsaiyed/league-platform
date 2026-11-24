@@ -1,7 +1,7 @@
 // Clears a setting's value at one place, so the lookup falls back to the next level
 // (record 019: "not set" is no row). Written to the activity log like setting one.
 import { z } from 'zod';
-import { recordActivity } from '../../access/index.ts';
+import { recordActivity, type ActivityTx } from '../../access/index.ts';
 import {
   defineCommand,
   fail,
@@ -10,7 +10,7 @@ import {
   type Result,
 } from '../../../command/index.ts';
 import { leagueSettingChanged } from '../events.ts';
-import type { LeaguesTx } from '../ports.ts';
+import type { LeaguesStore, LeaguesTx } from '../ports.ts';
 import { declaredSettings } from '../settings/declarations.ts';
 import type { SettingRegistry } from '../settings/define-setting.ts';
 import {
@@ -20,6 +20,7 @@ import {
   placeScopeDetails,
   settingKey,
 } from '../settings/place.ts';
+import type { FirstChildGuard } from './put-back-on-first-child.ts';
 import { placeId } from './set-setting.ts';
 
 export type ClearSettingError = {
@@ -73,10 +74,12 @@ export const clearSetting = clearSettingFor(declaredSettings);
  * Clears a league-level value inside another command's transaction, logged as this
  * command's own clearing, so the settings keep one writer (record 065). Used by
  * setLeagueAudience (step 2.125), which clears "children in full" when an adult league
- * brings children in: a clearing only ever shows less (R-26). False if the value moved.
+ * brings children in, and by putBackOnFirstChild (step 2.243, S-109) when a save records
+ * an adult league's first child: a clearing only ever shows less (R-26). False if the
+ * value moved.
  */
 export async function clearLeagueValueInside(
-  tx: LeaguesTx,
+  tx: ActivityTx & { readonly leagues: Pick<LeaguesStore, 'clearSetting'> },
   context: CommandContext,
   key: string,
   version: number,
@@ -90,4 +93,37 @@ export async function clearLeagueValueInside(
     details: { key: setting.key, level: 'league', label: setting.label },
   });
   return true;
+}
+
+/** The guard over the leagues store, for a leagues command (a time zone change). */
+export function leaguesFirstChildGuard(
+  leagues: Pick<
+    LeaguesStore,
+    'leagueAudience' | 'hasRecordedChild' | 'settingRows' | 'clearSetting'
+  >,
+): FirstChildGuard {
+  return {
+    leagueAudience: () => leagues.leagueAudience(),
+    hasRecordedChild: () => leagues.hasRecordedChild(),
+    leagueSettingRows: async (key) =>
+      (await leagues.settingRows(key, {})).filter((row) => row.level === 'league'),
+    clearLeagueSetting: (key, version) => leagues.clearSetting({ level: 'league' }, key, version),
+  };
+}
+
+/**
+ * clearLeagueValueInside through a first-child guard (S-109, putBackOnFirstChild): the
+ * one clearing of a league value outside leagues.clear_setting, logged the same way.
+ */
+export function clearGuardedValueInside(
+  guard: FirstChildGuard,
+  tx: ActivityTx,
+  context: CommandContext,
+  key: string,
+  version: number,
+): Promise<boolean> {
+  const leagues = {
+    clearSetting: (_place: unknown, k: string, v: number) => guard.clearLeagueSetting(k, v),
+  };
+  return clearLeagueValueInside({ ...tx, leagues }, context, key, version);
 }

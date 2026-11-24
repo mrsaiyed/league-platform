@@ -47,3 +47,38 @@ describe('restorePerson', () => {
     expect(await restorePerson(as('reg'), { personId: id }, deps)).toMatchObject({ ok: true });
   });
 });
+
+describe('restorePerson and the first child (S-109)', () => {
+  const child = { id, kind: 'person' as const, name: 'Kid', binnedAt, child: true };
+  const grownUp = { id: teamId(6), kind: 'person' as const, name: 'Ada', binnedAt: null };
+
+  it("bringing back an adult league's only child puts the yes back to no, and says so", async () => {
+    const { db, deps, as } = memoryBin({ things: [child, grownUp], childrenInFull: true });
+    expect(await restorePerson(as(ownerId), { personId: id }, deps)).toEqual({
+      ok: true,
+      value: { personId: id, clearedChildrenInFull: true },
+    });
+    expect(db.state.childrenInFull).toBe(false);
+    expect(db.state.activity.map((a) => a.action)).toEqual([
+      'leagues.restore_person',
+      'leagues.clear_setting',
+    ]);
+  });
+
+  it('a second child, an adult, or a league for children changes nothing', async () => {
+    const otherChild = { ...grownUp, child: true };
+    for (const state of [
+      { things: [child, otherChild] },
+      { things: [{ ...child, child: false }] },
+      { things: [child], audience: 'mixed' as const },
+      { things: [child], audience: 'youth' as const },
+    ]) {
+      const { db, deps, as } = memoryBin({ ...state, childrenInFull: true });
+      expect(await restorePerson(as(ownerId), { personId: id }, deps)).toEqual({
+        ok: true,
+        value: { personId: id },
+      });
+      expect(db.state.childrenInFull).toBe(true);
+    }
+  });
+});

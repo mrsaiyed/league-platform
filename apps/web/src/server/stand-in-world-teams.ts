@@ -292,5 +292,15 @@ export function worldPeopleStore(s: LeagueWorld, now: () => Date): PeopleStore {
       s.settings
         .filter((r) => r.key === key && r.place.level === 'league')
         .map((r) => ({ level: r.place.level, document: r.document, version: r.version })),
+    // S-109, as has-recorded-child.ts and delete-setting-value.ts in the database.
+    hasRecordedChild: async () =>
+      s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
+    clearLeagueSetting: async (key, version) => {
+      const before = s.settings.length;
+      s.settings = s.settings.filter(
+        (r) => !(r.key === key && r.place.level === 'league' && r.version === version),
+      );
+      return s.settings.length < before;
+    },
   };
 }
