@@ -21,6 +21,9 @@
 // newest reopen that kept one, looking back past reopens whose save kept no lines (T-368):
 // it ends that reopen, and the reopens between are part of the slip and mark nothing.
 // Where no correction says whether it kept a sheet, the put back ends the reopen before it.
+// Where they do say and no earlier reopen kept a sheet, a correction that left the game
+// decided cannot be a put back (one always restores a kept sheet): it is an ordinary
+// correction of the result, read as before step 2.229.
 import { isDecided } from './game-fields.ts';
 
 /** A game's result as a correction keeps it, or as the game holds it now. */
@@ -57,6 +60,7 @@ export function correctedMarkDate(
   // Each put back ends the reopen it undid; it and the reopens between mark nothing.
   const endedBy = new Map<number, MarkResult | undefined>();
   const part = new Set<number>();
+  const told = corrections.some((correction) => correction.keptSheet !== undefined);
   corrections.forEach((correction, at) => {
     if (!isPutBack(correction)) return;
     let undid = at - 1;
@@ -65,6 +69,7 @@ export function correctedMarkDate(
       if (earlier !== undefined && !isPutBack(earlier) && earlier.keptSheet === true) break;
       undid -= 1;
     }
+    if (undid < 0 && told) return;
     if (undid < 0) undid = at - 1;
     for (let k = undid + 1; k <= at; k += 1) part.add(k);
     if (undid >= 0) endedBy.set(undid, correction.after);

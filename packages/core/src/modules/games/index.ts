@@ -218,6 +218,7 @@ export type {
   ScoringReach,
   GameLine,
   GameRecord,
+  GameRosterEntry,
   GameRosterPlayer,
   NewGameLine,
   GameResultDocument,

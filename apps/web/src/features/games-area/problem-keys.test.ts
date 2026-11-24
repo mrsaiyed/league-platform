@@ -60,6 +60,7 @@ describe('why a change in the games area was refused, as words', () => {
       'put-back-reason',
       'scored-live',
       'player-gone',
+      'player-in-bin',
     ]) {
       expect(putBackProblemKey(code), code).toBe(`admin.boxScore.putBackError.${code}`);
       expect(en[putBackProblemKey(code)], code).not.toContain(code);

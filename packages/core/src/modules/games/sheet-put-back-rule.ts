@@ -9,11 +9,14 @@
 // through the game's corrections, newest first (T-368): it puts back the sheet of the
 // newest correction that keeps one, as long as no save since recorded player lines or
 // plays. A correction is truthful: its "before" is what the game held then, never a copy
-// carried forward. So a reopen whose "before" kept no sheet shows the save before it
-// recorded no lines (a final score only, a score within, a forfeit), and the look goes on
-// past it; a put back is itself a newer save, so the look stops there (`newer-save`). The
-// save that followed the newest correction may be anything, another sheet too (T-366); one
-// that recorded lines closes every older correction (`newer-save`).
+// carried forward. A reopen whose "before" kept no sheet is one of two: the save before it
+// recorded no lines (a final score only, a score within, a forfeit), or the game was
+// tracked, whose lines follow its plays and are not kept (reopen-game.ts). A tracked game
+// keeps its plays, so the `scored-live` check, which comes first, refuses it before the
+// look; the look goes on past only the first kind. A put back is itself a newer save, so
+// the look stops there (`newer-save`). The save that followed the newest correction may be
+// anything, another sheet too (T-366); one that recorded lines closes every older
+// correction (`newer-save`).
 import { isDecided } from './game-fields.ts';
 import type { GameResultDocument, KeptSheet, StoredGameCorrection } from './ports.ts';
 

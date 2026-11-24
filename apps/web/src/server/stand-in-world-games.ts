@@ -259,6 +259,12 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       }
       s.lines = [...s.lines.filter((l) => l.gameId !== gameId), ...lines];
     },
+    // Both still here, one of them in the bin, as games-store.ts reads it.
+    inBin: async ({ teamId, personId }) => {
+      const person = s.people.find((p) => p.id === personId);
+      const team = s.teams.find((t) => t.id === teamId);
+      return person !== undefined && team !== undefined && (person.binned || team.binned);
+    },
     listRoster: async (gameId) => {
       const teams = teamsOfGame(s, gameId);
       return s.roster

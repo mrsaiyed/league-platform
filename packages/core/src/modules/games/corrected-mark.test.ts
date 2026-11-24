@@ -111,6 +111,15 @@ describe('correctedMarkDate (S-8: the mark only when the next final differs)', (
       expect(correctedMarkDate(later, final(51, 40))).toBe('2030-12-09');
     });
 
+    it('reads a decided "after" as an ordinary correction when no reopen kept a sheet', () => {
+      // A result corrected straight from 48-40 to 52-40: no sheet was ever kept, so no put back.
+      const corrections = [
+        { on: '2030-12-04', before: final(50, 40), after: reopened, keptSheet: false },
+        { on: '2030-12-06', before: final(48, 40), after: final(52, 40), keptSheet: false },
+      ];
+      expect(correctedMarkDate(corrections, final(52, 40))).toBe('2030-12-06');
+    });
+
     it('marks a later reopen after the put back as any other', () => {
       const corrections = [
         { on: '2030-12-06', before: final(50, 40), after: reopened },

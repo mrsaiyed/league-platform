@@ -20,7 +20,11 @@ import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { gameFinalized, type GameFinalized } from '../../../events/game-events.ts';
 import { correctionReason, gameVersion } from '../game-fields.ts';
-import { sheetToKeep } from '../kept-sheet.ts';
+import {
+  keptSheetPlayersRefusal,
+  sheetToKeep,
+  type KeptSheetPlayersRefusal,
+} from '../kept-sheet.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
 import { sheetPutBackRuling, type SheetPutBackRefusal } from '../sheet-put-back-rule.ts';
@@ -30,8 +34,8 @@ export type PutSheetBackError = {
     | 'game-not-found'
     | 'changed-since-read'
     | 'not-allowed'
-    /** A person the kept sheet names is no longer in the league (purged from the bin). */
-    | 'player-gone'
+    /** A player the kept sheet names is in the bin, or purged from it (kept-sheet.ts). */
+    | KeptSheetPlayersRefusal
     | SheetPutBackRefusal;
 };
 
@@ -62,15 +66,11 @@ export const putSheetBack = defineCommand({
     );
     if (ruling.refusal !== undefined) return fail({ code: ruling.refusal });
     const kept = ruling.restore;
-    // A person or roster entry the sheet names may have been purged from the bin since
+    // A person or roster entry the sheet names may be in the bin, or purged from it since
     // (T-220 keeps only the id): refused in plain words, not on the database's link. The
     // rosters list those who left too (R-17), so a player who left still comes back.
-    const roster = new Set(
-      (await tx.games.listRoster(game.id)).map((p) => `${p.teamId} ${p.personId}`),
-    );
-    if (kept.sheet.lines.some((line) => !roster.has(`${line.teamId} ${line.personId}`))) {
-      return fail({ code: 'player-gone' });
-    }
+    const gone = await keptSheetPlayersRefusal(tx, game.id, kept.sheet);
+    if (gone !== undefined) return fail({ code: gone });
     const replaced = await sheetToKeep(tx, game);
     await tx.games.addCorrection({
       gameId: game.id,

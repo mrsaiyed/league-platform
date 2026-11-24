@@ -63,3 +63,25 @@ export function resultDocumentOf(stored: unknown): GameResultDocument | undefine
   const { sheet, ...result } = parsed.data;
   return sheet === undefined ? result : { ...result, sheet };
 }
+
+/** Why a kept sheet's players cannot come back now: in the bin, or purged from it for good. */
+export type KeptSheetPlayersRefusal = 'player-in-bin' | 'player-gone';
+
+/**
+ * Whether every player the kept sheet names is on one of the game's two teams' rosters
+ * now (those who left included, R-17). One in the bin, or on a team in the bin, can come
+ * back once restored (`player-in-bin`); one purged from the bin since cannot (T-220 keeps
+ * only the id: `player-gone`). The put back and the read that offers it both ask.
+ */
+export async function keptSheetPlayersRefusal(
+  tx: TrackerTx,
+  gameId: string,
+  sheet: KeptSheet,
+): Promise<KeptSheetPlayersRefusal | undefined> {
+  const key = (entry: { teamId: string; personId: string }) => `${entry.teamId} ${entry.personId}`;
+  const roster = new Set((await tx.games.listRoster(gameId)).map(key));
+  const missing = sheet.lines.filter((line) => !roster.has(key(line)));
+  if (missing.length === 0) return undefined;
+  for (const line of missing) if (!(await tx.games.inBin(line))) return 'player-gone';
+  return 'player-in-bin';
+}

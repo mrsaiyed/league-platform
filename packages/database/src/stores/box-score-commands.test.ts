@@ -7,6 +7,7 @@ import {
   eventHandlers,
   getBoxScoreSheet,
   putSheetBack,
+  readSheetPutBackOffer,
   recordFinalScore,
   reopenGame,
   setBoxScore,
@@ -237,6 +238,41 @@ describe('a box score entered afterwards (step 2.64)', () => {
       [s.paper],
     );
     expect(kept.count).toBe(0);
+  });
+
+  // A player only in the bin (or on a team in the bin) can be restored: the put back says
+  // so, and the read that offers it says so before a reason is typed.
+  it('tells a player in the bin from one purged, before the tap and on it', async () => {
+    const s = await season();
+    expect(await setBoxScore(s.ctx, sheetOf(s), deps)).toMatchObject({ ok: true });
+    const reason = 'Misread the sheet';
+    expect(await reopenGame(s.ctx, { gameId: s.paper, version: 2, reason }, deps)).toMatchObject({
+      ok: true,
+    });
+    const score = { gameId: s.paper, version: 3, homeScore: 50, awayScore: 48 };
+    expect(await recordFinalScore(s.ctx, score, deps)).toMatchObject({ ok: true });
+    const offer = () => readSheetPutBackOffer(s.ctx, { gameId: s.paper }, deps);
+    const putBack = { gameId: s.paper, version: 4, reason: 'The sheet was right' };
+    for (const table of ['people', 'teams']) {
+      const id = table === 'people' ? s.bo : s.away;
+      const bin = (at: string) =>
+        pglite.query(`update ${table} set deleted_at = ${at} where league_id = $1 and id = $2`, [
+          s.l.leagueId,
+          id,
+        ]);
+      await bin('now()');
+      expect(await offer(), table).toEqual({
+        ok: true,
+        value: { offered: false, code: 'player-in-bin' },
+      });
+      expect(await putSheetBack(s.ctx, putBack, deps), table).toEqual({
+        ok: false,
+        error: { code: 'player-in-bin' },
+      });
+      await bin('null');
+    }
+    expect(await offer()).toEqual({ ok: true, value: { offered: true } });
+    expect(await putSheetBack(s.ctx, putBack, deps)).toMatchObject({ ok: true });
   });
 
   it('shows the sheet, refuses a tracked game, and is corrected by reopening', async () => {

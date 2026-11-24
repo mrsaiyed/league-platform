@@ -44,8 +44,9 @@ const putBackKeys: readonly TextKey[] = [
   'admin.boxScore.putBackError.newer-save',
   'admin.boxScore.putBackError.no-sheet-kept',
   'admin.boxScore.putBackError.player-gone',
-  'admin.boxScore.putBackError.scored-live',
+  'admin.boxScore.putBackError.player-in-bin',
   'admin.boxScore.putBackError.put-back-reason',
+  'admin.boxScore.putBackError.scored-live',
 ];
 
 /** A refusal on the games list, as words. */

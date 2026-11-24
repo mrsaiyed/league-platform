@@ -49,6 +49,7 @@ import { waitingListAnchor } from './waiting-anchor.ts';
 import { boxScoreField } from './box-score-form.ts';
 import { BoxScoreSheetForm, type SheetRow, type SheetTeam } from './box-score-sheet-form.tsx';
 import { sheetScoresId } from './form-state.ts';
+import { putBackProblemKey } from './problem-keys.ts';
 import { ReopenForm } from './reopen-form.tsx';
 import { SavedLine } from './saved-line.tsx';
 import { sheetNeedsOffer, sheetReopenViewOf, type ReopenView } from './reopen-view.ts';
@@ -188,13 +189,20 @@ export async function BoxScorePage({
   );
   // "Put the sheet back as it was" (step 2.229, T-366): for whoever may correct games, while
   // the game's newest correction is the reopen that kept its sheet and nothing newer was
-  // saved; the same rule the put back follows, read before the tap.
-  const putBack =
+  // saved; the same rule the put back follows, read before the tap. A kept sheet whose
+  // player is in the bin, or purged from it, says so here, before a reason is typed.
+  const offer =
     sheet.mayCorrect && (game.status === 'final' || game.status === 'forfeit')
-      ? await readSheetPutBackOffer(context, { gameId: game.id }, ports.games.deps).then(
-          (offer) => offer.ok && offer.value.offered,
-        )
-      : false;
+      ? await readSheetPutBackOffer(context, { gameId: game.id }, ports.games.deps)
+      : undefined;
+  const putBack = offer !== undefined && offer.ok && offer.value.offered;
+  const putBackBlocked =
+    offer !== undefined &&
+    offer.ok &&
+    !offer.value.offered &&
+    (offer.value.code === 'player-in-bin' || offer.value.code === 'player-gone')
+      ? offer.value.code
+      : undefined;
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
   // Postponed or cancelled: no box score, no grid; the way it is put back (step 2.158).
   const calledOff = sheet.locked === 'cancelled' || sheet.locked === 'postponed';
@@ -280,6 +288,11 @@ export async function BoxScorePage({
           />
         </div>
       ) : null}
+      {putBackBlocked === undefined ? null : (
+        <div className="staff-panel">
+          <p data-put-back-blocked={putBackBlocked}>{t(putBackProblemKey(putBackBlocked))}</p>
+        </div>
+      )}
       {reopen.kind === 'correct' ? (
         <div className="staff-panel">
           <ReopenForm

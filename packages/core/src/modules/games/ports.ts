@@ -123,6 +123,9 @@ export type GameLine = {
 /** A line as the box score grid saves it: with the jersey the player wore (from the roster). */
 export type NewGameLine = GameLine & { readonly jerseyNumber: string | null };
 
+/** A roster entry of one of a game's two teams, by ids only (T-220). */
+export type GameRosterEntry = { readonly teamId: string; readonly personId: string };
+
 /** A player on the roster of one of a game's two teams, as the box score grid lists them (P7 §5.2). */
 export type GameRosterPlayer = {
   readonly teamId: string;
@@ -284,6 +287,12 @@ export type GamesStore = {
    * by team, roster order and name.
    */
   readonly listRoster: (gameId: string) => Promise<readonly GameRosterPlayer[]>;
+  /**
+   * Whether the person and team are both still in the league and one of them is in the bin
+   * (A-5): left out of `listRoster`, but a restore brings them back (step 2.229, the put
+   * back's refusal). False for one purged from the bin for good.
+   */
+  readonly inBin: (entry: GameRosterEntry) => Promise<boolean>;
   /** Whether the tracker has recorded any play of the game (T3 §8 `game_events`). */
   readonly hasPlays: (gameId: string) => Promise<boolean>;
   /** The program a season belongs to and its rules as stored, or undefined if it is not here. */

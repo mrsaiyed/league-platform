@@ -266,6 +266,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
         listLines: async () => [],
         replaceLines: async () => undefined,
         listRoster: async () => [],
+        inBin: async () => false,
         hasPlays: async (gameId) => s.tracked.includes(gameId),
         findSeason: async (id) => {
           const season = s.seasons.find((x) => x.id === id);
