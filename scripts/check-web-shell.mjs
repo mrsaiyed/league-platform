@@ -1151,6 +1151,56 @@ const cases = [
   ],
   ['visitor', '/signin?problem=signInToScore', 200, ['Sign in to score this game.']],
   ['otherAdmin', `/north-valley/score/${liveGame}`, 403, [noAccess], ['Bears at Hawks']],
+  // The upload of a copy of a game (step 2.70): whoever may score the game, and nobody else,
+  // in the league's frame; the form is drawn by the page's script. "Your games" links to it.
+  ...['owner', 'scheduler', 'scorekeeper'].map((who) => [
+    who,
+    `/north-valley/score/${liveGame}/upload`,
+    200,
+    ['Upload a copy of the game', 'Bears at Hawks', 'data-copy-file', 'Upload the copy'],
+    [noAccess],
+  ]),
+  // The staff of the draft league only (admin, registrar, editor, club admin, program
+  // scheduler) score nothing in this league, as a coach or another league's admin.
+  ...[
+    'coach',
+    'teamCoach',
+    'stranger',
+    'admin',
+    'registrar',
+    'editor',
+    'clubAdmin',
+    'programScheduler',
+    'otherAdmin',
+  ].map((who) => [
+    who,
+    `/north-valley/score/${liveGame}/upload`,
+    403,
+    [noAccess],
+    ['Bears at Hawks'],
+  ]),
+  [
+    'visitor',
+    `/north-valley/score/${liveGame}/upload`,
+    307,
+    [],
+    ['Bears at Hawks'],
+    `/signin?problem=signInToScore&next=%2Fnorth-valley%2Fscore%2F${liveGame}%2Fupload`,
+  ],
+  ['owner', '/north-valley/score/game-1/upload', 404, [notFound], ['Upload the copy']],
+  [
+    'owner',
+    `/harbor-city/score/${liveGame}/upload`,
+    404,
+    [notFound],
+    ['Bears at Hawks', 'North Valley'],
+  ],
+  [
+    'scorekeeper',
+    '/north-valley/admin',
+    200,
+    [`href="/north-valley/score/${liveGame}/upload"`, 'Upload a copy of this game'],
+  ],
   // No such game: "Page not found" with status 404, in the tracker's own look, with the way
   // back (step 2.33; status 404 since step 2.157).
   [

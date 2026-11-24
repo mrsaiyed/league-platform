@@ -67,6 +67,11 @@ export const leaguePages = {
   /** The courtside tracker for one game. */
   score: { path: ['score', ':game'], level: 'private' },
   /**
+   * The upload of a copy of a game (step 2.70, S-5): the file "Save a copy" wrote on the
+   * scoring device, opened on any phone or computer and sent to the server.
+   */
+  'score-upload': { path: ['score', ':game', 'upload'], level: 'private' },
+  /**
    * The tracker installed on a device (step 2.38, T-115): its web app manifest and the
    * worker that keeps its pages on the device. Both sit beside the games' addresses, so the
    * worker's reach (its scope) is this league's tracker pages and nothing else.

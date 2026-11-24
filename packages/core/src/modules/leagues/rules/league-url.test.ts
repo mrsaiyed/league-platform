@@ -43,6 +43,7 @@ describe('leagueUrl (T-34)', () => {
       expect(leagueUrl(north, 'admin-area', { area })).toBe(`/north-league/admin/${area}`);
     }
     expect(leagueUrl(north, 'score', { game: 'g1' })).toBe('/north-league/score/g1');
+    expect(leagueUrl(north, 'score-upload', { game: 'g1' })).toBe('/north-league/score/g1/upload');
   });
 
   it("builds an invitation's link, a full address for its email (T-226)", () => {

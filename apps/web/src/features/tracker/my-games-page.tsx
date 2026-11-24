@@ -117,6 +117,13 @@ export async function MyGamesPage({ view }: { readonly view: LeagueView }) {
                       href={leagueUrl(here, 'score', { game: game.id })}
                     >
                       {t('admin.myGames.score')}
+                    </a>{' '}
+                    {/* A copy saved on a device that cannot get back online (step 2.70). */}
+                    <a
+                      data-upload-copy-link=""
+                      href={leagueUrl(here, 'score-upload', { game: game.id })}
+                    >
+                      {t('tracker.upload.link')}
                     </a>
                   </p>
                 ) : null}
