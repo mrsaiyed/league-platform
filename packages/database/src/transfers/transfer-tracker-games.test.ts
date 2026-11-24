@@ -259,9 +259,11 @@ async function fillBackup(db: PGlite) {
 async function makeLeague(pglite: PGlite, slug: string) {
   const l = await newLeague(pglite, slug);
   const seasonId = await newSeason(pglite, l.leagueId, l.defaultProgramId, { slug: '2025-26' });
+  // The tracker kept turnovers, and a season takes a turnover only if it keeps them
+  // (S-93, step 2.241), so the season the games move into keeps them.
   await pglite.query(`update seasons set status = 'active', rules = $2 where id = $1`, [
     seasonId,
-    JSON.stringify(seasonRulesPreset('high-school')),
+    JSON.stringify({ ...seasonRulesPreset('high-school'), statistics: 'full' }),
   ]);
   const stageId = await newStage(pglite, l.leagueId, seasonId);
   const teams = {} as Record<TeamKey, string>;
