@@ -2,9 +2,10 @@
 // browser's transports reach the commands, session and state handlers in this process,
 // over the web app's made-up stand-in. Tapping offline, reconnecting, a tab closed with
 // taps waiting, a refusal (T-113) and a takeover (T6 §5).
-import { TrackerGameState } from '@srleagues/contracts';
+import { TrackerGameState, TrackerRosters } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { trackerRostersRequest } from '../../server/tracker-rosters-endpoint.ts';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import {
   bears,
@@ -13,11 +14,12 @@ import {
   liveLeagueId,
   type Person,
 } from '../../server/tracker-endpoints.test-helper.ts';
+import { deviceRosters } from './device-rosters.ts';
 import { endpointNetwork, type EndpointNetwork } from './endpoint-network.test-helper.ts';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
-import type { DeviceScoring } from './opened-game-storage.ts';
+import type { DeviceRosters, DeviceScoring } from './opened-game-storage.ts';
 import type { KeptTap, QueueStorage } from './queue-storage.ts';
 import { createTrackerController, type TapInput } from './tracker-controller.ts';
 import {
@@ -52,7 +54,10 @@ function device(
     askServer = (ask) => ask,
     kept,
     keepScoring,
+    rosters,
   }: {
+    /** The rosters the page brought, for changes of players (step 2.118). */
+    rosters?: DeviceRosters;
     /** What the device kept of the game, as a page reloaded finds it (step 2.38). */
     kept?: { readonly state: ServerState | null; readonly scoring: DeviceScoring | null };
     keepScoring?: (scoring: DeviceScoring) => Promise<void>;
@@ -91,6 +96,7 @@ function device(
     }),
     ...(kept === undefined ? {} : { kept }),
     ...(keepScoring === undefined ? {} : { keepScoring }),
+    ...(rosters === undefined ? {} : { rosters: { page: rosters } }),
   });
   return { controller, storage, clock };
 }
@@ -100,6 +106,17 @@ async function serverGame(network: EndpointNetwork) {
   const context = await network.world.contextAs('owner', 'live', ['games', gameId, 'state']);
   const answer = await trackerStateRequest(context, gameId, network.world.tracker);
   return TrackerGameState.parse(answer.body) as { sequence: number; state: basketball.GameState };
+}
+
+/** The game's rosters as the server gives them to the scorekeeper. */
+async function serverRosters(network: EndpointNetwork): Promise<DeviceRosters> {
+  const context = await network.world.contextAs('scorekeeper', 'live', [
+    'games',
+    gameId,
+    'rosters',
+  ]);
+  const answer = await trackerRostersRequest(context, gameId, network.world.tracker);
+  return deviceRosters(TrackerRosters.parse(answer.body), {});
 }
 
 const scoreOf = (state: basketball.GameState | null) => {
@@ -652,6 +669,63 @@ describe('tracker controller: offline and reconnecting (T6 §4)', () => {
     expect(status.mode).toEqual({ kind: 'scoring' });
     expect(scoreOf(status.game)).toEqual({ home: 4, away: 3 });
     expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 4, away: 3 });
+  });
+
+  /**
+   * Step 2.61, seed 5 with the no-signal steps given signal (T-331): a player added at the
+   * table and taken by the server after the state the device kept, the page closed (its
+   * release reached the server) and opened again with no signal, a tap. Opening gives a
+   * new session; the add is the device's own, so nobody else scored. Before, only taps
+   * counted as its own: the add made it look as if somebody had, and every tap since the
+   * reopen was listed as not saved and never sent.
+   */
+  it('carries the taps on when its own change of players was taken since the state it kept (T-331)', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const rosters = await serverRosters(network);
+    const keptBy: DeviceScoring[] = [];
+    const keepScoring = (scoring: DeviceScoring) => {
+      keptBy.push(scoring);
+      return Promise.resolve();
+    };
+    const first = device(network, { storage, rosters, keepScoring });
+    await first.controller.start();
+    // Started, so a batch the server takes is followed by no load (record 062): the
+    // state the device keeps stays the one before the add.
+    await tapAll(first.controller, [...tipOff, basket('away', bears[1] ?? '')]);
+    await first.controller.idle();
+    const keptState: ServerState = await serverGame(network);
+    expect(first.controller.status().serverSequence).toBe(keptState.sequence);
+    const loads = network.reached.filter((r) => r === 'GET state').length;
+    const added = await first.controller.changePlayers([
+      { type: 'add-player', side: 'away', jersey: '77', name: '' },
+    ]);
+    expect(added.ok).toBe(true);
+    await first.controller.idle();
+    expect((await serverGame(network)).sequence).toBe(keptState.sequence + 1);
+    expect(network.reached.filter((r) => r === 'GET state')).toHaveLength(loads);
+    await first.controller.leave();
+    expect(network.reached).toContain('POST session:release');
+    network.mode = 'down';
+    const second = device(network, {
+      storage,
+      rosters,
+      keepScoring,
+      kept: { state: keptState, scoring: (keptBy.at(-1) ?? null) as DeviceScoring | null },
+    });
+    await second.controller.start();
+    await tapAll(second.controller, [basket('home', hawks[0] ?? '')]);
+    await second.controller.idle();
+    network.mode = 'up';
+    second.controller.online();
+    await second.controller.idle();
+    const status = second.controller.status();
+    // Without the fix: the tap listed as not saved, 0-2 on the server.
+    expect(status.notSaved).toEqual([]);
+    expect(status.queue.waiting).toBe(0);
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(scoreOf(status.game)).toEqual({ home: 2, away: 2 });
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 2 });
   });
 });
 

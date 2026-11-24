@@ -1242,17 +1242,21 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   /**
    * Whether anybody but this device scored the game between `from`, the state it last
    * knew, and `now`: every command the server took since is one of `own` (by id, lower
-   * case), and none is missing from the state's recent ones. When that cannot be told
-   * (too many since), somebody may have.
+   * case), and none is missing from the state's recent ones but at most `ownUnseen`:
+   * this device's changes of players the server took, which count in its sequence but
+   * never show in the state's plays (T-331). When that cannot be told (too many since),
+   * somebody may have.
    */
   const nobodyElseScored = (
     from: ServerState,
     now: ServerState,
     own: ReadonlySet<string>,
+    ownUnseen: number,
   ): boolean => {
     const before = new Set(from.state.recent.map((id) => id.toLowerCase()));
     const since = now.state.recent.map((id) => id.toLowerCase()).filter((id) => !before.has(id));
-    return now.sequence - from.sequence === since.length && since.every((id) => own.has(id));
+    const unseen = now.sequence - from.sequence - since.length;
+    return unseen >= 0 && unseen <= ownUnseen && since.every((id) => own.has(id));
   };
 
   /**
@@ -1267,18 +1271,26 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   const carryOnTaps = async (
     held: string,
     stale: readonly KeptTap[],
+    stored: ReadonlySet<string>,
   ): Promise<'carried' | 'taken' | 'unanswered'> => {
     const from = base ?? options.kept?.state ?? null;
     if (from === null) return 'taken';
     const loaded = await ask((signal) => server.loadState(signal));
     if (loaded.kind === 'unanswered') return 'unanswered';
     if (loaded.kind === 'rejected') return 'taken';
-    const own = new Set(
-      [...made, ...(options.kept?.scoring?.onTop ?? []), ...stale.map((t) => t.command)].map((c) =>
-        c.commandId.toLowerCase(),
-      ),
-    );
-    if (!nobodyElseScored(from, loaded.value, own)) return 'taken';
+    const ownCommands = [
+      ...made,
+      ...(options.kept?.scoring?.onTop ?? []),
+      ...stale.map((t) => t.command),
+    ];
+    const own = new Set(ownCommands.map((c) => c.commandId.toLowerCase()));
+    // This device's changes of players on top that the storage no longer holds: taken.
+    const ownUnseen = new Set(
+      ownCommands
+        .filter((c) => isTablePlayerCommand(c) && !stored.has(c.commandId))
+        .map((c) => c.commandId),
+    ).size;
+    if (!nobodyElseScored(from, loaded.value, own, ownUnseen)) return 'taken';
     await queue.carryOn(
       stale.map((t) => t.command.commandId),
       held,
@@ -1301,8 +1313,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     await queue.idle();
     let stale: KeptTap[];
     let setAside: KeptTap[];
+    let stored: Set<string>;
     try {
       const list = await storage.list(gameId);
+      stored = new Set(list.map((entry) => entry.command.commandId));
       setAside = keptIn(list, 'not-saved');
       stale = list.filter((entry) => entry.state === 'waiting' && !madeUnder(entry)).map(keptTap);
     } catch {
@@ -1311,7 +1325,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       return readOnly('storage-failed');
     }
     if (stale.length > 0) {
-      const carried = await carryOnTaps(held, stale).catch(() => 'storage-failed' as const);
+      const carried = await carryOnTaps(held, stale, stored).catch(() => 'storage-failed' as const);
       if (carried === 'storage-failed') return readOnly('storage-failed');
       // Asked again: the server gives this device the same session while it holds it.
       if (carried === 'unanswered') return later(open);
@@ -1349,11 +1363,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       // Shown taps the storage no longer holds were taken by the server (sent from the
       // kept scoring before opening was answered, say): saved, so still counted until a
       // loaded state has them, though the base is older (T-329, step 2.61 seed 66).
-      const stored = new Set(list.map((entry) => entry.command.commandId));
+      const storedNow = new Set(list.map((entry) => entry.command.commandId));
       const inBase = new Set((base?.state.recent ?? []).map((id) => id.toLowerCase()));
       const taken = made.filter(
         (c) =>
-          !stored.has(c.commandId) &&
+          !storedNow.has(c.commandId) &&
           !refusedIds.has(c.commandId) &&
           !inBase.has(c.commandId.toLowerCase()),
       );
@@ -1925,6 +1939,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         showRosters();
         return { ok: false, reason: 'not-scoring' };
       }
+      // On top of the base like a tap (the engine skips them), and kept with the scoring:
+      // a reload that judges the taps of an ended session knows them as this device's own,
+      // or its own add looks like somebody else's scoring (T-331, step 2.61 seed 5).
+      made.push(...commands);
+      keepScoringNow();
       showRosters();
       return {
         ok: true,
