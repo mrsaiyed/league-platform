@@ -12,6 +12,7 @@ import {
   listGamePlayerLines,
   listGameTeams,
   listPeopleForDisplay,
+  listResultsBeingCorrected,
   listSeasonStatKeys,
 } from '../queries/index.ts';
 
@@ -53,5 +54,7 @@ export function gamesReadStore(scope: LeagueScope): GameSnapshotStore {
     lines: (gameId) => listGamePlayerLines(scope, gameId),
     people: (personIds) => listPeopleForDisplay(scope, personIds),
     correctedOn: (gameId) => findGameCorrectedDate(scope, gameId),
+    resultBeingCorrected: async (gameId) =>
+      (await listResultsBeingCorrected(scope, [gameId])).get(gameId),
   };
 }

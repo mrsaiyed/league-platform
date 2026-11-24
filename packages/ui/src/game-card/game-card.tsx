@@ -95,9 +95,15 @@ export type GameCardProps = {
   readonly layout?: 'rows' | 'board';
   /**
    * A quiet word about a game still marked to be played, already written by the page:
-   * "Awaiting result" for one whose start has passed. Drawn where a state's pill would be.
+   * "Awaiting result" for one whose start has passed (the admin's games list). Drawn where a
+   * state's pill would be, and only when no `pill` is given.
    */
   readonly note?: string | undefined;
+  /**
+   * A pill of the game's public truth, drawn in place of its state's own whatever its
+   * status (step 2.159): "Awaiting score", "Being corrected".
+   */
+  readonly pill?: string | undefined;
   /** A board picked out from the others: the game being played now. Larger figures. */
   readonly featured?: boolean;
   /**
@@ -306,6 +312,7 @@ export function GameCard({
   labels,
   layout = 'rows',
   note,
+  pill,
   featured = false,
   marks = 'chip',
   room,
@@ -313,7 +320,13 @@ export function GameCard({
 }: GameCardProps) {
   const winner = winnerOf(status, home, away);
   let state: ReactNode = null;
-  if (status === 'live') state = <LiveMarker label={labels.live} />;
+  if (pill)
+    state = (
+      <span className="ui-game-state" data-kind="truth">
+        {pill}
+      </span>
+    );
+  else if (status === 'live') state = <LiveMarker label={labels.live} />;
   else if (status !== 'scheduled')
     state = (
       <span className="ui-game-state">

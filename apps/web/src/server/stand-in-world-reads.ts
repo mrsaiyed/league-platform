@@ -7,6 +7,7 @@
 // people only through the one name function (T-81). Nothing here changes the world.
 import {
   correctedMarkDate,
+  resultBeingCorrected,
   lookupSetting,
   membersStartPage,
   minimumGamesToRank,
@@ -73,6 +74,11 @@ const choiceOf = (s: ReadWorld, season: WorldSeason): PublicSeasonChoice => ({
 });
 
 function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
+  // The result as it stood while a reopen is open (S-47), as list-public-games.ts reads it.
+  const stood = resultBeingCorrected(
+    s.corrections.filter((c) => c.gameId === game.id),
+    game,
+  );
   const team = (id: string) => {
     const found = s.teams.find((t) => t.id === id);
     return {
@@ -88,7 +94,11 @@ function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
     id: game.id,
     number: game.number,
     startsAt: game.startsAt,
-    localDate: game.startsAt === null ? null : dayIn(new Date(game.startsAt), s.timeZone),
+    // A game with no time yet takes its round's date as its day (step 2.159).
+    localDate:
+      game.startsAt === null
+        ? (s.rounds.find((r) => r.id === game.roundId)?.date ?? null)
+        : dayIn(new Date(game.startsAt), s.timeZone),
     status: game.status,
     homeTeam: team(game.homeTeamId),
     awayTeam: team(game.awayTeamId),
@@ -106,6 +116,7 @@ function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
         ? null
         : { name: venue.name, address: venue.address, mapLink: venue.mapLink },
     courtName: s.courts.find((c) => c.id === game.courtId)?.name ?? null,
+    ...(stood === undefined ? {} : { beingCorrected: stood }),
   };
 }
 
@@ -165,6 +176,7 @@ export function worldGameFacts(
   const shown = publicGameOf(s, game);
   return {
     number: shown.number,
+    localDate: shown.localDate,
     venue: shown.venue,
     courtName: shown.courtName,
     season: { slug: season.slug, isCurrent: s.currentSeasonId === season.id },
@@ -250,6 +262,16 @@ export function worldGameSnapshot(
           .filter((c) => c.gameId === gameId)
           // Which reopen a put back undid (T-368), as find-game-corrected-date.ts reads it.
           .map((c) => ({ ...c, keptSheet: c.before.sheet !== undefined })),
+        game,
+      );
+    },
+    // The result as it stood while a reopen is open (S-47), as on the database.
+    resultBeingCorrected: async (gameId) => {
+      const s = await read();
+      const game = s?.games.find((g) => g.id === gameId);
+      if (s === undefined || game === undefined) return undefined;
+      return resultBeingCorrected(
+        s.corrections.filter((c) => c.gameId === gameId),
         game,
       );
     },

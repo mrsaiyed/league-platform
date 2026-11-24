@@ -190,6 +190,15 @@ export const gameCss = String.raw`
 .ui-scoreboard:not([data-pill='quiet']) .ui-game-state {
   background: var(--color-tint-panel);
 }
+/* A card's pill of its public truth ("Awaiting score", "Being corrected", step 2.159) wears
+   the same soft tint as the big board of its page gives it, whatever the card's status:
+   a result being corrected is drawn as a final, whose own pill is quiet. */
+.ui-game-card .ui-game-state[data-kind='truth'] {
+  border-color: color-mix(in srgb, var(--color-accent) 25%, transparent);
+  background: var(--color-tint-panel);
+  color: var(--color-accent-text);
+  font-weight: 700;
+}
 /* Beside a round's name the mark stands on the page itself, with nothing washed under it:
    there the tint is laid over the page, see-through. */
 .ui-group .ui-group-mark[data-kind='note'] {

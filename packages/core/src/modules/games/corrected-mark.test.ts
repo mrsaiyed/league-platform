@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { correctedMarkDate } from './corrected-mark.ts';
+import { correctedMarkDate, resultBeingCorrected } from './corrected-mark.ts';
 
 const final = (homeScore: number, awayScore: number) => ({
   status: 'final',
@@ -129,5 +129,39 @@ describe('correctedMarkDate (S-8: the mark only when the next final differs)', (
       expect(correctedMarkDate(corrections, final(51, 40))).toBe('2030-12-09');
       expect(correctedMarkDate(corrections, final(50, 40))).toBeUndefined();
     });
+  });
+});
+
+describe('resultBeingCorrected: the result as it stood while a reopen is open (S-47)', () => {
+  const reopen = (homeScore: number, awayScore: number, status = 'final') => ({
+    on: '2026-11-14',
+    before: { status, homeScore, awayScore },
+    after: { status: 'scheduled', homeScore: null, awayScore: null },
+  });
+  it('is the latest reopen’s before while the game is not decided again', () => {
+    const rows = [reopen(40, 38), reopen(41, 38)];
+    expect(resultBeingCorrected(rows, { status: 'scheduled' })).toEqual(rows[1]?.before);
+    expect(resultBeingCorrected(rows, { status: 'live' })).toEqual(rows[1]?.before);
+  });
+  it('a forfeit reopened is shown as the forfeit it was', () => {
+    expect(resultBeingCorrected([reopen(0, 20, 'forfeit')], { status: 'scheduled' })).toEqual({
+      status: 'forfeit',
+      homeScore: 0,
+      awayScore: 20,
+    });
+  });
+  it('is nothing once the game is decided again, or with no correction', () => {
+    expect(resultBeingCorrected([reopen(40, 38)], { status: 'final' })).toBeUndefined();
+    expect(resultBeingCorrected([], { status: 'scheduled' })).toBeUndefined();
+  });
+  it('a put back ends the reopen it undid', () => {
+    const putBack = {
+      on: '2026-11-14',
+      before: { status: 'final', homeScore: 45, awayScore: 38 },
+      after: { status: 'final', homeScore: 40, awayScore: 38 },
+    };
+    expect(resultBeingCorrected([reopen(40, 38), putBack], { status: 'scheduled' })).toBe(
+      undefined,
+    );
   });
 });

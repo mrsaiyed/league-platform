@@ -10,6 +10,7 @@ import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildHomeGames, buildScheduleView, gameView, type GameView } from './build-schedule.ts';
 import { gameLinkText } from './game-link-text.ts';
 import { homeLeadersPlace, homeNextGames, homeNextTitle, homeResults } from './home-lists.ts';
+import { applyUpdate } from './live-game-list.tsx';
 import { gameLinkWords } from './schedule-views.tsx';
 
 const adult = '01900000-0000-7000-8000-000000000001';
@@ -69,7 +70,7 @@ describe('a game whose start has passed with no result', () => {
     );
     const words = gameLinkWords();
     expect(gameLinkText(late, words)).toBe(
-      `${late.away.name} against ${late.home.name}, ${late.whenText}, awaiting the result`,
+      `${late.away.name} against ${late.home.name}, ${late.whenText}, awaiting the score`,
     );
     expect(gameLinkText({ ...late, awaiting: false }, words)).toBe(
       `${late.away.name} against ${late.home.name}, ${late.whenText}`,
@@ -99,23 +100,26 @@ describe('a game whose start has passed with no result', () => {
     );
     expect(home.awaiting.map((g) => g.id)).toEqual(['earlier-today', 'yesterday']);
     expect(home.awaiting.every((g) => g.awaiting === true)).toBe(true);
-    // The list of games still to play is as it was: these are in it, after the coming ones.
-    expect(home.upcoming.map((g) => g.id)).toEqual([
+    // The list of games still to play holds none of them (step 2.159): only those to come.
+    expect(home.upcoming.map((g) => g.id)).toEqual(['tonight', 'tomorrow', 'no-day']);
+    // Nor are they results.
+    expect(home.recent.some((g) => g.awaiting === true)).toBe(false);
+    // On the home page none of them stands among the games to come.
+    expect(homeNextGames(home.upcoming).map((g) => g.id)).toEqual([
       'tonight',
       'tomorrow',
-      'earlier-today',
-      'yesterday',
-      'last-week',
+      'no-day',
     ]);
-    // On the home page none of them stands among the games to come.
-    expect(homeNextGames(home.upcoming).map((g) => g.id)).toEqual(['tonight', 'tomorrow']);
     // On the schedule page its card carries the same mark.
-    const listed = buildScheduleView(
+    const built = buildScheduleView(
       { ...schedule, rounds: [], unplacedGames: games },
       evening,
       addressee,
       {},
-    ).rounds.flatMap((r) => r.games);
+    );
+    // The schedule lists them apart too, latest first, and each in its place as well.
+    expect(built.awaiting.map((g) => g.id)).toEqual(['earlier-today', 'yesterday', 'last-week']);
+    const listed = built.rounds.flatMap((r) => r.games);
     expect(
       listed
         .filter((g) => g.awaiting === true)
@@ -129,7 +133,7 @@ describe('a game whose start has passed with no result', () => {
     const home = buildHomeGames(schedule, clock, addressee);
     // The game the games list's "Needs a result" opens on (step 2.156).
     expect(home.awaiting.map((g) => gameLinkText(g, gameLinkWords()))).toEqual([
-      'Badgers against Herons, Tue, Nov 10, 7:00 PM, awaiting the result',
+      'Badgers against Herons, Tue, Nov 10, 7:00 PM, awaiting the score',
     ]);
     expect(homeNextGames(home.upcoming).some((g) => g.awaiting === true)).toBe(false);
   });
@@ -201,60 +205,25 @@ describe('the home page’s results', () => {
 
   it('are about as many as the standings beside them are tall, from two to five', () => {
     // One short table: two results.
-    expect(ids(homeResults(finals, [], [table(3, true)]))).toEqual(['f1', 'f2']);
+    expect(ids(homeResults(finals, [table(3, true)]))).toEqual(['f1', 'f2']);
     // Two divisions of three and two, with notes: still two.
-    expect(homeResults(finals, [], [table(3, true), table(2, true)])).toHaveLength(2);
+    expect(homeResults(finals, [table(3, true), table(2, true)])).toHaveLength(2);
     // A division of twelve: three. Two of ten: five, and never more.
-    expect(homeResults(finals, [], [table(12)])).toHaveLength(3);
-    expect(homeResults(finals, [], [table(10), table(10)])).toHaveLength(5);
-    expect(homeResults(finals, [], [table(30), table(30)])).toHaveLength(5);
+    expect(homeResults(finals, [table(12)])).toHaveLength(3);
+    expect(homeResults(finals, [table(10), table(10)])).toHaveLength(5);
+    expect(homeResults(finals, [table(30), table(30)])).toHaveLength(5);
     // No standings yet: two.
-    expect(homeResults(finals, [], [])).toHaveLength(2);
-    expect(homeResults(finals.slice(0, 1), [], [table(12)])).toHaveLength(1);
+    expect(homeResults(finals, [])).toHaveLength(2);
+    expect(homeResults(finals.slice(0, 1), [table(12)])).toHaveLength(1);
   });
 
   it('with more than two tables stand across the page instead: four of them', () => {
-    expect(homeResults(finals, [], [table(4), table(4), table(4)])).toHaveLength(4);
+    expect(homeResults(finals, [table(4), table(4), table(4)])).toHaveLength(4);
   });
 
-  it('open with decided games; a game waiting for its result comes after them, inside the number', () => {
-    const late = [card('late', 'scheduled', true)];
-    const two = [card('late', 'scheduled', true), card('later', 'scheduled', true)];
-    // Room for two beside one short table: one result, then the game that is waiting. The
-    // column is as tall as it was with two results, so it still ends level with the table.
-    expect(ids(homeResults(finals, late, [table(3, true)]))).toEqual(['f1', 'late']);
-    // A waiting game never takes the last decided game's place.
-    expect(ids(homeResults(finals, two, [table(3, true)]))).toEqual(['f1', 'late']);
-    // Room for three, and for five.
-    expect(ids(homeResults(finals, two, [table(12)]))).toEqual(['f1', 'late', 'later']);
-    expect(ids(homeResults(finals, late, [table(10), table(10)]))).toEqual([
-      'f1',
-      'f2',
-      'f3',
-      'f4',
-      'late',
-    ]);
-    // Across the page, with more than two tables: four in all.
-    expect(ids(homeResults(finals, two, [table(4), table(4), table(4)]))).toEqual([
-      'f1',
-      'f2',
-      'late',
-      'later',
-    ]);
-    // Never more than the number without one, whatever is waiting.
-    for (const tables of [[], [table(3, true)], [table(12)], [table(10), table(10)]]) {
-      const without = homeResults(finals, [], tables).length;
-      for (const waiting of [late, two]) {
-        expect(homeResults(finals, waiting, tables)).toHaveLength(without);
-      }
-    }
-  });
-
-  it('with nothing decided yet are the games waiting for their results, and decided games fill what those leave', () => {
-    const two = [card('late', 'scheduled', true), card('later', 'scheduled', true)];
-    expect(ids(homeResults([], two, [table(3, true)]))).toEqual(['late', 'later']);
-    expect(ids(homeResults(finals.slice(0, 1), two, [table(12)]))).toEqual(['f1', 'late', 'later']);
-    expect(homeResults([], [], [table(12)])).toEqual([]);
+  it('hold only the results they are given: a game waiting for its score has a list of its own', () => {
+    expect(ids(homeResults(finals, [table(12)]))).toEqual(['f1', 'f2', 'f3']);
+    expect(homeResults([], [table(12)])).toEqual([]);
   });
 });
 
@@ -313,5 +282,58 @@ describe('the heading over the coming games', () => {
   it('stays "The next matchups" while a real game is coming', () => {
     expect(homeNextTitle([game('a', 'scheduled'), game('b', 'postponed')])).toBe('home.upcoming');
     expect(homeNextTitle([])).toBe('home.upcoming');
+  });
+});
+
+describe('a game being corrected (step 2.159, S-47)', () => {
+  it('shows on every list the result as it stood, marked "Being corrected", among the results', async () => {
+    const { schedule, base } = await load();
+    const reopened = {
+      ...base,
+      id: 'reopened',
+      status: 'live',
+      startsAt: '2026-11-13T01:00:00.000Z',
+      localDate: '2026-11-12',
+      homeScore: 3,
+      awayScore: 0,
+      beingCorrected: { status: 'final', homeScore: 41, awayScore: 38 },
+    };
+    const changed = { ...schedule, rounds: [], unplacedGames: [reopened] };
+    const home = buildHomeGames(changed, evening, addressee);
+    expect(home.upcoming).toEqual([]);
+    expect(home.awaiting).toEqual([]);
+    const [shown] = home.recent;
+    expect(shown?.pill).toBe('Being corrected');
+    expect([shown?.away.score, shown?.home.score, shown?.status, shown?.held]).toEqual([
+      38,
+      41,
+      'final',
+      true,
+    ]);
+    expect(gameLinkText(shown as GameView, gameLinkWords())).toBe(
+      `${reopened.awayTeam.name} against ${reopened.homeTeam.name}, being corrected, 38 to 41`,
+    );
+    const listed = buildScheduleView(changed, evening, addressee, {}).rounds.flatMap(
+      (r) => r.games,
+    );
+    expect(listed.map((g) => [g.pill, g.home.score])).toEqual([['Being corrected', 41]]);
+    // The correction's taps do not move it; its end again does, and drops the mark.
+    const held = shown as GameView;
+    const tap = { sequence: 2, status: 'live' as const, home: 5, away: 0 };
+    expect(applyUpdate(held, tap)).toBe(held);
+    const ended = applyUpdate(held, { ...tap, sequence: 3, status: 'final', home: 43 });
+    expect([ended.pill, ended.held, ended.home.score]).toEqual([undefined, undefined, 43]);
+  });
+
+  it('is not a result once a put back or an end again leaves no reopen open', async () => {
+    const { schedule, base } = await load();
+    const game = { ...base, id: 'plain', status: 'live', homeScore: 3, awayScore: 0 };
+    const home = buildHomeGames(
+      { ...schedule, rounds: [], unplacedGames: [game] },
+      evening,
+      addressee,
+    );
+    expect(home.recent).toEqual([]);
+    expect(home.upcoming.map((g) => [g.id, g.pill])).toEqual([['plain', undefined]]);
   });
 });

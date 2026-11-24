@@ -3,10 +3,14 @@
 // field by field (T-29): no team, score or person. Undefined when the game is not in that
 // season, is in the bin, or its season is still being set up (or in the bin), as on the
 // public schedule (list-public-games.ts).
+import { sql } from 'kysely';
 import type { PublicGame } from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
-export type PublicGameFactsRow = Pick<PublicGame, 'number' | 'venue' | 'courtName'> & {
+export type PublicGameFactsRow = Pick<
+  PublicGame,
+  'number' | 'localDate' | 'venue' | 'courtName'
+> & {
   readonly season: { readonly slug: string; readonly isCurrent: boolean };
 };
 
@@ -22,6 +26,13 @@ export async function findPublicGameFacts(
         .onRef('seasons.league_id', '=', 'games.league_id')
         .onRef('seasons.id', '=', 'games.season_id'),
     )
+    .innerJoin('leagues', 'leagues.id', 'games.league_id')
+    // A game with no time yet takes its round's date as its day (step 2.159).
+    .leftJoin('rounds', (join) =>
+      join
+        .onRef('rounds.league_id', '=', 'games.league_id')
+        .onRef('rounds.id', '=', 'games.round_id'),
+    )
     .leftJoin('venues', (join) =>
       join
         .onRef('venues.league_id', '=', 'games.league_id')
@@ -34,6 +45,12 @@ export async function findPublicGameFacts(
     )
     .select([
       'games.game_number as game_number',
+      // The game's day in the league's zone, as the public schedule reads it.
+      sql<
+        string | null
+      >`coalesce(to_char(games.starts_at at time zone leagues.time_zone, 'YYYY-MM-DD'), to_char(rounds.date, 'YYYY-MM-DD'))`.as(
+        'local_date',
+      ),
       'venues.name as venue_name',
       'venues.address as venue_address',
       'venues.map_link as venue_map_link',
@@ -51,6 +68,7 @@ export async function findPublicGameFacts(
   if (row === undefined) return undefined;
   return {
     number: row.game_number,
+    localDate: row.local_date,
     venue:
       row.venue_name === null
         ? null

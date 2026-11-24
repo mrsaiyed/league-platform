@@ -65,11 +65,14 @@ export type StandingsFoot = {
 export async function StandingsPage({
   league,
   search,
+  beside,
   after,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
   readonly search: SearchParams;
+  /** What stands right under the tables: the route puts the line on games being corrected there. */
+  readonly beside?: (foot: StandingsFoot) => ReactNode;
   readonly after?: (foot: StandingsFoot) => ReactNode;
 }) {
   const view = await loadLeaguePage(league, 'site');
@@ -83,6 +86,10 @@ export async function StandingsPage({
     season === undefined ? undefined : await publicStats.standingsOf(addressee.id, season.id);
   if (result !== undefined && !result.ok) return notFound();
   const tables = result === undefined || !result.ok ? [] : buildStandingsViews(result.value);
+  const foot = (shown: { id: string; slug: string; isCurrent: boolean }): StandingsFoot => ({
+    addressee,
+    season: { id: shown.id, slug: shown.slug, isCurrent: shown.isCurrent },
+  });
   return (
     <main>
       <PageHead title={t('standings.heading')} kicker={season?.name} sub={t('standings.lead')} />
@@ -96,12 +103,8 @@ export async function StandingsPage({
               season: asked === undefined || asked === '' ? undefined : asked,
             })}
           />
-          {after === undefined || tables.length === 0
-            ? null
-            : after({
-                addressee,
-                season: { id: season.id, slug: season.slug, isCurrent: season.isCurrent },
-              })}
+          {beside === undefined || tables.length === 0 ? null : beside(foot(season))}
+          {after === undefined || tables.length === 0 ? null : after(foot(season))}
         </>
       )}
     </main>
