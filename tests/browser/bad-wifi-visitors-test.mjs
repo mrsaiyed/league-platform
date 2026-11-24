@@ -25,6 +25,18 @@
 // the clash on both players for the admin (the season's unique rule waits for the admin's
 // confirming, step 2.71).
 //
+// A session that ends while the device is away (step 2.242, T-356, T-357), twice. First,
+// with the server's state held back from the device (so the state it keeps is older), an
+// add of its own ("30 Di Own") is taken and "77 Ry Refused" is given an id the server
+// refuses (one not made by a device, version 7); both count in the server's sequence. A
+// foul is made with no signal and the tab closed; another tablet takes the game over and
+// lets it go; the tab opened again with signal gets a new session, judges the commands
+// since the state it kept by their IDs as its own, and carries the foul on: saved, nothing
+// listed not saved. Second, at the end, a tap made with no signal and the tab closed;
+// another tablet takes over, scores and lets go: the tab opened again lists the tap as not
+// saved, with "Enter again" and nothing offered to send, and it is entered again. At the
+// end the refused add is the only thing not saved, and nothing is listed.
+//
 // At the end the score and box score on the screen and the box score folded from the
 // server's plays must equal the one counted from the script, the added players included,
 // and the server must hold each added player with the number and name typed.
@@ -32,7 +44,7 @@
 // BAD_WIFI_SEED=<n> replays a run's cuts (printed first; the browser's timing still varies);
 // a failing run prints the seed and the order of events, BAD_WIFI_EVENTS=1 a passing one's
 // too. Every wait has a limit, and the whole run fails after five minutes.
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import {
   court,
   league,
@@ -82,8 +94,11 @@ const added = [
   [15, '', ''],
   [16, 'Ada', 'Walk-On'],
   [23, 'Bo', 'Guest'],
+  [30, 'Di', 'Own'],
 ];
 const twin = [8, 'Cy', 'Twin'];
+/** The add the server refuses (step 2.242): the id the device gives it is not version 4. */
+const refusedAdd = { line: '77', name: 'Ry Refused', id: '018f0000-0000-7000-8000-000000000077' };
 
 /** The game: adds, the lineups, the clash, and plays [side, jersey, what]. */
 const script = [
@@ -94,6 +109,8 @@ const script = [
   ['home', 5, 'p2'],
   ['away', 4, 'p3'],
   ['away', 16, 'p2'],
+  ['add', '30', 'Di Own'],
+  ['refused'],
   ['home', 9, 'foul'],
   ['away', 8, 'p2'],
   ['away', 23, 'foul'],
@@ -108,10 +125,33 @@ const script = [
   ['home', 11, 'p1'],
   ['away', 15, 'p2'],
   ['away', 16, 'p1'],
+  // Another tablet's play, while this device is away (step 2.242).
+  ['other', 'home', 5, 'p2'],
 ];
 const clashAt = script.findIndex(([what]) => what === 'clash') + 1;
+/** The add of this device's own while the server's state is held back (step 2.242). */
+const ownAt = script.findIndex(([what, a]) => what === 'add' && a === '30') + 1;
+const otherAt = script.length;
 /** After which step (counted from 1) the tab is closed and opened again. */
-const reopenAfter = { 3: 'with no signal', 9: 'with signal', [clashAt + 3]: 'with no signal' };
+const reopenAfter = {
+  3: 'with no signal',
+  [ownAt + 2]: 'after the session ended',
+  [clashAt + 3]: 'with no signal',
+  [otherAt]: 'after another device scored',
+};
+/**
+ * The steps whose connection is set, not left to chance (step 2.242): the own add and the
+ * refused add reach the server, the foul after them and the last tap wait with no signal.
+ */
+const forcedSignal = {
+  [ownAt]: 'on',
+  [ownAt + 1]: 'on',
+  [ownAt + 2]: 'off',
+  [otherAt - 1]: 'sent-then-off',
+  [otherAt]: 'off',
+};
+/** The visitors the panel lists after step `n`: the own add and the twin come late. */
+const visitorsBy = (n) => 5 + (n >= ownAt ? 1 : 0) + (n >= clashAt ? 1 : 0);
 /** The steps taken with no signal at all: the clash and the three plays after it. */
 const noSignal = { from: clashAt, to: clashAt + 3 };
 /** The step whose batch always goes slowly with its answer lost: the add of a named player. */
@@ -127,7 +167,8 @@ const keys = [
 function counted(n = script.length) {
   const box = Object.fromEntries(keys.map((key) => [key, { points: 0, fouls: 0 }]));
   const score = { home: 0, away: 0 };
-  for (const [side, jersey, what] of script.slice(0, n)) {
+  for (const step of script.slice(0, n)) {
+    const [side, jersey, what] = step[0] === 'other' ? step.slice(1) : step;
     if (side !== 'home' && side !== 'away') continue;
     const line = box[`${side} ${jersey}`];
     if (what === 'foul') line.fouls += 1;
@@ -197,6 +238,49 @@ if (!process.argv.includes('--no-build')) {
 const toServer = (url) => url.pathname.endsWith('/commands');
 const gameApi = (origin, part) => `${origin}/api/v1/leagues/${leagueId}/games/${liveGame}/${part}`;
 const asScorekeeper = { cookie: `${scorekeeper.name}=${scorekeeper.value}` };
+
+/**
+ * Another tablet of the same scorekeeper takes the game over from the browser (its tab
+ * closed with no signal, its session still held), sends `inputs`, and lets the game go:
+ * the browser's session has ended (step 2.242).
+ */
+async function anotherTabletTakesOver(origin, inputs) {
+  const post = async (part, body) => {
+    const answer = await fetch(gameApi(origin, part), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...asScorekeeper, origin },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const text = await answer.text();
+    if (!answer.ok) throw new Error(`/${part} answered ${answer.status}: ${text.slice(0, 200)}`);
+    return JSON.parse(text);
+  };
+  const deviceId = 'another-tablet';
+  const held = await post('session', { type: 'open', deviceId });
+  if (held.status !== 'held-by-other') throw new Error(`the game was not held: ${held.status}`);
+  const taken = await post('session', {
+    type: 'take-over',
+    deviceId,
+    confirmed: true,
+    expectedHolderSince: held.holder.since,
+  });
+  if (taken.status !== 'held-by-you') throw new Error(`not taken over: ${taken.status}`);
+  try {
+    if (inputs.length > 0) {
+      const commands = inputs.map((input) => ({ commandId: randomUUID(), at: Date.now(), input }));
+      const reply = await post('commands', {
+        protocolVersion: 2,
+        sessionId: taken.sessionId,
+        commands,
+      });
+      const refused = reply.results.filter((r) => r.status !== 'accepted');
+      if (refused.length > 0) throw new Error(`another tablet refused: ${JSON.stringify(refused)}`);
+    }
+  } finally {
+    await post('session', { type: 'release', sessionId: taken.sessionId });
+  }
+}
 
 /** The owner marks every visiting player as left (yesterday) and makes numbers unique. */
 async function setUp(browser, origin) {
@@ -295,6 +379,15 @@ async function oneGame(browser) {
       hasTouch: true,
     });
     await context.addCookies([{ ...scorekeeper, url: origin }]);
+    // The next id the page makes, once asked, is one the server refuses (step 2.242).
+    await context.addInitScript((id) => {
+      const real = globalThis.crypto.randomUUID.bind(globalThis.crypto);
+      globalThis.crypto.randomUUID = () => {
+        if (globalThis.__refuseNextId !== true) return real();
+        globalThis.__refuseNextId = false;
+        return id;
+      };
+    }, refusedAdd.id);
     const errors = [];
     let page;
     let c;
@@ -310,7 +403,10 @@ async function oneGame(browser) {
       return c.open();
     };
     const away = () => panel.locator('[data-players-team="away"]');
-    const rows = () => away().locator('[data-player-row]');
+    // The refused add's row (shown while it waits) is not one of the visitors counted.
+    const rows = () =>
+      away().locator(`[data-player-row]:not([data-player-row="${refusedAdd.id}"])`);
+    const refusedGroups = () => panel.locator('[data-players-refused-player]');
     const openPanel = async () => {
       if (await panel.isVisible()) return;
       await c.more.click();
@@ -329,7 +425,10 @@ async function oneGame(browser) {
         .filter({ has: page.locator('[data-player-clash]') })
         .count(),
       waiting: await away().locator('[data-player-row][data-waiting]').count(),
-      refused: await panel.locator('[data-players-refused]').count(),
+      // Refused, other than the add refused on purpose.
+      refused: await refusedGroups()
+        .and(panel.locator(`:not([data-players-refused-player="${refusedAdd.id}"])`))
+        .count(),
     });
 
     // The three ways the connection goes, as in bad-wifi-test.mjs.
@@ -358,6 +457,14 @@ async function oneGame(browser) {
       if (answer?.ok() === true) answerLost();
       return route.abort('connectionreset').catch(() => undefined);
     });
+    // The server's state held back from the device (step 2.242): the state it keeps stays
+    // the one before its own add and the refused add.
+    let statesHeld = false;
+    await context.route(
+      (url) => url.pathname.endsWith('/state'),
+      (route) =>
+        (statesHeld ? route.abort('connectionreset') : route.continue()).catch(() => undefined),
+    );
     const setSlow = (to) => {
       if (to === slow) return;
       slow = to;
@@ -478,7 +585,26 @@ async function oneGame(browser) {
           const n = index + 1;
           const quiet = n >= noSignal.from && n <= noSignal.to;
           const roll = random();
-          if (quiet) {
+          const forced = forcedSignal[n];
+          if (forced !== undefined) {
+            await later();
+            setAnswersLost(false);
+            setSlow(false);
+            if (forced === 'sent-then-off') {
+              await setOffline(false);
+              await until(
+                () => c.root.locator('[data-saved-banner][data-state="waiting"]').count(),
+                (waiting) => waiting === 0,
+                `step ${n}: taps still waiting with the signal on`,
+                30_000,
+              );
+            }
+            await setOffline(forced !== 'on');
+            if (n === ownAt) {
+              statesHeld = true;
+              log('the server state held back from now');
+            }
+          } else if (quiet) {
             // A cut still to come after the last tap must not bring the signal back here.
             await later();
             await setOffline(true);
@@ -491,7 +617,7 @@ async function oneGame(browser) {
             setAnswersLost(true);
             setSlow(true);
           }
-          if (random() < 0.3 && !quiet) cutSoon();
+          if (random() < 0.3 && !quiet && forced === undefined) cutSoon();
           if (what === 'add') {
             await addLine(a, b);
             log(`step ${n}: added "${a}"${b ? ` "${b}"` : ''}`);
@@ -504,6 +630,39 @@ async function oneGame(browser) {
               for (const jersey of side === 'home' ? starters : awayStarters)
                 idOf[`${side} ${jersey}`] = await c.tile(side, jersey).getAttribute('data-player');
             log(`step ${n}: both lineups set`);
+          } else if (what === 'refused') {
+            await openPanel();
+            await page.evaluate(() => (globalThis.__refuseNextId = true));
+            await away().locator('[data-players-line="away"]').fill(refusedAdd.line);
+            await away().locator('[data-players-name="away"]').fill(refusedAdd.name);
+            await away().locator('[data-players-add="away"]').click();
+            // Listed while it waits, or refused already: either way the device made it.
+            await until(
+              async () =>
+                (await away().locator(`[data-player-row="${refusedAdd.id}"]`).count()) +
+                (await panel.locator(`[data-players-refused-player="${refusedAdd.id}"]`).count()),
+              (n) => n > 0,
+              'the add to be refused was neither listed nor refused',
+            );
+            note(
+              'the page gave the add the id the server refuses',
+              (await page.evaluate(() => globalThis.__refuseNextId)) === false,
+            );
+            // Both adds reach the server before the foul is made with no signal.
+            await until(
+              async () => ({
+                refused: await panel
+                  .locator(`[data-players-refused-player="${refusedAdd.id}"]`)
+                  .count(),
+                waiting: await rows().and(away().locator('[data-waiting]')).count(),
+              }),
+              (s) => s.refused === 1 && s.waiting === 0,
+              'the own add not taken, or the add to be refused not refused',
+            );
+            await closePanel();
+            log(`step ${n}: "${refusedAdd.line} ${refusedAdd.name}" added, to be refused`);
+          } else if (what === 'other') {
+            log(`step ${n}: another tablet is to score ${a} #${b} ${script[n - 1][3]}`);
           } else if (what === 'clash') {
             // S-44 with no signal: #8 is worn; a late arrival given 8 is taken and marked.
             await openPanel();
@@ -516,7 +675,10 @@ async function oneGame(browser) {
             const says = await panelSays();
             note(
               'with no signal, the clashing add is taken and marked on both #8, never refused (S-44)',
-              says.rows === 6 && says.clash === 2 && says.waiting >= 1 && says.refused === 0,
+              says.rows === visitorsBy(n) &&
+                says.clash === 2 &&
+                says.waiting >= 1 &&
+                says.refused === 0,
               JSON.stringify(says),
             );
             await closePanel();
@@ -530,12 +692,66 @@ async function oneGame(browser) {
           if (promptAfter.includes(n)) await sentPromptly(n);
           const how = reopenAfter[n];
           if (!how) continue;
+          const ended = how.startsWith('after');
           await later();
-          await setOffline(how === 'with no signal');
+          await setOffline(how === 'with no signal' || ended);
           await page.close({ runBeforeUnload: true });
+          if (ended) {
+            // Closed with no signal, its session still held: another tablet takes the game
+            // over (and scores, the second time) and lets it go. The session has ended.
+            const [, side, jersey, act] = script[n - 1];
+            const playerId = idOf[`${side} ${jersey}`];
+            await anotherTabletTakesOver(
+              origin,
+              what === 'other'
+                ? [{ type: 'score', side, playerId, points: Number(act.slice(1)) }]
+                : [],
+            );
+            log(`another tablet took the game over${what === 'other' ? ' and scored' : ''}`);
+            statesHeld = false;
+            await setOffline(false);
+          }
           log(`tab closed; opened again ${how}`);
           const { tookOver } = await openTab();
-          note(`the tab opened again ${how} found the game still this device's`, !tookOver);
+          note(
+            `the tab opened again ${how} found the game ${ended ? 'free' : "still this device's"}`,
+            !tookOver,
+          );
+          const keptSays = async () => ({
+            plays: await page.locator('[data-kept-list] [data-kept-play]').count(),
+            again: await page.locator('[data-kept-list] [data-enter-again]').count(),
+            send: await page.locator('[data-send-plays]').count(),
+            cannotTell: await page.locator('[data-cannot-tell]').count(),
+          });
+          if (how === 'after the session ended') {
+            // Its own add and the refused add came after the state it kept: judged its own
+            // by their IDs, the foul made under the ended session is carried on and saved.
+            await sentPromptly(n);
+            const says = await keptSays();
+            note(
+              'the session ended while away, its own add and refused add since the state it kept: the tap carried on, nothing listed not saved (step 2.242, T-357)',
+              says.plays === 0 && says.cannotTell === 0,
+              JSON.stringify(says),
+            );
+          } else if (how === 'after another device scored') {
+            const says = await until(
+              keptSays,
+              (s) => s.plays > 0,
+              'the tap made under the session taken over was never listed',
+              30_000,
+            );
+            note(
+              'another tablet scored while away: the tap is listed not saved with "Enter again", nothing offered to send, no "could not tell" (step 2.242, T-358)',
+              says.plays === 1 && says.again === 1 && says.send === 0 && says.cannotTell === 0,
+              JSON.stringify(says),
+            );
+            await page.locator('[data-kept-list] [data-enter-again]').click();
+            await until(
+              () => page.locator('[data-kept-list]').count(),
+              (lists) => lists === 0,
+              'the tap entered again is still listed',
+            );
+          }
           if (idOf['away 4'] !== undefined)
             await boxIs(n, `the tab opened again ${how} shows every play (T-114)`);
           await openPanel();
@@ -543,9 +759,7 @@ async function oneGame(browser) {
           const clashed = n > clashAt;
           note(
             `the tab opened again ${how} lists every visitor added${clashed ? ', both #8 marked' : ''}`,
-            says.rows === (clashed ? 6 : 5) &&
-              says.clash === (clashed ? 2 : 0) &&
-              says.refused === 0,
+            says.rows === visitorsBy(n) && says.clash === (clashed ? 2 : 0) && says.refused === 0,
             JSON.stringify(says),
           );
           await closePanel();
@@ -558,22 +772,37 @@ async function oneGame(browser) {
       setAnswersLost(false);
       setSlow(false);
       await setOffline(false);
-      // Until all is saved or something is refused (a refusal never ends in "saved", and
-      // its own check below then names it): a limit, never a pass on a timeout.
+      // Until nothing waits: the add refused on purpose then says the one play not saved,
+      // and any other refusal is named by its own check below. A limit, never a pass on a
+      // timeout.
       await openPanel();
       const settled = await until(
         async () => ({
-          saved: await c.root.locator('[data-saved-banner][data-state="saved"]').count(),
-          refused: await panel.locator('[data-players-refused]').count(),
+          waiting: await c.root.locator('[data-saved-banner][data-state="waiting"]').count(),
+          banner: (await c.root.locator('[data-saved-banner]').allTextContents()).join(' | '),
+          own: await panel.locator(`[data-players-refused-player="${refusedAdd.id}"]`).count(),
+          refused: await refusedGroups().count(),
         }),
-        (s) => s.saved > 0 || s.refused > 0,
-        'with the signal back, neither all saved nor anything refused',
+        (s) => s.waiting === 0 && s.own === 1,
+        'with the signal back, still waiting, or the add to be refused not refused',
         90_000,
       );
-      log(settled.saved > 0 ? 'everything saved' : 'something refused');
-      note('with the signal back everything is saved', settled.saved > 0, JSON.stringify(settled));
-      const listed = await page.locator('[data-kept-list], [data-not-applied-list]').count();
-      note('nothing is listed not saved or not applied', listed === 0, `${listed} lists`);
+      log('nothing waiting; the add refused');
+      note(
+        'with the signal back everything is saved but the add refused on purpose (step 2.242)',
+        settled.refused === 1 && settled.banner.includes('1 play not saved'),
+        JSON.stringify(settled),
+      );
+      // The add refused on purpose is listed as not applied, as any refusal is; nothing
+      // else is listed, and no play is listed not saved because of it (step 2.242). The
+      // one refusal the panel names by its id above is that add's.
+      const kept = await page.locator('[data-kept-list]').count();
+      const notApplied = await page.locator('[data-not-applied-play]').allTextContents();
+      note(
+        'nothing is listed not saved, and only the add refused on purpose is listed not applied',
+        kept === 0 && notApplied.length === 1 && settled.own === 1 && settled.refused === 1,
+        JSON.stringify({ kept, notApplied }),
+      );
       const says = await until(
         panelSays,
         (s) => s.waiting === 0,
@@ -581,7 +810,7 @@ async function oneGame(browser) {
       );
       note(
         'with the signal back the twin was taken, not refused, both #8 still marked (S-44)',
-        says.rows === 6 && says.clash === 2 && says.refused === 0,
+        says.rows === visitorsBy(script.length) && says.clash === 2 && says.refused === 0,
         JSON.stringify(says),
       );
       await closePanel();
@@ -619,7 +848,7 @@ async function oneGame(browser) {
       );
       note(
         'every player added at the table is on the visiting team, marked for review (S-6, S-44)',
-        atTable.length === 6 && atTable.every((p) => p.away && p.toReview),
+        atTable.length === 7 && atTable.every((p) => p.away && p.toReview),
         JSON.stringify(atTable),
       );
       const played = Object.entries(idOf).filter(([key]) => key.startsWith('away'));
@@ -632,8 +861,8 @@ async function oneGame(browser) {
       );
       const roster = await ownersRoster(browser, origin, teamPage);
       note(
-        "the league's roster screen marks the clash on both #8 for the admin, all six to review (S-44)",
-        roster.lines === 6 && roster.clash === 2 && roster.review === 6,
+        "the league's roster screen marks the clash on both #8 for the admin, all seven to review (S-44)",
+        roster.lines === 7 && roster.clash === 2 && roster.review === 7,
         JSON.stringify(roster),
       );
     });

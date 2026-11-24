@@ -9,28 +9,71 @@
 // when nothing has been tapped yet. So a device that applies its waiting taps to this
 // state gets what the server will get.
 //
+// Beside it, the command IDs of the changes of players among the last events (step
+// 2.242, T-356): the state's `recent` lists the plays' IDs, never theirs, though each
+// counts in the sequence. With both, the device tells its own commands from somebody
+// else's by ID, an add the server refused included (it is kept as an event, record 058).
+// The list goes only up to the state's own sequence, so it never names a batch taken
+// after the state was read; with no state saved yet (changes of players only), the
+// sequence is that of the last change of players.
+//
 // It is a staff read, not the visitor's snapshot (record 039): the engine's state names
 // every player by id, a team that shows its numbers to staff only included. Only whoever
 // may score the game may read it (`games.score`, mayScoreGame, read fresh, T-75). It
 // changes nothing, but runs in the same shape as a command (record 014).
+import { tablePlayerEventTypes, trackerChangesWindow } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { engineRulesOf } from '../engine-rules.ts';
 import { readState, withCurrentRules } from '../live-game.ts';
 import { mayScoreGame } from '../policy.ts';
-import type { TrackerTx } from '../ports.ts';
+import type { GameEventMark, TrackerTx } from '../ports.ts';
 import { lowerId } from '../scoring-session.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
 
-/** The engine's state on the server, and the sequence number of the last tap in it. */
+/** The engine's state on the server, and the sequence number of the last event in it. */
 export type TrackerGameState = {
-  /** 0 while nothing has been tapped. */
+  /** 0 while nothing has been tapped or changed. */
   readonly sequence: number;
   readonly state: basketball.GameState;
+  /**
+   * The command IDs (lower case, oldest first) of the changes of players, refused adds
+   * included, among the game's last `trackerChangesWindow` events up to `sequence`.
+   */
+  readonly changes: readonly string[];
 };
 
 export type ReadTrackerStateError = { readonly code: 'game-not-found' };
+
+const isChange = (mark: GameEventMark) =>
+  (tablePlayerEventTypes as readonly string[]).includes(mark.type);
+
+/**
+ * The changes of players among the last events up to `upTo`, and the sequence the list
+ * and the state agree on. `saved`: whether a state is saved, so `upTo` is its own. With
+ * none, the events are changes of players only, unless a batch with plays was taken
+ * after the state was read: the list stops before it, and so does the sequence.
+ */
+async function changesUpTo(
+  tx: TrackerTx,
+  gameId: string,
+  upTo: number,
+  saved: boolean,
+): Promise<{ readonly sequence: number; readonly changes: string[] }> {
+  if (upTo === 0) return { sequence: 0, changes: [] };
+  const from = Math.max(0, upTo - trackerChangesWindow);
+  const marks = await tx.liveGames.eventsAfter(gameId, from, trackerChangesWindow);
+  const changes: string[] = [];
+  let sequence = saved ? upTo : from;
+  for (const mark of marks) {
+    if (mark.seq > upTo) break;
+    if (isChange(mark)) changes.push(mark.commandId.toLowerCase());
+    else if (!saved) break;
+    if (!saved) sequence = mark.seq;
+  }
+  return { sequence, changes };
+}
 
 export const readTrackerState = defineCommand({
   name: 'games.read_tracker_state',
@@ -46,6 +89,8 @@ export const readTrackerState = defineCommand({
       saved === undefined
         ? basketball.newGame(rules, 0)
         : withCurrentRules(readState(saved.state), rules);
-    return ok({ sequence: saved?.seq ?? 0, state });
+    const upTo = saved?.seq ?? (await tx.liveGames.lastEventSeq(input.gameId));
+    const { sequence, changes } = await changesUpTo(tx, input.gameId, upTo, saved !== undefined);
+    return ok({ sequence, state, changes });
   },
 });

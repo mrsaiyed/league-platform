@@ -33,6 +33,7 @@ import * as database from '@srleagues/database';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { actors, gamesWorld, type Actor, type GamesWorld } from './database-games.test-helper.ts';
+import { commandsSince } from '../features/tracker/commands-since.ts';
 import { databaseTracker, GameNamesOnlyWithSettings } from './database-tracker.ts';
 import { gameSnapshot } from './game-snapshot-endpoint.ts';
 
@@ -584,4 +585,137 @@ describe('"Score this game" on the database ports (step 2.153)', () => {
       refused,
     );
   });
+});
+
+describe('the state read, with a batch landing in the middle of it (step 2.242, T-356)', () => {
+  // The read does not lock the game: a batch taken between its statements is cut off by
+  // the state's sequence, so the device never takes somebody else's command for its own.
+  type Deps = typeof w.ports.tracker.deps;
+  type Point = 'findState' | 'lastEventSeq';
+  /**
+   * Reads the state, with the batch `between` taken right after `point` answered. The
+   * made-up database has one connection (PGlite), so a second transaction would wait for
+   * the read to end: the batch runs, through the real command, on the read's connection
+   * between its statements, which see it exactly as they would see a batch committed
+   * meanwhile (read committed).
+   */
+  async function readWithABatchBetween(
+    gameId: string,
+    point: Point,
+    between: (deps: Deps) => Promise<unknown>,
+  ) {
+    const deps = w.ports.tracker.deps;
+    let stops = 0;
+    const wrapped: Deps = {
+      ...deps,
+      transaction: (context, work) =>
+        deps.transaction(context, (tx) => {
+          const after = async <T>(answer: Promise<T>): Promise<T> => {
+            const value = await answer;
+            stops += 1;
+            if (stops === 1) await between({ ...deps, transaction: (_c, inner) => inner(tx) });
+            return value;
+          };
+          return work({
+            ...tx,
+            liveGames: {
+              ...tx.liveGames,
+              ...(point === 'findState'
+                ? { findState: (id: string) => after(tx.liveGames.findState(id)) }
+                : { lastEventSeq: (id: string) => after(tx.liveGames.lastEventSeq(id)) }),
+            },
+          });
+        }),
+    };
+    const read = await readTrackerState(w.asOwner, { gameId }, wrapped);
+    expect(stops).toBe(1);
+    if (!read.ok) throw new Error(read.error.code);
+    return read.value;
+  }
+  const readNow = async (gameId: string) => {
+    const read = await readTrackerState(w.asOwner, { gameId }, w.ports.tracker.deps);
+    if (!read.ok) throw new Error(read.error.code);
+    return read.value;
+  };
+  let jersey = 70;
+  const add = () => {
+    jersey += 1;
+    return tap({
+      type: 'add-player',
+      side: 'away',
+      playerId: randomUUID(),
+      jersey: `${jersey}`,
+      name: '',
+    });
+  };
+  const sendV2 = async (
+    gameId: string,
+    sessionId: string,
+    commands: readonly unknown[],
+    deps: Deps = w.ports.tracker.deps,
+  ) => {
+    const sent = await applyTrackerCommands(
+      w.asOwner,
+      { gameId, protocolVersion: 2, sessionId, commands },
+      deps,
+    );
+    expect(sent.ok && sent.value.results.map((r) => r.status)).toEqual(
+      commands.map(() => 'accepted'),
+    );
+  };
+  const idsOf = (commands: readonly { readonly commandId: string }[]) =>
+    new Set(commands.map((c) => c.commandId.toLowerCase()));
+
+  it('a state saved: the batch is after the state read, and the next read catches it', async () => {
+    const gameId = await fresh();
+    const sessionId = await open(w.asOwner, gameId, 'owner-tablet');
+    const own = [add(), ...tipOff()];
+    await sendV2(gameId, sessionId, own);
+    const known = await readNow(gameId);
+    // Somebody else's add and play, and one more of this device's own adds.
+    const others = [
+      add(),
+      tap({ type: 'score', side: 'home', playerId: w.players.herons[0], points: 2 }),
+    ];
+    const mine = add();
+    const during = await readWithABatchBetween(gameId, 'findState', (deps) =>
+      sendV2(gameId, sessionId, [mine, ...others], deps),
+    );
+    const ownIds = idsOf([...own, mine]);
+    // The read answers the state it found, with the list cut at its sequence.
+    expect(during.sequence).toBe(known.sequence);
+    expect(during.changes).toEqual(known.changes);
+    expect(commandsSince(known, during, ownIds)).toBe('own');
+    const now = await readNow(gameId);
+    expect(now.sequence).toBe(known.sequence + 3);
+    expect(commandsSince(known, now, ownIds)).toBe('somebody-else');
+    expect(commandsSince(during, now, ownIds)).toBe('somebody-else');
+  });
+
+  for (const point of ['findState', 'lastEventSeq'] as const) {
+    it(`no state saved, a batch after ${point}: never judged own`, async () => {
+      const gameId = await fresh();
+      const sessionId = await open(w.asOwner, gameId, 'owner-tablet');
+      const own = [add()];
+      await sendV2(gameId, sessionId, own);
+      const known = await readNow(gameId);
+      expect(known.sequence).toBe(1);
+      // Somebody else's add, then plays (the first state saved).
+      const others = [add(), ...tipOff()];
+      const during = await readWithABatchBetween(gameId, point, (deps) =>
+        sendV2(gameId, sessionId, others, deps),
+      );
+      const ownIds = idsOf(own);
+      const judged = commandsSince(known, during, ownIds);
+      // Read after the state was looked for: the other's add is named, the plays cut off.
+      // Read after the last sequence was: the batch is cut off whole.
+      expect([during.sequence, judged]).toEqual(
+        point === 'findState' ? [2, 'somebody-else'] : [1, 'own'],
+      );
+      const now = await readNow(gameId);
+      expect(now.sequence).toBe(5);
+      expect(commandsSince(known, now, ownIds)).toBe('somebody-else');
+      expect(commandsSince(during, now, ownIds)).toBe('somebody-else');
+    });
+  }
 });

@@ -7,7 +7,8 @@
 // (`ownTrackerRefusal`): a filter's 403 page never stops scoring.
 import {
   SessionReply,
-  TrackerGameState,
+  trackerChangesHeader,
+  TrackerGameStateWithChanges,
   TrackerRosters,
   ownTrackerRefusal,
 } from '@srleagues/contracts';
@@ -87,15 +88,25 @@ export function createFetchTrackerServer(options: FetchTrackerServerOptions): Tr
     },
 
     async loadState(signal) {
-      const answer = await call(address('state'), { method: 'GET', signal });
+      // With the IDs of the changes of players, to tell its own commands by (T-356).
+      const answer = await call(address('state'), {
+        method: 'GET',
+        headers: { [trackerChangesHeader]: '1' },
+        signal,
+      });
       if (answer === null) return unanswered;
       if (answer.status === 200) {
-        const read = TrackerGameState.safeParse(answer.body);
+        const read = TrackerGameStateWithChanges.safeParse(answer.body);
         if (!read.success) return unanswered;
         // The contract checks the marks of the engine's version 1; the rest is the engine's.
         const state = read.data.state as unknown as basketball.GameState;
         if (!engineReads(state)) return unanswered;
-        const value: ServerState = { sequence: read.data.sequence, state };
+        const { changes } = read.data;
+        const value: ServerState = {
+          sequence: read.data.sequence,
+          state,
+          ...(changes === undefined ? {} : { changes }),
+        };
         return { kind: 'answer', value };
       }
       return turnedAway<ServerState>(answer);

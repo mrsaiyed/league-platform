@@ -9,6 +9,12 @@ import type { basketball } from '@srleagues/sports';
 export type ServerState = {
   readonly sequence: number;
   readonly state: basketball.GameState;
+  /**
+   * The command IDs of the last changes of players up to `sequence` (T-356), which the
+   * state's `recent` never lists. Missing from a state kept before step 2.242, or from a
+   * server that did not give them: then the device cannot tell whose they were.
+   */
+  readonly changes?: readonly string[];
 };
 
 export type ServerOutcome<T> =
