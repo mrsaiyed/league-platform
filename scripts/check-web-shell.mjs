@@ -2338,13 +2338,17 @@ async function checkTeams(origin) {
     jerseyNumber: '7',
     role: 'captain',
   });
-  if (player === undefined || to(player) !== `${page}?done=added`) {
+  // Step 2.155: added, the browser goes to the team's page, and the new line says so once.
+  if (player === undefined || player.status !== 303 || to(player) !== page) {
     problems.push(`adding a player answers ${player?.status} to ${player && to(player)}`);
     return problems;
   }
   const withPlayer = await pageOf('owner', page);
   if (!withPlayer.includes('Casey Walker') || !withPlayer.includes('value="7"')) {
     problems.push('the roster does not show the player added with a number');
+  }
+  if (!withPlayer.includes('Saved: Casey Walker was added to Blue Jays.')) {
+    problems.push('the new line does not say the player was added');
   }
   const entry = /name="entry" value="([^"]+)"/.exec(withPlayer)?.[1];
   const version = /name="version" value="([^"]+)"[^>]*\/><p><label>Number/.exec(withPlayer)?.[1];
@@ -2394,7 +2398,12 @@ async function checkTeams(origin) {
       version: '1',
       name: 'Hijacked',
     });
-    if (hijack !== undefined && !to(hijack).includes('problem=teams.update_team.team-not-found')) {
+    // Step 2.155: refused in the answer to the post itself, the form drawn again.
+    const hijackSaid = hijack === undefined ? '' : await hijack.text();
+    if (
+      hijack !== undefined &&
+      (hijack.status === 303 || !hijackSaid.includes('That team is not there.'))
+    ) {
       problems.push(`another league's team id was not refused (${hijack.status} to ${to(hijack)})`);
     }
   }
