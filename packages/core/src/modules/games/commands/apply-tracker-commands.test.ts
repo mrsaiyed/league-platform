@@ -1067,6 +1067,57 @@ describe('a play of a statistic the season does not keep (S-93, step 2.241, T-39
     }
   });
 
+  // Added by the reviewer of step 2.241: a turnover between two baskets, and the batch
+  // sent again (its answer lost): each basket is taken once, in order, the turnover never.
+  it('takes the baskets around it once each, in order, on a retry too', async () => {
+    const t = setUp();
+    const second: Input = { type: 'score', side: 'home', playerId: homeIds[0] ?? '', points: 3 };
+    const commands = taps([...tipOff, basket, turnover, second], 1, startOfTest);
+    const first = await applyTrackerCommands(t.as(scorekeeperId), batchOf(commands, knows), t.deps);
+    expect(statuses(first)).toEqual([
+      'accepted',
+      'accepted',
+      'accepted',
+      'accepted',
+      'refused',
+      'accepted',
+    ]);
+    const again = await applyTrackerCommands(t.as(scorekeeperId), batchOf(commands, knows), t.deps);
+    expect(statuses(again)).toEqual([
+      'duplicate',
+      'duplicate',
+      'duplicate',
+      'duplicate',
+      'refused',
+      'duplicate',
+    ]);
+    const scores = t.db.state.events.filter((e) => e.type === 'score');
+    expect(scores.map((e) => e.seq)).toEqual([4, 5]);
+    expect(t.db.state.events.some((e) => e.type === 'turnover')).toBe(false);
+  });
+
+  // REVIEW FAULT (reviewer of step 2.241), `it.fails` while the fault is there: a turnover
+  // taken while turnovers were kept cannot be taken back once the admin turns them off,
+  // so it stays in the game for good and is back on the public pages if they turn them on
+  // again. The fix makes this pass: turn `it.fails` into `it`.
+  it.fails(
+    'takes back a turnover recorded while turnovers were kept, after they are turned off',
+    async () => {
+      const t = setUp({ seasons: [{ id: seasonId, programId: 'p1', rules: keepsTurnovers }] });
+      const kept = taps([...tipOff, turnover], 1, startOfTest);
+      expect(
+        statuses(await applyTrackerCommands(t.as(scorekeeperId), batchOf(kept, knows), t.deps)),
+      ).toEqual(Array(4).fill('accepted'));
+      t.db.state.seasons = [
+        { id: seasonId, programId: 'p1', rules: seasonRulesPreset('high-school') },
+      ];
+      const back: Input = { type: 'unturnover', side: 'home', playerId: homeIds[1] ?? '' };
+      const later = taps([back], 10, startOfTest + 5000);
+      const result = await applyTrackerCommands(t.as(scorekeeperId), batchOf(later, knows), t.deps);
+      expect(statuses(result)).toEqual(['accepted']);
+    },
+  );
+
   it('is taken in a season that keeps turnovers, and so is taking one back', async () => {
     const t = setUp({ seasons: [{ id: seasonId, programId: 'p1', rules: keepsTurnovers }] });
     const back: Input = { type: 'unturnover', side: 'home', playerId: homeIds[1] ?? '' };
