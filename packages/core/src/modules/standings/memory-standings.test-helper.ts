@@ -187,6 +187,7 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
     },
     findLastEnd: async () => undefined,
     endedAgo: async () => undefined,
+    decidedBy: async () => null,
     findEvent: async () => undefined,
     findTablePlayer: async () => undefined,
     addTablePlayer: async () => {

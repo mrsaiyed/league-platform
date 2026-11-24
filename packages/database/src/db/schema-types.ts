@@ -147,6 +147,7 @@ export interface GamesTable {
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
   overtime_periods: number | null;
+  finalized_by: string | null;
 }
 
 export interface ImportsTable {

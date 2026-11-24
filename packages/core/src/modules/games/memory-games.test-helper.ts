@@ -41,6 +41,8 @@ export type MemoryGames = {
   /** Games the tracker has recorded plays for. */
   tracked: string[];
   corrections: NewGameCorrection[];
+  /** Who decided each game by hand, as `finalized_by` keeps it (migration 0026). */
+  deciders: Record<string, string | null>;
   grants: Grant[];
   activity: ActivityEntry[];
   /** Who is assigned to score which game. */
@@ -180,6 +182,7 @@ export const emptyGames = (): MemoryGames => ({
   roster: [],
   tracked: [],
   corrections: [],
+  deciders: {},
   grants: [],
   activity: [],
   assignments: [],
@@ -226,6 +229,7 @@ export function gamesTxOf(s: MemoryGames, jobs: JobQueue): ScorekeepersTx {
         const at = s.games.findIndex((g) => g.id === id);
         const found = s.games[at];
         if (found === undefined || found.binned || found.version !== version) return undefined;
+        s.deciders[id] = change.decided ? (change.decidedBy ?? null) : null;
         s.games[at] = {
           ...found,
           status: change.status,

@@ -58,6 +58,11 @@ export type GameResultChange = {
   readonly format?: SeasonRules;
   /** How the game is now recorded (final, box or live), when that changes with the result. */
   readonly captureMode?: 'final' | 'box' | 'live';
+  /**
+   * The account that decided it by hand (step 2.177, migration 0026), kept while the game
+   * stays decided; left out or null for a tracker's end, or a change that undecides it.
+   */
+  readonly decidedBy?: string | null;
 };
 
 /** A result as a correction keeps it: a versioned document of words and numbers only (T-220). */
@@ -516,6 +521,12 @@ export type LiveGamesStore = {
    * it is not decided. Never below 0.
    */
   readonly endedAgo: (gameId: string) => Promise<number | undefined>;
+  /**
+   * Who decided the game's present result by hand (step 2.177, migration 0026): the
+   * account, or null when nobody did (its tracker ended it, it is not decided, it was
+   * decided before 0026 or with no account). Read inside the database, as endedAgo is.
+   */
+  readonly decidedBy: (gameId: string) => Promise<string | null>;
   /** The game's event made by this command id: its number, type and sender, or undefined. */
   readonly findEvent: (
     gameId: string,

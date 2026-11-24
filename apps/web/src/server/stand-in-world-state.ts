@@ -131,6 +131,8 @@ export type LeagueWorld = {
   drafts: DraftRecord[];
   assignments: { readonly gameId: string; readonly accountId: string }[];
   corrections: (NewGameCorrection & { readonly on: string })[];
+  /** Who decided each game by hand, as `finalized_by` keeps it (migration 0026). */
+  deciders: Record<string, string | null>;
   sessions: ScoringSession[];
   states: { readonly gameId: string; readonly seq: number; readonly state: unknown }[];
   events: NewGameEvent[];
@@ -174,6 +176,7 @@ export function emptyLeagueWorld(
     drafts: [],
     assignments: [],
     corrections: [],
+    deciders: {},
     sessions: [],
     states: [],
     events: [],

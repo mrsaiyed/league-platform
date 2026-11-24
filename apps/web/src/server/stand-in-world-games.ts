@@ -113,6 +113,7 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       const at = s.games.findIndex((g) => g.id === gameId);
       const found = s.games[at];
       if (found === undefined || found.binned || found.version !== version) return undefined;
+      s.deciders = { ...s.deciders, [gameId]: change.decided ? (change.decidedBy ?? null) : null };
       // As 0021 refuses it: only a final game has an overtime count, of 0 to 18.
       const overtime = change.overtimePeriods;
       if (overtime !== null && (change.status !== 'final' || overtime < 0 || overtime > 18)) {
@@ -498,6 +499,7 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
       const decidedAt = s.games.find((g) => g.id === gameId)?.finalizedAt ?? null;
       return decidedAt === null ? undefined : Math.max(0, now().getTime() - Date.parse(decidedAt));
     },
+    decidedBy: async (gameId) => s.deciders[gameId] ?? null,
     findEvent: async (gameId, commandId) => {
       const found = s.events.find((e) => e.gameId === gameId && e.commandId === commandId);
       return found === undefined

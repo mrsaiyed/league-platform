@@ -272,6 +272,7 @@ export function liveGamesOf(s: MemoryTracker, databaseNow: () => number): LiveGa
         ? undefined
         : Math.max(0, databaseNow() - Date.parse(decided));
     },
+    decidedBy: async (gameId) => s.deciders[gameId] ?? null,
     findEvent: async (gameId, commandId) => {
       const found = s.events.find((e) => e.gameId === gameId && e.commandId === commandId);
       return found === undefined

@@ -113,6 +113,8 @@ export async function decideGame(args: {
       homeScore: args.homeScore,
       awayScore: args.awayScore,
       decided: true,
+      // Who decided it, so they may reopen it within the league's minutes (S-52).
+      decidedBy: context.accountId,
       // Decided by hand: a typed final score says whether it went to overtime (step 2.56,
       // S-86); a box score, an import and a forfeit say nothing, so it is not known.
       overtimePeriods: args.overtimePeriods ?? null,
