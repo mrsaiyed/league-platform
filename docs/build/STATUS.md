@@ -40,10 +40,9 @@ Learned, not yet rules elsewhere: (a) a lane that adds a page, a route, a field,
 
 Every lane's work is on GitHub. Three at a time, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`) | Where it stands                                                               | What is left                                            |
-| ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------- |
-| 2.118-players-panel    | built, reviewed (2 High, 2 Medium); fix round started 04:50 UTC on 2026-11-24 | fix round, confirming look, land; then 2.61's last part |
-| 2.191-ci-parallel      | parked                                                                        | after the first test is in the founder's hands          |
+| Lane (branch `lane/…`) | Where it stands | What is left                                   |
+| ---------------------- | --------------- | ---------------------------------------------- |
+| 2.191-ci-parallel      | parked          | after the first test is in the founder's hands |
 
 Next free: STEP 2.241, migration 0026, record 108 (103 to 105 were never used), T-331 (T-310, T-311 and T-315 were never used; T-330 is lane 2.118's), S-91, A-22, U-19. Numbers already given out stand with their lanes (in each lane's note).
 
