@@ -8,7 +8,7 @@
 // the account. The rule of what the person may see of each (U-9) is not here: core's
 // myLeagues applies it to these rows, on the stand-in and on the database alike.
 import type { AccessReader, AccountLeagueRow, LeagueStatus } from '@srleagues/core';
-import { standInStatusOf } from './stand-in-league-states.ts';
+import { standInNamesOf, standInStatusOf } from './stand-in-league-states.ts';
 import type { World } from './stand-in-world.ts';
 
 type MadeUpLeague = {
@@ -70,10 +70,10 @@ export function standInMyLeagues(
       if (!isOwner && roles.length === 0 && !onRoster) continue;
       rows.push({
         leagueId: league.id,
-        slug: league.slug,
-        // The league's own name, as the database's leagues.name: the cast's, which its
-        // pages show too (stand-in-league-sites.ts).
-        name: league.name,
+        // The league's own name and short name, as the database's leagues row: the cast's,
+        // unless League settings → Profile changed them (step 2.125).
+        slug: standInNamesOf(league).slug,
+        name: standInNamesOf(league).name,
         status: standInStatusOf(league),
         isOwner,
         roles,

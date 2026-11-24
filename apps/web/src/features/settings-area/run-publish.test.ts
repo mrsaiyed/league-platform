@@ -20,7 +20,7 @@ import {
 } from '../../server/stand-in-league-states.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { problemKey } from './answer.ts';
-import { runPublish } from './run-publish.ts';
+import { runArchive, runPublish } from './run-publish.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
 const ownerId = '01900000-0000-7000-8000-0000000000a1';
@@ -148,5 +148,63 @@ describe('runPublish', () => {
     expect(sentence('no-contact-email')).toContain('contact email');
     await chooseNames(ports);
     expect(await runPublish(as(ownerId), ports.deps, 1)).toMatchObject({ done: 'published' });
+  });
+});
+
+// Archive and Un-archive (step 2.125 part 2, U-9, U-14).
+describe('runArchive', () => {
+  const versionOf = async (ports: ReturnType<typeof standIn>) =>
+    (await ports.deps.transaction(as(ownerId), (tx) => tx.leagues.currentLeague()))?.version ??
+    Number.NaN;
+
+  it('lets an admin archive a published league and the owner bring it back', async () => {
+    const ports = standIn('adult');
+    await chooseNames(ports);
+    expect(await runPublish(as(ownerId), ports.deps, 1)).toMatchObject({ done: 'published' });
+    expect(await runArchive(as(adminId), ports.deps, 'archived', await versionOf(ports))).toEqual({
+      kind: 'done',
+      done: 'archived',
+    });
+    expect(standInStatusOf({ id: leagueId, status: 'draft' })).toBe('archived');
+    // Pressed twice: done, nothing changes.
+    expect(await runArchive(as(adminId), ports.deps, 'archived', 1)).toMatchObject({
+      done: 'archived',
+    });
+    expect(await runArchive(as(ownerId), ports.deps, 'live', await versionOf(ports))).toEqual({
+      kind: 'done',
+      done: 'unarchived',
+    });
+    expect(standInStatusOf({ id: leagueId, status: 'draft' })).toBe('live');
+  });
+
+  it('refuses a scheduler, and never archives or "un-archives" a draft', async () => {
+    const ports = standIn('adult');
+    await chooseNames(ports);
+    expect(await runArchive(as(ownerId), ports.deps, 'live', 1)).toMatchObject({
+      kind: 'refused',
+      code: 'illegal-transition',
+    });
+    expect(await runArchive(as(ownerId), ports.deps, 'archived', 1)).toMatchObject({
+      kind: 'refused',
+      code: 'illegal-transition',
+    });
+    await runPublish(as(ownerId), ports.deps, 1);
+    expect(
+      await runArchive(as(schedulerId), ports.deps, 'archived', await versionOf(ports)),
+    ).toMatchObject({ kind: 'refused' });
+    expect(standInStatusOf({ id: leagueId, status: 'draft' })).toBe('live');
+  });
+
+  it('never tells a scheduler "done" for a league already in the state asked', async () => {
+    const ports = standIn('adult');
+    await chooseNames(ports);
+    await runPublish(as(ownerId), ports.deps, 1);
+    const version = await versionOf(ports);
+    const refusedHere = { kind: 'refused', command: 'leagues.set_status', code: 'not-allowed' };
+    expect(await runArchive(as(schedulerId), ports.deps, 'live', version)).toEqual(refusedHere);
+    expect(await runPublish(as(schedulerId), ports.deps, version)).toEqual(refusedHere);
+    expect(await runArchive(as(ownerId), ports.deps, 'live', version)).toMatchObject({
+      kind: 'done',
+    });
   });
 });

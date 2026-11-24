@@ -5,7 +5,16 @@
 import { catalogs } from '@srleagues/site';
 import type { TextKey } from '../../server/messages.ts';
 
-export const doneNames = ['saved', 'cleared', 'published'] as const;
+export const doneNames = [
+  'saved',
+  'cleared',
+  'published',
+  // League settings → Profile and the Archive buttons (step 2.125 part 2).
+  'renamed',
+  'audienceClearedFullNames',
+  'archived',
+  'unarchived',
+] as const;
 export type DoneName = (typeof doneNames)[number];
 
 export type Answer =

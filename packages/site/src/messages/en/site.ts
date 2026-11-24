@@ -152,6 +152,8 @@ export const enSite = {
   'page.team': 'Team',
   'page.terms': 'Terms',
   'shell.archivedNotice': 'This league is archived. Everything here is kept as it was.',
+  // On an archived league's staff pages, for those who may bring it back (step 2.125).
+  'shell.archivedNoticeUnarchive': 'Un-archive it in League settings',
   'shell.backToLeague': 'Back to the league home',
   'shell.draftNotice': 'This league is not published. Only the people who run it can see it.',
   // On a draft's staff pages, for those who may publish it (step 2.240).

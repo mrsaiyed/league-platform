@@ -6,6 +6,7 @@
 // activity log. Every area of the web app reads and writes this one set of rows
 // (stand-in-world.ts), so a team added, a schedule published or a score typed shows
 // wherever the product shows it. Plain data only, so a transaction can copy it whole.
+import { listedByDefault } from '@srleagues/core';
 import type {
   ActivityRecord,
   Audience,
@@ -113,10 +114,15 @@ export type LeagueWorld = {
   /** Its short name and its own name, as the leagues table keeps them. */
   readonly slug: string;
   readonly name: string;
-  /** Who plays in the league (R-15). */
-  readonly audience: Audience;
+  /** Who plays in the league (R-15); League settings → Profile changes it (step 2.125). */
+  audience: Audience;
   /** The league's own time zone: its "today" and its game times. */
-  readonly timeZone: string;
+  timeZone: string;
+  /** The rest of its profile, as the leagues table keeps it (step 2.125): its contact
+   * email, where it plays (null is none) and whether it is listed in /find (U-10). */
+  contactEmail: string;
+  city: string | null;
+  listed: boolean;
   currentSeasonId: string | null;
   seasons: WorldSeason[];
   divisions: WorldDivision[];
@@ -161,7 +167,7 @@ export type LeagueWorld = {
 /** A league that holds nothing yet. */
 export function emptyLeagueWorld(
   league: { readonly id: string; readonly slug: string; readonly name: string },
-  facts: Pick<LeagueWorld, 'audience' | 'timeZone'>,
+  facts: Pick<LeagueWorld, 'audience' | 'timeZone'> & { readonly city?: string | null },
 ): LeagueWorld {
   return {
     leagueId: league.id,
@@ -169,6 +175,11 @@ export function emptyLeagueWorld(
     name: league.name,
     audience: facts.audience,
     timeZone: facts.timeZone,
+    // Made as the leagues command makes one: a contact email of its own (step 2.240) and
+    // listed as U-10 starts it for who plays (create-league.ts).
+    contactEmail: `${league.slug}@example.org`,
+    city: facts.city ?? null,
+    listed: listedByDefault[facts.audience],
     currentSeasonId: null,
     seasons: [],
     divisions: [],

@@ -14,6 +14,7 @@ import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 import {
   findLeagueAudience,
   findLeagueContactEmail,
+  findLeagueProfile,
   findPerson,
   findPersonIsMinor,
   hasRecordedChild,
@@ -81,6 +82,16 @@ registerIsolationCase({
   run: async (scope) => {
     await moveOwnLeagueRowLast(scope);
     return findLeagueAudience(scope);
+  },
+});
+
+registerIsolationCase({
+  subject: findLeagueProfile,
+  name: "read the scope's league's profile, its row moved after the target's (step 2.125)",
+  arrange: setTargetLeagueApart,
+  run: async (scope) => {
+    await moveOwnLeagueRowLast(scope);
+    return findLeagueProfile(scope);
   },
 });
 
