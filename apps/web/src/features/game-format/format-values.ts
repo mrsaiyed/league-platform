@@ -85,3 +85,37 @@ export function formatOfValues(values: FormatValues): GameFormatRules | null {
   });
   return parsed.success ? parsed.data : null;
 }
+
+/** The fields typed in: whole numbers, minutes, or empty for none. */
+export type TypedField =
+  | 'minutes'
+  | 'overtimeMinutes'
+  | 'stopLastSeconds'
+  | 'mercyLead'
+  | 'bonusFouls'
+  | 'doubleBonusFouls'
+  | 'playerFoulLimit'
+  | 'fullTimeouts'
+  | 'shortTimeouts'
+  | 'overtimeTimeouts';
+/** The fields chosen from a list. */
+export type ChoiceField = 'periods' | 'clockMode' | 'stopScope' | 'teamFoulsReset' | 'timeoutsPer';
+
+const choices: { readonly [F in ChoiceField]: readonly FormatValues[F][] } = {
+  periods: ['2', '4'],
+  clockMode: ['stop', 'running'],
+  stopScope: ['period', 'half', 'game'],
+  teamFoulsReset: ['period', 'half', 'game'],
+  timeoutsPer: ['game', 'half'],
+};
+
+/** The values with one field typed or chosen; a choice not on its list changes nothing. */
+export function withValue(
+  values: FormatValues,
+  field: TypedField | ChoiceField,
+  value: string,
+): FormatValues {
+  if (!(field in choices)) return { ...values, [field]: value };
+  const allowed: readonly string[] = choices[field as ChoiceField];
+  return allowed.includes(value) ? { ...values, [field]: value } : values;
+}

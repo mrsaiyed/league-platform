@@ -20,7 +20,8 @@ import {
   type LeagueAddressee,
 } from '@srleagues/core';
 import { en, finalPillOf } from '@srleagues/site';
-import { GameFormatSection, formatWords } from './game-format-section.tsx';
+import { formatWords } from '../game-format/index.ts';
+import { GameFormatSection } from './game-format-section.tsx';
 import { FinalStatePill, MessagePage, PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';

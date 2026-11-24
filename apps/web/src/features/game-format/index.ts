@@ -6,5 +6,5 @@ export {
   type GameFormatClient,
 } from './format-client.ts';
 export { formatOfValues, valuesOf, type FormatValues } from './format-values.ts';
-export { factLine, factLines, refusalText, summaryOf } from './format-words.ts';
+export { factLine, factLines, formatWords, refusalText, summaryOf } from './format-words.ts';
 export { GameFormatForm, GameFormatPanel, type FormatPanelLook } from './game-format-panel.tsx';

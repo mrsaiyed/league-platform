@@ -2,7 +2,7 @@
 // the start confirmation lists it, the clock mode included, and the one line said back
 // once a format is saved (checklist B4).
 import type { FormatFact, GameFormatRefusal, GameFormatRules } from '@srleagues/contracts';
-import type { Translate } from '@srleagues/site';
+import type { Catalog, Translate } from '@srleagues/site';
 
 const minutesOf = (seconds: number, locale: string) =>
   new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(seconds / 60);
@@ -84,4 +84,14 @@ export function refusalText(code: GameFormatRefusal, t: Translate): string {
   if (code === 'setting-off') return t(`${k}.refused.setting`);
   if (code === 'changed-since-read') return t(`${k}.refused.changed`);
   return t(`${k}.refused.other`);
+}
+
+/**
+ * The words the panel uses, for a page that hands a client component only these: the
+ * tracker's format words, which the games area shares.
+ */
+export function formatWords(catalog: Catalog): Catalog {
+  return Object.fromEntries(
+    Object.entries(catalog).filter(([key]) => key.startsWith('tracker.format')),
+  );
 }

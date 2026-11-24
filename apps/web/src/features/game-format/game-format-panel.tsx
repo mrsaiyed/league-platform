@@ -10,7 +10,14 @@ import type { GameFormatRules, GameFormatView } from '@srleagues/contracts';
 import type { Translate } from '@srleagues/site';
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import type { GameFormatClient } from './format-client.ts';
-import { formatOfValues, valuesOf, type FormatValues } from './format-values.ts';
+import {
+  formatOfValues,
+  valuesOf,
+  withValue,
+  type ChoiceField,
+  type FormatValues,
+  type TypedField,
+} from './format-values.ts';
 import { factLines, refusalText, summaryOf } from './format-words.ts';
 
 export type FormatPanelLook = {
@@ -173,24 +180,6 @@ export function GameFormatPanel({
   );
 }
 
-/** The fields typed in: whole numbers, minutes, or empty for none. */
-type TypedField =
-  | 'minutes'
-  | 'overtimeMinutes'
-  | 'stopLastSeconds'
-  | 'mercyLead'
-  | 'bonusFouls'
-  | 'doubleBonusFouls'
-  | 'playerFoulLimit'
-  | 'fullTimeouts'
-  | 'shortTimeouts'
-  | 'overtimeTimeouts';
-
-type Choice<K extends keyof FormatValues> = {
-  readonly field: K;
-  readonly options: readonly FormatValues[K][];
-};
-
 export function GameFormatForm({
   view,
   t,
@@ -209,8 +198,8 @@ export function GameFormatForm({
   const id = useId();
   const [values, setValues] = useState<FormatValues>(() => valuesOf(view.applies));
   const [invalid, setInvalid] = useState(false);
-  const set = <K extends keyof FormatValues>(field: K, value: FormatValues[K]) =>
-    setValues((v) => ({ ...v, [field]: value }));
+  const set = (field: TypedField | ChoiceField, value: string) =>
+    setValues((v) => withValue(v, field, value));
   const k = 'tracker.formatChange';
 
   const number = (field: TypedField, label: string) => (
@@ -226,24 +215,19 @@ export function GameFormatForm({
       />
     </p>
   );
-  const choice = <
-    K extends 'periods' | 'clockMode' | 'stopScope' | 'teamFoulsReset' | 'timeoutsPer',
-  >(
-    { field, options }: Choice<K>,
-    label: string,
-    word: (option: FormatValues[K]) => string,
-  ) => (
+  /** A field chosen from a list: each option's value and its words. */
+  const choice = (field: ChoiceField, label: string, options: readonly (readonly string[])[]) => (
     <p>
       <label htmlFor={`${id}-${field}`}>{label}</label>
       <select
         id={`${id}-${field}`}
         name={field}
         value={values[field]}
-        onChange={(e) => set(field, e.target.value as FormatValues[K])}
+        onChange={(e) => set(field, e.target.value)}
       >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {word(option)}
+        {options.map(([value, words]) => (
+          <option key={value} value={value}>
+            {words}
           </option>
         ))}
       </select>
@@ -284,34 +268,37 @@ export function GameFormatForm({
           ))}
         </select>
       </p>
-      {choice({ field: 'periods', options: ['2', '4'] }, t(`${k}.field.periods`), (o) =>
-        t(o === '4' ? `${k}.option.periods.quarters` : `${k}.option.periods.halves`),
-      )}
+      {choice('periods', t(`${k}.field.periods`), [
+        ['2', t(`${k}.option.periods.halves`)],
+        ['4', t(`${k}.option.periods.quarters`)],
+      ])}
       {number('minutes', t(`${k}.field.length`))}
       {number('overtimeMinutes', t(`${k}.field.overtime`))}
-      {choice({ field: 'clockMode', options: ['stop', 'running'] }, t(`${k}.field.clock`), (o) =>
-        t(o === 'running' ? `${k}.option.clock.running` : `${k}.option.clock.stop`),
-      )}
+      {choice('clockMode', t(`${k}.field.clock`), [
+        ['stop', t(`${k}.option.clock.stop`)],
+        ['running', t(`${k}.option.clock.running`)],
+      ])}
       {number('stopLastSeconds', t(`${k}.field.stop`))}
-      {choice(
-        { field: 'stopScope', options: ['period', 'half', 'game'] },
-        t(`${k}.field.scope`),
-        (o) => t(`${k}.option.scope.${o}`),
-      )}
+      {choice('stopScope', t(`${k}.field.scope`), [
+        ['period', t(`${k}.option.scope.period`)],
+        ['half', t(`${k}.option.scope.half`)],
+        ['game', t(`${k}.option.scope.game`)],
+      ])}
       {number('mercyLead', t(`${k}.field.mercy`))}
-      {choice(
-        { field: 'teamFoulsReset', options: ['period', 'half', 'game'] },
-        t(`${k}.field.reset`),
-        (o) => t(`${k}.option.reset.${o}`),
-      )}
+      {choice('teamFoulsReset', t(`${k}.field.reset`), [
+        ['period', t(`${k}.option.reset.period`)],
+        ['half', t(`${k}.option.reset.half`)],
+        ['game', t(`${k}.option.reset.game`)],
+      ])}
       {number('bonusFouls', t(`${k}.field.bonus`))}
       {number('doubleBonusFouls', t(`${k}.field.double`))}
       {number('playerFoulLimit', t(`${k}.field.fouled`))}
       {number('fullTimeouts', t(`${k}.field.full`))}
       {number('shortTimeouts', t(`${k}.field.short`))}
-      {choice({ field: 'timeoutsPer', options: ['game', 'half'] }, t(`${k}.field.timeouts`), (o) =>
-        t(`${k}.option.timeouts.${o}`),
-      )}
+      {choice('timeoutsPer', t(`${k}.field.timeouts`), [
+        ['game', t(`${k}.option.timeouts.game`)],
+        ['half', t(`${k}.option.timeouts.half`)],
+      ])}
       {number('overtimeTimeouts', t(`${k}.field.overtimeouts`))}
       <p>
         <input
@@ -319,7 +306,7 @@ export function GameFormatForm({
           type="checkbox"
           name="timeoutsCarry"
           checked={values.timeoutsCarry}
-          onChange={(e) => set('timeoutsCarry', e.target.checked)}
+          onChange={(e) => setValues((v) => ({ ...v, timeoutsCarry: e.target.checked }))}
         />
         <label htmlFor={`${id}-carry`}>{t(`${k}.field.carry`)}</label>
       </p>

@@ -21,13 +21,6 @@ const adminLook: FormatPanelLook = {
   notice: 'staff-notice',
 };
 
-/** The words the panel uses: the tracker's format words, which the games area shares. */
-export function formatWords(catalog: Catalog): Catalog {
-  return Object.fromEntries(
-    Object.entries(catalog).filter(([key]) => key.startsWith('tracker.format')),
-  );
-}
-
 export function GameFormatSection({
   leagueId,
   gameId,

@@ -11,7 +11,8 @@ import { en } from '@srleagues/site';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { formatWords, GameFormatSection } from './game-format-section.tsx';
+import { formatWords } from '../game-format/index.ts';
+import { GameFormatSection } from './game-format-section.tsx';
 
 const rules = seasonRulesPreset('high-school');
 const format = formatOfRules(rules);
