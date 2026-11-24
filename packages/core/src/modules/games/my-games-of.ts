@@ -6,7 +6,7 @@
 // games are still listed, but marked not scorable (U-9); so are an archived season's, but
 // while a correction is open, for those who may correct games there (T-389).
 import { accessOfAccount, readOnlyLeagueStatuses, type Scope } from '../access/index.ts';
-import { archivedSeasonRefusesScoring } from './archived-season.ts';
+import { archivedSeasonRefusesScoring, gameInArchivedSeason } from './archived-season.ts';
 import { recordingOf } from './game-fields.ts';
 import type { GameInWindow, GamesTx } from './ports.ts';
 import { mayScoreUnder, scoringRuleOf } from './scoring-access.ts';
@@ -41,6 +41,12 @@ export type MyGame = {
    */
   readonly scorable: boolean;
   /**
+   * Its season is archived (O-12), by the commands' own check (gameInArchivedSeason):
+   * postponing, cancelling and putting it back are refused there, a correction open on it
+   * or not, so no page offers them (T-390).
+   */
+  readonly inArchivedSeason: boolean;
+  /**
    * Whether the live tracker has recorded plays of a game still to be decided (scheduled
    * or live), by the store's own rule (plays since its last "not started" marker): such a
    * game is ended in the tracker, never by a score typed by hand (S-46). False for a game
@@ -59,6 +65,7 @@ const view = (
   { game, day, assigned, programId }: GameInWindow,
   today: string,
   scorable: boolean,
+  inArchivedSeason: boolean,
   hasPlays: boolean,
   forfeitScore: MyGame['forfeitScore'],
 ): MyGame => ({
@@ -78,6 +85,7 @@ const view = (
   recording: recordingOf(game.captureMode),
   assignedToMe: assigned,
   scorable,
+  inArchivedSeason,
   hasPlays,
   version: game.version,
   forfeitScore,
@@ -123,8 +131,9 @@ export async function myGamesOf(
     const { forfeit } = rulesOfGame(entry.game.format, seasonRules.get(seasonId));
     const scope: Scope = { type: 'program', id: entry.programId };
     const open = scorable && !(await archivedSeasonRefusesScoring(entry.game, tx, holder, scope));
+    const archived = await gameInArchivedSeason({ gameId: entry.game.id }, tx);
     listed.push(
-      view(entry, today, open, plays, {
+      view(entry, today, open, archived, plays, {
         winner: forfeit.winnerScore,
         loser: forfeit.loserScore,
       }),

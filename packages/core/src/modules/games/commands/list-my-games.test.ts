@@ -80,6 +80,7 @@ describe('listMyGames', () => {
       recording: 'final-score',
       assignedToMe: true,
       scorable: true,
+      inArchivedSeason: false,
       hasPlays: false,
       version: 1,
       // The starting rules' forfeit score (step 2.158: the forfeit's question says it).
@@ -200,6 +201,16 @@ describe('listMyGames', () => {
       ['1', true],
       ['7', true],
       ['2', false],
+    ]);
+    // Its season archived, by the commands' own check, correction open or not (T-390).
+    const listed = await listMyGames(as(ownerId), {}, deps);
+    expect(
+      listed.ok && listed.value.games.map((g) => [g.id.slice(-1), g.inArchivedSeason]),
+    ).toEqual([
+      ['8', true],
+      ['1', true],
+      ['7', false],
+      ['2', true],
     ]);
   });
 
