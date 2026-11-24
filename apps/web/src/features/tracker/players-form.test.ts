@@ -9,6 +9,7 @@ import {
   fixChange,
   lineBox,
   lineChanges,
+  lineProblem,
   readDrafts,
   someTeamIsEmpty,
   typed,
@@ -132,5 +133,15 @@ describe('the Players panel: what is typed', () => {
     odd.setItem(draftsKey('g'), '[1,2]');
     expect(readDrafts(odd, 'g')).toEqual({});
     expect(readDrafts(null, 'g')).toEqual({});
+  });
+});
+
+describe('an add line that is neither a bench nor one player (step 2.118, part 3)', () => {
+  it('says several numbers with a name do not go together, and lets the rest through', () => {
+    expect(lineProblem('3 5', 'Made Player')).toBe('numbers-with-name');
+    expect(lineProblem('3,5,10', ' x ')).toBe('numbers-with-name');
+    expect(lineProblem('3 5 10 12 14', '')).toBeNull();
+    expect(lineProblem('12', 'Made Player')).toBeNull();
+    expect(lineProblem('', 'Made Player')).toBeNull();
   });
 });

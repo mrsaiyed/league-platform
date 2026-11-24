@@ -128,6 +128,17 @@ export function PlayersSheet(props: PlayersSheetProps) {
             ))}
           </div>
         )}
+        {/* On a phone the teams are stacked: the second is one tap away, not 17 rows down. */}
+        <button
+          type="button"
+          className="court-button court-players-jump"
+          data-players-jump="away"
+          onClick={() =>
+            document.getElementById(teamAnchor('away'))?.scrollIntoView({ block: 'start' })
+          }
+        >
+          {t('tracker.players.jump', { team: panel.away.name })}
+        </button>
         <div className="court-players-teams">
           {sides.map((side) => (
             <TeamPlayers key={side} {...props} team={panel[side]} />
@@ -137,6 +148,8 @@ export function PlayersSheet(props: PlayersSheetProps) {
     </div>
   );
 }
+
+const teamAnchor = (side: PlayerSide) => `court-players-team-${side}`;
 
 function TeamPlayers(props: PlayersSheetProps & { readonly team: PanelTeam }) {
   const { t, team, drafts, on } = props;
@@ -152,6 +165,7 @@ function TeamPlayers(props: PlayersSheetProps & { readonly team: PanelTeam }) {
   return (
     <section
       className="court-players-team"
+      id={teamAnchor(team.side)}
       data-players-team={team.side}
       aria-label={team.name}
       data-color={team.side === 'home' ? 'light' : 'dark'}

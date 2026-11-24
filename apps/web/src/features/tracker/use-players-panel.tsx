@@ -14,6 +14,7 @@ import {
   fixNumberBox,
   lineBox,
   lineChanges,
+  lineProblem,
   nameBox,
   readDrafts,
   someTeamIsEmpty,
@@ -167,6 +168,13 @@ export function usePlayersPanel(args: {
     add: (side: PlayerSide) => {
       const line = latest.current[lineBox(side)] ?? '';
       const name = latest.current[nameBox(side)] ?? '';
+      if (lineProblem(line, name) !== null) {
+        setSaid((before) => ({
+          ...before,
+          [side]: { kind: 'error', text: t('tracker.players.numbersWithName') },
+        }));
+        return;
+      }
       const changes = lineChanges(side, line, name);
       void send(side, changes, (result) => {
         if (result.ok) keep(cleared(latest.current, [lineBox(side), nameBox(side)]));

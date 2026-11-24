@@ -2618,7 +2618,18 @@
   gap: 16px;
   align-items: start;
 }
+/* The jump to the away team, only where the teams are stacked (two columns of 300 and
+   the sheet's edges do not fit). */
+.court-players-jump {
+  align-self: flex-start;
+}
+@media (min-width: 680px) {
+  .court-players-jump {
+    display: none;
+  }
+}
 .court-players-team {
+  scroll-margin-block-start: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;

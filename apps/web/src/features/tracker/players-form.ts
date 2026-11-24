@@ -41,6 +41,15 @@ export const someTeamIsEmpty = (rosters: DeviceRosters) =>
   teamIsEmpty(rosters.home) || teamIsEmpty(rosters.away);
 
 /**
+ * Why a team's add line is not sent as typed, or null: several numbers with a name are
+ * neither a bench nor one player (the lead's decision, step 2.118 part 3), so the panel
+ * says what to do instead of sending them to be refused.
+ */
+export function lineProblem(line: string, name: string): 'numbers-with-name' | null {
+  return numbersOfLine(line).length > 1 && name.trim() !== '' ? 'numbers-with-name' : null;
+}
+
+/**
  * The changes a team's add line asks for: several numbers and no name are a bench, one
  * player each; otherwise one player with the number (or none) and the name typed.
  */

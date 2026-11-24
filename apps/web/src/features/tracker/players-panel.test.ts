@@ -191,3 +191,23 @@ describe('the Players panel, drawn', () => {
     }
   });
 });
+
+describe('both teams within reach on a phone (step 2.118, part 3)', () => {
+  it('puts a jump to the away team at the top, and each add line above its list', () => {
+    const html = draw({
+      rosters: { ...rosters, away: { ...rosters.away, players: [player(3, '9')] } },
+    });
+    const jump = html.indexOf('data-players-jump="away"');
+    expect(jump).toBeGreaterThan(-1);
+    expect(html).toContain('Go to the away team: Made Away');
+    expect(jump).toBeLessThan(html.indexOf('data-players-team="home"'));
+    expect(html).toContain('id="court-players-team-away"');
+    for (const side of ['home', 'away']) {
+      const team = html.indexOf(`data-players-team="${side}"`);
+      const line = html.indexOf(`data-players-line="${side}"`, team);
+      const firstRow = html.indexOf('data-player-row=', team);
+      expect(line).toBeGreaterThan(team);
+      expect(line).toBeLessThan(firstRow);
+    }
+  });
+});
