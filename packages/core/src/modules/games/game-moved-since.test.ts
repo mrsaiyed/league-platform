@@ -262,6 +262,20 @@ describe('send these plays (S-43, T-335)', () => {
     expect(t.db.state.events).toHaveLength(since);
   });
 
+  // The closing (step 2.148): the kept session's account is checked, not only the game.
+  it('refuses another scorekeeper, allowed to score, who names the tablet’s lost session with nothing recorded since, and writes nothing', async () => {
+    const { t, since, plays } = await takenOver();
+    const logged = t.db.state.activity.length;
+    // The phone's scorekeeper holds the game and learned the tablet's session id.
+    expect(statuses(await send(t, plays, since, otherScorekeeperId))).toEqual(
+      plays.map(() => 'game-moved'),
+    );
+    expect(t.db.state.events).toHaveLength(since);
+    expect(t.db.state.activity).toHaveLength(logged);
+    // The tablet's own scorekeeper can still send them: nothing was written for that session.
+    expect(statuses(await send(t, plays, since))).toEqual(plays.map(() => 'accepted'));
+  });
+
   it('does not look past another account’s play that carries one of the batch’s command ids', async () => {
     const { t, since, plays, phoneSession } = await takenOver();
     const forged = plays[0]?.commandId ?? '';
