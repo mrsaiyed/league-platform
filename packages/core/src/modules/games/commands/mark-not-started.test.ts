@@ -288,8 +288,10 @@ describe('marking a game not started once something is recorded (S-40)', () => {
       { type: 'turnover', side: 'home', playerId: homeIds[1] ?? '' },
       { type: 'team-turnover', side: 'away' },
     ];
+    // A season that keeps turnovers: one that does not refuses them (S-93, step 2.241).
+    const full = { ...seasonRulesPreset('high-school'), statistics: 'full' as const };
     for (const play of plays) {
-      const t = setUp();
+      const t = setUp({ seasons: [{ id: seasonId, programId: 'p1', rules: full }] });
       await tap(t, [...tipOff, play]);
       expect(await mark(t, scorekeeperId), play.type).toMatchObject({
         ok: false,

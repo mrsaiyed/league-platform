@@ -16,6 +16,7 @@ import {
   hawks,
   liveLeagueId,
   tap,
+  keepingTurnovers,
   trackerWorld,
   type League,
   type Person,
@@ -93,7 +94,7 @@ describe('POST …/games/{game}/commands', () => {
   });
 
   it("never publishes a staff-only team's player names", async () => {
-    const world = trackerWorld();
+    const world = trackerWorld({ deps: keepingTurnovers });
     const sessionId = await openSession(world, games.hawksBears);
     const plays = [
       tap({ type: 'score', side: 'away', playerId: bears[0], points: 3 }),

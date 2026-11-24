@@ -9,7 +9,13 @@ import { basketball } from '@srleagues/sports';
 import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { bears, games, hawks, liveLeagueId } from '../../server/tracker-endpoints.test-helper.ts';
+import {
+  bears,
+  games,
+  hawks,
+  keepingTurnovers,
+  liveLeagueId,
+} from '../../server/tracker-endpoints.test-helper.ts';
 import { standInPlayerId } from '../../server/stand-in-games.ts';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
@@ -524,9 +530,30 @@ describe('substitutions (checklist E1 to E5)', () => {
   });
 });
 
+// The stand-in seasons keep the standard set: these play in one that keeps turnovers (S-93).
+const turnoversKept = () => scoringDevice(endpointNetwork({ deps: keepingTurnovers }));
+
 describe('turnovers (checklist D9, G1, G2)', () => {
-  it('counts a player’s turnovers in the team’s chip, lists them, and takes one back', async () => {
+  it('sets a turnover aside and lists it where the season keeps none, and sends the plays after it (S-93)', async () => {
     const device = await scoringDevice();
+    await device.tipOff();
+    await device.option(h2, 'turnover');
+    await device.option(h1, 'p2');
+    const server = await device.onServer();
+    expect(server.teams.home.turnovers).toBe(0);
+    expect(server.teams.home.score).toBe(2);
+    const status = device.controller.status();
+    expect(status.waiting).toEqual([]);
+    // Listed as not applied, with its own code (T-391): never lost silently.
+    expect(status.notApplied.map((r) => [r.command.commandId, r.refusal.code])).toEqual([
+      [expect.any(String), 'statistic-not-kept'],
+    ]);
+    const refused = status.notApplied[0]?.command;
+    expect(refused !== undefined && 'input' in refused && refused.input.type).toBe('turnover');
+  });
+
+  it('counts a player’s turnovers in the team’s chip, lists them, and takes one back', async () => {
+    const device = await turnoversKept();
     await device.tipOff();
     const none = drawn(device.view(), { pad: { kind: 'turnovers', side: 'home' } });
     expect(tagWith(none, 'data-turnovers="home"')).toContain('aria-expanded="true"');
@@ -558,7 +585,7 @@ describe('turnovers (checklist D9, G1, G2)', () => {
   });
 
   it('adds a team turnover, charged to no player, and takes it back (G2)', async () => {
-    const device = await scoringDevice();
+    const device = await turnoversKept();
     await device.tipOff();
     await device.taken({ type: 'team-turnover', side: 'away' });
     const server = await device.onServer();

@@ -36,6 +36,10 @@
 // only, never the typed name: events are never changed, and a name must stay
 // erasable (T-52). The lines a batch started with are worked out from the rosters as
 // they were then, so a number changed in the batch is written to the lines it reaches.
+//
+// A play of a statistic the season does not keep (a turnover in a season keeping the
+// standard set) is refused, about that tap alone (S-93, step 2.241, T-391): the tracker
+// sets it aside, lists it and sends the rest.
 import {
   buildVersionRefusal,
   CommandBatch,
@@ -76,6 +80,7 @@ import { recordActivity, scopeDetails } from '../../access/index.ts';
 import type { GameRecord, NewGameEvent, TrackerTx } from '../ports.ts';
 import { lowerId, scorerOf, sessionStanding } from '../scoring-session.ts';
 import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
+import { keptForScoring, tapNotKept } from '../statistic-of-tap.ts';
 import { applyTablePlayer, tableRefusal, type TableRefusal } from '../table-players.ts';
 
 export type ApplyTrackerCommandsError =
@@ -119,7 +124,9 @@ function tableEventPayload(input: TablePlayerInput): Readonly<Record<string, unk
 /** A game the tracker may score: not decided, called off or put off. */
 const isPlayable = (game: GameRecord) => game.status === 'scheduled' || game.status === 'live';
 
-const messages: Readonly<Record<Exclude<RefusalCode, 'rule' | 'not-allowed'>, string>> = {
+const messages: Readonly<
+  Record<Exclude<RefusalCode, 'rule' | 'not-allowed' | 'statistic-not-kept'>, string>
+> = {
   'session-not-held': 'This device no longer holds the game.',
   'game-not-live': 'This game cannot be scored now.',
   'unknown-game': 'There is no such game.',
@@ -300,6 +307,15 @@ export const applyTrackerCommands = defineCommand({
     // The rosters as the batch found them, for the lines it started with.
     const rosterAtStart = new Map(roster);
     const { uniqueJerseys } = (await seasonRulesOf(tx, game.seasonId)).rosters;
+    // S-93 (step 2.241): the statistics the season keeps as they stand, as the public
+    // pages count them, not the ones the game kept when it went live: a tap whose
+    // statistic the pages would not show is refused, so it is never lost silently.
+    const kept = keptForScoring((await tx.games.findSeason(game.seasonId))?.rules);
+    // T-391: its own code only to a tracker that reads it; to any other, a game rule.
+    const notKeptCode =
+      batch.knownRefusals?.includes('statistic-not-kept') === true
+        ? ('statistic-not-kept' as const)
+        : ('rule' as const);
     const events: NewGameEvent[] = [];
     /** Whether a play was taken: only then is a state saved for a game that has none. */
     let played = false;
@@ -415,6 +431,14 @@ export const applyTrackerCommands = defineCommand({
       const input: TrackerInput = withLowerIds(command.input);
       const platform = platformProblem(input);
       if (platform !== undefined) return refused(platform);
+      const notKept = tapNotKept(input.type, kept);
+      if (notKept !== undefined) {
+        return {
+          commandId: command.commandId,
+          status: 'refused',
+          reason: { code: notKeptCode, message: `This season does not keep ${notKept}.` },
+        };
+      }
       const missing = playerNotOnTeam(game, roster, input);
       if (missing !== undefined && notAdded.has(missing)) return notAddedRefusal(missing);
       if (missing !== undefined) {
