@@ -36,6 +36,8 @@ export const problems = {
   signInAgain: 'problem.signInAgain',
   /** Sent from the tracker's address with no session (step 2.33). */
   signInToScore: 'problem.signInToScore',
+  /** Sent from a game being scored whose sign-in ran out (step 2.33): the plays are kept. */
+  backToYourGame: 'problem.backToYourGame',
   noPassword: 'problem.noPassword',
   signOutEverywhereFailed: 'problem.signOutEverywhereFailed',
 } as const satisfies Record<string, TextKey>;

@@ -258,6 +258,42 @@ if (browser) {
         await accessible(page, 'sign-in from a league');
         await noSidewaysScroll(page, 'sign-in from a league');
         await tallEnough(page, 'main', 'the sign-in screen');
+        // Step 2.102: the sign-in family's other screens, in the same look and width.
+        const other = await page.context().newPage();
+        await other.setViewportSize(page.viewportSize() ?? { width: 390, height: 844 });
+        for (const [at, name] of [
+          ['/signin?problem=backToYourGame', 'sign-in after a mid-game sign-out'],
+          ['/signin/forgot', 'the forgotten-password screen'],
+          ['/signup/code', 'the code screen'],
+        ]) {
+          await other.goto(`${origin}${at}`);
+          await accessible(other, name);
+          await noSidewaysScroll(other, name);
+          await tallEnough(other, 'main', name);
+        }
+        // With nothing waiting, the code screen has no code box: "Start again" is its one
+        // filled button (step 2.102's fix round).
+        await other.goto(`${origin}/signup/code`);
+        const waiting = {
+          boxes: await other.locator('main input[name=code]').count(),
+          filled: await other.locator('main .ui-button[data-kind=main]').allInnerTexts(),
+        };
+        note(
+          'with nothing waiting the code screen offers only "Start again", filled',
+          waiting.boxes === 0 &&
+            waiting.filled.length === 1 &&
+            waiting.filled[0]?.trim() === 'Start again',
+          JSON.stringify(waiting),
+        );
+        await other.goto(`${origin}/signin?problem=backToYourGame`);
+        const kept = await other.locator('[data-sign-in-problem=backToYourGame]').innerText();
+        note(
+          'after a mid-game sign-out, sign-in says the game is kept on this device',
+          kept.trim() ===
+            'Sign in again to go back to your game. What you entered is kept on this device.',
+          kept,
+        );
+        await other.close();
         await signIn(page, people.scorekeeper);
         note(
           'signed in, the scorekeeper is back on the league home',
@@ -319,6 +355,29 @@ if (browser) {
           (await page
             .locator('main [role=alert]', { hasText: 'Wrong email or password.' })
             .count()) === 1 && (await link(page, 'Back to North Valley League').count()) === 1,
+        );
+        // Step 2.102's fix round: both fields are marked wrong, pointing at the refusal, and
+        // the keyboard is on the first of them.
+        const marked = await page.evaluate(() => {
+          const alert = document.querySelector('main [role=alert]');
+          const fields = [
+            ...document.querySelectorAll('main input[name=email], main input[name=password]'),
+          ];
+          return {
+            fields: fields.length,
+            marked: fields.every(
+              (f) =>
+                f.getAttribute('aria-invalid') === 'true' &&
+                alert !== null &&
+                f.getAttribute('aria-describedby') === alert.id,
+            ),
+            focused: document.activeElement?.getAttribute('name') ?? null,
+          };
+        });
+        note(
+          'after a wrong password both fields are marked wrong, tied to the refusal, and focus is on the email',
+          marked.fields === 2 && marked.marked && marked.focused === 'email',
+          JSON.stringify(marked),
         );
         await signIn(page, people.owner);
         note(
@@ -401,11 +460,14 @@ if (browser) {
       await openMenu(page);
       await link(page, 'Your account').click();
       await page.waitForURL((url) => url.pathname === '/account');
-      const first = await page.locator('main > *').first().innerText();
+      // Our name as the kicker, like every other card, then who is signed in, above
+      // everything else (step 2.102's fix round).
+      const [kicker, who] = await page.locator('main > *').allInnerTexts();
       note(
-        'the account page says who is signed in above everything else',
-        first === 'Signed in as scorekeeper@example.test',
-        first,
+        'the account page says who is signed in above everything else, under our name',
+        kicker?.trim().toLowerCase() === 'sr leagues' &&
+          who === 'Signed in as scorekeeper@example.test',
+        `${kicker} / ${who}`,
       );
       note(
         'the account page lists their leagues, each a link',
@@ -414,6 +476,57 @@ if (browser) {
       await accessible(page, 'the account page');
       await noSidewaysScroll(page, 'the account page');
       await tallEnough(page, 'main', 'the account page');
+    } finally {
+      await context.close();
+    }
+  });
+
+  // Step 2.102: SR Leagues' serif titles reach the pages of no league, "not found" among
+  // them; under a league's address, a page not found keeps the league's own look.
+  await step('a page not found keeps the look of where it is', async () => {
+    const { context, page } = await fresh();
+    try {
+      const looks = async () =>
+        page.evaluate(() => {
+          const h1 = document.querySelector('main h1');
+          const root = getComputedStyle(document.documentElement);
+          return {
+            heading: root.getPropertyValue('--font-heading').trim(),
+            primary: root.getPropertyValue('--color-primary').trim(),
+            title: h1 === null ? '' : getComputedStyle(h1).fontFamily,
+          };
+        });
+      await page.goto(`${origin}/north-valley`);
+      const league = await looks();
+      await page.goto(`${origin}/no-such-page-anywhere`);
+      const platform = await looks();
+      note(
+        "a page of no league has SR Leagues' serif title",
+        /gelasio/i.test(platform.title),
+        platform.title,
+      );
+      note(
+        "the league's look is not SR Leagues'",
+        league.heading !== platform.heading || league.primary !== platform.primary,
+        `${league.heading} ${league.primary}`,
+      );
+      await page.goto(`${origin}/north-valley/teams/no-such-team`);
+      const inLeague = await looks();
+      note(
+        "a page not found inside a league keeps the league's colors and title face",
+        inLeague.heading === league.heading &&
+          inLeague.primary === league.primary &&
+          inLeague.primary !== platform.primary &&
+          inLeague.title.replace(/["'\s]/g, '') === inLeague.heading.replace(/["'\s]/g, ''),
+        JSON.stringify(inLeague),
+      );
+      await page.goto(`${origin}/north-valley`);
+      const after = await looks();
+      note(
+        "a league's page after one of SR Leagues' keeps the league's look",
+        after.heading === league.heading && after.primary === league.primary,
+        JSON.stringify(after),
+      );
     } finally {
       await context.close();
     }

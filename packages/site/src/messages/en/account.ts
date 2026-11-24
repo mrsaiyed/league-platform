@@ -148,6 +148,8 @@ export const enAccount = {
   // Refused, though the form keeps the email typed (record 081, F4 and C2). Each has a
   // wording for a screen that draws "Continue with Google" and one for a screen that does
   // not (M27): Google is offered only where its button really is.
+  'problem.backToYourGame':
+    'Sign in again to go back to your game. What you entered is kept on this device.',
   'problem.botCheckDidNotLoad':
     'The check that you are a person could not load on this connection. Please try again, or try another connection (mobile data instead of this Wi-Fi, for example), or use Continue with Google.',
   'problem.botCheckDidNotLoadNoGoogle':

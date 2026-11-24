@@ -98,6 +98,8 @@ const publicPages = [
   { name: 'stats', at: '/stats' },
   { name: 'teams', at: '/teams' },
   { name: 'team', at: '/teams', first: '/teams/' },
+  // Step 2.102: a page not found inside a league keeps the league's own look.
+  { name: 'league-not-found', at: '/teams/no-such-team' },
 ];
 // A game's page in each of its states. The ids are the stand-in's own
 // (apps/web/src/server/stand-in-games.ts and stand-in-public-schedule.ts): a tracked game
@@ -805,6 +807,14 @@ const overtimePages = [
 const signedInPlatformPages = [
   { name: 'platform-home-signed-in', at: '/' },
   { name: 'platform-account', at: '/account' },
+  // Step 2.102 part 2: "already signed in", and the password again, with its refusal beside
+  // the field.
+  { name: 'platform-signin-already', at: '/signin' },
+  { name: 'platform-confirm', at: '/account/confirm?next=%2Faccount' },
+  {
+    name: 'platform-confirm-refused',
+    at: '/account/confirm?problem=wrongPassword&next=%2Faccount',
+  },
 ];
 // The account button's menu, open, on the first league's home (step 2.127).
 const accountMenuPages = [{ name: 'account-menu-open', at: '', opens: true }];
@@ -813,6 +823,11 @@ const platformPages = [
   { name: 'platform-home', at: '/' },
   { name: 'platform-signin', at: '/signin' },
   { name: 'platform-signup', at: '/signup' },
+  // Step 2.102: the sign-in family's other screens, and sign-in after a mid-game sign-out.
+  { name: 'platform-signin-again', at: '/signin?problem=backToYourGame' },
+  { name: 'platform-signin-refused', at: '/signin?problem=wrongEmailOrPassword' },
+  { name: 'platform-forgot', at: '/signin/forgot' },
+  { name: 'platform-signup-code', at: '/signup/code' },
   { name: 'platform-find', at: '/find' },
   { name: 'platform-start', at: '/start' },
   { name: 'platform-help', at: '/help' },

@@ -164,6 +164,7 @@ const FIELDS = {
   '/signin': { email: 'the email boxes' },
   '/signup': { email: 'the email boxes' },
   '/signin/forgot': { email: 'the email boxes' },
+  // Only while a sign-up is waiting (step 2.102's fix round): typed in the email boxes' step.
   '/signup/code': { code: 'the email boxes' },
 };
 
@@ -379,6 +380,8 @@ let boxScore = '';
 const decidedGame = '01900000-0000-7000-8000-006a00000001';
 /** Fields a step above typed into by their label (the reopen form exists only while decided). */
 const typedInto = new Set();
+/** Fields a step above saw on a page the walk cannot open as it stands (the code box). */
+const seenEarly = [];
 
 if (browser) {
   const context = await contextFor(owner);
@@ -722,6 +725,43 @@ if (browser) {
         [...found.made, ...found.refused].join(' | '),
       );
     }
+    // The code box shows only while a sign-up is waiting on this device (step 2.102's fix
+    // round), so a made-up sign-up is started first, then the attack is typed into the box.
+    await context.clearCookies();
+    await page.goto(`${origin}/signup`);
+    await page.locator('input[name=email]').fill('harmful-text-walk@example.test');
+    await Promise.all([
+      page.waitForURL((url) => url.pathname === '/signup/code'),
+      page.getByRole('button', { name: 'Email me a code' }).click(),
+    ]);
+    const box = page.locator('form input[name=code]');
+    note('/signup/code: with a sign-up waiting, the code box is drawn', (await box.count()) === 1);
+    seenEarly.push({
+      route: '/signup/code',
+      field: { kind: (await box.getAttribute('type')) ?? 'text', name: 'code' },
+      inForm: true,
+    });
+    // Set as a value, past the box's own length limit, as a hand-made post would be.
+    await box.evaluate((element, value) => {
+      element.removeAttribute('maxlength');
+      element.closest('form').noValidate = true;
+      element.value = value;
+    }, attack('code'));
+    await Promise.all([
+      page.waitForLoadState('load'),
+      page
+        .locator('form', { has: page.locator('input[name=code]') })
+        .locator('button[type=submit]')
+        .click(),
+    ]);
+    await page.waitForTimeout(500);
+    typedInto.add('/signup/code code');
+    const found = await harm(page);
+    note(
+      '/signup/code: a refused code made no element',
+      found.made.length === 0 && found.ran === null && found.refused.length === 0,
+      [...found.made, ...found.refused].join(' | '),
+    );
   });
   await context.close();
 
@@ -1055,6 +1095,7 @@ async function walkEveryRoute() {
     entry.inForm ||= inForm;
     inventory.set(key, entry);
   };
+  for (const { route, field, inForm } of seenEarly) saw(route, field, inForm);
 
   // A. Every route as each role, from the server's answer: no attack unescaped, every field
   // written down, every plain form kept to be posted to.
