@@ -70,7 +70,9 @@ import {
   type TrackerInput,
 } from '../live-game.ts';
 import { finishTrackedGame, liveResultOf } from '../finish-tracked-game.ts';
+import { gameMovedSince } from '../game-moved-since.ts';
 import { gameScope, mayChangeGames, mayScoreGame } from '../policy.ts';
+import { recordActivity, scopeDetails } from '../../access/index.ts';
 import type { GameRecord, NewGameEvent, TrackerTx } from '../ports.ts';
 import { lowerId, scorerOf, sessionStanding } from '../scoring-session.ts';
 import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
@@ -121,6 +123,7 @@ const messages: Readonly<Record<Exclude<RefusalCode, 'rule' | 'not-allowed'>, st
   'session-not-held': 'This device no longer holds the game.',
   'game-not-live': 'This game cannot be scored now.',
   'unknown-game': 'There is no such game.',
+  'game-moved': 'Something was recorded in this game since these plays were made.',
 };
 
 export const applyTrackerCommands = defineCommand({
@@ -201,14 +204,69 @@ export const applyTrackerCommands = defineCommand({
     if (!isPlayable(game)) {
       return ok(reply(seq, refuseAll('game-not-live', messages['game-not-live'], taken)));
     }
-    const standing = await sessionStanding(tx, gameId, batch.sessionId.toLowerCase(), accountId);
     // The device says whose taps these are (T-327): only the session's own account's are
     // taken. The stated maker can only refuse a batch, never let one in.
     const otherMaker =
       batch.accountId !== undefined && batch.accountId.toLowerCase() !== accountId.toLowerCase();
-    if (!standing.held || otherMaker) {
-      return ok(reply(seq, refuseAll('session-not-held', messages['session-not-held'], taken)));
+    const namedSession = batch.sessionId.toLowerCase();
+    /**
+     * Where the answer is written down (T-335): the holding session is heard at it; a lost
+     * session's kept plays, once some were taken, were sent up to it.
+     */
+    let noteAnswer: (() => Promise<void>) | undefined;
+    if (batch.notSavedSince === undefined) {
+      const standing = await sessionStanding(tx, gameId, namedSession, accountId);
+      if (!standing.held || otherMaker) {
+        return ok(reply(seq, refuseAll('session-not-held', messages['session-not-held'], taken)));
+      }
+      noteAnswer = () => tx.scoringSessions.heard(gameId, namedSession, seq);
+    } else {
+      // "Send these plays" (S-43, T-335): the scorekeeper's own tap, whoever holds the
+      // game now, taken only from the account whose session the game was taken from
+      // (the server keeps it, 0027), and only if the game has not moved since the server
+      // last answered that session. All of it under this game's lock (above), so no
+      // batch or takeover of this game can come between the check and the write.
+      if (otherMaker) {
+        return ok(reply(seq, refuseAll('session-not-held', messages['session-not-held'], taken)));
+      }
+      const lost = await tx.scoringSessions.findLost(gameId, namedSession);
+      const moved =
+        lost === undefined ||
+        lost.accountId.toLowerCase() !== accountId.toLowerCase() ||
+        (await gameMovedSince(tx, {
+          gameId,
+          since: batch.notSavedSince,
+          last: seq,
+          own: new Set(ids),
+          accountId,
+          heard: lost.heardSeq,
+          ...(lost.sentSeq === undefined ? {} : { sent: lost.sentSeq }),
+        }));
+      if (moved) {
+        return ok(reply(seq, refuseAll('game-moved', messages['game-moved'], taken)));
+      }
+      const seqBefore = seq;
+      noteAnswer = async () => {
+        if (seq === seqBefore) return;
+        await tx.scoringSessions.sent(gameId, namedSession, seq);
+        // Written as what it is (T-335): plays kept after a takeover, sent by their maker.
+        await recordActivity(tx, context, {
+          action: 'games.apply_tracker_commands',
+          target: { type: 'game', id: gameId },
+          details: {
+            gameId,
+            change: 'sent-after-takeover',
+            events: seq - seqBefore,
+            ...scopeDetails(await gameScope(tx, gameId)),
+          },
+        });
+      };
     }
+    /** Every answer from here on: written down first, in this same transaction. */
+    const answer = async (results: CommandResult[]) => {
+      await noteAnswer?.();
+      return ok(reply(seq, results));
+    };
 
     const now = tx.clock.now();
     const before = saved === undefined ? undefined : readState(saved.state);
@@ -383,18 +441,18 @@ export const applyTrackerCommands = defineCommand({
     for (const [i, command] of batch.commands.entries()) {
       results.push(await applyOne(ids[i] ?? command.commandId.toLowerCase(), command));
     }
-    if (events.length === 0) return ok(reply(seq, results));
+    if (events.length === 0) return answer(results);
 
     // T6 §1: the events, the state, every changed line and the score, all together.
     await tx.liveGames.addEvents(events);
     // Changes of players alone are not plays: a game with no state is not given one,
     // so it is not taken for a tracked game (its box score can be entered from paper,
     // and reopening it later keeps that box score). A state it has follows the events.
-    if (before === undefined && !played) return ok(reply(seq, results));
+    if (before === undefined && !played) return answer(results);
     await tx.liveGames.saveState(gameId, seq, state);
     if (state.status === 'final') {
       await finishTrackedGame({ context, tx, emit, game, state, rules });
-      return ok(reply(seq, results));
+      return answer(results);
     }
     const changed = changedLines(
       before === undefined ? new Map() : linesOf(game, rosterAtStart, before),
@@ -427,6 +485,6 @@ export const applyTrackerCommands = defineCommand({
       // The game is locked and was read after the lock: it cannot have moved on.
       if (updated === undefined) throw new Error('A locked game changed under its batch.');
     }
-    return ok(reply(seq, results));
+    return answer(results);
   },
 });

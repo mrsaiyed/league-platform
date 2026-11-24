@@ -188,7 +188,10 @@ export async function openIndexedDbQueueStorage(
       });
     },
 
-    async settle(gameId, { remove = [], refuse = [], notSaved = [], carryOn }: QueueSettlement) {
+    async settle(
+      gameId,
+      { remove = [], refuse = [], notSaved = [], notSavedSince, carryOn }: QueueSettlement,
+    ) {
       const dropped = new Set(remove);
       const refusals = new Map(refuse.map((r) => [r.commandId, r.refusal]));
       const setAside = new Set(notSaved);
@@ -207,7 +210,8 @@ export async function openIndexedDbQueueStorage(
           else if (refusal !== undefined) cursor.update({ ...row, state: 'refused', refusal });
           else if (setAside.has(id)) {
             const { refusal: _refusal, ...kept } = row as Row & { refusal?: unknown };
-            cursor.update({ ...kept, state: 'not-saved' });
+            const since = notSavedSince === undefined ? {} : { notSavedSince };
+            cursor.update({ ...kept, state: 'not-saved', ...since });
           } else if (carryOn !== undefined && carried.has(id) && row.state === 'waiting') {
             cursor.update({ ...row, sessionId: carryOn.sessionId });
           }

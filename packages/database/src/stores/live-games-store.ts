@@ -15,6 +15,7 @@ import {
   insertTablePlayer,
   listRefusedAdds,
   listGamePlayerLines,
+  listGameEventsAfter,
   listGamePlayers,
   listTakenCommands,
   removeTablePlayer,
@@ -59,5 +60,6 @@ export function liveGamesStore(scope: LeagueScope): LiveGamesStore {
       removeTablePlayer(scope, entryId, personId, gameId, thisGameToo),
     refusedAdds: (gameId) => listRefusedAdds(scope, gameId),
     lastEventSeq: (gameId) => findLastEventSeq(scope, gameId),
+    eventsAfter: (gameId, afterSeq, limit) => listGameEventsAfter(scope, gameId, afterSeq, limit),
   };
 }

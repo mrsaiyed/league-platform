@@ -34,6 +34,7 @@ export const openScoringSession = defineCommand({
     const game = await scorableGame(tx, input.gameId);
     if (!game.ok) return game;
     const device = { accountId: scorerOf(context), deviceId: input.deviceId };
+    // A game under way is never given away without the takeover question (S-42).
     return ok(await openFor(tx, game.value, device, tx.clock.now()));
   },
 });

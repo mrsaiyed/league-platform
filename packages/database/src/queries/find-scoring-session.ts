@@ -14,6 +14,8 @@ export async function findScoringSession(
     .select(scoringSessionColumns)
     .where('league_id', '=', scope.leagueId)
     .where('game_id', '=', gameId)
+    // A session the game was taken from is kept, holding nothing (0027).
+    .where('lost_at', 'is', null)
     .executeTakeFirst();
   return row === undefined ? undefined : scoringSessionSummary(row);
 }

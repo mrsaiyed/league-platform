@@ -127,6 +127,12 @@ export type QueueStatus = {
   readonly savedAt: number | null;
 };
 
+/**
+ * The server's answer to a batch of a session that still held the game (T-335, T-338):
+ * the game's sequence then, and how many of the batch's commands it took as new events.
+ */
+export type HeldAnswer = { readonly sequence: number; readonly took: number };
+
 export type StorageFailure = { readonly code: QueueErrorCode; readonly since: number };
 
 export type TrackerQueueOptions = {
@@ -194,9 +200,10 @@ export type TrackerQueue = {
   forget(commandIds: readonly string[]): Promise<void>;
   /**
    * Keeps waiting taps as not saved: never sent, still stored until `forget`, so the
-   * list survives a reload (T6 §5). A halt is cleared as `forget` clears it.
+   * list survives a reload (T6 §5). A halt is cleared as `forget` clears it. Given
+   * `notSavedSince`, the sequence they were made on, it is kept with them (T-337).
    */
-  setAside(commandIds: readonly string[]): Promise<void>;
+  setAside(commandIds: readonly string[], notSavedSince?: number): Promise<void>;
   /**
    * Sends waiting taps made under an earlier session of this device under `sessionId`
    * (step 2.38): the tracker has checked that nobody else scored since that one ended.
@@ -213,8 +220,11 @@ export type TrackerQueue = {
   /** The scorekeeper has seen these notices (record 058): they are dropped. */
   dismissNotices(commandIds: readonly string[]): void;
   status(): QueueStatus;
-  /** Called with the new status after every change. Returns the unsubscribe. */
-  subscribe(listener: (status: QueueStatus) => void): () => void;
+  /**
+   * Called with the new status after every change, and with `answer` when that change is
+   * the server's answer to a batch while this device held the game. Returns the unsubscribe.
+   */
+  subscribe(listener: (status: QueueStatus, answer?: HeldAnswer) => void): () => void;
   /** Stops sending: the page is leaving the game. What is stored stays stored. */
   stop(): void;
   /** Resolves when the queue is not in the middle of sending. For tests. */
@@ -253,7 +263,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     sequence: null,
     savedAt: null,
   };
-  const listeners = new Set<(status: QueueStatus) => void>();
+  const listeners = new Set<(status: QueueStatus, answer?: HeldAnswer) => void>();
   let started = false;
   let stopped = false;
   let failures = 0;
@@ -273,9 +283,9 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
    */
   const unsure = new Set<string>();
 
-  const update = (change: Partial<QueueStatus>): void => {
+  const update = (change: Partial<QueueStatus>, answer?: HeldAnswer): void => {
     current = { ...current, ...change };
-    for (const listener of listeners) listener(current);
+    for (const listener of listeners) listener(current, answer);
   };
 
   /** Runs one storage call, keeping `storageFailure` true to how the last one went. */
@@ -348,17 +358,25 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
   };
 
   /** The server answered: whatever it said, the device is not offline. */
-  const answered = (change: Partial<QueueStatus> = {}): void => {
+  const answered = (change: Partial<QueueStatus> = {}, answer?: HeldAnswer): void => {
     failures = 0;
-    update({ unansweredSince: null, ...change });
+    update({ unansweredSince: null, ...change }, answer);
   };
 
   const settle = (
     remove: readonly string[],
     refuse: readonly RefusedEntry[],
     notSaved: readonly string[] = [],
+    notSavedSince?: number,
   ): Promise<void> =>
-    stored('storage-write-failed', () => storage.settle(gameId, { remove, refuse, notSaved }));
+    stored('storage-write-failed', () =>
+      storage.settle(gameId, {
+        remove,
+        refuse,
+        notSaved,
+        ...(notSavedSince === undefined ? {} : { notSavedSince }),
+      }),
+    );
 
   const nextBatch = (list: readonly QueuedCommand[], session: string): CommandBatch | null => {
     // A tap made under another session is never sent under this one (T6 §5, record 049):
@@ -478,11 +496,21 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     if (remove.length > 0 || refuse.length > 0) await settle(remove, refuse);
     if (notices.length > 0) update({ notices: [...current.notices, ...notices] });
     if (singlesLeft > 0) singlesLeft = Math.max(singlesLeft - batch.commands.length, 0);
-    answered({
-      sequence: Math.max(current.sequence ?? 0, outcome.reply.sequence),
-      ...(halt === null ? {} : { halted: halt }),
-      ...(remove.length === 0 ? {} : { savedAt: clock.now() }),
-    });
+    // Only an answer while this device still held the game moves its sequence (T-335): one
+    // saying the game is no longer held carries the new holder's plays, which the plays
+    // kept here were never made on.
+    const took = outcome.reply.results.filter(
+      (r) => r.status === 'accepted' && batch.commands.some((c) => c.commandId === r.commandId),
+    ).length;
+    answered(
+      {
+        ...(halt === null
+          ? { sequence: Math.max(current.sequence ?? 0, outcome.reply.sequence) }
+          : { halted: halt }),
+        ...(remove.length === 0 ? {} : { savedAt: clock.now() }),
+      },
+      halt === null ? { sequence: outcome.reply.sequence, took } : undefined,
+    );
     await refresh();
     return halt === null;
   };
@@ -522,8 +550,12 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
   };
 
   /** Drops taps, or keeps them as not saved; either way they are never sent. */
-  const putAway = async (remove: readonly string[], notSaved: readonly string[]) => {
-    await settle(remove, [], notSaved);
+  const putAway = async (
+    remove: readonly string[],
+    notSaved: readonly string[],
+    notSavedSince?: number,
+  ) => {
+    await settle(remove, [], notSaved, notSavedSince);
     for (const id of [...remove, ...notSaved]) unsure.delete(id);
     const list = await refresh();
     // Nothing left for the halt to hold back: the queue is free again.
@@ -587,7 +619,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
 
     forget: (commandIds) => putAway(commandIds, []),
 
-    setAside: (commandIds) => putAway([], commandIds),
+    setAside: (commandIds, notSavedSince) => putAway([], commandIds, notSavedSince),
 
     async carryOn(commandIds, session) {
       await stored('storage-write-failed', () =>

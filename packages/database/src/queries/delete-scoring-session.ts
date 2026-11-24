@@ -14,7 +14,8 @@ export async function deleteScoringSession(
     .deleteFrom('scoring_sessions')
     .where('league_id', '=', scope.leagueId)
     .where('game_id', '=', gameId)
-    .where('id', '=', sessionId);
+    .where('id', '=', sessionId)
+    .where('lost_at', 'is', null);
   if (lapsedBy !== undefined) query = query.where('held_until', '<=', new Date(lapsedBy));
   const row = await query.returning('id').executeTakeFirst();
   return row !== undefined;
