@@ -119,7 +119,7 @@ export function GameFormatPanel({
       {said !== null ? (
         <p
           className={look.notice}
-          data-kind={said.kind === 'saved' ? 'success' : 'error'}
+          data-kind={said.kind === 'saved' ? 'saved' : 'error'}
           role={said.kind === 'saved' ? 'status' : 'alert'}
           data-format-said={said.kind}
         >

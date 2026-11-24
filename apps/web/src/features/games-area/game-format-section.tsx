@@ -15,10 +15,10 @@ import {
 
 const adminLook: FormatPanelLook = {
   section: 'staff-form',
-  list: 'staff-list',
+  list: 'staff-rows',
   quiet: 'staff-quiet',
-  button: 'button',
-  notice: 'staff-notice',
+  button: 'ui-button',
+  notice: 'ui-notice',
 };
 
 export function GameFormatSection({
