@@ -94,7 +94,7 @@ Until the members' own tools are built (stage 4), `/{league}/my` is the way to a
 
 In a league with several programs, the sports pages move one level down: `/tcsaal/varsity-boys-basketball/schedule`. League-wide pages (home, news, register, clubs, custom pages) stay at the top.
 
-A past season is the same address with `?season=fall-2025`. Without it, you get the current season. A season picker on the page switches between them, as Faraj's site does today.
+A past season is the same address with `?season=fall-2025`. Without it, you get the current season while it is shown to visitors, and otherwise the most recent shown season (S-103: an admin may make a hidden season current to prepare it). A season picker on the page switches between them, as Faraj's site does today.
 
 **Private areas**
 

@@ -15,7 +15,13 @@ import { mayChangeGames, mayScoreGame, seasonScope } from './policy.ts';
 import type { GameRecord, GamesTx, TrackerTx } from './ports.ts';
 
 /** Why this person may not change the game's format now. */
-export type FormatRefusal = 'no-permission' | 'setting-off' | 'under-way' | 'finished';
+export type FormatRefusal =
+  | 'no-permission'
+  | 'setting-off'
+  | 'under-way'
+  | 'finished'
+  /** Its season is archived (O-12, step 2.130): the commands are refused there too. */
+  | 'season-archived';
 
 /** Whether this person may change the game's format now, and as whom; else why not. */
 export type FormatChange =
@@ -66,6 +72,9 @@ export async function formatChangeOf(
   const as = await mayReachFormat(context, tx, game);
   if (as === undefined) return { may: false, reason: 'no-permission' };
   if (isDecided(game.status)) return { may: false, reason: 'finished' };
+  if (await tx.games.seasonArchived(game.seasonId)) {
+    return { may: false, reason: 'season-archived' };
+  }
   if (as === 'scorekeeper' && !(await scorekeepersMayChangeFormatOf(tx))) {
     return { may: false, reason: 'setting-off' };
   }

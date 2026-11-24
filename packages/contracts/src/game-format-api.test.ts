@@ -13,7 +13,7 @@ describe('the game format contract', () => {
     const statuses = gameFormatRefusals.map((code) =>
       gameFormatStatus({ status: 'refused', code, sentAt: 0 }),
     );
-    expect(statuses).toEqual([403, 404, 409, 409, 409, 409, 409]);
+    expect(statuses).toEqual([403, 404, 409, 409, 409, 409, 409, 409]);
   });
 
   it('takes a reply as the server’s only at its own status', () => {

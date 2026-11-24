@@ -48,6 +48,7 @@ export const fields = {
   LOCAL_SIMULATED_LEAGUE: { secret: false },
   LOCAL_DESIGN: { secret: false },
   LOCAL_NOW: { secret: false },
+  LOCAL_NO_CURRENT_SEASON: { secret: false },
   LOCAL_UNRELEASED: { secret: false },
   SESSION_SECRET: { secret: true },
   SUPABASE_URL: { secret: false },
@@ -146,6 +147,13 @@ const schema = z.object({
   // seed is made at that moment and its clock runs on from it. Only the stand-in's world
   // reads it, never the made-up database; only local and test.
   LOCAL_NOW: z.iso.datetime().optional(),
+  // A made-up league's short name, left with no current season as the stand-in's world is
+  // made, its seasons kept (step 2.130): so a browser test sees where Teams sends an admin
+  // then. Only the stand-in's world reads it; only local and test.
+  LOCAL_NO_CURRENT_SEASON: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a short name')
+    .optional(),
   // Whether the pages and admin areas not released yet are drawn (step 2.140, record 087):
   // 'shown', the default, as local work and tests always were; or 'hidden', exactly as
   // staging and production draw them (releases.ts), so a check on this computer can see
@@ -200,6 +208,7 @@ const optional: readonly ConfigName[] = [
   'LOCAL_SIMULATED_LEAGUE',
   'LOCAL_DESIGN',
   'LOCAL_NOW',
+  'LOCAL_NO_CURRENT_SEASON',
   'LOCAL_UNRELEASED',
   'SESSION_SECRET',
   'STRIPE_SECRET_KEY',
@@ -239,6 +248,7 @@ const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   LOCAL_SIMULATED_LEAGUE: ['local', 'test'],
   LOCAL_DESIGN: ['local', 'test'],
   LOCAL_NOW: ['local', 'test'],
+  LOCAL_NO_CURRENT_SEASON: ['local', 'test'],
   LOCAL_UNRELEASED: ['local', 'test'],
 };
 

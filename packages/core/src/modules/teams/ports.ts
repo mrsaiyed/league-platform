@@ -175,6 +175,8 @@ export type TeamsStore = {
   readonly leagueToday: () => Promise<string>;
   /** The program a season belongs to (where a team's permission is checked), or undefined. */
   readonly seasonProgramId: (seasonId: string) => Promise<string | undefined>;
+  /** Whether the season is archived, so read-only (O-12, step 2.130); false if not here. */
+  readonly seasonArchived: (seasonId: string) => Promise<boolean>;
   /** The season a division belongs to and whether it is in the bin, or undefined if not found. */
   readonly findDivision: (
     divisionId: string,

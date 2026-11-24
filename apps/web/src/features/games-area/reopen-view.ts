@@ -24,7 +24,7 @@ export type ReopenView =
   /** They may reopen it: by this door, and until this server time (ms) when it closes. */
   | { readonly kind: 'correct'; readonly door: ReopenDoor; readonly until: number | null }
   /** They may not: who can, and why not them. */
-  | { readonly kind: 'who'; readonly because: 'admins' | 'time-over' | 'overturned' }
+  | { readonly kind: 'who'; readonly because: 'admins' | 'time-over' | 'overturned' | 'archived' }
   /** Nothing to say: no door would accept anyone's reopening here. */
   | { readonly kind: 'none' };
 
@@ -39,6 +39,8 @@ export function ownReopenViewOf(own: Pick<OwnResultOffer, 'reopen'> | undefined)
   if (when?.when === 'always') return { kind: 'correct', door: 'own', until: null };
   if (when?.code === 'game-not-decided') return { kind: 'none' };
   if (when?.code === 'result-overturned') return { kind: 'who', because: 'overturned' };
+  // Its season is archived (O-12, step 2.130): only a correction with a reason reopens it.
+  if (when?.code === 'season-archived') return { kind: 'who', because: 'archived' };
   return { kind: 'who', because: when?.code === 'reopen-time-over' ? 'time-over' : 'admins' };
 }
 
@@ -62,6 +64,7 @@ export function reopenViewOf(
   if (when.code === 'game-not-decided') return { kind: 'none' };
   // Theirs to reopen, but an overturn rules on the result (S-85).
   if (when.code === 'result-overturned') return { kind: 'who', because: 'overturned' };
+  if (when.code === 'season-archived') return { kind: 'who', because: 'archived' };
   return { kind: 'who', because: when.code === 'reopen-time-over' ? 'time-over' : 'admins' };
 }
 

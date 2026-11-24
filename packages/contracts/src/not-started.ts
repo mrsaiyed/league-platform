@@ -50,6 +50,8 @@ export const notStartedRefusals = [
   'game-final',
   /** Final once and reopened: it is corrected, never cleared (S-40). */
   'was-decided',
+  /** Its season is archived, so read-only (O-12, step 2.130): only a correction with a reason. */
+  'season-archived',
   /** A final score, a box score or a forfeit entered by hand: it was never on the tracker. */
   'entered-by-hand',
   'game-postponed',

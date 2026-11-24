@@ -10,6 +10,9 @@
 // - 404 refused unknown-game: no such game in this league (one of another league asked
 //   for through this one's address included).
 // - 409 refused game-not-live: decided, cancelled or postponed; it cannot be scored now.
+// - 409 refused season-archived: its season is archived and no correction by someone who
+//   may correct games is open on it (O-12, T-389); said first, before game-not-live
+//   (T-390).
 //
 // 401 and 400 carry the contract's `TrackerRefusal`, the rest a `SessionReply`: the
 // tracker takes nothing else as the server's word.
@@ -39,6 +42,7 @@ const refusedStatus: Readonly<Record<Refusal, number>> = {
   'not-allowed': 403,
   'unknown-game': 404,
   'game-not-live': 409,
+  'season-archived': 409,
 };
 
 const refused = (code: Refusal, sentAt: number): ApiAnswer => ({
@@ -69,6 +73,9 @@ const refusalOf = (code: Exclude<SessionCommandError['code'], 'invalid-input'>):
     case 'game-closed':
     case 'game-postponed':
       return 'game-not-live';
+    // Its season is archived and no correction open to this person (O-12, T-389, T-390).
+    case 'season-archived':
+      return 'season-archived';
   }
 };
 

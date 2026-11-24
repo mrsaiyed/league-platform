@@ -2,6 +2,7 @@
 // stand-in leagues: records and seeds, rosters through the one name function, statistics
 // following each team's setting, and who lands where.
 import {
+  archiveSeason,
   createTeam,
   defaultNamePolicy,
   publicRosterLine,
@@ -80,14 +81,37 @@ describe('the teams list', () => {
   it('a past season keeps its season in the address, and a team with no place has no seed', async () => {
     const past = await season(adult, 1);
     // A team added to the season after its last result has no place in its standings yet
-    // (in a world of its own, so the other cases keep theirs as seeded).
-    const own = testWorld(undefined, now);
+    // (in a world of its own, so the other cases keep theirs as seeded). An archived
+    // season is read-only (O-12, T-390), so the team joins while the season still runs
+    // and the season is archived after.
+    let version = 0;
+    const own = testWorld(undefined, now, (leagues) => {
+      const seasons = leagues.find((l) => l.leagueId === adult)?.seasons ?? [];
+      const at = seasons.findIndex((x) => x.id === past.id);
+      const running = seasons[at];
+      if (running === undefined) throw new Error('no past season');
+      seasons[at] = { ...running, status: 'active' };
+      version = running.version;
+    });
+    const owner = { leagueId: adult, accountId: standInPeople.owner.accountId, requestId: 'r1' };
     const added = await createTeam(
-      { leagueId: adult, accountId: standInPeople.owner.accountId, requestId: 'r1' },
+      owner,
       newTeamInput({ name: 'Owls', useOwnColors: 'on' }, past.id),
       own.deps,
     );
     expect(added.ok).toBe(true);
+    const archived = await archiveSeason(
+      { ...owner, requestId: 'r2' },
+      { seasonId: past.id, version },
+      own.deps,
+    );
+    expect(archived.ok).toBe(true);
+    const late = await createTeam(
+      { ...owner, requestId: 'r3' },
+      newTeamInput({ name: 'Kites', useOwnColors: 'on' }, past.id),
+      own.deps,
+    );
+    expect(late).toEqual({ ok: false, error: { code: 'season-archived' } });
     const store = standInPublicStats(own, startingNamePolicy).readStoreOf(adult);
     const cards = await loadTeamCards(store, addressee, past, past.isCurrent);
     expect(cards?.every((c) => c.href.endsWith('?season=spring-2026'))).toBe(true);

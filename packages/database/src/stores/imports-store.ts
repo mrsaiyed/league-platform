@@ -7,6 +7,7 @@ import {
   insertImport,
   listSeasonNames,
   updateImport,
+  seasonIsArchived,
 } from '../queries/index.ts';
 
 export function importsStore(scope: LeagueScope): ImportsStore {
@@ -17,6 +18,7 @@ export function importsStore(scope: LeagueScope): ImportsStore {
     },
     seasonNames: (seasonId) => listSeasonNames(scope, seasonId),
     insert: (value) => insertImport(scope, value),
+    seasonArchived: (seasonId) => seasonIsArchived(scope, seasonId),
     find: (importId) => findImport(scope, importId),
     save: (importId, change, version) => updateImport(scope, importId, change, version),
   };

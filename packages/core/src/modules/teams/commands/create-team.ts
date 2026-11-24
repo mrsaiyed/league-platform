@@ -11,6 +11,7 @@ import { mayChangeTeams, seasonScope } from '../policy.ts';
 import type { TeamsTx } from '../ports.ts';
 import { leagueStartingStatsLevel } from '../stats-level-settings.ts';
 import { teamColor, teamName, teamSlug, teamStatsVisibility } from '../team-fields.ts';
+import { seasonArchivedForTeams } from '../archived-season.ts';
 
 export type CreateTeamError = {
   readonly code:
@@ -23,6 +24,7 @@ export type CreateTeamError = {
 export const createTeam = defineCommand({
   name: 'teams.create_team',
   permission: 'teams.manage',
+  refusedInArchivedSeason: seasonArchivedForTeams,
   input: z.object({
     seasonId: z.uuid(),
     name: teamName,

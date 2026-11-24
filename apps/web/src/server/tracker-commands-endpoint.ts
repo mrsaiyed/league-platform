@@ -78,6 +78,9 @@ export async function sendTrackerCommands(
         return answer(400, { ...buildVersionRefusal(), accepted: [...error.accepted] });
       case 'invalid-input':
         return refuse({ error: 'invalid-input', issues: [...error.issues] });
+      // The game's season is archived and the game has no correction (O-12, step 2.130).
+      case 'season-archived':
+        return answer(409, { error: 'season-archived' });
     }
   }
   const reply = result.value;

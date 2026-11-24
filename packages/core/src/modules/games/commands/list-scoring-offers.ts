@@ -7,13 +7,15 @@
 // transaction (T-75). Only a game under way, or one still to be played whose day has come in
 // the league's time zone, is offered (S-70, offeredOnItsDay): one days ahead, one with no
 // date, and one decided, postponed or called off are not, and nothing is while the league is
-// archived or suspended (U-9). The menu's "My games to score" and Admin → Games still lead
+// archived or suspended (U-9), nor, in an archived season, unless a correction is open
+// and the person may correct games there (T-389). The menu's "My games to score" and Admin → Games still lead
 // to a game days ahead. The answer is game ids and how each is recorded, nothing about a
 // game the person may not score. It changes nothing, but runs in the same shape as a
 // command (record 014).
 import { z } from 'zod';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
 import { accessOfAccount, type Scope } from '../../access/index.ts';
+import { archivedSeasonRefusesScoring } from '../archived-season.ts';
 import { recordingOf } from '../game-fields.ts';
 import { leagueScores } from '../my-games-of.ts';
 import { mayReadGames } from '../policy.ts';
@@ -69,6 +71,9 @@ export const listScoringOffers = defineCommand({
       if (recording === undefined || !offeredOnItsDay(entry, found.today)) continue;
       const scope: Scope = { type: 'program', id: entry.programId };
       if (!mayScoreUnder(holder, scope, rule, entry.assigned)) continue;
+      // An archived season's game (O-12, T-381, T-389): only while a correction is open on
+      // it and to someone who may correct games there, by the commands' own rule.
+      if (await archivedSeasonRefusesScoring(entry.game, tx, holder, scope)) continue;
       offered.set(entry.game.id, { gameId: entry.game.id, recording });
     }
     return ok({ games: asked.flatMap((id) => offered.get(id) ?? []) });

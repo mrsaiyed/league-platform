@@ -18,6 +18,7 @@
 //   entry and given in the answer for the screen to say (telling them comes with stage 4,
 //   as for a publish).
 import { z } from 'zod';
+import { binnedGameInArchivedSeason } from '../archived-season.ts';
 import { leagueScope, recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { binSeasonScope, mayRestore } from '../bin-policy.ts';
@@ -51,6 +52,7 @@ const neverPlayed = ['scheduled', 'postponed', 'cancelled'];
 export const restoreGame = defineCommand({
   name: 'leagues.restore_game',
   permission: 'schedule.publish',
+  refusedInArchivedSeason: binnedGameInArchivedSeason,
   input: z.object({ gameId: z.uuid() }),
   allowed: async (context, input, tx: RestoreGameTx) => {
     const game = await tx.bin.findGame(input.gameId);

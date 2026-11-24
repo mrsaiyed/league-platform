@@ -50,7 +50,7 @@ async function endedByName(
 }
 
 /** The command's own error codes, every one named, so a new one fails the type check here. */
-const refusalOf = (code: ReopenTrackedGameError['code']): ReopenRefusalCode => {
+const refusalOf = (code: ReopenTrackedGameError['code'] | 'season-archived'): ReopenRefusalCode => {
   switch (code) {
     case 'game-not-found':
     case 'changed-since-read':
@@ -60,6 +60,7 @@ const refusalOf = (code: ReopenTrackedGameError['code']): ReopenRefusalCode => {
     case 'not-ended-by-you':
     case 'reopen-time-over':
     case 'result-overturned':
+    case 'season-archived':
       return code;
   }
 };

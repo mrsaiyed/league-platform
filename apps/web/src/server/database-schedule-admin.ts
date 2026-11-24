@@ -40,6 +40,7 @@ export type ScheduleAdminQueries = Pick<
   | 'standingsStore'
   | 'gamesStore'
   | 'listLeagueSeasons'
+  | 'seasonIsArchived'
   | 'listScheduleTeams'
 >;
 
@@ -83,9 +84,13 @@ export function databaseScheduleAdmin(
         given === undefined
           ? undefined
           : await accessOf({ leagueId, accountId: given.accountId, requestId: randomUUID() });
-      const rows = await database.withTransaction(db, { leagueId }, (scope) =>
-        database.listLeagueSeasons(scope),
-      );
+      const rows = await database.withTransaction(db, { leagueId }, async (scope) => {
+        const seasons = await database.listLeagueSeasons(scope);
+        const archived = await Promise.all(
+          seasons.map((season) => database.seasonIsArchived(scope, season.id)),
+        );
+        return seasons.map((season, i) => ({ ...season, archived: archived[i] === true }));
+      });
       const listed: readonly ScheduleSeason[] = rows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -93,6 +98,7 @@ export function databaseScheduleAdmin(
         isCurrent: row.isCurrent,
         isPublic: row.isPublic,
         programId: row.programId,
+        archived: row.archived,
       }));
       // Only what this holder may be told of: the scheduling module's one rule (P4 §4).
       return listed.filter((season) => mayListSeason(holder, season));

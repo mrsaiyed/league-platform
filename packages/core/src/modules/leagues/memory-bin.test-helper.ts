@@ -110,6 +110,7 @@ export function memoryBin(state: Partial<MemoryBin> = {}) {
         clashesOf: async (id) => (find(id)?.clashesWith ?? []).map((other) => ({ id: other })),
       },
       bin: {
+        seasonArchived: async () => false,
         list: async () =>
           s.things
             .filter((t) => t.binnedAt !== null)

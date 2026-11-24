@@ -290,6 +290,8 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
     },
     // Plays past the last "not started" marker, by core's one rule; the players the
     // scorer's table changed are events too, but not plays (records 058, 061).
+    seasonArchived: async (seasonId) =>
+      s.seasons.some((x) => x.id === seasonId && x.status === 'completed'),
     hasPlays: async (gameId) =>
       s.playsBefore.includes(gameId) || hasPlaysPastMarker(s.events, gameId),
     findSeason: async (seasonId) => {

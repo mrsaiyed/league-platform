@@ -21,7 +21,12 @@ import {
 export type AdminTeamsTx = TeamsTx & PeopleTx;
 
 /** The season the screens work on: the league's current one. */
-export type AdminSeason = { readonly id: string; readonly name: string };
+export type AdminSeason = {
+  readonly id: string;
+  readonly name: string;
+  /** Archived (O-12): read-only, so the screens offer no change (step 2.130). */
+  readonly archived: boolean;
+};
 
 export type AdminDivision = { readonly id: string; readonly name: string };
 

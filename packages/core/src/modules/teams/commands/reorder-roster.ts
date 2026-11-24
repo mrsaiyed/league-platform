@@ -10,6 +10,7 @@ import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { mayChangeRosters, teamScope } from '../policy.ts';
 import type { TeamsTx } from '../ports.ts';
+import { teamInArchivedSeason } from '../archived-season.ts';
 
 export type ReorderRosterError = {
   readonly code: 'team-not-found' | 'roster-entry-not-found' | 'roster-incomplete';
@@ -24,6 +25,7 @@ export type ReorderRosterResult = {
 export const reorderRoster = defineCommand({
   name: 'teams.reorder_roster',
   permission: 'rosters.manage',
+  refusedInArchivedSeason: teamInArchivedSeason,
   input: z.object({
     teamId: z.uuid(),
     rosterEntryIds: z

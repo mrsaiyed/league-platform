@@ -28,9 +28,16 @@ import { answerParams } from './answer.ts';
 import { typedOf, untouched, type PartState } from './part-form-state.ts';
 import type { MovedTeam } from './part-words.ts';
 import { runPartSave, type PartSaveResult } from './run-part-save.ts';
+import { runSeasonChange } from './run-season-change.ts';
+import { runStartSeason } from './run-start-season.ts';
 import { runVisibilityChange } from './run-visibility-change.ts';
 import { partAnchor } from './season-parts.ts';
-import { seasonSettingsAddress, visibilityAnchor } from './season-settings-address.ts';
+import {
+  seasonSettingsAddress,
+  seasonStateAnchor,
+  startSeasonAnchor,
+  visibilityAnchor,
+} from './season-settings-address.ts';
 
 /** A form's text fields; files and repeated names are ignored. */
 function fieldsOf(form: FormData): Readonly<Record<string, string>> {
@@ -52,6 +59,39 @@ export async function changeVisibilityAction(form: FormData): Promise<never> {
   );
   const address = seasonSettingsAddress(view.context.league, seasonSlug, answerParams(answer));
   return redirect(`${address}#${visibilityAnchor}`);
+}
+
+/** "Yes" to "Make … the current season?" or "Archive …?" (step 2.130). */
+export async function changeSeasonAction(form: FormData): Promise<never> {
+  const fields = fieldsOf(form);
+  const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'season');
+  const { adminSettings } = await webPorts();
+  const { answer, seasonSlug } = await runSeasonChange(
+    commandContextOf(view.context),
+    fields,
+    adminSettings.deps,
+  );
+  const address = seasonSettingsAddress(view.context.league, seasonSlug, answerParams(answer));
+  return redirect(`${address}#${seasonStateAnchor}`);
+}
+
+/**
+ * "Start the season" (step 2.130): made, the page opens on the new season and says it is
+ * ready and hidden, at the panel with "Show this season to visitors" (step 2.182); refused,
+ * the page says why at the form. A post sent twice is answered as the first.
+ */
+export async function startSeasonAction(form: FormData): Promise<never> {
+  const fields = fieldsOf(form);
+  const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'season');
+  const context = commandContextOf(view.context);
+  const { adminSettings } = await webPorts();
+  const { answer, seasonSlug } = await sameRequestsHere<
+    Awaited<ReturnType<typeof runStartSeason>>
+  >().once(requestKeyOf(context, fields), () =>
+    runStartSeason(context, fields, adminSettings.deps),
+  );
+  const address = seasonSettingsAddress(view.context.league, seasonSlug, answerParams(answer));
+  return redirect(`${address}#${answer.kind === 'done' ? visibilityAnchor : startSeasonAnchor}`);
 }
 
 export async function savePartAction(_state: PartState, form: FormData): Promise<PartState> {

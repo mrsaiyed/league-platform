@@ -5,6 +5,7 @@
 // (record_imported_scores). A round, game number or outside reference the file gave stays
 // in the report only: a draft game has no place for them yet.
 import { z } from 'zod';
+import { importInArchivedSeason } from './archived-season.ts';
 import { defineCommand, fail, ok, type Result } from '../../command/index.ts';
 import { recordActivity } from '../access/index.ts';
 import {
@@ -52,6 +53,7 @@ export type FixtureImportApplied = {
 export const applyFixtureImport = defineCommand({
   name: 'imports.apply_fixture_import',
   permission: 'schedule.import',
+  refusedInArchivedSeason: importInArchivedSeason,
   input: z.object({ importId: z.uuid(), version: z.number().int().positive() }),
   allowed: async (context, input, tx: ImportsTx) => {
     const found = await tx.imports.find(input.importId);

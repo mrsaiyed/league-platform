@@ -140,6 +140,8 @@ export type NewScheduleRevision = {
 export type SchedulingStore = {
   /** The program a season belongs to, or undefined if the season is not in this league. */
   readonly findSeason: (seasonId: string) => Promise<{ readonly programId: string } | undefined>;
+  /** Whether the season is archived, so read-only (O-12, step 2.130); false if not here. */
+  readonly seasonArchived: (seasonId: string) => Promise<boolean>;
   /** The number of the season's latest published schedule revision, or null if none yet. */
   readonly latestRevision: (seasonId: string) => Promise<number | null>;
   readonly findDraft: (seasonId: string) => Promise<DraftRecord | undefined>;

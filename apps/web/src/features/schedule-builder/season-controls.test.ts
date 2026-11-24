@@ -23,8 +23,8 @@ const holder = (grants: readonly Grant[], isOwner = false): AccessHolder => ({
   grants,
 });
 
-const seasonOfA = { programId: programA };
-const publicSeasonOfB = { programId: programB };
+const seasonOfA = { programId: programA, archived: false };
+const publicSeasonOfB = { programId: programB, archived: false };
 const all = { canEdit: true, canPublish: true };
 const none = { canEdit: false, canPublish: false };
 
@@ -48,5 +48,13 @@ describe("the grid's controls, at the season's program (P4 §3)", () => {
     );
     expect(seasonControls(holder([]), seasonOfA)).toEqual(none);
     expect(seasonControls(undefined, seasonOfA)).toEqual(none);
+  });
+
+  it('gives no one the controls in an archived season, the owner included (O-12)', () => {
+    const archived = { programId: programA, archived: true };
+    expect(seasonControls(holder([], true), archived)).toEqual(none);
+    expect(seasonControls(holder([grant('scheduler', { type: 'league' })]), archived)).toEqual(
+      none,
+    );
   });
 });

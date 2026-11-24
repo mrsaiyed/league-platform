@@ -30,7 +30,7 @@ export type MemoryScheduling = {
   grants: Grant[];
   activity: ActivityEntry[];
   /** Seasons that exist, with their program. */
-  seasons: { id: string; programId: string }[];
+  seasons: { id: string; programId: string; status?: string }[];
   /** The published revision numbers of the season (a revision is published by raising this). */
   latestRevision: number | null;
   draft: DraftRecord | undefined;
@@ -175,6 +175,8 @@ export function memoryScheduling(state: Partial<MemoryScheduling> = {}) {
       },
       scheduling: {
         findSeason: async (id) => s.seasons.find((x) => x.id === id),
+        seasonArchived: async (seasonId) =>
+          s.seasons.some((x) => x.id === seasonId && x.status === 'completed'),
         latestRevision: async () => s.latestRevision,
         findDraft: async () => s.draft,
         insertDraft: async (season, changes: DraftDocument, basedOnRevision) => {

@@ -44,6 +44,8 @@ export const reopenNotOfferedCodes = [
   'not-ended-by-tracker',
   /** The league lets no scorekeeper reopen a game (its setting is 0). */
   'scorekeepers-may-not-reopen',
+  /** Its season is archived, so read-only (O-12, step 2.130): only a correction with a reason. */
+  'season-archived',
   /** Another account ended it; `endedBy` names them. */
   'not-ended-by-you',
   /** Longer ago than the league allows. */
@@ -80,6 +82,7 @@ export const reopenRefusalStatus: Readonly<Record<ReopenRefusalCode, number>> = 
   'not-ended-by-you': 403,
   'reopen-time-over': 403,
   'result-overturned': 409,
+  'season-archived': 409,
   'not-allowed': 403,
   'game-not-found': 404,
   'changed-since-read': 409,

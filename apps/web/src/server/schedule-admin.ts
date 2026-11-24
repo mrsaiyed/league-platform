@@ -26,6 +26,8 @@ export type ScheduleTeam = {
 export type ScheduleSeason = PublicSeason & {
   readonly isPublic: boolean;
   readonly programId: string;
+  /** Archived (O-12): read-only, so no screen offers to change it. */
+  readonly archived: boolean;
 };
 
 export type ScheduleAdminPorts = {

@@ -46,6 +46,8 @@ export const enError = {
     'This result was overturned. Take the overturn off in Standings and stats first.',
   'error.games.reopen_tracked_game.scorekeepers-may-not-reopen':
     'This league does not let scorekeepers reopen a game. A league admin can reopen it.',
+  'error.games.reopen_tracked_game.season-archived':
+    'This game’s season is archived, so it is read-only and the game was not reopened. A league admin can still correct its result, with a reason.',
   'error.games.take_over_scoring.game-closed':
     'That game is already decided or cancelled. Reopen it first to correct it.',
   'error.games.take_over_scoring.game-not-found': 'That game is not there.',
@@ -161,6 +163,10 @@ export const enError = {
     'The league has no contact email yet, so it cannot be published. Ask the people who run SR Leagues, who made the league, to add it.',
   'error.leagues.set_status.privacy-not-chosen':
     'Choose how young players\' names show first: save "Names on public pages" under Privacy, then publish.',
+  'error.leagues.start_season.program-not-found':
+    'There is nowhere to start this season in this league. Nothing was changed.',
+  'error.leagues.start_season.season-slug-taken':
+    'Another season already uses that short name. Choose another; nothing was changed.',
   'error.leagues.update_season.season-not-found': 'That season is not there.',
   'error.not-allowed': 'You are not allowed to do that.',
   'error.not-confirmed': 'Tick the box to confirm first. Nothing was changed.',
@@ -187,6 +193,10 @@ export const enError = {
     'Its venue is in the bin. Bring the venue back first.',
   'error.scheduling.restore_venue.venue-name-taken':
     'Another venue now has this name. Rename one of them in Venues, then bring this one back.',
+  'error.season-archived':
+    'That season is archived, so it is read-only and nothing was changed. Only a correction with a reason changes one of its games.',
+  'error.season-hidden':
+    'That season is hidden from visitors, so it was not archived: an archived season is shown to visitors and cannot be hidden again. Show it to visitors first, or leave it hidden.',
   'error.short-name-needed':
     'A short name could not be made from this name. Type a short name: lower-case letters and numbers, with single hyphens.',
   'error.teams.add_new_person.already-on-team':

@@ -9,6 +9,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { entryScope, mayChangeRosters } from '../policy.ts';
 import type { RosterEntryChange, TeamsTx } from '../ports.ts';
 import { jerseyNumber, rosterRole } from '../roster-fields.ts';
+import { entryInArchivedSeason } from '../archived-season.ts';
 
 export type ChangeRosterEntryError = {
   readonly code: 'roster-entry-not-found' | 'already-left' | 'jersey-taken' | 'changed-since-read';
@@ -17,6 +18,7 @@ export type ChangeRosterEntryError = {
 export const changeRosterEntry = defineCommand({
   name: 'teams.change_roster_entry',
   permission: 'rosters.manage',
+  refusedInArchivedSeason: entryInArchivedSeason,
   input: z
     .object({
       rosterEntryId: z.uuid(),

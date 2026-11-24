@@ -12,6 +12,7 @@ import { gameVersion } from '../game-fields.ts';
 import { formatChangeOf, mayAskAboutFormat, type FormatRefusal } from '../game-format.ts';
 import type { TrackerTx } from '../ports.ts';
 import { lowerId } from '../scoring-session.ts';
+import { gameInArchivedSeason } from '../archived-season.ts';
 
 export type GiveGameFormatError = {
   readonly code: 'game-not-found' | 'changed-since-read' | FormatRefusal;
@@ -20,6 +21,7 @@ export type GiveGameFormatError = {
 export const giveGameFormat = defineCommand({
   name: 'games.give_game_format',
   permission: 'games.score',
+  refusedInArchivedSeason: gameInArchivedSeason,
   input: z.object({ gameId: lowerId, version: gameVersion, format: GameFormatRules }),
   allowed: (context, input, tx: TrackerTx) => mayAskAboutFormat(context, tx, input.gameId),
   run: async ({

@@ -8,6 +8,16 @@ export type LeagueStatus = (typeof leagueStatuses)[number];
 export const seasonStatuses = ['draft', 'active', 'completed'] as const;
 export type SeasonStatus = (typeof seasonStatuses)[number];
 
+/** A hidden season (A-18): still being set up, which visitors do not see. */
+export const hiddenSeasonStatus = 'draft' satisfies SeasonStatus;
+
+/** An archived season (step 2.130, O-12, T-376): over, still shown, read-only. */
+export const archivedSeasonStatus = 'completed' satisfies SeasonStatus;
+
+/** What "Start a new season" brings besides the last season's setup (P3 §5, T-378). */
+export const seasonCarryChoices = ['nothing', 'teams', 'teams-and-rosters'] as const;
+export type SeasonCarry = (typeof seasonCarryChoices)[number];
+
 export const audiences = ['adult', 'youth', 'mixed'] as const;
 export type Audience = (typeof audiences)[number];
 
