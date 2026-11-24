@@ -25,7 +25,17 @@
 //
 // The random moments come from a seed, printed first: BAD_WIFI_SEED=<n> replays a run's
 // cuts exactly (the browser's own timing still varies). On a failure the order of events
-// (every cut, restore, tap and reopening) is printed with it.
+// (every cut, restore, tap and reopening) is printed with it. Every wait has a limit: a
+// tracker that stops sending makes the run fail with the seed and the order of events,
+// never hang (and the whole run is stopped the same way after five minutes). Twice in the
+// game, the signal on, the server must have every play tapped so far within ten seconds,
+// so a tracker that sends late cannot pass.
+//
+// In the gate it runs once a push with a printed random seed; ten seeds in a row were run
+// at landing (the lane note, docs/build/handover/lanes/2.61.md). The timing varies, so a
+// browser run cannot show a given order of events happened: the fixed guard of the
+// seed-66 fix (T-329) is the unit test in apps/web/src/features/tracker/
+// tracker-controller.test.ts ("keeps the taps the server took on opening…").
 import { randomInt } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -105,6 +115,8 @@ const reopenAfter = {
 /** The plays tapped with no signal at all, and after which the clocks move on 61 minutes. */
 const longOffline = { from: 14, moveAfter: 14, to: 17 };
 const minutes61 = 61 * 60_000;
+/** After which plays, the signal put back on, the server must have every play so far. */
+const promptAfter = [9, 19];
 
 /** The box score counted from the first `n` plays of the list, by hand; an undo takes the latest out. */
 function counted(n = script.length) {
@@ -137,6 +149,25 @@ const note = (label, ok, detail = '') => {
   checked.push(label);
   if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ''}`);
 };
+/** Fails the run when `promise` has not settled within `ms`, naming what never came. */
+const within = (ms, promise, what) => {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, fail) => {
+      timer = setTimeout(() => fail(new Error(`${what}: not within ${ms / 1000} s`)), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+};
+/** The last resort: a run still going after five minutes fails with what it has. */
+const wholeRunMs = 5 * 60_000;
+setTimeout(() => {
+  console.error(`bad-wifi: the run was still going after five minutes (seed ${seed})`);
+  for (const failure of failures) console.error(`- ${failure}`);
+  console.error('the order of events:');
+  for (const event of events) console.error(`  ${event}`);
+  process.exit(1);
+}, wholeRunMs).unref();
 const step = async (name, run) => {
   try {
     await run();
@@ -263,7 +294,9 @@ async function oneGame(browser) {
         holdNext = null;
         log('a batch held on its way while its page is reloaded');
         held.reached();
-        await held.reloaded;
+        await within(30_000, held.reloaded, 'the page reloaded while its batch was held').catch(
+          () => undefined,
+        );
         const answer = await route.fetch().catch(() => null);
         log(`the held batch reached the server (${answer?.status() ?? 'no answer'}), page gone`);
         return route.abort('connectionreset').catch(() => undefined);
@@ -291,15 +324,17 @@ async function oneGame(browser) {
       log(to ? 'answers lost from now' : 'answers come back');
     };
     // A cut while a tap is being sent: switched a random moment after the tap, in order.
-    let later = Promise.resolve();
+    let pending = Promise.resolve();
     const cutSoon = () => {
       const wait = Math.floor(random() * 400);
       const to = !offline;
-      later = later.then(async () => {
+      pending = pending.then(async () => {
         await new Promise((done) => setTimeout(done, wait));
         await setOffline(to);
       });
     };
+    /** Waits for the cuts switched after a tap, within a limit. */
+    const later = () => within(10_000, pending, 'a cut after a tap was switched');
 
     const play = async (side, jersey, act) => {
       if (side === 'undo') {
@@ -333,6 +368,47 @@ async function oneGame(browser) {
       const shown = await shownBox();
       note(label, JSON.stringify(shown) === JSON.stringify(want), JSON.stringify({ shown, want }));
     };
+    /** The box score folded from the server's `/state` plays, by the ids the screen showed. */
+    const serverBox = async () => {
+      const answer = await fetch(`${origin}/api/v1/leagues/${leagueId}/games/${liveGame}/state`, {
+        headers: { cookie: `${scorekeeper.name}=${scorekeeper.value}` },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!answer.ok) throw new Error(`/state answered ${answer.status}`);
+      const { state } = await answer.json();
+      const read = {};
+      for (const line of Object.values(ids)) read[line] = { points: 0, fouls: 0 };
+      const unknown = [];
+      for (const p of state.plays) {
+        if (!['score', 'foul', 'unfoul'].includes(p.type)) continue;
+        const line = read[ids[p.playerId]];
+        if (!line) unknown.push(p);
+        else if (p.type === 'score') line.points += p.points;
+        else line.fouls += p.type === 'foul' ? 1 : -1;
+      }
+      return { read, unknown };
+    };
+    /** With the signal on, the server has every play tapped so far within ten seconds. */
+    const sentPromptly = async (n) => {
+      await later();
+      setAnswersLost(false);
+      setSlow(false);
+      await setOffline(false);
+      const want = JSON.stringify(counted(n).box);
+      const end = Date.now() + 10_000;
+      let got = await serverBox();
+      while (JSON.stringify(got.read) !== want && Date.now() < end) {
+        await new Promise((done) => setTimeout(done, 250));
+        got = await serverBox();
+      }
+      const ok = got.unknown.length === 0 && JSON.stringify(got.read) === want;
+      log(`the server ${ok ? 'has' : 'lacks'} plays 1 to ${n}, signal on`);
+      note(
+        `with the signal on, the server has plays 1 to ${n} within ten seconds`,
+        ok,
+        JSON.stringify({ read: got.read, want: counted(n).box, unknown: got.unknown }),
+      );
+    };
 
     await step('the game is opened and its starters picked', async () => {
       const { tookOver } = await openTab();
@@ -341,6 +417,7 @@ async function oneGame(browser) {
       for (const jersey of starters) await c.tile('away', jersey).tap();
       await page.locator('[data-scoring][data-stage="play"]').waitFor();
       await c.saved();
+      await shownBox(); // learns each player's id, for reading the server's plays
       // The page must be on the device before the tab can come back with no signal.
       const end = Date.now() + 20_000;
       while (!(await pageKept(page))) {
@@ -368,7 +445,7 @@ async function oneGame(browser) {
         }
         let held = null;
         if (how === 'reloaded by itself while a batch is sent') {
-          await later;
+          await later();
           setAnswersLost(false);
           setSlow(false);
           held = {};
@@ -379,11 +456,12 @@ async function oneGame(browser) {
         }
         if (random() < 0.3 && !noSignal && held === null) cutSoon();
         await play(side, jersey, act);
-        if (index === 3) await firstLost;
+        if (index === 3)
+          await within(20_000, firstLost, 'play 4 reached the server with its answer lost');
         log(`play ${n}: ${side} #${jersey ?? ''} ${act ?? ''}`.trim());
         if (n === longOffline.moveAfter) {
           // An hour and a minute with no signal, by moving both clocks on, not by waiting.
-          await later;
+          await later();
           writeFileSync(clockFile, String(minutes61));
           await context.clock.fastForward(minutes61);
           await new Promise((done) => setTimeout(done, 300));
@@ -400,8 +478,9 @@ async function oneGame(browser) {
           await context.clearCookies({ name: scorekeeper.name });
           log('both clocks moved on 61 minutes; the run-out session cookie dropped');
         }
+        if (promptAfter.includes(n)) await sentPromptly(n);
         if (!how) continue;
-        await later;
+        await later();
         if (held !== null) {
           await Promise.race([
             held.reachedYet,
@@ -432,7 +511,7 @@ async function oneGame(browser) {
         }
         await boxIs(n, `the page ${how} shows every play tapped (T-114)`);
       }
-      await later;
+      await later();
     });
 
     await step(
@@ -455,21 +534,7 @@ async function oneGame(browser) {
           script.length,
           'the score and box score on the screen are the ones counted from the list (T-123)',
         );
-        const answer = await fetch(`${origin}/api/v1/leagues/${leagueId}/games/${liveGame}/state`, {
-          headers: { cookie: `${scorekeeper.name}=${scorekeeper.value}` },
-        });
-        if (!answer.ok) throw new Error(`/state answered ${answer.status}`);
-        const { state } = await answer.json();
-        const read = {};
-        for (const line of Object.values(ids)) read[line] = { points: 0, fouls: 0 };
-        const unknown = [];
-        for (const p of state.plays) {
-          if (!['score', 'foul', 'unfoul'].includes(p.type)) continue;
-          const line = read[ids[p.playerId]];
-          if (!line) unknown.push(p);
-          else if (p.type === 'score') line.points += p.points;
-          else line.fouls += p.type === 'foul' ? 1 : -1;
-        }
+        const { read, unknown } = await serverBox();
         note(
           'the box score the server reads back is the one counted from the list (T-123)',
           unknown.length === 0 && JSON.stringify(read) === JSON.stringify(want.box),

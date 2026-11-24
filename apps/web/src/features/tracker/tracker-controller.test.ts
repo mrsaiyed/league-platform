@@ -390,11 +390,12 @@ describe('tracker controller: offline and reconnecting (T6 §4)', () => {
     expect(scoreOf(withIt.second.controller.status().game)).toEqual({ home: 2, away: 0 });
   });
 
-  it('keeps the taps the server took on opening in the kept scoring until the state after them is kept (T-329)', async () => {
-    // Step 2.61, seed 66: reloaded with no signal, scoring from the kept state with taps
-    // waiting on top; the signal back for a moment: the queue sends them and opening is
-    // answered, then the signal goes before the state is; more taps; the tab opened again
-    // with no signal.
+  /**
+   * Step 2.61, seed 66: reloaded with no signal, scoring from the kept state with a tap
+   * waiting on top (2-0, then 4-0). The bad Wi-Fi browser test cannot replay this order
+   * (its timing varies): these cases are the fixed guard of the fix (T-329).
+   */
+  async function reloadedWithNoSignal() {
     const network = endpointNetwork();
     const storage = createMemoryQueueStorage();
     const keptBy: DeviceScoring[] = [];
@@ -411,46 +412,81 @@ describe('tracker controller: offline and reconnecting (T6 §4)', () => {
     await tapAll(first.controller, [basket('home', hawks[0] ?? '')]);
     await first.controller.leave();
     const reloaded = (keptBy.at(-1) ?? null) as DeviceScoring | null;
-    let stateDown = false;
+    // The state is never answered while the signal is back: opening is, and holds.
+    let stateAsks = 0;
     const second = device(network, {
       storage,
       keepScoring,
       kept: { state: keptState, scoring: reloaded },
-      askServer: (ask) => (input, init) =>
-        stateDown && String(input instanceof Request ? input.url : input).endsWith('/state')
-          ? Promise.reject(new TypeError('Failed to fetch'))
-          : ask(input, init),
+      askServer: (ask) => (input, init) => {
+        if (!String(input instanceof Request ? input.url : input).endsWith('/state'))
+          return ask(input, init);
+        stateAsks += network.mode === 'up' ? 1 : 0;
+        return Promise.reject(new TypeError('Failed to fetch'));
+      },
     });
     await second.controller.start();
     await tapAll(second.controller, [basket('home', hawks[1] ?? '')]);
     expect(scoreOf(second.controller.status().game)).toEqual({ home: 4, away: 0 });
-    // Its send with no signal answered (not), so the signal's return sends at once.
-    await second.controller.idle();
-    stateDown = true;
-    network.mode = 'up';
-    second.controller.online();
-    await second.controller.idle();
-    // The server took both; the state after them is not loaded.
-    expect(second.controller.status().queue.waiting).toBe(0);
-    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 4, away: 0 });
-    network.mode = 'down';
+    /** The signal back for a moment: the queue sends, opening is answered, no state. */
+    const signalBack = async (total: number, opening: boolean) => {
+      // Its send with no signal answered (not) first, so the return sends at once.
+      await second.controller.idle();
+      const from = network.reached.length;
+      const asked = stateAsks;
+      network.mode = 'up';
+      second.controller.online();
+      await second.controller.idle();
+      const reached = network.reached.slice(from);
+      expect(reached).toContain('POST commands');
+      // The first time, opening was answered and the state after it asked (and lost):
+      // `hold` ran. The second time the session is held already: it is renewed.
+      if (opening) expect(reached).toContain('POST session:open');
+      if (opening) expect(stateAsks).toBeGreaterThan(asked);
+      expect(second.controller.status().queue.waiting).toBe(0);
+      expect(scoreOf((await serverGame(network)).state)).toEqual({ home: total, away: 0 });
+      network.mode = 'down';
+    };
+    /** The tab opened again with no signal, then the signal back for good. */
+    const openedAgain = async (total: number) => {
+      await second.controller.leave();
+      const third = device(network, {
+        storage,
+        kept: { state: keptState, scoring: (keptBy.at(-1) ?? null) as DeviceScoring | null },
+      });
+      await third.controller.start();
+      // Without the fix: 2-0, the taps the server took gone from the kept scoring.
+      expect(scoreOf(third.controller.status().game)).toEqual({ home: total, away: 0 });
+      network.mode = 'up';
+      third.controller.online();
+      await third.controller.idle();
+      // Once the server's state is loaded, each tap counts once.
+      expect(third.controller.status().mode).toEqual({ kind: 'scoring' });
+      expect(scoreOf(third.controller.status().game)).toEqual({ home: total, away: 0 });
+      expect(scoreOf((await serverGame(network)).state)).toEqual({ home: total, away: 0 });
+    };
+    return { second, signalBack, openedAgain };
+  }
+
+  it('keeps the taps the server took on opening in the kept scoring until the state after them is kept (T-329)', async () => {
+    // The signal back for a moment, gone before the state is; one tap more; the tab
+    // opened again with no signal.
+    const { second, signalBack, openedAgain } = await reloadedWithNoSignal();
+    await signalBack(4, true);
     await tapAll(second.controller, [basket('home', hawks[2] ?? '')]);
     expect(scoreOf(second.controller.status().game)).toEqual({ home: 6, away: 0 });
-    await second.controller.leave();
-    const third = device(network, {
-      storage,
-      kept: { state: keptState, scoring: (keptBy.at(-1) ?? null) as DeviceScoring | null },
-    });
-    await third.controller.start();
-    // Without the fix: 2-0, the two taps the server took gone from the kept scoring.
-    expect(scoreOf(third.controller.status().game)).toEqual({ home: 6, away: 0 });
-    network.mode = 'up';
-    third.controller.online();
-    await third.controller.idle();
-    // Once the server's state is loaded, each tap counts once.
-    expect(third.controller.status().mode).toEqual({ kind: 'scoring' });
-    expect(scoreOf(third.controller.status().game)).toEqual({ home: 6, away: 0 });
-    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 6, away: 0 });
+    await openedAgain(6);
+  });
+
+  it('keeps them when the signal comes back twice before the state is loaded (T-329)', async () => {
+    const { second, signalBack, openedAgain } = await reloadedWithNoSignal();
+    await signalBack(4, true);
+    await tapAll(second.controller, [basket('home', hawks[2] ?? '')]);
+    expect(scoreOf(second.controller.status().game)).toEqual({ home: 6, away: 0 });
+    await signalBack(6, false);
+    await tapAll(second.controller, [basket('home', hawks[3] ?? '')]);
+    expect(scoreOf(second.controller.status().game)).toEqual({ home: 8, away: 0 });
+    await openedAgain(8);
   });
 
   it('sends the taps made since under the new session, though a send under the ended one was refused first', async () => {
