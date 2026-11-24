@@ -467,6 +467,27 @@ export const TrackerGameState = z.strictObject({
 });
 export type TrackerGameState = z.infer<typeof TrackerGameState>;
 
+/** The request header, set to `1`, by which a tracker asks for the changes of players (T-356). */
+export const trackerChangesHeader = 'X-Tracker-Changes';
+
+/** How many of the game's last events the list of changes of players looks through (T-356). */
+export const trackerChangesWindow = 300;
+
+/**
+ * The same state as a tracker of this release asks for it (`trackerChangesHeader`, step 2.242,
+ * T-356): with `changes`, the command IDs (lower case, oldest first) of the changes of
+ * players among the game's last `trackerChangesWindow` events up to `sequence`, the adds
+ * the server refused included. Plays and the rest of the engine's commands are in the
+ * state's `recent`; changes of players never are, though each counts in the sequence.
+ * With both, the device tells its own commands from somebody else's by their IDs. A
+ * tracker of an earlier release does not ask, and is answered as before: its contract
+ * is strict, and would read the extra list as a page that is not the server's (T-127).
+ */
+export const TrackerGameStateWithChanges = TrackerGameState.extend({
+  changes: z.array(z.string().max(64)).max(trackerChangesWindow).optional(),
+});
+export type TrackerGameStateWithChanges = z.infer<typeof TrackerGameStateWithChanges>;
+
 // ---------------------------------------------------------------- the rosters (record 058)
 
 /**

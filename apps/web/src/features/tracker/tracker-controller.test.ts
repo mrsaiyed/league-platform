@@ -2,7 +2,7 @@
 // browser's transports reach the commands, session and state handlers in this process,
 // over the web app's made-up stand-in. Tapping offline, reconnecting, a tab closed with
 // taps waiting, a refusal (T-113) and a takeover (T6 §5).
-import { TrackerGameState, TrackerRosters } from '@srleagues/contracts';
+import { TrackerGameStateWithChanges, TrackerRosters } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { trackerRostersRequest } from '../../server/tracker-rosters-endpoint.ts';
@@ -55,7 +55,10 @@ function device(
     kept,
     keepScoring,
     rosters,
+    newPlayerId,
   }: {
+    /** The ids the device gives the players it adds (step 2.242: one already in use). */
+    newPlayerId?: () => string;
     /** The rosters the page brought, for changes of players (step 2.118). */
     rosters?: DeviceRosters;
     /** What the device kept of the game, as a page reloaded finds it (step 2.38). */
@@ -97,15 +100,20 @@ function device(
     ...(kept === undefined ? {} : { kept }),
     ...(keepScoring === undefined ? {} : { keepScoring }),
     ...(rosters === undefined ? {} : { rosters: { page: rosters } }),
+    ...(newPlayerId === undefined ? {} : { newPlayerId }),
   });
   return { controller, storage, clock };
 }
 
-/** The game as the server holds it, read as the owner. */
+/** The game as the server holds it, read as the owner, as the tracker reads it (T-356). */
 async function serverGame(network: EndpointNetwork) {
   const context = await network.world.contextAs('owner', 'live', ['games', gameId, 'state']);
-  const answer = await trackerStateRequest(context, gameId, network.world.tracker);
-  return TrackerGameState.parse(answer.body) as { sequence: number; state: basketball.GameState };
+  const answer = await trackerStateRequest(context, gameId, network.world.tracker, true);
+  return TrackerGameStateWithChanges.parse(answer.body) as {
+    sequence: number;
+    state: basketball.GameState;
+    changes?: string[];
+  };
 }
 
 /** The game's rosters as the server gives them to the scorekeeper. */
@@ -2584,5 +2592,328 @@ describe('tracker controller: the server’s time (finding M1)', () => {
     await clock.advance(1_000);
     expect(serverTime() - controller.status().now()).toBe(150);
     await until(clock, controller.leave());
+  });
+});
+
+/**
+ * Step 2.242 (T-356, T-357): the device tells its own commands from somebody else's by
+ * their IDs, never by counting. Each case is a tab closed after the state it kept (its
+ * release reached the server), opened again with no signal, a tap, then the signal back:
+ * opening gives a new session, and the taps made under the ended one are judged.
+ */
+describe('tracker controller: its own commands told by their IDs (step 2.242)', () => {
+  const awayAdd = (jersey: string) => [
+    { type: 'add-player' as const, side: 'away' as const, jersey, name: '' },
+  ];
+
+  /** Kept scoring, recorded as the device writes it. */
+  function keeping() {
+    const keptBy: DeviceScoring[] = [];
+    const keepScoring = (scoring: DeviceScoring) => {
+      keptBy.push(scoring);
+      return Promise.resolve();
+    };
+    return { keptBy, keepScoring, last: () => (keptBy.at(-1) ?? null) as DeviceScoring | null };
+  }
+
+  /** Opened again from what was kept, with no signal, a tap, and the signal back. */
+  async function reopenedWithATap(
+    network: EndpointNetwork,
+    options: Parameters<typeof device>[1] & {
+      kept: { readonly state: ServerState | null; readonly scoring: DeviceScoring | null };
+    },
+  ) {
+    network.mode = 'down';
+    const again = device(network, options);
+    await again.controller.start();
+    await tapAll(again.controller, [basket('home', hawks[0] ?? '')]);
+    await again.controller.idle();
+    network.mode = 'up';
+    again.controller.online();
+    await again.controller.idle();
+    return again.controller.status();
+  }
+
+  /** Somebody else (the same account on another tablet) adds a player, and maybe scores. */
+  async function somebodyElse(network: EndpointNetwork, rosters: DeviceRosters, plays: TapInput[]) {
+    const other = device(network, { deviceId: 'tablet-2', rosters });
+    await other.controller.start();
+    await other.controller.idle();
+    expect((await other.controller.changePlayers(awayAdd('88'))).ok).toBe(true);
+    await tapAll(other.controller, plays);
+    await other.controller.idle();
+    await other.controller.leave();
+  }
+
+  it('carries the taps on when its own add was refused since the state it kept', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const rosters = await serverRosters(network);
+    const k = keeping();
+    // An id already someone's: the server refuses the add, and counts it in its sequence.
+    const first = device(network, {
+      storage,
+      rosters,
+      keepScoring: k.keepScoring,
+      newPlayerId: () => bears[0] ?? '',
+    });
+    await first.controller.start();
+    await tapAll(first.controller, [...tipOff, basket('away', bears[1] ?? '')]);
+    await first.controller.idle();
+    const keptState: ServerState = await serverGame(network);
+    expect((await first.controller.changePlayers(awayAdd('61'))).ok).toBe(true);
+    await first.controller.idle();
+    expect(first.controller.status().queue.refused[0]?.refusal.problem).toBe('player-id-taken');
+    expect((await serverGame(network)).sequence).toBe(keptState.sequence + 1);
+    await first.controller.leave();
+    expect(network.reached).toContain('POST session:release');
+    const status = await reopenedWithATap(network, {
+      storage,
+      rosters,
+      keepScoring: k.keepScoring,
+      kept: { state: keptState, scoring: k.last() },
+    });
+    // Before: the refused add looked like somebody else's; the tap listed, 0-2 on the server.
+    expect(status.notSaved).toEqual([]);
+    expect(status.cannotTell).toBe(false);
+    expect(status.queue.waiting).toBe(0);
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 2 });
+  });
+
+  it('counts its own add taken before the state it kept once: an add by somebody else is caught', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const rosters = await serverRosters(network);
+    const k = keeping();
+    const first = device(network, { storage, rosters, keepScoring: k.keepScoring });
+    await first.controller.start();
+    await tapAll(first.controller, [...tipOff, basket('away', bears[1] ?? '')]);
+    await first.controller.idle();
+    // The add kept on top while it waits; the server takes it, and the state kept has it
+    // (as when it is taken during a load): kept on top and in the kept state's sequence.
+    network.mode = 'down';
+    expect((await first.controller.changePlayers(awayAdd('61'))).ok).toBe(true);
+    await first.controller.idle();
+    const withAdd = k.last();
+    expect(withAdd?.onTop.some((c) => c.input.type === 'add-player')).toBe(true);
+    network.mode = 'up';
+    first.controller.online();
+    await first.controller.idle();
+    const keptState: ServerState = await serverGame(network);
+    await first.controller.leave();
+    await somebodyElse(network, rosters, []);
+    const status = await reopenedWithATap(network, {
+      storage,
+      rosters,
+      keepScoring: k.keepScoring,
+      kept: { state: keptState, scoring: withAdd },
+    });
+    // Before: the own add counted again made up for the other's; the tap was sent.
+    expect(status.notSaved.map((t) => t.command.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    expect(status.cannotTell).toBe(false);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 2 });
+  });
+
+  it('still catches an add and a play by somebody else when it has its own adds', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const rosters = await serverRosters(network);
+    const k = keeping();
+    const first = device(network, { storage, rosters, keepScoring: k.keepScoring });
+    await first.controller.start();
+    await tapAll(first.controller, [...tipOff, basket('away', bears[1] ?? '')]);
+    await first.controller.idle();
+    const keptState: ServerState = await serverGame(network);
+    // Its own add, taken after the state it kept.
+    expect((await first.controller.changePlayers(awayAdd('61'))).ok).toBe(true);
+    await first.controller.idle();
+    await first.controller.leave();
+    await somebodyElse(network, rosters, [basket('away', bears[2] ?? '', 3)]);
+    const status = await reopenedWithATap(network, {
+      storage,
+      rosters,
+      keepScoring: k.keepScoring,
+      kept: { state: keptState, scoring: k.last() },
+    });
+    expect(status.notSaved.map((t) => t.command.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    expect(status.cannotTell).toBe(false);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 5 });
+  });
+
+  it('takes the safe side when the lists cannot tell: the tap listed, never sent unasked', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const rosters = await serverRosters(network);
+    const k = keeping();
+    const first = device(network, { storage, rosters, keepScoring: k.keepScoring });
+    await first.controller.start();
+    await tapAll(first.controller, [...tipOff, basket('away', bears[1] ?? '')]);
+    await first.controller.idle();
+    // A state kept with no list of changes (before step 2.242): whose the add since was
+    // cannot be told from it.
+    const { changes: _unknown, ...keptState } = await serverGame(network);
+    expect((await first.controller.changePlayers(awayAdd('61'))).ok).toBe(true);
+    await first.controller.idle();
+    await first.controller.leave();
+    const status = await reopenedWithATap(network, {
+      storage,
+      rosters,
+      keepScoring: k.keepScoring,
+      kept: { state: keptState, scoring: k.last() },
+    });
+    // Before: counted as its own, the tap sent though nobody could tell.
+    expect(status.notSaved.map((t) => t.command.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    expect(status.cannotTell).toBe(true);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 2 });
+  });
+
+  it('shows the game and keeps the scoring rebuilt in hold, though the state after it is lost', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const rosters = await serverRosters(network);
+    const k = keeping();
+    const first = device(network, { storage, rosters, keepScoring: k.keepScoring });
+    await first.controller.start();
+    await tapAll(first.controller, [...tipOff, basket('away', bears[1] ?? '')]);
+    await first.controller.idle();
+    const keptState: ServerState = await serverGame(network);
+    await first.controller.leave();
+    await somebodyElse(network, rosters, [basket('away', bears[2] ?? '', 3)]);
+    const keptScoring = k.last();
+    // The state judging the taps is answered; the one opening loads after it is lost.
+    let statesAnswered = 0;
+    const loseTheSecondState =
+      (ask: typeof globalThis.fetch): typeof globalThis.fetch =>
+      async (input, init) => {
+        const address = String(input instanceof Request ? input.url : input).split('?')[0] ?? '';
+        if (network.mode === 'up' && address.endsWith('/state')) {
+          statesAnswered += 1;
+          if (statesAnswered === 2) throw new TypeError('Failed to fetch');
+        }
+        return ask(input, init);
+      };
+    network.mode = 'down';
+    const again = device(network, {
+      storage,
+      rosters,
+      keepScoring: k.keepScoring,
+      askServer: loseTheSecondState,
+      kept: { state: keptState, scoring: keptScoring },
+    });
+    await again.controller.start();
+    await tapAll(again.controller, [basket('home', hawks[0] ?? '')]);
+    await again.controller.idle();
+    network.mode = 'up';
+    again.controller.online();
+    await again.controller.idle();
+    expect(statesAnswered).toBe(2);
+    const status = again.controller.status();
+    expect(status.notSaved.map((t) => t.command.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    // Before: the tap listed as not saved was still shown, 2-2, and kept on top under
+    // the ended session, until a load answered.
+    expect(status.game === null ? null : scoreOf(status.game)).toEqual({ home: 0, away: 2 });
+    const kept = k.last();
+    expect(kept?.sessionId).not.toBe(keptScoring?.sessionId);
+    expect(kept?.onTop.some((c) => c.input.type === 'score')).toBe(false);
+  });
+
+  it('offers only "Enter again" when it cannot tell, never "Send these plays" (T-358)', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const rosters = await serverRosters(network);
+    const k = keeping();
+    const first = device(network, { storage, rosters, keepScoring: k.keepScoring });
+    await first.controller.start();
+    await tapAll(first.controller, [...tipOff, basket('away', bears[1] ?? '')]);
+    await first.controller.idle();
+    const { changes: _unknown, ...keptState } = await serverGame(network);
+    expect((await first.controller.changePlayers(awayAdd('61'))).ok).toBe(true);
+    await first.controller.idle();
+    await first.controller.leave();
+    network.mode = 'down';
+    const again = device(network, {
+      storage,
+      rosters,
+      keepScoring: k.keepScoring,
+      kept: { state: keptState, scoring: k.last() },
+    });
+    await again.controller.start();
+    await tapAll(again.controller, [basket('home', hawks[0] ?? '')]);
+    await again.controller.idle();
+    network.mode = 'up';
+    again.controller.online();
+    await again.controller.idle();
+    expect(again.controller.status().cannotTell).toBe(true);
+    // Before: "Send these plays" was offered. The session the plays were made under was
+    // released, so the server refused it nearly always (review M1): taken away.
+    expect(again.controller.status().sendNotSaved).toBe('none');
+    const listed = again.controller.status().notSaved;
+    expect(listed.map((t) => t.command.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 2 });
+    expect((await again.controller.enterAgain(listed[0]?.command.commandId ?? '')).ok).toBe(true);
+    await again.controller.idle();
+    expect(again.controller.status().notSaved).toEqual([]);
+    expect(again.controller.status().cannotTell).toBe(false);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 2 });
+  });
+
+  it('leaves no offer up when judging again finds a command by somebody else (review M2)', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const rosters = await serverRosters(network);
+    const k = keeping();
+    const first = device(network, { storage, rosters, keepScoring: k.keepScoring });
+    await first.controller.start();
+    await tapAll(first.controller, [...tipOff, basket('away', bears[1] ?? '')]);
+    await first.controller.idle();
+    const { changes: _unknown, ...keptState } = await serverGame(network);
+    expect((await first.controller.changePlayers(awayAdd('61'))).ok).toBe(true);
+    await first.controller.idle();
+    await first.controller.leave();
+    // The first judging cannot tell. A tap made while it asks is made under the ended
+    // session, so the taps are judged again; that time a play by somebody else is since.
+    const somebodyElsesPlay = '01900000-0000-7000-8000-0000000be1f0';
+    let states = 0;
+    let tapMeanwhile: () => Promise<void> = () => Promise.resolve();
+    network.mode = 'down';
+    const again = device(network, {
+      storage,
+      rosters,
+      keepScoring: k.keepScoring,
+      kept: { state: keptState, scoring: k.last() },
+      askServer: (ask) => async (input, init) => {
+        const address = String(input instanceof Request ? input.url : input).split('?')[0] ?? '';
+        if (network.mode !== 'up' || !address.endsWith('/state')) return ask(input, init);
+        states += 1;
+        if (states === 1) await tapMeanwhile();
+        const answer = await ask(input, init);
+        if (states !== 2) return answer;
+        const body = (await answer.json()) as { sequence: number; state: { recent: string[] } };
+        body.sequence += 1;
+        body.state.recent = [...body.state.recent, somebodyElsesPlay];
+        return new Response(JSON.stringify(body), {
+          status: answer.status,
+          headers: answer.headers,
+        });
+      },
+    });
+    await again.controller.start();
+    await tapAll(again.controller, [basket('home', hawks[0] ?? '')]);
+    await again.controller.idle();
+    tapMeanwhile = () => tapAll(again.controller, [basket('home', hawks[1] ?? '')]);
+    network.mode = 'up';
+    again.controller.online();
+    await again.controller.idle();
+    expect(states).toBeGreaterThanOrEqual(2);
+    const status = again.controller.status();
+    expect(status.notSaved.map((t) => t.command.input)).toEqual(
+      expect.arrayContaining([basket('home', hawks[0] ?? ''), basket('home', hawks[1] ?? '')]),
+    );
+    expect(status.notSaved).toHaveLength(2);
+    // Before: the offer made when the first judging could not tell stayed up, though the
+    // second found somebody else's play.
+    expect(status.sendNotSaved).toBe('none');
+    expect(status.cannotTell).toBe(false);
   });
 });

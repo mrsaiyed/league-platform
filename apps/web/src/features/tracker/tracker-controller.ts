@@ -64,6 +64,7 @@ import {
 import { basketball } from '@srleagues/sports';
 import { againCommandId } from './again-command-id.ts';
 import type { CommandTransport } from './command-transport.ts';
+import { commandsSince } from './commands-since.ts';
 import { refreshedRosters } from './device-rosters.ts';
 import type { GameDoors } from './game-doors.ts';
 import { mayEnterAgain } from './kept-plays.ts';
@@ -186,6 +187,12 @@ export type TrackerControllerStatus = {
   readonly notSaved: readonly KeptTap[];
   /** Whether "Send these plays" is offered for `notSaved` (S-43, T-335): `sendNotSaved`. */
   readonly sendNotSaved: SendNotSavedOffer;
+  /**
+   * The taps in `notSaved` were listed because the device could not tell whether
+   * somebody else scored meanwhile (T-357): more commands came in than the server's lists
+   * name. The safe side: listed, never sent unasked. False once the list is empty.
+   */
+  readonly cannotTell: boolean;
   /**
    * The taps not on the server yet, oldest first (finding L1), each with the period and
    * game clock it was made at (finding I): the plays whose `id` is one of these command
@@ -687,6 +694,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   let made: BatchCommand[] = [];
   /** Every tap the server refused: never replayed. */
   const refusedIds = new Set<string>();
+  /** Set while opening is settled: the last judging of the commands since could not tell. */
+  let couldNotTell = false;
   let stopped = false;
   let failures = 0;
   let cancelTimer: (() => void) | null = null;
@@ -715,6 +724,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     serverSequence: null,
     notApplied: [],
     notSaved: [],
+    cannotTell: false,
     sendNotSaved: 'none',
     waiting: [],
     lastSavedAt: null,
@@ -1074,6 +1084,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   /** Lists `list` as not saved, and says whether "Send these plays" is offered for it. */
   const showNotSaved = (list: readonly KeptTap[]): void => {
     if (list.length === 0) notSavedSince = null;
+    if (list.length === 0 && current.cannotTell) update({ cannotTell: false });
     const was = current.sendNotSaved;
     const sendNotSaved: SendNotSavedOffer =
       list.length === 0 || notSavedSince === null ? 'none' : was === 'none' ? 'offered' : was;
@@ -1398,26 +1409,6 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   };
 
   /**
-   * Whether anybody but this device scored the game between `from`, the state it last
-   * knew, and `now`: every command the server took since is one of `own` (by id, lower
-   * case), and none is missing from the state's recent ones but at most `ownUnseen`:
-   * this device's changes of players the server took, which count in its sequence but
-   * never show in the state's plays (T-331). When that cannot be told (too many since),
-   * somebody may have.
-   */
-  const nobodyElseScored = (
-    from: ServerState,
-    now: ServerState,
-    own: ReadonlySet<string>,
-    ownUnseen: number,
-  ): boolean => {
-    const before = new Set(from.state.recent.map((id) => id.toLowerCase()));
-    const since = now.state.recent.map((id) => id.toLowerCase()).filter((id) => !before.has(id));
-    const unseen = now.sequence - from.sequence - since.length;
-    return unseen >= 0 && unseen <= ownUnseen && since.every((id) => own.has(id));
-  };
-
-  /**
    * The server gave this device a new session `held` while taps made under its earlier
    * one wait (step 2.38): that one ended with the device away (released as the page
    * reloaded with no signal, say). The server gives a session only to this device and
@@ -1425,12 +1416,17 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * fit the game as it is: they are moved to the new session in the storage and sent,
    * neither lost nor listed. Otherwise somebody else took the game, and they are listed
    * as not saved. With no answer, opening is asked again before anything is decided.
+   * Whose the commands since were is judged by ID (T-357): this device's own are those it
+   * made, kept or stored, refused ones included. When the server's lists are too short to
+   * tell, somebody else may have scored: listed (`cannotTell`) to enter again, never sent
+   * and never offered to send (T-358).
    */
   const carryOnTaps = async (
     held: string,
     stale: readonly KeptTap[],
     stored: ReadonlySet<string>,
   ): Promise<'carried' | 'taken' | 'unanswered'> => {
+    couldNotTell = false;
     const from = base ?? options.kept?.state ?? null;
     if (from === null) return 'taken';
     const loaded = await ask((signal) => server.loadState(signal));
@@ -1441,14 +1437,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       ...(options.kept?.scoring?.onTop ?? []),
       ...stale.map((t) => t.command),
     ];
-    const own = new Set(ownCommands.map((c) => c.commandId.toLowerCase()));
-    // This device's changes of players on top that the storage no longer holds: taken.
-    const ownUnseen = new Set(
-      ownCommands
-        .filter((c) => isTablePlayerCommand(c) && !stored.has(c.commandId))
-        .map((c) => c.commandId),
-    ).size;
-    if (!nobodyElseScored(from, loaded.value, own, ownUnseen)) return 'taken';
+    const own = new Set(
+      [...ownCommands.map((c) => c.commandId), ...stored, ...refusedIds].map((id) =>
+        id.toLowerCase(),
+      ),
+    );
+    const since = commandsSince(from, loaded.value, own);
+    if (since === 'cannot-tell') couldNotTell = true;
+    if (since !== 'own') return 'taken';
     await queue.carryOn(
       stale.map((t) => t.command.commandId),
       held,
@@ -1490,6 +1486,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       // Carried: the storage holds them under `held` now, read again below.
       if (carried === 'carried') stale = [];
     }
+    // Listed because whose the commands since were could not be told (T-357): "Enter
+    // again" only, never "Send these plays" (T-358, review M1): the session they were made
+    // under has ended, so the server would refuse the send nearly always. Nothing here
+    // sets an offer, so none is left up when the taps are judged again (review M2).
     // Set aside, then listed: meanwhile the queue's listener must not take a stale change
     // of players for one taken (review M1 of step 2.118).
     const staleIds = stale.map((t) => t.command.commandId);
@@ -1531,6 +1531,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       );
       made = [...taken, ...waiting.map((entry) => entry.command)];
       sessionId = held;
+      // Shown and kept as rebuilt now, in the lock (step 2.242): a tap set aside is never
+      // shown, nor kept on top under the ended session, while the load below is unanswered.
+      if (base === null) keepScoringNow();
+      else showGame();
       return 'rebuilt';
     });
     if (rebuilt !== 'rebuilt') {
@@ -1543,6 +1547,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const sent = new Set(made.map((c) => c.commandId));
     const listed = withTaps(withTaps(current.notSaved, setAside), stale);
     listNotSaved(withoutTaps(listed, sent));
+    // Listed because whose the commands since were could not be told (T-357): said so.
+    if (couldNotTell && current.notSaved.length > 0) {
+      update({ cannotTell: true });
+    }
+    couldNotTell = false;
     for (const id of staleIds) settingAside.delete(id);
     // Loading the state then drops any of them the server has after all (M1).
     return scoreWith(held);
@@ -1559,6 +1568,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   };
 
   const openOnce = async (): Promise<void> => {
+    couldNotTell = false;
     // Scoring from what the device kept (step 2.38) carries on while opening is asked again.
     if (!(fromDevice && current.mode.kind === 'scoring')) update({ mode: { kind: 'opening' } });
     const opened = await session({ type: 'open', deviceId });

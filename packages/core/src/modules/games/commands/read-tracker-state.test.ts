@@ -73,7 +73,7 @@ describe('reading the tracker’s state (T-113, T-253)', () => {
     const engineRules = engineRulesOf(seasonRulesPreset('high-school'));
     expect(result).toEqual({
       ok: true,
-      value: { sequence: 0, state: basketball.newGame(engineRules, 0) },
+      value: { sequence: 0, state: basketball.newGame(engineRules, 0), changes: [] },
     });
   });
 
@@ -102,6 +102,41 @@ describe('reading the tracker’s state (T-113, T-253)', () => {
     if (!result.ok) throw new Error(result.error.code);
     expect(result.value.state.rules).toEqual(engineRulesOf(halves));
     expect(result.value.state.clock.remainingMs).toBe(1_200_000);
+  });
+
+  // Step 2.242 (T-356): the changes of players' IDs beside the plays', refused adds included.
+  it('lists the changes of players by ID, a refused add included, and counts them in the sequence', async () => {
+    const t = setUp();
+    const add = (n: number, playerId: string) => ({
+      commandId: `01900000-0000-7000-8000-0000a000000${n}`,
+      at: startOfTest + n,
+      input: {
+        type: 'add-player' as const,
+        side: 'away' as const,
+        playerId,
+        jersey: `${n}`,
+        name: '',
+      },
+    });
+    // The second names an id the platform made (version 7): refused, and kept as an event.
+    const changes = [add(1, '4b0f6f9e-3c1d-4a2b-9e8f-0123456789ab'), add(2, home)];
+    const batch = { gameId, protocolVersion: 2, sessionId, commands: changes };
+    const answered = await applyTrackerCommands(t.as(scorekeeperId), batch, t.deps);
+    if (!answered.ok) throw new Error(answered.error.code);
+    expect(answered.value.results.map((r) => r.status)).toEqual(['accepted', 'refused']);
+    const before = await readTrackerState(t.as(scorekeeperId), { gameId }, t.deps);
+    if (!before.ok) throw new Error(before.error.code);
+    // No state is saved for changes of players alone: the sequence is the last change's.
+    expect(before.value.sequence).toBe(2);
+    expect(before.value.changes).toEqual(changes.map((c) => c.commandId));
+    expect(before.value.state.recent).toEqual([]);
+    const plays = { gameId, protocolVersion: 2, sessionId, commands: taps };
+    await applyTrackerCommands(t.as(scorekeeperId), plays, t.deps);
+    const after = await readTrackerState(t.as(scorekeeperId), { gameId }, t.deps);
+    if (!after.ok) throw new Error(after.error.code);
+    expect(after.value.sequence).toBe(4);
+    expect(after.value.changes).toEqual(changes.map((c) => c.commandId));
+    expect(after.value.state.recent).toEqual(taps.map((c) => c.commandId));
   });
 
   it('is only for whoever may score the game, and changes nothing', async () => {
