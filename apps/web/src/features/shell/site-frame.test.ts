@@ -20,6 +20,7 @@ const signInHref = '/signin?next=%2Fnorth-valley';
 const madeUpAccount: AccountMenu = {
   initial: 'O',
   email: 'owner@example.test',
+  accountId: '00000000-0000-4000-8000-0000000000a1',
   adminHref: '/north-valley/admin',
   gamesHref: '/north-valley/admin/games',
   myTeam: null,

@@ -20,6 +20,7 @@ import { QueueError, type QueueErrorCode } from './queue-storage.ts';
 import {
   stillKept,
   withLineupPicks,
+  withScoring,
   type OpenedGame,
   type OpenedGameStorage,
 } from './opened-game-storage.ts';
@@ -171,7 +172,7 @@ export async function openIndexedDbOpenedGameStorage(
       return change(gameId, (game) => ({ ...game, confirmedFormat: format }));
     },
     saveScoring(gameId, scoring) {
-      return change(gameId, (game) => ({ ...game, scoring }));
+      return change(gameId, (game) => withScoring(game, scoring));
     },
     saveLineupPicks(gameId, picks) {
       return change(gameId, (game) => withLineupPicks(game, picks));

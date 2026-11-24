@@ -9,6 +9,7 @@ import {
   signedInFrom,
   trackerWorkerForgetMessage,
   trackerWorkerKeepMessage,
+  trackerWorkerReleaseMessage,
 } from './tracker-worker-rules.ts';
 import { trackerWorkerScript } from './tracker-worker-script.ts';
 
@@ -57,9 +58,11 @@ describe("the tracker worker's script (step 2.38)", () => {
     const head = '<meta name="srleagues-account" content="account-1"/>';
     expect(rules.accountMarkOfPage(head, 'srleagues-account')).toBe('account-1');
     for (const signedIn of ['account-1', 'account-2', null, undefined]) {
-      expect(rules.mayServeKeptPage('account-1', signedIn)).toBe(
-        mayServeKeptPage('account-1', signedIn),
-      );
+      for (const here of ['account-1', 'account-2', null]) {
+        expect(rules.mayServeKeptPage('account-1', signedIn, here)).toBe(
+          mayServeKeptPage('account-1', signedIn, here),
+        );
+      }
     }
     const sentToSignIn = { status: 0, type: 'opaqueredirect', redirected: false };
     expect(rules.signedInFrom(sentToSignIn, null)).toBe(signedInFrom(sentToSignIn, null));
@@ -71,7 +74,7 @@ describe("the tracker worker's script (step 2.38)", () => {
     expect(script).toContain('"accountMeta":"srleagues-account"');
     expect(script).toContain('if (signedIn !== undefined) await forgetPagesNotOf(signedIn);');
     expect(script).toContain(
-      'if (kept && !mayServeKeptPage(await accountOf(kept), signedIn)) kept = undefined;',
+      'if (kept && !mayServeKeptPage(await accountOf(kept), signedIn, await deviceAccount())) kept = undefined;',
     );
   });
 
@@ -135,13 +138,58 @@ describe("the tracker worker's script (step 2.38)", () => {
     expect(script).toContain('asking.transaction.abort()');
   });
 
-  it('counts a game open only while it is not final or its plays wait (T-322)', () => {
+  it('counts only tracker pages open now, their game in progress (T-323)', () => {
     const script = trackerWorkerScript();
     expect(script).toContain('"queueDatabase":"srleagues-tracker-queue"');
     expect(script).toContain('"queue":"commands"');
+    expect(script).toContain('"accountDatabase":"srleagues-device-account"');
     expect(script).toContain(`const gamesHoldingBack = (${String(gamesHoldingBack)});`);
     expect(script).toContain(
-      'return gamesHoldingBack(games, await readAll(names.queueDatabase, names.queue));',
+      "self.clients.matchAll({ type: 'window', includeUncontrolled: true })",
     );
+    expect(script).toContain('if (open.length === 0) return 0;');
+  });
+
+  it('"Reload" on "update needed": the kept pages and files go, a waiting worker takes over, the plays stay (T-323)', async () => {
+    const boxes = new Map<string, Map<string, unknown>>([
+      ['srleagues-tracker https://site.test/north/score/ abc', new Map([['page', 1]])],
+      ['srleagues-tracker https://site.test/south/score/ xyz', new Map([['page', 2]])],
+    ]);
+    const caches = {
+      open: () => Promise.reject(new Error('not opened here')),
+      keys: () => Promise.resolve([...boxes.keys()]),
+      delete: (name: string) => Promise.resolve(boxes.delete(name)),
+    };
+    const handlers = new Map<string, (event: unknown) => void>();
+    let tookOver = false;
+    const self = {
+      registration: { scope: 'https://site.test/north/score/' },
+      location: { href: 'https://site.test/north/score/tracker-worker.js?code=abc' },
+      addEventListener: (type: string, handler: (event: unknown) => void) =>
+        handlers.set(type, handler),
+      skipWaiting: () => {
+        tookOver = true;
+        return Promise.resolve();
+      },
+    };
+    // The worker never opens the device's databases for this: the plays stay where they are.
+    const indexedDB = {
+      open: () => {
+        throw new Error('the release message must not touch the device storage');
+      },
+    };
+    new Function('self', 'caches', 'indexedDB', trackerWorkerScript())(self, caches, indexedDB);
+    const pending: Promise<unknown>[] = [];
+    let answered = false;
+    handlers.get('message')?.({
+      data: { type: trackerWorkerReleaseMessage },
+      ports: [{ postMessage: () => (answered = true) }],
+      waitUntil: (p: Promise<unknown>) => pending.push(p),
+    });
+    await Promise.all(pending);
+    expect(answered).toBe(true);
+    expect(tookOver).toBe(true);
+    // Only this scope's kept copies go; another league's stay.
+    expect([...boxes.keys()]).toEqual(['srleagues-tracker https://site.test/south/score/ xyz']);
   });
 });

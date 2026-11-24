@@ -295,6 +295,11 @@ export type TrackerControllerOptions = {
   readonly kept?: { readonly state: ServerState | null; readonly scoring: DeviceScoring | null };
   /** Keeps how the device is scoring the game, each time it changes (step 2.38). */
   readonly keepScoring?: (scoring: DeviceScoring) => Promise<void>;
+  /**
+   * Forgets the kept scoring: the device lost the game, so a reload with no signal does
+   * not score on under the lost session (step 2.38, review M3).
+   */
+  readonly forgetScoring?: () => Promise<void>;
 };
 
 export type TrackerController = {
@@ -705,6 +710,13 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // Best effort: the taps themselves are in the queue, which says when storage fails.
     keeping = keeping.then(() => keep(scoring)).catch(() => undefined);
   };
+  /** After every keeping under way, so a kept scoring never lands after the forgetting. */
+  const forgetScoringNow = (): Promise<void> => {
+    const forget = options.forgetScoring;
+    if (forget === undefined) return Promise.resolve();
+    keeping = keeping.then(() => forget()).catch(() => undefined);
+    return keeping;
+  };
 
   const showGame = (): void => {
     if (base === null) return;
@@ -743,14 +755,21 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     if (state === null || scoring === null || state.state.status === 'final') return;
     fromDevice = true;
     let waiting: BatchCommand[];
+    // A kept tap the queue holds as not saved or refused was listed when the game was
+    // lost: it is never counted again on the screen (review M3).
+    let settled: Set<string>;
     try {
-      waiting = (await storage.list(gameId))
+      const held = await storage.list(gameId);
+      waiting = held
         .filter(
           (entry) =>
             entry.state === 'waiting' &&
             (entry.sessionId === undefined || entry.sessionId === scoring.sessionId),
         )
         .map((entry) => entry.command);
+      settled = new Set(
+        held.filter((entry) => entry.state !== 'waiting').map((entry) => entry.command.commandId),
+      );
     } catch {
       return;
     }
@@ -760,7 +779,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     // not counted twice.
     const inState = new Set(state.state.recent.map((id) => id.toLowerCase()));
     made = [...scoring.onTop, ...waiting.filter((c) => !onTop.has(c.commandId))].filter(
-      (c) => !refusedIds.has(c.commandId) && !inState.has(c.commandId.toLowerCase()),
+      (c) =>
+        !refusedIds.has(c.commandId) &&
+        !settled.has(c.commandId) &&
+        !inState.has(c.commandId.toLowerCase()),
     );
     base = state;
     sessionId = scoring.sessionId;
@@ -894,6 +916,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * be scoring it, or the game is over.
    */
   const lost = async (): Promise<void> => {
+    // What the device kept of its scoring under the lost session goes (review M3).
+    await forgetScoringNow();
     // A batch already on its way may still be taken: wait for its answer, so a tap the
     // server took is not listed. Nothing more is sent, as the session is let go.
     await queue.idle();

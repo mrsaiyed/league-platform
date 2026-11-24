@@ -102,6 +102,18 @@ export type OpenTrackerGameOptions = {
    * so the clearing of a sign-out is the last thing written (step 2.38). Left out: never.
    */
   readonly letGo?: () => boolean;
+  /**
+   * Who the device says is signed in here (device-account.ts, T-323). What the device kept
+   * of the game (its state and scoring) is scored from with no signal only when this is
+   * the account opening it: someone else may have signed in on another page since. Left
+   * out: the account opening (tests).
+   */
+  readonly deviceAccount?: () => Promise<string | null>;
+  /**
+   * Called once the server has answered with the game's state: the page reached the
+   * network signed in as `accountId`, so the device's mark is written (T-323).
+   */
+  readonly markSignedIn?: (accountId: string) => Promise<void>;
   /** A new device id, used only the first time this device opens a game. */
   readonly newDeviceId: () => string;
   readonly now?: () => number;
@@ -146,6 +158,25 @@ export type OpenTrackerGameResult =
 const codeOf = (error: unknown): QueueErrorCode =>
   error instanceof QueueError ? error.code : 'storage-unavailable';
 
+/** `server`, calling `mark` once, the first time the game's state is answered (T-323). */
+function markingOnAnswer(
+  server: TrackerServer,
+  mark: () => Promise<void> | undefined,
+): TrackerServer {
+  let marked = false;
+  return {
+    session: (request, signal) => server.session(request, signal),
+    async loadState(signal) {
+      const outcome = await server.loadState(signal);
+      if (outcome.kind === 'answer' && !marked) {
+        marked = true;
+        await mark()?.catch(() => undefined);
+      }
+      return outcome;
+    },
+  };
+}
+
 /**
  * Prepares the device and makes the controller; `controller.start()` then takes the
  * session and loads the game. The caller starts it once it listens to its status.
@@ -174,7 +205,15 @@ export async function openTrackerGame(
     deviceId = await storage.games.deviceId(options.newDeviceId);
     const kept = await storage.games.find(gameId);
     confirmed = kept?.confirmedFormat ?? null;
-    keptGame = { state: kept?.state ?? null, scoring: kept?.scoring ?? null };
+    // Kept for this very account, and the device says it is the one signed in here (T-323).
+    const here = await (options.deviceAccount ?? (async () => accountId))();
+    const ours =
+      kept?.accountId === accountId &&
+      here !== null &&
+      here.toLowerCase() === accountId.toLowerCase();
+    keptGame = ours
+      ? { state: kept.state, scoring: kept.scoring ?? null }
+      : { state: null, scoring: null };
     picks = kept?.lineupPicks ?? noLineupPicks;
   } catch (error) {
     return { ok: false, code: codeOf(error) };
@@ -192,11 +231,14 @@ export async function openTrackerGame(
     // With no answer on opening, scoring starts from what the device kept (step 2.38).
     kept: keptGame,
     keepScoring: (scoring) => games.saveScoring(gameId, scoring),
+    // The device lost the game: what it kept of its scoring goes, so a reload with no
+    // signal does not score on under the lost session (step 2.38, review M3).
+    forgetScoring: () => games.saveScoring(gameId, null),
     transport: options.transport,
     ...(options.doors === undefined ? {} : { doors: options.doors }),
     server: createStoringTrackerServer({
       gameId,
-      server: options.server,
+      server: markingOnAnswer(options.server, () => options.markSignedIn?.(accountId)),
       storage: games,
       ...(options.onStoreFailed === undefined ? {} : { onStoreFailed: options.onStoreFailed }),
     }),

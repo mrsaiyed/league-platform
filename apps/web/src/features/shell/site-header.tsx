@@ -102,7 +102,11 @@ function AccountEntries({
           {t('account.signOut')}
         </SignOutLink>
       ) : (
-        <SignOutForm action={signOutAction} waitingQuestion={waitingQuestionWords()}>
+        <SignOutForm
+          action={signOutAction}
+          waitingQuestion={waitingQuestionWords()}
+          accountId={account.accountId}
+        >
           <SignOutFields fields={account.signOutFields} />
           <button className="site-account-sign-out" type="submit">
             {t('account.signOut')}

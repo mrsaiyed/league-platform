@@ -11,11 +11,13 @@ const tap = (n: number) => ({
 });
 
 describe('the taps of one account (T-321)', () => {
-  it('counts a tap as the account’s own when it made it, or when no maker was kept', () => {
+  it('counts a tap as the account’s own only when it made it; one kept with no maker is nobody’s (T-323)', () => {
     expect(madeBy({ accountId: 'account-1' }, 'account-1')).toBe(true);
     expect(madeBy({ accountId: 'account-1' }, 'account-2')).toBe(false);
     expect(madeBy({ accountId: 'account-1' }, null)).toBe(false);
-    expect(madeBy({}, 'account-2')).toBe(true);
+    // Stored before this release: never sent, listed to nobody.
+    expect(madeBy({}, 'account-2')).toBe(false);
+    expect(madeBy({}, null)).toBe(false);
   });
 
   it('keeps league and account with each tap, and lists a game’s queue for its account only', async () => {

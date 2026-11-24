@@ -84,7 +84,11 @@ export function StaffFoot({
               </span>
             </span>
           </a>
-          <SignOutForm action={signOutAction} waitingQuestion={waitingQuestionWords()}>
+          <SignOutForm
+            action={signOutAction}
+            waitingQuestion={waitingQuestionWords()}
+            accountId={account.accountId}
+          >
             <SignOutFields fields={account.signOutFields} />
             <button className="staff-foot-link" type="submit">
               <StaffIcon name="sign-out" />

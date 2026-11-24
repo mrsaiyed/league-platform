@@ -422,6 +422,36 @@ describe('one scorer at a time (T-116, T6 §5)', () => {
     });
   });
 
+  it('refuses a batch whose stated maker is not the account of its session: the session decides (T-323)', async () => {
+    const t = setUp({ sessions: [holdingSession()] });
+    const asV2 = { protocolVersion: 2 };
+    // Taps the device kept for another person are never taken under this session.
+    const theirs = await applyTrackerCommands(
+      t.as(scorekeeperId),
+      batchOf(taps(tipOff), { ...asV2, accountId: editorId }),
+      t.deps,
+    );
+    expect(theirs).toMatchObject({
+      value: { results: [{ status: 'refused', reason: { code: 'session-not-held' } }, {}, {}] },
+    });
+    expect(t.db.state.events).toHaveLength(0);
+    // The stated maker grants nothing: someone else's session stays refused when it is named.
+    const borrowed = setUp({ sessions: [holdingSession({ accountId: editorId })] });
+    const named = await applyTrackerCommands(
+      borrowed.as(scorekeeperId),
+      batchOf(taps(tipOff), { ...asV2, accountId: editorId }),
+      borrowed.deps,
+    );
+    expect(statuses(named)).toEqual(['refused', 'refused', 'refused']);
+    // The session's own account, said or not, is taken.
+    const own = await applyTrackerCommands(
+      t.as(scorekeeperId),
+      batchOf(taps(tipOff), { ...asV2, accountId: scorekeeperId }),
+      t.deps,
+    );
+    expect(statuses(own)).toEqual(['accepted', 'accepted', 'accepted']);
+  });
+
   it('a lease that ran out with nobody taking the game still carries the device’s taps (record 036)', async () => {
     const t = setUp();
     t.clock.advance(600);

@@ -6,6 +6,7 @@ import {
   trackerScopeOf,
   trackerWorkerForgetMessage,
   trackerWorkerKeepMessage,
+  trackerWorkerReleaseMessage,
   trackerWorkerUpdateMessage,
 } from './tracker-worker-rules.ts';
 
@@ -13,7 +14,7 @@ import {
 const forgetAnswerMs = 1000;
 
 /** Tells `worker` to keep nothing more and delete what it kept; settles on its answer. */
-function workerForgets(worker: ServiceWorker): Promise<void> {
+function askWorker(worker: ServiceWorker, type: string): Promise<void> {
   return new Promise<void>((done) => {
     const channel = new MessageChannel();
     const timer = setTimeout(done, forgetAnswerMs);
@@ -22,7 +23,7 @@ function workerForgets(worker: ServiceWorker): Promise<void> {
       done();
     };
     try {
-      worker.postMessage({ type: trackerWorkerForgetMessage }, [channel.port2]);
+      worker.postMessage({ type }, [channel.port2]);
     } catch {
       clearTimeout(timer);
       done();
@@ -73,7 +74,9 @@ export async function forgetTrackerPagesOnDevice(): Promise<void> {
       await Promise.all(
         registrations
           .flatMap((r) => [r.active, r.waiting, r.installing])
-          .map((worker) => (worker === null ? Promise.resolve() : workerForgets(worker))),
+          .map((worker) =>
+            worker === null ? Promise.resolve() : askWorker(worker, trackerWorkerForgetMessage),
+          ),
       );
     }
     if (typeof caches !== 'undefined') {
@@ -90,5 +93,54 @@ export async function forgetTrackerPagesOnDevice(): Promise<void> {
     }
   } catch {
     // Nothing more to do here: a page kept by a worker is never kept for someone signed out.
+  }
+}
+
+/** The part of the browser that "Reload" on "update needed" uses (T-323). */
+export type ReleaseBrowser = {
+  readonly registrations: () => Promise<readonly ServiceWorkerRegistration[]>;
+  readonly ask: (worker: ServiceWorker, type: string) => Promise<void>;
+  readonly cacheNames: () => Promise<readonly string[]>;
+  readonly deleteCache: (name: string) => Promise<unknown>;
+};
+
+const thisBrowser = (): ReleaseBrowser | null =>
+  typeof navigator === 'undefined' || !('serviceWorker' in navigator)
+    ? null
+    : {
+        registrations: () => navigator.serviceWorker.getRegistrations(),
+        ask: askWorker,
+        cacheNames: () => (typeof caches === 'undefined' ? Promise.resolve([]) : caches.keys()),
+        deleteCache: (name) => caches.delete(name),
+      };
+
+/**
+ * "Reload" when the server says this tracker is too old (T-323): each worker lets go of
+ * every page and file it kept (a waiting one takes over), so the reload that follows
+ * opens the new release from the network and nobody is held on a refused version. Only
+ * the kept pages and files go: the plays waiting on the device live in its own storage,
+ * which the new release reads and sends. Never fails; never waits more than a second a
+ * worker.
+ */
+export async function takeNewRelease(
+  browser: ReleaseBrowser | null = thisBrowser(),
+): Promise<void> {
+  if (browser === null) return;
+  try {
+    const registrations = await browser.registrations();
+    await Promise.all(
+      registrations
+        .flatMap((r) => [r.active, r.waiting, r.installing])
+        .map((worker) =>
+          worker === null ? Promise.resolve() : browser.ask(worker, trackerWorkerReleaseMessage),
+        ),
+    );
+    const names = await browser.cacheNames();
+    await Promise.all(
+      names.filter((name) => name.startsWith(trackerKeptPrefix)).map(browser.deleteCache),
+    );
+  } catch {
+    // The reload goes ahead: the worker keeps no page once the network answers with
+    // another release's (no game open) or the scorer closes the game.
   }
 }

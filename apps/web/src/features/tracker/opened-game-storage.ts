@@ -143,7 +143,8 @@ export interface OpenedGameStorage {
    * Stores how the device is scoring the game (step 2.38); cleared with the game. Ignored
    * for a game whose rosters are not stored.
    */
-  saveScoring(gameId: string, scoring: DeviceScoring): Promise<void>;
+  /** `null` forgets the kept scoring (the device lost the game, review M3). */
+  saveScoring(gameId: string, scoring: DeviceScoring | null): Promise<void>;
   /** This device's own id, made with `make` the first time and kept from then on. */
   deviceId(make: () => string): Promise<string>;
 }
@@ -161,6 +162,12 @@ export function stillKept(game: OpenedGame, owner: OpenedGameOwner, olderThan: n
 }
 
 /** `game` with the starters being picked, or without any when nobody is picked. */
+/** `game` with `scoring` kept, or with none kept when it is null. */
+export function withScoring(game: OpenedGame, scoring: DeviceScoring | null): OpenedGame {
+  const { scoring: _before, ...rest } = game;
+  return scoring === null ? rest : { ...rest, scoring };
+}
+
 export function withLineupPicks(game: OpenedGame, picks: LineupPicks): OpenedGame {
   const { lineupPicks: _before, ...rest } = game;
   return picks.home.length === 0 && picks.away.length === 0

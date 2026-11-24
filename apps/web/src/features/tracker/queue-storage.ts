@@ -176,11 +176,12 @@ export interface HeldPlaysStorage {
 export type DeviceQueueStorage = QueueStorage & HeldPlaysStorage;
 
 /**
- * Whether `entry` is the account's own (T-321): made by it, or stored before the maker
- * was kept. Another account's taps are never sent, listed or dismissed under this one.
+ * Whether `entry` is the account's own (T-321, T-323): made by it. Another account's taps
+ * are never sent, listed or dismissed under this one. A tap stored before the maker was
+ * kept is nobody's: never sent, listed to nobody; it goes with the device's 14-day keep.
  */
 export function madeBy(entry: Pick<QueuedCommand, 'accountId'>, accountId: string | null): boolean {
-  return entry.accountId === undefined || entry.accountId === accountId;
+  return entry.accountId !== undefined && accountId !== null && entry.accountId === accountId;
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   codeMarkOf,
   keptAddressOf,
   mayKeepAnswer,
+  deviceAccountOf,
   gamesHoldingBack,
   mayReplaceStored,
   mayServeKeptPage,
@@ -97,37 +98,47 @@ describe('the update rule (T-127): the stored tracker is replaced only when no g
   });
 });
 
-describe('which games hold a release back (T-127, T-322): open as a scorekeeper means it', () => {
+describe('which pages hold a release back (T-127, T-323): a game in progress open now', () => {
   const live = { gameId: 'g1', state: { state: { status: 'live' } } };
   const final = { gameId: 'g2', state: { state: { status: 'final' } } };
   const notLoaded = { gameId: 'g3', state: null };
+  const kept = [live, final, notLoaded];
 
-  it('a game not final holds a release back, waiting plays or not', () => {
-    expect(gamesHoldingBack([live], [])).toBe(1);
-    expect(gamesHoldingBack([notLoaded], [])).toBe(1);
-    expect(gamesHoldingBack([live, notLoaded], [{ gameId: 'g1', state: 'waiting' }])).toBe(2);
+  it('stored data alone holds nothing back: no page open, nothing waits (review M2)', () => {
+    expect(gamesHoldingBack([], kept, [{ gameId: 'g1', state: 'waiting' }])).toBe(0);
+    expect(gamesHoldingBack([], null, null)).toBe(0);
+    expect(mayReplaceStored(gamesHoldingBack([], kept, []))).toBe(true);
   });
 
-  it('a final game holds it back only while its plays wait on this device', () => {
-    expect(gamesHoldingBack([final], [])).toBe(0);
-    expect(gamesHoldingBack([final], [{ gameId: 'g2', state: 'waiting' }])).toBe(1);
+  it('an open page of a game not final holds it back, waiting plays or not', () => {
+    expect(gamesHoldingBack(['g1'], kept, [])).toBe(1);
+    expect(gamesHoldingBack(['G3'], kept, [])).toBe(1);
+    expect(gamesHoldingBack(['g1', 'g3'], kept, [{ gameId: 'g1', state: 'waiting' }])).toBe(2);
+    // A page still opening, its game not stored yet, holds it back too.
+    expect(gamesHoldingBack(['g9'], kept, [])).toBe(1);
+  });
+
+  it('an open page of a final game holds it back only while its plays wait on this device', () => {
+    expect(gamesHoldingBack(['g2'], kept, [])).toBe(0);
+    expect(gamesHoldingBack(['g2'], kept, [{ gameId: 'g2', state: 'waiting' }])).toBe(1);
     // Plays listed not saved, or refused, wait for nobody: nothing is sent.
-    expect(gamesHoldingBack([final], [{ gameId: 'g2', state: 'not-saved' }])).toBe(0);
-    expect(gamesHoldingBack([final], [{ gameId: 'g2', state: 'refused' }])).toBe(0);
-    expect(mayReplaceStored(gamesHoldingBack([final], []))).toBe(true);
+    expect(gamesHoldingBack(['g2'], kept, [{ gameId: 'g2', state: 'not-saved' }])).toBe(0);
+    expect(gamesHoldingBack(['g2'], kept, [{ gameId: 'g2', state: 'refused' }])).toBe(0);
   });
 
-  it('a game the device let go holds nothing back, whatever of it waits', () => {
-    expect(gamesHoldingBack([], [{ gameId: 'g1', state: 'waiting' }])).toBe(0);
-    expect(gamesHoldingBack([final], [{ gameId: 'g9', state: 'waiting' }])).toBe(0);
+  it('an open page counts when the store or the queue cannot be read', () => {
+    expect(gamesHoldingBack(['g2'], null, [])).toBe(1);
+    expect(mayReplaceStored(gamesHoldingBack(['g2'], null, []))).toBe(false);
+    expect(gamesHoldingBack(['g2'], kept, null)).toBe(1);
   });
+});
 
-  it('never replaces when it cannot tell', () => {
-    expect(gamesHoldingBack(null, [])).toBeNull();
-    expect(mayReplaceStored(gamesHoldingBack(null, []))).toBe(false);
-    // The queue unread: a final game may still have plays waiting, so it counts.
-    expect(gamesHoldingBack([final], null)).toBe(1);
-    expect(gamesHoldingBack([], null)).toBe(0);
+describe('who the device says is signed in here (T-323)', () => {
+  it('reads the account id of the mark, never anything else', () => {
+    expect(deviceAccountOf([{ accountId: 'account-1' }])).toBe('account-1');
+    expect(deviceAccountOf([])).toBeNull();
+    expect(deviceAccountOf(null)).toBeNull();
+    expect(deviceAccountOf([{ accountId: '' }, 'x', null])).toBeNull();
   });
 });
 
@@ -190,13 +201,20 @@ describe('a kept page is the account’s that made it (T-321)', () => {
     expect(signedInFrom(answer(404), null)).toBeUndefined();
   });
 
-  it('shows a kept page only while its own account is signed in, or while the network cannot say', () => {
-    expect(mayServeKeptPage('account-1', 'account-1')).toBe(true);
-    expect(mayServeKeptPage('account-1', undefined)).toBe(true);
-    expect(mayServeKeptPage('account-1', 'account-2')).toBe(false);
-    expect(mayServeKeptPage('account-1', null)).toBe(false);
+  it('shows a kept page only while its own account is signed in, as the network or the device says', () => {
+    expect(mayServeKeptPage('account-1', 'account-1', null)).toBe(true);
+    expect(mayServeKeptPage('account-1', 'account-2', 'account-1')).toBe(false);
+    expect(mayServeKeptPage('account-1', null, 'account-1')).toBe(false);
     // A kept page that names no account is never shown.
-    expect(mayServeKeptPage(null, undefined)).toBe(false);
-    expect(mayServeKeptPage(null, null)).toBe(false);
+    expect(mayServeKeptPage(null, undefined, null)).toBe(false);
+    expect(mayServeKeptPage(null, null, null)).toBe(false);
+  });
+
+  it('with no signal, shows a kept page only to the account the device marks as signed in (review M1)', () => {
+    expect(mayServeKeptPage('account-1', undefined, 'account-1')).toBe(true);
+    // Someone else signed in on another page of the league since: the plain offline page.
+    expect(mayServeKeptPage('account-1', undefined, 'account-2')).toBe(false);
+    // Nobody marked (signed out, or a device from before this release): not shown.
+    expect(mayServeKeptPage('account-1', undefined, null)).toBe(false);
   });
 });

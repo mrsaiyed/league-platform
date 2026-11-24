@@ -21,6 +21,11 @@ export type AccountMenu = {
   readonly initial: string;
   /** The address the person is signed in with, said at the top of the menu. */
   readonly email: string;
+  /**
+   * The account's id, from the server's session: written on the device as the one signed
+   * in here (DeviceAccountMark, T-323). An id, never a secret.
+   */
+  readonly accountId: string;
   /** The admin's home, for someone with an area of the admin here who does more than score. */
   readonly adminHref: string | null;
   /** Their games to score, for someone who may score here. */
@@ -59,6 +64,7 @@ export function accountMenuOf(
   return {
     initial: initialOf(email),
     email,
+    accountId: view.context.account.accountId,
     adminHref: view.areas.length > 0 && !onlyScores ? leagueUrl(league, 'admin') : null,
     // A scorekeeper's games are the admin's home for them (P4 §4); for staff who also
     // run other areas, the games area.

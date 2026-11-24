@@ -4,6 +4,7 @@
 import {
   stillKept,
   withLineupPicks,
+  withScoring,
   type OpenedGame,
   type OpenedGameStorage,
 } from './opened-game-storage.ts';
@@ -55,7 +56,7 @@ export function createMemoryOpenedGameStorage(): OpenedGameStorage {
       change(gameId, (game) => ({ ...game, confirmedFormat: format }));
     },
     async saveScoring(gameId, scoring) {
-      change(gameId, (game) => ({ ...game, scoring }));
+      change(gameId, (game) => withScoring(game, scoring));
     },
     async saveLineupPicks(gameId, picks) {
       change(gameId, (game) => withLineupPicks(game, picks));

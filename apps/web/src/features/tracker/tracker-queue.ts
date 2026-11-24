@@ -374,9 +374,17 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
     const commands: BatchCommand[] = [];
     for (const entry of waiting) {
       if (entry.protocolVersion !== first.protocolVersion || commands.length === most) break;
+      // One maker a batch (T-323): the server refuses a batch whose maker is not the
+      // account of its session, so another account's tap is never sent under this one.
+      if (entry.accountId !== first.accountId) break;
       commands.push(entry.command);
     }
-    return { protocolVersion: first.protocolVersion, sessionId: session, commands };
+    // The maker is said from version 2 on; a version 1 batch stays as it was (T-127).
+    const maker =
+      first.accountId === undefined || first.protocolVersion < 2
+        ? {}
+        : { accountId: first.accountId };
+    return { protocolVersion: first.protocolVersion, sessionId: session, commands, ...maker };
   };
 
   const send = async (batch: CommandBatch): Promise<TransportOutcome> => {

@@ -74,10 +74,10 @@ export function mayKeepAnswer(answer: WorkerAnswer): boolean {
 }
 
 /**
- * The update rule (T-127): the stored tracker is replaced only when no game is open on
- * the device. `gamesOpen` is how many games hold a release back (`gamesHoldingBack`),
- * or null when the worker cannot tell, which counts as a game open: a release must
- * never interrupt a game.
+ * The update rule (T-127, T-323): the stored tracker is replaced only when no tracker
+ * page with a game in progress is open now. `gamesOpen` is how many such pages there are
+ * (`gamesHoldingBack`), or null when the worker cannot tell, which counts as one open: a
+ * release must never interrupt a game being scored.
  */
 export function mayReplaceStored(gamesOpen: number | null): boolean {
   return gamesOpen === 0;
@@ -93,25 +93,48 @@ export type KeptGameRecord = {
 export type QueuedPlayRecord = { readonly gameId: string; readonly state: string };
 
 /**
- * How many games hold a release back (T-127, T-322): a game is open as a scorekeeper
- * means it while it is not final, or while plays of it still wait on this device. A
- * final game with nothing waiting holds nothing back, nor does a game the device has let
- * go (no longer in its store), whatever waits of it. `games` null: the store cannot be
- * read, so the worker cannot tell. `queued` null: the queue cannot be read, so every
- * kept game, final or not, counts as open.
+ * How many tracker pages open now hold a release back (T-127, T-323). `openGames` are
+ * the games of the tracker pages open in a window at this moment; stored data alone
+ * holds nothing back, so a game kept for 14 days never keeps a scorer on an old release.
+ * An open page holds it back while its game is in progress: not final, or with plays of
+ * it still waiting on this device, or not stored yet (a page still opening). `games`
+ * null: the store cannot be read, so every open page counts. `queued` null: the queue
+ * cannot be read, so every open page of a kept game counts, final or not.
  */
 export function gamesHoldingBack(
+  openGames: readonly string[],
   games: readonly KeptGameRecord[] | null,
   queued: readonly QueuedPlayRecord[] | null,
-): number | null {
-  if (games === null) return null;
+): number {
+  if (games === null) return openGames.length;
   const waiting =
     queued === null
       ? null
-      : new Set(queued.filter((play) => play.state === 'waiting').map((play) => play.gameId));
-  return games.filter(
-    (game) => game.state?.state?.status !== 'final' || waiting === null || waiting.has(game.gameId),
-  ).length;
+      : new Set(
+          queued
+            .filter((play) => play.state === 'waiting')
+            .map((play) => play.gameId.toLowerCase()),
+        );
+  return openGames.filter((open) => {
+    const id = open.toLowerCase();
+    const game = games.find((kept) => kept.gameId.toLowerCase() === id);
+    if (game === undefined) return true;
+    return game.state?.state?.status !== 'final' || waiting === null || waiting.has(id);
+  }).length;
+}
+
+/**
+ * Who the device says is signed in here (T-323): the account id of the one record of the
+ * device's mark (`device-account.ts`), or null when there is none. An id, never a secret.
+ */
+export function deviceAccountOf(records: readonly unknown[] | null): string | null {
+  if (records === null) return null;
+  for (const record of records) {
+    if (typeof record !== 'object' || record === null) continue;
+    const accountId = (record as { readonly accountId?: unknown }).accountId;
+    if (typeof accountId === 'string' && accountId !== '') return accountId;
+  }
+  return null;
 }
 
 /**
@@ -166,17 +189,20 @@ export function signedInFrom(
 }
 
 /**
- * Whether a kept tracker page may be shown (T-321): it belongs to the account that made
- * it. Never when it names no account; never when the network says another account, or
- * nobody, is signed in now. When the network did not say (no signal), the kept page is
- * shown: signing in needs the network, so the device is still the maker's.
+ * Whether a kept tracker page may be shown (T-321, T-323): it belongs to the account that
+ * made it. Never when it names no account; never when the network says another account,
+ * or nobody, is signed in now. When the network did not say (no signal), only when the
+ * device's own mark of who is signed in here (`deviceAccountOf`) names the same account:
+ * someone else may have signed in on another page since, out of the worker's reach.
  */
 export function mayServeKeptPage(
   keptMark: string | null,
   signedIn: string | null | undefined,
+  deviceAccount: string | null,
 ): boolean {
   if (keptMark === null) return false;
-  return signedIn === undefined || signedIn === keptMark;
+  if (signedIn !== undefined) return signedIn === keptMark;
+  return deviceAccount === keptMark;
 }
 
 /** The meta tag's name that says which account a tracker page was made for (T-321). */
@@ -221,6 +247,15 @@ export const trackerWorkerKeepMessage = 'srleagues-tracker-keep';
 
 /** What the page sends a waiting worker: take over now if no game is open. */
 export const trackerWorkerUpdateMessage = 'srleagues-tracker-update';
+
+/**
+ * What "Reload" sends each worker when the server says the tracker is too old (T-323):
+ * delete every kept page and file of this scope once a copy being written has landed, a
+ * waiting worker takes over at once, then answer on the message's port. The reload that
+ * follows then opens the new release from the network. The plays waiting on the device
+ * are in its own storage, not here, so they stay and the new release sends them.
+ */
+export const trackerWorkerReleaseMessage = 'srleagues-tracker-release';
 
 /**
  * What signing out sends each worker before it deletes the caches (T-115): keep nothing

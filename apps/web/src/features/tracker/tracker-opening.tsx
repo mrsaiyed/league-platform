@@ -17,7 +17,8 @@ import { openIndexedDbOpenedGameStorage } from './indexeddb-opened-game-storage.
 import { openIndexedDbQueueStorage } from './indexeddb-queue-storage.ts';
 import { keptRows, notAppliedRows, type KeptRow } from './kept-plays.ts';
 import { openTrackerGame, screenOf, type OpenedTrackerGame } from './open-tracker-game.ts';
-import { registerTrackerWorker } from './tracker-worker-registration.ts';
+import { readDeviceAccount, writeDeviceAccount } from './device-account.ts';
+import { registerTrackerWorker, takeNewRelease } from './tracker-worker-registration.ts';
 import type { DeviceRosters, GameFormat } from './opened-game-storage.ts';
 import {
   isOffline,
@@ -187,6 +188,12 @@ export function TrackerOpening({
         onStoreFailed: () => setStoreFailed(true),
         // Signed out or left while opening: nothing more is kept and no session taken.
         letGo: () => gone || leaving.current,
+        // With no signal, what the device kept is scored from only for the one marked
+        // signed in here; once the server answers, this account is (T-323).
+        deviceAccount: () => readDeviceAccount(),
+        markSignedIn: async (account) => {
+          await writeDeviceAccount(account);
+        },
       });
       if (gone || leaving.current) {
         if (result.ok) void result.game.controller.leave();
@@ -754,7 +761,7 @@ function OpenGame({
             className="court-button"
             data-kind="main"
             data-reload=""
-            onClick={() => window.location.reload()}
+            onClick={() => void takeNewRelease().then(() => window.location.reload())}
           >
             {t('tracker.readOnly.reload')}
           </button>

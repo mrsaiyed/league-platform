@@ -13,20 +13,24 @@
 //   another account or nobody is signed in, the kept pages are deleted, never shown;
 // - code: kept by address (each built file's address names its content), so it is
 //   answered from the device first;
+// - with no signal, a kept page is shown only to the account the device's mark says is
+//   signed in here (device-account.ts, T-323): someone may have signed in elsewhere;
 // - a new worker (a release that changed the code) takes over, and the code kept for
-//   earlier releases is let go, only when no game is open on the device (T-127). Until
-//   then the kept pages keep opening with the code they were kept with;
-// - "open on the device" (T-322, gamesHoldingBack): a game in the tracker's own store of
-//   opened games (indexeddb-opened-game-storage.ts) that is not final, or whose plays
-//   still wait in the queue (indexeddb-queue-storage.ts); closing the game and signing
-//   out clear the store. The worker never creates either: if it is not there, no game
-//   is open.
+//   earlier releases is let go, only when no tracker page with a game in progress is
+//   open now (T-127, T-323, gamesHoldingBack): a page open in a window whose game, in the
+//   tracker's store of opened games (indexeddb-opened-game-storage.ts), is not final, or
+//   has plays waiting in the queue (indexeddb-queue-storage.ts), or is not stored yet.
+//   Stored data alone holds nothing back. The worker never creates either store;
+// - "Reload" on "update needed" sends the release message: every kept page and file of
+//   the scope goes, a waiting worker takes over, and the reload opens the new release.
 // Signing out deletes everything kept here (forgetTrackerPagesOnDevice).
 import { openedGamesDatabaseName, openedGamesStoreName } from './indexeddb-opened-game-storage.ts';
 import { queueDatabaseName, queueStoreName } from './indexeddb-queue-storage.ts';
+import { deviceAccountDatabaseName, deviceAccountStoreName } from './device-account.ts';
 import {
   accountMarkOfPage,
   codeMarkOf,
+  deviceAccountOf,
   gamesHoldingBack,
   keptAddressOf,
   mayKeepAnswer,
@@ -39,6 +43,7 @@ import {
   trackerNetworkWaitMs,
   trackerWorkerForgetMessage,
   trackerWorkerKeepMessage,
+  trackerWorkerReleaseMessage,
   trackerWorkerUpdateMessage,
 } from './tracker-worker-rules.ts';
 
@@ -88,11 +93,29 @@ function readAll(database, store) {
   });
 }
 
-// How many games hold a release back (gamesHoldingBack): not final, or plays waiting.
+// How many tracker pages open now hold a release back (gamesHoldingBack): their game is
+// not final, has plays waiting, or is not stored yet. No page open: nothing holds it.
 async function gamesOpen() {
+  let windows;
+  try {
+    windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  } catch (error) {
+    return null;
+  }
+  const open = [];
+  for (const client of windows) {
+    const what = keptAddressOf({ url: client.url, method: 'GET', mode: 'navigate' }, scope);
+    if (what !== null && what.kind === 'page') open.push(what.key.slice(what.key.lastIndexOf('/') + 1));
+  }
+  if (open.length === 0) return 0;
   const games = await readAll(names.database, names.games);
-  if (games === null) return null;
-  return gamesHoldingBack(games, await readAll(names.queueDatabase, names.queue));
+  const queued = games === null ? null : await readAll(names.queueDatabase, names.queue);
+  return gamesHoldingBack(open, games, queued);
+}
+
+// Who the device says is signed in here (T-323), or null.
+async function deviceAccount() {
+  return deviceAccountOf(await readAll(names.accountDatabase, names.accountStore));
 }
 
 async function letGoOfEarlier() {
@@ -124,6 +147,15 @@ async function forgetEverything() {
   await Promise.all(all.filter((name) => name.startsWith(names.kept)).map((name) => caches.delete(name)));
 }
 
+// "Reload" on "update needed" (T-323): this scope's kept pages and files go once the copy
+// under way has landed, so the reload opens the new release; keeping goes on after.
+async function letGoForRelease() {
+  await writing;
+  const all = await caches.keys();
+  await Promise.all(all.filter((name) => name.startsWith(prefix)).map((name) => caches.delete(name)));
+  await self.skipWaiting();
+}
+
 function keptIn(key) {
   return caches.keys().then(async (all) => {
     // The newest kept copy of this scope first.
@@ -153,7 +185,7 @@ async function forgetPagesNotOf(signedIn) {
     for (const asked of await box.keys()) {
       const what = keptAddressOf({ url: asked.url, method: 'GET', mode: 'navigate' }, scope);
       if (what === null || what.kind !== 'page') continue;
-      if (!mayServeKeptPage(await accountOf(await box.match(asked)), signedIn)) await box.delete(asked);
+      if (!mayServeKeptPage(await accountOf(await box.match(asked)), signedIn, null)) await box.delete(asked);
     }
   }
 }
@@ -186,7 +218,7 @@ async function answerPage(request, key, event) {
             { status: late.status, type: late.type, redirected: late.redirected },
             await accountOf(late),
           );
-          if (now === undefined || mayServeKeptPage(shownMark, now)) return;
+          if (now === undefined || mayServeKeptPage(shownMark, now, null)) return;
           await forgetPagesNotOf(now);
           const client = await self.clients.get(event.resultingClientId);
           if (client) await client.navigate(client.url);
@@ -194,7 +226,7 @@ async function answerPage(request, key, event) {
         .catch(() => undefined),
     );
   }
-  if (kept && !mayServeKeptPage(await accountOf(kept), signedIn)) kept = undefined;
+  if (kept && !mayServeKeptPage(await accountOf(kept), signedIn, await deviceAccount())) kept = undefined;
   const plan = pageAnswerPlan(open, kept !== undefined);
   if (plan.first === 'kept' && kept) return kept;
   if (!answer) return kept || Response.error();
@@ -261,6 +293,15 @@ self.addEventListener('message', (event) => {
     );
     return;
   }
+  if (event.data && event.data.type === names.releaseMessage) {
+    const port = event.ports && event.ports[0];
+    event.waitUntil(
+      letGoForRelease()
+        .catch(() => undefined)
+        .then(() => port && port.postMessage(names.releaseMessage)),
+    );
+    return;
+  }
   if (!event.data || event.data.type !== names.updateMessage) return;
   event.waitUntil(
     gamesOpen().then((open) => (mayReplaceStored(open) ? self.skipWaiting() : undefined)),
@@ -286,12 +327,16 @@ export function trackerWorkerScript(): string {
     updateMessage: trackerWorkerUpdateMessage,
     keepMessage: trackerWorkerKeepMessage,
     forgetMessage: trackerWorkerForgetMessage,
+    releaseMessage: trackerWorkerReleaseMessage,
+    accountDatabase: deviceAccountDatabaseName,
+    accountStore: deviceAccountStoreName,
     accountMeta: trackerAccountMetaName,
     networkWaitMs: trackerNetworkWaitMs,
   };
   const rules = {
     accountMarkOfPage,
     codeMarkOf,
+    deviceAccountOf,
     gamesHoldingBack,
     keptAddressOf,
     mayKeepAnswer,

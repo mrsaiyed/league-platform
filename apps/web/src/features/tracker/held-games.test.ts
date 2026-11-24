@@ -26,6 +26,8 @@ const row = (
   extra: {
     readonly leagueId?: string;
     readonly accountId?: string;
+    /** Stored before the maker was kept with each play: nobody's (T-323). */
+    readonly noMaker?: true;
     readonly state?: 'waiting' | 'not-saved';
   } = {},
 ): QueuedCommand => ({
@@ -37,7 +39,7 @@ const row = (
     input: { type: 'score', side: 'home', playerId: player, points: 2 },
   },
   ...(extra.leagueId === undefined ? {} : { leagueId: extra.leagueId }),
-  ...(extra.accountId === undefined ? {} : { accountId: extra.accountId }),
+  ...(extra.noMaker === true ? {} : { accountId: extra.accountId ?? account }),
   state: extra.state ?? 'waiting',
 });
 
@@ -103,8 +105,8 @@ describe('the games this device holds plays for (step 2.38, S-88)', () => {
       row('shared', 2, { leagueId: league, accountId: account }),
       row('shared', 3, { leagueId: league, accountId: otherAccount }),
       row('theirs', 4, { leagueId: league, accountId: otherAccount }),
-      // Stored before the account was kept with each play: listed, as it was then.
-      row('before', 5, { leagueId: league }),
+      // Stored before the account was kept with each play: nobody's, listed to nobody (T-323).
+      row('before', 5, { leagueId: league, noMaker: true }),
     ];
     const kept = new Map([
       ['ours', keptGame('ours', league)],
@@ -113,22 +115,18 @@ describe('the games this device holds plays for (step 2.38, S-88)', () => {
     ]);
     const listed = heldGames(queue, mine, (id) => kept.get(id));
     expect(listed.map((game) => [game.gameId, game.waiting, game.teams?.home ?? null])).toEqual([
-      ['before', 1, null],
       ['shared', 1, null],
       ['ours', 1, 'Hawks'],
     ]);
-    // The other account sees its own plays only; nobody signed in, only the older ones.
+    // The other account sees its own plays only; nobody signed in, nothing.
     const theirs = heldGames(queue, { leagueId: league, accountId: otherAccount }, (id) =>
       kept.get(id),
     );
     expect(theirs.map((game) => [game.gameId, game.waiting, game.teams?.home ?? null])).toEqual([
-      ['before', 1, 'Hawks'],
       ['theirs', 1, 'Hawks'],
       ['shared', 1, null],
     ]);
-    expect(heldGames(queue, { leagueId: league, accountId: null }, () => undefined)).toEqual([
-      { gameId: 'before', waiting: 1, notSaved: 0, lastTapAt: 5, teams: null },
-    ]);
+    expect(heldGames(queue, { leagueId: league, accountId: null }, () => undefined)).toEqual([]);
   });
 
   it('lists nothing when the device holds no plays', () => {
@@ -170,7 +168,12 @@ describe('what a held game says', () => {
 describe('a held game whose league the device does not know (step 2.38, part 2)', () => {
   const t = createTranslator('en');
   const play = (gameId: string): QueuedCommand =>
-    ({ command: { at: 5 }, gameId, state: 'waiting' }) as unknown as QueuedCommand;
+    ({
+      command: { at: 5 },
+      gameId,
+      accountId: account,
+      state: 'waiting',
+    }) as unknown as QueuedCommand;
 
   it('is listed in every league, and its line says it may belong to another league', () => {
     const [listed] = heldGames(
