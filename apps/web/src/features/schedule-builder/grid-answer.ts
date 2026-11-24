@@ -108,7 +108,13 @@ export function answerParams(outcome: ScheduleActionOutcome): {
     }
     if (at.form === 'round') {
       return {
-        query: { ...query, at: 'round', round: at.roundId },
+        query: {
+          ...query,
+          at: 'round',
+          round: at.roundId,
+          ...(at.label === undefined ? {} : { label: at.label.slice(0, 120) }),
+          ...(at.date === undefined ? {} : { date: at.date.slice(0, 10) }),
+        },
         hash: `#${roundAnchor(at.roundId)}`,
       };
     }
@@ -258,7 +264,15 @@ export function refusedAtOf(search: Search): RefusedAt | undefined {
   }
   if (at === 'round') {
     const roundId = idOf(first(search['round']));
-    return roundId === undefined ? undefined : { form: 'round', roundId };
+    if (roundId === undefined) return undefined;
+    const label = first(search['label']);
+    const date = first(search['date']);
+    return {
+      form: 'round',
+      roundId,
+      ...(label === undefined ? {} : { label: label.slice(0, 120) }),
+      ...(date === undefined ? {} : { date: dateShape.test(date) ? date : '' }),
+    };
   }
   if (at === 'add-round') {
     const label = (first(search['label']) ?? '').slice(0, 120);

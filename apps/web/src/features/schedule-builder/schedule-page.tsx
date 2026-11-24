@@ -512,6 +512,7 @@ export async function ScheduleBuilderPage({
             basis={basis}
             rounds={grid.rounds}
             problem={besideRound === round.id ? roundProblem : undefined}
+            typed={besideRound === round.id && refusedAt?.form === 'round' ? refusedAt : undefined}
             saved={savedAt({ round: round.id })}
             savedGame={savedGame}
             previousRoundId={grid.rounds[grid.rounds.indexOf(round) - 1]?.id ?? null}
@@ -667,6 +668,7 @@ function RoundSection({
   basis,
   rounds,
   problem,
+  typed,
   saved,
   savedGame,
   previousRoundId,
@@ -679,6 +681,8 @@ function RoundSection({
   readonly rounds: readonly GridRound[];
   /** Why the last change to this round was refused, said beside its forms. */
   readonly problem: string | undefined;
+  /** A refused new name or day, as typed: kept in its box, the sentence beside it (2.155). */
+  readonly typed: { readonly label?: string; readonly date?: string } | undefined;
   /** "Saved", when the last save was this round's. */
   readonly saved: ReactNode;
   readonly savedGame: (gameId: string) => SavedGame;
@@ -686,6 +690,21 @@ function RoundSection({
   readonly previousRoundId: string | null;
 }) {
   const headingId = roundAnchor(round.id);
+  // The box a refusal of a new name or day is about, and the sentence beside it naming it.
+  const boxWrong =
+    problem === undefined
+      ? undefined
+      : typed?.label !== undefined
+        ? ('label' as const)
+        : typed?.date !== undefined
+          ? ('date' as const)
+          : undefined;
+  const besideBox = (box: 'label' | 'date', field: string) =>
+    boxWrong === box && problem !== undefined
+      ? t('schedule.admin.fieldRefused', { field, why: problem })
+      : undefined;
+  const marked = (box: 'label' | 'date') =>
+    boxWrong === box ? { 'aria-invalid': true as const, autoFocus: true as const } : {};
   return (
     <section aria-labelledby={headingId} data-round={round.id} className="staff-panel admin-round">
       {/* The round's head: its name, then its day (as the public pages write a day) and
@@ -697,7 +716,7 @@ function RoundSection({
         <RoundFacts round={round} />
       </div>
       {saved}
-      {problem === undefined ? null : (
+      {problem === undefined || boxWrong !== undefined ? null : (
         <p className="ui-notice" data-kind="error" role="alert" data-notice="problem">
           {problem}
         </p>
@@ -709,8 +728,17 @@ function RoundSection({
             <form action={renameRoundAction} className="staff-form">
               <BasisFields basis={basis} />
               <input type="hidden" name="roundId" value={round.id} />
-              <Field label={t('schedule.admin.renameRound')}>
-                <input name="label" defaultValue={round.label} required maxLength={120} />
+              <Field
+                label={t('schedule.admin.renameRound')}
+                wrong={besideBox('label', t('schedule.admin.renameRound'))}
+              >
+                <input
+                  name="label"
+                  defaultValue={typed?.label ?? round.label}
+                  required
+                  maxLength={120}
+                  {...marked('label')}
+                />
               </Field>
               <p className="staff-buttons">
                 <button type="submit" className="ui-button">
@@ -721,8 +749,17 @@ function RoundSection({
             <form action={changeRoundDateAction} className="staff-form">
               <BasisFields basis={basis} />
               <input type="hidden" name="roundId" value={round.id} />
-              <Field label={t('schedule.admin.changeRoundDate')}>
-                <input type="date" name="date" defaultValue={round.date ?? ''} required />
+              <Field
+                label={t('schedule.admin.changeRoundDate')}
+                wrong={besideBox('date', t('schedule.admin.changeRoundDate'))}
+              >
+                <input
+                  type="date"
+                  name="date"
+                  defaultValue={typed?.date ?? round.date ?? ''}
+                  required
+                  {...marked('date')}
+                />
               </Field>
               <p className="ui-field-help">{t('schedule.admin.changeRoundDateNote')}</p>
               <p className="staff-buttons">

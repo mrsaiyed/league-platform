@@ -75,7 +75,13 @@ export type SavedDetail =
 /** Which form a refusal belongs beside: the new round's, or one round's own. */
 export type RefusedAt =
   | { readonly form: 'add-round'; readonly label: string; readonly date: string }
-  | { readonly form: 'round'; readonly roundId: string }
+  /** A round's own form; a refused new name or day as typed (step 2.155). */
+  | {
+      readonly form: 'round';
+      readonly roundId: string;
+      readonly label?: string;
+      readonly date?: string;
+    }
   /** A game's own form, with what was typed in it (step 2.155). */
   | { readonly form: 'game'; readonly gameId: string; readonly typed: GameTyped }
   /** A round's "Add a game" (its round in `typed.roundId`; '': "Games with no round"). */
@@ -321,7 +327,16 @@ export async function runScheduleAction(
             );
       return done.ok
         ? { kind: 'saved', detail: { what: 'round-saved', roundId } }
-        : { ...refusal(done), at: { form: 'round', roundId } };
+        : {
+            ...refusal(done),
+            at: {
+              form: 'round',
+              roundId,
+              ...(kind === 'rename-round'
+                ? { label: text(form, 'label') }
+                : { date: text(form, 'date') }),
+            },
+          };
     }
     case 'publish': {
       if (basis.draftId === null || basis.version === null) return invalid;

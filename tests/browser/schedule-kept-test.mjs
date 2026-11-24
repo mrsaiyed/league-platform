@@ -8,7 +8,7 @@
 // - put right and tapped twice, one game is added, "Saved" names it beside it on the
 //   screen without scrolling, never "Someone else changed…", and a reload says nothing old;
 // - a game's own form sent after the draft moved on is refused beside that game, with the
-//   time as typed still in its box.
+//   time as typed still in its box; so is a round's new name, beside its box, marked.
 // `--no-build` serves the build already here.
 import {
   accessibilityProblems,
@@ -118,6 +118,15 @@ async function journey(browser, origin, scripts) {
     const staleTime = scripts ? '07:15' : '07:45';
     await gameLine.locator('form').first().locator('input[name=time]').fill(staleTime);
 
+    // And a third, whose form for the first round's name is drawn now too.
+    const staleRound = await context.newPage();
+    staleRound.setDefaultTimeout(60_000);
+    await staleRound.goto(`${origin}${schedule}`);
+    const roundHere = staleRound.locator(`section[data-round="${roundId}"]`);
+    await roundHere.locator('summary', { hasText: 'Change or remove this round' }).click();
+    const newName = scripts ? 'Opening night' : 'Opening night two';
+    await roundHere.locator('input[name=label]').fill(newName);
+
     // Put right and tapped twice: one game, "Saved" beside it.
     const games = () => page.locator(`section[data-round="${roundId}"] li[data-game]`).count();
     const before = await games();
@@ -163,6 +172,18 @@ async function journey(browser, origin, scripts) {
       `${how}: the time typed is still in its box`,
       (await line.locator('form').first().locator('input[name=time]').inputValue()) === staleTime,
     );
+    // The round's name from before: refused beside its box, as typed, the box marked.
+    const rename = roundHere.getByRole('button', { name: 'Rename round' });
+    if (scripts) await rename.click();
+    else await Promise.all([staleRound.waitForEvent('load'), rename.click()]);
+    const roundAgain = staleRound.locator(`section[data-round="${roundId}"]`);
+    const nameProblem = roundAgain.locator('.admin-round-forms [data-notice=problem]');
+    await nameProblem.waitFor({ timeout: 15_000 });
+    const nameBox = roundAgain.locator('input[name=label]');
+    note(`${how}: the round's new name is kept as typed`, (await nameBox.inputValue()) === newName);
+    note(`${how}: the name box is marked`, (await nameBox.getAttribute('aria-invalid')) === 'true');
+    const nameSaid = (await nameProblem.innerText()).trim();
+    note(`${how}: the sentence beside it names it`, nameSaid.startsWith('Round name: '), nameSaid);
     const problems = await accessibilityProblems(stale);
     note(`${how}: accessibility of the refused game`, problems.length === 0, problems.join('; '));
   } finally {

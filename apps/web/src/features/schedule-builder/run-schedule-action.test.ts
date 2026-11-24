@@ -451,7 +451,8 @@ describe('schedule grid', () => {
     expect(stale).toEqual({
       kind: 'refused',
       code: 'changed-since-read',
-      at: { form: 'round', roundId: '01900000-0000-7000-8000-0000b2000001' },
+      // With the name as typed, kept in its box (step 2.155).
+      at: { form: 'round', roundId: '01900000-0000-7000-8000-0000b2000001', label: 'Second' },
     });
   });
 
