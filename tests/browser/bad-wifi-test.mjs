@@ -433,8 +433,11 @@ async function oneGame(browser) {
         const how = reopenAfter[n];
         const noSignal = n >= longOffline.from && n <= longOffline.to;
         const roll = random();
-        if (noSignal) await setOffline(true);
-        else if (roll < 0.3) await setOffline(!offline);
+        if (noSignal) {
+          // A cut still to come after the last play must not bring the signal back here.
+          await later();
+          await setOffline(true);
+        } else if (roll < 0.3) await setOffline(!offline);
         else if (roll < 0.42) setAnswersLost(!answersLost);
         else if (roll < 0.54) setSlow(!slow);
         if (index === 3) {

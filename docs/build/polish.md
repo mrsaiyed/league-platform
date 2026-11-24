@@ -123,3 +123,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.62 (review Low, decided): accessibility is checked once per kind of page for each person, not on every one of the 40 demo pages.
 - 2.118 (review Low): the jump to the away team shows under 680 wide; that break is measured only at the four sizes.
 - 2.118 (review Low): the panel read-only when the game is final is tried in unit tests only, not in a browser.
+
+- 2.61 (last part): bad-wifi-test.mjs still logs 'reached the server' for a failed fetch (:301, :312); after hold's rebuild the screen is not redrawn nor the kept scoring saved until the next state (tracker-controller.ts about :1374); no unit test shows an add or play by somebody else is still caught when the device has its own adds (goes with step 2.242).

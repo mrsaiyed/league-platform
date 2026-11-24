@@ -39,13 +39,23 @@ const note = (label, ok, detail = '') => {
   checked.push(label);
   if (!ok) failures.push(`${label}${detail ? `: ${detail}` : ''}`);
 };
+/** Where the run is, said if it is still going after five minutes. */
+let where = 'starting';
 const step = async (name, run) => {
+  where = name;
   try {
     await run();
   } catch (error) {
     failures.push(`${name}: ${String(error?.message ?? error).split('\n')[0]}`);
   }
 };
+
+// The whole run fails after five minutes, saying where it was (no wait may hang it).
+setTimeout(() => {
+  console.error(`score-this-game: the run was still going after five minutes, at: ${where}`);
+  for (const line of checked.slice(-3)) console.error(`  last checked: ${line}`);
+  process.exit(1);
+}, 5 * 60_000).unref();
 
 const phone = { width: 390, height: 844 };
 const scorekeeper = { email: 'scorekeeper@example.test', password: 'made-up scorekeeper password' };
@@ -428,17 +438,29 @@ if (browser) {
           page.locator('.site-header .site-account-sign-out').filter({ visible: true }).click(),
         ]);
 
-        // Back to the league home they were on: asked again, as nobody, and no button.
-        const backRead = readOfPage(page, false);
+        // Back to the league home they were on: asked again, as nobody, and no button. The
+        // read is the Back page's own (sent from the address without the notice), never the
+        // signed-out page's; none within 15 s fails, as a page kept from before signing out
+        // would show its buttons without asking.
+        const isBackRead = (r) => {
+          if (!new URL(r.url()).pathname.endsWith('/scoring')) return false;
+          const from = r.request().headers()['referer'];
+          return from !== undefined && !new URL(from).searchParams.has('notice');
+        };
+        const backRead = page
+          .waitForResponse(isBackRead, { timeout: 15_000 })
+          .then((answer) => ({ answer }))
+          .catch((error) => ({ error: String(error?.message ?? error).split('\n')[0] }));
         await page.goBack();
-        await page.waitForURL((url) => url.pathname === '/north-valley');
+        await page.waitForURL((url) => url.pathname === '/north-valley' && url.search === '');
         const back = await backRead;
-        const backBody = back === null ? null : await back.json().catch(() => null);
+        const backBody = back.answer === undefined ? null : await back.answer.json();
         note(
-          'after Back, the page asked again and was told of no games (or did not need to ask)',
-          back === null || (Array.isArray(backBody?.games) && backBody.games.length === 0),
-          JSON.stringify(backBody),
+          'after Back, the page asked again, as nobody, and was told of no games',
+          Array.isArray(backBody?.games) && backBody.games.length === 0,
+          back.error ?? JSON.stringify(backBody),
         );
+        await page.waitForTimeout(400);
         note('after signing out and going Back, no card has a button', (await offersNow()) === 0);
 
         // The league's home by its link, in the same document.
