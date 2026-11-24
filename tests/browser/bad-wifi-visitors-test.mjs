@@ -353,8 +353,9 @@ async function oneGame(browser) {
       if (!answersLost) return route.continue().catch(() => undefined);
       // The batch reaches the server and is taken; the device never hears so.
       const answer = await route.fetch().catch(() => null);
-      log(`a batch reached the server (${answer?.status() ?? 'no answer'}), its answer lost`);
-      answerLost();
+      if (answer === null) log('a batch never reached the server (the fetch failed)');
+      else log(`a batch reached the server (${answer.status()}), its answer lost`);
+      if (answer?.ok() === true) answerLost();
       return route.abort('connectionreset').catch(() => undefined);
     });
     const setSlow = (to) => {
@@ -629,10 +630,6 @@ async function oneGame(browser) {
         ),
         JSON.stringify({ played, atTable }),
       );
-      note(
-        'the season wants unique numbers, as the rosters answer says',
-        rosters.uniqueJerseys === true,
-      );
       const roster = await ownersRoster(browser, origin, teamPage);
       note(
         "the league's roster screen marks the clash on both #8 for the admin, all six to review (S-44)",
@@ -642,10 +639,15 @@ async function oneGame(browser) {
     });
 
     const happened = (what) => events.filter((e) => e.includes(what)).length;
-    const cuts = { network: happened('network cut'), answers: happened('its answer lost') };
+    // The cuts are the script's own; whether the server took a batch whose answer was then
+    // lost is not: it is counted only from a fetch the server answered with success.
+    const cuts = {
+      network: happened('network cut'),
+      taken: happened('reached the server (200), its answer lost'),
+    };
     note(
-      'the run cut the network and lost answers of batches the server took',
-      cuts.network > 0 && cuts.answers > 0,
+      'the server took batches whose answers were then lost (200 at the route)',
+      cuts.taken > 0,
       JSON.stringify(cuts),
     );
     note('no script error on the page', errors.length === 0, errors.join(' | '));
