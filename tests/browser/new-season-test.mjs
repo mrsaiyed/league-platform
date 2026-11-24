@@ -6,8 +6,10 @@
 // question. A coach and a scorekeeper are offered none of the three actions. In the
 // archived Spring 2026, made current: Teams, a team, Divisions and Schedule say it is
 // read-only and offer no change; a result cannot be entered, the scorekeeper is offered
-// no reopen, is refused through the owner's open correction, and the owner's correction
-// with a reason saves, after which the game is read-only again.
+// no reopen; through the owner's open correction the scorekeeper is offered no entry and
+// a post by hand to the tracker's door is refused `season-archived` (T-389), and the
+// owner's correction with a reason saves, after which the game is read-only again. In
+// Harbor City, made with no current season, Teams leads to "Start a new season".
 // Pages are found by their own marks; no check passes on a timeout.
 import {
   accessibilityProblems,
@@ -19,6 +21,7 @@ import {
   waitFor,
   whatWentWrong,
 } from './web-browser-kit.mjs';
+import { leagueId } from './tracker-driver.mjs';
 
 const failures = [];
 const checked = [];
@@ -42,6 +45,8 @@ if (built) {
   const server = startNext(dev ? ['dev', '--port', port] : ['start', '--port', port], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
+    // The test's own league with no current season (step 2.130, the stand-in's world only).
+    LOCAL_NO_CURRENT_SEASON: 'harbor-city',
   });
   let browser;
   let at = 'starting';
@@ -157,6 +162,26 @@ if (built) {
       copies,
     );
     await accessible(page, 'Season settings with "Start a new season"');
+
+    at = 'a league with no current season: Teams leads to the form';
+    // Harbor City is made with no current season (LOCAL_NO_CURRENT_SEASON, below).
+    await page.goto(`${origin}/harbor-city/admin/teams`);
+    const toForm = page.locator('main a[href$="/harbor-city/admin/season#start-season"]');
+    note(
+      'with no current season, Teams lists no team and offers to start a season',
+      (await page.locator('main [data-team-row]').count()) === 0 &&
+        (await page.locator('form[data-form=create-team]').count()) === 0 &&
+        (await toForm.count()) === 1,
+    );
+    await tap(page, toForm, /\/harbor-city\/admin\/season#start-season$/);
+    note(
+      'it leads to "Start a new season", which says nothing is copied',
+      (await page.locator('#start-season form[data-start-season-form]').count()) === 1 &&
+        (await page.locator('#start-season [data-start-copies=nothing]').count()) === 1 &&
+        (await page
+          .locator('#start-season input[type=hidden][name=carry][value=nothing]')
+          .count()) === 1,
+    );
 
     at = 'Spring 2027: teams and rosters, hidden, made current';
     await start('Spring 2027', 'spring-2027', 'teams-and-rosters');
@@ -286,6 +311,17 @@ if (built) {
       (await page.locator('[data-season-read-only]').count()) === 1,
     );
 
+    // Admin → Games lists the games of the days around today, whatever their season: those
+    // are Fall 2026's (the new seasons have none). Archived, they are an archived season's.
+    at = 'the owner archives Fall 2026, whose games Admin → Games lists';
+    await page.goto(`${origin}/north-valley/admin/season?season=fall-2026`);
+    await tap(page, page.locator('[data-season-change=archive]'), /ask=archive/);
+    await tap(page, page.getByRole('button', { name: 'Yes, archive it' }), /done=archived/);
+    note(
+      'Fall 2026 says it is archived',
+      (await page.locator('[data-season-archived]').count()) === 1,
+    );
+
     at = 'a game of the archived season';
     const owner2 = await signedIn('local-owner-token', true);
     const keeper = await signedIn('local-scorekeeper-token', true);
@@ -323,32 +359,43 @@ if (built) {
     ]);
     const boxes = rowOf(owner2).getByLabel(/^Score for /);
     await boxes.first().waitFor();
+    // Only someone who may correct games uses the owner's open correction (T-389): the
+    // scorekeeper's page offers no entry, and the server refuses what is posted by hand.
     await keeper.goto(games);
-    const keeperSave = rowOf(keeper).getByRole('button', { name: 'Save final score' });
-    if ((await keeperSave.count()) > 0) {
-      if (
-        !(await rowOf(keeper)
+    note(
+      "the scorekeeper is offered no entry through the owner's open correction",
+      (await rowOf(keeper).count()) === 1 &&
+        (await rowOf(keeper).getByRole('button', { name: 'Save final score' }).count()) === 0 &&
+        (await rowOf(keeper)
           .getByLabel(/^Score for /)
-          .first()
-          .isVisible())
-      ) {
-        await rowOf(keeper).getByText('Enter the final score').click();
-      }
-      for (const box of await rowOf(keeper)
-        .getByLabel(/^Score for /)
-        .all())
-        await box.fill('1');
-      await keeperSave.click();
-      await rowOf(keeper).getByRole('button', { name: 'Yes, make it final' }).click();
-      const refused = await rowOf(keeper).getByRole('alert').innerText();
-      note(
-        "the scorekeeper is refused through the owner's open correction",
-        refused.includes('archived'),
-        refused,
-      );
-    } else {
-      note("the scorekeeper is offered no entry through the owner's open correction", true);
-    }
+          .count()) === 0 &&
+        (await rowOf(keeper).getByText('Enter the final score').count()) === 0,
+    );
+    const gameId = (rowId ?? '').replace(/^game-/, '');
+    /** The tracker's commands door, posted by hand as a device would, with a session's cookie. */
+    const postCommands = async (token) => {
+      const answer = await fetch(`${origin}/api/v1/leagues/${leagueId}/games/${gameId}/commands`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie: `srl_session=${token}`, origin },
+        body: JSON.stringify({ protocolVersion: 1 }),
+        signal: AbortSignal.timeout(60_000),
+      });
+      return { status: answer.status, body: await answer.text() };
+    };
+    const byKeeper = await postCommands('local-scorekeeper-token');
+    note(
+      "the scorekeeper's own post through the open correction is refused season-archived",
+      byKeeper.status === 409 && JSON.parse(byKeeper.body).error === 'season-archived',
+      `${byKeeper.status} ${byKeeper.body.slice(0, 200)}`,
+    );
+    // The same post from the owner passes the archived season (it holds no command, so it
+    // is refused for that, and changes nothing).
+    const byOwner = await postCommands('local-owner-token');
+    note(
+      "the owner's same post is not refused for the archived season",
+      !byOwner.body.includes('season-archived'),
+      `${byOwner.status} ${byOwner.body.slice(0, 200)}`,
+    );
     const all = await boxes.all();
     for (const [i, box] of all.entries()) await box.fill(String(40 + i));
     await rowOf(owner2).getByRole('button', { name: 'Save final score' }).click();

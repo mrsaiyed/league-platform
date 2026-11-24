@@ -84,6 +84,7 @@ import {
 import { madeUpLeagues, standInOwlsTeamId } from './stand-in-world-seed.ts';
 import { madeUpWorld } from './stand-in-world.ts';
 import { binTeamOfFirstLeague } from './stand-in-world-binned-team.ts';
+import { leaveWithoutCurrentSeason } from './stand-in-world-no-current-season.ts';
 import { answersOnlyHere, isLocalOrTestHost } from './this-computer.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
@@ -230,6 +231,11 @@ export type StandInOptions = {
    * current season, put in the bin as the world is made, with its games and results.
    */
   readonly binnedTeam?: string;
+  /**
+   * LOCAL_NO_CURRENT_SEASON (step 2.130): the short name of a made-up league left with no
+   * current season as the world is made, its seasons kept.
+   */
+  readonly noCurrentSeason?: string;
   /**
    * The working folder's `.local/captured-email` (kept-emails.ts, step 2.96): once the app
    * has started, a copy of each email to a made-up address is written there for the kept
@@ -460,6 +466,9 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     options.worldStartsAt === undefined ? systemClock : clockStartingAt(options.worldStartsAt);
   const worldLeagues = madeUpLeagues(standInSeedCast, new Date(clock.now()));
   if (options.binnedTeam !== undefined) binTeamOfFirstLeague(worldLeagues, options.binnedTeam);
+  if (options.noCurrentSeason !== undefined) {
+    leaveWithoutCurrentSeason(worldLeagues, options.noCurrentSeason);
+  }
   const world = madeUpWorld({
     leagues: worldLeagues,
     accessOf: (leagueId) => accessTx(leagueId).access,
