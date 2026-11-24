@@ -164,7 +164,9 @@ const FIELDS = {
   '/signin': { email: 'the email boxes' },
   '/signup': { email: 'the email boxes' },
   '/signin/forgot': { email: 'the email boxes' },
-  '/signup/code': { code: 'the email boxes' },
+  // '/signup/code' holds its code box only while a sign-up is waiting on this device; the
+  // walk opens it with none, where it draws no box since step 2.102's fix round. The code
+  // typed is never drawn back on any page (T-68).
 };
 
 /**

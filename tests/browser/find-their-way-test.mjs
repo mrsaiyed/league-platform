@@ -456,11 +456,14 @@ if (browser) {
       await openMenu(page);
       await link(page, 'Your account').click();
       await page.waitForURL((url) => url.pathname === '/account');
-      const first = await page.locator('main > *').first().innerText();
+      // Our name as the kicker, like every other card, then who is signed in, above
+      // everything else (step 2.102's fix round).
+      const [kicker, who] = await page.locator('main > *').allInnerTexts();
       note(
-        'the account page says who is signed in above everything else',
-        first === 'Signed in as scorekeeper@example.test',
-        first,
+        'the account page says who is signed in above everything else, under our name',
+        kicker?.trim().toLowerCase() === 'sr leagues' &&
+          who === 'Signed in as scorekeeper@example.test',
+        `${kicker} / ${who}`,
       );
       note(
         'the account page lists their leagues, each a link',
