@@ -60,7 +60,11 @@ export async function PersonPage({
   if (!read.ok) return notFound();
   const person = read.person;
   const holder = noticeHolderOf(context);
-  const notice = holder === undefined ? undefined : savedNoticesHere().take(holder, 'person');
+  const taken = holder === undefined ? undefined : savedNoticesHere().take(holder, 'person');
+  // S-109: a save that recorded the adult league's first child says so as well.
+  const firstChild = taken?.said.endsWith('.firstChild') === true && taken.thing === person.id;
+  const notice =
+    taken === undefined ? undefined : { ...taken, said: taken.said.replace(/\.firstChild$/, '') };
   const said =
     notice?.thing !== person.id
       ? undefined
@@ -111,6 +115,11 @@ export async function PersonPage({
           words={personFormWords(t('adminPeople.save.submit'))}
           main
         />
+        {firstChild ? (
+          <p role="status" data-says="first-child">
+            {t('adminPeople.firstChild')}
+          </p>
+        ) : null}
         {notice?.said === 'added' && notice.thing === person.id ? (
           <p>
             <a className="ui-button" data-kind="quiet" href={`${listUrl}#${addPersonAnchor}`}>
