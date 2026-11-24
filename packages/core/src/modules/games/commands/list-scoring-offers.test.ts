@@ -58,6 +58,16 @@ async function offers(account: string | null, gameIds: readonly string[], state 
 }
 
 describe('listScoringOffers', () => {
+  it('offers no game of an archived season (O-12, T-381)', async () => {
+    const { deps, as, db } = memoryGames({ games, grants });
+    expect((await listScoringOffers(as(ownerId), { gameIds: every }, deps)).ok).toBe(true);
+    db.state.seasons = db.state.seasons.map((x) => ({ ...x, status: 'completed' }));
+    expect(await listScoringOffers(as(ownerId), { gameIds: every }, deps)).toEqual({
+      ok: true,
+      value: { games: [] },
+    });
+  });
+
   it('offers the games still to be decided, in the order asked, with how each is recorded', async () => {
     expect(await offers(scorekeeperId, [gameUuid(3), ...every])).toEqual([
       { gameId: gameUuid(3), recording: 'box-score' },

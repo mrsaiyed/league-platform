@@ -373,6 +373,8 @@ export function worldSchedulingStore(s: LeagueWorld): SchedulingStore {
 export function worldImportsStore(s: LeagueWorld, now: () => Date): ImportsStore {
   const season = (seasonId: string) => s.seasons.find((x) => x.id === seasonId);
   return {
+    seasonArchived: async (seasonId) =>
+      s.seasons.some((x) => x.id === seasonId && x.status === 'completed'),
     findSeason: async (seasonId) => {
       const found = season(seasonId);
       return found === undefined ? undefined : { programId: found.programId };

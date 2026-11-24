@@ -114,7 +114,6 @@ export type SeasonSetupCopy = {
 /** How many of each "Start a new season" copied. */
 export type SeasonSetupCopied = {
   readonly divisions: number;
-  readonly settings: number;
   readonly teams: number;
   readonly rosterEntries: number;
 };

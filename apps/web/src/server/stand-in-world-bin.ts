@@ -137,6 +137,8 @@ export function worldBinStore(s: LeagueWorld): BinStore {
       );
     },
     seasonProgramId: async (seasonId) => s.seasons.find((x) => x.id === seasonId)?.programId,
+    seasonArchived: async (seasonId) =>
+      s.seasons.some((x) => x.id === seasonId && x.status === 'completed'),
     findTeam: async (teamId) => {
       const team = s.teams.find((t) => t.id === teamId);
       if (team === undefined) return undefined;

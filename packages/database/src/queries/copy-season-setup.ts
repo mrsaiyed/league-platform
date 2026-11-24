@@ -1,12 +1,14 @@
 // Copies what a new season takes from the program's last one (step 2.130, T-378), in the
 // caller's transaction: the rules document as stored and the statistics the season names,
-// its season-level setting values, its divisions (their tree, colors and order), and, if
+// its divisions (their tree, colors and order), and, if
 // asked, its teams and their rosters. A team is carried as a new row of the new season
 // with the old row's lineage (0008), its division the copy of its old one; a team in the
 // bin or one that left (S-87) stays behind. A roster carries the players still on it and
 // not in the bin, with their numbers, roles and order; their joining date is left empty
 // and none is marked for review. Games, rounds, the schedule and the old season's own
-// state are never copied.
+// state are never copied, nor its season-level settings: only the settings commands write
+// a setting (record 065, only-writer.test.ts), so a copy cannot carry a confirmation that
+// nobody gave; the admin sets them again for the new season (T-378).
 import type { JsonObject } from '../db/schema-types.ts';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
@@ -19,7 +21,6 @@ export type SeasonSetupCopyRow = {
 
 export type SeasonSetupCopiedRow = {
   readonly divisions: number;
-  readonly settings: number;
   readonly teams: number;
   readonly rosterEntries: number;
 };
@@ -45,28 +46,6 @@ export async function copySeasonSetup(
     .where('league_id', '=', leagueId)
     .where('id', '=', copy.toSeasonId)
     .execute();
-
-  const settings = await trx
-    .selectFrom('setting_values')
-    .select(['key', 'value'])
-    .where('league_id', '=', leagueId)
-    .where('level', '=', 'season')
-    .where('season_id', '=', copy.fromSeasonId)
-    .execute();
-  if (settings.length > 0) {
-    await trx
-      .insertInto('setting_values')
-      .values(
-        settings.map((row) => ({
-          league_id: leagueId,
-          level: 'season',
-          season_id: copy.toSeasonId,
-          key: row.key,
-          value: row.value as JsonObject,
-        })),
-      )
-      .execute();
-  }
 
   // Parents before their children, so each copy can name its parent's copy.
   const divisions = await trx
@@ -166,5 +145,5 @@ export async function copySeasonSetup(
       rosterEntries += entries.length;
     }
   }
-  return { divisions: divisionCopy.size, settings: settings.length, teams, rosterEntries };
+  return { divisions: divisionCopy.size, teams, rosterEntries };
 }

@@ -21,7 +21,7 @@ import { gameScore, gameVersion } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GameRosterPlayer, GamesTx, NewGameLine } from '../ports.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
-import { gameInArchivedSeasonUncorrected } from '../archived-season.ts';
+import { gameInArchivedSeasonNotReopened } from '../archived-season.ts';
 
 export type SetBoxScoreError =
   | DecideGameError
@@ -50,7 +50,7 @@ export type BoxScoreLineInput = z.infer<typeof boxScoreLine>;
 export const setBoxScore = defineCommand({
   name: 'games.set_box_score',
   permission: 'games.score',
-  refusedInArchivedSeason: gameInArchivedSeasonUncorrected,
+  refusedInArchivedSeason: gameInArchivedSeasonNotReopened,
   input: z.object({
     gameId: z.uuid(),
     version: gameVersion,

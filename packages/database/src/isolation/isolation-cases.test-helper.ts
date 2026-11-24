@@ -25,6 +25,8 @@ import {
   revokeGrant,
   searchActivity,
   setCurrentSeason as setCurrentSeasonCommand,
+  startSeason as startSeasonCommand,
+  archiveSeason as archiveSeasonCommand,
   setLeagueAudience,
   setLeagueName,
   setLeagueProfile,
@@ -299,6 +301,21 @@ registerIsolationCase({
 
 registerCommandCase(setCurrentSeasonCommand, harnessTx, {
   name: "make the target's season current",
+  input: (target) => ({ seasonId: target.seasonId, version: 1 }),
+});
+
+registerCommandCase(startSeasonCommand, harnessTx, {
+  name: "start a new season in the target's program, its teams and rosters carried",
+  input: (target) => ({
+    programId: target.programId,
+    slug: 'harness-next-season',
+    name: 'Harness next season',
+    carry: 'teams-and-rosters',
+  }),
+});
+
+registerCommandCase(archiveSeasonCommand, harnessTx, {
+  name: "archive the target's season",
   input: (target) => ({ seasonId: target.seasonId, version: 1 }),
 });
 

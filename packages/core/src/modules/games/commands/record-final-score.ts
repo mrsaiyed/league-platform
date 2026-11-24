@@ -17,7 +17,7 @@ import { gameScore, gameVersion } from '../game-fields.ts';
 import { mayScoreGame } from '../policy.ts';
 import type { GamesTx } from '../ports.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
-import { gameInArchivedSeasonUncorrected } from '../archived-season.ts';
+import { gameInArchivedSeasonNotReopened } from '../archived-season.ts';
 
 export type RecordFinalScoreError = DecideGameError;
 
@@ -27,7 +27,7 @@ export const maxOvertimePeriods = 18;
 export const recordFinalScore = defineCommand({
   name: 'games.record_final_score',
   permission: 'games.score',
-  refusedInArchivedSeason: gameInArchivedSeasonUncorrected,
+  refusedInArchivedSeason: gameInArchivedSeasonNotReopened,
   input: z.object({
     gameId: z.uuid(),
     version: gameVersion,

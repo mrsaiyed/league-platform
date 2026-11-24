@@ -5,6 +5,7 @@
 // a team that is not in the bin changes nothing. Whoever may remove a team may restore
 // it (A-5): `teams.manage` at its season's program, as `teams.remove_team` needs.
 import { z } from 'zod';
+import { binnedTeamInArchivedSeason } from '../archived-season.ts';
 import { leagueScope, recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { binSeasonScope, mayRestore } from '../bin-policy.ts';
@@ -23,6 +24,7 @@ export type RestoreTeamError = {
 export const restoreTeam = defineCommand({
   name: 'leagues.restore_team',
   permission: 'teams.manage',
+  refusedInArchivedSeason: binnedTeamInArchivedSeason,
   input: z.object({ teamId: z.uuid() }),
   allowed: async (context, input, tx: BinTx) => {
     const team = await tx.bin.findTeam(input.teamId);

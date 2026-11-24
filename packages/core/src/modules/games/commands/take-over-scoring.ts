@@ -25,14 +25,14 @@ import {
   type ScorableGameError,
   type ScoringSessionReply,
 } from '../scoring-session.ts';
-import { gameInArchivedSeasonUncorrected } from '../archived-season.ts';
+import { gameInArchivedSeasonNotReopened } from '../archived-season.ts';
 
 export type TakeOverScoringError = ScorableGameError;
 
 export const takeOverScoring = defineCommand({
   name: 'games.take_over_scoring',
   permission: 'games.score',
-  refusedInArchivedSeason: gameInArchivedSeasonUncorrected,
+  refusedInArchivedSeason: gameInArchivedSeasonNotReopened,
   input: z.object({
     gameId: lowerId,
     deviceId: deviceIdField,

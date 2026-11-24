@@ -24,7 +24,7 @@ export type StartSeasonValue = {
 };
 
 const day = z.iso.date();
-const nothingCopied: SeasonSetupCopied = { divisions: 0, settings: 0, teams: 0, rosterEntries: 0 };
+const nothingCopied: SeasonSetupCopied = { divisions: 0, teams: 0, rosterEntries: 0 };
 
 export const startSeason = defineCommand({
   name: 'leagues.start_season',

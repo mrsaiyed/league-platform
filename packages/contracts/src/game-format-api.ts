@@ -49,7 +49,7 @@ const FormatChangeReply = z.union([
   z.strictObject({ may: z.literal(true), as: z.enum(['admin', 'scorekeeper']) }),
   z.strictObject({
     may: z.literal(false),
-    reason: z.enum(['no-permission', 'setting-off', 'under-way', 'finished']),
+    reason: z.enum(['no-permission', 'setting-off', 'under-way', 'finished', 'season-archived']),
   }),
 ]);
 

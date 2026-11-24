@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import { defineCommand, ok, type Result } from '../../../command/index.ts';
 import { accessOfAccount, type Scope } from '../../access/index.ts';
+import { correctionOpenOn } from '../archived-season.ts';
 import { recordingOf } from '../game-fields.ts';
 import { leagueScores } from '../my-games-of.ts';
 import { mayReadGames } from '../policy.ts';
@@ -69,6 +70,14 @@ export const listScoringOffers = defineCommand({
       if (recording === undefined || !offeredOnItsDay(entry, found.today)) continue;
       const scope: Scope = { type: 'program', id: entry.programId };
       if (!mayScoreUnder(holder, scope, rule, entry.assigned)) continue;
+      // An archived season's game (O-12, T-381): only while a correction is open on it,
+      // as the scoring session itself (games.open_scoring_session) is refused otherwise.
+      if (
+        (await tx.games.seasonArchived(entry.game.seasonId)) &&
+        !(await correctionOpenOn(entry.game, tx))
+      ) {
+        continue;
+      }
       offered.set(entry.game.id, { gameId: entry.game.id, recording });
     }
     return ok({ games: asked.flatMap((id) => offered.get(id) ?? []) });

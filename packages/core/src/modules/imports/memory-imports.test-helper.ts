@@ -129,6 +129,7 @@ export function memoryImports(state: Partial<MemoryImports> = {}) {
       activity: { record: async (entry) => void s.activity.push(entry), list: async () => [] },
       imports: {
         findSeason: async (id) => s.seasons.find((x) => x.id === id),
+        seasonArchived: async () => false,
         seasonNames: async () => s.names,
         insert: async (value) => {
           if (!s.seasons.some((x) => x.id === value.seasonId)) return 'no-season';

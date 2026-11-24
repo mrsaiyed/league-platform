@@ -27,6 +27,11 @@ import {
 } from './stand-in-league-states.ts';
 import { minorAt } from './stand-in-world-clock.ts';
 import { newId } from './stand-in-world-ids.ts';
+import {
+  copyWorldSeasonSetup,
+  createWorldSeason,
+  currentWorldSeasonOf,
+} from './stand-in-world-new-season.ts';
 import { replacedAt } from './stand-in-world-rows.ts';
 import type { LeagueWorld, SavedPlayerTotals, WorldDivision } from './stand-in-world-state.ts';
 import type { Frozen, ReadWorld } from './stand-in-world.ts';
@@ -507,7 +512,7 @@ export function worldLeaguesStores(
       if (next !== undefined && unlist) s.listed = false;
       return next;
     },
-    createSeason: notYet('leagues.createSeason'),
+    createSeason: async (season) => createWorldSeason(s, season),
     findSeason: async (seasonId) => {
       const found = s.seasons.find((x) => x.id === seasonId);
       return found === undefined
@@ -561,8 +566,8 @@ export function worldLeaguesStores(
       s.seasons = replacedAt(s.seasons, at, { ...found, ...fields, version: version + 1 });
       return version + 1;
     },
-    currentSeasonOf: notYet('leagues.currentSeasonOf'),
-    copySeasonSetup: notYet('leagues.copySeasonSetup'),
+    currentSeasonOf: async (programId) => currentWorldSeasonOf(s, programId),
+    copySeasonSetup: async (copy) => copyWorldSeasonSetup(s, copy),
     setCurrentSeason: notYet('leagues.setCurrentSeason'),
     latestSiteReleaseNumber: notYet('leagues.latestSiteReleaseNumber'),
     publishSiteRelease: notYet('leagues.publishSiteRelease'),

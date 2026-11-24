@@ -4,6 +4,7 @@
 // the row until the worker has read it, then the report replaces it, so the file is never
 // kept, never served and never in a job.
 import { z } from 'zod';
+import { seasonArchivedForImport } from './archived-season.ts';
 import { defineCommand, fail, ok, type Result } from '../../command/index.ts';
 import { recordActivity } from '../access/index.ts';
 import { maxReportBytes } from './import-documents.ts';
@@ -19,6 +20,7 @@ export type StartFixtureImportError = {
 export const startFixtureImport = defineCommand({
   name: 'imports.start_fixture_import',
   permission: 'schedule.import',
+  refusedInArchivedSeason: seasonArchivedForImport,
   input: z.object({
     seasonId: z.uuid(),
     fileName: z.string().trim().min(1).max(255).nullable(),

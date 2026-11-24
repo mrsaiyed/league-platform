@@ -121,7 +121,13 @@ describe('starting a new season (step 2.130)', () => {
     const started = await start(owner, 'winter-2027', 'teams');
     if (!started.ok) throw new Error(started.error.code);
     expect(started.value.copiedFromSeasonId).toBe(seasonId);
-    expect(started.value.copied).toEqual({ divisions: 1, settings: 1, teams: 2, rosterEntries: 0 });
+    expect(started.value.copied).toEqual({ divisions: 1, teams: 2, rosterEntries: 0 });
+    // Its settings stay behind: only the settings commands write one (record 065).
+    expect(
+      await count('select count(*) as n from setting_values where season_id = $1', [
+        started.value.seasonId,
+      ]),
+    ).toBe(0);
     const made = await one<{
       status: string;
       is_current: boolean;
@@ -177,7 +183,7 @@ describe('starting a new season (step 2.130)', () => {
     if (!first.ok) throw new Error(first.error.code);
     expect(first.value).toMatchObject({
       copiedFromSeasonId: null,
-      copied: { divisions: 0, settings: 0, teams: 0, rosterEntries: 0 },
+      copied: { divisions: 0, teams: 0, rosterEntries: 0 },
     });
     expect((await start(owner, 'fresh', 'nothing')).ok).toBe(false);
   });

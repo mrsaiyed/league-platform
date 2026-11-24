@@ -337,7 +337,6 @@ function withPlaysFromEvents(s: MemoryTracker, tx: TrackerTx): TrackerTx {
     ...tx,
     games: {
       ...tx.games,
-      seasonArchived: async () => false,
       hasPlays: async (gameId) =>
         s.tracked.includes(gameId) || hasPlaysPastMarker(s.events, gameId),
       // The game's one lock, as the database has it: the games store and the session
