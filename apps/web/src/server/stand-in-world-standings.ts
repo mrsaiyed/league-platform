@@ -468,7 +468,15 @@ export function worldLeaguesStores(
     // Publishing a made-up draft (step 2.240): the state is kept beside the cast's
     // (stand-in-league-states.ts), which the access reader and the address lookups read.
     setStatus: async (status, version) => setStandInStatus(s.leagueId, status, version),
-    leagueProfile: notYet('leagues.leagueProfile'),
+    // League settings → Profile reads it (step 2.125); the made-up cast keeps no city and
+    // no listing, so the listing is U-10's start (adult leagues listed).
+    leagueProfile: async () => ({
+      contactEmail: `${s.slug}@example.org`,
+      city: null,
+      timeZone: s.timeZone,
+      listed: s.audience === 'adult',
+      audience: s.audience,
+    }),
     setProfile: notYet('leagues.setProfile'),
     setAudience: notYet('leagues.setAudience'),
     createSeason: notYet('leagues.createSeason'),

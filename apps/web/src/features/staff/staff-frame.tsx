@@ -84,6 +84,13 @@ function StaffStatus({
             <a href={publishAt}>{t('shell.draftNoticePublish')}</a>
           </>
         ) : null}
+        {/* An archived league points to Un-archive the same way (step 2.125). */}
+        {status === 'archived' && publishAt !== null ? (
+          <>
+            {' '}
+            <a href={publishAt}>{t('shell.archivedNoticeUnarchive')}</a>
+          </>
+        ) : null}
       </p>
     </details>
   );

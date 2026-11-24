@@ -105,6 +105,10 @@ export const enError = {
   'error.leagues.clear_setting.changed-since-read':
     'Someone else changed this setting while you were looking, so it was not put back to the default. The page now shows the latest value.',
   'error.leagues.clear_setting.unknown-setting': 'That setting does not exist.',
+  'error.leagues.rename_short_name.short-name-blocked':
+    'That short name cannot be used. Choose another.',
+  'error.leagues.rename_short_name.short-name-taken':
+    'Another league already has that short name, or keeps it for forwarding. Choose another.',
   'error.leagues.restore_division.division-name-taken':
     'Another division of the season now has this name. Rename one of them in Divisions, then bring this one back.',
   'error.leagues.restore_division.division-parent-in-bin':
@@ -132,6 +136,8 @@ export const enError = {
   'error.leagues.restore_team.team-not-found': 'That team is not there.',
   'error.leagues.restore_team.team-short-name-taken':
     'Another team of the season now has this short name. Change that team’s short name on its page in Teams, then bring this one back.',
+  'error.leagues.set_audience.confirmation-needed':
+    'Tick the confirmation to show more people as adults, then save again.',
   // Why a season's roster settings were refused (T-187): `error.`, the command's name,
   // the code, and the setting at fault when there is one.
   'error.leagues.set_season_roster_settings.invalid-rules': 'These roster settings are not valid.',
@@ -148,6 +154,8 @@ export const enError = {
   'error.leagues.set_setting.invalid-value':
     'That value is not allowed for this setting. Check what it accepts and try again.',
   'error.leagues.set_setting.unknown-setting': 'That setting does not exist.',
+  'error.leagues.set_status.illegal-transition':
+    'The league cannot be changed that way from where it is now.',
   // Publishing waits for P3's "Must fix" list (step 2.240): each item says where it is put right.
   'error.leagues.set_status.no-contact-email':
     'The league has no contact email yet, so it cannot be published. Ask the people who run SR Leagues, who made the league, to add it.',

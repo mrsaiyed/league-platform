@@ -1,9 +1,11 @@
 // Admin → League settings (step 2.48, P4 §6, T5 §6): a form for every setting the
 // product declares at the league level, drawn from the declarations (T-98).
 import {
+  holdsChildrenInFull,
   leagueUrl,
   listLeagueSettings,
   mayChangeLeagueSettings,
+  mayEditLeague,
   readNamePolicy,
   readPrivacyFacts,
   readPublishChecks,
@@ -15,7 +17,8 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { doneKey, problemKey } from './answer.ts';
 import { privacyNotes } from './privacy-notes.ts';
-import { publishAsk, PublishPanel } from './publish-panel.tsx';
+import { ProfilePanel } from './profile-panel.tsx';
+import { archiveAsk, publishAsk, PublishPanel } from './publish-panel.tsx';
 import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
 
 /** The groups the settings are shown under, in the order they are drawn, each once. */
@@ -40,9 +43,8 @@ export async function SettingsPage({
   const view = await loadLeaguePage(league, 'admin', 'settings');
   const { adminSettings, publicSchedule } = await webPorts();
   const context = commandContextOf(view.context);
-  const { rows, facts, policy, current, checks, mayPublish } = await adminSettings.deps.transaction(
-    context,
-    async (tx) => ({
+  const { rows, facts, policy, current, checks, mayPublish, profile, childrenInFull, mayEdit } =
+    await adminSettings.deps.transaction(context, async (tx) => ({
       rows: await listLeagueSettings(tx),
       facts: await readPrivacyFacts(tx),
       policy: await readNamePolicy(tx.leagues),
@@ -50,8 +52,11 @@ export async function SettingsPage({
       current: await tx.leagues.currentLeague(),
       checks: await readPublishChecks(tx),
       mayPublish: await mayChangeLeagueSettings(context, tx),
-    }),
-  );
+      // League settings → Profile (step 2.125).
+      profile: await tx.leagues.leagueProfile(),
+      childrenInFull: await holdsChildrenInFull(tx),
+      mayEdit: await mayEditLeague(context, tx),
+    }));
   const { timeZone } = await publicSchedule.clockOf(view.context.league.id);
   const notes = privacyNotes({ facts, policy, rows, timeZone, locale });
   const problem = problemKey(query);
@@ -95,6 +100,7 @@ export async function SettingsPage({
           checks={checks}
           mayPublish={mayPublish}
           asking={query[publishAsk.name] === publishAsk.value}
+          askingArchive={query[archiveAsk.name] === archiveAsk.value}
         />
       )}
       {rows.length === 0 ? (
@@ -113,6 +119,19 @@ export async function SettingsPage({
           </nav>
           <SettingForms rows={rows} league={view.context.league.slug} say={say} notes={notes} />
         </>
+      )}
+      {/* Profile (step 2.125) comes after the settings' forms, which the page-step
+          checks reach by their place on the page. */}
+      {current === undefined || profile === undefined ? null : (
+        <ProfilePanel
+          league={view.context.league.slug}
+          name={current.name}
+          slug={current.slug}
+          version={current.version}
+          profile={profile}
+          childrenInFull={childrenInFull}
+          mayChange={mayEdit}
+        />
       )}
     </main>
   );
