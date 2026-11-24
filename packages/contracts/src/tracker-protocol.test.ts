@@ -160,6 +160,7 @@ describe('players at the scorer’s table (version 2, record 058)', () => {
       status: 'scheduled',
       uniqueJerseys: true,
       allowTies: false,
+      statistics: ['points', 'fouls'],
       players: [
         {
           teamId: id(3),

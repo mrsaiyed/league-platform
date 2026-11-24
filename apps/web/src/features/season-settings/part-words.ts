@@ -316,7 +316,7 @@ export function partGroups(part: SeasonPart, rules: SeasonRules): readonly FormG
             ),
             radios(
               'statistics',
-              ['points-only', 'points-fouls', 'standard', 'full'],
+              ['points-only', 'points-fouls', 'standard', 'standard-turnovers', 'full'],
               help('seasonSettings.field.statistics.help'),
             ),
           ],

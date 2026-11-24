@@ -2,7 +2,8 @@
 // §1 "Statistics kept"). The command takes any stat key; this only picks the grid's
 // columns. "Standard" is P7's default set: points, 3-pointers, free throws and fouls,
 // with minutes. "Full" adds the other counts the stats pages already have words for
-// (S-25: rebounds, assists, steals, blocks, turnovers).
+// (S-25: rebounds, assists, steals, blocks, turnovers). "Standard with turnovers" is the
+// standard set and turnovers (S-107), so the admin chooses whether tracked games offer them.
 // The keys are the tracker's: fg3 for 3-pointers made, fg1 for free throws made.
 import type { SeasonRules } from '@srleagues/contracts';
 
@@ -12,6 +13,7 @@ const columns: Readonly<Record<SeasonRules['statistics'], readonly string[]>> = 
   'points-only': ['points'],
   'points-fouls': ['points', 'fouls'],
   standard,
+  'standard-turnovers': [...standard, 'turnovers'],
   full: [...standard, 'rebounds', 'assists', 'steals', 'blocks', 'turnovers'],
 };
 
@@ -22,6 +24,6 @@ export function boxScoreColumns(statistics: SeasonRules['statistics']): {
 } {
   return {
     statKeys: columns[statistics],
-    minutes: statistics === 'standard' || statistics === 'full',
+    minutes: statistics !== 'points-only' && statistics !== 'points-fouls',
   };
 }
