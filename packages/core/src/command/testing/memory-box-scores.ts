@@ -18,7 +18,10 @@ export type BoxScoreData = {
   tracked: string[];
 };
 
-type BoxScoreStores = Pick<GamesStore, 'listLines' | 'replaceLines' | 'listRoster' | 'hasPlays'>;
+type BoxScoreStores = Pick<
+  GamesStore,
+  'listLines' | 'replaceLines' | 'listRoster' | 'inBin' | 'hasPlays'
+>;
 
 export function boxScoreStores(s: BoxScoreData): BoxScoreStores {
   const teamsOf = (gameId: string) => {
@@ -45,6 +48,8 @@ export function boxScoreStores(s: BoxScoreData): BoxScoreStores {
       const teams = teamsOf(gameId);
       return s.roster.filter((player) => teams.includes(player.teamId));
     },
+    // No bin here: a player missing from the roster is purged (the database test tells them apart).
+    inBin: async () => false,
     hasPlays: async (gameId) => s.tracked.includes(gameId),
   };
 }

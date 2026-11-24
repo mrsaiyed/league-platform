@@ -105,16 +105,49 @@ describe('game corrections', () => {
         [g.leagueId, g.gameId, g.ownerId, before, after],
       );
     const big = JSON.stringify({ version: 1, pad: 'x'.repeat(16400) });
-    for (const bad of ['{}', '[]', '{"version": 0}', big]) {
+    const huge = JSON.stringify({ version: 1, pad: 'x'.repeat(4_194_304) });
+    for (const bad of ['{}', '[]', '{"version": 0}', huge]) {
       await expect(write(bad, '{"version": 1}')).rejects.toMatchObject({
         ...refused.check,
         constraint: 'game_corrections_before_document',
       });
+    }
+    for (const bad of ['{}', '[]', '{"version": 0}', big]) {
       await expect(write('{"version": 1}', bad)).rejects.toMatchObject({
         ...refused.check,
         constraint: 'game_corrections_after_document',
       });
     }
+  });
+
+  it('keep in "before" the largest box score the grid saves (migration 0029, T-365)', async () => {
+    const g = await game();
+    // 200 lines of 40 stats with the longest keys and counts the grid takes (set-box-score.ts).
+    const stats = Object.fromEntries(
+      Array.from({ length: 40 }, (_, n) => [`s${String(n).padStart(39, 'x')}`, 999]),
+    );
+    const line = {
+      teamId: g.gameId,
+      personId: g.gameId,
+      jerseyNumber: '00',
+      played: true,
+      secondsPlayed: 86_400,
+      stats,
+    };
+    const sheet = { captureMode: 'box', overtimePeriods: 18, lines: Array(200).fill(line) };
+    const before = JSON.stringify({
+      version: 1,
+      status: 'final',
+      homeScore: 1,
+      awayScore: 0,
+      sheet,
+    });
+    expect(before.length).toBeGreaterThan(16_384);
+    await db.query(
+      `insert into game_corrections (league_id, game_id, account_id, reason, before, after)
+       values ($1, $2, $3, 'Why', $4, '{"version": 1}')`,
+      [g.leagueId, g.gameId, g.ownerId, before],
+    );
   });
 
   it('are dated by the database, never by the caller', async () => {

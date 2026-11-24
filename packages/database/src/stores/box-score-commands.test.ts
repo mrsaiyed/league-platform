@@ -6,6 +6,8 @@ import type { PGlite } from '@electric-sql/pglite';
 import {
   eventHandlers,
   getBoxScoreSheet,
+  putSheetBack,
+  readSheetPutBackOffer,
   recordFinalScore,
   reopenGame,
   setBoxScore,
@@ -202,6 +204,75 @@ describe('a box score entered afterwards (step 2.64)', () => {
     expect(await getBoxScoreSheet(s.ctx, { gameId: s.paper }, deps)).toMatchObject({
       value: { players: [] },
     });
+  });
+
+  // Step 2.229 (fix round): a kept sheet holds only ids (T-220), and a person in the bin
+  // with no lines, totals or roster entry left may be purged. The put back then says so
+  // in plain words instead of failing on the database's link (player_game_stats_person).
+  it('refuses to put back a kept sheet that names a person purged since', async () => {
+    const s = await season();
+    expect(await setBoxScore(s.ctx, sheetOf(s), deps)).toMatchObject({ ok: true });
+    expect(
+      await reopenGame(s.ctx, { gameId: s.paper, version: 2, reason: 'Misread the sheet' }, deps),
+    ).toMatchObject({ ok: true });
+    expect(
+      await recordFinalScore(
+        s.ctx,
+        { gameId: s.paper, version: 3, homeScore: 50, awayScore: 48 },
+        deps,
+      ),
+    ).toMatchObject({ ok: true });
+    // Bo is purged from the bin: what purge-binned.ts asks for first, then his row.
+    for (const table of ['roster_entries', 'season_player_totals']) {
+      await pglite.query(`delete from ${table} where person_id = $1`, [s.bo]);
+    }
+    await pglite.query('delete from people where id = $1', [s.bo]);
+    const putBack = { gameId: s.paper, version: 4, reason: 'The sheet was right' };
+    expect(await putSheetBack(s.ctx, putBack, deps)).toEqual({
+      ok: false,
+      error: { code: 'player-gone' },
+    });
+    const kept = await one<{ count: number }>(
+      pglite,
+      'select count(*)::int as count from player_game_stats where game_id = $1',
+      [s.paper],
+    );
+    expect(kept.count).toBe(0);
+  });
+
+  // A player only in the bin (or on a team in the bin) can be restored: the put back says
+  // so, and the read that offers it says so before a reason is typed.
+  it('tells a player in the bin from one purged, before the tap and on it', async () => {
+    const s = await season();
+    expect(await setBoxScore(s.ctx, sheetOf(s), deps)).toMatchObject({ ok: true });
+    const reason = 'Misread the sheet';
+    expect(await reopenGame(s.ctx, { gameId: s.paper, version: 2, reason }, deps)).toMatchObject({
+      ok: true,
+    });
+    const score = { gameId: s.paper, version: 3, homeScore: 50, awayScore: 48 };
+    expect(await recordFinalScore(s.ctx, score, deps)).toMatchObject({ ok: true });
+    const offer = () => readSheetPutBackOffer(s.ctx, { gameId: s.paper }, deps);
+    const putBack = { gameId: s.paper, version: 4, reason: 'The sheet was right' };
+    for (const table of ['people', 'teams']) {
+      const id = table === 'people' ? s.bo : s.away;
+      const bin = (at: string) =>
+        pglite.query(`update ${table} set deleted_at = ${at} where league_id = $1 and id = $2`, [
+          s.l.leagueId,
+          id,
+        ]);
+      await bin('now()');
+      expect(await offer(), table).toEqual({
+        ok: true,
+        value: { offered: false, code: 'player-in-bin' },
+      });
+      expect(await putSheetBack(s.ctx, putBack, deps), table).toEqual({
+        ok: false,
+        error: { code: 'player-in-bin' },
+      });
+      await bin('null');
+    }
+    expect(await offer()).toEqual({ ok: true, value: { offered: true } });
+    expect(await putSheetBack(s.ctx, putBack, deps)).toMatchObject({ ok: true });
   });
 
   it('shows the sheet, refuses a tracked game, and is corrected by reopening', async () => {

@@ -141,6 +141,8 @@ import {
   readOwnResultOffer,
   readOwnResultOffers,
   reopenGame,
+  putSheetBack,
+  readSheetPutBackOffer,
   reopenOwnResult,
   reopenTrackedGame,
   reorderDivisions,
@@ -1028,6 +1030,53 @@ const gameCommandRows: readonly Row[] = [
       reason: 'The score was wrong',
     }),
     (c, i) => reopenGame(c, i, trackerDeps),
+  ),
+  // Step 2.229 (T-366): putting a box score back as its game's newest correction kept it
+  // is a correction, so it needs what reopening does. The game is final again, saved
+  // after a reopen whose correction kept its sheet (no lines here: the matrix is about who).
+  ...gameRows(
+    'games.put_sheet_back',
+    'put a box score back as it was',
+    'games.correct',
+    async (league, program) => {
+      const { gameId } = await gameIn(league, program, {
+        status: 'final',
+        home_score: 50,
+        away_score: 40,
+        finalized_at: '2026-12-06T19:30:00Z',
+      });
+      const sheet = { captureMode: 'box', overtimePeriods: null, lines: [] };
+      await pglite.query(
+        `insert into game_corrections (league_id, game_id, account_id, reason, before, after)
+         values ($1, $2, $3, 'Reopened', $4, $5)`,
+        [
+          league.leagueId,
+          gameId,
+          league.ownerId,
+          JSON.stringify({ version: 1, status: 'final', homeScore: 41, awayScore: 45, sheet }),
+          JSON.stringify({ version: 1, status: 'scheduled', homeScore: null, awayScore: null }),
+        ],
+      );
+      return { gameId, version: 1, reason: 'Saved the wrong thing' };
+    },
+    (c, i) => putSheetBack(c, i, trackerDeps),
+  ),
+  // Whether "Put the sheet back as it was" is offered, before the tap (step 2.229): whoever
+  // may correct games, as the put back itself. A read.
+  ...gameRows(
+    'games.read_sheet_put_back_offer',
+    'see whether a box score can be put back as it was',
+    'games.correct',
+    async (league, program) => {
+      const { gameId } = await gameIn(league, program, {
+        status: 'final',
+        home_score: 50,
+        away_score: 40,
+        finalized_at: '2026-12-06T19:30:00Z',
+      });
+      return { gameId };
+    },
+    (c, i) => readSheetPutBackOffer(c, i, trackerDeps),
   ),
   // Assigning scorekeepers is part of running Games (P4 §3, P7 §5.1): schedulers too.
   ...gameRows(

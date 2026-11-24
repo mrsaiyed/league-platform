@@ -48,7 +48,7 @@ import {
   type Refused,
   type TypedFields,
 } from './form-state.ts';
-import { boxScoreProblemKey, gamesProblemKey } from './problem-keys.ts';
+import { boxScoreProblemKey, gamesProblemKey, putBackProblemKey } from './problem-keys.ts';
 import {
   runBoxScoreAction,
   type BoxScoreAction,
@@ -110,6 +110,16 @@ async function showSaved(to: string): Promise<void> {
   redirect(to);
 }
 
+/** A put back's refusals said beside its form as it is (step 2.229). */
+const putBackSaid: readonly string[] = [
+  'put-back-reason',
+  'newer-save',
+  'no-sheet-kept',
+  'game-not-decided',
+  'scored-live',
+  'player-gone',
+];
+
 /** Refusals answered without drawing the screen again (see `refused`). */
 const keptAsIs: readonly string[] = [
   'invalid-input',
@@ -129,11 +139,13 @@ function refused(
   typed: TypedFields,
   wrong: readonly string[],
   said: string,
+  /** Answered beside the form as it is, whatever the code (a put back refused, step 2.229). */
+  keep = false,
 ): Refused {
   // Not for a game called off since the form was drawn (step 2.158): drawn again, it would
   // have no score boxes, and the sentence saying why the score was refused would go with
   // them. It stays beside the boxes, which say nothing more is saved.
-  if (!keptAsIs.includes(code)) refresh();
+  if (!keep && !keptAsIs.includes(code)) refresh();
   return { kind: 'refused', code, typed, wrong, said };
 }
 
@@ -367,5 +379,30 @@ export async function reopenBoxScoreAction(_state: FormState, form: FormData): P
     fields,
     result.code === 'reopen-reason' ? ['reason'] : [],
     t(boxScoreProblemKey(result.code)),
+  );
+}
+
+/**
+ * The box score put back as the game's last reopen kept it (step 2.229, T-366): back to
+ * its grid, which says so once. Refused (something newer saved, the game reopened, the
+ * page old), the sentence says why in plain words and the reason keeps what was typed.
+ */
+export async function putSheetBackAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
+  const { result, context, gameId, list, sheet } = await onBoxScore('put-back', fields);
+  if (result.ok) {
+    if (gameId === undefined) return redirect(list);
+    leaveNotice(context, 'box-score', gameId, 'put-back');
+    await showSaved(sheet(gameId));
+    return untouched;
+  }
+  return refused(
+    result.code,
+    fields,
+    result.code === 'put-back-reason' ? ['reason'] : [],
+    t(putBackProblemKey(result.code)),
+    // Drawn again the page would no longer hold the offer, and the sentence saying why it
+    // was refused would go with it: it stays beside the reason, which says nothing was saved.
+    putBackSaid.includes(result.code),
   );
 }

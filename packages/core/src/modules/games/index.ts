@@ -105,6 +105,13 @@ export { hasPlaysPastMarker } from './plays-past-marker.ts';
 export { reopenTrackedGame, type ReopenTrackedGameError } from './commands/reopen-tracked-game.ts';
 export { readReopenOffer, type ReadReopenOfferError } from './commands/read-reopen-offer.ts';
 export { reopenOwnResult, type ReopenOwnResultError } from './commands/reopen-own-result.ts';
+export { putSheetBack, type PutSheetBackError } from './commands/put-sheet-back.ts';
+export {
+  readSheetPutBackOffer,
+  type ReadSheetPutBackOfferError,
+  type SheetPutBackOffer,
+} from './commands/read-sheet-put-back-offer.ts';
+export { resultDocumentOf } from './kept-sheet.ts';
 export {
   readOwnResultOffer,
   type ReadOwnResultOfferError,
@@ -211,9 +218,13 @@ export type {
   ScoringReach,
   GameLine,
   GameRecord,
+  GameRosterEntry,
   GameRosterPlayer,
   NewGameLine,
   GameResultDocument,
+  KeptLine,
+  KeptSheet,
+  StoredGameCorrection,
   GameResultChange,
   GamesStore,
   GamesTx,

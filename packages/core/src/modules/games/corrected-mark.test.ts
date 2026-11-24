@@ -64,4 +64,70 @@ describe('correctedMarkDate (S-8: the mark only when the next final differs)', (
     ];
     expect(correctedMarkDate(corrections, final(50, 40))).toBe('2030-12-08');
   });
+
+  describe('a put back of the sheet (S-98: it applies S-81 to a put back)', () => {
+    const reopened = { status: 'scheduled', homeScore: null, awayScore: null };
+
+    it('leaves no mark from the reopen it undid when the result is as before the reopen', () => {
+      // 50-40 reopened, saved as 20-0 (a final score only or a forfeit), then put back.
+      const corrections = [
+        { on: '2030-12-06', before: final(50, 40), after: reopened },
+        {
+          on: '2030-12-07',
+          before: { status: 'forfeit', homeScore: 20, awayScore: 0 },
+          after: final(50, 40),
+        },
+      ];
+      expect(correctedMarkDate(corrections, final(50, 40))).toBeUndefined();
+    });
+
+    it('keeps the mark and date of an earlier correction that did change the result', () => {
+      const corrections = [
+        { on: '2030-12-04', before: final(48, 40), after: reopened },
+        { on: '2030-12-06', before: final(50, 40), after: reopened },
+        { on: '2030-12-07', before: final(20, 0), after: final(50, 40) },
+      ];
+      expect(correctedMarkDate(corrections, final(50, 40))).toBe('2030-12-04');
+    });
+
+    // T-368: a put back looks back past reopens whose save kept no lines, so it undoes
+    // the whole slip: those reopens are part of it and mark nothing.
+    it('leaves no mark when a put back undoes a chain of reopens', () => {
+      const corrections = [
+        { on: '2030-12-06', before: final(50, 40), after: reopened, keptSheet: true },
+        { on: '2030-12-07', before: final(52, 48), after: reopened, keptSheet: false },
+        {
+          on: '2030-12-08',
+          before: { status: 'forfeit', homeScore: 20, awayScore: 0 },
+          after: final(50, 40),
+          keptSheet: false,
+        },
+      ];
+      expect(correctedMarkDate(corrections, final(50, 40))).toBeUndefined();
+      const later = [
+        ...corrections,
+        { on: '2030-12-09', before: final(50, 40), after: reopened, keptSheet: true },
+      ];
+      expect(correctedMarkDate(later, final(51, 40))).toBe('2030-12-09');
+    });
+
+    it('reads a decided "after" as an ordinary correction when no reopen kept a sheet', () => {
+      // A result corrected straight from 48-40 to 52-40: no sheet was ever kept, so no put back.
+      const corrections = [
+        { on: '2030-12-04', before: final(50, 40), after: reopened, keptSheet: false },
+        { on: '2030-12-06', before: final(48, 40), after: final(52, 40), keptSheet: false },
+      ];
+      expect(correctedMarkDate(corrections, final(52, 40))).toBe('2030-12-06');
+    });
+
+    it('marks a later reopen after the put back as any other', () => {
+      const corrections = [
+        { on: '2030-12-06', before: final(50, 40), after: reopened },
+        { on: '2030-12-07', before: final(20, 0), after: final(50, 40) },
+        { on: '2030-12-09', before: final(50, 40), after: reopened },
+      ];
+      expect(correctedMarkDate(corrections, final(51, 40))).toBe('2030-12-09');
+      expect(correctedMarkDate(corrections, final(50, 40))).toBeUndefined();
+    });
+  });
 });

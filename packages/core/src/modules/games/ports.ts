@@ -83,6 +83,29 @@ export type GameResultDocument = {
   readonly status: string;
   readonly homeScore: number | null;
   readonly awayScore: number | null;
+  /**
+   * A correction's "before" of a game entered by hand that had box score lines (step 2.229,
+   * T-365): every line as it was, so the save after the reopen may remove or replace them
+   * and "put the sheet back" can restore them (A-5). Ids and numbers only, never a name
+   * (T-220). Never counted anywhere: only `player_game_stats` rows count (S-27).
+   */
+  readonly sheet?: KeptSheet;
+};
+
+/** A box score as a correction keeps it (T-365): how it was recorded and its lines. */
+export type KeptSheet = {
+  readonly captureMode: 'box' | 'final' | 'live';
+  readonly overtimePeriods: number | null;
+  readonly lines: readonly KeptLine[];
+};
+
+/** One kept line: the line without its game id, with the jersey worn (a number, R-17). */
+export type KeptLine = Omit<NewGameLine, 'gameId'>;
+
+/** A correction as it was written, read back: its two documents (step 2.229). */
+export type StoredGameCorrection = {
+  readonly before: GameResultDocument;
+  readonly after: GameResultDocument;
 };
 
 /** One player's box score line in one game (T3 §8 `player_game_stats`). */
@@ -99,6 +122,9 @@ export type GameLine = {
 
 /** A line as the box score grid saves it: with the jersey the player wore (from the roster). */
 export type NewGameLine = GameLine & { readonly jerseyNumber: string | null };
+
+/** A roster entry of one of a game's two teams, by ids only (T-220). */
+export type GameRosterEntry = { readonly teamId: string; readonly personId: string };
 
 /** A player on the roster of one of a game's two teams, as the box score grid lists them (P7 §5.2). */
 export type GameRosterPlayer = {
@@ -229,6 +255,8 @@ export type GamesStore = {
   ) => Promise<number | undefined>;
   /** Writes the correction row (S-7) in this transaction; the database needs it to change a decided game. */
   readonly addCorrection: (correction: NewGameCorrection) => Promise<void>;
+  /** The game's corrections, newest first (by when written, then id; step 2.229, T-368). */
+  readonly correctionsNewestFirst: (gameId: string) => Promise<readonly StoredGameCorrection[]>;
   /** Postponed games not in the bin, soonest first, of one season or all. */
   readonly listPostponed: (seasonId?: string) => Promise<readonly GameRecord[]>;
   /**
@@ -259,6 +287,12 @@ export type GamesStore = {
    * by team, roster order and name.
    */
   readonly listRoster: (gameId: string) => Promise<readonly GameRosterPlayer[]>;
+  /**
+   * Whether the person and team are both still in the league and one of them is in the bin
+   * (A-5): left out of `listRoster`, but a restore brings them back (step 2.229, the put
+   * back's refusal). False for one purged from the bin for good.
+   */
+  readonly inBin: (entry: GameRosterEntry) => Promise<boolean>;
   /** Whether the tracker has recorded any play of the game (T3 §8 `game_events`). */
   readonly hasPlays: (gameId: string) => Promise<boolean>;
   /** The program a season belongs to and its rules as stored, or undefined if it is not here. */

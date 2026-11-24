@@ -38,6 +38,17 @@ const boxScoreKeys: readonly TextKey[] = [
   'admin.boxScore.error.scorekeepers-may-not-reopen',
 ];
 
+// A put back of the sheet refused (step 2.229, T-366), in plain words.
+const putBackKeys: readonly TextKey[] = [
+  'admin.boxScore.putBackError.game-not-decided',
+  'admin.boxScore.putBackError.newer-save',
+  'admin.boxScore.putBackError.no-sheet-kept',
+  'admin.boxScore.putBackError.player-gone',
+  'admin.boxScore.putBackError.player-in-bin',
+  'admin.boxScore.putBackError.put-back-reason',
+  'admin.boxScore.putBackError.scored-live',
+];
+
 /** A refusal on the games list, as words. */
 export function gamesProblemKey(code: string): TextKey {
   return gamesKeys.find((k) => k === `admin.games.error.${code}`) ?? 'admin.games.error.unknown';
@@ -49,5 +60,12 @@ export function boxScoreProblemKey(code: string): TextKey {
     boxScoreKeys.find((k) => k === `admin.boxScore.error.${code}`) ??
     gamesKeys.find((k) => k === `admin.games.error.${code}` && code !== 'invalid-input') ??
     'admin.games.error.unknown'
+  );
+}
+
+/** The words for a put back of the sheet refused (step 2.229), else the box score's own. */
+export function putBackProblemKey(code: string): TextKey {
+  return (
+    putBackKeys.find((k) => k === `admin.boxScore.putBackError.${code}`) ?? boxScoreProblemKey(code)
   );
 }

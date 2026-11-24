@@ -54,6 +54,8 @@ const reads = new Set([
   // Whether the device may offer Reopen, before the tap (step 2.120): a read.
   'games.read_own_result_offer',
   'games.read_own_result_offers',
+  // Whether "Put the sheet back as it was" is offered, before the tap (step 2.229): a read.
+  'games.read_sheet_put_back_offer',
   'games.read_reopen_offer',
   // Every rule of one game, at the tracker's start and in the games area (step 2.119): a read.
   'games.read_game_format',
