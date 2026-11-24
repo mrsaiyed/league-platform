@@ -7,12 +7,13 @@
 //
 // The open tracker page registers how it leaves (holdSignOut); every sign-out form asks
 // beforeSignOut what to do. With no game open there is nothing to ask or release.
-import { createTranslator, type Catalog } from '@srleagues/site';
+import { translatorFrom, type Catalog } from '@srleagues/site';
+import type { QueuedCommand } from './queue-storage.ts';
 
 /** What the open tracker page offers a sign-out: its waiting plays, and leaving the game. */
 export type TrackerSignOutHold = {
   /** Plays stored on the device and not yet answered for by the server. */
-  readonly waitingPlays: () => number;
+  readonly waitingPlays: () => number | Promise<number>;
   /** Releases the scoring session (T6 §5) and stops the page acting on the game. */
   readonly leave: () => Promise<void>;
 };
@@ -32,6 +33,23 @@ export function trackerSignOutHold(): TrackerSignOutHold | null {
   return held;
 }
 
+/**
+ * The plays waiting for the open game: the controller's count, or more if the device's
+ * queue keeps more (a page reloaded a moment ago has not loaded its queue yet; step
+ * 2.38). `stored` lists the account's own taps of the game; unreadable, the count stands.
+ */
+export async function waitingOnDevice(
+  counted: number,
+  stored: () => Promise<readonly Pick<QueuedCommand, 'state'>[]>,
+): Promise<number> {
+  try {
+    const kept = (await stored()).filter((entry) => entry.state === 'waiting').length;
+    return Math.max(counted, kept);
+  } catch {
+    return counted;
+  }
+}
+
 /** What a sign-out does: go ahead or not, and whether to clear the games kept here. */
 export type SignOutPlan = { readonly go: boolean; readonly clearKeptGames: boolean };
 
@@ -46,7 +64,7 @@ export async function beforeSignOut(
   ask: (waiting: number) => boolean,
 ): Promise<SignOutPlan> {
   if (hold === null) return { go: true, clearKeptGames: true };
-  const waiting = hold.waitingPlays();
+  const waiting = await hold.waitingPlays();
   if (waiting > 0 && !ask(waiting)) return { go: false, clearKeptGames: false };
   try {
     await hold.leave();
@@ -74,7 +92,7 @@ export function waitingQuestionOf(locale: string, catalog: Catalog): WaitingQues
 
 /** The question for `waiting` plays, in the language's own plural form. */
 export function waitingQuestionText(words: WaitingQuestion, waiting: number): string {
-  return createTranslator(words.locale, { [words.locale]: words.catalog }).plural(
+  return translatorFrom(words.locale, { [words.locale]: words.catalog }).plural(
     'account.signOutWaiting',
     waiting,
   );

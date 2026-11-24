@@ -5,8 +5,36 @@ import {
   beforeSignOut,
   holdSignOut,
   trackerSignOutHold,
+  waitingOnDevice,
   type TrackerSignOutHold,
 } from './tracker-sign-out.ts';
+
+describe('waitingOnDevice (step 2.38)', () => {
+  const kept = (...states: ('waiting' | 'not-saved')[]) =>
+    Promise.resolve(states.map((state) => ({ state })));
+
+  it("counts the plays the device's queue keeps before the game has loaded them", async () => {
+    expect(await waitingOnDevice(0, () => kept('waiting', 'not-saved', 'waiting'))).toBe(2);
+  });
+
+  it("keeps the controller's count when it is more, or the queue cannot be read", async () => {
+    expect(await waitingOnDevice(3, () => kept('waiting'))).toBe(3);
+    expect(await waitingOnDevice(1, () => Promise.reject(new Error('no storage')))).toBe(1);
+  });
+
+  it('asks before signing out when the plays are counted only from the queue', async () => {
+    const asked: number[] = [];
+    const hold: TrackerSignOutHold = {
+      waitingPlays: () => waitingOnDevice(0, () => kept('waiting')),
+      leave: async () => {},
+    };
+    expect(await beforeSignOut(hold, (n) => (asked.push(n), true))).toEqual({
+      go: true,
+      clearKeptGames: false,
+    });
+    expect(asked).toEqual([1]);
+  });
+});
 
 function openGame(waiting: number) {
   const done: string[] = [];

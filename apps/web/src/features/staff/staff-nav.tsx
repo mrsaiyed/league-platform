@@ -79,10 +79,16 @@ export function StaffFoot({
             </span>
             <span className="staff-foot-words">
               <span>{t('account.menu.account')}</span>
-              <span className="staff-who">{t('account.signedInAs', { email: account.email })}</span>
+              <span className="staff-who" data-staff-account="">
+                {t('account.signedInAs', { email: account.email })}
+              </span>
             </span>
           </a>
-          <SignOutForm action={signOutAction} waitingQuestion={waitingQuestionWords()}>
+          <SignOutForm
+            action={signOutAction}
+            waitingQuestion={waitingQuestionWords()}
+            accountId={account.accountId}
+          >
             <SignOutFields fields={account.signOutFields} />
             <button className="staff-foot-link" type="submit">
               <StaffIcon name="sign-out" />

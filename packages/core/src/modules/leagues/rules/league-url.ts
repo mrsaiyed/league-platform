@@ -67,6 +67,13 @@ export const leaguePages = {
   /** The courtside tracker for one game. */
   score: { path: ['score', ':game'], level: 'private' },
   /**
+   * The tracker installed on a device (step 2.38, T-115): its web app manifest and the
+   * worker that keeps its pages on the device. Both sit beside the games' addresses, so the
+   * worker's reach (its scope) is this league's tracker pages and nothing else.
+   */
+  'tracker-manifest': { path: ['score', 'manifest.webmanifest'], level: 'private' },
+  'tracker-worker': { path: ['score', 'tracker-worker.js'], level: 'private' },
+  /**
    * Accepting an invitation (P4 §4, T-226): the link in the invitation's email, built
    * only by the worker as it sends. `token` is the link's secret, in the path (record
    * 023): the page that opens it must answer with `Referrer-Policy: no-referrer` and

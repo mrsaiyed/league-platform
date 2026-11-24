@@ -4,6 +4,7 @@
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import {
+  bears,
   games,
   hawks,
   liveLeagueId,
@@ -15,11 +16,19 @@ import { createFetchGameDoors } from './fetch-game-doors.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { createMemoryOpenedGameStorage } from './memory-opened-game-storage.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
-import { holdCheckMs, openTrackerGame, screenOf } from './open-tracker-game.ts';
+import { standInPeople } from '../../server/stand-in-cast.ts';
+import {
+  holdCheckMs,
+  openTrackerGame,
+  screenOf,
+  type OpenTrackerGameOptions,
+} from './open-tracker-game.ts';
 import { madeUpRosters } from './opened-game-storage-contract.test-helper.ts';
 import { formatOf, openedGameKeepMs, type OpenedGameStorage } from './opened-game-storage.ts';
 import { QueueError, type QueueStorage } from './queue-storage.ts';
+import type { TapInput } from './tracker-controller.ts';
 import type { QueueClock } from './tracker-queue.ts';
+import { createManualClock } from './tracker-queue.test-helper.ts';
 
 const gameId = games.hawksBears;
 
@@ -29,8 +38,12 @@ const newDevice = (): Device => ({
   games: createMemoryOpenedGameStorage(),
 });
 
-/** A made-up account id for each person: the device keeps their games under it. */
-const accountOf = (as: Person) => `account-${as}`;
+/**
+ * Each person's made-up account id, the one the server's session has: the device keeps
+ * their games and taps under it, and each batch says it (T-327).
+ */
+const accountOf = (as: Person) =>
+  as === 'visitor' ? '00000000-0000-4000-8000-0000000000ff' : standInPeople[as].accountId;
 
 let deviceNumber = 0;
 async function open(
@@ -38,6 +51,7 @@ async function open(
   as: Person,
   device: Device = newDevice(),
   clock?: QueueClock,
+  more: Partial<Pick<OpenTrackerGameOptions, 'deviceAccount' | 'markSignedIn'>> = {},
 ) {
   const fetch = network.fetchAs(as);
   const opened = await openTrackerGame({
@@ -51,6 +65,7 @@ async function open(
     newDeviceId: () => `device-${(deviceNumber += 1)}`,
     now: () => 1_000,
     controller: { random: () => 1, ...(clock === undefined ? {} : { clock }) },
+    ...more,
   });
   if (!opened.ok) throw new Error(opened.code);
   await opened.game.controller.start();
@@ -229,6 +244,32 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     expect(await device.games.find(other)).toBeUndefined();
   });
 
+  it('signed out on the device while it opens: writes nothing after the clearing (step 2.38)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const fetch = network.fetchAs('scorekeeper');
+    let signedOut = false;
+    const result = await openTrackerGame({
+      gameId,
+      leagueId: liveLeagueId,
+      accountId: accountOf('scorekeeper'),
+      rosters: madeUpRosters,
+      // The sign-out lands while the device's storage opens, and clears what is kept.
+      openStorage: async () => {
+        signedOut = true;
+        await device.games.forgetAll();
+        return device;
+      },
+      transport: createFetchCommandTransport({ leagueId: liveLeagueId, gameId, fetch }),
+      server: createFetchTrackerServer({ leagueId: liveLeagueId, gameId, fetch }),
+      newDeviceId: () => 'device-signed-out',
+      now: () => 1_000,
+      letGo: () => signedOut,
+    });
+    expect(result).toEqual({ ok: false, code: 'let-go' });
+    expect(await device.games.find(gameId)).toBeUndefined();
+  });
+
   it('keeps the rosters, names and state when the sign-in runs out mid-game (record 054)', async () => {
     const network = endpointNetwork();
     const device = newDevice();
@@ -264,6 +305,193 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     const kept = await device.games.find(gameId);
     expect(kept?.rosters).toEqual(madeUpRosters);
     expect(kept?.state).not.toBeNull();
+    // The tap still waiting keeps its league, so "Your games" lists it there (T-317).
+    expect((await device.queue.list(gameId)).map((entry) => entry.leagueId)).toEqual([
+      liveLeagueId,
+    ]);
+  });
+
+  it('reloaded with no signal, scores on from what the device kept, and settles once the server answers (step 2.38, M5)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const basket = (side: 'home' | 'away', playerId: string): TapInput => ({
+      type: 'score',
+      side,
+      playerId,
+      points: 2,
+    });
+    const first = await open(network, 'scorekeeper', device, createManualClock());
+    const taps: TapInput[] = [
+      { type: 'lineup', side: 'home', playerIds: hawks },
+      { type: 'lineup', side: 'away', playerIds: bears },
+      basket('home', hawks[0] ?? ''),
+    ];
+    for (const input of taps) expect((await first.controller.tap(input)).ok).toBe(true);
+    await first.controller.idle();
+    // Every tap is on the server: the queue holds none, and the device keeps them in the
+    // state it last loaded or on top of it, with the session it scored under.
+    expect(await device.queue.list(gameId)).toEqual([]);
+    const kept = await device.games.find(gameId);
+    expect((kept?.state?.sequence ?? 0) + (kept?.scoring?.onTop.length ?? 0)).toBe(3);
+    expect(kept?.scoring?.sessionId).toEqual(expect.any(String));
+    // The page reloads in a gym with no signal: the old page never released the game.
+    first.controller.hidden();
+    network.mode = 'down';
+    const clock = createManualClock();
+    const again = await open(network, 'scorekeeper', device, clock);
+    expect(again.controller.status().mode).toEqual({ kind: 'scoring' });
+    expect(
+      basketball.derive(
+        again.controller.status().game ?? kept?.state?.state ?? basketball.newGame(),
+      ).teams.home.score,
+    ).toBe(2);
+    expect((await again.controller.tap(basket('away', bears[0] ?? ''))).ok).toBe(true);
+    await clock.advance(60_000);
+    expect(again.controller.status().mode).toEqual({ kind: 'scoring' });
+    expect(again.controller.status().queue.waiting).toBe(1);
+    // The network is back and nobody took the game: the waiting tap is taken.
+    network.mode = 'up';
+    again.controller.online();
+    await again.controller.idle();
+    await clock.advance(60_000);
+    await again.controller.idle();
+    expect(again.controller.status().queue.waiting).toBe(0);
+    expect(again.controller.status().mode).toEqual({ kind: 'scoring' });
+    const score = basketball.derive(again.controller.status().game ?? basketball.newGame()).teams;
+    expect([score.home.score, score.away.score]).toEqual([2, 2]);
+    expect(again.controller.status().serverSequence).toBeGreaterThanOrEqual(3);
+    await again.controller.leave();
+  });
+
+  it('reloaded with no signal while someone takes the game, lists the taps made since as not saved (step 2.38)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const first = await open(network, 'scorekeeper', device, createManualClock());
+    for (const input of [
+      { type: 'lineup', side: 'home', playerIds: hawks },
+      { type: 'lineup', side: 'away', playerIds: bears },
+    ] satisfies TapInput[]) {
+      expect((await first.controller.tap(input)).ok).toBe(true);
+    }
+    await first.controller.idle();
+    first.controller.hidden();
+    network.mode = 'down';
+    const clock = createManualClock();
+    const again = await open(network, 'scorekeeper', device, clock);
+    expect(again.controller.status().mode).toEqual({ kind: 'scoring' });
+    const basket: TapInput = { type: 'score', side: 'home', playerId: hawks[0] ?? '', points: 2 };
+    expect((await again.controller.tap(basket)).ok).toBe(true);
+    // Its send is tried while the signal is still down (each tap's account is read with
+    // the queue, T-321, which takes the send a moment longer to start).
+    await again.controller.idle();
+    const keptScoring = (await device.games.find(gameId))?.scoring ?? null;
+    expect(keptScoring?.onTop.map((c) => c.input.type)).toContain('score');
+    // Meanwhile someone else takes the game on another device.
+    network.mode = 'up';
+    const other = await open(network, 'owner');
+    expect(await other.controller.takeOver()).toEqual({ ok: true });
+    // The signal comes back: the basket is listed as not saved, and nothing more is scored.
+    again.controller.online();
+    await again.controller.idle();
+    await clock.advance(60_000);
+    await again.controller.idle();
+    expect(again.controller.status().mode.kind).not.toBe('scoring');
+    expect(again.controller.status().queue.waiting).toBe(0);
+    expect(again.controller.status().notSaved.map((tap) => tap.command.input.type)).toEqual([
+      'score',
+    ]);
+    // The kept scoring went with the game (review M3): a reload with no signal does not
+    // return to scoring it, and the basket stays listed not saved, once.
+    expect((await device.games.find(gameId))?.scoring).toBeUndefined();
+    network.mode = 'down';
+    const third = await open(network, 'scorekeeper', device, createManualClock());
+    expect(third.controller.status().mode.kind).not.toBe('scoring');
+    expect(
+      (await device.queue.list(gameId)).filter((entry) => entry.state === 'not-saved'),
+    ).toHaveLength(1);
+    network.mode = 'up';
+    await third.controller.leave();
+    // Had the forgetting not landed (it fails quietly), the kept scoring comes back with
+    // no signal, but the basket listed not saved is never counted on the screen again.
+    await device.games.saveScoring(gameId, keptScoring);
+    network.mode = 'down';
+    const fourth = await open(network, 'scorekeeper', device, createManualClock());
+    expect(fourth.controller.status().mode).toEqual({ kind: 'scoring' });
+    expect(
+      basketball.derive(fourth.controller.status().game ?? basketball.newGame()).teams.home.score,
+    ).toBe(0);
+    network.mode = 'up';
+    await fourth.controller.leave();
+    await again.controller.leave();
+    await other.controller.leave();
+  });
+
+  it('with no signal, scores from what the device kept only for the person marked signed in here (T-327, review M1)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const first = await open(network, 'scorekeeper', device, createManualClock());
+    for (const input of [
+      { type: 'lineup', side: 'home', playerIds: hawks },
+      { type: 'lineup', side: 'away', playerIds: bears },
+    ] satisfies TapInput[]) {
+      expect((await first.controller.tap(input)).ok).toBe(true);
+    }
+    await first.controller.idle();
+    first.controller.hidden();
+    network.mode = 'down';
+    // Someone else signed in on another page of the league since: the device says so.
+    const someoneElse = await open(network, 'scorekeeper', device, createManualClock(), {
+      deviceAccount: async () => accountOf('owner'),
+    });
+    expect(someoneElse.controller.status().mode.kind).not.toBe('scoring');
+    // Nobody marked (signed out since, or a device from before this release): the same.
+    const nobody = await open(network, 'scorekeeper', device, createManualClock(), {
+      deviceAccount: async () => null,
+    });
+    expect(nobody.controller.status().mode.kind).not.toBe('scoring');
+    // Marked as the scorekeeper: scoring goes on from the device.
+    const same = await open(network, 'scorekeeper', device, createManualClock(), {
+      deviceAccount: async () => accountOf('scorekeeper'),
+    });
+    expect(same.controller.status().mode).toEqual({ kind: 'scoring' });
+    network.mode = 'up';
+    for (const game of [someoneElse, nobody, same, first]) await game.controller.leave();
+  });
+
+  it('never sends a tap kept for another person, and marks the device once the server answers (T-327)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const first = await open(network, 'scorekeeper', device, createManualClock());
+    for (const input of [
+      { type: 'lineup', side: 'home', playerIds: hawks },
+      { type: 'lineup', side: 'away', playerIds: bears },
+    ] satisfies TapInput[]) {
+      expect((await first.controller.tap(input)).ok).toBe(true);
+    }
+    await first.controller.idle();
+    network.mode = 'down';
+    const basket: TapInput = { type: 'score', side: 'home', playerId: hawks[0] ?? '', points: 2 };
+    expect((await first.controller.tap(basket)).ok).toBe(true);
+    await first.controller.idle();
+    first.controller.hidden();
+    // Another person signs in on the same device and opens the game with a signal.
+    network.mode = 'up';
+    const marked: string[] = [];
+    const other = await open(network, 'owner', device, createManualClock(), {
+      markSignedIn: async (accountId) => {
+        marked.push(accountId);
+      },
+    });
+    expect(marked).toEqual([accountOf('owner')]);
+    expect(other.controller.status().queue.waiting).toBe(0);
+    const score = basketball.derive(other.controller.status().game ?? basketball.newGame()).teams;
+    expect(score.home.score).toBe(0);
+    // The scorekeeper's basket stays on the device, hidden, for when they sign in again.
+    expect(
+      (await device.queue.list(gameId)).map((entry) => [entry.accountId, entry.state]),
+    ).toEqual([[accountOf('scorekeeper'), 'waiting']]);
+    await other.controller.leave();
+    await first.controller.leave();
   });
 
   it('keeps the names on the device when refused for another reason', async () => {

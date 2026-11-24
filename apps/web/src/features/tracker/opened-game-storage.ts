@@ -12,6 +12,7 @@
 //
 // Failures throw a QueueError with one of its fixed codes (queue-storage.ts), never a
 // sentence (T-187): the tracker picks the words.
+import type { BatchCommand } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import type { ServerState } from './tracker-server.ts';
 
@@ -87,6 +88,17 @@ export type OpenedGameOwner = {
  */
 export const openedGameKeepMs = 14 * 24 * 60 * 60 * 1000;
 
+/**
+ * How this device was scoring the game (step 2.38, finding M5; T-248, T-253): the scoring
+ * session it held, and the taps it made on top of the kept state, the ones the server has
+ * taken included (the queue lets those go). A reload with no signal starts from the kept
+ * state with these on top, under the same session, and settles once the server answers.
+ */
+export type DeviceScoring = {
+  readonly sessionId: string;
+  readonly onTop: readonly BatchCommand[];
+};
+
 /** One opened game, as the device keeps it. */
 export type OpenedGame = OpenedGameOwner & {
   readonly rosters: DeviceRosters;
@@ -98,6 +110,8 @@ export type OpenedGame = OpenedGameOwner & {
   readonly confirmedFormat: GameFormat | null;
   /** The starters being picked; absent while nobody is picked (and on rows from before). */
   readonly lineupPicks?: LineupPicks;
+  /** How the device was scoring it; absent until it held the session (and on rows from before). */
+  readonly scoring?: DeviceScoring;
 };
 
 export interface OpenedGameStorage {
@@ -125,6 +139,12 @@ export interface OpenedGameStorage {
    * a game whose rosters are not stored.
    */
   saveLineupPicks(gameId: string, picks: LineupPicks): Promise<void>;
+  /**
+   * Stores how the device is scoring the game (step 2.38); cleared with the game. Ignored
+   * for a game whose rosters are not stored.
+   */
+  /** `null` forgets the kept scoring (the device lost the game, review M3). */
+  saveScoring(gameId: string, scoring: DeviceScoring | null): Promise<void>;
   /** This device's own id, made with `make` the first time and kept from then on. */
   deviceId(make: () => string): Promise<string>;
 }
@@ -142,6 +162,12 @@ export function stillKept(game: OpenedGame, owner: OpenedGameOwner, olderThan: n
 }
 
 /** `game` with the starters being picked, or without any when nobody is picked. */
+/** `game` with `scoring` kept, or with none kept when it is null. */
+export function withScoring(game: OpenedGame, scoring: DeviceScoring | null): OpenedGame {
+  const { scoring: _before, ...rest } = game;
+  return scoring === null ? rest : { ...rest, scoring };
+}
+
 export function withLineupPicks(game: OpenedGame, picks: LineupPicks): OpenedGame {
   const { lineupPicks: _before, ...rest } = game;
   return picks.home.length === 0 && picks.away.length === 0

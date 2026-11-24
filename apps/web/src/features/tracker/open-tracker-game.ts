@@ -18,7 +18,7 @@
 //    are deleted (`forgetAll`), as signing out on the device deletes them: whoever
 //    picks the device up next does not find the players' names on it (T-115).
 import type { QueueErrorCode } from './queue-storage.ts';
-import { QueueError, type QueueStorage } from './queue-storage.ts';
+import { inLeague, QueueError, type QueueStorage } from './queue-storage.ts';
 import type { CommandTransport } from './command-transport.ts';
 import type { GameDoors } from './game-doors.ts';
 import {
@@ -27,6 +27,7 @@ import {
   openedGameKeepMs,
   sameFormat,
   type DeviceRosters,
+  type DeviceScoring,
   type GameFormat,
   type LineupPicks,
   type OpenedGameStorage,
@@ -39,7 +40,7 @@ import {
   type TrackerControllerOptions,
   type TrackerControllerStatus,
 } from './tracker-controller.ts';
-import type { TrackerServer } from './tracker-server.ts';
+import type { ServerState, TrackerServer } from './tracker-server.ts';
 
 /** What the tracker's page shows while a game is opened, chosen from the controller's status. */
 export type OpeningScreen =
@@ -95,6 +96,24 @@ export type OpenTrackerGameOptions = {
    * browser, fetch-game-doors.ts. Left out, the controller offers neither.
    */
   readonly doors?: GameDoors;
+  /**
+   * True once the page let go of the game before it was open (signed out on the device,
+   * or left): the opening then keeps nothing more on the device and makes no controller,
+   * so the clearing of a sign-out is the last thing written (step 2.38). Left out: never.
+   */
+  readonly letGo?: () => boolean;
+  /**
+   * Who the device says is signed in here (device-account.ts, T-327). What the device kept
+   * of the game (its state and scoring) is scored from with no signal only when this is
+   * the account opening it: someone else may have signed in on another page since. Left
+   * out: the account opening (tests).
+   */
+  readonly deviceAccount?: () => Promise<string | null>;
+  /**
+   * Called once the server has answered with the game's state: the page reached the
+   * network signed in as `accountId`, so the device's mark is written (T-327).
+   */
+  readonly markSignedIn?: (accountId: string) => Promise<void>;
   /** A new device id, used only the first time this device opens a game. */
   readonly newDeviceId: () => string;
   readonly now?: () => number;
@@ -132,10 +151,31 @@ export type OpenedTrackerGame = {
 export type OpenTrackerGameResult =
   | { readonly ok: true; readonly game: OpenedTrackerGame }
   /** The device's storage is not there or failed: nothing can be kept, so nothing is opened. */
-  | { readonly ok: false; readonly code: QueueErrorCode };
+  | { readonly ok: false; readonly code: QueueErrorCode }
+  /** Let go of before it was open (`letGo`): nothing was kept for it, nothing is opened. */
+  | { readonly ok: false; readonly code: 'let-go' };
 
 const codeOf = (error: unknown): QueueErrorCode =>
   error instanceof QueueError ? error.code : 'storage-unavailable';
+
+/** `server`, calling `mark` once, the first time the game's state is answered (T-327). */
+function markingOnAnswer(
+  server: TrackerServer,
+  mark: () => Promise<void> | undefined,
+): TrackerServer {
+  let marked = false;
+  return {
+    session: (request, signal) => server.session(request, signal),
+    async loadState(signal) {
+      const outcome = await server.loadState(signal);
+      if (outcome.kind === 'answer' && !marked) {
+        marked = true;
+        await mark()?.catch(() => undefined);
+      }
+      return outcome;
+    },
+  };
+}
 
 /**
  * Prepares the device and makes the controller; `controller.start()` then takes the
@@ -144,36 +184,61 @@ const codeOf = (error: unknown): QueueErrorCode =>
 export async function openTrackerGame(
   options: OpenTrackerGameOptions,
 ): Promise<OpenTrackerGameResult> {
-  const { gameId, leagueId, accountId, rosters, now = Date.now } = options;
+  const { gameId, leagueId, accountId, rosters, now = Date.now, letGo = () => false } = options;
   const owner = { gameId, leagueId, accountId };
+  const letGoOf = { ok: false, code: 'let-go' } as const;
   let storage: Awaited<ReturnType<OpenTrackerGameOptions['openStorage']>>;
   let deviceId: string;
   let confirmed: GameFormat | null;
   let picks: LineupPicks;
+  let keptGame: { readonly state: ServerState | null; readonly scoring: DeviceScoring | null };
   try {
+    // Checked after each wait, just before the next write: a sign-out made meanwhile
+    // has its clearing come after, so no rosters come back once it has cleared.
+    if (letGo()) return letGoOf;
     storage = await options.openStorage();
     const openedAt = now();
+    if (letGo()) return letGoOf;
     await storage.games.forgetOthers(owner, openedAt - openedGameKeepMs);
+    if (letGo()) return letGoOf;
     await storage.games.saveRosters(owner, rosters, openedAt);
     deviceId = await storage.games.deviceId(options.newDeviceId);
     const kept = await storage.games.find(gameId);
     confirmed = kept?.confirmedFormat ?? null;
+    // Kept for this very account, and the device says it is the one signed in here (T-327).
+    const here = await (options.deviceAccount ?? (async () => accountId))();
+    const ours =
+      kept?.accountId === accountId &&
+      here !== null &&
+      here.toLowerCase() === accountId.toLowerCase();
+    keptGame = ours
+      ? { state: kept.state, scoring: kept.scoring ?? null }
+      : { state: null, scoring: null };
     picks = kept?.lineupPicks ?? noLineupPicks;
   } catch (error) {
     return { ok: false, code: codeOf(error) };
   }
+  if (letGo()) return letGoOf;
   const { games } = storage;
   const controller = createTrackerController({
     renewEveryMs: holdCheckMs,
     ...options.controller,
     gameId,
     deviceId,
-    storage: storage.queue,
+    // Each tap keeps its league, so "Your games" lists it there however old (T-317), and
+    // its account: another account's taps on this device are never sent from here (T-321).
+    storage: inLeague(storage.queue, leagueId, accountId),
+    // With no answer on opening, scoring starts from what the device kept (step 2.38).
+    kept: keptGame,
+    keepScoring: (scoring) => games.saveScoring(gameId, scoring),
+    // The device lost the game: what it kept of its scoring goes, so a reload with no
+    // signal does not score on under the lost session (step 2.38, review M3).
+    forgetScoring: () => games.saveScoring(gameId, null),
     transport: options.transport,
     ...(options.doors === undefined ? {} : { doors: options.doors }),
     server: createStoringTrackerServer({
       gameId,
-      server: options.server,
+      server: markingOnAnswer(options.server, () => options.markSignedIn?.(accountId)),
       storage: games,
       ...(options.onStoreFailed === undefined ? {} : { onStoreFailed: options.onStoreFailed }),
     }),
