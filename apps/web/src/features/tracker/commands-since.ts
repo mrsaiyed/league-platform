@@ -28,10 +28,19 @@ export function commandsSince(
   own: ReadonlySet<string>,
 ): CommandsSince {
   const count = now.sequence - from.sequence;
+  const changesKnown = from.changes !== undefined && now.changes !== undefined;
+  const plays = new Set(now.state.recent.map((id) => id.toLowerCase()));
   const before = new Set(idsOf(from));
   const since = new Set(idsOf(now).filter((id) => !before.has(id)));
-  for (const id of since) if (!own.has(id)) return 'somebody-else';
+  let unsure = false;
+  for (const id of since) {
+    if (own.has(id)) continue;
+    // A change of players not in a state with no list of changes may be older than that
+    // state: whose it is since is not known (review L1). A play is told by the plays.
+    if (changesKnown || plays.has(id)) return 'somebody-else';
+    unsure = true;
+  }
   if (count === 0 && since.size === 0) return 'own';
-  if (count < 0 || from.changes === undefined || now.changes === undefined) return 'cannot-tell';
+  if (unsure || count < 0 || !changesKnown) return 'cannot-tell';
   return since.size === count ? 'own' : 'cannot-tell';
 }

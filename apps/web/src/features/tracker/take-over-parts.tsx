@@ -54,16 +54,22 @@ export function SendNotSaved({
   readonly busy: boolean;
   readonly onSend: () => void;
   readonly t: Translate;
-  /** Listed because the device could not tell whether somebody else scored (step 2.242). */
+  /**
+   * Listed because the device could not tell whether somebody else scored (step 2.242):
+   * said so, and no "Send these plays" (T-358).
+   */
   readonly cannotTell?: boolean;
 }) {
   if (!cannotTell) return <SendNotSavedOffered offer={offer} busy={busy} onSend={onSend} t={t} />;
+  // Could not tell: each is entered again, never sent from here (T-358, review M1).
   return (
     <>
       <p className="court-notice" data-cannot-tell="">
         {t('tracker.sendNotSaved.cannotTell')}
       </p>
-      <SendNotSavedOffered offer={offer} busy={busy} onSend={onSend} t={t} />
+      {offer === 'game-moved' ? (
+        <SendNotSavedOffered offer={offer} busy={busy} onSend={onSend} t={t} />
+      ) : null}
     </>
   );
 }

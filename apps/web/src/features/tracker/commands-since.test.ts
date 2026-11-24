@@ -61,6 +61,17 @@ describe('commands since a state, told by their IDs', () => {
     expect(commandsSince(at(2, ['p1']), at(2, ['p1']), own())).toBe('own');
   });
 
+  it('cannot tell from a state with no list of changes when an older add by somebody else is listed (review L1)', () => {
+    // `other-add` may be from before the state it knew, which has no list to say so.
+    expect(commandsSince(at(3, ['p1']), at(4, ['p1', 'p2'], ['other-add']), own('p2'))).toBe(
+      'cannot-tell',
+    );
+    // A play by somebody else since is told by the list of plays all the same.
+    expect(
+      commandsSince(at(3, ['p1']), at(5, ['p1', 'other-play'], ['other-add']), own('other-add')),
+    ).toBe('somebody-else');
+  });
+
   it('cannot tell when the state now is older than the one it knew', () => {
     expect(commandsSince(at(3, ['p1'], []), at(2, ['p1'], []), own())).toBe('cannot-tell');
   });

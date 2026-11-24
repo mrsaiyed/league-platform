@@ -1051,12 +1051,6 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   let notSavedSince: number | null = null;
   /** The last session this device held: the batch names it, though the server goes by the sequence. */
   let lastHeldSession: string | null = null;
-  /**
-   * The ended session the taps `hold` listed were made under, when it listed them because
-   * it could not tell whose the commands since were (step 2.242): "Send these plays" names
-   * it, since the server takes kept plays only from the session they were made under.
-   */
-  let listedUnder: string | null = null;
 
   /**
    * Keeps waiting taps as not saved, with the sequence the list was made on when it is
@@ -1089,10 +1083,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** Lists `list` as not saved, and says whether "Send these plays" is offered for it. */
   const showNotSaved = (list: readonly KeptTap[]): void => {
-    if (list.length === 0) {
-      notSavedSince = null;
-      listedUnder = null;
-    }
+    if (list.length === 0) notSavedSince = null;
     if (list.length === 0 && current.cannotTell) update({ cannotTell: false });
     const was = current.sendNotSaved;
     const sendNotSaved: SendNotSavedOffer =
@@ -1427,7 +1418,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
    * as not saved. With no answer, opening is asked again before anything is decided.
    * Whose the commands since were is judged by ID (T-357): this device's own are those it
    * made, kept or stored, refused ones included. When the server's lists are too short to
-   * tell, somebody else may have scored: listed (`cannotTell`), never sent unasked.
+   * tell, somebody else may have scored: listed (`cannotTell`) to enter again, never sent
+   * and never offered to send (T-358).
    */
   const carryOnTaps = async (
     held: string,
@@ -1476,16 +1468,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     let stale: KeptTap[];
     let setAside: KeptTap[];
     let stored: Set<string>;
-    let staleSessions: Set<string>;
-    // The state the stale taps were made on, as this device last knew it (T-335).
-    const madeOn = Math.max(knownSequence(), options.kept?.state?.sequence ?? 0);
     try {
       const list = await storage.list(gameId);
       stored = new Set(list.map((entry) => entry.command.commandId));
       setAside = keptIn(list, 'not-saved');
-      const staleEntries = list.filter((entry) => entry.state === 'waiting' && !madeUnder(entry));
-      stale = staleEntries.map(keptTap);
-      staleSessions = new Set(staleEntries.map((entry) => entry.sessionId ?? ''));
+      stale = list.filter((entry) => entry.state === 'waiting' && !madeUnder(entry)).map(keptTap);
     } catch {
       // Not known to be dropped, so nothing may be sent: the session is not used, and
       // its lease runs out unless opening again (into the same session) gets this far.
@@ -1499,23 +1486,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       // Carried: the storage holds them under `held` now, read again below.
       if (carried === 'carried') stale = [];
     }
-    // Listed because whose the commands since were could not be told (T-357): "Send these
-    // plays" is offered as well as "Enter again" (T-358), for a first list made under one
-    // session. The server judges it (T-335) and answers an ID it has as a duplicate.
-    const [madeUnderSession] = staleSessions;
-    if (
-      couldNotTell &&
-      stale.length > 0 &&
-      staleSessions.size === 1 &&
-      madeUnderSession !== undefined &&
-      madeUnderSession !== '' &&
-      notSavedSince === null &&
-      current.notSaved.length === 0 &&
-      setAside.length === 0
-    ) {
-      notSavedSince = madeOn;
-      listedUnder = madeUnderSession;
-    }
+    // Listed because whose the commands since were could not be told (T-357): "Enter
+    // again" only, never "Send these plays" (T-358, review M1): the session they were made
+    // under has ended, so the server would refuse the send nearly always. Nothing here
+    // sets an offer, so none is left up when the taps are judged again (review M2).
     // Set aside, then listed: meanwhile the queue's listener must not take a stale change
     // of players for one taken (review M1 of step 2.118).
     const staleIds = stale.map((t) => t.command.commandId);
@@ -2385,7 +2359,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
     async sendNotSaved() {
       const since = notSavedSince;
-      const named = listedUnder ?? lastHeldSession;
+      const named = lastHeldSession;
       if (current.sendNotSaved !== 'offered' || since === null || named === null) {
         return { ok: false, reason: 'not-offered' };
       }
@@ -2421,7 +2395,6 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       }
       // Any the engine refused stay listed, to enter again; sending them again would not help.
       notSavedSince = null;
-      listedUnder = null;
       update({ sendNotSaved: 'none' });
       void track(showServerGame());
       return { ok: true, saved };
