@@ -20,6 +20,7 @@ export const enActivity = {
   'activity.games.mark_not_started': 'Marked a started game not started',
   'activity.games.postpone_game': 'Postponed a game',
   'activity.games.put_game_back': 'Put a cancelled game back on the schedule',
+  'activity.games.put_sheet_back': 'Put a game’s box score back as it was before it was reopened',
   'activity.games.record_final_score': 'Recorded a final score',
   'activity.games.record_forfeit': 'Recorded a forfeit',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
@@ -114,6 +115,8 @@ export const enActivity = {
   'activityNamed.games.mark_not_started': 'Marked the started game {name} not started',
   'activityNamed.games.postpone_game': 'Postponed the game {name}',
   'activityNamed.games.put_game_back': 'Put the cancelled game {name} back on the schedule',
+  'activityNamed.games.put_sheet_back':
+    'Put the box score of {name} back as it was before it was reopened',
   'activityNamed.games.reopen_game': 'Reopened the final game {name} to correct it',
   'activityNamed.games.reopen_own_result':
     'Reopened the result they recorded for {name}, to correct it',

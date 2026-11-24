@@ -2,7 +2,8 @@
 // public, or undefined. Only the date: the reason stays private (S-7). Not every
 // correction row marks it: only one whose next final differs from the result it took
 // back (S-81, S-8; core's correctedMarkDate, step 2.56). The activity log keeps every
-// reopen either way.
+// reopen either way. A put back of the sheet ends the reopen it undid (S-98): its
+// "after" is read so the mark compares the result it left.
 import { correctedMarkDate, type MarkResult } from '@srleagues/core';
 import { sql } from 'kysely';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
@@ -36,6 +37,7 @@ export async function findGameCorrectedDate(
     .innerJoin('leagues', 'leagues.id', 'game_corrections.league_id')
     .select([
       'game_corrections.before',
+      'game_corrections.after',
       sql<string>`to_char(game_corrections.created_at at time zone leagues.time_zone, 'YYYY-MM-DD')`.as(
         'local_date',
       ),
@@ -45,7 +47,11 @@ export async function findGameCorrectedDate(
     .orderBy('game_corrections.created_at', 'asc')
     .execute();
   return correctedMarkDate(
-    rows.map((row) => ({ on: row.local_date, before: resultOf(row.before) })),
+    rows.map((row) => ({
+      on: row.local_date,
+      before: resultOf(row.before),
+      after: resultOf(row.after),
+    })),
     { status: game.status, homeScore: game.home_score, awayScore: game.away_score },
   );
 }

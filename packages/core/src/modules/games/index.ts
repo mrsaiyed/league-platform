@@ -106,6 +106,11 @@ export { reopenTrackedGame, type ReopenTrackedGameError } from './commands/reope
 export { readReopenOffer, type ReadReopenOfferError } from './commands/read-reopen-offer.ts';
 export { reopenOwnResult, type ReopenOwnResultError } from './commands/reopen-own-result.ts';
 export { putSheetBack, type PutSheetBackError } from './commands/put-sheet-back.ts';
+export {
+  readSheetPutBackOffer,
+  type ReadSheetPutBackOfferError,
+  type SheetPutBackOffer,
+} from './commands/read-sheet-put-back-offer.ts';
 export { resultDocumentOf } from './kept-sheet.ts';
 export {
   readOwnResultOffer,

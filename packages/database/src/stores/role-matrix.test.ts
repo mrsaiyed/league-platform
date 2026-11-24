@@ -142,6 +142,7 @@ import {
   readOwnResultOffers,
   reopenGame,
   putSheetBack,
+  readSheetPutBackOffer,
   reopenOwnResult,
   reopenTrackedGame,
   reorderDivisions,
@@ -1057,6 +1058,23 @@ const gameCommandRows: readonly Row[] = [
       return { gameId, version: 1, reason: 'Saved the wrong thing' };
     },
     (c, i) => putSheetBack(c, i, trackerDeps),
+  ),
+  // Whether "Put the sheet back as it was" is offered, before the tap (step 2.229): whoever
+  // may correct games, as the put back itself. A read.
+  ...gameRows(
+    'games.read_sheet_put_back_offer',
+    'see whether a box score can be put back as it was',
+    'games.correct',
+    async (league, program) => {
+      const { gameId } = await gameIn(league, program, {
+        status: 'final',
+        home_score: 50,
+        away_score: 40,
+        finalized_at: '2026-12-06T19:30:00Z',
+      });
+      return { gameId };
+    },
+    (c, i) => readSheetPutBackOffer(c, i, trackerDeps),
   ),
   // Assigning scorekeepers is part of running Games (P4 §3, P7 §5.1): schedulers too.
   ...gameRows(

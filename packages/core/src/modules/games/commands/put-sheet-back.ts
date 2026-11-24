@@ -18,22 +18,14 @@ import { z } from 'zod';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { gameFinalized, type GameFinalized } from '../../../events/game-events.ts';
-import { correctionReason, gameVersion, isDecided } from '../game-fields.ts';
+import { correctionReason, gameVersion } from '../game-fields.ts';
 import { sheetToKeep } from '../kept-sheet.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
+import { sheetPutBackRefusal, type SheetPutBackRefusal } from '../sheet-put-back-rule.ts';
 
 export type PutSheetBackError = {
-  readonly code:
-    | 'game-not-found'
-    | 'changed-since-read'
-    | 'not-allowed'
-    | 'game-not-decided'
-    | 'result-overturned'
-    /** The newest correction kept no sheet (none, or the game had no lines when reopened). */
-    | 'no-sheet-kept'
-    /** Something newer was saved on the game after the save that followed the reopen. */
-    | 'newer-save';
+  readonly code: 'game-not-found' | 'changed-since-read' | 'not-allowed' | SheetPutBackRefusal;
 };
 
 export const putSheetBack = defineCommand({
@@ -53,15 +45,13 @@ export const putSheetBack = defineCommand({
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
     if (game.version !== input.version) return fail({ code: 'changed-since-read' });
     if (context.accountId === null) return fail({ code: 'not-allowed' });
-    if (!isDecided(game.status)) return fail({ code: 'game-not-decided' });
-    if (game.overturned === true) return fail({ code: 'result-overturned' });
     const newest = await tx.games.newestCorrection(game.id);
-    if (newest === undefined) return fail({ code: 'no-sheet-kept' });
-    // A reopen leaves the game undecided; a correction that leaves it decided is a put
-    // back, saved after the save that followed the reopen.
-    if (isDecided(newest.after.status)) return fail({ code: 'newer-save' });
+    const refusal = sheetPutBackRefusal(game, newest);
+    if (refusal !== undefined || newest === undefined) {
+      return fail({ code: refusal ?? 'no-sheet-kept' });
+    }
     const kept = newest.before;
-    if (kept.sheet === undefined || !isDecided(kept.status)) return fail({ code: 'no-sheet-kept' });
+    if (kept.sheet === undefined) return fail({ code: 'no-sheet-kept' });
     const replaced = await sheetToKeep(tx, game);
     await tx.games.addCorrection({
       gameId: game.id,

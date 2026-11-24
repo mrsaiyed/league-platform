@@ -25,6 +25,7 @@ import {
   reopenGame,
   putSheetBack,
   readOwnResultOffer,
+  readSheetPutBackOffer,
   readOwnResultOffers,
   readReopenOffer,
   reopenOwnResult,
@@ -347,9 +348,26 @@ registerIsolationCase({
 registerIsolationCase({
   subject: findNewestGameCorrection,
   name: "read the newest correction of the target's upcoming game",
+  // A reopen's correction of the game, inside the target's own fence (fixed id, dates and
+  // documents), so a query with its league filter taken out would find it from another
+  // league (the fence check, step 2.229).
+  arrange: (inTarget, target) =>
+    sql`insert into game_corrections
+      (id, league_id, game_id, account_id, reason, before, after, at, created_at)
+      values ('01900000-0000-7000-8000-00000000c229', ${inTarget.leagueId},
+        ${target.upcomingGameId}, ${target.ownerId}, 'Harness reopening',
+        ${JSON.stringify({ version: 1, status: 'final', homeScore: 50, awayScore: 40 })}::jsonb,
+        ${JSON.stringify({ version: 1, status: 'scheduled', homeScore: null, awayScore: null })}::jsonb,
+        '2026-11-20T18:00:00Z', '2026-11-20T18:00:00Z')`.execute(transactionOf(inTarget)),
+  run: (scope, target) => findNewestGameCorrection(scope, target.upcomingGameId),
+});
+
+registerIsolationCase({
+  subject: readSheetPutBackOffer,
+  name: "read whether the sheet a correction of the target's upcoming game kept can be put back",
   run: async (scope, target) => {
     await keptSheetOf(scope, target);
-    return findNewestGameCorrection(scope, target.upcomingGameId);
+    return runAsApp(readSheetPutBackOffer, harnessTx, scope, { gameId: target.upcomingGameId });
   },
 });
 

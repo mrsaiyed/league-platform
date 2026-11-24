@@ -272,6 +272,7 @@ const NOT_COVERED = [
   "the draft league's own roles (admin, registrar, editor, club admin, a program's scheduler, another league's admin): not covered, because this test fills only the first league (\"north-valley\") with the attack and they hold no role there",
   "text a script draws only after a tap (beyond the games list's question, the reopen form, the scorer's table and the Players panel): not covered, because the walk opens each page and reads what it draws on arrival, it does not tap every control",
   'the scorer\'s own Reopen question ("By mistake" beside its reason): not typed into; its reason goes to the reopen answer route, which is posted the attack by hand below',
+  'the box score\'s "Put the sheet back as it was" reason (step 2.229): shown only after a box score is reopened and saved again, which the walk does not do; sheet-put-back-test types an attack into it on a refused put back and checks it stays text',
   'the walk of every route runs with the script policy off (the stronger proof: the page itself keeps the text); the policy on is checked on the pages that show typed text',
 ];
 

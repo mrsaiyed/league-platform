@@ -1,6 +1,6 @@
 import { en } from '@srleagues/site';
 import { describe, expect, it } from 'vitest';
-import { boxScoreProblemKey, gamesProblemKey } from './problem-keys.ts';
+import { boxScoreProblemKey, gamesProblemKey, putBackProblemKey } from './problem-keys.ts';
 
 const codes = [
   'not-allowed',
@@ -50,5 +50,14 @@ describe('why a change in the games area was refused, as words', () => {
       expect(keys.has(gamesProblemKey(code)), code).toBe(true);
       expect(keys.has(boxScoreProblemKey(code)), code).toBe(true);
     }
+  });
+
+  it('words a put back of the sheet refused by its own sentences (step 2.229)', () => {
+    for (const code of ['newer-save', 'no-sheet-kept', 'game-not-decided', 'put-back-reason']) {
+      expect(putBackProblemKey(code), code).toBe(`admin.boxScore.putBackError.${code}`);
+      expect(en[putBackProblemKey(code)], code).not.toContain(code);
+    }
+    expect(putBackProblemKey('changed-since-read')).toBe('admin.games.error.changed-since-read');
+    expect(putBackProblemKey('not-allowed')).toBe('admin.games.error.not-allowed');
   });
 });

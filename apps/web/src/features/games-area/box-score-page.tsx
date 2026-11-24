@@ -15,6 +15,7 @@ import {
   readGameFormat,
   readOwnResultOffer,
   readReopenOffer,
+  readSheetPutBackOffer,
   type BoxScoreSheet,
   type GameLine,
   type GameRosterPlayer,
@@ -38,6 +39,7 @@ import { ActionForm } from './action-form.tsx';
 import {
   callOffAction,
   putBackAction,
+  putSheetBackAction,
   reopenBoxScoreAction,
   saveBoxScoreAction,
 } from './actions.ts';
@@ -153,7 +155,12 @@ export async function BoxScorePage({
   const holder = noticeHolderOf(context);
   const notice = holder === undefined ? undefined : savedNoticesHere().take(holder, 'box-score');
   const mine = notice?.thing === game.id ? notice : undefined;
-  const reopened = mine?.said === 'reopen' ? t('admin.boxScore.done.reopen') : undefined;
+  const reopened =
+    mine?.said === 'reopen'
+      ? t('admin.boxScore.done.reopen')
+      : mine?.said === 'put-back'
+        ? t('admin.boxScore.done.putBack')
+        : undefined;
   const saved =
     mine === undefined || reopened !== undefined
       ? undefined
@@ -179,6 +186,15 @@ export async function BoxScorePage({
         )
       : undefined,
   );
+  // "Put the sheet back as it was" (step 2.229, T-366): for whoever may correct games, while
+  // the game's newest correction is the reopen that kept its sheet and nothing newer was
+  // saved; the same rule the put back follows, read before the tap.
+  const putBack =
+    sheet.mayCorrect && (game.status === 'final' || game.status === 'forfeit')
+      ? await readSheetPutBackOffer(context, { gameId: game.id }, ports.games.deps).then(
+          (offer) => offer.ok && offer.value.offered,
+        )
+      : false;
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
   // Postponed or cancelled: no box score, no grid; the way it is put back (step 2.158).
   const calledOff = sheet.locked === 'cancelled' || sheet.locked === 'postponed';
@@ -243,6 +259,26 @@ export async function BoxScorePage({
           initial={format.value}
           title={t('tracker.formatChange.title')}
         />
+      ) : null}
+      {putBack ? (
+        <div className="staff-panel">
+          <ReopenForm
+            kind="put-back"
+            action={putSheetBackAction}
+            permalink={sheetHref}
+            hidden={{
+              league,
+              gameId: game.id,
+              version: String(game.version),
+              requestToken: crypto.randomUUID(),
+            }}
+            texts={{
+              help: t('admin.boxScore.putBackHelp'),
+              reason: t('admin.boxScore.putBackReason'),
+              reopen: t('admin.boxScore.putBack'),
+            }}
+          />
+        </div>
       ) : null}
       {reopen.kind === 'correct' ? (
         <div className="staff-panel">

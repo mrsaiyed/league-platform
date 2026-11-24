@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   putSheetBack,
+  readSheetPutBackOffer,
   recordFinalScore,
   recordForfeit,
   reopenGame,
@@ -237,5 +238,35 @@ describe('a correction keeps the sheet it replaces (step 2.229)', () => {
     expect(
       await putSheetBack(w.as(ownerId), { gameId: gameId(1), version: 2, reason }, w.deps),
     ).toEqual({ ok: false, error: { code: 'no-sheet-kept' } });
+  });
+
+  it('is offered before the tap exactly while the put back would be allowed', async () => {
+    const w = setUp();
+    const offer = () => readSheetPutBackOffer(w.as(ownerId), { gameId: gameId(1) }, w.deps);
+    expect(await offer()).toEqual({
+      ok: true,
+      value: { offered: false, code: 'game-not-decided' },
+    });
+    await enteredAndReopened(w);
+    expect(await offer()).toEqual({
+      ok: true,
+      value: { offered: false, code: 'game-not-decided' },
+    });
+    expect(
+      await recordFinalScore(
+        w.as(ownerId),
+        { gameId: gameId(1), version: versionOf(w), homeScore: 50, awayScore: 48 },
+        w.deps,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(await offer()).toEqual({ ok: true, value: { offered: true } });
+    expect(
+      await putSheetBack(
+        w.as(ownerId),
+        { gameId: gameId(1), version: versionOf(w), reason },
+        w.deps,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(await offer()).toEqual({ ok: true, value: { offered: false, code: 'newer-save' } });
   });
 });

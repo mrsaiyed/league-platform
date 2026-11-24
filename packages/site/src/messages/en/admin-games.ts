@@ -7,6 +7,9 @@ export const enAdminGames = {
   'admin.boxScore.back': 'Back to the games',
   'admin.boxScore.cellLabel': '{stat} for {name}',
   'admin.boxScore.columnsKey': 'What the columns are',
+  // Step 2.229 (T-366): the box score put back as it was before the game was reopened.
+  'admin.boxScore.done.putBack':
+    'The box score is back as it was before the game was reopened, and the game is final again.',
   'admin.boxScore.done.reopen': 'The game is reopened. Fix the grid and save it again.',
   'admin.boxScore.done.save': 'The box score is saved and the game is final.',
   // An empty box of a final game's grid, which is read and not filled in.
@@ -52,6 +55,21 @@ export const enAdminGames = {
   'admin.boxScore.played': 'Played',
   'admin.boxScore.playedBy': '{name} played',
   'admin.boxScore.player': 'Player',
+  // Step 2.229 (A-5, T-366): a reopened box score saved again without its players' lines
+  // (a final score only, a forfeit) can be put back as the reopen kept it, until something
+  // newer is saved on the game. Only for whoever may correct games.
+  'admin.boxScore.putBack': 'Put the sheet back as it was',
+  'admin.boxScore.putBackError.game-not-decided':
+    'This game is reopened right now, so its sheet cannot be put back. Save its result first.',
+  'admin.boxScore.putBackError.newer-save':
+    'Something newer was saved on this game, so the sheet can no longer be put back as it was.',
+  'admin.boxScore.putBackError.no-sheet-kept':
+    'Something newer was saved on this game, so the sheet can no longer be put back as it was.',
+  'admin.boxScore.putBackError.put-back-reason':
+    'Say why the sheet goes back (up to 1000 characters) to put it back.',
+  'admin.boxScore.putBackHelp':
+    'This game was reopened and then saved again. Its box score from before the reopen was kept: you can put it back as it was, with its players’ lines and its score.',
+  'admin.boxScore.putBackReason': 'Why the sheet goes back (kept in the log, never shown publicly)',
   // A refused box beside the scores, naming it (step 2.155; A-4).
   'admin.boxScore.refused.cell': '{cell}: enter a whole number from 0 to 999, or leave it empty.',
   'admin.boxScore.refused.minutes':
