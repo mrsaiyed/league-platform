@@ -13,6 +13,7 @@ import {
   getBoxScoreSheet,
   leagueUrl,
   readGameFormat,
+  readOwnResultOffer,
   readReopenOffer,
   type BoxScoreSheet,
   type GameLine,
@@ -170,6 +171,13 @@ export async function BoxScorePage({
           offer.ok ? offer.value : undefined,
         )
       : undefined,
+    // A result recorded by hand, for someone who may not reopen it as a corrector: their
+    // own door within the league's minutes, else who can (step 2.177, S-52).
+    !sheet.mayReopen && (game.status === 'final' || game.status === 'forfeit')
+      ? await readOwnResultOffer(context, { gameId: game.id }, ports.games.deps).then((own) =>
+          own.ok ? own.value : undefined,
+        )
+      : undefined,
   );
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
   // Postponed or cancelled: no box score, no grid; the way it is put back (step 2.158).
@@ -256,9 +264,14 @@ export async function BoxScorePage({
               ...(reopen.until === null
                 ? {}
                 : {
-                    until: t('admin.games.reopenUntil', {
-                      time: clockTimeText(reopen.until, { locale, timeZone }),
-                    }),
+                    until: t(
+                      reopen.door === 'own'
+                        ? 'admin.games.reopenUntilOwn'
+                        : 'admin.games.reopenUntil',
+                      {
+                        time: clockTimeText(reopen.until, { locale, timeZone }),
+                      },
+                    ),
                   }),
               reason: t('admin.boxScore.reopenReason'),
               reopen: t('admin.boxScore.reopen'),

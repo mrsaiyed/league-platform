@@ -48,6 +48,8 @@ Two things to know before reading:
 
 ### Children's records and each league's private data
 
+- **2.243 A child recorded in an adult league is never shown in full on an old yes** (added 2026-11-24, found while confirming 2.125). Why: a confirmation given when a league had no children must not decide how its first child is shown.
+
 19. **2.223 One league gate for every way into a league.** Why: today the tracker's routes reach a league that is not published yet; Faraj will sit unpublished during the move and the test season.
 20. **2.225 No person's ID in any public answer.** Why: a hidden or removed player, a child above all, must not be traceable through the public pages.
 21. **2.226 Names on the scoring screens.** Why: the scorer's phone is sent every child's full name whatever the league's rule; it needs a decision first (the lead answers it, as the rules allow).

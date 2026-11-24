@@ -52,6 +52,8 @@ const reads = new Set([
   // The rosters stored on the scorekeeper's device when it opens a game (T-258): a read.
   'games.read_tracker_rosters',
   // Whether the device may offer Reopen, before the tap (step 2.120): a read.
+  'games.read_own_result_offer',
+  'games.read_own_result_offers',
   'games.read_reopen_offer',
   // Every rule of one game, at the tracker's start and in the games area (step 2.119): a read.
   'games.read_game_format',

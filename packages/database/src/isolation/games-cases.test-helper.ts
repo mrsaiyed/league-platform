@@ -23,13 +23,16 @@ import {
   releaseScoringSession,
   renewScoringSession,
   reopenGame,
+  readOwnResultOffer,
+  readOwnResultOffers,
   readReopenOffer,
+  reopenOwnResult,
   reopenTrackedGame,
   setBoxScore,
   takeOverScoring,
   unassignScorekeeper,
 } from '@srleagues/core';
-import { refusedAddEventType, seasonRulesPreset } from '@srleagues/contracts';
+import { defaultSeasonRules, refusedAddEventType, seasonRulesPreset } from '@srleagues/contracts';
 import type { JsonObject } from '../db/schema-types.ts';
 import { sql } from 'kysely';
 import { randomUUID } from 'node:crypto';
@@ -43,6 +46,8 @@ import {
   setScoringSessionHeard,
   findScoringSession,
   insertScoringSession,
+  findGameDecidedBy,
+  listHandResults,
   findGameEndedAgo,
   findGameEvent,
   findLastGameEnd,
@@ -305,6 +310,83 @@ registerCommandCase(reopenTrackedGame, harnessTx, {
 registerCommandCase(readReopenOffer, harnessTx, {
   name: "read whether the target's final game can be reopened from its tracker",
   input: (target) => ({ gameId: target.gameId }),
+});
+
+// The scorekeeper's own reopening of a result typed by hand (step 2.177, S-52): the
+// target's upcoming game given a final score in the run's own scope by the target's
+// member (in any other league that finds nothing), then reopened by the run. In the
+// target's league its owner may correct games, so it reopens it; anywhere else it is
+// refused or finds no game.
+const typedFinal = (scope: Parameters<typeof updateGameResult>[0], gameId: string, by: string) =>
+  updateGameResult(
+    scope,
+    gameId,
+    {
+      status: 'final',
+      homeScore: 50,
+      awayScore: 40,
+      decided: true,
+      overtimePeriods: null,
+      // A decided game is played under rules of its own (0009, S-1).
+      format: defaultSeasonRules(),
+      decidedBy: by,
+    },
+    1,
+  );
+
+registerIsolationCase({
+  subject: reopenOwnResult,
+  name: "reopen a result typed by hand for the target's upcoming game",
+  run: async (scope, target) => {
+    await typedFinal(scope, target.upcomingGameId, target.memberId);
+    return runAsApp(reopenOwnResult, harnessTx, scope, {
+      gameId: target.upcomingGameId,
+      version: 2,
+      reason: 'Harness reopening',
+    });
+  },
+});
+
+registerIsolationCase({
+  subject: readOwnResultOffer,
+  name: "read whether a result typed by hand for the target's upcoming game can be reopened",
+  run: async (scope, target) => {
+    await typedFinal(scope, target.upcomingGameId, target.memberId);
+    return runAsApp(readOwnResultOffer, harnessTx, scope, { gameId: target.upcomingGameId });
+  },
+});
+
+registerIsolationCase({
+  subject: readOwnResultOffers,
+  name: "read, for a list, whether results typed by hand for the target's games can be reopened",
+  run: async (scope, target) => {
+    await typedFinal(scope, target.upcomingGameId, target.memberId);
+    return runAsApp(readOwnResultOffers, harnessTx, scope, { gameIds: [target.upcomingGameId] });
+  },
+});
+
+registerIsolationCase({
+  subject: listHandResults,
+  name: "read, for a list, who typed the result of the target's upcoming game and when",
+  run: async (scope, target) => {
+    await typedFinal(scope, target.upcomingGameId, target.memberId);
+    return listHandResults(scope, [target.upcomingGameId]);
+  },
+});
+
+registerIsolationCase({
+  subject: findGameDecidedBy,
+  name: "read who typed the result of the target's upcoming game",
+  // The game decided, with who typed it, inside the target's own fence (fixed values), so a query with
+  // its league filter taken out would find it from another league (the fence check).
+  arrange: (inTarget, target) =>
+    sql`update games set status = 'final', home_score = 50, away_score = 40,
+      finalized_at = '2026-11-20T18:00:00Z', finalized_by = ${target.memberId},
+      format = coalesce(format, ${JSON.stringify(defaultSeasonRules())}::jsonb)
+      where league_id = ${inTarget.leagueId} and id = ${target.upcomingGameId}`.execute(
+      transactionOf(inTarget),
+    ),
+  run: (scope, target) => findGameDecidedBy(scope, target.upcomingGameId),
 });
 
 // Box scores entered afterwards (step 2.64) -------------------------------------------

@@ -27,6 +27,13 @@ describe('the line about putting a result right', () => {
     expect(html).toContain('Correct this result</a>');
   });
 
+  it('says until when for a result the scorekeeper recorded by hand (step 2.177)', () => {
+    const until = Date.UTC(2026, 10, 16, 1, 42);
+    const html = draw({ kind: 'correct', door: 'own', until });
+    expect(html).toContain('You recorded this result, so you can correct it until 7:42');
+    expect(html).toContain(`href="${href}">Correct this result</a>`);
+  });
+
   it('says who can to everyone else, with no way to reopen', () => {
     expect(draw({ kind: 'who', because: 'admins' })).toBe(
       '<p data-reopen="who">Only a league admin or a scheduler can reopen this game.</p>',

@@ -58,6 +58,23 @@ export type GameResultChange = {
   readonly format?: SeasonRules;
   /** How the game is now recorded (final, box or live), when that changes with the result. */
   readonly captureMode?: 'final' | 'box' | 'live';
+  /**
+   * The account that decided it by hand (step 2.177, migration 0028), kept while the game
+   * stays decided; left out or null for a tracker's end, or a change that undecides it.
+   */
+  readonly decidedBy?: string | null;
+};
+
+/** One game's facts for the scorekeeper's own reopening, read for a whole list (T-349). */
+export type HandResultFacts = {
+  readonly gameId: string;
+  readonly status: string;
+  /** The account that decided it by hand, or null. */
+  readonly decidedBy: string | null;
+  /** Milliseconds since it was decided, by the database's clock; undefined if it is not. */
+  readonly ago: number | undefined;
+  readonly overturned: boolean;
+  readonly tracked: boolean;
 };
 
 /** A result as a correction keeps it: a versioned document of words and numbers only (T-220). */
@@ -572,6 +589,20 @@ export type LiveGamesStore = {
    * it is not decided. Never below 0.
    */
   readonly endedAgo: (gameId: string) => Promise<number | undefined>;
+  /**
+   * Who decided the game's present result by hand (step 2.177, migration 0028): the
+   * account, or null when nobody did (its tracker ended it, it is not decided, it was
+   * decided before 0028 or with no account). Read inside the database, as endedAgo is.
+   */
+  readonly decidedBy: (gameId: string) => Promise<string | null>;
+  /**
+   * For a list of games (step 2.177, T-349), in one read of the database: each of these
+   * games of the league, with who decided it by hand (as decidedBy), how long ago it was
+   * decided (as endedAgo), whether an overturn rules on it, and whether it is tracked (a
+   * saved state with plays, as games.reopen_game tells them apart). Games not here, and
+   * games in the bin, are left out.
+   */
+  readonly handResults: (gameIds: readonly string[]) => Promise<readonly HandResultFacts[]>;
   /** The game's event made by this command id: its number, type and sender, or undefined. */
   readonly findEvent: (
     gameId: string,

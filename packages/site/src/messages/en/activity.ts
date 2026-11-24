@@ -23,6 +23,7 @@ export const enActivity = {
   'activity.games.record_final_score': 'Recorded a final score',
   'activity.games.record_forfeit': 'Recorded a forfeit',
   'activity.games.reopen_game': 'Reopened a final game to correct it',
+  'activity.games.reopen_own_result': 'Reopened a result they recorded, to correct it',
   'activity.games.reopen_tracked_game': 'Reopened a game ended from the tracker',
   'activity.games.set_box_score': 'Recorded a box score',
   'activity.games.take_over_scoring': 'Took over scoring a game from another device',
@@ -116,6 +117,8 @@ export const enActivity = {
   'activityNamed.games.postpone_game': 'Postponed the game {name}',
   'activityNamed.games.put_game_back': 'Put the cancelled game {name} back on the schedule',
   'activityNamed.games.reopen_game': 'Reopened the final game {name} to correct it',
+  'activityNamed.games.reopen_own_result':
+    'Reopened the result they recorded for {name}, to correct it',
   'activityNamed.games.reopen_tracked_game': 'Reopened the game {name}, ended from the tracker',
   'activityNamed.games.take_over_scoring': 'Took over scoring the game {name} from another device',
   'activityNamed.games.unassign_scorekeeper': 'Took a scorekeeper off the game {name}',

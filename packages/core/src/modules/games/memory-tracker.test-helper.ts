@@ -279,6 +279,25 @@ export function liveGamesOf(s: MemoryTracker, databaseNow: () => number): LiveGa
         ? undefined
         : Math.max(0, databaseNow() - Date.parse(decided));
     },
+    decidedBy: async (gameId) => s.deciders[gameId] ?? null,
+    handResults: async (gameIds) => {
+      s.handResultReads += 1;
+      return s.games
+        .filter((g) => gameIds.includes(g.id) && !g.binned)
+        .map((g) => ({
+          gameId: g.id,
+          status: g.status,
+          decidedBy: s.deciders[g.id] ?? null,
+          ago:
+            g.finalizedAt === null || g.finalizedAt === undefined
+              ? undefined
+              : Math.max(0, databaseNow() - Date.parse(g.finalizedAt)),
+          overturned: g.overturned === true,
+          tracked:
+            s.states.some((x) => x.gameId === g.id) &&
+            (s.tracked.includes(g.id) || hasPlaysPastMarker(s.events, g.id)),
+        }));
+    },
     findEvent: async (gameId, commandId) => {
       const found = s.events.find((e) => e.gameId === gameId && e.commandId === commandId);
       return found === undefined

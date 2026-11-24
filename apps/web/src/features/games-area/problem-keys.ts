@@ -33,6 +33,9 @@ const boxScoreKeys: readonly TextKey[] = [
   'admin.boxScore.error.game-not-decided',
   'admin.boxScore.error.reopen-time-over',
   'admin.boxScore.error.result-overturned',
+  'admin.boxScore.error.not-recorded-by-you',
+  'admin.boxScore.error.not-recorded-by-hand',
+  'admin.boxScore.error.scorekeepers-may-not-reopen',
 ];
 
 /** A refusal on the games list, as words. */

@@ -18,6 +18,10 @@ export const enAdminGames = {
   'admin.boxScore.error.game-not-decided': 'That game is not final, so there is nothing to reopen.',
   'admin.boxScore.error.invalid-input':
     'Enter every number as a whole number from 0 to 999 (minutes up to 1440).',
+  'admin.boxScore.error.not-recorded-by-hand':
+    'This game was ended from the tracker. Reopen it there, or ask a league admin or a scheduler.',
+  'admin.boxScore.error.not-recorded-by-you':
+    'Someone else recorded this result, so only a league admin or a scheduler can reopen it.',
   'admin.boxScore.error.player-listed-twice': 'A player is listed twice.',
   'admin.boxScore.error.player-not-on-team':
     'A player in the grid is no longer on that team’s roster. The page now shows the latest.',
@@ -27,6 +31,8 @@ export const enAdminGames = {
     'Your time to reopen this game is over. Ask a league admin or a scheduler.',
   'admin.boxScore.error.result-overturned':
     'This result was overturned. Take the overturn off in Standings and stats first.',
+  'admin.boxScore.error.scorekeepers-may-not-reopen':
+    'This league does not let scorekeepers reopen a result. Only a league admin or a scheduler can.',
   'admin.boxScore.help':
     'Copy the paper score sheet. Tick each player who played; a player with any number filled in counts as played. Leave a whole column empty if the sheet did not keep that number; it then does not count in that player’s averages. In a column you fill in, an empty box counts as 0.',
   'admin.boxScore.jersey': '#{number}',
@@ -245,6 +251,7 @@ export const enAdminGames = {
   'admin.games.removedTeam': '{name} (removed)',
   'admin.games.reopenUntil':
     'You ended this game in the tracker, so you can reopen it until {time}.',
+  'admin.games.reopenUntilOwn': 'You recorded this result, so you can correct it until {time}.',
   'admin.games.reopenWho.admins': 'Only a league admin or a scheduler can reopen this game.',
   'admin.games.reopenWho.overturned':
     'This result was overturned. Take the overturn off in Standings and stats first.',

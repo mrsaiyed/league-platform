@@ -7,11 +7,18 @@
 //   (games.read_reopen_offer, the read the tracker uses): someone who may correct games at
 //   any time, the scorekeeper who ended it within the league's minutes;
 // - any other decided game (a final score or a box score typed by hand, a forfeit) through
-//   games.reopen_game, for someone who may correct games at its program.
-import type { BoxScoreSheet, GameReopenOffer as ReopenOffer } from '@srleagues/core';
+//   games.reopen_game, for someone who may correct games at its program;
+// - the same game, for the scorekeeper who recorded it, within the league's minutes,
+//   through games.reopen_own_result (step 2.177, S-52), whose answer is read before the
+//   tap too (games.read_own_result_offer).
+import type {
+  BoxScoreSheet,
+  GameReopenOffer as ReopenOffer,
+  OwnResultOffer,
+} from '@srleagues/core';
 
 /** Which door reopens the game for this person. */
-export type ReopenDoor = 'tracked' | 'by-hand';
+export type ReopenDoor = 'tracked' | 'by-hand' | 'own';
 
 export type ReopenView =
   /** They may reopen it: by this door, and until this server time (ms) when it closes. */
@@ -22,18 +29,35 @@ export type ReopenView =
   | { readonly kind: 'none' };
 
 /**
- * `offer` is the tracker's answer for this person (undefined when it was not read), and
- * `mayCorrect` whether they may correct games at the game's program (games.correct).
+ * A result recorded by hand, for someone who may not correct games: their own door while
+ * they recorded it and the league's minutes run, else who can (step 2.177, S-52).
+ * `own` is games.read_own_result_offer's answer (undefined when it was not read).
  */
-export function reopenViewOf(offer: ReopenOffer | undefined, mayCorrect: boolean): ReopenView {
+export function ownReopenViewOf(own: Pick<OwnResultOffer, 'reopen'> | undefined): ReopenView {
+  const when = own?.reopen;
+  if (when?.when === 'until') return { kind: 'correct', door: 'own', until: when.until };
+  if (when?.when === 'always') return { kind: 'correct', door: 'own', until: null };
+  if (when?.code === 'game-not-decided') return { kind: 'none' };
+  if (when?.code === 'result-overturned') return { kind: 'who', because: 'overturned' };
+  return { kind: 'who', because: when?.code === 'reopen-time-over' ? 'time-over' : 'admins' };
+}
+
+/**
+ * `offer` is the tracker's answer for this person (undefined when it was not read),
+ * `mayCorrect` whether they may correct games at the game's program (games.correct), and
+ * `own` the answer for a result they recorded by hand (step 2.177).
+ */
+export function reopenViewOf(
+  offer: ReopenOffer | undefined,
+  mayCorrect: boolean,
+  own?: Pick<OwnResultOffer, 'reopen'>,
+): ReopenView {
   const when = offer?.reopen;
   if (when?.when === 'always') return { kind: 'correct', door: 'tracked', until: null };
   if (when?.when === 'until') return { kind: 'correct', door: 'tracked', until: when.until };
   if (when === undefined || when.code === 'not-ended-by-tracker') {
     // Decided by hand: the admin's door, for whoever may correct games.
-    return mayCorrect
-      ? { kind: 'correct', door: 'by-hand', until: null }
-      : { kind: 'who', because: 'admins' };
+    return mayCorrect ? { kind: 'correct', door: 'by-hand', until: null } : ownReopenViewOf(own);
   }
   if (when.code === 'game-not-decided') return { kind: 'none' };
   // Theirs to reopen, but an overturn rules on the result (S-85).
@@ -60,12 +84,19 @@ export function sheetNeedsOffer(sheet: SheetFacts): boolean {
  * decided by hand while it had plays, the admin's door to whoever may correct games
  * (games.reopen_game hands it back to its tracker, S-46); nothing for any other.
  */
-export function sheetReopenViewOf(sheet: SheetFacts, offer: ReopenOffer | undefined): ReopenView {
+export function sheetReopenViewOf(
+  sheet: SheetFacts,
+  offer: ReopenOffer | undefined,
+  /** For a result recorded by hand, games.read_own_result_offer's answer (step 2.177). */
+  own?: Pick<OwnResultOffer, 'reopen'>,
+): ReopenView {
   const view: ReopenView = sheet.mayReopen
     ? { kind: 'correct', door: 'by-hand', until: null }
     : sheetNeedsOffer(sheet)
-      ? reopenViewOf(offer, sheet.mayCorrect)
-      : { kind: 'none' };
+      ? reopenViewOf(offer, sheet.mayCorrect, own)
+      : own === undefined
+        ? { kind: 'none' }
+        : ownReopenViewOf(own);
   // An overturn rules on the result: say where to go instead (S-85).
   return view.kind === 'correct' && sheet.game.overturned === true
     ? { kind: 'who', because: 'overturned' }
