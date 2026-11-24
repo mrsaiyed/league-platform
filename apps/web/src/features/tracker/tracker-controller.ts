@@ -1698,7 +1698,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     await reload();
   };
 
-  queue.subscribe((status) => {
+  queue.subscribe((status, answer) => {
     watchOffline(status);
     // The time of the last save, on the server's clock (L1).
     const saved =
@@ -1708,6 +1708,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     seenSavedAt = status.savedAt;
     update({ queue: status, notApplied: status.refused, waiting: status.waitingTaps, ...saved });
     let tookBatch = false;
+    // Where the game stood before this answer, as this device knew it (T-338).
+    const before = Math.max(seenSequence ?? 0, base?.sequence ?? 0);
     if (status.sequence !== null && status.sequence !== seenSequence) {
       seenSequence = status.sequence;
       tookBatch = true;
@@ -1733,16 +1735,16 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       if (settling) settleAgain = true;
       else void track(settle());
     } else if (
-      tookBatch &&
+      answer !== undefined &&
       base !== null &&
       current.mode.kind === 'scoring' &&
-      status.sequence !== null &&
-      status.sequence - base.sequence > made.length
+      answer.sequence - before > answer.took
     ) {
-      // The server's game moved by more than this device's own taps since the state it is
-      // built on (T-338): plays sent by another scorekeeper's "Send these plays" while this
-      // device held the game. It is loaded again, as after a refusal, so the next taps
-      // count on top of them and the screen never builds on a stale game.
+      // The server's game moved by more than this answer's own taps since where this device
+      // last knew it (T-338): plays sent by another scorekeeper's "Send these plays" while
+      // this device held the game. Judged by what the server said it took for this batch,
+      // never by the taps still waiting here. It is loaded again, as after a refusal, so
+      // the next taps count on top of them and the screen never builds on a stale game.
       void track(loadAgain());
     }
     // The server has this device's End: the final game's look starts now (fix round B).
@@ -2290,13 +2292,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       }
       update({ sendNotSaved: 'sending' });
       const plays = current.notSaved.map((t) => t.command);
-      let from = since;
       let saved = 0;
       for (let i = 0; i < plays.length; i += maxCommandsPerBatch) {
         const batch: CommandBatch = {
           protocolVersion: trackerProtocolVersion,
           sessionId: named,
-          notSavedSince: from,
+          // Every batch names the same sequence: the server bounds it by where it last
+          // answered the named session, and looks past this list's earlier batches (T-335).
+          notSavedSince: since,
           commands: plays.slice(i, i + maxCommandsPerBatch),
         };
         const sent = await track(sendPlays(batch));
@@ -2316,7 +2319,6 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
           if (current.notSaved.length > 0) update({ sendNotSaved: 'game-moved' });
           return { ok: false, reason: 'game-moved' };
         }
-        from = sent.value.sequence;
       }
       // Any the engine refused stay listed, to enter again; sending them again would not help.
       notSavedSince = null;

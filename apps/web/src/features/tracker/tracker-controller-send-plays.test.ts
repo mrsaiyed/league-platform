@@ -6,7 +6,7 @@
 // again (S-43, T-335).
 import { TrackerGameState } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { standInPeople } from '../../server/stand-in-cast.ts';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import {
@@ -40,11 +40,12 @@ function device(
   as: Person = 'scorekeeper',
   deviceId = 'tablet-1',
   kept: QueueStorage = createMemoryQueueStorage(),
+  wrap: (fetch: typeof globalThis.fetch) => typeof globalThis.fetch = (fetch) => fetch,
 ) {
   // What a device keeps is one person's (T-327): the page keeps it so too.
   const storage = inLeague(kept, liveLeagueId, accountOf(as));
   const clock = createManualClock();
-  const fetch: typeof globalThis.fetch = (input, init) => network.fetchAs(as)(input, init);
+  const fetch = wrap((input, init) => network.fetchAs(as)(input, init));
   const controller = createTrackerController({
     gameId,
     deviceId,
@@ -88,9 +89,26 @@ async function tapAll(controller: Controller, inputs: TapInput[]) {
   for (const input of inputs) expect(await controller.tap(input)).toMatchObject({ ok: true });
 }
 
-/** The tablet scores, loses its signal with three baskets made, and the laptop takes over. */
-async function tabletLosesTheGame(network: EndpointNetwork) {
-  const tablet = device(network);
+/**
+ * The tablet scores, loses its signal with three baskets made, and the laptop takes over;
+ * with `laptopScores`, the laptop records it before the tablet is heard from again.
+ */
+async function tabletLosesTheGame(network: EndpointNetwork, laptopScores: TapInput[] = []) {
+  // With the laptop scoring first, the tablet's renewal is slowed until its waiting batch
+  // is answered, so it hears "not held" with the laptop's play in the sequence first.
+  let slowRenewal = false;
+  let batchAnswered = () => undefined as void;
+  const answeredFirst = new Promise<void>((resolve) => (batchAnswered = resolve));
+  const wrap =
+    (fetch: typeof globalThis.fetch): typeof globalThis.fetch =>
+    async (input, init) => {
+      const url = String(input);
+      if (slowRenewal && url.endsWith('/session')) await answeredFirst;
+      const response = await fetch(input, init);
+      if (slowRenewal && url.endsWith('/commands')) batchAnswered();
+      return response;
+    };
+  const tablet = device(network, 'scorekeeper', 'tablet-1', createMemoryQueueStorage(), wrap);
   await tablet.controller.start();
   await tapAll(tablet.controller, tipOff);
   await tablet.controller.idle();
@@ -102,6 +120,9 @@ async function tabletLosesTheGame(network: EndpointNetwork) {
   await laptop.controller.idle();
   expect(await laptop.controller.takeOver()).toEqual({ ok: true });
   await laptop.controller.idle();
+  await tapAll(laptop.controller, laptopScores);
+  await laptop.controller.idle();
+  slowRenewal = laptopScores.length > 0;
   tablet.controller.online();
   await tablet.controller.idle();
   expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'taken-over' });
@@ -167,6 +188,17 @@ describe('send these plays (S-43, T-335)', () => {
     expect(await tablet.controller.sendNotSaved()).toEqual({ ok: false, reason: 'not-offered' });
   });
 
+  // The plan's worst night (fix round): the tablet's waiting batch is answered "not held"
+  // with the game's sequence, the laptop's play in it, before the tablet learns it lost.
+  it('is refused when the new scorekeeper recorded while the tablet was still offline, then the tablet learned it lost the game', async () => {
+    const network = endpointNetwork();
+    const { tablet } = await tabletLosesTheGame(network, [basket('away', bears[0] ?? '')]);
+    expect(await serverScore(network)).toEqual({ home: 0, away: 2 });
+    expect(await tablet.controller.sendNotSaved()).toEqual({ ok: false, reason: 'game-moved' });
+    expect(tablet.controller.status().notSaved).toHaveLength(3);
+    expect(await serverScore(network)).toEqual({ home: 0, away: 2 });
+  });
+
   it('is still offered after a reload, to the same person only, and puts the plays on the server once', async () => {
     const network = endpointNetwork();
     const { tablet } = await tabletLosesTheGame(network);
@@ -212,5 +244,90 @@ describe('the device holding the game after plays were sent (T-338)', () => {
     expect(await serverScore(network)).toEqual({ home: 6, away: 4 });
     expect(shown(laptop.controller)).toEqual({ home: 6, away: 4 });
     expect(laptop.controller.status().mode).toEqual({ kind: 'scoring' });
+  });
+
+  /**
+   * After the tablet's three were sent, the laptop makes 53 baskets with no signal: the
+   * first batch (50) is taken while the other three are still on their way (held here),
+   * so this device's own taps outnumber the server's jump until they drain (review Low).
+   */
+  async function laptopBehindSentPlays(holdState: boolean) {
+    const network = endpointNetwork();
+    let commandPosts = 0;
+    let releaseBatch = () => undefined as void;
+    const batchHeld = new Promise<void>((resolve) => (releaseBatch = resolve));
+    let releaseState = () => undefined as void;
+    const stateHeld = new Promise<void>((resolve) => (releaseState = resolve));
+    let gate = false;
+    let stateAsked = false;
+    const wrap =
+      (fetch: typeof globalThis.fetch): typeof globalThis.fetch =>
+      async (input, init) => {
+        const url = String(input);
+        if (gate && url.endsWith('/commands') && init?.method === 'POST') {
+          commandPosts += 1;
+          if (commandPosts === 2) await batchHeld;
+        }
+        if (gate && url.endsWith('/state') && (init?.method ?? 'GET') === 'GET' && !stateAsked) {
+          stateAsked = true;
+          if (holdState) await stateHeld;
+        }
+        return fetch(input, init);
+      };
+    const tablet = device(network);
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    await tapAll(tablet.controller, threeBaskets);
+    network.mode = 'up';
+    const laptop = device(network, 'owner', 'laptop', createMemoryQueueStorage(), wrap);
+    await laptop.controller.start();
+    await laptop.controller.idle();
+    expect(await laptop.controller.takeOver()).toEqual({ ok: true });
+    await laptop.controller.idle();
+    tablet.controller.online();
+    await tablet.controller.idle();
+    expect(await tablet.controller.sendNotSaved()).toEqual({ ok: true, saved: 3 });
+    network.mode = 'down';
+    await tapAll(
+      laptop.controller,
+      Array.from({ length: 53 }, (_, i) => basket('away', bears[i % 5] ?? '')),
+    );
+    network.mode = 'up';
+    gate = true;
+    laptop.controller.online();
+    // The first batch is answered, and the second is held on its way.
+    await vi.waitFor(() => expect(commandPosts).toBe(2));
+    return { network, laptop, releaseBatch, releaseState, stateAsked: () => stateAsked };
+  }
+
+  it('loads the game again at the first answer that shows the jump, while its own taps are still on their way', async () => {
+    const { network, laptop, releaseBatch } = await laptopBehindSentPlays(false);
+    await vi.waitFor(() => expect(shown(laptop.controller)).toEqual({ home: 6, away: 106 }));
+    expect(await serverScore(network)).toEqual({ home: 6, away: 100 });
+    releaseBatch();
+    await laptop.controller.idle();
+    expect(await serverScore(network)).toEqual({ home: 6, away: 106 });
+    expect(shown(laptop.controller)).toEqual({ home: 6, away: 106 });
+  });
+
+  it('a load with taps on their way and a tap waiting behind them neither doubles nor drops one', async () => {
+    const { network, laptop, releaseBatch, releaseState, stateAsked } =
+      await laptopBehindSentPlays(true);
+    await vi.waitFor(() => expect(stateAsked()).toBe(true));
+    // One more while the load is under way: waiting behind the three on their way.
+    await tapAll(laptop.controller, [basket('away', bears[0] ?? '')]);
+    // The three on their way and the one behind them are all taken before the state comes
+    // back, so the state holds every tap this device still keeps on top of its game.
+    releaseBatch();
+    await vi.waitFor(async () =>
+      expect(await serverScore(network)).toEqual({ home: 6, away: 108 }),
+    );
+    releaseState();
+    await laptop.controller.idle();
+    expect(await serverScore(network)).toEqual({ home: 6, away: 108 });
+    expect(shown(laptop.controller)).toEqual({ home: 6, away: 108 });
+    expect(laptop.controller.status().waiting).toEqual([]);
   });
 });
