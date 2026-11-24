@@ -509,7 +509,8 @@ if (built) {
         for (const [button, yes, words] of [
           [
             'Postpone',
-            'Yes, postpone it',
+            // A schedule editor's "Yes" (beside "… give it a new date now").
+            'Yes, postpone it, decide the new date later',
             'Removed in this draft, and postponed since: publishing still removes it. Putting it back in the draft keeps it in the schedule, still waiting in Games for a new date.',
           ],
           [
@@ -537,7 +538,8 @@ if (built) {
           await page.waitForTimeout(1000);
           await Promise.all([
             page.waitForEvent('load'),
-            listed.getByRole('button', { name: yes }).click(),
+            // The question's own "Yes" (its mark), said in these words.
+            listed.locator('[data-call-off-yes]', { hasText: yes }).click(),
           ]);
           await page.goto(`${origin}/north-valley/admin/schedule`);
           const calledText = await calledRow.innerText();
