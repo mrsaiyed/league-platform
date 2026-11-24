@@ -15,7 +15,7 @@ import type { ActivityTx } from '../../access/index.ts';
 import { leagueSettingChanged } from '../events.ts';
 import type { Audience } from '../league-values.ts';
 import type { StoredSettingRow } from '../ports.ts';
-import { childrenInFullConfirmed } from '../settings/declarations.ts';
+import { childrenInFullConfirmed, publicNames } from '../settings/declarations.ts';
 import { clearGuardedValueInside } from './clear-setting.ts';
 
 /** What the put-back reads and writes, for the league of the transaction. */
@@ -50,10 +50,43 @@ export async function watchForFirstChild(guard: FirstChildGuard): Promise<boolea
   return (await guard.leagueAudience()) === 'adult' && !(await guard.hasRecordedChild());
 }
 
+/** The league's own saved "Names on public pages" row when it says full names. */
+function savedFullNamesRow(rows: readonly StoredSettingRow[]): StoredSettingRow | undefined {
+  return rows.find((row) => {
+    const document = row.document;
+    return row.level === 'league' && typeof document === 'object' && document !== null
+      ? 'value' in document && document.value === 'fullName'
+      : false;
+  });
+}
+
+/** Clears the league's row that `match` finds; false when there is none (or no longer). */
+async function putBackRow(
+  guard: FirstChildGuard,
+  tx: ActivityTx,
+  context: CommandContext,
+  emit: <Event extends DomainEvent>(event: Event) => void,
+  key: string,
+  match: (rows: readonly StoredSettingRow[]) => StoredSettingRow | undefined,
+): Promise<boolean> {
+  const saved = match(await guard.leagueSettingRows(key));
+  if (saved === undefined) return false;
+  if (!(await clearGuardedValueInside(guard, tx, context, key, saved.version))) {
+    // Another save cleared it first: nothing is left to put back.
+    if (match(await guard.leagueSettingRows(key)) === undefined) return false;
+    throw new Error(`putBackOnFirstChild: ${key} moved and is still saved.`);
+  }
+  emit({ type: leagueSettingChanged, leagueId: context.leagueId, key });
+  return true;
+}
+
 /**
  * Read AFTER the save, in the same transaction: if it recorded the league's first child,
- * a confirmed "children in full" goes back to no. True when it was put back. Throws (the
- * whole save rolls back) if the yes is still there and could not be cleared.
+ * a confirmed "children in full" goes back to no, and a saved "full names" is cleared
+ * (the start, full names, so adults look the same) so that League settings asks for the
+ * privacy choices, as S-96 does. A saved initials or hidden shows less and is kept. True
+ * when the yes was put back. Throws (the whole save rolls back) if a value to put back
+ * is still there and could not be cleared.
  */
 export async function putBackOnFirstChild(
   guard: FirstChildGuard,
@@ -63,15 +96,14 @@ export async function putBackOnFirstChild(
   watching: boolean,
 ): Promise<boolean> {
   if (!watching || !(await guard.hasRecordedChild())) return false;
-  const key = childrenInFullConfirmed.key;
-  const saved = confirmedChildrenInFullRow(await guard.leagueSettingRows(key));
-  if (saved === undefined) return false;
-  const cleared = await clearGuardedValueInside(guard, tx, context, key, saved.version);
-  if (!cleared) {
-    // Another save cleared it first: nothing is left to put back.
-    if (confirmedChildrenInFullRow(await guard.leagueSettingRows(key)) === undefined) return false;
-    throw new Error('putBackOnFirstChild: the confirmation moved and is still yes.');
-  }
-  emit({ type: leagueSettingChanged, leagueId: context.leagueId, key });
-  return true;
+  const yes = await putBackRow(
+    guard,
+    tx,
+    context,
+    emit,
+    childrenInFullConfirmed.key,
+    confirmedChildrenInFullRow,
+  );
+  await putBackRow(guard, tx, context, emit, publicNames.key, savedFullNamesRow);
+  return yes;
 }

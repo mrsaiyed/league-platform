@@ -42,6 +42,7 @@ describe('putBackOnFirstChild (S-109)', () => {
     const emit = vi.fn();
     expect(await putBackOnFirstChild(guard, tx as never, context, emit, true)).toBe(true);
     expect(clear).toHaveBeenCalledWith('privacy.childrenInFullConfirmed', 4);
+    expect(clear).toHaveBeenCalledTimes(1);
     expect(activity.map((a) => a.action)).toEqual(['leagues.clear_setting']);
     expect(emit).toHaveBeenCalledWith({
       type: 'leagues.setting_changed',
@@ -71,6 +72,27 @@ describe('putBackOnFirstChild (S-109)', () => {
     const stuck = guardOf({ clearLeagueSetting: async () => false });
     await expect(
       putBackOnFirstChild(stuck.guard, stuck.tx as never, context, vi.fn(), true),
-    ).rejects.toThrow('still yes');
+    ).rejects.toThrow('still saved');
+  });
+
+  it('clears a saved "full names" too, so League settings asks again; a saved initials is kept', async () => {
+    const full = {
+      level: 'league' as const,
+      document: { version: 1, value: 'fullName' },
+      version: 2,
+    };
+    const initials = { ...full, document: { version: 1, value: 'firstNameLastInitial' } };
+    for (const [row, times] of [
+      [full, 1],
+      [initials, 0],
+    ] as const) {
+      const clear = vi.fn(async () => true);
+      const { guard, tx } = guardOf({
+        clearLeagueSetting: clear,
+        leagueSettingRows: async (key) => (key === 'privacy.publicNames' ? [row] : []),
+      });
+      expect(await putBackOnFirstChild(guard, tx as never, context, vi.fn(), true)).toBe(false);
+      expect(clear).toHaveBeenCalledTimes(times);
+    }
   });
 });

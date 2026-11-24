@@ -163,7 +163,7 @@ describe('the first child an adult league records (S-109, step 2.243)', () => {
 
   it('rolls the whole save back when the yes cannot be cleared: the child is not recorded', async () => {
     expect(await setQuinnBorn('2000-09-03')).toMatchObject({ ok: true });
-    await expect(setQuinnBorn('2012-09-03', stuckDeps)).rejects.toThrow('still yes');
+    await expect(setQuinnBorn('2012-09-03', stuckDeps)).rejects.toThrow('still saved');
     expect((await quinnNow()).recordedChild).toBe(false);
     expect(await quinnOnTeamPage()).toBe('Quinn Sample');
   });
