@@ -99,6 +99,11 @@ export type SeasonChange = {
   readonly status?: SeasonStatus;
   readonly isCurrent?: boolean;
   readonly rules?: SeasonRules;
+  /**
+   * The season's own named list of statistics (`seasons.stat_keys`, record 070); `[]`
+   * names none, so the rules' "Statistics kept" is what the season keeps (T-393).
+   */
+  readonly statKeys?: readonly string[];
 };
 
 export type LeaguesStore = {

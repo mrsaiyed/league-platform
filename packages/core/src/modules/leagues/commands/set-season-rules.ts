@@ -73,7 +73,12 @@ export const setSeasonRules = defineCommand({
     const preview = await previewRulesChange(tx, season.id, input.rules);
     const moves = preview?.gamesDecided === true ? preview.moves : [];
     if (moves.length > 0 && !input.confirmed) return fail({ code: 'confirmation-needed', moves });
-    const updated = await tx.leagues.updateSeason(season.id, { rules: input.rules }, input.version);
+    // The admin's "Statistics kept" is what the season keeps from now on, for the scoring
+    // screen and the public pages alike: a named list the season held gives way (T-393).
+    const change = changed.includes('statistics')
+      ? { rules: input.rules, statKeys: [] }
+      : { rules: input.rules };
+    const updated = await tx.leagues.updateSeason(season.id, change, input.version);
     if (updated === 'unique-jerseys-clash') return fail({ code: 'unique-jerseys-clash' });
     if (updated === undefined) return fail({ code: 'changed-since-read' });
     await rebuildSeason(tx, season.id);
