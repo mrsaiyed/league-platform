@@ -134,7 +134,7 @@ export type LeagueWorld = {
   corrections: (NewGameCorrection & { readonly on: string })[];
   /** The format each game was given (step 2.119, migration 0026), by game id; absent for none. */
   givenFormats?: Readonly<Record<string, unknown>>;
-  /** Who decided each game by hand, as `finalized_by` keeps it (migration 0027). */
+  /** Who decided each game by hand, as `finalized_by` keeps it (migration 0028). */
   deciders: Record<string, string | null>;
   sessions: ScoringSession[];
   /** Where each session was last heard (T-335), by session id, as heard_seq keeps it. */

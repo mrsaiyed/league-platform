@@ -1545,7 +1545,7 @@ export function madeUpLeagues(cast: SeedCast, now: Date): LeagueWorld[] {
     emptyLeagueWorld(league, { audience: 'youth', timeZone: 'UTC' }),
   );
   const leagues = [adult, youth, draft, history, empty, ...others];
-  // A result typed by hand keeps who typed it (`finalized_by`, migration 0027): the
+  // A result typed by hand keeps who typed it (`finalized_by`, migration 0028): the
   // leagues' owner, as a real league's would; a game its tracker ended keeps nobody.
   for (const league of leagues) {
     for (const g of league.games) {

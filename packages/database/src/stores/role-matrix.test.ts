@@ -1471,7 +1471,7 @@ const gameCommandRows: readonly Row[] = [
   },
 ];
 
-/** A final score the matrix's scorekeeper typed in five minutes ago (step 2.177, 0027). */
+/** A final score the matrix's scorekeeper typed in five minutes ago (step 2.177, 0028). */
 async function handResultRecordedIn(league: League, program: boolean): Promise<string> {
   const { gameId } = await gameIn(league, program, {
     status: 'final',

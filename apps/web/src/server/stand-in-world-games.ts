@@ -152,7 +152,7 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
     },
     givenFormat: async (gameId) =>
       s.games.some((g) => g.id === gameId) ? (s.givenFormats?.[gameId] ?? null) : undefined,
-    // As the database does it (0027): only a game never started, scheduled or postponed.
+    // As the database does it (0028): only a game never started, scheduled or postponed.
     setGivenFormat: async (gameId, format, version) => {
       const at = s.games.findIndex((g) => g.id === gameId);
       const found = s.games[at];

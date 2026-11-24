@@ -59,7 +59,7 @@ export type GameResultChange = {
   /** How the game is now recorded (final, box or live), when that changes with the result. */
   readonly captureMode?: 'final' | 'box' | 'live';
   /**
-   * The account that decided it by hand (step 2.177, migration 0027), kept while the game
+   * The account that decided it by hand (step 2.177, migration 0028), kept while the game
    * stays decided; left out or null for a tracker's end, or a change that undecides it.
    */
   readonly decidedBy?: string | null;
@@ -590,9 +590,9 @@ export type LiveGamesStore = {
    */
   readonly endedAgo: (gameId: string) => Promise<number | undefined>;
   /**
-   * Who decided the game's present result by hand (step 2.177, migration 0027): the
+   * Who decided the game's present result by hand (step 2.177, migration 0028): the
    * account, or null when nobody did (its tracker ended it, it is not decided, it was
-   * decided before 0027 or with no account). Read inside the database, as endedAgo is.
+   * decided before 0028 or with no account). Read inside the database, as endedAgo is.
    */
   readonly decidedBy: (gameId: string) => Promise<string | null>;
   /**

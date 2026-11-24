@@ -10,7 +10,7 @@
 //
 // - only a decided game recorded by hand (no plays: a tracked game has its own door);
 // - an account that may also correct games at the game's program reopens it at any time;
-// - otherwise only the account that recorded the result (`finalized_by`, migration 0027),
+// - otherwise only the account that recorded the result (`finalized_by`, migration 0028),
 //   and only while it was decided no longer ago than the league's
 //   games.scorekeeperReopenMinutes (0: never). Who and how long ago are both read inside
 //   the database (`statement_timestamp() - finalized_at`); the device's clock never
