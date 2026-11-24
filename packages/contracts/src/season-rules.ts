@@ -101,6 +101,37 @@ const Rosters = z.strictObject({
   uniqueJerseys: z.boolean(),
 });
 
+type FormatParts = {
+  readonly gameFormat: z.infer<typeof GameFormat>;
+  readonly clock: z.infer<typeof Clock>;
+  readonly fouls: z.infer<typeof Fouls>;
+};
+
+/** The checks a format passes, a season's and one game's alike (step 2.119). */
+function formatIssues(
+  r: FormatParts,
+  issue: (path: (string | number)[], message: string) => void,
+): void {
+  if (r.fouls.doubleBonusFouls !== null && r.fouls.doubleBonusFouls <= r.fouls.bonusFouls) {
+    issue(['fouls', 'doubleBonusFouls'], 'The double bonus must start after the bonus.');
+  }
+  if (r.clock.mode === 'stop' && r.clock.stopClockLastSeconds !== null) {
+    issue(
+      ['clock', 'stopClockLastSeconds'],
+      'A stop clock for the last minutes only applies to a running clock.',
+    );
+  }
+  if (
+    r.clock.stopClockLastSeconds !== null &&
+    r.clock.stopClockLastSeconds > r.gameFormat.periodSeconds
+  ) {
+    issue(['clock', 'stopClockLastSeconds'], 'The stop-clock time cannot be longer than a period.');
+  }
+  if (r.clock.mode === 'running' && r.clock.mercyLead !== null) {
+    issue(['clock', 'mercyLead'], 'A mercy rule only applies to a stop clock.');
+  }
+}
+
 export const SeasonRules = z
   .strictObject({
     version: z.literal(SEASON_RULES_VERSION),
@@ -119,9 +150,7 @@ export const SeasonRules = z
   .superRefine((r, ctx) => {
     const issue = (path: (string | number)[], message: string) =>
       ctx.addIssue({ code: 'custom', path, message });
-    if (r.fouls.doubleBonusFouls !== null && r.fouls.doubleBonusFouls <= r.fouls.bonusFouls) {
-      issue(['fouls', 'doubleBonusFouls'], 'The double bonus must start after the bonus.');
-    }
+    formatIssues(r, issue);
     if (r.forfeit.winnerScore <= r.forfeit.loserScore) {
       issue(['forfeit', 'winnerScore'], 'The winner of a forfeit must score more than the loser.');
     }
@@ -158,24 +187,6 @@ export const SeasonRules = z
         ['standings', 'pointsPerWin'],
         'A win must be worth at least a tie, and a tie at least a loss.',
       );
-    }
-    if (r.clock.mode === 'stop' && r.clock.stopClockLastSeconds !== null) {
-      issue(
-        ['clock', 'stopClockLastSeconds'],
-        'A stop clock for the last minutes only applies to a running clock.',
-      );
-    }
-    if (
-      r.clock.stopClockLastSeconds !== null &&
-      r.clock.stopClockLastSeconds > r.gameFormat.periodSeconds
-    ) {
-      issue(
-        ['clock', 'stopClockLastSeconds'],
-        'The stop-clock time cannot be longer than a period.',
-      );
-    }
-    if (r.clock.mode === 'running' && r.clock.mercyLead !== null) {
-      issue(['clock', 'mercyLead'], 'A mercy rule only applies to a stop clock.');
     }
     // Live tracking records fouls as well as points, so a points-only season cannot use it.
     // Final-score and box-score games may use any set: the set only limits what is shown.
@@ -236,6 +247,117 @@ export function seasonRulesPreset(preset: SeasonRulesPreset): SeasonRules {
     case 'custom':
       return base;
   }
+}
+
+/**
+ * One game's format (P7 §5.1, S-21, S-35; step 2.119, T-340): the part of a season's rules
+ * the scorer's table plays by, which checklist B1 lists: periods and their lengths,
+ * overtime, the clock mode with its last-minutes stop clock and mercy lead, the fouls and
+ * the bonus, and the timeouts. A game GIVEN one (by an admin, or at the table before the
+ * first play) keeps it apart from the rules FIXED when it starts (the game's `format`), so
+ * marking the game not started returns it to what it was given.
+ */
+export const GAME_FORMAT_VERSION = 1;
+
+export const GameFormatRules = z
+  .strictObject({
+    version: z.literal(GAME_FORMAT_VERSION),
+    gameFormat: GameFormat,
+    clock: Clock,
+    fouls: Fouls,
+    timeouts: Timeouts,
+  })
+  .superRefine((f, ctx) =>
+    formatIssues(f, (path, message) => ctx.addIssue({ code: 'custom', path, message })),
+  );
+export type GameFormatRules = z.infer<typeof GameFormatRules>;
+
+/** The format part of a season's rules. */
+export function formatOfRules(rules: SeasonRules): GameFormatRules {
+  const { gameFormat, clock, fouls, timeouts } = rules;
+  return { version: GAME_FORMAT_VERSION, gameFormat, clock, fouls, timeouts };
+}
+
+/**
+ * A season's rules with one game's format in place of their own. The rest (ties, what is
+ * recorded, standings, rosters) stays the season's: a game's format is how it is played.
+ */
+export function rulesWithFormat(rules: SeasonRules, format: GameFormatRules): SeasonRules {
+  const { gameFormat, clock, fouls, timeouts } = format;
+  return { ...rules, gameFormat, clock, fouls, timeouts };
+}
+
+/** A stored game format; null when there is none or it does not read in this version. */
+export function parseGameFormat(stored: unknown): GameFormatRules | null {
+  if (stored === null || stored === undefined) return null;
+  const parsed = GameFormatRules.safeParse(stored);
+  return parsed.success ? parsed.data : null;
+}
+
+/** The form's presets (checklist B2): high-school, rec-league, and the season's own. */
+export const GAME_FORMAT_PRESETS = ['high-school', 'rec-league', 'season'] as const;
+export type GameFormatPreset = (typeof GAME_FORMAT_PRESETS)[number];
+export type GameFormatPresetChoice = {
+  readonly preset: GameFormatPreset;
+  readonly format: GameFormatRules;
+};
+
+export function gameFormatPresets(seasonRules: SeasonRules): readonly GameFormatPresetChoice[] {
+  return GAME_FORMAT_PRESETS.map((preset) => ({
+    preset,
+    format: formatOfRules(preset === 'season' ? seasonRules : seasonRulesPreset(preset)),
+  }));
+}
+
+/** Every rule of a format, in the order the start confirmation lists them (S-39). */
+export const FORMAT_FACTS = [
+  'periods',
+  'periodSeconds',
+  'overtimeSeconds',
+  'clockMode',
+  'stopClockLastSeconds',
+  'stopClockScope',
+  'mercyLead',
+  'teamFoulsReset',
+  'bonusFouls',
+  'doubleBonusFouls',
+  'playerFoulLimit',
+  'fullTimeouts',
+  'shortTimeouts',
+  'timeoutsPer',
+  'overtimeTimeouts',
+  'timeoutsCarry',
+] as const;
+export type FormatFactKey = (typeof FORMAT_FACTS)[number];
+/** One rule and its value; null means none (no mercy lead, no double bonus, no foul limit). */
+export type FormatFact = {
+  readonly fact: FormatFactKey;
+  readonly value: number | string | boolean | null;
+};
+
+/** The facts the start confirmation lists: every rule, the clock mode included (S-39). */
+export function formatFacts(format: GameFormatRules): readonly FormatFact[] {
+  const { gameFormat: g, clock: c, fouls: f, timeouts: t } = format;
+  const values: Record<FormatFactKey, FormatFact['value']> = {
+    periods: g.periods,
+    periodSeconds: g.periodSeconds,
+    overtimeSeconds: g.overtimeSeconds,
+    clockMode: c.mode,
+    stopClockLastSeconds: c.stopClockLastSeconds,
+    // Where the last seconds are counts only when there are some ('half' when not said).
+    stopClockScope: c.stopClockLastSeconds === null ? null : (c.stopClockScope ?? 'half'),
+    mercyLead: c.mercyLead,
+    teamFoulsReset: f.teamFoulsReset,
+    bonusFouls: f.bonusFouls,
+    doubleBonusFouls: f.doubleBonusFouls,
+    playerFoulLimit: f.playerFoulLimit,
+    fullTimeouts: t.full,
+    shortTimeouts: t.short,
+    timeoutsPer: t.per,
+    overtimeTimeouts: t.overtime,
+    timeoutsCarry: t.carry,
+  };
+  return FORMAT_FACTS.map((fact) => ({ fact, value: values[fact] }));
 }
 
 /** The flat shape from before versions existed; read only so old data still opens. */
