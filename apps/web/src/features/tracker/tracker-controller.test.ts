@@ -2767,4 +2767,104 @@ describe('tracker controller: its own commands told by their IDs (step 2.242)', 
     expect(status.cannotTell).toBe(true);
     expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 2 });
   });
+
+  it('shows the game and keeps the scoring rebuilt in hold, though the state after it is lost', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const rosters = await serverRosters(network);
+    const k = keeping();
+    const first = device(network, { storage, rosters, keepScoring: k.keepScoring });
+    await first.controller.start();
+    await tapAll(first.controller, [...tipOff, basket('away', bears[1] ?? '')]);
+    await first.controller.idle();
+    const keptState: ServerState = await serverGame(network);
+    await first.controller.leave();
+    await somebodyElse(network, rosters, [basket('away', bears[2] ?? '', 3)]);
+    const keptScoring = k.last();
+    // The state judging the taps is answered; the one opening loads after it is lost.
+    let statesAnswered = 0;
+    const loseTheSecondState =
+      (ask: typeof globalThis.fetch): typeof globalThis.fetch =>
+      async (input, init) => {
+        const address = String(input instanceof Request ? input.url : input).split('?')[0] ?? '';
+        if (network.mode === 'up' && address.endsWith('/state')) {
+          statesAnswered += 1;
+          if (statesAnswered === 2) throw new TypeError('Failed to fetch');
+        }
+        return ask(input, init);
+      };
+    network.mode = 'down';
+    const again = device(network, {
+      storage,
+      rosters,
+      keepScoring: k.keepScoring,
+      askServer: loseTheSecondState,
+      kept: { state: keptState, scoring: keptScoring },
+    });
+    await again.controller.start();
+    await tapAll(again.controller, [basket('home', hawks[0] ?? '')]);
+    await again.controller.idle();
+    network.mode = 'up';
+    again.controller.online();
+    await again.controller.idle();
+    expect(statesAnswered).toBe(2);
+    const status = again.controller.status();
+    expect(status.notSaved.map((t) => t.command.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    // Before: the tap listed as not saved was still shown, 2-2, and kept on top under
+    // the ended session, until a load answered.
+    expect(status.game === null ? null : scoreOf(status.game)).toEqual({ home: 0, away: 2 });
+    const kept = k.last();
+    expect(kept?.sessionId).not.toBe(keptScoring?.sessionId);
+    expect(kept?.onTop.some((c) => c.input.type === 'score')).toBe(false);
+  });
+
+  it('offers "Send these plays" when it cannot tell, and the server counts nothing twice', async () => {
+    const network = endpointNetwork();
+    const storage = createMemoryQueueStorage();
+    const rosters = await serverRosters(network);
+    const k = keeping();
+    const first = device(network, { storage, rosters, keepScoring: k.keepScoring });
+    await first.controller.start();
+    await tapAll(first.controller, [...tipOff, basket('away', bears[1] ?? '')]);
+    await first.controller.idle();
+    const { changes: _unknown, ...keptState } = await serverGame(network);
+    expect((await first.controller.changePlayers(awayAdd('61'))).ok).toBe(true);
+    await first.controller.idle();
+    await first.controller.leave();
+    const keptScoring = k.last();
+    const named: string[] = [];
+    network.mode = 'down';
+    const again = device(network, {
+      storage,
+      rosters,
+      keepScoring: k.keepScoring,
+      kept: { state: keptState, scoring: keptScoring },
+      sendTaps: (send) => async (input, init) => {
+        const body = String(init?.body ?? '');
+        if (body.includes('"notSavedSince"')) named.push(body);
+        return send(input, init);
+      },
+    });
+    await again.controller.start();
+    await tapAll(again.controller, [basket('home', hawks[0] ?? '')]);
+    await again.controller.idle();
+    network.mode = 'up';
+    again.controller.online();
+    await again.controller.idle();
+    expect(again.controller.status().cannotTell).toBe(true);
+    expect(again.controller.status().sendNotSaved).toBe('offered');
+    // The batch names the session the plays were made under. That one was released, so
+    // the server finds no lost session and refuses: listed still, entered again once.
+    expect(await again.controller.sendNotSaved()).toEqual({ ok: false, reason: 'game-moved' });
+    expect(named).toHaveLength(1);
+    expect(named[0]).toContain(`"sessionId":"${keptScoring?.sessionId ?? 'none'}"`);
+    const listed = again.controller.status().notSaved;
+    expect(listed.map((t) => t.command.input)).toEqual([basket('home', hawks[0] ?? '')]);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 0, away: 2 });
+    expect((await again.controller.enterAgain(listed[0]?.command.commandId ?? '')).ok).toBe(true);
+    await again.controller.idle();
+    expect(again.controller.status().notSaved).toEqual([]);
+    expect(again.controller.status().cannotTell).toBe(false);
+    expect(scoreOf((await serverGame(network)).state)).toEqual({ home: 2, away: 2 });
+  });
 });
