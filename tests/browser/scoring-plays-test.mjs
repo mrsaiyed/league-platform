@@ -855,8 +855,10 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
         items[0] === 'End game' && items.includes('Mark not started'),
         items.join(' | '),
       );
-      watch = new URL(await c.sheet.locator('a[target="_blank"]').getAttribute('href'), origin)
-        .href;
+      watch = new URL(
+        await c.sheet.getByRole('link', { name: 'Open the public game page' }).getAttribute('href'),
+        origin,
+      ).href;
       await c.sheet.locator('.court-close').tap();
       await c.sheet.waitFor({ state: 'detached' });
       before = await visitor();
@@ -1322,7 +1324,7 @@ async function tryOut(browser, size, face) {
       await c.more.tap();
       await c.sheet.waitFor();
       const watch = new URL(
-        await c.sheet.locator('a[target="_blank"]').getAttribute('href'),
+        await c.sheet.getByRole('link', { name: 'Open the public game page' }).getAttribute('href'),
         origin,
       ).href;
       await c.sheet.locator('[data-more-not-started]').tap();
