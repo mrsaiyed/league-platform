@@ -8,28 +8,20 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { playerLabel } from './engine-words.ts';
 import type { DeviceRosters } from './opened-game-storage.ts';
 import {
+  addLine,
   cleared,
   fixChange,
   fixNameBox,
   fixNumberBox,
-  lineBox,
-  lineChanges,
-  lineProblem,
-  nameBox,
   readDrafts,
   someTeamIsEmpty,
   typed,
   writeDrafts,
+  type LineProblem,
   type PlayerDrafts,
 } from './players-form.ts';
 import { PlayersButton, PlayersSheet, type PanelSaid } from './players-panel.tsx';
-import {
-  numbersOfLine,
-  playersPanel,
-  teamOn,
-  type PlayerChange,
-  type PlayerSide,
-} from './roster-changes.ts';
+import { playersPanel, teamOn, type PlayerChange, type PlayerSide } from './roster-changes.ts';
 import type {
   PlayersResult,
   TrackerController,
@@ -42,6 +34,18 @@ function draftStore(): Storage | null {
     return typeof window === 'undefined' ? null : window.localStorage;
   } catch {
     return null;
+  }
+}
+
+/** Why a typed line is not sent, naming the entry that is wrong. */
+function lineProblemText(problem: LineProblem, t: Translate) {
+  switch (problem.kind) {
+    case 'numbers-with-name':
+      return t('tracker.players.numbersWithName');
+    case 'not-a-number':
+      return t('tracker.players.notANumber', { entry: problem.entry });
+    case 'twice':
+      return t('tracker.players.twice', { jersey: problem.entry });
   }
 }
 
@@ -95,15 +99,18 @@ export function usePlayersPanel(args: {
   const [fixing, setFixing] = useState<string | null>(null);
   const [said, setSaid] = useState<Partial<Record<PlayerSide, PanelSaid>>>({});
   const [drafts, setDrafts] = useState<PlayerDrafts>(() => readDrafts(draftStore(), draftsFor));
+  const latest = useRef(drafts);
+  latest.current = drafts;
   const keep = useCallback(
     (next: PlayerDrafts) => {
+      // At once, so a second tap in the same moment reads what the first left.
+      latest.current = next;
       setDrafts(next);
       writeDrafts(draftStore(), draftsFor, next);
     },
     [draftsFor],
   );
-  const latest = useRef(drafts);
-  latest.current = drafts;
+  const [busy, setBusy] = useState<Partial<Record<PlayerSide, boolean>>>({});
 
   const scoring = status.mode.kind === 'scoring';
   const panel = useMemo(
@@ -137,14 +144,8 @@ export function usePlayersPanel(args: {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  const send = useCallback(
-    async (
-      side: PlayerSide,
-      changes: readonly PlayerChange[],
-      done: (r: PlayersResult) => void,
-    ) => {
-      const result = await controller.changePlayers(changes);
-      done(result);
+  const tell = useCallback(
+    (side: PlayerSide, changes: readonly PlayerChange[], result: PlayersResult) => {
       setSaid((before) => ({
         ...before,
         [side]: result.ok
@@ -160,34 +161,45 @@ export function usePlayersPanel(args: {
           : { kind: 'error', text: refusalText(result, rosters, side, t) },
       }));
     },
-    [controller, rosters, t],
+    [rosters, t],
   );
+  const send = useCallback(
+    async (
+      side: PlayerSide,
+      changes: readonly PlayerChange[],
+      done: (r: PlayersResult) => void,
+    ) => {
+      const result = await controller.changePlayers(changes);
+      done(result);
+      tell(side, changes, result);
+    },
+    [controller, tell],
+  );
+  // One submit of an add line at a time (review H2): the panel's own gate, kept across
+  // renders so a double tap is one change.
+  const told = useRef(tell);
+  told.current = tell;
+  const submit = useRef<ReturnType<typeof addLine> | null>(null);
+  submit.current ??= addLine({
+    read: () => latest.current,
+    keep,
+    busy: (side, on) => setBusy((before) => ({ ...before, [side]: on })),
+    store: async (side, changes) => {
+      const result = await controller.changePlayers(changes);
+      told.current(side, changes, result);
+      return result;
+    },
+  });
 
   const on = {
     type: (box: string, text: string) => keep(typed(latest.current, box, text)),
     add: (side: PlayerSide) => {
-      const line = latest.current[lineBox(side)] ?? '';
-      const name = latest.current[nameBox(side)] ?? '';
-      if (lineProblem(line, name) !== null) {
+      void submit.current?.(side).then((done) => {
+        if (done.kind !== 'problem') return;
         setSaid((before) => ({
           ...before,
-          [side]: { kind: 'error', text: t('tracker.players.numbersWithName') },
+          [side]: { kind: 'error', text: lineProblemText(done.problem, t) },
         }));
-        return;
-      }
-      const changes = lineChanges(side, line, name);
-      void send(side, changes, (result) => {
-        if (result.ok) keep(cleared(latest.current, [lineBox(side), nameBox(side)]));
-        else if (result.reason === 'storage' && result.stored > 0) {
-          // The first of a bench were kept: what is left of the line is what was not.
-          keep(
-            typed(
-              latest.current,
-              lineBox(side),
-              numbersOfLine(line).slice(result.stored).join(' '),
-            ),
-          );
-        }
       });
     },
     fix: (playerId: string | null) => {
@@ -232,6 +244,7 @@ export function usePlayersPanel(args: {
         panel={panel}
         rosters={rosters}
         drafts={drafts}
+        busy={busy}
         fixing={fixing}
         said={said}
         banner={args.banner}

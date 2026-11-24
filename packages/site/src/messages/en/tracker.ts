@@ -396,6 +396,8 @@ export const enTracker = {
     'Use numbers from 0 to 99 (or 00). Type one number with a name, or several numbers with no name.',
   'tracker.players.jump': 'Go to the away team: {team}',
   'tracker.players.name': 'Name (if known)',
+  'tracker.players.notANumber':
+    '“{entry}” is not a jersey number. Use numbers from 0 to 99 (or 00).',
   'tracker.players.number': 'Number',
   'tracker.players.numbers': 'Number, or several numbers',
   'tracker.players.numbersHelp': 'For a whole bench, type the numbers in one line: 3 5 10 12 14.',
@@ -435,6 +437,7 @@ export const enTracker = {
   'tracker.players.takeOff': 'Take off the team',
   'tracker.players.takenOff': 'Taken off.',
   'tracker.players.title': 'Players',
+  'tracker.players.twice': '{jersey} is typed twice in the line. Type each number once.',
   'tracker.players.waiting': 'Not sent yet',
   'tracker.players.wornBy': '{player} wears #{jersey}.',
   'tracker.pregame.players_one': '{team}: {count} player',

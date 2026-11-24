@@ -7,8 +7,10 @@
 // - A number already worn is marked while it is typed, on the typed line and on the
 //   player who wears it, and never stops the add (S-44).
 // - What is typed is kept as drafts, by game, so a half-typed line survives the panel
-//   being shut and the page being loaded again; a line is cleared only once it is stored.
+//   being shut and the page being loaded again. A line is cleared from the tap and given
+//   back if it could not be stored; one submit is stored at a time (review H2).
 import type { DevicePlayer, DeviceRosters, DeviceTeam } from './opened-game-storage.ts';
+import type { PlayersResult } from './tracker-controller.ts';
 import { numbersOfLine, wornOn, type PlayerChange, type PlayerSide } from './roster-changes.ts';
 
 /** What is typed in the panel, by box: `home:number`, `away:name`, `fix:<id>:number`, … */
@@ -45,8 +47,24 @@ export const someTeamIsEmpty = (rosters: DeviceRosters) =>
  * neither a bench nor one player (the lead's decision, step 2.118 part 3), so the panel
  * says what to do instead of sending them to be refused.
  */
-export function lineProblem(line: string, name: string): 'numbers-with-name' | null {
-  return numbersOfLine(line).length > 1 && name.trim() !== '' ? 'numbers-with-name' : null;
+export type LineProblem =
+  | { readonly kind: 'numbers-with-name' }
+  /** An entry that is no jersey number ("abc", "1234"): named, so it can be fixed. */
+  | { readonly kind: 'not-a-number'; readonly entry: string }
+  /** A number typed twice in the line ("40 40"): said, never dropped silently. */
+  | { readonly kind: 'twice'; readonly entry: string };
+
+const jerseyShape = /^(?:0|00|[1-9][0-9]?)$/u;
+
+export function lineProblem(line: string, name: string): LineProblem | null {
+  const entries = line.split(/[\s,;]+/u).filter((part) => part !== '');
+  const wrong = entries.find((entry) => !jerseyShape.test(entry));
+  if (wrong !== undefined) {
+    return { kind: 'not-a-number', entry: wrong };
+  }
+  const twice = entries.find((entry, i) => entries.indexOf(entry) !== i);
+  if (twice !== undefined) return { kind: 'twice', entry: twice };
+  return entries.length > 1 && name.trim() !== '' ? { kind: 'numbers-with-name' } : null;
 }
 
 /**
@@ -136,4 +154,54 @@ export function writeDrafts(store: DraftStore | null, gameId: string, drafts: Pl
   } catch {
     // Private windows and full storage: the boxes still hold the text until the page goes.
   }
+}
+
+/** What one submit of a team's add line came to. */
+export type AddSubmit =
+  | { readonly kind: 'ignored' }
+  | { readonly kind: 'problem'; readonly problem: LineProblem }
+  | { readonly kind: 'stored'; readonly result: PlayersResult };
+
+/**
+ * A team's add line, submitted one at a time (review of 2.118, H2): from the tap the line
+ * is cleared and the team busy, so a second tap (or Enter) while the first is stored is
+ * ignored and one submit is one change; the text comes back if it was not stored (only
+ * the numbers not stored, when a bench was stored in part).
+ */
+export function addLine(deps: {
+  readonly read: () => PlayerDrafts;
+  readonly keep: (next: PlayerDrafts) => void;
+  readonly store: (side: PlayerSide, changes: readonly PlayerChange[]) => Promise<PlayersResult>;
+  readonly busy: (side: PlayerSide, busy: boolean) => void;
+}): (side: PlayerSide) => Promise<AddSubmit> {
+  const storing = new Set<PlayerSide>();
+  return async (side) => {
+    if (storing.has(side)) return { kind: 'ignored' };
+    const boxes = [lineBox(side), nameBox(side)];
+    const line = deps.read()[lineBox(side)] ?? '';
+    const name = deps.read()[nameBox(side)] ?? '';
+    if (line.trim() === '' && name.trim() === '') return { kind: 'ignored' };
+    const problem = lineProblem(line, name);
+    if (problem !== null) return { kind: 'problem', problem };
+    storing.add(side);
+    deps.busy(side, true);
+    deps.keep(cleared(deps.read(), boxes));
+    try {
+      const result = await deps.store(side, lineChanges(side, line, name));
+      if (!result.ok) {
+        const left =
+          result.reason === 'storage' && result.stored > 0
+            ? numbersOfLine(line).slice(result.stored).join(' ')
+            : line;
+        const back = typed(typed(deps.read(), lineBox(side), left), nameBox(side), name);
+        // What was typed meanwhile is kept: the text comes back only into empty boxes.
+        const now = deps.read();
+        deps.keep(boxes.every((b) => (now[b] ?? '') === '') ? back : now);
+      }
+      return { kind: 'stored', result };
+    } finally {
+      storing.delete(side);
+      deps.busy(side, false);
+    }
+  };
 }

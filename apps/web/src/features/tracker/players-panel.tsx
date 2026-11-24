@@ -52,6 +52,8 @@ export type PlayersSheetProps = {
   /** The same rosters the panel was made from: a typed number is checked against them. */
   readonly rosters: DeviceRosters;
   readonly drafts: PlayerDrafts;
+  /** The teams whose add line is being stored: its button waits (one submit at a time). */
+  readonly busy?: Partial<Readonly<Record<PlayerSide, boolean>>>;
   /** The player whose fix is open, or null. */
   readonly fixing: string | null;
   readonly said: Partial<Readonly<Record<PlayerSide, PanelSaid>>>;
@@ -159,6 +161,7 @@ function TeamPlayers(props: PlayersSheetProps & { readonly team: PanelTeam }) {
   const clashes = typedClashes(teamOn(props.rosters, team.side), line);
   const marked = clashedIds(clashes);
   const said = props.said[team.side];
+  const busy = props.busy?.[team.side] === true;
   const lineId = `court-players-line-${team.side}`;
   const nameId = `court-players-name-${team.side}`;
   const listed = team.players.filter((p) => !p.player.left);
@@ -220,7 +223,8 @@ function TeamPlayers(props: PlayersSheetProps & { readonly team: PanelTeam }) {
             className="court-button"
             data-kind="main"
             data-players-add={team.side}
-            disabled={line.trim() === '' && name.trim() === ''}
+            disabled={busy || (line.trim() === '' && name.trim() === '')}
+            aria-busy={busy ? true : undefined}
           >
             {t('tracker.players.add')}
           </button>
