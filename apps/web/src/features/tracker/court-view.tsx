@@ -142,6 +142,11 @@ export type CourtViewProps = {
    * them: nothing above the teams' block grows, so no five is cut (step 2.37).
    */
   readonly noticesIn?: 'top' | 'pad';
+  /**
+   * The season keeps turnovers (S-93, step 2.241): only then are the turnover button, the
+   * team-turnover button, the turnovers chip and its hint drawn. Absent: they are.
+   */
+  readonly turnovers?: boolean;
   readonly pad: PadMode;
   /**
    * The latest thing the screen said, or null; with a short form where a phone is short
@@ -402,17 +407,19 @@ function Team(props: CourtViewProps & { readonly team: TeamPanel }) {
               <span className="court-caret" aria-hidden="true" />
             </button>
           ) : null}
-          <button
-            type="button"
-            className="court-chip"
-            data-turnovers={team.side}
-            aria-expanded={turnoversOpen}
-            aria-controls={padId}
-            onClick={() => on.turnovers(team.side)}
-          >
-            {t.plural('tracker.turnovers.chip', team.turnovers)}
-            <span className="court-caret" aria-hidden="true" />
-          </button>
+          {props.turnovers === false ? null : (
+            <button
+              type="button"
+              className="court-chip"
+              data-turnovers={team.side}
+              aria-expanded={turnoversOpen}
+              aria-controls={padId}
+              onClick={() => on.turnovers(team.side)}
+            >
+              {t.plural('tracker.turnovers.chip', team.turnovers)}
+              <span className="court-caret" aria-hidden="true" />
+            </button>
+          )}
         </div>
       </header>
 
@@ -653,7 +660,9 @@ function Pad(props: CourtViewProps) {
         )}
       </p>
       {tile !== undefined ? <PlayerPad {...props} tile={tile} /> : null}
-      {pad.kind === 'turnovers' ? <TurnoversPad {...props} team={view.teams[pad.side]} /> : null}
+      {pad.kind === 'turnovers' && props.turnovers !== false ? (
+        <TurnoversPad {...props} team={view.teams[pad.side]} />
+      ) : null}
       {pad.kind === 'bench' ? (
         <BenchPad {...props} team={view.teams[pad.side]} forId={pad.forId} />
       ) : null}
@@ -700,7 +709,7 @@ function Pad(props: CourtViewProps) {
                 <span className="court-hint-bench">{t('tracker.hint.subs')}</span>
                 <span className="court-hint-folded">{t('tracker.hint.subsFolded')}</span>
               </p>
-              <p>{t('tracker.hint.turnovers')}</p>
+              {props.turnovers === false ? null : <p>{t('tracker.hint.turnovers')}</p>}
               <p>{t('tracker.hint.saved')}</p>
             </div>
           )}
@@ -875,15 +884,17 @@ function PlayerPad(props: CourtViewProps & { readonly tile: PlayerTile }) {
         >
           {t('tracker.pad.unfoul')}
         </button>
-        <button
-          type="button"
-          className="court-opt court-opt-turnover"
-          data-act="turnover"
-          aria-label={t('tracker.pad.turnoverFor', { player: name })}
-          onClick={(event) => on.action(tile, 'turnover', event)}
-        >
-          {t('tracker.pad.turnover')}
-        </button>
+        {props.turnovers === false ? null : (
+          <button
+            type="button"
+            className="court-opt court-opt-turnover"
+            data-act="turnover"
+            aria-label={t('tracker.pad.turnoverFor', { player: name })}
+            onClick={(event) => on.action(tile, 'turnover', event)}
+          >
+            {t('tracker.pad.turnover')}
+          </button>
+        )}
       </div>
     </div>
   );

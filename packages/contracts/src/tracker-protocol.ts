@@ -555,6 +555,12 @@ export const TrackerRosters = z.strictObject({
    * without a signal; the server stays the judge of the End tap.
    */
   allowTies: z.boolean(),
+  /**
+   * The statistics the season keeps ("Statistics kept", P7 §1), as the public pages count
+   * them (S-93, step 2.241): the tracker draws a button only for a statistic in it. The
+   * server stays the judge of each tap.
+   */
+  statistics: z.array(z.string().max(40)).max(40),
   players: z.array(TrackerRosterPlayer).max(1000),
 });
 export type TrackerRosters = z.infer<typeof TrackerRosters>;

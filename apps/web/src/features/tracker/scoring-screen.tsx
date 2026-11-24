@@ -121,6 +121,7 @@ import {
   type Tap,
   type TapRest,
 } from './tap-rest.ts';
+import { keepsTurnovers } from './device-rosters.ts';
 import { createTileDrag, type TileDrag } from './tile-drag.ts';
 import { createTileMarks, type MarkKind, type TileMark, type TileMarks } from './tile-marks.ts';
 import type { TapInput, TapResult, TrackerControllerStatus } from './tracker-controller.ts';
@@ -1529,6 +1530,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       banner={props.banner}
       notices={props.notices}
       noticesIn={noticesInPad ? 'pad' : 'top'}
+      turnovers={keepsTurnovers(props.rosters)}
       pad={pad}
       said={said}
       moreOpen={moreOpen}

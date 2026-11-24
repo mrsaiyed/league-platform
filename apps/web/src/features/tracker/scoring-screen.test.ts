@@ -191,6 +191,7 @@ function drawn(
     readonly when?: string | null;
     readonly account?: ReactNode;
     readonly banner?: CourtBanner;
+    readonly turnovers?: boolean;
   } = {},
 ): string {
   return renderToStaticMarkup(
@@ -208,6 +209,7 @@ function drawn(
       on: noHandlers,
       ...(options.slots === undefined ? {} : { slots: options.slots }),
       ...(options.account === undefined ? {} : { account: options.account }),
+      ...(options.turnovers === undefined ? {} : { turnovers: options.turnovers }),
     }),
   );
 }
@@ -534,6 +536,28 @@ describe('substitutions (checklist E1 to E5)', () => {
 const turnoversKept = () => scoringDevice(endpointNetwork({ deps: keepingTurnovers }));
 
 describe('turnovers (checklist D9, G1, G2)', () => {
+  it('draws no turnover button, chip or hint where the season keeps none, and all three where it does (S-93)', async () => {
+    const device = await scoringDevice();
+    await device.tipOff();
+    const tapped = tapTile(device.view(), noLineupPicks, padAtRest, h1);
+    if (tapped?.kind !== 'pad') throw new Error('the options did not open');
+    for (const turnovers of [false, true]) {
+      const atRest = drawn(device.view(), { turnovers });
+      const open = drawn(device.view(), { pad: tapped.pad, turnovers });
+      const list = drawn(device.view(), { pad: { kind: 'turnovers', side: 'home' }, turnovers });
+      const shown = [
+        atRest.includes('data-turnovers="home"'),
+        atRest.includes('data-turnovers="away"'),
+        padDrawn(atRest).includes(t('tracker.hint.turnovers')),
+        padDrawn(open).includes('data-act="turnover"'),
+        padDrawn(list).includes('data-act="team-turnover"'),
+      ];
+      expect(shown).toEqual(shown.map(() => turnovers));
+      // The other options stay.
+      expect(padDrawn(open)).toContain('data-act="foul"');
+    }
+  });
+
   it('sets a turnover aside and lists it where the season keeps none, and sends the plays after it (S-93)', async () => {
     const device = await scoringDevice();
     await device.tipOff();
