@@ -15,7 +15,8 @@
 //   cache or a browser shows no hidden number to the next person;
 // - what the visitor sees, once the page has asked for more, names no such player;
 // - the owner, once the page has asked for more, is shown them: on the statistics page, and
-//   on the pages of the schools the tracked school played.
+//   on the pages of the schools the tracked school played, and on each of the tracked
+//   school's ten game pages (staff-game-numbers.tsx), so the check is seen to find them there.
 // Accessibility checks (T-186) on each kind of page, as each of the two. The visitor's checks
 // on the same pages without the owner are demo-league-on-database-test.mjs's.
 import { leagueUrl } from '@srleagues/core';
@@ -213,6 +214,16 @@ if (browser) {
     note(
       `the owner is shown ${school.name}'s players' numbers on its page`,
       shownToStaff.includes(school.name),
+      shownToStaff.join(', '),
+    );
+  }
+  // Staff are shown a game's hidden lines too (staff-game-numbers.tsx): so on each of the
+  // tracked school's games the check is seen to find them, and could find a leak there.
+  for (const [kind, , label] of list) {
+    if (kind !== 'game' || !label.startsWith(`${tracked.name}'s game`)) continue;
+    note(
+      `the owner is shown the hidden numbers on ${label}`,
+      shownToStaff.includes(label),
       shownToStaff.join(', '),
     );
   }

@@ -3,23 +3,24 @@
 // up (apps/web/src/server/stand-in-games.ts). Builds the app first unless given --no-build.
 //
 // The made-up scorekeeper (signed in by their session, as the other browser tests sign in)
-// opens North Valley's live game, Hawks at home to Bears, and scores it through the tracker's
-// own endpoints, as a tablet would, while a visitor's phone shows the game's public page:
-// each play, one by one, is on that second screen within 2 seconds, measured. Then the made-up
-// owner takes the game over on a second tablet: the first one can score no more, the owner
-// scores on, each play still on the second screen within 2 seconds, and ends the game. The
-// standings (a game played for both, a win for the Hawks, a loss for the Bears) and the
-// statistics move, and the Bears, whose players' numbers are for their staff only, are named
-// on none of these pages. Accessibility checks (T-186) on every screen it opens.
+// opens North Valley's live game, Hawks at home to Bears, on the scoring screen and scores it
+// by taps (tracker-driver.mjs, as scoring-screen-test.mjs taps), while a visitor's phone shows
+// the game's public page: each play, one by one, is on that second screen within 2 seconds,
+// measured from the tap until the page shows the play's words and the score it makes. Then
+// the made-up owner takes the game over on a second tablet's scoring screen: the first one
+// says it can score no more, the owner taps on, each play still on the second screen within
+// 2 seconds, and ends the game. The standings and the statistics move by the numbers counted
+// from the plays tapped, and the Bears, whose players' numbers are for their staff only, are
+// named on none of these pages. Accessibility checks (T-186) on every page the visitor opens.
 //
 // The same parts are proven one by one elsewhere: live-game-test.mjs (one play on two screens,
 // the snapshot fallbacks), scoring-trouble-test.mjs (a takeover learnt on the scoring screen),
 // first-test-walk-test.mjs (a game ended on the scoring screen, then the standings). The
 // demo-shaped league on the made-up database cannot be scored live within 2 seconds yet: the
-// database has no live service (database-ports.ts, `liveFeed: null`), so a watcher there asks
-// for the snapshot every 5 seconds; this walk is on the stand-in, which has one.
-import { randomUUID } from 'node:crypto';
+// database has no live service (database-ports.ts, `liveFeed: null`; steps 2.124 and 2.116),
+// so a watcher there asks for the snapshot every 5 seconds; this walk is on the stand-in.
 import { leagueUrl } from '@srleagues/core';
+import { court, owner, scorekeeper, starters, trackerPath } from './tracker-driver.mjs';
 import {
   accessibilityProblems,
   buildNext,
@@ -44,27 +45,42 @@ const step = async (name, run) => {
   }
 };
 
-// The made-up league, game and players (stand-in-ports.ts, stand-in-games.ts).
+// The made-up league and game (stand-in-games.ts); the Hawks' #3 is Max Hawkins
+// (stand-in-world-seed.ts, players numbered 3, 5, 7, 9, 11, 13 in roster order).
 const league = { slug: 'north-valley' };
-const leagueId = '01900000-0000-7000-8000-000000000001';
 const gameId = '01900000-0000-7000-8000-006a00000002';
-const player = (team, n) =>
-  `01900000-0000-7000-8000-${(0x70 + team).toString(16).padStart(4, '0')}${n
-    .toString(16)
-    .padStart(8, '0')}`;
-const hawks = [1, 2, 3, 4, 5].map((n) => player(3, n));
-const bears = [1, 2, 3, 4, 5].map((n) => player(4, n));
 /** The Bears' made-up players: their numbers are for the Bears' staff only (S-22). */
 const bearsNames = ['Sol', 'Tam', 'Uma', 'Vic', 'Wes', 'Xan', 'Bearsley'];
-const api = `/api/v1/leagues/${leagueId}/games/${gameId}`;
-const tokens = { scorekeeper: 'local-scorekeeper-token', owner: 'local-owner-token' };
+const teamName = { home: 'Hawks', away: 'Bears' };
 const pages = {
   game: leagueUrl(league, 'game', { game: gameId }),
   standings: leagueUrl(league, 'standings'),
-  stats: leagueUrl(league, 'stats'),
+  // Totals, not the page's first view of averages: a game's numbers are added, not averaged.
+  stats: `${leagueUrl(league, 'stats')}?by=total`,
 };
 /** The longest a play may take to reach the second screen (P9 §3, item 3; T6 §11). */
 const withinMs = 2_000;
+const tablet = { width: 1180, height: 820 };
+
+/** The plays tapped, in order: who taps, the side, the jersey and the option. */
+const plays = [
+  ['keeper', 'home', 3, 'p3'],
+  ['keeper', 'away', 3, 'p2'],
+  ['keeper', 'away', 5, 'foul'],
+  ['keeper', 'home', 5, 'p2'],
+  ['keeper', 'home', 7, 'p2'],
+  ['keeper', 'away', 7, 'p2'],
+  ['owner', 'home', 9, 'p2'],
+  ['owner', 'away', 9, 'p3'],
+  ['owner', 'home', 11, 'p1'],
+];
+const pointsOf = (act) => ({ p1: 1, p2: 2, p3: 3 })[act] ?? 0;
+/** Counted from the plays: each team's points, and Max's (the Hawks' #3). */
+const counted = {
+  home: plays.filter((p) => p[1] === 'home').reduce((n, p) => n + pointsOf(p[3]), 0),
+  away: plays.filter((p) => p[1] === 'away').reduce((n, p) => n + pointsOf(p[3]), 0),
+  max: plays.filter((p) => p[1] === 'home' && p[2] === 3).reduce((n, p) => n + pointsOf(p[3]), 0),
+};
 
 let built = true;
 if (!process.argv.includes('--no-build')) {
@@ -85,51 +101,6 @@ if (built) {
     await waitFor(`${origin}/`, server);
     browser = await launch();
   });
-}
-
-/** One tablet scoring the game through the tracker's endpoints (step 2.32, record 058). */
-function tablet(token, deviceId) {
-  let sessionId;
-  const post = async (path, body) => {
-    const answer = await fetch(origin + api + path, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', cookie: `srl_session=${token}`, origin },
-      body: JSON.stringify(body),
-    });
-    const text = await answer.text();
-    if (!answer.ok) throw new Error(`${path} answered ${answer.status}: ${text.slice(0, 200)}`);
-    return JSON.parse(text);
-  };
-  return {
-    /** Opens the game on this tablet: its session, or who holds the game already. */
-    open: async () => {
-      const reply = await post('/session', { type: 'open', deviceId });
-      if (typeof reply.sessionId === 'string') sessionId = reply.sessionId;
-      return reply;
-    },
-    /** Takes a game another device holds, after saying yes to the question. */
-    takeOver: async (since) => {
-      const reply = await post('/session', {
-        type: 'take-over',
-        deviceId,
-        confirmed: true,
-        expectedHolderSince: since,
-      });
-      if (typeof reply.sessionId !== 'string') throw new Error(JSON.stringify(reply));
-      sessionId = reply.sessionId;
-    },
-    /** Sends taps in one batch; resolves with the game's sequence after them. */
-    tap: async (...inputs) => {
-      const reply = await post('/commands', {
-        protocolVersion: 1,
-        sessionId,
-        commands: inputs.map((input) => ({ commandId: randomUUID(), at: Date.now(), input })),
-      });
-      const refused = reply.results.filter((r) => r.status !== 'accepted');
-      if (refused.length > 0) throw new Error(`refused: ${JSON.stringify(refused)}`);
-      return reply.sequence;
-    },
-  };
 }
 
 async function accessible(page, label) {
@@ -160,6 +131,30 @@ function rowOf(tables, team) {
   }
   return null;
 }
+/** Every table of the statistics page: headings and each row's cells, its name first. */
+const tablesOf = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('main table')].map((table) => ({
+      headers: [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim()),
+      rows: [...table.querySelectorAll('tbody tr')].map((tr) =>
+        [...tr.querySelectorAll('th, td')].map((cell) => cell.textContent.trim()),
+      ),
+    })),
+  );
+/**
+ * The points of the first row named `name` in the table of `kind` ('Player' or 'Team', its
+ * first column's heading): 0 when no row has it yet.
+ */
+function pointsIn(tables, kind, name) {
+  for (const table of tables.filter((t) => t.headers[0]?.includes(kind))) {
+    const row = table.rows.find((cells) => cells[0]?.includes(name));
+    const column = table.headers.findIndex((h) => /\bPTS\b/.test(h));
+    if (!row || column < 0) continue;
+    const value = Number.parseFloat(row[column + row.length - table.headers.length]);
+    return Number.isNaN(value) ? 0 : value;
+  }
+  return 0;
+}
 /** Whether a Bears player is named, word by word, in a page's words. */
 const namesABear = (text) => bearsNames.some((name) => new RegExp(`\\b${name}\\b`).test(text));
 const rose = (before, after, column) => (after?.[column] ?? NaN) - (before?.[column] ?? NaN);
@@ -172,10 +167,41 @@ async function visit(context, address) {
   return page;
 }
 
+/** A scorekeeper's tablet: a browser of its own, signed in, its scoring screen open. */
+async function scoringTablet(cookie) {
+  const context = await browser.newContext({ viewport: tablet });
+  await context.addCookies([{ ...cookie, url: origin }]);
+  const page = await context.newPage();
+  page.setDefaultTimeout(30_000);
+  await page.goto(origin + trackerPath(gameId));
+  const c = court(page);
+  const { tookOver } = await c.open();
+  return { context, page, c, tookOver };
+}
+
+/** What the second screen shows now: each team's score and the latest play's words. */
+const shownOn = (page) =>
+  page.evaluate(() => {
+    const sides = [...document.querySelectorAll('.game-live .ui-scoreboard-side')];
+    const scoreOf = (name) =>
+      Number(
+        sides
+          .find((s) => s.querySelector('.ui-scoreboard-name')?.textContent.includes(name))
+          ?.querySelector('.ui-scoreboard-score')?.textContent ?? NaN,
+      );
+    return {
+      home: scoreOf('Hawks'),
+      away: scoreOf('Bears'),
+      latest:
+        document.querySelector('.game-latest-play > span:not(.ui-visually-hidden)')?.textContent ??
+        '',
+    };
+  });
+
 if (browser) {
   const visitor = await browser.newContext({ viewport: { width: 390, height: 844 } });
   let standingsBefore = [];
-  let statsBefore = '';
+  let statsBefore = [];
   await step('the standings and statistics before the game', async () => {
     const standings = await visit(visitor, pages.standings);
     standingsBefore = await standingsOf(standings);
@@ -186,81 +212,101 @@ if (browser) {
     );
     await standings.close();
     const stats = await visit(visitor, pages.stats);
-    statsBefore = await stats.locator('main').innerText();
+    statsBefore = await tablesOf(stats);
     await stats.close();
   });
 
-  const keeper = tablet(tokens.scorekeeper, 'game-night-tablet');
-  const owner = tablet(tokens.owner, 'game-night-owner-tablet');
   const took = [];
+  const tablets = {};
   let screen;
-  /** One play from `from`, timed until the second screen shows it. */
-  const play = async (from, input) => {
-    const before = Date.now();
-    const sequence = await from.tap(input);
-    await screen.waitForFunction(
-      (n) => Number(document.querySelector('[data-live-sequence]')?.dataset.liveSequence) >= n,
-      sequence,
-      { timeout: 10_000 },
+  const score = { home: 0, away: 0 };
+  /** One play tapped on a tablet, timed from the tap until the second screen shows it. */
+  const play = async ([who, side, jersey, act]) => {
+    const before = Number(
+      await screen.locator('[data-live-sequence]').getAttribute('data-live-sequence'),
     );
-    took.push(Date.now() - before);
+    score[side] += pointsOf(act);
+    const started = Date.now();
+    await tablets[who].c.play(side, jersey, act);
+    await screen
+      .waitForFunction(
+        ({ home, away, words, before }) => {
+          const sides = [...document.querySelectorAll('.game-live .ui-scoreboard-side')];
+          const scoreOf = (name) =>
+            Number(
+              sides
+                .find((s) => s.querySelector('.ui-scoreboard-name')?.textContent.includes(name))
+                ?.querySelector('.ui-scoreboard-score')?.textContent ?? NaN,
+            );
+          const latest =
+            document.querySelector('.game-latest-play > span:not(.ui-visually-hidden)')
+              ?.textContent ?? '';
+          return (
+            scoreOf('Hawks') === home &&
+            scoreOf('Bears') === away &&
+            Number(document.querySelector('[data-live-sequence]')?.dataset.liveSequence) > before &&
+            words.every((word) => latest.includes(word))
+          );
+        },
+        // The play's own words: its team, and the points it scored.
+        {
+          ...score,
+          words: [teamName[side], ...(pointsOf(act) > 0 ? [String(pointsOf(act))] : [])],
+          before,
+        },
+        { timeout: 10_000 },
+      )
+      .catch(async (error) => {
+        const shown = JSON.stringify(await shownOn(screen));
+        throw new Error(`${side} #${jersey} ${act}: the second screen shows ${shown}: ${error}`);
+      });
+    took.push(Date.now() - started);
   };
-  const score = (side, playerId, points) => ({ type: 'score', side, playerId, points });
-
-  await step('the scorekeeper opens the game and tips off, a visitor watching', async () => {
-    const opened = await keeper.open();
-    note(
-      'the scorekeeper’s tablet holds the game',
-      typeof opened.sessionId === 'string',
-      JSON.stringify(opened),
-    );
-    await keeper.tap(
-      { type: 'lineup', side: 'home', playerIds: hawks },
-      { type: 'lineup', side: 'away', playerIds: bears },
-      { type: 'start' },
-    );
-    screen = await visit(visitor, pages.game);
-    await screen.locator('[data-live-connection="open"]').waitFor({ timeout: 10_000 });
-    await accessible(screen, 'the live game on the second screen');
-  });
 
   await step(
-    'each of the scorekeeper’s plays is on the second screen within 2 seconds',
+    'the scorekeeper opens the game on the scoring screen, a visitor watching',
     async () => {
-      await play(keeper, score('home', hawks[0], 3));
-      await play(keeper, score('away', bears[0], 2));
-      await play(keeper, { type: 'foul', side: 'away', playerId: bears[1] });
-      await play(keeper, score('home', hawks[1], 2));
-      await play(keeper, score('home', hawks[2], 2));
-      await play(keeper, score('away', bears[2], 2));
+      tablets.keeper = await scoringTablet(scorekeeper);
+      note('the game was free for the scorekeeper to open', !tablets.keeper.tookOver);
+      await tablets.keeper.c.pick('home', starters);
+      await tablets.keeper.c.pick('away', starters);
+      screen = await visit(visitor, pages.game);
+      await screen.locator('[data-live-connection="open"]').waitFor({ timeout: 10_000 });
+      await accessible(screen, 'the live game on the second screen');
     },
   );
 
-  await step('a second scorekeeper takes the game over', async () => {
-    const asked = await owner.open();
+  await step(
+    'each of the scorekeeper’s taps is on the second screen within 2 seconds',
+    async () => {
+      for (const p of plays.filter((p) => p[0] === 'keeper')) await play(p);
+    },
+  );
+
+  await step('a second scorekeeper takes the game over on another tablet', async () => {
+    tablets.owner = await scoringTablet(owner);
+    note('the second tablet was asked to take the game over', tablets.owner.tookOver);
+    // The first tablet learns it by its next renewal of the hold (T-295) and says so.
+    const keeper = tablets.keeper.page;
+    await keeper
+      .getByText(
+        'Someone else is now scoring this game on another device. This device can no longer score it.',
+      )
+      .waitFor({ timeout: 20_000 });
     note(
-      'the second tablet is told who holds the game',
-      asked.status === 'held-by-other',
-      JSON.stringify(asked),
+      'the first tablet no longer shows the scoring screen once the game is taken over',
+      (await tablets.keeper.c.root.count()) === 0,
     );
-    await owner.takeOver(asked.holder?.since);
-    const stillScores = await keeper.tap(score('home', hawks[3], 2)).then(
-      () => true,
-      () => false,
-    );
-    note('the first tablet can score no more once the game is taken over', !stillScores);
   });
 
   await step(
-    'each of the second scorekeeper’s plays is on the second screen within 2 seconds',
+    'each of the second scorekeeper’s taps is on the second screen within 2 seconds',
     async () => {
-      await play(owner, score('home', hawks[3], 2));
-      await play(owner, score('away', bears[3], 3));
-      await play(owner, score('home', hawks[4], 1));
+      for (const p of plays.filter((p) => p[0] === 'owner')) await play(p);
     },
   );
   console.log(`game night: each play reached the second screen in ${took.join(', ')} ms`);
-  note('every play was timed', took.length === 9, `${took.length} timed`);
+  note('every play was timed', took.length === plays.length, `${took.length} timed`);
   note(
     `every play reached the second screen within ${withinMs} ms`,
     took.length > 0 && Math.max(...took) <= withinMs,
@@ -268,34 +314,27 @@ if (browser) {
   );
 
   await step('the second scorekeeper ends the game', async () => {
-    // The format's last period: End is refused before it, so the next period is tried.
-    let ended = false;
-    for (let period = 2; period <= 4 && !ended; period += 1) {
-      ended = await owner.tap({ type: 'end' }).then(
-        () => true,
-        () => false,
-      );
-      if (!ended) await owner.tap({ type: 'pause' }, { type: 'period', period }, { type: 'start' });
-    }
-    if (!ended)
-      ended = await owner.tap({ type: 'end' }).then(
-        () => true,
-        () => false,
-      );
-    note('the game is ended', ended);
+    const { c } = tablets.owner;
+    await c.endGame();
+    await c.root.locator('[data-final="saved"]').waitFor({ timeout: 20_000 });
+    note('the game is ended and saved', true);
     await screen.reload();
     await screen.locator('main').first().waitFor();
-    const main = await screen.locator('main').innerText();
+    const shown = await shownOn(screen);
+    const state = await screen.locator('.game-live .ui-scoreboard').getAttribute('data-state');
     note(
-      'the game’s page reads Final, 10 to 7',
-      /final/i.test(main) && main.includes('10') && main.includes('7'),
-      main.slice(0, 300),
+      `the game’s page reads final, ${counted.home} to ${counted.away}`,
+      state === 'final' && shown.home === counted.home && shown.away === counted.away,
+      `${state}: ${JSON.stringify(shown)}`,
     );
-    note('the game’s page names no Bears player', !namesABear(main));
+    note(
+      'the game’s page names no Bears player',
+      !namesABear(await screen.locator('main').innerText()),
+    );
     await accessible(screen, 'the ended game');
   });
 
-  await step('the standings move', async () => {
+  await step('the standings move by the result', async () => {
     const page = await visit(visitor, pages.standings);
     const after = await standingsOf(page);
     const [hb, bb, ha, ba] = [
@@ -304,33 +343,52 @@ if (browser) {
       rowOf(after, 'Hawks'),
       rowOf(after, 'Bears'),
     ];
+    const [winner, loser] =
+      counted.home > counted.away
+        ? [
+            [hb, ha],
+            [bb, ba],
+          ]
+        : [
+            [bb, ba],
+            [hb, ha],
+          ];
     const columns = Object.keys(ha ?? {});
     const played = columns.filter((c) => rose(hb, ha, c) === 1 && rose(bb, ba, c) === 1);
-    const won = columns.filter((c) => rose(hb, ha, c) === 1 && rose(bb, ba, c) === 0);
-    const lost = columns.filter((c) => rose(bb, ba, c) === 1 && rose(hb, ha, c) === 0);
+    const won = columns.filter((c) => rose(...winner, c) === 1 && rose(...loser, c) === 0);
+    const lost = columns.filter((c) => rose(...loser, c) === 1 && rose(...winner, c) === 0);
     const seen = JSON.stringify({ hb, ha, bb, ba });
     note('the standings count one more game for both teams', played.length > 0, seen);
-    note('the standings count a win for the Hawks', won.length > 0, seen);
-    note('the standings count a loss for the Bears', lost.length > 0, seen);
+    note('the standings count a win for the team with more points', won.length > 0, seen);
+    note('the standings count a loss for the other', lost.length > 0, seen);
     const words = await page.locator('main').innerText();
     note('the standings name no Bears player', !namesABear(words));
     await accessible(page, 'the standings after the game');
     await page.close();
   });
 
-  await step('the statistics move', async () => {
+  await step('the statistics move by the points tapped', async () => {
     const page = await visit(visitor, pages.stats);
-    const text = await page.locator('main').innerText();
+    const after = await tablesOf(page);
+    const grew = (kind, name) => pointsIn(after, kind, name) - pointsIn(statsBefore, kind, name);
+    const seen = JSON.stringify(
+      after.map((t) => [t.headers, t.rows.filter((r) => /Hawk|Bears/.test(r.join(' ')))]),
+    ).slice(0, 900);
+    note(`the Hawks’ points grew by ${counted.home}`, grew('Team', 'Hawks') === counted.home, seen);
+    note(`the Bears’ points grew by ${counted.away}`, grew('Team', 'Bears') === counted.away, seen);
     note(
-      'the statistics are not what they were before the game',
-      text !== statsBefore,
-      text.slice(0, 300),
+      `Max Hawkins’ points grew by ${counted.max}`,
+      grew('Player', 'Max Hawkins') === counted.max,
+      seen,
     );
-    const words = await page.locator('main').innerText();
-    note('the statistics name no Bears player', !namesABear(words));
+    note(
+      'the statistics name no Bears player',
+      !namesABear(await page.locator('main').innerText()),
+    );
     await accessible(page, 'the statistics after the game');
     await page.close();
   });
+  for (const t of Object.values(tablets)) await t.context.close();
   await visitor.close();
 }
 
