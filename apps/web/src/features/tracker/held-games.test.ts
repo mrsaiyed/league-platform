@@ -28,7 +28,7 @@ const row = (
     readonly accountId?: string;
     /** Stored before the maker was kept with each play: nobody's (T-327). */
     readonly noMaker?: true;
-    readonly state?: 'waiting' | 'not-saved';
+    readonly state?: 'waiting' | 'not-saved' | 'taken';
   } = {},
 ): QueuedCommand => ({
   gameId,
@@ -72,6 +72,17 @@ describe('the games this device holds plays for (step 2.38, S-88)', () => {
         lastTapAt: 3_000,
         teams: { home: 'Hawks', away: 'Bears' },
       },
+    ]);
+  });
+
+  it('counts a play the server already took (T-373) as neither waiting nor not saved', () => {
+    const queue = [
+      row('taken', 1_000, { leagueId: league, state: 'taken' }),
+      row('taken', 2_000, { leagueId: league, state: 'taken' }),
+      row('taken', 3_000, { leagueId: league, state: 'not-saved' }),
+    ];
+    expect(heldGames(queue, mine, () => undefined)).toEqual([
+      { gameId: 'taken', waiting: 0, notSaved: 1, lastTapAt: 3_000, teams: null },
     ]);
   });
 

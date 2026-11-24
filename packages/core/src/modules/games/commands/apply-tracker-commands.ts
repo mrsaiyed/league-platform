@@ -70,7 +70,7 @@ import {
   type TrackerInput,
 } from '../live-game.ts';
 import { finishTrackedGame, liveResultOf } from '../finish-tracked-game.ts';
-import { gameMovedSince } from '../game-moved-since.ts';
+import { explainedUpTo } from '../game-moved-since.ts';
 import { gameScope, mayChangeGames, mayScoreGame } from '../policy.ts';
 import { recordActivity, scopeDetails } from '../../access/index.ts';
 import type { GameRecord, NewGameEvent, TrackerTx } from '../ports.ts';
@@ -232,25 +232,36 @@ export const applyTrackerCommands = defineCommand({
         return ok(reply(seq, refuseAll('session-not-held', messages['session-not-held'], taken)));
       }
       const lost = await tx.scoringSessions.findLost(gameId, namedSession);
-      const moved =
-        lost === undefined ||
-        lost.accountId.toLowerCase() !== accountId.toLowerCase() ||
-        (await gameMovedSince(tx, {
-          gameId,
-          since: batch.notSavedSince,
-          last: seq,
-          own: new Set(ids),
-          accountId,
-          heard: lost.heardSeq,
-          ...(lost.sentSeq === undefined ? {} : { sent: lost.sentSeq }),
-        }));
-      if (moved) {
+      const since = batch.notSavedSince;
+      const explained =
+        lost === undefined || lost.accountId.toLowerCase() !== accountId.toLowerCase()
+          ? null
+          : await explainedUpTo(tx, {
+              gameId,
+              since,
+              last: seq,
+              own: new Set(ids),
+              accountId,
+              heard: lost.heardSeq,
+              ...(lost.sentSeq === undefined ? {} : { sent: lost.sentSeq }),
+            });
+      if (explained !== seq) {
+        // T-372: a list longer than a batch (a whole game's copy uploaded) is explained
+        // batch by batch. How far this batch explains the events, in order, is written as
+        // sent, so the next batch looks past it; its plays already there answer
+        // duplicate (they add nothing), and any other is refused, to enter again.
+        if (lost !== undefined && explained !== null && explained > (lost.sentSeq ?? since)) {
+          await tx.scoringSessions.sent(gameId, namedSession, explained);
+        }
         return ok(reply(seq, refuseAll('game-moved', messages['game-moved'], taken)));
       }
       const seqBefore = seq;
+      const sentBefore = lost?.sentSeq ?? since;
       noteAnswer = async () => {
+        // Explained up to here, whether this batch added plays or only answered
+        // duplicates (T-372): the list's next batch looks past it.
+        if (seq > sentBefore) await tx.scoringSessions.sent(gameId, namedSession, seq);
         if (seq === seqBefore) return;
-        await tx.scoringSessions.sent(gameId, namedSession, seq);
         // Written as what it is (T-335): plays kept after a takeover, sent by their maker.
         await recordActivity(tx, context, {
           action: 'games.apply_tracker_commands',

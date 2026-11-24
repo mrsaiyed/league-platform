@@ -138,6 +138,7 @@ export async function TrackerPage({
         rosters={deviceRosters(trackerRostersReply(read.value), names.teams)}
         when={when}
         watchHref={leagueUrl(here, 'game', { game: read.value.gameId })}
+        uploadHref={leagueUrl(here, 'score-upload', { game: read.value.gameId })}
         backHref={backHref}
         accountHref={platformUrl('account')}
         account={menu === null ? null : <AccountButton account={menu} />}

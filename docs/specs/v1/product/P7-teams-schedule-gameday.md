@@ -135,7 +135,7 @@ How the grid works (built in step 2.64):
 
 - If a tablet dies, another scorekeeper opens the game, is told who was scoring, confirms the takeover, and continues from the last saved tap.
 - Every tap is kept on the device first and uploads by itself as soon as there is a connection. No Wi-Fi in the gym is not a problem.
-- The scorekeeper can also **save a copy of the game** to the device as a file at any time. If that tablet never gets back online, the file can be opened on any other phone or computer and uploaded from there. Nothing is counted twice if the tablet uploads later as well.
+- The scorekeeper can also **save a copy of the game** to the device as a file at any time. If that tablet never gets back online, the file can be opened on any other phone or computer and uploaded from there, on the game's upload page: it is linked from each game in "Your games" and from Save a copy, and opens for whoever may score the game (S-97). Nothing is counted twice if the tablet uploads later as well. A game that has ended must be reopened before its copy is uploaded.
 
 **S-6 (agreed, changed November 12): the league decides whether players can be added at the scorer's table.** Three choices: allowed, with the added player flagged for the admin afterwards ("2 walk-up players to review"); allowed with no flag; or not allowed, so only rostered players can be scored. The first is the starting setting, so game night is never blocked by paperwork.
 

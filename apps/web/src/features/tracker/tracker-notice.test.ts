@@ -119,6 +119,19 @@ describe('tracker notices (T6 §5, T-113)', () => {
     ]);
   });
 
+  it('left the game with plays this device can still send: says they wait and points to sending them (step 2.70, T-370)', () => {
+    const status = {
+      ...calm,
+      mode: { kind: 'read-only', reason: 'released' },
+      notSaved: [kept(1)],
+      sendNotSaved: 'offered',
+    } as const;
+    const said = trackerNotices(status).map((n) => trackerNoticeText(n, t));
+    expect(said).toEqual([t.plural('tracker.releasedKept', 1)]);
+    expect(said[0]).toContain('Send these plays');
+    expect(said[0]).not.toContain('Enter it again');
+  });
+
   it('a final game this device shows says so in its final panel, not in a notice above it (step 2.37)', () => {
     const final = played([basket, { type: 'end' }], tippedOff());
     const over = { kind: 'read-only', reason: 'game-not-live' } as const;

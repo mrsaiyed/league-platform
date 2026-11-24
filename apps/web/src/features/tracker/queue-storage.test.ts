@@ -34,4 +34,16 @@ describe('the taps of one account (T-321)', () => {
     // Both stay on the device, each for its own account.
     expect(device.all().map((e) => e.accountId)).toEqual(['account-1', 'account-2']);
   });
+
+  // T-373: a taken tap the device no longer held, stored at the end, is still the maker's
+  // after a reload, so "Send these plays" still names it as the device's own.
+  it('keeps league and account with a taken tap stored anew, and lists it to its maker only', async () => {
+    const device = createMemoryQueueStorage();
+    const first = inLeague(device, 'league-1', 'account-1');
+    await first.settle(game, { taken: [{ protocolVersion: 2, command: tap(3), sessionId: 's' }] });
+    expect((await first.list(game)).map((e) => [e.state, e.leagueId, e.accountId])).toEqual([
+      ['taken', 'league-1', 'account-1'],
+    ]);
+    expect(await inLeague(device, 'league-1', 'account-2').list(game)).toEqual([]);
+  });
 });

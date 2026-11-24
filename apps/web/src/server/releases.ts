@@ -77,6 +77,8 @@ export const leaguePageReleases = {
   admin: 'released',
   'admin-area': 'released',
   score: 'released',
+  // The upload of a copy of a game (step 2.70).
+  'score-upload': 'released',
   // The tracker on the home screen and with no signal (step 2.38).
   'tracker-manifest': 'released',
   'tracker-worker': 'released',
