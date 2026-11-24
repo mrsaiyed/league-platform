@@ -116,7 +116,7 @@ export const enAdminSettings = {
   'adminSettings.publish.check.privacyChosen.cure':
     'Choose and save "Names on public pages" under Privacy, even to keep how it starts.',
   'adminSettings.publish.confirmPrivacyLive':
-    'Under-18s now play in this league, so its privacy choices were put back to where a youth league starts. The league stays published: confirm its privacy choices.',
+    'Under-18s play in this league, so its privacy choices must be confirmed. The league stays published meanwhile.',
   'adminSettings.publish.cureLink': 'Go to Privacy',
   'adminSettings.publish.cureLinkProfile': 'Go to Profile',
   'adminSettings.publish.draft':
