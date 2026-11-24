@@ -13,10 +13,23 @@
 // At the end, the connection back and everything sent, the box score on the screen and
 // the one the server reads back must both equal the one counted from the list (T-123).
 //
+// Part 2: the scorer signs in through the form, so the sign-in's access token really runs
+// out. One play is undone. Mid-game the page is reloaded with no signal, and later
+// reloaded by itself while a batch is on its way (the server takes it, the page is gone).
+// For three plays the device has no signal, and both clocks are moved on 61 minutes,
+// longer than the access token (T-225): the browser's (Playwright's clock) and the
+// server's (a preload that shifts its `Date`, below); the browser's cookie jar keeps real
+// time, so its session cookie, which runs out before the token, is dropped as the browser
+// would. Everything must then be sent under the same person once the proxy renews the
+// sign-in, and nothing be listed not saved.
+//
 // The random moments come from a seed, printed first: BAD_WIFI_SEED=<n> replays a run's
 // cuts exactly (the browser's own timing still varies). On a failure the order of events
 // (every cut, restore, tap and reopening) is printed with it.
 import { randomInt } from 'node:crypto';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   court,
   leagueId,
@@ -68,6 +81,7 @@ const script = [
   ['away', 9, 'p1'],
   ['home', 7, 'p3'],
   ['away', 11, 'p2'],
+  ['undo'],
   ['home', 5, 'foul'],
   ['away', 3, 'p2'],
   ['home', 9, 'p2'],
@@ -81,16 +95,29 @@ const script = [
   ['home', 5, 'p2'],
   ['away', 3, 'p1'],
 ];
-/** After which play (counted from 1) the tab is closed and opened again, and how. */
-const reopenAfter = { 7: 'with signal', 15: 'with no signal' };
+/** After which play (counted from 1) the tab is closed and opened again, or the page reloaded. */
+const reopenAfter = {
+  7: 'with signal',
+  12: 'reloaded with no signal',
+  17: 'with no signal',
+  21: 'reloaded by itself while a batch is sent',
+};
+/** The plays tapped with no signal at all, and after which the clocks move on 61 minutes. */
+const longOffline = { from: 14, moveAfter: 14, to: 17 };
+const minutes61 = 61 * 60_000;
 
-/** The box score counted from the first `n` plays of the list, by hand. */
+/** The box score counted from the first `n` plays of the list, by hand; an undo takes the latest out. */
 function counted(n = script.length) {
   const box = {};
   const score = { home: 0, away: 0 };
   for (const side of ['home', 'away'])
     for (const jersey of starters) box[`${side} ${jersey}`] = { points: 0, fouls: 0 };
-  for (const [side, jersey, what] of script.slice(0, n)) {
+  const kept = [];
+  for (const entry of script.slice(0, n)) {
+    if (entry[0] === 'undo') kept.pop();
+    else kept.push(entry);
+  }
+  for (const [side, jersey, what] of kept) {
     const line = box[`${side} ${jersey}`];
     if (what === 'foul') line.fouls += 1;
     else {
@@ -128,6 +155,36 @@ if (!process.argv.includes('--no-build')) {
 
 const toServer = (url) => url.pathname.endsWith('/commands');
 
+/**
+ * The server's clock, moved on by the test: a preload (`--import`) that shifts its `Date`
+ * by the milliseconds in a file the test writes, read every 50 ms, so the sign-in's
+ * tokens run out on the server as they would an hour later. Only this test's server.
+ */
+const clockFolder = mkdtempSync(join(tmpdir(), 'bad-wifi-clock-'));
+const clockFile = join(clockFolder, 'offset');
+const clockPreload = join(clockFolder, 'moved-clock.mjs');
+writeFileSync(clockFile, '0');
+writeFileSync(
+  clockPreload,
+  `import { readFileSync } from 'node:fs';
+const Real = Date;
+let offset = 0;
+const read = () => {
+  try { offset = Number(readFileSync(${JSON.stringify(clockFile)}, 'utf8')) || 0; } catch {}
+};
+read();
+setInterval(read, 50).unref();
+class Moved extends Real {
+  constructor(...a) { if (a.length === 0) super(Real.now() + offset); else super(...a); }
+  static now() { return Real.now() + offset; }
+  static UTC(...a) { return Real.UTC(...a); }
+  static parse(text) { return Real.parse(text); }
+}
+globalThis.Date = Moved;
+`,
+);
+const scorer = { email: 'scorekeeper@example.test', password: 'made-up scorekeeper password' };
+
 /** Whether the worker keeps the tracker page of the game, so it opens with no signal. */
 const pageKept = (page) =>
   page.evaluate(async (game) => {
@@ -145,6 +202,7 @@ async function oneGame(browser) {
   const server = startNext(['start', '--port', new URL(origin).port], {
     APP_ENV: 'test',
     PUBLIC_BASE_URL: origin,
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${clockPreload}`.trim(),
   });
   let context;
   const started = Date.now();
@@ -155,8 +213,23 @@ async function oneGame(browser) {
       viewport: { width: phone.width, height: phone.height },
       hasTouch: true,
     });
-    await context.addCookies([{ ...scorekeeper, url: origin }]);
+    // The page's clock: runs as the real one does until the test moves it on.
+    await context.clock.install();
     const errors = [];
+    // Signed in through the form, so the access token is one that runs out (T-225).
+    const signing = await context.newPage();
+    await signing.goto(`${origin}/signin`);
+    await signing.getByLabel('Email').fill(scorer.email);
+    await signing.getByLabel('Password').fill(scorer.password);
+    await Promise.all([
+      signing.waitForURL((url) => url.pathname !== '/signin'),
+      signing.getByRole('button', { name: 'Sign in', exact: true }).click(),
+    ]);
+    await signing.close();
+    const sessionCookie = async () =>
+      (await context.cookies(origin)).find((k) => k.name === scorekeeper.name)?.value;
+    const firstToken = await sessionCookie();
+    if (firstToken === undefined) throw new Error('the sign-in form set no session cookie');
     let page;
     let c;
     const openTab = async () => {
@@ -182,7 +255,19 @@ async function oneGame(browser) {
       await context.setOffline(to);
       log(to ? 'network cut' : 'network back');
     };
+    // A batch held on its way until the page that sent it is reloaded, then taken.
+    let holdNext = null;
     await context.route(toServer, async (route) => {
+      if (holdNext !== null) {
+        const held = holdNext;
+        holdNext = null;
+        log('a batch held on its way while its page is reloaded');
+        held.reached();
+        await held.reloaded;
+        const answer = await route.fetch().catch(() => null);
+        log(`the held batch reached the server (${answer?.status() ?? 'no answer'}), page gone`);
+        return route.abort('connectionreset').catch(() => undefined);
+      }
       if (slow) {
         const wait = Math.floor(slowness() * 1500);
         log(`a batch held ${wait} ms on the way`);
@@ -217,6 +302,11 @@ async function oneGame(browser) {
     };
 
     const play = async (side, jersey, act) => {
+      if (side === 'undo') {
+        await c.undo();
+        await c.pad.locator('[data-rest]').waitFor();
+        return;
+      }
       const options = c.pad.locator(
         `[data-options="${await c.tile(side, jersey).getAttribute('data-player')}"]`,
       );
@@ -262,8 +352,12 @@ async function oneGame(browser) {
 
     await step('the scripted game, tapped while the connection comes and goes', async () => {
       for (const [index, [side, jersey, act]] of script.entries()) {
+        const n = index + 1;
+        const how = reopenAfter[n];
+        const noSignal = n >= longOffline.from && n <= longOffline.to;
         const roll = random();
-        if (roll < 0.3) await setOffline(!offline);
+        if (noSignal) await setOffline(true);
+        else if (roll < 0.3) await setOffline(!offline);
         else if (roll < 0.42) setAnswersLost(!answersLost);
         else if (roll < 0.54) setSlow(!slow);
         if (index === 3) {
@@ -272,19 +366,71 @@ async function oneGame(browser) {
           setAnswersLost(true);
           setSlow(true);
         }
-        if (random() < 0.3) cutSoon();
+        let held = null;
+        if (how === 'reloaded by itself while a batch is sent') {
+          await later;
+          setAnswersLost(false);
+          setSlow(false);
+          held = {};
+          held.reachedYet = new Promise((done) => (held.reached = done));
+          held.reloaded = new Promise((done) => (held.reload = done));
+          holdNext = held;
+          await setOffline(false);
+        }
+        if (random() < 0.3 && !noSignal && held === null) cutSoon();
         await play(side, jersey, act);
         if (index === 3) await firstLost;
-        log(`play ${index + 1}: ${side} #${jersey} ${act}`);
-        const how = reopenAfter[index + 1];
+        log(`play ${n}: ${side} #${jersey ?? ''} ${act ?? ''}`.trim());
+        if (n === longOffline.moveAfter) {
+          // An hour and a minute with no signal, by moving both clocks on, not by waiting.
+          await later;
+          writeFileSync(clockFile, String(minutes61));
+          await context.clock.fastForward(minutes61);
+          await new Promise((done) => setTimeout(done, 300));
+          const old = await fetch(`${origin}/api/v1/leagues/${leagueId}/games/${liveGame}/state`, {
+            headers: { cookie: `${scorekeeper.name}=${firstToken}` },
+          });
+          note(
+            'after 61 minutes the first access token is turned away by the server (T-225)',
+            old.status === 401,
+            `answered ${old.status}`,
+          );
+          // The cookie jar keeps real time: the session cookie, which runs out a little
+          // before its token, is dropped as the browser would drop it an hour later.
+          await context.clearCookies({ name: scorekeeper.name });
+          log('both clocks moved on 61 minutes; the run-out session cookie dropped');
+        }
         if (!how) continue;
         await later;
-        await setOffline(how === 'with no signal');
-        await page.close({ runBeforeUnload: true });
-        log(`tab closed; opened again ${how}`);
-        const { tookOver } = await openTab();
-        note(`the tab opened again ${how} found the game still this device's`, !tookOver);
-        await boxIs(index + 1, `the tab opened again ${how} shows every play tapped (T-114)`);
+        if (held !== null) {
+          await Promise.race([
+            held.reachedYet,
+            new Promise((_, fail) =>
+              setTimeout(() => fail(new Error('no batch was sent to hold')), 20_000),
+            ),
+          ]);
+          log('the page reloads by itself, mid-send');
+          await page.evaluate(() => location.reload()).catch(() => undefined);
+          held.reload();
+          await page.waitForLoadState('domcontentloaded');
+          c = court(page);
+          const { tookOver } = await c.open();
+          note(`the page ${how} found the game still this device's`, !tookOver);
+        } else if (how.startsWith('reloaded')) {
+          await setOffline(true);
+          await page.reload();
+          log(`page ${how}`);
+          c = court(page);
+          const { tookOver } = await c.open();
+          note(`the page ${how} found the game still this device's`, !tookOver);
+        } else {
+          await setOffline(how === 'with no signal');
+          await page.close({ runBeforeUnload: true });
+          log(`tab closed; opened again ${how}`);
+          const { tookOver } = await openTab();
+          note(`the tab opened again ${how} found the game still this device's`, !tookOver);
+        }
+        await boxIs(n, `the page ${how} shows every play tapped (T-114)`);
       }
       await later;
     });
@@ -297,6 +443,13 @@ async function oneGame(browser) {
         await setOffline(false);
         await c.saved();
         log('everything saved');
+        const renewed = await sessionCookie();
+        note(
+          'the sign-in was renewed once the signal came back (T-225)',
+          renewed !== undefined && renewed !== firstToken,
+        );
+        const listed = await page.locator('[data-kept-list], [data-not-applied-list]').count();
+        note('nothing is listed not saved or not applied', listed === 0, `${listed} lists`);
         const want = counted();
         await boxIs(
           script.length,
@@ -343,6 +496,7 @@ async function oneGame(browser) {
 const browser = built ? await launch() : null;
 if (browser) await step('a game on bad gym Wi-Fi', () => oneGame(browser));
 await browser?.close();
+rmSync(clockFolder, { recursive: true, force: true });
 
 for (const label of checked) console.log(`checked: ${label}`);
 // BAD_WIFI_EVENTS=1 prints the order of events of a run that passed too.
