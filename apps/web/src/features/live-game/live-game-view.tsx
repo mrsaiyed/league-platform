@@ -128,14 +128,17 @@ export function redrawsFor(
 
 /**
  * Whether a page held at the result as it stood (a game being corrected) must be drawn
- * again: only once the game is final again, by a newer message or snapshot. A tracked
- * correction's own taps are not news to the public (S-47).
+ * again: only once the game is final again. A tracked correction's own taps are not news
+ * to the public (S-47). A correction made by hand and ended again saves no play, so its
+ * snapshot (fetched every 30 seconds while the page is open, follow-game.ts) comes back
+ * final at the same sequence number the page arrived at: that is news too. A page is held
+ * only while the game is not decided, so a final snapshot no older than it is the end.
  */
 export function redrawsWhileHeld(
   arrived: Pick<GameSnapshot, 'sequence'>,
   now: Pick<ViewerGame, 'status' | 'sequence'>,
 ): boolean {
-  return now.sequence > arrived.sequence && now.status === 'final';
+  return now.sequence >= arrived.sequence && now.status === 'final';
 }
 
 /**

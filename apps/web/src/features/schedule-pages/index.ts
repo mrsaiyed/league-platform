@@ -10,7 +10,9 @@ export {
   buildHomeGames,
   buildScheduleView,
   comingOrder,
+  gameTruth,
   gameView,
+  hasResult,
   placeOf,
   type GameView,
 } from './build-schedule.ts';

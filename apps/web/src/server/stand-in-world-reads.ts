@@ -74,6 +74,11 @@ const choiceOf = (s: ReadWorld, season: WorldSeason): PublicSeasonChoice => ({
 });
 
 function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
+  // The result as it stood while a reopen is open (S-47), as list-public-games.ts reads it.
+  const stood = resultBeingCorrected(
+    s.corrections.filter((c) => c.gameId === game.id),
+    game,
+  );
   const team = (id: string) => {
     const found = s.teams.find((t) => t.id === id);
     return {
@@ -107,6 +112,7 @@ function publicGameOf(s: ReadWorld, game: WorldGame): PublicGame {
         ? null
         : { name: venue.name, address: venue.address, mapLink: venue.mapLink },
     courtName: s.courts.find((c) => c.id === game.courtId)?.name ?? null,
+    ...(stood === undefined ? {} : { beingCorrected: stood }),
   };
 }
 
@@ -166,6 +172,7 @@ export function worldGameFacts(
   const shown = publicGameOf(s, game);
   return {
     number: shown.number,
+    localDate: shown.localDate,
     venue: shown.venue,
     courtName: shown.courtName,
     season: { slug: season.slug, isCurrent: s.currentSeasonId === season.id },

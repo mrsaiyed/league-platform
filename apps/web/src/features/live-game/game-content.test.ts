@@ -36,6 +36,7 @@ import {
   forfeitNote,
   gameTitle,
   gameTruthOf,
+  shownParts,
   gameWords,
   startText,
   titleLine,
@@ -259,6 +260,7 @@ describe('a game page', () => {
     if (listed === undefined) throw new Error('no listed game');
     expect(await publicSchedule.gameFactsOf(liveLeagueId, season, listed.id)).toEqual({
       number: listed.number,
+      localDate: listed.localDate,
       venue: listed.venue,
       courtName: listed.courtName,
       season: { slug: 'fall-2026', isCurrent: true },
@@ -818,7 +820,10 @@ describe('a game page', () => {
     it('a page held at the result as it stood is drawn again only once the game is final again', () => {
       expect(redrawsWhileHeld({ sequence: 4 }, { status: 'live', sequence: 9 })).toBe(false);
       expect(redrawsWhileHeld({ sequence: 4 }, { status: 'scheduled', sequence: 9 })).toBe(false);
-      expect(redrawsWhileHeld({ sequence: 4 }, { status: 'final', sequence: 4 })).toBe(false);
+      // A correction by hand, ended again: no play saved, the same sequence, final again.
+      expect(redrawsWhileHeld({ sequence: 4 }, { status: 'final', sequence: 4 })).toBe(true);
+      // An older snapshot (a cached one) is not news.
+      expect(redrawsWhileHeld({ sequence: 4 }, { status: 'final', sequence: 3 })).toBe(false);
       expect(redrawsWhileHeld({ sequence: 4 }, { status: 'final', sequence: 5 })).toBe(true);
     });
 
@@ -852,7 +857,16 @@ describe('a game page', () => {
       );
       const start = truthLine(setFor, zone, truth);
       expect(start).toBe('Was set for Saturday, November 14 at 10:00 AM');
-      const html = draw({ ...view, status: 'forfeit', truth, start, boxScores: null, plays: [] });
+      const { page } = await viewOf(world, games.lionsTigers);
+      const parts = shownParts(truth.state);
+      expect(parts.boxScores).toBe(false);
+      const html = draw({
+        ...view,
+        status: 'forfeit',
+        truth,
+        start,
+        boxScores: parts.boxScores ? buildBoxScores(page) : null,
+      });
       expect(html).not.toContain('Played');
       expect(html).not.toContain('Box scores');
       expect(html).toContain('Forfeit');
@@ -876,7 +890,7 @@ describe('a game page', () => {
     it('a game being corrected shows the result as it stood, marked "Being corrected" (S-47)', async () => {
       const world = trackerWorld();
       await scoreHawksBears(world);
-      const { view } = await viewOf(world, games.hawksBears);
+      const { view, page } = await viewOf(world, games.hawksBears);
       // A tracked game reopened: live again, the board held at 40 to 38.
       const truth = publicGameState(
         {
@@ -893,9 +907,12 @@ describe('a game page', () => {
         status: 'live',
         truth,
         start: truthLine(setFor, zone, truth),
-        boxScores: null,
-        plays: [],
+        boxScores: shownParts(truth.state).boxScores ? buildBoxScores(page) : null,
+        plays: shownParts(truth.state).plays ? view.plays : [],
       });
+      expect(shownParts(truth.state)).toEqual({ boxScores: false, plays: false });
+      // A final game, by the same rule, shows both.
+      expect(shownParts('final')).toEqual({ boxScores: true, plays: true });
       expect(html).toContain('Being corrected');
       expect(html).toContain('>40<');
       expect(html).toContain('>38<');

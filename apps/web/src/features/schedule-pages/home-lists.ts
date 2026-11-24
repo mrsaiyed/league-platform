@@ -83,25 +83,20 @@ export function homeLeadersPlace(
 }
 
 /**
- * The home page's latest games: the latest decided games first, then the games whose
- * start has passed with no result yet (each says "Awaiting result"). They stand in a
- * column beside the standings, so their number follows the height of the tables there:
- * about as many scoreboards as the tables are tall, never fewer than two or more than
- * five. A game waiting for its result is counted inside that number, so the column still
- * ends level with the tables; it never takes the last decided game's place, so the list
- * opens with a result whenever there is one. A league with more than two tables has the
- * list across the page instead, four of them.
+ * The home page's latest results, newest first: only games with a result (decided, or
+ * being corrected), never a game waiting for its score, which has a list of its own (step
+ * 2.159). They stand in a column beside the standings, so their number follows the height
+ * of the tables there: about as many scoreboards as the tables are tall, never fewer than
+ * two or more than five. A league with more than two tables has the list across the page
+ * instead, four of them.
  */
 export function homeResults(
   recent: readonly GameView[],
-  awaiting: readonly GameView[],
   tables: readonly TableHeight[],
 ): readonly GameView[] {
   // In rows of a table: a table's name and headings are about two rows, its notes one more.
   const rows = tables.reduce((sum, table) => sum + 2 + table.rows + (table.hasNotes ? 1 : 0), 0);
   // A scoreboard is about as tall as five rows of a table.
   const fits = tables.length > 2 ? 4 : Math.min(5, Math.max(2, Math.round(rows / 5)));
-  const waiting = awaiting.slice(0, recent.length > 0 ? fits - 1 : fits);
-  // Where fewer games are waiting than there is room for, decided games fill the rest.
-  return [...recent.slice(0, fits - waiting.length), ...waiting];
+  return recent.slice(0, fits);
 }

@@ -76,6 +76,7 @@ describe('databasePublicSchedule', () => {
     const gameId = game.id;
     expect(await ports.gameFactsOf(league('lakeside'), seasonId, gameId)).toEqual({
       number: game.number,
+      localDate: game.localDate,
       venue: null,
       courtName: null,
       season: { slug: 'winter-seed', isCurrent: true },

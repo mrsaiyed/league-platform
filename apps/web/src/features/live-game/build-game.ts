@@ -212,6 +212,18 @@ export const gameTruthOf = (
     clock,
   );
 
+/**
+ * Which of a game's server-drawn parts its page shows in each public state: box scores only
+ * for a final game (a forfeit has none, P7 §5.6; a game being corrected shows the result as
+ * it stood, not the sheet being changed, T-384), and its plays except while it is corrected.
+ */
+export const shownParts = (
+  state: PublicGameState,
+): { readonly boxScores: boolean; readonly plays: boolean } => ({
+  boxScores: state === 'final',
+  plays: state !== 'being-corrected',
+});
+
 /** The board's pill of a state only the public truth knows; undefined for every other. */
 export function truthPill(state: PublicGameState): string | undefined {
   if (state === 'awaiting-score') return t('game.awaitingScore');

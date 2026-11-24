@@ -4,7 +4,12 @@
 // periods (0021) and its regulation periods, and no person.
 // A game in the bin, or one of a season still being set up, is not there.
 import { sql } from 'kysely';
-import { rulesOfGame, type PublicGame } from '@srleagues/core';
+import {
+  resultBeingCorrected,
+  rulesOfGame,
+  type MarkResult,
+  type PublicGame,
+} from '@srleagues/core';
 import { transactionOf, type LeagueScope } from '../db/transaction-scope.ts';
 
 /** A public game and the round it belongs to, if any. */
@@ -94,6 +99,10 @@ export async function listPublicGames(
     .orderBy(sql`games.game_number asc nulls last`)
     .orderBy('games.id')
     .execute();
+  const stood = await resultsAsTheyStood(
+    scope,
+    rows.filter((row) => row.status !== 'final' && row.status !== 'forfeit').map((row) => row.id),
+  );
   return rows.map((row) => ({
     id: row.id,
     roundId: row.round_id,
@@ -125,5 +134,63 @@ export async function listPublicGames(
         ? null
         : { name: row.venue_name, address: row.venue_address, mapLink: row.venue_map_link },
     courtName: row.court_name,
+    ...(stood.has(row.id) ? { beingCorrected: stood.get(row.id) } : {}),
   }));
+}
+
+const resultOf = (stored: unknown): MarkResult => {
+  if (typeof stored !== 'object' || stored === null) return {};
+  const field = (key: string) => (key in stored ? (stored as Record<string, unknown>)[key] : null);
+  const number = (value: unknown) => (typeof value === 'number' ? value : null);
+  const status = field('status');
+  return {
+    status: typeof status === 'string' ? status : null,
+    homeScore: number(field('homeScore')),
+    awayScore: number(field('awayScore')),
+  };
+};
+
+/**
+ * The result as it stood of each listed game a reopen is open on (S-47, T-383), read in one
+ * go from the games' corrections under the league's filter, as
+ * find-game-result-being-corrected.ts reads one game's. Only games not decided now are asked.
+ */
+async function resultsAsTheyStood(
+  scope: LeagueScope,
+  gameIds: readonly string[],
+): Promise<Map<string, MarkResult>> {
+  const found = new Map<string, MarkResult>();
+  if (gameIds.length === 0) return found;
+  const rows = await transactionOf(scope)
+    .selectFrom('game_corrections')
+    .innerJoin('games', (join) =>
+      join
+        .onRef('games.league_id', '=', 'game_corrections.league_id')
+        .onRef('games.id', '=', 'game_corrections.game_id'),
+    )
+    .select([
+      'game_corrections.game_id as game_id',
+      'game_corrections.before as before',
+      'game_corrections.after as after',
+      'games.status as status',
+    ])
+    .where('game_corrections.league_id', '=', scope.leagueId)
+    .where('game_corrections.game_id', 'in', [...gameIds])
+    .orderBy('game_corrections.created_at', 'asc')
+    .orderBy('game_corrections.id', 'asc')
+    .execute();
+  const byGame = new Map<string, typeof rows>();
+  for (const row of rows) byGame.set(row.game_id, [...(byGame.get(row.game_id) ?? []), row]);
+  for (const [gameId, corrections] of byGame) {
+    const result = resultBeingCorrected(
+      corrections.map((row) => ({
+        on: '',
+        before: resultOf(row.before),
+        after: resultOf(row.after),
+      })),
+      { status: corrections[0]?.status ?? '' },
+    );
+    if (result !== undefined) found.set(gameId, result);
+  }
+  return found;
 }

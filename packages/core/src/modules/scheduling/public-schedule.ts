@@ -4,6 +4,13 @@
 // published game; the draft lives elsewhere). It holds no person's name: players
 // appear only through the one name function (T-81).
 
+/** A result as it stood before a reopen: its score and how it was decided (games' MarkResult). */
+export type PublicResultAsItStood = {
+  readonly status?: string | null | undefined;
+  readonly homeScore?: number | null | undefined;
+  readonly awayScore?: number | null | undefined;
+};
+
 /** A season a visitor can pick (P2 §4, `?season=`). A season still being set up is not offered. */
 export type PublicSeasonChoice = {
   readonly slug: string;
@@ -50,6 +57,11 @@ export type PublicGame = {
    * and for every game that is not final.
    */
   readonly overtimePeriods: number | null;
+  /**
+   * While a decided game is reopened for correction, the result as it stood: the latest
+   * reopen's `before` (S-47, T-383, resultBeingCorrected). Left out otherwise.
+   */
+  readonly beingCorrected?: PublicResultAsItStood | undefined;
   /**
    * The regulation periods of the rules it is played under (its own once fixed, else its
    * season's): 2 halves or 4 quarters. A card open while the game is played works out its

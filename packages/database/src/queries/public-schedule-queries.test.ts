@@ -251,6 +251,8 @@ describe("a league's clock and one game's facts (step 2.93)", () => {
     const facts = await inLeague((scope) => findPublicGameFacts(scope, seasonId, firstGame));
     expect(facts).toEqual({
       number: 7,
+      // November 1 at 18:00 UTC is that day in Chicago, the league's zone.
+      localDate: '2026-11-01',
       venue: { name: 'North Gym', address: '1 Court St', mapLink: null },
       courtName: null,
       season: { slug: 'fall-2026', isCurrent: true },

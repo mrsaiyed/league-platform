@@ -295,6 +295,22 @@ export async function TeamPage({
               />
             )}
           </Section>
+          {/* A game whose start has passed with no score: a list of its own (step 2.159). */}
+          {games.awaiting.length === 0 ? null : (
+            <Section
+              title={t('schedule.waitingForScore')}
+              kicker={t('schedule.waitingForScore.kicker')}
+            >
+              <div data-awaiting-list="">
+                <GameList
+                  leagueId={addressee.id}
+                  games={games.awaiting}
+                  layout="board"
+                  across="pair"
+                />
+              </div>
+            </Section>
+          )}
           {resultsBeside ? results : null}
         </div>
         <div className="team-roster">

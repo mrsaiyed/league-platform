@@ -20,7 +20,7 @@ export type LeagueClock = {
  * number, where it is played, and which season's schedule it is on. One game's facts, so
  * the page does not read and build a whole season to learn them.
  */
-export type PublicGameFacts = Pick<PublicGame, 'number' | 'venue' | 'courtName'> & {
+export type PublicGameFacts = Pick<PublicGame, 'number' | 'localDate' | 'venue' | 'courtName'> & {
   readonly season: { readonly slug: string; readonly isCurrent: boolean };
 };
 

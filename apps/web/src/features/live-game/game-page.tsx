@@ -29,6 +29,7 @@ import {
   correctedText,
   gameTitle,
   gameTruthOf,
+  shownParts,
   gameWords,
   truthLine,
 } from './build-game.ts';
@@ -78,9 +79,8 @@ export async function GamePage({
   // The game's one public truth, as the home page, the schedule and a team's page read it
   // (step 2.159): a game whose start has passed with no score is awaiting it, a reopened
   // game shows the result as it stood (S-47).
-  // A game with a day and no time is not yet read here with its day (the schedule's facts
-  // of one game do not carry it): its page reads it as upcoming until it has a time.
-  const truth = gameTruthOf(page.value, clock);
+  // A game with a day and no time is read with its day, as the schedule's lists read it.
+  const truth = gameTruthOf(page.value, clock, listed?.localDate ?? null);
   // Only a game still to come says its day on the board.
   const when =
     truth.state === 'upcoming'
@@ -88,7 +88,7 @@ export async function GamePage({
       : undefined;
   // A forfeit has no box scores (P7 §5.6), and a game being corrected shows its result as
   // it stood, not the sheet or plays the correction is changing (T-384).
-  const corrected = truth.state === 'being-corrected';
+  const parts = shownParts(truth.state);
   // A game still to come, or put off, ends with its two teams and their records. Read only
   // for such a game: never for one under way, whose page is read again and again.
   const pending = ['scheduled', 'postponed', 'cancelled'].includes(page.value.game.status);
@@ -114,8 +114,8 @@ export async function GamePage({
         snapshot: snapshot.value,
         snapshotAddress: leagueApiUrl(addressee, ['games', snapshot.value.gameId, 'snapshot']),
         selfAddress: leagueUrl(addressee, 'game', { game: snapshot.value.gameId }),
-        boxScores: truth.state === 'final' ? buildBoxScores(page.value) : null,
-        plays: corrected ? [] : buildPlays(page.value, words),
+        boxScores: parts.boxScores ? buildBoxScores(page.value) : null,
+        plays: parts.plays ? buildPlays(page.value, words) : [],
         // Back to the schedule the game is on: an earlier season's, when it is one of those.
         scheduleAddress: leagueUrl(
           addressee,
