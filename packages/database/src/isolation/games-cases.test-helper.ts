@@ -372,10 +372,16 @@ registerIsolationCase({
 registerIsolationCase({
   subject: findGameDecidedBy,
   name: "read who typed the result of the target's upcoming game",
-  run: async (scope, target) => {
-    await typedFinal(scope, target.upcomingGameId, target.memberId);
-    return findGameDecidedBy(scope, target.upcomingGameId);
-  },
+  // The game decided, with who typed it, inside the target's own fence (fixed values), so a query with
+  // its league filter taken out would find it from another league (the fence check).
+  arrange: (inTarget, target) =>
+    sql`update games set status = 'final', home_score = 50, away_score = 40,
+      finalized_at = '2026-11-20T18:00:00Z', finalized_by = ${target.memberId},
+      format = coalesce(format, ${JSON.stringify(defaultSeasonRules())}::jsonb)
+      where league_id = ${inTarget.leagueId} and id = ${target.upcomingGameId}`.execute(
+      transactionOf(inTarget),
+    ),
+  run: (scope, target) => findGameDecidedBy(scope, target.upcomingGameId),
 });
 
 // Box scores entered afterwards (step 2.64) -------------------------------------------
