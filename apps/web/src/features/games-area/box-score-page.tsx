@@ -12,13 +12,15 @@
 import {
   getBoxScoreSheet,
   leagueUrl,
+  readGameFormat,
   readReopenOffer,
   type BoxScoreSheet,
   type GameLine,
   type GameRosterPlayer,
   type LeagueAddressee,
 } from '@srleagues/core';
-import { finalPillOf } from '@srleagues/site';
+import { en, finalPillOf } from '@srleagues/site';
+import { GameFormatSection, formatWords } from './game-format-section.tsx';
 import { FinalStatePill, MessagePage, PageHead } from '@srleagues/ui';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
@@ -133,6 +135,9 @@ export async function BoxScorePage({
   if (!read.ok) return notFound();
   const sheet = read.value;
   const { game } = sheet;
+  // The game's own format (step 2.119): shown to whoever may reach it, the admin's
+  // "games.manage" or the game's scorekeeper; left out for anyone else.
+  const format = await readGameFormat(context, { gameId: game.id }, ports.tracker.deps);
   const names = (await ports.games.namesOf(here.id)).teams;
   const homeName = names[game.homeTeamId] ?? '';
   const awayName = names[game.awayTeamId] ?? '';
@@ -220,6 +225,16 @@ export async function BoxScorePage({
         ) : null}
       </PageHead>
       {reopened === undefined ? null : <SavedLine text={reopened} />}
+      {format.ok ? (
+        <GameFormatSection
+          leagueId={here.id}
+          gameId={game.id}
+          locale={locale}
+          words={formatWords(en)}
+          initial={format.value}
+          title={t('tracker.formatChange.title')}
+        />
+      ) : null}
       {reopen.kind === 'correct' ? (
         <div className="staff-panel">
           <ReopenForm
