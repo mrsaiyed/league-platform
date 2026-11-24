@@ -47,6 +47,12 @@ export type MyGame = {
    */
   readonly inArchivedSeason: boolean;
   /**
+   * False while the league is archived or suspended (U-9): nothing is corrected then. An
+   * archived season's decided game stays correctable (O-12, T-381), so its "Correct this
+   * result" is offered whatever `scorable` says.
+   */
+  readonly leagueScores: boolean;
+  /**
    * Whether the live tracker has recorded plays of a game still to be decided (scheduled
    * or live), by the store's own rule (plays since its last "not started" marker): such a
    * game is ended in the tracker, never by a score typed by hand (S-46). False for a game
@@ -66,6 +72,7 @@ const view = (
   today: string,
   scorable: boolean,
   inArchivedSeason: boolean,
+  leagueOpen: boolean,
   hasPlays: boolean,
   forfeitScore: MyGame['forfeitScore'],
 ): MyGame => ({
@@ -86,6 +93,7 @@ const view = (
   assignedToMe: assigned,
   scorable,
   inArchivedSeason,
+  leagueScores: leagueOpen,
   hasPlays,
   version: game.version,
   forfeitScore,
@@ -133,7 +141,7 @@ export async function myGamesOf(
     const open = scorable && !(await archivedSeasonRefusesScoring(entry.game, tx, holder, scope));
     const archived = await gameInArchivedSeason({ gameId: entry.game.id }, tx);
     listed.push(
-      view(entry, today, open, archived, plays, {
+      view(entry, today, open, archived, scorable, plays, {
         winner: forfeit.winnerScore,
         loser: forfeit.loserScore,
       }),

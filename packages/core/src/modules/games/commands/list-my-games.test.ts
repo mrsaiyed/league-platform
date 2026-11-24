@@ -81,6 +81,7 @@ describe('listMyGames', () => {
       assignedToMe: true,
       scorable: true,
       inArchivedSeason: false,
+      leagueScores: true,
       hasPlays: false,
       version: 1,
       // The starting rules' forfeit score (step 2.158: the forfeit's question says it).

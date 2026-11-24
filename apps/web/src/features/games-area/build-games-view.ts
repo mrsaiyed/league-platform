@@ -118,7 +118,9 @@ export function buildGameRows(
       canPutBack: callOff && status === 'cancelled',
       canRestore: callOff && status === 'postponed',
       forfeitScore: game.forfeitScore,
-      reopen: game.scorable ? reopens.get(game.id) : undefined,
+      // Not only while scorable: an archived season's decided game is still corrected (O-12,
+      // T-381); the view says who may (reopen-view.ts).
+      reopen: game.leagueScores ? reopens.get(game.id) : undefined,
     };
   });
 }

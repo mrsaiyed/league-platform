@@ -22,6 +22,7 @@ const game = (over: Partial<MyGame>): MyGame => ({
   assignedToMe: false,
   scorable: true,
   inArchivedSeason: false,
+  leagueScores: true,
   hasPlays: false,
   version: 2,
   forfeitScore: { winner: 20, loser: 0 },
@@ -55,5 +56,19 @@ describe('buildGameRows', () => {
     expect(rowOf({ inArchivedSeason: true, status: 'cancelled' })).toMatchObject({
       canPutBack: false,
     });
+  });
+
+  it("shows an archived season's decided game how it is corrected, but nothing in an archived league (O-12, T-381, U-9)", () => {
+    const correct = { kind: 'correct', door: 'by-hand', until: null } as const;
+    const decided = { status: 'final', scorable: false, inArchivedSeason: true } as const;
+    const rows = (leagueScores: boolean) =>
+      buildGameRows(
+        [game({ ...decided, leagueScores })],
+        { teams: {}, scorekeepers: {} },
+        owner,
+        new Map([[game({}).id, correct]]),
+      );
+    expect(rows(true)[0]?.reopen).toEqual(correct);
+    expect(rows(false)[0]?.reopen).toBeUndefined();
   });
 });
