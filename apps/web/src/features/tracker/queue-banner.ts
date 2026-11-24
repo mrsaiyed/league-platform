@@ -4,6 +4,7 @@
 // A device whose storage is failing says that, not that it is offline (record 024).
 // The words are in the message files (T-187); this only picks which and the counts.
 import type { Translate } from '@srleagues/site';
+import { playerChangesIn } from './roster-changes.ts';
 import type { QueueStatus } from './tracker-queue.ts';
 
 export type SavedBannerLine =
@@ -14,7 +15,12 @@ export type SavedBannerLine =
         | 'tracker.queue.offline';
     }
   | {
-      readonly key: 'tracker.queue.waiting' | 'tracker.queue.kept' | 'tracker.queue.notSaved';
+      readonly key:
+        | 'tracker.queue.waiting'
+        | 'tracker.queue.waitingChanges'
+        | 'tracker.queue.kept'
+        | 'tracker.queue.keptChanges'
+        | 'tracker.queue.notSaved';
       readonly count: number;
     };
 
@@ -39,17 +45,25 @@ export function isOffline(
  * to send" (finding M2).
  */
 export function savedBanner(
-  status: Pick<QueueStatus, 'waiting' | 'refused' | 'storageFailure'>,
+  status: Pick<QueueStatus, 'waiting' | 'refused' | 'storageFailure'> &
+    Partial<Pick<QueueStatus, 'waitingTaps'>>,
   offline = false,
   keptOnly = false,
 ): SavedBanner {
   const lines: SavedBannerLine[] = [];
   if (status.storageFailure !== null) lines.push({ key: 'tracker.queue.storageFailed' });
   if (offline) lines.push({ key: 'tracker.queue.offline' });
-  if (status.waiting > 0) {
+  // Changes of players are said as changes, plays as plays, both counts when both wait
+  // (step 2.118): "5 plays waiting" after four adds and a take-off was not true.
+  const changes = Math.min(status.waiting, playerChangesIn(status.waitingTaps ?? []).length);
+  const plays = status.waiting - changes;
+  if (plays > 0) {
+    lines.push({ key: keptOnly ? 'tracker.queue.kept' : 'tracker.queue.waiting', count: plays });
+  }
+  if (changes > 0) {
     lines.push({
-      key: keptOnly ? 'tracker.queue.kept' : 'tracker.queue.waiting',
-      count: status.waiting,
+      key: keptOnly ? 'tracker.queue.keptChanges' : 'tracker.queue.waitingChanges',
+      count: changes,
     });
   }
   if (status.refused.length > 0) {
@@ -84,8 +98,12 @@ export function savedBannerShortLines(banner: SavedBanner, t: Translate): readon
         return t('tracker.queue.offlineShort');
       case 'tracker.queue.waiting':
         return t.plural('tracker.queue.waitingShort', line.count);
+      case 'tracker.queue.waitingChanges':
+        return t.plural('tracker.queue.waitingChangesShort', line.count);
       case 'tracker.queue.kept':
         return t.plural('tracker.queue.keptShort', line.count);
+      case 'tracker.queue.keptChanges':
+        return t.plural('tracker.queue.keptChangesShort', line.count);
       case 'tracker.queue.notSaved':
         return t.plural('tracker.queue.notSavedShort', line.count);
     }

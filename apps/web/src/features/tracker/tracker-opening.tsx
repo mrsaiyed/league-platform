@@ -399,6 +399,7 @@ export function TrackerOpening({
         state={phase.status.game}
         rosters={listed}
         gameId={gameId}
+        accountId={accountId}
         t={t}
         title={matchup}
         when={when}

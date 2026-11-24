@@ -13,6 +13,7 @@ import {
   lineBox,
   lineChanges,
   lineProblem,
+  nameBox,
   readDrafts,
   someTeamIsEmpty,
   typed,
@@ -112,13 +113,26 @@ describe('the Players panel: what is typed', () => {
   it('keeps a half-typed line by game through a reload, and clears it once stored', () => {
     const store = memoryStore();
     const drafts = typed({}, lineBox('away'), '3 5 1');
-    writeDrafts(store, 'game-1', drafts);
-    expect(store.kept.has(draftsKey('game-1'))).toBe(true);
-    expect(readDrafts(store, 'game-1')).toEqual({ 'away:number': '3 5 1' });
-    expect(readDrafts(store, 'game-2')).toEqual({});
-    writeDrafts(store, 'game-1', cleared(drafts, [lineBox('away')]));
+    const a = { gameId: 'game-1', accountId: 'person-a' };
+    writeDrafts(store, a, drafts);
+    expect(store.kept.has(draftsKey(a))).toBe(true);
+    expect(readDrafts(store, a)).toEqual({ 'away:number': '3 5 1' });
+    expect(readDrafts(store, { ...a, gameId: 'game-2' })).toEqual({});
+    writeDrafts(store, a, cleared(drafts, [lineBox('away')]));
     expect(store.kept.size).toBe(0);
     expect(typed(drafts, lineBox('away'), '')).toEqual({});
+  });
+
+  it('keeps the drafts per person too: B on the same device never sees what A half typed (T-327)', () => {
+    const store = memoryStore();
+    const a = { gameId: 'game-1', accountId: 'person-a' };
+    const b = { gameId: 'game-1', accountId: 'person-b' };
+    writeDrafts(store, a, typed({}, nameBox('home'), 'Half a na'));
+    expect(draftsKey(a)).not.toBe(draftsKey(b));
+    expect(readDrafts(store, b)).toEqual({});
+    writeDrafts(store, b, typed({}, lineBox('home'), '7'));
+    expect(readDrafts(store, a)).toEqual({ 'home:name': 'Half a na' });
+    expect(readDrafts(store, b)).toEqual({ 'home:number': '7' });
   });
 
   it('loses only the typing when the storage cannot be read or written', () => {
@@ -131,12 +145,13 @@ describe('the Players panel: what is typed', () => {
       },
       removeItem: () => undefined,
     };
-    expect(readDrafts(broken, 'g')).toEqual({});
-    expect(() => writeDrafts(broken, 'g', { a: 'b' })).not.toThrow();
+    expect(readDrafts(broken, { gameId: 'g', accountId: 'p' })).toEqual({});
+    expect(() => writeDrafts(broken, { gameId: 'g', accountId: 'p' }, { a: 'b' })).not.toThrow();
     const odd = memoryStore();
-    odd.setItem(draftsKey('g'), '[1,2]');
-    expect(readDrafts(odd, 'g')).toEqual({});
-    expect(readDrafts(null, 'g')).toEqual({});
+    const g = { gameId: 'g', accountId: 'p' };
+    odd.setItem(draftsKey(g), '[1,2]');
+    expect(readDrafts(odd, g)).toEqual({});
+    expect(readDrafts(null, g)).toEqual({});
   });
 });
 

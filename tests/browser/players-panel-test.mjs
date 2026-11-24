@@ -352,9 +352,17 @@ async function withSignal(browser) {
     });
 
     await step('both lineups, then #12 scores', async () => {
+      // A walk-on added at the table to the home team, whose numbers are public, starts.
+      await add('home', '44', 'Sam Walker');
+      await until(
+        page,
+        () => rows('home').count(),
+        (n) => n === 18,
+        'the walk-on was not added',
+      );
       await s.closePanel();
       await bothTeamsInReach(s);
-      await c.pick('home', hawksStarters);
+      await c.pick('home', [...hawksStarters.slice(0, 4), 44]);
       await c.pick('away', awayStarters);
       await page.locator('[data-scoring][data-stage="play"]').waitFor();
       await c.play('away', 12, 'p2');
@@ -430,6 +438,57 @@ async function withSignal(browser) {
         'the three plays of the corrected player reach the public game page, no number shown',
         shown !== null && !/#41\b/.test(shown) && !/#14\b/.test(shown),
         shown?.slice(0, 300) ?? `timed out: ${lastPublic.slice(0, 300)}`,
+      );
+    });
+
+    // The done test where numbers are public: a walk-on's number corrected after three
+    // plays shows on the tile, the log and the public game page (the Bears' stay hidden).
+    await step("a walk-on's number corrected after three plays, on a public team", async () => {
+      await c.play('home', 44, 'p2');
+      await c.play('home', 44, 'p2');
+      await c.play('home', 44, 'p1');
+      await c.saved();
+      const id = await s.rowOf('home', 44);
+      await s.openPanel();
+      await panel.locator(`[data-player-fix="${id}"]`).click();
+      await panel.locator(`[data-player-number="${id}"]`).fill('45');
+      await panel.locator(`[data-player-save="${id}"]`).click();
+      await until(
+        page,
+        () => words(panel.locator(`[data-player-row="${id}"] .court-players-who`)),
+        (t) => t.includes('45'),
+        'the number was not changed',
+      );
+      await s.closePanel();
+      await c.saved();
+      note(
+        "the walk-on's corrected number is on the tile, with his five points",
+        (await c.points('home', 45)) === 5 && (await c.tile('home', 44).count()) === 0,
+      );
+      const log = await s.logText();
+      note(
+        "the walk-on's corrected number is in the log",
+        /#45\b/.test(log) && !/#44\b/.test(log),
+        log.slice(0, 300),
+      );
+      const shown = await until(
+        page,
+        async () => (lastPublic = await publicWords(browser, origin)),
+        (t) => /#45 Sam Walker/.test(t),
+        'the public page never showed #45 Sam Walker',
+      ).catch(() => null);
+      note(
+        "the walk-on's corrected number reaches the public game page, the old one gone",
+        shown !== null && !/#44\b/.test(shown),
+        shown?.slice(0, 300) ?? `timed out: ${lastPublic.slice(0, 300)}`,
+      );
+      note(
+        "the Bears' numbers stay hidden on the public page",
+        shown !== null &&
+          /numbers are not public/.test(shown) &&
+          !/#41\b/.test(shown) &&
+          !/#12\b/.test(shown),
+        shown?.slice(0, 300) ?? 'timed out',
       );
     });
 

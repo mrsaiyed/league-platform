@@ -124,15 +124,22 @@ export function fixChange(
   };
 }
 
-/** The place a game's drafts are kept on this device (a convenience: losing it loses only typing). */
-export const draftsKey = (gameId: string) => `srleagues.tracker.players-drafts.${gameId}`;
+/**
+ * Whose drafts: a game's, typed by one person. Kept per person too (T-327): someone else
+ * signed in on the same device never sees what the last scorer half typed.
+ */
+export type DraftsOwner = { readonly gameId: string; readonly accountId: string };
+
+/** The place a person's drafts of a game are kept on this device (losing it loses only typing). */
+export const draftsKey = (owner: DraftsOwner) =>
+  `srleagues.tracker.players-drafts.${owner.accountId}.${owner.gameId}`;
 
 type DraftStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
-/** The drafts kept for a game; none when there are none or the storage cannot be read. */
-export function readDrafts(store: DraftStore | null, gameId: string): PlayerDrafts {
+/** The drafts kept for a person's game; none when there are none or the storage cannot be read. */
+export function readDrafts(store: DraftStore | null, owner: DraftsOwner): PlayerDrafts {
   try {
-    const text = store?.getItem(draftsKey(gameId));
+    const text = store?.getItem(draftsKey(owner));
     if (text === null || text === undefined) return {};
     const parsed: unknown = JSON.parse(text);
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
@@ -147,10 +154,14 @@ export function readDrafts(store: DraftStore | null, gameId: string): PlayerDraf
 }
 
 /** Keeps the drafts; a storage that says no loses only the typing, never a stored change. */
-export function writeDrafts(store: DraftStore | null, gameId: string, drafts: PlayerDrafts): void {
+export function writeDrafts(
+  store: DraftStore | null,
+  owner: DraftsOwner,
+  drafts: PlayerDrafts,
+): void {
   try {
-    if (Object.keys(drafts).length === 0) store?.removeItem(draftsKey(gameId));
-    else store?.setItem(draftsKey(gameId), JSON.stringify(drafts));
+    if (Object.keys(drafts).length === 0) store?.removeItem(draftsKey(owner));
+    else store?.setItem(draftsKey(owner), JSON.stringify(drafts));
   } catch {
     // Private windows and full storage: the boxes still hold the text until the page goes.
   }

@@ -19,6 +19,7 @@ import {
   writeDrafts,
   type LineProblem,
   type PlayerDrafts,
+  type DraftsOwner,
 } from './players-form.ts';
 import { PlayersButton, PlayersSheet, type PanelSaid } from './players-panel.tsx';
 import { playersPanel, teamOn, type PlayerChange, type PlayerSide } from './roster-changes.ts';
@@ -85,7 +86,7 @@ export function usePlayersPanel(args: {
   /** The saved banner's words, shown over the panel too. */
   readonly banner: string;
   /** Where the drafts are kept: the game's id. */
-  readonly draftsFor: string;
+  readonly draftsFor: DraftsOwner;
   /** Called as the panel is opened by a button (More is shut). */
   readonly onOpen?: () => void;
 }): {
@@ -98,6 +99,7 @@ export function usePlayersPanel(args: {
   const [open, setOpen] = useState(false);
   const [fixing, setFixing] = useState<string | null>(null);
   const [said, setSaid] = useState<Partial<Record<PlayerSide, PanelSaid>>>({});
+  const { gameId: draftsGame, accountId: draftsPerson } = draftsFor;
   const [drafts, setDrafts] = useState<PlayerDrafts>(() => readDrafts(draftStore(), draftsFor));
   const latest = useRef(drafts);
   latest.current = drafts;
@@ -106,10 +108,19 @@ export function usePlayersPanel(args: {
       // At once, so a second tap in the same moment reads what the first left.
       latest.current = next;
       setDrafts(next);
-      writeDrafts(draftStore(), draftsFor, next);
+      writeDrafts(draftStore(), { gameId: draftsGame, accountId: draftsPerson }, next);
     },
-    [draftsFor],
+    [draftsGame, draftsPerson],
   );
+  // Someone else signed in on this screen: their own drafts, never the last person's (T-327).
+  const draftsOf = useRef(`${draftsPerson}.${draftsGame}`);
+  useEffect(() => {
+    if (draftsOf.current === `${draftsPerson}.${draftsGame}`) return;
+    draftsOf.current = `${draftsPerson}.${draftsGame}`;
+    const theirs = readDrafts(draftStore(), { gameId: draftsGame, accountId: draftsPerson });
+    latest.current = theirs;
+    setDrafts(theirs);
+  }, [draftsGame, draftsPerson]);
   const [busy, setBusy] = useState<Partial<Record<PlayerSide, boolean>>>({});
 
   const scoring = status.mode.kind === 'scoring';

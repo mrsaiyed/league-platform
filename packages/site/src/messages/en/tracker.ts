@@ -450,6 +450,11 @@ export const enTracker = {
   'tracker.queue.allSaved': 'All saved',
   // Signed out or no longer allowed to score (step 2.37, part 2): nothing is on its way,
   // so the plays are kept, never "waiting to send".
+  // Changes of players (the Players panel, step 2.118) are said as changes, not plays.
+  'tracker.queue.keptChangesShort_one': '{count} change kept',
+  'tracker.queue.keptChangesShort_other': '{count} changes kept',
+  'tracker.queue.keptChanges_one': '{count} change of players kept on this device',
+  'tracker.queue.keptChanges_other': '{count} changes of players kept on this device',
   'tracker.queue.keptShort_one': '{count} kept',
   'tracker.queue.keptShort_other': '{count} kept',
   'tracker.queue.kept_one': '{count} play kept on this device',
@@ -469,6 +474,10 @@ export const enTracker = {
   // ones (lying down, where the banner sits beside the scores and takes its width from
   // the teams' names; upright in a browser, where a second line of it would push the
   // players under the pad). "All saved" is said the same.
+  'tracker.queue.waitingChangesShort_one': '{count} change to send',
+  'tracker.queue.waitingChangesShort_other': '{count} changes to send',
+  'tracker.queue.waitingChanges_one': '{count} change of players waiting to send',
+  'tracker.queue.waitingChanges_other': '{count} changes of players waiting to send',
   'tracker.queue.waitingShort_one': '{count} to send',
   'tracker.queue.waitingShort_other': '{count} to send',
   'tracker.queue.waiting_one': '{count} play waiting to send',

@@ -157,6 +157,8 @@ export type ScoringScreenProps = {
   readonly offline?: boolean;
   /** The game's id: what is typed in the Players panel is kept on the device under it. */
   readonly gameId?: string;
+  /** Who is signed in: the panel's typing is kept per person too (T-327). */
+  readonly accountId: string;
 };
 
 /** How long the latest sentence stays (checklist I5). */
@@ -469,7 +471,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
     rosters,
     t,
     banner: props.banner.text,
-    draftsFor: props.gameId ?? `${rosters.home.teamId}.${rosters.away.teamId}`,
+    draftsFor: {
+      gameId: props.gameId ?? `${rosters.home.teamId}.${rosters.away.teamId}`,
+      accountId: props.accountId,
+    },
     onOpen: () => setMoreOpen(false),
   });
   // The options of a player the game no longer shows are not left open.
