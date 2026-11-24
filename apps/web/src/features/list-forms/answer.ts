@@ -46,6 +46,17 @@ export async function answerSaved(
   return redirect(to);
 }
 
+/**
+ * Leaves the notice and sends the browser to `to`, with scripts on or off (step 2.155): a
+ * thing just made has a page of its own, and its "Saved" is said there, at the top, beside
+ * its name. As answerSaved, nothing of it rides in the address; a reload says nothing old.
+ */
+export function answerSavedAt(context: CommandContext, notice: SavedNotice, to: string): never {
+  const holder = noticeHolderOf(context);
+  if (holder !== undefined) savedNoticesHere().leave(holder, notice);
+  return redirect(to);
+}
+
 /** The notice left for this person on this screen, taken: a reload says nothing old. */
 export function takeNotice(context: CommandContext, screen: NoticeScreen) {
   const holder = noticeHolderOf(context);

@@ -25,6 +25,14 @@ export const enAdminTeams = {
   'adminTeams.allTeams': 'All teams',
   'adminTeams.byNumber': '#{number}',
   'adminTeams.confirm': 'Yes, I am sure',
+  // A refused "Add team", beside the box it is about (step 2.155): each names its box.
+  'adminTeams.create.problem.color':
+    "The color could not be read. Choose it again, or tick “Use the league's own colors”.",
+  'adminTeams.create.problem.name': "The team's name is needed, at most 120 characters.",
+  'adminTeams.create.problem.shortName':
+    'The short name can have only lower-case letters, numbers and single hyphens, like blue-jays.',
+  // At the top of the new team's own page, beside its name, once (step 2.155).
+  'adminTeams.create.saved': 'Saved: {name} was added to the season.',
   'adminTeams.create.submit': 'Add team',
   'adminTeams.create.title': 'Add a team',
   'adminTeams.done.added': 'The player was added to the roster.',

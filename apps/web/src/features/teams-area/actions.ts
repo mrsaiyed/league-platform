@@ -15,8 +15,16 @@ import {
   setTeamStatsVisibility,
   undoTeamLeft,
   updateTeam,
+  leagueUrl,
   type Result,
 } from '@srleagues/core';
+import { commandContextOf } from '../../server/context.ts';
+import { webPorts } from '../../server/container.ts';
+import { loadLeaguePage } from '../../server/load-league-page.ts';
+import { t } from '../../server/messages.ts';
+import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
+import { answerSavedAt, refusedWith, typedOf, type FormState } from '../list-forms/index.ts';
+import { createTeamRefusal } from './create-team-answer.ts';
 import { done, refused, type DoneName } from './answer.ts';
 import {
   addToRosterInput,
@@ -45,20 +53,43 @@ function settle(
   return teamId === undefined ? { answer } : { answer, teamId };
 }
 
-export async function createTeamAction(form: FormData): Promise<never> {
-  return runTeamsAction(form, async ({ context, ports, seasonId, fields }) => {
-    if (seasonId === undefined) {
-      return { answer: refused(createTeam.commandName, 'season-not-found') };
-    }
-    const input = newTeamInput(fields, seasonId);
-    if (shortNameNeeded(input)) {
-      return { answer: refused(createTeam.commandName, 'short-name-needed') };
-    }
-    const result = await createTeam(context, input, ports.deps);
-    return result.ok
-      ? { answer: done('created'), teamId: result.value.teamId }
-      : settle(createTeam, result, 'created');
-  });
+type CreateOutcome = Result<
+  { readonly teamId: string },
+  { readonly code: string; readonly issues?: readonly { readonly path: string }[] }
+>;
+
+/**
+ * "Add team" (step 2.155; T-271, record 067): refused in the response to the post, with
+ * every box as typed and the wrong one marked; added, the browser goes to the new team's
+ * page, where "Saved" names it at the top. A second post of the same form (a double tap
+ * with scripts off) is answered as the first, so one team is added.
+ */
+export async function createTeamAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
+  const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'teams');
+  const { adminTeams: ports } = await webPorts();
+  const context = commandContextOf(view.context);
+  const outcome = await sameRequestsHere<CreateOutcome>().once(
+    requestKeyOf(context, fields),
+    async (): Promise<CreateOutcome> => {
+      const season = await ports.currentSeason(context);
+      if (season === undefined) return { ok: false, error: { code: 'season-not-found' } };
+      const input = newTeamInput(fields, season.id);
+      if (shortNameNeeded(input)) return { ok: false, error: { code: 'short-name-needed' } };
+      return createTeam(context, input, ports.deps);
+    },
+  );
+  if (!outcome.ok) {
+    const { code, issues } = outcome.error;
+    const refusal = createTeamRefusal(code, issues);
+    return refusedWith(code, fields, refusal.wrong, t(refusal.said));
+  }
+  const teamId = outcome.value.teamId;
+  return answerSavedAt(
+    context,
+    { screen: 'teams', thing: teamId, said: 'created' },
+    leagueUrl(view.context.league, 'admin-area', { area: 'teams', subpath: [teamId] }),
+  );
 }
 
 export async function saveTeamAction(form: FormData): Promise<never> {

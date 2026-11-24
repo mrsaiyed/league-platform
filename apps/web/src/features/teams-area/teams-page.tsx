@@ -2,6 +2,7 @@
 // Drawn by step 2.103 as a list page: a title, one line of what it is for, and its main
 // action ("Add a team") at the top right, which leads to the form; each team a row with
 // its shield, its division and one way in; an empty list a calm panel with the action.
+import { randomUUID } from 'node:crypto';
 import { leagueUrl, type CommandContext } from '@srleagues/core';
 import { EmptyPanel, PageHead } from '@srleagues/ui';
 import { webPorts } from '../../server/container.ts';
@@ -9,16 +10,10 @@ import { commandContextOf } from '../../server/context.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { binLinkFor } from '../bin-area/index.ts';
 import { t } from '../../server/messages.ts';
+import { requestTokenField } from '../../server/same-request.ts';
+import { ListForm } from '../list-forms/index.ts';
 import { createTeamAction } from './actions.ts';
-import {
-  ColorFields,
-  DivisionField,
-  LeagueField,
-  Notice,
-  Section,
-  Swatch,
-  TextField,
-} from './parts.tsx';
+import { Notice, Section, Swatch } from './parts.tsx';
 
 /** Where "Add a team" leads: the form's own place on the page. */
 const addTeamAnchor = 'add-team';
@@ -124,23 +119,54 @@ async function Body({
       )}
       <div id={addTeamAnchor} className="admin-add-team">
         <Section title={t('adminTeams.create.title')}>
-          <form action={createTeamAction} className="staff-form" data-form="create-team">
-            <LeagueField league={league.slug} />
-            <TextField name="name" label={t('adminTeams.field.name')} required maxLength={120} />
-            <TextField
-              name="shortName"
-              label={t('adminTeams.field.shortName')}
-              hint={t('adminTeams.field.shortNameHint')}
-              maxLength={60}
-            />
-            <ColorFields color={null} />
-            <DivisionField divisions={divisions} value={null} />
-            <p className="staff-buttons">
-              <button type="submit" className="ui-button" data-kind="main">
-                {t('adminTeams.create.submit')}
-              </button>
-            </p>
-          </form>
+          {/* Refused, every box keeps what was typed and the wrong one is marked, with its
+              sentence beside it (step 2.155; ../list-forms). */}
+          <ListForm
+            action={createTeamAction}
+            permalink={`${leagueUrl(league, 'admin-area', { area: 'teams' })}#${addTeamAnchor}`}
+            hidden={{ league: league.slug, [requestTokenField]: randomUUID() }}
+            fields={[
+              {
+                kind: 'text',
+                name: 'name',
+                label: t('adminTeams.field.name'),
+                value: '',
+                required: true,
+                maxLength: 120,
+              },
+              {
+                kind: 'text',
+                name: 'shortName',
+                label: t('adminTeams.field.shortName'),
+                value: '',
+                maxLength: 60,
+                help: t('adminTeams.field.shortNameHint'),
+              },
+              {
+                kind: 'color',
+                name: 'color',
+                label: t('adminTeams.field.color'),
+                value: null,
+                ownName: 'useOwnColors',
+                ownLabel: t('adminTeams.field.useOwnColors'),
+              },
+              {
+                kind: 'select',
+                name: 'divisionId',
+                label: t('adminTeams.field.division'),
+                value: '',
+                required: false,
+                options: [
+                  { value: '', label: t('adminTeams.noDivision') },
+                  ...divisions.map((division) => ({ value: division.id, label: division.name })),
+                ],
+              },
+            ]}
+            button={t('adminTeams.create.submit')}
+            kind="main"
+            label={t('adminTeams.create.title')}
+            name="create-team"
+          />
         </Section>
       </div>
     </>

@@ -190,7 +190,11 @@ if (browser !== null) {
 
   await step('a team is added and its page opens', async () => {
     await page.getByLabel('Name', { exact: true }).fill(teamName);
-    await submit(page, page.getByRole('button', { name: 'Add team' }), /done=created/);
+    await submit(
+      page,
+      page.getByRole('button', { name: 'Add team' }),
+      /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+    );
     teamPath = new URL(page.url()).pathname;
     note(
       "the team's own page opens",
@@ -198,7 +202,14 @@ if (browser !== null) {
         (await page.getByRole('heading', { level: 1, name: teamName }).count()) === 1,
       page.url(),
     );
-    note('it says the team was added', (await page.getByText('The team was added.').count()) === 1);
+    // Said at the top of its own page, naming it, once (step 2.155).
+    note(
+      'it says the team was added, naming it',
+      (await page
+        .getByRole('status')
+        .filter({ hasText: `Saved: ${teamName} was added to the season.` })
+        .count()) === 1,
+    );
     await accessible(page, "a team's page on the database");
   });
 

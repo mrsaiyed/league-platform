@@ -95,7 +95,11 @@ if (built) {
     const texts = async (p) => entries(p).allInnerTexts();
     const addTeam = async (p, name) => {
       await p.locator('input[name=name]').fill(name);
-      await tap(p, p.getByRole('button', { name: 'Add team' }), /done=created/);
+      await tap(
+        p,
+        p.getByRole('button', { name: 'Add team' }),
+        /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+      );
     };
 
     at = 'enough teams are added for a second page of the log';

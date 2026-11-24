@@ -188,7 +188,10 @@ if (built) {
     await openStaffMenu(page);
     await tap(adminLink('Teams'), /\/admin\/teams$/);
     await page.locator('input[name=name]').fill(wrens.team);
-    await tap(page.getByRole('button', { name: 'Add team' }), /done=created/);
+    await tap(
+      page.getByRole('button', { name: 'Add team' }),
+      /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+    );
     for (const name of wrens.people) {
       const [first, last] = name.split(' ');
       const form = page.locator('form', { has: page.locator('input[name=firstName]') });

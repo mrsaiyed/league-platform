@@ -2268,25 +2268,40 @@ async function checkTeams(origin) {
    */
   async function post(who, page, index, fields, formPage = page) {
     const html = await pageOf('owner', formPage);
-    const actionOf = (form) => /name="(\$ACTION_ID_[^"]+)"/.exec(form)?.[1];
-    let id;
+    // A form's framework fields: a plain form's one `$ACTION_ID_…`, or all the hidden
+    // `$ACTION…` boxes of a form with its own state (step 2.155: "Add team"), as sent.
+    const actionFieldsOf = (form) => {
+      const found = [...form.matchAll(/<input[^>]*>/g)]
+        .map(([input]) => [
+          /name="([^"]*)"/.exec(input)?.[1] ?? '',
+          (/value="([^"]*)"/.exec(input)?.[1] ?? '')
+            .replaceAll('&quot;', '"')
+            .replaceAll('&amp;', '&'),
+        ])
+        .filter(([name]) => name.startsWith('$ACTION'));
+      return found.some(([name]) => name.startsWith('$ACTION_ID_') || name === '$ACTION_KEY')
+        ? found
+        : undefined;
+    };
+    const forms = pageForms(html)
+      .split('<form')
+      .slice(1)
+      .map((form) => form.slice(0, form.indexOf('</form>')))
+      .filter((form) => actionFieldsOf(form) !== undefined);
+    let action;
     if (typeof index === 'number') {
-      id = [...pageForms(html).matchAll(/name="(\$ACTION_ID_[^"]+)"/g)].map((m) => m[1])[index];
+      action = forms[index] === undefined ? undefined : actionFieldsOf(forms[index]);
     } else {
-      const having = pageForms(html)
-        .split('<form')
-        .slice(1)
-        .map((form) => form.slice(0, form.indexOf('</form>')))
-        .filter((form) => form.includes(`name="${index}"`) && actionOf(form) !== undefined);
+      const having = forms.filter((form) => form.includes(`name="${index}"`));
       if (having.length > 1) problems.push(`${page}: ${having.length} forms have ${index}`);
-      id = having.length === 1 ? actionOf(having[0]) : undefined;
+      action = having.length === 1 ? actionFieldsOf(having[0]) : undefined;
     }
-    if (id === undefined) {
+    if (action === undefined) {
       problems.push(`${page}: no form ${index}`);
       return undefined;
     }
     const body = new FormData();
-    body.set(id, '');
+    for (const [name, value] of action) body.set(name, value);
     for (const [name, value] of Object.entries(fields)) body.set(name, value);
     return fetch(origin + page, {
       method: 'POST',
@@ -2300,13 +2315,13 @@ async function checkTeams(origin) {
     return location.pathname + location.search;
   };
   const list = '/harbor-city/admin/teams';
-  const added = await post('owner', list, 0, {
+  const added = await post('owner', list, 'shortName', {
     league: 'harbor-city',
     name: 'Blue Jays',
     useOwnColors: 'on',
   });
   if (added === undefined) return problems;
-  const team = /^\/harbor-city\/admin\/teams\/([0-9a-f-]{36})\?done=created$/.exec(to(added))?.[1];
+  const team = /^\/harbor-city\/admin\/teams\/([0-9a-f-]{36})$/.exec(to(added))?.[1];
   if (added.status !== 303 || team === undefined) {
     problems.push(`adding a team answers ${added.status} to ${to(added)}`);
     return problems;
@@ -2362,11 +2377,7 @@ async function checkTeams(origin) {
   // Forged posts change nothing: a league field that is not the page's league is "not
   // found", and another league's team id is not a team of this league (T-23).
   const forgedLeague = await post('owner', list, 0, { league: 'north-valley', name: 'Forged' });
-  if (
-    forgedLeague !== undefined &&
-    forgedLeague.status === 303 &&
-    !to(forgedLeague).includes('problem=')
-  ) {
+  if (forgedLeague !== undefined && forgedLeague.status === 303) {
     problems.push(
       `a post naming another league was taken (${forgedLeague.status} to ${to(forgedLeague)})`,
     );

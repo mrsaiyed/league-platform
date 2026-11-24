@@ -98,7 +98,10 @@ if (built) {
     await tap(adminLink('Teams'), /\/admin\/teams$/);
     await page.locator('input[name=name]').fill(team);
     await page.locator('select[name=divisionId]').selectOption({ label: 'East' });
-    await tap(page.getByRole('button', { name: 'Add team' }), /done=created/);
+    await tap(
+      page.getByRole('button', { name: 'Add team' }),
+      /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+    );
     await accessible('the new team in the admin');
 
     at = 'the owner adds two players';

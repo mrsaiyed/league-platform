@@ -127,7 +127,11 @@ export async function walkFirstTest(o) {
     ]) {
       await staffLink(page, 'Teams', /\/admin\/teams$/);
       await page.locator('input[name=name]').fill(name);
-      await tap(page, page.getByRole('button', { name: 'Add team' }), /done=created/);
+      await tap(
+        page,
+        page.getByRole('button', { name: 'Add team' }),
+        /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+      );
       if (name === 'Ravens') say(3, await mainText(page));
       if (from === null) continue;
       const headings = await page.locator('main h2').allInnerTexts();

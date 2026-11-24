@@ -7,7 +7,7 @@
 // button when no box is wrong). With scripts off React's form state does the same in the
 // page that answers the post, at the form's own place (`permalink`). Every word comes from
 // the server, from the message files (T-187).
-import { useActionState, useId } from 'react';
+import { useActionState, useEffect, useId, useRef } from 'react';
 import { untouched, type FormState } from './form-state.ts';
 import { useOneSubmit } from './use-one-submit.ts';
 
@@ -37,6 +37,8 @@ export type ListField =
       readonly value: string;
       readonly options: readonly { readonly value: string; readonly label: string }[];
       readonly help?: string;
+      /** False where one of the options is "none" (a team with no division); true when left out. */
+      readonly required?: boolean;
     }
   | {
       /** A color, and the choice to use the league's own (checked when there is none). */
@@ -59,7 +61,7 @@ export type ListFormProps = {
   readonly confirm?: string;
   readonly button: string;
   /** A button that takes something away is drawn as one; a small step (move up) is quiet. */
-  readonly kind?: 'danger' | 'quiet';
+  readonly kind?: 'danger' | 'quiet' | 'main';
   /** What the form is about, for a screen reader: "Change East". */
   readonly label: string;
   /** How the test and the page find the form: `data-form="rename"`. */
@@ -83,6 +85,13 @@ export function ListForm({
 }: ListFormProps) {
   const [state, dispatch, pending] = useActionState(action, untouched, permalink);
   const onSubmit = useOneSubmit(pending, state);
+  const formRef = useRef<HTMLFormElement>(null);
+  // After a refusal the first wrong box has the focus, so the keyboard and the screen
+  // reader are where the sentence is (step 2.155, as the games area's boxes).
+  useEffect(() => {
+    if (state.kind !== 'refused') return;
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [state]);
   const base = useId();
   const problemId = `${base}-problem`;
   const refused = state.kind === 'refused' ? state : undefined;
@@ -98,6 +107,7 @@ export function ListForm({
     wrongField === field ? { 'aria-invalid': true, 'aria-describedby': problemId } : {};
   return (
     <form
+      ref={formRef}
       action={dispatch}
       onSubmit={onSubmit}
       className="staff-form"
@@ -149,7 +159,7 @@ export function ListForm({
                   key={`${field.name}:${value}`}
                   name={field.name}
                   defaultValue={value}
-                  required
+                  required={field.required ?? true}
                   {...marked(field.name)}
                 >
                   {field.options.map((option) => (

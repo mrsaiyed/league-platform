@@ -150,7 +150,10 @@ if (built) {
     at = 'a new team with no games has its tick and button';
     await openArea('Teams', /\/admin\/teams$/);
     await page.locator('input[name=name]').fill(kestrels);
-    await tap(page.getByRole('button', { name: 'Add team' }), /done=created/);
+    await tap(
+      page.getByRole('button', { name: 'Add team' }),
+      /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+    );
     const freeText = await bin().innerText();
     note(
       'a new team says it has no games',

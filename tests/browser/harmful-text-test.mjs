@@ -440,7 +440,10 @@ if (browser) {
         .evaluateAll((options) => options.find((o) => o.value !== '')?.value ?? '');
       await division.selectOption(first);
     }
-    await tap(form.getByRole('button', { name: 'Add team' }), /done=created/);
+    await tap(
+      form.getByRole('button', { name: 'Add team' }),
+      /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+    );
     teamAdmin = new URL(page.url()).pathname;
   });
 
@@ -606,7 +609,10 @@ if (browser) {
       await page.goto(`${origin}/north-valley/admin/teams`);
       const create = page.locator('form[data-form=create-team]');
       await create.locator('input[name=name]').fill(name);
-      await tap(create.getByRole('button', { name: 'Add team' }), /done=created/);
+      await tap(
+        create.getByRole('button', { name: 'Add team' }),
+        /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+      );
     }
     await page.goto(`${origin}/north-valley/admin/standings`);
     const set = page.locator('[data-level-set*="Level Partner"]');

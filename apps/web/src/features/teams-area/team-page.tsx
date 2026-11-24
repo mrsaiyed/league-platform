@@ -58,6 +58,8 @@ import {
   TextField,
 } from './parts.tsx';
 
+import { SaidLine, takeNotice } from '../list-forms/index.ts';
+
 /** Where "Add a player", the page's main action, leads: the form's own place on the page. */
 const addPlayerAnchor = 'add-player';
 
@@ -101,6 +103,9 @@ export async function TeamPage({
     return (await binnedTeamPage(here, context, teamId.toLowerCase())) ?? notFound();
   }
 
+  // A team just added: "Saved" at the top, beside its name, once (step 2.155).
+  const notice = takeNotice(context, 'teams');
+  const justAdded = notice?.thing === team.id && notice.said === 'created';
   const roster = await listRoster(context, { teamId: team.id }, ports.deps);
   const lines: readonly RosterLine[] = roster.ok ? roster.value : [];
   const open = lines.filter((line) => line.leftOn === null);
@@ -165,6 +170,9 @@ export async function TeamPage({
           </a>
         ) : null}
       </PageHead>
+      {justAdded ? (
+        <SaidLine kind="saved">{t('adminTeams.create.saved', { name: team.name })}</SaidLine>
+      ) : null}
       <Notice
         query={query}
         binHref={leagueUrl(here, 'admin-area', { area: 'settings', subpath: ['bin'] })}
