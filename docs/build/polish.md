@@ -115,3 +115,7 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.62 (review Low): the takeover in game-night is by the league's owner, as the made-up league has one scorekeeper only; a second made-up scorekeeper would prove two people of that role hand a game over.
 - 2.62 (review Low): demo-hidden-numbers matches hidden players only as "First L."; a full name would pass, and the statistics page's `?by=` and `?season=` views and the game's public snapshot answer are not read.
 - 2.62 (review Low, decided): accessibility is checked once per kind of page for each person, not on every one of the 40 demo pages.
+- 2.118 (review Low, left by its fix round): the banner says "plays" for changes of players waiting ("5 plays waiting to send" after four adds and a take-off); it should say "changes" when what waits is a change of players.
+- 2.118 (review Low, left by its fix round): the panel's half-typed drafts are kept by game, not by game and person (T-327's spirit): on a shared device the next scorer sees the last one's half-typed line.
+- 2.118 (review Low): the jump to the away team shows under 680 wide; that break is measured only at the four sizes.
+- 2.118 (review Low): the panel read-only when the game is final is tried in unit tests only, not in a browser.
