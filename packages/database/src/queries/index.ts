@@ -137,7 +137,7 @@ export { updateGameResult } from './update-game-result.ts';
 export { updateGameNotStarted } from './update-game-not-started.ts';
 export { updateGameGivenFormat } from './update-game-given-format.ts';
 export { findGameCorrectedDate } from './find-game-corrected-date.ts';
-export { findGameResultBeingCorrected } from './find-game-result-being-corrected.ts';
+export { listResultsBeingCorrected } from './list-results-being-corrected.ts';
 export { findGameState } from './find-game-state.ts';
 export { listGameNames, type GameNamesRows } from './list-game-names.ts';
 export { listGamePlayerLines } from './list-game-player-lines.ts';

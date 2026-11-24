@@ -248,15 +248,20 @@ export function LiveGameView({
   const redraw =
     held === true ? redrawsWhileHeld(initial, followed.game) : redrawsFor(initial, followed.game);
   const sequence = useRef(followed.game.sequence);
+  const status = useRef(followed.game.status);
   useEffect(() => {
     sequence.current = followed.game.sequence;
+    status.current = followed.game.status;
   });
   useEffect(() => {
     // The server reads the same store the change came from, so the page drawn again
     // arrives at least this new. Spread over a few seconds, only when the page answers,
-    // and once per sequence number (redraw-page.ts).
+    // and once per sequence number and status (redraw-page.ts).
     if (!redraw) return undefined;
-    return redrawPage({ gameId, sequence: sequence.current }, browserRedrawDevice);
+    return redrawPage(
+      { gameId, sequence: sequence.current, status: status.current },
+      browserRedrawDevice,
+    );
   }, [redraw, gameId]);
   const serverNow = deviceNow === null ? initial.sentAt : deviceNow + followed.offsetMs;
   const running = game.status === 'live' && clockIsRunning(game.clock, serverNow);
