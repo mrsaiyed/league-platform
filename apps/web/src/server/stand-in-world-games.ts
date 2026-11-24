@@ -164,6 +164,7 @@ export function worldGamesStore(s: LeagueWorld, now: () => Date): GamesStore {
       s.games = replacedAt(s.games, at, { ...found, version: found.version + 1 });
       return found.version + 1;
     },
+    newestCorrection: async (gameId) => s.corrections.filter((c) => c.gameId === gameId).at(-1),
     addCorrection: async (correction) => {
       s.corrections = [...s.corrections, { ...correction, on: dayIn(now(), s.timeZone) }];
     },

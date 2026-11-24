@@ -83,6 +83,29 @@ export type GameResultDocument = {
   readonly status: string;
   readonly homeScore: number | null;
   readonly awayScore: number | null;
+  /**
+   * A correction's "before" of a game entered by hand that had box score lines (step 2.229,
+   * T-365): every line as it was, so the save after the reopen may remove or replace them
+   * and "put the sheet back" can restore them (A-5). Ids and numbers only, never a name
+   * (T-220). Never counted anywhere: only `player_game_stats` rows count (S-27).
+   */
+  readonly sheet?: KeptSheet;
+};
+
+/** A box score as a correction keeps it (T-365): how it was recorded and its lines. */
+export type KeptSheet = {
+  readonly captureMode: 'box' | 'final' | 'live';
+  readonly overtimePeriods: number | null;
+  readonly lines: readonly KeptLine[];
+};
+
+/** One kept line: the line without its game id, with the jersey worn (a number, R-17). */
+export type KeptLine = Omit<NewGameLine, 'gameId'>;
+
+/** A correction as it was written, read back: its two documents (step 2.229). */
+export type StoredGameCorrection = {
+  readonly before: GameResultDocument;
+  readonly after: GameResultDocument;
 };
 
 /** One player's box score line in one game (T3 §8 `player_game_stats`). */
@@ -229,6 +252,8 @@ export type GamesStore = {
   ) => Promise<number | undefined>;
   /** Writes the correction row (S-7) in this transaction; the database needs it to change a decided game. */
   readonly addCorrection: (correction: NewGameCorrection) => Promise<void>;
+  /** The game's newest correction (by when it was written, then id), or undefined (step 2.229). */
+  readonly newestCorrection: (gameId: string) => Promise<StoredGameCorrection | undefined>;
   /** Postponed games not in the bin, soonest first, of one season or all. */
   readonly listPostponed: (seasonId?: string) => Promise<readonly GameRecord[]>;
   /**

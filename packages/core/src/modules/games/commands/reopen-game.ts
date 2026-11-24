@@ -15,6 +15,7 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { gameReopened, type GameReopened } from '../../../events/game-events.ts';
 import { correctionReason, gameVersion, isDecided } from '../game-fields.ts';
 import { handBackTrackedGame } from '../finish-tracked-game.ts';
+import { sheetToKeep } from '../kept-sheet.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
 
@@ -59,6 +60,10 @@ export const reopenGame = defineCommand({
       saved === undefined
         ? { status: 'scheduled', homeScore: null, awayScore: null }
         : await handBackTrackedGame(tx, game, saved, context.accountId, crypto.randomUUID());
+    // By hand, the box score's lines are kept too, ids and numbers only, so the save after
+    // this may remove or replace them and the sheet can still be put back (T-365). A
+    // tracked game's lines follow its plays, which stay.
+    const sheet = saved === undefined ? await sheetToKeep(tx, game) : undefined;
     await tx.games.addCorrection({
       gameId: game.id,
       accountId: context.accountId,
@@ -68,6 +73,7 @@ export const reopenGame = defineCommand({
         status: game.status,
         homeScore: game.homeScore,
         awayScore: game.awayScore,
+        ...(sheet === undefined ? {} : { sheet }),
       },
       after: { version: 1 as const, ...after },
     });

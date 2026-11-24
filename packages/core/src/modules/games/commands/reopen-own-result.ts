@@ -25,6 +25,7 @@ import { gameReopened, type GameReopened } from '../../../events/game-events.ts'
 import { correctionReason, gameVersion } from '../game-fields.ts';
 import { ownResultOffer, type OwnResultNotOffered } from '../own-result-window.ts';
 import { mayScoreGame } from '../policy.ts';
+import { sheetToKeep } from '../kept-sheet.ts';
 import type { TrackerTx } from '../ports.ts';
 
 export type ReopenOwnResultError =
@@ -64,6 +65,8 @@ export const reopenOwnResult = defineCommand({
       });
     }
     const after = { status: 'scheduled', homeScore: null, awayScore: null };
+    // A box score they typed keeps its lines in the correction, as the admin's door does (T-365).
+    const sheet = await sheetToKeep(tx, game);
     await tx.games.addCorrection({
       gameId: game.id,
       accountId: context.accountId,
@@ -73,6 +76,7 @@ export const reopenOwnResult = defineCommand({
         status: game.status,
         homeScore: game.homeScore,
         awayScore: game.awayScore,
+        ...(sheet === undefined ? {} : { sheet }),
       },
       after: { version: 1 as const, ...after },
     });

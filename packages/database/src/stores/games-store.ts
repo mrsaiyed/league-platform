@@ -11,6 +11,7 @@ import {
   hasBinnedGamePart,
   insertGameAssignment,
   insertGameCorrection,
+  findNewestGameCorrection,
   isGameAssigned,
   listDecidedGameLines,
   listDecidedGames,
@@ -43,6 +44,7 @@ export function gamesStore(scope: LeagueScope): GamesStore {
     setGivenFormat: (gameId, format, version) =>
       updateGameGivenFormat(scope, gameId, format, version),
     addCorrection: (correction) => insertGameCorrection(scope, correction),
+    newestCorrection: (gameId) => findNewestGameCorrection(scope, gameId),
     listPostponed: (seasonId) => listPostponedGames(scope, seasonId),
     statusBeforeCancelled: (gameId) => findStatusBeforeCancelled(scope, gameId),
     partInBin: (gameId) => hasBinnedGamePart(scope, gameId),

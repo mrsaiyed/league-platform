@@ -211,7 +211,12 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
   const transaction = memoryTransaction(db, (s, jobs): TrackerTx & StandingsTx => ({
     jobs,
     scoringSessions: noSessions(s),
-    liveGames: noLiveGames,
+    liveGames: {
+      ...noLiveGames,
+      // A game's lines, as the database reads them for any game (a reopen keeps them, T-365).
+      lines: async (gameId) =>
+        s.lines.filter((l) => l.gameId === gameId).map((l) => ({ jerseyNumber: null, ...l })),
+    },
     clock: { now: () => Date.UTC(2026, 11, 20, 20, 0, 0) },
     access: {
       ownerAccountId: async () => ownerId,
@@ -246,6 +251,7 @@ export function memoryStandings(state: Partial<MemoryStandings> = {}, options: M
       // Standings never meet a game marked not started: it was only live (S-40).
       markNotStarted: async () => undefined,
       addCorrection: async (correction) => void s.corrections.push(correction),
+      newestCorrection: async (gameId) => s.corrections.filter((c) => c.gameId === gameId).at(-1),
       listPostponed: async () => [],
       statusBeforeCancelled: async () => undefined,
       partInBin: async () => false,
