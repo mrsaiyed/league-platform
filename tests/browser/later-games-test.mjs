@@ -11,10 +11,12 @@
 // - A team in the bin is named "Otters (removed)" on the list.
 // - A scheduled game whose line-ups the tracker holds (sent through the tracker's own
 //   endpoints, as a tablet would) does not say "Plays are being recorded", says its
-//   line-ups are set, and is forfeited from the list.
+//   line-ups are set, and is forfeited from the list; a visitor then reads the forfeit on
+//   the public game page and in the standings (a loss for the Lions, a win for the Hawks).
 // - S-87: the admin marks the Hawks as having left the league on their page; public
 //   standings and Teams mark them, the new-game form leaves them out; undone, offered again.
 // - Accessibility checks (T-186) and no sideways scrolling at phone width (A-2).
+import { leagueUrl } from '@srleagues/core';
 import {
   accessibilityProblems,
   buildNext,
@@ -79,6 +81,25 @@ if (built) {
 }
 
 const gameOn = (page, id) => page.locator(`li[id="game-${id}"]`);
+
+/** Each team's standings row, by team name: its numbers by column heading. */
+const standingsRows = (page) =>
+  page.evaluate(() => {
+    const rows = {};
+    for (const table of document.querySelectorAll('table.ui-standings')) {
+      const headers = [...table.querySelectorAll('thead th[scope="col"]')].map((th) =>
+        th.textContent.trim(),
+      );
+      for (const tr of table.querySelectorAll('tbody tr')) {
+        const team = tr.querySelector('th[scope="row"]')?.textContent.trim() ?? '';
+        const cells = [...tr.querySelectorAll('td')].map((td) => td.textContent.trim());
+        const heads = headers.slice(headers.length - cells.length);
+        rows[team] ??= Object.fromEntries(heads.map((h, i) => [h, Number.parseFloat(cells[i])]));
+      }
+    }
+    return rows;
+  });
+const rowNamed = (rows, team) => Object.entries(rows).find(([name]) => name.includes(team))?.[1];
 
 /** From the admin's home to the games list, by tapping the admin's own "Games". */
 async function openGames(page) {
@@ -182,6 +203,22 @@ if (browser) {
     );
   });
 
+  // A visitor's browser, signed in as no one: the forfeit as the public site shows it.
+  const visitor = await browser.newContext({ viewport: phone });
+  const visit = async (address) => {
+    const page = await visitor.newPage();
+    await page.goto(origin + address);
+    await page.locator('main').first().waitFor();
+    return page;
+  };
+  const standingsAddress = leagueUrl({ slug: 'north-valley' }, 'standings');
+  let standingsBefore = {};
+  await step('the standings a visitor sees before the forfeit', async () => {
+    const page = await visit(standingsAddress);
+    standingsBefore = await standingsRows(page);
+    await page.close();
+  });
+
   await step('a game with only its line-ups set is forfeited from the list', async () => {
     const send = await trackerTablet(origin, tomorrowGame, 'local-owner-token', 'later-tablet');
     await send({
@@ -208,6 +245,51 @@ if (browser) {
     note('the forfeit after line-ups is saved', true);
     await phoneProblems(page, 'a forfeit after line-ups');
   });
+
+  await step('a visitor reads the forfeit on the game page and in the standings', async () => {
+    const game = await visit(leagueUrl({ slug: 'north-valley' }, 'game', { game: tomorrowGame }));
+    const words = await game.locator('main').innerText();
+    note(
+      'the public game page says the Lions forfeited',
+      /forfeit/i.test(words) && words.includes('Lions'),
+      words.slice(0, 300),
+    );
+    const problems = await accessibilityProblems(game);
+    note(
+      'accessibility: the forfeited game’s public page',
+      problems.length === 0,
+      problems.join('; '),
+    );
+    await game.close();
+    const page = await visit(standingsAddress);
+    const after = await standingsRows(page);
+    await page.close();
+    const [lb, la, hb, ha] = [
+      rowNamed(standingsBefore, 'Lions'),
+      rowNamed(after, 'Lions'),
+      rowNamed(standingsBefore, 'Hawks'),
+      rowNamed(after, 'Hawks'),
+    ];
+    const rose = (before, now, column) => (now?.[column] ?? NaN) - (before?.[column] ?? NaN);
+    const columns = Object.keys(la ?? {});
+    const seen = JSON.stringify({ lb, la, hb, ha });
+    note(
+      'the standings count the forfeit as a game for both teams',
+      columns.some((c) => rose(lb, la, c) === 1 && rose(hb, ha, c) === 1),
+      seen,
+    );
+    note(
+      'the standings count a loss for the Lions, who forfeited',
+      columns.some((c) => rose(lb, la, c) === 1 && rose(hb, ha, c) === 0),
+      seen,
+    );
+    note(
+      'the standings count a win for the Hawks',
+      columns.some((c) => rose(hb, ha, c) === 1 && rose(lb, la, c) === 0),
+      seen,
+    );
+  });
+  await visitor.close();
   await step('a team that has left the league (S-87), marked and undone', async () => {
     await openArea(page, 'teams');
     const openHawks = async () => {

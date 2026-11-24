@@ -116,3 +116,8 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.61 (review Low): the seed replays the bad Wi-Fi test's cuts, not their timing; a failing run prints the order of events, enough to read, not to replay.
 - 2.61 (review Low): the bad Wi-Fi test's scripted game has no substitutions, clock, periods or end of game: minutes (T-281), the clock's taps and taking back the End are not played under cuts.
 - 2.61 (review Low): a wake from `online()` that comes while a send with no signal is still failing is swallowed by that send's retry wait (the queue sends at its end, seconds later, up to 30 s): not a loss, not changed.
+- 2.62 (review Low, partly done in its fix round): game-night now reads the play's words on the second screen, but those words are only "Hawks scored 2"; nothing reads the second screen's foul line or a player's line as each play lands.
+- 2.62 (review Low, after its fix round): game-night reads the final as the scoreboard's two scores, but its standings check counts only games, wins and losses, not the points for and against that the plays make.
+- 2.62 (review Low): the takeover in game-night is by the league's owner, as the made-up league has one scorekeeper only; a second made-up scorekeeper would prove two people of that role hand a game over.
+- 2.62 (review Low): demo-hidden-numbers matches hidden players only as "First L."; a full name would pass, and the statistics page's `?by=` and `?season=` views and the game's public snapshot answer are not read.
+- 2.62 (review Low, decided): accessibility is checked once per kind of page for each person, not on every one of the 40 demo pages.
