@@ -40,11 +40,10 @@ Learned, not yet rules elsewhere: (a) a lane that adds a page, a route, a field,
 
 Every lane's work is on GitHub. Three at a time, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`) | Where it stands                                                                                                                                                                   | What is left                                       |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 2.191-ci-parallel      | parked                                                                                                                                                                            | after the first test is in the founder's hands     |
-| 2.148-takeover         | builder 1 of 2 working (the server and the controller; numbers T-335 to T-339, S-91, S-92)                                                                                        | builder 2 (the screen, browser test), review, land |
-| 2.119-format           | builder 1 of 2 working (below the screens; numbers T-340 to T-344; S-93 decided for the founder: the scoring screen offers only what the season keeps, to be built as step 2.241) | builder 2 (the screens), review, land              |
+| Lane (branch `lane/…`) | Where it stands                                                                            | What is left                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| 2.191-ci-parallel      | parked                                                                                     | after the first test is in the founder's hands     |
+| 2.148-takeover         | builder 1 of 2 working (the server and the controller; numbers T-335 to T-339, S-91, S-92) | builder 2 (the screen, browser test), review, land |
 
 Next free: STEP 2.241, migration 0026, record 108 (103 to 105 were never used), T-331 (T-310, T-311 and T-315 were never used), S-91, A-22, U-19. Numbers already given out stand with their lanes (in each lane's note).
 
