@@ -705,7 +705,10 @@ if (browser) {
       await signIn(page, people.scorekeeper);
       await openMenu(page);
       await link(page, 'My games to score').click();
-      await page.locator(`li[data-game="${liveGame}"] a[href*="/score/"]`).click();
+      await page
+        .locator(`li[data-game="${liveGame}"]`)
+        .getByRole('link', { name: 'Score this game', exact: true })
+        .click();
       await gameOpen(page).waitFor();
       await openAccountOnTracker(page);
       const signOut = page.getByRole('link', { name: 'Sign out', exact: true });
@@ -754,7 +757,10 @@ if (browser) {
       await context.route('**/commands', (route) => route.abort());
       await openMenu(page);
       await link(page, 'My games to score').click();
-      await page.locator(`li[data-game="${liveGame}"] a[href*="/score/"]`).click();
+      await page
+        .locator(`li[data-game="${liveGame}"]`)
+        .getByRole('link', { name: 'Score this game', exact: true })
+        .click();
       await gameOpen(page).waitFor();
       // A play made while the connection to the server is down stays waiting.
       await seedWaitingPlay(page, liveGame);

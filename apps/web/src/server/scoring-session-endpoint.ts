@@ -127,7 +127,7 @@ export async function scoringSessionRequest(
   return { status: 200, body: await replyOf(context.league.id, result.value, ports) };
 }
 
-async function replyOf(
+export async function replyOf(
   leagueId: string,
   reply: ScoringSessionReply,
   ports: SessionPorts,

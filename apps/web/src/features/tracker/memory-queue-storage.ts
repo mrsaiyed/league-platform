@@ -47,9 +47,17 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
     },
     async settle(
       gameId,
-      { remove = [], refuse = [], notSaved = [], notSavedSince, carryOn }: QueueSettlement,
+      {
+        remove = [],
+        refuse = [],
+        notSaved = [],
+        notSavedSince,
+        carryOn,
+        taken = [],
+      }: QueueSettlement,
     ) {
       const carried = new Set(carryOn?.commandIds ?? []);
+      const tookIds = new Set(taken.map((t) => t.command.commandId));
       const dropped = new Set(remove);
       const refusals = new Map(refuse.map((r) => [r.commandId, r.refusal]));
       const setAside = new Set(notSaved);
@@ -77,11 +85,19 @@ export function createMemoryQueueStorage(): MemoryQueueStorage {
           const since = notSavedSince === undefined ? {} : { notSavedSince };
           return [structuredClone({ ...kept, state: 'not-saved', ...since })];
         }
+        if (tookIds.has(id)) return [structuredClone({ ...kept, state: 'taken' })];
         if (carryOn !== undefined && carried.has(id) && entry.state === 'waiting') {
           return [structuredClone({ ...entry, sessionId: carryOn.sessionId })];
         }
         return [entry];
       });
+      // A taken tap the device no longer holds is stored at the end (T-372).
+      const holds = new Set(held.map((entry) => entry.command.commandId));
+      for (const tap of taken) {
+        if (holds.has(tap.command.commandId)) continue;
+        held.push(structuredClone({ gameId, ...tap, state: 'taken' }));
+        holds.add(tap.command.commandId);
+      }
     },
     async listAll() {
       return structuredClone(held);

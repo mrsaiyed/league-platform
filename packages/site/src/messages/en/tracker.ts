@@ -72,6 +72,38 @@ export const enTracker = {
   'tracker.clockSheet.title': 'Clock and period',
   // A time longer than the period being played: "H1 is 20:00 long: type 20:00 or less."
   'tracker.clockSheet.tooLong': '{period} is {length} long: type {length} or less.',
+  // "Save a copy" behind More (S-5, T-129, step 2.70): what the copy is for.
+  'tracker.copy.explain':
+    'Saves a file on this device with the plays not yet on the server. If this device cannot get back online, open the file on another phone or computer to upload it. Nothing is counted twice.',
+  'tracker.copy.failed':
+    'The copy could not be saved: this device’s storage did not answer. Try again.',
+  // Why an uploaded file was not taken (step 2.70): the upload page words these.
+  'tracker.copy.refused.damaged':
+    'This copy is damaged: it was cut short or changed. Save a new copy on the scoring device if you can.',
+  'tracker.copy.refused.game-not-live': 'This game is postponed: it cannot be scored now.',
+  'tracker.copy.refused.not-a-copy':
+    'This file is not a copy of a game. Pick the file saved by “Save a copy”.',
+  'tracker.copy.refused.not-allowed': 'You may not score this game, so you cannot upload its copy.',
+  'tracker.copy.refused.other-game':
+    'This copy is of another game. Open that game’s upload page instead.',
+  'tracker.copy.refused.other-league': 'This copy is of a game in another league.',
+  'tracker.copy.refused.reopen-first':
+    'This game has ended. Reopen it first, then upload the copy again.',
+  'tracker.copy.refused.unknown-game': 'There is no such game.',
+  'tracker.copy.refused.unknown-version':
+    'This copy was saved by a newer version of the tracker. Reload this page and try again.',
+  'tracker.copy.save': 'Save a copy',
+  'tracker.copy.savedNone':
+    'Copy saved. Every play is already on the server, so it holds nothing to upload.',
+  'tracker.copy.saved_one':
+    'Copy saved on this device, with {count} play not yet on the server. Keep the file until the play is sent.',
+  'tracker.copy.saved_other':
+    'Copy saved on this device, with {count} plays not yet on the server. Keep the file until they are sent.',
+  // After several minutes offline with plays waiting (T6 §4, T-129).
+  'tracker.copy.suggest':
+    'To be safe, save a copy of the game now: if this device cannot get back online, the copy can be uploaded from another phone or computer.',
+  'tracker.copy.where':
+    'Cannot get back online? Sign in on another phone or computer and upload the copy there:',
   'tracker.court.close': 'Close',
   'tracker.court.controls': 'Clock and undo',
   'tracker.court.more': 'More',
@@ -586,6 +618,12 @@ export const enTracker = {
   'tracker.redo.done': 'Brought back: {play}.',
   'tracker.redo.label': 'Redo {play}',
   'tracker.redo.nothing': 'Redo: nothing to bring back',
+  // Left the game (an upload of a copy let go of it, step 2.70) with plays this device
+  // can still send by "Send these plays" (T-370).
+  'tracker.releasedKept_one':
+    'This device has left the game. {count} play made here is still waiting: it is not on the server yet. Send it with “Send these plays” below, then open the game again to keep scoring.',
+  'tracker.releasedKept_other':
+    'This device has left the game. {count} plays made here are still waiting: they are not on the server yet. Send them with “Send these plays” below, then open the game again to keep scoring.',
   // The bonus horn's sentence: a muted tablet is the normal case in a gym.
   'tracker.say.bonus.1': 'Bonus: {team}.',
   'tracker.say.bonus.2': 'Double bonus: {team}.',
@@ -754,6 +792,36 @@ export const enTracker = {
   'tracker.undo.label': 'Undo {play}',
   'tracker.undo.nothing': 'Undo: nothing to take back',
   'tracker.unknownGame': 'We could not find that game.',
+  // The upload page of a copy of a game (step 2.70): any phone or computer, signed in.
+  'tracker.upload.addedNone': 'No play in the copy was new.',
+  'tracker.upload.added_one': '{count} play was new: it is saved now.',
+  'tracker.upload.added_other': '{count} plays were new: they are saved now.',
+  'tracker.upload.alreadyThere_one':
+    'The server already had {count} play, so it was not counted again.',
+  'tracker.upload.alreadyThere_other':
+    'The server already had {count} plays, so they were not counted again.',
+  'tracker.upload.back': 'Back to your games',
+  'tracker.upload.done': 'The copy is uploaded.',
+  'tracker.upload.empty': 'The copy held no plays: there was nothing to send.',
+  'tracker.upload.failed':
+    'The copy could not be uploaded: the server did not answer. Check the connection and try again. Uploading it again never counts a play twice.',
+  'tracker.upload.file': 'The copy’s file',
+  'tracker.upload.intro':
+    'Pick the file saved by “Save a copy” on the scoring device. Its plays are sent to the server; any the server already has are skipped, so nothing is counted twice.',
+  'tracker.upload.link': 'Upload a copy of this game',
+  'tracker.upload.noFile': 'Pick the copy’s file first.',
+  'tracker.upload.notNow': 'Nothing was uploaded. The game stays with that device.',
+  'tracker.upload.notTaken_one':
+    '{count} play was not taken: the game’s rules refused it, or another device took the game while the copy was being sent.',
+  'tracker.upload.notTaken_other':
+    '{count} plays were not taken: the game’s rules refused them, or another device took the game while the copy was being sent.',
+  'tracker.upload.send': 'Upload the copy',
+  'tracker.upload.sending': 'Uploading…',
+  'tracker.upload.signedOut': 'You are signed out. Sign in again, then upload the copy.',
+  'tracker.upload.title': 'Upload a copy of the game',
+  'tracker.upload.tooLarge':
+    'This file is too large to be a copy of a game. Pick the file “Save a copy” wrote on the scoring device.',
+  'tracker.upload.unreadable': 'This file could not be opened on this device. Pick it again.',
   'tracker.where.bench': 'bench',
   'tracker.where.floor': 'on court',
 } as const;

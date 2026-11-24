@@ -41,14 +41,18 @@ async function readAtMost(request: Request, limit: number): Promise<Uint8Array |
   return bytes;
 }
 
-/** The body as JSON, or undefined when it is not declared JSON, is not JSON or is too large. */
-export async function jsonBody(request: Request): Promise<unknown> {
+/**
+ * The body as JSON, or undefined when it is not declared JSON, is not JSON or is too large.
+ * `limit` is `maxBodyBytes` but for an endpoint that says otherwise: the upload of a copy
+ * of a whole game (step 2.70).
+ */
+export async function jsonBody(request: Request, limit: number = maxBodyBytes): Promise<unknown> {
   if (!declaresJson(request)) return undefined;
   const declared = Number(request.headers.get('content-length') ?? '0');
-  if (Number.isFinite(declared) && declared > maxBodyBytes) return undefined;
+  if (Number.isFinite(declared) && declared > limit) return undefined;
   let bytes: Uint8Array | undefined;
   try {
-    bytes = await readAtMost(request, maxBodyBytes);
+    bytes = await readAtMost(request, limit);
   } catch {
     return undefined;
   }

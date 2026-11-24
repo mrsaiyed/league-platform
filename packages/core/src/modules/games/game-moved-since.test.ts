@@ -276,15 +276,45 @@ describe('send these plays (S-43, T-335)', () => {
     expect(statuses(await send(t, plays, since))).toEqual(plays.map(() => 'accepted'));
   });
 
-  it('does not look past another account’s play that carries one of the batch’s command ids', async () => {
+  // T-370 (step 2.70, fix round): a copy uploaded by another account (the owner) records
+  // the tablet's own commands under the owner's account. An event whose command id is one
+  // of the batch's is the device's own, whoever recorded it.
+  it('looks past the tablet’s own plays recorded by another account (a copy uploaded), and takes the rest once', async () => {
     const { t, since, plays, phoneSession } = await takenOver();
-    const forged = plays[0]?.commandId ?? '';
-    expect(statuses(await phonePlay(t, phoneSession, forged))).toEqual(['accepted']);
+    const copied = plays.slice(0, 10);
+    const upload = await applyTrackerCommands(
+      t.as(otherScorekeeperId),
+      { gameId, protocolVersion: 2, sessionId: phoneSession, commands: copied },
+      t.deps,
+    );
+    expect(statuses(upload)).toEqual(copied.map(() => 'accepted'));
+    expect(statuses(await send(t, plays, since))).toEqual([
+      ...copied.map(() => 'duplicate'),
+      ...plays.slice(10).map(() => 'accepted'),
+    ]);
+    const after = t.db.state.events.filter((e) => e.seq > since);
+    expect(after.map((e) => e.commandId)).toEqual(plays.map((c) => c.commandId));
+  });
+
+  // The attacker (T-370): a device allowed to score names another's play as its own. It
+  // stays once, as it was recorded; the claimed copy answers duplicate and adds nothing.
+  it('a device claiming another’s play as its own counts nothing twice and drops nothing of theirs', async () => {
+    const { t, since, plays, phoneSession } = await takenOver();
+    const theirs = plays[0]?.commandId ?? '';
+    expect(statuses(await phonePlay(t, phoneSession, theirs))).toEqual(['accepted']);
+    const recorded = t.db.state.events.find((e) => e.commandId === theirs);
     expect(statuses(await send(t, plays, since))).toEqual([
       'duplicate',
-      ...plays.slice(1).map(() => 'game-moved'),
+      ...plays.slice(1).map(() => 'accepted'),
     ]);
-    expect(t.db.state.events).toHaveLength(since + 1);
+    const after = t.db.state.events.filter((e) => e.seq > since);
+    expect(after).toHaveLength(20);
+    expect(after.filter((e) => e.commandId === theirs)).toEqual([recorded]);
+    expect(recorded?.accountId).toBe(otherScorekeeperId);
+    // A play of theirs the batch does not name still means the game moved.
+    expect(statuses(await phonePlay(t, phoneSession, playUuid(98)))).toEqual(['accepted']);
+    const more = [...plays, { ...(plays[1] as TrackerCommand), commandId: playUuid(97) }];
+    expect(statuses(await send(t, more, since)).at(-1)).toBe('game-moved');
   });
 
   it('takes a long list in several batches, one answer lost and the batch sent again, each play once', async () => {
@@ -308,6 +338,67 @@ describe('send these plays (S-43, T-335)', () => {
       actorAccountId: scorekeeperId,
       details: { gameId, change: 'sent-after-takeover', events: 20 },
     });
+  });
+
+  // T-372: a whole game's copy uploaded is longer than one batch of the list. The device
+  // sends its plays in the order made, fifty at a time, all naming the same sequence.
+  const baskets = (t: Tracker, n: number): TrackerCommand[] =>
+    Array.from({ length: n }, (_, i) => ({
+      commandId: playUuid(i + 1),
+      at: t.clock.now() + i * 1000,
+      input: { type: 'score', side: 'home', playerId: homeIds[i % 5] ?? '', points: 2 },
+    }));
+  const inBatches = async (commands: TrackerCommand[], each: (b: TrackerCommand[]) => unknown) => {
+    const answers: unknown[] = [];
+    for (let i = 0; i < commands.length; i += 50)
+      answers.push(await each(commands.slice(i, i + 50)));
+    return answers;
+  };
+  const upload = (t: Tracker, phoneSession: string, commands: TrackerCommand[]) =>
+    inBatches(commands, async (batch) =>
+      statuses(
+        await applyTrackerCommands(
+          t.as(otherScorekeeperId),
+          { gameId, protocolVersion: 2, sessionId: phoneSession, commands: batch },
+          t.deps,
+        ),
+      ),
+    );
+
+  it('takes the 5 new plays of 120 once, 115 of them already uploaded, batch by batch', async () => {
+    const { t, since, phoneSession } = await takenOver();
+    const plays = baskets(t, 120);
+    expect((await upload(t, phoneSession, plays.slice(0, 115))).flat()).toEqual(
+      plays.slice(0, 115).map(() => 'accepted'),
+    );
+    expect(await inBatches(plays, async (batch) => statuses(await send(t, batch, since)))).toEqual([
+      plays.slice(0, 50).map(() => 'duplicate'),
+      plays.slice(50, 100).map(() => 'duplicate'),
+      [...plays.slice(100, 115).map(() => 'duplicate'), ...plays.slice(115).map(() => 'accepted')],
+    ]);
+    const after = t.db.state.events.filter((e) => e.seq > since);
+    expect(after.map((e) => e.commandId)).toEqual(plays.map((c) => c.commandId));
+  });
+
+  it('refuses the 5 new plays of 120 when somebody else recorded one in the middle of the upload', async () => {
+    const { t, since, phoneSession } = await takenOver();
+    const plays = baskets(t, 120);
+    await upload(t, phoneSession, plays.slice(0, 60));
+    expect(statuses(await phonePlay(t, phoneSession, playUuid(900)))).toEqual(['accepted']);
+    await upload(t, phoneSession, plays.slice(60, 115));
+    expect(await inBatches(plays, async (batch) => statuses(await send(t, batch, since)))).toEqual([
+      plays.slice(0, 50).map(() => 'duplicate'),
+      plays.slice(50, 100).map(() => 'duplicate'),
+      [
+        ...plays.slice(100, 115).map(() => 'duplicate'),
+        ...plays.slice(115).map(() => 'game-moved'),
+      ],
+    ]);
+    const after = t.db.state.events.filter((e) => e.seq > since);
+    expect(after).toHaveLength(116);
+    const ids = new Set(after.map((e) => e.commandId));
+    expect(plays.slice(115).filter((c) => ids.has(c.commandId))).toEqual([]);
+    expect(after.filter((e) => e.commandId === playUuid(900))).toHaveLength(1);
   });
 
   it('a version 1 batch cannot ask for it', async () => {

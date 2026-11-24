@@ -413,6 +413,8 @@ const Holder = z.strictObject({
   lastHeardAt: Ms.optional(),
   sameAccount: z.literal(true).optional(),
 });
+/** Who holds a game, as another scorekeeper is told it: the upload of a copy answers it too (step 2.70). */
+export const SessionHolder = Holder;
 
 export const SessionReply = z.discriminatedUnion('status', [
   /** This device holds the game until `expiresAt` (server time, ms). `sentAt` is server time on every reply. */

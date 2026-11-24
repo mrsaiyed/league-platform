@@ -9,3 +9,4 @@ export * from './src/live-channels.ts';
 export * from './src/not-started.ts';
 export * from './src/game-format-api.ts';
 export * from './src/site-design.ts';
+export * from './src/game-copy.ts';

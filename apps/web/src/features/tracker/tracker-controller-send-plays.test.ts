@@ -4,9 +4,10 @@
 // not saved after a takeover are sent only by the scorekeeper's "Send these plays",
 // taken only when nothing was recorded since, and otherwise stay listed to be entered
 // again (S-43, T-335).
-import { TrackerGameState } from '@srleagues/contracts';
+import { GameCopyUploadReply, TrackerGameState } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it, vi } from 'vitest';
+import { uploadGameCopy } from '../../server/game-copy-upload-endpoint.ts';
 import { standInPeople } from '../../server/stand-in-cast.ts';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import {
@@ -19,6 +20,7 @@ import {
 import { endpointNetwork, type EndpointNetwork } from './endpoint-network.test-helper.ts';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
+import { gameCopyFile } from './game-copy-on-device.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
 import { inLeague, type QueueStorage } from './queue-storage.ts';
 import { createTrackerController, type TapInput } from './tracker-controller.ts';
@@ -330,4 +332,108 @@ describe('the device holding the game after plays were sent (T-338)', () => {
     expect(shown(laptop.controller)).toEqual({ home: 6, away: 108 });
     expect(laptop.controller.status().waiting).toEqual([]);
   });
+});
+
+// Step 2.70, fix round (T-370): a play made on the tablet after its copy was saved,
+// once an upload of the copy took the game, by the same scorekeeper or the owner.
+describe('a play made after the copy was saved, once the copy is uploaded (T-370)', () => {
+  async function uploadCopy(network: EndpointNetwork, as: Person, copy: string) {
+    const upload = async (body: unknown) => {
+      const context = await network.world.contextAs(as, 'live', ['games', gameId, 'copy']);
+      const outcome = await uploadGameCopy(
+        context,
+        gameId,
+        body,
+        network.world.tracker,
+        network.world.publishPlays,
+      );
+      return GameCopyUploadReply.parse(outcome.answer.body);
+    };
+    const first = await upload({ copy });
+    if (first.status !== 'held-by-other') return first;
+    return upload({ copy, takeOver: { expectedHolderSince: first.holder.since } });
+  }
+
+  /** The tablet copies `n` plays, makes one more, the copy is uploaded, the tablet sends. */
+  async function lateAfterCopy(uploader: Person, n: number, reload: boolean) {
+    const network = endpointNetwork();
+    const tablet = device(network);
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    network.mode = 'down';
+    const baskets = Array.from({ length: n }, (_, i) => basket('home', hawks[i % 3] ?? ''));
+    await tapAll(tablet.controller, baskets);
+    const entries = await inLeague(tablet.storage, liveLeagueId, accountOf('scorekeeper')).list(
+      gameId,
+    );
+    const copy = gameCopyFile({
+      leagueId: liveLeagueId,
+      gameId,
+      accountId: accountOf('scorekeeper'),
+      entries,
+      savedAt: 1,
+    });
+    expect(copy.count).toBe(n);
+    // The late play: made after the copy was saved, so only the tablet has it.
+    await tapAll(tablet.controller, [basket('away', bears[0] ?? '')]);
+    network.mode = 'up';
+    expect(await uploadCopy(network, uploader, copy.text)).toMatchObject({
+      status: 'uploaded',
+      added: n,
+    });
+    expect(await serverScore(network)).toEqual({ home: 2 * n, away: 0 });
+    tablet.controller.online();
+    await tablet.controller.idle();
+    // The copy's plays are on the server, so only the late one is listed, to send by
+    // the scorekeeper's one tap; the copy's go with it, answered as already there. Past
+    // the state's 300 recent ids the device cannot tell the older ones are there: they
+    // are listed too, and the send finds them there (T-374).
+    const listed = tablet.controller.status().notSaved.length;
+    if (n <= 120) expect(listed).toBe(1);
+    else expect(listed).toBeGreaterThanOrEqual(1);
+    expect(tablet.controller.status().sendNotSaved).toBe('offered');
+    let sender = tablet;
+    if (reload) {
+      // The copy's plays are kept on the device as taken, beside the list (T-372).
+      await tablet.controller.leave();
+      sender = device(network, 'scorekeeper', 'tablet-1', tablet.storage);
+      await sender.controller.start();
+      await sender.controller.idle();
+      expect(sender.controller.status().notSaved).toHaveLength(listed);
+      expect(sender.controller.status().sendNotSaved).toBe('offered');
+    }
+    expect(await sender.controller.sendNotSaved()).toEqual({ ok: true, saved: listed });
+    await sender.controller.idle();
+    expect(await serverScore(network)).toEqual({ home: 2 * n, away: 2 });
+    expect(sender.controller.status().notSaved).toEqual([]);
+    expect(sender.controller.status().waiting).toEqual([]);
+    // Gone with the list: nothing of the game is left on the device.
+    expect(await sender.storage.list(gameId)).toEqual([]);
+  }
+
+  for (const uploader of ['scorekeeper', 'owner'] as const) {
+    it(`is counted once without being entered again, the copy uploaded by the ${uploader}`, async () => {
+      await lateAfterCopy(uploader, 3, false);
+    });
+  }
+
+  it('is counted once after a reload before "Send these plays" (T-373)', async () => {
+    await lateAfterCopy('owner', 3, true);
+  });
+
+  it('is counted once with 120 plays in the copy, more than one batch holds (T-372)', async () => {
+    await lateAfterCopy('owner', 120, false);
+  });
+
+  // More than the server's state names among its recent plays (300): the taps the server
+  // answered as already there while the tablet had lost the game are all sent along, in
+  // the order they were made, so every batch is explained (T-374).
+  for (const n of [301, 600]) {
+    for (const reload of [false, true]) {
+      it(`is counted once with ${n} plays in the copy${reload ? ', after a reload' : ''} (T-374)`, async () => {
+        await lateAfterCopy('owner', n, reload);
+      });
+    }
+  }
 });

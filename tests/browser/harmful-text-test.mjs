@@ -1095,6 +1095,9 @@ const ROUTES = {
   '/[league]/my': () => '/north-valley/my',
   '/[league]/schedule': () => '/north-valley/schedule',
   '/[league]/score/[game]': () => `/north-valley/score/${liveGame}`,
+  // The upload of a copy of a game (step 2.70): its one field is a file, read by the page's
+  // script and never posted by a form.
+  '/[league]/score/[game]/upload': () => `/north-valley/score/${liveGame}/upload`,
   '/[league]/standings': () => '/north-valley/standings',
   '/[league]/stats': () => '/north-valley/stats',
   '/[league]/teams': () => '/north-valley/teams',
@@ -1110,6 +1113,8 @@ const ANSWERS = {
   '/[league]/score/manifest.webmanifest': [null, keeper],
   '/[league]/score/tracker-worker.js': [null, keeper],
   '/api/v1/leagues/[leagueId]/games/[game]/commands': [keeper, owner],
+  // The upload of a copy of a game (step 2.70).
+  '/api/v1/leagues/[leagueId]/games/[game]/copy': [keeper, owner],
   // A game's format (step 2.119): every rule, read at the tracker's start and in Games.
   '/api/v1/leagues/[leagueId]/games/[game]/format': [keeper, owner],
   '/api/v1/leagues/[leagueId]/games/[game]/not-started': [keeper, owner],

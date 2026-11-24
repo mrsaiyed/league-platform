@@ -57,7 +57,8 @@ export function heldGames(
     held.push({
       gameId,
       waiting,
-      notSaved: rows.length - waiting,
+      // A taken tap (T-372) is on the server already: neither waiting nor not saved.
+      notSaved: rows.filter((row) => row.state === 'not-saved' || row.state === 'refused').length,
       lastTapAt: Math.max(...rows.map((row) => row.command.at)),
       teams:
         game === undefined || game.leagueId !== leagueId
