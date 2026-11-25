@@ -13,9 +13,10 @@ export async function GET(request: Request): Promise<Response> {
   const games = asked.get('games');
   const correct = asked.get('correct');
   if (!endpoint.ok) return respond(await scoringOffersRequest(endpoint, games, correct));
-  const { context, ports } = endpoint;
+  const { context, holder, ports } = endpoint;
   const read = {
-    accessOf: ports.accessOf,
+    // What the gate read already (league-api.ts), not read a second time.
+    accessOf: async () => holder,
     // The games area's ports are reached only for someone who may see the league.
     games: () => ports.games.deps,
   };

@@ -77,10 +77,12 @@ export function uploadViewOf(status: number, body: unknown, copy: string): Uploa
     return { kind: 'refused', code: r.code };
   }
   // The league's own refusals, before the upload is read (league-api.ts).
-  if (status === 401) return { kind: 'signed-out' };
+  // A 404 here is the gate's "not there": a hidden league is answered as a missing one,
+  // so it may be a scorer signed out in another tab: sign in (T-453). Past the gate a
+  // missing game is the server's reply above, with its code.
+  if (status === 401 || status === 404) return { kind: 'signed-out' };
   if (status === 413) return { kind: 'too-large' };
   if (status === 403) return { kind: 'refused', code: 'not-allowed' };
-  if (status === 404) return { kind: 'refused', code: 'unknown-game' };
   return { kind: 'failed' };
 }
 

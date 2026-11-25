@@ -11,6 +11,7 @@ import './court.css';
 import type { CourtBanner } from './court-view.tsx';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchGameDoors } from './fetch-game-doors.ts';
+import { createFetchSignedIn } from './fetch-signed-in.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { formatLines } from './format-text.ts';
 import type { StartConfirm } from '../game-format/index.ts';
@@ -190,6 +191,7 @@ export function TrackerOpening({
         }),
         transport: createFetchCommandTransport({ leagueId, gameId }),
         server: createFetchTrackerServer({ leagueId, gameId }),
+        signedIn: createFetchSignedIn(),
         // Reopen and Mark not started are requests of their own, not taps (step 2.37).
         doors: createFetchGameDoors({ leagueId, gameId }),
         newDeviceId: () => globalThis.crypto.randomUUID(),
@@ -406,6 +408,9 @@ export function TrackerOpening({
     );
 
   const matchup = t('tracker.matchup', { away: listed.away.name, home: listed.home.name });
+  // "Save a copy" (step 2.70): behind More while scoring; offered outright to an account
+  // that can no longer open the game, to hand the kept taps to the league's admin (T-456).
+  const copyProps = { leagueId, gameId, accountId, uploadHref, t };
 
   // The scoring screen, once this device holds the game and its format is confirmed. And
   // it stays while the game it shows is final (step 2.37): about half a minute after an
@@ -422,7 +427,6 @@ export function TrackerOpening({
     const banner = savedBanner(phase.status.queue, offline, keptOnly(phase.status));
     const notices = trackerNotices(phase.status);
     // "Save a copy" (step 2.70): behind More always, suggested after minutes offline.
-    const copyProps = { leagueId, gameId, accountId, uploadHref, t };
     const suggestCopy = suggestsCopy(phase.status);
     const anythingToTell =
       notices.length > 0 ||
@@ -499,6 +503,7 @@ export function TrackerOpening({
               busy={busy}
               openingText={openingText}
               signIn={signIn}
+              saveCopy={<SaveCopy {...copyProps} />}
               onTakeOver={act((game) => game.controller.takeOver())}
               onOpenAgain={act((game) => game.controller.openAgain())}
               lists={lists}
@@ -549,7 +554,9 @@ function bannerState(banner: SavedBanner): CourtBanner['state'] {
 const keptOnly = (status: Pick<TrackerControllerStatus, 'mode' | 'signedOut'>): boolean =>
   status.signedOut ||
   (status.mode.kind === 'read-only' &&
-    (status.mode.reason === 'not-allowed' || status.mode.reason === 'signed-out'));
+    (status.mode.reason === 'not-allowed' ||
+      status.mode.reason === 'signed-out' ||
+      status.mode.reason === 'cannot-open'));
 
 /** The two lists of kept plays, and what can be done with them (step 2.37, part 2). */
 type KeptLists = {
@@ -723,6 +730,7 @@ function OpenGame({
   busy,
   openingText,
   signIn,
+  saveCopy,
   onTakeOver,
   onOpenAgain,
   lists,
@@ -737,6 +745,8 @@ function OpenGame({
   readonly openingText: ReactNode;
   /** The way to sign in, shown under the notices when the device is signed out. */
   readonly signIn: ReactNode;
+  /** "Save a copy" (step 2.70), shown when this account can no longer open the game (T-456). */
+  readonly saveCopy: ReactNode;
   readonly onTakeOver: () => void;
   readonly onOpenAgain: () => void;
   /** The plays kept on this device, play by play (step 2.37, part 2). */
@@ -834,6 +844,7 @@ function OpenGame({
           </p>
         </section>
       ) : null}
+      {screen.kind === 'read-only' && screen.reason === 'cannot-open' ? saveCopy : null}
       {screen.kind === 'read-only' && mayOpenAgain(screen.reason) ? (
         <p>
           <button type="button" className="court-button" onClick={onOpenAgain} disabled={busy}>

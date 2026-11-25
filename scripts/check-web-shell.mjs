@@ -1722,6 +1722,7 @@ try {
   }
   failures.push(...(await sameAsNoLeague(origin)));
   failures.push(...(await scoringSameAsNoLeague(origin)));
+  failures.push(...(await everyWaySameAsNoLeague(origin)));
   failures.push(...(await checkSnapshotCache(origin)));
   failures.push(...(await checkStaffNumbers(origin)));
   failures.push(...(await checkStylesheets(origin)));
@@ -2220,6 +2221,220 @@ async function scoringSameAsNoLeague(origin) {
   const owner = await ask('owner', leagues.draft);
   if (owner.status !== 200 || !/private, no-store/.test(owner.headers)) {
     found.push(`the draft league's owner's scoring read is ${owner.status}: ${owner.headers}`);
+  }
+  return found;
+}
+
+/**
+ * Every way into a league answers a league hidden from someone byte for byte as one that
+ * does not exist (step 2.223, U-9, T-449, T-453): a draft, a suspended and a binned league
+ * against a missing short name of the same length (or an id no league has), as a visitor,
+ * a signed-in stranger, another league's admin, a coach (who holds a coach's place in the
+ * draft, no area of it) and a member (the Owls' coach, who holds a role on one team of the
+ * live league only). Compared: every league page (settled as sameAsNoLeague's are), all
+ * twelve league API routes by GET, POST and PUT (with `{}` and with a valid body), and both
+ * "my team" actions (posted from the live league's team page with the league's short name
+ * in the form): the status, every header but the date, and the body. A name is the same
+ * length as its stand-in, so the length is compared too.
+ */
+async function everyWaySameAsNoLeague(origin) {
+  const found = [];
+  const leagueOf = (n) => `01900000-0000-7000-8000-${n.toString(16).padStart(12, '0')}`;
+  const hidden = [
+    { what: 'draft', slug: 'quiet-pines', id: leagueOf(3) },
+    { what: 'suspended', slug: 'closed-gate', id: leagueOf(5) },
+    { what: 'in the bin', slug: 'binned-league', id: leagueOf(6) },
+  ];
+  const noSlugOf = (slug) => `nobody${'z'.repeat(slug.length - 6)}`;
+  const noId = leagueOf(0xfffff);
+  const people = ['visitor', 'stranger', 'otherAdmin', 'coach', 'teamCoach'];
+  const cookieOf = (who) => (who === 'visitor' ? {} : { cookie: `srl_session=${tokens[who]}` });
+  const said = async (response, name, label) => {
+    const headers = [...response.headers]
+      .filter(([header]) => header !== 'date')
+      .map(([header, value]) => `${header}: ${value.replaceAll(name, '{name}')}`)
+      .join('\n');
+    const body = (await response.text()).replaceAll(name, '{name}');
+    return { status: response.status, ...oneNonce(headers, body, found, label) };
+  };
+  const compare = (label, there, none, settled) => {
+    if (there.status !== none.status) {
+      found.push(`${label}: answers ${there.status}, no league ${none.status}`);
+    }
+    if (there.headers !== none.headers) {
+      found.push(`${label}: headers differ:\n${there.headers}\n---\n${none.headers}`);
+    }
+    const a = settled ? settle(there.body) : { markup: there.body, rows: '' };
+    const b = settled ? settle(none.body) : { markup: none.body, rows: '' };
+    if (a.markup !== b.markup) found.push(`${label}: body ${firstDifference(a.markup, b.markup)}`);
+    if (a.rows !== b.rows) found.push(`${label}: page data ${firstDifference(a.rows, b.rows)}`);
+  };
+  // Every page under app/[league] (the invitation page too), with made-up parts.
+  const person = '01900000-0000-7000-8000-0000000000a3';
+  const pages = [
+    ...['', '/games/' + draftUnscored, '/my', '/schedule', '/standings', '/stats'],
+    ...['/teams', '/teams/owls', '/no-such-page', '/invitation'],
+    ...['/admin', '/admin/games', `/admin/games/${draftUnscored}`],
+    ...[`/admin/games/${draftUnscored}/edit`, '/admin/games/scorekeepers', '/admin/people'],
+    ...[`/admin/people/${person}`, '/admin/schedule', '/admin/schedule/import'],
+    ...['/admin/schedule/venues', '/admin/season', '/admin/season/divisions'],
+    ...['/admin/settings', '/admin/settings/activity', '/admin/settings/admins'],
+    ...['/admin/settings/bin', '/admin/standings', '/admin/teams', '/admin/teams/owls'],
+    ...['/admin/no-such-area', `/score/${draftUnscored}`, `/score/${draftUnscored}/upload`],
+  ];
+  const page = async (who, name, rest) =>
+    said(
+      await fetch(`${origin}/${name}${rest}`, { headers: cookieOf(who), redirect: 'manual' }),
+      name,
+      `${who} at /${name}${rest}`,
+    );
+  for (const who of people) {
+    for (const rest of pages) {
+      for (const { what, slug } of hidden) {
+        const there = await page(who, slug, rest);
+        const none = await page(who, noSlugOf(slug), rest);
+        // The invitation page answers a missing league as any other (it is not gated: an
+        // invitee must reach a draft league), so only the others must be "not found".
+        if (none.status !== 404 && rest !== '/invitation') {
+          found.push(`${who} at /{none}${rest}: answers ${none.status}`);
+        }
+        compare(`${who} at the ${what} league's ${rest || '/'}`, there, none, true);
+      }
+    }
+  }
+  // The invitation page with a token-shaped invitation cookie held (review M2): a hidden
+  // league's held invitation is read, and so is a missing one's (T-449), so the answers
+  // match, headers too. Three times each, as a header that comes with a slower answer
+  // showed up only some of the time.
+  const heldShaped = `srl_invitation=${'A'.repeat(43)}`;
+  for (const who of people) {
+    const cookie = [cookieOf(who).cookie, heldShaped].filter(Boolean).join('; ');
+    const asked = async (name) =>
+      said(
+        await fetch(`${origin}/${name}/invitation`, { headers: { cookie }, redirect: 'manual' }),
+        name,
+        `${who} holding an invitation at /${name}/invitation`,
+      );
+    for (const { what, slug } of hidden) {
+      for (let round = 1; round <= 3; round += 1) {
+        const there = await asked(slug);
+        const none = await asked(noSlugOf(slug));
+        compare(
+          `${who} holding an invitation at the ${what} league, try ${round}`,
+          there,
+          none,
+          true,
+        );
+      }
+    }
+  }
+  // All twelve league API routes, by each method, with nothing, `{}` and a valid body.
+  const made = (n) => `01900000-0000-7000-8000-0000000d${n.toString(16).padStart(4, '0')}`;
+  const valid = {
+    commands: {
+      protocolVersion: 1,
+      sessionId: made(1),
+      commands: [{ commandId: made(2), at: 1_700_000_000_000, input: { type: 'start' } }],
+    },
+    'not-started': { sequence: 0 },
+    reopen: { requestId: made(3), reason: 'A made-up reason' },
+    session: { type: 'open', deviceId: 'made-up-device' },
+    format: { version: 0, format: null },
+    copy: { copy: 'made-up copy' },
+  };
+  const routes = [
+    ...['scoring', 'my-team', 'staff-numbers'].map((end) => [end, end]),
+    ...['commands', 'not-started', 'reopen', 'rosters', 'session', 'state', 'format', 'copy']
+      .concat(['snapshot'])
+      .map((end) => [end, `games/${draftUnscored}/${end}`]),
+  ];
+  const asks = [
+    ['GET', undefined],
+    ['POST', '{}'],
+    ['POST', 'valid'],
+    ['PUT', '{}'],
+    ['PUT', 'valid'],
+  ];
+  const api = async (who, id, path, method, body, label) =>
+    said(
+      await fetch(`${origin}/api/v1/leagues/${id}/${path}`, {
+        method,
+        headers: {
+          ...cookieOf(who),
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        body,
+        redirect: 'manual',
+      }),
+      id,
+      label,
+    );
+  for (const who of people) {
+    for (const [end, path] of routes) {
+      for (const [method, kind] of asks) {
+        const body =
+          kind === undefined ? undefined : kind === '{}' ? '{}' : JSON.stringify(valid[end] ?? {});
+        const label = `${who}'s ${method} ${kind ?? ''} of …/${path}`;
+        const none = await api(who, noId, path, method, body, label);
+        // A crash on both sides alike is no proof (review L2): no league is "not found",
+        // or 405 for a method the route does not answer at all (Next.js, before any code).
+        if (none.status !== 404 && none.status !== 405) {
+          found.push(`${label}, no league: answers ${none.status}`);
+        }
+        for (const { what, id } of hidden) {
+          compare(`${label}, ${what}`, await api(who, id, path, method, body, label), none, false);
+        }
+      }
+    }
+  }
+  // Both "my team" actions, from the youth league's Rockets page (it offers "my team"), naming the league in the form.
+  const rockets = '/harbor-city/teams/rockets';
+  const formOf = async (cookie) => {
+    const html = await (await fetch(origin + rockets, { headers: { cookie } })).text();
+    const form = /<form class="team-mine"[\s\S]*?<\/form>/.exec(html)?.[0];
+    return form === undefined
+      ? undefined
+      : [...form.matchAll(/<input[^>]*>/g)].map(([input]) => [
+          /name="([^"]*)"/.exec(input)?.[1] ?? '',
+          (/value="([^"]*)"/.exec(input)?.[1] ?? '')
+            .replaceAll('&quot;', '"')
+            .replaceAll('&amp;', '&'),
+        ]);
+  };
+  const mine = `srl_my_team_${harborCity}=rockets`;
+  for (const [action, cookie] of [
+    ['choose', ''],
+    ['clear', mine],
+  ]) {
+    const fields = await formOf(cookie);
+    if (fields === undefined || !fields.some(([name]) => name.startsWith('$ACTION'))) {
+      found.push(`the Rockets' page has no "my team" form to ${action}`);
+      continue;
+    }
+    const post = async (who, name) => {
+      const body = new FormData();
+      for (const [field, value] of fields) body.set(field, value);
+      body.set('league', name);
+      const sent = [cookie, cookieOf(who).cookie ?? ''].filter((c) => c !== '').join('; ');
+      return said(
+        await fetch(origin + rockets, {
+          method: 'POST',
+          body,
+          headers: { origin, ...(sent === '' ? {} : { cookie: sent }) },
+          redirect: 'manual',
+        }),
+        name,
+        `${who}'s "${action} my team" at ${name}`,
+      );
+    };
+    for (const who of people) {
+      for (const { what, slug } of hidden) {
+        const there = await post(who, slug);
+        const none = await post(who, noSlugOf(slug));
+        if (none.status !== 404) found.push(`${who}'s "${action}" at no league: ${none.status}`);
+        compare(`${who}'s "${action} my team" at the ${what} league`, there, none, true);
+      }
+    }
   }
   return found;
 }

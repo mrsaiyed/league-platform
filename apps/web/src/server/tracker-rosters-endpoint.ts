@@ -36,10 +36,10 @@ export async function trackerRostersRequest(
   ports: Pick<TrackerPorts, 'deps'>,
 ): Promise<ApiAnswer> {
   if (context.account === null) return refuse({ error: 'signed-out' });
-  if (!isGameIdFormat(game)) return refuse({ error: 'not-found' });
+  if (!isGameIdFormat(game)) return refuse({ error: 'unknown-game' });
   const result = await readTrackerRosters(commandContextOf(context), { gameId: game }, ports.deps);
   if (!result.ok) {
-    return refuse({ error: result.error.code === 'not-allowed' ? 'not-allowed' : 'not-found' });
+    return refuse({ error: result.error.code === 'not-allowed' ? 'not-allowed' : 'unknown-game' });
   }
   // The same shape the tracker's page hands the device (tracker-rosters-reply.ts).
   const body: TrackerRosters = trackerRostersReply(result.value);

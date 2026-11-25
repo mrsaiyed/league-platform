@@ -56,7 +56,7 @@ export async function sendTrackerCommands(
   publish: PublishPlays,
 ): Promise<CommandsOutcome> {
   if (context.account === null) return refuse({ error: 'signed-out' });
-  if (!isGameIdFormat(game)) return refuse({ error: 'not-found' });
+  if (!isGameIdFormat(game)) return refuse({ error: 'unknown-game' });
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     return refuse({ error: 'invalid-input', issues: [] });
   }
@@ -91,7 +91,7 @@ export async function sendTrackerCommands(
   const noGame = reply.results.every(
     (r) => r.status === 'refused' && r.reason.code === 'unknown-game',
   );
-  if (noGame) return refuse({ error: 'not-found' });
+  if (noGame) return refuse({ error: 'unknown-game' });
   const saved = reply.results.some((r) => r.status === 'accepted');
   const leagueId = context.league.id;
   return {

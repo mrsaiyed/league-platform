@@ -101,7 +101,7 @@ describe('GET …/games/{game}/state', () => {
     // The owner holds both leagues: the game is simply not in the other one.
     expect(await read(world, { as: 'owner', league: 'other' })).toEqual({
       status: 404,
-      body: { error: 'not-found' },
+      body: { error: 'unknown-game' },
     });
     expect(await read(world, { league: 'other' })).toEqual({
       status: 403,
@@ -109,7 +109,7 @@ describe('GET …/games/{game}/state', () => {
     });
     expect(await read(world, { game: 'not-a-game' })).toEqual({
       status: 404,
-      body: { error: 'not-found' },
+      body: { error: 'unknown-game' },
     });
   });
 });

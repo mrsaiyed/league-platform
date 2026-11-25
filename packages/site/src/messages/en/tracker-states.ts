@@ -60,6 +60,8 @@ export const enTrackerStates = {
     'This game was final once, so it was played and cannot be marked not started. Correct its plays instead.',
   'tracker.notStarted.working': 'Clearing…',
   'tracker.notStarted.yes': 'Yes, mark not started',
+  'tracker.readOnly.cannot-open':
+    'This account can no longer open this game. Anything you entered here that is not saved stays on this device. If the league’s admin gives this account its place back, tap “Open the game again”.',
   'tracker.readOnly.expired':
     'This device was away too long and another device has had the game since. This device can no longer score it.',
   'tracker.readOnly.game-not-live':

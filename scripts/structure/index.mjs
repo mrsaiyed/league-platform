@@ -14,6 +14,7 @@ import * as migrationSafety from './migration-safety.mjs';
 import * as workerOnly from './worker-only.mjs';
 import * as interfaceText from './interface-text.mjs';
 import * as nodeStrip from './node-strip.mjs';
+import * as leagueGate from './league-gate.mjs';
 
 export const checks = [
   importDirections,
@@ -26,6 +27,7 @@ export const checks = [
   workerOnly,
   interfaceText,
   nodeStrip,
+  leagueGate,
 ];
 
 /** Runs every check (or those whose rule is in `only`) over the repository at `root`. */

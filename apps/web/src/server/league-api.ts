@@ -7,7 +7,11 @@
 //   They differ only when the proxy did not run and the path header came from the
 //   browser, or the address was spelled another way; either is "not found", as for
 //   pages (league-gate.ts, addressMatchesRoute).
-// - A league that is not there, or is in the bin, is "not found".
+// - A league that is not there, is in the bin, or is hidden from this person (a draft
+//   or suspended league, mayOpenLeague, U-9) is "not found", decided here before any
+//   endpoint reads its body, so no endpoint can forget it (step 2.223). The person's
+//   access is read once, here, for a missing league as for a hidden one (T-449), and
+//   handed to the endpoint.
 // - A session cookie that no longer works is "signed out" (401): the proxy renews a
 //   session before any endpoint sees it, so one still failing here has ended. A public
 //   read (the snapshot) treats it as a visitor instead, as pages do.
@@ -15,13 +19,16 @@
 //   "account problem" (403), or a visitor for a public read; signing in again would
 //   not help, and the account page says why.
 import { trackerRefusalStatus, type TrackerRefusal } from '@srleagues/contracts';
-import { leagueApiUrl, type AccessHolder } from '@srleagues/core';
+import { leagueApiUrl, mayOpenLeague, type AccessHolder } from '@srleagues/core';
 import {
+  commandContextOf,
   requestContext,
   type ContextDeps,
   type LeagueRequestContext,
   type RequestFacts,
 } from './context.ts';
+import { readAccessOfNoLeague } from './league-gate.ts';
+import type { WebPorts } from './ports.ts';
 
 /** The JSON answer an endpoint gives: its status and body, and headers beside them. */
 export type ApiAnswer = {
@@ -51,6 +58,9 @@ const notFound: ApiRefusal = { status: 404, error: 'not-found' };
 /** The path of the address as it arrived, without its query. */
 const pathOnly = (path: string) => path.split(/[?#]/)[0] ?? '';
 
+/** What resolveLeagueApi reads with: the league, and the person's access in it. */
+export type LeagueApiDeps = ContextDeps & Pick<WebPorts, 'accessOf'>;
+
 /**
  * The league request behind an endpoint at `/api/v1/leagues/{leagueId}/{...parts}`,
  * or why there is none.
@@ -58,14 +68,19 @@ const pathOnly = (path: string) => path.split(/[?#]/)[0] ?? '';
 export async function resolveLeagueApi(
   facts: RequestFacts,
   parts: readonly string[],
-  deps: ContextDeps,
+  deps: LeagueApiDeps,
   /**
    * What a session cookie that no longer works means: "signed out" for commands and
    * session requests, or, for a public read, a visitor, as for pages (league-gate.ts).
    */
   signedOut: 'refuse' | 'visitor' = 'refuse',
 ): Promise<
-  | { readonly ok: true; readonly context: LeagueRequestContext }
+  | {
+      readonly ok: true;
+      readonly context: LeagueRequestContext;
+      /** What the account holds in the league, read fresh (T-75); undefined for a visitor. */
+      readonly holder: AccessHolder | undefined;
+    }
   | { readonly ok: false; readonly refusal: ApiRefusal }
 > {
   const built = await requestContext(facts, deps);
@@ -73,6 +88,8 @@ export async function resolveLeagueApi(
     const code = built.error.code;
     const accountProblem = code === 'account-problem';
     if (code !== 'renew-session' && code !== 'session-ended' && !accountProblem) {
+      // Read as for a league that is there and hidden (T-449).
+      if (code === 'league-not-found') await readAccessOfNoLeague(facts, deps);
       return { ok: false, refusal: notFound };
     }
     if (signedOut === 'visitor' && facts.session !== null) {
@@ -83,6 +100,9 @@ export async function resolveLeagueApi(
   }
   const context = built.value;
   if (context.kind !== 'league') return { ok: false, refusal: notFound };
+  // Read before anything else is compared, so every "not found" below costs the same.
+  const holder =
+    context.account === null ? undefined : await deps.accessOf(commandContextOf(context));
   let expected: string;
   try {
     expected = leagueApiUrl({ id: context.league.id }, parts);
@@ -90,7 +110,9 @@ export async function resolveLeagueApi(
     return { ok: false, refusal: notFound };
   }
   if (pathOnly(facts.path) !== expected) return { ok: false, refusal: notFound };
-  return { ok: true, context };
+  // U-9: a league hidden from this person is not there for them, whatever the endpoint.
+  if (!mayOpenLeague(context.league.status, holder)) return { ok: false, refusal: notFound };
+  return { ok: true, context, holder };
 }
 
 /** A game's id as an address part: a UUID, in lower case as the database spells it. */

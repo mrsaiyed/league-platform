@@ -5,6 +5,7 @@
 import { TrackerGameStateWithChanges, TrackerRosters } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
+import { refusalAnswer } from '../../server/league-api.ts';
 import { trackerRostersRequest } from '../../server/tracker-rosters-endpoint.ts';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import {
@@ -17,11 +18,14 @@ import {
 import { deviceRosters } from './device-rosters.ts';
 import { endpointNetwork, type EndpointNetwork } from './endpoint-network.test-helper.ts';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
+import type { SignedInCheck } from './fetch-signed-in.ts';
+import { gameCopyFile } from './game-copy-on-device.ts';
 import { createFetchTrackerServer } from './fetch-tracker-server.ts';
 import { createMemoryQueueStorage } from './memory-queue-storage.ts';
 import type { DeviceRosters, DeviceScoring } from './opened-game-storage.ts';
 import type { KeptTap, QueueStorage } from './queue-storage.ts';
 import { createTrackerController, type TapInput } from './tracker-controller.ts';
+import { trackerNotices } from './tracker-notice.ts';
 import {
   createFakeServer,
   createManualClock,
@@ -50,6 +54,7 @@ function device(
     clock = createManualClock(),
     game = gameId,
     signedIn = () => as,
+    whoIsSignedIn,
     sendTaps = (send) => send,
     askServer = (ask) => ask,
     kept,
@@ -68,6 +73,8 @@ function device(
     as?: Person;
     /** Who the device is signed in as at each request, when that changes in a test. */
     signedIn?: () => Person;
+    /** "Am I signed in?" (T-456), asked of the address about no league. */
+    whoIsSignedIn?: SignedInCheck;
     /** Wraps how taps reach the server, to hold an answer back in a test. */
     sendTaps?: (send: typeof globalThis.fetch) => typeof globalThis.fetch;
     /** Wraps the session and state requests, likewise. */
@@ -101,6 +108,7 @@ function device(
     ...(keepScoring === undefined ? {} : { keepScoring }),
     ...(rosters === undefined ? {} : { rosters: { page: rosters } }),
     ...(newPlayerId === undefined ? {} : { newPlayerId }),
+    ...(whoIsSignedIn === undefined ? {} : { signedIn: whoIsSignedIn }),
   });
   return { controller, storage, clock };
 }
@@ -1420,6 +1428,149 @@ const pageInBetween = (status: number) => () =>
     }),
   );
 
+describe('tracker controller: a 404 is the game gone only when it says so (T-453)', () => {
+  // The league gate's own "not found", byte for byte: a draft league to a visitor.
+  const gateAnswer = () => {
+    const { status, body } = refusalAnswer({ status: 404, error: 'not-found' });
+    return Promise.resolve(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  };
+
+  it('a scorer signed out in a draft league meets the gate: sign-in asked, every tap held, then saved', async () => {
+    const network = endpointNetwork();
+    let signedOutInAnotherTab = false;
+    const tablet = device(network, {
+      sendTaps: (send) => (input, init) =>
+        signedOutInAnotherTab ? gateAnswer() : send(input, init),
+      askServer: (ask) => (input, init) =>
+        signedOutInAnotherTab ? gateAnswer() : ask(input, init),
+    });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    signedOutInAnotherTab = true;
+    const waiting = [basket('home', hawks[0] ?? ''), basket('away', bears[0] ?? '', 3)];
+    await tapAll(tablet.controller, waiting);
+    await tablet.controller.idle();
+    // The renewal meets the gate too.
+    await tablet.clock.advance(31_000);
+    await tablet.controller.idle();
+    let status = tablet.controller.status();
+    expect(status.mode).toEqual({ kind: 'scoring' });
+    expect(status).toMatchObject({ signedOut: true, notSaved: [], notApplied: [] });
+    expect(status.waiting.map(inputOf)).toEqual(waiting);
+    expect((await tablet.storage.list(gameId)).map((e) => e.state)).toEqual(['waiting', 'waiting']);
+
+    // Signed in again: every tap goes, once, and the score is the device's.
+    signedOutInAnotherTab = false;
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    status = tablet.controller.status();
+    expect(status).toMatchObject({ signedOut: false, mode: { kind: 'scoring' }, waiting: [] });
+    const server = await serverGame(network);
+    expect(server.sequence).toBe(4);
+    expect(scoreOf(server.state)).toEqual({ home: 2, away: 3 });
+  });
+
+  it('opening in a draft league while signed out: asked to sign in, never "no such game"', async () => {
+    const network = endpointNetwork();
+    const { controller } = device(network, { askServer: () => () => gateAnswer() });
+    await controller.start();
+    await controller.idle();
+    expect(controller.status().mode).toEqual({ kind: 'read-only', reason: 'signed-out' });
+  });
+});
+
+describe('tracker controller: refused "not found" while signed in (T-456)', () => {
+  const gateAnswer = () => {
+    const { status, body } = refusalAnswer({ status: 404, error: 'not-found' });
+    return Promise.resolve(new Response(JSON.stringify(body), { status }));
+  };
+
+  /** A scorer at work, then the league closed to them (removed from a draft league). */
+  const removedWhileScoring = async (answer: boolean | null) => {
+    const network = endpointNetwork();
+    let removed = false;
+    let asked = 0;
+    const tablet = device(network, {
+      sendTaps: (send) => (input, init) => (removed ? gateAnswer() : send(input, init)),
+      askServer: (ask) => (input, init) => (removed ? gateAnswer() : ask(input, init)),
+      whoIsSignedIn: async () => {
+        asked += 1;
+        return answer;
+      },
+    });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    removed = true;
+    const waiting = [basket('home', hawks[0] ?? ''), basket('away', bears[0] ?? '', 3)];
+    await tapAll(tablet.controller, waiting);
+    await tablet.controller.idle();
+    await tablet.clock.advance(31_000);
+    await tablet.controller.idle();
+    return { tablet, waiting, asked: () => asked };
+  };
+
+  it('signed out: sign-in asked, every tap held, as before', async () => {
+    const { tablet, waiting, asked } = await removedWhileScoring(false);
+    const status = tablet.controller.status();
+    expect(status).toMatchObject({ mode: { kind: 'scoring' }, signedOut: true, notSaved: [] });
+    expect(status.waiting.map(inputOf)).toEqual(waiting);
+    expect(asked()).toBeGreaterThan(0);
+  });
+
+  it('no answer to "am I signed in?": signed out, as before', async () => {
+    const { tablet } = await removedWhileScoring(null);
+    expect(tablet.controller.status()).toMatchObject({
+      mode: { kind: 'scoring' },
+      signedOut: true,
+    });
+  });
+
+  it('signed in and refused: says so, keeps every tap, offers a copy, and stops asking', async () => {
+    const { tablet, waiting, asked } = await removedWhileScoring(true);
+    const status = tablet.controller.status();
+    expect(status.mode).toEqual({ kind: 'read-only', reason: 'cannot-open' });
+    expect(status).toMatchObject({ signedOut: false, notSaved: [], notApplied: [] });
+    expect(status.waiting.map(inputOf)).toEqual(waiting);
+    expect(trackerNotices(status)).toContainEqual({ key: 'tracker.cannotOpenKept', count: 2 });
+    const entries = await tablet.storage.list(gameId);
+    expect(entries.map((e) => e.state)).toEqual(['waiting', 'waiting']);
+    // "Save a copy" (step 2.70) holds both taps, to hand to the league's admin.
+    // (The page's storage marks each tap with the account, inLeague; this one does not.)
+    const copy = gameCopyFile({
+      leagueId: liveLeagueId,
+      gameId,
+      accountId: 'scorer',
+      entries: entries.map((entry) => ({ ...entry, accountId: 'scorer' })),
+      savedAt: 0,
+    });
+    expect(copy.count).toBe(2);
+    // No loop: minutes later nothing more is asked and nothing has changed.
+    const askedThen = asked();
+    await tablet.clock.advance(5 * 60_000);
+    await tablet.controller.idle();
+    expect(asked()).toBe(askedThen);
+    expect(tablet.controller.status().mode).toEqual({ kind: 'read-only', reason: 'cannot-open' });
+  });
+
+  it('opening a game this account can no longer open: says so, never "sign in"', async () => {
+    const network = endpointNetwork();
+    const { controller } = device(network, {
+      askServer: () => () => gateAnswer(),
+      whoIsSignedIn: async () => true,
+    });
+    await controller.start();
+    await controller.idle();
+    expect(controller.status().mode).toEqual({ kind: 'read-only', reason: 'cannot-open' });
+  });
+});
+
 describe('tracker controller: an answer that is not the server’s is no answer (finding G)', () => {
   for (const httpStatus of [404, 403, 401, 400]) {
     it(`a ${httpStatus} page in between while taps wait: nothing is lost, refused or set aside`, async () => {
@@ -1492,7 +1643,7 @@ describe('tracker controller: an answer that is not the server’s is no answer 
       sendTaps: (send) => (input, init) =>
         gone
           ? Promise.resolve(
-              new Response(JSON.stringify({ error: 'not-found' }), {
+              new Response(JSON.stringify({ error: 'unknown-game' }), {
                 status: 404,
                 headers: { 'content-type': 'application/json' },
               }),

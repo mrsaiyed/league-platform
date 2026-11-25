@@ -1,7 +1,12 @@
 // How the queue reaches the server, as the queue sees it. The browser's version is
 // fetch-command-transport.ts; tests give a stand-in server. The queue never learns
 // about addresses, only which of five things happened (and a status code to log).
-import type { CommandBatch, CommandReply, VersionRefusal } from '@srleagues/contracts';
+import type {
+  CommandBatch,
+  CommandReply,
+  TrackerRefusal,
+  VersionRefusal,
+} from '@srleagues/contracts';
 
 export type TransportOutcome =
   /** The server answered for the batch (T-111). */
@@ -13,7 +18,12 @@ export type TransportOutcome =
    * help until something changes: signed out (401), not allowed (403), no such game (404).
    * Only the server's own refusal (`TrackerRefusal`, at its own status) is this.
    */
-  | { readonly kind: 'rejected'; readonly httpStatus: number }
+  | {
+      readonly kind: 'rejected';
+      readonly httpStatus: number;
+      /** The refusal's code: a 404 is "no such game" only with `unknown-game` (T-453). */
+      readonly error: TrackerRefusal['error'];
+    }
   /**
    * The server could not take the batch as sent (its own 400 invalid-input): one of its
    * taps is bad. The queue finds the tap by sending one at a time (record 024).

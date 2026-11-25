@@ -582,11 +582,11 @@ describe('tracker queue: the done test, each case left in a known state', () => 
     await queue.enqueue(tap(1));
     await clock.advance(5_000);
     expect(queue.status().unansweredSince).not.toBeNull();
-    server.answerWith = { kind: 'rejected', httpStatus: 403 };
+    server.answerWith = { kind: 'rejected', httpStatus: 403, error: 'not-allowed' };
     queue.wake();
     await queue.idle();
     expect(queue.status()).toMatchObject({
-      halted: { kind: 'rejected', httpStatus: 403 },
+      halted: { kind: 'rejected', httpStatus: 403, error: 'not-allowed' },
       unansweredSince: null,
     });
     expect(clock.pending()).toBe(0);
@@ -632,10 +632,14 @@ describe('tracker queue: the done test, each case left in a known state', () => 
     expect(queue.status().halted).toEqual({ kind: 'version-refused', accepted: [2, 3] });
     expect(await held(storage)).toEqual([[commandId(1), 'waiting']]);
 
-    server.answerWith = { kind: 'rejected', httpStatus: 401 };
+    server.answerWith = { kind: 'rejected', httpStatus: 401, error: 'signed-out' };
     queue.resume();
     await queue.idle();
-    expect(queue.status().halted).toEqual({ kind: 'rejected', httpStatus: 401 });
+    expect(queue.status().halted).toEqual({
+      kind: 'rejected',
+      httpStatus: 401,
+      error: 'signed-out',
+    });
     expect(await held(storage)).toEqual([[commandId(1), 'waiting']]);
 
     server.answerWith = null;
