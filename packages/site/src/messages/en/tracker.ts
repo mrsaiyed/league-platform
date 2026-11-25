@@ -304,10 +304,15 @@ export const enTracker = {
   // The server's answer brought another format than the device was playing (T-344).
   'tracker.formatChangedTo': 'The format of this game was changed. It is now: {format}.',
   'tracker.formatChangedTo.dismiss': 'OK',
-  // Team fouls this period, in each team's box of the scoreboard, and the bonus badge
-  // beside the team that shoots it.
+  // Team fouls this period (or this half, or this game, as the season counts them, step
+  // 2.123), in each team's box of the scoreboard, and the bonus badge beside the team that
+  // shoots it.
   'tracker.fouls.count_one': '{count} foul',
   'tracker.fouls.count_other': '{count} fouls',
+  'tracker.fouls.thisGame_one': '{count} team foul this game',
+  'tracker.fouls.thisGame_other': '{count} team fouls this game',
+  'tracker.fouls.thisHalf_one': '{count} team foul this half',
+  'tracker.fouls.thisHalf_other': '{count} team fouls this half',
   'tracker.fouls.thisPeriod_one': '{count} team foul this period',
   'tracker.fouls.thisPeriod_other': '{count} team fouls this period',
   'tracker.held.dismiss': 'Dismiss',

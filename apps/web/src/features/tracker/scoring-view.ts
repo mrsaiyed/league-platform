@@ -90,6 +90,8 @@ export type TeamPanel = {
   readonly turnoverList: readonly PlayerTile[];
   /** Team fouls counted toward the bonus in the period being played (F1, F5). */
   readonly teamFouls: number;
+  /** What `teamFouls` counts: this period, this half or the game, as the season says (2.123). */
+  readonly foulsCounted: basketball.TeamFoulsReset;
   /**
    * This team's own foul trouble (F2): 1 once its fouls have put the other team in the
    * bonus, 2 in the double bonus.
@@ -287,6 +289,7 @@ export function scoringView(
           (a, b) => b.turnovers - a.turnovers || (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
         ),
       teamFouls: view.periodFouls,
+      foulsCounted: game.rules.teamFoulsReset ?? 'period',
       foulLevel: view.penalty,
       bonus: view.bonus,
       timeouts: {

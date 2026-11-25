@@ -61,6 +61,7 @@ const refusals: Readonly<Record<string, RefusalKey>> = {
     'tracker.refusal.rules.lastMinutesScope',
   'The mercy rule starts at a lead of 1 to 100 points.': 'tracker.refusal.rules.mercyLead',
   'A player fouls out after 1 to 20 fouls, or never.': 'tracker.refusal.rules.foulLimit',
+  'Team fouls reset each period, each half or once a game.': 'tracker.refusal.rules.teamFoulsReset',
 };
 
 /** The engine's refusals with a value written into them, by their shape. */
