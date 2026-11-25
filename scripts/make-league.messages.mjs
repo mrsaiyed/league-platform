@@ -92,6 +92,17 @@ export const seasonName = (suggestion) =>
 export const withDefault = (question, value) => `${question} [${value}]: `;
 export const plainQuestion = (question) => `${question}: `;
 
+/**
+ * Which sentence a refused mercy lead gets: a whole number given without a stop clock is
+ * refused for the clock; anything else, for the number (review L2).
+ */
+export const mercyLeadProblem = (answers) =>
+  String(answers.clock ?? '')
+    .trim()
+    .toLowerCase() !== 'stop' && /^\d{1,3}$/.test(String(answers.mercyLead ?? '').trim())
+    ? 'mercyLeadClock'
+    : 'mercyLead';
+
 export const problemWords = {
   missing: (field) => `${questions[field] ?? otherFields[field]}: missing.`,
   invalid: {
@@ -114,8 +125,10 @@ export const problemWords = {
     accentColor: 'Accent color: a color written #rrggbb, such as #d3b780.',
     highlightColor: 'Highlight color: a color written #rrggbb, such as #d3b780.',
     clock: 'Clock: stop or running.',
-    mercyLead:
-      'Mercy rule: a lead from 1 to 100 points, or none. It only goes with a stop clock: with a running clock, answer none.',
+    // Review L2: one sentence for each cause, chosen by mercyLeadProblem below.
+    mercyLead: 'Mercy rule: a whole number of points from 1 to 100, or none.',
+    mercyLeadClock:
+      'Mercy rule: it only works with a stop clock. Choose a stop clock or answer none.',
   },
   blocked: {
     shortName:

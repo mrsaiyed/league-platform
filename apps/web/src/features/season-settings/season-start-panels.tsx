@@ -164,6 +164,7 @@ export function StartSeasonPanel({
   programId,
   copiedFrom,
   gameRules,
+  stopClockDropped,
   permalink,
 }: {
   /** The route's `[league]` value, which the form's post finds the page by. */
@@ -174,6 +175,11 @@ export function StartSeasonPanel({
   readonly copiedFrom: string | undefined;
   /** The game rules asked (S-106, step 2.245), filled with the copied season's (or the starting) ones. */
   readonly gameRules: Required<GameRuleAnswers>;
+  /**
+   * Said under the clock question when the copied season has a last-minutes stop clock,
+   * which a stop clock for the whole game clears (T-428, review M1); else undefined.
+   */
+  readonly stopClockDropped?: string | undefined;
   /** Where the browser lands with scripts off: this form's place on the page. */
   readonly permalink: string;
 }) {
@@ -225,6 +231,19 @@ export function StartSeasonPanel({
         ),
       })),
     },
+    ...(stopClockDropped === undefined
+      ? []
+      : [
+          {
+            kind: 'note',
+            name: 'stopClockDropped',
+            content: (
+              <p className="ui-field-help" data-stop-clock-dropped="">
+                {stopClockDropped}
+              </p>
+            ),
+          } satisfies ListField,
+        ]),
     {
       kind: 'number',
       name: 'mercyLead',

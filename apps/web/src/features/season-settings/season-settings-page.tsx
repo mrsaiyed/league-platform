@@ -40,6 +40,7 @@ import { PartForm } from './part-form.tsx';
 import { partFacts, partGroups, partTexts } from './part-words.ts';
 import { panelWords } from './panel-words.ts';
 import { SeasonStatePanel, StartSeasonPanel } from './season-start-panels.tsx';
+import { stopClockDroppedNote } from './stop-clock-dropped.ts';
 import {
   isSeasonPart,
   nameFields,
@@ -115,6 +116,7 @@ export async function SeasonSettingsPage({
       programId={programId}
       copiedFrom={current?.name}
       gameRules={gameRuleAnswersOf(startRules)}
+      stopClockDropped={stopClockDroppedNote(current?.name, startRules)}
       permalink={`${seasonSettingsAddress(addressee, season?.slug)}#${startSeasonAnchor}`}
     />
   ) : null;

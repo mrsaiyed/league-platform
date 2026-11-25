@@ -12,6 +12,8 @@ import {
   confirmHosted,
   made,
   makeProblemLines,
+  mercyLeadProblem,
+  problemWords,
 } from '../scripts/make-league.messages.mjs';
 
 const plan = {
@@ -149,4 +151,15 @@ test('a short name with a word from the offensive starter list is refused in pla
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
+});
+
+test('a refused mercy lead is told its own cause: the number, or the clock (review L2)', () => {
+  const said = (clock, mercyLead) => problemWords.invalid[mercyLeadProblem({ clock, mercyLead })];
+  const number = 'Mercy rule: a whole number of points from 1 to 100, or none.';
+  const clock = 'Mercy rule: it only works with a stop clock. Choose a stop clock or answer none.';
+  assert.equal(said('stop', '12.5'), number);
+  assert.equal(said('STOP', ' 101 '), number);
+  assert.equal(said('running', '12.5'), number);
+  assert.equal(said('running', '20'), clock);
+  assert.equal(said(undefined, '15'), clock);
 });

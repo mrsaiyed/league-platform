@@ -45,6 +45,9 @@ const typed = (value: string | undefined): string | undefined => {
   return trimmed === '' ? undefined : trimmed;
 };
 
+/** The form's own code for a mercy lead that is not a whole number from 1 to 100. */
+export const mercyLeadNumber = 'mercy-lead-number';
+
 const refused = (code: string, field: StartField | undefined): StartedSeason => ({
   kind: 'refused',
   code,
@@ -70,13 +73,18 @@ export async function runStartSeason(
   const programId = typed(fields['programId']);
   // The game rules asked (S-106, step 2.245): an empty mercy lead is none; the command
   // checks the pair against the season's settings' own contract.
-  const clockMode = clockModes.find((mode) => mode === fields['clockMode']);
+  // An unknown clock word is refused, as the command refuses it (review L1).
+  const clockTyped = typed(fields['clockMode']);
+  const clockMode = clockModes.find((mode) => mode === clockTyped);
   const mercyTyped = typed(fields['mercyLead']);
   const mercyLead =
     mercyTyped === undefined ? null : /^\d{1,3}$/.test(mercyTyped) ? Number(mercyTyped) : undefined;
   if (typed(fields['name']) === undefined) return refused('invalid-input', 'name');
   if (slug === undefined) return refused('invalid-input', 'slug');
-  if (mercyLead === undefined) return refused('game-rule-refused', 'mercyLead');
+  if (clockTyped !== undefined && clockMode === undefined) {
+    return refused('invalid-input', 'clockMode');
+  }
+  if (mercyLead === undefined) return refused(mercyLeadNumber, 'mercyLead');
   if (carry === undefined) return refused('invalid-input', 'carry');
   const result = await startSeason(
     context,
@@ -100,7 +108,11 @@ export async function runStartSeason(
         error.issues.map((issue) => fieldOfPath(issue.path)).find((f) => f !== undefined),
       );
     case 'game-rule-refused':
-      return refused(error.code, error.question);
+      // With a stop clock the mercy lead can only be refused for its number (review L2).
+      return refused(
+        error.question === 'mercyLead' && clockMode === 'stop' ? mercyLeadNumber : error.code,
+        error.question,
+      );
     case 'season-slug-taken':
       return refused(error.code, 'slug');
     default:

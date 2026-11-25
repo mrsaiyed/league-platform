@@ -2,7 +2,7 @@
 // it ("Short name: …"); about no box, the command's own words beside the button.
 import type { TextKey } from '../../server/messages.ts';
 import { problemKey } from './answer.ts';
-import type { StartField } from './run-start-season.ts';
+import { mercyLeadNumber, type StartField } from './run-start-season.ts';
 
 export function startRefusalKey(code: string, field: StartField | undefined): TextKey {
   if (field === undefined) {
@@ -10,6 +10,9 @@ export function startRefusalKey(code: string, field: StartField | undefined): Te
   }
   if (field === 'slug' && code === 'season-slug-taken') {
     return 'seasonSettings.start.refused.slug-taken';
+  }
+  if (field === 'mercyLead' && code === mercyLeadNumber) {
+    return 'seasonSettings.start.refused.mercyLeadNumber';
   }
   return `seasonSettings.start.refused.${field}`;
 }

@@ -107,6 +107,29 @@ try {
   const page = await ownerPage();
   let game;
 
+  await step(
+    'a copied last-minutes stop clock is named under the clock question (review M1)',
+    async () => {
+      await page.goto(`${seasonPage}?season=fall-2026&edit=game`);
+      await page.locator('input[name=clockMode][value=running]').check();
+      await page.locator('input[name=lastMinutes]').fill('2');
+      await tap(
+        page,
+        page.getByRole('button', { name: 'Save the game rules' }),
+        /season=fall-2026/,
+      );
+      await page.goto(seasonPage);
+      const dropped = startForm(page).locator('[data-stop-clock-dropped]');
+      note(
+        'the start form says a stop clock for the whole game replaces it',
+        (await dropped.count()) === 1 &&
+          (await dropped.innerText()).trim() ===
+            'Fall 2026 also stops the clock in the last 2 minutes. A stop clock for the whole game replaces that.',
+        (await dropped.count()) === 1 ? await dropped.innerText() : 'no sentence',
+      );
+    },
+  );
+
   await step('the owner starts Rules 2027 with a stop clock and a mercy lead of 12', async () => {
     await startSeason(page, {
       name: 'Rules 2027',
@@ -190,12 +213,20 @@ try {
       await clock('stop').waitFor({ timeout: limit });
       note('the game starts on a stop clock', (await clock('stop').count()) === 1);
       for (const jersey of [50, 51, 52]) await c.play('home', jersey, 'p3');
-      note('a 9-point lead (under 10) brings no notice', (await notice.count()) === 0);
-      note('and the clock still stops', (await clock('stop').count()) === 1);
-      await c.play('home', 53, 'p2');
+      // Review L3: the play is shown saved (the score says 9) before the clock is read;
+      // the stop clock is drawn only while the mercy rule is not on, so it is the proof.
+      const nine = await c.score();
+      note('the 9-point lead is shown', nine.home === 9 && nine.away === 0, JSON.stringify(nine));
+      note(
+        'a 9-point lead (one under 10) keeps the stop clock and brings no notice',
+        (await clock('stop').count()) === 1 && (await notice.count()) === 0,
+      );
+      await c.play('home', 53, 'p1');
       await notice.waitFor({ timeout: limit });
       await clock('running').waitFor({ timeout: limit });
-      note('an 11-point lead brings the mercy notice', (await notice.count()) === 1);
+      const ten = await c.score();
+      note('the 10-point lead is shown', ten.home === 10 && ten.away === 0, JSON.stringify(ten));
+      note('a lead of exactly 10 brings the mercy notice', (await notice.count()) === 1);
       note('and the clock runs', (await clock('running').count()) === 1);
     } finally {
       await context.close();
@@ -208,10 +239,11 @@ try {
     const offered = {
       mode: await form.locator('input[name=clockMode]:checked').getAttribute('value'),
       mercyLead: await form.locator('input[name=mercyLead]').inputValue(),
+      dropped: await form.locator('[data-stop-clock-dropped]').count(),
     };
     note(
-      'the start form offers a stop clock and 10',
-      offered.mode === 'stop' && offered.mercyLead === '10',
+      'the start form offers a stop clock and 10, and no last-minutes sentence (none to copy)',
+      offered.mode === 'stop' && offered.mercyLead === '10' && offered.dropped === 0,
       JSON.stringify(offered),
     );
     await startSeason(page, { name: 'Next 2028', slug: 'next-2028', carry: 'nothing' });

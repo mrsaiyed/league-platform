@@ -395,6 +395,8 @@ export const enAdminSettings = {
   'seasonSettings.start.clock': 'When a foul is called, does the game clock stop?',
   'seasonSettings.start.clock.running': 'No, the clock keeps running (a running clock)',
   'seasonSettings.start.clock.stop': 'Yes, the clock stops on every foul (a stop clock)',
+  'seasonSettings.start.clockDropsLastMinutes':
+    '{season} also stops the clock in the last {minutes} minutes. A stop clock for the whole game replaces that.',
   'seasonSettings.start.endsOn': 'Last day (you can leave it empty)',
   'seasonSettings.start.gameRules': 'Game rules',
   'seasonSettings.start.gameRulesHelp':
@@ -411,11 +413,13 @@ export const enAdminSettings = {
   'seasonSettings.start.refused.carry':
     'Teams: choose which teams come along. Nothing was changed.',
   'seasonSettings.start.refused.clockMode':
-    'Clock: a mercy rule needs a stop clock. Choose a stop clock or leave the mercy rule empty; nothing was changed.',
+    'Clock: choose a running clock or a stop clock. Nothing was changed.',
   'seasonSettings.start.refused.endsOn':
     'Last day: it must be a date on or after the first day, or empty. Nothing was changed.',
   'seasonSettings.start.refused.mercyLead':
-    'Mercy rule: it needs a stop clock and a lead from 1 to 100 points. Choose a stop clock or leave the mercy rule empty; nothing was changed.',
+    'Mercy rule: it only works with a stop clock. Choose a stop clock or leave it empty.',
+  'seasonSettings.start.refused.mercyLeadNumber':
+    'Mercy rule: a whole number of points from 1 to 100, or empty for none.',
   'seasonSettings.start.refused.name':
     'Name: give the season a name of up to 120 letters. Nothing was changed.',
   'seasonSettings.start.refused.slug':

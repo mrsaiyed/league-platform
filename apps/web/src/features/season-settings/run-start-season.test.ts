@@ -49,18 +49,30 @@ describe('runStartSeason', () => {
     });
 
     it('refuses a mercy lead with a running clock, or one that is not a number, at the mercy box', async () => {
-      for (const [clock, lead] of [
-        ['running', '15'],
-        ['stop', 'ten'],
-        ['stop', '0'],
+      // Review L2: a stop clock's refusal is about the number; a running clock's, the clock.
+      for (const [clock, lead, code] of [
+        ['running', '15', 'game-rule-refused'],
+        ['stop', 'ten', 'mercy-lead-number'],
+        ['stop', '0', 'mercy-lead-number'],
+        ['stop', '101', 'mercy-lead-number'],
+        ['running', '12.5', 'mercy-lead-number'],
       ] as const) {
         const world = testWorld();
         expect(await runStartSeason(owner, asked(clock, lead), world.deps)).toEqual({
           kind: 'refused',
-          code: 'game-rule-refused',
+          code,
           field: 'mercyLead',
         });
       }
+    });
+
+    it('refuses an unknown clock word at the clock box, as the command does (review L1)', async () => {
+      const world = testWorld();
+      expect(await runStartSeason(owner, asked('fast', ''), world.deps)).toEqual({
+        kind: 'refused',
+        code: 'invalid-input',
+        field: 'clockMode',
+      });
     });
   });
 

@@ -202,7 +202,11 @@ async function run(stage) {
       console.error(
         problem === 'missing'
           ? words.problemWords.missing(field)
-          : words.problemWords[problem][field],
+          : words.problemWords[problem][
+              problem === 'invalid' && field === 'mercyLead'
+                ? words.mercyLeadProblem(answers)
+                : field
+            ],
       );
     }
     return 2;
