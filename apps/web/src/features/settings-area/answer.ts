@@ -9,13 +9,10 @@ export const doneNames = [
   'saved',
   'cleared',
   'published',
-  // League settings → Profile and the Archive buttons (step 2.125 part 2).
-  'renamed',
-  'audienceClearedFullNames',
+  // The Archive buttons (step 2.125 part 2). Profile's forms answer in the response to the
+  // post since step 2.155 part 3 (profile-form-answer.ts), not here.
   'archived',
   'unarchived',
-  // Profile's time zone made someone the league's first recorded child (S-109).
-  'firstChild',
 ] as const;
 export type DoneName = (typeof doneNames)[number];
 

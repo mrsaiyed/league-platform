@@ -27,7 +27,13 @@ export type FormState =
     };
 
 /** "Saved now:", and what it says when nothing is saved in that box. */
-export type SavedNowWords = { readonly label: string; readonly nothing: string };
+export type SavedNowWords = {
+  readonly label: string;
+  readonly nothing: string;
+  /** Beside a tick: what is saved now when it is ticked, and when it is not (step 2.155). */
+  readonly ticked?: string;
+  readonly unticked?: string;
+};
 
 export const untouched: FormState = { kind: 'untouched' };
 
