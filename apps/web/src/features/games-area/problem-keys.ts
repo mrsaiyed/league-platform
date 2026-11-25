@@ -52,7 +52,7 @@ const putBackKeys: readonly TextKey[] = [
 ];
 
 const trackedGridKeys: readonly TextKey[] = [
-  'admin.boxScore.tracked.refused.basket-taken-back',
+  'admin.boxScore.tracked.refused.basket-not-in-plays',
   'admin.boxScore.tracked.refused.cell',
   'admin.boxScore.tracked.refused.changed-since-read',
   'admin.boxScore.tracked.refused.engine',

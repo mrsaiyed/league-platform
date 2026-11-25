@@ -171,7 +171,7 @@ describe('the grid of a tracked game (step 2.65)', () => {
     expect(after.sequence).toBeGreaterThan(wrong.sequence);
   });
 
-  it('refuses a grid read before someone else changed the game, a lowered basket and a box that is no count', async () => {
+  it('refuses a grid read before someone else changed the game and a box that is no count; takes back a lowered basket', async () => {
     const { ports, read, statKeys } = await trackedGame();
     const before = await read();
     const [first] = before.lines;
@@ -188,20 +188,33 @@ describe('the grid of a tracked game (step 2.65)', () => {
       first.fouls + 1,
     );
     const now = await read();
-    const scored = now.lines.find((l) => l.fg2 > 0);
-    if (scored !== undefined) {
-      const box = trackedGridField(scored.personId, 'fg2');
-      expect(
-        await runTrackedGridAction(
-          posted(now, statKeys, { [box]: String(scored.fg2 - 1) }),
-          ctx,
-          ports.deps,
-        ),
-      ).toEqual({ ok: false, code: 'basket-taken-back', wrong: [box] });
-    }
     expect(
       await runTrackedGridAction(posted(now, statKeys, { [fouls]: 'two' }), ctx, ports.deps),
     ).toEqual({ ok: false, code: 'cell', wrong: [fouls] });
+    // A lowered basket is the take-back of that player's newest one (step 2.247, T-436).
+    const scored = now.lines.find((l) => l.fg2 > 0);
+    if (scored === undefined) throw new Error('the seeded game has no 2-point basket');
+    const box = trackedGridField(scored.personId, 'fg2');
+    expect(
+      await runTrackedGridAction(
+        posted(now, statKeys, { [box]: String(scored.fg2 - 1) }),
+        ctx,
+        ports.deps,
+      ),
+    ).toEqual({
+      ok: true,
+      plays: [
+        {
+          type: 'unscore',
+          side: expect.stringMatching(/^(home|away)$/),
+          playerId: scored.personId.toLowerCase(),
+          points: 2,
+          playId: expect.any(String),
+        },
+      ],
+    });
+    const lowered = (await read()).lines.find((l) => l.personId === scored.personId);
+    expect([lowered?.fg2, lowered?.points]).toEqual([scored.fg2 - 1, scored.points - 2]);
   });
 
   it('refuses a save of too many plays at the top, and ends the game again (T-407)', async () => {
@@ -287,10 +300,10 @@ describe('the grid form', () => {
     expect(fresh).not.toContain('data-grid-problem');
     const lowered = draw({
       kind: 'refused',
-      code: 'basket-taken-back',
+      code: 'basket-not-in-plays',
       typed: { 'grid-a-fg2': '2', 'grid-a-fouls': '4' },
       wrong: ['grid-a-fg2'],
-      said: '{cell} cannot go lower here.',
+      said: '{cell}: too few baskets to take back.',
     });
     const described =
       /aria-label="fg2 for #4 Ada" aria-invalid="true" aria-describedby="([^"]+)" name="grid-a-fg2" value="2"\/><span id="([^"]+)"/.exec(
@@ -299,7 +312,7 @@ describe('the grid form', () => {
     expect(described?.[1]).toBe(described?.[2]);
     expect(lowered).toContain('name="grid-a-fouls" value="4"');
     expect(lowered).toMatch(
-      /aria-invalid="true"[^>]*\/><span[^>]*data-grid-problem="basket-taken-back">fg2 for #4 Ada cannot go lower here\.</,
+      /aria-invalid="true"[^>]*\/><span[^>]*data-grid-problem="basket-not-in-plays">fg2 for #4 Ada: too few baskets to take back\.</,
     );
   });
 
@@ -323,7 +336,7 @@ describe('the grid form', () => {
 describe('the grid’s words', () => {
   it('words every refusal and every play from the message files', () => {
     for (const code of [
-      'basket-taken-back',
+      'basket-not-in-plays',
       'cell',
       'changed-since-read',
       'engine',
@@ -342,10 +355,13 @@ describe('the grid’s words', () => {
       'score1:a',
       'score2:a',
       'score3:a',
+      'unscore1:a',
+      'unscore2:a',
+      'unscore3:a',
       'odd:a',
     ];
     const said = playSentences(marks);
-    expect(said).toHaveLength(7);
+    expect(said).toHaveLength(10);
     for (const { key } of said) expect(en[key]).toBeTruthy();
   });
 });

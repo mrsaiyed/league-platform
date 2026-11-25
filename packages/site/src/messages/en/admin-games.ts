@@ -116,7 +116,7 @@ export const enAdminGames = {
   'admin.boxScore.tracked.help':
     'Change a player’s numbers and save. Each change is saved as a play in the game’s list of plays, so the list still explains the numbers. Minutes and points come from the plays and cannot be typed here.',
   'admin.boxScore.tracked.lower':
-    'Baskets can only go up here. To take points away, reopen the game on the scoring screen and use Undo.',
+    'Lowering a player’s baskets takes back their latest baskets of that kind, as plays in the list. To move points to another player, lower one and raise the other. You can also correct the game on the scoring screen.',
   'admin.boxScore.tracked.lowerLink': 'Open the scoring screen',
   'admin.boxScore.tracked.noChange': 'Nothing was changed: the grid already matched the plays.',
   'admin.boxScore.tracked.notCorrectable.game-final':
@@ -125,8 +125,8 @@ export const enAdminGames = {
     'This game is not under way, so its box score cannot be edited here.',
   'admin.boxScore.tracked.notCorrectable.reason-needed':
     'This game is still being scored live. To edit its box score here, end it on the scoring screen, then reopen it with a reason.',
-  'admin.boxScore.tracked.refused.basket-taken-back':
-    '{cell} cannot go lower here. To take points away, reopen the game on the scoring screen and use Undo. Nothing was saved.',
+  'admin.boxScore.tracked.refused.basket-not-in-plays':
+    '{cell}: the list of plays does not hold that many of these baskets to take back. Load the grid again to see the plays’ numbers. Nothing was saved.',
   'admin.boxScore.tracked.refused.cell': '{cell}: enter a whole number from 0 to 999.',
   'admin.boxScore.tracked.refused.changed-since-read':
     'Someone else changed this game since you opened this page, so nothing was saved. Load it again to see the new numbers; what you typed is still shown below.',
@@ -144,6 +144,9 @@ export const enAdminGames = {
     'This save would add more than {limit} plays, so nothing was saved. Check for a mistyped number.',
   'admin.boxScore.tracked.reload': 'Load it again',
   'admin.boxScore.tracked.removed.foul': 'Took a foul away from {name}.',
+  'admin.boxScore.tracked.removed.score1': 'Took a made free throw away from {name}.',
+  'admin.boxScore.tracked.removed.score2': 'Took a 2-point basket away from {name}.',
+  'admin.boxScore.tracked.removed.score3': 'Took a 3-point basket away from {name}.',
   'admin.boxScore.tracked.removed.turnover': 'Took a turnover away from {name}.',
   'admin.boxScore.tracked.save': 'Save the changes',
   'admin.boxScore.tracked.saved': 'Saved. These plays were added to the game’s list of plays:',

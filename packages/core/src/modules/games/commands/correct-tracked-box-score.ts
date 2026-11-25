@@ -37,7 +37,12 @@ import { defineCommand, fail, ok, type Result } from '../../../command/index.ts'
 import { applyPlays } from '../apply-plays.ts';
 import { gameInArchivedSeasonNotReopened } from '../archived-season.ts';
 import { isDecided } from '../game-fields.ts';
-import { gridCorrectionPlays, gridCounts, type GridCount } from '../grid-correction-plays.ts';
+import {
+  gridCorrectionPlays,
+  gridCounts,
+  type GridCount,
+  type GridPlay,
+} from '../grid-correction-plays.ts';
 import { linesOf, playerNotOnTeam, readState, rosterOf, scoreOf } from '../live-game.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
@@ -67,7 +72,7 @@ export type CorrectTrackedBoxScoreError =
   | { readonly code: 'statistic-not-kept'; readonly personId: string; readonly statistic: string }
   | {
       readonly code: 'rule';
-      readonly problem: 'basket-taken-back';
+      readonly problem: 'basket-not-in-plays';
       readonly personId: string;
       readonly stat: GridCount;
     }
@@ -111,7 +116,10 @@ export const correctTrackedBoxScore = defineCommand({
     tx,
     emit,
   }): Promise<
-    Result<{ sequence: number; plays: number; ended: boolean }, CorrectTrackedBoxScoreError>
+    Result<
+      { sequence: number; plays: number; ended: boolean; written: readonly GridPlay[] },
+      CorrectTrackedBoxScoreError
+    >
   > => {
     const gameId = input.gameId.toLowerCase();
     // T-111: the game's lock first, as every command that writes a live game takes it.
@@ -137,14 +145,19 @@ export const correctTrackedBoxScore = defineCommand({
 
     const state = readState(saved.state);
     const roster = rosterOf(await tx.liveGames.players(gameId));
-    const made = gridCorrectionPlays(game, [...linesOf(game, roster, state).values()], input.lines);
+    const made = gridCorrectionPlays(
+      game,
+      [...linesOf(game, roster, state).values()],
+      input.lines,
+      state.plays,
+    );
     if (!made.ok) {
       const [first] = made.problems;
       if (first === undefined) throw new Error('A grid refused with no problem.');
-      if (first.problem === 'basket-taken-back') {
+      if (first.problem === 'basket-not-in-plays') {
         return fail({
           code: 'rule',
-          problem: 'basket-taken-back',
+          problem: 'basket-not-in-plays',
           personId: first.personId,
           stat: first.stat,
         });
@@ -155,7 +168,9 @@ export const correctTrackedBoxScore = defineCommand({
       return fail({ code: 'too-many-plays', limit: maxCorrectionPlays });
     }
     const end = input.end === true;
-    if (made.plays.length === 0 && !end) return ok({ sequence: seq, plays: 0, ended: false });
+    if (made.plays.length === 0 && !end) {
+      return ok({ sequence: seq, plays: 0, ended: false, written: [] });
+    }
 
     // Judged first, as the door will judge them, so nothing is written for a grid refused.
     const kept = keptForScoring((await tx.games.findSeason(game.seasonId))?.rules);
@@ -240,6 +255,6 @@ export const correctTrackedBoxScore = defineCommand({
         ...scopeDetails(await gameScope(tx, gameId)),
       },
     });
-    return ok({ sequence: applied.seq, plays: made.plays.length, ended: end });
+    return ok({ sequence: applied.seq, plays: made.plays.length, ended: end, written: made.plays });
   },
 });
