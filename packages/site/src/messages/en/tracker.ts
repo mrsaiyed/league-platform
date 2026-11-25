@@ -22,9 +22,9 @@ export const enTracker = {
   'tracker.bonus.2': 'Double bonus',
   // Signed in, and this account can no longer open the game (T-456): the plays are kept.
   'tracker.cannotOpenKept_one':
-    'This account can no longer open this game. {count} play not yet saved is kept on this device. Save a copy and give it to the league’s admin, so it can be added.',
+    'This account can no longer open this game. {count} play not yet saved is kept on this device. Save a copy and give it to the league’s admin, so it can be added. If the league’s admin gives this account its place back, tap “Open the game again”.',
   'tracker.cannotOpenKept_other':
-    'This account can no longer open this game. {count} plays not yet saved are kept on this device. Save a copy and give it to the league’s admin, so they can be added.',
+    'This account can no longer open this game. {count} plays not yet saved are kept on this device. Save a copy and give it to the league’s admin, so they can be added. If the league’s admin gives this account its place back, tap “Open the game again”.',
   // Beside the period while the last-minutes stop clock holds (step 2.69): one short word,
   // so the scoreboard is no taller; a screen reader is told the label.
   'tracker.clock.lastMinutes': 'Stop clock',
