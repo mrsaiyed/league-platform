@@ -620,7 +620,8 @@ export type GameStatus = z.infer<typeof GameStatus>;
 const sidesShape = { home: Ms, away: Ms };
 
 const latestPlayShape = {
-  type: z.enum(['score', 'foul', 'turnover', 'timeout', 'sub', 'period', 'other']),
+  // `unscore`: a basket taken back by a correction (T-432), with its player and points.
+  type: z.enum(['score', 'unscore', 'foul', 'turnover', 'timeout', 'sub', 'period', 'other']),
   side: Side.optional(),
   playerName: z.string().max(120).nullable(),
   jersey: Jersey.min(1).nullable(),

@@ -39,6 +39,9 @@ export function gameWords(): GameWords {
       foul: t('game.play.foul'),
       foulTeam: t('game.play.foulTeam'),
       unfoul: t('game.play.unfoul'),
+      unscore: t('game.play.unscore'),
+      unscoreOne: t('game.play.unscoreOne'),
+      unscoreTeam: t('game.play.unscoreTeam'),
       turnover: t('game.play.turnover'),
       turnoverTeam: t('game.play.turnoverTeam'),
       unturnover: t('game.play.unturnover'),
@@ -54,6 +57,8 @@ export function gameWords(): GameWords {
         scoreOne: t('game.play.noTeam.scoreOne'),
         foul: t('game.play.noTeam.foul'),
         unfoul: t('game.play.noTeam.unfoul'),
+        unscore: t('game.play.noTeam.unscore'),
+        unscoreOne: t('game.play.noTeam.unscoreOne'),
         turnover: t('game.play.noTeam.turnover'),
         unturnover: t('game.play.noTeam.unturnover'),
         timeout: t('game.play.noTeam.timeout'),
@@ -406,7 +411,8 @@ export function buildPlays(page: GamePage, words: GameWords): readonly PlayPerio
         period: line.period === null ? null : periodName(words, line.period, periods),
       }),
       ...(line.side === null ? {} : { team: { color: colorOf(line.side) } }),
-      ...(line.type === 'score'
+      // A basket taken back says the corrected score after it (T-432).
+      ...(line.type === 'score' || line.type === 'unscore'
         ? { score: { text: t('game.playScore', names), spoken: t('game.playScoreSpoken', names) } }
         : {}),
     });

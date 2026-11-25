@@ -75,6 +75,7 @@ export type BoxScore = {
 export const playTypes = [
   'lineup',
   'score',
+  'unscore',
   'foul',
   'unfoul',
   'turnover',
@@ -174,10 +175,12 @@ const pointsOf = (play: Record<string, unknown>): 1 | 2 | 3 | null =>
 function scoreOfPlays(plays: readonly unknown[]): Record<Side, number> {
   const score = { home: 0, away: 0 };
   for (const play of plays) {
-    if (!isRecord(play) || play['type'] !== 'score') continue;
+    if (!isRecord(play) || (play['type'] !== 'score' && play['type'] !== 'unscore')) continue;
     const side = sideOf(play['side']);
     const points = pointsOf(play);
-    if (side !== null && points !== null) score[side] += points;
+    // A basket taken back (T-432) counts no more.
+    if (side !== null && points !== null)
+      score[side] += play['type'] === 'score' ? points : -points;
   }
   return score;
 }
@@ -333,7 +336,10 @@ export async function readGamePage(
     if (type === undefined) continue;
     const side = sideOf(raw['side']);
     const points = pointsOf(raw);
+    // A basket taken back (T-432) is said where the correction was made, and the score from
+    // there on is the corrected one, as the engine's runningScores gives it.
     if (type === 'score' && side !== null && points !== null) runningScore[side] += points;
+    if (type === 'unscore' && side !== null && points !== null) runningScore[side] -= points;
     if (type === 'period' && count(raw['period']) !== null) period = raw['period'] as number;
     const open = side === null || shown[side];
     // A hidden team's substitutions and line-ups say only who played: left out.
@@ -345,7 +351,7 @@ export async function readGamePage(
       side,
       period: count(raw['period']) ?? period,
       clockMs: count(raw['clockMs']),
-      points: type === 'score' ? points : null,
+      points: type === 'score' || type === 'unscore' ? points : null,
       timeoutSeconds: raw['seconds'] === 30 || raw['seconds'] === 60 ? raw['seconds'] : null,
       player: side !== null && open && playerId !== null ? refOf(side, playerId) : null,
       playersIn:

@@ -2,7 +2,7 @@
 // saved state, the box score lines a state gives, and the checks the platform makes on
 // a command before the engine sees it. The engine (packages/sports) is used as it is
 // (T-110); the Al-Hadi tracker's server makes the same player check (apps/live-stats).
-import type { TrackerCommand } from '@srleagues/contracts';
+import { correctionPlaySource, type PlaySource, type TrackerCommand } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import type { GamePlayer, GameRecord, LiveGameLine } from './ports.ts';
 
@@ -35,7 +35,10 @@ export function readState(stored: unknown): basketball.GameState {
  * need a reason and leaves a trace in the activity log, so a game is marked not
  * started through its own command (games.mark_not_started, S-40), not a tap.
  */
-export function platformProblem(input: TrackerInput): string | undefined {
+export function platformProblem(input: TrackerInput, source?: PlaySource): string | undefined {
+  // An earlier basket is taken back by an admin's correction (T-433), never a tap.
+  if (input.type === 'unscore' && source !== correctionPlaySource)
+    return 'A basket is taken back by correcting the game, not a tap.';
   if (input.type === 'rules') return 'The game’s rules come from the league’s settings.';
   if (input.type === 'reopen') return 'A final game is reopened by an admin, with a reason.';
   if (input.type === 'reset') return 'A game is marked not started with its own button, not a tap.';
@@ -59,6 +62,7 @@ export function withLowerIds(input: TrackerInput): TrackerInput {
     case 'sub':
       return { ...input, inId: lower(input.inId), outId: lower(input.outId) };
     case 'score':
+    case 'unscore':
     case 'foul':
     case 'unfoul':
     case 'turnover':
@@ -112,6 +116,7 @@ export function playersNamed(input: TrackerInput): readonly string[] {
     case 'sub':
       return [input.inId, input.outId];
     case 'score':
+    case 'unscore':
     case 'foul':
     case 'unfoul':
     case 'turnover':
@@ -263,8 +268,11 @@ export function changedLines(
   return { lines, removed };
 }
 
-/** Taps that only move the clock: the period picked and the clock mode switched (S-40). */
-const clockOnly: ReadonlySet<string> = new Set(['period', 'clock-mode']);
+/**
+ * Plays that do not make a period played: the period picked and the clock mode switched
+ * (S-40), and a basket's take-back (T-432), which records no play of the game.
+ */
+const notPlayed: ReadonlySet<string> = new Set(['period', 'clock-mode', 'unscore']);
 
 /**
  * How many overtime periods a state's game was played in (P7 §5.6): the latest period past
@@ -273,13 +281,20 @@ const clockOnly: ReadonlySet<string> = new Set(['period', 'clock-mode']);
  * rules; 0 when nothing stands past regulation. Not the period the screen stands on when
  * End is tapped: a game reopened and put right in an earlier period keeps the overtime it
  * was won in, and an overtime picked by mistake with nothing in it counts for nothing.
- * Undone plays are not standing and count for nothing. Read when the tracker ends a game.
+ * Undone plays are not standing and count for nothing; nor do a take-back and the basket
+ * it takes back, which reads as never made (T-432): an overtime whose only play is a basket
+ * taken back counts for nothing, as the engine's score by period has no column for it. The
+ * two do not always agree: an overtime holding a basket taken back and a foul counts 1.
+ * Read when the tracker ends a game.
  */
 export function overtimePeriodsOf(state: basketball.GameState): number {
   const regulation = state.rules.periods;
+  const takenBack = new Set<string>();
+  for (const play of state.plays) if (play.type === 'unscore') takenBack.add(play.playId);
   let latest: number = regulation;
   for (const play of state.plays) {
-    if (!clockOnly.has(play.type) && play.period > latest) latest = play.period;
+    if (notPlayed.has(play.type) || takenBack.has(play.id)) continue;
+    if (play.period > latest) latest = play.period;
   }
   return latest - regulation;
 }

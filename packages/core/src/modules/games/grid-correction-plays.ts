@@ -2,11 +2,11 @@
 // wants (step 2.65, T6 §8, T-122). A grid on a tracked game never writes lines: its
 // edits become the tracker's own commands, so the event log always explains the final
 // numbers. One more foul is a foul, one fewer is the tracker's own take-back (unfoul);
-// turnovers the same; one more basket of 1, 2 or 3 is that basket. The engine has no
-// command that takes back a basket other than the last play (undo), so a grid that
-// lowers a player's baskets cannot be made of commands, and is said so here (T-405):
-// the game is fixed with the tracker's undo, or marked not started and scored again.
-// Minutes are the clock's, never typed. Pure: the command judges and applies the plays.
+// turnovers the same; one more basket of 1, 2 or 3 is that basket. One fewer basket is
+// the engine's take-back of one earlier basket (`unscore`, T-432), naming it by its play
+// ID (step 2.247, T-436): the player's newest standing basket of that value first, so a
+// basket moved from one player to another is a take-back and a new basket. Minutes are
+// the clock's, never typed. Pure: the command judges and applies the plays.
 import type { basketball } from '@srleagues/sports';
 
 /** The counts the grid can change on a tracked game: the tracker's own. */
@@ -34,6 +34,14 @@ export type GridPlay =
       readonly points: 1 | 2 | 3;
     }
   | {
+      /** One earlier basket taken back, named by its own play ID (T-432). */
+      readonly type: 'unscore';
+      readonly side: basketball.Side;
+      readonly playerId: string;
+      readonly points: 1 | 2 | 3;
+      readonly playId: string;
+    }
+  | {
       readonly type: 'foul' | 'unfoul' | 'turnover' | 'unturnover';
       readonly side: basketball.Side;
       readonly playerId: string;
@@ -43,8 +51,9 @@ export type GridPlay =
 export type GridProblem =
   | { readonly problem: 'team-not-in-game'; readonly teamId: string }
   | { readonly problem: 'player-listed-twice'; readonly personId: string }
+  /** Fewer baskets wanted than the player has standing in the plays: cannot be explained. */
   | {
-      readonly problem: 'basket-taken-back';
+      readonly problem: 'basket-not-in-plays';
       readonly personId: string;
       readonly stat: 'fg1' | 'fg2' | 'fg3';
     };
@@ -61,6 +70,30 @@ const keyOf = (teamId: string, personId: string) =>
   `${teamId.toLowerCase()}|${personId.toLowerCase()}`;
 
 /**
+ * The player's standing baskets of `points` (made, not taken back), newest first: the
+ * ones a lower count takes back (T-436). The newest is the likeliest mistake (a correction
+ * is most often of the latest), it lies in the latest period, where the grid's new
+ * baskets are stamped, so the score by period moves least, and it is the one the
+ * scorer's own Undo would have taken.
+ */
+function standingBaskets(
+  plays: readonly basketball.LoggedPlay[],
+  side: basketball.Side,
+  playerId: string,
+  value: 1 | 2 | 3,
+): string[] {
+  const takenBack = new Set<string>();
+  for (const play of plays) if (play.type === 'unscore') takenBack.add(play.playId);
+  const ids: string[] = [];
+  for (const play of plays) {
+    if (play.type !== 'score' || takenBack.has(play.id)) continue;
+    if (play.side !== side || play.points !== value) continue;
+    if (play.playerId.toLowerCase() === playerId) ids.push(play.id);
+  }
+  return ids.reverse();
+}
+
+/**
  * The plays, in order: every take-back first (so a foul moved from one player to another
  * never counts as one too many on the way), then every foul and turnover added, then every
  * basket. Players in the grid's order. Nothing changed gives no plays.
@@ -69,6 +102,8 @@ export function gridCorrectionPlays(
   teams: { readonly homeTeamId: string; readonly awayTeamId: string },
   replayed: readonly ReplayedLine[],
   wanted: readonly WantedLine[],
+  /** The game's plays, so a basket taken back is named by its play ID. */
+  plays: readonly basketball.LoggedPlay[],
 ): GridCorrection {
   const now = new Map(replayed.map((line) => [keyOf(line.teamId, line.personId), line.stats]));
   const problems: GridProblem[] = [];
@@ -105,7 +140,15 @@ export function gridCorrectionPlays(
         const list = change > 0 ? added : takeBacks;
         for (let i = 0; i < Math.abs(change); i += 1) list.push({ type, side, playerId });
       } else if (change < 0) {
-        problems.push({ problem: 'basket-taken-back', personId: line.personId, stat });
+        const value = points[stat];
+        const ids = standingBaskets(plays, side, playerId, value).slice(0, -change);
+        if (ids.length < -change) {
+          problems.push({ problem: 'basket-not-in-plays', personId: line.personId, stat });
+          continue;
+        }
+        for (const playId of ids) {
+          takeBacks.push({ type: 'unscore', side, playerId, points: value, playId });
+        }
       } else {
         for (let i = 0; i < change; i += 1) {
           baskets.push({ type: 'score', side, playerId, points: points[stat] });

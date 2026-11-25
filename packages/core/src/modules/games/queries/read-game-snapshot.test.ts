@@ -194,6 +194,32 @@ describe('readGameSnapshot', () => {
     expect(shot.players.find((p) => p.playerId === homeIds[0])?.points).toBe(5);
   });
 
+  it('gives a basket taken back as the latest play as a take-back, with its points (T-432)', async () => {
+    const basket = { side: 'home', playerId: homeIds[0] ?? '', points: 2 } as const;
+    const scored = basketball.apply(
+      playedState(),
+      { type: 'score', ...basket },
+      { id: 'c9', now: 7000 },
+    );
+    const takenBack = basketball.apply(
+      scored,
+      { type: 'unscore', ...basket, playId: 'c9' },
+      { id: 'c10', now: 8000 },
+    );
+    const hidden = await snapshot(store({ state: takenBack }));
+    expect(hidden.latestPlay).toEqual({
+      type: 'unscore',
+      side: 'home',
+      playerName: null,
+      jersey: null,
+      points: 2,
+    });
+    expect(hidden.players.find((p) => p.playerId === homeIds[0])?.points).toBe(3);
+    const open = await snapshot(store({ state: takenBack, awayVisibility: 'everyone' }));
+    expect(open.latestPlay?.type).toBe('unscore');
+    expect(open.latestPlay?.playerName).toEqual(expect.any(String));
+  });
+
   it("shows the staff-only team's players to the league's admin", async () => {
     const admin = viewing({ leagueId, leagueAdmin: true, staffOfTeamIds: [] });
     const shot = await snapshot(store(), admin);

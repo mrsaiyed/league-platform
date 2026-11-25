@@ -13,8 +13,12 @@
 //   and the device then shows the server's numbers (or says in words why it cannot). Its
 //   Undo takes that tap back; the next Undo, on the correction's foul, asks first (T-408),
 //   (once, for a fast double tap) and "Leave it" keeps the foul on the server.
-// - A lowered basket is refused beside its box, with everything typed kept and nothing
-//   saved; a grid left open while the game changed in a second tab is refused at the top
+// - A basket moved from one player to another is a take-back and a basket (step 2.247):
+//   3 points, then 2 (the saved sentence names the basket taken back; the grid's lines and
+//   both totals); the scoring screen's Undo afterwards takes back its own tap alone; the
+//   public page reads each take-back as one, with the grid's totals; a move within a team
+//   leaves the standings, and a take-back that changes the winner changes them back;
+//   a grid left open while the game changed in a second tab is refused at the top
 //   with "Load it again", everything typed kept, and the second tab's change alone saved.
 // - The owner ends it again from the grid ("End the game again", T-407) while a device
 //   still holds it: the game's page says it is final, the device is told in plain words at
@@ -59,8 +63,6 @@ const words = {
   endAgain: 'End the game again',
   deviceTold: 'This game cannot be scored now: it is over, cancelled or postponed.',
   saved: 'Saved. These plays were added to the game’s list of plays:',
-  lowered: (cell) =>
-    `${cell} cannot go lower here. To take points away, reopen the game on the scoring screen and use Undo. Nothing was saved.`,
   stale:
     'Someone else changed this game since you opened this page, so nothing was saved. Load it again to see the new numbers; what you typed is still shown below.',
 };
@@ -175,6 +177,73 @@ async function boxOf(page, jersey, column) {
     );
   }
   return { ...box, heading: row.heading, input: page.locator(`input[name="${box.name}"]`) };
+}
+
+/**
+ * Home's number `jersey`'s box for one count, found by the box's own name
+ * (`grid-{person}-{count}`, e.g. `fg2`), with its row's heading and points.
+ */
+async function countBox(page, jersey, count) {
+  const rows = await homeRows(page);
+  const row = rows.find((r) => r.jersey === String(jersey));
+  const box = Object.values(row?.boxes ?? {}).find((b) => b.name.endsWith(`-${count}`));
+  if (box === undefined) throw new Error(`no ${count} box for #${jersey}`);
+  return {
+    ...box,
+    heading: row.heading,
+    points: row.points,
+    input: page.locator(`input[name="${box.name}"]`),
+  };
+}
+
+/** Each team's points in the grid, `[away, home]`: the sum of its rows' Points. */
+async function teamTotals(page) {
+  const totals = [];
+  for (const name of await teamsOf(page)) {
+    const section = gridOf(page).locator('section', {
+      has: page.getByRole('heading', { name, exact: true }),
+    });
+    totals.push(
+      await section
+        .locator('tbody tr')
+        .evaluateAll((rows) =>
+          rows.reduce(
+            (sum, row) => sum + Number(row.querySelectorAll('td')[1]?.textContent ?? 'NaN'),
+            0,
+          ),
+        ),
+    );
+  }
+  return totals;
+}
+
+/** The away team's first row's 3-pointers box in the grid, found by its own name. */
+async function awayFirstThrees(page) {
+  const home = await homeName(page);
+  const name = await gridOf(page)
+    .locator('section', { hasNot: page.getByRole('heading', { name: home, exact: true }) })
+    .locator('tbody tr')
+    .first()
+    .evaluate((row) => row.querySelector('input[name$="-fg3"]')?.name ?? '');
+  if (name === '') throw new Error('no 3-pointers box in away’s first row');
+  return page.locator(`input[name="${name}"]`);
+}
+
+/** The public game page read signed out: its play lines' words and the board's `[away, home]`. */
+async function publicPlays() {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(pageLimit);
+    await open(page, `/${league}/games/${liveGame}`);
+    const plays = (
+      await page.locator('table.ui-plays tbody tr td:nth-child(2)').allTextContents()
+    ).map((text) => text.trim());
+    const scores = (await page.locator('.ui-scoreboard-score').allTextContents()).map(Number);
+    return { plays, scores };
+  } finally {
+    await context.close();
+  }
 }
 
 /** The public game page's box scores: each team's played lines with points or fouls, by jersey. */
@@ -496,31 +565,159 @@ try {
   );
   await device.context.close();
 
-  await step('a lowered basket is refused beside its box, everything typed kept', async () => {
-    await open(page, gridPage);
-    const before = (await serverPlays()).length;
-    const three = await boxOf(page, 9, '3-pointers made');
-    const foul = await boxOf(page, 11, 'Fouls');
-    note('number 9 has one 3-point basket', three.value === '1', three.value);
-    await three.input.fill('0');
-    await foul.input.fill('2');
-    await page.getByRole('button', { name: words.save }).click();
-    const beside = page.locator(
-      `td:has(input[name="${three.name}"]) [data-grid-problem="basket-taken-back"]`,
-    );
-    await beside.waitFor({ timeout: pageLimit });
-    note(
-      'the sentence is beside the lowered box',
-      (await beside.textContent()) === words.lowered(three.label),
-      (await beside.textContent()) ?? '',
-    );
-    note('the lowered box is marked', (await three.input.getAttribute('aria-invalid')) === 'true');
-    note(
-      'every box still holds what was typed',
-      (await three.input.inputValue()) === '0' && (await foul.input.inputValue()) === '2',
-    );
-    note('nothing was saved', (await serverPlays()).length === before);
-  });
+  // Step 2.247 (T-436): points moved from one player to another are a take-back of the
+  // first player's newest basket of that value and a new basket for the other.
+  await step(
+    'a 3-point basket moved from number 9 to number 11 is a take-back and a basket',
+    async () => {
+      await open(page, gridPage);
+      const before = await serverPlays();
+      const three = await boxOf(page, 9, '3-pointers made');
+      const theirs = await boxOf(page, 11, '3-pointers made');
+      note('number 9 has one 3-point basket', three.value === '1', three.value);
+      const basket = before.findLast((p) => p.type === 'score' && p.points === 3);
+      await three.input.fill('0');
+      await theirs.input.fill(String(Number(theirs.value) + 1));
+      await page.getByRole('button', { name: words.save }).click();
+      await page.locator('[data-grid-saved]').waitFor({ timeout: pageLimit });
+      const after = await serverPlays();
+      const [takeBack, added] = after.slice(before.length);
+      note(
+        'the event log holds the take-back of that basket, then the new basket',
+        after.length === before.length + 2 &&
+          takeBack?.type === 'unscore' &&
+          takeBack.playId === basket?.id &&
+          takeBack.points === 3 &&
+          added?.type === 'score' &&
+          added.points === 3 &&
+          added.playerId !== basket?.playerId,
+        JSON.stringify([takeBack, added]),
+      );
+      await open(page, gridPage);
+      const nine = await boxOf(page, 9, '3-pointers made');
+      const eleven = await boxOf(page, 11, '3-pointers made');
+      note(
+        'the grid read again gives the moved basket',
+        nine.value === '0' && eleven.value === String(Number(theirs.value) + 1),
+        `${nine.value} ${eleven.value}`,
+      );
+    },
+  );
+
+  // Step 2.247: two points moved within home, from number 5 to number 7.
+  let gridTotals = [];
+  await step(
+    'two points moved from number 5 to number 7 are a take-back and a basket',
+    async () => {
+      await open(page, gridPage);
+      const before = await serverPlays();
+      const totals = await teamTotals(page);
+      const five = await countBox(page, 5, 'fg2');
+      const seven = await countBox(page, 7, 'fg2');
+      note(
+        'number 5 has one 2-point basket and number 7 none',
+        five.value === '1' && seven.value === '0',
+        JSON.stringify([five.value, seven.value]),
+      );
+      const basket = before.findLast(
+        (p) => p.type === 'score' && p.points === 2 && p.playerId === ids[5],
+      );
+      await five.input.fill('0');
+      await seven.input.fill('1');
+      await page.getByRole('button', { name: words.save }).click();
+      const saved = page.locator('[data-grid-saved]');
+      await saved.waitFor({ timeout: pageLimit });
+      const sentences = await saved.locator('li').allTextContents();
+      // The game never left period 1, so the basket taken back was made there.
+      note(
+        'the saved sentences name the basket taken back, then the new one',
+        JSON.stringify(sentences) ===
+          JSON.stringify([
+            `Took back a 2-point basket of ${five.heading}, the one made in period 1.`,
+            `Added a 2-point basket for ${seven.heading}.`,
+          ]),
+        JSON.stringify(sentences),
+      );
+      const [takeBack, added, ...more] = (await serverPlays()).slice(before.length);
+      note(
+        'the event log holds the take-back of number 5’s basket, then number 7’s new one',
+        more.length === 0 &&
+          takeBack?.type === 'unscore' &&
+          takeBack.playId === basket?.id &&
+          takeBack.playerId === ids[5] &&
+          takeBack.points === 2 &&
+          added?.type === 'score' &&
+          added.points === 2 &&
+          added.playerId === ids[7],
+        JSON.stringify({ takeBack, added, more, basket }),
+      );
+      await open(page, gridPage);
+      const lines = [await countBox(page, 5, 'fg2'), await countBox(page, 7, 'fg2')].map((b) => [
+        b.value,
+        b.points,
+      ]);
+      note(
+        'the grid read again gives number 5 no basket and number 7 the 2 points',
+        JSON.stringify(lines) === '[["0","0"],["1","2"]]',
+        JSON.stringify(lines),
+      );
+      gridTotals = await teamTotals(page);
+      note(
+        'both teams’ totals are as before the move, home 6 and away 0',
+        JSON.stringify(gridTotals) === JSON.stringify(totals) &&
+          JSON.stringify(gridTotals) === '[0,6]',
+        JSON.stringify({ totals, gridTotals }),
+      );
+    },
+  );
+
+  await step(
+    'on the scoring screen, Undo takes the last play back and never brings back the basket taken back',
+    async () => {
+      const holder = await signedIn(scorekeeper);
+      try {
+        await open(holder.page, trackerPath());
+        const h = court(holder.page);
+        await h.open();
+        const before = await serverPlays();
+        await h.play('home', 5, 'p2');
+        await h.saved();
+        const scored = await serverPlays();
+        note(
+          'number 5’s new basket is saved',
+          scored.length === before.length + 1 &&
+            scored.at(-1)?.type === 'score' &&
+            scored.at(-1)?.playerId === ids[5],
+          JSON.stringify(scored.slice(before.length)),
+        );
+        await h.undo();
+        await h.saved();
+        const undone = await serverPlays();
+        note(
+          'Undo took that basket back alone: the plays are as the grid left them',
+          JSON.stringify(undone) === JSON.stringify(before),
+          JSON.stringify(undone.slice(-3)),
+        );
+        // [number 5's points, number 7's points, home's score]: no basket of 5 comes back.
+        const want = JSON.stringify([0, 2, gridTotals[1]]);
+        const shown = async () =>
+          JSON.stringify([
+            await h.points('home', 5),
+            await h.points('home', 7),
+            (await h.score()).home,
+          ]);
+        const limit = Date.now() + tapLimit;
+        let seen = await shown();
+        while (seen !== want && Date.now() < limit) {
+          await holder.page.waitForTimeout(250);
+          seen = await shown();
+        }
+        note('the device shows number 5 with no points and the grid’s score', seen === want, seen);
+      } finally {
+        await holder.context.close();
+      }
+    },
+  );
 
   await step('a grid left open while the game changed is refused, everything kept', async () => {
     await open(page, gridPage);
@@ -673,6 +870,26 @@ try {
     }
   });
 
+  await step(
+    'the public game page reads each take-back as one, with the grid’s totals',
+    async () => {
+      const { plays, scores } = await publicPlays();
+      const takenBack = plays.filter((text) => text.includes('Basket taken back:'));
+      note(
+        'the play list reads the 3-point and the 2-point take-backs as take-backs',
+        takenBack.length === 2 &&
+          takenBack.some((text) => text.includes('3 points for')) &&
+          takenBack.some((text) => text.includes('2 points for')),
+        JSON.stringify(plays),
+      );
+      note(
+        'the public score is the grid’s totals',
+        JSON.stringify(scores) === JSON.stringify(gridTotals),
+        JSON.stringify({ scores, gridTotals }),
+      );
+    },
+  );
+
   await step('ended again with no change, the standings are as they were', async () => {
     await reopenAgain('Checked the score again');
     await endAgainIn('[data-end-again]');
@@ -684,27 +901,40 @@ try {
     );
   });
 
+  await step('a basket moved within a team leaves the standings as they were', async () => {
+    await reopenAgain('A basket was given to the wrong player');
+    await open(page, gridPage);
+    const before = (await serverPlays()).length;
+    await (await countBox(page, 7, 'fg2')).input.fill('0');
+    await (await countBox(page, 5, 'fg2')).input.fill('1');
+    await page.getByRole('button', { name: words.save }).click();
+    await page.locator('[data-grid-saved]').waitFor({ timeout: pageLimit });
+    const added = (await serverPlays()).slice(before).map((p) => p.type);
+    note(
+      'the move was a take-back and a basket',
+      JSON.stringify(added) === '["unscore","score"]',
+      JSON.stringify(added),
+    );
+    await endAgainIn('[data-end-again]');
+    const again = await standingsRows(teams);
+    note(
+      'the two teams’ rows are unchanged',
+      JSON.stringify(again) === JSON.stringify(counted),
+      JSON.stringify({ counted, again }),
+    );
+  });
+
+  let awayWon = {};
   await step('a basket that changes the winner changes the standings', async () => {
     await reopenAgain('An away 3-pointer was missed');
     await open(page, gridPage);
-    const home = await homeName(page);
     // The away team's first row, its 3-pointers box: three of them make away the winner.
-    const name = await gridOf(page)
-      .locator('section', { hasNot: page.getByRole('heading', { name: home, exact: true }) })
-      .locator('tbody tr')
-      .first()
-      .evaluate((row, column) => {
-        const columns = [...row.closest('table').querySelectorAll('thead abbr')].map(
-          (a) => a.title,
-        );
-        const cell = [...row.querySelectorAll('td')].find((_, index) => columns[index] === column);
-        return cell?.querySelector('input')?.name ?? '';
-      }, '3-pointers made');
-    await page.locator(`input[name="${name}"]`).fill('3');
+    await (await awayFirstThrees(page)).fill('3');
     await page.getByRole('button', { name: words.save }).click();
     await page.locator('[data-grid-saved]').waitFor({ timeout: pageLimit });
     await endAgainIn('[data-end-again]');
     const after = await standingsRows(teams);
+    awayWon = after;
     // Away won instead: a win and nine points more for away, a loss more for home.
     const [awayMoved, homeMoved] = moved(teams, counted, after);
     note(
@@ -721,6 +951,40 @@ try {
       'the public page says Final and Corrected on, as the result changed',
       shown.includes('Final') && shown.includes('Corrected on'),
       shown.slice(0, 300),
+    );
+  });
+
+  // Step 2.247: a take-back can change the winner too. Away's three 3-pointers become one,
+  // so home (6) beats away (3) again: the standings follow it back.
+  await step('a take-back that changes the winner changes the standings back', async () => {
+    await reopenAgain('Two away 3-pointers were counted twice');
+    await open(page, gridPage);
+    const before = (await serverPlays()).length;
+    await (await awayFirstThrees(page)).fill('1');
+    await page.getByRole('button', { name: words.save }).click();
+    await page.locator('[data-grid-saved]').waitFor({ timeout: pageLimit });
+    const added = (await serverPlays()).slice(before).map((p) => [p.type, p.points]);
+    note(
+      'two 3-point baskets of away were taken back, and nothing added',
+      JSON.stringify(added) ===
+        JSON.stringify([
+          ['unscore', 3],
+          ['unscore', 3],
+        ]),
+      JSON.stringify(added),
+    );
+    await endAgainIn('[data-end-again]');
+    const back = await standingsRows(teams);
+    // Home won again: a win more and six points less against for home, a loss more and six
+    // points less for away.
+    const [awayMoved, homeMoved] = moved(teams, awayWon, back);
+    note(
+      'the two teams’ rows follow the winner back',
+      JSON.stringify(awayMoved) ===
+        JSON.stringify([-1, 1, ...(back[teams[0]].for === null ? [null, null] : [-6, 0])]) &&
+        JSON.stringify(homeMoved) ===
+          JSON.stringify([1, -1, ...(back[teams[1]].for === null ? [null, null] : [0, -6])]),
+      JSON.stringify({ teams, awayWon, back }),
     );
   });
 

@@ -167,3 +167,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.155 part 5: the bin keeps one notice per person and league, so two tabs used at the same moment can show one tab the other's answer; a name ending in ! or ? reads with a full stop after it; no test makes restore_binned_person refuse with profile-taken in a browser.
 
 - 2.245: the season settings' own sentence reads 'the last 1 minutes' for a 60-second stop clock; the browser test tracks no game in a season started with the team-fouls question left alone; any later change to the league-removal guard must start from migration 0030, not 0020.
+
+- 2.247: the grid's 2-point column is headed with the raw key fg2 (statLabel has no words for it); nothing warns an admin before a grid save that changes a final game's winner; a basket the grid adds is not marked as a correction in the public play list; the import replay's player mapping does not name unscore.

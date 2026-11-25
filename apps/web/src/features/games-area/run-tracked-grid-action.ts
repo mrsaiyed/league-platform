@@ -1,12 +1,10 @@
 // A tracked game's "edit box score" grid saved (step 2.65, T6 §8, T-122): the form read
-// against the grid as it was drawn (the read's `sequence` handed back), the plays it makes
-// worked out by core's own rule (gridCorrectionPlays, as the command does, so the
-// sentences said after the save are the plays in the log), and the command run. A
+// against the grid as it was drawn (the read's `sequence` handed back) and the command run;
+// the sentences said after the save are the plays the command wrote to the log. A
 // refusal names the box it is about when it is about one.
 import {
   correctTrackedBoxScore,
   getBoxScoreSheet,
-  gridCorrectionPlays,
   readTrackedBoxScore,
   type CommandContext,
   type CommandDeps,
@@ -16,7 +14,6 @@ import {
 import type { TypedFields } from './form-state.ts';
 import {
   readTrackedGrid,
-  replayedOf,
   trackedGridColumns,
   trackedGridField,
   type TrackedGridCount,
@@ -62,19 +59,18 @@ export async function runTrackedGridAction(
       wrong: typed.wrong,
     };
   }
-  const made = gridCorrectionPlays(sheet.value.game, replayedOf(read.value.lines), typed.lines);
   const saved = await correctTrackedBoxScore(
     context,
     { gameId, sequence, lines: typed.lines },
     deps,
   );
-  if (saved.ok) return { ok: true, plays: made.ok ? made.plays : [] };
+  if (saved.ok) return { ok: true, plays: saved.value.written };
   const error = saved.error;
   if (error.code === 'changed-since-read' || error.code === 'too-many-plays') {
     return { ok: false, code: error.code };
   }
-  if (error.code === 'rule' && error.problem === 'basket-taken-back') {
-    return about('basket-taken-back', error.personId, error.stat);
+  if (error.code === 'rule' && error.problem === 'basket-not-in-plays') {
+    return about('basket-not-in-plays', error.personId, error.stat);
   }
   if (error.code === 'rule') return about('engine', error.personId);
   if (error.code === 'player-not-on-team') return about(error.code, error.personId);

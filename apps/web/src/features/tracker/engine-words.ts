@@ -36,6 +36,11 @@ const refusals: Readonly<Record<string, RefusalKey>> = {
   'This team already has players on the floor. Use substitutions.':
     'tracker.refusal.lineupAlreadySet',
   'A basket is 1, 2 or 3 points.': 'tracker.refusal.badPoints',
+  'Pick the basket to take back.': 'tracker.refusal.pickBasket',
+  'That basket is not in this game.': 'tracker.refusal.basketNotInGame',
+  'That play is not a basket.': 'tracker.refusal.notABasket',
+  'That basket is already taken back.': 'tracker.refusal.basketAlreadyTakenBack',
+  'That basket was not made by that player for those points.': 'tracker.refusal.basketNotTheirs',
   'Pick a player.': 'tracker.refusal.pickPlayer',
   'That player has no foul to take back.': 'tracker.refusal.noFoulToTakeBack',
   'That player has no turnover to take back.': 'tracker.refusal.noTurnoverToTakeBack',
@@ -93,6 +98,7 @@ export const playKeys = {
   score: 'tracker.play.score',
   foul: 'tracker.play.foul',
   unfoul: 'tracker.play.unfoul',
+  unscore: 'tracker.play.unscore',
   turnover: 'tracker.play.turnover',
   unturnover: 'tracker.play.unturnover',
   'team-turnover': 'tracker.play.team-turnover',
@@ -171,6 +177,8 @@ export function playShortText(
   switch (play.type) {
     case 'score':
       return t('tracker.play.short.score', { who: who(play.playerId), points: play.points });
+    case 'unscore':
+      return t('tracker.play.short.unscore', { who: who(play.playerId), points: play.points });
     case 'foul':
     case 'unfoul':
     case 'turnover':
@@ -204,6 +212,8 @@ export function playText(
   switch (play.type) {
     case 'score':
       return t(playKeys.score, { player: player(play.playerId), points: play.points });
+    case 'unscore':
+      return t(playKeys.unscore, { player: player(play.playerId), points: play.points });
     case 'foul':
     case 'unfoul':
     case 'turnover':
