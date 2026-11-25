@@ -2447,7 +2447,6 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
     'period'
-    'mode'
     'time'
     'keys'
     'set';
@@ -2465,16 +2464,22 @@
 .court-clock-part[data-part='time'] {
   grid-area: time;
 }
-/* The running-clock switch (step 2.69): one row, its word on one side and On or Off on
-   the other. On is gold (what is picked now); Off is the quiet grey. */
-.court-clock-part[data-part='mode'] {
-  grid-area: mode;
+/* The running-clock switch (step 2.69), beside the form's title: its word small over On
+   or Off, so the first row holds the title, the switch and the close button on a phone.
+   On is gold (what is picked now); Off is the quiet grey. */
+.court-clock-sheet .court-sheet-head h2 {
+  flex: 1 1 auto;
+  min-inline-size: 0;
 }
 .court-opt.court-clock-mode {
-  flex-direction: row;
-  justify-content: space-between;
-  gap: var(--court-gap);
-  padding-inline: 12px;
+  flex: none;
+  gap: 0;
+  padding-inline: 10px;
+}
+.court-clock-mode-word {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 .court-clock-mode[aria-checked='true'] {
   border-color: var(--court-gold);
@@ -3495,10 +3500,9 @@
   }
   .court-clock-parts {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     grid-template-areas:
       'period keys'
-      'mode keys'
       'time keys'
       'set keys';
     column-gap: 16px;

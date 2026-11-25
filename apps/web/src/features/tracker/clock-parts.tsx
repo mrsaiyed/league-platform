@@ -703,6 +703,7 @@ export function ClockSheetView(props: {
       >
         <div className="court-sheet-head">
           <h2 id="court-clock-title">{t('tracker.clockSheet.title')}</h2>
+          <ClockModeSwitch t={t} mode={clock.mode} on={on} />
           <button
             type="button"
             className="court-close"
@@ -755,7 +756,6 @@ export function ClockSheetView(props: {
             </div>
             <p className="court-quiet court-clock-help">{t('tracker.clockSheet.periodHelp')}</p>
           </section>
-          <ClockModePart t={t} mode={clock.mode} on={on} />
           <section className="court-clock-part" data-part="time" aria-labelledby="court-time-title">
             <h3 className="court-label" id="court-time-title">
               {t('tracker.clockSheet.time')}
@@ -825,9 +825,11 @@ export function ClockSheetView(props: {
 /**
  * The running-clock switch (step 2.69; P7 section 5.2, S-21): on or off at any moment of
  * the game, whatever the season's rule says. It shows the mode in force, so inside the
- * last-minutes stop clock it reads Off and a tap keeps the clock running there.
+ * last-minutes stop clock it reads Off and a tap keeps the clock running there. It sits
+ * in the form's first row, beside its title, where it takes no height: the form is whole
+ * on a phone's screen with nothing scrolling (DESIGN.md section 7, line 8).
  */
-function ClockModePart(props: {
+function ClockModeSwitch(props: {
   readonly t: Translate;
   readonly mode: ClockModeShown;
   readonly on: Pick<ClockHandlers, 'switchClock'>;
@@ -835,21 +837,22 @@ function ClockModePart(props: {
   const { t, mode } = props;
   const running = mode.now === 'running';
   return (
-    <section className="court-clock-part" data-part="mode">
+    <>
       <button
         type="button"
         role="switch"
         className="court-opt court-clock-mode"
         data-clock-switch=""
         aria-checked={running}
+        aria-describedby="court-clock-mode-help"
         onClick={props.on.switchClock}
       >
-        <span className="court-opt-word">{t('tracker.clockMode.label')}</span>
+        <span className="court-clock-mode-word">{t('tracker.clockMode.label')}</span>
         <span className="court-clock-mode-state" data-on={running ? '' : undefined}>
           {t(running ? 'tracker.clockMode.on' : 'tracker.clockMode.off')}
         </span>
       </button>
-      <p className="court-quiet court-clock-help" data-clock-mode-help="">
+      <p className="court-sr" id="court-clock-mode-help" data-clock-mode-help="">
         {t(
           running
             ? 'tracker.clockMode.helpRunning'
@@ -858,7 +861,7 @@ function ClockModePart(props: {
               : 'tracker.clockMode.helpStop',
         )}
       </p>
-    </section>
+    </>
   );
 }
 
