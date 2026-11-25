@@ -215,7 +215,10 @@ describe('giving one game its own format (step 2.119)', () => {
 
   it('refuses a format that does not hold together', async () => {
     const t = setUp();
-    const wrong = { ...quarters, clock: { ...quarters.clock, stopClockLastSeconds: 60 } };
+    // Last minutes longer than a period (a stop clock beside them holds together since
+    // step 2.248, S-113).
+    const longer = quarters.gameFormat.periodSeconds + 60;
+    const wrong = { ...quarters, clock: { ...quarters.clock, stopClockLastSeconds: longer } };
     const result = await give(t, schedulerId, wrong);
     expect(result.ok).toBe(false);
     expect(t.db.state.givenFormats).toEqual({});

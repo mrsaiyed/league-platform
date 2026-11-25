@@ -60,15 +60,42 @@ describe('withGameRuleAnswers', () => {
     }
   });
 
-  it('clears a copied last-minutes stop clock when a stop clock is chosen (T-428)', () => {
+  it('keeps a copied last-minutes stop clock with either clock (step 2.248, S-113, S-123)', () => {
     const base: SeasonRules = {
       ...defaultSeasonRules(),
-      clock: { mode: 'running', stopClockLastSeconds: 120, mercyLead: null },
+      clock: {
+        mode: 'running',
+        stopClockLastSeconds: 120,
+        stopClockScope: 'game',
+        mercyLead: null,
+      },
     };
+    expect(rulesOf(withGameRuleAnswers(base, { clockMode: 'stop', mercyLead: 12 })).clock).toEqual({
+      mode: 'stop',
+      stopClockLastSeconds: 120,
+      stopClockScope: 'game',
+      mercyLead: 12,
+    });
     expect(
       rulesOf(withGameRuleAnswers(base, { clockMode: 'stop' })).clock.stopClockLastSeconds,
-    ).toBeNull();
+    ).toBe(120);
     expect(rulesOf(withGameRuleAnswers(base, {})).clock.stopClockLastSeconds).toBe(120);
+  });
+
+  it('keeps a copied pair, a mercy lead beside the last minutes, left alone or answered again', () => {
+    const pair: SeasonRules = {
+      ...defaultSeasonRules(),
+      clock: { mode: 'stop', stopClockLastSeconds: 60, mercyLead: 15 },
+    };
+    expect(rulesOf(withGameRuleAnswers(pair, {})).clock).toEqual(pair.clock);
+    expect(rulesOf(withGameRuleAnswers(pair, { clockMode: 'stop', mercyLead: 15 })).clock).toEqual(
+      pair.clock,
+    );
+    // A running clock answered with the copied lead is still refused, at the mercy question.
+    expect(withGameRuleAnswers(pair, { clockMode: 'running' })).toMatchObject({
+      ok: false,
+      question: 'mercyLead',
+    });
   });
 
   describe('when team fouls start again (after step 2.123, T-422)', () => {

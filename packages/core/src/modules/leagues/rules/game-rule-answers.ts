@@ -2,8 +2,9 @@
 // S-106): each question is one rule of the season's rules document, with the answer an
 // admin may leave alone. The answers are put into a whole rules document and checked by
 // the settings' own contract (`SeasonRules`), so these questions hold no second copy of
-// the rules' limits: what the season's settings refuse, these refuse too (S-113: a
-// mercy lead with a running clock, until step 2.248).
+// the rules' limits: what the season's settings refuse, these refuse too (a mercy lead
+// with a running clock). A copied last-minutes stop clock is kept whatever clock is
+// answered (S-113, S-123: it stands beside either clock since step 2.248).
 //
 // One more question is one more entry in `gameRuleQuestions`, one more field in
 // `gameRuleAnswers` and one more line in `withGameRuleAnswers`. The third, when team
@@ -61,10 +62,9 @@ export type GameRuleRefusal = {
 };
 
 /**
- * The rules document with the answers in it, checked whole. A stop clock has no
- * last-minutes stop clock (the contract refuses the pair, and no screen of this step
- * asks it), so answering "stop clock" clears one copied from a running-clock season
- * (T-428). A refusal names the question it is about.
+ * The rules document with the answers in it, checked whole; what is not asked, such as a
+ * last-minutes stop clock, is kept as the base has it (T-428, narrowed by step 2.248). A
+ * refusal names the question it is about.
  */
 export function withGameRuleAnswers(
   base: SeasonRules,
@@ -75,7 +75,6 @@ export function withGameRuleAnswers(
     ...base.clock,
     mode,
     mercyLead: answers.mercyLead === undefined ? base.clock.mercyLead : answers.mercyLead,
-    stopClockLastSeconds: answers.clockMode === 'stop' ? null : base.clock.stopClockLastSeconds,
   };
   const reset = answers.teamFoulsReset;
   const fouls =

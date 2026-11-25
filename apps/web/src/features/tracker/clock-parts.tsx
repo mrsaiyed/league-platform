@@ -874,7 +874,9 @@ function ClockModeSwitch(props: {
 
 /**
  * The mercy rule switched the clock to running (step 2.69): a plain sentence, and the way
- * back in one tap. Kept until it is dismissed or the clock is switched by hand. It comes
+ * back in one tap. Kept until it is dismissed or the clock is switched by hand. Inside the
+ * last minutes (step 2.248) it says the clock stops there and offers only "Got it": the
+ * engine would refuse the way back, the stop clock being in force already. It comes
  * up as a basket is taken, under the finger that took it, so its answers rest for a moment
  * (the screen marks them `data-resting`) and it is drawn in the pad at rest at every size,
  * where it moves nothing (the step's fix round).
@@ -888,19 +890,62 @@ export function MercyNotice(props: {
   const { t } = props;
   return (
     <div className="court-notice court-mercy" role="status" data-mercy-notice="">
-      <p>{t('tracker.mercy.said', { lead: props.mercy.lead })}</p>
+      {props.mercy.lastMinutes ? (
+        <>
+          <p data-mercy-last-minutes="">
+            {t('tracker.mercy.saidLastMinutes', { lead: props.mercy.lead })}
+          </p>
+          <div className="court-mercy-acts">
+            <button type="button" className="court-button" data-mercy-keep="" onClick={props.keep}>
+              {t('tracker.mercy.seen')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p>{t('tracker.mercy.said', { lead: props.mercy.lead })}</p>
+          <div className="court-mercy-acts">
+            <button
+              type="button"
+              className="court-button"
+              data-kind="main"
+              data-mercy-back=""
+              onClick={props.back}
+            >
+              {t('tracker.mercy.back')}
+            </button>
+            <button type="button" className="court-button" data-mercy-keep="" onClick={props.keep}>
+              {t('tracker.mercy.keep')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The scorer turned the running clock On and then Off inside the last minutes (S-124): the
+ * clock now stops on fouls for the rest of the game (the engine has no switch that ends
+ * with them until step 2.252), so the screen says so, in the mercy notice's own place and
+ * pattern, while that holds. One answer dismisses it; it comes back if it happens again.
+ */
+export function LastMinutesStopNotice(props: {
+  readonly t: Translate;
+  readonly seen: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const { t } = props;
+  return (
+    <div className="court-notice court-mercy" role="status" data-last-minutes-stop="">
+      <p>{t('tracker.clockMode.stopForGame')}</p>
       <div className="court-mercy-acts">
         <button
           type="button"
           className="court-button"
-          data-kind="main"
-          data-mercy-back=""
-          onClick={props.back}
+          data-last-minutes-stop-seen=""
+          onClick={props.seen}
         >
-          {t('tracker.mercy.back')}
-        </button>
-        <button type="button" className="court-button" data-mercy-keep="" onClick={props.keep}>
-          {t('tracker.mercy.keep')}
+          {t('tracker.mercy.seen')}
         </button>
       </div>
     </div>

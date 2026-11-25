@@ -158,7 +158,7 @@ async function askToMake(plan, hosted, place) {
 async function askForMissing() {
   for (const field of Object.keys(words.questions)) {
     if (answers[field] !== undefined && answers[field].trim() !== '') continue;
-    // A mercy rule only applies to a stop clock (S-113): not asked under a running one.
+    // A mercy rule only applies to a stop clock (T-439): not asked under a running one.
     if (field === 'mercyLead' && answers.clock?.trim().toLowerCase() === 'running') continue;
     const fallback = defaults[field]?.();
     if (prompt === null) {

@@ -148,7 +148,7 @@ describe('season rules presets', () => {
     };
     const edge = (key: string, value: number | null, expected: boolean) => {
       const doc = structuredClone(defaultSeasonRules());
-      // The document keeps the stop clock to a running clock and the mercy rule to a stop one.
+      // The document keeps the mercy rule to a stop clock.
       if (key === 'stopClockLastSeconds') doc.clock.stopClockLastSeconds = value;
       if (key === 'mercyLead') doc.clock = { ...doc.clock, mode: 'stop', mercyLead: value };
       if (key === 'playerFoulLimit') doc.fouls.playerFoulLimit = value;
@@ -234,7 +234,7 @@ describe('season rules limits', () => {
     expect(accepts((r) => (r.clock.mercyLead = 30))).toBe(false);
   });
 
-  it('keeps the stop-clock extra to a running clock, within a period, with a scope', () => {
+  it('keeps the last-minutes stop clock within a period, with a scope', () => {
     expect(
       accepts((r) => {
         r.clock.stopClockLastSeconds = 120;
@@ -249,13 +249,31 @@ describe('season rules limits', () => {
         r.clock.stopClockLastSeconds = 301;
       }),
     ).toBe(false);
-    expect(
-      accepts((r) => {
-        r.clock.mode = 'stop';
-        r.clock.stopClockLastSeconds = 120;
-      }),
-    ).toBe(false);
     expect(accepts((r) => (r.clock.stopClockScope = 'quarter' as 'half'))).toBe(false);
+  });
+
+  it('lets a stop clock have the last minutes too, with a mercy rule or without (S-113, S-123)', () => {
+    const pair = {
+      mode: 'stop',
+      stopClockLastSeconds: 120,
+      stopClockScope: 'game',
+      mercyLead: 15,
+    } as const;
+    expect(accepts((r) => (r.clock = { ...pair, mode: 'stop' }))).toBe(true);
+    expect(accepts((r) => (r.clock = { ...pair, mode: 'stop', mercyLead: null }))).toBe(true);
+    // What the engine cannot follow is still refused, in plain words.
+    const refusal = (clock: SeasonRules['clock'], periodSeconds = 480) =>
+      SeasonRules.safeParse({
+        ...defaultSeasonRules(),
+        gameFormat: { ...defaultSeasonRules().gameFormat, periodSeconds },
+        clock,
+      }).error?.issues.map((i) => i.message);
+    expect(refusal({ ...pair, mode: 'running' })).toEqual([
+      'A mercy rule only applies to a stop clock.',
+    ]);
+    expect(refusal({ ...pair, mode: 'stop', stopClockLastSeconds: 481 })).toEqual([
+      'The stop-clock time cannot be longer than a period.',
+    ]);
   });
 
   it('accepts a mercy rule on a stop clock', () => {

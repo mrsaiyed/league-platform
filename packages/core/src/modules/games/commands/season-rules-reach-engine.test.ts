@@ -305,6 +305,92 @@ describe('the last-minutes stop clock reaches the engine (step 2.122, S-28)', ()
   });
 });
 
+describe('a mercy lead and a last-minutes stop clock together reach the engine (step 2.248, S-113)', () => {
+  const both = seasonRules((r) => {
+    r.clock = { mode: 'stop', stopClockLastSeconds: 60, stopClockScope: 'half', mercyLead: 6 };
+  });
+  const three: Input = { type: 'score', side: 'home', playerId: scorer, points: 3 };
+  const stopped = (t: ReturnType<typeof setUp>) => ({
+    running: savedState(t).clock.running,
+    stoppedClock: savedState(t).plays.at(-1)?.stoppedClock ?? false,
+    inForce: basketball.clockModeAt(savedState(t)),
+  });
+  const accepted = (n: number) => Array<string>(n).fill('accepted');
+
+  it('stop clock before the mercy line, running after it, stop clock in the last minutes, running again after them', async () => {
+    const t = setUp(both);
+    expect(savedState(t)).toBeUndefined();
+    // Before the mercy line: a foul stops the clock.
+    expect(await send(t, [...tipOff, { type: 'start' }, three, foul])).toEqual(accepted(5));
+    expect(stopped(t)).toEqual({ running: false, stoppedClock: true, inForce: 'stop' });
+    // The basket that reaches the lead runs the clock: a foul leaves it running.
+    expect(await send(t, [{ type: 'start' }, three, foul])).toEqual(accepted(3));
+    expect(savedState(t).plays.at(-2)).toMatchObject({ type: 'score', mercyClock: true });
+    expect(stopped(t)).toEqual({ running: true, stoppedClock: false, inForce: 'running' });
+    // The first quarter's last seconds are not in a window that is each half's.
+    expect(await send(t, [{ type: 'set-clock', ms: 30_000 }, { type: 'start' }, foul])).toEqual(
+      accepted(3),
+    );
+    expect(stopped(t)).toEqual({ running: true, stoppedClock: false, inForce: 'running' });
+    // Inside the half's last minute the stop clock wins over the mercy rule (S-30).
+    const intoWindow: Input[] = [
+      { type: 'period', period: 2 },
+      { type: 'set-clock', ms: 30_000 },
+      { type: 'start' },
+      foul,
+    ];
+    expect(await send(t, intoWindow)).toEqual(accepted(4));
+    expect(stopped(t)).toEqual({ running: false, stoppedClock: true, inForce: 'stop' });
+    expect(basketball.derive(savedState(t)).clockMode).toBe('running');
+    // The next period is out of the window: the mercy rule's running clock is back.
+    expect(await send(t, [{ type: 'period', period: 3 }, { type: 'start' }, foul])).toEqual(
+      accepted(3),
+    );
+    expect(stopped(t)).toEqual({ running: true, stoppedClock: false, inForce: 'running' });
+    expect(await deviceState(t)).toEqual(savedState(t));
+  });
+
+  it('in overtime the last seconds are a stop clock, and the rest runs (S-28)', async () => {
+    const t = setUp(both);
+    const overtime: Input[] = [
+      ...tipOff,
+      { type: 'start' },
+      three,
+      three,
+      { type: 'period', period: 5 },
+      { type: 'start' },
+      foul,
+    ];
+    expect(await send(t, overtime)).toEqual(accepted(overtime.length));
+    expect(stopped(t)).toEqual({ running: true, stoppedClock: false, inForce: 'running' });
+    expect(await send(t, [{ type: 'set-clock', ms: 30_000 }, { type: 'start' }, foul])).toEqual(
+      accepted(3),
+    );
+    expect(stopped(t)).toEqual({ running: false, stoppedClock: true, inForce: 'stop' });
+  });
+
+  it('the scorer may still run the clock by hand inside the last minutes, for that window only (S-29)', async () => {
+    const t = setUp(both);
+    const run: Input[] = [
+      ...tipOff,
+      { type: 'start' },
+      three,
+      three,
+      { type: 'period', period: 4 },
+      { type: 'set-clock', ms: 30_000 },
+      { type: 'clock-mode', mode: 'running' },
+      { type: 'start' },
+      foul,
+    ];
+    expect(await send(t, run)).toEqual(accepted(run.length));
+    expect(stopped(t)).toEqual({ running: true, stoppedClock: false, inForce: 'running' });
+    // A switch to the stop clock already in force there would be refused by the engine.
+    const t2 = setUp(both);
+    const back: Input[] = [...run.slice(0, 7), { type: 'clock-mode', mode: 'stop' }];
+    expect(await send(t2, back)).toEqual([...accepted(7), 'refused']);
+  });
+});
+
 describe('the platform’s command shape at the door (T-128, record 062)', () => {
   it('takes the clock-mode switch and saves it as a play and an event', async () => {
     const t = setUp(seasonRules());

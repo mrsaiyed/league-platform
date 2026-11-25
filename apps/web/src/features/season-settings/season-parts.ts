@@ -106,9 +106,9 @@ export function fieldsOfPart(part: SeasonPart): readonly string[] {
         'periodMinutes',
         'overtimeMinutes',
         'clockMode',
+        'mercyLead',
         'lastMinutes',
         'stopClockScope',
-        'mercyLead',
         'bonusFouls',
         'doubleBonusFouls',
         'playerFoulLimit',
@@ -315,9 +315,10 @@ export function rulesFromPart(
         return { ok: false, wrong };
       }
       const periodCount = periods === '4' ? 4 : 2;
-      // The last-minutes stop clock is for a running clock and the mercy lead for a stop
-      // clock: the one the clock chosen does not use is not kept (the form says so).
-      const last = mode === 'running' && lastMinutes !== null ? seconds(lastMinutes) : null;
+      // The last-minutes stop clock stands beside either clock (S-113, S-123); the mercy
+      // lead is for a stop clock only, so under a running clock it is not kept (the form
+      // says so).
+      const last = lastMinutes !== null ? seconds(lastMinutes) : null;
       rules = {
         ...base,
         gameFormat: {
