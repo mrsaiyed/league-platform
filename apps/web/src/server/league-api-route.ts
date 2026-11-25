@@ -5,6 +5,7 @@
 import { cookies } from 'next/headers';
 import { getConfig } from './config.ts';
 import { webPorts } from './container.ts';
+import type { AccessHolder } from '@srleagues/core';
 import type { LeagueRequestContext } from './context.ts';
 import { resolveLeagueApi, type ApiAnswer, type ApiRefusal } from './league-api.ts';
 import type { WebPorts } from './ports.ts';
@@ -19,7 +20,13 @@ export async function leagueEndpoint(
   /** A public read sees a session that no longer works as a visitor (league-api.ts). */
   signedOut: 'refuse' | 'visitor' = 'refuse',
 ): Promise<
-  | { readonly ok: true; readonly context: LeagueRequestContext; readonly ports: WebPorts }
+  | {
+      readonly ok: true;
+      readonly context: LeagueRequestContext;
+      /** What the account holds in the league, read once by the gate; undefined for a visitor. */
+      readonly holder: AccessHolder | undefined;
+      readonly ports: WebPorts;
+    }
   | { readonly ok: false; readonly refusal: ApiRefusal }
 > {
   const ports = await webPorts();
@@ -33,7 +40,9 @@ export async function leagueEndpoint(
     },
     signedOut,
   );
-  return resolved.ok ? { ok: true, context: resolved.context, ports } : resolved;
+  return resolved.ok
+    ? { ok: true, context: resolved.context, holder: resolved.holder, ports }
+    : resolved;
 }
 
 /**

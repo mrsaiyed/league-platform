@@ -1,15 +1,16 @@
 import { ownTrackerRefusal } from '@srleagues/contracts';
 import { leagueApiUrl, ok } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
-import type { ContextDeps, RequestFacts } from './context.ts';
-import { refusalAnswer, resolveLeagueApi } from './league-api.ts';
+import type { RequestFacts } from './context.ts';
+import { refusalAnswer, resolveLeagueApi, type LeagueApiDeps } from './league-api.ts';
 
 const leagueA = '01900000-0000-7000-8000-00000000000a';
 const leagueB = '01900000-0000-7000-8000-00000000000b';
 const game = '01900000-0000-7000-8000-0000000b0001';
 const parts = ['games', game, 'commands'];
 
-const deps: ContextDeps = {
+const deps: LeagueApiDeps = {
+  accessOf: async () => undefined,
   siteOrigin: 'http://localhost:3000',
   findLeague: async () => undefined,
   findLeagueById: async (id) =>

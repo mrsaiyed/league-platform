@@ -15,9 +15,10 @@ export async function GET(request: Request): Promise<Response> {
   const endpoint = await leagueEndpoint(staffNumbersParts, 'visitor');
   const question = askedStaffNumbers(new URL(request.url).searchParams);
   if (!endpoint.ok) return respond(await staffNumbersRequest(endpoint, question));
-  const { context, ports } = endpoint;
+  const { context, holder, ports } = endpoint;
   const read = {
-    accessOf: ports.accessOf,
+    // What the gate read already (league-api.ts), not read a second time.
+    accessOf: async () => holder,
     publicStats: ports.publicStats,
     tracker: ports.tracker,
   };

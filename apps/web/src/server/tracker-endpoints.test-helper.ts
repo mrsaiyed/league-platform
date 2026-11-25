@@ -12,7 +12,7 @@ import {
   type AccessHolder,
 } from '@srleagues/core';
 import type { LivePublisher } from '@srleagues/providers';
-import { commandContextOf, type LeagueRequestContext } from './context.ts';
+import { commandContextOf, requestContext, type LeagueRequestContext } from './context.ts';
 import { resolveLeagueApi } from './league-api.ts';
 import { createPlayPublisher } from './publish-plays.ts';
 import { standInPlayerId } from './stand-in-games.ts';
@@ -120,6 +120,26 @@ export function trackerWorld(options: TrackerWorldOptions = {}) {
     return resolved.context;
   }
 
+  /**
+   * The request as `person` through `league`'s address as an endpoint would see it if
+   * the gate let it through: to test an endpoint's own refusal in a league hidden from
+   * this person, which resolveLeagueApi already answers "not found" (step 2.223).
+   */
+  async function contextPastTheGate(
+    person: Person,
+    league: League,
+    parts: readonly string[],
+  ): Promise<LeagueRequestContext> {
+    const session = person === 'visitor' ? null : await ports.identify(standInPeople[person].token);
+    const path = leagueApiUrl({ id: standInLeagues[league].id }, parts);
+    const built = await requestContext(
+      { host: 'localhost:3000', path, session },
+      { ...ports, siteOrigin },
+    );
+    if (!built.ok || built.value.kind !== 'league') throw new Error('no league');
+    return built.value;
+  }
+
   async function holderOf(context: LeagueRequestContext): Promise<AccessHolder | undefined> {
     return context.account === null
       ? undefined
@@ -200,6 +220,7 @@ export function trackerWorld(options: TrackerWorldOptions = {}) {
     warnings,
     publishPlays,
     contextAs,
+    contextPastTheGate,
     holderOf,
     archiveSeasonOf,
     tabletEndsHawksBears,
