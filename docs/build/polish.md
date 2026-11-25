@@ -153,3 +153,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.155 part 2 leftovers: a refused grid form still carries what was typed in the address (a round name ends in history and logs; a reload drops it); the grid's one-time notice does not record which answer it belongs to, so a fresh notice lets an older address show its old words; a refusal is remembered for ten minutes, so retrying an unchanged form gets the old refusal even after its cause was fixed elsewhere; a jersey number a teammate already wears was not walked in a browser.
 
 - 2.155 part 3: not walked in a browser: Profile's "Saved now" with scripts off; a short name refused by the server with scripts on (the browser's own checks stop it first).
+
+- 2.69: the last-minutes sign at a period change, in overtime and with the clock set by hand into the window was checked by reading only; no read-only page shows the clock mode to a second device.
