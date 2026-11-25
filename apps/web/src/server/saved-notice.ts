@@ -15,6 +15,8 @@ export const noticeScreens = [
   'admins',
   'games',
   'box-score',
+  // A tracked game's box score edited in its grid (step 2.65): the plays it added.
+  'tracked-grid',
   'schedule',
   'people',
   'person',

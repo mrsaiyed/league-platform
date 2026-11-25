@@ -14,14 +14,13 @@ import {
   setLeagueProfile,
   setSetting,
 } from '@srleagues/core';
-import { done, refused } from './answer.ts';
 import { clearIntent, tickValue, valueOf, versionOf } from './form-input.ts';
 import { runArchive, runPublish } from './run-publish.ts';
 import { runSettingsAction, type SettingsAction } from './run-settings-action.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { t } from '../../server/messages.ts';
+import { t, type TextKey } from '../../server/messages.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import {
   answerSaved,
@@ -31,40 +30,86 @@ import {
   type FormState,
 } from '../list-forms/index.ts';
 import { profileRefusal, type ProfileFormName, type ProfileSaid } from './profile-form-answer.ts';
-import { profilePlace } from './profile-place.ts';
+import { profilePlace, settingPlace } from './profile-place.ts';
+import { settingRefusal, type SettingSaid } from './setting-form-answer.ts';
 
-export async function saveSettingAction(form: FormData): Promise<never> {
-  return runSettingsAction(form, async ({ context, ports, fields }) => {
-    const key = fields['key'] ?? '';
-    const version = versionOf(fields);
-    if (fields['intent'] === clearIntent) {
-      // Going back to the default needs the version of the value being removed.
-      const result = await clearSetting(
+type SettingResult =
+  | { readonly kind: 'done'; readonly said: SettingSaid }
+  | { readonly kind: 'refused'; readonly command: string; readonly code: string };
+
+/**
+ * One setting's form (step 2.48): saves its value, or with `intent=clear` goes back to the
+ * default. Since step 2.155 part 4 (T-417) it answers in the response to the post, as
+ * Profile's: carried out once (a second tap with the same token gets the first answer);
+ * refused, every box as typed, the wrong one marked and the setting named; saved,
+ * "Saved: …" beside the setting, once. The league and the person come from the session.
+ */
+export async function saveSettingAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
+  const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'settings');
+  const { adminSettings: ports } = await webPorts();
+  const context = commandContextOf(view.context);
+  const key = fields['key'] ?? '';
+  const setting = declaredSettings.get(key);
+  const described = setting === undefined ? undefined : describeSetting(setting);
+  const result = await sameRequestsHere<SettingResult>().once(
+    requestKeyOf(context, { ...fields, settingForm: key }),
+    async (): Promise<SettingResult> => {
+      const version = versionOf(fields);
+      if (fields['intent'] === clearIntent) {
+        // Going back to the default needs the version of the value being removed.
+        const cleared = await clearSetting(
+          context,
+          { level: 'league', key, version: version ?? Number.NaN },
+          ports.deps,
+        );
+        return cleared.ok
+          ? { kind: 'done', said: 'settingCleared' }
+          : { kind: 'refused', command: clearSetting.commandName, code: cleared.error.code };
+      }
+      // The box ticked to confirm a value that asks for it (R-14); the command checks it.
+      const confirmed = fields['confirmed'] === 'yes';
+      // A yes-or-no setting drawn as one box to tick (the parents' confirmation, record
+      // 065): ticked is yes and confirmed, unticked is no.
+      const field = described?.field;
+      const value =
+        field === undefined
+          ? undefined
+          : field.kind === 'toggle' && fields['value'] === tickValue
+            ? confirmed
+            : valueOf(field, fields['value']);
+      const saved = await setSetting(
         context,
-        { level: 'league', key, version: version ?? Number.NaN },
+        { level: 'league', key, value, version, confirmed },
         ports.deps,
       );
-      return result.ok ? done('cleared') : refused(clearSetting.commandName, result.error.code);
+      return saved.ok
+        ? { kind: 'done', said: 'setting' }
+        : { kind: 'refused', command: setSetting.commandName, code: saved.error.code };
+    },
+  );
+  if (result.kind === 'refused') {
+    const label = (described?.label ?? 'adminSettings.field.value') as TextKey;
+    const asTick = fields['value'] === tickValue;
+    const refusal = settingRefusal(label, result.command, result.code, asTick);
+    // Not allowed: said where it was tapped, the page not drawn again (as Profile).
+    if (result.code === 'not-allowed') {
+      return { kind: 'refused', code: result.code, typed: fields, wrong: [], said: refusal.said };
     }
-    const setting = declaredSettings.get(key);
-    // The box ticked to confirm a value that asks for it (R-14); the command checks it.
-    const confirmed = fields['confirmed'] === 'yes';
-    // A yes-or-no setting drawn as one box to tick (the parents' confirmation, record
-    // 065): ticked is yes and confirmed, unticked is no.
-    const field = setting === undefined ? undefined : describeSetting(setting).field;
-    const value =
-      field === undefined
-        ? undefined
-        : field.kind === 'toggle' && fields['value'] === tickValue
-          ? confirmed
-          : valueOf(field, fields['value']);
-    const result = await setSetting(
-      context,
-      { level: 'league', key, value, version, confirmed },
-      ports.deps,
-    );
-    return result.ok ? done('saved') : refused(setSetting.commandName, result.error.code);
-  });
+    const savedNow =
+      result.code === 'changed-since-read'
+        ? {
+            label: t('adminSettings.savedNow'),
+            nothing: t('adminSettings.savedNowNothing'),
+            ticked: t('adminSettings.savedNowTicked'),
+            unticked: t('adminSettings.savedNowUnticked'),
+          }
+        : undefined;
+    return refusedWith(result.code, fields, refusal.wrong, refusal.said, savedNow);
+  }
+  const notice = { screen: 'settings', thing: key, said: result.said } as const;
+  const at = leagueUrl(view.context.league, 'admin-area', { area: 'settings' });
+  return answerSaved(context, notice, `${at}#${settingPlace(key)}`);
 }
 
 /**

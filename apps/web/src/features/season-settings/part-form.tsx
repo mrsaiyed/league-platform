@@ -9,9 +9,22 @@
 // - a change that moves the standings (S-1, step 2.25): the teams it moves, and the
 //   question, before anything is saved; "No, change the rules" gives the boxes back as
 //   they were typed.
-// A save that works sends the browser to the season's settings, where "Saved" is said
-// beside the part. Every word comes from the server, from the message files (T-187).
-import { useActionState, useEffect, useId, useRef, type FormEvent } from 'react';
+// - refused because someone else saved the season meanwhile (T-418): the boxes keep what
+//   was typed and "Saved now: …" stands beside each box whose saved value differs.
+// After a refusal the first marked box has the focus; each refusal is a new line, even one
+// that reads as the last (step 2.155 part 4). A save that works sends the browser to the
+// season's settings, where "Saved" is said beside the part, once. Every word comes from the
+// server, from the message files (T-187).
+import {
+  useActionState,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
+import type { SavedNowWords } from '../list-forms/index.ts';
 import {
   typedOnly,
   untouched,
@@ -59,6 +72,15 @@ export function PartForm(props: PartFormProps) {
   const [state, dispatch, pending] = useActionState(action, untouched, props.permalink);
   const onSubmit = useOneSubmit(pending, state);
   const id = useId();
+  const formRef = useRef<HTMLFormElement>(null);
+  // A mark that changes with every answer: two refusals that read the same are two lines.
+  const [answers, setAnswers] = useState({ state, count: 0 });
+  if (answers.state !== state) setAnswers({ state, count: answers.count + 1 });
+  // After a refusal the first marked box has the focus, where its sentence is.
+  useEffect(() => {
+    if (state.kind !== 'refused') return;
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [state]);
   const common = (step: string) => (
     <>
       <input type="hidden" name="league" value={props.league} />
@@ -107,6 +129,8 @@ export function PartForm(props: PartFormProps) {
 
   const values = state.kind === 'untouched' ? props.saved : state.typed;
   const wrong = state.kind === 'refused' ? state.wrong : [];
+  const now = state.kind === 'refused' ? state.savedNow : undefined;
+  const shown = { values, wrong, id, saved: props.saved, now };
   const formId = `${id}-form`;
   const problemId = `${id}-problem`;
   // Drawn afresh with each answer, so every box starts from the values it is given.
@@ -148,6 +172,7 @@ export function PartForm(props: PartFormProps) {
         </form>
       )}
       <form
+        ref={formRef}
         id={formId}
         action={dispatch}
         onSubmit={onSubmit}
@@ -158,12 +183,12 @@ export function PartForm(props: PartFormProps) {
         {props.groups.map((group, n) =>
           group.legend === undefined ? (
             <div key={n} className="admin-season-group">
-              <Fields fields={group.fields} values={values} wrong={wrong} id={id} />
+              <Fields fields={group.fields} {...shown} />
             </div>
           ) : (
             <fieldset key={n} className="admin-season-group">
               <legend>{group.legend}</legend>
-              <Fields fields={group.fields} values={values} wrong={wrong} id={id} />
+              <Fields fields={group.fields} {...shown} />
             </fieldset>
           ),
         )}
@@ -173,7 +198,14 @@ export function PartForm(props: PartFormProps) {
           </p>
         ) : null}
         {state.kind === 'refused' ? (
-          <p id={problemId} className="ui-field-error" role="alert">
+          <p
+            key={answers.count}
+            id={problemId}
+            className="ui-field-error"
+            role="alert"
+            data-problem="part"
+            data-answer={answers.count}
+          >
             {state.said}
           </p>
         ) : null}
@@ -220,17 +252,62 @@ function WrongLine({
   );
 }
 
+/** "Saved now: …" beside a box whose saved value differs from what was typed (T-418). */
+function SavedNow({
+  name,
+  words,
+  shown,
+}: {
+  readonly name: string;
+  readonly words: SavedNowWords | undefined;
+  readonly shown: string | undefined;
+}) {
+  if (words === undefined || shown === undefined) return null;
+  return (
+    <small className="ui-field-help" data-saved-now={name}>
+      {words.label} {shown}
+    </small>
+  );
+}
+
+/** What is saved now in a box, as the form would show it, when it differs from `typed`. */
+function savedNowOf(
+  field: FormField,
+  name: string,
+  typed: TypedFields,
+  saved: TypedFields,
+  words: SavedNowWords | undefined,
+): string | undefined {
+  if (words === undefined || field.kind === 'note') return undefined;
+  const was = saved[name] ?? '';
+  if ((typed[name] ?? '') === was) return undefined;
+  if (field.kind === 'tick' || field.kind === 'ticks') {
+    return was === 'yes' ? (words.ticked ?? words.label) : (words.unticked ?? words.nothing);
+  }
+  if (field.kind === 'radios' || field.kind === 'select') {
+    return field.options.find((option) => option.value === was)?.label ?? words.nothing;
+  }
+  return was === '' ? words.nothing : was;
+}
+
 function Fields({
   fields,
   values,
   wrong,
   id,
+  saved,
+  now,
 }: {
   readonly fields: readonly FormField[];
   readonly values: TypedFields;
   readonly wrong: readonly { readonly field: string; readonly said: string }[];
   readonly id: string;
+  readonly saved: TypedFields;
+  readonly now: SavedNowWords | undefined;
 }) {
+  const savedNow = (field: FormField, name: string): ReactNode => (
+    <SavedNow name={name} words={now} shown={savedNowOf(field, name, values, saved, now)} />
+  );
   return (
     <>
       {fields.map((field) => {
@@ -267,6 +344,7 @@ function Fields({
                 {field.help === undefined ? null : (
                   <small className="ui-field-help">{field.help}</small>
                 )}
+                {savedNow(field, field.name)}
                 <WrongLine name={field.name} wrong={wrong} id={id} />
               </label>
             );
@@ -285,6 +363,7 @@ function Fields({
                     </option>
                   ))}
                 </select>
+                {savedNow(field, field.name)}
                 <WrongLine name={field.name} wrong={wrong} id={id} />
               </label>
             );
@@ -304,6 +383,7 @@ function Fields({
                 {field.help === undefined ? null : (
                   <small className="ui-field-help">{field.help}</small>
                 )}
+                {savedNow(field, field.name)}
                 <WrongLine name={field.name} wrong={wrong} id={id} />
               </div>
             );
@@ -346,8 +426,10 @@ function Fields({
                           />{' '}
                           {option.label}
                         </label>
+                        {savedNow(field, option.name)}
                       </p>
                     ))}
+                {field.kind === 'radios' ? savedNow(field, field.name) : null}
                 <WrongLine name={field.name} wrong={wrong} id={id} />
               </fieldset>
             );

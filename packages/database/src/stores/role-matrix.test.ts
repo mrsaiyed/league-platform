@@ -66,6 +66,7 @@ import {
   countPlaceGames,
   countTeamGames,
   createCourt,
+  correctTrackedBoxScore,
   createDivision,
   createLeague,
   createPerson,
@@ -117,6 +118,7 @@ import {
   readInvitation,
   putGameBack,
   readReopenOffer,
+  readTrackedBoxScore,
   readTrackerRosters,
   readTrackerState,
   rebuildStandings,
@@ -1033,6 +1035,31 @@ const gameCommandRows: readonly Row[] = [
     }),
     (c, i) => reopenGame(c, i, trackerDeps),
   ),
+  // Step 2.65 (T-122): correcting a tracked game in its grid is a correction, so it needs
+  // what reopening does; the game was ended from the tracker and reopened by the owner. No
+  // lines here (the matrix is about who): nothing changed is a save that adds no plays.
+  ...gameRows(
+    'games.correct_tracked_box_score',
+    'correct a tracked game in its box score grid',
+    'games.correct',
+    async (league, program) => {
+      const gameId = await trackedGameReopenedIn(league, program);
+      const last = await pglite.query<{ seq: number }>(
+        'select max(seq) as seq from game_events where game_id = $1',
+        [gameId],
+      );
+      return { gameId, sequence: last.rows[0]?.seq ?? 0, lines: [] };
+    },
+    (c, i) => correctTrackedBoxScore(c, i, trackerDeps),
+  ),
+  // What that grid shows: whoever may correct the game. A read.
+  ...gameRows(
+    'games.read_tracked_box_score',
+    'read the box score grid of a tracked game',
+    'games.correct',
+    async (league, program) => ({ gameId: await trackedGameEndedIn(league, program) }),
+    (c, i) => readTrackedBoxScore(c, i, trackerDeps),
+  ),
   // Step 2.229 (T-366): putting a box score back as its game's newest correction kept it
   // is a correction, so it needs what reopening does. The game is final again, saved
   // after a reopen whose correction kept its sheet (no lines here: the matrix is about who).
@@ -1576,6 +1603,23 @@ async function trackedLiveGame(
     `update games set status = 'live', home_score = $2, away_score = $3, format = $4 where id = $1`,
     [gameId, home.score, away.score, JSON.stringify(rules)],
   );
+  return gameId;
+}
+
+/** A game ended from the tracker (trackedGameEndedIn), then reopened by the owner with a reason. */
+async function trackedGameReopenedIn(league: League, program: boolean): Promise<string> {
+  const gameId = await trackedGameEndedIn(league, program);
+  const context = {
+    leagueId: league.leagueId,
+    accountId: league.accountOf('owner'),
+    requestId: 'matrix',
+  };
+  const reopened = await reopenGame(
+    context,
+    { gameId, version: 1, reason: 'A foul on the wrong player' },
+    trackerDeps,
+  );
+  if (!reopened.ok) throw new Error(`reopen refused: ${reopened.error.code}`);
   return gameId;
 }
 

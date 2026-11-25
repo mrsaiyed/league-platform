@@ -85,6 +85,7 @@ import {
 import type { OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, LineupPicks } from './opened-game-storage.ts';
 import { endOffered, playLog, redoTarget, redoneText, undoTarget, undoneText } from './play-log.ts';
+import { useUndoAsk } from './undo-correction-ask.tsx';
 import {
   LatestPlays,
   MoreLog,
@@ -268,6 +269,11 @@ const restingPlaces = {
    * two fast taps is not an answer.
    */
   mercy: '[data-mercy-notice] .court-mercy-acts',
+  /**
+   * The answers to Undo's question about a correction's play (step 2.65), after it is
+   * asked: the double of the Undo tap that asked is not an answer.
+   */
+  undoAsked: '[data-undo-correction] .court-sheet-head',
 } as const;
 type RestingPlace = keyof typeof restingPlaces;
 const restingNames = Object.keys(restingPlaces) as RestingPlace[];
@@ -543,6 +549,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     asked: createTapRest(restTimers, drawRests),
     final: createTapRest(restTimers, drawRests, takeBackRestMs),
     mercy: createTapRest(restTimers, drawRests),
+    undoAsked: createTapRest(restTimers, drawRests),
   };
   const resting = rests.current;
   // After every drawing: a control drawn anew while it rests is marked as well.
@@ -675,10 +682,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const mercy = mercySwitch(state);
   const mercyShown = mercy !== null && mercy.playId !== mercyDismissed ? mercy : null;
   // Its answers rest from the moment it comes up (above, `restingPlaces.mercy`).
+  // (The effect that begins it is below Undo's question, which makes the notice wait.)
   const mercyShownId = mercyShown?.playId ?? null;
-  useLayoutEffect(() => {
-    if (mercyShownId !== null) resting.mercy.begin();
-  }, [mercyShownId, resting]);
   // Start or Pause under the scoreboard rests when its word changes, whatever changed it
   // (a tap kept by the device, a foul that stopped the clock, the clock running out): a
   // tap already on its way was meant for the word that was there.
@@ -1095,6 +1100,17 @@ export function ScoringScreen(props: ScoringScreenProps) {
   // game does not wait for every line of it (finding M6).
   const undoPlay = useMemo(() => undoTarget(state, rosters, t), [state, rosters, t]);
   const redoPlay = useMemo(() => redoTarget(state, rosters, t), [state, rosters, t]);
+  const undoAsk = useUndoAsk(t, () => controller.status().game ?? state, status.corrections, {
+    undo: resting.undo,
+    answers: resting.undoAsked,
+  });
+  // Undo's question and the mercy notice never answer at once (step 2.65): while the
+  // question is asked the notice waits, its place kept so nothing moves, and its answers
+  // rest again when it comes back, so the tap that closed the question cannot land on one.
+  const mercyWaits = undoAsk.ask !== null;
+  useLayoutEffect(() => {
+    if (!mercyWaits && mercyShownId !== null) resting.mercy.begin();
+  }, [mercyWaits, mercyShownId, resting]);
   const { waiting } = status;
   const logHasPanel = useScreenIs(logPanelWhere);
   const noticesInPad = useScreenIs(uprightPhone);
@@ -1135,7 +1151,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       .finally(taken(event.currentTarget));
   };
   const plays: PlaysHandlers = {
-    undo: (event) => turn('undo', event),
+    undo: (event) => undoAsk.undo(event, (tap) => turn('undo', tap)),
     redo: (event) => turn('redo', event),
     playLog(open) {
       if (open) logOpener.current = document.activeElement;
@@ -1580,7 +1596,12 @@ export function ScoringScreen(props: ScoringScreenProps) {
       banner={props.banner}
       notices={props.notices}
       padNotice={
-        mercyShown === null ? null : (
+        mercyShown === null ? null : mercyWaits ? (
+          // Waiting behind Undo's question: in its place, out of sight and out of reach.
+          <div className="court-waits" data-mercy-waits="">
+            <MercyNotice t={t} mercy={mercyShown} back={() => undefined} keep={() => undefined} />
+          </div>
+        ) : (
           <MercyNotice
             t={t}
             mercy={mercyShown}
@@ -1610,6 +1631,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
         controls: (
           <>
             <UndoRedo t={t} undo={undoPlay} redo={redoPlay} on={plays} />
+            {undoAsk.ask}
             {props.slots?.controls}
           </>
         ),

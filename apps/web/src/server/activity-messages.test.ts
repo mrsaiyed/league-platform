@@ -39,6 +39,8 @@ const reads = new Set([
   // What a team has of games, said before it is removed (A-17): a read.
   'teams.count_team_games',
   'games.get_box_score_sheet',
+  // The grid of a tracked game, to correct it (step 2.65): a read.
+  'games.read_tracked_box_score',
   // Holding a game to score (T-116): the tracker opens, renews every half minute and
   // leaves, which would flood the log. Only taking over a game from someone is logged.
   'games.open_scoring_session',

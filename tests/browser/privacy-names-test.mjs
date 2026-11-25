@@ -21,6 +21,7 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  settingAnswer,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -72,19 +73,25 @@ if (browser) {
   page.setDefaultTimeout(60_000);
 
   const settings = (league) => `${origin}/${league}/admin/settings`;
-  const saved = async (label) => {
-    const said = await admin.locator('[role=status], [role=alert]').first().innerText();
-    note(`${label}: the screen says it was saved`, said === 'The setting was saved.', said);
+  // "Saved: <the setting's short name>." whole (T-419), beside the setting itself (step 2.155 part 4).
+  const saved = (label, answer, setting) => {
+    const said = answer.text;
+    note(
+      `${label}: the screen says it was saved`,
+      answer.saved && said === `Saved: ${setting}.`,
+      said,
+    );
   };
   /** Chooses a names value as the owner, never touching the tick. */
   const choose = async (league, value) => {
     await admin.goto(settings(league));
     await admin.locator(`${names} input[type=radio][value="${value}"]`).check();
-    await Promise.all([
-      admin.waitForURL(/done=|problem=/),
-      admin.locator(`${names} button[type=submit]`).first().click(),
-    ]);
-    await saved(`${league} saves ${value}`);
+    const answer = await settingAnswer(
+      admin,
+      names,
+      admin.locator(`${names} button[type=submit]`).first(),
+    );
+    saved(`${league} saves ${value}`, answer, 'Names on public pages');
   };
   /** Ticks or unticks the parents' confirmation and saves it. */
   const tick = async (league, ticked) => {
@@ -92,11 +99,16 @@ if (browser) {
     const box = admin.locator(`${confirmation} input[type=checkbox]`);
     if (ticked) await box.check();
     else await box.uncheck();
-    await Promise.all([
-      admin.waitForURL(/done=|problem=/),
-      admin.locator(`${confirmation} button[type=submit]`).first().click(),
-    ]);
-    await saved(`${league} ${ticked ? 'ticks' : 'unticks'} the confirmation`);
+    const answer = await settingAnswer(
+      admin,
+      confirmation,
+      admin.locator(`${confirmation} button[type=submit]`).first(),
+    );
+    saved(
+      `${league} ${ticked ? 'ticks' : 'unticks'} the confirmation`,
+      answer,
+      "Children's full names",
+    );
   };
   const seen = async (address) => {
     await page.goto(`${origin}${address}`);

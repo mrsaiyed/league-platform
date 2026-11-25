@@ -72,6 +72,21 @@ describe('GET …/games/{game}/state', () => {
     expect(JSON.stringify(body.state)).toContain(bears[0]);
   });
 
+  it('answers a tracker that does not ask for changes as before: no changes, no corrections (T-408)', async () => {
+    const world = trackerWorld();
+    await scoreABasket(world);
+    const context = await world.contextAs('scorekeeper', 'live', [
+      'games',
+      games.hawksBears,
+      'state',
+    ]);
+    const before = await trackerStateRequest(context, games.hawksBears, world.tracker);
+    expect(Object.keys(before.body as object).toSorted()).toEqual(['sequence', 'state']);
+    // One that asks is given its changes, and `corrections` only once a correction wrote plays.
+    const asks = await trackerStateRequest(context, games.hawksBears, world.tracker, true);
+    expect(Object.keys(asks.body as object).toSorted()).toEqual(['changes', 'sequence', 'state']);
+  });
+
   it('is turned away for a visitor, someone who may not score, and another league', async () => {
     const world = trackerWorld();
     await scoreABasket(world);

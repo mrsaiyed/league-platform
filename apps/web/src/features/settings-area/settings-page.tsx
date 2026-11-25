@@ -18,6 +18,7 @@ import { locale, t, type TextKey } from '../../server/messages.ts';
 import { takeNotice } from '../list-forms/index.ts';
 import { doneKey, problemKey } from './answer.ts';
 import { profileSaved } from './profile-form-answer.ts';
+import { settingSaved } from './setting-form-answer.ts';
 import { privacyNotes } from './privacy-notes.ts';
 import { ProfilePanel } from './profile-panel.tsx';
 import { archiveAsk, publishAsk, PublishPanel } from './publish-panel.tsx';
@@ -61,8 +62,14 @@ export async function SettingsPage({
     }));
   const { timeZone } = await publicSchedule.clockOf(view.context.league.id);
   const notes = privacyNotes({ facts, policy, rows, timeZone, locale });
-  // A Profile form's "Saved" (step 2.155 part 3): taken once, so a reload says nothing old.
-  const saved = profileSaved(takeNotice(context, 'settings')?.said);
+  // A Profile form's or a setting's "Saved" (step 2.155 parts 3 and 4): taken once, so a
+  // reload says nothing old.
+  const notice = takeNotice(context, 'settings');
+  const saved = profileSaved(notice?.said);
+  const settingSaid = settingSaved(
+    notice,
+    (key) => rows.find((row) => row.key === key)?.label as TextKey | undefined,
+  );
   const address = leagueUrl(view.context.league, 'admin-area', { area: 'settings' });
   const problem = problemKey(query);
   const good = doneKey(query);
@@ -137,7 +144,14 @@ export async function SettingsPage({
               ))}
             </ul>
           </nav>
-          <SettingForms rows={rows} league={view.context.league.slug} say={say} notes={notes} />
+          <SettingForms
+            rows={rows}
+            league={view.context.league.slug}
+            address={address}
+            say={say}
+            notes={notes}
+            saved={settingSaid}
+          />
         </>
       )}
     </main>

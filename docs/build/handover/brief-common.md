@@ -16,3 +16,4 @@
 14. CODE RULES are in `CLAUDE.md` ("Rules for all code"): commands, no league named, no SQL outside `packages/database`, the address helper, text in message files, strict TypeScript, no `any`. Do not change `apps/live-stats` or `packages/sports` behaviour unless the brief says so.
 15. REPORT: at most 12 lines: what is done (count the brief's items), what was run with numbers, commits, what is left, product faults found, how many commands you used.
 16. SHARED FILES. Read `docs/build/RUNBOOK.md` line 102 (`sed -n 102p | cut -c1-1500`) before your first commit: a lane does not edit `docs/specs/v1/DECISIONS.md`, and it says which other shared files a lane leaves alone and where its lines go instead.
+17. ARCHIVED SEASONS. A new command that changes a game, a team or a season gets its row in `packages/database/src/stores/archived-season-guards.test.ts` (an archived season is read-only, O-12), and a test of the command itself in an archived season.

@@ -91,6 +91,7 @@ import { moveOwnLeagueRowLast, setTargetLeagueApart } from './public-schedule-ca
 import { registerIsolationCase } from './isolation-registry.test-helper.ts';
 import './league-removal-cases.test-helper.ts';
 import './game-format-cases.test-helper.ts';
+import './grid-correction-cases.test-helper.ts';
 import './not-started-cases.test-helper.ts';
 import './people-cases.test-helper.ts';
 import './public-reads-cases.test-helper.ts';

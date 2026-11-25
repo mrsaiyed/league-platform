@@ -24,6 +24,7 @@ import {
   startNext,
   waitFor,
   worldAtNoon,
+  settingAnswer,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -363,10 +364,15 @@ if (browser) {
     const owner = await signedIn('local-owner-token');
     try {
       await owner.page.goto(`${origin}/north-valley/admin/settings`);
-      const setting = owner.page.locator('[data-setting="games.scorekeeperReopenMinutes"]');
+      const section = '[data-setting="games.scorekeeperReopenMinutes"]';
+      const setting = owner.page.locator(section);
       await setting.locator('input:not([type="hidden"])').first().fill('1');
-      await setting.locator('button[type="submit"]').first().click();
-      await owner.page.waitForLoadState('load');
+      const answer = await settingAnswer(
+        owner.page,
+        section,
+        setting.locator('button[type="submit"]').first(),
+      );
+      if (!answer.saved) throw new Error(`the reopen minutes were not saved: ${answer.text}`);
     } finally {
       await owner.context.close();
     }

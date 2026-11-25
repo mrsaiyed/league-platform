@@ -43,9 +43,14 @@ export async function trackerStateRequest(
   if (!result.ok) {
     return refuse({ error: result.error.code === 'not-allowed' ? 'not-allowed' : 'not-found' });
   }
-  const { changes, ...state } = result.value;
+  const { changes, corrections, ...state } = result.value;
+  // T-408: the plays a correction wrote, only to a tracker that asks, as `changes` is.
   const body: TrackerGameStateWithChanges = withChanges
-    ? { ...state, changes: [...changes] }
+    ? {
+        ...state,
+        changes: [...changes],
+        ...(corrections === undefined ? {} : { corrections: [...corrections] }),
+      }
     : state;
   return { status: 200, body, headers: { 'Cache-Control': 'private, no-store' } };
 }

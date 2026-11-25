@@ -15,6 +15,8 @@ export type ServerState = {
    * server that did not give them: then the device cannot tell whose they were.
    */
   readonly changes?: readonly string[];
+  /** The command IDs of the plays a correction wrote up to `sequence` (T-408); missing when none. */
+  readonly corrections?: readonly string[];
 };
 
 export type ServerOutcome<T> =

@@ -2496,6 +2496,12 @@
   letter-spacing: 0;
   white-space: nowrap;
 }
+/* The mercy notice while Undo's question is asked (step 2.65): it keeps its place in the
+   pad, so nothing moves, but cannot be seen or tapped until the question is answered. */
+.court-waits {
+  display: contents;
+  visibility: hidden;
+}
 /* The mercy rule's notice: the sentence, then its two answers side by side. */
 .court-mercy {
   display: flex;

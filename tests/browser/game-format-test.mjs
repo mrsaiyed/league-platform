@@ -26,6 +26,7 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  settingAnswer,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -450,15 +451,15 @@ if (browser) {
       const admin = await contextAs(boss);
       try {
         await admin.page.goto(`${origin}/north-valley/admin/settings`);
-        const setting = admin.page.locator(
-          'section[data-setting="games.scorekeepersMayChangeFormat"]',
-        );
+        const section = 'section[data-setting="games.scorekeepersMayChangeFormat"]';
+        const setting = admin.page.locator(section);
         await setting.locator('input[type=radio][value=false]').check();
-        await Promise.all([
-          admin.page.waitForURL(/done=|problem=/),
-          setting.locator('button[type=submit]').click(),
-        ]);
-        note('the owner turns the setting off', /done=/.test(admin.page.url()), admin.page.url());
+        const answer = await settingAnswer(
+          admin.page,
+          section,
+          setting.locator('button[type=submit]').first(),
+        );
+        note('the owner turns the setting off', answer.saved, answer.text);
       } finally {
         await admin.context.close();
       }

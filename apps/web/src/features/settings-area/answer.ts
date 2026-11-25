@@ -6,8 +6,8 @@ import { catalogs } from '@srleagues/site';
 import type { TextKey } from '../../server/messages.ts';
 
 export const doneNames = [
-  'saved',
-  'cleared',
+  // A setting's own Save and "Go back to the default" answer in the response to the post
+  // since step 2.155 part 4 (setting-form-answer.ts), not here.
   'published',
   // The Archive buttons (step 2.125 part 2). Profile's forms answer in the response to the
   // post since step 2.155 part 3 (profile-form-answer.ts), not here.
@@ -28,7 +28,7 @@ export const refused = (command: string, code: string): Answer => ({
   code,
 });
 
-/** The part of the address that carries an answer: `?done=saved` or `?problem=...`. */
+/** The part of the address that carries an answer: `?done=published` or `?problem=...`. */
 export function answerQuery(answer: Answer): string {
   return answer.kind === 'done'
     ? `?done=${answer.done}`

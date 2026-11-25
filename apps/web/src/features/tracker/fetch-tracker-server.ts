@@ -101,11 +101,12 @@ export function createFetchTrackerServer(options: FetchTrackerServerOptions): Tr
         // The contract checks the marks of the engine's version 1; the rest is the engine's.
         const state = read.data.state as unknown as basketball.GameState;
         if (!engineReads(state)) return unanswered;
-        const { changes } = read.data;
+        const { changes, corrections } = read.data;
         const value: ServerState = {
           sequence: read.data.sequence,
           state,
           ...(changes === undefined ? {} : { changes }),
+          ...(corrections === undefined ? {} : { corrections }),
         };
         return { kind: 'answer', value };
       }

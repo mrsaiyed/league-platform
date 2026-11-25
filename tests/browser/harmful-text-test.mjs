@@ -34,8 +34,10 @@ import {
   freePort,
   launch,
   startNext,
+  trackedPlayer,
   waitFor,
   whatWentWrong,
+  settingAnswer,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -848,14 +850,11 @@ if (browser) {
     const ownerContext = await contextFor(owner);
     const settingsPage = await ownerContext.newPage();
     await settingsPage.goto(`${origin}/north-valley/admin/settings`);
-    const form = settingsPage.locator('form', {
-      has: settingsPage.locator('input[type=text][name=value]'),
-    });
+    const section = 'section[data-setting="site.notice"]';
+    const form = settingsPage.locator(`${section} form`);
     await form.locator('input[name=value]').fill(typed.notice);
-    await Promise.all([
-      settingsPage.waitForURL(/done=saved/),
-      form.locator('button').first().click(),
-    ]);
+    const answer = await settingAnswer(settingsPage, section, form.locator('button').first());
+    if (!answer.saved) throw new Error(`the site notice was not saved: ${answer.text}`);
     await ownerContext.close();
   });
 
@@ -1117,6 +1116,9 @@ const ROUTES = {
   '/[league]/admin/[...missing]': () => `/north-valley/admin/${encodeURIComponent(typed.query)}`,
   '/[league]/admin/games': () => '/north-valley/admin/games',
   '/[league]/admin/games/[game]': () => boxScore,
+  // A tracked game's grid (step 2.65): the stand-in's tracked game is not reopened during
+  // the walk, so its page says to reopen first; walkTheTrackedGrid types into its boxes.
+  '/[league]/admin/games/[game]/edit': () => `/north-valley/admin/games/${liveGame}/edit`,
   '/[league]/admin/games/scorekeepers': () => '/north-valley/admin/games/scorekeepers',
   '/[league]/admin/people': () => '/north-valley/admin/people',
   '/[league]/admin/people/[person]': (at) => at.person,
@@ -1626,8 +1628,13 @@ async function walkThePublishPart() {
     const page = await context.newPage();
     await page.goto(origin + settings);
     if ((await page.locator('li[data-check="privacyChosen"][data-met="no"]').count()) > 0) {
-      const save = page.locator('section[data-setting="privacy.publicNames"] button[type=submit]');
-      await Promise.all([page.waitForURL(/done=|problem=/), save.first().click()]);
+      const names = 'section[data-setting="privacy.publicNames"]';
+      const answer = await settingAnswer(
+        page,
+        names,
+        page.locator(`${names} button[type=submit]`).first(),
+      );
+      if (!answer.saved) throw new Error(`names on public pages was not saved: ${answer.text}`);
     }
     await context.close();
     const asked = `${settings}?publish=ask`;
@@ -1659,8 +1666,106 @@ async function walkThePublishPart() {
   });
 }
 
+/**
+ * A tracked game's "Edit the box score" grid (step 2.65) is drawn only once the game is
+ * reopened with a reason, which the walk above never does. Last of all, so nothing above
+ * meets the game changed: the made-up live game is played to its end from a tablet, the
+ * owner reopens it with the attack as the reason, and every box of its grid is typed the
+ * attack and saved. The grid takes whole numbers only, so it is refused, by name, and each
+ * box must still hold the attack as text, with no script run and no element made.
+ */
+async function walkTheTrackedGrid() {
+  await step("a tracked game's grid is typed the attack in every box", async () => {
+    // From a tablet of its own, which takes the game over from the scoring screen above.
+    const post = async (at, body) => {
+      const answer = await fetch(`${origin}/api/v1/leagues/${leagueId}/games/${liveGame}${at}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie: `srl_session=${keeper}`, origin },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
+      });
+      const text = await answer.text();
+      if (!answer.ok) throw new Error(`${at} answered ${answer.status}: ${text.slice(0, 200)}`);
+      return JSON.parse(text);
+    };
+    const deviceId = 'harmful-grid-tablet';
+    const opened = await post('/session', { type: 'open', deviceId });
+    const held =
+      opened.status === 'held-by-other'
+        ? await post('/session', {
+            type: 'take-over',
+            deviceId,
+            confirmed: true,
+            expectedHolderSince: opened.holder.since,
+          })
+        : opened;
+    if (held.status !== 'held-by-you') throw new Error(`the tablet holds no game: ${held.status}`);
+    const five = (team) => [1, 2, 3, 4, 5].map((n) => trackedPlayer(team, n));
+    const inputs = [
+      { type: 'lineup', side: 'home', playerIds: five(3) },
+      { type: 'lineup', side: 'away', playerIds: five(4) },
+      { type: 'start' },
+      { type: 'score', side: 'home', playerId: trackedPlayer(3, 1), points: 2 },
+      { type: 'end' },
+    ];
+    const reply = await post('/commands', {
+      protocolVersion: 2,
+      sessionId: held.sessionId,
+      commands: inputs.map((input) => ({ commandId: crypto.randomUUID(), at: Date.now(), input })),
+    });
+    const refused = reply.results.filter((r) => r.status !== 'accepted');
+    if (refused.length > 0) throw new Error(`taps refused: ${JSON.stringify(refused)}`);
+    const context = await contextFor(owner, { withoutPolicy: true });
+    const page = await context.newPage();
+    page.setDefaultTimeout(30_000);
+    const dialogs = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.message());
+      void dialog.dismiss();
+    });
+    try {
+      const gamePage = `/north-valley/admin/games/${liveGame}`;
+      await page.goto(origin + gamePage);
+      await page
+        .getByLabel('Why it needs correcting (kept in the log, never shown publicly)')
+        .fill(attack('grid-reason'));
+      await Promise.all([
+        page.waitForURL((url) => url.pathname === gamePage, { timeout: 30_000 }),
+        page.getByRole('button', { name: 'Reopen to correct' }).click(),
+      ]);
+      await page.goto(`${origin}${gamePage}/edit`);
+      const boxes = page.locator('form[data-tracked-grid] input[name^="grid-"]');
+      const count = await boxes.count();
+      note('the reopened game draws its grid, with boxes to type into', count > 0, String(count));
+      for (let i = 0; i < count; i += 1) await boxes.nth(i).fill(attack('grid'));
+      await page.getByRole('button', { name: 'Save the changes' }).click();
+      await page
+        .locator('form[data-tracked-grid] [data-grid-problem="cell"]')
+        .waitFor({ timeout: 30_000 });
+      const values = await boxes.evaluateAll((inputs) => inputs.map((input) => input.value));
+      note(
+        'every box of the refused grid still holds the attack as typed',
+        values.length === count && values.every((value) => value === attack('grid')),
+        JSON.stringify(values.slice(0, 2)),
+      );
+      const found = await harm(page);
+      note(
+        'the refused grid ran no script of the attack and made no element',
+        found.ran === null &&
+          dialogs.length === 0 &&
+          found.made.length === 0 &&
+          found.scripts === 0,
+        [found.ran ?? '', ...dialogs, ...found.made].join(' | '),
+      );
+    } finally {
+      await context.close();
+    }
+  });
+}
+
 if (browser) await walkEveryRoute();
 if (browser) await walkThePublishPart();
+if (browser) await walkTheTrackedGrid();
 
 await browser?.close();
 server?.child.kill();

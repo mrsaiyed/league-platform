@@ -11,6 +11,8 @@ export const enAdminGames = {
   'admin.boxScore.done.putBack':
     'The box score is back as it was before the game was reopened, and the game is final again.',
   'admin.boxScore.done.reopen': 'The game is reopened. Fix the grid and save it again.',
+  'admin.boxScore.done.reopenTracked':
+    'The game is live again. Correct it with “Edit the box score” below, or on the scoring screen, then tap “End the game again”.',
   'admin.boxScore.done.save': 'The box score is saved and the game is final.',
   // An empty box of a final game's grid, which is read and not filled in.
   'admin.boxScore.empty': '–',
@@ -49,7 +51,7 @@ export const enAdminGames = {
   'admin.boxScore.locked.postponed':
     'This game is postponed, so it has no score yet. It is scored once it is played on its new date.',
   'admin.boxScore.locked.tracked':
-    'This game was scored with the live tracker. Correct it in the tracker, so its list of plays still explains the numbers.',
+    'This game was scored with the live tracker. Correct it with “Edit the box score”, or on the scoring screen to take points away; either way its list of plays still explains the numbers.',
   'admin.boxScore.minutes': 'Minutes',
   'admin.boxScore.minutes.short': 'MIN',
   'admin.boxScore.noPlayers': 'This team has no players on its roster yet. Add them in Teams.',
@@ -99,6 +101,53 @@ export const enAdminGames = {
   'admin.boxScore.title': 'Box score: {away} at {home}',
   // A postponed or cancelled game's own page, which has no box score (step 2.158).
   'admin.boxScore.titleCalledOff': '{away} at {home}',
+  // Step 2.65 (T6 §8, T-122, T-405): a tracked game's box score edited in a grid; each
+  // change is saved as a play, so the game's list of plays still explains the numbers.
+  'admin.boxScore.tracked.added.foul': 'Added a foul for {name}.',
+  'admin.boxScore.tracked.added.score1': 'Added a made free throw for {name}.',
+  'admin.boxScore.tracked.added.score2': 'Added a 2-point basket for {name}.',
+  'admin.boxScore.tracked.added.score3': 'Added a 3-point basket for {name}.',
+  'admin.boxScore.tracked.added.turnover': 'Added a turnover for {name}.',
+  'admin.boxScore.tracked.edit': 'Edit the box score',
+  // Step 2.65 fix round (T-407): the scoring screen's own end, from the admin's pages.
+  'admin.boxScore.tracked.endAgain': 'End the game again',
+  'admin.boxScore.tracked.endAgainHelp':
+    'When the numbers are right, end the game again. It becomes final, marked Corrected, and the standings count it. A device still scoring it is told at its next tap.',
+  'admin.boxScore.tracked.help':
+    'Change a player’s numbers and save. Each change is saved as a play in the game’s list of plays, so the list still explains the numbers. Minutes and points come from the plays and cannot be typed here.',
+  'admin.boxScore.tracked.lower':
+    'Baskets can only go up here. To take points away, reopen the game on the scoring screen and use Undo.',
+  'admin.boxScore.tracked.lowerLink': 'Open the scoring screen',
+  'admin.boxScore.tracked.noChange': 'Nothing was changed: the grid already matched the plays.',
+  'admin.boxScore.tracked.notCorrectable.game-final':
+    'This game is final. To edit its box score, reopen it with a reason first.',
+  'admin.boxScore.tracked.notCorrectable.game-not-live':
+    'This game is not under way, so its box score cannot be edited here.',
+  'admin.boxScore.tracked.notCorrectable.reason-needed':
+    'This game is still being scored live. To edit its box score here, end it on the scoring screen, then reopen it with a reason.',
+  'admin.boxScore.tracked.refused.basket-taken-back':
+    '{cell} cannot go lower here. To take points away, reopen the game on the scoring screen and use Undo. Nothing was saved.',
+  'admin.boxScore.tracked.refused.cell': '{cell}: enter a whole number from 0 to 999.',
+  'admin.boxScore.tracked.refused.changed-since-read':
+    'Someone else changed this game since you opened this page, so nothing was saved. Load it again to see the new numbers; what you typed is still shown below.',
+  'admin.boxScore.tracked.refused.engine':
+    '{cell}: the game’s scoring rules would not take this change. Nothing was saved.',
+  'admin.boxScore.tracked.refused.gone':
+    'This game can no longer be edited here, so nothing was saved. Load the page again.',
+  'admin.boxScore.tracked.refused.player-not-on-team':
+    '{cell}: this player is not on the team’s roster for this game. Nothing was saved.',
+  'admin.boxScore.tracked.refused.statistic-not-kept':
+    '{cell}: this season does not keep that number. Nothing was saved.',
+  'admin.boxScore.tracked.refused.tie-not-allowed':
+    'The score is level, and this season’s rules do not allow a tie, so the game was not ended. Add the deciding points first.',
+  'admin.boxScore.tracked.refused.too-many-plays':
+    'This save would add more than {limit} plays, so nothing was saved. Check for a mistyped number.',
+  'admin.boxScore.tracked.reload': 'Load it again',
+  'admin.boxScore.tracked.removed.foul': 'Took a foul away from {name}.',
+  'admin.boxScore.tracked.removed.turnover': 'Took a turnover away from {name}.',
+  'admin.boxScore.tracked.save': 'Save the changes',
+  'admin.boxScore.tracked.saved': 'Saved. These plays were added to the game’s list of plays:',
+  'admin.boxScore.tracked.title': 'Edit box score: {away} at {home}',
   // The box score grid (step 2.64).
   'admin.games.boxScore': 'Box score',
   // Step 2.158 (H9; A-5): "Forfeit, postpone or cancel" asks once, naming the game, and only
