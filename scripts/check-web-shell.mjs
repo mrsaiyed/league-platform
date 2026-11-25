@@ -2350,6 +2350,11 @@ async function everyWaySameAsNoLeague(origin) {
           kind === undefined ? undefined : kind === '{}' ? '{}' : JSON.stringify(valid[end] ?? {});
         const label = `${who}'s ${method} ${kind ?? ''} of …/${path}`;
         const none = await api(who, noId, path, method, body, label);
+        // A crash on both sides alike is no proof (review L2): no league is "not found",
+        // or 405 for a method the route does not answer at all (Next.js, before any code).
+        if (none.status !== 404 && none.status !== 405) {
+          found.push(`${label}, no league: answers ${none.status}`);
+        }
         for (const { what, id } of hidden) {
           compare(`${label}, ${what}`, await api(who, id, path, method, body, label), none, false);
         }
