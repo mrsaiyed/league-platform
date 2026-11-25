@@ -197,8 +197,10 @@ const excused = new Map([
 ]);
 // 4 of the purge, 12 repeated filters and 48 files with no filter of their own (2.224,
 // part 2); 14 filters of statements joined on league_id and 17 statements keyed by another
-// league-filtered statement or held by a composite key (part 3); the coin flip's insert (2.56).
-const mostExcused = 96;
+// league-filtered statement or held by a composite key (part 3); the coin flip's insert (2.56);
+// step 2.128's change-own-email.ts and email-free-for-own-account.ts (approved by the lead,
+// 2026-11-25).
+const mostExcused = 98;
 
 /** Whole-file excuses: each file name with the one reason. */
 function wholeFiles(reason, ...files) {

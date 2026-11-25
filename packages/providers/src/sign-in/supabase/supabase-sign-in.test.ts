@@ -1,6 +1,6 @@
 // Each operation of the sign-in interface on the Supabase adapter, against a fake
 // Supabase Auth (T4 §3, T-225, record 018). Not verified against the live service.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fail } from '@srleagues/core';
 import { createSignInCodeCapture } from '../local/code-capture.ts';
 import { createMemorySignInStore } from './memory-sign-in-store.ts';
@@ -1186,6 +1186,30 @@ describe('a waiting change of email is the account’s own (T-455; the review’
       fail({ code: 'code-wrong' }),
     );
     expect(await emailOf(env, b.session.accessToken)).toBe(bo);
+    expect(await signsIn(env, bo)).toBe(true);
+  });
+
+  it('A’s waiting row copied to B’s key does not take A’s code: the hash names the account (T-461)', async () => {
+    const env = setup();
+    const a = await signUp(env, ana);
+    const b = await signUp(env, bo);
+    const put = vi.spyOn(env.store.codes, 'putEmailChange');
+    value(await begin(env, a.session.accessToken));
+    const codeOfA = codeFor(env, target);
+    value(await begin(env, b.session.accessToken, 'bo.new@example.test'));
+    const [rowOfA, rowOfB] = put.mock.calls;
+    if (!rowOfA || !rowOfB) throw new Error('Both waiting changes were stored.');
+    const [idOfA, changeOfA] = rowOfA;
+    const [idOfB] = rowOfB;
+    expect(idOfB).not.toBe(idOfA);
+    // The store's row of A, word for word, under B's account.
+    await env.store.codes.putEmailChange(idOfB, changeOfA);
+    expect(await confirm(env, b.session.accessToken, codeOfA)).toEqual(
+      fail({ code: 'code-wrong' }),
+    );
+    expect(await emailOf(env, b.session.accessToken)).toBe(bo);
+    expect(await emailOf(env, a.session.accessToken)).toBe(ana);
+    expect(await signsIn(env, target)).toBe(false);
     expect(await signsIn(env, bo)).toBe(true);
   });
 
