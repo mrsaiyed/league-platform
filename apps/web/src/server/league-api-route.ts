@@ -46,6 +46,18 @@ export async function leagueEndpoint(
 }
 
 /**
+ * This API request's facts and ports, about no league (the signed-in endpoint, T-456):
+ * an API route is a request of its own, so it reads its facts here, as leagueEndpoint does.
+ */
+export async function apiRequestFacts(): Promise<{
+  readonly facts: Awaited<ReturnType<typeof requestFacts>>;
+  readonly ports: WebPorts;
+}> {
+  const ports = await webPorts();
+  return { facts: await requestFacts(ports), ports };
+}
+
+/**
  * Whether the request carried a sign-in cookie: a session, or the renewing token the
  * proxy may have just used to set new cookies on this request's answer (proxy.ts).
  */
