@@ -111,7 +111,7 @@ export async function runTeamsAction(
 }
 
 /** Whether the page a post came from is `address` (its path and query; the #… aside). */
-function sameAddress(from: string | null, address: string): boolean {
+export function sameAddress(from: string | null, address: string): boolean {
   if (from === null) return false;
   try {
     const was = new URL(from);

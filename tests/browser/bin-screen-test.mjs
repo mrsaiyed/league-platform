@@ -390,6 +390,26 @@ if (built) {
       liveBack.text,
     );
 
+    // A refusal with scripts on: it goes back to the bin at its row (#bin-…), which the
+    // page's scripts take as a scroll; it must still be drawn in that row, with no reload.
+    at = 'with scripts on, a bring back refused';
+    const owls = `Owls ${run}`;
+    await toTeams(live);
+    await addTeam(live, owls);
+    await removeTeamHere(live);
+    await toTeams(live);
+    await addTeam(live, owls);
+    await live.goto(binAddress);
+    const owlsRefused = await binAnswer(
+      live,
+      binRow(live, owls).getByRole('button', { name: 'Bring it back' }),
+    );
+    note(
+      'scripts on: the refusal is drawn in the row of what was not brought back',
+      owlsRefused.said === 'refused' &&
+        (await binRow(live, owls).locator('[data-bin-answer][data-said=refused]').count()) === 1,
+      owlsRefused.text,
+    );
     // A second kind of thing with scripts on (step 2.155 part 5): a person removed from
     // People, brought back from the bin.
     at = 'with scripts on, a person removed and brought back';
