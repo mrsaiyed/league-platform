@@ -5,6 +5,11 @@
 import { safeReturnPath } from './sign-in/device.ts';
 import { screenUrl, type Problem } from './sign-in/problems.ts';
 
+/** The account page's name question, to come back to `returnTo` once named (T-460). */
+export function giveNameFirstUrl(returnTo: string): string {
+  return screenUrl('account', { next: safeReturnPath(returnTo) });
+}
+
 /** The sign-in screen, to come back to `returnTo`, with `problem` shown on it if given. */
 export function signInFirstUrl(
   returnTo: string,

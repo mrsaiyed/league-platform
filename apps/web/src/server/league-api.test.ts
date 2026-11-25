@@ -114,6 +114,25 @@ describe('resolveLeagueApi', () => {
     }
   });
 
+  it('is "name needed" for a signed-in person with no name yet, told only about their own account (T-460)', async () => {
+    const session = {
+      ok: false,
+      error: { code: 'account-problem', problem: 'name-needed' },
+    } as const;
+    const resolved = await resolveLeagueApi(
+      facts(leagueApiUrl({ id: leagueA }, parts), session),
+      parts,
+      deps,
+    );
+    expect(resolved).toEqual({ ok: false, refusal: { status: 403, error: 'name-needed' } });
+    if (!resolved.ok) {
+      expect(refusalAnswer(resolved.refusal)).toEqual({
+        status: 403,
+        body: { error: 'name-needed' },
+      });
+    }
+  });
+
   it('is "account problem" for a live session none of our accounts hold, a visitor for a public read', async () => {
     const session = {
       ok: false,

@@ -19,6 +19,11 @@
 //   answers it exactly as a scorer removed from the league, "not found" at every league
 //   endpoint, and "signed in" at the address about no league). The screen says so in
 //   plain words, never asks for sign-in, keeps the two plays, and "Save a copy" gives them.
+// - T-460: two more plays wait, and the browser's sign-in is a person with no name yet (the
+//   stand-in's one, local-unnamed-token): every league endpoint answers 403 `name-needed`.
+//   The screen says to give the name and that the plays are kept, never "sign in" or "an
+//   admin", and its link goes to the account page's name question, coming back to this
+//   game. Answered (made up here: the scorer's cookie given back), the plays are saved.
 import { readFileSync } from 'node:fs';
 import {
   buildNext,
@@ -40,6 +45,8 @@ const scorer = { name: 'srl_session', value: 'local-admin-token' };
 const scorePath = `/${draftLeague}/score/${game}`;
 // Signed in, with no place in the draft league (stand-in-cast.ts).
 const noPlaceHere = { name: 'srl_session', value: 'local-stranger-token' };
+// Signed in, with no name given yet (stand-in-ports.ts, T-446).
+const noNameYet = { name: 'srl_session', value: 'local-unnamed-token' };
 
 const failures = [];
 const checked = [];
@@ -242,6 +249,74 @@ if (built) {
         );
       },
     );
+    await step('T-460: no name given yet, two plays wait, then named: saved', async () => {
+      await context.setOffline(true);
+      await play('home', 9, 'p2');
+      await play('away', 3, 'p2');
+      await context.clearCookies();
+      await context.addCookies([{ ...noNameYet, url: origin }]);
+      const refused = [];
+      const onRefused = async (response) => {
+        const url = new URL(response.url());
+        if (url.pathname.startsWith('/api/v1/leagues/') && response.status() === 403) {
+          refused.push(await response.text());
+        }
+      };
+      page.on('response', onRefused);
+      await context.setOffline(false);
+      await page
+        .getByText(
+          'Give your name to go on. 2 plays are kept on this device and are sent once you have given it.',
+        )
+        .waitFor({ timeout: 90_000 });
+      page.off('response', onRefused);
+      note(
+        'no name: the league endpoints answered 403 "name-needed"',
+        refused.length > 0 && refused.every((said) => said === '{"error":"name-needed"}'),
+        JSON.stringify(refused),
+      );
+      note(
+        'no name: never "sign in", never "signed out", never "an admin gives the game back"',
+        (await page.getByRole('link', { name: 'Sign in', exact: true }).count()) === 0 &&
+          (await page.getByText('You are signed out', { exact: false }).count()) === 0 &&
+          (await page.getByText('If an admin gives', { exact: false }).count()) === 0,
+      );
+      const kept = await keptTaps(page);
+      note(
+        'no name: the device still keeps the two plays as waiting',
+        kept.filter((state) => state === 'waiting').length === 2,
+        JSON.stringify(kept),
+      );
+      const link = page.locator('a[data-give-name]');
+      const href = new URL((await link.getAttribute('href')) ?? '', origin);
+      note(
+        'the link asks for the name on the account page and comes back to this game',
+        (await link.textContent()) === 'Give your name' &&
+          href.pathname === '/account' &&
+          href.searchParams.get('next') === scorePath,
+        href.toString(),
+      );
+      await Promise.all([page.waitForURL((url) => url.pathname === '/account'), link.tap()]);
+      note(
+        'the account page asks for the name',
+        (await page.locator('[data-name-screen] form[data-own-name="give"]').count()) === 1,
+      );
+      // Answering is made up here: the stand-in's one nameless person scores no game, so
+      // the browser is given the scorer's (named) cookie back, as the answer would leave it.
+      await context.clearCookies();
+      await context.addCookies([{ ...scorer, url: origin }]);
+      await page.goto(`${origin}${href.searchParams.get('next')}`);
+      await c.open();
+      await c.saved();
+      await page.reload();
+      await c.open();
+      note(
+        'named: the two kept plays are saved once',
+        JSON.stringify(await c.score()) === '{"home":6,"away":4}' &&
+          !(await keptTaps(page)).includes('waiting'),
+        JSON.stringify(await c.score()),
+      );
+    });
     await step(
       'T-456: this account can no longer open the league, with two plays waiting',
       async () => {

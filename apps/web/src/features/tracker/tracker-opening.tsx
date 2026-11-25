@@ -66,6 +66,8 @@ export type TrackerOpeningProps = {
   readonly account?: ReactNode;
   /** The sign-in screen, coming back to this game: offered once the device is signed out. */
   readonly signInHref: string;
+  /** The account page's name question, coming back to this game (T-460). */
+  readonly nameHref: string;
   /**
    * The account works in more areas than scoring, so it may correct games: a hint for
    * the words of the Mark not started question only (step 2.37; S-40).
@@ -103,6 +105,7 @@ export function TrackerOpening({
   accountHref,
   account = null,
   signInHref,
+  nameHref,
   mayCorrect = false,
   locale,
   catalog,
@@ -338,16 +341,20 @@ export function TrackerOpening({
     phase.kind === 'open' &&
     phase.status.mode.kind === 'read-only' &&
     phase.status.mode.reason === 'signed-out';
+  // Signed in with no name yet (T-460): the way to give it instead, back to this game.
+  const named = phase.kind === 'open' && phase.status.nameNeeded;
+  const signInTo = named ? nameHref : signInHref;
   const signIn =
     phase.kind === 'open' && (phase.status.signedOut || readOnlySignedOut) ? (
       <p>
         <a
           className="court-button"
           {...(readOnlySignedOut ? { 'data-kind': 'main' } : {})}
-          href={signInHref}
-          onClick={leaveBy(signInHref)}
+          {...(named ? { 'data-give-name': '' } : {})}
+          href={signInTo}
+          onClick={leaveBy(signInTo)}
         >
-          {t('tracker.signIn')}
+          {t(named ? 'tracker.nameNeededLink' : 'tracker.signIn')}
         </a>
       </p>
     ) : null;

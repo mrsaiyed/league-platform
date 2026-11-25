@@ -14,12 +14,19 @@ import type { ReadOnlyReason, TrackerControllerStatus } from './tracker-controll
 export type TrackerNotice =
   | { readonly key: `tracker.readOnly.${ReadOnlyReason}` }
   | { readonly key: 'tracker.heldByOther'; readonly name: string }
-  | { readonly key: 'tracker.signedOut' | 'tracker.reopen.doneElsewhere' | 'tracker.heldBySelf' }
+  | {
+      readonly key:
+        | 'tracker.signedOut'
+        | 'tracker.nameNeeded'
+        | 'tracker.reopen.doneElsewhere'
+        | 'tracker.heldBySelf';
+    }
   | {
       readonly key:
         | 'tracker.notApplied'
         | 'tracker.notSaved'
         | 'tracker.signedOutKept'
+        | 'tracker.nameNeededKept'
         | 'tracker.notAllowedKept'
         | 'tracker.cannotOpenKept'
         | 'tracker.releasedKept'
@@ -48,11 +55,14 @@ export function trackerNotices(
     TrackerControllerStatus,
     'mode' | 'game' | 'notApplied' | 'notSaved' | 'signedOut' | 'waiting' | 'offlineLong'
   > &
-    Partial<Pick<TrackerControllerStatus, 'sendNotSaved'>>,
+    Partial<Pick<TrackerControllerStatus, 'sendNotSaved' | 'nameNeeded'>>,
 ): readonly TrackerNotice[] {
   const notices: TrackerNotice[] = [];
   const { mode } = status;
   const kept = status.waiting.length;
+  // No name given yet (T-460): give it to go on, the taps kept; never "sign in".
+  const nameNeeded = (): TrackerNotice =>
+    kept > 0 ? { key: 'tracker.nameNeededKept', count: kept } : { key: 'tracker.nameNeeded' };
   // Left the game with plays "Send these plays" can still send (T-370): said as waiting.
   const leftWithPlays =
     mode.kind === 'read-only' &&
@@ -66,6 +76,8 @@ export function trackerNotices(
     } else if (mode.reason === 'cannot-open' && kept > 0) {
       // Signed in, and the league is closed to this account now (T-456): kept, a copy offered.
       notices.push({ key: 'tracker.cannotOpenKept', count: kept });
+    } else if (mode.reason === 'signed-out' && status.nameNeeded === true) {
+      notices.push(nameNeeded());
     } else if (leftWithPlays) {
       notices.push({ key: 'tracker.releasedKept', count: status.notSaved.length });
     } else if (!showsFinalPanel(status)) {
@@ -85,7 +97,11 @@ export function trackerNotices(
   }
   if (mode.kind === 'scoring' && status.signedOut) {
     notices.push(
-      kept > 0 ? { key: 'tracker.signedOutKept', count: kept } : { key: 'tracker.signedOut' },
+      status.nameNeeded === true
+        ? nameNeeded()
+        : kept > 0
+          ? { key: 'tracker.signedOutKept', count: kept }
+          : { key: 'tracker.signedOut' },
     );
   }
   // Several minutes with no connection and plays waiting (T6 §4): they are only here.

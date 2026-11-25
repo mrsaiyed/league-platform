@@ -3,6 +3,7 @@
 // over the web app's made-up stand-in. Tapping offline, reconnecting, a tab closed with
 // taps waiting, a refusal (T-113) and a takeover (T6 §5).
 import { TrackerGameStateWithChanges, TrackerRosters } from '@srleagues/contracts';
+import { createTranslator } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { refusalAnswer } from '../../server/league-api.ts';
@@ -25,7 +26,7 @@ import { createMemoryQueueStorage } from './memory-queue-storage.ts';
 import type { DeviceRosters, DeviceScoring } from './opened-game-storage.ts';
 import type { KeptTap, QueueStorage } from './queue-storage.ts';
 import { createTrackerController, type TapInput } from './tracker-controller.ts';
-import { trackerNotices } from './tracker-notice.ts';
+import { trackerNoticeText, trackerNotices } from './tracker-notice.ts';
 import {
   createFakeServer,
   createManualClock,
@@ -1568,6 +1569,96 @@ describe('tracker controller: refused "not found" while signed in (T-456)', () =
     await controller.start();
     await controller.idle();
     expect(controller.status().mode).toEqual({ kind: 'read-only', reason: 'cannot-open' });
+  });
+});
+
+describe('tracker controller: signed in with no name given yet (T-460)', () => {
+  const t = createTranslator('en');
+  const refused = (error: 'name-needed' | 'account-problem') => () => {
+    const { status, body } = refusalAnswer({ status: 403, error });
+    return Promise.resolve(new Response(JSON.stringify(body), { status }));
+  };
+  const said = (status: Parameters<typeof trackerNotices>[0]) =>
+    trackerNotices(status).map((notice) => trackerNoticeText(notice, t));
+
+  it('mid-game: says to give the name, holds every tap, never asks for sign-in; sent once named', async () => {
+    const network = endpointNetwork();
+    let nameless = false;
+    let asked = 0;
+    const tablet = device(network, {
+      sendTaps: (send) => (input, init) =>
+        nameless ? refused('name-needed')() : send(input, init),
+      askServer: (ask) => (input, init) => (nameless ? refused('name-needed')() : ask(input, init)),
+      // `/api/v1/signed-in` answers "not signed in" to a nameless person: never read for a 403.
+      whoIsSignedIn: async () => {
+        asked += 1;
+        return false;
+      },
+    });
+    await tablet.controller.start();
+    await tapAll(tablet.controller, tipOff);
+    await tablet.controller.idle();
+    nameless = true;
+    const waiting = [basket('home', hawks[0] ?? ''), basket('away', bears[0] ?? '', 3)];
+    await tapAll(tablet.controller, waiting);
+    await tablet.controller.idle();
+    await tablet.clock.advance(31_000);
+    await tablet.controller.idle();
+    let status = tablet.controller.status();
+    expect(status).toMatchObject({
+      mode: { kind: 'scoring' },
+      signedOut: true,
+      nameNeeded: true,
+      notSaved: [],
+      notApplied: [],
+    });
+    expect(status.waiting.map(inputOf)).toEqual(waiting);
+    expect((await tablet.storage.list(gameId)).map((e) => e.state)).toEqual(['waiting', 'waiting']);
+    expect(asked).toBe(0);
+    const words = said(status);
+    expect(words).toContain(
+      'Give your name to go on. 2 plays are kept on this device and are sent once you have given it.',
+    );
+    expect(words.join(' ')).not.toMatch(/sign in|admin/i);
+
+    // Named: every tap goes, once, and the screen no longer asks.
+    nameless = false;
+    await tablet.controller.openAgain();
+    await tablet.controller.idle();
+    status = tablet.controller.status();
+    expect(status).toMatchObject({ signedOut: false, nameNeeded: false, waiting: [] });
+    const server = await serverGame(network);
+    expect(server.sequence).toBe(4);
+    expect(scoreOf(server.state)).toEqual({ home: 2, away: 3 });
+  });
+
+  it('opening with no name: read-only, asked for the name, never "sign in" or "no such game"', async () => {
+    const network = endpointNetwork();
+    const { controller } = device(network, {
+      askServer: () => refused('name-needed'),
+      whoIsSignedIn: async () => false,
+    });
+    await controller.start();
+    await controller.idle();
+    const status = controller.status();
+    expect(status).toMatchObject({
+      mode: { kind: 'read-only', reason: 'signed-out' },
+      nameNeeded: true,
+    });
+    expect(said(status)).toEqual([
+      'Give your name to go on. Your taps are kept on this device and sent once you have given it.',
+    ]);
+  });
+
+  it('a 403 without the code is read as before: not allowed, no name asked', async () => {
+    const network = endpointNetwork();
+    const { controller } = device(network, { askServer: () => refused('account-problem') });
+    await controller.start();
+    await controller.idle();
+    expect(controller.status()).toMatchObject({
+      mode: { kind: 'read-only', reason: 'not-allowed' },
+      nameNeeded: false,
+    });
   });
 });
 

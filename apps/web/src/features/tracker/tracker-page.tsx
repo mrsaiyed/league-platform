@@ -43,7 +43,7 @@ import { isGameIdFormat } from '../../server/league-api.ts';
 import { siteOfThisRequest } from '../../server/league-site.ts';
 import { loadLeaguePage, signedInEmail } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
-import { signInFirstUrl } from '../../server/sign-in-first.ts';
+import { giveNameFirstUrl, signInFirstUrl } from '../../server/sign-in-first.ts';
 import { deviceRosters } from './device-rosters.ts';
 import { trackerRostersReply } from '../../server/tracker-rosters-reply.ts';
 import { notScoredBecause, scoresOnly } from './my-games.ts';
@@ -143,6 +143,7 @@ export async function TrackerPage({
         accountHref={platformUrl('account')}
         account={menu === null ? null : <AccountButton account={menu} />}
         signInHref={signInFirstUrl(trackerHref, { problem: 'backToYourGame' })}
+        nameHref={giveNameFirstUrl(trackerHref)}
         // Whoever works in more areas than scoring may correct games: only the words of
         // the Mark not started question follow from it. The league stays the judge (S-40).
         mayCorrect={!scoresOnly(view.areas)}
