@@ -2513,7 +2513,10 @@ async function checkSettings(origin) {
   if (!after.includes('Now: set for this league.') || !after.includes('Go back to the default')) {
     problems.push('the settings page does not show the saved value');
   }
-  if (!after.includes('data-said="saved"') || !/Saved: Which games a scorekeeper/.test(after)) {
+  if (
+    !after.includes('data-said="saved"') ||
+    !after.includes('>Saved: Which games a scorekeeper may score.<')
+  ) {
     problems.push('the settings page does not say the setting was saved, by its name');
   }
   if ((await pageOf('owner')).includes('data-said="saved"')) {
@@ -2544,7 +2547,9 @@ async function checkSettings(origin) {
     !/<fieldset class="settings-choice" aria-invalid="true"[^>]*><legend>Which games a scorekeeper/.test(
       outside.body,
     ) ||
-    !/Which games a scorekeeper[^<]*: That value is not allowed for this setting/.test(outside.body)
+    !outside.body.includes(
+      '>Which games a scorekeeper may score: That value is not allowed for this setting. Check what it accepts and try again.<',
+    )
   ) {
     problems.push(`a value outside the limits was not refused in the page (${outside?.to})`);
   }

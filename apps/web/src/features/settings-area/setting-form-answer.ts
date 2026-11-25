@@ -3,8 +3,19 @@
 // that names the setting ("Who may score: That value is not one this setting accepts…");
 // after a save, which setting the "Saved" line stands beside and its words. The fixed
 // words of a command's error only, never anything typed (T-187).
+import { catalogs } from '@srleagues/site';
 import { t, type TextKey } from '../../server/messages.ts';
 import { problemKey } from './answer.ts';
+
+/**
+ * A setting's short name (T-419): `setting.<key>.name` beside its `.label`, a few words with
+ * no full stop, so "Saved: <name>." reads as one sentence. A label with no name (a setting
+ * declared only in a test) is used as it is.
+ */
+export function settingName(label: TextKey): TextKey {
+  const name = label.replace(/\.label$/, '.name');
+  return name !== label && Object.hasOwn(catalogs['en'] ?? {}, name) ? (name as TextKey) : label;
+}
 
 /** What a saved setting form leaves in the notice (its `said`); its `thing` is the key. */
 export const settingSaids = ['setting', 'settingCleared'] as const;
@@ -38,7 +49,10 @@ export function settingRefusal(
         : undefined;
   return box === undefined
     ? { wrong: [], said: why }
-    : { wrong: [box], said: t('adminSettings.fieldRefused', { field: t(label), why }) };
+    : {
+        wrong: [box],
+        said: t('adminSettings.fieldRefused', { field: t(settingName(label)), why }),
+      };
 }
 
 /** The setting a notice's "Saved" line stands beside, and its words; undefined for another notice. */
@@ -51,6 +65,6 @@ export function settingSaved(
   if (said === undefined || notice === undefined || label === undefined) return undefined;
   return {
     key: notice.thing,
-    text: t(`adminSettings.saved.${said}`, { setting: t(label) }),
+    text: t(`adminSettings.saved.${said}`, { setting: t(settingName(label)) }),
   };
 }

@@ -73,12 +73,12 @@ if (browser) {
   page.setDefaultTimeout(60_000);
 
   const settings = (league) => `${origin}/${league}/admin/settings`;
-  // "Saved: <the setting's name>…" beside the setting itself (step 2.155 part 4).
+  // "Saved: <the setting's short name>." whole (T-419), beside the setting itself (step 2.155 part 4).
   const saved = (label, answer, setting) => {
     const said = answer.text;
     note(
       `${label}: the screen says it was saved`,
-      answer.saved && said.startsWith(`Saved: ${setting}`),
+      answer.saved && said === `Saved: ${setting}.`,
       said,
     );
   };

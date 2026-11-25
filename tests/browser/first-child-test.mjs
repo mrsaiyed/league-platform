@@ -82,7 +82,7 @@ try {
     );
     note(
       `${label}: the yes is saved`,
-      answer.saved && answer.text.startsWith("Saved: Children's full names"),
+      answer.saved && answer.text === "Saved: Children's full names.",
       answer.text,
     );
   };

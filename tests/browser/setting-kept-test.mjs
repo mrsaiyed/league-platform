@@ -40,7 +40,8 @@ async function journey(browser, origin, scripts) {
   const how = scripts ? 'scripts on' : 'scripts off';
   // A setting of its own for each journey, so the two never meet.
   const key = scripts ? 'statistics.minimumGamesToRank' : 'games.scorekeeperReopenMinutes';
-  const named = scripts ? 'Games in which a statistic' : 'Minutes after a game ends';
+  // The setting's short name (T-419), and each sentence checked whole.
+  const named = scripts ? 'Games needed to be ranked' : 'How long a scorekeeper may reopen a game';
   const section = `section[data-setting="${key}"]`;
   const settings = `${origin}/north-valley/admin/settings`;
   const context = await browser.newContext({ javaScriptEnabled: scripts, viewport: phone });
@@ -64,7 +65,8 @@ async function journey(browser, origin, scripts) {
     const why = (await problem.innerText(limit)).trim();
     note(
       `${how}: the sentence names the setting and says why`,
-      why.startsWith(named) && why.includes('That value is not allowed for this setting'),
+      why ===
+        `${named}: That value is not allowed for this setting. Check what it accepts and try again.`,
       why,
     );
     note(`${how}: nothing is said as saved`, (await page.locator('[data-said]').count()) === 0);
@@ -103,7 +105,7 @@ async function journey(browser, origin, scripts) {
     await said.waitFor(limit);
     note(
       `${how}: "Saved" names the setting`,
-      (await said.innerText(limit)).trim().startsWith(`Saved: ${named}`),
+      (await said.innerText(limit)).trim() === `Saved: ${named}.`,
     );
     note(`${how}: said once`, (await page.locator('[data-said]').count()) === 1);
     note(`${how}: the box shows the saved number`, (await box.inputValue(limit)) === '4');
@@ -146,7 +148,7 @@ async function journey(browser, origin, scripts) {
     await said.waitFor(limit);
     note(
       `${how}: going back to the default is said beside it`,
-      (await said.innerText(limit)).trim().endsWith('is back to its default.'),
+      (await said.innerText(limit)).trim() === `${named} is back to its default.`,
     );
     note(
       `${how}: the pill says the default`,

@@ -136,9 +136,9 @@ export const enAdminSettings = {
     'Saved: the contact email, city, time zone and listing. In the new time zone someone in this league is now a child, the first one recorded, so the confirmation that parents agreed to children’s full names is back to no and a saved choice of full names is cleared. Until you confirm again under Privacy, children are shown by first name and last initial.',
   'adminSettings.saved.name': "Saved: the league's name.",
   'adminSettings.saved.profile': 'Saved: the contact email, city, time zone and listing.',
-  // Beside one setting after its save (step 2.155 part 4): the setting's own name.
+  // Beside one setting after its save (step 2.155 part 4): the setting's short name.
   'adminSettings.saved.setting': 'Saved: {setting}.',
-  'adminSettings.saved.settingCleared': 'Saved: {setting} is back to its default.',
+  'adminSettings.saved.settingCleared': '{setting} is back to its default.',
   'adminSettings.saved.shortName':
     'Saved: the short name. The old address forwards to the new one for 12 months.',
   'adminSettings.saved.whoPlays': 'Saved: who plays.',
@@ -514,15 +514,22 @@ export const enAdminSettings = {
     "A team of this season already has two players wearing one number. Change one of them on the team's page first, then switch this on.",
   'setting.games.scorekeeperReopenMinutes.label':
     'Minutes after a game ends during which the scorekeeper who ended it may reopen it from the tracker, with a reason, if they tapped End game too soon. 0 means never. After that, only an admin can reopen it.',
+  // A setting's short name (step 2.155 part 4, T-419): a few words, no full stop, used in
+  // "Saved: <name>.", "<name> is back to its default." and a refusal's "<name>: <why>".
+  'setting.games.scorekeeperReopenMinutes.name': 'How long a scorekeeper may reopen a game',
   'setting.games.scorekeepersMayChangeFormat.label':
     "Scorekeepers may change a game's format before it starts. When this is off, they ask an admin, who can always give a game its own format from Games.",
+  'setting.games.scorekeepersMayChangeFormat.name':
+    "Whether scorekeepers may change a game's format",
   'setting.games.whoMayScore.label':
     'Which games a scorekeeper may score: any game, or only the games they are assigned to',
+  'setting.games.whoMayScore.name': 'Which games a scorekeeper may score',
   'setting.games.whoMayScore.option.anyScorekeeper': 'Any game',
   'setting.games.whoMayScore.option.assignedOnly': 'Only games they are assigned to',
   // Setting labels (T5 §6, T-98): `setting.<key>.label`, shown on the admin screen.
   'setting.members.startPage.label':
     'Where members land first: the league home or their own team page',
+  'setting.members.startPage.name': 'Where members land first',
   // The words for that setting's choices: `setting.<key>.option.<choice>`.
   'setting.members.startPage.option.leagueHome': 'The league home',
   'setting.members.startPage.option.myTeam': 'Their own team page',
@@ -531,10 +538,13 @@ export const enAdminSettings = {
   // The parents' confirmation, a setting of its own (R-14, R-29, record 065).
   'setting.privacy.childrenInFullConfirmed.label':
     "Children's full names: shown only while names are on full names, and only with their parents' or guardians' agreement. In a youth or mixed league this also covers anyone whose age is not recorded.",
+  'setting.privacy.childrenInFullConfirmed.name': "Children's full names",
   'setting.privacy.playersMayAskForInitials.label':
     'Adults may ask to appear as initials on public pages. Children always can, whatever this says: a request from a parent is always followed. Anyone can ask to have their name taken off. Switching this off only stops new requests: anyone already shown as initials stays that way until their own record is changed.',
+  'setting.privacy.playersMayAskForInitials.name': 'Whether adults may ask for initials',
   'setting.privacy.publicNames.label':
     "Names on public pages: how players are shown on the team pages, game pages and statistics. If a person's own request for less is recorded (initials, or their name taken off), it always wins over this setting.",
+  'setting.privacy.publicNames.name': 'Names on public pages',
   'setting.privacy.publicNames.option.firstNameLastInitial':
     'First name and last initial for everyone, adults and children, like "Jordan E."',
   // Each choice says what it does to adults and to children (R-29, record 065).
@@ -545,14 +555,19 @@ export const enAdminSettings = {
   // The site's two settings (step 2.60, U-10, U-18).
   'setting.site.doNotIndex.label':
     'Ask search engines not to show this league. A league with children in it is never shown by search engines, whatever this says.',
+  'setting.site.doNotIndex.name': 'Asking search engines not to show the league',
   'setting.site.notice.label':
     'A notice at the top of every public page, in your own words, for example "Unofficial demo". Leave it empty for none. At most 200 characters.',
+  'setting.site.notice.name': 'The notice on public pages',
   'setting.statistics.minimumGamesToRank.label':
     'Games in which a statistic must be recorded for a player to be ranked on its leaders board. 0 sets no minimum. A player with fewer still shows in the full table.',
+  'setting.statistics.minimumGamesToRank.name': 'Games needed to be ranked',
   'setting.teams.mayChooseStatsLevel.label':
     "Whether each team may choose who sees its players' statistics",
+  'setting.teams.mayChooseStatsLevel.name': 'Whether teams may choose who sees their statistics',
   'setting.teams.startingStatsLevel.label':
     "Who sees a new team's players' statistics until the team chooses",
+  'setting.teams.startingStatsLevel.name': "Who sees a new team's statistics",
   'setting.teams.startingStatsLevel.option.everyone': 'Everyone',
   'setting.teams.startingStatsLevel.option.staff': "Only the team's staff and the league's admins",
 } as const;
