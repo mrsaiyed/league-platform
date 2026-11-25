@@ -147,3 +147,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.241 leftovers: the server and keptForScoring do not read a season's own named list of statistics (record 070), which no command writes today; the transfer's check also reads plays already sent, so it is stricter than it needs to be; saving "Statistics kept" unchanged raises the season's version, so a second click from the same old page is told "changed since read".
 
 - 2.246 leftovers: browser tests that type no date and the database store tests (the database's own clock) were not searched for a dependence on the hour.
+
+- 2.243 leftovers: no browser test reaches the Profile time-zone sentence; the first-child sentence shows only when a yes was put back, not when only a saved "full names" was cleared; an adult league that had a child and an old yes before this step keeps both (made-up data only today; the lead checks the test copy in a session the founder started); the two-connection race wants a run on a real PostgreSQL.
