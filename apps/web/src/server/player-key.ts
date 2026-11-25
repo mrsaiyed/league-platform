@@ -5,18 +5,45 @@
 // old answer can work it back to the id or forward to another game.
 //
 // It is HMAC-SHA-256 of a fixed label, the game's id and the player's id, under the
-// server's session secret (SESSION_SECRET), cut to 16 bytes. The label means the same
-// secret can never give the same value for any other use. The 16 bytes are written as a
+// server's key secret, cut to 16 bytes. The label means the same secret can never give
+// the same value for any other use. The 16 bytes are written as a
 // UUID of version 8 (RFC 9562's version for a value made by our own rule, T-463), so a
 // watcher's page opened before this step, whose contract reads `playerId` as a UUID,
-// still takes the next answer whole. Where no session secret is set (this computer, the
-// tests) a random secret made when the server starts stands in: nothing public is ever
-// the key's secret, and keys then change when the server restarts, which a page takes
-// as a new answer (it adopts every snapshot whole).
-import { createHmac, randomBytes } from 'node:crypto';
+// still takes the next answer whole.
+//
+// The key secret (T-465): every server process with the same settings must give the same
+// key for a game, and no setting the founder must add by hand may be needed. So, in order:
+// SESSION_SECRET when it is set; else, where the app runs on a real database, a secret
+// derived (HKDF-SHA-256 under a label of its own) from the sign-in service's secret key,
+// which the settings already require there (config-schema.ts) and which no visitor ever
+// sees; else, only on made-up data with neither, a random secret made when the server
+// starts (keys then change on a restart, which a page takes whole). Nothing public is ever
+// the key's secret, and none of it is ever logged.
+import { createHmac, hkdfSync, randomBytes } from 'node:crypto';
 import type { PlayerKeyOf } from '@srleagues/core';
+import type { Config } from './config-schema.ts';
 
 const label = 'srleagues/public-snapshot/player-key/v1';
+const derivationLabel = 'srleagues/public-snapshot/player-key-secret/v1';
+
+/** The settings the key secret is chosen from (T-465). */
+export type PlayerKeySettings = Pick<Config, 'SESSION_SECRET' | 'SUPABASE_SECRET_KEY'>;
+
+/**
+ * A secret of 32 bytes derived from a server-only secret under a label (HKDF-SHA-256): not
+ * the secret itself, and another label gives another. Exported for its tests.
+ */
+export function derivedSecret(serverSecret: string, info: string = derivationLabel): Uint8Array {
+  return new Uint8Array(hkdfSync('sha256', serverSecret, derivationLabel, info, 32));
+}
+
+/** The key's secret from the settings, in T-465's order. */
+export function playerKeySecretFrom(settings: PlayerKeySettings): string | Uint8Array {
+  if (settings.SESSION_SECRET !== undefined) return settings.SESSION_SECRET;
+  if (settings.SUPABASE_SECRET_KEY !== undefined)
+    return derivedSecret(settings.SUPABASE_SECRET_KEY);
+  return randomBytes(32);
+}
 
 /** The key under one secret: exported for its tests; the app uses `publicPlayerKey`. */
 export function playerKeyUnder(secret: string | Uint8Array): PlayerKeyOf {
@@ -45,12 +72,12 @@ type Holder = { [slot]?: PlayerKeyOf };
 const holder = globalThis as Holder;
 
 /**
- * Sets the server's key under its session secret, once, as the server starts (container.ts),
- * before any snapshot is read. Without one a random secret stands in.
+ * Sets the server's key, once, as the server starts (container.ts), before any snapshot is
+ * read, under the secret T-465 chooses. It never fails for want of SESSION_SECRET.
  */
-export function startPublicPlayerKey(sessionSecret: string | undefined): void {
+export function startPublicPlayerKey(settings: PlayerKeySettings): void {
   if (holder[slot] !== undefined) throw new Error('The public player key was made before start.');
-  holder[slot] = playerKeyUnder(sessionSecret ?? randomBytes(32));
+  holder[slot] = playerKeyUnder(playerKeySecretFrom(settings));
 }
 
 /** The server's one player key (T-462). */

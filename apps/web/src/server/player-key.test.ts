@@ -1,8 +1,15 @@
 // The public snapshot's player key (T-462, T-463; step 2.225).
 import { createHmac } from 'node:crypto';
 import { GameSnapshotReading } from '@srleagues/contracts';
-import { describe, expect, it } from 'vitest';
-import { playerKeyUnder, publicPlayerKey } from './player-key.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  derivedSecret,
+  playerKeySecretFrom,
+  playerKeyUnder,
+  publicPlayerKey,
+  startPublicPlayerKey,
+  type PlayerKeySettings,
+} from './player-key.ts';
 
 const secret = 'made-up-session-secret-0123456789abcdef';
 const gameA = '01900000-0000-7000-8000-0000000b0001';
@@ -48,5 +55,82 @@ describe('the public player key', () => {
     expect(publicPlayerKey(gameA, player)).toMatch(uuid);
     expect(publicPlayerKey(gameA, player)).toBe(publicPlayerKey(gameA, player));
     expect(publicPlayerKey(gameA, player)).not.toBe(publicPlayerKey(gameB, player));
+  });
+});
+
+// T-465: which secret the key is made under. Each "process" here is a fresh key made from
+// the same settings, as two server processes would make it as they start.
+describe("the public player key's secret", () => {
+  const serviceKey = 'made-up-sign-in-service-secret-key-0123456789';
+  const keyOf = playerKeyUnder(secret);
+  const processKey = (settings: PlayerKeySettings) => playerKeyUnder(playerKeySecretFrom(settings));
+  const slot = Symbol.for('srleagues.public-player-key');
+  const holder = globalThis as { [slot]?: unknown };
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('is SESSION_SECRET when it is set: two processes give the same key', () => {
+    const settings = { SESSION_SECRET: secret, SUPABASE_SECRET_KEY: serviceKey };
+    expect(processKey(settings)(gameA, player)).toBe(processKey(settings)(gameA, player));
+    expect(processKey(settings)(gameA, player)).toBe(keyOf(gameA, player));
+  });
+
+  it('is derived from the sign-in service key on a real database: two processes agree', () => {
+    const settings = { SUPABASE_SECRET_KEY: serviceKey };
+    expect(processKey(settings)(gameA, player)).toBe(processKey(settings)(gameA, player));
+    expect(processKey(settings)(gameA, player)).not.toBe(keyOf(gameA, player));
+    expect(processKey(settings)(gameA, player)).not.toBe(playerKeyUnder(serviceKey)(gameA, player));
+  });
+
+  it('is not the service key itself, and another label gives another secret', () => {
+    const derived = Buffer.from(derivedSecret(serviceKey));
+    expect(derived).toHaveLength(32);
+    expect(derived.toString('hex')).not.toContain(Buffer.from(serviceKey).toString('hex'));
+    expect(derived.toString('utf8')).not.toContain(serviceKey.slice(0, 8));
+    expect(derived.equals(Buffer.from(derivedSecret(serviceKey)))).toBe(true);
+    expect(derived.equals(Buffer.from(derivedSecret(serviceKey, 'another/label')))).toBe(false);
+    expect(derived.equals(Buffer.from(derivedSecret(`${serviceKey}x`)))).toBe(false);
+  });
+
+  it('is random only with neither secret, and starting never fails for want of one', () => {
+    expect(processKey({})(gameA, player)).not.toBe(processKey({})(gameA, player));
+    const before = holder[slot];
+    try {
+      delete holder[slot];
+      expect(() => startPublicPlayerKey({})).not.toThrow();
+    } finally {
+      holder[slot] = before;
+    }
+  });
+
+  it('logs nothing of either secret as the server starts', () => {
+    const written: string[] = [];
+    const keep = (...parts: unknown[]) => {
+      written.push(parts.map(String).join(' '));
+      return true;
+    };
+    for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+      vi.spyOn(console, method).mockImplementation(keep);
+    }
+    vi.spyOn(process.stdout, 'write').mockImplementation(keep);
+    vi.spyOn(process.stderr, 'write').mockImplementation(keep);
+    const before = holder[slot];
+    try {
+      delete holder[slot];
+      startPublicPlayerKey({ SUPABASE_SECRET_KEY: serviceKey });
+      expect(publicPlayerKey(gameA, player)).toBe(
+        processKey({ SUPABASE_SECRET_KEY: serviceKey })(gameA, player),
+      );
+    } finally {
+      holder[slot] = before;
+    }
+    const derived = Buffer.from(derivedSecret(serviceKey));
+    for (const line of written) {
+      expect(line).not.toContain(serviceKey);
+      expect(line).not.toContain(derived.toString('hex'));
+      expect(line).not.toContain(derived.toString('base64'));
+    }
+    expect(written).toEqual([]);
   });
 });

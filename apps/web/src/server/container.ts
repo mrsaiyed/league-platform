@@ -41,8 +41,8 @@ export function webPorts(): Promise<WebPorts> {
 
 function start(): Promise<WebPorts> {
   const config = getConfig();
-  // The public snapshot's player key, under the session secret (T-462, step 2.225).
-  startPublicPlayerKey(config.SESSION_SECRET);
+  // The public snapshot's player key, under the secret T-465 chooses (T-462, step 2.225).
+  startPublicPlayerKey(config);
   const logger = createLogger({ sink: consoleSink, level: config.LOG_LEVEL, base: { app: 'web' } });
   return startWebApp(config, {
     database: () => import(/* turbopackIgnore: true */ '@srleagues/database'),
