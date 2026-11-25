@@ -16,20 +16,13 @@
 // Both are given the route's `[league]` value. When it is not the league of the
 // address the proxy wrote down, the proxy did not run for this request, and the
 // answer is "not found" (league-gate.ts, addressMatchesRoute).
-import {
-  holdsAnywhere,
-  platformUrl,
-  roles,
-  type AdminArea,
-  type Permission,
-  type Role,
-} from '@srleagues/core';
+import { holdsAnywhere, roles, type AdminArea, type Permission, type Role } from '@srleagues/core';
 import { headers } from 'next/headers';
 import { forbidden, notFound, permanentRedirect, redirect } from 'next/navigation';
 import { cache } from 'react';
 import { getConfig } from './config.ts';
 import { signInFirstUrl } from './sign-in-first.ts';
-import type { Problem } from './sign-in/problems.ts';
+import { screenUrl, type Problem } from './sign-in/problems.ts';
 import { webPorts } from './container.ts';
 import {
   addressMatchesRoute,
@@ -108,8 +101,11 @@ export async function loadLeaguePage(
       return forbidden();
     case 'not-found':
       return notFound();
-    case 'account-problem':
-      return redirect(platformUrl('account'));
+    case 'account-problem': {
+      // The account page explains; its name screen (step 2.128) comes back to this page.
+      const { path } = await resolvedRequest();
+      return redirect(screenUrl('account', { next: path }));
+    }
   }
 }
 

@@ -23,6 +23,7 @@ import { leagueUrl } from '@srleagues/core';
 import { demoLeague } from '../../packages/database/src/seed/demo-league-data.ts';
 import {
   accessibilityProblems,
+  answerNameScreen,
   buildNext,
   freePort,
   launch,
@@ -113,6 +114,8 @@ if (browser) {
         page.waitForURL((url) => url.pathname !== '/signup/password'),
         page.getByRole('button', { name: 'Save and sign in' }).click(),
       ]);
+      // The one name screen a new account meets (step 2.128).
+      await answerNameScreen(page, 'Made-up', 'Signer');
     }
     await page.goto(`${origin}/account`);
     note(

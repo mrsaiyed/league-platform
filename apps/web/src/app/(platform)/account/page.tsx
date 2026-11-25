@@ -25,6 +25,7 @@ import {
   giveOwnNameAction,
 } from '../../../server/sign-in/own-name-actions.ts';
 import { cookieNames } from '../../../server/sign-in/cookies.ts';
+import { safeReturnPath } from '../../../server/sign-in/device.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
 import { leaguesOfThisRequest, signedInPerson } from '../../../server/signed-in-leagues.ts';
 import { timeInWords } from '../../../server/sign-in/sign-in-mail.ts';
@@ -45,12 +46,13 @@ export default async function Page({ searchParams }: SearchProps) {
   // The cookies first: this makes the page drawn per request, never at build time.
   // The session is identified once for the whole request (this-request.ts).
   const accessToken = (await cookies()).get(cookieNames.session)?.value ?? '';
-  const asking = (await searchParams)['ask'] === 'signOutEverywhere';
+  const query = await searchParams;
+  const asking = query['ask'] === 'signOutEverywhere';
   const ports = await webPorts();
   const who = await signedInPerson();
   if (who.kind === 'account-problem') {
     return who.problem === 'name-needed' ? (
-      <NameScreen />
+      <NameScreen next={safeReturnPath(query['next'])} />
     ) : (
       <AccountProblemPage problem={who.problem} />
     );
@@ -188,8 +190,9 @@ function ownNameWords(): OwnNameWords {
 /**
  * The one screen that asks a new account's first and last name, once (R-21, step 2.128):
  * every page sends a signed-in person here until they have answered; they can still sign out.
+ * Answered, they go on to the page that sent them (`?next=`, S-125), else the account page.
  */
-function NameScreen() {
+function NameScreen({ next }: { readonly next: string | null }) {
   return (
     <StandalonePage>
       <main className="ui-message ui-form-card account" data-name-screen="">
@@ -201,6 +204,7 @@ function NameScreen() {
           initial={{ firstName: '', lastName: '', problem: null, saved: false, round: 0 }}
           words={ownNameWords()}
           mark="give"
+          next={next}
         />
         <form action={signOutAction}>
           <button className="ui-button" data-kind="quiet" type="submit">

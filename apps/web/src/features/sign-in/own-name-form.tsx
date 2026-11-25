@@ -19,12 +19,15 @@ export function OwnNameForm({
   initial,
   words,
   mark,
+  next = null,
 }: {
   readonly action: (state: OwnNameFormState, form: FormData) => Promise<OwnNameFormState>;
   readonly initial: OwnNameFormState;
   readonly words: OwnNameWords;
   /** The form's own mark, by which tests find it. */
   readonly mark: string;
+  /** Where the one screen goes once answered (S-125): a path on this site, or none. */
+  readonly next?: string | null;
 }) {
   const [state, formAction, pending] = useActionState(action, initial);
   const problem = state.problem === null ? null : words.problems[state.problem];
@@ -40,6 +43,7 @@ export function OwnNameForm({
           {words.saved}
         </p>
       ) : null}
+      {next === null ? null : <input type="hidden" name="next" value={next} />}
       <label className="ui-field">
         <span>{words.firstName}</span>
         <input

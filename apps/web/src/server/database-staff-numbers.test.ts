@@ -27,6 +27,7 @@ import {
   staffNumbersParts,
   staffNumbersRequest,
 } from './staff-numbers-endpoint.ts';
+import { identifyNamed } from './named-identify.test-helper.ts';
 
 let made: database.MadeUpDatabase;
 let db: database.DatabaseHandle;
@@ -55,7 +56,7 @@ const signedIn = (email: string) => {
   return token;
 };
 const accountOf = async (token: string) => {
-  const who = await ports.identify(token);
+  const who = await identifyNamed(ports, token);
   if (!who.ok) throw new Error(`not signed in: ${who.error.code}`);
   return who.value.accountId;
 };
@@ -202,7 +203,7 @@ async function ask(who: string | 'visitor', query: Record<string, string>) {
     {
       host: 'localhost:3000',
       path: leagueApiUrl({ id: lakeside().leagueId }, staffNumbersParts),
-      session: token === undefined ? null : await ports.identify(token),
+      session: token === undefined ? null : await identifyNamed(ports, token),
     },
     staffNumbersParts,
     { ...ports, siteOrigin: 'http://localhost:3000' },

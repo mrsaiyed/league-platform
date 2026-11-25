@@ -25,6 +25,7 @@ import { serveMadeUpDatabase } from '../../packages/database/index.ts';
 import { serveFakeSupabaseAuth } from '../../packages/providers/index.ts';
 import {
   accessibilityProblems,
+  answerNameScreen,
   buildNext,
   freePort,
   launch,
@@ -134,6 +135,8 @@ async function signUp(page, address) {
     page.waitForURL((url) => url.pathname !== '/signup/password'),
     page.getByRole('button', { name: 'Save and sign in' }).click(),
   ]);
+  // The one name screen a new account meets (step 2.128).
+  await answerNameScreen(page, 'Made-up', 'Signer');
 }
 
 /** The devices the account page lists, and which one is this. */

@@ -37,6 +37,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   accessibilityProblems,
+  answerNameScreen,
   buildNext,
   freePort,
   launch,
@@ -200,7 +201,10 @@ async function enterCode(page, code) {
   await tap(page, button(page, 'Continue'), atPath('/signup/password'));
 }
 
-/** Signs `email` up the whole way through; leaves the page on the account page. */
+/**
+ * Signs `email` up the whole way through, the one name screen (step 2.128) included; leaves
+ * the page on the account page.
+ */
 async function signUp(context, page, email) {
   addresses.add(email);
   await page.goto(`${origin}/signup`);
@@ -210,6 +214,7 @@ async function signUp(context, page, email) {
   await enterCode(page, code);
   await page.getByLabel('Password').fill(chosen);
   await tap(page, button(page, 'Save and sign in'), atPath('/account'));
+  await answerNameScreen(page, 'Made-up', 'Signer');
 }
 
 async function signIn(page, email, password) {
@@ -292,6 +297,7 @@ async function slipWalk(scripts) {
       await page.getByLabel('Password').fill(chosen);
     }
     await tap(page, button(page, 'Save and sign in'), atPath('/account'));
+    await answerNameScreen(page, 'Made-up', `Slip ${scripts ? 'On' : 'Off'}`);
     note(
       `signed up, on the account page (${label})`,
       (await page.getByText(`Signed in as ${right}`).count()) === 1,

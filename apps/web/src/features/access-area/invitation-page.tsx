@@ -46,7 +46,9 @@ export async function InvitationPage() {
 
 async function InvitationBody() {
   const request = await invitationRequest();
-  if (request.kind === 'account-problem') return redirect(platformUrl('account'));
+  // The account page explains, and its name screen (step 2.128) comes back here.
+  if (request.kind === 'account-problem')
+    return redirect(screenUrl('account', { next: request.path }));
   const slug = request.kind === 'no-league' ? request.slug : request.context.league.slug;
   const here = heldInvitationPath(slug);
   const token = await heldToken();

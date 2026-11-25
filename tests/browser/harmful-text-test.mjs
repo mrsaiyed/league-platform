@@ -200,6 +200,10 @@ const FIELDS = {
   },
   // League settings → Admins (step 2.97): the address an invitation is sent to.
   '/[league]/admin/settings/admins': { email: 'the email boxes' },
+  // Step 2.128: "Your name" on the account page, posted by hand; the walk then reads the
+  // name back wherever it is shown (the account page, League settings → Admins). The one
+  // name screen holds the same two boxes, but no made-up person of the stand-in meets it.
+  '/account': { firstName: POSTED, lastName: POSTED },
   '/signin': { email: 'the email boxes' },
   '/signup': { email: 'the email boxes' },
   '/signin/forgot': { email: 'the email boxes' },

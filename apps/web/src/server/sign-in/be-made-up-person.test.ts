@@ -24,6 +24,7 @@ import {
   enterCode,
   type FlowDeps,
 } from './flows.ts';
+import { identifyNamed } from '../named-identify.test-helper.ts';
 
 const origin = 'http://127.0.0.1:3000';
 /** The scratch folders this file made in the system's temp folder: removed after each test. */
@@ -324,7 +325,12 @@ describe('no code in a log line (T4 §10)', () => {
       to: platformUrl('account'),
     });
     const token = cookies.get(cookieNames.session) ?? '';
-    expect((await ports.identify(token)).ok).toBe(true);
+    // A new account meets the one name screen first (step 2.128), then is let in.
+    expect(await ports.identify(token)).toEqual({
+      ok: false,
+      error: { code: 'account-problem', problem: 'name-needed' },
+    });
+    expect((await identifyNamed(ports, token)).ok).toBe(true);
     // A line that tries to log them, as a careless one might: the logger's redaction must
     // remove both, so the check below also looks at a real line.
     await ports.signInMail.newDevice(email, 'made-up', new Date());

@@ -17,6 +17,7 @@
 // scorekeeper, another league's admin and a visitor refused, holding nothing of her.
 import {
   accessibilityProblems,
+  answerNameScreen,
   buildNext,
   freePort,
   launch,
@@ -88,6 +89,8 @@ async function signedIn(browser, origin, address) {
     page.waitForURL((url) => url.pathname !== '/signup/password'),
     page.getByRole('button', { name: 'Save and sign in' }).click(),
   ]);
+  // The one name screen a new account meets (step 2.128).
+  await answerNameScreen(page, 'Made-up', 'Signer');
   const cookie = (await context.cookies()).find((c) => c.name === 'srl_session')?.value ?? '';
   note(`${address} is signed in`, cookie !== '');
   return { context, page, cookie };

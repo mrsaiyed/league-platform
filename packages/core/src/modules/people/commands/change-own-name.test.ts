@@ -22,6 +22,8 @@ function memoryStore(): OwnNameStore & { readonly names: Map<string, OwnName> } 
   };
 }
 
+const context = { accountId: 'a1', requestId: 'r1' };
+
 describe('changeOwnName (step 2.128)', () => {
   it('changes the name of an account that has given one', async () => {
     const store = memoryStore();

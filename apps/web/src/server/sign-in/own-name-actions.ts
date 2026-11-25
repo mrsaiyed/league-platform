@@ -11,6 +11,7 @@ import type { OwnNameFormState } from '../../features/sign-in/own-name-state.ts'
 import { webPorts } from '../container.ts';
 import { signedInPerson } from '../signed-in-leagues.ts';
 import { cookieNames } from './cookies.ts';
+import { safeReturnPath } from './device.ts';
 
 function typed(form: FormData): { readonly firstName: string; readonly lastName: string } {
   const field = (name: string) => {
@@ -20,7 +21,7 @@ function typed(form: FormData): { readonly firstName: string; readonly lastName:
   return { firstName: field('firstName'), lastName: field('lastName') };
 }
 
-/** The one screen's answer: the name made, then the account page, where a sign-in lands. */
+/** The one screen's answer: the name made, then the page that sent them here (S-125), else the account page. */
 export async function giveOwnNameAction(
   state: OwnNameFormState,
   form: FormData,
@@ -37,7 +38,7 @@ export async function giveOwnNameAction(
     const problem = given.error.code === 'already-named' ? 'alreadyNamed' : 'invalid';
     return { ...input, problem, saved: false, round: state.round + 1 };
   }
-  redirect(platformUrl('account'));
+  redirect(safeReturnPath(form.get('next')) ?? platformUrl('account'));
 }
 
 /** "Your name" on the account page: saved and drawn at once, or refused with the text kept. */

@@ -89,7 +89,7 @@ export type InvitationRequest =
       readonly visitor: boolean;
     }
   /** The session is none of our accounts' (record 055): the account page explains. */
-  | { readonly kind: 'account-problem' }
+  | { readonly kind: 'account-problem'; readonly path: string }
   | {
       readonly kind: 'league';
       readonly context: LeagueRequestContext;
@@ -116,7 +116,7 @@ export async function invitationRequest(): Promise<InvitationRequest> {
   const slug = (facts.path.split(/[?#]/)[0] ?? '').split('/')[1] ?? '';
   if (!built.ok) {
     return built.error.code === 'account-problem'
-      ? { kind: 'account-problem' }
+      ? { kind: 'account-problem', path: facts.path }
       : { kind: 'no-league', slug, visitor };
   }
   const context = built.value;

@@ -66,6 +66,7 @@ import { addNewPerson, moveEntry } from '../features/teams-area/roster-changes.t
 import { databasePorts } from './database-ports.ts';
 import type { WebPorts } from './ports.ts';
 import type { SignInMail } from './sign-in/sign-in-mail.ts';
+import { identifyNamed } from './named-identify.test-helper.ts';
 
 const actors = [
   'owner',
@@ -112,7 +113,7 @@ async function accountFor(email: string): Promise<string> {
     passwordEnteredAt: null,
     lastSignInAt: new Date('2026-11-01T10:00:00Z'),
   });
-  const who = await ports.identify(token);
+  const who = await identifyNamed(ports, token);
   if (!who.ok) throw new Error(`${email} not signed in: ${who.error.code}`);
   return who.value.accountId;
 }

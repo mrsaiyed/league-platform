@@ -392,3 +392,20 @@ export async function binAnswer(page, button, timeout = 10_000) {
     text: (await fresh.innerText({ timeout })).trim(),
   };
 }
+
+/**
+ * The one name screen (R-21, step 2.128) that a new account meets right after its password
+ * is chosen, or at its first sign-in when it has no name yet: the screen must be on the page
+ * (it fails if not); `first` and `last` are typed and saved, and it waits until the screen is
+ * gone (the page that sent the person there, else the account page). Gives that address.
+ */
+export async function answerNameScreen(page, first, last, timeout = 15_000) {
+  const screen = page.locator('[data-name-screen]');
+  const form = screen.locator('form[data-own-name="give"]');
+  await form.waitFor({ timeout });
+  await form.locator('input[name=firstName]').fill(first);
+  await form.locator('input[name=lastName]').fill(last);
+  await form.locator('button[type=submit]').click();
+  await screen.waitFor({ state: 'detached', timeout });
+  return page.url();
+}
