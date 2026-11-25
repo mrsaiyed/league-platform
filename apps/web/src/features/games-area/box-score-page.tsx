@@ -16,6 +16,7 @@ import {
   readOwnResultOffer,
   readReopenOffer,
   readSheetPutBackOffer,
+  readTrackedBoxScore,
   type BoxScoreSheet,
   type GameLine,
   type GameRosterPlayer,
@@ -203,6 +204,13 @@ export async function BoxScorePage({
     (offer.value.code === 'player-in-bin' || offer.value.code === 'player-gone')
       ? offer.value.code
       : undefined;
+  // A game scored with the tracker is edited in its own grid, as plays (step 2.65): the
+  // way there once it is reopened with a reason, else what to do first.
+  const tracked =
+    sheet.locked === 'tracked' && sheet.mayCorrect
+      ? await readTrackedBoxScore(context, { gameId: game.id }, ports.games.deps)
+      : undefined;
+  const trackedGrid = tracked !== undefined && tracked.ok ? tracked.value : undefined;
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
   // Postponed or cancelled: no box score, no grid; the way it is put back (step 2.158).
   const calledOff = sheet.locked === 'cancelled' || sheet.locked === 'postponed';
@@ -332,6 +340,30 @@ export async function BoxScorePage({
           {t(`admin.games.reopenWho.${reopen.because}`)}
         </p>
       ) : null}
+      {trackedGrid === undefined ? null : (
+        <div className="staff-panel">
+          {trackedGrid.correctable ? (
+            <p>
+              <a
+                className="ui-button"
+                data-kind="main"
+                href={leagueUrl(here, 'admin-area', {
+                  area: 'games',
+                  subpath: [game.id, 'edit'],
+                })}
+              >
+                {t('admin.boxScore.tracked.edit')}
+              </a>
+            </p>
+          ) : (
+            <p data-grid-closed={trackedGrid.notCorrectable}>
+              {t(
+                `admin.boxScore.tracked.notCorrectable.${trackedGrid.notCorrectable ?? 'game-not-live'}`,
+              )}
+            </p>
+          )}
+        </div>
+      )}
       {calledOff ? (
         // Its own page puts it back too (step 2.158, S-51, S-75), so a game called off
         // outside this week's list is never stuck: a cancelled one to what it was, a

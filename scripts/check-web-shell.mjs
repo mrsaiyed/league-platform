@@ -1247,6 +1247,22 @@ const cases = [
     [notFound, 'That game is not there, or you may not score it.'],
     [noAccess],
   ],
+  // A tracked game's "Edit the box score" grid (step 2.65): another league's game is the
+  // same 404, nothing of it said; a game with no plays saved by the tracker has no such grid.
+  [
+    'owner',
+    `/harbor-city/admin/games/${liveGame}/edit`,
+    404,
+    [notFound, 'That game is not there, or you may not score it.'],
+    ['Bears at Hawks', 'North Valley', 'Edit box score'],
+  ],
+  [
+    'owner',
+    `/north-valley/admin/games/${game(1)}/edit`,
+    404,
+    [notFound, 'That game is not there, or you may not score it.'],
+    ['Edit box score', 'data-tracked-grid'],
+  ],
   [
     'owner',
     `/north-valley/admin/games/${game(99)}`,
