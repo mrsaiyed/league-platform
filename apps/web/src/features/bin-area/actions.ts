@@ -7,7 +7,8 @@
 // a one-time notice, never the address (bin-answer.ts, T-426): what was brought back is said at the
 // top of the bin, where the browser lands; a refusal beside the thing's own row (`#bin-<id>`). Both
 // name the thing as the bin listed it. A second tap is the same request, answered as the first
-// (server/same-request.ts). A plain form, so it works with no script in the page.
+// (server/same-request.ts), while that answer still holds: a tap from an old page after the
+// thing was binned again brings it back again. A plain form, so it works with no script in the page.
 import {
   leagueUrl,
   restoreCourt,
@@ -132,6 +133,13 @@ export async function bringBackAction(form: FormData): Promise<never> {
         said: binBackSaid(kind === 'person' ? 'person' : (kind as BinKindShown), { firstChild }),
         ...named,
       };
+    },
+    // A kept "brought back" is the truth only while the thing is out of the bin: a stale tap
+    // (an old bin page, after it was binned again) brings it back again rather than saying so.
+    async (kept) => {
+      if (!kept.ok) return true;
+      const now = await listBinPart(context, {}, deps);
+      return now.ok && !now.value.items.some((i) => i.id === id);
     },
   );
   if (outcome.said === '') return redirect(bin);

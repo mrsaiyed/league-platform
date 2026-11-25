@@ -239,6 +239,44 @@ if (built) {
       'the team is back with its player on the roster',
       (await page.locator('main ol > li', { hasText: kites.last }).count()) === 1,
     );
+    const restoredRows = async () => {
+      await page.goto(`${origin}/north-valley/admin/settings/activity`);
+      return page
+        .locator('li[data-entry]', { hasText: `Restored the team ${kites.team} from the bin` })
+        .count();
+    };
+    const restoredOnce = await restoredRows();
+    note(
+      'the doubled post wrote one row in the activity log, not two',
+      restoredOnce === 1,
+      String(restoredOnce),
+    );
+
+    at = 'an old bin page, after the team was binned again, brings it back again';
+    await page.goto(teamAddress);
+    await removeTeamHere(page);
+    const stale = await page.request.post(binAddress, {
+      multipart: fields,
+      headers: { origin },
+      maxRedirects: 0,
+      timeout: 10_000,
+    });
+    await page.goto(binAddress);
+    const staleBack = page.locator('[data-bin-answer][data-said]').first();
+    const staleText = (await staleBack.count()) === 1 ? await staleBack.innerText() : '';
+    note(
+      'the old page\'s "Bring it back" is the truth: the team is out of the bin, and said back',
+      stale.status() === 303 &&
+        staleText.startsWith(`Brought back: ${kites.team}.`) &&
+        (await binRow(page, kites.team).count()) === 0,
+      `${stale.status()} ${staleText}`,
+    );
+    const restoredTwice = await restoredRows();
+    note(
+      'and the activity log has a second restore, as it ran again',
+      restoredTwice === 2,
+      String(restoredTwice),
+    );
 
     at = 'a published game is removed and published';
     await openStaffMenu(page);

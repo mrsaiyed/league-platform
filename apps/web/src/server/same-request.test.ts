@@ -113,4 +113,28 @@ describe('a save sent twice is the same request (T-271)', () => {
     expect(await requests.once('broken', async () => 'second try')).toBe('second try');
     expect(await requests.once('ok', async () => 'not run')).toBe('kept');
   });
+
+  it('gives a kept answer only while it holds, else runs again (a stale "Bring it back")', async () => {
+    let at = 0;
+    const store = sameRequests<string>({ keepMs: 1000, most: 10, now: () => at });
+    let runs = 0;
+    const run = async () => `back ${++runs}`;
+    let inBin = false;
+    const holds = async () => !inBin;
+    expect(await store.once('k', run, holds)).toBe('back 1');
+    at = 10;
+    // Still out of the bin: the second post is the first, nothing runs again.
+    expect(await store.once('k', run, holds)).toBe('back 1');
+    expect(runs).toBe(1);
+    // Binned again meanwhile: the old page's post brings it back again, and says so.
+    inBin = true;
+    const [one, two] = await Promise.all([
+      store.once('k', run, holds),
+      store.once('k', run, holds),
+    ]);
+    expect([one, two]).toEqual(['back 2', 'back 2']);
+    expect(runs).toBe(2);
+    // With no `holds`, a kept answer is given as before.
+    expect(await store.once('k', run)).toBe('back 2');
+  });
 });
