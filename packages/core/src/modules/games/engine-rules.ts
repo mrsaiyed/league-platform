@@ -13,7 +13,7 @@
 // keeps the rules it started with (S-1), so a game begun before a season's change, or
 // before this step, keeps counting as it did. The 2.107 audit's note that the bonus "can
 // show early" was wrong both ways round: it showed late or never (M8, L8), and no longer.
-import type { SeasonRules } from '@srleagues/contracts';
+import { teamFoulsCounted, type SeasonRules } from '@srleagues/contracts';
 import type { basketball } from '@srleagues/sports';
 
 /**
@@ -47,7 +47,8 @@ export function trackerEngineRulesOf(rules: SeasonRules): basketball.Rules {
  * the same as each period, the engine's reading when it is absent (step 2.123).
  */
 function teamFoulsResetOf(rules: SeasonRules): { teamFoulsReset?: basketball.TeamFoulsReset } {
-  const reset = rules.fouls.teamFoulsReset;
+  // Unmarked rules, every season and game saved before this step, count each period (T-422).
+  const reset = teamFoulsCounted(rules);
   if (reset === 'game' || (reset === 'half' && rules.gameFormat.periods === 4)) {
     return { teamFoulsReset: reset };
   }

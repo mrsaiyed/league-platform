@@ -35,7 +35,7 @@ import { changeVisibilityAction, savePartAction } from './actions.ts';
 import { earnedDone, earnedStateDone, problemKey } from './answer.ts';
 import { mayShowSeason, mayStartSeason } from './may-show-season.ts';
 import { PartForm } from './part-form.tsx';
-import { partFacts, partGroups, partTexts } from './part-words.ts';
+import { partFacts, partGroups, partTexts, teamFoulsLine } from './part-words.ts';
 import { panelWords } from './panel-words.ts';
 import { SeasonStatePanel, StartSeasonPanel } from './season-start-panels.tsx';
 import {
@@ -258,7 +258,12 @@ function PartPanel({
       <p className="staff-quiet">{t(partKey(part, 'about'))}</p>
       {saved ? (
         <StaffNotice kind="saved" data={{ 'data-notice': 'saved' }}>
-          <p>{t(partKey(part, 'saved'))}</p>
+          {/* The game rules' "Saved" says what the team fouls now do (T-422). */}
+          <p>
+            {part === 'game'
+              ? `${t(partKey(part, 'saved'))} ${teamFoulsLine(season.rules)}`
+              : t(partKey(part, 'saved'))}
+          </p>
         </StaffNotice>
       ) : null}
       {part === 'game' && !season.rulesSaved ? (

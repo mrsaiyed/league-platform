@@ -1,4 +1,4 @@
-import { SeasonRules, seasonRulesPreset } from '@srleagues/contracts';
+import { foulsWithReset, SeasonRules, seasonRulesPreset } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import { engineRulesOf, trackerEngineRulesOf, withoutMercyOrLastMinutes } from './engine-rules.ts';
@@ -61,8 +61,7 @@ describe("a season's rules as the engine reads them (T-128, S-1)", () => {
       timeoutsCarry: true,
       clockMode: 'stop',
       playerFoulLimit: 5,
-      // The custom start resets team fouls each half; with quarters that counts (step 2.123).
-      teamFoulsReset: 'half',
+      // The custom start stores 'half' with no choice marked: each period, as before (T-422).
       ...gameClock,
     });
   });
@@ -173,7 +172,7 @@ describe('when team fouls reset reaches the engine (step 2.123)', () => {
     teamFoulsReset: SeasonRules['fouls']['teamFoulsReset'],
   ): SeasonRules => {
     const rules = seasonRulesPreset(preset);
-    rules.fouls = { ...rules.fouls, teamFoulsReset };
+    rules.fouls = foulsWithReset(rules.fouls, teamFoulsReset);
     return rules;
   };
   const home = ['h1', 'h2', 'h3', 'h4', 'h5'];
@@ -207,6 +206,18 @@ describe('when team fouls reset reaches the engine (step 2.123)', () => {
       withReset('rec-league', 'half'),
       withReset('rec-league', 'period'),
     ]) {
+      expect(Object.hasOwn(engineRulesOf(rules), 'teamFoulsReset')).toBe(false);
+    }
+  });
+
+  it('counts each period for rules saved before this step, whatever they store (T-422)', () => {
+    for (const [preset, teamFoulsReset] of [
+      ['high-school', 'half'],
+      ['high-school', 'game'],
+      ['rec-league', 'game'],
+    ] as const) {
+      const rules = seasonRulesPreset(preset);
+      rules.fouls = { ...rules.fouls, teamFoulsReset };
       expect(Object.hasOwn(engineRulesOf(rules), 'teamFoulsReset')).toBe(false);
     }
   });

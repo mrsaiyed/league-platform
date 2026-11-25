@@ -1,9 +1,9 @@
 // Season settings' words for when team fouls start again (step 2.123): the form offers all
 // three choices the tracker follows, and the settings page says the one chosen in plain words.
-import { defaultSeasonRules, type SeasonRules } from '@srleagues/contracts';
+import { defaultSeasonRules, foulsWithReset, type SeasonRules } from '@srleagues/contracts';
 import type { SeasonView } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
-import { partFacts, partGroups } from './part-words.ts';
+import { partFacts, partGroups, teamFoulsLine } from './part-words.ts';
 
 const base = defaultSeasonRules();
 const seasonWith = (rules: SeasonRules): SeasonView => ({
@@ -25,7 +25,7 @@ const withReset = (
 ): SeasonRules => ({
   ...base,
   gameFormat: { ...base.gameFormat, periods },
-  fouls: { ...base.fouls, teamFoulsReset },
+  fouls: foulsWithReset(base.fouls, teamFoulsReset),
 });
 const foulsLine = (rules: SeasonRules): string =>
   partFacts('game', seasonWith(rules)).find((fact) => fact.term === 'Fouls')?.value ?? '';
@@ -50,5 +50,27 @@ describe('when team fouls start again', () => {
     expect(foulsLine(withReset(4, 'half'))).toMatch(/Team fouls start again each half\.$/);
     expect(foulsLine(withReset(2, 'period'))).toMatch(/Team fouls start again each half\.$/);
     expect(foulsLine(withReset(4, 'game'))).toMatch(/Team fouls count for the whole game\.$/);
+  });
+
+  it('says each quarter for a season saved before this step with quarters and "half" (T-422)', () => {
+    const old = {
+      ...withReset(4, 'period'),
+      fouls: { ...base.fouls, teamFoulsReset: 'half' as const },
+    };
+    expect(foulsLine(old)).toMatch(/Team fouls start again each quarter\.$/);
+    expect(teamFoulsLine(old)).toBe('Team fouls start again each quarter.');
+  });
+
+  it('says in the help line what the team fouls do now, and what a change of periods does', () => {
+    const helpOf = (rules: SeasonRules) => {
+      const field = partGroups('game', rules)
+        .flatMap((group) => group.fields)
+        .find((f) => 'name' in f && f.name === 'teamFoulsReset');
+      return field !== undefined && 'help' in field ? field.help : undefined;
+    };
+    expect(helpOf(withReset(4, 'half'))).toMatch(/^Team fouls start again each half\. /);
+    expect(helpOf(withReset(4, 'period'))).toMatch(/^Team fouls start again each quarter\. /);
+    expect(helpOf(withReset(2, 'game'))).toMatch(/^Team fouls count for the whole game\. /);
+    expect(helpOf(base)).toMatch(/leave this as it is, and it becomes each half or quarter\.$/);
   });
 });

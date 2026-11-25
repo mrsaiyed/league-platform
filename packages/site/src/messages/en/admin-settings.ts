@@ -236,7 +236,7 @@ export const enAdminSettings = {
   'seasonSettings.field.stopClockScope': 'Those last minutes are of',
   'seasonSettings.field.teamFoulsReset': 'Team fouls start again',
   'seasonSettings.field.teamFoulsReset.help':
-    'Overtime goes on with the count the last half or quarter ended with.',
+    'Overtime goes on with the count the last half or quarter ended with. Change between halves and quarters and leave this as it is, and it becomes each half or quarter.',
   'seasonSettings.field.tiebreaker1': 'First tiebreaker',
   'seasonSettings.field.tiebreaker2': 'Second tiebreaker',
   'seasonSettings.field.tiebreaker3': 'Third tiebreaker',

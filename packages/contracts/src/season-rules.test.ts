@@ -33,6 +33,8 @@ import {
   defaultSeasonRules,
   seasonRulesPreset,
   upgradeSeasonRules,
+  foulsWithReset,
+  teamFoulsCounted,
 } from './season-rules.ts';
 
 describe('season rules presets', () => {
@@ -414,5 +416,36 @@ describe('upgradeSeasonRules', () => {
     expect(upgradeSeasonRules(null)).toMatchObject({ ok: false, reason: 'invalid' });
     expect(upgradeSeasonRules('rules')).toMatchObject({ ok: false, reason: 'invalid' });
     expect(upgradeSeasonRules([])).toMatchObject({ ok: false });
+  });
+});
+
+describe('when team fouls start again, saved before step 2.123 or chosen since (T-422)', () => {
+  const base = defaultSeasonRules();
+  const quarters = (fouls: SeasonRules['fouls']): SeasonRules => ({
+    ...base,
+    gameFormat: { ...base.gameFormat, periods: 4 },
+    fouls,
+  });
+
+  it('counts each period when no choice is marked, whatever is stored', () => {
+    for (const teamFoulsReset of ['period', 'half', 'game'] as const) {
+      expect(teamFoulsCounted(quarters({ ...base.fouls, teamFoulsReset }))).toBe('period');
+    }
+  });
+
+  it('counts the choice an admin saved, marked only when it is not each period', () => {
+    for (const reset of ['period', 'half', 'game'] as const) {
+      const fouls = foulsWithReset(base.fouls, reset);
+      expect(teamFoulsCounted(quarters(fouls))).toBe(reset);
+      expect(fouls.teamFoulsResetChosen).toBe(reset === 'period' ? undefined : true);
+      expect(SeasonRules.safeParse(quarters(fouls)).success).toBe(true);
+    }
+    const marked = foulsWithReset(base.fouls, 'game');
+    expect(Object.hasOwn(foulsWithReset(marked, 'period'), 'teamFoulsResetChosen')).toBe(false);
+  });
+
+  it('takes the mark only as true', () => {
+    const fouls = { ...base.fouls, teamFoulsResetChosen: false };
+    expect(SeasonRules.safeParse({ ...base, fouls }).success).toBe(false);
   });
 });
