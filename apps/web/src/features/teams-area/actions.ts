@@ -10,7 +10,6 @@ import {
   markLeft,
   markTeamLeft,
   putBackOnRoster,
-  removePerson,
   removeTeam,
   setTeamStatsVisibility,
   undoTeamLeft,
@@ -357,20 +356,6 @@ export async function moveEntryAction(form: FormData): Promise<void> {
   return runTeamsAction(form, ({ context, ports, fields }) =>
     moveEntry(context, ports.deps, fields),
   );
-}
-
-/** Takes a person off the league list: refused while they are on a roster (R-17). */
-export async function removePersonAction(form: FormData): Promise<void> {
-  return runTeamsAction(form, async ({ context, ports, fields }) => {
-    if (fields['confirm'] === undefined) {
-      return { answer: refused(removePerson.commandName, 'not-confirmed'), teamId: fields['team'] };
-    }
-    const personId = fields['personId'] ?? '';
-    const result = await removePerson(context, { personId }, ports.deps);
-    const settled = settle(removePerson, result, 'personRemoved', fields['team']);
-    // Kept with the person, so a second post is answered as this one while they stay off.
-    return result.ok ? { ...settled, truth: { personOff: personId } } : settled;
-  });
 }
 
 /** S-87: marks the team as having left the league; its results and games stay. */

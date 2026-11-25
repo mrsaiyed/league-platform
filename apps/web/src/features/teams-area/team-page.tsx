@@ -49,7 +49,6 @@ import {
   markLeftAction,
   moveEntryAction,
   putBackAction,
-  removePersonAction,
   removeTeamAction,
   saveTeamAction,
   markTeamLeftAction,
@@ -596,35 +595,6 @@ export async function TeamPage({
             name="from-list"
           />
         )}
-      </Section>
-
-      <Section title={t('adminTeams.people.title')}>
-        {peopleNotAllowed ? (
-          <p className="staff-quiet">{t('adminTeams.people.notAllowed')}</p>
-        ) : (
-          <p className="staff-quiet">{t('adminTeams.people.body')}</p>
-        )}
-        {people.ok || peopleNotAllowed ? null : (
-          <StaffNotice kind="refused">{t('adminTeams.people.readFailed')}</StaffNotice>
-        )}
-        <ul className="staff-rows admin-people">
-          {everyone.map((person) => (
-            <li key={person.id}>
-              <span className="staff-row-name" dir="auto">
-                {nameOf(person)}
-              </span>
-              <form action={removePersonAction} className="admin-person-form">
-                <LeagueField league={here.slug} />
-                <input type="hidden" name="team" value={team.id} />
-                <input type="hidden" name="personId" value={person.id} />
-                <ConfirmBox />
-                <button type="submit" className="ui-button" data-kind="danger">
-                  {t('adminTeams.people.remove')}
-                </button>
-              </form>
-            </li>
-          ))}
-        </ul>
       </Section>
 
       <LeftLeaguePanel

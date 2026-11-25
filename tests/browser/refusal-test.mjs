@@ -440,7 +440,9 @@ if (browser) {
     const { context, page } = await asToken('local-club-admin-token');
     try {
       await page.goto(`${origin}/quiet-pines/admin/teams/${draftTeam}`);
-      await page.getByRole('heading', { level: 2, name: 'The league list' }).waitFor();
+      await page
+        .getByRole('heading', { level: 2, name: 'Someone already in the league' })
+        .waitFor();
       const text = await mainText(page);
       note(
         'the club admin reads that their role does not include the list of people',

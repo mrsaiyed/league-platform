@@ -6,7 +6,7 @@
 // (answer-notice.ts, T-435). A form sent twice (its one-time token, LeagueField) is the same
 // request, answered as the first while that answer still holds (server/same-request.ts).
 // Plain forms, so it all works with no script in the page.
-import { getPerson, leagueUrl, listRoster, type CommandContext } from '@srleagues/core';
+import { leagueUrl, listRoster, type CommandContext } from '@srleagues/core';
 import { refresh } from 'next/cache';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -61,25 +61,15 @@ export async function runTeamsAction(
     () => work({ context, ports, seasonId: season?.id, fields }),
     async (kept) => {
       const team = (kept.teamId ?? fields['team'] ?? '').toLowerCase();
-      const personOff =
-        kept.truth !== undefined && 'personOff' in kept.truth ? kept.truth.personOff : undefined;
-      const [teams, roster, person] = await Promise.all([
+      const [teams, roster] = await Promise.all([
         season === undefined ? Promise.resolve([]) : ports.teams(context, season.id),
         uuidShape.test(team) ? listRoster(context, { teamId: team }, ports.deps) : undefined,
-        personOff === undefined
-          ? undefined
-          : getPerson(context, { personId: personOff }, ports.deps),
       ]);
-      const personOnList =
-        person === undefined
-          ? undefined
-          : person.ok || (person.error.code === 'person-not-found' ? false : undefined);
       return answerHolds(
         kept.answer,
         {
           lines: roster?.ok === true ? roster.value : undefined,
           team: teams.find((candidate) => candidate.id === team),
-          personOnList,
         },
         kept.truth,
       );

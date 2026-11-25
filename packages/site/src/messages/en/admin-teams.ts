@@ -42,8 +42,6 @@ export const enAdminTeams = {
   'adminTeams.done.added': 'The player was added to the roster.',
   'adminTeams.done.left': 'The player was marked as having left.',
   'adminTeams.done.moved': 'The roster order was saved.',
-  'adminTeams.done.personRemoved':
-    'Moved to the bin: taken off the league list, and kept in the bin for 30 days.',
   'adminTeams.done.putBack':
     'The player was put back on the roster. Their games and numbers are as they were.',
   'adminTeams.done.putBackNoNumber':
@@ -100,15 +98,6 @@ export const enAdminTeams = {
   'adminTeams.none': 'No teams yet.',
   'adminTeams.openRoster': 'Roster',
   'adminTeams.ownColors': "The league's own colors",
-  'adminTeams.people.body':
-    'Taking someone off the list is refused while they are on a roster: mark them as having left first. A place on a team that was moved to the bin does not count.',
-  // Step 2.157: for a role that may not read the league's list of people (a club admin).
-  'adminTeams.people.notAllowed':
-    'Your role in this league does not include its list of people, so it is not shown here.',
-  'adminTeams.people.readFailed':
-    'The league list could not be read just now, so it is not shown. Reload the page to try again.',
-  'adminTeams.people.remove': 'Remove from the league list',
-  'adminTeams.people.title': 'The league list',
   // A person's name as the Teams screens show it; a language may put the parts the other way.
   'adminTeams.personName': '{firstName} {lastName}',
   // The bin has its screen (step 2.77): the notice after a removal leads to it.

@@ -17,7 +17,6 @@ export const doneNames = [
   'left',
   'putBack',
   'putBackNoNumber',
-  'personRemoved',
   'teamLeft',
   'teamBack',
 ] as const;
