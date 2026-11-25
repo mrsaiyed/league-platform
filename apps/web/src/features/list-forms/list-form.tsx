@@ -66,6 +66,8 @@ export type ListFormProps = {
   readonly label: string;
   /** How the test and the page find the form: `data-form="rename"`. */
   readonly name: string;
+  /** The form's own look where it is not a stacked form (a roster line's, step 2.155). */
+  readonly className?: string;
 };
 
 /** A colour the color box can show: the league's own colors show a calm grey to start from. */
@@ -101,6 +103,7 @@ export function ListForm({
   kind,
   label,
   name,
+  className = 'staff-form',
 }: ListFormProps) {
   const [state, dispatch, pending] = useActionState(action, untouched, permalink);
   const onSubmit = useOneSubmit(pending, state);
@@ -140,7 +143,7 @@ export function ListForm({
       ref={formRef}
       action={dispatch}
       onSubmit={onSubmit}
-      className="staff-form"
+      className={className}
       aria-label={label}
       data-form={name}
     >

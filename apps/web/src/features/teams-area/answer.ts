@@ -66,6 +66,8 @@ export const addPlayerAnchor = 'add-player';
 
 /** The place on a team's page of its details form, where its "Saved" is said. */
 export const teamDetailsAnchor = 'team-details';
+/** Where "Who sees this team's numbers" is, so a save of it lands there (step 2.155). */
+export const teamStatsAnchor = 'team-stats';
 
 /** The anchor of a roster line, where a refusal of its leaving date is said. */
 export const entryAnchor = (entryId: string): string => `entry-${entryId}`;

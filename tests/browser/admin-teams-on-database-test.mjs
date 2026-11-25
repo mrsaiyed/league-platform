@@ -245,11 +245,13 @@ if (browser !== null) {
     await form.getByLabel('Person').selectOption({ label: 'Morgan Example' });
     await form.getByLabel('Jersey number (0 to 99, or 00)').fill('8');
     await form.getByLabel('Role').selectOption({ label: 'Captain' });
-    await submit(page, form.getByRole('button', { name: 'Add to the roster' }), /done=added/);
-    note(
-      'it says the player was added',
-      (await page.getByText('The player was added to the roster.').count()) === 1,
-    );
+    // Answered on the new line itself (step 2.155): the team's page, at that line.
+    await submit(page, form.getByRole('button', { name: 'Add to the roster' }), /#entry-/);
+    const addedSaid = page.locator('[data-said-on] [role=status]', {
+      hasText: 'Saved: Morgan Example was added to',
+    });
+    await addedSaid.waitFor({ timeout: 10_000 });
+    note('it says the player was added, on their line', (await addedSaid.count()) === 1);
     const line = lineOf(page, 'Morgan Example');
     note('Morgan Example is on the roster', (await line.count()) === 1);
     note(
@@ -268,15 +270,12 @@ if (browser !== null) {
   await step("a player's number is changed", async () => {
     const line = lineOf(page, `${newcomer.first} ${newcomer.last}`);
     await line.getByLabel('Number').fill('22');
-    await submit(
-      page,
-      line.getByRole('button', { name: 'Save number and role' }),
-      /done=entrySaved/,
-    );
-    note(
-      'it says the number and role were saved',
-      (await page.getByText('The number and role were saved.').count()) === 1,
-    );
+    await submit(page, line.getByRole('button', { name: 'Save number and role' }), /#entry-/);
+    const entrySaid = page.locator('[data-said-on] [role=status]', {
+      hasText: `Saved: the number and role of ${newcomer.first} ${newcomer.last}.`,
+    });
+    await entrySaid.waitFor({ timeout: 10_000 });
+    note('it says the number and role were saved, on the line', (await entrySaid.count()) === 1);
     note(
       'the number is 22, read back',
       (await lineOf(page, `${newcomer.first} ${newcomer.last}`)

@@ -37,6 +37,7 @@ import {
   entryAnchor,
   refused,
   teamDetailsAnchor,
+  teamStatsAnchor,
   type DoneName,
 } from './answer.ts';
 import {
@@ -187,16 +188,20 @@ export async function saveTeamAction(_state: FormState, form: FormData): Promise
   );
 }
 
-export async function saveTeamStatsAction(form: FormData): Promise<never> {
-  return runTeamsAction(form, async ({ context, ports, fields }) => {
-    const input = teamStatsInput(fields);
-    return settle(
-      setTeamStatsVisibility,
-      await setTeamStatsVisibility(context, input, ports.deps),
-      'statsSaved',
-      input.teamId,
-    );
-  });
+/** "Who sees this team's numbers" (step 2.155): answered as "Team details". */
+export async function saveTeamStatsAction(_state: FormState, form: FormData): Promise<FormState> {
+  return answerTeamForm(
+    'stats',
+    form,
+    async ({ context, ports, fields }) =>
+      settle(
+        setTeamStatsVisibility,
+        await setTeamStatsVisibility(context, teamStatsInput(fields), ports.deps),
+        'statsSaved',
+      ),
+    () => ({ said: 'stats' }),
+    () => teamStatsAnchor,
+  );
 }
 
 export async function removeTeamAction(form: FormData): Promise<never> {
@@ -211,6 +216,10 @@ export async function removeTeamAction(form: FormData): Promise<never> {
   });
 }
 
+/**
+ * A person put on a team from their People page: answered on the team's page, in the
+ * address (People is converted later, handover of step 2.155).
+ */
 export async function addToRosterAction(form: FormData): Promise<never> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     const input = addToRosterInput(fields, fields['personId'] ?? '');
@@ -223,31 +232,70 @@ export async function addToRosterAction(form: FormData): Promise<never> {
   });
 }
 
+/** "Add to the roster" from the league list (step 2.155): said on the new roster line. */
+export async function addFromListAction(_state: FormState, form: FormData): Promise<FormState> {
+  return answerTeamForm(
+    'fromList',
+    form,
+    async ({ context, ports, fields }) => {
+      const result = await addToRoster(
+        context,
+        addToRosterInput(fields, fields['personId'] ?? ''),
+        ports.deps,
+      );
+      return result.ok
+        ? { answer: done('added', { entry: result.value.rosterEntryId }) }
+        : { answer: refused(addToRoster.commandName, result.error.code) };
+    },
+    savedOnLine('added'),
+    (result) => anchorOfLine(result, addPlayerAnchor),
+  );
+}
+
+/** What a roster line's save leaves in the notice: the line, by id, never anything typed. */
+function savedOnLine(said: DoneName) {
+  return (result: FormResult) => ({
+    said,
+    ...(result.answer.kind === 'done' && result.answer.at !== undefined
+      ? { about: [result.answer.at.entry] }
+      : {}),
+  });
+}
+
+/** The saved line's own place on the page, where it is said; else `otherwise`. */
+function anchorOfLine(result: FormResult, otherwise: string): string {
+  return result.answer.kind === 'done' && result.answer.at !== undefined
+    ? entryAnchor(result.answer.at.entry)
+    : otherwise;
+}
+
 /** "Someone not in the list yet": a new person, put on the roster (step 2.155). */
 export async function addNewPersonAction(_state: FormState, form: FormData): Promise<FormState> {
   return answerTeamForm(
     'newPlayer',
     form,
     ({ context, ports, fields }) => addNewPerson(context, ports.deps, fields),
-    (result) => ({
-      said: 'added',
-      ...(result.answer.kind === 'done' && result.answer.at !== undefined
-        ? { about: [result.answer.at.entry] }
-        : {}),
-    }),
+    savedOnLine('added'),
     // The new line's own place, where it is said.
-    (result) =>
-      result.answer.kind === 'done' && result.answer.at !== undefined
-        ? entryAnchor(result.answer.at.entry)
-        : addPlayerAnchor,
+    (result) => anchorOfLine(result, addPlayerAnchor),
   );
 }
 
-export async function changeEntryAction(form: FormData): Promise<never> {
-  return runTeamsAction(form, async ({ context, ports, fields }) => {
-    const result = await changeRosterEntry(context, changeEntryInput(fields), ports.deps);
-    return settle(changeRosterEntry, result, 'entrySaved', fields['team']);
-  });
+/** A roster line's number and role (step 2.155): said on that line. */
+export async function changeEntryAction(_state: FormState, form: FormData): Promise<FormState> {
+  return answerTeamForm(
+    'entry',
+    form,
+    async ({ context, ports, fields }) => {
+      const input = changeEntryInput(fields);
+      const result = await changeRosterEntry(context, input, ports.deps);
+      return result.ok
+        ? { answer: done('entrySaved', { entry: input.rosterEntryId }) }
+        : { answer: refused(changeRosterEntry.commandName, result.error.code) };
+    },
+    savedOnLine('entrySaved'),
+    (result) => anchorOfLine(result, teamDetailsAnchor),
+  );
 }
 
 export async function markLeftAction(form: FormData): Promise<never> {

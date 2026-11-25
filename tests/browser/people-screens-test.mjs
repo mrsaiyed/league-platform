@@ -206,7 +206,10 @@ if (built) {
     const adding = page.locator('form').filter({ has: page.getByLabel('Person') });
     await adding.getByLabel('Person').selectOption({ label: 'Jon Smiht' });
     await Promise.all([
-      page.waitForURL(/done=added/),
+      // Said on the new line (step 2.155).
+      page
+        .locator('[data-said-on] [role=status]', { hasText: 'Saved: Jon Smiht was added to' })
+        .waitFor({ timeout: 10_000 }),
       adding.getByRole('button', { name: 'Add to the roster' }).click(),
     ]);
     note(

@@ -31,4 +31,31 @@ describe("a refused form of a team's page names the box it is about (step 2.155)
     expect(refusal.wrong).toEqual([]);
     expect(refusal.said).toBe('That team is not there.');
   });
+
+  it("marks a roster line's number worn, or one not of the roster's shape", () => {
+    const taken = teamFormRefusal('entry', 'teams.change_roster_entry', 'jersey-taken', {});
+    expect(taken.wrong).toEqual(['jerseyNumber']);
+    expect(taken.said.startsWith('Number: ')).toBe(true);
+    const shape = teamFormRefusal('entry', 'teams.change_roster_entry', 'invalid-input', {
+      jerseyNumber: 'x7',
+    });
+    expect(shape.wrong).toEqual(['jerseyNumber']);
+  });
+
+  it('marks the person chosen from the league list when they cannot be added', () => {
+    const on = teamFormRefusal('fromList', 'teams.add_to_roster', 'already-on-team', {});
+    expect(on.wrong).toEqual(['personId']);
+    const worn = teamFormRefusal('fromList', 'teams.add_to_roster', 'jersey-taken', {});
+    expect(worn.wrong).toEqual(['jerseyNumber']);
+  });
+
+  it('marks no box of who sees the numbers when the team changed meanwhile', () => {
+    const refusal = teamFormRefusal(
+      'stats',
+      'teams.set_team_stats_visibility',
+      'changed-since-read',
+      {},
+    );
+    expect(refusal.wrong).toEqual([]);
+  });
 });

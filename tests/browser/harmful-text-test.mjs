@@ -504,7 +504,13 @@ if (browser) {
       has: page.getByRole('button', { name: 'Add to the roster', exact: true }),
     });
     await form.getByLabel('Person').selectOption({ label: 'Amal Nasser' });
-    await tap(form.getByRole('button', { name: 'Add to the roster', exact: true }), /done=added/);
+    // Said on the new line (step 2.155), with scripts on or off.
+    await Promise.all([
+      page
+        .locator('[data-said-on] [role=status]', { hasText: 'Saved: Amal Nasser was added to' })
+        .waitFor({ timeout: 10_000 }),
+      form.getByRole('button', { name: 'Add to the roster', exact: true }).click(),
+    ]);
   });
 
   await step('a round is renamed with the attack', async () => {

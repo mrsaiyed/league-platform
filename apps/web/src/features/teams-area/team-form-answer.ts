@@ -7,7 +7,7 @@ import { problemKey } from './answer.ts';
 import type { Fields } from './form-input.ts';
 
 /** The forms of a team's page that answer in the response to the post. */
-export type TeamFormName = 'details' | 'newPlayer';
+export type TeamFormName = 'details' | 'newPlayer' | 'stats' | 'fromList' | 'entry';
 
 /** Each form's boxes, in the order they are on the screen, with their labels. */
 const boxesOf: Readonly<Record<TeamFormName, Readonly<Record<string, TextKey>>>> = {
@@ -23,6 +23,16 @@ const boxesOf: Readonly<Record<TeamFormName, Readonly<Record<string, TextKey>>>>
     jerseyNumber: 'adminTeams.add.number',
     role: 'adminTeams.roster.role',
   },
+  stats: { statsVisibility: 'adminTeams.field.statsVisibility' },
+  fromList: {
+    personId: 'adminTeams.add.person',
+    jerseyNumber: 'adminTeams.add.number',
+    role: 'adminTeams.roster.role',
+  },
+  entry: {
+    jerseyNumber: 'adminTeams.roster.number',
+    role: 'adminTeams.roster.role',
+  },
 };
 
 /** A refusal a command gives for one box, by its code. */
@@ -32,6 +42,8 @@ const boxOfCode: Readonly<Record<string, string>> = {
   'short-name-needed': 'shortName',
   'division-not-found': 'divisionId',
   'jersey-taken': 'jerseyNumber',
+  'person-not-found': 'personId',
+  'already-on-team': 'personId',
 };
 
 /** The jersey number core's roster-fields.ts accepts: 0 to 99, or 00. */
@@ -57,9 +69,10 @@ export function teamFormRefusal(
   );
   const own = boxOfCode[code];
   if (own !== undefined && own in boxes) wrong = [own];
-  // The number is the one box of a new player the server checks before anyone is made.
+  // A number that is not one: the box a form with a number is refused for when the
+  // command names none (a new player is checked before anyone is made).
   const number = (typed['jerseyNumber'] ?? '').trim();
-  if (wrong.length === 0 && code === 'invalid-input' && form === 'newPlayer' && number !== '') {
+  if (wrong.length === 0 && code === 'invalid-input' && 'jerseyNumber' in boxes && number !== '') {
     if (!jerseyShape.test(number)) wrong = ['jerseyNumber'];
   }
   const first = wrong[0];
