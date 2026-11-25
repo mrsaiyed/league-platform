@@ -536,6 +536,8 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       if (account.hash !== hashUsed) return fail({ code: 'wrong-password' });
       account.hash = hash;
       forgetProofsFor(account.email);
+      // A new password ends a waiting change of email too (L2): it must be asked again.
+      emailChanges.delete(account);
       // T-85: every other device is signed out; this one stays.
       const endedSessions = endSessions(account, session);
       const at = now();
@@ -604,14 +606,14 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       if (!pending || now().getTime() >= pending.expiresAt) return fail({ code: 'code-expired' });
       if (pending.attemptsLeft <= 0) return fail({ code: 'too-many-attempts' });
       const code = emailCode.safeParse(rawCode);
-      if (pending.code === null || !code.success || code.data !== pending.code) {
+      const right = pending.code !== null && code.success && code.data === pending.code;
+      // Taken since it was asked: nothing changes, and the answer is a wrong code's (T-455).
+      if (!right || accounts.has(pending.newEmail)) {
         pending.attemptsLeft--;
         guessesPerNetwork.recordFailure(network);
         return fail({ code: pending.attemptsLeft <= 0 ? 'too-many-attempts' : 'code-wrong' });
       }
       emailChanges.delete(account);
-      // Taken since it was asked: nothing changes.
-      if (accounts.has(pending.newEmail)) return fail({ code: 'code-expired' });
       const oldEmail = account.email;
       forgetProofsFor(oldEmail);
       forgetProofsFor(pending.newEmail);

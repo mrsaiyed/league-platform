@@ -37,8 +37,6 @@ export type GoTrueUser = {
   readonly email: string;
   /** `email_confirmed_at`: when Supabase took the address as proved; null if it never has. */
   readonly emailConfirmedAt: Date | null;
-  /** `new_email`: the address a change of email waits to move to (T-455); null if none. */
-  readonly newEmail: string | null;
 };
 
 export type GoTrueSession = {
@@ -51,7 +49,7 @@ export type GoTrueSession = {
 };
 
 /** Which check an emailed code answers at `/verify`. */
-export type GoTrueVerifyType = 'signup' | 'magiclink' | 'recovery' | 'email_change';
+export type GoTrueVerifyType = 'signup' | 'magiclink' | 'recovery';
 
 export type GoTrueGeneratedCode = {
   readonly user: GoTrueUser;
@@ -153,13 +151,11 @@ function userOf(value: unknown, what: string): GoTrueUser {
   // Missing, null or not a time all mean "not confirmed": the safe answer.
   const confirmed = text(value['email_confirmed_at']);
   const confirmedAt = confirmed === undefined ? null : new Date(confirmed);
-  const newEmail = text(value['new_email']);
   return {
     id,
     email: asciiLower(email),
     emailConfirmedAt:
       confirmedAt === null || Number.isNaN(confirmedAt.getTime()) ? null : confirmedAt,
-    newEmail: newEmail === undefined || newEmail === '' ? null : asciiLower(newEmail),
   };
 }
 
@@ -349,25 +345,18 @@ export function createGoTrueClient(options: GoTrueClientOptions) {
     },
 
     /**
-     * A code for moving the user with `email` to `newEmail` (T-455), without sending any
-     * email: Supabase keeps the pending address on its user (`new_email`) until the code is
-     * verified with type `email_change`. Refused with `email_exists` when another user
-     * holds `newEmail`.
+     * Sets the address of the user with this id, at once and confirmed
+     * (`PUT /admin/users/{id}`, T-455): called only after our own check of the person's
+     * code has passed. Supabase keeps no pending change and sends nothing. Refused with
+     * `email_exists` when another user holds the address.
      */
-    async generateEmailChangeCode(email: string, newEmail: string) {
-      const what = 'generate_link';
-      const answer = await call(what, 'POST', '/admin/generate_link', admin, {
-        type: 'email_change_new',
+    async setUserEmail(userId: string, email: string) {
+      const what = 'admin user update';
+      const answer = await call(what, 'PUT', `/admin/users/${encodeURIComponent(userId)}`, admin, {
         email,
-        new_email: newEmail,
+        email_confirm: true,
       });
-      return mapAnswer(answer, (body) => {
-        const json = isObject(body) ? body : {};
-        const properties = isObject(json['properties']) ? json['properties'] : json;
-        const code = text(properties['email_otp']);
-        if (code === undefined) throw new SupabaseAuthUnexpected(what);
-        return { code };
-      });
+      return mapAnswer(answer, (body) => userOf(body, what));
     },
 
     /** Checks an emailed code; a right one gives a session. */

@@ -19,7 +19,7 @@ export type AttemptLimits = {
 /** A wait, in whole seconds. */
 export type Limited = { readonly retryAfterSeconds: number };
 
-export type VerifyType = 'signup' | 'magiclink' | 'recovery' | 'email_change';
+export type VerifyType = 'signup' | 'magiclink' | 'recovery';
 
 export type PendingCode = {
   readonly verifyType: VerifyType | null;
@@ -33,6 +33,24 @@ export type CodeAttempt =
   | {
       readonly status: 'taken';
       readonly verifyType: VerifyType | null;
+      readonly attemptsLeft: number;
+    };
+
+/** A waiting change of email (T-455): one per sign-in user, the code only hashed (0031). */
+export type PendingEmailChange = {
+  readonly newEmail: string;
+  readonly codeHash: string;
+  readonly expiresAt: Date;
+  readonly attemptsLeft: number;
+};
+
+export type EmailChangeAttempt =
+  | { readonly status: 'none' }
+  | { readonly status: 'used-up' }
+  | {
+      readonly status: 'taken';
+      readonly newEmail: string;
+      readonly codeHash: string;
       readonly attemptsLeft: number;
     };
 
@@ -97,6 +115,9 @@ export type DatabaseSignInStore = {
     readonly putCode: (email: string, code: PendingCode) => Promise<void>;
     readonly takeCodeAttempt: (email: string, at: Date) => Promise<CodeAttempt>;
     readonly dropCode: (email: string) => Promise<void>;
+    readonly putEmailChange: (accountId: string, change: PendingEmailChange) => Promise<void>;
+    readonly takeEmailChangeAttempt: (accountId: string, at: Date) => Promise<EmailChangeAttempt>;
+    readonly dropEmailChange: (accountId: string) => Promise<void>;
     readonly putProof: (proofHash: string, proof: HeldProof) => Promise<void>;
     readonly peekProof: (proofHash: string, at: Date) => Promise<HeldProof | undefined>;
     readonly takeProof: (proofHash: string, at: Date) => Promise<HeldProof | undefined>;

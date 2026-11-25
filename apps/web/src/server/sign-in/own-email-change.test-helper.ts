@@ -1,6 +1,14 @@
 // A stand-in with two signed-up accounts, and deps that record what the email change sends
-// and writes (start-own-email-change.test.ts, confirm-own-email-change.test.ts).
-import { createLocalSignInStandIn, createSignInCodeCapture } from '@srleagues/providers';
+// and writes (start-own-email-change.test.ts, confirm-own-email-change.test.ts). The same
+// over the Supabase adapter, on a fake Supabase Auth served here (T-455): `close` ends it.
+import {
+  createLocalSignInStandIn,
+  createMemorySignInStore,
+  createSignInCodeCapture,
+  createSupabaseSignIn,
+  serveFakeSupabaseAuth,
+  type SignInService,
+} from '@srleagues/providers';
 import type { ConfirmOwnEmailChangeDeps } from './confirm-own-email-change.ts';
 import type { OwnEmailContext, StartOwnEmailChangeDeps } from './start-own-email-change.ts';
 
@@ -11,16 +19,44 @@ export const fresh = 'ana.new@example.test';
 const laptop = { deviceId: 'device-laptop-0000000001', label: 'Firefox', networkAddress: here };
 const phone = { deviceId: 'device-phone-00000000002', label: 'Safari', networkAddress: here };
 
-export async function setup() {
-  let at = Date.UTC(2026, 10, 25, 18);
-  const capture = createSignInCodeCapture();
-  const { service } = createLocalSignInStandIn({
-    environment: 'test',
-    nodeEnv: 'test',
+export type Adapter = 'stand-in' | 'supabase';
+
+async function serviceOf(
+  adapter: Adapter,
+  capture: ReturnType<typeof createSignInCodeCapture>,
+  now: () => Date,
+) {
+  if (adapter === 'stand-in') {
+    const { service } = createLocalSignInStandIn({
+      environment: 'test',
+      nodeEnv: 'test',
+      codeSender: capture.sender,
+      returnOrigins: ['http://localhost:3000'],
+      now,
+    });
+    return { service: service as SignInService, close: async () => {} };
+  }
+  const secretKey = 'sb_secret_fake_for_tests_only';
+  const auth = await serveFakeSupabaseAuth({ secretKey, now });
+  const service = createSupabaseSignIn({
+    projectUrl: auth.url,
+    secretKey,
+    fetch: (input, init) => fetch(input, init),
+    store: createMemorySignInStore({ environment: 'test', nodeEnv: 'test', now }),
     codeSender: capture.sender,
     returnOrigins: ['http://localhost:3000'],
-    now: () => new Date(at),
+    allowLocalHttp: true,
+    now,
+    elapsed: () => 0,
+    sleep: async () => {},
   });
+  return { service, close: auth.close };
+}
+
+export async function setup(adapter: Adapter = 'stand-in') {
+  let at = Date.UTC(2026, 10, 25, 18);
+  const capture = createSignInCodeCapture();
+  const { service, close } = await serviceOf(adapter, capture, () => new Date(at));
   const signUp = async (email: string, device = laptop) => {
     await service.startSignUp({ email, networkAddress: here });
     const code = capture.latestCodeFor(email) ?? '';
@@ -78,6 +114,7 @@ export async function setup() {
     (await service.signIn({ email, password, device: laptop })).ok;
   return {
     service,
+    close,
     capture,
     context,
     boContext,

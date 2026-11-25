@@ -218,8 +218,9 @@ export type StartEmailChangeError =
   | CodeNotSent;
 
 /**
- * Why a code changed nothing. As `verifyCode`'s: `code-expired` also covers no pending
- * change, one asked by another account, and an address taken since it was asked.
+ * Why a code changed nothing. As `verifyCode`'s: `code-expired` also covers no waiting
+ * change (none asked, or ended by a new password). An address the service gives another
+ * account answers `code-wrong`, exactly as a wrong code does (T-455).
  */
 export type ConfirmEmailChangeError = VerifyCodeError | SessionError;
 
@@ -343,8 +344,9 @@ export type SignInService = {
    * the password first, counted as `confirmPassword`'s guesses, then a code for the new
    * address under every code's limits (T-225). An address the service gives another
    * account, or `takenElsewhere` (the caller's own records do), gets no code and the same
-   * answer (T-68). Asking again replaces the pending change. Nothing changes yet; the caller
-   * tells the old address.
+   * answer (T-68). The waiting change is the adapter's own, one per account, the code
+   * hashed (T-455): asking again replaces it, so the older code is dead. Nothing changes
+   * yet; the caller tells the old address.
    */
   readonly startEmailChange: (input: {
     readonly accessToken: string;
@@ -354,9 +356,11 @@ export type SignInService = {
     readonly networkAddress: string;
   }) => Promise<Result<CodeRequested, StartEmailChangeError>>;
   /**
-   * The code from the new address. A right one moves the account's address, ends every
+   * The code from the new address, checked against this account's own waiting change only
+   * (by the session, never by address). Only after that check is the service asked to set
+   * the address of this account. A right one moves the account's address, ends every
    * other session and keeps this one; a wrong one spends an attempt and counts against the
-   * network, as for `verifyCode`. Any refusal changes nothing.
+   * network, as for `verifyCode`. Any refusal changes nothing (T-455).
    */
   readonly confirmEmailChange: (input: {
     readonly accessToken: string;

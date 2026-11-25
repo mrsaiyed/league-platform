@@ -14,6 +14,7 @@ import { createAttemptLimiter, type AttemptLimiter } from '../local/attempt-limi
 import type {
   HeldProof,
   PendingCode,
+  PendingEmailChange,
   StoredSession,
   SupabaseSignInStore,
 } from './sign-in-store.ts';
@@ -52,6 +53,7 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
   const emailLimiterKeys = new Set<string>();
   const tickets = new Map<string, Ticket>();
   const codes = new Map<string, PendingCode & { attemptsLeft: number }>();
+  const emailChanges = new Map<string, PendingEmailChange & { attemptsLeft: number }>();
   const proofs = new Map<string, HeldProof>();
   const accounts = new Map<string, { hasPassword: boolean; devices: Set<string> }>();
   const sessions = new Map<string, Session>();
@@ -172,6 +174,24 @@ export function createMemorySignInStore(options: MemorySignInStoreOptions): Supa
       },
       async dropCode(email) {
         codes.delete(email);
+      },
+      async putEmailChange(accountId, change) {
+        emailChanges.set(accountId, { ...change });
+      },
+      async takeEmailChangeAttempt(accountId, at) {
+        const pending = emailChanges.get(accountId);
+        if (!pending || at.getTime() >= pending.expiresAt.getTime()) return { status: 'none' };
+        if (pending.attemptsLeft <= 0) return { status: 'used-up' };
+        pending.attemptsLeft--;
+        return {
+          status: 'taken',
+          newEmail: pending.newEmail,
+          codeHash: pending.codeHash,
+          attemptsLeft: pending.attemptsLeft,
+        };
+      },
+      async dropEmailChange(accountId) {
+        emailChanges.delete(accountId);
       },
       async putProof(proofHash, proof) {
         proofs.set(proofHash, proof);

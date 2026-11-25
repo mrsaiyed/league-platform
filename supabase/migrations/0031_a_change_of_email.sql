@@ -1,11 +1,14 @@
 -- 0031: a change of email (step 2.128, T-73, T-455, T-458).
 --
--- The pending change itself is the sign-in service's (T-455): Supabase keeps the pending
--- address on its user, and the adapter's store keeps the code's attempts under the new
--- address as it does every code. So:
+-- A waiting change of email is ours, never the sign-in service's (T-455): the service is
+-- told nothing until our own check of the code has passed, and then only to set the
+-- address of that one account. So:
 --
--- 1. sign_in.codes admits a fourth kind of check, email_change (Supabase's verify type for
---    a change of email). Every other condition of the table stays as 0012 made it.
+-- 1. sign_in.email_changes keeps at most one waiting change per sign-in user: the new
+--    address, the code only as its hash, its attempts left and its end. Asking again
+--    replaces the row, so an older code is dead. It is the sign-in store's, as every
+--    table of schema sign_in (0012): reached by sign_in_store only, one policy, and gone
+--    with the user (on delete cascade, so erase_account needs no change).
 -- 2. Our own account's address follows a confirmed change through two owner-run
 --    functions, for the account set in the transaction only (record 008's rules, the
 --    reviewed list in packages/database/src/schema/app-role.test.ts). They are the only
@@ -13,11 +16,42 @@
 --    Each takes the address's lock, the same one account_for_sign_in takes (0012), so a
 --    first sign-in and a change of email to one address cannot pass each other.
 --
--- Accounts made before this step have no pending change; nothing reads one that is not there.
+-- Accounts made before this step have no waiting change; nothing reads one that is not there.
 
-alter table sign_in.codes drop constraint codes_verify_type;
-alter table sign_in.codes add constraint codes_verify_type
-  check (verify_type in ('signup', 'magiclink', 'recovery', 'email_change'));
+create table sign_in.email_changes (
+  user_id text primary key references sign_in.users (user_id) on delete cascade,
+  new_email text not null,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  attempts_left integer not null,
+  constraint email_changes_new_email_length check (length(new_email) between 1 and 320),
+  constraint email_changes_code_hash_length check (length(code_hash) between 1 and 200),
+  constraint email_changes_attempts_left check (attempts_left >= 0)
+);
+
+comment on table sign_in.email_changes is
+  'A waiting change of email, one per sign-in user, the code only hashed (T-455).';
+
+grant select, insert, update, delete on sign_in.email_changes to sign_in_store;
+alter table sign_in.email_changes enable row level security;
+alter table sign_in.email_changes force row level security;
+create policy email_changes_store_only on sign_in.email_changes
+  to sign_in_store using (true) with check (true);
+
+-- Supabase's API roles get nothing here either (T-64), as 0012 does for every sign_in table.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'anon') then
+    revoke all on sign_in.email_changes from anon;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'authenticated') then
+    revoke all on sign_in.email_changes from authenticated;
+  end if;
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    revoke all on sign_in.email_changes from service_role;
+  end if;
+end
+$$;
 
 -- Whether no other account holds the address (compared by lower(), as accounts_email_key
 -- is). Answers for the account set only, and never says whose the address is: a yes or a

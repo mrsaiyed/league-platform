@@ -68,6 +68,7 @@ const signInTables = [
   'code_requests',
   'codes',
   'devices',
+  'email_changes',
   'guess_locks',
   'guesses',
   'proofs',
