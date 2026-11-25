@@ -9,6 +9,12 @@
 //   notice and the clock runs.
 // - The start form, now copying Rules 2027, offers a stop clock and 10; a season started
 //   leaving them keeps them.
+// - After step 2.123, the third question: Fall 2026 is given quarters (its team fouls
+//   left alone, so each quarter), and Rules 2027 is started with team fouls that start
+//   again each half; its settings show it, and its tracked game carries the home team's
+//   four first-quarter fouls into the second (step 2.123's own mark, data-team-fouls).
+//   The form offers "each half" again, and Next 2028 keeps it; Fall 2026 counts each
+//   quarter in its settings, its question never answered.
 // - A refused start (a mercy lead beside a running clock), with scripts on and off, keeps
 //   every box as typed, marks the mercy box, and the sentence beside it names it.
 // Found by their own marks; every wait has a limit; no check passes on a timeout.
@@ -80,17 +86,21 @@ async function gameRulesOf(page, slug) {
   return {
     mode: await page.locator('input[name=clockMode]:checked').getAttribute('value'),
     mercyLead: await page.locator('input[name=mercyLead]').inputValue(),
+    teamFoulsReset: await page.locator('input[name=teamFoulsReset]:checked').getAttribute('value'),
   };
 }
 
 /** Starts a season from the form: `more` fills boxes by name, `clock` picks the clock. */
-async function startSeason(page, { name, slug, clock, mercyLead, carry }) {
+async function startSeason(page, { name, slug, clock, mercyLead, teamFoulsReset, carry }) {
   await page.goto(seasonPage);
   const form = startForm(page);
   await form.locator('input[name=name]').fill(name);
   await form.locator('input[name=slug]').fill(slug);
   if (clock !== undefined) await form.locator(`input[name=clockMode][value=${clock}]`).check();
   if (mercyLead !== undefined) await form.locator('input[name=mercyLead]').fill(mercyLead);
+  if (teamFoulsReset !== undefined) {
+    await form.locator(`input[name=teamFoulsReset][value=${teamFoulsReset}]`).check();
+  }
   if (carry !== undefined) await form.locator(`input[name=carry][value=${carry}]`).check();
   await tap(
     page,
@@ -113,6 +123,8 @@ try {
       await page.goto(`${seasonPage}?season=fall-2026&edit=game`);
       await page.locator('input[name=clockMode][value=running]').check();
       await page.locator('input[name=lastMinutes]').fill('2');
+      // Quarters, the team-foul question left as it was: each quarter (T-422).
+      await page.locator('input[name=periods][value="4"]').check();
       await tap(
         page,
         page.getByRole('button', { name: 'Save the game rules' }),
@@ -127,39 +139,51 @@ try {
             'Fall 2026 also stops the clock in the last 2 minutes. A stop clock for the whole game replaces that.',
         (await dropped.count()) === 1 ? await dropped.innerText() : 'no sentence',
       );
+      const fouls = startForm(page).locator('input[name=teamFoulsReset]:checked');
+      const said = startForm(page).locator('[data-team-fouls-said]');
+      note(
+        'the start form offers Fall 2026’s team fouls, each half or quarter, and says it',
+        (await fouls.getAttribute('value')) === 'period' &&
+          (await said.innerText()).trim() === 'Team fouls start again each quarter.',
+        `${await fouls.getAttribute('value')} ${await said.innerText()}`,
+      );
     },
   );
 
-  await step('the owner starts Rules 2027 with a stop clock and a mercy lead of 12', async () => {
-    await startSeason(page, {
-      name: 'Rules 2027',
-      slug: 'rules-2027',
-      clock: 'stop',
-      mercyLead: '12',
-      carry: 'teams-and-rosters',
-    });
-    await page.goto(`${seasonPage}?season=rules-2027`);
-    await tap(page, page.locator('[data-season-change=current]'), /ask=current/);
-    await tap(page, page.getByRole('button', { name: 'Yes, make it current' }), /done=current/);
-    note(
-      'Rules 2027 is the current season',
-      (await page.locator('[data-season-state=current]').count()) === 1,
-    );
-  });
+  await step(
+    'the owner starts Rules 2027 with a stop clock, a mercy lead of 12 and team fouls by the half',
+    async () => {
+      await startSeason(page, {
+        name: 'Rules 2027',
+        slug: 'rules-2027',
+        clock: 'stop',
+        mercyLead: '12',
+        teamFoulsReset: 'half',
+        carry: 'teams-and-rosters',
+      });
+      await page.goto(`${seasonPage}?season=rules-2027`);
+      await tap(page, page.locator('[data-season-change=current]'), /ask=current/);
+      await tap(page, page.getByRole('button', { name: 'Yes, make it current' }), /done=current/);
+      note(
+        'Rules 2027 is the current season',
+        (await page.locator('[data-season-state=current]').count()) === 1,
+      );
+    },
+  );
 
   await step("the season's settings show both and change the lead", async () => {
     const shown = await gameRulesOf(page, 'rules-2027');
     note(
-      "the season's settings show a stop clock and a mercy lead of 12",
-      shown.mode === 'stop' && shown.mercyLead === '12',
+      "the season's settings show a stop clock, a mercy lead of 12 and fouls by the half",
+      shown.mode === 'stop' && shown.mercyLead === '12' && shown.teamFoulsReset === 'half',
       JSON.stringify(shown),
     );
     await page.locator('input[name=mercyLead]').fill('10');
     await tap(page, page.getByRole('button', { name: 'Save the game rules' }), /season=rules-2027/);
     const changed = await gameRulesOf(page, 'rules-2027');
     note(
-      "the season's settings changed the lead to 10, the clock kept",
-      changed.mode === 'stop' && changed.mercyLead === '10',
+      "the season's settings changed the lead to 10, the clock and the fouls kept",
+      changed.mode === 'stop' && changed.mercyLead === '10' && changed.teamFoulsReset === 'half',
       JSON.stringify(changed),
     );
   });
@@ -228,6 +252,22 @@ try {
       note('the 10-point lead is shown', ten.home === 10 && ten.away === 0, JSON.stringify(ten));
       note('a lead of exactly 10 brings the mercy notice', (await notice.count()) === 1);
       note('and the clock runs', (await clock('running').count()) === 1);
+      // Team fouls by the half, with quarters: four in the first quarter, one in the
+      // second, and the home team's count is five, carried (step 2.123's mark).
+      for (const jersey of [50, 51, 52, 53]) await c.play('home', jersey, 'foul');
+      const homeFouls = (text) =>
+        screen
+          .locator('[data-scoring] [data-team-fouls="home"]', { hasText: text })
+          .waitFor({ timeout: limit });
+      await homeFouls(/^\s*4 fouls\s*$/);
+      await c.pickPeriod(2);
+      await c.play('home', 54, 'foul');
+      await homeFouls(/^\s*5 fouls\s*$/);
+      note(
+        'the second quarter carries the first quarter’s four team fouls: five',
+        (await c.teamFouls('home').innerText()).trim() === '5 fouls',
+        await c.teamFouls('home').innerText(),
+      );
     } finally {
       await context.close();
     }
@@ -240,18 +280,31 @@ try {
       mode: await form.locator('input[name=clockMode]:checked').getAttribute('value'),
       mercyLead: await form.locator('input[name=mercyLead]').inputValue(),
       dropped: await form.locator('[data-stop-clock-dropped]').count(),
+      teamFoulsReset: await form
+        .locator('input[name=teamFoulsReset]:checked')
+        .getAttribute('value'),
     };
     note(
-      'the start form offers a stop clock and 10, and no last-minutes sentence (none to copy)',
-      offered.mode === 'stop' && offered.mercyLead === '10' && offered.dropped === 0,
+      'the start form offers a stop clock, 10, fouls by the half, and no last-minutes sentence',
+      offered.mode === 'stop' &&
+        offered.mercyLead === '10' &&
+        offered.dropped === 0 &&
+        offered.teamFoulsReset === 'half',
       JSON.stringify(offered),
     );
     await startSeason(page, { name: 'Next 2028', slug: 'next-2028', carry: 'nothing' });
     const kept = await gameRulesOf(page, 'next-2028');
     note(
-      'a season started leaving them keeps a stop clock and 10',
-      kept.mode === 'stop' && kept.mercyLead === '10',
+      'a season started leaving them keeps a stop clock, 10 and fouls by the half',
+      kept.mode === 'stop' && kept.mercyLead === '10' && kept.teamFoulsReset === 'half',
       JSON.stringify(kept),
+    );
+    // Fall 2026's question was never answered: its settings count each quarter.
+    const plain = await gameRulesOf(page, 'fall-2026');
+    note(
+      'Fall 2026, its team fouls left alone, counts each half or quarter',
+      plain.teamFoulsReset === 'period',
+      JSON.stringify(plain),
     );
   });
 
