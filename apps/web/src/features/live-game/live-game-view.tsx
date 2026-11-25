@@ -45,6 +45,8 @@ export type LiveGameLabels = {
   readonly notStarted: string;
   /** With {away} {awayFouls} {home} {homeFouls}. */
   readonly teamFouls: string;
+  /** With {team}: the team that shoots the bonus, and the double bonus (step 2.123). */
+  readonly bonus: { readonly 1: string; readonly 2: string };
   /** With {play}. */
   readonly latestPlay: string;
   readonly playersHidden: string;
@@ -139,6 +141,35 @@ export function redrawsWhileHeld(
   now: Pick<ViewerGame, 'status' | 'sequence'>,
 ): boolean {
   return now.sequence >= arrived.sequence && now.status === 'final';
+}
+
+/**
+ * " Hawks shoot the bonus.", for each team the other team's fouls have put there, as the
+ * tracker's badge says it (step 2.123); nothing when the snapshot does not say how fouls
+ * count, or nobody is there.
+ */
+export function bonusWords(
+  rules: GameSnapshot['foulRules'],
+  fouls: { readonly home: number; readonly away: number },
+  teams: { readonly home: { readonly name: string }; readonly away: { readonly name: string } },
+  labels: LiveGameLabels['bonus'],
+): string {
+  if (rules === undefined) return '';
+  const level = (count: number): 0 | 1 | 2 =>
+    rules.doubleBonusFouls !== null && count >= rules.doubleBonusFouls
+      ? 2
+      : count >= rules.bonusFouls
+        ? 1
+        : 0;
+  let said = '';
+  for (const [side, other] of [
+    ['away', 'home'],
+    ['home', 'away'],
+  ] as const) {
+    const shoots = level(fouls[other]);
+    if (shoots !== 0) said += ` ${fill(labels[shoots], { team: teams[side].name })}`;
+  }
+  return said;
 }
 
 /**
@@ -322,6 +353,7 @@ export function LiveGameView({
               home: teams.home.name,
               homeFouls: game.teamFouls.home,
             })}
+            {bonusWords(initial.foulRules, game.teamFouls, teams, labels.bonus)}
           </p>
         ) : null}
         {/* Always there, so a screen reader hears each change; out of sight when it has

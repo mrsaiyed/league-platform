@@ -87,7 +87,11 @@ export function statusNote(status: string): string | null {
 }
 
 /** The live part's words, for a game whose own status is `status` and public state `state`. */
-export function liveGameLabels(status: string, state?: PublicGameState): LiveGameLabels {
+export function liveGameLabels(
+  status: string,
+  state?: PublicGameState,
+  counted: 'period' | 'half' | 'game' = 'period',
+): LiveGameLabels {
   const labels = displayLabels(t);
   return {
     region: t('game.region'),
@@ -95,7 +99,14 @@ export function liveGameLabels(status: string, state?: PublicGameState): LiveGam
     spokenScore: t('game.spokenScore'),
     // A game whose start has passed with no score has not "not started" (step 2.159).
     notStarted: state === 'awaiting-score' ? t('game.noScoreYet') : notStartedText(status),
-    teamFouls: t('game.teamFouls'),
+    teamFouls: t(
+      counted === 'game'
+        ? 'game.teamFouls.game'
+        : counted === 'half'
+          ? 'game.teamFouls.half'
+          : 'game.teamFouls',
+    ),
+    bonus: { 1: t('game.bonus.1'), 2: t('game.bonus.2') },
     latestPlay: t('game.latestPlay'),
     playersHidden: t('game.playersHidden'),
     nameNotShown: t('game.nameNotShown'),

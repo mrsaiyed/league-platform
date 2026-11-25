@@ -271,6 +271,15 @@ export async function readGameSnapshot(
     },
     players,
     ...(correctedOn !== undefined && datePattern.test(correctedOn) ? { correctedOn } : {}),
+    ...(state === undefined
+      ? {}
+      : {
+          foulRules: {
+            counted: state.rules.teamFoulsReset ?? 'period',
+            bonusFouls: state.rules.bonusFouls,
+            doubleBonusFouls: state.rules.doubleBonusFouls,
+          },
+        }),
   });
 }
 
