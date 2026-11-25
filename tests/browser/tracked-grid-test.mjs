@@ -12,7 +12,7 @@
 // - The device's next tap is saved on top of the correction, which it never overwrites,
 //   and the device then shows the server's numbers (or says in words why it cannot). Its
 //   Undo takes that tap back; the next Undo, on the correction's foul, asks first (T-408),
-//   and "Leave it" keeps the foul on the server.
+//   (once, for a fast double tap) and "Leave it" keeps the foul on the server.
 // - A lowered basket is refused beside its box, with everything typed kept and nothing
 //   saved; a grid left open while the game changed in a second tab is refused at the top
 //   with "Load it again", everything typed kept, and the second tab's change alone saved.
@@ -471,13 +471,17 @@ try {
         undone.length === before.length - 1 && isTheFoul(undone.at(-1)),
         JSON.stringify(undone.slice(-2)),
       );
-      await device.page.locator('[data-undo]:not([data-resting])').click();
+      // A fast double tap: the first asks, the second lands on the question as it comes
+      // up and is not an answer, so the question is asked once and stays.
+      await device.page.locator('[data-undo]:not([data-resting])').click({ clickCount: 2 });
       const ask = device.page.locator('[data-undo-correction]');
       await ask.waitFor({ timeout: tapLimit });
       note(
         'the next Undo asks first, in plain words',
         (await ask.textContent())?.includes(words.undoCorrection),
       );
+      note('Undo tapped twice fast asks once, and the question stays', (await ask.count()) === 1);
+      await ask.locator('.court-sheet-head:not([data-resting])').waitFor({ timeout: tapLimit });
       await ask.getByRole('button', { name: words.leaveIt, exact: true }).click();
       await ask.waitFor({ state: 'detached', timeout: tapLimit });
       await c.saved();

@@ -15,8 +15,12 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { tapTaken, type TapRest } from './tap-rest.ts';
 
 type Tap = MouseEvent<HTMLButtonElement>;
+
+/** A click as the rests read it: when the finger made it, and whether a key did. */
+const tapAt = (event: MouseEvent) => ({ at: event.timeStamp, keyboard: event.detail === 0 });
 
 /** Whether the play Undo would take back now is one a correction wrote. */
 export const undoesCorrection = (
@@ -46,7 +50,8 @@ export const undoTapped = (
 export function UndoCorrectionQuestion(props: {
   readonly t: Translate;
   readonly leaveRef?: RefObject<HTMLButtonElement | null>;
-  readonly onLeave: () => void;
+  /** A tap on "Leave it" or around the question; null for Escape. */
+  readonly onLeave: (event: MouseEvent<HTMLElement> | null) => void;
   readonly onTakeBack: (event: Tap) => void;
 }) {
   const { t, onLeave, onTakeBack } = props;
@@ -59,7 +64,7 @@ export function UndoCorrectionQuestion(props: {
         aria-modal="true"
         aria-labelledby="court-undo-correction"
         onKeyDown={(event) => {
-          if (event.key === 'Escape') onLeave();
+          if (event.key === 'Escape') onLeave(null);
         }}
       >
         <p id="court-undo-correction">{t('tracker.undo.correctionAsk')}</p>
@@ -96,12 +101,16 @@ export type UndoAsk = {
 
 /**
  * `game` is read at the tap (the device's game as it stands then), `corrections` as the
- * server's last state named them.
+ * server's last state named them. `rests.undo` is Undo's own rest: a tap Undo would not
+ * take (the double of the one before) asks nothing either. `rests.answers` rests the
+ * question from the tap that asked it, so the double of that tap, landing on the
+ * question, is not an answer (step 2.65, last helper).
  */
 export function useUndoAsk(
   t: Translate,
   game: () => basketball.GameState | null,
   corrections: readonly string[],
+  rests: { readonly undo: TapRest; readonly answers: TapRest },
 ): UndoAsk {
   const [go, setGo] = useState<((event: Tap) => void) | null>(null);
   const leave = useRef<HTMLButtonElement | null>(null);
@@ -109,16 +118,27 @@ export function useUndoAsk(
   useEffect(() => {
     if (asking) leave.current?.focus();
   }, [asking]);
-  const undo = (event: Tap, next: (event: Tap) => void) =>
-    undoTapped(undoesCorrection(game(), corrections), event, next, (later) => setGo(() => later));
+  const undo = (event: Tap, next: (event: Tap) => void) => {
+    const asks = undoesCorrection(game(), corrections);
+    if (asks && !tapTaken(rests.undo, tapAt(event))) return;
+    undoTapped(asks, event, next, (later) => {
+      rests.answers.begin(event.timeStamp);
+      setGo(() => later);
+    });
+  };
   const close = () => setGo(null);
+  const answered = (event: MouseEvent | null) =>
+    event === null || tapTaken(rests.answers, tapAt(event));
   const ask =
     go === null ? null : (
       <UndoCorrectionQuestion
         t={t}
         leaveRef={leave}
-        onLeave={close}
+        onLeave={(event) => {
+          if (answered(event)) close();
+        }}
         onTakeBack={(event) => {
+          if (!answered(event)) return;
           close();
           go(event);
         }}

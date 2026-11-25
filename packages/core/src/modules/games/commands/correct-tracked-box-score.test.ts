@@ -54,8 +54,8 @@ async function grid(t: Tracker, accountId = ownerId) {
 const correct = (t: Tracker, sequence: number, lines: object[], accountId: string = ownerId) =>
   correctTrackedBoxScore(t.as(accountId), { gameId, sequence, lines }, t.deps);
 
-const endAgain = (t: Tracker, sequence: number, lines: object[] = []) =>
-  correctTrackedBoxScore(t.as(ownerId), { gameId, sequence, lines, end: true }, t.deps);
+const endAgain = (t: Tracker, sequence: number, lines: object[] = [], accountId = ownerId) =>
+  correctTrackedBoxScore(t.as(accountId), { gameId, sequence, lines, end: true }, t.deps);
 
 /**
  * The game's event log replayed with the engine from nothing: the lines it gives. With
@@ -211,6 +211,13 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
       ok: false,
       error: { code: 'not-allowed' },
     });
+    // "End the game again" from the scorekeeper is refused the same way, and writes nothing.
+    const events = t.db.state.events.length;
+    expect(await endAgain(t, sequence, [], scorekeeperId)).toEqual({
+      ok: false,
+      error: { code: 'not-allowed' },
+    });
+    expect([t.db.state.events.length, t.db.state.games[0]?.status]).toEqual([events, 'live']);
     // Another league's admin: the memory stores keep one league, so that case is the
     // two-league harness's (packages/database/src/isolation/grid-correction-cases).
   });
