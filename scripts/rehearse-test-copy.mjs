@@ -38,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { serveFakeSupabaseAuth } from '../packages/providers/index.ts';
 import { leagueUrl } from '@srleagues/core';
 import { signInWithPassword, walkFirstTest } from '../tests/browser/first-test-walk.mjs';
-import { freePort, launch } from '../tests/browser/web-browser-kit.mjs';
+import { answerNameScreen, freePort, launch } from '../tests/browser/web-browser-kit.mjs';
 import * as words from './rehearse-test-copy.messages.mjs';
 import {
   addressAs,
@@ -486,6 +486,8 @@ async function rehearse() {
       page.waitForURL((url) => url.pathname !== '/signup/password'),
       page.getByRole('button', { name: 'Save and sign in' }).click(),
     ]);
+    // The one name screen a new account meets (step 2.128).
+    await answerNameScreen(page, 'Made-up', 'Owner');
     const admin = await page.goto(`${origin}${leagueUrl({ slug: shortName }, 'admin')}`);
     if (admin?.status() !== 200) throw new StepFailed(words.reasons.notOwner(admin?.status()));
     return "signed up with the code the kept-emails script read; the league's admin area opens (200)";
