@@ -9,7 +9,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import { bears, games, hawks, liveLeagueId } from '../../server/tracker-endpoints.test-helper.ts';
-import { clockModeShown, mercySwitch, switchedClock, type ClockModeShown } from './clock-mode.ts';
+import {
+  clockModeShown,
+  mercySwitch,
+  readMercyDismissed,
+  switchedClock,
+  writeMercyDismissed,
+  type ClockModeShown,
+} from './clock-mode.ts';
 import {
   ClockButton,
   ClockSheetView,
@@ -246,6 +253,34 @@ describe('the mercy rule’s notice (step 2.69, item 2)', () => {
     expect(second?.playId).not.toBe(firstId);
     // Still the same crossing while the lead stays: the notice keeps the first basket's id.
     expect(mercySwitch(played([three('home', 'h5')], first))?.playId).toBe(firstId);
+  });
+
+  it('a dismissal is kept on the device by game and person, so a reload does not say it again', () => {
+    const kept = new Map<string, string>();
+    const store = {
+      getItem: (key: string) => kept.get(key) ?? null,
+      setItem: (key: string, value: string) => void kept.set(key, value),
+    };
+    const owner = { gameId: 'game-1', accountId: 'person-1' };
+    const firstId = mercySwitch(homeRuns(mercyRules))?.playId ?? '';
+    expect(readMercyDismissed(store, owner)).toBeNull();
+    writeMercyDismissed(store, owner, firstId);
+    // The page is opened again: the same game and person read the same basket back.
+    expect(readMercyDismissed(store, owner)).toBe(firstId);
+    expect(readMercyDismissed(store, { ...owner, gameId: 'game-2' })).toBeNull();
+    expect(readMercyDismissed(store, { ...owner, accountId: 'person-2' })).toBeNull();
+    // A storage that cannot be reached loses only the dismissal.
+    const broken = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('full');
+      },
+    };
+    expect(() => writeMercyDismissed(broken, owner, firstId)).not.toThrow();
+    expect(readMercyDismissed(broken, owner)).toBeNull();
+    expect(readMercyDismissed(null, owner)).toBeNull();
   });
 });
 

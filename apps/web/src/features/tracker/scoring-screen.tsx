@@ -37,7 +37,14 @@ import {
   type BonusHorn,
   type BonusShown,
 } from './bonus-horn.ts';
-import { clockModeShown, mercySwitch, switchedClock } from './clock-mode.ts';
+import {
+  clockModeShown,
+  deviceStore,
+  mercySwitch,
+  readMercyDismissed,
+  switchedClock,
+  writeMercyDismissed,
+} from './clock-mode.ts';
 import { clockSetSaid, MercyNotice, type ClockSheet, type CourtClock } from './clock-parts.tsx';
 import { createClockTicker } from './clock-ticker.ts';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
@@ -649,8 +656,15 @@ export function ScoringScreen(props: ScoringScreenProps) {
     return () => window.clearTimeout(timer);
   }, [lastMinutesAtMs, reading.running, reading.remainingMs]);
   // The mercy rule switched the clock to running: said until dismissed or switched back,
-  // and not again for the same basket once dismissed (step 2.69).
-  const [mercyDismissed, setMercyDismissed] = useState<string | null>(null);
+  // and not again for the same basket once dismissed (step 2.69), even after a reload: the
+  // dismissal is kept on the device by game and person, as the Players panel's drafts are.
+  const mercyOwner = {
+    gameId: props.gameId ?? `${rosters.home.teamId}.${rosters.away.teamId}`,
+    accountId: props.accountId,
+  };
+  const [mercyDismissed, setMercyDismissed] = useState<string | null>(() =>
+    readMercyDismissed(deviceStore(), mercyOwner),
+  );
   const mercy = mercySwitch(state);
   const mercyShown = mercy !== null && mercy.playId !== mercyDismissed ? mercy : null;
   // Start or Pause under the scoreboard rests when its word changes, whatever changed it
@@ -1563,7 +1577,10 @@ export function ScoringScreen(props: ScoringScreenProps) {
               back={() => {
                 void send({ type: 'clock-mode', mode: 'stop' }, t('tracker.play.clock-mode.stop'));
               }}
-              keep={() => setMercyDismissed(mercyShown.playId)}
+              keep={() => {
+                writeMercyDismissed(deviceStore(), mercyOwner, mercyShown.playId);
+                setMercyDismissed(mercyShown.playId);
+              }}
             />
             {props.notices}
           </>

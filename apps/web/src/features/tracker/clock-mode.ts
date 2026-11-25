@@ -73,3 +73,48 @@ export function mercySwitch(game: basketball.GameState): MercySwitch | null {
   }
   return null;
 }
+
+/** Whose dismissal it is: the game and the person, as the Players panel's drafts are kept. */
+export type MercyOwner = { readonly gameId: string; readonly accountId: string };
+
+/**
+ * Where a person's dismissed mercy notice of a game is kept on this device (step 2.69): a
+ * scorekeeper's phone reloads often, and "Keep it running" is not asked again for the same
+ * basket. Losing it only says the notice once more.
+ */
+export const mercyDismissedKey = (owner: MercyOwner) =>
+  `srleagues.tracker.mercy-dismissed.${owner.accountId}.${owner.gameId}`;
+
+type DismissalStore = Pick<Storage, 'getItem' | 'setItem'>;
+
+/** The basket whose mercy notice was dismissed on this device; null for none or unreadable. */
+export function readMercyDismissed(store: DismissalStore | null, owner: MercyOwner): string | null {
+  try {
+    const kept = store?.getItem(mercyDismissedKey(owner));
+    return typeof kept === 'string' && kept.length > 0 && kept.length < 100 ? kept : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keeps the dismissal of the notice for `playId`, the basket that made the switch. */
+export function writeMercyDismissed(
+  store: DismissalStore | null,
+  owner: MercyOwner,
+  playId: string,
+): void {
+  try {
+    store?.setItem(mercyDismissedKey(owner), playId);
+  } catch {
+    // Private windows and full storage: the dismissal holds until the page goes.
+  }
+}
+
+/** The device's own storage, or none where it cannot be reached. */
+export function deviceStore(): Storage | null {
+  try {
+    return typeof window === 'undefined' ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
