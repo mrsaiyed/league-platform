@@ -142,6 +142,7 @@ How the grid works (built in step 2.64):
 **S-21 (new, the founder's direction, November 12): every game rule that differs between leagues is a setting, and the scorekeeper can override anything automatic at the table.** Leagues play by different rules. A high school league stops the clock on every foul. A rec league lets it run. Some switch to a running clock once a team leads by a set number of points. So nothing about the rules is built in.
 
 - Each rule is a season setting, with presets to start from: a high-school-style stop clock, a rec-league-style running clock, or custom.
+- Team fouls, and with them the bonus and the double bonus, start again each period, each half or once a game, as the season says; overtime continues the count of the last period, of the second half or of the game (**S-114**, decided for you).
 - **S-106 (agreed, the founder, November 24):** the mercy rule, the running clock and whether team fouls reset each half are asked of the admin when the league is made, each with a plain default they can leave, and the admin can change them for a season in its settings. The platform chooses none of them for any league.
 - A single game can be given different rules before it starts: by an admin, or at the table by the scorekeeper where the league allows it (S-35).
 - During a game the clock mode can be switched at any moment, and the clock, period, fouls and score can always be corrected by hand.

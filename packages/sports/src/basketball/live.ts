@@ -36,13 +36,16 @@ export const CLOCK_MODES: readonly ClockMode[] = ['stop', 'running'];
 /** Where a last-minutes stop clock applies: the end of every period, of each half, or of the game. */
 export type StopClockScope = 'period' | 'half' | 'game';
 export const STOP_CLOCK_SCOPES: readonly StopClockScope[] = ['period', 'half', 'game'];
+/** When team fouls start again from none: each period, each half or once a game. */
+export type TeamFoulsReset = 'period' | 'half' | 'game';
+export const TEAM_FOULS_RESETS: readonly TeamFoulsReset[] = ['period', 'half', 'game'];
 
 export type Rules = {
   /** Regulation periods: 2 halves or 4 quarters. */
   periods: 2 | 4;
   periodSeconds: number;
   overtimeSeconds: number;
-  /** Team fouls in a period that put the other team in the bonus. */
+  /** Team fouls in a foul window (`teamFoulsReset`) that put the other team in the bonus. */
   bonusFouls: number;
   /** Team fouls for the double bonus, or null when the format has none. */
   doubleBonusFouls: number | null;
@@ -75,6 +78,13 @@ export type Rules = {
   mercyLead?: number | null;
   /** Personal fouls that mark a player out (`Line.fouledOut`). */
   playerFoulLimit?: number | null;
+  /**
+   * When team fouls, and with them the bonus, start again from none (step 2.123).
+   * Absent means each period, as in every game saved before it and every game of the
+   * Al-Hadi tracker. Overtime always continues the last regulation window's count: the
+   * last period's, the second half's or the game's (S-114). Read through `foulWindow`.
+   */
+  teamFoulsReset?: TeamFoulsReset;
   /**
    * How minutes are counted when the clock is set (S-71, record 077). Absent, as in
    * every game of the Al-Hadi tracker and every game saved before it: on the clock's
@@ -336,7 +346,10 @@ export type TeamView = {
   turnovers: number;
   /** Turnovers charged to the team rather than a player. */
   teamTurnovers: number;
-  /** Team fouls counted toward the bonus in the current period. */
+  /**
+   * Team fouls counted toward the bonus in the current foul window: the period, the
+   * half or the game, as `teamFoulsReset` says (`foulWindow`).
+   */
   periodFouls: number;
   onCourt: string[];
   /** This team's own foul trouble. */
@@ -809,11 +822,13 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
   if (limit != null)
     for (const l of Object.values(players)) if (l.fouls >= limit) l.fouledOut = true;
 
-  // Team fouls reset each period; overtime continues the last regulation period's count.
-  const bucket = (p: number) => Math.min(p, state.rules.periods);
+  // Team fouls count in the current foul window (each period unless the rules say
+  // otherwise); overtime continues the last regulation window's count.
+  const now = foulWindow(state.rules, period);
   for (const [id, periods] of Object.entries(standing)) {
     const l = players[id];
-    if (l) teams[l.side].periodFouls += periods.filter((p) => bucket(p) === bucket(period)).length;
+    if (l)
+      teams[l.side].periodFouls += periods.filter((p) => foulWindow(state.rules, p) === now).length;
   }
   for (const side of SIDES) {
     teams[side].penalty = bonusLevel(teams[side].periodFouls, state.rules);
@@ -821,6 +836,20 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
     teams[side].timeoutsLeft = timeoutsLeft(state.rules, teams[side].timeouts, period);
   }
   return { period, periodStartElapsedMs, clockMode, teams, players, standing };
+}
+
+/**
+ * The foul window `period` counts in: team fouls toward the bonus are those of its
+ * window. Each period is its own window, unless the rules count by the half (Q1–Q2 and
+ * Q3–Q4; with halves the same as each period) or once a game. Every overtime period
+ * belongs to the last regulation window, so overtime continues that count (S-114).
+ */
+export function foulWindow(rules: Rules, period: number): number {
+  const regulation = Math.min(period, rules.periods);
+  const reset = rules.teamFoulsReset ?? 'period';
+  if (reset === 'game') return 1;
+  if (reset === 'half') return regulation <= rules.periods / 2 ? 1 : 2;
+  return regulation;
 }
 
 /**
@@ -1164,6 +1193,8 @@ function checkRules(rules: Rules): Rules {
     fail('The mercy rule starts at a lead of 1 to 100 points.');
   if (given(r.playerFoulLimit) && !whole(r.playerFoulLimit, 1, 20))
     fail('A player fouls out after 1 to 20 fouls, or never.');
+  if (r.teamFoulsReset !== undefined && !TEAM_FOULS_RESETS.includes(r.teamFoulsReset))
+    fail('Team fouls reset each period, each half or once a game.');
   return {
     periods: r.periods,
     periodSeconds: r.periodSeconds,
@@ -1178,6 +1209,7 @@ function checkRules(rules: Rules): Rules {
     ...(r.stopClockScope !== undefined ? { stopClockScope: r.stopClockScope } : {}),
     ...(given(r.mercyLead) ? { mercyLead: r.mercyLead } : {}),
     ...(given(r.playerFoulLimit) ? { playerFoulLimit: r.playerFoulLimit } : {}),
+    ...(r.teamFoulsReset !== undefined ? { teamFoulsReset: r.teamFoulsReset } : {}),
   };
 }
 
