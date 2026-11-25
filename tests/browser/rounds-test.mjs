@@ -18,6 +18,8 @@ import {
   accessibilityProblems,
   buildNext,
   freePort,
+  leagueDay,
+  leagueDayWords,
   launch,
   openStaffMenu,
   startNext,
@@ -39,12 +41,17 @@ if (!dev && !process.argv.includes('--no-build')) {
   if (!built) failures.push('next build failed or took over 10 minutes');
 }
 
-// Three Sundays a week apart, far from the seed's own dates.
-const weeks = [
-  { label: 'Week 1', date: '2027-01-10', words: 'Sun, Jan 10' },
-  { label: 'Week 2', date: '2027-01-17', words: 'Sun, Jan 17' },
-  { label: 'Week 3', date: '2027-01-24', words: 'Sun, Jan 24' },
-];
+// Three Sundays a week apart, far from the seed's own dates: over a year after the made-up
+// world's today (it reads this computer's clock), so always ahead, whatever day it is run (T-404).
+const worldNow = new Date().toISOString();
+const firstSunday = [400, 401, 402, 403, 404, 405, 406].find(
+  (d) => new Date(`${leagueDay(worldNow, d)}T12:00:00Z`).getUTCDay() === 0,
+);
+const weeks = [0, 7, 14].map((d, i) => ({
+  label: `Week ${i + 1}`,
+  date: leagueDay(worldNow, (firstSunday ?? 400) + d),
+  words: leagueDayWords(worldNow, (firstSunday ?? 400) + d),
+}));
 const screen = { width: 390, height: 844 };
 
 if (built) {

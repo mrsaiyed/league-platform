@@ -14,12 +14,19 @@ import {
   accessibilityProblems,
   buildNext,
   freePort,
+  leagueDay,
   launch,
   startNext,
   waitFor,
   whatWentWrong,
 } from './web-browser-kit.mjs';
 
+// The file's days: over a year after the made-up world's today (it reads this computer's
+// clock), so always ahead, whatever day it is run (T-404), and a 30 February that never is.
+const worldNow = new Date().toISOString();
+const first = leagueDay(worldNow, 400);
+const second = leagueDay(worldNow, 407);
+const noSuchDay = `${Number(first.slice(0, 4)) + 1}-02-30`;
 const failures = [];
 const checked = [];
 const note = (label, ok, detail = '') => {
@@ -37,11 +44,11 @@ const step = async (name, run) => {
 /** Three good games, a team the season does not have (row 4) and a date that does not exist (row 5). */
 const madeUpFile = [
   'Date,Time,Home,Away,Venue,Court,Home score,Away score',
-  '2027-01-09,18:00,Lions,Tigers,Central Gym,Court 1,,',
-  '2027-01-09,19:30,Hawks,Bears,Central Gym,Court 2,,',
-  '2027-01-16,18:00,Lions,Comets,Central Gym,Court 1,,',
-  '2027-02-30,18:00,Tigers,Hawks,Central Gym,Court 1,,',
-  '2027-01-16,19:30,Bears,Lions,Central Gym,Court 2,52,47',
+  `${first},18:00,Lions,Tigers,Central Gym,Court 1,,`,
+  `${first},19:30,Hawks,Bears,Central Gym,Court 2,,`,
+  `${second},18:00,Lions,Comets,Central Gym,Court 1,,`,
+  `${noSuchDay},18:00,Tigers,Hawks,Central Gym,Court 1,,`,
+  `${second},19:30,Bears,Lions,Central Gym,Court 2,52,47`,
 ].join('\n');
 
 let built = true;
@@ -182,7 +189,7 @@ if (browser) {
   await step('a file just over the import limit gets our own notice', async () => {
     // About 850 KB: over the import's limit (800 KB), under the 2 MB a server action may
     // read (next.config.ts), so it must reach our check and not the framework's error.
-    const row = '2027-01-09,18:00,Lions,Tigers,Central Gym,Court 1,,\n';
+    const row = `${first},18:00,Lions,Tigers,Central Gym,Court 1,,\n`;
     const big = `Date,Time,Home,Away,Venue,Court,Home score,Away score\n${row.repeat(
       Math.ceil(850_000 / row.length),
     )}`;
