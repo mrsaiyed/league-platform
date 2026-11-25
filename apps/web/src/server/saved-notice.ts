@@ -54,13 +54,22 @@ export type SavedNotice = {
    * "Removed …" (steps 2.49 and 2.50). Held here for one look, as the rest.
    */
   readonly name?: string;
+  /**
+   * Where it is said, when a screen shows more than one: the schedule's season (step 2.155
+   * part 6 fix round). Without it a notice is said where its `thing` is: a Teams page's team.
+   */
+  readonly place?: string;
 };
 
 export type SavedNotices = {
   /** Leaves the notice for this person in this league, in place of any before it. */
   readonly leave: (holder: string, notice: SavedNotice) => void;
-  /** The notice left for this person and screen, taken: it is not there a second time. */
-  readonly take: (holder: string, screen: NoticeScreen) => SavedNotice | undefined;
+  /**
+   * The notice left for this person and screen, taken: it is not there a second time. Given
+   * `place`, a notice for another place (its `place`, else its `thing`) is neither given nor
+   * taken: it waits for its own page.
+   */
+  readonly take: (holder: string, screen: NoticeScreen, place?: string) => SavedNotice | undefined;
 };
 
 /** Whose notices: one person in one league. Undefined for a visitor, who saves nothing. */
@@ -89,9 +98,10 @@ export function savedNotices(options: {
       }
       left.set(holder, { ...notice, at: now() });
     },
-    take: (holder, screen) => {
+    take: (holder, screen, place) => {
       const found = left.get(holder);
       if (found === undefined || found.screen !== screen) return undefined;
+      if (place !== undefined && (found.place ?? found.thing) !== place) return undefined;
       left.delete(holder);
       if (found.at < now() - options.keepMs) return undefined;
       return {
@@ -100,6 +110,7 @@ export function savedNotices(options: {
         said: found.said,
         ...(found.about === undefined ? {} : { about: found.about }),
         ...(found.name === undefined ? {} : { name: found.name }),
+        ...(found.place === undefined ? {} : { place: found.place }),
       };
     },
   };

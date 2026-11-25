@@ -64,9 +64,12 @@ export async function performScheduleAction(
   const address = query.size === 0 ? base : `${base}?${query.toString()}`;
   const holder = noticeHolderOf(context);
   if (holder !== undefined) {
+    const seasonId = form.get('seasonId');
     savedNoticesHere().leave(holder, {
       screen: 'schedule',
       ...(noticeOfAnswer(outcome) ?? { thing: base, said: answerSaid(outcome) }),
+      // Said only on this season's schedule, never on another's in a second tab.
+      place: typeof seasonId === 'string' ? seasonId : '',
     });
     const asked = await headers();
     // Next.js's own header on a post its scripts send; a form sent by the browser has none.

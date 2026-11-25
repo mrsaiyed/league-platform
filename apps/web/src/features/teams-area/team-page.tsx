@@ -100,7 +100,8 @@ export async function TeamPage({
   }
 
   // A team just added: "Saved" at the top, beside its name, once (step 2.155).
-  const notice = takeNotice(context, 'teams');
+  // This team's notice only: another team's waits for its own page.
+  const notice = takeNotice(context, 'teams', team.id);
   const justAdded = notice?.thing === team.id && notice.said === 'created';
   // The details saved, said beside them; a player added, said on their new line (step 2.155).
   const saved = notice?.thing === team.id ? notice.said : undefined;

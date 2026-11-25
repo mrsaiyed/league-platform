@@ -139,19 +139,14 @@ export async function ScheduleBuilderPage({
   // taking it clears it, so a reload, or Back to the page, says nothing old, and no answer
   // is ever read from the address. A removal or a put back is read from its own notice; any
   // other answer's words, a refusal's typed boxes too, are in the notice (answerShown).
-  const noticeHolder = noticeHolderOf(context);
-  const taken =
-    noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'schedule');
-  const action = leagueUrl(addressee, 'admin-area', { area: 'schedule' });
-  const search = answerShown(inAddress, taken, action);
   const holder = await ports.accessOf(context);
   // Every season the holder may be told of, the ones not public yet among them (a season is
   // scheduled before it is shown): the port lists only those (P4 §4).
   const seasons = await ports.scheduleAdmin.seasonsOf(addressee.id, holder);
-  const asked = firstValue(search['season']);
+  // The season is the address's own word, never an answer's.
+  const asked = firstValue(inAddress['season']);
   const chosen = chooseSeason(seasons, asked);
   const season = seasons.find((s) => s.id === chosen?.id);
-  const notice = noticeOf(search);
   if (season === undefined) {
     return (
       <main className="admin-schedule">
@@ -160,6 +155,15 @@ export async function ScheduleBuilderPage({
       </main>
     );
   }
+  // Only this season's notice: another season's waits for its own schedule.
+  const noticeHolder = noticeHolderOf(context);
+  const taken =
+    noticeHolder === undefined
+      ? undefined
+      : savedNoticesHere().take(noticeHolder, 'schedule', season.id);
+  const action = leagueUrl(addressee, 'admin-area', { area: 'schedule' });
+  const search = answerShown(inAddress, taken, action);
+  const notice = noticeOf(search);
   const deps = ports.scheduleAdmin.deps;
   const [drafted, listed, seasonTeams] = await Promise.all([
     getScheduleDraft(context, { seasonId: season.id }, deps),

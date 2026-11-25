@@ -35,7 +35,7 @@ export async function TeamsPage({
   const season = await ports.currentSeason(context);
   const binLink = await binLinkFor(here, context, 'teams');
   // A removed team's answer, taken once, never from the address (T-435).
-  const query = answerQueryOf(takeNotice(context, 'teams'), teamsListThing);
+  const query = answerQueryOf(takeNotice(context, 'teams', teamsListThing), teamsListThing);
   return (
     <main className="admin-teams">
       <PageHead
