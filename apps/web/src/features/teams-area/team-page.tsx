@@ -38,7 +38,7 @@ import { removePanel, tapRefusal, type RemoveWayOn } from './remove-team-words.t
 import { backToTeamParam, publishAnchor } from '../schedule-builder/index.ts';
 import { offTheLeagueList, putBackOffer } from './put-back-offer.ts';
 import { FindPersonForm } from './find-person-form.tsx';
-import { pickOf } from './person-pick.ts';
+import { pickOf, pickQuery } from './person-pick.ts';
 import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
 import {
@@ -175,11 +175,8 @@ export async function TeamPage({
     `${leagueUrl(here, 'admin-area', {
       area: 'teams',
       subpath: [team.id],
-      query: {
-        ...(pick.search === undefined ? {} : { q: pick.search }),
-        ...(page === 1 ? {} : { page: String(page) }),
-      },
-    })}#${fromListAnchor}`;
+      query: pickQuery(pick, page),
+    })}`;
   const morePeople = everyone.length === peopleShown;
   // A role that may not read the league's list of people (a club admin) is told so, in
   // calm words; a read that fails is shown as such, never as an empty roster or list.
@@ -534,6 +531,11 @@ export async function TeamPage({
                 {t('adminTeams.find.submit')}
               </button>
             </FindPersonForm>
+            {pick.byNameOnly ? (
+              <p className="staff-quiet" data-found-by-name="true">
+                {t('adminTeams.find.byNameOnly')}
+              </p>
+            ) : null}
             {pick.search === undefined ? null : (
               <p className="staff-quiet" data-found-for="true">
                 {t('adminTeams.find.foundFor', { search: pick.search })}{' '}
@@ -544,10 +546,14 @@ export async function TeamPage({
               <p className="staff-quiet" data-person-pages="true">
                 {t('adminTeams.find.page', { page: String(pick.page) })}{' '}
                 {pick.page > 1 ? (
-                  <a href={pickUrl(pick.page - 1)}>{t('adminTeams.find.previous')}</a>
+                  <a href={`${pickUrl(pick.page - 1)}#${fromListAnchor}`}>
+                    {t('adminTeams.find.previous')}
+                  </a>
                 ) : null}{' '}
                 {morePeople ? (
-                  <a href={pickUrl(pick.page + 1)}>{t('adminTeams.find.next')}</a>
+                  <a href={`${pickUrl(pick.page + 1)}#${fromListAnchor}`}>
+                    {t('adminTeams.find.next')}
+                  </a>
                 ) : null}
               </p>
             ) : null}
@@ -568,8 +574,15 @@ export async function TeamPage({
         ) : (
           <ListForm
             action={addFromListAction}
-            permalink={`${teamUrl}#${addPlayerAnchor}`}
-            hidden={{ league: here.slug, team: team.id, [requestTokenField]: randomUUID() }}
+            // The search and page shown ride with the add, so with no script the answer
+            // is this same search and page, the person chosen still in the select.
+            permalink={`${pickUrl(pick.page)}#${addPlayerAnchor}`}
+            hidden={{
+              league: here.slug,
+              team: team.id,
+              ...pickQuery(pick),
+              [requestTokenField]: randomUUID(),
+            }}
             fields={[
               {
                 kind: 'select',

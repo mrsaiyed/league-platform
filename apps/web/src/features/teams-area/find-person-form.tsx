@@ -6,6 +6,7 @@
 // holds an email address is never put in an address (T-76).
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
+import { findQuery } from './person-pick.ts';
 
 export function FindPersonForm({
   action,
@@ -27,12 +28,11 @@ export function FindPersonForm({
       className="staff-form"
       onSubmit={(event) => {
         event.preventDefault();
-        const typed = String(new FormData(event.currentTarget).get('q') ?? '')
-          .trim()
-          .slice(0, 100)
-          .replace(/[‘’]/g, "'");
+        const typed = String(new FormData(event.currentTarget).get('q') ?? '');
         const url = new URL(to, window.location.href);
-        if (typed !== '' && !typed.includes('@')) url.searchParams.set('q', typed);
+        for (const [key, value] of Object.entries(findQuery(typed))) {
+          url.searchParams.set(key, value);
+        }
         router.push(`${url.pathname}${url.search}#${anchor}`);
       }}
     >

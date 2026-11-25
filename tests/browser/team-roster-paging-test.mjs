@@ -7,7 +7,12 @@
 //   does not offer them and says there is a next page; "Find a person by name" on the
 //   server finds them, and they are added to the roster with a number;
 // - every answer appears without a reload: the document of the first visit is still the
-//   one on the screen at the end.
+//   one on the screen at the end, and the search is still shown after the add;
+// - an email typed into "Find" is said in words (people are found by name), never put in
+//   the address; the team's page draws no "Remove from the league list" (S-128);
+// - with scripts OFF: "Next page" is followed and the 250th is on page 2; a search, its
+//   next page, a refused add (number "05") and an add all come back to that same search
+//   and page, the person chosen and the number typed kept on the refusal.
 // `--no-build` serves the build already here.
 import {
   answered,
@@ -88,6 +93,7 @@ async function journey(browser, origin) {
   await context.addCookies([{ name: 'srl_session', value: 'local-owner-token', url: origin }]);
   const page = await context.newPage();
   page.setDefaultTimeout(60_000);
+  let teamAddress = '';
   try {
     // Filled to 250 first, so the team's page is drawn on a league of 250.
     const before = await peopleCount(page, origin);
@@ -111,6 +117,7 @@ async function journey(browser, origin) {
       page.waitForURL(/\/north-valley\/admin\/teams\/[0-9a-f-]{36}/),
       create.getByRole('button', { name: 'Add team' }).click(),
     ]);
+    teamAddress = page.url().split(/[?#]/)[0];
     await page.evaluate(() => {
       window.sameDocument = 'yes';
     });
@@ -158,15 +165,33 @@ async function journey(browser, origin) {
     // The 250th: not on the first page of 200, found by name on the server, added.
     const choose = page.locator('form[data-form=from-list] select[name=personId]');
     const lastName = `${lastOne.first} ${lastOne.last}`;
+    // Proved on the select itself: a page that lost it must not pass as "not offered".
+    const firstPage = await choose.locator('option').count();
     note(
       'the first page of the league list does not hold the 250th',
-      (await choose.locator('option', { hasText: lastName }).count()) === 0,
+      (await choose.count()) === 1 &&
+        firstPage > 150 &&
+        (await choose.locator('option', { hasText: lastName }).count()) === 0,
+      String(firstPage),
+    );
+    note(
+      'the team page offers no "Remove from the league list" (S-128)',
+      (await page.getByRole('button', { name: 'Remove from the league list' }).count()) === 0,
     );
     note(
       'the list says there is a next page',
       (await page.locator('[data-person-pages] a', { hasText: 'Next page' }).count()) === 1,
     );
     const find = page.locator('[data-find-person] form');
+    await find.locator('input[name=q]').fill('someone@example.test');
+    await find.getByRole('button', { name: 'Find', exact: true }).click();
+    await page.locator('[data-found-by-name]').waitFor({ timeout: 30_000 });
+    note(
+      'an email typed into Find is said in words: people are found by name',
+      (await page.locator('[data-found-by-name]').innerText()).includes('found here by name'),
+    );
+    note('the email is not in the address', !page.url().includes('example.test'), page.url());
+    note('said without a reload', await kept());
     await find.locator('input[name=q]').fill(lastOne.last);
     await find.getByRole('button', { name: 'Find', exact: true }).click();
     await page.locator('[data-found-for]').waitFor({ timeout: 30_000 });
@@ -190,9 +215,17 @@ async function journey(browser, origin) {
       String(await roster.count()),
     );
     note('added without a reload', await kept());
+    note(
+      'the search is still shown after the add',
+      (await page.locator('[data-found-for]').count()) === 1 &&
+        (await find.locator('input[name=q]').inputValue()) === lastOne.last &&
+        new URL(page.url()).searchParams.get('q') === lastOne.last,
+      page.url(),
+    );
   } finally {
     await context.close();
   }
+  return teamAddress;
 
   /** The league's count, read in a page of its own so the team's page stays as it is. */
   async function peopleCountHere() {
@@ -202,6 +235,91 @@ async function journey(browser, origin) {
     } finally {
       await other.close();
     }
+  }
+}
+
+/** The same team's page with scripts OFF: every form a plain post, every answer a page. */
+async function scriptsOff(browser, origin, teamAddress) {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    javaScriptEnabled: false,
+  });
+  await context.addCookies([{ name: 'srl_session', value: 'local-owner-token', url: origin }]);
+  const page = await context.newPage();
+  page.setDefaultTimeout(60_000);
+  const go = async (locator) => {
+    await Promise.all([page.waitForEvent('load'), locator.click()]);
+  };
+  const asked = () => new URL(page.url()).searchParams;
+  const fromList = page.locator('form[data-form=from-list]');
+  const choose = fromList.locator('select[name=personId]');
+  const roster = page.locator('ol.admin-roster > li');
+  const lastName = `${lastOne.first} ${lastOne.last}`;
+  try {
+    await page.goto(teamAddress);
+    await go(page.locator('[data-person-pages] a', { hasText: 'Next page' }));
+    note('scripts off: "Next page" leads to page 2', asked().get('page') === '2', page.url());
+    note(
+      'scripts off: the 250th is on a later page of the league list',
+      (await choose.locator('option', { hasText: lastName }).count()) === 1 ||
+        (await roster.filter({ hasText: lastName }).count()) === 1,
+    );
+
+    // An email: said in words, never in the address.
+    const find = page.locator('[data-find-person] form');
+    await find.locator('input[name=q]').fill('someone@example.test');
+    await go(find.getByRole('button', { name: 'Find', exact: true }));
+    note(
+      'scripts off: an email typed into Find is said in words, not put in the address',
+      (await page.locator('[data-found-by-name]').count()) === 1 &&
+        !page.url().includes('example.test'),
+      page.url(),
+    );
+
+    // A search with more than one page ("a": the Paged fillers and many of the league's
+    // own), its second page, then a refused add and an add.
+    const many = 'a';
+    await find.locator('input[name=q]').fill(many);
+    await go(find.getByRole('button', { name: 'Find', exact: true }));
+    note('scripts off: the search is in the address', asked().get('q') === many, page.url());
+    const next = page.locator('[data-person-pages] a', { hasText: 'Next page' });
+    note('scripts off: the search has a next page', (await next.count()) === 1);
+    if ((await next.count()) === 1) await go(next);
+    const onPage2 = () => asked().get('q') === many && asked().get('page') === '2';
+    note("scripts off: the search's next page", onPage2(), page.url());
+    const chosen = await choose.locator('option').nth(1).getAttribute('value');
+    const chosenName = (await choose.locator('option').nth(1).innerText()).trim();
+    await choose.selectOption(chosen ?? '');
+    await fromList.locator('input[name=jerseyNumber]').fill('05');
+    const before = await roster.count();
+    await go(fromList.getByRole('button', { name: 'Add to the roster', exact: true }));
+    note(
+      'scripts off: a refused add comes back to the same search and page',
+      onPage2(),
+      page.url(),
+    );
+    note(
+      'scripts off: a refused add keeps the person chosen and the number typed',
+      (await choose.inputValue()) === chosen &&
+        (await fromList.locator('input[name=jerseyNumber]').inputValue()) === '05',
+    );
+    note('scripts off: the refused add added no one', (await roster.count()) === before);
+    await fromList.locator('input[name=jerseyNumber]').fill('33');
+    await go(fromList.getByRole('button', { name: 'Add to the roster', exact: true }));
+    note('scripts off: an add comes back to the same search and page', onPage2(), page.url());
+    note(
+      'scripts off: the search is still shown after the add',
+      (await page.locator('[data-found-for]').count()) === 1 &&
+        (await find.locator('input[name=q]').inputValue()) === many,
+    );
+    note(
+      'scripts off: the person chosen is on the roster',
+      (await roster.filter({ hasText: chosenName }).count()) === 1 &&
+        (await roster.count()) === before + 1,
+      chosenName,
+    );
+  } finally {
+    await context.close();
   }
 }
 
@@ -216,7 +334,8 @@ if (built) {
   try {
     await waitFor(`${origin}/`, server);
     browser = await launch();
-    await journey(browser, origin);
+    const teamAddress = await journey(browser, origin);
+    await scriptsOff(browser, origin, teamAddress);
   } catch (error) {
     failures.push(whatWentWrong(error));
   } finally {

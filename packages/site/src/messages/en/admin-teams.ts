@@ -62,6 +62,8 @@ export const enAdminTeams = {
   // A refusal said beside the box it is about, naming it (step 2.155).
   'adminTeams.fieldRefused': '{field}: {why}',
   'adminTeams.find.allOnRoster': 'Everyone found here is already on this roster.',
+  'adminTeams.find.byNameOnly':
+    'People are found here by name, not by email address, so nothing was searched. Type part of their name.',
   'adminTeams.find.clear': 'Show everyone',
   'adminTeams.find.foundFor': 'People whose name holds “{search}”.',
   'adminTeams.find.label': 'Find a person by name',

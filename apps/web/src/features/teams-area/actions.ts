@@ -52,6 +52,7 @@ import {
   teamLeftInput,
   teamStatsInput,
 } from './form-input.ts';
+import { findQuery, pickOf, pickQuery } from './person-pick.ts';
 import { addNewPerson, moveEntry } from './roster-changes.ts';
 import { runTeamsAction, type TeamsAction, type TeamsActionResult } from './run-teams-action.ts';
 import { teamFormRefusal, type TeamFormName } from './team-form-answer.ts';
@@ -106,6 +107,9 @@ async function answerTeamForm(
   const page = leagueUrl(view.context.league, 'admin-area', {
     area: 'teams',
     ...(teamIdShape.test(teamId) ? { subpath: [teamId] } : {}),
+    // The search and page "Someone already in the league" was on (step 2.90): with no
+    // script this address is the answer, so the admin is back where they were.
+    ...(formName === 'fromList' ? { query: pickQuery(pickOf(fields)) } : {}),
   });
   return answerSaved(
     context,
@@ -227,15 +231,10 @@ export async function findPersonAction(form: FormData): Promise<void> {
   const fields = typedOf(form);
   const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'teams');
   const teamId = (fields['team'] ?? '').toLowerCase();
-  const typed = (fields['q'] ?? '')
-    .trim()
-    .slice(0, 100)
-    .replace(/[\u2018\u2019]/g, "'");
-  const search = typed === '' || typed.includes('@') ? {} : { q: typed };
   const page = leagueUrl(view.context.league, 'admin-area', {
     area: 'teams',
     ...(teamIdShape.test(teamId) ? { subpath: [teamId] } : {}),
-    query: search,
+    query: findQuery(fields['q'] ?? ''),
   });
   redirect(`${page}#${fromListAnchor}`);
 }
