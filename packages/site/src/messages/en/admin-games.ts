@@ -144,9 +144,12 @@ export const enAdminGames = {
     'This save would add more than {limit} plays, so nothing was saved. Check for a mistyped number.',
   'admin.boxScore.tracked.reload': 'Load it again',
   'admin.boxScore.tracked.removed.foul': 'Took a foul away from {name}.',
-  'admin.boxScore.tracked.removed.score1': 'Took a made free throw away from {name}.',
-  'admin.boxScore.tracked.removed.score2': 'Took a 2-point basket away from {name}.',
-  'admin.boxScore.tracked.removed.score3': 'Took a 3-point basket away from {name}.',
+  'admin.boxScore.tracked.removed.score1':
+    'Took back a made free throw of {name}, the one made in period {period}.',
+  'admin.boxScore.tracked.removed.score2':
+    'Took back a 2-point basket of {name}, the one made in period {period}.',
+  'admin.boxScore.tracked.removed.score3':
+    'Took back a 3-point basket of {name}, the one made in period {period}.',
   'admin.boxScore.tracked.removed.turnover': 'Took a turnover away from {name}.',
   'admin.boxScore.tracked.save': 'Save the changes',
   'admin.boxScore.tracked.saved': 'Saved. These plays were added to the game’s list of plays:',

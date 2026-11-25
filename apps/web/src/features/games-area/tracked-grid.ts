@@ -92,10 +92,12 @@ export function replayedOf(rows: readonly TrackedGridRow[]) {
 }
 
 /** A play the grid made, as the notice carries it: "foul:{person}", "score2:{person}". */
-export function playMark(play: GridPlay): string {
+export function playMark(play: GridPlay & { readonly basketPeriod?: number }): string {
   const kind =
     play.type === 'score' || play.type === 'unscore' ? `${play.type}${play.points}` : play.type;
-  return `${kind}:${play.playerId}`;
+  // A basket taken back carries the period it was made in (step 2.247, L3).
+  const period = play.basketPeriod === undefined ? '' : `:${play.basketPeriod}`;
+  return `${kind}:${play.playerId}${period}`;
 }
 
 /** The message key of a play's sentence, by its mark's first part. */
@@ -115,13 +117,22 @@ const sentenceKeys = {
 export type PlaySentenceKey = (typeof sentenceKeys)[keyof typeof sentenceKeys];
 
 /** A notice's marks as sentence keys and the player each is about; an unknown mark is left out. */
-export function playSentences(
-  marks: readonly string[],
-): readonly { readonly key: PlaySentenceKey; readonly personId: string }[] {
+export function playSentences(marks: readonly string[]): readonly {
+  readonly key: PlaySentenceKey;
+  readonly personId: string;
+  /** A basket taken back: the period it was made in. */
+  readonly period?: string;
+}[] {
   return marks.flatMap((mark) => {
-    const [kind = '', personId = ''] = mark.split(':');
+    const [kind = '', personId = '', period = ''] = mark.split(':');
     return Object.hasOwn(sentenceKeys, kind) && personId !== ''
-      ? [{ key: sentenceKeys[kind as keyof typeof sentenceKeys], personId }]
+      ? [
+          {
+            key: sentenceKeys[kind as keyof typeof sentenceKeys],
+            personId,
+            ...(/^[1-9][0-9]?$/.test(period) ? { period } : {}),
+          },
+        ]
       : [];
   });
 }

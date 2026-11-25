@@ -114,7 +114,9 @@ export async function TrackedGridPage({
   const said =
     mine === undefined
       ? undefined
-      : playSentences(mine.about ?? []).map((s) => t(s.key, { name: nameOf(s.personId) }));
+      : playSentences(mine.about ?? []).map((s) =>
+          t(s.key, { name: nameOf(s.personId), period: s.period ?? '' }),
+        );
   const columns = trackedGridColumns(sheet.statKeys);
   const teams: readonly TrackedGridTeam[] = [
     { teamId: game.awayTeamId, name: awayName },

@@ -96,6 +96,9 @@ export const trackedGridLine = z.strictObject({
   >),
 });
 
+/** A play the save wrote; a basket taken back also names the period it was made in. */
+export type WrittenPlay = GridPlay & { readonly basketPeriod?: number };
+
 export const correctTrackedBoxScore = defineCommand({
   name: 'games.correct_tracked_box_score',
   permission: 'games.correct',
@@ -117,7 +120,7 @@ export const correctTrackedBoxScore = defineCommand({
     emit,
   }): Promise<
     Result<
-      { sequence: number; plays: number; ended: boolean; written: readonly GridPlay[] },
+      { sequence: number; plays: number; ended: boolean; written: readonly WrittenPlay[] },
       CorrectTrackedBoxScoreError
     >
   > => {
@@ -255,6 +258,12 @@ export const correctTrackedBoxScore = defineCommand({
         ...scopeDetails(await gameScope(tx, gameId)),
       },
     });
-    return ok({ sequence: applied.seq, plays: made.plays.length, ended: end, written: made.plays });
+    // A basket taken back is said with the period it was made in (step 2.247, L3).
+    const periodOf = new Map(state.plays.map((p) => [p.id, p.period]));
+    const written = made.plays.map((p): WrittenPlay => {
+      const basketPeriod = p.type === 'unscore' ? periodOf.get(p.playId) : undefined;
+      return basketPeriod === undefined ? p : { ...p, basketPeriod };
+    });
+    return ok({ sequence: applied.seq, plays: made.plays.length, ended: end, written });
   },
 });

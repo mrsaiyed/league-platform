@@ -211,6 +211,15 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
       { teamId: homeTeamId, personId: h0, fg2: 1 },
     ]);
     expect(result.ok).toBe(true);
+    // The save names the basket it took back with the period it was made in (L3).
+    const madeIn = t.db.state.events.find((e) => e.commandId === basket.commandId);
+    expect(result.ok && result.value.written[0]).toMatchObject({
+      type: 'unscore',
+      playerId: h1,
+      points: 2,
+      basketPeriod: expect.any(Number),
+    });
+    expect(madeIn).toBeDefined();
     const mark = { [playSourceKey]: correctionPlaySource };
     const added = t.db.state.events.filter((e) => e.seq > before.sequence);
     expect(added.map((e) => [e.type, e.payload])).toEqual([

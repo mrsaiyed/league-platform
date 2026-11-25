@@ -210,6 +210,8 @@ describe('the grid of a tracked game (step 2.65)', () => {
           playerId: scored.personId.toLowerCase(),
           points: 2,
           playId: expect.any(String),
+          // The period the basket was made in, for the saved sentence (L3).
+          basketPeriod: expect.any(Number),
         },
       ],
     });
@@ -363,5 +365,16 @@ describe('the grid’s words', () => {
     const said = playSentences(marks);
     expect(said).toHaveLength(10);
     for (const { key } of said) expect(en[key]).toBeTruthy();
+    // A basket taken back is said with its player, value and period (step 2.247, L3).
+    const back = { type: 'unscore', side: 'home', playerId: 'a', points: 3, playId: 'p' } as const;
+    expect(playMark({ ...back, basketPeriod: 2 })).toBe('unscore3:a:2');
+    const [sentence] = playSentences([playMark({ ...back, basketPeriod: 2 }), 'unscore2:a:x']);
+    expect(sentence).toEqual({
+      key: 'admin.boxScore.tracked.removed.score3',
+      personId: 'a',
+      period: '2',
+    });
+    expect(en['admin.boxScore.tracked.removed.score3']).toMatch(/\{name\}.*\{period\}/);
+    expect(playSentences(['unscore2:a:x'])[0]?.period).toBeUndefined();
   });
 });

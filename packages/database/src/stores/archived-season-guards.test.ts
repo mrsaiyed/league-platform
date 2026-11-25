@@ -75,7 +75,6 @@ const guarded: Readonly<Record<string, Reads>> = {
   'games.renew_scoring_session': 'game',
   'games.reopen_own_result': 'game',
   'games.set_box_score': 'game',
-  'games.take_back_tracked_basket': 'game',
   'games.take_over_scoring': 'game',
   'games.unassign_scorekeeper': 'game',
   'imports.apply_fixture_import': 'import',

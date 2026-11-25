@@ -28,7 +28,6 @@ export const enActivity = {
   'activity.games.reopen_own_result': 'Reopened a result they recorded, to correct it',
   'activity.games.reopen_tracked_game': 'Reopened a game ended from the tracker',
   'activity.games.set_box_score': 'Recorded a box score',
-  'activity.games.take_back_tracked_basket': 'Took back a basket of a tracked game, to correct it',
   'activity.games.take_over_scoring': 'Took over scoring a game from another device',
   'activity.games.unassign_scorekeeper': 'Took a scorekeeper off a game',
   'activity.imports.apply_fixture_import':
@@ -129,8 +128,6 @@ export const enActivity = {
   'activityNamed.games.reopen_own_result':
     'Reopened the result they recorded for {name}, to correct it',
   'activityNamed.games.reopen_tracked_game': 'Reopened the game {name}, ended from the tracker',
-  'activityNamed.games.take_back_tracked_basket':
-    'Took back a basket of the tracked game {name}, to correct it',
   'activityNamed.games.take_over_scoring': 'Took over scoring the game {name} from another device',
   'activityNamed.games.unassign_scorekeeper': 'Took a scorekeeper off the game {name}',
   'activityNamed.leagues.archive_season': 'Archived the season {name}',
