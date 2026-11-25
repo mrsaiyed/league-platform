@@ -97,6 +97,13 @@ async function box(c, page, side) {
   };
 }
 
+/** A team's count, once it reads `text` (as "6 fouls"), or a timeout. */
+const counted = (c, side, text) =>
+  c
+    .teamFouls(side)
+    .filter({ hasText: new RegExp(`^\\s*${text}\\s*$`) })
+    .waitFor({ timeout: tapLimit });
+
 /** The bonus badge of `side`, once it shows `level`, or a timeout. */
 const badge = (page, side, level) =>
   page
@@ -141,6 +148,7 @@ try {
       for (const jersey of [3, 5, 7, 9]) await c.play('home', jersey, 'foul');
       await c.pickPeriod(2);
       for (const jersey of [3, 5]) await c.play('home', jersey, 'foul');
+      await counted(c, 'home', '6 fouls');
       note('six fouls of the half: no bonus yet', (await box(c, page, 'away')).bonus === null);
       await c.play('home', 7, 'foul');
       await badge(page, 'away', 1);
@@ -184,6 +192,7 @@ try {
       for (const jersey of [9, 11]) await c.play('home', jersey, 'foul');
       note('Q4: 5 of the second half', (await box(c, page, 'home')).count === '5 fouls');
       await c.pickPeriod(5);
+      await c.clock.locator('[data-period="5"]').waitFor({ timeout: tapLimit });
       note('overtime goes on with 5', (await box(c, page, 'home')).count === '5 fouls');
       await c.play('home', 11, 'foul');
       await c.play('home', 9, 'foul');
