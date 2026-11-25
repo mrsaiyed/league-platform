@@ -48,6 +48,7 @@ import {
   isTablePlayerCommand,
   maxCommandsPerBatch,
   sessionRenewSeconds,
+  knownRefusals,
   trackerProtocolVersion,
   type BatchCommand,
   type CommandBatch,
@@ -2431,6 +2432,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
             // Every batch names the same sequence: the server bounds it by where it last
             // answered the named session, and looks past this list's earlier batches (T-335).
             notSavedSince: since,
+            knownRefusals: [...knownRefusals],
             commands: plays.slice(i, i + maxCommandsPerBatch),
           };
           const sent = await track(sendPlays(batch));

@@ -12,7 +12,15 @@ import { z } from 'zod';
  */
 export const SEASON_RULES_VERSION = 1;
 
-export const StatSet = z.enum(['points-only', 'points-fouls', 'standard', 'full']);
+export const StatSet = z.enum([
+  'points-only',
+  'points-fouls',
+  'standard',
+  // The standard set with turnovers (S-107, step 2.241): the admin's choice whether a
+  // tracked game offers turnovers.
+  'standard-turnovers',
+  'full',
+]);
 export const StandingsColumn = z.enum([
   'played',
   'wins',

@@ -326,26 +326,15 @@ export async function walkFirstTest(o) {
     note('9. the foul is on Ben Ravens (2)', (await c.fouls('home', 2)) === 1);
     await picture(scoring, 9);
 
-    at = 'step 10: one team turnover for the Wolves';
-    const chip = c.turnoversChip('away');
+    at = 'step 10: no turnover button, as the season keeps the standard set';
+    // The default rules keep the standard set, which has no turnovers (S-93, step 2.241):
+    // the scoring screen draws no turnovers count and no team-turnover button.
     note(
-      '10. the Wolves\' chip starts at "0 turnovers"',
-      (await chip.innerText()).trim() === '0 turnovers',
-    );
-    await chip.tap();
-    const list = c.pad.locator('[data-turnover-list="away"]');
-    await list.waitFor();
-    say(10, await list.innerText());
-    await list.getByRole('button', { name: '+ Team turnover' }).tap();
-    await c.said.filter({ hasText: 'Team turnover: Wolves.' }).waitFor();
-    note(
-      '10. the Wolves\' chip reads "1 turnover"',
-      (await chip.innerText()).trim() === '1 turnover',
+      '10. no turnovers count for either team',
+      (await c.turnoversChip('away').count()) === 0 &&
+        (await c.turnoversChip('home').count()) === 0,
     );
     await picture(scoring, 10);
-    // Closed as a phone closes it: the same button again.
-    await chip.tap();
-    await c.pad.locator('[data-rest]').waitFor();
 
     at = 'step 11: a wrong basket, taken back with Undo';
     await c.play('home', 1, 'p3');

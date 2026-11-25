@@ -12,6 +12,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import {
   eventHandlers,
+  keptForScoring,
   mayTransferTrackerGames,
   planTrackerTransfer,
   rulesOfGame,
@@ -139,6 +140,7 @@ async function readsOf(
   return {
     timeZone,
     uniqueJerseys: rulesOfGame(null, season?.rules).rosters.uniqueJerseys,
+    statisticsKept: keptForScoring(season?.rules),
     peopleOffRosters: (name) =>
       scoped(async (scope) => {
         const people = peopleStore(scope);

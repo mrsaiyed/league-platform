@@ -43,6 +43,8 @@ export type MemoryLeagues = {
     endsOn?: string | null;
     status?: SeasonStatus;
     rules?: unknown;
+    /** The season's own named list of statistics (`seasons.stat_keys`). */
+    statKeys?: readonly string[];
     version?: number;
     /** A team of the season already has a number worn twice (the database refuses the switch). */
     jerseyClash?: boolean;
@@ -335,6 +337,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           if (change.endsOn !== undefined) x.endsOn = change.endsOn;
           if (change.status !== undefined) x.status = change.status;
           if (change.rules !== undefined) x.rules = change.rules;
+          if (change.statKeys !== undefined) x.statKeys = change.statKeys;
           if (change.isCurrent !== undefined) {
             if (change.isCurrent) {
               for (const other of s.seasons) {

@@ -52,6 +52,8 @@ export type DeviceRosters = {
    * so the device never refuses an End the league would take. The league still decides.
    */
   readonly allowTies?: boolean;
+  /** The statistics the season keeps (S-93); missing in rosters an older page stored. */
+  readonly statistics?: readonly string[];
 };
 
 /** The game format the scorekeeper is asked to confirm (P7 §1, §5.1). */

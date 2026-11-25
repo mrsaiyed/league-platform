@@ -149,6 +149,54 @@ describe('changing the rules after a game is decided (step 2.25)', () => {
   });
 });
 
+// Added by the reviewer of step 2.241 (T-393): the write of `stat_keys` read back from
+// the real database, which no other test did.
+describe('saving "Statistics kept" empties the season\'s own named list (T-393)', () => {
+  const statKeysOf = async (seasonId: string) =>
+    (
+      await one<{ stat_keys: string[]; version: number }>(
+        pglite,
+        'select stat_keys, version from seasons where id = $1',
+        [seasonId],
+      )
+    ).stat_keys;
+
+  it('empties the list when the statistics change or are saved again, and keeps it otherwise', async () => {
+    const l = await newLeague(pglite);
+    const seasonId = await newSeason(pglite, l.leagueId, l.defaultProgramId);
+    await pglite.query(`update seasons set stat_keys = '{points,rebounds,fouls}' where id = $1`, [
+      seasonId,
+    ]);
+    const ctx = { leagueId: l.leagueId, accountId: l.ownerId, requestId: 'r-1' };
+    const versionOf = async () =>
+      (
+        await one<{ version: number }>(pglite, 'select version from seasons where id = $1', [
+          seasonId,
+        ])
+      ).version;
+
+    const rules = defaultSeasonRules();
+    rules.tiebreakers = ['head-to-head', 'points-scored'];
+    const first = { seasonId, version: await versionOf(), rules };
+    expect(await setSeasonRules(ctx, first, deps)).toMatchObject({ ok: true });
+    expect(await statKeysOf(seasonId)).toEqual(['points', 'rebounds', 'fouls']);
+
+    const kept = { ...rules, statistics: 'standard-turnovers' as const };
+    const second = { seasonId, version: await versionOf(), rules: kept };
+    expect(await setSeasonRules(ctx, second, deps)).toMatchObject({ ok: true });
+    expect(await statKeysOf(seasonId)).toEqual([]);
+
+    // "Statistics kept" saved with the choice already saved: the list gives way all the same.
+    await pglite.query(`update seasons set stat_keys = '{points,fouls}' where id = $1`, [seasonId]);
+    const same = { seasonId, version: await versionOf(), rules: kept };
+    expect(await setSeasonRules(ctx, same, deps)).toMatchObject({ ok: true });
+    expect(await statKeysOf(seasonId)).toEqual(['points', 'fouls']);
+    const saved = { ...same, version: await versionOf(), statisticsSaved: true };
+    expect(await setSeasonRules(ctx, saved, deps)).toMatchObject({ ok: true });
+    expect(await statKeysOf(seasonId)).toEqual([]);
+  });
+});
+
 describe('standings adjustments (step 2.25)', () => {
   it('adds one, shows it in the standings, and removes it again', async () => {
     const s = await playedSeason();

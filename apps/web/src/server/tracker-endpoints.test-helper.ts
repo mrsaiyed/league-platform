@@ -50,7 +50,35 @@ export type Published =
   | { readonly kind: 'game'; readonly leagueId: string; readonly message: LiveMessage }
   | { readonly kind: 'score'; readonly leagueId: string; readonly message: LeagueScoreMessage };
 
-export function trackerWorld() {
+/**
+ * The game's season keeps turnovers (S-93, step 2.241): the stand-in seasons keep the
+ * standard set, so a turnover there is refused. Wraps what the endpoints' commands run on.
+ */
+export const keepingTurnovers = (deps: TrackerPorts['deps']): TrackerPorts['deps'] => ({
+  ...deps,
+  transaction: (context, work) =>
+    deps.transaction(context, (tx) =>
+      work({
+        ...tx,
+        games: {
+          ...tx.games,
+          findSeason: async (seasonId) => {
+            const season = await tx.games.findSeason(seasonId);
+            if (season === undefined) return undefined;
+            const rules = { ...(season.rules as Record<string, unknown>), statistics: 'full' };
+            return { ...season, rules };
+          },
+        },
+      }),
+    ),
+});
+
+export type TrackerWorldOptions = {
+  /** Wraps what the endpoints' commands run on: a season's rules changed in a test, say. */
+  readonly deps?: (deps: TrackerPorts['deps']) => TrackerPorts['deps'];
+};
+
+export function trackerWorld(options: TrackerWorldOptions = {}) {
   const ports = standInPorts({
     appEnv: 'test',
     publicBaseUrl: siteOrigin,
@@ -64,7 +92,8 @@ export function trackerWorld() {
     publishLeagueScore: async (leagueId, message) =>
       void published.push({ kind: 'score', leagueId, message }),
   };
-  const tracker: TrackerPorts = { ...ports.tracker, publisher };
+  const deps = options.deps?.(ports.tracker.deps) ?? ports.tracker.deps;
+  const tracker: TrackerPorts = { ...ports.tracker, publisher, deps };
   const warnings: string[] = [];
   const publishPlays = createPlayPublisher({
     ...tracker,

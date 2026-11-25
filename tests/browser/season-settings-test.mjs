@@ -17,6 +17,7 @@ import {
   accessibilityProblems,
   buildNext,
   freePort,
+  leagueDay,
   launch,
   openStaffMenu,
   startNext,
@@ -24,6 +25,10 @@ import {
   whatWentWrong,
 } from './web-browser-kit.mjs';
 
+// The live season's first and last day, as far from the made-up world's today (it reads this
+// computer's clock) as the days this was written with: whatever day it is run (T-404).
+const worldNow = new Date().toISOString();
+const firstDay = leagueDay(worldNow, -85);
 const failures = [];
 const checked = [];
 const note = (label, ok, detail = '') => {
@@ -267,17 +272,17 @@ if (built) {
     await panel(live, 'name').getByRole('link', { name: 'Change the name and dates' }).click();
     await live.waitForURL(/edit=name/);
     await live.getByLabel('Season name').fill(' ');
-    await live.getByLabel('First day').fill('2026-09-01');
+    await live.getByLabel('First day').fill(firstDay);
     await live.getByRole('button', { name: 'Save the name and dates' }).click();
     const nameBox = live.getByLabel('Season name');
     await live.locator('#season-name .ui-field-error[role=alert]').waitFor();
     note(
       'with scripts on, an empty name is refused beside its box, the day kept',
       (await nameBox.getAttribute('aria-invalid')) === 'true' &&
-        (await live.getByLabel('First day').inputValue()) === '2026-09-01',
+        (await live.getByLabel('First day').inputValue()) === firstDay,
     );
     await nameBox.fill('Fall 2026 Season');
-    await live.getByLabel('Last day').fill('2026-12-12');
+    await live.getByLabel('Last day').fill(leagueDay(worldNow, 17));
     await live.getByRole('button', { name: 'Save the name and dates' }).click();
     await live.waitForURL(/#season-name$/);
     const saved = live.locator('#season-name [data-notice=saved]');

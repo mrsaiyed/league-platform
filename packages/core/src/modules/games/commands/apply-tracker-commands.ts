@@ -36,6 +36,12 @@
 // only, never the typed name: events are never changed, and a name must stay
 // erasable (T-52). The lines a batch started with are worked out from the rosters as
 // they were then, so a number changed in the batch is written to the lines it reaches.
+//
+// A play of a statistic the season does not keep (a turnover in a season keeping the
+// standard set) is refused, about that tap alone (S-93, step 2.241, T-391): the tracker
+// sets it aside, lists it and sends the rest. The refusal carries no sentence: the
+// statistic it names is plain data beside the reply (`notKept`), and the server words it
+// from its message files (T-187) before the reply goes out.
 import {
   buildVersionRefusal,
   CommandBatch,
@@ -76,8 +82,18 @@ import { recordActivity, scopeDetails } from '../../access/index.ts';
 import type { GameRecord, NewGameEvent, TrackerTx } from '../ports.ts';
 import { lowerId, scorerOf, sessionStanding } from '../scoring-session.ts';
 import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
+import { keptForScoring, tapNotKept } from '../statistic-of-tap.ts';
 import { applyTablePlayer, tableRefusal, type TableRefusal } from '../table-players.ts';
 import { gameInArchivedSeasonNotReopened } from '../archived-season.ts';
+
+/**
+ * The reply, and the statistic each play refused for not being kept names, by command
+ * id: there only when some play was. Not the tracker's: the server words those refusals
+ * and sends the reply without it.
+ */
+export type TrackerCommandsApplied = CommandReply & {
+  readonly notKept?: Readonly<Record<string, string>>;
+};
 
 export type ApplyTrackerCommandsError =
   | { readonly code: 'unsupported-protocol-version'; readonly accepted: readonly number[] }
@@ -120,7 +136,9 @@ function tableEventPayload(input: TablePlayerInput): Readonly<Record<string, unk
 /** A game the tracker may score: not decided, called off or put off. */
 const isPlayable = (game: GameRecord) => game.status === 'scheduled' || game.status === 'live';
 
-const messages: Readonly<Record<Exclude<RefusalCode, 'rule' | 'not-allowed'>, string>> = {
+const messages: Readonly<
+  Record<Exclude<RefusalCode, 'rule' | 'not-allowed' | 'statistic-not-kept'>, string>
+> = {
   'session-not-held': 'This device no longer holds the game.',
   'game-not-live': 'This game cannot be scored now.',
   'unknown-game': 'There is no such game.',
@@ -153,7 +171,7 @@ export const applyTrackerCommands = defineCommand({
     input,
     tx,
     emit,
-  }): Promise<Result<CommandReply, ApplyTrackerCommandsError>> => {
+  }): Promise<Result<TrackerCommandsApplied, ApplyTrackerCommandsError>> => {
     const version = input.protocolVersion;
     const reader = batchReaders[version];
     if (!isAcceptedProtocolVersion(version) || reader === undefined) {
@@ -172,10 +190,15 @@ export const applyTrackerCommands = defineCommand({
     const batch = parsed.data;
     const accountId = scorerOf(context);
     const ids = batch.commands.map((c) => c.commandId.toLowerCase());
-    const reply = (sequence: number, results: CommandResult[]): CommandReply => ({
+    const reply = (
+      sequence: number,
+      results: CommandResult[],
+      notKept: Readonly<Record<string, string>> = {},
+    ): TrackerCommandsApplied => ({
       protocolVersion: version,
       sequence,
       results,
+      ...(Object.keys(notKept).length === 0 ? {} : { notKept }),
     });
     const refuseAll = (code: RefusalCode, message: string, taken: ReadonlySet<string>) =>
       batch.commands.map(
@@ -278,7 +301,7 @@ export const applyTrackerCommands = defineCommand({
     /** Every answer from here on: written down first, in this same transaction. */
     const answer = async (results: CommandResult[]) => {
       await noteAnswer?.();
-      return ok(reply(seq, results));
+      return ok(reply(seq, results, notKept));
     };
 
     const now = tx.clock.now();
@@ -302,6 +325,17 @@ export const applyTrackerCommands = defineCommand({
     // The rosters as the batch found them, for the lines it started with.
     const rosterAtStart = new Map(roster);
     const { uniqueJerseys } = (await seasonRulesOf(tx, game.seasonId)).rosters;
+    // S-93 (step 2.241): the statistics the season keeps as they stand, as the public
+    // pages count them, not the ones the game kept when it went live: a tap whose
+    // statistic the pages would not show is refused, so it is never lost silently.
+    const kept = keptForScoring((await tx.games.findSeason(game.seasonId))?.rules);
+    // T-391: its own code only to a tracker that reads it; to any other, a game rule.
+    const notKeptCode =
+      batch.knownRefusals?.includes('statistic-not-kept') === true
+        ? ('statistic-not-kept' as const)
+        : ('rule' as const);
+    /** The statistic of each play refused for not being kept, by command id. */
+    const notKept: Record<string, string> = {};
     const events: NewGameEvent[] = [];
     /** Whether a play was taken: only then is a state saved for a game that has none. */
     let played = false;
@@ -417,6 +451,15 @@ export const applyTrackerCommands = defineCommand({
       const input: TrackerInput = withLowerIds(command.input);
       const platform = platformProblem(input);
       if (platform !== undefined) return refused(platform);
+      const statistic = tapNotKept(input.type, kept);
+      if (statistic !== undefined) {
+        notKept[command.commandId] = statistic;
+        return {
+          commandId: command.commandId,
+          status: 'refused',
+          reason: { code: notKeptCode, message: '' },
+        };
+      }
       const missing = playerNotOnTeam(game, roster, input);
       if (missing !== undefined && notAdded.has(missing)) return notAddedRefusal(missing);
       if (missing !== undefined) {

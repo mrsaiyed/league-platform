@@ -53,6 +53,7 @@ import {
   addPlayers,
   court,
   drawIn,
+  keepStatistics,
   league,
   lettersHere,
   owner,
@@ -464,6 +465,8 @@ async function shortGame(browser, size, face, { afterRenewal = false } = {}) {
     await waitFor(`${origin}/`, server);
     await addPlayers(origin);
     await stopClockGame(origin);
+    // The game taps a turnover: its season keeps them (S-93, S-107; step 2.241).
+    await keepStatistics(browser, origin);
     context = await browser.newContext({
       viewport: { width: size.width, height: size.height },
       hasTouch: true,

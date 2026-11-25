@@ -65,4 +65,39 @@ describe('the upload page of a copy of a game', () => {
       'The copy held no plays: there was nothing to send.',
     ]);
   });
+
+  it('says apart the plays of a statistic the season does not keep, and where to change it (T-395)', () => {
+    const reply = {
+      status: 'uploaded',
+      added: 2,
+      alreadyThere: 0,
+      notTaken: 1,
+      notKept: [
+        { statistic: 'turnovers', count: 2 },
+        { statistic: 'steals', count: 1 },
+      ],
+    };
+    const view = uploadViewOf(200, reply, copy);
+    expect(view).toEqual({
+      kind: 'uploaded',
+      added: 2,
+      alreadyThere: 0,
+      notTaken: 1,
+      notKept: reply.notKept,
+    });
+    if (view.kind !== 'uploaded') throw new Error('not uploaded');
+    expect(uploadedLines(view, t)).toEqual([
+      'The copy is uploaded.',
+      '2 plays were new: they are saved now.',
+      '1 play was not taken: the game’s rules refused it, or another device took the game while the copy was being sent.',
+      '2 turnovers were not taken: this season does not keep turnovers. An admin can change that in “Statistics kept”.',
+      '1 play was not taken: this season does not keep its statistic. An admin can change that in “Statistics kept”.',
+    ]);
+    const one = { kind: 'uploaded', added: 0, alreadyThere: 0, notTaken: 0 } as const;
+    expect(uploadedLines({ ...one, notKept: [{ statistic: 'turnovers', count: 1 }] }, t)).toEqual([
+      'The copy is uploaded.',
+      'No play in the copy was new.',
+      '1 turnover was not taken: this season does not keep turnovers. An admin can change that in “Statistics kept”.',
+    ]);
+  });
 });
