@@ -46,9 +46,18 @@ function readGame(rules, list) {
 test('the file holds nine games, none with a take-back, with refusals and baskets', () => {
   assert.equal(before.games.length, 9);
   for (const game of before.games) {
-    assert.ok(game.commands.every(({ command }) => command.type !== 'unscore'), game.name);
-    assert.ok(game.commands.some(({ command }) => command.type === 'score'), game.name);
-    assert.ok(game.expected.steps.some((s) => s.startsWith('refused: ')), game.name);
+    assert.ok(
+      game.commands.every(({ command }) => command.type !== 'unscore'),
+      game.name,
+    );
+    assert.ok(
+      game.commands.some(({ command }) => command.type === 'score'),
+      game.name,
+    );
+    assert.ok(
+      game.expected.steps.some((s) => s.startsWith('refused: ')),
+      game.name,
+    );
   }
 });
 

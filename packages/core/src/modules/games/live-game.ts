@@ -268,8 +268,11 @@ export function changedLines(
   return { lines, removed };
 }
 
-/** Taps that only move the clock: the period picked and the clock mode switched (S-40). */
-const clockOnly: ReadonlySet<string> = new Set(['period', 'clock-mode']);
+/**
+ * Plays that do not make a period played: the period picked and the clock mode switched
+ * (S-40), and a basket's take-back (T-432), which records no play of the game.
+ */
+const notPlayed: ReadonlySet<string> = new Set(['period', 'clock-mode', 'unscore']);
 
 /**
  * How many overtime periods a state's game was played in (P7 §5.6): the latest period past
@@ -278,13 +281,19 @@ const clockOnly: ReadonlySet<string> = new Set(['period', 'clock-mode']);
  * rules; 0 when nothing stands past regulation. Not the period the screen stands on when
  * End is tapped: a game reopened and put right in an earlier period keeps the overtime it
  * was won in, and an overtime picked by mistake with nothing in it counts for nothing.
- * Undone plays are not standing and count for nothing. Read when the tracker ends a game.
+ * Undone plays are not standing and count for nothing; nor do a take-back and the basket
+ * it takes back, which reads as never made (T-432), so the count agrees with the engine's
+ * score by period, which has no column for an overtime whose only basket was taken back.
+ * Read when the tracker ends a game.
  */
 export function overtimePeriodsOf(state: basketball.GameState): number {
   const regulation = state.rules.periods;
+  const takenBack = new Set<string>();
+  for (const play of state.plays) if (play.type === 'unscore') takenBack.add(play.playId);
   let latest: number = regulation;
   for (const play of state.plays) {
-    if (!clockOnly.has(play.type) && play.period > latest) latest = play.period;
+    if (notPlayed.has(play.type) || takenBack.has(play.id)) continue;
+    if (play.period > latest) latest = play.period;
   }
   return latest - regulation;
 }

@@ -7,6 +7,7 @@ import {
   derive,
   describePlay,
   HALVES,
+  hasRecordedStats,
   newGame,
   QUARTERS,
   runningScores,
@@ -153,6 +154,16 @@ describe('taking back an earlier basket', () => {
       runningScores(shown).map((r) => r.home),
       [2, 5, 3],
     );
+  });
+
+  it('leaves no statistics when every basket was taken back: the game cannot end so', () => {
+    let s = play(started(), basket('h1', 2), 'b');
+    s = play(s, unscore('b', 'h1', 2));
+    assert.equal(hasRecordedStats(s), false);
+    refused(s, { type: 'end' }, 'Nothing is recorded for this game yet.');
+    s = play(s, { type: 'foul', side: 'away', playerId: 'a1' });
+    assert.equal(hasRecordedStats(s), true);
+    assert.equal(play(s, { type: 'end' }).status, 'final');
   });
 
   it('is followed by more plays as by any other', () => {

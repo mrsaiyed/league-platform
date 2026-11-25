@@ -1289,15 +1289,21 @@ function setClock(s: GameState, ms: number) {
   s.clock = clock;
 }
 
-/** Has a basket, foul or turnover been recorded? Lineups and substitutions alone are not a played game. */
-export const hasRecordedStats = (state: GameState) =>
-  state.plays.some(
+/**
+ * Has a basket, foul or turnover been recorded? Lineups and substitutions alone are not a
+ * played game, nor is a basket taken back, which reads as never made (T-432).
+ */
+export function hasRecordedStats(state: GameState): boolean {
+  const takenBack = new Set<string>();
+  for (const p of state.plays) if (p.type === 'unscore') takenBack.add(p.playId);
+  return state.plays.some(
     (p) =>
-      p.type === 'score' ||
+      (p.type === 'score' && !takenBack.has(p.id)) ||
       p.type === 'foul' ||
       p.type === 'turnover' ||
       p.type === 'team-turnover',
   );
+}
 
 /** The score after each play, for a play-by-play log. */
 export function runningScores(plays: readonly Play[]) {

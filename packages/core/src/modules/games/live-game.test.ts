@@ -108,6 +108,55 @@ describe('overtimePeriodsOf (P7 §5.6, step 2.200)', () => {
     expect(basketball.derive(back).period).toBe(2);
     expect(overtimePeriodsOf(back)).toBe(1);
   });
+
+  describe('a basket taken back (T-432)', () => {
+    const lineups = (rules: basketball.Rules) =>
+      tap(
+        tap(basketball.newGame(rules, 0), {
+          type: 'lineup',
+          side: 'home',
+          playerIds: ['h1', 'h2', 'h3', 'h4', 'h5'],
+        }),
+        { type: 'lineup', side: 'away', playerIds: ['a1', 'a2', 'a3', 'a4', 'a5'] },
+      );
+    const basket = { type: 'score', side: 'home', playerId: 'h1', points: 2 } as const;
+    const takeBack = (state: basketball.GameState) => {
+      const last = state.plays.findLast((p) => p.type === 'score');
+      if (last?.type !== 'score') throw new Error('no basket');
+      return tap(state, { ...basket, playId: last.id, type: 'unscore' });
+    };
+    /** The overtime count and the score by period's columns agree. */
+    const agree = (state: basketball.GameState) =>
+      expect(basketball.scoreByPeriod(state.plays).home.length).toBeLessThanOrEqual(
+        state.rules.periods + overtimePeriodsOf(state),
+      );
+
+    it('a regulation game left on period 5 gets no overtime from a take-back alone', () => {
+      const won = tap(tap(lineups(basketball.QUARTERS), basket), { type: 'period', period: 5 });
+      expect(overtimePeriodsOf(won)).toBe(0);
+      const corrected = takeBack(won);
+      expect(basketball.derive(corrected).period).toBe(5);
+      expect(overtimePeriodsOf(corrected)).toBe(0);
+      agree(corrected);
+    });
+
+    it('an overtime whose only basket was taken back counts for nothing, as its column', () => {
+      const inOvertime = tap(tap(lineups(basketball.QUARTERS), basket), {
+        type: 'period',
+        period: 5,
+      });
+      const scored = tap(inOvertime, basket);
+      expect(overtimePeriodsOf(scored)).toBe(1);
+      expect(basketball.scoreByPeriod(scored.plays).home).toEqual([2, 0, 0, 0, 2]);
+      const corrected = takeBack(scored);
+      expect(overtimePeriodsOf(corrected)).toBe(0);
+      expect(basketball.scoreByPeriod(corrected.plays).home).toEqual([2]);
+      agree(corrected);
+      // A foul in that overtime still makes it played.
+      const fouled = tap(corrected, { type: 'foul', side: 'away', playerId: 'a1' });
+      expect(overtimePeriodsOf(fouled)).toBe(1);
+    });
+  });
 });
 
 describe('withCurrentRules, onto minutes on the game clock (record 077)', () => {
