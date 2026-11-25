@@ -5,7 +5,7 @@
 // is entered again, with "Saved" there. It goes quiet once sent. Words from the server.
 import { useActionState, useId } from 'react';
 import { untouched, type FormState } from './form-state.ts';
-import { useOneSubmit } from './use-one-submit.ts';
+import { useOneSubmit } from '../list-forms/use-one-submit.ts';
 
 export type ReopenFormProps = {
   readonly action: (state: FormState, form: FormData) => Promise<FormState>;

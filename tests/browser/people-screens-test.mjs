@@ -355,11 +355,11 @@ if (built) {
       page.locator('#remove').getByRole('button', { name: 'Remove from the league list' }).click(),
     ]);
     const removedNotice = page.locator('[data-removed]');
-    await removedNotice.getByRole('button', { name: 'Put them back' }).waitFor();
+    await removedNotice.getByRole('button', { name: 'Put Ada Lovell back' }).waitFor();
     note(
-      'the removed notice names her and offers "Put them back"',
+      'the removed notice names her and offers "Put Ada Lovell back"',
       (await removedNotice.innerText()).includes('Removed from the league list: Ada Lovell.') &&
-        (await removedNotice.getByRole('button', { name: 'Put them back' }).count()) === 1,
+        (await removedNotice.getByRole('button', { name: 'Put Ada Lovell back' }).count()) === 1,
       await removedNotice.innerText(),
     );
     note(
@@ -368,11 +368,11 @@ if (built) {
     );
     await Promise.all([
       page.waitForURL((url) => url.href.startsWith(adaAddress)),
-      removedNotice.getByRole('button', { name: 'Put them back' }).click(),
+      removedNotice.getByRole('button', { name: 'Put Ada Lovell back' }).click(),
     ]);
     await page.getByText('Put back on the league list: Ada Lovell', { exact: false }).waitFor();
     note(
-      '"Put them back" brings her back to her record, on no team',
+      '"Put Ada Lovell back" brings her back to her record, on no team',
       (await page.getByRole('heading', { level: 1, name: 'Ada Lovell' }).count()) === 1 &&
         (await page.locator('[data-person-teams]').innerText()).includes('On no team'),
     );

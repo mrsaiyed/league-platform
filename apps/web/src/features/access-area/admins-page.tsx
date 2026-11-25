@@ -23,7 +23,7 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere, type SavedNotice } from '../../server/saved-notice.ts';
-import { SavedLine } from '../games-area/saved-line.tsx';
+import { SaidLine } from '../list-forms/said-line.tsx';
 import { StaffPill, StaffTrail } from '../staff/index.ts';
 import { adminsView, offeredRoles, type PersonLine } from './access-view.ts';
 import { cancelAction, inviteAction, removeAction, resendAction } from './admins-actions.ts';
@@ -244,7 +244,7 @@ export async function AdminsPage({ league }: { readonly league: string }) {
 }
 
 function Saved({ notice }: { readonly notice: SavedNotice }) {
-  return <SavedLine text={t(`adminAccess.saved.${notice.said}` as TextKey)} />;
+  return <SaidLine kind="saved">{t(`adminAccess.saved.${notice.said}` as TextKey)}</SaidLine>;
 }
 
 function Person({

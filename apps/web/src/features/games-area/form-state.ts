@@ -5,22 +5,18 @@
 // by sending the browser to the screen again, with a one-time notice
 // (server/saved-notice.ts), never with one of these.
 
-/** What a form held: text only, by field name. */
-export type TypedFields = Readonly<Record<string, string>>;
+import type { Refused, TypedFields, Untouched } from '../list-forms/form-state.ts';
 
-/** Refused: why (a command's error code), what was typed, and the fields that are wrong. */
-export type Refused = {
-  readonly kind: 'refused';
-  readonly code: string;
-  readonly typed: TypedFields;
-  /** The names of the fields to mark, in the order they are on the screen. */
-  readonly wrong: readonly string[];
-  /** Why, as a sentence from the message files: said where no field's own sentence fits. */
-  readonly said: string;
-};
-
-/** Nothing said yet. */
-export type Untouched = { readonly kind: 'untouched' };
+// The pieces every admin form shares are list-forms' own (step 2.155 part 5): this file
+// keeps only what the games area adds to them.
+export {
+  typedOf,
+  untouched,
+  type FormState,
+  type Refused,
+  type TypedFields,
+  type Untouched,
+} from '../list-forms/form-state.ts';
 
 /** A final score's boxes on the games list (step 2.154: two steps before it is saved). */
 export type FinalScoreState =
@@ -43,9 +39,6 @@ export type FinalScoreState =
 export type BoxScoreState =
   | Untouched
   | (Refused & { readonly scores?: { readonly home: number; readonly away: number } });
-
-/** Any other form of the games area: refused, or nothing said yet. */
-export type FormState = Untouched | Refused;
 
 /** What "Forfeit, postpone or cancel" does to a game (step 2.158): each asks first. */
 /** `restore`: a postponed game put back on its old date (S-75). */
@@ -73,8 +66,6 @@ export type CallOffState =
       readonly readyInMs: number;
     };
 
-export const untouched: Untouched = { kind: 'untouched' };
-
 /** The box score grid's scores, where its refusal and its "Saved" are said. */
 export const sheetScoresId = 'box-score-scores';
 
@@ -86,13 +77,4 @@ export function fillScores(
   return template
     .replaceAll('{awayScore}', String(scores.away))
     .replaceAll('{homeScore}', String(scores.home));
-}
-
-/** The fields a form posted, text only, the framework's own `$ACTION…` fields left out. */
-export function typedOf(form: FormData): Record<string, string> {
-  const fields: Record<string, string> = {};
-  for (const [name, value] of form.entries()) {
-    if (typeof value === 'string' && !name.startsWith('$ACTION')) fields[name] = value;
-  }
-  return fields;
 }

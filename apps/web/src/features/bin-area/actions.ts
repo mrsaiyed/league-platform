@@ -3,9 +3,12 @@
 // settings' store, a venue's and a court's on the schedule's, the rest on the bin's), which check again
 // that this person may restore that kind of thing. Who is asking and which league come
 // from the session; the form only says which thing. Someone with no admin page is refused
-// before anything runs (loadLeaguePage); each restore then checks its own permission. The browser goes back to the
-// bin with the answer in the address: only the kind, the thing's id and a refusal's code,
-// never a name. A plain form, so it works with no script in the page.
+// before anything runs (loadLeaguePage); each restore then checks its own permission. The answer is
+// a one-time notice, never the address (bin-answer.ts, T-426): what was brought back is said at the
+// top of the bin, where the browser lands; a refusal beside the thing's own row (`#bin-<id>`). Both
+// name the thing as the bin listed it. A second tap is the same request, answered as the first
+// (server/same-request.ts), while that answer still holds: a tap from an old page after the
+// thing was binned again brings it back again. A plain form, so it works with no script in the page.
 import {
   leagueUrl,
   restoreCourt,
@@ -14,16 +17,33 @@ import {
   restorePerson,
   restoreTeam,
   restoreVenue,
+  listBinPart,
 } from '@srleagues/core';
 import { redirect } from 'next/navigation';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
-import { firstChildSaid, gameBackSaid } from './bin-view.ts';
+import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
+import { binKindsShown, type BinKindShown } from './bin-view.ts';
+import { binBackSaid, binNotSaid, binTitle } from './bin-answer.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { fieldsOf } from '../teams-area/run-teams-action.ts';
 
+type Outcome =
+  | {
+      readonly ok: true;
+      readonly said: string;
+      readonly about?: readonly string[];
+      readonly name?: string;
+    }
+  | { readonly ok: false; readonly said: string; readonly name?: string };
+
+/** The answers to the restores of the last ten minutes, by request (server/same-request.ts). */
+const requests = () => sameRequestsHere<Outcome>();
+
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const binKinds = new Set<string>(binKindsShown);
 
 export async function bringBackAction(form: FormData): Promise<never> {
   const fields = fieldsOf(form);
@@ -35,7 +55,7 @@ export async function bringBackAction(form: FormData): Promise<never> {
   const id = (fields['id'] ?? '').trim().toLowerCase();
   const kind = fields['kind'];
   if (!uuidShape.test(id)) return redirect(bin);
-  const result =
+  const restore = async () =>
     kind === 'team'
       ? { name: restoreTeam.commandName, done: await restoreTeam(context, { teamId: id }, deps) }
       : kind === 'person'
@@ -76,40 +96,64 @@ export async function bringBackAction(form: FormData): Promise<never> {
                     ),
                   }
                 : undefined;
-  if (result === undefined) return redirect(bin);
-  if (result.done.ok) {
-    // A game brought back is a schedule change (A-19): the page says its revision, the
-    // teams and people it reaches (A-7) and names the games now at its time. They are
-    // kept on the server for the next page, never in the address, so a crafted link
-    // cannot make the notice say a revision that was not made.
-    const game = 'revision' in result.done.value ? result.done.value : undefined;
-    const holder = noticeHolderOf(context);
-    if (game !== undefined && game.revision !== null && holder !== undefined) {
-      savedNoticesHere().leave(holder, {
-        screen: 'bin',
-        thing: id,
-        said: gameBackSaid({
-          revision: game.revision,
-          teams: game.teamCount,
-          people: game.peopleCount,
-        }),
-        name: game.seasonId,
-        ...(game.clashes.length === 0 ? {} : { about: game.clashes.map((c) => c.id) }),
-      });
-    }
-    // A person back from the bin who is the league's first recorded child put the yes to
-    // "children in full" back to no (S-109): said on the bin's page, kept on the server.
-    if (
-      kind === 'person' &&
-      holder !== undefined &&
-      'clearedChildrenInFull' in result.done.value &&
-      result.done.value.clearedChildrenInFull === true
-    ) {
-      savedNoticesHere().leave(holder, { screen: 'bin', thing: id, said: firstChildSaid });
-    }
-    const said = '';
-    return redirect(`${bin}?back=${kind}&id=${id}${said}`);
+  if (!binKinds.has(kind ?? '')) return redirect(bin);
+  const outcome = await requests().once(
+    requestKeyOf(context, fields),
+    async (): Promise<Outcome> => {
+      // Its name as the bin lists it, read before it leaves the bin, so the answer (and the
+      // same answer to a second post, when it is no longer there) can name it.
+      const listed = await listBinPart(context, {}, deps);
+      const item = listed.ok ? listed.value.items.find((i) => i.id === id) : undefined;
+      const named = item === undefined ? {} : { name: binTitle(item) };
+      const result = await restore();
+      if (result === undefined) return { ok: false, said: '' };
+      if (!result.done.ok) {
+        return { ok: false, said: binNotSaid(result.name, result.done.error.code), ...named };
+      }
+      // A game brought back is a schedule change (A-19): its revision, the teams and people
+      // it reaches (A-7) and the games now at its time, kept on the server for the next page.
+      const game = 'revision' in result.done.value ? result.done.value : undefined;
+      if (game !== undefined && game.revision !== null) {
+        return {
+          ok: true,
+          said: binBackSaid('game', {
+            game: { revision: game.revision, teams: game.teamCount, people: game.peopleCount },
+            seasonId: game.seasonId,
+          }),
+          about: game.clashes.map((c) => c.id),
+          ...named,
+        };
+      }
+      // A person back who is the league's first recorded child put "children in full" back to no (S-109).
+      const firstChild =
+        'clearedChildrenInFull' in result.done.value &&
+        result.done.value.clearedChildrenInFull === true;
+      return {
+        ok: true,
+        said: binBackSaid(kind === 'person' ? 'person' : (kind as BinKindShown), { firstChild }),
+        ...named,
+      };
+    },
+    // A kept "brought back" is the truth only while the thing is out of the bin: a stale tap
+    // (an old bin page, after it was binned again) brings it back again rather than saying so.
+    async (kept) => {
+      if (!kept.ok) return true;
+      const now = await listBinPart(context, {}, deps);
+      return now.ok && !now.value.items.some((i) => i.id === id);
+    },
+  );
+  if (outcome.said === '') return redirect(bin);
+  const holder = noticeHolderOf(context);
+  if (holder !== undefined) {
+    savedNoticesHere().leave(holder, {
+      screen: 'bin',
+      thing: id,
+      said: outcome.said,
+      ...(outcome.name === undefined ? {} : { name: outcome.name }),
+      ...(outcome.ok && outcome.about !== undefined && outcome.about.length > 0
+        ? { about: outcome.about }
+        : {}),
+    });
   }
-  const why = encodeURIComponent(`${result.name}.${result.done.error.code}`);
-  return redirect(`${bin}?not=${id}&why=${why}#bin-${id}`);
+  return redirect(outcome.ok ? bin : `${bin}#bin-${id}`);
 }

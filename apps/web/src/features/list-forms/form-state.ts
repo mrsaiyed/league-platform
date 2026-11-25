@@ -1,8 +1,8 @@
 // What a form of the divisions and venues screens (step 2.49) is answered with in the
 // response to the post itself (T-271, record 067): a refusal, with what was typed and which
 // fields are wrong, or nothing. A save that works is answered by drawing the screen again
-// with a one-time notice (server/saved-notice.ts), never with one of these. As the games
-// area's form-state.ts, which a client component of another feature cannot import.
+// with a one-time notice (server/saved-notice.ts), never with one of these. The games
+// area's form-state.ts adds its own states to these (step 2.155 part 5).
 
 /** What a form held: text only, by field name. */
 export type TypedFields = Readonly<Record<string, string>>;
@@ -35,7 +35,13 @@ export type SavedNowWords = {
   readonly unticked?: string;
 };
 
-export const untouched: FormState = { kind: 'untouched' };
+/** Refused: why, what was typed, and the fields to mark. */
+export type Refused = Extract<FormState, { readonly kind: 'refused' }>;
+
+/** Nothing said yet. */
+export type Untouched = Extract<FormState, { readonly kind: 'untouched' }>;
+
+export const untouched: Untouched = { kind: 'untouched' };
 
 /** The fields a form posted, text only, the framework's own `$ACTION…` fields left out. */
 export function typedOf(form: FormData): Record<string, string> {

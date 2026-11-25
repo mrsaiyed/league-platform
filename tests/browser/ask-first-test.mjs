@@ -1064,6 +1064,14 @@ if (browser) {
           (await statusOf(game())) === 'cancelled' && (await said.count()) === 1,
           `${await statusOf(game())}`,
         );
+        // It names the game, as every refusal of the games list does (step 2.155 part 5).
+        const saidText = (await said.innerText()).trim();
+        note(
+          `${mode}: the stale postpone's sentence names the game first`,
+          saidText ===
+            'Herons at Falcons: Someone cancelled this game meanwhile, so nothing else was changed. It is shown again as it is now.',
+          saidText,
+        );
         if (scripts) await accessible(page, 'a postpone refused: the game was cancelled meanwhile');
         await openGames(theirs.page);
         const putBack = other().locator('details[data-action-form]');
