@@ -392,9 +392,18 @@ export const enAdminSettings = {
   'seasonSettings.start.carry.teams-and-rosters': 'Bring the teams and their rosters',
   'seasonSettings.start.carryHelp':
     'A team brought along is the same team across seasons. A team or player that left, or is in the bin, is not brought.',
+  'seasonSettings.start.clock': 'When a foul is called, does the game clock stop?',
+  'seasonSettings.start.clock.running': 'No, the clock keeps running (a running clock)',
+  'seasonSettings.start.clock.stop': 'Yes, the clock stops on every foul (a stop clock)',
   'seasonSettings.start.endsOn': 'Last day (you can leave it empty)',
+  'seasonSettings.start.gameRules': 'Game rules',
+  'seasonSettings.start.gameRulesHelp':
+    "Filled in with the rules the new season would start with. Leave them as they are to keep them; you can change them later in this season's settings.",
   'seasonSettings.start.hidden':
     'The new season starts hidden from visitors and is not the current season until you make it so.',
+  'seasonSettings.start.mercyLead': 'Mercy rule: lead in points (leave empty for none)',
+  'seasonSettings.start.mercyLeadHelp':
+    'Only with a stop clock: once a team leads by this many points, the clock keeps running through fouls. Empty means no mercy rule.',
   'seasonSettings.start.name': 'Name',
   'seasonSettings.start.nameHelp': 'For example Winter 2027.',
   'seasonSettings.start.open': 'Start a new season',

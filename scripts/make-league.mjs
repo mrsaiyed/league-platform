@@ -54,6 +54,8 @@ try {
       'main-color': { type: 'string' },
       'accent-color': { type: 'string' },
       'highlight-color': { type: 'string' },
+      clock: { type: 'string' },
+      'mercy-lead': { type: 'string' },
       as: { type: 'string' },
       db: { type: 'string' },
       hosted: { type: 'boolean', default: false },
@@ -90,6 +92,8 @@ const answers = {
   mainColor: values['main-color'],
   accentColor: values['accent-color'],
   highlightColor: values['highlight-color'],
+  clock: values.clock,
+  mercyLead: values['mercy-lead'],
 };
 
 const computerZone = () => namedTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -97,6 +101,9 @@ const computerZone = () => namedTimeZone(Intl.DateTimeFormat().resolvedOptions()
 /** Suggestions, worked out when asked: the season goes by the league's own date. */
 const defaults = {
   sport: () => 'basketball',
+  // The game rules asked (S-106, step 2.245): P7 section 1's defaults, no mercy rule.
+  clock: () => 'running',
+  mercyLead: () => 'none',
   timeZone: () => computerZone(),
   seasonName: () => {
     const zone = namedTimeZone(answers.timeZone ?? '') ?? computerZone() ?? 'UTC';
@@ -147,6 +154,8 @@ async function askToMake(plan, hosted, place) {
 async function askForMissing() {
   for (const field of Object.keys(words.questions)) {
     if (answers[field] !== undefined && answers[field].trim() !== '') continue;
+    // A mercy rule only applies to a stop clock (S-113): not asked under a running one.
+    if (field === 'mercyLead' && answers.clock?.trim().toLowerCase() === 'running') continue;
     const fallback = defaults[field]?.();
     if (prompt === null) {
       if (fallback !== undefined && !optional.has(field)) answers[field] = fallback;

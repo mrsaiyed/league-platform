@@ -4,6 +4,7 @@
 // in), or the league's default one when there is no season yet. The command checks every field; its refusal is answered by its own words. The
 // context comes from the session, never from the form (T-23).
 import {
+  clockModes,
   seasonCarryChoices,
   startSeason,
   type CommandContext,
@@ -33,6 +34,18 @@ export async function runStartSeason(
   const startsOn = typed(fields['startsOn']);
   const endsOn = typed(fields['endsOn']);
   const programId = typed(fields['programId']);
+  // The game rules asked (S-106, step 2.245): an empty mercy lead is none; the command
+  // checks the pair against the season's settings' own contract.
+  const clockMode = clockModes.find((mode) => mode === fields['clockMode']);
+  const mercyTyped = typed(fields['mercyLead']);
+  const mercyLead =
+    mercyTyped === undefined ? null : /^\d{1,3}$/.test(mercyTyped) ? Number(mercyTyped) : undefined;
+  if (mercyLead === undefined) {
+    return {
+      answer: refusedBy(startSeason.commandName, 'game-rule-refused'),
+      seasonSlug: undefined,
+    };
+  }
   if (carry === undefined || slug === undefined) {
     return { answer: refusedBy(startSeason.commandName, 'invalid-input'), seasonSlug: undefined };
   }
@@ -43,6 +56,7 @@ export async function runStartSeason(
       slug,
       name: fields['name'] ?? '',
       carry,
+      gameRules: { ...(clockMode === undefined ? {} : { clockMode }), mercyLead },
       ...(startsOn === undefined ? {} : { startsOn }),
       ...(endsOn === undefined ? {} : { endsOn }),
     },

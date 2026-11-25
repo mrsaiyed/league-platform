@@ -12,7 +12,9 @@
 import {
   archivedSeasonStatus,
   hiddenSeasonStatus,
+  clockModes,
   seasonCarryChoices,
+  type GameRuleAnswers,
   type SeasonView,
 } from '@srleagues/core';
 import { randomUUID } from 'node:crypto';
@@ -158,6 +160,7 @@ export function StartSeasonPanel({
   league,
   programId,
   copiedFrom,
+  gameRules,
   problem,
 }: {
   /** The route's `[league]` value, which the form's post finds the page by. */
@@ -166,6 +169,8 @@ export function StartSeasonPanel({
   readonly programId: string | undefined;
   /** The current season's name, which the new one copies; undefined when there is none. */
   readonly copiedFrom: string | undefined;
+  /** The game rules asked (S-106, step 2.245), filled with the copied season's (or the starting) ones. */
+  readonly gameRules: Required<GameRuleAnswers>;
   readonly problem: TextKey | undefined;
 }) {
   return (
@@ -224,6 +229,44 @@ export function StartSeasonPanel({
             <input name="endsOn" type="date" />
           </label>
         </p>
+        <fieldset data-game-rules="">
+          <legend>{t('seasonSettings.start.gameRules')}</legend>
+          <p className="ui-field-help">{t('seasonSettings.start.gameRulesHelp')}</p>
+          <p>{t('seasonSettings.start.clock')}</p>
+          {clockModes.map((mode) => (
+            <p key={mode}>
+              <label className="staff-check">
+                <input
+                  type="radio"
+                  name="clockMode"
+                  value={mode}
+                  defaultChecked={mode === gameRules.clockMode}
+                  data-game-rule="clockMode"
+                />{' '}
+                {t(
+                  mode === 'stop'
+                    ? 'seasonSettings.start.clock.stop'
+                    : 'seasonSettings.start.clock.running',
+                )}
+              </label>
+            </p>
+          ))}
+          <p>
+            <label className="staff-field">
+              {t('seasonSettings.start.mercyLead')}
+              <input
+                name="mercyLead"
+                type="text"
+                inputMode="numeric"
+                maxLength={3}
+                autoComplete="off"
+                defaultValue={gameRules.mercyLead === null ? '' : String(gameRules.mercyLead)}
+                data-game-rule="mercyLead"
+              />
+            </label>
+            <span className="ui-field-help">{t('seasonSettings.start.mercyLeadHelp')}</span>
+          </p>
+        </fieldset>
         {copiedFrom === undefined ? (
           <input type="hidden" name="carry" value="nothing" />
         ) : (

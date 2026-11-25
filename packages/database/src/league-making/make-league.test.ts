@@ -238,6 +238,19 @@ describe('makeLeague', () => {
     ).toEqual({ listed: true });
   });
 
+  it('saves the first season with the clock and the mercy rule asked (S-106, step 2.245)', async () => {
+    const plan = planFor({ clock: 'stop', mercyLead: '20' });
+    const outcome = await makeLeague(target, plan);
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    const saved = await one(pglite, 'select rules from seasons where id = $1', [
+      outcome.made.seasonId,
+    ]);
+    expect(saved).toMatchObject({
+      rules: { clock: { mode: 'stop', mercyLead: 20, stopClockLastSeconds: null } },
+    });
+  });
+
   it('gives the league the starting design and colors it was given, as its first release (step 2.187)', async () => {
     const plan = planFor({
       design: 'Midnight-Gold',

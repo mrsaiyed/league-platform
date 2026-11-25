@@ -30,6 +30,10 @@ export const usage = [
   '  --main-color <#rrggbb>   colors in place of the design’s own (each optional):',
   '  --accent-color <#rrggbb>   the main color, the accent and the highlight',
   '  --highlight-color <#rrggbb>',
+  '  --clock <stop|running>   the first season’s clock: stop stops it on every foul,',
+  '                           running keeps it going (default: running)',
+  '  --mercy-lead <points>    with a stop clock, the lead that turns it into a running',
+  '                           clock, or none (default: none)',
   '  --as <email>             your own email, as SR Leagues staff',
   '  --db <folder>            a local test database folder (default: .local/seed-db)',
   '  --hosted                 a hosted database instead: see below',
@@ -59,6 +63,10 @@ export const questions = {
   seasonName: 'First season’s name',
   seasonStartsOn: 'First season starts (YYYY-MM-DD, or Enter to leave it out)',
   seasonEndsOn: 'First season ends (YYYY-MM-DD, or Enter to leave it out)',
+  clock:
+    'Clock: stop (it stops on every foul) or running (it keeps going through fouls); the admin can change it for each season',
+  mercyLead:
+    'Mercy rule: the lead in points that turns the stop clock into a running clock, or none for no mercy rule',
   staffEmail: 'Your own email (SR Leagues staff)',
 };
 
@@ -105,6 +113,9 @@ export const problemWords = {
     mainColor: 'Main color: a color written #rrggbb, such as #96062d.',
     accentColor: 'Accent color: a color written #rrggbb, such as #d3b780.',
     highlightColor: 'Highlight color: a color written #rrggbb, such as #d3b780.',
+    clock: 'Clock: stop or running.',
+    mercyLead:
+      'Mercy rule: a lead from 1 to 100 points, or none. It only goes with a stop clock: with a running clock, answer none.',
   },
   blocked: {
     shortName:
@@ -141,6 +152,14 @@ const listedWords = (plan) => {
 };
 
 const colorNames = { primary: 'main', accent: 'accent', highlight: 'highlight' };
+
+/** The first season's game rules in plain words (S-106, step 2.245). */
+const clockWords = {
+  stop: 'stop clock: it stops on every foul',
+  running: 'running clock: it keeps going through fouls',
+};
+const mercyWords = (lead) =>
+  lead === null ? 'none' : `a lead of ${lead} points turns the stop clock into a running clock`;
 
 /** The starting design and any colors chosen in place of its own, in plain words. */
 const designWords = (design) => {
@@ -209,6 +228,8 @@ export const planLines = (plan, preview, place, address) => [
   `  Owner           ${plan.ownerEmail} ${accountWords.owner[preview.owner]}`,
   `  First season    ${plan.season.name}, the current one, ${seasonDates(plan.season)}`,
   `  Design          ${designWords(plan.design)}; the admin can change its colors later`,
+  `  Clock           ${clockWords[plan.gameRules.clockMode]}`,
+  `  Mercy rule      ${mercyWords(plan.gameRules.mercyLead)}; both can be changed in Season settings`,
   '  State           draft: only the league’s own staff can see it until it is published',
   `  Made by         ${plan.staffEmail} ${accountWords.staff[preview.staff]}`,
   `  Where           ${placeWords(place)}`,

@@ -256,6 +256,8 @@ export async function makeLeague(
           slug: plan.season.slug,
           ...(plan.season.startsOn === null ? {} : { startsOn: plan.season.startsOn }),
           ...(plan.season.endsOn === null ? {} : { endsOn: plan.season.endsOn }),
+          // The game rules asked (S-106, step 2.245): saved as the season's rules.
+          gameRules: plan.gameRules,
         },
         // Its site's first release, in the same transaction (step 2.187, record 073).
         design: { startingDesign: plan.design.startingDesign, colors: plan.design.colors },

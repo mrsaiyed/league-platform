@@ -15,11 +15,13 @@
 // league of the session: a season of another league is never found (T-28).
 import {
   archivedSeasonStatus,
+  gameRuleAnswersOf,
   getSeason,
   isLeagueHidden,
   readOnlyStatuses,
   type SeasonView,
 } from '@srleagues/core';
+import { defaultSeasonRules } from '@srleagues/contracts';
 import { displayLabels } from '@srleagues/site';
 import { EmptyPanel, OptionPicker, PageHead } from '@srleagues/ui';
 import { randomUUID } from 'node:crypto';
@@ -99,11 +101,18 @@ export async function SeasonSettingsPage({
     (s) => s.isCurrent && (programId === undefined || s.programId === programId),
   );
   const mayStart = mayStartSeason(holder, programId, addressee.status);
+  // The game rules asked (S-106, step 2.245) are filled with the copied season's.
+  const copiedRead =
+    mayStart && current !== undefined
+      ? await getSeason(context, { seasonId: current.id }, ports.adminSettings.seasons)
+      : undefined;
+  const startRules = copiedRead?.ok === true ? copiedRead.value.rules : defaultSeasonRules();
   const start = mayStart ? (
     <StartSeasonPanel
       league={league}
       programId={programId}
       copiedFrom={current?.name}
+      gameRules={gameRuleAnswersOf(startRules)}
       problem={problemFor('start')}
     />
   ) : null;

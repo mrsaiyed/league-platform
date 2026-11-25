@@ -165,6 +165,8 @@ export const enError = {
     'The league has no contact email yet, so it cannot be published. Ask the people who run SR Leagues, who made the league, to add it.',
   'error.leagues.set_status.privacy-not-chosen':
     'Choose how young players\' names show first: save "Names on public pages" under Privacy, then publish.',
+  'error.leagues.start_season.game-rule-refused':
+    'The mercy rule needs a stop clock and a lead from 1 to 100 points. Choose a stop clock or leave the mercy rule empty; nothing was changed.',
   'error.leagues.start_season.program-not-found':
     'There is nowhere to start this season in this league. Nothing was changed.',
   'error.leagues.start_season.season-slug-taken':

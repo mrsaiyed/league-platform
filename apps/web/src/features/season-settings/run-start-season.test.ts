@@ -30,4 +30,37 @@ describe('runStartSeason', () => {
       seasonSlug: undefined,
     });
   });
+
+  describe('the game rules asked (S-106, step 2.245)', () => {
+    const asked = (clockMode: string, mercyLead: string) => ({
+      league: 'ignored-the-session-decides',
+      name: 'Summer 2027',
+      slug: 'summer-2027',
+      carry: 'nothing',
+      clockMode,
+      mercyLead,
+    });
+
+    it('starts a season with a stop clock and a mercy lead', async () => {
+      const world = testWorld();
+      expect(await runStartSeason(owner, asked('stop', ' 15 '), world.deps)).toMatchObject({
+        answer: { kind: 'done' },
+        seasonSlug: 'summer-2027',
+      });
+    });
+
+    it('refuses a mercy lead with a running clock, or one that is not a number', async () => {
+      for (const [clock, lead] of [
+        ['running', '15'],
+        ['stop', 'ten'],
+        ['stop', '0'],
+      ] as const) {
+        const world = testWorld();
+        expect(await runStartSeason(owner, asked(clock, lead), world.deps)).toEqual({
+          answer: refusedBy(startSeason.commandName, 'game-rule-refused'),
+          seasonSlug: undefined,
+        });
+      }
+    });
+  });
 });
