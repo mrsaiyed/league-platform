@@ -8,7 +8,7 @@ const withClock = (clock: Partial<SeasonRules['clock']>): SeasonRules => {
 };
 
 const kept = (minutes: string) =>
-  `Fall 2026 also stops the clock in the last ${minutes}. The new season keeps that with either clock; you can change it in its settings.`;
+  `Fall 2026 also stops the clock in the last ${minutes}. The new season keeps that whichever clock you choose; you can change it in its settings.`;
 
 describe('lastMinutesKeptNote (step 2.245, review M1; step 2.248)', () => {
   it('says the copied last-minutes stop clock is kept, with either clock', () => {

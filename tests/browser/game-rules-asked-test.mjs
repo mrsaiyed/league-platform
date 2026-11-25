@@ -138,7 +138,7 @@ try {
         'the start form says the new season keeps it with either clock',
         (await kept.count()) === 1 &&
           (await kept.innerText()).trim() ===
-            'Fall 2026 also stops the clock in the last 2 minutes. The new season keeps that with either clock; you can change it in its settings.',
+            'Fall 2026 also stops the clock in the last 2 minutes. The new season keeps that whichever clock you choose; you can change it in its settings.',
         (await kept.count()) === 1 ? await kept.innerText() : 'no sentence',
       );
       const fouls = startForm(page).locator('input[name=teamFoulsReset]:checked');

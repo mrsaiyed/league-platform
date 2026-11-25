@@ -40,12 +40,12 @@ export const enTracker = {
   'tracker.clockMode.helpRunning': 'The clock keeps going after a foul.',
   'tracker.clockMode.helpStop': 'The clock stops on every foul.',
   'tracker.clockMode.label': 'Running clock',
+  'tracker.clockMode.off': 'Off',
+  'tracker.clockMode.on': 'On',
   // Turned On then Off inside the last minutes (S-124): a stop clock for the rest of the
   // game until step 2.252, said on the scoring screen while it holds.
   'tracker.clockMode.stopForGame':
     'The clock now stops on fouls for the rest of the game. Tap Running clock to change it back.',
-  'tracker.clockMode.off': 'Off',
-  'tracker.clockMode.on': 'On',
   // What a time that takes time off the clock adds to the minutes (S-71): it was played
   // with the clock stopped. The engine's own figure, "4:55" for 16:55 set to 12:00.
   'tracker.clockSheet.adds': 'This adds {time} to the minutes of the players on the court.',

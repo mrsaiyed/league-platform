@@ -88,7 +88,7 @@ describe('the clock in words, with the mercy rule and the last minutes (step 2.2
       'Stop clock, then a running clock once a team leads by 15, but a stop clock again in the last 2 minutes of each half',
     );
     expect(clockLine({ mode: 'stop', ...last, mercyLead: null })).toBe(
-      'Stop clock; if it is switched to running, it stops again in the last 2 minutes of each half',
+      'Stop clock; if the scorekeeper switches to a running clock, it stops again in the last 2 minutes of each half',
     );
     expect(clockLine({ mode: 'stop', stopClockLastSeconds: null, mercyLead: 15 })).toBe(
       'Stop clock, then a running clock once a team leads by 15',

@@ -86,10 +86,13 @@ export function partFacts(part: SeasonPart, season: SeasonView): readonly PartFa
           : mercyLead === null
             ? lastWords === undefined
               ? say('seasonSettings.value.clock.stop')
-              : say('seasonSettings.value.clock.stopLast', lastWords)
+              : t.plural('seasonSettings.value.clock.stopLast', last! / 60, lastWords)
             : lastWords === undefined
               ? say('seasonSettings.value.clock.stopMercy', { lead: mercyLead })
-              : say('seasonSettings.value.clock.stopMercyLast', { lead: mercyLead, ...lastWords });
+              : t.plural('seasonSettings.value.clock.stopMercyLast', last! / 60, {
+                  lead: mercyLead,
+                  ...lastWords,
+                });
       const { bonusFouls, doubleBonusFouls, playerFoulLimit } = r.fouls;
       const timeouts = r.timeouts;
       return [
