@@ -68,3 +68,17 @@ describe('last-minutes stop clock, mercy lead and foul limit (step 2.67)', () =>
     }
   });
 });
+
+describe('when team fouls reset (step 2.123)', () => {
+  it('the platform shape takes each reset and refuses another; the current tracker refuses it', () => {
+    for (const teamFoulsReset of ['period', 'half', 'game']) {
+      const input = { type: 'rules', rules: { ...rules, teamFoulsReset } };
+      expect(PlatformCommand.safeParse(input).success).toBe(true);
+      expect(Command.safeParse(input).success).toBe(false);
+    }
+    for (const teamFoulsReset of ['quarter', null, 2]) {
+      const input = { type: 'rules', rules: { ...rules, teamFoulsReset } };
+      expect(PlatformCommand.safeParse(input).success).toBe(false);
+    }
+  });
+});

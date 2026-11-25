@@ -235,6 +235,9 @@ export const enAdminSettings = {
   'seasonSettings.field.statistics.help':
     'The box score sheet asks for these. Live tracking keeps at least points and fouls.',
   'seasonSettings.field.stopClockScope': 'Those last minutes are of',
+  'seasonSettings.field.teamFoulsReset': 'Team fouls start again',
+  'seasonSettings.field.teamFoulsReset.help':
+    'Overtime goes on with the count the last half or quarter ended with. Never stays as it is when you change between halves and quarters; leave any other choice as it is, and it becomes each half or quarter.',
   'seasonSettings.field.tiebreaker1': 'First tiebreaker',
   'seasonSettings.field.tiebreaker2': 'Second tiebreaker',
   'seasonSettings.field.tiebreaker3': 'Third tiebreaker',
@@ -305,6 +308,9 @@ export const enAdminSettings = {
   'seasonSettings.option.stopClockScope.game': 'The game',
   'seasonSettings.option.stopClockScope.half': 'Each half',
   'seasonSettings.option.stopClockScope.period': 'Each half or quarter',
+  'seasonSettings.option.teamFoulsReset.game': 'Never: they count for the whole game',
+  'seasonSettings.option.teamFoulsReset.half': 'Each half, also with quarters',
+  'seasonSettings.option.teamFoulsReset.period': 'Each half or quarter',
   'seasonSettings.option.timeoutsPer.game': 'For the whole game',
   'seasonSettings.option.timeoutsPer.half': 'For each half',
   'seasonSettings.part.game.about':
@@ -405,11 +411,9 @@ export const enAdminSettings = {
   'seasonSettings.start.submit': 'Start the season',
   'seasonSettings.start.title': 'Start a new season',
   'seasonSettings.state.title': 'Current and archived',
-  'seasonSettings.teamFouls.form':
-    'Team fouls start again each half with halves, and each quarter with quarters, as the tracker counts them.',
-  'seasonSettings.teamFouls.half': 'Team fouls start again each half, as the tracker counts them.',
-  'seasonSettings.teamFouls.quarter':
-    'Team fouls start again each quarter, as the tracker counts them.',
+  'seasonSettings.teamFouls.game': 'Team fouls count for the whole game.',
+  'seasonSettings.teamFouls.half': 'Team fouls start again each half.',
+  'seasonSettings.teamFouls.quarter': 'Team fouls start again each quarter.',
   'seasonSettings.term.clock': 'Clock',
   'seasonSettings.term.coinFlip': 'Coin flip',
   'seasonSettings.term.columns': 'Columns',

@@ -3,13 +3,19 @@
 // takes them from the message files by the keys named here, T-187) and nothing read or
 // saved. Every rule a part changes is followed by the product today (step 2.138 follows
 // this one): the roster limits, the lock date and the coin flip are not fields of any
-// part (they are shown "not in use yet"), the team-foul reset is not a choice (it follows
-// the game's periods, as the tracker counts it, step 2.123), and "last five" is not a
-// column (nothing works it out).
+// part (they are shown "not in use yet"), the team-foul reset is the admin's choice (each
+// period, each half or once a game, which the tracker counts since step 2.123; S-106), and
+// "last five" is not a column (nothing works it out).
 //
 // A part's form changes only its own part of the rules: the rest is the season's rules
 // as read fresh when it is saved, so two admins saving two parts do not undo each other.
-import { seasonRulesPreset, SeasonRules, type SeasonRulesPreset } from '@srleagues/contracts';
+import {
+  foulsWithReset,
+  seasonRulesPreset,
+  SeasonRules,
+  teamFoulsCounted,
+  type SeasonRulesPreset,
+} from '@srleagues/contracts';
 import type { TypedFields } from './part-form-state.ts';
 
 type StandingsColumn = SeasonRules['standings']['columns'][number];
@@ -106,6 +112,7 @@ export function fieldsOfPart(part: SeasonPart): readonly string[] {
         'bonusFouls',
         'doubleBonusFouls',
         'playerFoulLimit',
+        'teamFoulsReset',
         'fullTimeouts',
         'shortTimeouts',
         'timeoutsPer',
@@ -163,6 +170,7 @@ export function rulesFields(part: Exclude<SeasonPart, 'name'>, rules: SeasonRule
         bonusFouls: shown(rules.fouls.bonusFouls),
         doubleBonusFouls: shown(rules.fouls.doubleBonusFouls),
         playerFoulLimit: shown(rules.fouls.playerFoulLimit),
+        teamFoulsReset: teamFoulsCounted(rules),
         fullTimeouts: shown(rules.timeouts.full),
         shortTimeouts: shown(rules.timeouts.short),
         timeoutsPer: rules.timeouts.per,
@@ -276,6 +284,12 @@ export function rulesFromPart(
       const bonusFouls = readNumber(fields, 'bonusFouls', wrong);
       const doubleBonusFouls = readNumber(fields, 'doubleBonusFouls', wrong);
       const playerFoulLimit = readNumber(fields, 'playerFoulLimit', wrong);
+      const reset = readChoice(
+        fields,
+        'teamFoulsReset',
+        ['period', 'half', 'game'] as const,
+        wrong,
+      );
       const full = readNumber(fields, 'fullTimeouts', wrong);
       const short = readNumber(fields, 'shortTimeouts', wrong);
       const per = readChoice(fields, 'timeoutsPer', ['game', 'half'] as const, wrong);
@@ -292,6 +306,7 @@ export function rulesFromPart(
         bonusFouls == null ||
         doubleBonusFouls === undefined ||
         playerFoulLimit === undefined ||
+        reset === undefined ||
         full == null ||
         short == null ||
         per === undefined ||
@@ -316,12 +331,11 @@ export function rulesFromPart(
           ...(last === null ? {} : { stopClockScope: scope }),
           mercyLead: mode === 'stop' ? mercyLead : null,
         },
-        fouls: {
-          teamFoulsReset: teamFoulsResetFor(periodCount, base.fouls.teamFoulsReset),
+        fouls: teamFoulsSaved(base, periodCount, reset, {
           bonusFouls,
           doubleBonusFouls,
           playerFoulLimit,
-        },
+        }),
         timeouts: { full, short, per, overtime, carry: has(fields, 'timeoutsCarry') },
       };
       break;
@@ -404,17 +418,24 @@ export function rulesFromPart(
 }
 
 /**
- * How team fouls reset, as the tracker counts them (until step 2.123 it counts by period):
- * each quarter with quarters; with halves a period is a half, so "each half" (or "each
- * period", the same thing) is kept, and "once a game", which the tracker does not follow,
- * becomes each half.
+ * The fouls a save of the game rules keeps (T-422). The team-foul choice as it was (the
+ * radio shows how the season counts) and the periods as they were: the stored value is
+ * kept as it is, so a season saved before step 2.123 keeps counting each period until its
+ * admin chooses otherwise. Periods changed and the choice left as it was: it becomes the
+ * natural one for the new periods, each half or quarter, as the help line says, except
+ * once a game, which does not depend on the periods and is kept. Any other choice is
+ * saved, marked as chosen when it is not each period.
  */
-export function teamFoulsResetFor(
+export function teamFoulsSaved(
+  base: SeasonRules,
   periods: 2 | 4,
-  now: SeasonRules['fouls']['teamFoulsReset'],
-): SeasonRules['fouls']['teamFoulsReset'] {
-  if (periods === 4) return 'period';
-  return now === 'game' ? 'half' : now;
+  reset: SeasonRules['fouls']['teamFoulsReset'],
+  numbers: Pick<SeasonRules['fouls'], 'bonusFouls' | 'doubleBonusFouls' | 'playerFoulLimit'>,
+): SeasonRules['fouls'] {
+  const fouls = { ...base.fouls, ...numbers };
+  const left = reset === teamFoulsCounted(base);
+  if (left && periods === base.gameFormat.periods) return fouls;
+  return foulsWithReset(fouls, left && reset !== 'game' ? 'period' : reset);
 }
 
 /** Where on the form each finding of the rules contract is said, by its path. */

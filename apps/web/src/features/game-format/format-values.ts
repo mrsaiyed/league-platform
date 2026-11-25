@@ -2,7 +2,7 @@
 // and choices, and back: a format the contract takes, or null when the fields do not make
 // one (the same checks as a season's rules, GameFormatRules). Minutes on the screen,
 // seconds in the format.
-import { GameFormatRules, GAME_FORMAT_VERSION } from '@srleagues/contracts';
+import { GameFormatRules, GAME_FORMAT_VERSION, teamFoulsCounted } from '@srleagues/contracts';
 
 export type FormatValues = {
   readonly periods: '2' | '4';
@@ -36,7 +36,8 @@ export function valuesOf(format: GameFormatRules): FormatValues {
     stopLastSeconds: text(c.stopClockLastSeconds),
     stopScope: c.stopClockScope ?? 'half',
     mercyLead: text(c.mercyLead),
-    teamFoulsReset: f.teamFoulsReset,
+    // As counted: a format saved before step 2.123 counts each period (T-422).
+    teamFoulsReset: teamFoulsCounted(format),
     bonusFouls: String(f.bonusFouls),
     doubleBonusFouls: text(f.doubleBonusFouls),
     playerFoulLimit: text(f.playerFoulLimit),
@@ -71,6 +72,8 @@ export function formatOfValues(values: FormatValues): GameFormatRules | null {
     },
     fouls: {
       teamFoulsReset: values.teamFoulsReset,
+      // Marked as the admin's choice when it is not each period (T-422).
+      ...(values.teamFoulsReset === 'period' ? {} : { teamFoulsResetChosen: true }),
       bonusFouls: whole(values.bonusFouls),
       doubleBonusFouls: wholeOrNone(values.doubleBonusFouls),
       playerFoulLimit: wholeOrNone(values.playerFoulLimit),

@@ -3,7 +3,7 @@
 // form, field by field; the sentence beside a box that is wrong; and, before a change that
 // moves the standings is saved, each team that moves and how (S-1, step 2.25). A league
 // with one program never reads the word "program" here (U-3): nothing here names one.
-import type { SeasonRules } from '@srleagues/contracts';
+import { teamFoulsCounted, type SeasonRules } from '@srleagues/contracts';
 import type { SeasonView, TeamMove } from '@srleagues/core';
 import { locale, t, type TextKey } from '../../server/messages.ts';
 import type { FormGroup, PartFormTexts } from './part-form-state.ts';
@@ -220,12 +220,18 @@ export function partFacts(part: SeasonPart, season: SeasonView): readonly PartFa
   }
 }
 
-/** How team fouls reset, as the tracker counts them: not a choice (step 2.123). */
-function teamFoulsLine(rules: SeasonRules): string {
+/**
+ * When team fouls start again, as they are counted (step 2.123, T-422): the admin's choice,
+ * or each period when none was saved. With halves a period is a half.
+ */
+export function teamFoulsLine(rules: SeasonRules): string {
+  const reset = teamFoulsCounted(rules);
   return say(
-    rules.gameFormat.periods === 4
-      ? 'seasonSettings.teamFouls.quarter'
-      : 'seasonSettings.teamFouls.half',
+    reset === 'game'
+      ? 'seasonSettings.teamFouls.game'
+      : reset === 'period' && rules.gameFormat.periods === 4
+        ? 'seasonSettings.teamFouls.quarter'
+        : 'seasonSettings.teamFouls.half',
   );
 }
 
@@ -291,7 +297,9 @@ export function partGroups(part: SeasonPart, rules: SeasonRules): readonly FormG
             number('bonusFouls'),
             number('doubleBonusFouls', help('seasonSettings.field.doubleBonusFouls.help')),
             number('playerFoulLimit', help('seasonSettings.field.playerFoulLimit.help')),
-            { kind: 'note', text: say('seasonSettings.teamFouls.form') },
+            radios('teamFoulsReset', ['period', 'half', 'game'], {
+              help: `${teamFoulsLine(rules)} ${say('seasonSettings.field.teamFoulsReset.help')}`,
+            }),
           ],
         },
         {

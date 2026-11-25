@@ -6,13 +6,14 @@
 // keeps them (`checkRules` in packages/sports): off is left out, never null, so rules
 // with none of them read exactly as before (record 062).
 //
-// ENGINE GAP, for an engine step (2.107 audit, M8; NEW-7): `fouls.teamFoulsReset` is
-// not carried. The engine always resets team fouls each period, with overtime
-// continuing the last regulation period's count, which is the 'period' setting. A
-// season set to reset each half or once a game gets that per-period count in the
-// tracker (in quarters the bonus comes late or never) until the engine learns the
-// setting; the box score and the standings are not affected.
-import type { SeasonRules } from '@srleagues/contracts';
+// When team fouls reset (`fouls.teamFoulsReset`, step 2.123) is carried the same way:
+// only when it counts differently from each period, which is what the engine reads when
+// it is absent: once a game, or each half in a game of quarters (with halves, each half
+// is each period). Overtime continues the last regulation window's count (S-114). A game
+// keeps the rules it started with (S-1), so a game begun before a season's change, or
+// before this step, keeps counting as it did. The 2.107 audit's note that the bonus "can
+// show early" was wrong both ways round: it showed late or never (M8, L8), and no longer.
+import { teamFoulsCounted, type SeasonRules } from '@srleagues/contracts';
 import type { basketball } from '@srleagues/sports';
 
 /**
@@ -28,13 +29,30 @@ export function withoutMercyOrLastMinutes(rules: SeasonRules): SeasonRules {
 
 /**
  * The rules for a game brought over from the Al-Hadi tracker (the transfer, step 2.58):
- * without the mercy lead and the last-minutes stop clock, and with the tracker's own way
- * of counting minutes when the clock is set, so it keeps the tracker's numbers (S-71,
- * record 077).
+ * without the mercy lead and the last-minutes stop clock, with team fouls counted each
+ * period as the tracker counted them, and with the tracker's own way of counting minutes
+ * when the clock is set, so it keeps the tracker's numbers (S-71, record 077).
  */
 export function trackerEngineRulesOf(rules: SeasonRules): basketball.Rules {
-  const { minutesFollow: _minutes, ...asTracked } = engineRulesOf(withoutMercyOrLastMinutes(rules));
+  const {
+    minutesFollow: _minutes,
+    teamFoulsReset: _reset,
+    ...asTracked
+  } = engineRulesOf(withoutMercyOrLastMinutes(rules));
   return asTracked;
+}
+
+/**
+ * When team fouls reset, as the engine keeps it: left out when the season's choice counts
+ * the same as each period, the engine's reading when it is absent (step 2.123).
+ */
+function teamFoulsResetOf(rules: SeasonRules): { teamFoulsReset?: basketball.TeamFoulsReset } {
+  // Unmarked rules, every season and game saved before this step, count each period (T-422).
+  const reset = teamFoulsCounted(rules);
+  if (reset === 'game' || (reset === 'half' && rules.gameFormat.periods === 4)) {
+    return { teamFoulsReset: reset };
+  }
+  return {};
 }
 
 /**
@@ -62,6 +80,7 @@ export function engineRulesOf(rules: SeasonRules): basketball.Rules {
     ...(stopClockLastSeconds === null || stopClockScope === undefined ? {} : { stopClockScope }),
     ...(mercyLead === null ? {} : { mercyLead }),
     ...(playerFoulLimit === null ? {} : { playerFoulLimit }),
+    ...teamFoulsResetOf(rules),
     minutesFollow: 'game-clock',
   };
 }
