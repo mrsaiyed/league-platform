@@ -46,6 +46,7 @@ import { teamStatsView, type TeamStatsDrawnView } from '../features/team-pages/t
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { refusalAnswer, type ApiAnswer, type ApiRefusal } from './league-api.ts';
 import { t } from './messages.ts';
+import { publicPlayerKey } from './player-key.ts';
 import type { PublicStatsPorts } from './public-stats.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
@@ -256,6 +257,7 @@ async function gameMore(
       { gameId },
       viewing(publicViewer(league.id)),
       ports.tracker.clock.now(),
+      publicPlayerKey,
     );
     if (!snapshot.ok) return null;
     const everyone = await readGamePage(store, { gameId }, viewing(publicViewer(league.id)));

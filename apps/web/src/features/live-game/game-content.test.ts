@@ -46,6 +46,7 @@ import {
 import { GameContent, type GameView } from './game-content.tsx';
 import { latestPlayText, redrawsFor, redrawsWhileHeld } from './live-game-view.tsx';
 import type { ViewerGame } from './viewer-state.ts';
+import { publicPlayerKey } from '../../server/player-key.ts';
 
 const viewing = {
   leagueId: liveLeagueId,
@@ -94,7 +95,7 @@ async function scoreHawksBears(world: ReturnType<typeof trackerWorld>) {
 
 async function viewOf(world: ReturnType<typeof trackerWorld>, gameId: string) {
   const store = world.tracker.snapshotStoreOf(liveLeagueId);
-  const snapshot = await readGameSnapshot(store, { gameId }, viewing, Date.now());
+  const snapshot = await readGameSnapshot(store, { gameId }, viewing, Date.now(), publicPlayerKey);
   const page = await readGamePage(store, { gameId }, viewing);
   if (!snapshot.ok || !page.ok) throw new Error('no game');
   const view: GameView = {
@@ -167,7 +168,13 @@ describe('a game page', () => {
       const store = world.tracker.snapshotStoreOf(leagueId);
       const as = { ...viewing, leagueId, viewer: publicViewer(leagueId) };
       for (const game of listed) {
-        const shot = await readGameSnapshot(store, { gameId: game.id }, as, Date.now());
+        const shot = await readGameSnapshot(
+          store,
+          { gameId: game.id },
+          as,
+          Date.now(),
+          publicPlayerKey,
+        );
         const page = await readGamePage(store, { gameId: game.id }, as);
         if (!shot.ok || !page.ok) throw new Error(`no page for ${game.id}`);
         expect(page.value.scoreboard.home.name).toBe(game.homeTeam.name);

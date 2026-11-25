@@ -21,6 +21,7 @@ import { mayOpenLeague, publicViewer, readGameSnapshot } from '@srleagues/core';
 import { gamePageLabel, leagueLabel } from '@srleagues/providers';
 import { longestSharedSeconds, notKept, sharedFor } from './cache-headers.ts';
 import { isGameIdFormat, type ApiAnswer, type LeagueApiRequest } from './league-api.ts';
+import { publicPlayerKey } from './player-key.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
 
 const notFound: ApiAnswer = {
@@ -46,6 +47,7 @@ export async function gameSnapshot(
       { gameId: game },
       { leagueId: league.id, viewer: publicViewer(league.id), audience, policy },
       ports.clock.now(),
+      publicPlayerKey,
     ),
   );
   if (!read.ok) return notFound;

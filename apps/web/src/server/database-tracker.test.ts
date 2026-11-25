@@ -36,6 +36,7 @@ import { actors, gamesWorld, type Actor, type GamesWorld } from './database-game
 import { commandsSince } from '../features/tracker/commands-since.ts';
 import { databaseTracker, GameNamesOnlyWithSettings } from './database-tracker.ts';
 import { gameSnapshot } from './game-snapshot-endpoint.ts';
+import { publicPlayerKey } from './player-key.ts';
 
 let w: GamesWorld;
 
@@ -250,6 +251,7 @@ describe('a game scored live on the database ports', () => {
             policy: read.policy,
           },
           w.clock.at,
+          publicPlayerKey,
         ),
       }));
       // The settings it read are the league's saved ones, the same the names read alone gives.
@@ -292,6 +294,7 @@ describe('what a watcher reads, in one snapshot (record 076)', () => {
         { gameId },
         { leagueId: w.leagueId, viewer: publicViewer(w.leagueId), audience, policy },
         w.clock.at,
+        publicPlayerKey,
       ),
     );
     expect(JSON.stringify(read)).toContain('Heronfamily');
