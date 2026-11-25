@@ -10,7 +10,6 @@ import {
   markLeft,
   markTeamLeft,
   putBackOnRoster,
-  removePerson,
   removeTeam,
   setTeamStatsVisibility,
   undoTeamLeft,
@@ -18,6 +17,7 @@ import {
   leagueUrl,
   type Result,
 } from '@srleagues/core';
+import { redirect } from 'next/navigation';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -33,6 +33,7 @@ import {
 import { createTeamRefusal } from './create-team-answer.ts';
 import {
   addPlayerAnchor,
+  fromListAnchor,
   done,
   entryAnchor,
   refused,
@@ -51,6 +52,7 @@ import {
   teamLeftInput,
   teamStatsInput,
 } from './form-input.ts';
+import { findQuery, pickOf, pickQuery } from './person-pick.ts';
 import { addNewPerson, moveEntry } from './roster-changes.ts';
 import { runTeamsAction, type TeamsAction, type TeamsActionResult } from './run-teams-action.ts';
 import { teamFormRefusal, type TeamFormName } from './team-form-answer.ts';
@@ -105,6 +107,9 @@ async function answerTeamForm(
   const page = leagueUrl(view.context.league, 'admin-area', {
     area: 'teams',
     ...(teamIdShape.test(teamId) ? { subpath: [teamId] } : {}),
+    // The search and page "Someone already in the league" was on (step 2.90): with no
+    // script this address is the answer, so the admin is back where they were.
+    ...(formName === 'fromList' ? { query: pickQuery(pickOf(fields)) } : {}),
   });
   return answerSaved(
     context,
@@ -214,6 +219,24 @@ export async function removeTeamAction(form: FormData): Promise<void> {
     // Gone, so back to the list; a refusal stays on the team's own page.
     return result.ok ? { answer: done('removed') } : settle(removeTeam, result, 'removed', teamId);
   });
+}
+
+/**
+ * "Find" on a team's page (step 2.90, T-448): the browser goes to the team's own address
+ * with the name searched for, where the league list is read on the server for it. A name
+ * only: what holds an email address is never put in an address (T-76); the page then
+ * shows the list unsearched.
+ */
+export async function findPersonAction(form: FormData): Promise<void> {
+  const fields = typedOf(form);
+  const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'teams');
+  const teamId = (fields['team'] ?? '').toLowerCase();
+  const page = leagueUrl(view.context.league, 'admin-area', {
+    area: 'teams',
+    ...(teamIdShape.test(teamId) ? { subpath: [teamId] } : {}),
+    query: findQuery(fields['q'] ?? ''),
+  });
+  redirect(`${page}#${fromListAnchor}`);
 }
 
 /**
@@ -332,20 +355,6 @@ export async function moveEntryAction(form: FormData): Promise<void> {
   return runTeamsAction(form, ({ context, ports, fields }) =>
     moveEntry(context, ports.deps, fields),
   );
-}
-
-/** Takes a person off the league list: refused while they are on a roster (R-17). */
-export async function removePersonAction(form: FormData): Promise<void> {
-  return runTeamsAction(form, async ({ context, ports, fields }) => {
-    if (fields['confirm'] === undefined) {
-      return { answer: refused(removePerson.commandName, 'not-confirmed'), teamId: fields['team'] };
-    }
-    const personId = fields['personId'] ?? '';
-    const result = await removePerson(context, { personId }, ports.deps);
-    const settled = settle(removePerson, result, 'personRemoved', fields['team']);
-    // Kept with the person, so a second post is answered as this one while they stay off.
-    return result.ok ? { ...settled, truth: { personOff: personId } } : settled;
-  });
 }
 
 /** S-87: marks the team as having left the league; its results and games stay. */

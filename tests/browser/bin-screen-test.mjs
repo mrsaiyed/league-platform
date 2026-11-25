@@ -147,21 +147,29 @@ if (built) {
       (await page.getByRole('link', { name: 'Removed teams and people' }).count()) === 1,
     );
 
-    at = 'the player is taken off the league list';
-    await tap(page, page.locator('main .staff-row-link').first(), /\/admin\/teams\//);
-    const item = page
-      .locator('section', { has: page.getByRole('heading', { name: 'The league list' }) })
-      .locator('li', { hasText: kites.last });
-    await item.locator('input[name=confirm]').check();
-    await tap(page, item.getByRole('button', { name: 'Remove from the league list' }), {
-      said: 'Moved to the bin: taken off the league list, and kept in the bin for 30 days.',
-    });
-    const gone = page.locator('main [role=status]').first();
-    note(
-      'the notice says the person moved to the bin',
-      (await gone.innerText()).startsWith('Moved to the bin'),
+    at = 'the player is taken off the league list, on their own People page (S-128)';
+    await page.goto(`${origin}/north-valley/admin/people`);
+    await tap(
+      page,
+      page.locator('main').getByRole('link', { name: `${kites.first} ${kites.last}`, exact: true }),
+      /\/admin\/people\/[0-9a-f-]{36}/,
     );
-    await tap(page, gone.getByRole('link', { name: 'Bring it back' }), /\/admin\/settings\/bin/);
+    await page.locator('#remove').getByLabel('Yes, I am sure').check();
+    await tap(
+      page,
+      page.locator('#remove').getByRole('button', { name: 'Remove from the league list' }),
+      /\/admin\/people(\?|#|$)/,
+    );
+    const gone = page.locator('[data-removed]');
+    await gone.waitFor({ timeout: 10_000 });
+    const goneText = await gone.innerText();
+    note(
+      'the notice says the person is off the league list and kept in the bin',
+      goneText.includes(`Removed from the league list: ${kites.first} ${kites.last}.`) &&
+        goneText.includes('stay in the league’s bin'),
+      goneText,
+    );
+    await page.goto(`${origin}/north-valley/admin/settings/bin`);
 
     at = 'the bin tells what comes back';
     const teamRow = binRow(page, kites.team);

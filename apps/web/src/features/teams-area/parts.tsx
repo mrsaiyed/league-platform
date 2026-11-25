@@ -12,10 +12,7 @@ import { IntoView } from '../list-forms/index.ts';
 import { doneKey, problemKey } from './answer.ts';
 
 /** The notices that say something went to the bin, and so lead to it (step 2.77). */
-const removedKeys: ReadonlySet<TextKey> = new Set<TextKey>([
-  'adminTeams.done.removed',
-  'adminTeams.done.personRemoved',
-]);
+const removedKeys: ReadonlySet<TextKey> = new Set<TextKey>(['adminTeams.done.removed']);
 
 /** What Next.js gives a page: the address's query. */
 export type SearchProps = {
