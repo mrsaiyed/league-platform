@@ -1011,29 +1011,6 @@
 .admin-left > li > .ui-notice {
   flex: 1 1 100%;
 }
-/* The league's people: a name, then the tick and the button that takes them off. On a
-   phone the name and the tick share a row and the button stands under them, at the end;
-   on a laptop all three are one row. The form's own box is not drawn: its tick and its
-   button are laid out with the name. */
-.admin-people > li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--step-1) var(--step-4);
-  padding-block: var(--step-2);
-  padding-inline: var(--step-3);
-}
-.admin-people > li > .staff-row-name {
-  flex: 1 1 8rem;
-  min-inline-size: 0;
-}
-.staff .admin-person-form {
-  display: contents;
-}
-.admin-people > li .ui-button {
-  margin-inline-start: auto;
-}
-
 /* ---------- League settings → Admins (step 2.97) ---------- */
 
 .admin-settings > .settings-admins,

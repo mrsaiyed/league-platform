@@ -260,7 +260,7 @@ describe('answers in the address', () => {
 
   it('says a removal moved it to the bin, whose screen brings it back (steps 2.161, 2.77)', () => {
     expect(t('adminTeams.remove.body')).toContain('kept for 30 days.');
-    for (const key of ['adminTeams.done.removed', 'adminTeams.done.personRemoved'] as const) {
+    for (const key of ['adminTeams.done.removed'] as const) {
       expect(t(key)).toMatch(/^Moved to the bin/);
       expect(t(key)).toContain('30 days.');
       expect(t(key)).not.toMatch(/not ready/i);

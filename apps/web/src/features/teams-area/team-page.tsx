@@ -30,22 +30,25 @@ import {
   removeRefusalOf,
   removeTeamAnchor,
   addPlayerAnchor,
+  fromListAnchor,
   teamDetailsAnchor,
   teamStatsAnchor,
 } from './answer.ts';
 import { removePanel, tapRefusal, type RemoveWayOn } from './remove-team-words.ts';
 import { backToTeamParam, publishAnchor } from '../schedule-builder/index.ts';
 import { offTheLeagueList, putBackOffer } from './put-back-offer.ts';
+import { FindPersonForm } from './find-person-form.tsx';
+import { pickOf, pickQuery } from './person-pick.ts';
 import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
 import {
   addNewPersonAction,
   addFromListAction,
   changeEntryAction,
+  findPersonAction,
   markLeftAction,
   moveEntryAction,
   putBackAction,
-  removePersonAction,
   removeTeamAction,
   saveTeamAction,
   markTeamLeftAction,
@@ -61,7 +64,7 @@ import { requestTokenField } from '../../server/same-request.ts';
 /** Where "Add a player", the page's main action, leads: the form's own place on the page. */
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** How many of the league list one page reads. */
+/** How many of the league list one page reads (step 2.90: then by search or the next page). */
 const peopleShown = 200;
 
 const roleText = (role: string): string =>
@@ -75,6 +78,7 @@ const nameOf = rosterName;
 export async function TeamPage({
   league,
   teamId,
+  query: asked,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
@@ -146,15 +150,34 @@ export async function TeamPage({
     );
   }
   // Names only: the page shows no private field, so none is read (T-76).
+  // A page of 200 at most, or the people whose name holds what was searched for (step
+  // 2.90): on the server, in this league only, so a league of any size can pick anyone.
+  const pick = pickOf(asked);
   const people = await listPeople(
     context,
-    { limit: peopleShown, privateFields: false },
+    {
+      ...(pick.search === undefined ? {} : { search: pick.search }),
+      limit: peopleShown,
+      offset: (pick.page - 1) * peopleShown,
+      privateFields: false,
+    },
     ports.deps,
   );
   const everyone: readonly PersonRecord[] = people.ok ? people.value : [];
+  // The whole list was read only when nothing was searched and the first page held it all.
   const leagueList = people.ok
-    ? { ids: new Set(everyone.map((person) => person.id)), complete: everyone.length < peopleShown }
+    ? {
+        ids: new Set(everyone.map((person) => person.id)),
+        complete: pick.search === undefined && pick.page === 1 && everyone.length < peopleShown,
+      }
     : undefined;
+  const pickUrl = (page: number) =>
+    `${leagueUrl(here, 'admin-area', {
+      area: 'teams',
+      subpath: [team.id],
+      query: pickQuery(pick, page),
+    })}`;
+  const morePeople = everyone.length === peopleShown;
   // A role that may not read the league's list of people (a club admin) is told so, in
   // calm words; a read that fails is shown as such, never as an empty roster or list.
   const peopleNotAllowed = !people.ok && people.error.code === 'not-allowed';
@@ -488,19 +511,78 @@ export async function TeamPage({
         title={t('adminTeams.add.fromLeague')}
         {...(mayAddPeople ? {} : { id: addPlayerAnchor })}
       >
+        {/* Step 2.90: a person is found by name on the server, so a league of more than
+            200 can pick anyone; the select holds what was found, 200 to a page. */}
+        {readFailed || peopleNotAllowed ? null : (
+          <div id={fromListAnchor} data-find-person="true">
+            <FindPersonForm action={findPersonAction} to={teamUrl} anchor={fromListAnchor}>
+              <LeagueField league={here.slug} />
+              <input type="hidden" name="team" value={team.id} />
+              <StaffField label={t('adminTeams.find.label')}>
+                <input
+                  className="ui-input"
+                  type="search"
+                  name="q"
+                  maxLength={100}
+                  defaultValue={pick.search ?? ''}
+                />
+              </StaffField>
+              <button type="submit" className="ui-button">
+                {t('adminTeams.find.submit')}
+              </button>
+            </FindPersonForm>
+            {pick.byNameOnly ? (
+              <p className="staff-quiet" data-found-by-name="true">
+                {t('adminTeams.find.byNameOnly')}
+              </p>
+            ) : null}
+            {pick.search === undefined ? null : (
+              <p className="staff-quiet" data-found-for="true">
+                {t('adminTeams.find.foundFor', { search: pick.search })}{' '}
+                <a href={`${teamUrl}#${fromListAnchor}`}>{t('adminTeams.find.clear')}</a>
+              </p>
+            )}
+            {morePeople || pick.page > 1 ? (
+              <p className="staff-quiet" data-person-pages="true">
+                {t('adminTeams.find.page', { page: String(pick.page) })}{' '}
+                {pick.page > 1 ? (
+                  <a href={`${pickUrl(pick.page - 1)}#${fromListAnchor}`}>
+                    {t('adminTeams.find.previous')}
+                  </a>
+                ) : null}{' '}
+                {morePeople ? (
+                  <a href={`${pickUrl(pick.page + 1)}#${fromListAnchor}`}>
+                    {t('adminTeams.find.next')}
+                  </a>
+                ) : null}
+              </p>
+            ) : null}
+          </div>
+        )}
         {readFailed ? (
           <StaffNotice kind="refused">{t('adminTeams.add.readFailed')}</StaffNotice>
         ) : peopleNotAllowed ? (
           <p className="staff-quiet">{t('adminTeams.add.notAllowed')}</p>
+        ) : everyone.length === 0 && (pick.search !== undefined || pick.page > 1) ? (
+          <p className="staff-quiet">{t('adminTeams.find.nobody')}</p>
         ) : everyone.length === 0 ? (
           <p className="staff-quiet">{t('adminTeams.add.nobody')}</p>
+        ) : available.length === 0 && (pick.search !== undefined || pick.page > 1) ? (
+          <p className="staff-quiet">{t('adminTeams.find.allOnRoster')}</p>
         ) : available.length === 0 ? (
           <p className="staff-quiet">{t('adminTeams.add.noOne')}</p>
         ) : (
           <ListForm
             action={addFromListAction}
-            permalink={`${teamUrl}#${addPlayerAnchor}`}
-            hidden={{ league: here.slug, team: team.id, [requestTokenField]: randomUUID() }}
+            // The search and page shown ride with the add, so with no script the answer
+            // is this same search and page, the person chosen still in the select.
+            permalink={`${pickUrl(pick.page)}#${addPlayerAnchor}`}
+            hidden={{
+              league: here.slug,
+              team: team.id,
+              ...pickQuery(pick),
+              [requestTokenField]: randomUUID(),
+            }}
             fields={[
               {
                 kind: 'select',
@@ -526,35 +608,6 @@ export async function TeamPage({
             name="from-list"
           />
         )}
-      </Section>
-
-      <Section title={t('adminTeams.people.title')}>
-        {peopleNotAllowed ? (
-          <p className="staff-quiet">{t('adminTeams.people.notAllowed')}</p>
-        ) : (
-          <p className="staff-quiet">{t('adminTeams.people.body')}</p>
-        )}
-        {people.ok || peopleNotAllowed ? null : (
-          <StaffNotice kind="refused">{t('adminTeams.people.readFailed')}</StaffNotice>
-        )}
-        <ul className="staff-rows admin-people">
-          {everyone.map((person) => (
-            <li key={person.id}>
-              <span className="staff-row-name" dir="auto">
-                {nameOf(person)}
-              </span>
-              <form action={removePersonAction} className="admin-person-form">
-                <LeagueField league={here.slug} />
-                <input type="hidden" name="team" value={team.id} />
-                <input type="hidden" name="personId" value={person.id} />
-                <ConfirmBox />
-                <button type="submit" className="ui-button" data-kind="danger">
-                  {t('adminTeams.people.remove')}
-                </button>
-              </form>
-            </li>
-          ))}
-        </ul>
       </Section>
 
       <LeftLeaguePanel
