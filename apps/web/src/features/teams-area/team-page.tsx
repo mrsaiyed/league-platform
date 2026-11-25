@@ -53,8 +53,9 @@ import {
   undoTeamLeftAction,
 } from './actions.ts';
 import { LeagueField, Notice, Section, Swatch } from './parts.tsx';
+import { answerQueryOf } from './answer-notice.ts';
 
-import { ListForm, SaidLine, takeNotice } from '../list-forms/index.ts';
+import { IntoView, ListForm, SaidLine, takeNotice } from '../list-forms/index.ts';
 import { requestTokenField } from '../../server/same-request.ts';
 
 /** Where "Add a player", the page's main action, leads: the form's own place on the page. */
@@ -74,7 +75,6 @@ const nameOf = rosterName;
 export async function TeamPage({
   league,
   teamId,
-  query,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
@@ -100,12 +100,15 @@ export async function TeamPage({
   }
 
   // A team just added: "Saved" at the top, beside its name, once (step 2.155).
-  const notice = takeNotice(context, 'teams');
+  // This team's notice only: another team's waits for its own page.
+  const notice = takeNotice(context, 'teams', team.id);
   const justAdded = notice?.thing === team.id && notice.said === 'created';
   // The details saved, said beside them; a player added, said on their new line (step 2.155).
   const saved = notice?.thing === team.id ? notice.said : undefined;
   // A line added or its number and role saved: said on that line (step 2.155).
   const savedEntry = saved === 'added' || saved === 'entrySaved' ? notice?.about?.[0] : undefined;
+  // Every other answer of this team's forms, from the same notice, never the address (T-435).
+  const query = answerQueryOf(notice, team.id);
   const teamUrl = leagueUrl(here, 'admin-area', { area: 'teams', subpath: [team.id] });
   const roster = await listRoster(context, { teamId: team.id }, ports.deps);
   const lines: readonly RosterLine[] = roster.ok ? roster.value : [];
@@ -608,7 +611,11 @@ export async function TeamPage({
               : t.plural('adminTeams.remove.roster', open.length)}
         </p>
         {tapRefused === undefined ? null : (
-          <StaffNotice kind="refused" data={{ 'data-remove-refused': removeCode ?? '' }}>
+          <StaffNotice
+            kind="refused"
+            data={{ 'data-remove-refused': removeCode ?? '' }}
+            intoView={tapRefused}
+          >
             <p>{tapRefused}</p>
           </StaffNotice>
         )}
@@ -731,9 +738,17 @@ function LeavingDate({
         </StaffField>
       </p>
       {problem === undefined ? null : (
-        <p id={errorId} className="ui-field-error" role="alert" data-left-on-problem={entryId}>
+        <IntoView
+          words={problem}
+          marks={{
+            id: errorId,
+            className: 'ui-field-error',
+            role: 'alert',
+            'data-left-on-problem': entryId,
+          }}
+        >
           {problem}
-        </p>
+        </IntoView>
       )}
       <p id={helpId} className="ui-field-help">
         {t('adminTeams.roster.leftOnHelp')}

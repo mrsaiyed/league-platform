@@ -100,7 +100,12 @@ if (built) {
 
     at = 'publishing puts it on the public schedule';
     await tap(page.locator('[data-publish-submit]'));
-    note('published', page.url().includes('done=published'), page.url());
+    note(
+      'published: said once, the address holding no answer',
+      (await page.locator('[role=status]', { hasText: 'The schedule is published' }).count()) ===
+        1 && !/[?&](done|saved|problem)=/.test(page.url()),
+      page.url(),
+    );
     await tap(page.locator('[data-to-waiting]'));
     note(
       'it no longer waits for a new date',

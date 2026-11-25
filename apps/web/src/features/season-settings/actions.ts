@@ -17,6 +17,7 @@
 // season's settings at that part, where "Saved" is said beside it; nothing about the
 // answer rides in the address. A post sent twice is answered as the first
 // (server/same-request.ts).
+import type { CommandContext, LeagueAddressee } from '@srleagues/core';
 import { refresh } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { commandContextOf } from '../../server/context.ts';
@@ -26,7 +27,7 @@ import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { t } from '../../server/messages.ts';
 import { refusedWith, type FormState } from '../list-forms/index.ts';
-import { answerParams, done } from './answer.ts';
+import { answerSaid, done, seasonAnswerThing, type Answer } from './answer.ts';
 import { typedOf, untouched, type PartState } from './part-form-state.ts';
 import type { MovedTeam } from './part-words.ts';
 import { runPartSave, type PartSaveResult } from './run-part-save.ts';
@@ -41,6 +42,27 @@ import {
 } from './season-settings-address.ts';
 import { startRefusalKey } from './start-season-refusal.ts';
 
+/**
+ * Leaves a visibility, current-or-archived or start answer as the one-time notice (step 2.155
+ * part 6, T-437) and gives the season's address with no answer in it: a reload says nothing.
+ */
+function answeredAt(
+  context: CommandContext,
+  league: LeagueAddressee,
+  seasonSlug: string | undefined,
+  answer: Answer,
+): string {
+  const holder = noticeHolderOf(context);
+  if (holder !== undefined) {
+    savedNoticesHere().leave(holder, {
+      screen: 'season',
+      thing: seasonAnswerThing(seasonSlug),
+      said: answerSaid(answer),
+    });
+  }
+  return seasonSettingsAddress(league, seasonSlug);
+}
+
 /** A form's text fields; files and repeated names are ignored. */
 function fieldsOf(form: FormData): Readonly<Record<string, string>> {
   const fields: Record<string, string> = {};
@@ -54,12 +76,9 @@ export async function changeVisibilityAction(form: FormData): Promise<never> {
   const fields = fieldsOf(form);
   const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'season');
   const { adminSettings } = await webPorts();
-  const { answer, seasonSlug } = await runVisibilityChange(
-    commandContextOf(view.context),
-    fields,
-    adminSettings.deps,
-  );
-  const address = seasonSettingsAddress(view.context.league, seasonSlug, answerParams(answer));
+  const context = commandContextOf(view.context);
+  const { answer, seasonSlug } = await runVisibilityChange(context, fields, adminSettings.deps);
+  const address = answeredAt(context, view.context.league, seasonSlug, answer);
   return redirect(`${address}#${visibilityAnchor}`);
 }
 
@@ -68,12 +87,9 @@ export async function changeSeasonAction(form: FormData): Promise<never> {
   const fields = fieldsOf(form);
   const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'season');
   const { adminSettings } = await webPorts();
-  const { answer, seasonSlug } = await runSeasonChange(
-    commandContextOf(view.context),
-    fields,
-    adminSettings.deps,
-  );
-  const address = seasonSettingsAddress(view.context.league, seasonSlug, answerParams(answer));
+  const context = commandContextOf(view.context);
+  const { answer, seasonSlug } = await runSeasonChange(context, fields, adminSettings.deps);
+  const address = answeredAt(context, view.context.league, seasonSlug, answer);
   return redirect(`${address}#${seasonStateAnchor}`);
 }
 
@@ -100,11 +116,7 @@ export async function startSeasonAction(_state: FormState, form: FormData): Prom
       t(startRefusalKey(started.code, started.field)),
     );
   }
-  const address = seasonSettingsAddress(
-    view.context.league,
-    started.seasonSlug,
-    answerParams(done('started')),
-  );
+  const address = answeredAt(context, view.context.league, started.seasonSlug, done('started'));
   return redirect(`${address}#${visibilityAnchor}`);
 }
 

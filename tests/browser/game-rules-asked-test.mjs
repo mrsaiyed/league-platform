@@ -22,6 +22,7 @@
 import { leagueDay } from '../../scripts/league-clock.mjs';
 import { addPlayers, court, league, owner, scorekeeper, trackerPath } from './tracker-driver.mjs';
 import {
+  answered,
   buildNext,
   freePort,
   launch,
@@ -104,11 +105,14 @@ async function startSeason(page, { name, slug, clock, mercyLead, teamFoulsReset,
     await form.locator(`input[name=teamFoulsReset][value=${teamFoulsReset}]`).check();
   }
   if (carry !== undefined) await form.locator(`input[name=carry][value=${carry}]`).check();
+  // "Started" is the server's one-time notice (step 2.155 part 6): said on the new season's
+  // own address, never in it.
   await tap(
     page,
     form.getByRole('button', { name: 'Start the season', exact: true }),
-    new RegExp(`season=${slug}&done=started`),
+    new RegExp(`\\?season=${slug}(#|$)`),
   );
+  await answered(page, `${name} is ready. Visitors cannot see it until you show it.`);
 }
 
 try {
@@ -165,7 +169,12 @@ try {
       });
       await page.goto(`${seasonPage}?season=rules-2027`);
       await tap(page, page.locator('[data-season-change=current]'), /ask=current/);
-      await tap(page, page.getByRole('button', { name: 'Yes, make it current' }), /done=current/);
+      await tap(
+        page,
+        page.getByRole('button', { name: 'Yes, make it current' }),
+        /\?season=rules-2027(#|$)/,
+      );
+      await answered(page, 'Rules 2027 is the current season now.');
       note(
         'Rules 2027 is the current season',
         (await page.locator('[data-season-state=current]').count()) === 1,
@@ -201,21 +210,28 @@ try {
     const round = page.locator('[data-no-rounds] form');
     await round.locator('input[name=label]').fill('Week 1');
     await round.locator('input[name=date]').fill(leagueDay(worldNow, 0));
-    await tap(page, round.getByRole('button', { name: 'Add round' }), /saved=round-added/);
+    // With scripts the schedule is drawn again in place (step 2.155 part 6): no new page, the
+    // answer said on the screen and never in the address.
+    await round.getByRole('button', { name: 'Add round' }).click();
+    await page.locator('section[data-round]').first().waitFor({ timeout: limit });
+    await answered(page, /Saved to the draft/);
     const add = page.locator('section[data-round] details[data-add-game]').first();
     await add.locator('summary').click();
     await add.locator('select[name=homeTeamId]').selectOption({ index: 1 });
     await add.locator('select[name=awayTeamId]').selectOption({ index: 2 });
     await add.locator('input[name=time]').fill('13:00');
     await add.locator('select[name=place]').selectOption({ index: 1 });
-    await tap(page, add.locator('button[type=submit]'), /done=saved/);
+    await add.locator('button[type=submit]').click();
+    await page.locator('li[data-game]').first().waitFor({ timeout: limit });
+    await answered(page, /Saved to the draft/);
     const games = await page
       .locator('li[data-game]')
       .evaluateAll((items) => items.map((item) => item.getAttribute('data-game')));
     note('the schedule of Rules 2027 holds one game', games.length === 1, String(games.length));
     game = games[0];
     // A game added is a draft until the schedule is published: the tracker finds no other.
-    await tap(page, page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await page.getByRole('button', { name: 'Publish this schedule' }).click();
+    await answered(page, 'The schedule is published');
   });
 
   await step('the tracked game follows the stop clock and the mercy lead of 10', async () => {
@@ -343,7 +359,8 @@ try {
         else await tap(on, button, /\/admin\/season/);
         const problem = form.locator('[data-problem=start-season]');
         await problem.waitFor({ timeout: limit });
-        note(`${named}: no season was started`, !on.url().includes('done=started'), on.url());
+        const ready = await on.getByText(`${typed.name} is ready.`).count();
+        note(`${named}: no season was started`, ready === 0, `${ready} "is ready" said`);
         const kept = {};
         for (const box of Object.keys(typed)) {
           kept[box] = await form.locator(`input[name=${box}]`).inputValue();

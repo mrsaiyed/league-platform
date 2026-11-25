@@ -26,6 +26,7 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  answered,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -74,6 +75,11 @@ if (built) {
     const page = await open(false);
     /** Taps a link or button and waits until the address matches. */
     const tap = async (p, locator, url) => {
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) {
+        await locator.click();
+        return answered(p, url.said);
+      }
       await Promise.all([p.waitForURL(url), locator.click()]);
     };
     const checks = async (p, label) => {
@@ -110,7 +116,9 @@ if (built) {
         has: p.getByRole('heading', { name: 'Remove this team' }),
       });
       await panel.locator('input[name=confirm]').check();
-      await tap(p, panel.getByRole('button', { name: 'Move the team to the bin' }), /done=removed/);
+      await tap(p, panel.getByRole('button', { name: 'Move the team to the bin' }), {
+        said: 'Moved to the bin: the team is kept there for 30 days.',
+      });
     };
     const binRow = (p, text) => p.locator('li[data-bin]', { hasText: text });
 
@@ -145,11 +153,9 @@ if (built) {
       .locator('section', { has: page.getByRole('heading', { name: 'The league list' }) })
       .locator('li', { hasText: kites.last });
     await item.locator('input[name=confirm]').check();
-    await tap(
-      page,
-      item.getByRole('button', { name: 'Remove from the league list' }),
-      /done=personRemoved/,
-    );
+    await tap(page, item.getByRole('button', { name: 'Remove from the league list' }), {
+      said: 'Moved to the bin: taken off the league list, and kept in the bin for 30 days.',
+    });
     const gone = page.locator('main [role=status]').first();
     note(
       'the notice says the person moved to the bin',
@@ -294,7 +300,9 @@ if (built) {
       page.waitForEvent('load'),
       game.getByRole('button', { name: 'Remove game' }).click(),
     ]);
-    await tap(page, page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page, page.getByRole('button', { name: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
     await tap(page, page.getByRole('link', { name: 'Removed games' }), /\/admin\/settings\/bin/);
     const gameRow = page.locator(`li[id="bin-${gameId}"]`);
     note('the bin lists the removed game', (await gameRow.count()) === 1);
@@ -382,6 +390,26 @@ if (built) {
       liveBack.text,
     );
 
+    // A refusal with scripts on: it goes back to the bin at its row (#bin-…), which the
+    // page's scripts take as a scroll; it must still be drawn in that row, with no reload.
+    at = 'with scripts on, a bring back refused';
+    const owls = `Owls ${run}`;
+    await toTeams(live);
+    await addTeam(live, owls);
+    await removeTeamHere(live);
+    await toTeams(live);
+    await addTeam(live, owls);
+    await live.goto(binAddress);
+    const owlsRefused = await binAnswer(
+      live,
+      binRow(live, owls).getByRole('button', { name: 'Bring it back' }),
+    );
+    note(
+      'scripts on: the refusal is drawn in the row of what was not brought back',
+      owlsRefused.said === 'refused' &&
+        (await binRow(live, owls).locator('[data-bin-answer][data-said=refused]').count()) === 1,
+      owlsRefused.text,
+    );
     // A second kind of thing with scripts on (step 2.155 part 5): a person removed from
     // People, brought back from the bin.
     at = 'with scripts on, a person removed and brought back';

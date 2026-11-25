@@ -73,6 +73,9 @@ const typed = {
   first: attack('first'),
   last: attack('last'),
   round: attack('round'),
+  // A refused round's name comes back in its box from the server's one-time notice (step
+  // 2.155 part 6), never the address.
+  refusedRound: attack('refused-round'),
   reason: attack('reason'),
   table: tightAttack('table'),
   // The tracker's Players panel (step 2.118): a name typed with a number, and a whole line.
@@ -538,6 +541,37 @@ if (browser) {
     await page.getByText(typed.round).first().waitFor();
   });
 
+  await step(
+    'a refused round keeps the attack in its box, as text, not in the address',
+    async () => {
+      await page.goto(`${origin}/north-valley/admin/schedule`);
+      await page.locator('details[data-add-round] > summary').click();
+      const form = page.locator('details[data-add-round] form');
+      await form.locator('input[name=label]').fill(typed.refusedRound);
+      await form.locator('input[name=date]').fill('3027-01-31');
+      await form.getByRole('button', { name: 'Add round' }).click();
+      const kept = page.locator('details[data-add-round] form');
+      await kept
+        .locator('.ui-field-error', { hasText: 'Choose a date between the years 1900 and 2999.' })
+        .waitFor({ timeout: 10_000 });
+      const found = await harm(page);
+      note(
+        'the refused round keeps the attack in its box as typed',
+        (await kept.locator('input[name=label]').inputValue()) === typed.refusedRound,
+      );
+      note(
+        'the refused round made no element',
+        found.made.length === 0 && found.ran === null && found.refused.length === 0,
+        [...found.made, ...found.refused].join(' | '),
+      );
+      note(
+        'the address holds nothing typed',
+        !/[?&](label|problem|at)=/.test(page.url()),
+        page.url(),
+      );
+    },
+  );
+
   await step('a division is added with the attack as its name', async () => {
     await page.goto(`${origin}/north-valley/admin/season/divisions`);
     const form = page.locator('form', {
@@ -705,7 +739,7 @@ if (browser) {
       buffer: Buffer.from(file),
     });
     await Promise.all([
-      page.waitForURL((url) => url.searchParams.get('done') === 'upload'),
+      page.waitForURL((url) => url.searchParams.has('import')),
       page.getByRole('button', { name: 'Upload and check' }).click(),
     ]);
     // The venue is not one of the season's: the row is left out, its venue quoted, cut short.

@@ -31,6 +31,7 @@ import {
   trackerPath,
 } from './tracker-driver.mjs';
 import {
+  answered,
   buildNext,
   freePort,
   launch,
@@ -108,10 +109,10 @@ async function setUp(browser, origin, { unique }) {
         .locator('main ol > li', { hasText: name })
         .filter({ has: page.getByRole('button', { name: 'Mark as left' }) });
       await line.locator('input[name=leftOn]').fill(yesterday);
-      await Promise.all([
-        page.waitForEvent('load'),
-        line.getByRole('button', { name: 'Mark as left' }).click(),
-      ]);
+      // The answer is a one-time notice on the same page (step 2.155 part 6): with scripts
+      // on, the page is redrawn in place and fires no load, so wait for what it says.
+      await line.getByRole('button', { name: 'Mark as left' }).click();
+      await answered(page, `${name} was marked as having left`, 30_000);
       if (!page.url().startsWith(teamPage.split('?')[0])) throw new Error(`left for ${page.url()}`);
     }
     const stillOn = await page

@@ -19,6 +19,8 @@ import {
   restoreVenue,
   listBinPart,
 } from '@srleagues/core';
+import { refresh } from 'next/cache';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
@@ -27,7 +29,7 @@ import { binBackSaid, binNotSaid, binTitle } from './bin-answer.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { fieldsOf } from '../teams-area/run-teams-action.ts';
+import { fieldsOf, sameAddress } from '../teams-area/run-teams-action.ts';
 
 type Outcome =
   | {
@@ -45,7 +47,7 @@ const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 
 const binKinds = new Set<string>(binKindsShown);
 
-export async function bringBackAction(form: FormData): Promise<never> {
+export async function bringBackAction(form: FormData): Promise<void> {
   const fields = fieldsOf(form);
   const view = await loadLeaguePage(fields['league'] ?? '', 'admin');
   const context = commandContextOf(view.context);
@@ -155,5 +157,13 @@ export async function bringBackAction(form: FormData): Promise<never> {
         : {}),
     });
   }
-  return redirect(outcome.ok ? bin : `${bin}#bin-${id}`);
+  const asked = await headers();
+  // A refusal goes back to the bin at its row (#bin-…): with the page's own scripts (Next.js's
+  // header) that is a mere scroll, and the row's answer would not be drawn. A post from the
+  // bin itself is drawn again in place instead, as Teams does; with no script it redirects.
+  if (asked.has('next-action') && sameAddress(asked.get('referer'), bin)) {
+    refresh();
+    return;
+  }
+  redirect(outcome.ok ? bin : `${bin}#bin-${id}`);
 }

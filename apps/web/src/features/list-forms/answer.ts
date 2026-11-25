@@ -69,8 +69,11 @@ export function answerSavedAt(context: CommandContext, notice: SavedNotice, to: 
   return redirect(to);
 }
 
-/** The notice left for this person on this screen, taken: a reload says nothing old. */
-export function takeNotice(context: CommandContext, screen: NoticeScreen) {
+/**
+ * The notice left for this person on this screen, taken: a reload says nothing old. Given
+ * `place`, only the notice said there (saved-notice.ts): another's waits for its own page.
+ */
+export function takeNotice(context: CommandContext, screen: NoticeScreen, place?: string) {
   const holder = noticeHolderOf(context);
-  return holder === undefined ? undefined : savedNoticesHere().take(holder, screen);
+  return holder === undefined ? undefined : savedNoticesHere().take(holder, screen, place);
 }

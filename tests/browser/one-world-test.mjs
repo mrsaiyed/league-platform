@@ -20,6 +20,7 @@ import {
   showSheetTeamOf,
   startNext,
   waitFor,
+  answered,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -73,6 +74,8 @@ if (built) {
     /** Taps a link or button, waits for the page it leads to, and checks its address. */
     const tap = async (locator, url) => {
       await Promise.all([page.waitForEvent('load'), locator.click()]);
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) return answered(page, url.said);
       if (!url.test(page.url())) throw new Error(`landed on ${page.url()}, not ${url}`);
     };
     /** Opens the phone's menu (a plain disclosure with scripts off) if it is closed. */
@@ -158,12 +161,14 @@ if (built) {
       // A court no seed game uses, against teams whose own games today are at other hours,
       // so no clash can come from the time of day the test runs at.
       await add.locator('select[name=place]').selectOption({ label: 'Riverside Hall: Court A' });
-      await tap(add.locator('button[type=submit]'), /done=saved/);
+      await tap(add.locator('button[type=submit]'), { said: /Saved to the draft/ });
     };
     await addGame('Tigers', '13:00');
     await addGame('Herons', '15:00');
     note('the new games raise no clash', (await page.locator('[data-clashes] li').count()) === 0);
-    await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page.getByRole('button', { name: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
     await accessible('the published schedule in the admin');
 
     at = "the owner types the first game's final score";

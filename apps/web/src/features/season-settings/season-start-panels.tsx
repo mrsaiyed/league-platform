@@ -73,7 +73,7 @@ export function SeasonStatePanel({
     >
       <h2 id="season-state-title">{t('seasonSettings.state.title')}</h2>
       {problem === undefined ? null : (
-        <StaffNotice kind="refused">
+        <StaffNotice kind="refused" intoView={problem}>
           <p>{t(problem)}</p>
         </StaffNotice>
       )}

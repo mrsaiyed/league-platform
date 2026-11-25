@@ -66,6 +66,7 @@ import { createRequire } from 'node:module';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { answered as saidOnPage } from '../tests/browser/web-browser-kit.mjs';
 import { withLoopback } from './web-listen.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -573,9 +574,9 @@ const adminPages = [
   // Step 2.182, Season settings' first panel: the first league's season not public yet; the
   // question before showing it and before hiding the current one; the answer after the
   // owner really shows it (winterSteps taps Show and Yes); and the schedule's "published"
-  // sentence for the hidden season (the page draws it from the address's `done=published`
-  // and the season as it stands, as after publishing, so taking it publishes nothing that
-  // the other pictures would then show). Each picture of the season hidden first hides it
+  // page of the hidden season (its "published" sentence is a one-time notice since step
+  // 2.155 part 6, not drawn from a typed address, so the picture shows the page without it:
+  // publishing it for the picture would change what the other pictures show). Each picture of the season hidden first hides it
   // again by the owner's own taps if an earlier picture showed it.
   {
     name: 'admin-season-hidden',
@@ -616,8 +617,7 @@ const adminPages = [
     name: 'admin-schedule-published-hidden',
     at: '/admin/schedule?season=winter-2027',
     league: 'north-valley',
-    steps: (page) =>
-      winterSteps(page, 'hidden', '/admin/schedule?season=winter-2027&done=published'),
+    steps: (page) => winterSteps(page, 'hidden', '/admin/schedule?season=winter-2027'),
   },
   { name: 'admin-settings', at: '/admin/settings' },
   // Step 2.97: League settings → Admins (the stand-in's grants and made-up names; its
@@ -1440,6 +1440,8 @@ async function divisionVenueSteps(page, what) {
 async function undoSteps(page, what) {
   const tapTo = async (locator, url) => {
     await Promise.all([page.waitForEvent('load'), locator.click()]);
+    // An answer is a one-time notice (step 2.155 part 6): what the page says, not the address.
+    if (!(url instanceof RegExp)) return saidOnPage(page, url.said);
     if (!url.test(page.url())) throw new Error(`a step landed on ${page.url()}, not ${url}`);
   };
   if (what === 'schedule-game-removed') {
@@ -1477,13 +1479,15 @@ async function undoSteps(page, what) {
       await number('Tess Moreno', '1');
       const lately = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
       await row('Tess Moreno').locator('input[name=leftOn]').fill(lately);
-      await tapTo(row('Tess Moreno').getByRole('button', { name: 'Mark as left' }), /done=left/);
+      await tapTo(row('Tess Moreno').getByRole('button', { name: 'Mark as left' }), {
+        said: 'The player was marked as having left.',
+      });
     }
     await number('Jay Whitaker', '1');
     const formerly = page.locator('[data-left-entry]', { hasText: 'Tess Moreno' });
     await tapTo(
       formerly.getByRole('button', { name: 'Put back on the roster (marked by mistake)' }),
-      /done=putBackNoNumber/,
+      { said: 'The player is back on the roster with no number' },
     );
     return;
   }
@@ -1501,7 +1505,7 @@ async function undoSteps(page, what) {
   if (what === 'team-leaving-refused') {
     const line = page.locator('main ol > li', { hasText: 'Marcus Oyelaran' });
     await line.locator('input[name=leftOn]').fill(`${new Date().getFullYear() + 1}-06-01`);
-    await tapTo(line.getByRole('button', { name: 'Mark as left' }), /problem=/);
+    await tapTo(line.getByRole('button', { name: 'Mark as left' }), { said: /./ });
     return;
   }
   // The seed's Falcons already have a player who left. They have results, so since A-17
@@ -1517,6 +1521,8 @@ async function undoSteps(page, what) {
 async function winterSteps(page, want, then) {
   const tapTo = async (locator, url) => {
     await Promise.all([page.waitForEvent('load'), locator.click()]);
+    // An answer is a one-time notice (step 2.155 part 6): what the page says, not the address.
+    if (!(url instanceof RegExp)) return saidOnPage(page, url.said);
     if (!url.test(page.url())) throw new Error(`a step landed on ${page.url()}, not ${url}`);
   };
   const origin = new URL(page.url()).origin;
@@ -1524,8 +1530,12 @@ async function winterSteps(page, want, then) {
   const panel = page.locator('#who-can-see');
   const [button, yes, answer] =
     want === 'shown'
-      ? ['Show this season to visitors', 'Yes, show it', /done=shown/]
-      : ['Hide it again', 'Yes, hide it', /done=hidden/];
+      ? [
+          'Show this season to visitors',
+          'Yes, show it',
+          { said: /Visitors can see .+ now\.|is shown\. Visitors will see it once/ },
+        ]
+      : ['Hide it again', 'Yes, hide it', { said: /is hidden from visitors again\./ }];
   const start = panel.getByRole('button', { name: button });
   if ((await start.count()) > 0) {
     await tapTo(start, /ask=/);
@@ -1580,18 +1590,20 @@ async function draftPutBackSteps(page, then) {
   const answered = /\/admin\/schedule(\?[^#]*)?#(saved|game-[\w-]+)$/;
   const tapTo = async (on, locator, url) => {
     await Promise.all([on.waitForEvent('load'), locator.click()]);
+    // An answer is a one-time notice (step 2.155 part 6): what the page says, not the address.
+    if (!(url instanceof RegExp)) return saidOnPage(on, url.said);
     if (!url.test(on.url())) throw new Error(`a step landed on ${on.url()}, not ${url}`);
   };
   const discard = async (on) => {
     // A draft that changes nothing is discarded in one tap (step 2.185).
     const same = on.locator('[data-discard-same] button').first();
-    if ((await same.count()) > 0) return tapTo(on, same, /done=discarded/);
+    if ((await same.count()) > 0) return tapTo(on, same, { said: 'The draft was discarded.' });
     const box = on.locator('details', {
       has: on.locator('button', { hasText: 'Discard all draft changes' }),
     });
     if ((await box.count()) === 0) return;
     await box.locator('summary').click();
-    await tapTo(on, box.locator('button'), /done=discarded/);
+    await tapTo(on, box.locator('button'), { said: 'The draft was discarded.' });
   };
   await discard(page);
   const editable = page.locator('li[data-game]', {
@@ -1605,7 +1617,9 @@ async function draftPutBackSteps(page, then) {
     const next = editable.first();
     await next.locator('summary', { hasText: 'Edit this game' }).click();
     await next.locator('input[name=time]').fill('21:30');
-    await tapTo(page, next.getByRole('button', { name: 'Save game' }), /saved=game-saved/);
+    await tapTo(page, next.getByRole('button', { name: 'Save game' }), {
+      said: /Saved to the draft/,
+    });
   } else {
     const struck = page.locator(`li[data-removed-game="${gameId}"]`);
     await tapTo(page, struck.getByRole('button', { name: 'Put it back' }), answered);
@@ -1623,18 +1637,20 @@ async function draftPutBackSteps(page, then) {
 async function emptiedRoundSteps(page, remove) {
   const tapTo = async (on, locator, url) => {
     await Promise.all([on.waitForEvent('load'), locator.click()]);
+    // An answer is a one-time notice (step 2.155 part 6): what the page says, not the address.
+    if (!(url instanceof RegExp)) return saidOnPage(on, url.said);
     if (!url.test(on.url())) throw new Error(`a step landed on ${on.url()}, not ${url}`);
   };
   const discard = async (on) => {
     // A draft that changes nothing is discarded in one tap (step 2.185).
     const same = on.locator('[data-discard-same] button').first();
-    if ((await same.count()) > 0) return tapTo(on, same, /done=discarded/);
+    if ((await same.count()) > 0) return tapTo(on, same, { said: 'The draft was discarded.' });
     const box = on.locator('details', {
       has: on.locator('button', { hasText: 'Discard all draft changes' }),
     });
     if ((await box.count()) === 0) return;
     await box.locator('summary').click();
-    await tapTo(on, box.locator('button'), /done=discarded/);
+    await tapTo(on, box.locator('button'), { said: 'The draft was discarded.' });
   };
   await discard(page);
   const last = page.locator('section[data-round]').last();
@@ -1653,7 +1669,8 @@ async function emptiedRoundSteps(page, remove) {
   await last.locator('summary', { hasText: 'Change or remove this round' }).click();
   if (remove) {
     const button = last.getByRole('button', { name: 'Remove this round' });
-    await tapTo(page, button, /saved=round-removed|at=round/);
+    // Removed, or refused beside the round: either is an answer said on the page.
+    await tapTo(page, button, { said: /./ });
   }
   const other = await page.context().newPage();
   try {
@@ -1668,6 +1685,8 @@ async function roundSteps(page, steps) {
   // Scripts are off in this page (the grid is plain forms): each tap loads a whole page.
   const tapTo = async (locator, url) => {
     await Promise.all([page.waitForEvent('load'), locator.click()]);
+    // An answer is a one-time notice (step 2.155 part 6): what the page says, not the address.
+    if (!(url instanceof RegExp)) return saidOnPage(page, url.said);
     if (!url.test(page.url())) throw new Error(`a step landed on ${page.url()}, not ${url}`);
   };
   const discard = page.locator('details', {
@@ -1675,7 +1694,7 @@ async function roundSteps(page, steps) {
   });
   if ((await discard.count()) > 0) {
     await discard.locator('summary').click();
-    await tapTo(discard.locator('button'), /done=discarded/);
+    await tapTo(discard.locator('button'), { said: 'The draft was discarded.' });
   }
   const round = (label) =>
     page.locator('section[data-round]', { has: page.locator('h2', { hasText: label }) });
@@ -1690,7 +1709,7 @@ async function roundSteps(page, steps) {
     const form = await addRoundForm();
     await form.locator('input[name=label]').fill(label);
     await form.locator('input[name=date]').fill(date);
-    await tapTo(form.locator('button', { hasText: 'Add round' }), /saved=round-added/);
+    await tapTo(form.locator('button', { hasText: 'Add round' }), { said: /Saved to the draft/ });
   };
   const game = page.locator('li[data-game]').first();
   for (const step of steps) {
@@ -1708,11 +1727,11 @@ async function roundSteps(page, steps) {
         await add.locator(`select[name=${field}]`).selectOption({ index: n });
       }
       await add.locator('input[name=time]').fill('18:00');
-      await tapTo(add.locator('button', { hasText: 'Add game' }), /done=saved/);
+      await tapTo(add.locator('button', { hasText: 'Add game' }), { said: /Saved to the draft/ });
     } else if (step === 'move') {
       await game.locator('summary', { hasText: 'Edit this game' }).click();
       await game.locator('select[name=roundId]').selectOption({ label: 'Round 3: Week 3' });
-      await tapTo(game.locator('button', { hasText: 'Save game' }), /saved=game-round/);
+      await tapTo(game.locator('button', { hasText: 'Save game' }), { said: /is now in/ });
     } else if (step === 'keep') {
       await tapTo(
         page.locator('[data-follow-round-date] a', { hasText: 'No, keep' }),

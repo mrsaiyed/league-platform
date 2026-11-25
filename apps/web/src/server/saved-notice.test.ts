@@ -73,6 +73,26 @@ describe('the one-time "Saved" notice (T-271)', () => {
     expect(notices.take('c', 'games')).toEqual(final);
   });
 
+  it("is said only in its own place: another team's or season's page neither shows nor eats it", () => {
+    const notices = savedNotices({ keepMs: 60_000, most: 10 });
+    // A Teams notice is said on its team's page (its thing).
+    const teamA = { screen: 'teams', thing: 'team-a', said: '?done=moved' } as const;
+    notices.leave('p', teamA);
+    expect(notices.take('p', 'teams', 'team-b')).toBeUndefined();
+    expect(notices.take('p', 'teams', 'team-a')).toEqual(teamA);
+    expect(notices.take('p', 'teams', 'team-a')).toBeUndefined();
+    // A schedule notice carries its season: season Y's grid leaves season X's.
+    const seasonX = {
+      screen: 'schedule',
+      thing: '/x/admin/schedule',
+      said: '?problem=p',
+      place: 'X',
+    } as const;
+    notices.leave('p', seasonX);
+    expect(notices.take('p', 'schedule', 'Y')).toBeUndefined();
+    expect(notices.take('p', 'schedule', 'X')).toEqual(seasonX);
+  });
+
   it('is one store for the whole server', () => {
     expect(savedNoticesHere()).toBe(savedNoticesHere());
   });

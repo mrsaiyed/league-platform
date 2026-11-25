@@ -97,6 +97,13 @@ async function noSidewaysScroll(page, label) {
   note(`no sideways scrolling at phone width: ${label}`, width <= inner, `${width} > ${inner}`);
 }
 const shows = async (page, text) => (await page.getByText(text).count()) > 0;
+const saidOnce = async (page, text) =>
+  (await page.locator('.ui-notice').filter({ hasText: text }).count()) === 1;
+// Since T-434 a step's answer is never in the address: at most the import shown.
+const addressHoldsNoAnswer = (page) => {
+  const words = [...new URL(page.url()).searchParams.keys()];
+  return words.every((word) => word === 'import');
+};
 
 if (browser) {
   await step('import, apply and undo a file with two bad rows', async () => {
@@ -118,10 +125,12 @@ if (browser) {
         buffer: Buffer.from(madeUpFile),
       });
       await Promise.all([
-        page.waitForURL((url) => url.searchParams.get('done') === 'upload'),
+        page.waitForURL((url) => url.searchParams.has('import')),
         page.getByRole('button', { name: 'Upload and check' }).click(),
       ]);
       await page.getByText('2 rows will be left out').waitFor();
+      note('the upload is said once', await saidOnce(page, 'The file was uploaded.'));
+      note('the address holds the import and no answer', addressHoldsNoAnswer(page));
       note('the report names the file', await shows(page, 'File: made-up-fixtures.csv'));
       note('the report counts the good games', await shows(page, '3 games can be added.'));
       const problems = await page
@@ -149,11 +158,9 @@ if (browser) {
       await accessible(page, 'the report');
       await noSidewaysScroll(page, 'the report');
 
-      await Promise.all([
-        page.waitForURL((url) => url.searchParams.get('done') === 'apply'),
-        page.getByRole('button', { name: 'Add 3 games to the schedule draft' }).click(),
-      ]);
+      await page.getByRole('button', { name: 'Add 3 games to the schedule draft' }).click();
       await page.getByText('The games were added to the schedule draft.').waitFor();
+      note('the address after adding holds no answer', addressHoldsNoAnswer(page));
       note(
         'the draft now holds the three games',
         await shows(page, 'The schedule draft has 3 changes that are not published yet.'),
@@ -163,11 +170,25 @@ if (browser) {
         await shows(page, '1 final score will be recorded once its game is published.'),
       );
       await accessible(page, 'after adding the games');
+      const imported = new URL(page.url()).searchParams.get('import');
+      await page.reload();
+      await page.getByText('The schedule draft has 3 changes').waitFor();
+      note(
+        'a reload does not say the games were added again',
+        (await page.getByText('The games were added to the schedule draft.').count()) === 0,
+      );
+      // An address with the old answer's words in it says nothing: no step, no clashes.
+      for (const words of ['done=apply&clashes=7', 'done=undo', 'problem=file-too-large']) {
+        await open(page, `${screen}?import=${imported}&${words}`);
+        note(
+          `a typed address (${words}) says nothing`,
+          (await page
+            .locator('.ui-notice[data-kind=saved], .ui-notice[data-kind=error]')
+            .count()) === 0 && !(await shows(page, 'clash')),
+        );
+      }
 
-      await Promise.all([
-        page.waitForURL((url) => url.searchParams.get('done') === 'undo'),
-        page.getByRole('button', { name: 'Undo this import' }).click(),
-      ]);
+      await page.getByRole('button', { name: 'Undo this import' }).click();
       await page.getByText('The import was undone.', { exact: false }).first().waitFor();
       note('undo empties the draft again', await shows(page, 'The schedule draft is empty'));
       note(
@@ -205,13 +226,18 @@ if (browser) {
         mimeType: 'text/csv',
         buffer: Buffer.from(big),
       });
-      await Promise.all([
-        page.waitForURL((url) => url.searchParams.get('problem') === 'file-too-large'),
-        page.getByRole('button', { name: 'Upload and check' }).click(),
-      ]);
+      await page.getByRole('button', { name: 'Upload and check' }).click();
+      await page.getByText('The file is too large to import at once').waitFor();
       note(
         'a file over the limit is refused in plain words',
-        await shows(page, 'The file is too large to import at once'),
+        await saidOnce(page, 'The file is too large to import at once'),
+      );
+      note('the refusal is not in the address', addressHoldsNoAnswer(page));
+      await page.reload();
+      await page.getByRole('heading', { level: 1, name: 'Import fixtures' }).waitFor();
+      note(
+        'a reload does not repeat the refusal',
+        !(await shows(page, 'The file is too large to import at once')),
       );
       await accessible(page, 'the too-large notice');
     } finally {

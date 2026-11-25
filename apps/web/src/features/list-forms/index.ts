@@ -8,6 +8,7 @@ export {
   type SavedNowWords,
   type TypedFields,
 } from './form-state.ts';
+export { IntoView, useIntoView } from './into-view.tsx';
 export { ListForm, type ListField, type ListFormProps } from './list-form.tsx';
 export { nameBeforeStop } from './name-before-stop.ts';
 export { MarkedFocus } from './marked-focus.tsx';
