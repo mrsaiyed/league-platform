@@ -69,6 +69,11 @@ const people = {
     holds: () => [grant(accountId(0xa5), 'scheduler', { type: 'league' })],
   },
   owner: { account: accountId(0xa6), holds: () => [] },
+  // A plain scorekeeper of the league (review M4): no admin area, only the games to score.
+  scorekeeper: {
+    account: accountId(0xa7),
+    holds: () => [grant(accountId(0xa7), 'scorekeeper', { type: 'league' })],
+  },
 } as const;
 type Person = keyof typeof people | 'visitor';
 const outsiders = ['visitor', 'stranger', 'otherLeagueAdmin', 'coach', 'member'] as const;
@@ -268,5 +273,47 @@ describe('a hidden league by its endpoints (resolveLeagueApi)', () => {
     const owner = await api('owner', leagues.suspended.id, ['scoring'], 'refuse');
     expect(owner.resolved).toMatchObject({ ok: true, holder: { isOwner: true } });
     expect(owner.reads).toEqual(['findLeagueById', 'accessOf']);
+  });
+});
+
+describe("a league's plain scorekeeper (review M4: the plan's done test)", () => {
+  // Every endpoint the scoring screen asks (app/api/v1/leagues/[leagueId]/games/*), and the
+  // scoring offers the score page's list reads.
+  const tracker = endpoints.filter((parts) => parts[0] === 'games' || parts[0] === 'scoring');
+
+  it('passes the gate of a draft league at every tracker endpoint and the score page', async () => {
+    for (const parts of tracker) {
+      for (const mode of ['refuse', 'visitor'] as const) {
+        const draft = await api('scorekeeper', leagues.draft.id, parts, mode);
+        const label = `${parts.join('/')}, ${mode}`;
+        expect(draft.resolved, label).toMatchObject({ ok: true });
+        expect(draft.resolved.ok && draft.resolved.holder?.grants[0]?.role, label).toBe(
+          'scorekeeper',
+        );
+      }
+    }
+    const scoring = await page('scorekeeper', leagues.draft.slug);
+    expect(scoring.outcomes[3]?.kind).toBe('show');
+  });
+
+  it("gets exactly a missing league's answer at a suspended league, by the same reads", async () => {
+    for (const parts of tracker) {
+      for (const mode of ['refuse', 'visitor'] as const) {
+        const there = await api('scorekeeper', leagues.suspended.id, parts, mode);
+        const none = await api('scorekeeper', missing.id, parts, mode);
+        const label = `${parts.join('/')}, ${mode}`;
+        expect(there.resolved, label).toEqual(none.resolved);
+        expect(there.reads, label).toEqual(none.reads);
+        expect(none.resolved, label).toEqual({
+          ok: false,
+          refusal: { status: 404, error: 'not-found' },
+        });
+      }
+    }
+    const there = await page('scorekeeper', leagues.suspended.slug);
+    const none = await page('scorekeeper', missing.slug);
+    expect(there.outcomes).toEqual(none.outcomes);
+    expect(there.reads).toEqual(none.reads);
+    expect(none.outcomes[3]?.kind).not.toBe('show');
   });
 });
