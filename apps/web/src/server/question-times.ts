@@ -6,7 +6,7 @@
 // wait never starts again.
 //
 // Kept in this server's memory, as the answers to saves are (same-request.ts; the web app
-// runs as one server, T-270). After a restart a question's "Yes" asks once more.
+// runs as one copy, T-444). After a restart a question's "Yes" asks once more.
 import { createHash } from 'node:crypto';
 import { requestTokenField } from './same-request.ts';
 

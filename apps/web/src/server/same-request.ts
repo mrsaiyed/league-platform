@@ -7,7 +7,8 @@
 // request: a person who corrects a refused field and saves again is not given the old
 // refusal.
 //
-// The answers are kept in this server's memory: the web app runs as one server (T-270).
+// The answers are kept in this server's memory, the named exception to T-9 (T-444): the web
+// app runs as one copy until step 2.251 moves this store to one every copy shares.
 // The commands' own checks (a stale version is refused) still stop a repeat this server
 // does not know, as after a restart; the games area also reads such a refusal against the
 // game as it is now (run-game-action.ts, run-box-score-action.ts).
