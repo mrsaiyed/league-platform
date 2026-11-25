@@ -1054,7 +1054,9 @@ const gameCommandRows: readonly Row[] = [
     (c, i) => correctTrackedBoxScore(c, i, trackerDeps),
   ),
   // Step 2.247 (T-433): taking back one earlier basket is the same correction. The basket
-  // named is the game's first, so whoever may correct it is told yes.
+  // named is the game's first, so whoever may correct it is told yes. Its scorer is put on
+  // the home team's roster: the tracker's door refuses a play naming a player who is not
+  // on the team (`not-on-team`), and the reopened game's scorer is on no roster.
   ...gameRows(
     'games.take_back_tracked_basket',
     'take back a basket of a tracked game',
@@ -1065,10 +1067,20 @@ const gameCommandRows: readonly Row[] = [
         'select max(seq) as seq from game_events where game_id = $1',
         [gameId],
       );
-      const basket = await pglite.query<{ command_id: string }>(
-        "select command_id from game_events where game_id = $1 and type = 'score' order by seq limit 1",
+      const basket = await pglite.query<{
+        command_id: string;
+        player_id: string;
+        home_team_id: string;
+      }>(
+        `select e.command_id, e.payload->>'playerId' as player_id, g.home_team_id
+         from game_events e join games g on g.id = e.game_id
+         where e.game_id = $1 and e.type = 'score' order by e.seq limit 1`,
         [gameId],
       );
+      const scorer = basket.rows[0];
+      if (scorer !== undefined) {
+        await newRosterEntry(pglite, league.leagueId, scorer.home_team_id, scorer.player_id);
+      }
       return {
         gameId,
         sequence: last.rows[0]?.seq ?? 0,
