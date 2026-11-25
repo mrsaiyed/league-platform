@@ -38,10 +38,10 @@ export async function trackerStateRequest(
   withChanges = false,
 ): Promise<ApiAnswer> {
   if (context.account === null) return refuse({ error: 'signed-out' });
-  if (!isGameIdFormat(game)) return refuse({ error: 'not-found' });
+  if (!isGameIdFormat(game)) return refuse({ error: 'unknown-game' });
   const result = await readTrackerState(commandContextOf(context), { gameId: game }, ports.deps);
   if (!result.ok) {
-    return refuse({ error: result.error.code === 'not-allowed' ? 'not-allowed' : 'not-found' });
+    return refuse({ error: result.error.code === 'not-allowed' ? 'not-allowed' : 'unknown-game' });
   }
   const { changes, corrections, ...state } = result.value;
   // T-408: the plays a correction wrote, only to a tracker that asks, as `changes` is.

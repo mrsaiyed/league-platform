@@ -21,6 +21,7 @@ export type TrackerNotice =
         | 'tracker.notSaved'
         | 'tracker.signedOutKept'
         | 'tracker.notAllowedKept'
+        | 'tracker.cannotOpenKept'
         | 'tracker.releasedKept'
         | 'tracker.offlineLong';
       readonly count: number;
@@ -62,6 +63,9 @@ export function trackerNotices(
     // Taken off the game with plays still on the device: they are kept, not saved.
     if (mode.reason === 'not-allowed' && kept > 0) {
       notices.push({ key: 'tracker.notAllowedKept', count: kept });
+    } else if (mode.reason === 'cannot-open' && kept > 0) {
+      // Signed in, and the league is closed to this account now (T-456): kept, a copy offered.
+      notices.push({ key: 'tracker.cannotOpenKept', count: kept });
     } else if (leftWithPlays) {
       notices.push({ key: 'tracker.releasedKept', count: status.notSaved.length });
     } else if (!showsFinalPanel(status)) {

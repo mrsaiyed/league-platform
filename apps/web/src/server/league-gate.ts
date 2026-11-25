@@ -15,7 +15,7 @@
 //   is sent to the account page, which says what is wrong and offers to sign out.
 //
 // A request is worked out once (resolveLeagueRequest: one request id, one read of
-// the person's access), and each layout and page of it then gets its own answer
+// the person's access, made for a missing league as for a hidden one, T-449), and each layout and page of it then gets its own answer
 // (leaguePageOutcome). The page must also be the one Next.js chose for the address
 // the proxy wrote down (addressMatchesRoute): if not, the proxy did not run for this
 // request, and the answer is "not found" rather than trust a header (record 020).
@@ -79,6 +79,27 @@ export type ResolvedLeagueRequest =
 
 const settled = (outcome: LeagueOutcome): ResolvedLeagueRequest => ({ kind: 'settled', outcome });
 
+/** A league id no league ever has: what a "not there" read asks about. */
+export const noLeagueId = '00000000-0000-0000-0000-000000000000';
+
+/**
+ * The access read a signed-in person's request makes when its league is not there
+ * (T-449): the same read, in the same place, as for a league that is there but hidden
+ * from them, so a hidden league costs the gate no more reads than a missing one. Its
+ * answer is never used. A visitor's request reads no access either way.
+ */
+export async function readAccessOfNoLeague(
+  facts: RequestFacts,
+  deps: Pick<WebPorts, 'accessOf'> & Pick<ContextDeps, 'newRequestId'>,
+): Promise<void> {
+  if (facts.session === null || !facts.session.ok) return;
+  await deps.accessOf({
+    leagueId: noLeagueId,
+    accountId: facts.session.value.accountId.toLowerCase(),
+    requestId: deps.newRequestId(),
+  });
+}
+
 export async function resolveLeagueRequest(
   facts: RequestFacts,
   deps: GateDeps,
@@ -94,7 +115,11 @@ async function resolveWith(facts: RequestFacts, deps: GateDeps): Promise<Resolve
     const refusal = built.error;
     switch (refusal.code) {
       case 'unknown-host':
+        return settled({ kind: 'not-found' });
+      // Read as for a league that is there and hidden (T-449): the same answer at the
+      // same cost.
       case 'league-not-found':
+        await readAccessOfNoLeague(facts, deps);
         return settled({ kind: 'not-found' });
       case 'forward':
         return settled({ kind: 'forward', to: refusal.to });

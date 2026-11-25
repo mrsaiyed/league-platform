@@ -15,6 +15,7 @@ import {
 import { signOut } from '../../server/sign-in/flows.ts';
 import { flowDeps, nextVisit } from '../../server/sign-in/next-visit.ts';
 import { screenUrl } from '../../server/sign-in/problems.ts';
+import { turnedBackTo } from './turned-back-to.ts';
 
 /**
  * Accepts the invitation held for this browser, as the signed-in account, and goes to the
@@ -25,10 +26,20 @@ export async function acceptHeldInvitationAction(): Promise<never> {
   const request = await invitationRequest();
   if (request.kind !== 'league') return redirect(platformUrl('home'));
   const league = request.context.league;
-  const back = heldInvitationPath(league.slug) ?? platformUrl('home');
   const token = await heldToken();
-  if (token === undefined || request.context.account === null) return redirect(back);
-  const { deps } = (await webPorts()).adminAccess;
+  const ports = await webPorts();
+  const signedIn = request.context.account !== null;
+  const holder = signedIn ? await ports.accessOf(contextOfRequest(request)) : undefined;
+  // A visitor at a hidden league goes where a missing league sends them (T-453).
+  const back = turnedBackTo({
+    status: league.status,
+    holder,
+    signedIn,
+    invitationHeld: token !== undefined,
+    back: heldInvitationPath(league.slug) ?? null,
+  });
+  if (token === undefined || !signedIn) return redirect(back);
+  const { deps } = ports.adminAccess;
   const accepted = await acceptInvitation(contextOfRequest(request), { token }, deps);
   if (!accepted.ok) return redirect(back);
   await forgetHeldToken(league.slug);

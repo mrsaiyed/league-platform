@@ -61,6 +61,7 @@ import {
   type SessionRequest,
   TablePlayerCommand,
   type TrackerCommand,
+  type TrackerRefusal,
 } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { againCommandId } from './again-command-id.ts';
@@ -94,6 +95,7 @@ import {
   type QueuedCommand,
 } from './queue-storage.ts';
 import { defaultRetryTiming, retryDelayMs, type RetryTiming } from './retry-delay.ts';
+import type { SignedInCheck } from './fetch-signed-in.ts';
 import type { ServerOutcome, ServerState, TrackerServer } from './tracker-server.ts';
 import {
   browserClock,
@@ -142,6 +144,13 @@ export type ReadOnlyReason =
    * not saved: they are never sent under another person's name.
    */
   | 'signed-in-as-other'
+  /**
+   * Signed in, and the league answers "not found" all the same (T-456): this account can
+   * no longer open the game (removed from a draft league while scoring, or a league
+   * suspended mid-game). Every tap not yet saved stays on the device, and a copy can be
+   * saved for the league's admin. Never a loss: nothing is listed as not saved.
+   */
+  | 'cannot-open'
   /** The server no longer speaks this tracker's version (T-127): reload the page. */
   | 'update-needed';
 
@@ -369,6 +378,12 @@ export type TrackerControllerOptions = {
   readonly transport: CommandTransport;
   readonly server: TrackerServer;
   /**
+   * "Am I signed in?", asked of the address about no league (T-456, fetch-signed-in.ts)
+   * when a league answers "not found" without `unknown-game`. Left out, or with no
+   * answer, such a refusal is "signed out", as before.
+   */
+  readonly signedIn?: SignedInCheck;
+  /**
    * Reopening and marking not started (game-doors.ts). Left out, neither is offered:
    * the calls answer `not-offered`.
    */
@@ -524,8 +539,26 @@ const isTap = (command: BatchCommand): command is TrackerCommand & { input: TapI
   command.input.type !== 'reopen' &&
   command.input.type !== 'reset';
 
-const reasonOfStatus = (httpStatus: number): ReadOnlyReason => {
-  if (httpStatus === 401) return 'signed-out';
+/** The server's own refusal, as a door or the queue hands it on. */
+type Rejection = {
+  readonly httpStatus: number;
+  readonly error?: TrackerRefusal['error'] | undefined;
+};
+
+/**
+ * Whether a refusal means "sign in again", the taps held (M4): a 401, or any 404 that
+ * does not say in its body that the game is gone (T-453). A league hidden from the
+ * person (a draft or suspended one, a scorer signed out in another tab) is "not found"
+ * at the league gate, the same answer as a missing league; only past the gate, to a
+ * person who may open the league, does the server say `unknown-game`.
+ */
+const asksSignIn = (rejection: Rejection): boolean =>
+  rejection.httpStatus === 401 ||
+  (rejection.httpStatus === 404 && rejection.error !== 'unknown-game');
+
+const reasonOfStatus = (rejection: Rejection): ReadOnlyReason => {
+  const { httpStatus } = rejection;
+  if (asksSignIn(rejection)) return 'signed-out';
   if (httpStatus === 403) return 'not-allowed';
   if (httpStatus === 404) return 'unknown-game';
   if (httpStatus === 409) return 'game-not-live';
@@ -542,7 +575,7 @@ const reasonOfHalt = (halt: QueueHalt): ReadOnlyReason | 'check-session' => {
     case 'version-refused':
       return 'update-needed';
     case 'rejected':
-      return reasonOfStatus(halt.httpStatus);
+      return reasonOfStatus(halt);
   }
 };
 
@@ -1019,6 +1052,39 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     if (!current.signedOut) update({ signedOut: true });
   };
 
+  /**
+   * Whether a refusal that reads as "signed out" came to a person who is signed in
+   * (T-456): only a 404, asked once at a time, and only when the server answers. Then
+   * this account can no longer open the game, and asking for sign-in would loop for ever.
+   */
+  let askingSignedIn = false;
+  const stillSignedIn = async (rejection: Rejection): Promise<boolean> => {
+    const check = options.signedIn;
+    if (check === undefined || rejection.httpStatus !== 404 || askingSignedIn) return false;
+    askingSignedIn = true;
+    try {
+      const answer = await ask(async (signal): Promise<ServerOutcome<boolean>> => {
+        const signedIn = await check(signal);
+        return signedIn === null ? { kind: 'unanswered' } : { kind: 'answer', value: signedIn };
+      });
+      return !stopped && answer.kind === 'answer' && answer.value;
+    } finally {
+      askingSignedIn = false;
+    }
+  };
+
+  /** Refused while scoring (M4, T-456): signed out, keep scoring; else read-only, taps kept. */
+  const refusedWhileScoring = async (rejection: Rejection): Promise<void> => {
+    if (await stillSignedIn(rejection)) return readOnly('cannot-open');
+    signedOutWhileScoring();
+  };
+
+  /** Why a refusal turns the tracker read-only, asking who is signed in for a 404 (T-456). */
+  const refusedReason = async (rejection: Rejection): Promise<ReadOnlyReason> => {
+    const reason = reasonOfStatus(rejection);
+    return reason === 'signed-out' && (await stillSignedIn(rejection)) ? 'cannot-open' : reason;
+  };
+
   /** Runs at once what was waiting to be asked again. */
   const askAgainNow = (): void => {
     const run = retrying;
@@ -1320,6 +1386,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       const sent = await transport.send(batch, signal);
       if (sent.kind === 'reply') return { kind: 'answer', value: sent.reply };
       if (sent.kind === 'unanswered') return { kind: 'unanswered' };
+      if (sent.kind === 'rejected') {
+        return { kind: 'rejected', httpStatus: sent.httpStatus, error: sent.error };
+      }
       return { kind: 'rejected', httpStatus: 'httpStatus' in sent ? sent.httpStatus : 426 };
     });
 
@@ -1397,12 +1466,13 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const loaded = await ask((signal) => server.loadState(signal));
     if (loaded.kind === 'unanswered') return false;
     if (loaded.kind === 'rejected') {
-      if (loaded.httpStatus === 401 && current.mode.kind === 'scoring') {
+      if (asksSignIn(loaded) && current.mode.kind === 'scoring') {
         // Still scoring (M4): asked again later, and at once on signing in again.
-        signedOutWhileScoring();
-        return false;
+        // Signed in all the same (T-456): this account can no longer open the game.
+        await refusedWhileScoring(loaded);
+        return current.mode.kind !== 'scoring';
       }
-      await readOnly(reasonOfStatus(loaded.httpStatus));
+      await readOnly(await refusedReason(loaded));
       return true;
     }
     await serially(() => {
@@ -1622,7 +1692,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       return later(open);
     }
     failures = 0;
-    if (opened.kind === 'rejected') return readOnly(reasonOfStatus(opened.httpStatus));
+    if (opened.kind === 'rejected') return readOnly(await refusedReason(opened));
     const reply = opened.value;
     if (reply.status !== 'held-by-you') return notHeld(reply);
     return hold(reply.sessionId);
@@ -1634,7 +1704,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     const renewed = await session({ type: 'renew', sessionId: held });
     if (sessionId !== held) return;
     // Signed out: keep scoring, and keep renewing, which finds the sign-in again (M4).
-    if (renewed.kind === 'rejected' && renewed.httpStatus === 401) signedOutWhileScoring();
+    if (renewed.kind === 'rejected' && asksSignIn(renewed)) {
+      await refusedWhileScoring(renewed);
+      if (current.mode.kind !== 'scoring') return;
+    }
     if (renewed.kind === 'answer') {
       if (renewed.value.status !== 'held-by-you') {
         return held === keptSession ? settleByOpening() : notHeld(renewed.value);
@@ -1648,7 +1721,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
   const onHalt = async (halt: QueueHalt): Promise<void> => {
     const reason = reasonOfHalt(halt);
     // Signed out (M4): the queue holds the taps; the renewal finds the sign-in again.
-    if (reason === 'signed-out') return signedOutWhileScoring();
+    if (reason === 'signed-out') {
+      return refusedWhileScoring(halt.kind === 'rejected' ? halt : { httpStatus: 401 });
+    }
     if (reason !== 'check-session') return readOnly(reason);
     const held = sessionId;
     if (held === null) return;
@@ -1657,13 +1732,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     if (held === keptSession) return settleByOpening();
     const renewed = await session({ type: 'renew', sessionId: held });
     if (sessionId !== held) return;
-    if (renewed.kind === 'rejected' && renewed.httpStatus === 401) {
-      return signedOutWhileScoring();
+    if (renewed.kind === 'rejected' && asksSignIn(renewed)) {
+      return refusedWhileScoring(renewed);
     }
     if (renewed.kind !== 'answer') {
-      return readOnly(
-        renewed.kind === 'rejected' ? reasonOfStatus(renewed.httpStatus) : 'not-held',
-      );
+      return readOnly(renewed.kind === 'rejected' ? reasonOfStatus(renewed) : 'not-held');
     }
     const reply = renewed.value;
     if (reply.status !== 'held-by-you') return notHeld(reply);
@@ -1930,7 +2003,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       return later(open);
     }
     failures = 0;
-    if (opened.kind === 'rejected') return readOnly(reasonOfStatus(opened.httpStatus));
+    if (opened.kind === 'rejected') return readOnly(await refusedReason(opened));
     const reply = opened.value;
     if (reply.status !== 'held-by-you') return notHeld(reply);
     return hold(reply.sessionId);
@@ -2027,7 +2100,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       reason:
         outcome.kind === 'unanswered'
           ? 'unanswered'
-          : outcome.httpStatus === 401
+          : asksSignIn(outcome)
             ? 'signed-out'
             : 'rejected',
     }) as const;
@@ -2229,7 +2302,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       // about the lost game when the takeover began is finished, as when it goes
       // unanswered (finding L2): another device has had the game whatever the reason.
       if (taken.kind === 'rejected') {
-        await track(readOnly(reasonOfStatus(taken.httpStatus), true));
+        await track(readOnly(reasonOfStatus(taken), true));
         return { ok: true };
       }
       const reply = taken.value;

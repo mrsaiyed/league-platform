@@ -59,8 +59,8 @@ export function createFetchCommandTransport(
       if (refusal.error === 'invalid-input') {
         return { kind: 'batch-refused', httpStatus: response.status };
       }
-      // Signed out, not allowed, no such game: the queue halts.
-      return { kind: 'rejected', httpStatus: response.status };
+      // Signed out, not allowed, not there, no such game: the queue halts.
+      return { kind: 'rejected', httpStatus: response.status, error: refusal.error };
     },
   };
 }

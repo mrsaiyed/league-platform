@@ -190,3 +190,19 @@ describe('"update needed" (step 2.37, part 2)', () => {
     expect(text).toContain('Your plays are kept on this device.');
   });
 });
+
+describe('"this account can no longer open this game" (T-456)', () => {
+  it('says how to try again, by the words of the button that is shown', () => {
+    const button = t('tracker.openAgain');
+    for (const count of [0, 1, 2]) {
+      const said = trackerNotices({
+        ...calm,
+        mode: { kind: 'read-only', reason: 'cannot-open' },
+        waiting: Array.from({ length: count }, (_, n) => kept(n + 1)),
+      }).map((notice) => trackerNoticeText(notice, t));
+      expect(said).toHaveLength(1);
+      expect(said[0]).toContain('can no longer open this game');
+      expect(said[0]).toContain(`tap “${button}”`);
+    }
+  });
+});

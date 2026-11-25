@@ -1,7 +1,6 @@
 // GET /api/v1/leagues/{leagueId}/games/{game}/snapshot: the game as it stands, for a
 // viewer's page (T6 §6; T-118, T-119). The handler is server/game-snapshot-endpoint.ts.
 import { refusalAnswer } from '../../../../../../../../server/league-api.ts';
-import { commandContextOf } from '../../../../../../../../server/context.ts';
 import { gameSnapshot } from '../../../../../../../../server/game-snapshot-endpoint.ts';
 import {
   carriesSignInCookies,
@@ -17,9 +16,8 @@ export async function GET(_request: Request, { params }: Params): Promise<Respon
   const { game } = await params;
   const endpoint = await leagueEndpoint(['games', game, 'snapshot'], 'visitor');
   if (!endpoint.ok) return respond(refusalAnswer(endpoint.refusal));
-  const { context, ports } = endpoint;
-  const holder =
-    context.account === null ? undefined : await ports.accessOf(commandContextOf(context));
+  // What the account holds here, read once by the gate (league-api.ts).
+  const { context, holder, ports } = endpoint;
   const carriesSignIn = await carriesSignInCookies();
   return respond(await gameSnapshot({ context, holder, carriesSignIn }, game, ports.tracker));
 }

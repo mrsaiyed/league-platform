@@ -14,10 +14,11 @@ export async function GET(): Promise<Response> {
   // A session that no longer works is a visitor here, as on the page that asks.
   const endpoint = await leagueEndpoint(['my-team'], 'visitor');
   if (!endpoint.ok) return respond(await myTeamRequest(endpoint, undefined));
-  const { context, ports } = endpoint;
+  const { context, holder, ports } = endpoint;
   const remembered = (await cookies()).get(myTeamCookieName(context.league.id))?.value;
   const read = {
-    accessOf: ports.accessOf,
+    // What the gate read already (league-api.ts), not read a second time.
+    accessOf: async () => holder,
     // The grants the read already holds, not read a second time.
     myTeams: (leagueId: string, accountId: string, holder: AccessHolder | undefined) =>
       myTeamsOf(ports, { leagueId, accountId, holder: async () => holder }),

@@ -133,14 +133,14 @@ export async function reopenOfferRequest(
   ports: ReopenPorts,
 ): Promise<ApiAnswer> {
   if (context.account === null) return turnedAway({ error: 'signed-out' });
-  if (!isGameIdFormat(game)) return turnedAway({ error: 'not-found' });
+  if (!isGameIdFormat(game)) return turnedAway({ error: 'unknown-game' });
   const result = await readReopenOffer(commandContextOf(context), { gameId: game }, ports.deps);
   if (!result.ok) {
     switch (result.error.code) {
       case 'not-allowed':
         return turnedAway({ error: 'not-allowed' });
       case 'game-not-found':
-        return turnedAway({ error: 'not-found' });
+        return turnedAway({ error: 'unknown-game' });
       case 'invalid-input':
         return turnedAway({ error: 'invalid-input', issues: [...result.error.issues] });
     }

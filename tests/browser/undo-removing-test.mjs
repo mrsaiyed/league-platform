@@ -237,20 +237,27 @@ if (built) {
         })
         .waitFor({ timeout: 10_000 });
     }
-    const listed = (name) =>
-      page
-        .locator('section', { has: page.getByRole('heading', { name: 'The league list' }) })
-        .locator('li', { hasText: name });
-    const removeFromList = async (name, url) => {
-      const item = listed(name);
-      await item.locator('input[name=confirm]').check();
-      await tap(item.getByRole('button', { name: 'Remove from the league list' }), url);
+    // Since S-128 a team's page draws no league list: a person comes off it on People.
+    const toPerson = async (name) => {
+      await openStaffMenu(page);
+      await tap(adminLink('People'), /\/admin\/people(\?|#|$)/);
+      await tap(
+        page.locator('main').getByRole('link', { name, exact: true }),
+        /\/admin\/people\/[0-9a-f-]{36}/,
+      );
     };
-    await removeFromList(wrens.people[0], { said: 'That person is still on a roster.' });
+    const listed = (name) => page.locator('main li[data-person]', { hasText: name });
+    const removeButton = () =>
+      page.locator('#remove').getByRole('button', { name: 'Remove from the league list' });
+    await toPerson(wrens.people[0]);
+    const held = page.locator('#remove [data-on-roster]');
     note(
-      'a player of a team still there is not taken off the list',
-      (await listed(wrens.people[0]).count()) === 1,
+      'a player of a team still there is not offered a way off the list, and is told why',
+      (await held.count()) === 1 &&
+        (await removeButton().count()) === 0 &&
+        (await held.innerText()).includes(wrens.team),
     );
+    await openTeam(wrens.team);
 
     at = 'the team is moved to the bin';
     const bin = page.locator('section', {
@@ -296,22 +303,21 @@ if (built) {
     await accessible('the teams list after a team was removed');
 
     at = 'one of its players is taken off the league list';
-    await tap(
-      page.locator('main').getByRole('link', { name: 'Falcons', exact: true }),
-      /\/admin\/teams\//,
-    );
-    await removeFromList(wrens.people[0], {
-      said: 'Moved to the bin: taken off the league list',
-    });
+    await toPerson(wrens.people[0]);
+    await page.locator('#remove').getByLabel('Yes, I am sure').check();
+    await Promise.all([page.waitForURL(/\/admin\/people(\?|#|$)/), removeButton().click()]);
+    const goneNotice = page.locator('[data-removed]');
+    await goneNotice.waitFor({ timeout: 10_000 });
     note(
       'the player of the binned team is off the league list',
       (await listed(wrens.people[0]).count()) === 0,
     );
     note('the other one is still in it', (await listed(wrens.people[1]).count()) === 1);
-    const gone = await page.locator('main [role=status]').first().innerText();
+    const gone = await goneNotice.innerText();
     note(
       'taking someone off the list promises only what is true',
-      gone.includes('kept in the bin for 30 days.'),
+      gone.includes(`Removed from the league list: ${wrens.people[0]}.`) &&
+        gone.includes('stay in the league’s bin'),
       gone,
     );
     await accessible('a person taken off the league list');

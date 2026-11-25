@@ -364,8 +364,19 @@ export const TrackerRefusal = z.discriminatedUnion('error', [
    * again would not help. A tracker takes it as it takes "not allowed".
    */
   z.strictObject({ error: z.literal('account-problem') }),
-  /** No such league or game, one of another league asked for through this one's address included (404). */
+  /**
+   * Not there for this person (404): no such league, one in the bin, one hidden from
+   * them (a draft or suspended league, U-9), or an address spelled another way. A
+   * tracker never reads it as "the game is gone": it may be a scorer signed out in a
+   * hidden league, so it asks for sign-in and holds every waiting tap (T-453).
+   */
   z.strictObject({ error: z.literal('not-found') }),
+  /**
+   * No such game in this league, one of another league asked for through this one's
+   * address included (404). Given only past the league gate, to a person who may open
+   * the league (T-453): the one 404 a tracker reads as "the game is gone".
+   */
+  z.strictObject({ error: z.literal('unknown-game') }),
   /** The body is not a request the endpoint takes (400). */
   z.strictObject({ error: z.literal('invalid-input'), issues: z.array(z.unknown()) }),
 ]);
@@ -377,6 +388,7 @@ export const trackerRefusalStatus: Readonly<Record<TrackerRefusal['error'], numb
   'not-allowed': 403,
   'account-problem': 403,
   'not-found': 404,
+  'unknown-game': 404,
   'invalid-input': 400,
 };
 
@@ -732,3 +744,13 @@ export const GameSnapshotReading = LiveMessageReading.extend({
   teams: z.object({ home: z.object(teamShape), away: z.object(teamShape) }),
   players: z.array(z.object(snapshotPlayerShape)).max(200),
 });
+
+/**
+ * Whether this request is signed in, asked of an address about no league (T-456): a
+ * tracker refused "not found" at a league asks it once, to tell "signed out" (sign in,
+ * the taps held) from "this account can no longer open this game" (the taps kept, a
+ * copy offered). It says nothing about any league, so it gives nothing away.
+ */
+export const signedInApiPath = '/api/v1/signed-in';
+export const SignedInAnswer = z.strictObject({ signedIn: z.boolean() });
+export type SignedInAnswer = z.infer<typeof SignedInAnswer>;

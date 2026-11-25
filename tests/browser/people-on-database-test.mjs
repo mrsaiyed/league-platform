@@ -199,9 +199,12 @@ if (browser !== null) {
     );
 
     await toTeam(page, 'Lakeside Herons');
-    // The form that puts someone already in the league on the roster, found by what it is:
-    // the one form with a "Person" list (the new-player form comes first, step 2.194).
-    const adding = page.locator('form').filter({ has: page.getByLabel('Person') });
+    // The form that puts someone already in the league on the roster, found by its own button
+    // (the new-player form comes first, step 2.194; the Find box above it, step 2.90, is labelled
+    // "Find a person by name", which holds "person" too).
+    const adding = page.locator('form', {
+      has: page.getByRole('button', { name: 'Add to the roster', exact: true }),
+    });
     await adding.getByLabel('Person').selectOption({ label: 'Jon Smiht' });
     await Promise.all([
       // Said on the new line (step 2.155).

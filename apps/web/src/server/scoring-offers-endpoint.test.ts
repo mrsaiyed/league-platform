@@ -127,7 +127,12 @@ describe('the scoring read of a public page', () => {
     }
     // The other public read, the snapshot, as a visitor of the draft league.
     const world = trackerWorld();
-    const context = await world.contextAs('visitor', 'draft', ['games', gameId(1), 'snapshot']);
+    const parts = ['games', gameId(1), 'snapshot'];
+    // The gate answers first (step 2.223); the snapshot's own answer is the same.
+    await expect(world.contextAs('visitor', 'draft', parts)).rejects.toThrow(
+      'no context: not-found',
+    );
+    const context = await world.contextPastTheGate('visitor', 'draft', parts);
     const snapshot = await gameSnapshot(
       { context, holder: undefined, carriesSignIn: false },
       gameId(1),

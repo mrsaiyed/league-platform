@@ -69,11 +69,13 @@ async function InvitationBody() {
       </Card>
     );
   }
-  if (request.kind === 'no-league') return <NotUsable />;
-  const league = request.context.league;
   const ports = await webPorts();
-  const offer = await readInvitation(contextOfRequest(request), { token }, ports.adminAccess.deps);
-  if (!offer.ok) return <NotUsable />;
+  // A missing league's held invitation is read too, with an id no league has (T-449,
+  // review M2): the same read, the same time, the same headers as for a hidden league.
+  const asked = request.kind === 'no-league' ? request.asNoLeague : contextOfRequest(request);
+  const offer = await readInvitation(asked, { token }, ports.adminAccess.deps);
+  if (request.kind === 'no-league' || !offer.ok) return <NotUsable />;
+  const league = request.context.league;
   // The token proved the invitation, so the league may be named, shown or not.
   const name = (await siteOf(league, ports.leagueSites)).name;
   if (offer.value.kind === 'accepted') {

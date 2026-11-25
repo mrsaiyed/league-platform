@@ -135,6 +135,8 @@ const FIELDS = {
     firstName: 'a person is added',
     lastName: 'a person is added',
     jerseyNumber: 'a person is added',
+    // Step 2.90: "Find a person by name" for the roster, a plain question shown back.
+    q: POSTED,
   },
   // People: the search box (a plain question, shown back) and the add-a-person form, each
   // posted the attack by hand; what is kept is read back by the walk below.
@@ -1212,6 +1214,8 @@ const ROUTES = {
 const ANSWERS = {
   '/api/v1/health': [null],
   '/api/v1/live': [null, keeper],
+  // "Am I signed in?" (T-456): about no league, signed out and as the scorekeeper.
+  '/api/v1/signed-in': [null, keeper],
   // The tracker kept on the device (step 2.38): its manifest names the league, its
   // worker the pages it keeps; asked signed out and as the scorekeeper.
   '/[league]/score/manifest.webmanifest': [null, keeper],
@@ -1466,6 +1470,32 @@ async function walkEveryRoute() {
       `The walk: ${pageRoutes.length} page routes as ${ROLES.length} roles, ${posts.length} fields posted by hand, ${answerRoutes.length} answer routes.`,
     );
   });
+
+  // One of those fields is the team page's tick "Move the team to the bin" (since step 2.90
+  // the team page holds no other tick): posted by hand it is ticked, so the attack team went
+  // to the bin. It is brought back, so the reads below (the coach's own teams) still find it.
+  await step(
+    'the attack team, moved to the bin by its tick posted by hand, is brought back',
+    async () => {
+      const context = await contextFor(owner);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(30_000);
+        await page.goto(`${origin}/north-valley/admin/settings/bin`);
+        const row = page.locator('li[data-bin=team]', { hasText: typed.team });
+        const binned = (await row.count()) === 1;
+        note('the tick posted by hand moved the attack team to the bin', binned);
+        if (binned) {
+          await Promise.all([
+            page.locator('[data-bin-answer][data-said=back]').waitFor({ timeout: 10_000 }),
+            row.getByRole('button', { name: 'Bring it back' }).click(),
+          ]);
+        }
+      } finally {
+        await context.close();
+      }
+    },
+  );
 
   // C. Every route again, in a browser as each role, with the script policy off: whatever was
   // kept from the posts above is shown as text, and the questions too.

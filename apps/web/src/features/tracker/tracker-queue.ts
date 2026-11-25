@@ -36,6 +36,7 @@ import {
   type RefusalCode,
   type TapRefusalCode,
   type TableNotice,
+  type TrackerRefusal,
 } from '@srleagues/contracts';
 import type { CommandTransport, TransportOutcome } from './command-transport.ts';
 import {
@@ -78,7 +79,12 @@ export type QueueHalt =
   /** The server no longer speaks the version these taps were made under (T-127). */
   | { readonly kind: 'version-refused'; readonly accepted: readonly number[] }
   /** The server turned the request away whole: signed out (401), not allowed (403), no such game (404). */
-  | { readonly kind: 'rejected'; readonly httpStatus: number };
+  | {
+      readonly kind: 'rejected';
+      readonly httpStatus: number;
+      /** The refusal's code: a 404 is "no such game" only with `unknown-game` (T-453). */
+      readonly error?: TrackerRefusal['error'];
+    };
 
 /**
  * A change of players the server took with something to say (record 058, S-44): a
@@ -450,7 +456,9 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
         answered({ halted: { kind: 'version-refused', accepted: outcome.refusal.accepted } });
         return false;
       case 'rejected':
-        answered({ halted: { kind: 'rejected', httpStatus: outcome.httpStatus } });
+        answered({
+          halted: { kind: 'rejected', httpStatus: outcome.httpStatus, error: outcome.error },
+        });
         return false;
       case 'batch-refused': {
         const [only, ...rest] = batch.commands;
