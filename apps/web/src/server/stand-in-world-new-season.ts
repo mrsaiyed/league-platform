@@ -25,7 +25,7 @@ export function createWorldSeason(s: LeagueWorld, season: NewSeason): string | '
       endsOn: season.endsOn,
       slug: season.slug,
       status: 'draft',
-      rules: { version: 1 },
+      rules: season.rules ?? { version: 1 },
       statKeys: [],
       version: 1,
     },

@@ -206,22 +206,15 @@ async function makeFirstSeason(
     name: season.name,
     startsOn: season.startsOn ?? null,
     endsOn: season.endsOn ?? null,
+    // In the one statement that makes it (T-430): no second save, so the season's
+    // version is a just-made season's and the league stays removable.
+    ...(rules === undefined ? {} : { rules }),
   });
   if (seasonId === 'slug-taken') {
     throw new Error('leagues.create: a new league already had a season with that short name.');
   }
   if (!(await tx.leagues.setCurrentSeason(seasonId))) {
     throw new Error('leagues.create: the first season could not be made the current one.');
-  }
-  if (rules !== undefined) {
-    const made = await tx.leagues.findSeason(seasonId);
-    const saved =
-      made === undefined
-        ? undefined
-        : await tx.leagues.updateSeason(seasonId, { rules }, made.version);
-    if (typeof saved !== 'number') {
-      throw new Error("leagues.create: the first season's rules could not be saved.");
-    }
   }
   return seasonId;
 }

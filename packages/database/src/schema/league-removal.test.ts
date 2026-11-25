@@ -396,6 +396,61 @@ describe('league_removal_problems: a season exactly as the maker leaves it', () 
       await one(db, 'select public.league_removal_problems($1) as problems', [league.leagueId]),
     ).toEqual({ problems: ['season-changed'] });
   });
+
+  // Migration 0030 (step 2.245, T-430): a rules document is not work; the version still is.
+  const problemsOf = async (leagueId: string) =>
+    one(db, 'select public.league_removal_problems($1) as problems', [leagueId]);
+  const stopClockRules = JSON.stringify({
+    version: 1,
+    clock: { mode: 'stop', mercyLead: 20, stopClockLastSeconds: null },
+  });
+  const madeWithRules = async () => {
+    const league = await makerShaped();
+    // The maker's season again, but made with its rules in the one insert (0030).
+    await db.query('delete from seasons where id = $1', [league.seasonId]);
+    const season = await one<{ id: string }>(
+      db,
+      `insert into seasons (league_id, program_id, slug, name, rules)
+       values ($1, $2, 'fall', 'Fall', $3) returning id`,
+      [league.leagueId, league.defaultProgramId, stopClockRules],
+    );
+    await db.query('update seasons set is_current = true where id = $1', [season.id]);
+    return { ...league, seasonId: season.id };
+  };
+
+  it('passes a league made before step 2.245: its season holds the starting rules document', async () => {
+    const league = await makerShaped();
+    expect(await one(db, 'select rules from seasons where id = $1', [league.seasonId])).toEqual({
+      rules: { version: 1 },
+    });
+    expect(await problemsOf(league.leagueId)).toEqual({ problems: [] });
+  });
+
+  it('passes a season made with its rules in the statement that made it (version 2)', async () => {
+    const league = await madeWithRules();
+    expect(
+      await one(db, 'select version, rules from seasons where id = $1', [league.seasonId]),
+    ).toEqual({ version: 2, rules: JSON.parse(stopClockRules) });
+    expect(await problemsOf(league.leagueId)).toEqual({ problems: [] });
+  });
+
+  it('refuses a season whose rules were changed after it was made, even back to the start', async () => {
+    const league = await madeWithRules();
+    await db.query(
+      `update seasons set rules = jsonb_set(rules, '{clock,mercyLead}', '25') where id = $1`,
+      [league.seasonId],
+    );
+    expect(await problemsOf(league.leagueId)).toEqual({ problems: ['season-changed'] });
+    // Saved back to exactly the document it was made with: the version has still moved.
+    await db.query('update seasons set rules = $2 where id = $1', [
+      league.seasonId,
+      stopClockRules,
+    ]);
+    expect(await one(db, 'select version from seasons where id = $1', [league.seasonId])).toEqual({
+      version: 4,
+    });
+    expect(await problemsOf(league.leagueId)).toEqual({ problems: ['season-changed'] });
+  });
 });
 
 describe("Supabase's API roles get nothing in the platform schema (T-64)", () => {
