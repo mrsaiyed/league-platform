@@ -45,25 +45,37 @@ export function clockModeShown(
 /**
  * The scorer turned the running clock On and then Off inside the last minutes (S-124):
  * the engine has no switch that ends with them (step 2.252), so the game stops its clock
- * on fouls for the rest of it, and the screen says so while that holds. The `stop` play
- * that did it (its id keeps a dismissal), or null: none, a new period came between the
- * two taps, or the clock mode has changed since (a tap, or the mercy rule).
+ * on fouls for the rest of it, and the screen says so while that holds. Said only where
+ * the game was on a running clock just before the scorer's taps inside the window began:
+ * where it was already on a stop clock (a stop-clock season, or Off chosen before the
+ * last minutes), Off only puts back the clock the game had, and "change it back" would
+ * leave the rest of it on a running clock. The `stop` play that did it (its id keeps a
+ * dismissal), or null: none, a new period came between the taps, or the clock mode has
+ * changed since (a tap, or the mercy rule).
  */
 export function lastMinutesStop(game: basketball.GameState): { readonly playId: string } | null {
   if (basketball.derive(game).clockMode !== 'stop') return null;
   let stop: string | null = null;
+  // The earliest switch On of the taps made inside this window (the engine's own mark).
+  let first: number | null = null;
   for (let i = game.plays.length - 1; i >= 0; i--) {
     const play = game.plays[i]!;
-    if (play.mercyClock === true) return null;
+    if (play.mercyClock === true) break;
+    // A new period after the Off is the rest of the game; one before it, a new window.
+    if (play.type === 'period' && stop !== null) break;
+    if (play.type !== 'clock-mode') continue;
     if (stop === null) {
-      if (play.type !== 'clock-mode') continue;
       if (play.mode !== 'stop') return null;
       stop = play.id;
-    } else if (play.type === 'period') return null;
-    // The switch On before it was made inside the last minutes (the engine's own mark).
-    else if (play.type === 'clock-mode') return play.lastMinutes === true ? { playId: stop } : null;
+    } else if (play.mode === 'running') {
+      if (play.lastMinutes !== true) break;
+      first = i;
+    }
+    // An Off between two Ons inside the window: the taps go on.
   }
-  return null;
+  if (stop === null || first === null) return null;
+  const before = basketball.derive({ ...game, plays: game.plays.slice(0, first) });
+  return before.clockMode === 'running' ? { playId: stop } : null;
 }
 
 /** What a dismissal of the notice about `lastMinutesStop` keeps: its own, not a basket's. */

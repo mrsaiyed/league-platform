@@ -488,11 +488,6 @@ describe('a mercy rule beside the last minutes (step 2.248, items 1 and 2; S-124
   // for the rest of the game (until step 2.252), and the screen says so while it holds.
   const seasons = {
     '(a) both rules, after the mercy line': homeRuns(both()),
-    '(b) a stop-clock season with last minutes': tippedOff({
-      ...basketball.QUARTERS,
-      clockMode: 'stop',
-      stopClockLastSeconds: 120,
-    }),
     '(c) a running-clock season with last minutes': tippedOff({
       ...basketball.QUARTERS,
       clockMode: 'running',
@@ -520,6 +515,36 @@ describe('a mercy rule beside the last minutes (step 2.248, items 1 and 2; S-124
       );
     });
   }
+
+  // Where the game was already on a stop clock, Off only puts back the clock it had:
+  // "Tap Running clock to change it back" would leave the rest of it on a running clock.
+  it('(b) a stop-clock season with last minutes: On then Off inside them is not said', () => {
+    const stopSeason = tippedOff({
+      ...basketball.QUARTERS,
+      clockMode: 'stop',
+      stopClockLastSeconds: 120,
+    });
+    const on = flip(at(stopSeason, 4, 90_000));
+    expect(seen(on)).toEqual(plain('running'));
+    const off = flip(on);
+    expect(seen(off)).toEqual(plain('stop'));
+    expect(seen(at(off, 5, 240_000))).toEqual(plain('stop'));
+    expect(seen(flip(flip(off)))).toEqual(plain('stop'));
+  });
+
+  it('Off chosen before the last minutes, then On and Off inside them, is not said', () => {
+    const running = tippedOff({
+      ...basketball.QUARTERS,
+      clockMode: 'running',
+      stopClockLastSeconds: 120,
+    });
+    const chosen = flip(at(running, 4, 300_000));
+    expect(seen(chosen)).toEqual(plain('stop'));
+    const on = flip(at(chosen, 4, 90_000));
+    expect(seen(on)).toEqual(plain('running'));
+    expect(seen(flip(on))).toEqual(plain('stop'));
+    expect(seen(flip(flip(flip(on))))).toEqual(plain('stop'));
+  });
 
   it('On then Off outside the last minutes, or across a new period, is not that', () => {
     const running = tippedOff({
