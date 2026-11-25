@@ -83,6 +83,8 @@ Two things to know before reading:
 
 ## B. Can wait until after Faraj's first real season (54 steps)
 
+Added on 2026-11-25 by the lead, all three to this list (they can wait): **2.250 A basket moved to another player keeps its period and time** (every total is right today; only the play list's place of a moved basket is not as in the gym; build it before any page shows a score by quarter), **2.251 One-time form answers survive a second copy of the web app** (not needed while the site runs as one copy), and **2.252 A clock switch made inside the last minutes ends with them** (today the scoring screen says in plain words what happened and one tap changes it back).
+
 ### For other leagues, other sports, schools and the association demo
 
 - **2.63 Review of the demo cut** — it is the review for the association (TCSAAL) demo, and its long "needs" list would pull a dozen waiting steps in. A review of list A should be held before Faraj goes live instead. (unsure)

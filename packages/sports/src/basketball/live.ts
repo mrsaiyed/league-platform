@@ -220,6 +220,12 @@ const RECENT_LIMIT = 300;
 export type Play =
   | { type: 'lineup'; side: Side; playerIds: string[] }
   | { type: 'score'; side: Side; playerId: string; points: 1 | 2 | 3 }
+  /**
+   * Takes back one earlier basket, named by its own play ID (`Stamp.id`), never by its
+   * place: the basket then reads as never made. `side`, `playerId` and `points` repeat
+   * the basket's (T-432). Written by a correction; the Al-Hadi tracker never sends it.
+   */
+  | { type: 'unscore'; side: Side; playerId: string; points: 1 | 2 | 3; playId: string }
   | { type: 'foul'; side: Side; playerId: string }
   | { type: 'unfoul'; side: Side; playerId: string }
   | { type: 'turnover'; side: Side; playerId: string }
@@ -720,6 +726,9 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
   let period = 1;
   let periodStartElapsedMs = 0;
   let clockMode = clockModeOf(state.rules);
+  // Baskets a later `unscore` takes back read as never made (T-432).
+  const takenBack = new Set<string>();
+  for (const play of state.plays) if (play.type === 'unscore') takenBack.add(play.playId);
   const line = (id: string, side: Side) => (players[id] ??= emptyLine(side));
   const bank = (id: string, side: Side, at: number) => {
     const from = since[id];
@@ -741,6 +750,11 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
         break;
       }
       case 'score': {
+        // The running clock it switched on under the mercy rule stays (S-120).
+        if (takenBack.has(play.id)) {
+          if (play.mercyClock) clockMode = 'running';
+          break;
+        }
         const l = line(play.playerId, play.side);
         l.points += play.points;
         if (play.points === 1) l.fg1 += 1;
@@ -751,6 +765,8 @@ export function derive(state: GameState, elapsedNowMs = state.clock.elapsedMs): 
         if (play.mercyClock) clockMode = 'running';
         break;
       }
+      case 'unscore':
+        break;
       case 'foul': {
         const l = line(play.playerId, play.side);
         l.fouls += 1;
@@ -938,6 +954,7 @@ export function apply(state: GameState, command: Command, { id, now }: Context):
   switch (command.type) {
     case 'lineup':
     case 'score':
+    case 'unscore':
     case 'foul':
     case 'unfoul':
     case 'turnover':
@@ -1029,7 +1046,7 @@ export function apply(state: GameState, command: Command, { id, now }: Context):
 function record(s: GameState, input: Play, id: string, at: number) {
   const d = derive(s);
   const mode = clockModeAt(s, d);
-  const play = checkPlay(input, d, s.rules, mode);
+  const play = checkPlay(input, d, s.rules, mode, s.plays);
   const stamp = {
     id,
     at,
@@ -1091,7 +1108,13 @@ const isSide = (v: unknown): v is Side => v === 'home' || v === 'away';
  * A clean copy of a play, holding only the fields it should, or a TrackerError.
  * `mode` is the clock mode in force (`clockModeAt`), which a switch must change.
  */
-function checkPlay(input: Play, d: Derived, rules: Rules, mode: ClockMode): Play {
+function checkPlay(
+  input: Play,
+  d: Derived,
+  rules: Rules,
+  mode: ClockMode,
+  plays: readonly LoggedPlay[],
+): Play {
   if (input.type === 'period') {
     const period = input.period;
     if (!Number.isInteger(period) || period < 1 || period > MAX_PERIOD) fail('Pick a period.');
@@ -1126,6 +1149,18 @@ function checkPlay(input: Play, d: Derived, rules: Rules, mode: ClockMode): Play
       if (points !== 1 && points !== 2 && points !== 3) fail('A basket is 1, 2 or 3 points.');
       if (!isId(input.playerId)) fail('Pick a player.');
       return { type: 'score', side, playerId: input.playerId, points };
+    }
+    case 'unscore': {
+      const { playId, playerId, points } = input;
+      if (!isId(playId)) fail('Pick the basket to take back.');
+      const basket = plays.find((p) => p.id === playId);
+      if (!basket) fail('That basket is not in this game.');
+      if (basket.type !== 'score') fail('That play is not a basket.');
+      if (plays.some((p) => p.type === 'unscore' && p.playId === playId))
+        fail('That basket is already taken back.');
+      if (basket.side !== side || basket.playerId !== playerId || basket.points !== points)
+        fail('That basket was not made by that player for those points.');
+      return { type: 'unscore', side, playerId, points, playId };
     }
     case 'foul':
       if (!isId(input.playerId)) fail('Pick a player.');
@@ -1254,23 +1289,49 @@ function setClock(s: GameState, ms: number) {
   s.clock = clock;
 }
 
-/** Has a basket, foul or turnover been recorded? Lineups and substitutions alone are not a played game. */
-export const hasRecordedStats = (state: GameState) =>
-  state.plays.some(
+/**
+ * Has a basket, foul or turnover been recorded? Lineups and substitutions alone are not a
+ * played game, nor is a basket taken back, which reads as never made (T-432).
+ */
+export function hasRecordedStats(state: GameState): boolean {
+  const takenBack = new Set<string>();
+  for (const p of state.plays) if (p.type === 'unscore') takenBack.add(p.playId);
+  return state.plays.some(
     (p) =>
-      p.type === 'score' ||
+      (p.type === 'score' && !takenBack.has(p.id)) ||
       p.type === 'foul' ||
       p.type === 'turnover' ||
       p.type === 'team-turnover',
   );
+}
 
 /** The score after each play, for a play-by-play log. */
 export function runningScores(plays: readonly Play[]) {
   const score = { home: 0, away: 0 };
   return plays.map((play) => {
     if (play.type === 'score') score[play.side] += play.points;
+    // From the take-back on, the score is the corrected one (T-432).
+    else if (play.type === 'unscore') score[play.side] -= play.points;
     return { home: score.home, away: score.away };
   });
+}
+
+/**
+ * Each team's points in each period, from each basket's own period stamp: index 0 is
+ * the first period. A basket taken back counts in none (T-432).
+ */
+export function scoreByPeriod(plays: readonly LoggedPlay[]): Record<Side, number[]> {
+  const takenBack = new Set<string>();
+  for (const play of plays) if (play.type === 'unscore') takenBack.add(play.playId);
+  const score: Record<Side, number[]> = { home: [], away: [] };
+  for (const play of plays) {
+    if (play.type !== 'score' || takenBack.has(play.id)) continue;
+    const periods = Math.max(play.period, score.home.length, score.away.length);
+    for (const side of SIDES) while (score[side].length < periods) score[side].push(0);
+    const own = score[play.side];
+    own[play.period - 1] = (own[play.period - 1] ?? 0) + play.points;
+  }
+  return score;
 }
 
 /** Short description of a play, for the undo button and the play log. */
@@ -1283,6 +1344,8 @@ export function describePlay(
   switch (play.type) {
     case 'score':
       return `${nameOf(play.playerId)} +${play.points}`;
+    case 'unscore':
+      return `Basket taken back — ${nameOf(play.playerId)} +${play.points}`;
     case 'foul':
       return `Foul — ${nameOf(play.playerId)}`;
     case 'unfoul':

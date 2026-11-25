@@ -243,7 +243,7 @@ export async function applyPlays(p: PlaysToApply): Promise<PlaysApplied> {
       };
     }
     const input: TrackerInput = withLowerIds(command.input);
-    const platform = platformProblem(input);
+    const platform = platformProblem(input, p.source);
     if (platform !== undefined) return refused(platform);
     const statistic = tapNotKept(input.type, kept);
     if (statistic !== undefined) {

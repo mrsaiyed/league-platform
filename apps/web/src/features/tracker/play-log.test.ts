@@ -57,6 +57,17 @@ describe('the play log (checklist I4)', () => {
     expect(log.count).toBe(5);
   });
 
+  it('after a basket taken back, the corrected score (T-432)', () => {
+    const scored = played([basket('h5')], tippedOff());
+    const playId = lastId(scored);
+    const game = played(
+      [basket('a7', 3), { type: 'unscore', side: 'home', playerId: 'h5', points: 2, playId }],
+      scored,
+    );
+    const log = playLog(game, testRosters, [], t, 3);
+    expect(log.rows.map((row) => row.score)).toEqual(['0–3', '2–3', '2–0']);
+  });
+
   it('gives only the newest rows when asked, with the count, the unsent and the score of the whole game', () => {
     const game = played(
       [basket('h5'), { type: 'foul', side: 'away', playerId: 'a3' }, basket('a7', 3), basket('h9')],
@@ -121,6 +132,7 @@ describe('what Undo and Redo name (checklist I1, I3)', () => {
   it('has short words for every kind of play the engine has', () => {
     const plays: basketball.Play[] = [
       { type: 'score', side: 'home', playerId: 'h5', points: 2 },
+      { type: 'unscore', side: 'home', playerId: 'h5', points: 2, playId: 'p1' },
       { type: 'foul', side: 'home', playerId: 'h5' },
       { type: 'unfoul', side: 'home', playerId: 'h5' },
       { type: 'turnover', side: 'home', playerId: 'h5' },
@@ -138,6 +150,7 @@ describe('what Undo and Redo name (checklist I1, I3)', () => {
     expect(new Set(plays.map((play) => play.type))).toEqual(new Set(Object.keys(playKeys)));
     expect(plays.map((play) => playShortText(play, testRosters, 4, t))).toEqual([
       '+2 #5 Ned',
+      '−2 #5 Ned',
       'Foul #5 Ned',
       '−Foul #5 Ned',
       // The one long word comes after the player: a cut line keeps the number.

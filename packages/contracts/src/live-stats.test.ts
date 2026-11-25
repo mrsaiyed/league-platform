@@ -36,6 +36,24 @@ describe('clock mode (T-128)', () => {
   });
 });
 
+describe('a basket taken back (step 2.247, T-432)', () => {
+  const unscore = { type: 'unscore', side: 'home', playerId: id, points: 2, playId: id };
+
+  it('the platform shape takes it, and only with all its fields', () => {
+    expect(PlatformCommand.safeParse(unscore).success).toBe(true);
+    expect(PlatformCommand.safeParse({ ...unscore, points: 4 }).success).toBe(false);
+    const { playId: _, ...noPlay } = unscore;
+    expect(PlatformCommand.safeParse(noPlay).success).toBe(false);
+  });
+
+  it('the shape the current tracker uses refuses it, alone and in an envelope', () => {
+    expect(Command.safeParse(unscore).success).toBe(false);
+    const envelope = { commandId: id, at: 5, input: unscore };
+    expect(Envelope.safeParse(envelope).success).toBe(false);
+    expect(PlatformEnvelope.safeParse(envelope).success).toBe(true);
+  });
+});
+
 describe('last-minutes stop clock, mercy lead and foul limit (step 2.67)', () => {
   const extras = {
     stopClockLastSeconds: 120,

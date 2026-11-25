@@ -20,6 +20,10 @@ export type GameWords = {
     readonly foul: string;
     readonly foulTeam: string;
     readonly unfoul: string;
+    /** A basket taken back (T-432): its player, points and team; one point; no player. */
+    readonly unscore: string;
+    readonly unscoreOne: string;
+    readonly unscoreTeam: string;
     readonly turnover: string;
     readonly turnoverTeam: string;
     readonly unturnover: string;
@@ -37,6 +41,8 @@ export type GameWords = {
       readonly scoreOne: string;
       readonly foul: string;
       readonly unfoul: string;
+      readonly unscore: string;
+      readonly unscoreOne: string;
       readonly turnover: string;
       readonly unturnover: string;
       readonly timeout: string;
@@ -111,6 +117,7 @@ export type PlayFacts = {
   readonly type:
     | LatestPlay['type']
     | 'lineup'
+    | 'unscore'
     | 'unfoul'
     | 'unturnover'
     | 'team-turnover'
@@ -136,6 +143,8 @@ function withoutTeam(words: GameWords, play: PlayFacts): string | null {
       return play.points === 1 ? n.scoreOne : fill(n.score, { points: play.points ?? '' });
     case 'foul':
       return n.foul;
+    case 'unscore':
+      return play.points === 1 ? n.unscoreOne : fill(n.unscore, { points: play.points ?? '' });
     case 'unfoul':
       return n.unfoul;
     case 'turnover':
@@ -175,6 +184,13 @@ export function playSentence(words: GameWords, play: PlayFacts): string {
       return play.player === null
         ? fill(w.foulTeam, { team })
         : fill(w.foul, { team, player: play.player });
+    case 'unscore':
+      if (play.player === null) return fill(w.unscoreTeam, { team, points });
+      return fill(play.points === 1 ? w.unscoreOne : w.unscore, {
+        team,
+        points,
+        player: play.player,
+      });
     case 'unfoul':
       return fill(w.unfoul, { team });
     case 'turnover':
