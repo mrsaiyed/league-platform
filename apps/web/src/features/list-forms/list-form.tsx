@@ -8,7 +8,13 @@
 // page that answers the post, at the form's own place (`permalink`). Every word comes from
 // the server, from the message files (T-187).
 import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { untouched, type FormState, type SavedNowWords, type TypedFields } from './form-state.ts';
+import {
+  chosenOf,
+  untouched,
+  type FormState,
+  type SavedNowWords,
+  type TypedFields,
+} from './form-state.ts';
 import { useOneSubmit } from './use-one-submit.ts';
 
 export type ListField =
@@ -290,7 +296,7 @@ export function ListForm({
           );
         }
         if (field.kind === 'choice') {
-          const chosen = typed(field.name) ?? field.value;
+          const chosen = chosenOf(field.options, typed(field.name), field.value);
           return (
             <div key={field.name} className="admin-field-group">
               {/* Each choice a line of its own, a whole line to tap (the settings' own look). */}

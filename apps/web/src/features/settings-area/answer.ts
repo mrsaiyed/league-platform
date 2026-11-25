@@ -28,7 +28,7 @@ export const refused = (command: string, code: string): Answer => ({
   code,
 });
 
-/** The part of the address that carries an answer: `?done=saved` or `?problem=...`. */
+/** The part of the address that carries an answer: `?done=published` or `?problem=...`. */
 export function answerQuery(answer: Answer): string {
   return answer.kind === 'done'
     ? `?done=${answer.done}`

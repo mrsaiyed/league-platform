@@ -2553,6 +2553,14 @@ async function checkSettings(origin) {
   ) {
     problems.push(`a value outside the limits was not refused in the page (${outside?.to})`);
   }
+  // A choice that does not exist: the stored choice is still drawn chosen, one of the two.
+  const outsideGroup =
+    /<fieldset class="settings-choice" aria-invalid="true"[^>]*>[\s\S]*?<\/fieldset>/.exec(
+      outside?.body ?? '',
+    )?.[0];
+  if ((outsideGroup?.match(/ checked=""/g) ?? []).length !== 1) {
+    problems.push('a choice that does not exist, refused, leaves no stored choice drawn chosen');
+  }
   const cleared = await post('owner', {
     league: 'north-valley',
     key,

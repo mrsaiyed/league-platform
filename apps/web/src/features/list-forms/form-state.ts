@@ -47,3 +47,16 @@ export function typedOf(form: FormData): Record<string, string> {
   }
   return fields;
 }
+
+/**
+ * The round button drawn chosen after a refusal: what was typed when it is one of the
+ * choices, else (a hand-made post with a choice that does not exist) the stored one, so a
+ * choice is always shown chosen while the refusal beside the group says why.
+ */
+export function chosenOf(
+  options: readonly { readonly value: string }[],
+  typed: string | undefined,
+  stored: string,
+): string {
+  return typed !== undefined && options.some((option) => option.value === typed) ? typed : stored;
+}
