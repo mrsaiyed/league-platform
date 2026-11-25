@@ -46,7 +46,7 @@ describe('a basket taken back (step 2.247, T-432)', () => {
     expect(PlatformCommand.safeParse(noPlay).success).toBe(false);
   });
 
-  it('the shape the Al-Hadi tracker uses refuses it, alone and in an envelope', () => {
+  it('the shape the current tracker uses refuses it, alone and in an envelope', () => {
     expect(Command.safeParse(unscore).success).toBe(false);
     const envelope = { commandId: id, at: 5, input: unscore };
     expect(Envelope.safeParse(envelope).success).toBe(false);
