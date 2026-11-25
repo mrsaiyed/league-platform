@@ -2,9 +2,9 @@
 // boxes' names, reading what was typed into the lines the grid wants, and the plays a save
 // made, as plain sentences and as the short marks the one-time notice carries. Pure.
 //
-// The baskets may only go up (T-405): the engine cannot take back a basket other than its
-// last play, so a lowered basket is refused here, beside its box, before anything is sent,
-// and the screen says to use Undo on the scoring screen. The command refuses it too.
+// A lowered basket is the engine's take-back of that player's newest standing basket of
+// that value (step 2.247, T-436): core works out which; what the plays cannot explain is
+// refused by the command, beside its box.
 import type { GridPlay, TrackedBoxScore, TrackedGridRow, WantedLine } from '@srleagues/core';
 import type { TypedFields } from './form-state.ts';
 
@@ -33,7 +33,7 @@ export type TrackedGridRead =
   | { readonly ok: true; readonly lines: readonly WantedLine[] }
   | {
       readonly ok: false;
-      readonly code: 'invalid-input' | 'basket-taken-back';
+      readonly code: 'invalid-input';
       /** The boxes to mark, in screen order. */
       readonly wrong: readonly string[];
     };
@@ -43,7 +43,7 @@ const countShape = /^\d{1,3}$/;
 /**
  * What was typed, as the lines the grid wants: only the counts that differ from the read,
  * only the players with one; a box the form did not hold is left as it is. A box that is not a whole number from 0 to 999 is refused by
- * name; then a basket typed lower than the plays give.
+ * name.
  */
 export function readTrackedGrid(
   read: Pick<TrackedBoxScore, 'lines'>,
@@ -51,7 +51,6 @@ export function readTrackedGrid(
   fields: TypedFields,
 ): TrackedGridRead {
   const notCounts: string[] = [];
-  const lowered: string[] = [];
   const lines: WantedLine[] = [];
   for (const row of read.lines) {
     const changed: Partial<Record<TrackedGridCount, number>> = {};
@@ -67,7 +66,6 @@ export function readTrackedGrid(
       }
       const value = Number(text);
       if (value === row[stat]) continue;
-      if (baskets.includes(stat) && value < row[stat]) lowered.push(field);
       changed[stat] = value;
     }
     if (Object.keys(changed).length > 0) {
@@ -75,7 +73,6 @@ export function readTrackedGrid(
     }
   }
   if (notCounts.length > 0) return { ok: false, code: 'invalid-input', wrong: notCounts };
-  if (lowered.length > 0) return { ok: false, code: 'basket-taken-back', wrong: lowered };
   return { ok: true, lines };
 }
 
@@ -95,8 +92,12 @@ export function replayedOf(rows: readonly TrackedGridRow[]) {
 }
 
 /** A play the grid made, as the notice carries it: "foul:{person}", "score2:{person}". */
-export function playMark(play: GridPlay): string {
-  return `${play.type === 'score' ? `score${play.points}` : play.type}:${play.playerId}`;
+export function playMark(play: GridPlay & { readonly basketPeriod?: number }): string {
+  const kind =
+    play.type === 'score' || play.type === 'unscore' ? `${play.type}${play.points}` : play.type;
+  // A basket taken back carries the period it was made in (step 2.247, L3).
+  const period = play.basketPeriod === undefined ? '' : `:${play.basketPeriod}`;
+  return `${kind}:${play.playerId}${period}`;
 }
 
 /** The message key of a play's sentence, by its mark's first part. */
@@ -107,19 +108,31 @@ const sentenceKeys = {
   score2: 'admin.boxScore.tracked.added.score2',
   score3: 'admin.boxScore.tracked.added.score3',
   unfoul: 'admin.boxScore.tracked.removed.foul',
+  unscore1: 'admin.boxScore.tracked.removed.score1',
+  unscore2: 'admin.boxScore.tracked.removed.score2',
+  unscore3: 'admin.boxScore.tracked.removed.score3',
   unturnover: 'admin.boxScore.tracked.removed.turnover',
 } as const;
 
 export type PlaySentenceKey = (typeof sentenceKeys)[keyof typeof sentenceKeys];
 
 /** A notice's marks as sentence keys and the player each is about; an unknown mark is left out. */
-export function playSentences(
-  marks: readonly string[],
-): readonly { readonly key: PlaySentenceKey; readonly personId: string }[] {
+export function playSentences(marks: readonly string[]): readonly {
+  readonly key: PlaySentenceKey;
+  readonly personId: string;
+  /** A basket taken back: the period it was made in. */
+  readonly period?: string;
+}[] {
   return marks.flatMap((mark) => {
-    const [kind = '', personId = ''] = mark.split(':');
+    const [kind = '', personId = '', period = ''] = mark.split(':');
     return Object.hasOwn(sentenceKeys, kind) && personId !== ''
-      ? [{ key: sentenceKeys[kind as keyof typeof sentenceKeys], personId }]
+      ? [
+          {
+            key: sentenceKeys[kind as keyof typeof sentenceKeys],
+            personId,
+            ...(/^[1-9][0-9]?$/.test(period) ? { period } : {}),
+          },
+        ]
       : [];
   });
 }

@@ -90,6 +90,25 @@ const viewing = (viewer: Viewer): GameViewing => ({
 });
 
 describe('readGamePage', () => {
+  it('says a basket taken back where it was taken back, and the score after it no longer counts it (T-432)', async () => {
+    const plays = [
+      { type: 'period', period: 1 },
+      { id: 'b1', type: 'score', side: 'home', playerId: homePlayer, points: 2, period: 1 },
+      { id: 'b2', type: 'score', side: 'home', playerId: homePlayer, points: 3, period: 1 },
+      { type: 'unscore', side: 'home', playerId: homePlayer, points: 2, playId: 'b1', period: 1 },
+    ];
+    const live = store({ state: async () => ({ status: 'live', rules: { periods: 4 }, plays }) });
+    const result = await readGamePage(live, { gameId }, viewing(publicViewer(leagueId)));
+    if (!result.ok) throw new Error('expected a page');
+    expect(result.value.plays.map((p) => [p.type, p.points, p.score.home])).toEqual([
+      ['period', null, 0],
+      ['score', 2, 2],
+      ['score', 3, 5],
+      ['unscore', 2, 3],
+    ]);
+    expect(result.value.plays.at(-1)?.player?.name).toBe('Hana Player');
+  });
+
   it("shows a visitor the staff-only team's totals, no player lines, and no names in the plays", async () => {
     const result = await readGamePage(store(), { gameId }, viewing(publicViewer(leagueId)));
     if (!result.ok) throw new Error('expected a page');

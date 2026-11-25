@@ -154,6 +154,7 @@ export function namedInState(state: basketball.GameState, personId: string): boo
       case 'sub':
         return play.inId.toLowerCase() === personId || play.outId.toLowerCase() === personId;
       case 'score':
+      case 'unscore':
       case 'foul':
       case 'unfoul':
       case 'turnover':

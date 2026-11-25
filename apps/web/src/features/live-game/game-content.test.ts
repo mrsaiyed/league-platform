@@ -327,6 +327,16 @@ describe('a game page', () => {
     const play = { side: 'home', playerName: null, jersey: null } as const;
     expect(latestPlayText(game({ ...play, type: 'other' }), gameWords(), labels)).toBe('');
     expect(latestPlayText(game(null), gameWords(), labels)).toBe('');
+    // A basket taken back by a correction says so (T-432), with or without its player.
+    const unscore = { ...play, type: 'unscore', points: 2 } as const;
+    expect(latestPlayText(game(unscore), gameWords(), labels)).toBe(
+      'Latest play: Basket taken back: 2 points for Hawks no longer count',
+    );
+    expect(
+      latestPlayText(game({ ...unscore, playerName: 'Avery Scorer' }), gameWords(), labels),
+    ).toMatch(
+      /^Latest play: Basket taken back: .*Avery Scorer.* 2 points for Hawks no longer count$/,
+    );
     expect(latestPlayText(game({ ...play, type: 'timeout' }), gameWords(), labels)).toBe(
       'Latest play: Timeout, Hawks',
     );

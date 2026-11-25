@@ -94,6 +94,7 @@ function clockOf(state: basketball.GameState | undefined): ClockReference {
 const playTypeOf = (type: string): LatestPlay['type'] => {
   switch (type) {
     case 'score':
+    case 'unscore':
     case 'foul':
     case 'turnover':
     case 'timeout':
@@ -107,10 +108,14 @@ const playTypeOf = (type: string): LatestPlay['type'] => {
   }
 };
 
-/** The one player a latest play is about, if any: the scorer, the fouler, who came in. */
+/**
+ * The one player a latest play is about, if any: the scorer, the player whose basket was
+ * taken back, the fouler, who came in.
+ */
 function playerOf(play: basketball.LoggedPlay): string | undefined {
   switch (play.type) {
     case 'score':
+    case 'unscore':
     case 'foul':
     case 'turnover':
       return play.playerId;
@@ -235,7 +240,7 @@ export async function readGameSnapshot(
       ...(side === undefined ? {} : { side }),
       playerName: named === undefined || side === undefined ? null : nameOf(side, named),
       jersey: named === undefined ? null : (jerseyOf.get(named) ?? null),
-      ...(latest.type === 'score' ? { points: latest.points } : {}),
+      ...(latest.type === 'score' || latest.type === 'unscore' ? { points: latest.points } : {}),
     };
   }
 

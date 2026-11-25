@@ -62,6 +62,13 @@ const endAgain = (t: Tracker, sequence: number, lines: object[] = [], accountId 
  * `withoutMark`, each payload is read with its source (T-408) taken out first.
  */
 function replayedLines(t: Tracker, withoutMark = false) {
+  const game = t.db.state.games[0];
+  if (game === undefined) throw new Error('no game');
+  return linesOf(game, rosterOf(t.db.state.players), replayedState(t, withoutMark));
+}
+
+/** The game's state as its event log replayed with the engine from nothing gives it. */
+function replayedState(t: Tracker, withoutMark = false) {
   const saved = t.db.state.states.find((s) => s.gameId === gameId);
   const game = t.db.state.games[0];
   if (saved === undefined || game === undefined) throw new Error('no game');
@@ -75,7 +82,7 @@ function replayedLines(t: Tracker, withoutMark = false) {
     const command = { type: event.type, ...payload } as basketball.Command;
     state = basketball.apply(state, command, { id: event.commandId, now: event.tappedAt });
   }
-  return linesOf(game, rosterOf(t.db.state.players), state);
+  return state;
 }
 
 const foulsOf = (lines: ReturnType<typeof replayedLines>, id: string) => lines.get(id)?.stats.fouls;
@@ -97,7 +104,15 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
     ]);
     expect(result).toEqual({
       ok: true,
-      value: { sequence: before.sequence + 2, plays: 2, ended: false },
+      value: {
+        sequence: before.sequence + 2,
+        plays: 2,
+        ended: false,
+        written: [
+          { type: 'unfoul', side: 'home', playerId: h0 },
+          { type: 'foul', side: 'home', playerId: h1 },
+        ],
+      },
     });
     const added = t.db.state.events.filter((e) => e.seq > before.sequence);
     const mark = { [playSourceKey]: correctionPlaySource };
@@ -158,7 +173,7 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
     const { sequence } = await grid(t);
     expect(await correct(t, sequence, [{ teamId: homeTeamId, personId: h0, fouls: 1 }])).toEqual({
       ok: true,
-      value: { sequence, plays: 0, ended: false },
+      value: { sequence, plays: 0, ended: false, written: [] },
     });
     expect(t.db.state.events.filter((e) => e.seq > sequence)).toEqual([]);
     const result = await correct(t, sequence, [{ teamId: awayTeamId, personId: a0, fg1: 1 }]);
@@ -183,7 +198,51 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
     expect(t.db.state.events.length).toBe(events);
   });
 
-  it('refuses a grid read before something else was recorded, and a basket taken back', async () => {
+  it('two points moved from one player to another: a take-back and a basket, and the replay agrees (T-436)', async () => {
+    const t = setUp();
+    await reopened(t);
+    const before = await grid(t);
+    const basket = t.db.state.events.find(
+      (e) => e.type === 'score' && e.payload['playerId'] === h1,
+    );
+    if (basket === undefined) throw new Error('no basket');
+    const result = await correct(t, before.sequence, [
+      { teamId: homeTeamId, personId: h1, fg2: 0 },
+      { teamId: homeTeamId, personId: h0, fg2: 1 },
+    ]);
+    expect(result.ok).toBe(true);
+    // The save names the basket it took back with the period it was made in (L3).
+    const madeIn = t.db.state.events.find((e) => e.commandId === basket.commandId);
+    expect(result.ok && result.value.written[0]).toMatchObject({
+      type: 'unscore',
+      playerId: h1,
+      points: 2,
+      basketPeriod: expect.any(Number),
+    });
+    expect(madeIn).toBeDefined();
+    const mark = { [playSourceKey]: correctionPlaySource };
+    const added = t.db.state.events.filter((e) => e.seq > before.sequence);
+    expect(added.map((e) => [e.type, e.payload])).toEqual([
+      ['unscore', { side: 'home', playerId: h1, points: 2, playId: basket.commandId, ...mark }],
+      ['score', { side: 'home', playerId: h0, points: 2, ...mark }],
+    ]);
+    const after = await grid(t);
+    const pointsOf = (id: string) => after.lines.find((l) => l.personId === id)?.points;
+    expect([pointsOf(h0), pointsOf(h1)]).toEqual([5, 0]);
+    expect(after.lines.find((l) => l.personId === h1)).toMatchObject({ fg2: 0 });
+    // The replayed log gives the grid's lines, the score and the score by period.
+    const replayed = replayedLines(t);
+    expect([replayed.get(h0)?.stats.points, replayed.get(h1)?.stats.points]).toEqual([5, 0]);
+    const saved = t.db.state.states.find((s) => s.gameId === gameId);
+    if (saved === undefined) throw new Error('no state');
+    const state = readState(saved.state);
+    const again = replayedState(t);
+    expect(basketball.scoreByPeriod(state.plays)).toEqual(basketball.scoreByPeriod(again.plays));
+    expect(basketball.scoreByPeriod(again.plays)).toEqual({ home: [5], away: [2] });
+    expect(basketball.derive(again).teams.home.score).toBe(5);
+  });
+
+  it('refuses a grid read before something else was recorded', async () => {
     const t = setUp();
     await reopened(t);
     const { sequence } = await grid(t);
@@ -192,12 +251,6 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
     expect(await correct(t, sequence - 1, line)).toEqual({
       ok: false,
       error: { code: 'changed-since-read' },
-    });
-    expect(
-      await correct(t, sequence, [{ teamId: homeTeamId, personId: h0, fouls: 0, fg3: 0 }]),
-    ).toEqual({
-      ok: false,
-      error: { code: 'rule', problem: 'basket-taken-back', personId: h0, stat: 'fg3' },
     });
     expect(t.db.state.events.length).toBe(events);
   });
@@ -259,7 +312,15 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
     // The tablet's session is the scorekeeper's: the grid asks for none.
     expect(t.db.state.sessions.map((s) => s.accountId)).toEqual([scorekeeperId]);
     const result = await endAgain(t, sequence, [{ teamId: awayTeamId, personId: a0, fg2: 2 }]);
-    expect(result).toEqual({ ok: true, value: { sequence: sequence + 2, plays: 1, ended: true } });
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        sequence: sequence + 2,
+        plays: 1,
+        ended: true,
+        written: [{ type: 'score', side: 'away', playerId: a0, points: 2 }],
+      },
+    });
     const added = t.db.state.events.filter((e) => e.seq > sequence);
     expect(added.map((e) => [e.type, e.accountId])).toEqual([
       ['score', ownerId],
