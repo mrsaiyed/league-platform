@@ -203,11 +203,11 @@ describe('the mercy rule’s notice (step 2.69, item 2)', () => {
   it('says so when the lead reaches the mercy lead, with the way back in one tap', () => {
     const game = homeRuns(mercyRules);
     const mercy = mercySwitch(game);
-    expect(mercy).toEqual({ playId: game.plays.at(-1)?.id, lead: 10 });
+    expect(mercy).toEqual({ playId: game.plays.at(-1)?.id, lead: 10, lastMinutes: false });
     const html = renderToStaticMarkup(
       createElement(MercyNotice, {
         t,
-        mercy: mercy ?? { playId: '', lead: 0 },
+        mercy: mercy ?? { playId: '', lead: 0, lastMinutes: false },
         back: () => undefined,
         keep: () => undefined,
       }),
@@ -325,18 +325,30 @@ describe('the last-minutes stop clock sign (step 2.69, item 3)', () => {
   it('is shown beside the period inside the last minutes of a running-clock game', () => {
     const early = at(tippedOff(lastTwo), 300_000);
     const shownEarly = clockModeShown(early);
-    expect(shownEarly).toEqual({ now: 'running', lastMinutes: false, lastMinutesAtMs: 120_000 });
+    expect(shownEarly).toEqual({
+      now: 'running',
+      lastMinutes: false,
+      lastMinutesAtMs: 120_000,
+      switchable: true,
+    });
     expect(buttonOf(early, shownEarly)).not.toContain('data-last-minutes');
 
     const late = clockModeShown(early, 90_000);
-    expect(late).toEqual({ now: 'stop', lastMinutes: true, lastMinutesAtMs: null });
+    expect(late).toEqual({
+      now: 'stop',
+      lastMinutes: true,
+      lastMinutesAtMs: null,
+      switchable: false,
+    });
     const html = buttonOf(early, late);
     expect(html).toContain('data-last-minutes');
     expect(text(html)).toContain('Stop clock');
     expect(text(html)).toContain('The last minutes: the clock stops on every foul.');
-    // The switch reads Off there, says why, and a tap keeps the clock running.
-    expect(text(sheetOf(early, late))).toContain('These are the last minutes');
-    expect(switchedClock(late)).toEqual({ type: 'clock-mode', mode: 'running' });
+    // The switch reads Off there, says why, and cannot be used (T-442, step 2.248).
+    expect(text(sheetOf(early, late))).toContain(
+      'These are the last minutes, so the clock stops on every foul. The switch comes back when they end.',
+    );
+    expect(sheetOf(early, late)).toMatch(/<button[^>]*data-last-minutes-locked=""[^>]*disabled=""/);
   });
 
   it('is not shown where the scorer switched to running inside them, nor on a stop clock', () => {
@@ -348,6 +360,7 @@ describe('the last-minutes stop clock sign (step 2.69, item 3)', () => {
       now: 'stop',
       lastMinutes: false,
       lastMinutesAtMs: null,
+      switchable: false,
     });
     // Q1 has no window when the last minutes are each half's.
     const q1 = at(tippedOff(lastTwo), 90_000, 1);
@@ -355,6 +368,137 @@ describe('the last-minutes stop clock sign (step 2.69, item 3)', () => {
       now: 'running',
       lastMinutes: false,
       lastMinutesAtMs: null,
+      switchable: true,
     });
+  });
+});
+
+describe('a mercy rule beside the last minutes (step 2.248, items 1 and 2)', () => {
+  /** A stop clock, a mercy lead of 10 and a stop clock in the last two minutes. */
+  const both = (scope: basketball.Rules['stopClockScope'] = 'half'): basketball.Rules => ({
+    ...basketball.QUARTERS,
+    clockMode: 'stop',
+    mercyLead: 10,
+    stopClockLastSeconds: 120,
+    stopClockScope: scope,
+  });
+  /** `game` moved to `period` (unless it is there) with `ms` left, the clock running. */
+  const at = (game: basketball.GameState, period: number, ms: number) =>
+    played(
+      [
+        ...(basketball.derive(game).period === period ? [] : [{ type: 'period', period } as const]),
+        { type: 'set-clock', ms },
+        { type: 'start' },
+      ],
+      game,
+    );
+  const noticeOf = (game: basketball.GameState) => {
+    const mercy = mercySwitch(game);
+    return mercy === null
+      ? null
+      : renderToStaticMarkup(
+          createElement(MercyNotice, { t, mercy, back: () => undefined, keep: () => undefined }),
+        );
+  };
+  const said =
+    'One team leads by 10 or more, so the clock now keeps running after fouls (the mercy rule). Stop the clock on fouls again Keep it running';
+  const saidLast =
+    'One team leads by 10 or more (the mercy rule), but in these last minutes the clock stops on every foul. Got it';
+  /** What the screen shows at `game`: the notice's words, the mode and the switch. */
+  const seen = (game: basketball.GameState) => {
+    const shown = clockModeShown(game);
+    const sheet = sheetOf(game, shown);
+    const html = noticeOf(game);
+    return {
+      notice: html === null ? null : text(html),
+      back: html?.includes('data-mercy-back') ?? false,
+      now: shown.now,
+      switchable: shown.switchable,
+      locked: /<button[^>]*data-clock-switch=""[^>]*disabled=""/.test(sheet),
+    };
+  };
+  const outside = { notice: said, back: true, now: 'running', switchable: true, locked: false };
+  const inside = { notice: saidLast, back: false, now: 'stop', switchable: false, locked: true };
+
+  it('before the mercy line: a stop clock, no notice, the switch out of use only in the window', () => {
+    const short = played(
+      [{ type: 'start' }, ...Array.from({ length: 3 }, () => three('home', 'h3'))],
+      tippedOff(both()),
+    );
+    expect(seen(at(short, 2, 300_000))).toEqual({
+      notice: null,
+      back: false,
+      now: 'stop',
+      switchable: true,
+      locked: false,
+    });
+    expect(seen(at(short, 2, 90_000))).toEqual({
+      notice: null,
+      back: false,
+      now: 'stop',
+      switchable: false,
+      locked: true,
+    });
+  });
+
+  it('after it: the notice as step 2.69 made it outside the window, its own words inside', () => {
+    const game = homeRuns(both());
+    expect(seen(at(game, 2, 300_000))).toEqual(outside);
+    const late = at(game, 2, 90_000);
+    expect(seen(late)).toEqual(inside);
+    expect(text(sheetOf(late, clockModeShown(late)))).toContain(
+      'These are the last minutes, so the clock stops on every foul. The switch comes back when they end.',
+    );
+    // The way back the notice no longer offers: the engine refuses it there.
+    expect(() => played([{ type: 'clock-mode', mode: 'stop' }], late)).toThrow(
+      'The clock already stops on fouls.',
+    );
+    // The window begins while the clock runs: the same state read at a later moment.
+    const early = at(game, 2, 125_000);
+    expect(mercySwitch(early)?.lastMinutes).toBe(false);
+    expect(mercySwitch(early, 110_000)?.lastMinutes).toBe(true);
+    expect(clockModeShown(early, 110_000).switchable).toBe(false);
+    expect(clockModeShown(early).lastMinutesAtMs).toBe(120_000);
+    // A new period ends the window: the running clock and the switch come back.
+    expect(seen(at(late, 3, 480_000))).toEqual(outside);
+  });
+
+  it('in overtime: each overtime period’s last minutes stop the clock, its start does not', () => {
+    const game = homeRuns(both());
+    expect(seen(at(game, 5, 200_000))).toEqual(outside);
+    const late = at(game, 5, 60_000);
+    expect(seen(late)).toEqual(inside);
+    expect(seen(at(late, 6, 240_000))).toEqual(outside);
+  });
+
+  it('follows the window’s scope: the game’s, each half’s, each period’s', () => {
+    const game = homeRuns(both('game'));
+    expect(seen(at(game, 2, 90_000))).toEqual(outside);
+    expect(seen(at(game, 3, 90_000))).toEqual(outside);
+    expect(seen(at(game, 4, 90_000))).toEqual(inside);
+    const half = homeRuns(both('half'));
+    expect(seen(at(half, 1, 90_000))).toEqual(outside);
+    expect(seen(at(half, 2, 90_000))).toEqual(inside);
+    expect(seen(at(half, 3, 90_000))).toEqual(outside);
+    expect(seen(at(half, 4, 90_000))).toEqual(inside);
+    const period = homeRuns(both('period'));
+    for (const q of [1, 2, 3, 4]) expect(seen(at(period, q, 90_000))).toEqual(inside);
+  });
+
+  it('a switch to running already made inside the window (a tap kept on a device) is shown as it stands, not usable', () => {
+    const late = at(homeRuns(both()), 2, 90_000);
+    const kept = played([{ type: 'clock-mode', mode: 'running' }], late);
+    expect(seen(kept)).toEqual({
+      notice: null,
+      back: false,
+      now: 'running',
+      switchable: false,
+      locked: true,
+    });
+    expect(text(sheetOf(kept, clockModeShown(kept)))).toContain(
+      'The clock keeps going in these last minutes, as it was switched. The switch comes back when they end.',
+    );
+    // After the window the game is on the running clock it was on.
+    expect(seen(at(kept, 3, 480_000))).toMatchObject({ now: 'running', switchable: true });
   });
 });

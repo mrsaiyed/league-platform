@@ -831,8 +831,9 @@ export function ClockSheetView(props: {
 
 /**
  * The running-clock switch (step 2.69; P7 section 5.2, S-21): on or off at any moment of
- * the game, whatever the season's rule says. It shows the mode in force, so inside the
- * last-minutes stop clock it reads Off and a tap keeps the clock running there. It sits
+ * the game, whatever the season's rule says, except inside the last minutes (T-442): there
+ * the stop clock wins, so it is shown as it stands, not usable, and says why; it comes
+ * back when the window ends. Out of use it keeps its place and size. It sits
  * in the form's first row, beside its title, where it takes no height: the form is whole
  * on a phone's screen with nothing scrolling (DESIGN.md section 7, line 8).
  */
@@ -850,6 +851,8 @@ function ClockModeSwitch(props: {
         role="switch"
         className="court-opt court-clock-mode"
         data-clock-switch=""
+        data-last-minutes-locked={mode.switchable ? undefined : ''}
+        disabled={!mode.switchable}
         aria-checked={running}
         aria-describedby="court-clock-mode-help"
         onClick={props.on.switchClock}
@@ -861,10 +864,12 @@ function ClockModeSwitch(props: {
       </button>
       <p className="court-sr" id="court-clock-mode-help" data-clock-mode-help="">
         {t(
-          running
-            ? 'tracker.clockMode.helpRunning'
-            : mode.lastMinutes
-              ? 'tracker.clockMode.helpLastMinutes'
+          !mode.switchable
+            ? running
+              ? 'tracker.clockMode.helpLastMinutesRunning'
+              : 'tracker.clockMode.helpLastMinutes'
+            : running
+              ? 'tracker.clockMode.helpRunning'
               : 'tracker.clockMode.helpStop',
         )}
       </p>
@@ -874,7 +879,9 @@ function ClockModeSwitch(props: {
 
 /**
  * The mercy rule switched the clock to running (step 2.69): a plain sentence, and the way
- * back in one tap. Kept until it is dismissed or the clock is switched by hand. It comes
+ * back in one tap. Kept until it is dismissed or the clock is switched by hand. Inside the
+ * last minutes (step 2.248) it says the clock stops there and offers only "Got it": the
+ * engine would refuse the way back, the stop clock being in force already. It comes
  * up as a basket is taken, under the finger that took it, so its answers rest for a moment
  * (the screen marks them `data-resting`) and it is drawn in the pad at rest at every size,
  * where it moves nothing (the step's fix round).
@@ -888,21 +895,36 @@ export function MercyNotice(props: {
   const { t } = props;
   return (
     <div className="court-notice court-mercy" role="status" data-mercy-notice="">
-      <p>{t('tracker.mercy.said', { lead: props.mercy.lead })}</p>
-      <div className="court-mercy-acts">
-        <button
-          type="button"
-          className="court-button"
-          data-kind="main"
-          data-mercy-back=""
-          onClick={props.back}
-        >
-          {t('tracker.mercy.back')}
-        </button>
-        <button type="button" className="court-button" data-mercy-keep="" onClick={props.keep}>
-          {t('tracker.mercy.keep')}
-        </button>
-      </div>
+      {props.mercy.lastMinutes ? (
+        <>
+          <p data-mercy-last-minutes="">
+            {t('tracker.mercy.saidLastMinutes', { lead: props.mercy.lead })}
+          </p>
+          <div className="court-mercy-acts">
+            <button type="button" className="court-button" data-mercy-keep="" onClick={props.keep}>
+              {t('tracker.mercy.seen')}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p>{t('tracker.mercy.said', { lead: props.mercy.lead })}</p>
+          <div className="court-mercy-acts">
+            <button
+              type="button"
+              className="court-button"
+              data-kind="main"
+              data-mercy-back=""
+              onClick={props.back}
+            >
+              {t('tracker.mercy.back')}
+            </button>
+            <button type="button" className="court-button" data-mercy-keep="" onClick={props.keep}>
+              {t('tracker.mercy.keep')}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

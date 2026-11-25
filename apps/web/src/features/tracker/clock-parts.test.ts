@@ -69,7 +69,7 @@ const stopped: CourtClock = {
   running: false,
   over: false,
   start: null,
-  mode: { now: 'stop', lastMinutes: false, lastMinutesAtMs: null },
+  mode: { now: 'stop', lastMinutes: false, lastMinutesAtMs: null, switchable: true },
 };
 const running: CourtClock = { ...stopped, running: true };
 const over: CourtClock = { ...stopped, text: '0:00', over: true };

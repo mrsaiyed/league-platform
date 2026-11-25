@@ -414,7 +414,7 @@ describe('where the frame draws them (DESIGN.md section 7, line 8)', () => {
           running: false,
           over: true,
           start: null,
-          mode: { now: 'stop', lastMinutes: false, lastMinutesAtMs: null },
+          mode: { now: 'stop', lastMinutes: false, lastMinutesAtMs: null, switchable: true },
         },
         banner: { text: 'All saved', short: ['All saved'], state: 'saved' },
         pad: padFor(view, asked),

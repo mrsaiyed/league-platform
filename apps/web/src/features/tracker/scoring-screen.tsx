@@ -679,11 +679,13 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const [mercyDismissed, setMercyDismissed] = useState<string | null>(() =>
     readMercyDismissed(deviceStore(), mercyOwner),
   );
-  const mercy = mercySwitch(state);
+  const mercy = mercySwitch(state, reading.remainingMs);
   const mercyShown = mercy !== null && mercy.playId !== mercyDismissed ? mercy : null;
   // Its answers rest from the moment it comes up (above, `restingPlaces.mercy`).
   // (The effect that begins it is below Undo's question, which makes the notice wait.)
-  const mercyShownId = mercyShown?.playId ?? null;
+  // Its words change as the last minutes begin: the answers rest again then too.
+  const mercyShownId =
+    mercyShown === null ? null : `${mercyShown.playId}${mercyShown.lastMinutes ? ':last' : ''}`;
   // Start or Pause under the scoreboard rests when its word changes, whatever changed it
   // (a tap kept by the device, a foul that stopped the clock, the clock running out): a
   // tap already on its way was meant for the word that was there.
@@ -1008,6 +1010,9 @@ export function ScoringScreen(props: ScoringScreenProps) {
       });
     },
     switchClock() {
+      // Not inside the last minutes (T-442), read again at the tap: the screen may be
+      // drawn from a moment before the window began.
+      if (!clockModeShown(state, readClock(state, status.now()).remainingMs).switchable) return;
       const input = switchedClock(clock.mode);
       setDigits('');
       setClockOpen(false);

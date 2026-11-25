@@ -35,8 +35,11 @@ export const enTracker = {
   'tracker.clock.startLabel': 'Start the clock',
   // The running-clock switch in the clock's form (step 2.69; S-21): on or off at any
   // moment, whatever the season's rule says. A timeout stops the clock either way.
+  // Inside the last minutes the switch is shown, not usable (T-442), and says why.
   'tracker.clockMode.helpLastMinutes':
-    'These are the last minutes, so the clock stops on every foul. Turn it on to keep the clock going.',
+    'These are the last minutes, so the clock stops on every foul. The switch comes back when they end.',
+  'tracker.clockMode.helpLastMinutesRunning':
+    'The clock keeps going in these last minutes, as it was switched. The switch comes back when they end.',
   'tracker.clockMode.helpRunning': 'The clock keeps going after a foul.',
   'tracker.clockMode.helpStop': 'The clock stops on every foul.',
   'tracker.clockMode.label': 'Running clock',
@@ -427,6 +430,10 @@ export const enTracker = {
   'tracker.mercy.keep': 'Keep it running',
   'tracker.mercy.said':
     'One team leads by {lead} or more, so the clock now keeps running after fouls (the mercy rule).',
+  // Inside the last minutes (step 2.248): the stop clock holds there, so no way back.
+  'tracker.mercy.saidLastMinutes':
+    'One team leads by {lead} or more (the mercy rule), but in these last minutes the clock stops on every foul.',
+  'tracker.mercy.seen': 'Got it',
   'tracker.noStorage':
     'This browser window cannot save the game on this device, so scoring is off. If this is a private window, open the tracker in a normal one.',
   // No longer allowed to score, with plays still on the device (finding M2).
