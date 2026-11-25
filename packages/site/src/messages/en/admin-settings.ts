@@ -354,8 +354,10 @@ export const enAdminSettings = {
   'seasonSettings.readOnlyNotice':
     '{season} is archived. It can be read but not changed; a game in it is changed only by a correction with a reason.',
   'seasonSettings.refused.boxes': 'Not saved: the marked boxes need a change.',
+  // A part refused because the season changed meanwhile (step 2.155 part 4): the boxes keep
+  // what was typed and "Saved now" stands beside each that differs, and this says so.
   'seasonSettings.refused.changed-since-read':
-    'Someone else saved this season while you were changing it. The other parts of the page now show what they saved; the boxes here still hold what you typed. Saving again replaces what they saved with what is in these boxes.',
+    'Someone else saved this season since you opened this page, so this was not saved. What you typed is kept, and beside each box that differs is what is saved now. Save again to replace it with yours.',
   'seasonSettings.refused.not-allowed':
     "Only the league's owner or an admin can change Season settings.",
   'seasonSettings.refused.not-archivable': 'That season is archived already. Nothing was changed.',
@@ -367,6 +369,10 @@ export const enAdminSettings = {
   'seasonSettings.refused.season-not-found': 'That season is not there any more.',
   'seasonSettings.rulesUpgraded':
     "This season's rules were saved in an older form, and anything that could not be kept was left out. Check them, and save each part you change.",
+  'seasonSettings.savedNow': 'Saved now:',
+  'seasonSettings.savedNowNothing': '(nothing)',
+  'seasonSettings.savedNowTicked': 'ticked',
+  'seasonSettings.savedNowUnticked': 'not ticked',
   'seasonSettings.seasonName': 'Season: {name}',
   'seasonSettings.seasonNotFound': 'That season was not found, so this page shows {name}.',
   'seasonSettings.show': 'Show this season to visitors',

@@ -7,7 +7,7 @@
 // button when no box is wrong). With scripts off React's form state does the same in the
 // page that answers the post, at the form's own place (`permalink`). Every word comes from
 // the server, from the message files (T-187).
-import { useActionState, useEffect, useId, useRef, type ReactNode } from 'react';
+import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { untouched, type FormState, type SavedNowWords, type TypedFields } from './form-state.ts';
 import { useOneSubmit } from './use-one-submit.ts';
 
@@ -176,6 +176,11 @@ export function ListForm({
     if (state.kind !== 'refused') return;
     formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
   }, [state]);
+  // A mark that changes with every answer (step 2.155 part 4): two refusals in a row that
+  // read the same are still two answers, drawn as a new line each, so a person's screen
+  // reader says the second one and a test can tell it from the first.
+  const [answers, setAnswers] = useState({ state, count: 0 });
+  if (answers.state !== state) setAnswers({ state, count: answers.count + 1 });
   const base = useId();
   const problemId = `${base}-problem`;
   const refused = state.kind === 'refused' ? state : undefined;
@@ -183,7 +188,14 @@ export function ListForm({
   const typed = (field: string) => refused?.typed[field];
   const problem =
     refused === undefined ? null : (
-      <p id={problemId} className="ui-field-error" role="alert" data-problem={name}>
+      <p
+        key={answers.count}
+        id={problemId}
+        className="ui-field-error"
+        role="alert"
+        data-problem={name}
+        data-answer={answers.count}
+      >
         {refused.said}
       </p>
     );
@@ -281,20 +293,23 @@ export function ListForm({
           const chosen = typed(field.name) ?? field.value;
           return (
             <div key={field.name} className="admin-field-group">
-              <fieldset {...marked(field.name)}>
+              {/* Each choice a line of its own, a whole line to tap (the settings' own look). */}
+              <fieldset className="settings-choice" {...marked(field.name)}>
                 <legend>{field.label}</legend>
                 {field.options.map((option) => (
-                  <label key={option.value}>
-                    <input
-                      key={`${option.value}:${String(option.value === chosen)}`}
-                      type="radio"
-                      name={field.name}
-                      value={option.value}
-                      defaultChecked={option.value === chosen}
-                      disabled={disabled}
-                    />{' '}
-                    {option.label}
-                  </label>
+                  <p key={option.value}>
+                    <label className="staff-check">
+                      <input
+                        key={`${option.value}:${String(option.value === chosen)}`}
+                        type="radio"
+                        name={field.name}
+                        value={option.value}
+                        defaultChecked={option.value === chosen}
+                        disabled={disabled}
+                      />{' '}
+                      {option.label}
+                    </label>
+                  </p>
                 ))}
               </fieldset>
               {savedNow(field)}

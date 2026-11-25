@@ -60,6 +60,17 @@ function refusedFor(code: string, typed: TypedFields): PartSaveResult {
       typed,
       wrong: [],
       said: t(`seasonSettings.refused.${known ?? 'other'}` as TextKey),
+      // Changed meanwhile (T-418): beside each box that differs, what is saved now.
+      ...(code === 'changed-since-read'
+        ? {
+            savedNow: {
+              label: t('seasonSettings.savedNow'),
+              nothing: t('seasonSettings.savedNowNothing'),
+              ticked: t('seasonSettings.savedNowTicked'),
+              unticked: t('seasonSettings.savedNowUnticked'),
+            },
+          }
+        : {}),
     },
   };
 }

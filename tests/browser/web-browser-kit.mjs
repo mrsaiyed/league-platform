@@ -345,7 +345,9 @@ export async function accessibilityProblems(page) {
  * `section[data-setting=…]`) and waits, at most `timeout`, for that setting's own answer
  * (step 2.155 part 4): "Saved: …" beside it or the refusal in its form, never an answer
  * that stood there before the press. Scripts on (drawn again in place) or off (a page that
- * answers the post). Returns whether it was saved and the words.
+ * answers the post). Returns whether it was saved and the words. A refusal is a new line
+ * with each answer (`ListForm`'s `data-answer`, a mark that changes with every answer), so
+ * a second refusal in a row that reads as the first is still told from it.
  */
 export async function settingAnswer(page, section, button, timeout = 10_000) {
   const before = 'data-answered-before';

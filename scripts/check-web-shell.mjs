@@ -2541,7 +2541,9 @@ async function checkSettings(origin) {
   });
   if (
     outside?.status !== 200 ||
-    !/<fieldset aria-invalid="true"[^>]*><legend>Which games a scorekeeper/.test(outside.body) ||
+    !/<fieldset class="settings-choice" aria-invalid="true"[^>]*><legend>Which games a scorekeeper/.test(
+      outside.body,
+    ) ||
     !/Which games a scorekeeper[^<]*: That value is not allowed for this setting/.test(outside.body)
   ) {
     problems.push(`a value outside the limits was not refused in the page (${outside?.to})`);

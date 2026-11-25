@@ -14,6 +14,7 @@ import {
   buildNext,
   freePort,
   launch,
+  settingAnswer,
   startNext,
   waitFor,
   whatWentWrong,
@@ -77,6 +78,23 @@ async function journey(browser, origin, scripts) {
       `${how}: no accessibility fault in the refused form`,
       (await accessibilityProblems(page)).length === 0,
       (await accessibilityProblems(page)).join('; '),
+    );
+
+    // A second refusal in a row, reading as the first: still told from it (its own mark).
+    const firstMark = await problem.getAttribute('data-answer', limit);
+    await form.evaluate((element) => {
+      element.noValidate = true;
+    });
+    await box.fill('6000');
+    const again = await settingAnswer(page, section, form.getByRole('button', { name: 'Save' }));
+    note(
+      `${how}: a second refusal in a row is its own answer`,
+      !again.saved && again.text === why && (await box.inputValue(limit)) === '6000',
+      again.text,
+    );
+    note(
+      `${how}: the second refusal carries a mark of its own`,
+      !scripts || (await problem.getAttribute('data-answer', limit)) !== firstMark,
     );
 
     await box.fill('4');
