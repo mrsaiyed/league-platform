@@ -210,10 +210,12 @@ export const enAdminSettings = {
   'seasonSettings.field.forfeitLoser': 'Score of the team that forfeited',
   'seasonSettings.field.forfeitWinner': 'Score of the team that did not forfeit',
   'seasonSettings.field.fullTimeouts': 'Full timeouts',
-  'seasonSettings.field.lastMinutes': 'With a running clock: stop clock in the last minutes',
-  'seasonSettings.field.lastMinutes.help': 'Minutes. Leave it empty for none.',
+  'seasonSettings.field.lastMinutes': 'Stop clock in the last minutes',
+  'seasonSettings.field.lastMinutes.help':
+    'Minutes. In these last minutes a foul stops the clock even when it was running: a running clock, or a stop clock the mercy rule switched. Leave it empty for none.',
   'seasonSettings.field.mercyLead': 'With a stop clock: running clock once a team leads by',
-  'seasonSettings.field.mercyLead.help': 'Points. Leave it empty for no mercy rule.',
+  'seasonSettings.field.mercyLead.help':
+    "Points. From then on fouls do not stop the clock, except in the stop clock's last minutes. Leave it empty for no mercy rule.",
   'seasonSettings.field.name': 'Season name',
   'seasonSettings.field.overtimeMinutes': 'Minutes of each overtime',
   'seasonSettings.field.overtimeTimeouts': 'Timeouts in each overtime',
@@ -401,10 +403,10 @@ export const enAdminSettings = {
   'seasonSettings.start.clock': 'When a foul is called, does the game clock stop?',
   'seasonSettings.start.clock.running': 'No, the clock keeps running (a running clock)',
   'seasonSettings.start.clock.stop': 'Yes, the clock stops on every foul (a stop clock)',
-  'seasonSettings.start.clockDropsLastMinutes_one':
-    '{season} also stops the clock in the last minute. A stop clock for the whole game replaces that.',
-  'seasonSettings.start.clockDropsLastMinutes_other':
-    '{season} also stops the clock in the last {minutes} minutes. A stop clock for the whole game replaces that.',
+  'seasonSettings.start.clockKeepsLastMinutes_one':
+    '{season} also stops the clock in the last minute. The new season keeps that with either clock; you can change it in its settings.',
+  'seasonSettings.start.clockKeepsLastMinutes_other':
+    '{season} also stops the clock in the last {minutes} minutes. The new season keeps that with either clock; you can change it in its settings.',
   'seasonSettings.start.endsOn': 'Last day (you can leave it empty)',
   'seasonSettings.start.gameRules': 'Game rules',
   'seasonSettings.start.gameRulesHelp':
@@ -475,8 +477,12 @@ export const enAdminSettings = {
   'seasonSettings.value.clock.runningLast':
     'Running clock, with a stop clock in the last {minutes} minutes of {scope}',
   'seasonSettings.value.clock.stop': 'Stop clock',
+  'seasonSettings.value.clock.stopLast':
+    'Stop clock; if it is switched to running, it stops again in the last {minutes} minutes of {scope}',
   'seasonSettings.value.clock.stopMercy':
     'Stop clock, then a running clock once a team leads by {lead}',
+  'seasonSettings.value.clock.stopMercyLast':
+    'Stop clock, then a running clock once a team leads by {lead}, but a stop clock again in the last {minutes} minutes of {scope}',
   'seasonSettings.value.dates': '{from} to {to}',
   'seasonSettings.value.datesFrom': 'From {from}',
   'seasonSettings.value.datesNone': 'Not set yet',

@@ -76,3 +76,33 @@ describe('when team fouls start again', () => {
     );
   });
 });
+
+describe('the clock in words, with the mercy rule and the last minutes (step 2.248, S-113)', () => {
+  const clockLine = (clock: SeasonRules['clock']): string =>
+    partFacts('game', seasonWith({ ...base, clock })).find((fact) => fact.term === 'Clock')
+      ?.value ?? '';
+  const last = { stopClockLastSeconds: 120, stopClockScope: 'half' } as const;
+
+  it('says each phase of a stop clock with both, and each rule alone', () => {
+    expect(clockLine({ mode: 'stop', ...last, mercyLead: 15 })).toBe(
+      'Stop clock, then a running clock once a team leads by 15, but a stop clock again in the last 2 minutes of each half',
+    );
+    expect(clockLine({ mode: 'stop', ...last, mercyLead: null })).toBe(
+      'Stop clock; if it is switched to running, it stops again in the last 2 minutes of each half',
+    );
+    expect(clockLine({ mode: 'stop', stopClockLastSeconds: null, mercyLead: 15 })).toBe(
+      'Stop clock, then a running clock once a team leads by 15',
+    );
+    expect(clockLine({ mode: 'running', ...last, mercyLead: null })).toBe(
+      'Running clock, with a stop clock in the last 2 minutes of each half',
+    );
+  });
+
+  it('puts the last-minutes field beside the mercy rule', () => {
+    const names = partGroups('game', base)
+      .flatMap((group) => group.fields)
+      .map((field) => ('name' in field ? field.name : ''));
+    const at = (name: string) => names.indexOf(name);
+    expect(at('lastMinutes')).toBe(at('mercyLead') + 1);
+  });
+});

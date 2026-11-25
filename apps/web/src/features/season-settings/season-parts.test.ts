@@ -114,7 +114,7 @@ describe('a part changes only its own rules', () => {
     expect(rules.fouls.playerFoulLimit).toBeNull();
   });
 
-  it('keeps only the clock extra the chosen clock uses', () => {
+  it('keeps the last minutes with either clock, and the mercy lead with a stop clock only (S-113)', () => {
     const running = {
       ...rulesFields('game', base),
       clockMode: 'running',
@@ -130,8 +130,17 @@ describe('a part changes only its own rules', () => {
     });
     expect(saved(rulesFromPart('game', base, { ...running, clockMode: 'stop' })).clock).toEqual({
       mode: 'stop',
-      stopClockLastSeconds: null,
+      stopClockLastSeconds: 120,
+      stopClockScope: 'game',
       mercyLead: 20,
+    });
+    // And the pair is shown again as it was saved.
+    const pair = saved(rulesFromPart('game', base, { ...running, clockMode: 'stop' }));
+    expect(rulesFields('game', pair)).toMatchObject({
+      clockMode: 'stop',
+      lastMinutes: '2',
+      stopClockScope: 'game',
+      mercyLead: '20',
     });
   });
 
