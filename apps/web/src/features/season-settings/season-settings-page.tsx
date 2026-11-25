@@ -53,6 +53,7 @@ import {
   divisionsScreenBuilt,
   partAddress,
   seasonSettingsAddress,
+  startSeasonAnchor,
   visibilityAnchor,
 } from './season-settings-address.ts';
 import { visibilityOf, wishOf, type VisibilityWish } from './season-visibility.ts';
@@ -83,8 +84,9 @@ export async function SeasonSettingsPage({
   const chosen = named ?? chooseSeason(seasons, undefined);
   const season = seasons.find((s) => s.id === chosen?.id);
   const top = <PageHead title={t('admin.area.season')} sub={t('seasonSettings.intro')} />;
-  // Which panel a refusal in the address belongs to (step 2.130): the start form's, the
-  // current-and-archived panel's, else the visibility panel's.
+  // Which panel a refusal in the address belongs to (step 2.130): the current-and-archived
+  // panel's, else the visibility panel's. The start form answers in the response to its
+  // post (step 2.245), so an old address with its refusal says nothing.
   const problemWord = firstValue(search['problem']) ?? '';
   const problemAt = problemWord.startsWith('leagues.start_season.')
     ? 'start'
@@ -113,7 +115,7 @@ export async function SeasonSettingsPage({
       programId={programId}
       copiedFrom={current?.name}
       gameRules={gameRuleAnswersOf(startRules)}
-      problem={problemFor('start')}
+      permalink={`${seasonSettingsAddress(addressee, season?.slug)}#${startSeasonAnchor}`}
     />
   ) : null;
   if (season === undefined) {

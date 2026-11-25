@@ -1023,11 +1023,19 @@ const cases = [
       'Who can see this season',
       'Everyone can see Fall 2026.',
       'Hide it again',
+      // Step 2.245: the start form asks the clock and the mercy rule, a form with its own
+      // state (a refusal keeps what was typed), filled with Fall 2026's: a running clock.
+      'data-form="start-season"',
+      'When a foul is called, does the game clock stop?',
+      'name="clockMode" value="stop"',
+      'name="clockMode" checked="" value="running"',
+      'name="mercyLead"',
+      '$ACTION_KEY',
       // Drawn inside the staff frame, its menu at Season settings (step 2.103).
       staffFrameAt('/north-valley/admin/season'),
       oneHeading,
     ],
-    [adminPlaceholder, 'Show this season to visitors'],
+    [adminPlaceholder, 'Show this season to visitors', 'data-start-season-form'],
   ],
   [
     'owner',

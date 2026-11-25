@@ -8,7 +8,9 @@
 // shown season (S-103).
 // "Start a new season": a name, a short name, dates and the one choice of what teams come
 // along, saying what is copied from the current season and what is not (T-378). Both are
-// plain form posts, so they work with no script in the page.
+// plain form posts, so they work with no script in the page; a refused start keeps what was
+// typed (step 2.245).
+import { defaultSeasonRules } from '@srleagues/contracts';
 import {
   archivedSeasonStatus,
   hiddenSeasonStatus,
@@ -20,6 +22,7 @@ import {
 import { randomUUID } from 'node:crypto';
 import { t, type TextKey } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
+import { ListForm, type ListField } from '../list-forms/index.ts';
 import { StaffNotice } from '../staff/index.ts';
 import { changeSeasonAction, startSeasonAction } from './actions.ts';
 import type { DoneName } from './answer.ts';
@@ -161,7 +164,7 @@ export function StartSeasonPanel({
   programId,
   copiedFrom,
   gameRules,
-  problem,
+  permalink,
 }: {
   /** The route's `[league]` value, which the form's post finds the page by. */
   readonly league: string;
@@ -171,8 +174,69 @@ export function StartSeasonPanel({
   readonly copiedFrom: string | undefined;
   /** The game rules asked (S-106, step 2.245), filled with the copied season's (or the starting) ones. */
   readonly gameRules: Required<GameRuleAnswers>;
-  readonly problem: TextKey | undefined;
+  /** Where the browser lands with scripts off: this form's place on the page. */
+  readonly permalink: string;
 }) {
+  // A refusal is said in the response to the post (step 2.245, as step 2.155's forms):
+  // every box keeps what was typed, the wrong one is marked, the sentence beside it.
+  const fields: ListField[] = [
+    {
+      kind: 'text',
+      name: 'name',
+      label: t('seasonSettings.start.name'),
+      value: '',
+      required: true,
+      maxLength: 120,
+      help: t('seasonSettings.start.nameHelp'),
+    },
+    {
+      kind: 'text',
+      name: 'slug',
+      label: t('seasonSettings.start.slug'),
+      value: '',
+      required: true,
+      maxLength: 60,
+      pattern: '[a-z0-9]+(-[a-z0-9]+)*',
+      help: t('seasonSettings.start.slugHelp'),
+    },
+    { kind: 'date', name: 'startsOn', label: t('seasonSettings.start.startsOn'), value: '' },
+    { kind: 'date', name: 'endsOn', label: t('seasonSettings.start.endsOn'), value: '' },
+    {
+      kind: 'note',
+      name: 'gameRules',
+      content: (
+        <div data-game-rules="">
+          <h3>{t('seasonSettings.start.gameRules')}</h3>
+          <p className="ui-field-help">{t('seasonSettings.start.gameRulesHelp')}</p>
+        </div>
+      ),
+    },
+    {
+      kind: 'choice',
+      name: 'clockMode',
+      label: t('seasonSettings.start.clock'),
+      value: gameRules.clockMode ?? defaultSeasonRules().clock.mode,
+      options: clockModes.map((mode) => ({
+        value: mode,
+        label: t(
+          mode === 'stop'
+            ? 'seasonSettings.start.clock.stop'
+            : 'seasonSettings.start.clock.running',
+        ),
+      })),
+    },
+    {
+      kind: 'number',
+      name: 'mercyLead',
+      label: t('seasonSettings.start.mercyLead'),
+      value: gameRules.mercyLead === null ? '' : String(gameRules.mercyLead),
+      help: t('seasonSettings.start.mercyLeadHelp'),
+    },
+    ...carryFields(copiedFrom),
+  ];
+  const hidden: Record<string, string> = { league, [requestTokenField]: randomUUID() };
+  if (programId !== undefined) hidden['programId'] = programId;
+  if (copiedFrom === undefined) hidden['carry'] = 'nothing';
   return (
     <section
       className="staff-panel"
@@ -181,119 +245,41 @@ export function StartSeasonPanel({
       data-start-season=""
     >
       <h2 id="start-season-title">{t('seasonSettings.start.title')}</h2>
-      {problem === undefined ? null : (
-        <StaffNotice kind="refused">
-          <p>{t(problem)}</p>
-        </StaffNotice>
-      )}
       <p className="staff-quiet" data-start-copies={copiedFrom === undefined ? 'nothing' : 'rules'}>
         {copiedFrom === undefined
           ? t('seasonSettings.start.aboutFresh')
           : t('seasonSettings.start.about', { season: copiedFrom })}
       </p>
       <p className="staff-quiet">{t('seasonSettings.start.hidden')}</p>
-      <form action={startSeasonAction} className="staff-form" data-start-season-form="">
-        <input type="hidden" name="league" value={league} />
-        {programId === undefined ? null : (
-          <input type="hidden" name="programId" value={programId} />
-        )}
-        <input type="hidden" name={requestTokenField} value={randomUUID()} />
-        <p>
-          <label className="staff-field">
-            {t('seasonSettings.start.name')}
-            <input name="name" type="text" required maxLength={120} autoComplete="off" />
-          </label>
-          <span className="ui-field-help">{t('seasonSettings.start.nameHelp')}</span>
-        </p>
-        <p>
-          <label className="staff-field">
-            {t('seasonSettings.start.slug')}
-            <input
-              name="slug"
-              type="text"
-              required
-              maxLength={60}
-              pattern="[a-z0-9]+(-[a-z0-9]+)*"
-              autoComplete="off"
-            />
-          </label>
-          <span className="ui-field-help">{t('seasonSettings.start.slugHelp')}</span>
-        </p>
-        <p>
-          <label className="staff-field">
-            {t('seasonSettings.start.startsOn')}
-            <input name="startsOn" type="date" />
-          </label>{' '}
-          <label className="staff-field">
-            {t('seasonSettings.start.endsOn')}
-            <input name="endsOn" type="date" />
-          </label>
-        </p>
-        <fieldset data-game-rules="">
-          <legend>{t('seasonSettings.start.gameRules')}</legend>
-          <p className="ui-field-help">{t('seasonSettings.start.gameRulesHelp')}</p>
-          <p>{t('seasonSettings.start.clock')}</p>
-          {clockModes.map((mode) => (
-            <p key={mode}>
-              <label className="staff-check">
-                <input
-                  type="radio"
-                  name="clockMode"
-                  value={mode}
-                  defaultChecked={mode === gameRules.clockMode}
-                  data-game-rule="clockMode"
-                />{' '}
-                {t(
-                  mode === 'stop'
-                    ? 'seasonSettings.start.clock.stop'
-                    : 'seasonSettings.start.clock.running',
-                )}
-              </label>
-            </p>
-          ))}
-          <p>
-            <label className="staff-field">
-              {t('seasonSettings.start.mercyLead')}
-              <input
-                name="mercyLead"
-                type="text"
-                inputMode="numeric"
-                maxLength={3}
-                autoComplete="off"
-                defaultValue={gameRules.mercyLead === null ? '' : String(gameRules.mercyLead)}
-                data-game-rule="mercyLead"
-              />
-            </label>
-            <span className="ui-field-help">{t('seasonSettings.start.mercyLeadHelp')}</span>
-          </p>
-        </fieldset>
-        {copiedFrom === undefined ? (
-          <input type="hidden" name="carry" value="nothing" />
-        ) : (
-          <fieldset>
-            <legend>{t('seasonSettings.start.carry')}</legend>
-            {seasonCarryChoices.map((carry) => (
-              <p key={carry}>
-                <label className="staff-check">
-                  <input
-                    type="radio"
-                    name="carry"
-                    value={carry}
-                    defaultChecked={carry === 'teams'}
-                  />{' '}
-                  {t(carryKey(carry))}
-                </label>
-              </p>
-            ))}
-            <p className="ui-field-help">{t('seasonSettings.start.carryHelp')}</p>
-          </fieldset>
-        )}
-        <p className="staff-buttons">
-          <button type="submit" className="ui-button" data-kind="main">
-            {t('seasonSettings.start.submit')}
-          </button>
-        </p>
-      </form>
+      <ListForm
+        action={startSeasonAction}
+        permalink={permalink}
+        hidden={hidden}
+        fields={fields}
+        button={t('seasonSettings.start.submit')}
+        kind="main"
+        label={t('seasonSettings.start.title')}
+        name="start-season"
+      />
     </section>
   );
+}
+
+/** What teams come along, asked only when there is a season to copy them from. */
+function carryFields(copiedFrom: string | undefined): ListField[] {
+  if (copiedFrom === undefined) return [];
+  return [
+    {
+      kind: 'choice',
+      name: 'carry',
+      label: t('seasonSettings.start.carry'),
+      value: 'teams',
+      options: seasonCarryChoices.map((carry) => ({ value: carry, label: t(carryKey(carry)) })),
+    },
+    {
+      kind: 'note',
+      name: 'carryHelp',
+      content: <p className="ui-field-help">{t('seasonSettings.start.carryHelp')}</p>,
+    },
+  ];
 }

@@ -407,6 +407,23 @@ export const enAdminSettings = {
   'seasonSettings.start.name': 'Name',
   'seasonSettings.start.nameHelp': 'For example Winter 2027.',
   'seasonSettings.start.open': 'Start a new season',
+  // A refused start form (step 2.245): each sentence stands beside its box and names it.
+  'seasonSettings.start.refused.carry':
+    'Teams: choose which teams come along. Nothing was changed.',
+  'seasonSettings.start.refused.clockMode':
+    'Clock: a mercy rule needs a stop clock. Choose a stop clock or leave the mercy rule empty; nothing was changed.',
+  'seasonSettings.start.refused.endsOn':
+    'Last day: it must be a date on or after the first day, or empty. Nothing was changed.',
+  'seasonSettings.start.refused.mercyLead':
+    'Mercy rule: it needs a stop clock and a lead from 1 to 100 points. Choose a stop clock or leave the mercy rule empty; nothing was changed.',
+  'seasonSettings.start.refused.name':
+    'Name: give the season a name of up to 120 letters. Nothing was changed.',
+  'seasonSettings.start.refused.slug':
+    'Short name: use lowercase letters, numbers and single dashes, up to 60, for example winter-2027. Nothing was changed.',
+  'seasonSettings.start.refused.slug-taken':
+    'Short name: another season already uses it. Choose another; nothing was changed.',
+  'seasonSettings.start.refused.startsOn':
+    'First day: it must be a date, or empty. Nothing was changed.',
   'seasonSettings.start.slug': 'Short name',
   'seasonSettings.start.slugHelp':
     "Used in the season's web address: lowercase letters, numbers and dashes, for example winter-2027.",

@@ -1,11 +1,9 @@
 // "Start the season" through the action's own work (step 2.130), on the made-up world:
 // the season lands in the program the form names (the one the admin is working in), never
 // silently in the league's default one; the database test covers the copying.
-import { startSeason } from '@srleagues/core';
 import { describe, expect, it } from 'vitest';
 import { standInLeagues, standInPeople } from '../../server/stand-in-cast.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
-import { refusedBy } from './answer.ts';
 import { runStartSeason } from './run-start-season.ts';
 
 const owner = {
@@ -26,8 +24,9 @@ describe('runStartSeason', () => {
     const world = testWorld();
     const missing = '00000000-0000-4000-8000-0000000000ff';
     expect(await runStartSeason(owner, fields(missing), world.deps)).toEqual({
-      answer: refusedBy(startSeason.commandName, 'program-not-found'),
-      seasonSlug: undefined,
+      kind: 'refused',
+      code: 'program-not-found',
+      field: undefined,
     });
   });
 
@@ -44,12 +43,12 @@ describe('runStartSeason', () => {
     it('starts a season with a stop clock and a mercy lead', async () => {
       const world = testWorld();
       expect(await runStartSeason(owner, asked('stop', ' 15 '), world.deps)).toMatchObject({
-        answer: { kind: 'done' },
+        kind: 'started',
         seasonSlug: 'summer-2027',
       });
     });
 
-    it('refuses a mercy lead with a running clock, or one that is not a number', async () => {
+    it('refuses a mercy lead with a running clock, or one that is not a number, at the mercy box', async () => {
       for (const [clock, lead] of [
         ['running', '15'],
         ['stop', 'ten'],
@@ -57,10 +56,51 @@ describe('runStartSeason', () => {
       ] as const) {
         const world = testWorld();
         expect(await runStartSeason(owner, asked(clock, lead), world.deps)).toEqual({
-          answer: refusedBy(startSeason.commandName, 'game-rule-refused'),
-          seasonSlug: undefined,
+          kind: 'refused',
+          code: 'game-rule-refused',
+          field: 'mercyLead',
         });
       }
+    });
+  });
+
+  // Step 2.245: a refusal names the box it is about, so the form marks it and keeps the rest.
+  describe('a refusal names its box', () => {
+    const typedForm = (more: Readonly<Record<string, string>>) => ({
+      league: 'ignored-the-session-decides',
+      name: 'Summer 2027',
+      slug: 'summer-2027',
+      carry: 'nothing',
+      ...more,
+    });
+
+    it('the name, the short name, the last day and the teams', async () => {
+      for (const [more, code, field] of [
+        [{ name: '  ' }, 'invalid-input', 'name'],
+        [{ slug: 'Summer 2027' }, 'invalid-input', 'slug'],
+        [{ startsOn: '2027-06-01', endsOn: '2027-05-01' }, 'invalid-input', 'endsOn'],
+        [{ startsOn: 'June' }, 'invalid-input', 'startsOn'],
+        [{ carry: 'everything' }, 'invalid-input', 'carry'],
+      ] as const) {
+        const world = testWorld();
+        expect(await runStartSeason(owner, typedForm(more), world.deps)).toEqual({
+          kind: 'refused',
+          code,
+          field,
+        });
+      }
+    });
+
+    it('a short name another season uses', async () => {
+      const world = testWorld();
+      expect(await runStartSeason(owner, typedForm({}), world.deps)).toMatchObject({
+        kind: 'started',
+      });
+      expect(await runStartSeason(owner, typedForm({}), world.deps)).toEqual({
+        kind: 'refused',
+        code: 'season-slug-taken',
+        field: 'slug',
+      });
     });
   });
 });
