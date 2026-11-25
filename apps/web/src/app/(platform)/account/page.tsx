@@ -9,10 +9,13 @@ import {
   waitingQuestionWords,
 } from '../../../features/shell/index.ts';
 import {
+  ChangeEmailForm,
+  changeEmailStart,
   ChangePasswordForm,
   changePasswordStart,
   LocalTime,
   OwnNameForm,
+  type ChangeEmailWords,
   type ChangePasswordWords,
   type LocalTimeWords,
   type OwnNameWords,
@@ -28,6 +31,7 @@ import {
   giveOwnNameAction,
 } from '../../../server/sign-in/own-name-actions.ts';
 import { cookieNames } from '../../../server/sign-in/cookies.ts';
+import { changeEmailAction } from '../../../server/sign-in/email-actions.ts';
 import { changePasswordAction } from '../../../server/sign-in/password-actions.ts';
 import { safeReturnPath } from '../../../server/sign-in/device.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
@@ -43,7 +47,8 @@ import { timeInWords } from '../../../server/sign-in/sign-in-mail.ts';
 // for the session), then lists the leagues they belong to with their role in each, each a
 // link (P2 line 71; record 066), before the devices.
 // Since step 2.128: "Your name", and "Your password" (the old one and a new one; a change
-// signs out every other device and emails the account, T-85).
+// signs out every other device and emails the account, T-85), and "Your email" (a code to the
+// new address, a notice to the old one; the code changes it and signs out the others, T-73).
 // Since step 2.163 (M26, M30, L10): this device first and said to be this one; each time in
 // the reader's own time ("today at 8:41 PM"), by their browser (local-time.tsx); a list that
 // could not be read says so; and "Sign out everywhere" asks first, on this page
@@ -99,6 +104,13 @@ export default async function Page({ searchParams }: SearchProps) {
           action={changePasswordAction}
           initial={changePasswordStart}
           words={changePasswordWords()}
+        />
+        <h2>{t('account.email.heading')}</h2>
+        <p>{t('account.email.help')}</p>
+        <ChangeEmailForm
+          action={changeEmailAction}
+          initial={changeEmailStart}
+          words={changeEmailWords()}
         />
         <h2>{t('account.leagues')}</h2>
         <MyLeaguesList leagues={leagues} />
@@ -214,6 +226,30 @@ function changePasswordWords(): ChangePasswordWords {
       tooShort: t('problem.passwordTooShort'),
       tooLong: t('problem.passwordTooLong'),
       leaked: t('problem.passwordLeaked'),
+      tooManyAttempts: t.plural('problem.tooManyAttempts', 2, { count: hole }),
+    },
+    tooManyAttemptsOne: t.plural('problem.tooManyAttempts', 1, { count: hole }),
+  };
+}
+
+function changeEmailWords(): ChangeEmailWords {
+  const hole = '{count}';
+  return {
+    newEmail: t('account.email.newEmail'),
+    password: t('account.email.password'),
+    send: t('account.email.send'),
+    sent: t('account.email.sent', { email: '{email}' }),
+    code: t('account.email.code'),
+    confirm: t('account.email.confirm'),
+    changed: t('account.email.changed', { email: '{email}' }),
+    problems: {
+      wrongPassword: t('account.email.wrongPassword'),
+      noPassword: t('account.email.noPassword'),
+      invalid: t('account.email.invalid'),
+      same: t('account.email.same'),
+      notSent: t('account.email.notSent'),
+      codeWrong: t('account.email.codeWrong'),
+      codeExpired: t('account.email.codeExpired'),
       tooManyAttempts: t.plural('problem.tooManyAttempts', 2, { count: hole }),
     },
     tooManyAttemptsOne: t.plural('problem.tooManyAttempts', 1, { count: hole }),

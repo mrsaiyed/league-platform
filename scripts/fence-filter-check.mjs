@@ -168,7 +168,9 @@ const excused = new Map([
     'before or beside any league by design, through a narrow database function that' +
       ' answers only for the account or name it is given (record 008)',
     'account-for-sign-in.ts',
+    'change-own-email.ts',
     'create-own-profile.ts',
+    'email-free-for-own-account.ts',
     'erase-account.ts',
     'find-account-of-sign-in.ts',
     'find-league-by-short-name.ts',

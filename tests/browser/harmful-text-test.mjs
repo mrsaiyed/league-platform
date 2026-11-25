@@ -203,7 +203,9 @@ const FIELDS = {
   // Step 2.128: "Your name" on the account page, posted by hand; the walk then reads the
   // name back wherever it is shown (the account page, League settings → Admins). The one
   // name screen holds the same two boxes, but no made-up person of the stand-in meets it.
-  '/account': { firstName: POSTED, lastName: POSTED },
+  // Layer 3: "Your email"'s new address, posted by hand too (its code box is drawn only
+  // once a code was asked, so no page holds it at first).
+  '/account': { firstName: POSTED, lastName: POSTED, newEmail: POSTED },
   '/signin': { email: 'the email boxes' },
   '/signup': { email: 'the email boxes' },
   '/signin/forgot': { email: 'the email boxes' },
