@@ -60,7 +60,6 @@ import {
   addGameAnchor,
   addRoundAnchor,
   answerShown,
-  freshAnswer,
   swapAnchor,
   refusedAtOf,
   roundAnchor,
@@ -78,6 +77,7 @@ import {
   type GameField,
 } from './notice.ts';
 import { publishedNotice } from './published-notice.ts';
+import { SaidInView } from './said-in-view.tsx';
 import { publishLines, publishWarnings, type PublishLine } from './publish-summary.ts';
 import { RoundFacts, RoundRemoval, roundIsEmpty } from './round-parts.tsx';
 import { ScheduleHeading } from './schedule-heading.tsx';
@@ -135,14 +135,15 @@ export async function ScheduleBuilderPage({
   const addressee = view.context.league;
   const ports = await webPorts();
   const context = commandContextOf(view.context);
-  // Every answer that worked is said once, from the notice its form left (steps 2.185 and
-  // 2.155): taking it clears it, so a reload, or Back to the page, says nothing old. A
-  // removal or a put back is read from the notice itself; any other save's words are in
-  // the address, read only while their notice is fresh.
+  // Every answer is said once, from the notice its form left (steps 2.185 and 2.155 part 6):
+  // taking it clears it, so a reload, or Back to the page, says nothing old, and no answer
+  // is ever read from the address. A removal or a put back is read from its own notice; any
+  // other answer's words, a refusal's typed boxes too, are in the notice (answerShown).
   const noticeHolder = noticeHolderOf(context);
   const taken =
     noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'schedule');
-  const search = answerShown(inAddress, taken?.said === freshAnswer);
+  const action = leagueUrl(addressee, 'admin-area', { area: 'schedule' });
+  const search = answerShown(inAddress, taken, action);
   const holder = await ports.accessOf(context);
   // Every season the holder may be told of, the ones not public yet among them (a season is
   // scheduled before it is shown): the port lists only those (P4 §4).
@@ -151,7 +152,6 @@ export async function ScheduleBuilderPage({
   const chosen = chooseSeason(seasons, asked);
   const season = seasons.find((s) => s.id === chosen?.id);
   const notice = noticeOf(search);
-  const action = leagueUrl(addressee, 'admin-area', { area: 'schedule' });
   if (season === undefined) {
     return (
       <main className="admin-schedule">
@@ -1558,10 +1558,10 @@ function savedHere(
   // One notice in kinds told apart at a glance (step 2.103): saved, or removed with its
   // way back.
   const said = (text: string, more?: ReactNode, kind: 'saved' | 'removed' = 'saved') => (
-    <div id={savedAnchor} className="ui-notice" data-kind={kind} role="status" data-notice="done">
+    <SaidInView id={savedAnchor} kind={kind} words={text}>
       <p>{text}</p>
       {more}
-    </div>
+    </SaidInView>
   );
   const gameName = (g: GridGame) =>
     t('schedule.admin.gameVs', { away: g.awayName, home: g.homeName });
@@ -1686,7 +1686,10 @@ function savedHere(
       if (game.offRoundDate === null || !basis.canEdit || !game.editable) {
         return { place: { game: game.id }, node: said(text) };
       }
-      const query = new URLSearchParams({ season: basis.seasonSlug }).toString();
+      // `kept` says nothing: it only makes the address differ from the grid's own, which no
+      // longer holds the answer (step 2.155 part 6), so the browser draws the grid again
+      // without the question rather than only moving to the game.
+      const query = new URLSearchParams({ season: basis.seasonSlug, kept: game.id }).toString();
       const keep = `${gridAddress}?${query}#${gameAnchor(game.id)}`;
       return {
         place: { game: game.id },

@@ -379,7 +379,22 @@ export async function settingAnswer(page, section, button, timeout = 10_000) {
  * the press is marked first, so only a new one counts; a wait past the limit throws.
  */
 /** The words an admin answer once rode in, in the address (gone since step 2.155 part 6). */
-const answerWords = ['done', 'problem', 'saved', 'clashes', 'entry', 'leftOn', 'number'];
+const answerWords = [
+  'done',
+  'problem',
+  'saved',
+  'clashes',
+  'entry',
+  'leftOn',
+  'number',
+  // The schedule's (step 2.155 part 6): a refused form, a publish's games moved to the bin.
+  'at',
+  'reason',
+  'partial',
+  'already',
+  'removed',
+  'blocker',
+];
 
 /**
  * After a press: the page says `said` (a sentence or a pattern) in a status or an alert,

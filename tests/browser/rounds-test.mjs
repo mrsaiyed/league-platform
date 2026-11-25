@@ -22,9 +22,11 @@ import {
   leagueDayWords,
   launch,
   openStaffMenu,
+  saysNothingOf,
   startNext,
   waitFor,
   whatWentWrong,
+  answered,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -81,6 +83,8 @@ if (built) {
     /** Taps a link or button, waits for the page it leads to, and checks its address. */
     const tap = async (locator, url) => {
       await Promise.all([page.waitForEvent('load'), locator.click()]);
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) return answered(page, url.said);
       if (!url.test(page.url())) throw new Error(`landed on ${page.url()}, not ${url}`);
     };
     /** On the screen as the page shows it now, without scrolling. */
@@ -101,7 +105,7 @@ if (built) {
     const editGame = async (roundLabel) => {
       await game.locator('summary', { hasText: 'Edit this game' }).click();
       await game.locator('select[name=roundId]').selectOption({ label: roundLabel });
-      await tap(game.getByRole('button', { name: 'Save game' }), /done=saved/);
+      await tap(game.getByRole('button', { name: 'Save game' }), { said: /Saved to the draft/ });
     };
     // The date in the game's own edit form (the flag's button carries the round's date).
     const gameDate = async () =>
@@ -160,10 +164,36 @@ if (built) {
       if (i === 0) note('"Add round" is the main button', (await kindOf(submit)) === 'main');
       await form.locator('input[name=label]').fill(week.label);
       await form.locator('input[name=date]').fill(week.date);
-      await tap(submit, /saved=round-added/);
+      await tap(submit, { said: /Saved to the draft: .+ was added/ });
       await saidBeside(`${week.label} added`, `Round ${i + 1}: ${week.label} was added`);
     }
     note('three rounds are in the grid', (await page.locator('section[data-round]').count()) === 3);
+
+    at = 'a "Saved" is said once: Back, a reload or a typed address says nothing (step 2.155)';
+    const plainGrid = page.url().replace(/#.*$/, '');
+    note('the address holds only the season', /\?season=winter-2027$/.test(plainGrid), plainGrid);
+    await page.goto(new URL('/', plainGrid).href);
+    await page.goBack();
+    await page.locator('section[data-round]').first().waitFor();
+    note('Back to the grid says nothing of the round added', await saysNothingOf(page, /added/));
+    await page.reload();
+    await page.locator('section[data-round]').first().waitFor();
+    note('a reload says nothing of the round added', await saysNothingOf(page, /added/));
+    const firstRound = await page.locator('section[data-round]').first().getAttribute('data-round');
+    for (const typed of [
+      `done=saved&saved=round-added&round=${firstRound}`,
+      'done=published&removed=3',
+      'problem=invalid-input&at=add-round&label=Typed+week&date=2027-02-02',
+    ]) {
+      await page.goto(`${plainGrid}&${typed}#saved`);
+      await page.locator('section[data-round]').first().waitFor();
+      note(
+        `a typed address says nothing: ${typed}`,
+        (await saysNothingOf(page, /added|published|bin|not saved|Choose/)) &&
+          (await page.locator('details[data-add-round] input[name=label]').inputValue()) !==
+            'Typed week',
+      );
+    }
     const summary = page.locator('details[data-add-round] > summary');
     const tall = (await summary.boundingBox())?.height ?? 0;
     note('"Add a round" at the foot is at least 44 high', tall >= 44, `${tall}`);
@@ -173,7 +203,9 @@ if (built) {
     const refusedForm = await addRoundForm();
     await refusedForm.locator('input[name=label]').fill('Far week');
     await refusedForm.locator('input[name=date]').fill('3027-01-31');
-    await tap(refusedForm.getByRole('button', { name: 'Add round' }), /at=add-round/);
+    await tap(refusedForm.getByRole('button', { name: 'Add round' }), {
+      said: 'Choose a date between the years 1900 and 2999.',
+    });
     const kept = page.locator('details[data-add-round] form');
     note(
       'the refused round keeps its name',
@@ -201,7 +233,7 @@ if (built) {
       (await add.locator('input[name=date]').inputValue()) === weeks[0].date,
     );
     await add.locator('input[name=time]').fill('18:00');
-    await tap(add.getByRole('button', { name: 'Add game' }), /done=saved/);
+    await tap(add.getByRole('button', { name: 'Add game' }), { said: /Saved to the draft/ });
     await saidBeside('the new game', `${teams[1]} at ${teams[0]}`);
     note(
       'the game is in the first round',
@@ -228,7 +260,7 @@ if (built) {
       (await page.locator('[data-off-round-date]').count()) === 0,
     );
     await accessible("the offer of the round's date");
-    await tap(yes, /done=saved/);
+    await tap(yes, { said: /Saved to the draft/ });
     note(
       'the game is in the third round',
       (await round('Week 3').locator('li[data-game]').count()) === 1,
@@ -261,7 +293,9 @@ if (built) {
       has: page.locator('button', { hasText: 'Change round date' }),
     });
     await dateForm.locator('input[name=date]').fill('1899-01-01');
-    await tap(dateForm.getByRole('button', { name: 'Change round date' }), /at=round/);
+    await tap(dateForm.getByRole('button', { name: 'Change round date' }), {
+      said: 'Round date: Choose a date between the years 1900 and 2999.',
+    });
     const roundError = round('Week 3').locator('[data-notice=problem]');
     note(
       'the round says why, in one sentence naming the date box',
@@ -276,7 +310,7 @@ if (built) {
     await second.locator('summary', { hasText: 'Change or remove this round' }).click();
     const remove = second.getByRole('button', { name: 'Remove this round' });
     note('"Remove this round" is drawn as a danger button', (await kindOf(remove)) === 'danger');
-    await tap(remove, /saved=round-removed/);
+    await tap(remove, { said: 'Saved to the draft: the round was removed.' });
     await saidBeside('the removal', 'the round was removed');
     note('two rounds are left', (await page.locator('section[data-round]').count()) === 2);
 
@@ -315,7 +349,9 @@ if (built) {
       publishing.includes('Rounds added: 2. Rounds removed: 0.'),
       publishing.slice(0, 300),
     );
-    await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page.getByRole('button', { name: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
     note(
       'the rounds stay after publishing',
       (await page.locator('section[data-round]').count()) === 2 &&
@@ -332,7 +368,9 @@ if (built) {
     const finals = 'Finals week';
     const finalsForm = await addRoundForm();
     await finalsForm.locator('input[name=label]').fill(finals);
-    await tap(finalsForm.getByRole('button', { name: 'Add round' }), /saved=round-added/);
+    await tap(finalsForm.getByRole('button', { name: 'Add round' }), {
+      said: /Saved to the draft: .+ was added/,
+    });
     const added = round(finals).locator('details[data-add-game]');
     await added.locator('summary').click();
     const names = await added
@@ -341,7 +379,7 @@ if (built) {
     await added.locator('select[name=homeTeamId]').selectOption({ label: names[0] });
     await added.locator('select[name=awayTeamId]').selectOption({ label: names[1] });
     await added.locator('input[name=time]').fill('20:00');
-    await tap(added.getByRole('button', { name: 'Add game' }), /done=saved/);
+    await tap(added.getByRole('button', { name: 'Add game' }), { said: /Saved to the draft/ });
 
     const visitor = await browser.newContext({ javaScriptEnabled: false, viewport: screen });
     const publicPage = await visitor.newPage();
@@ -354,7 +392,9 @@ if (built) {
       'the new round is not on the public schedule before publishing',
       !(await publicSchedule()).includes(finals),
     );
-    await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page.getByRole('button', { name: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
     const after = await publicSchedule();
     note(
       'the new round is on the public schedule once published',

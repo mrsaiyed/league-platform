@@ -20,6 +20,7 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  answered,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -65,6 +66,8 @@ if (built) {
     /** Taps a link or button, waits for the page it leads to, and checks its address. */
     const tap = async (locator, url) => {
       await Promise.all([page.waitForEvent('load'), locator.click()]);
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) return answered(page, url.said);
       if (!url.test(page.url())) throw new Error(`landed on ${page.url()}, not ${url}`);
     };
     /** On the screen as the page shows it now, without scrolling. */
@@ -138,7 +141,9 @@ if (built) {
       before.includes('Publishing makes 2 changes.') && before.split('Removed: ').length - 1 === 2,
       before.slice(0, 300),
     );
-    await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page.getByRole('button', { name: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
 
     at = 'the round now says it can be removed';
     const facts = (await round.locator('.admin-round-facts').textContent()) ?? '';
@@ -157,7 +162,7 @@ if (built) {
     await accessible('the emptied round, opened');
 
     at = 'the owner taps "Remove this round"';
-    await tap(remove, /saved=round-removed/);
+    await tap(remove, { said: 'Saved to the draft: the round was removed.' });
     const saved = page.locator('#saved');
     const said = (await saved.count()) === 1 ? ((await saved.textContent()) ?? '') : '';
     note(
@@ -182,7 +187,9 @@ if (built) {
       publishing.includes('Rounds removed: 1.'),
       publishing.slice(0, 300),
     );
-    await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page.getByRole('button', { name: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
     note('the round is gone after publishing', (await round.count()) === 0);
     const words = await page.locator('main').innerText();
     note('and nothing on the page refuses', !words.includes('cannot be removed'), '');
@@ -227,11 +234,16 @@ if (built) {
       answer = page.url();
     }
     await nextRound.locator('summary', { hasText: 'Change or remove this round' }).click();
-    await tap(nextRound.getByRole('button', { name: 'Remove this round' }), /saved=round-removed/);
+    await tap(nextRound.getByRole('button', { name: 'Remove this round' }), {
+      said: 'Saved to the draft: the round was removed.',
+    });
 
     at = 'the owner finds the removed game under "Games with no round" and puts it back';
     // The old answer's address says nothing old (step 2.185); the game itself stays in sight,
     // struck through, where "Put it back" will bring it, and says so before the tap (S-60).
+    // Loaded afresh: the page showing has the same address now that no answer rides in it,
+    // so going to it straight from here would only move to its place (step 2.155 part 6).
+    await page.goto('about:blank');
     await page.goto(answer);
     note(
       'the old "Removed" address says nothing old',
@@ -279,7 +291,9 @@ if (built) {
     note('the round stays removed', (await nextRound.count()) === 0);
 
     at = 'the owner publishes, and a visitor reads the public schedule';
-    await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page.getByRole('button', { name: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
     const publicAfter = await publicSchedule();
     const otherGames = publicAfter.slice(publicAfter.indexOf('Other games'));
     note(

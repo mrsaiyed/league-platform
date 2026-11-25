@@ -180,10 +180,12 @@ if (built) {
       await add.locator('select[name=homeTeamId]').selectOption({ label: game.home });
       await add.locator('select[name=awayTeamId]').selectOption({ label: kestrels });
       await add.locator('input[name=time]').fill(game.time);
-      await tap(add.locator('button[type=submit]'), /saved=/);
+      await tap(add.locator('button[type=submit]'), { said: /Saved to the draft/ });
     }
     note('the three games are in the draft', (await theirGames().count()) === 3);
-    await tap(page.locator('button', { hasText: 'Publish this schedule' }), /done=published/);
+    await tap(page.locator('button', { hasText: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
 
     at = 'the new team cannot be removed yet, said up front with no button';
     await openTeam(kestrels);
@@ -259,7 +261,9 @@ if (built) {
     note('still no button', (await binButtons().count()) === 0);
     await picture('removed-in-draft');
     await tap(toPublish, /\/admin\/schedule\?fromTeam=[^#]+#publish-heading$/);
-    await tap(page.locator('button', { hasText: 'Publish this schedule' }), /done=published/);
+    await tap(page.locator('button', { hasText: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
     note(
       'the public schedule no longer lists their games',
       !(await publicText('/schedule')).includes(kestrels),

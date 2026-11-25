@@ -18,6 +18,7 @@ import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import { buildGrid, dayText, daysAfter } from './build-grid.ts';
 import {
   answerParams,
+  answerSaid,
   answerShown,
   noticeOfAnswer,
   refusedAtOf,
@@ -471,6 +472,7 @@ describe('a game in the bin does not hold its round (step 2.181, S-60)', () => {
 
 describe('a refused game form keeps what was typed, and "Saved" is said once (step 2.155)', () => {
   const team = '11111111-1111-4111-8111-111111111111';
+  const base = '/stand-in/admin/schedule';
   const round = '22222222-2222-4222-8222-222222222222';
   const venue = '33333333-3333-4333-8333-333333333333';
   const typed = {
@@ -526,18 +528,30 @@ describe('a refused game form keeps what was typed, and "Saved" is said once (st
     );
   });
 
-  it('reads the address\'s "Saved" only while its notice is fresh', () => {
+  it('reads a "Saved" from the notice the grid took, never from the address', () => {
     const address = { done: 'saved', saved: 'game-saved', game: team, season: 's' };
-    expect(answerShown(address, false)).toEqual({ season: 's' });
-    expect(savedDetailOf(answerShown(address, true))).toEqual({ what: 'game-saved', gameId: team });
-    expect(noticeOf(answerShown({ done: 'published' }, false))).toBeUndefined();
+    expect(answerShown(address, undefined, base)).toEqual({ season: 's' });
+    const notice = {
+      thing: base,
+      said: answerSaid({ kind: 'saved', detail: { what: 'game-saved', gameId: team } }),
+    };
+    expect(savedDetailOf(answerShown({ season: 's' }, notice, base))).toEqual({
+      what: 'game-saved',
+      gameId: team,
+    });
+    expect(noticeOf(answerShown({ done: 'published' }, undefined, base))).toBeUndefined();
   });
 
-  it("reads a refusal's words only while its notice is fresh, a refused swap beside its game", () => {
+  it("reads a refusal's words from its notice only, a refused swap beside its game", () => {
     const address = { problem: 'stale-version', at: 'swap', game: team, other: team, season: 's' };
-    expect(answerShown(address, false)).toEqual({ season: 's' });
-    expect(refusedAtOf(answerShown(address, false))).toBeUndefined();
-    expect(refusedAtOf(answerShown(address, true))).toEqual({
+    expect(answerShown(address, undefined, base)).toEqual({ season: 's' });
+    expect(refusedAtOf(answerShown(address, undefined, base))).toBeUndefined();
+    const said = answerSaid({
+      kind: 'refused',
+      code: 'stale-version',
+      at: { form: 'swap', gameId: team, otherGameId: team },
+    });
+    expect(refusedAtOf(answerShown({ season: 's' }, { thing: base, said }, base))).toEqual({
       form: 'swap',
       gameId: team,
       otherGameId: team,

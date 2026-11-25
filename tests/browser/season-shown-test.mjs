@@ -24,6 +24,7 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  answered,
 } from './web-browser-kit.mjs';
 
 // The rounds' days: over a year after the made-up world's today (it reads this computer's
@@ -86,6 +87,8 @@ if (built) {
     /** Taps a link or button, waits for the page it leads to, and checks its address. */
     const tap = async (on, locator, url) => {
       await Promise.all([on.waitForEvent('load'), locator.click()]);
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) return answered(on, url.said);
       if (!url.test(on.url())) throw new Error(`landed on ${on.url()}, not ${url}`);
     };
     const mainText = (on) => on.locator('main').innerText();
@@ -110,8 +113,12 @@ if (built) {
       }
       await form.locator('input[name=label]').fill(label);
       await form.locator('input[name=date]').fill(date);
-      await tap(on, form.getByRole('button', { name: 'Add round' }), /saved=round-added/);
-      await tap(on, on.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+      await tap(on, form.getByRole('button', { name: 'Add round' }), {
+        said: /Saved to the draft: .+ was added/,
+      });
+      await tap(on, on.getByRole('button', { name: 'Publish this schedule' }), {
+        said: 'The schedule is published',
+      });
       return on.locator('[data-published]');
     };
 

@@ -462,7 +462,9 @@ if (built) {
       toBin.getByRole('button', { name: 'Remove game' }),
       /\/admin\/schedule(\?season=[\w-]+)?#(saved|game-[\w-]+)$/,
     );
-    await tap(page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page.getByRole('button', { name: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
     await tap(page.getByRole('link', { name: 'Removed games' }), /\/admin\/settings\/bin/);
     note(
       'the bin offers "Bring it back" for the published removal, as the schedule said',

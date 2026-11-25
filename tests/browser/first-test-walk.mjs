@@ -14,7 +14,7 @@
 // it is published.
 import { leagueUrl } from '@srleagues/core';
 import { court } from './tracker-driver.mjs';
-import { openStaffMenu } from './web-browser-kit.mjs';
+import { answered, openStaffMenu } from './web-browser-kit.mjs';
 
 export const phone = {
   viewport: { width: 390, height: 844 },
@@ -72,6 +72,8 @@ export async function walkFirstTest(o) {
     /** Taps a link or button on a page with scripts off and waits for the page it posts to. */
     const tap = async (on, locator, url) => {
       await Promise.all([on.waitForEvent('load'), locator.tap()]);
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) return answered(on, url.said);
       if (url !== undefined && !url.test(on.url())) {
         throw new Error(`landed on ${on.url()}, not ${url}`);
       }
@@ -185,7 +187,9 @@ export async function walkFirstTest(o) {
     const first = page.locator('[data-no-rounds] form');
     await first.getByLabel('Round name').fill('Week 1');
     await first.locator('input[name=date]').fill(today);
-    await tap(page, first.getByRole('button', { name: 'Add round' }), /saved=round-added/);
+    await tap(page, first.getByRole('button', { name: 'Add round' }), {
+      said: /Saved to the draft: .+ was added/,
+    });
     // As the document says, at any hour: game 1 today (the "Date" box is already filled with
     // the round's day) at a time still to come at both clocks, since "Score this game" is
     // offered for any game today; game 2 yesterday, so its time has come and its result can
@@ -215,7 +219,7 @@ export async function walkFirstTest(o) {
         (await place.count()) === 0 ||
           (await place.locator('option:checked').innerText()).trim() === 'No venue yet',
       );
-      await tap(page, add.locator('button[type=submit]'), /done=saved/);
+      await tap(page, add.locator('button[type=submit]'), { said: /Saved to the draft/ });
     }
     const drafted = await mainText(page);
     note(
@@ -227,7 +231,9 @@ export async function walkFirstTest(o) {
     await picture(page, 4);
 
     at = 'step 5: publishing the schedule';
-    await tap(page, page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page, page.getByRole('button', { name: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
     const published = await page.locator('[data-published]').innerText();
     say(5, published);
     note('5. the schedule is published', /published/i.test(published), published);

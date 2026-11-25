@@ -26,6 +26,7 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  answered,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -74,6 +75,11 @@ if (built) {
     const page = await open(false);
     /** Taps a link or button and waits until the address matches. */
     const tap = async (p, locator, url) => {
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) {
+        await locator.click();
+        return answered(p, url.said);
+      }
       await Promise.all([p.waitForURL(url), locator.click()]);
     };
     const checks = async (p, label) => {
@@ -110,7 +116,9 @@ if (built) {
         has: p.getByRole('heading', { name: 'Remove this team' }),
       });
       await panel.locator('input[name=confirm]').check();
-      await tap(p, panel.getByRole('button', { name: 'Move the team to the bin' }), /done=removed/);
+      await tap(p, panel.getByRole('button', { name: 'Move the team to the bin' }), {
+        said: 'Moved to the bin: the team is kept there for 30 days.',
+      });
     };
     const binRow = (p, text) => p.locator('li[data-bin]', { hasText: text });
 
@@ -145,11 +153,9 @@ if (built) {
       .locator('section', { has: page.getByRole('heading', { name: 'The league list' }) })
       .locator('li', { hasText: kites.last });
     await item.locator('input[name=confirm]').check();
-    await tap(
-      page,
-      item.getByRole('button', { name: 'Remove from the league list' }),
-      /done=personRemoved/,
-    );
+    await tap(page, item.getByRole('button', { name: 'Remove from the league list' }), {
+      said: 'Moved to the bin: taken off the league list, and kept in the bin for 30 days.',
+    });
     const gone = page.locator('main [role=status]').first();
     note(
       'the notice says the person moved to the bin',
@@ -294,7 +300,9 @@ if (built) {
       page.waitForEvent('load'),
       game.getByRole('button', { name: 'Remove game' }).click(),
     ]);
-    await tap(page, page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await tap(page, page.getByRole('button', { name: 'Publish this schedule' }), {
+      said: 'The schedule is published',
+    });
     await tap(page, page.getByRole('link', { name: 'Removed games' }), /\/admin\/settings\/bin/);
     const gameRow = page.locator(`li[id="bin-${gameId}"]`);
     note('the bin lists the removed game', (await gameRow.count()) === 1);
