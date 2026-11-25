@@ -105,19 +105,27 @@ export async function PeoplePage({
             <input type="hidden" name="personId" value={notice.thing} />
             <input type="hidden" name={requestTokenField} value={crypto.randomUUID()} />
             <button type="submit" className="ui-button">
-              {t('adminPeople.putBack.submit')}
+              {notice.name === undefined
+                ? t('adminPeople.putBack.submit')
+                : t('adminPeople.putBack.submitNamed', { name: notice.name })}
             </button>
           </form>
         </StaffNotice>
       ) : null}
       {notice?.said.startsWith('notPutBack.') === true ? (
-        <StaffNotice kind="refused">
-          {t('adminPeople.putBack.notPutBack', {
-            problem:
-              notice.said === 'notPutBack.person-profile-taken'
-                ? t('error.leagues.restore_person.person-profile-taken')
-                : t('error.leagues.restore_person.person-not-found'),
-          })}
+        <StaffNotice kind="refused" data={{ 'data-not-put-back': notice.thing }}>
+          {t(
+            notice.name === undefined
+              ? 'adminPeople.putBack.notPutBack'
+              : 'adminPeople.putBack.notPutBackNamed',
+            {
+              name: notice.name ?? '',
+              problem:
+                notice.said === 'notPutBack.person-profile-taken'
+                  ? t('error.leagues.restore_person.person-profile-taken')
+                  : t('error.leagues.restore_person.person-not-found'),
+            },
+          )}
         </StaffNotice>
       ) : null}
 

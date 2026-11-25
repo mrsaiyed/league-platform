@@ -20,20 +20,20 @@ import {
   createPerson,
   getPerson,
   leagueUrl,
+  listBinPart,
   listPeople,
   removePerson,
   restorePerson,
   updatePerson,
   type CommandContext,
 } from '@srleagues/core';
-import { catalogs } from '@srleagues/site';
 import { refresh } from 'next/cache';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
-import { t, type TextKey } from '../../server/messages.ts';
+import { t } from '../../server/messages.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere, type NoticeScreen } from '../../server/saved-notice.ts';
 import {
@@ -45,6 +45,7 @@ import {
 } from '../games-area/form-state.ts';
 import { rosterName } from '../teams-area/index.ts';
 import { unlikelyYears } from './age-on-record.ts';
+import { peopleRefusalText } from './refusal-text.ts';
 import { detailsAnchor } from './anchors.ts';
 import {
   newPersonInput,
@@ -88,17 +89,6 @@ async function peopleOf(fields: TypedFields) {
   };
 }
 
-/** The sentence for a refusal: the command's own when the message file has one. */
-function problemText(command: string, code: string): string {
-  const english = catalogs['en'] ?? {};
-  // "Not saved" is never the word for a removal.
-  const lead = command === 'remove_person' ? 'adminPeople.notRemoved' : 'adminPeople.refused';
-  for (const key of [`error.people.${command}.${code}`, `error.${code}`]) {
-    if (Object.hasOwn(english, key)) return t(lead, { problem: t(key as TextKey) });
-  }
-  return t(lead, { problem: t('error.unknown') });
-}
-
 /**
  * A refusal, drawn from the post. When the person may have changed meanwhile, the page is
  * drawn again as it is now (A-8: the latest is shown), keeping what was typed.
@@ -108,9 +98,10 @@ function refused(
   code: string,
   typed: TypedFields,
   wrong: readonly PersonBox[],
+  name?: string,
 ): Refused {
   if (code === 'changed-since-read') refresh();
-  return { kind: 'refused', code, typed, wrong, said: problemText(command, code) };
+  return { kind: 'refused', code, typed, wrong, said: peopleRefusalText(command, code, name) };
 }
 
 /**
@@ -308,24 +299,21 @@ export async function savePersonAction(_state: FormState, form: FormData): Promi
 export async function removePersonAction(_state: FormState, form: FormData): Promise<FormState> {
   const fields = typedOf(form);
   const { context, deps, list } = await peopleOf(fields);
-  if (fields['confirm'] !== 'on') return refused('remove_person', 'not-confirmed', fields, []);
   const personId = (fields['personId'] ?? '').trim().toLowerCase();
-  // Their name as it is stored, read before they go to the bin, so the notice can name them.
+  // Their name as it is stored, read before they go to the bin, so the answer can name them.
   const before = uuidShape.test(personId)
     ? await getPerson(context, { personId }, deps)
     : undefined;
+  const name = before?.ok === true ? rosterName(before.value) : undefined;
+  if (fields['confirm'] !== 'on') {
+    return refused('remove_person', 'not-confirmed', fields, [], name);
+  }
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const removed = await removePerson(context, { personId }, deps);
     return removed.ok ? { ok: true, personId } : { ok: false, code: removed.error.code };
   });
-  if (!result.ok) return refused('remove_person', result.code, fields, []);
-  leaveNotice(
-    context,
-    'people',
-    personId,
-    'removed',
-    before?.ok === true ? rosterName(before.value) : undefined,
-  );
+  if (!result.ok) return refused('remove_person', result.code, fields, [], name);
+  leaveNotice(context, 'people', personId, 'removed', name);
   return redirect(list);
 }
 
@@ -345,7 +333,10 @@ export async function putBackPersonAction(form: FormData): Promise<void> {
     return restored.ok ? { ok: true, personId } : { ok: false, code: restored.error.code };
   });
   if (!result.ok) {
-    leaveNotice(context, 'people', personId, `notPutBack.${result.code}`);
+    // Named as the bin lists them, read from the store (never the form), when it still does.
+    const binned = await listBinPart(context, {}, putBack);
+    const item = binned.ok ? binned.value.items.find((i) => i.id === personId) : undefined;
+    leaveNotice(context, 'people', personId, `notPutBack.${result.code}`, item?.name || undefined);
     redirect(list);
   }
   leaveNotice(context, 'person', personId, 'putBack');

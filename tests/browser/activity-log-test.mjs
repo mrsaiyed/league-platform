@@ -16,6 +16,7 @@
 // sideways at 390.
 import {
   accessibilityProblems,
+  binAnswer,
   buildNext,
   freePort,
   launch,
@@ -175,7 +176,8 @@ if (built) {
     );
     const row = page.locator(`li[id="${new URL(page.url()).hash.slice(1)}"]`);
     note('the link lands on the team in the bin', (await row.innerText()).includes(larks));
-    await tap(page, row.getByRole('button', { name: 'Bring it back' }), /back=team/);
+    const back = await binAnswer(page, row.getByRole('button', { name: 'Bring it back' }));
+    note('the bin says the team is back', back.said === 'back', back.text);
     await toLog(page);
     const after = await texts(page);
     note(

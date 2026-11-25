@@ -17,7 +17,9 @@ import { locale, t } from '../../server/messages.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffNotice } from '../staff/index.ts';
 import { problemKey } from '../teams-area/answer.ts';
+import { requestTokenField } from '../../server/same-request.ts';
 import { bringBackAction } from './actions.ts';
+import { binAnswerOf } from './bin-answer.ts';
 import { binAnchors } from './bin-anchors.ts';
 import {
   binKindsShown,
@@ -64,13 +66,18 @@ export async function BinPage({
   const rows = binView(listed.value.items, times);
   // Teams in this person's own part of the bin: only those are linked to (and theirs to bring back).
   const myTeams = new Set(rows.team.map((r) => r.id));
-  const refusedId = one(query['not']);
-  const refusal = refusedId === undefined ? undefined : problemKey({ problem: one(query['why']) });
+  // The answer to "Bring it back", taken once (bin-answer.ts, T-426): never from the address.
+  const holder = noticeHolderOf(context);
+  const answer = binAnswerOf(
+    holder === undefined ? undefined : savedNoticesHere().take(holder, 'bin'),
+  );
+  const refusedId = answer?.kind === 'refused' ? answer.id : undefined;
+  const why = answer?.kind === 'refused' ? answer.why : '';
+  const refusal = refusedId === undefined ? undefined : problemKey({ problem: why });
   // Another team took the name (S-83): which one, and the way to it.
   const refusedTeam = listed.value.items.find(
     (item) => item.id === refusedId && item.kind === 'team',
   );
-  const why = one(query['why']) ?? '';
   // A second team of the same name, or of the same short name (A-19): either refusal
   // names that team, the one holding the full name or the one holding the short name.
   const shortTaken = why.endsWith('.team-short-name-taken');
@@ -84,8 +91,7 @@ export async function BinPage({
           await ports.adminTeams.teams(context, refusedTeam.seasonId),
           shortTaken,
         );
-  const back = one(query['back']);
-  const backId = one(query['id']) ?? '';
+  const backId = answer?.kind === 'back' ? answer.id : '';
   const backTo = (kind: string): string | undefined => {
     if (!/^[0-9a-f-]{36}$/.test(backId)) return undefined;
     if (kind === 'team') return leagueUrl(here, 'admin-area', { area: 'teams', subpath: [backId] });
@@ -113,7 +119,13 @@ export async function BinPage({
           </span>
         ))}
         {refusedId === row.id && refusal !== undefined ? (
-          <span className="ui-notice" data-kind="error" role="alert">
+          <span
+            className="ui-notice"
+            data-kind="error"
+            role="alert"
+            data-bin-answer={row.id}
+            data-said="refused"
+          >
             {heldByTeam(row)
               ? teamsInBinWords(row.teamsInBin, myTeams, 'refusal')
               : takenBy !== undefined
@@ -122,7 +134,7 @@ export async function BinPage({
                     name: takenBy.name,
                     slug: takenBy.slug,
                   })
-                : t('admin.bin.notBack', { problem: t(refusal) })}
+                : t('admin.bin.notBack', { name: row.title, problem: t(refusal) })}
             {!heldByTeam(row)
               ? null
               : row.teamsInBin
@@ -153,6 +165,7 @@ export async function BinPage({
         <input type="hidden" name="league" value={here.slug} />
         <input type="hidden" name="kind" value={row.kind} />
         <input type="hidden" name="id" value={row.id} />
+        <input type="hidden" name={requestTokenField} value={crypto.randomUUID()} />
         <button type="submit" className="ui-button">
           {t('admin.bin.back')}
         </button>
@@ -185,24 +198,16 @@ export async function BinPage({
     </section>
   );
 
-  const backKind = binKindsShown.find((kind) => kind === back);
+  const backKind = answer?.kind === 'back' ? answer.what : undefined;
   const backHref = backKind === undefined ? undefined : backTo(backKind);
   // A game brought back is a schedule change (A-19): its revision, who it reaches (A-7)
   // and the games now at its time, named. Only what the restore itself left on the server
   // for this person is said, never numbers from the address.
-  const holder = noticeHolderOf(context);
-  const left =
-    (backKind !== 'game' && backKind !== 'person') || holder === undefined
-      ? undefined
-      : savedNoticesHere().take(holder, 'bin');
-  const gameBack =
-    left === undefined || left.thing !== backId || backKind !== 'game'
-      ? undefined
-      : gameBackOf(left.said);
-  const firstChild =
-    backKind === 'person' && left?.thing === backId && left.said === firstChildSaid;
-  const clashIds = gameBack === undefined ? [] : (left?.about ?? []);
-  const seasonId = left?.name;
+  const gameBack = answer?.kind === 'back' ? answer.game : undefined;
+  const firstChild = answer?.kind === 'back' && answer.firstChild;
+  const backName = answer?.kind === 'back' ? answer.name : '';
+  const clashIds = answer?.kind === 'back' ? answer.clashes : [];
+  const seasonId = gameBack?.seasonId;
   const clashes =
     clashIds.length === 0 || seasonId === undefined
       ? []
@@ -221,8 +226,15 @@ export async function BinPage({
     <main className="admin-teams">
       <PageHead title={t('admin.bin.title')} sub={t('admin.bin.sub')} />
       {backKind === undefined ? null : (
-        <StaffNotice kind="saved">
+        <StaffNotice
+          key={backId}
+          kind="saved"
+          data={{ 'data-bin-answer': backId, 'data-said': 'back' }}
+        >
           <p>
+            {backName === ''
+              ? t('admin.bin.backUnnamed')
+              : t('admin.bin.backNamed', { name: backName })}{' '}
             {t(`admin.bin.backDone.${backKind}`)}{' '}
             {backHref === undefined ? null : (
               <a href={backHref}>{t(`admin.bin.backLink.${backKind}`)}</a>

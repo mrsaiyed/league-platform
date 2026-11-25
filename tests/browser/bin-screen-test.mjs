@@ -18,6 +18,7 @@
 // scrolls sideways at 390.
 import {
   accessibilityProblems,
+  binAnswer,
   buildNext,
   freePort,
   launch,
@@ -185,15 +186,53 @@ if (built) {
 
     at = 'the person and the team are brought back';
     const personRow = page.locator('li[data-bin=person]', { hasText: kites.last });
-    await tap(page, personRow.getByRole('button', { name: 'Bring it back' }), /back=person/);
-    note(
-      'the bin says the person is back',
-      (await page.locator('main').innerText()).includes('They are on the league list again.'),
-    );
-    await tap(
+    const personBack = await binAnswer(
       page,
-      binRow(page, kites.team).getByRole('button', { name: 'Bring it back' }),
-      /back=team/,
+      personRow.getByRole('button', { name: 'Bring it back' }),
+    );
+    note(
+      'the bin says the person is back, naming them, at the top',
+      personBack.said === 'back' &&
+        personBack.text.startsWith('Brought back: ') &&
+        personBack.text.includes(kites.last) &&
+        personBack.text.includes('They are on the league list again.'),
+      personBack.text,
+    );
+    note('the address holds no answer', new URL(page.url()).search === '', page.url());
+    await page.reload();
+    note('a reload says nothing old', (await page.locator('[data-bin-answer]').count()) === 0);
+    // A double tap that got through: the row's one post, with its one-time token, sent twice.
+    const fields = await binRow(page, kites.team)
+      .locator('form')
+      .evaluate((element) =>
+        Object.fromEntries([...new FormData(element).entries()].map(([k, v]) => [k, String(v)])),
+      );
+    note('"Bring it back" carries a one-time token', (fields['requestToken'] ?? '') !== '');
+    const statuses = [];
+    for (let i = 0; i < 2; i += 1) {
+      const response = await page.request.post(page.url(), {
+        multipart: fields,
+        headers: { origin },
+        maxRedirects: 0,
+        timeout: 10_000,
+      });
+      statuses.push(response.status());
+    }
+    note(
+      'both posts are answered as the first',
+      statuses.join(',') === '303,303',
+      statuses.join(','),
+    );
+    await page.goto(binAddress);
+    const teamBack = page.locator('[data-bin-answer][data-said]').first();
+    const teamBackText = (await teamBack.count()) === 1 ? await teamBack.innerText() : '';
+    note(
+      'the second post is answered as the first: "Brought back", naming the team, not a refusal',
+      (await teamBack.count()) === 1 &&
+        (await teamBack.getAttribute('data-said', { timeout: 10_000 })) === 'back' &&
+        teamBackText.startsWith(`Brought back: ${kites.team}.`) &&
+        (await binRow(page, kites.team).count()) === 0,
+      teamBackText,
     );
     await tap(page, page.getByRole('link', { name: 'Open the team' }), /\/admin\/teams\//);
     note(
@@ -222,7 +261,15 @@ if (built) {
     const gameRow = page.locator(`li[id="bin-${gameId}"]`);
     note('the bin lists the removed game', (await gameRow.count()) === 1);
     await checks(page, 'the bin with a game');
-    await tap(page, gameRow.getByRole('button', { name: 'Bring it back' }), /back=game/);
+    const gameBackAnswer = await binAnswer(
+      page,
+      gameRow.getByRole('button', { name: 'Bring it back' }),
+    );
+    note(
+      'the game back is said at the top, naming the game',
+      gameBackAnswer.said === 'back' && gameBackAnswer.id === gameId,
+      gameBackAnswer.text,
+    );
     note(
       'the bin says the game is back',
       (await page.locator('main').innerText()).includes('The game is on the schedule again.'),
@@ -252,7 +299,21 @@ if (built) {
     await toTeams(page);
     await addTeam(page, larks);
     await page.goto(binAddress);
-    await tap(page, binRow(page, larks).getByRole('button', { name: 'Bring it back' }), /not=/);
+    const refused = await binAnswer(
+      page,
+      binRow(page, larks).getByRole('button', { name: 'Bring it back' }),
+    );
+    note(
+      'the refusal stands in the row of what was not brought back',
+      refused.said === 'refused' &&
+        (await binRow(page, larks).locator('[data-bin-answer][data-said=refused]').count()) === 1,
+      refused.text,
+    );
+    note(
+      'the browser lands on that row',
+      new URL(page.url()).hash.startsWith('#bin-') && new URL(page.url()).search === '',
+      page.url(),
+    );
     const refusedText = await binRow(page, larks).innerText();
     note(
       'bringing the first back is refused with one sentence naming the other (A-19)',
@@ -272,12 +333,16 @@ if (built) {
       live.locator('main [role=status]').getByRole('link', { name: 'Bring it back' }),
       /\/admin\/settings\/bin/,
     );
-    await tap(
+    const liveBack = await binAnswer(
       live,
       binRow(live, wrens).getByRole('button', { name: 'Bring it back' }),
-      /back=team/,
     );
-    note('scripts on: the team is back', (await binRow(live, wrens).count()) === 0);
+    note(
+      'scripts on: the team is back, said naming it',
+      (await binRow(live, wrens).count()) === 0 &&
+        liveBack.text.startsWith(`Brought back: ${wrens}.`),
+      liveBack.text,
+    );
 
     at = "a scheduler sees the bin's games only";
     const scheduler = await open(false, 'local-scheduler-token');
