@@ -303,6 +303,7 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
             name: season.name,
             startsOn: season.startsOn,
             endsOn: season.endsOn,
+            ...(season.rules === undefined ? {} : { rules: season.rules }),
           });
           return id;
         },

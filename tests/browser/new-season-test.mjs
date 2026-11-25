@@ -104,7 +104,7 @@ if (built) {
     /** "Start a new season" in Season settings, with one choice of what teams come. */
     const start = async (name, slug, carry) => {
       await page.goto(`${origin}/north-valley/admin/season`);
-      const form = page.locator('form[data-start-season-form]');
+      const form = page.locator('form[data-form=start-season]');
       await form.locator('input[name=name]').fill(name);
       await form.locator('input[name=slug]').fill(slug);
       await form.locator(`input[name=carry][value=${carry}]`).check();
@@ -192,7 +192,7 @@ if (built) {
     await tap(page, toForm, /\/harbor-city\/admin\/season#start-season$/);
     note(
       'it leads to "Start a new season", which says nothing is copied',
-      (await page.locator('#start-season form[data-start-season-form]').count()) === 1 &&
+      (await page.locator('#start-season form[data-form=start-season]').count()) === 1 &&
         (await page.locator('#start-season [data-start-copies=nothing]').count()) === 1 &&
         (await page
           .locator('#start-season input[type=hidden][name=carry][value=nothing]')
@@ -296,7 +296,7 @@ if (built) {
       note(
         `a ${role} is offered none of the three actions`,
         reply !== null &&
-          (await other.locator('[data-start-season-form], [data-season-change]').count()) === 0,
+          (await other.locator('[data-form=start-season], [data-season-change]').count()) === 0,
         String(reply?.status()),
       );
       await other.context().close();

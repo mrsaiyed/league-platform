@@ -25,20 +25,22 @@ import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
-import { answerSaid, seasonAnswerThing, type Answer } from './answer.ts';
+import { t } from '../../server/messages.ts';
+import { refusedWith, type FormState } from '../list-forms/index.ts';
+import { answerSaid, done, seasonAnswerThing, type Answer } from './answer.ts';
 import { typedOf, untouched, type PartState } from './part-form-state.ts';
 import type { MovedTeam } from './part-words.ts';
 import { runPartSave, type PartSaveResult } from './run-part-save.ts';
 import { runSeasonChange } from './run-season-change.ts';
-import { runStartSeason } from './run-start-season.ts';
+import { runStartSeason, type StartedSeason } from './run-start-season.ts';
 import { runVisibilityChange } from './run-visibility-change.ts';
 import { partAnchor } from './season-parts.ts';
 import {
   seasonSettingsAddress,
   seasonStateAnchor,
-  startSeasonAnchor,
   visibilityAnchor,
 } from './season-settings-address.ts';
+import { startRefusalKey } from './start-season-refusal.ts';
 
 /**
  * Leaves a visibility, current-or-archived or start answer as the one-time notice (step 2.155
@@ -93,21 +95,29 @@ export async function changeSeasonAction(form: FormData): Promise<never> {
 
 /**
  * "Start the season" (step 2.130): made, the page opens on the new season and says it is
- * ready and hidden, at the panel with "Show this season to visitors" (step 2.182); refused,
- * the page says why at the form. A post sent twice is answered as the first.
+ * ready and hidden, at the panel with "Show this season to visitors" (step 2.182). Refused
+ * (step 2.245, as step 2.155's forms): in the response to the post itself, every box holding
+ * what was typed, the wrong one marked and the sentence beside it. A post sent twice is
+ * answered as the first.
  */
-export async function startSeasonAction(form: FormData): Promise<never> {
-  const fields = fieldsOf(form);
+export async function startSeasonAction(_state: FormState, form: FormData): Promise<FormState> {
+  const fields = typedOf(form);
   const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'season');
   const context = commandContextOf(view.context);
   const { adminSettings } = await webPorts();
-  const { answer, seasonSlug } = await sameRequestsHere<
-    Awaited<ReturnType<typeof runStartSeason>>
-  >().once(requestKeyOf(context, fields), () =>
+  const started = await sameRequestsHere<StartedSeason>().once(requestKeyOf(context, fields), () =>
     runStartSeason(context, fields, adminSettings.deps),
   );
-  const address = answeredAt(context, view.context.league, seasonSlug, answer);
-  return redirect(`${address}#${answer.kind === 'done' ? visibilityAnchor : startSeasonAnchor}`);
+  if (started.kind === 'refused') {
+    return refusedWith(
+      started.code,
+      fields,
+      started.field === undefined ? [] : [started.field],
+      t(startRefusalKey(started.code, started.field)),
+    );
+  }
+  const address = answeredAt(context, view.context.league, started.seasonSlug, done('started'));
+  return redirect(`${address}#${visibilityAnchor}`);
 }
 
 export async function savePartAction(_state: PartState, form: FormData): Promise<PartState> {

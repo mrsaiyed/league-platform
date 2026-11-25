@@ -707,3 +707,40 @@ describe('removeLeague when something unexpected stops it', () => {
     expect(await everything()).toEqual(before);
   });
 });
+
+describe('the game rules asked when a league is made (step 2.245, T-430, migration 0030)', () => {
+  const seasonRow = async (seasonId: string) =>
+    one<{ version: number; rules: { clock?: unknown } }>(
+      pglite,
+      'select version, rules from seasons where id = $1',
+      [seasonId],
+    );
+
+  it('removes a league made with rules other than the starting ones: its season holds them, version 2', async () => {
+    const league = await made({ clock: 'stop', mercyLead: '20' });
+    expect(await seasonRow(league.seasonId)).toMatchObject({
+      version: 2,
+      rules: { clock: { mode: 'stop', mercyLead: 20, stopClockLastSeconds: null } },
+    });
+    expect(await remove(league)).toMatchObject({ ok: true });
+    expect(
+      await one(pglite, 'select count(*)::int as n from leagues where slug = $1', [league.slug]),
+    ).toEqual({ n: 0 });
+  });
+
+  it('refuses a league whose season rules were changed after it was made, with nothing removed', async () => {
+    const league = await made({ clock: 'stop', mercyLead: '20' });
+    // The admin's later change of the mercy lead: any update raises the version (0002).
+    await pglite.query(
+      `update seasons set rules = jsonb_set(rules, '{clock,mercyLead}', '25') where id = $1`,
+      [league.seasonId],
+    );
+    expect(await seasonRow(league.seasonId)).toMatchObject({ version: 3 });
+    const before = await everything();
+    const outcome = await remove(league);
+    expect(outcome).toMatchObject({ ok: false, problem: { kind: 'in-use' } });
+    if (outcome.ok || outcome.problem.kind !== 'in-use') return;
+    expect(outcome.problem.found.map((f) => f.kind)).toContain('season-changed');
+    expect(await everything()).toEqual(before);
+  });
+});

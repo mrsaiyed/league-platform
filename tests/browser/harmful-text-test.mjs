@@ -159,10 +159,12 @@ const FIELDS = {
     address: 'a venue and its court are added',
     mapLink: 'a venue and its court are added',
   },
-  // Step 2.130: "Start a new season" in Season settings: its name and its short name.
+  // Step 2.130: "Start a new season" in Season settings: its name and its short name; step
+  // 2.245: its mercy lead, refused first with the attack in it.
   '/[league]/admin/season': {
     name: 'a season is started',
     slug: 'a season is started',
+    mercyLead: 'a season is started',
   },
   '/[league]/admin/season/divisions': { name: 'a division is added' },
   // Step 2.56: an adjustment's four counts and its reason (the add form's and the remove
@@ -582,9 +584,26 @@ if (browser) {
 
   await step('a season is started with the attack as its name', async () => {
     await page.goto(`${origin}/north-valley/admin/season`);
-    const form = page.locator('form[data-start-season-form]');
+    const form = page.locator('form[data-form=start-season]');
     await form.locator('input[name=name]').fill(typed.seasonName);
     await form.locator('input[name=slug]').fill('typed-attack-season');
+    // Refused first (step 2.245): the mercy lead holds the attack, which is not a number; it
+    // comes back as typed, in its box, as text, and the name with it.
+    await form.locator('input[name=mercyLead]').fill(typed.seasonName);
+    await form.getByRole('button', { name: 'Start the season', exact: true }).click();
+    await form.locator('[data-problem=start-season]').waitFor({ timeout: 10_000 });
+    note(
+      'a refused start keeps the attack in the mercy box and the name, as typed',
+      (await form.locator('input[name=mercyLead]').inputValue()) === typed.seasonName &&
+        (await form.locator('input[name=name]').inputValue()) === typed.seasonName,
+    );
+    const refused = await harm(page);
+    note(
+      'the refused start form, with the attack in its boxes, made no element',
+      refused.made.length === 0 && refused.ran === null && refused.refused.length === 0,
+      [...refused.made, ...refused.refused].join(' | '),
+    );
+    await form.locator('input[name=mercyLead]').fill('');
     await form.getByRole('button', { name: 'Start the season', exact: true }).click();
     await page.locator('[data-notice=done]', { hasText: typed.seasonName }).waitFor();
   });

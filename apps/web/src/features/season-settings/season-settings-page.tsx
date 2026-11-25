@@ -15,11 +15,13 @@
 // league of the session: a season of another league is never found (T-28).
 import {
   archivedSeasonStatus,
+  gameRuleAnswersOf,
   getSeason,
   isLeagueHidden,
   readOnlyStatuses,
   type SeasonView,
 } from '@srleagues/core';
+import { defaultSeasonRules } from '@srleagues/contracts';
 import { displayLabels } from '@srleagues/site';
 import { EmptyPanel, OptionPicker, PageHead } from '@srleagues/ui';
 import { randomUUID } from 'node:crypto';
@@ -38,6 +40,7 @@ import { PartForm } from './part-form.tsx';
 import { partFacts, partGroups, partTexts, teamFoulsLine } from './part-words.ts';
 import { panelWords } from './panel-words.ts';
 import { SeasonStatePanel, StartSeasonPanel } from './season-start-panels.tsx';
+import { stopClockDroppedNote } from './stop-clock-dropped.ts';
 import {
   isSeasonPart,
   nameFields,
@@ -51,6 +54,7 @@ import {
   divisionsScreenBuilt,
   partAddress,
   seasonSettingsAddress,
+  startSeasonAnchor,
   visibilityAnchor,
 } from './season-settings-address.ts';
 import { visibilityOf, wishOf, type VisibilityWish } from './season-visibility.ts';
@@ -81,14 +85,15 @@ export async function SeasonSettingsPage({
   const chosen = named ?? chooseSeason(seasons, undefined);
   const season = seasons.find((s) => s.id === chosen?.id);
   const top = <PageHead title={t('admin.area.season')} sub={t('seasonSettings.intro')} />;
-  // Which panel a refusal in the address belongs to (step 2.130): the start form's, the
-  // current-and-archived panel's, else the visibility panel's.
   // The answer of a visibility, current-or-archived or start form, or a part's "Saved": the
-  // one-time notice, taken once as the page is drawn, never the address (T-437).
+  // one-time notice, taken once as the page is drawn, never the address (T-437). A start
+  // refusal answers in the response to its post (step 2.245), so only "started" comes here.
   const noticeHolder = noticeHolderOf(context);
   const notice =
     noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'season');
   const answer = seasonAnswerOf(notice, season?.slug);
+  // Which panel a refusal belongs to (step 2.130): the current-and-archived panel's, else
+  // the visibility panel's.
   const problemWord = firstValue(answer['problem']) ?? '';
   const problemAt = problemWord.startsWith('leagues.start_season.')
     ? 'start'
@@ -105,12 +110,21 @@ export async function SeasonSettingsPage({
     (s) => s.isCurrent && (programId === undefined || s.programId === programId),
   );
   const mayStart = mayStartSeason(holder, programId, addressee.status);
+  // The game rules asked (S-106, step 2.245) are filled with the copied season's.
+  const copiedRead =
+    mayStart && current !== undefined
+      ? await getSeason(context, { seasonId: current.id }, ports.adminSettings.seasons)
+      : undefined;
+  const startRules = copiedRead?.ok === true ? copiedRead.value.rules : defaultSeasonRules();
   const start = mayStart ? (
     <StartSeasonPanel
       league={league}
       programId={programId}
       copiedFrom={current?.name}
-      problem={problemFor('start')}
+      gameRules={gameRuleAnswersOf(startRules)}
+      stopClockDropped={stopClockDroppedNote(current?.name, startRules)}
+      teamFoulsSaid={teamFoulsLine(startRules)}
+      permalink={`${seasonSettingsAddress(addressee, season?.slug)}#${startSeasonAnchor}`}
     />
   ) : null;
   if (season === undefined) {

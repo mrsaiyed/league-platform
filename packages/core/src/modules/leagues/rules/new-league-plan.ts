@@ -8,6 +8,7 @@
 // makes nothing.
 // The commands check everything again when they run.
 import {
+  defaultSeasonRules,
   designColorPattern,
   firstStartingDesign,
   isStartingDesignKey,
@@ -15,6 +16,13 @@ import {
   type StartingDesignKey,
 } from '@srleagues/contracts';
 import { z } from 'zod';
+import {
+  clockModes,
+  teamFoulsResets,
+  withGameRuleAnswers,
+  type ClockMode,
+  type TeamFoulsResetAnswer,
+} from './game-rule-answers.ts';
 import { isBlockedShortName, isSystemShortName, shortNameSchema } from '../short-names.ts';
 import { namedTimeZone } from '../time-zone.ts';
 import {
@@ -61,6 +69,12 @@ export type NewLeagueAnswers = {
   readonly mainColor?: string | undefined;
   readonly accentColor?: string | undefined;
   readonly highlightColor?: string | undefined;
+  /** The game rules asked (S-106, step 2.245): "stop" or "running"; left out, the default. */
+  readonly clock?: string | undefined;
+  /** Points of lead for the mercy rule, or "none"; left out, none. */
+  readonly mercyLead?: string | undefined;
+  /** When team fouls start again: "period", "half" or "game"; left out, each period. */
+  readonly teamFoulsReset?: string | undefined;
 };
 
 export const newLeagueFields = [
@@ -81,6 +95,9 @@ export const newLeagueFields = [
   'mainColor',
   'accentColor',
   'highlightColor',
+  'clock',
+  'mercyLead',
+  'teamFoulsReset',
 ] as const;
 export type NewLeagueField = (typeof newLeagueFields)[number];
 
@@ -121,6 +138,13 @@ export type NewLeaguePlan = {
     /** True when the answers named it; false when it is the first one by default. */
     readonly chosen: boolean;
     readonly colors: StartingColors;
+  };
+  /** The first season's game rules, checked by the settings' contract; defaults when left. */
+  readonly gameRules: {
+    readonly clockMode: ClockMode;
+    readonly mercyLead: number | null;
+    /** Only when answered: left out, the first season writes no choice (T-422). */
+    readonly teamFoulsReset?: TeamFoulsResetAnswer;
   };
 };
 
@@ -289,6 +313,31 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
   const primary = check('mainColor', text(answers.mainColor), color);
   const accent = check('accentColor', text(answers.accentColor), color);
   const highlight = check('highlightColor', text(answers.highlightColor), color);
+  const clockMode = check(
+    'clock',
+    text(answers.clock)?.toLowerCase(),
+    (value) => clockModes.find((mode) => mode === value) ?? invalid,
+  );
+  const mercyLead = check('mercyLead', text(answers.mercyLead)?.toLowerCase(), (value) =>
+    value === 'none' ? null : /^\d{1,3}$/.test(value) ? Number(value) : invalid,
+  );
+  const teamFoulsReset = check(
+    'teamFoulsReset',
+    text(answers.teamFoulsReset)?.toLowerCase(),
+    (value) => teamFoulsResets.find((reset) => reset === value) ?? invalid,
+  );
+  const gameRules = withGameRuleAnswers(defaultSeasonRules(), {
+    ...(clockMode === undefined ? {} : { clockMode }),
+    ...(mercyLead === undefined ? {} : { mercyLead }),
+    ...(teamFoulsReset === undefined ? {} : { teamFoulsReset }),
+  });
+  const gameRuleFields = ['clock', 'mercyLead', 'teamFoulsReset'] as const;
+  if (!gameRules.ok && !problems.some((p) => gameRuleFields.some((f) => f === p.field))) {
+    problems.push({
+      field: gameRules.question === 'clockMode' ? 'clock' : gameRules.question,
+      problem: 'invalid',
+    });
+  }
 
   if (
     problems.length > 0 ||
@@ -301,7 +350,8 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
     contactEmail === undefined ||
     ownerEmail === undefined ||
     season === undefined ||
-    staffEmail === undefined
+    staffEmail === undefined ||
+    !gameRules.ok
   ) {
     return { ok: false, problems };
   }
@@ -328,6 +378,11 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
           ...(accent === undefined ? {} : { accent }),
           ...(highlight === undefined ? {} : { highlight }),
         },
+      },
+      gameRules: {
+        clockMode: gameRules.rules.clock.mode,
+        mercyLead: gameRules.rules.clock.mercyLead,
+        ...(teamFoulsReset === undefined ? {} : { teamFoulsReset }),
       },
     },
   };

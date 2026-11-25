@@ -7,14 +7,27 @@
 // is not carried, nor a player who left or is in the bin. With no current season nothing
 // is copied and the season starts from the presets. The new season is hidden until shown
 // (A-18, step 2.182) and is not made current: "Make this the current season" does that.
+//
+// The game rules asked when a season is started (S-106, step 2.245): given, they are put
+// into the rules the season would copy (the starting ones when nothing is copied) and
+// checked whole before anything is made; a refusal names the question.
+import type { SeasonRules } from '@srleagues/contracts';
 import { z } from 'zod';
 import { leagueScope, recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { seasonCarryChoices } from '../league-values.ts';
 import { mayEditLeague, programScope } from '../policy.ts';
 import type { LeaguesTx, SeasonSetupCopied } from '../ports.ts';
+import {
+  gameRuleAnswers,
+  withGameRuleAnswers,
+  type GameRuleRefusal,
+} from '../rules/game-rule-answers.ts';
+import { readSeasonRules } from './season-view.ts';
 
-export type StartSeasonError = { readonly code: 'program-not-found' | 'season-slug-taken' };
+export type StartSeasonError =
+  | { readonly code: 'program-not-found' | 'season-slug-taken' }
+  | GameRuleRefusal;
 
 export type StartSeasonValue = {
   readonly seasonId: string;
@@ -41,6 +54,8 @@ export const startSeason = defineCommand({
       startsOn: day.optional(),
       endsOn: day.optional(),
       carry: z.enum(seasonCarryChoices),
+      /** An answer left out keeps the copied (or starting) rule. */
+      gameRules: gameRuleAnswers.optional(),
     })
     .refine((s) => s.startsOn === undefined || s.endsOn === undefined || s.endsOn >= s.startsOn, {
       path: ['endsOn'],
@@ -55,6 +70,13 @@ export const startSeason = defineCommand({
     const program = await tx.leagues.findProgram(input.programId);
     if (program === undefined) return fail({ code: 'program-not-found' });
     const fromSeasonId = (await tx.leagues.currentSeasonOf(program.id)) ?? null;
+    let rules: SeasonRules | undefined;
+    if (input.gameRules !== undefined) {
+      const from = fromSeasonId === null ? undefined : await tx.leagues.findSeason(fromSeasonId);
+      const answered = withGameRuleAnswers(readSeasonRules(from?.rules).rules, input.gameRules);
+      if (!answered.ok) return fail({ code: answered.code, question: answered.question });
+      rules = answered.rules;
+    }
     const created = await tx.leagues.createSeason({
       programId: program.id,
       slug: input.slug,
@@ -72,6 +94,17 @@ export const startSeason = defineCommand({
             teams: input.carry !== 'nothing',
             rosters: input.carry === 'teams-and-rosters',
           });
+    if (rules !== undefined) {
+      const made = await tx.leagues.findSeason(created);
+      const saved =
+        made === undefined
+          ? undefined
+          : await tx.leagues.updateSeason(created, { rules }, made.version);
+      // A season just made in this transaction: anything else is a fault, rolled back.
+      if (typeof saved !== 'number') {
+        throw new Error("leagues.start_season: the new season's rules could not be saved.");
+      }
+    }
     await recordActivity(tx, context, {
       action: 'leagues.start_season',
       target: { type: 'season', id: created },
