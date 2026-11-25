@@ -72,12 +72,14 @@ describe('fetch command transport', () => {
       [401, 'signed-out'],
       [403, 'not-allowed'],
       [404, 'not-found'],
+      [404, 'unknown-game'],
     ] as const;
     for (const [status, error] of own) {
       const { transport } = transportAnswering(() => json(status, { error }));
       expect(await transport.send(batch, new AbortController().signal)).toEqual({
         kind: 'rejected',
         httpStatus: status,
+        error,
       });
     }
   });

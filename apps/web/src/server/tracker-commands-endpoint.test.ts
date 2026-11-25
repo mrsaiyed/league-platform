@@ -144,7 +144,7 @@ describe('POST …/games/{game}/commands', () => {
     const body = { protocolVersion: 1, sessionId, commands: tipOff() };
     // The owner holds both leagues: the game is simply not in the other one.
     const owner = await send(world, body, { as: 'owner', league: 'other' });
-    expect(owner.answer).toEqual({ status: 404, body: { error: 'not-found' } });
+    expect(owner.answer).toEqual({ status: 404, body: { error: 'unknown-game' } });
     // The scorekeeper holds nothing in the other league.
     const scorekeeper = await send(world, body, { league: 'other' });
     expect(scorekeeper.answer).toEqual({ status: 403, body: { error: 'not-allowed' } });

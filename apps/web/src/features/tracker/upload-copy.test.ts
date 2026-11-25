@@ -42,7 +42,8 @@ describe('the upload page of a copy of a game', () => {
       kind: 'refused',
       code: 'not-allowed',
     });
-    expect(uploadViewOf(404, null, copy)).toEqual({ kind: 'refused', code: 'unknown-game' });
+    // The gate's 404 (a hidden league is answered as a missing one): sign in (T-453).
+    expect(uploadViewOf(404, null, copy)).toEqual({ kind: 'signed-out' });
     expect(uploadViewOf(502, null, copy)).toEqual({ kind: 'failed' });
     // A body too large for the server, in its own words (step 2.70, fix round).
     expect(uploadViewOf(413, { error: 'too-large' }, copy)).toEqual({ kind: 'too-large' });

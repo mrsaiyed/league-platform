@@ -139,9 +139,9 @@ describe('GET …/games/{game}/reopen', () => {
     expect((await offer(world, { as: 'visitor' })).refusal).toEqual({ error: 'signed-out' });
     expect((await offer(world, { as: 'coach' })).refusal).toEqual({ error: 'not-allowed' });
     expect((await offer(world, { as: 'owner', league: 'other' })).refusal).toEqual({
-      error: 'not-found',
+      error: 'unknown-game',
     });
-    expect((await offer(world, { at: 'not-a-game' })).refusal).toEqual({ error: 'not-found' });
+    expect((await offer(world, { at: 'not-a-game' })).refusal).toEqual({ error: 'unknown-game' });
   });
 });
 

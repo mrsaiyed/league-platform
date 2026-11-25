@@ -69,7 +69,7 @@ describe('fetch game doors: Reopen', () => {
     const request = { requestId, reason: 'x' };
     expect(
       await doorsAnswering(json(401, { error: 'signed-out' })).doors.reopen(request, signal),
-    ).toEqual({ kind: 'rejected', httpStatus: 401 });
+    ).toEqual({ kind: 'rejected', httpStatus: 401, error: 'signed-out' });
     expect(await doorsAnswering(page(403)).doors.reopen(request, signal)).toEqual({
       kind: 'unanswered',
     });
