@@ -608,11 +608,35 @@ try {
         JSON.stringify(after) === JSON.stringify(before),
         JSON.stringify(after.slice(before.length)),
       );
-      // The device that held the game is told in plain words at its next tap.
+      // The device that held the game is told in plain words at its next tap. The words are
+      // shown only until the device has loaded the game as the server has it; then its final
+      // panel takes their place (`showsFinalPanel`), so they are watched for as they are drawn
+      // (T-409), not looked for twice, and the panel is waited for after them.
+      await holder.page.evaluate((text) => {
+        globalThis.toldSeen = false;
+        const look = () => {
+          const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          for (let node = walk.nextNode(); node !== null; node = walk.nextNode()) {
+            if (node.data.trim() === text) globalThis.toldSeen = true;
+          }
+        };
+        new MutationObserver(look).observe(document.body, {
+          subtree: true,
+          childList: true,
+          characterData: true,
+        });
+        look();
+      }, words.deviceTold);
       await h.play('home', 3, 'foul');
-      const told = holder.page.getByText(words.deviceTold, { exact: true });
-      await told.first().waitFor({ timeout: tapLimit });
-      note('the device is told the game cannot be scored now', (await told.count()) >= 1);
+      const told = await holder.page.waitForFunction(() => globalThis.toldSeen === true, null, {
+        timeout: tapLimit,
+      });
+      note('the device is told the game cannot be scored now', (await told.jsonValue()) === true);
+      await h.root.locator('[data-final]').waitFor({ timeout: tapLimit });
+      note(
+        'the device then shows the game final',
+        (await h.root.locator('[data-final]').count()) === 1,
+      );
       note('the device’s tap changed nothing', (await serverPlays()).length === after.length);
       const tables = await publicLines();
       note(
@@ -686,6 +710,13 @@ try {
         JSON.stringify(homeMoved) ===
           JSON.stringify([-1, 1, ...(after[teams[1]].for === null ? [null, null] : [0, 9])]),
       JSON.stringify({ teams, counted, after }),
+    );
+    const shown = await publicText();
+    note(
+      // The winner changed, so this correction changed the result: it is marked (S-81).
+      'the public page says Final and Corrected on, as the result changed',
+      shown.includes('Final') && shown.includes('Corrected on'),
+      shown.slice(0, 300),
     );
   });
 
