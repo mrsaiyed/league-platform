@@ -13,3 +13,5 @@ export {
   SubmitButton,
   type SearchProps,
 } from './sign-in-parts.tsx';
+export { OwnNameForm, type OwnNameWords } from './own-name-form.tsx';
+export type { OwnNameFormState } from './own-name-state.ts';

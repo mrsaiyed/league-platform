@@ -51,3 +51,12 @@ export type {
   PersonRecord,
   PersonSensitiveFields,
 } from './ports.ts';
+export { changeOwnName, type ChangeOwnNameError } from './commands/change-own-name.ts';
+export { giveOwnName, type GiveOwnNameError } from './commands/give-own-name.ts';
+export type {
+  OwnName,
+  OwnNameContext,
+  OwnNameDeps,
+  OwnNameFieldError,
+  OwnNameStore,
+} from './own-name.ts';

@@ -50,10 +50,19 @@ const signedIn = (email: string, signInId: string = randomUUID(), emailConfirmed
   return token;
 };
 
+// The session's account as linked or made, before the name gate (step 2.128): these tests
+// are about linking, and a new account has given no name yet.
 const accountOf = async (token: string) => {
-  const who = await ports.identify(token);
-  if (!who.ok) throw new Error(`not signed in: ${who.error.code}`);
-  return who.value.accountId;
+  const accountId = await ports.ownName.accountOf(token);
+  if (accountId === undefined) throw new Error('not signed in');
+  return accountId;
+};
+
+/** The session's account, named, so identify answers with it (R-21, step 2.128). */
+const namedAccountOf = async (token: string) => {
+  const accountId = await accountOf(token);
+  await ports.ownName.store.create(accountId, { firstName: 'Made-up', lastName: 'Person' });
+  return accountId;
 };
 
 const seedLeague = (slug: string) => {
@@ -90,6 +99,20 @@ afterAll(async () => {
 });
 
 describe('databasePorts (record 055)', () => {
+  it('asks a new account its name first: identify refuses it until it is given (step 2.128)', async () => {
+    const token = signedIn(`nameless-${randomUUID()}@example.test`);
+    const nameNeeded = fail({ code: 'account-problem', problem: 'name-needed' });
+    expect(await ports.identify(token)).toEqual(nameNeeded);
+    expect(await ports.identify(token)).toEqual(nameNeeded);
+    const accountId = await namedAccountOf(token);
+    const who = await ports.identify(token);
+    expect(who.ok && who.value.accountId).toBe(accountId);
+    expect(await ports.ownName.read(accountId)).toEqual({
+      firstName: 'Made-up',
+      lastName: 'Person',
+    });
+  });
+
   it('finds a seed league by its short name, and nothing for an unknown one', async () => {
     expect(await ports.findLeague('lakeside')).toMatchObject({
       leagueId: lakeside().leagueId,
@@ -241,10 +264,14 @@ describe('databasePorts (record 055)', () => {
       ports.identify(signedIn(other)),
       ports.identify(signedIn(other)),
     ]);
-    expect(answers.filter((answer) => answer.ok)).toHaveLength(1);
-    expect(answers.filter((answer) => !answer.ok)).toEqual([
-      fail({ code: 'account-problem', problem: 'sign-in-link-conflict' }),
-    ]);
+    // The one linked is a new account, which the name gate then asks its name (step 2.128).
+    expect(answers).toHaveLength(2);
+    expect(answers).toEqual(
+      expect.arrayContaining([
+        fail({ code: 'account-problem', problem: 'name-needed' }),
+        fail({ code: 'account-problem', problem: 'sign-in-link-conflict' }),
+      ]),
+    );
     // A pre-made account (the seed's scheduler), two first sign-ins at once: linked
     // once, to that account, which holds the scheduler's role.
     const scheduler = randomUUID();
@@ -347,9 +374,9 @@ describe('databasePorts (record 055)', () => {
       expect(seeded.members.length).toBeGreaterThan(0);
       const holders = [maple.ownerAccountId];
       for (const member of seeded.members) {
-        const who = await binnedPorts.identify(signedIn(member.email));
-        if (!who.ok) throw new Error(`${member.role} not signed in: ${who.error.code}`);
-        holders.push(who.value.accountId);
+        const who = await binnedPorts.ownName.accountOf(signedIn(member.email));
+        if (who === undefined) throw new Error(`${member.role} not signed in`);
+        holders.push(who);
         // Outside the bin the same member holds their role, so the bin is what ends it.
         const inPlace = await ports.accessOf({
           leagueId: seedLeague('maple-street').leagueId,
@@ -447,6 +474,8 @@ describe('databasePorts (record 055)', () => {
         }),
       );
     const askAs = async (token: string) => {
+      // A seed member has given no name yet: they give it, as at their next sign-in (2.128).
+      await namedAccountOf(token);
       const resolved = await resolveLeagueApi(
         {
           host: 'localhost:3000',

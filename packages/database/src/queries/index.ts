@@ -69,6 +69,8 @@ export { findInvitationByTokenHash } from './find-invitation-by-token-hash.ts';
 export { findLeagueByShortName, type LeagueByShortName } from './find-league-by-short-name.ts';
 export { accountForSignIn, isSignInLinkConflict, isSignInRefusal } from './account-for-sign-in.ts';
 export { createOwnProfile, type OwnProfile } from './create-own-profile.ts';
+export { readOwnName } from './read-own-name.ts';
+export { renameOwnProfile } from './rename-own-profile.ts';
 export { eraseAccount, type EraseAccountAnswer } from './erase-account.ts';
 export { findAccountOfSignIn } from './find-account-of-sign-in.ts';
 export { listAccessNames, type AccessListName } from './list-access-names.ts';

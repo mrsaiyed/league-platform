@@ -50,6 +50,19 @@ export const enAccount = {
   'account.menu.myGames': 'My games to score',
   'account.menu.myTeam': 'My team',
   'account.menu.myTeams': 'My teams',
+  'account.name.alreadyNamed': 'Your name is already saved. Open your account to change it.',
+  'account.name.firstName': 'First name',
+  'account.name.heading': 'Your name',
+  'account.name.help': 'The leagues you belong to show this name to their staff.',
+  'account.name.intro':
+    'Before you go on: what is your name? The staff of the leagues you join see it, and forms fill it in for you. You can change it later on your account page.',
+  'account.name.invalid':
+    'Please fill in both names, each at most 100 characters. What you typed is kept below.',
+  'account.name.lastName': 'Last name',
+  'account.name.noNameYet': 'Please give your name first.',
+  'account.name.save': 'Save my name',
+  'account.name.saved': 'Your name is saved.',
+  'account.name.title': 'Your name',
   'account.problem.addressRefused':
     'You are signed in, but we cannot open an account for this email address. Nothing has been lost, and we have noted it. Please contact us, or sign out and sign in with another email address.',
   'account.problem.linkConflict':

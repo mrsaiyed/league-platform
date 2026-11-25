@@ -79,6 +79,9 @@ export type DatabaseQueries = Pick<
   | 'findCurrentLeague'
   | 'databaseAnswers'
   | 'findAccountOfSignIn'
+  | 'createOwnProfile'
+  | 'readOwnName'
+  | 'renameOwnProfile'
   | 'accountForSignIn'
   | 'isSignInLinkConflict'
   | 'isSignInRefusal'
@@ -241,13 +244,46 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     }
   };
 
+  const readOwnName = (accountId: string) =>
+    database.withTransaction(db, { accountId }, (scope) => database.readOwnName(scope));
+  // The name gate (R-21, step 2.128, T-445): every way in identifies the session here, so an
+  // account that has not given its name is refused with `name-needed` everywhere at once,
+  // and the account page asks it. Accounts made before this step are asked at their next
+  // sign-in the same way; no name is ever made up for them.
   const identify: WebPorts['identify'] = async (accessToken) => {
     const who = await signIn.identify({ accessToken });
     if (!who.ok) return who;
     const { accountId, email, emailConfirmed } = who.value;
     const account = await accountOfSignIn(accountId, email, emailConfirmed);
     if (!account.ok) return account;
+    if ((await readOwnName(account.value)) === undefined) {
+      return fail({ code: 'account-problem', problem: 'name-needed' });
+    }
     return ok({ ...who.value, accountId: account.value });
+  };
+  const ownName: WebPorts['ownName'] = {
+    accountOf: async (accessToken) => {
+      const who = await signIn.identify({ accessToken });
+      if (!who.ok) return undefined;
+      const { accountId, email, emailConfirmed } = who.value;
+      const account = await accountOfSignIn(accountId, email, emailConfirmed);
+      return account.ok ? account.value : undefined;
+    },
+    read: readOwnName,
+    store: {
+      // The own profile and the display name the Admins page shows, in one transaction.
+      create: (accountId, name) =>
+        database.withTransaction(db, { accountId }, async (scope) => {
+          const made = await database.createOwnProfile(scope, { ...name, birthDate: null });
+          if (made === 'already-has-one') return made;
+          await database.renameOwnProfile(scope, name);
+          return 'made';
+        }),
+      rename: (accountId, name) =>
+        database.withTransaction(db, { accountId }, (scope) =>
+          database.renameOwnProfile(scope, name),
+        ),
+    },
   };
 
   const accessOf = accessOfVia(deps);
@@ -274,6 +310,7 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     },
     newRequestId: () => randomUUID(),
     identify,
+    ownName,
     signIn,
     signInMail: options.signInMail,
     botCheck: options.botCheck,

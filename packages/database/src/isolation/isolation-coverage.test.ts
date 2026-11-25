@@ -68,6 +68,17 @@ const reachNoLeagueData = new Map<unknown, string>([
   [venueSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [courtSummary, 'turns a row already read into the returned shape; runs no SQL'],
   [teamSummary, 'turns a row already read into the returned shape; runs no SQL'],
+  // Step 2.128: the account's own name. Both run in a transaction opened for an account,
+  // on its personal tables only (profiles, profile_access, accounts), each fenced to that
+  // account (0005); tested in read-own-name.test.ts.
+  [
+    databasePackage.readOwnName,
+    "the own name of the account set: its own profile's first and last name, no league's data",
+  ],
+  [
+    databasePackage.renameOwnProfile,
+    "renames the own profile of the account set and its display name: that account's personal rows only",
+  ],
   [
     databasePackage.seedLeaguesInto,
     'development-only bootstrap: takes a PGlite, not a scope; runs the scoped commands (own cases) per league and writes accounts and role grants directly',

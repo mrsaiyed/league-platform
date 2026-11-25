@@ -22,6 +22,7 @@
 // area reads and writes through the product's own commands; it is made again each time
 // the server starts.
 import {
+  fail,
   myLeagues,
   ok,
   systemClock,
@@ -56,7 +57,7 @@ import type { WebPorts } from './ports.ts';
 import { createPlayPublisher } from './publish-plays.ts';
 import { sharedRenewal } from './sign-in/renew-session.ts';
 import { createSignInMail } from './sign-in/sign-in-mail.ts';
-import { standInAdminAccess } from './stand-in-admin-access.ts';
+import { standInAdminAccess, standInOwnNames } from './stand-in-admin-access.ts';
 import { standInAdminSettings } from './stand-in-admin-settings.ts';
 import { standInAnswersTo, standInNamesOf, standInStatusOf } from './stand-in-league-states.ts';
 import { standInAdminTeams } from './stand-in-admin-teams.ts';
@@ -450,7 +451,11 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       ? undefined
       : { id: found.id, slug: standInNamesOf(found).slug, status: standInStatusOf(found) };
   };
-  const identify: WebPorts['identify'] = async (accessToken) => {
+  // The made-up world's own names (R-21, step 2.128): the made-up people have answered
+  // before (T-446), so the gate below asks only someone who signs up through the form.
+  const ownNames = standInOwnNames();
+  const madeUpIds = new Set(Object.values(standInPeople).map((p) => p.accountId));
+  const identifyAccount: WebPorts['identify'] = async (accessToken) => {
     const person = people.find((p) => p.token === accessToken);
     if (person !== undefined) return ok(identityOf(person));
     const who = await signIn.identify({ accessToken });
@@ -459,6 +464,20 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     // address the sign-in stand-in proved (stand-in-sign-ins.ts).
     const madeUp = madeUpAccountOf(who.value.email, standInMember.email, standInPeople);
     return madeUp === undefined ? who : ok({ ...who.value, accountId: madeUp });
+  };
+  const identify: WebPorts['identify'] = async (accessToken) => {
+    const who = await identifyAccount(accessToken);
+    if (!who.ok || madeUpIds.has(who.value.accountId)) return who;
+    if (ownNames.names.has(who.value.accountId)) return who;
+    return fail({ code: 'account-problem', problem: 'name-needed' });
+  };
+  const ownName: WebPorts['ownName'] = {
+    accountOf: async (accessToken) => {
+      const who = await identifyAccount(accessToken);
+      return who.ok ? who.value.accountId : undefined;
+    },
+    read: async (accountId) => ownNames.names.get(accountId),
+    store: ownNames,
   };
   const accessOf = accessOfVia(deps);
   // The one made-up world: every area below reads and writes the same rows (step 2.152).
@@ -538,6 +557,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     findLeagueById,
     newRequestId: () => randomUUID(),
     identify,
+    ownName,
     signIn,
     signInMail,
     botCheck,
@@ -598,7 +618,7 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       },
     },
     publicStats: standInPublicStats(world, namePolicy),
-    adminAccess: standInAdminAccess(deps, world),
+    adminAccess: standInAdminAccess(deps, world, ownNames),
     // The same made-up world's people, whom Admin → Teams puts on rosters (step 2.50).
     adminPeople: { deps: world.deps, putBack: world.deps },
     adminTeams: standInAdminTeams(world, accessOf),

@@ -10,7 +10,9 @@ import {
 } from '../../../features/shell/index.ts';
 import {
   LocalTime,
+  OwnNameForm,
   type LocalTimeWords,
+  type OwnNameWords,
   type SearchProps,
 } from '../../../features/sign-in/index.ts';
 import { SignOutForm } from '../../../features/tracker/index.ts';
@@ -18,6 +20,10 @@ import { webPorts } from '../../../server/container.ts';
 import type { AccountProblem } from '../../../server/context.ts';
 import { locale, t, type TextKey } from '../../../server/messages.ts';
 import { signOutAction, signOutEverywhereAction } from '../../../server/sign-in/actions.ts';
+import {
+  changeOwnNameAction,
+  giveOwnNameAction,
+} from '../../../server/sign-in/own-name-actions.ts';
 import { cookieNames } from '../../../server/sign-in/cookies.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
 import { leaguesOfThisRequest, signedInPerson } from '../../../server/signed-in-leagues.ts';
@@ -42,7 +48,13 @@ export default async function Page({ searchParams }: SearchProps) {
   const asking = (await searchParams)['ask'] === 'signOutEverywhere';
   const ports = await webPorts();
   const who = await signedInPerson();
-  if (who.kind === 'account-problem') return <AccountProblemPage problem={who.problem} />;
+  if (who.kind === 'account-problem') {
+    return who.problem === 'name-needed' ? (
+      <NameScreen />
+    ) : (
+      <AccountProblemPage problem={who.problem} />
+    );
+  }
   if (who.kind === 'visitor') redirect(screenUrl('signin', { next: platformUrl('account') }));
   const listed = await ports.signIn.listSessions({ accessToken });
   // This device first, then the others, most recent first, as the service lists them.
@@ -50,6 +62,7 @@ export default async function Page({ searchParams }: SearchProps) {
     ? [...listed.value.filter((s) => s.current), ...listed.value.filter((s) => !s.current)]
     : [];
   const leagues = await leaguesOfThisRequest();
+  const name = await ports.ownName.read(who.accountId);
   return (
     <StandalonePage>
       <main className="ui-message ui-form-card account">
@@ -58,6 +71,20 @@ export default async function Page({ searchParams }: SearchProps) {
         <p className="ui-kicker">{t('shell.siteName')}</p>
         <p className="account-who">{t('account.signedInAs', { email: who.email })}</p>
         <h1>{t('page.account')}</h1>
+        <h2>{t('account.name.heading')}</h2>
+        <p>{t('account.name.help')}</p>
+        <OwnNameForm
+          action={changeOwnNameAction}
+          initial={{
+            firstName: name?.firstName ?? '',
+            lastName: name?.lastName ?? '',
+            problem: null,
+            saved: false,
+            round: 0,
+          }}
+          words={ownNameWords()}
+          mark="change"
+        />
         <h2>{t('account.leagues')}</h2>
         <MyLeaguesList leagues={leagues} />
         <h2>{t('account.devices')}</h2>
@@ -141,7 +168,49 @@ const problemText = {
   'sign-in-link-conflict': 'account.problem.linkConflict',
   'address-not-confirmed': 'account.problem.notConfirmed',
   'address-refused': 'account.problem.addressRefused',
+  'name-needed': 'account.name.intro',
 } as const satisfies Record<AccountProblem, TextKey>;
+
+function ownNameWords(): OwnNameWords {
+  return {
+    firstName: t('account.name.firstName'),
+    lastName: t('account.name.lastName'),
+    save: t('account.name.save'),
+    saved: t('account.name.saved'),
+    problems: {
+      invalid: t('account.name.invalid'),
+      alreadyNamed: t('account.name.alreadyNamed'),
+      noNameYet: t('account.name.noNameYet'),
+    },
+  };
+}
+
+/**
+ * The one screen that asks a new account's first and last name, once (R-21, step 2.128):
+ * every page sends a signed-in person here until they have answered; they can still sign out.
+ */
+function NameScreen() {
+  return (
+    <StandalonePage>
+      <main className="ui-message ui-form-card account" data-name-screen="">
+        <p className="ui-kicker">{t('shell.siteName')}</p>
+        <h1>{t('account.name.title')}</h1>
+        <p>{t('account.name.intro')}</p>
+        <OwnNameForm
+          action={giveOwnNameAction}
+          initial={{ firstName: '', lastName: '', problem: null, saved: false, round: 0 }}
+          words={ownNameWords()}
+          mark="give"
+        />
+        <form action={signOutAction}>
+          <button className="ui-button" data-kind="quiet" type="submit">
+            {t('account.signOut')}
+          </button>
+        </form>
+      </main>
+    </StandalonePage>
+  );
+}
 
 /** What is wrong with the account, in plain words, and signing out (record 055). */
 function AccountProblemPage({ problem }: { readonly problem: AccountProblem }) {
