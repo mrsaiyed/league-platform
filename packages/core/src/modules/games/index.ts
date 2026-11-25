@@ -115,6 +115,10 @@ export {
   type CorrectTrackedBoxScoreError,
 } from './commands/correct-tracked-box-score.ts';
 export {
+  takeBackTrackedBasket,
+  type TakeBackTrackedBasketError,
+} from './commands/take-back-tracked-basket.ts';
+export {
   readTrackedBoxScore,
   type ReadTrackedBoxScoreError,
   type TrackedBoxScore,

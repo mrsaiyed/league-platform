@@ -174,10 +174,12 @@ const pointsOf = (play: Record<string, unknown>): 1 | 2 | 3 | null =>
 function scoreOfPlays(plays: readonly unknown[]): Record<Side, number> {
   const score = { home: 0, away: 0 };
   for (const play of plays) {
-    if (!isRecord(play) || play['type'] !== 'score') continue;
+    if (!isRecord(play) || (play['type'] !== 'score' && play['type'] !== 'unscore')) continue;
     const side = sideOf(play['side']);
     const points = pointsOf(play);
-    if (side !== null && points !== null) score[side] += points;
+    // A basket taken back (T-432) counts no more.
+    if (side !== null && points !== null)
+      score[side] += play['type'] === 'score' ? points : -points;
   }
   return score;
 }

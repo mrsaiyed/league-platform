@@ -105,6 +105,14 @@ export const PlatformCommand = z.discriminatedUnion('type', [
   ...sharedCommands,
   z.strictObject({ type: z.literal('rules'), rules: PlatformRules }),
   z.strictObject({ type: z.literal('clock-mode'), mode: z.enum(['stop', 'running']) }),
+  // One earlier basket taken back by its play ID (T-432): only a correction sends it (T-433).
+  z.strictObject({
+    type: z.literal('unscore'),
+    side: Side,
+    playerId: Id,
+    points: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    playId: Id,
+  }),
 ]);
 
 /**

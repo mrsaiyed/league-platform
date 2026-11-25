@@ -2,7 +2,7 @@
 // saved state, the box score lines a state gives, and the checks the platform makes on
 // a command before the engine sees it. The engine (packages/sports) is used as it is
 // (T-110); the Al-Hadi tracker's server makes the same player check (apps/live-stats).
-import type { TrackerCommand } from '@srleagues/contracts';
+import { correctionPlaySource, type PlaySource, type TrackerCommand } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import type { GamePlayer, GameRecord, LiveGameLine } from './ports.ts';
 
@@ -35,7 +35,10 @@ export function readState(stored: unknown): basketball.GameState {
  * need a reason and leaves a trace in the activity log, so a game is marked not
  * started through its own command (games.mark_not_started, S-40), not a tap.
  */
-export function platformProblem(input: TrackerInput): string | undefined {
+export function platformProblem(input: TrackerInput, source?: PlaySource): string | undefined {
+  // An earlier basket is taken back by an admin's correction (T-433), never a tap.
+  if (input.type === 'unscore' && source !== correctionPlaySource)
+    return 'A basket is taken back by correcting the game, not a tap.';
   if (input.type === 'rules') return 'The game’s rules come from the league’s settings.';
   if (input.type === 'reopen') return 'A final game is reopened by an admin, with a reason.';
   if (input.type === 'reset') return 'A game is marked not started with its own button, not a tap.';
@@ -59,6 +62,7 @@ export function withLowerIds(input: TrackerInput): TrackerInput {
     case 'sub':
       return { ...input, inId: lower(input.inId), outId: lower(input.outId) };
     case 'score':
+    case 'unscore':
     case 'foul':
     case 'unfoul':
     case 'turnover':
@@ -112,6 +116,7 @@ export function playersNamed(input: TrackerInput): readonly string[] {
     case 'sub':
       return [input.inId, input.outId];
     case 'score':
+    case 'unscore':
     case 'foul':
     case 'unfoul':
     case 'turnover':

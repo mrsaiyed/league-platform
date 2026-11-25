@@ -67,6 +67,7 @@ import {
   countTeamGames,
   createCourt,
   correctTrackedBoxScore,
+  takeBackTrackedBasket,
   createDivision,
   createLeague,
   createPerson,
@@ -1051,6 +1052,30 @@ const gameCommandRows: readonly Row[] = [
       return { gameId, sequence: last.rows[0]?.seq ?? 0, lines: [] };
     },
     (c, i) => correctTrackedBoxScore(c, i, trackerDeps),
+  ),
+  // Step 2.247 (T-433): taking back one earlier basket is the same correction. The basket
+  // named is the game's first, so whoever may correct it is told yes.
+  ...gameRows(
+    'games.take_back_tracked_basket',
+    'take back a basket of a tracked game',
+    'games.correct',
+    async (league, program) => {
+      const gameId = await trackedGameReopenedIn(league, program);
+      const last = await pglite.query<{ seq: number }>(
+        'select max(seq) as seq from game_events where game_id = $1',
+        [gameId],
+      );
+      const basket = await pglite.query<{ command_id: string }>(
+        "select command_id from game_events where game_id = $1 and type = 'score' order by seq limit 1",
+        [gameId],
+      );
+      return {
+        gameId,
+        sequence: last.rows[0]?.seq ?? 0,
+        playId: basket.rows[0]?.command_id ?? 'no-basket',
+      };
+    },
+    (c, i) => takeBackTrackedBasket(c, i, trackerDeps),
   ),
   // What that grid shows: whoever may correct the game. A read.
   ...gameRows(
