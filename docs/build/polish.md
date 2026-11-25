@@ -157,3 +157,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.69: the last-minutes sign at a period change, in overtime and with the clock set by hand into the window was checked by reading only; no read-only page shows the clock mode to a second device.
 
 - 2.249: other browser tests that use the real clock and a game dated from now were not run between 00:00 and 03:00 league time; bad-wifi-visitors-test line 291 uses yesterday in UTC.
+
+- 2.155 part 4: with scripts on a save leaves no #setting-… at the end of the address; done=saved remains in the schedule's and rounds' own tests (not converted forms).
