@@ -831,9 +831,8 @@ export function ClockSheetView(props: {
 
 /**
  * The running-clock switch (step 2.69; P7 section 5.2, S-21): on or off at any moment of
- * the game, whatever the season's rule says, except inside the last minutes (T-442): there
- * the stop clock wins, so it is shown as it stands, not usable, and says why; it comes
- * back when the window ends. Out of use it keeps its place and size. It sits
+ * the game, whatever the season's rule says. It shows the mode in force, so inside the
+ * last-minutes stop clock it reads Off and a tap keeps the clock running there. It sits
  * in the form's first row, beside its title, where it takes no height: the form is whole
  * on a phone's screen with nothing scrolling (DESIGN.md section 7, line 8).
  */
@@ -851,8 +850,6 @@ function ClockModeSwitch(props: {
         role="switch"
         className="court-opt court-clock-mode"
         data-clock-switch=""
-        data-last-minutes-locked={mode.switchable ? undefined : ''}
-        disabled={!mode.switchable}
         aria-checked={running}
         aria-describedby="court-clock-mode-help"
         onClick={props.on.switchClock}
@@ -864,12 +861,10 @@ function ClockModeSwitch(props: {
       </button>
       <p className="court-sr" id="court-clock-mode-help" data-clock-mode-help="">
         {t(
-          !mode.switchable
-            ? running
-              ? 'tracker.clockMode.helpLastMinutesRunning'
-              : 'tracker.clockMode.helpLastMinutes'
-            : running
-              ? 'tracker.clockMode.helpRunning'
+          running
+            ? 'tracker.clockMode.helpRunning'
+            : mode.lastMinutes
+              ? 'tracker.clockMode.helpLastMinutes'
               : 'tracker.clockMode.helpStop',
         )}
       </p>
@@ -925,6 +920,34 @@ export function MercyNotice(props: {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * The scorer turned the running clock On and then Off inside the last minutes (S-124): the
+ * clock now stops on fouls for the rest of the game (the engine has no switch that ends
+ * with them until step 2.252), so the screen says so, in the mercy notice's own place and
+ * pattern, while that holds. One answer dismisses it; it comes back if it happens again.
+ */
+export function LastMinutesStopNotice(props: {
+  readonly t: Translate;
+  readonly seen: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const { t } = props;
+  return (
+    <div className="court-notice court-mercy" role="status" data-last-minutes-stop="">
+      <p>{t('tracker.clockMode.stopForGame')}</p>
+      <div className="court-mercy-acts">
+        <button
+          type="button"
+          className="court-button"
+          data-last-minutes-stop-seen=""
+          onClick={props.seen}
+        >
+          {t('tracker.mercy.seen')}
+        </button>
+      </div>
     </div>
   );
 }

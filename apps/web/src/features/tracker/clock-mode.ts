@@ -17,16 +17,10 @@ export type ClockModeShown = {
   readonly lastMinutes: boolean;
   /**
    * While this period has a last-minutes window not yet reached: the time left at which
-   * it starts, so the screen can draw itself again then (the sign, the switch put out of
-   * use, the mercy notice's words). Null otherwise.
+   * it starts, under either clock, so the screen can draw itself again then (the sign, the
+   * switch reading Off, the mercy notice's words). Null otherwise.
    */
   readonly lastMinutesAtMs: number | null;
-  /**
-   * The running-clock switch can be used: everywhere but inside the last minutes (T-442).
-   * There the stop clock wins whatever the switch says, so it is shown, not usable, and
-   * comes back when the window ends (a new period, or the next overtime's start).
-   */
-  readonly switchable: boolean;
 };
 
 /** The clock mode at `remainingMs` of the period being played. */
@@ -45,9 +39,36 @@ export function clockModeShown(
     now,
     lastMinutes: d.clockMode === 'running' && inWindow && now === 'stop',
     lastMinutesAtMs: !inWindow && hasWindow ? windowMs : null,
-    switchable: !inWindow,
   };
 }
+
+/**
+ * The scorer turned the running clock On and then Off inside the last minutes (S-124):
+ * the engine has no switch that ends with them (step 2.252), so the game stops its clock
+ * on fouls for the rest of it, and the screen says so while that holds. The `stop` play
+ * that did it (its id keeps a dismissal), or null: none, a new period came between the
+ * two taps, or the clock mode has changed since (a tap, or the mercy rule).
+ */
+export function lastMinutesStop(game: basketball.GameState): { readonly playId: string } | null {
+  if (basketball.derive(game).clockMode !== 'stop') return null;
+  let stop: string | null = null;
+  for (let i = game.plays.length - 1; i >= 0; i--) {
+    const play = game.plays[i]!;
+    if (play.mercyClock === true) return null;
+    if (stop === null) {
+      if (play.type !== 'clock-mode') continue;
+      if (play.mode !== 'stop') return null;
+      stop = play.id;
+    } else if (play.type === 'period') return null;
+    // The switch On before it was made inside the last minutes (the engine's own mark).
+    else if (play.type === 'clock-mode') return play.lastMinutes === true ? { playId: stop } : null;
+  }
+  return null;
+}
+
+/** What a dismissal of the notice about `lastMinutesStop` keeps: its own, not a basket's. */
+export const lastMinutesStopDismissal = (stop: { readonly playId: string }): string =>
+  `${stop.playId}:stop`;
 
 /** What a tap on the switch sends: the other mode from the one in force. */
 export const switchedClock = (
@@ -94,6 +115,14 @@ export function mercySwitch(
   }
   return null;
 }
+
+/**
+ * What a dismissal of the mercy notice keeps: the basket, and inside the last minutes the
+ * basket with `:last`, so "Got it" there does not keep the notice and its way back from
+ * coming back after them (step 2.248's review, L2).
+ */
+export const mercyDismissal = (mercy: MercySwitch): string =>
+  `${mercy.playId}${mercy.lastMinutes ? ':last' : ''}`;
 
 /** Whose dismissal it is: the game and the person, as the Players panel's drafts are kept. */
 export type MercyOwner = { readonly gameId: string; readonly accountId: string };

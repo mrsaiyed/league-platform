@@ -257,7 +257,7 @@ describe('where they are on the screen (DESIGN.md section 7, lines 5 and 8)', ()
         running: true,
         over: false,
         start: null,
-        mode: { now: 'running', lastMinutes: false, lastMinutesAtMs: null, switchable: true },
+        mode: { now: 'running', lastMinutes: false, lastMinutesAtMs: null },
       },
       banner: { text: 'All saved', short: ['All saved'], state: 'saved' },
       pad: padAtRest,

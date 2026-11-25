@@ -206,7 +206,7 @@ function drawn(
         running: false,
         over: false,
         start: null,
-        mode: { now: 'stop', lastMinutes: false, lastMinutesAtMs: null, switchable: true },
+        mode: { now: 'stop', lastMinutes: false, lastMinutesAtMs: null },
       },
       banner: options.banner ?? { text: 'All saved', short: ['All saved'], state: 'saved' },
       pad: options.pad ?? padAtRest,
