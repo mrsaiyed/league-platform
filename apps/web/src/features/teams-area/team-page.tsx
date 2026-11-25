@@ -37,6 +37,7 @@ import {
 import { removePanel, tapRefusal, type RemoveWayOn } from './remove-team-words.ts';
 import { backToTeamParam, publishAnchor } from '../schedule-builder/index.ts';
 import { offTheLeagueList, putBackOffer } from './put-back-offer.ts';
+import { FindPersonForm } from './find-person-form.tsx';
 import { pickOf } from './person-pick.ts';
 import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
@@ -518,7 +519,7 @@ export async function TeamPage({
             200 can pick anyone; the select holds what was found, 200 to a page. */}
         {readFailed || peopleNotAllowed ? null : (
           <div id={fromListAnchor} data-find-person="true">
-            <form action={findPersonAction} role="search" className="staff-form">
+            <FindPersonForm action={findPersonAction} to={teamUrl} anchor={fromListAnchor}>
               <LeagueField league={here.slug} />
               <input type="hidden" name="team" value={team.id} />
               <StaffField label={t('adminTeams.find.label')}>
@@ -533,7 +534,7 @@ export async function TeamPage({
               <button type="submit" className="ui-button">
                 {t('adminTeams.find.submit')}
               </button>
-            </form>
+            </FindPersonForm>
             {pick.search === undefined ? null : (
               <p className="staff-quiet" data-found-for="true">
                 {t('adminTeams.find.foundFor', { search: pick.search })}{' '}
