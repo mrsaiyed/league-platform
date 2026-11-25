@@ -23,6 +23,7 @@ import { addPersonAnchor } from './anchors.ts';
 import { personFormWords } from './form-words.ts';
 import { peopleAskOf, peoplePageSize, readPeopleList, type PeopleAsk } from './people-view.ts';
 import { PersonForm } from './person-form.tsx';
+import { notPutBackText } from './refusal-text.ts';
 import { currentTeamsByPerson, type TeamsByPerson } from './teams-of-people.ts';
 
 const area: AdminArea = 'people';
@@ -105,21 +106,16 @@ export async function PeoplePage({
             <input type="hidden" name="personId" value={notice.thing} />
             <input type="hidden" name={requestTokenField} value={crypto.randomUUID()} />
             <button type="submit" className="ui-button">
-              {t('adminPeople.putBack.submit')}
+              {notice.name === undefined
+                ? t('adminPeople.putBack.submit')
+                : t('adminPeople.putBack.submitNamed', { name: notice.name })}
             </button>
           </form>
         </StaffNotice>
       ) : null}
-      {notice?.said.startsWith('notPutBack.') === true ? (
-        <StaffNotice kind="refused">
-          {t('adminPeople.putBack.notPutBack', {
-            problem:
-              notice.said === 'notPutBack.person-profile-taken'
-                ? t('error.leagues.restore_person.person-profile-taken')
-                : t('error.leagues.restore_person.person-not-found'),
-          })}
-        </StaffNotice>
-      ) : null}
+      {notice === undefined ? null : (
+        <NotPutBack said={notPutBackText(notice.said, notice.name)} thing={notice.thing} />
+      )}
 
       <section className="staff-panel admin-team-part">
         {/* Posted, so an email address typed here never rides in an address: the action
@@ -283,4 +279,19 @@ export function teamsLineOf(teams: readonly { readonly name: string }[] | undefi
   return teams === undefined || teams.length === 0
     ? t('adminPeople.list.noTeam')
     : teams.map((team) => team.name).join(', ');
+}
+
+/** "Put them back" refused, said at the top of the list (refusal-text.ts). */
+function NotPutBack({
+  said,
+  thing,
+}: {
+  readonly said: string | undefined;
+  readonly thing: string;
+}) {
+  return said === undefined ? null : (
+    <StaffNotice kind="refused" data={{ 'data-not-put-back': thing }}>
+      {said}
+    </StaffNotice>
+  );
 }

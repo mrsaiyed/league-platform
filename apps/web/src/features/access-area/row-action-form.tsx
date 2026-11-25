@@ -5,8 +5,8 @@
 // the answer to the post itself (T-271, record 067); a change that works draws the page
 // again with its notice. It goes quiet once sent, and works with no script in the page.
 import { useActionState, useId } from 'react';
-import { untouched, type FormState } from '../games-area/form-state.ts';
-import { useOneSubmit } from '../games-area/use-one-submit.ts';
+import { untouched, type FormState } from '../list-forms/form-state.ts';
+import { useOneSubmit } from '../list-forms/use-one-submit.ts';
 
 export function RowActionForm({
   action,

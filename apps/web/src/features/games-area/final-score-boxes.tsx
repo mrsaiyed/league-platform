@@ -11,7 +11,7 @@
 import { useActionState, useId } from 'react';
 import { fillScores, untouched, type FinalScoreState } from './form-state.ts';
 import { scoreFields, type ScoreField } from './score-fields.ts';
-import { useOneSubmit } from './use-one-submit.ts';
+import { useOneSubmit } from '../list-forms/use-one-submit.ts';
 
 export type FinalScoreTexts = {
   readonly enterFinal: string;

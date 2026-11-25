@@ -54,7 +54,7 @@ import { BoxScoreSheetForm, type SheetRow, type SheetTeam } from './box-score-sh
 import { sheetScoresId } from './form-state.ts';
 import { putBackProblemKey } from './problem-keys.ts';
 import { ReopenForm } from './reopen-form.tsx';
-import { SavedLine } from './saved-line.tsx';
+import { SaidLine } from '../list-forms/said-line.tsx';
 import { sheetNeedsOffer, sheetReopenViewOf, type ReopenView } from './reopen-view.ts';
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -271,7 +271,7 @@ export async function BoxScorePage({
           />
         ) : null}
       </PageHead>
-      {reopened === undefined ? null : <SavedLine text={reopened} />}
+      {reopened === undefined ? null : <SaidLine kind="saved">{reopened}</SaidLine>}
       {format.ok ? (
         <GameFormatSection
           leagueId={here.id}

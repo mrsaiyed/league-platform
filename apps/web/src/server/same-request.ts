@@ -38,8 +38,16 @@ export function requestKeyOf(
 }
 
 export type SameRequests<T> = {
-  /** The answer to this request: the first one's, if it was sent before; else run's. */
-  readonly once: (key: string | undefined, run: () => Promise<T>) => Promise<T>;
+  /**
+   * The answer to this request: the first one's, if it was sent before; else run's. With
+   * `holds`, a kept answer whose request has finished is given only while `holds` says it is
+   * still true (a thing said brought back that is in the bin again): otherwise it runs again.
+   */
+  readonly once: (
+    key: string | undefined,
+    run: () => Promise<T>,
+    holds?: (answer: T) => Promise<boolean>,
+  ) => Promise<T>;
 };
 
 export function sameRequests<T>(options: {
@@ -60,29 +68,38 @@ export function sameRequests<T>(options: {
       if (!entry.running) kept.delete(key);
     }
   };
+  const start = (key: string, run: () => Promise<T>): Promise<T> => {
+    kept.delete(key);
+    prune();
+    const entry: Entry = { at: now(), answer: run(), running: true };
+    kept.set(key, entry);
+    entry.answer.then(
+      () => {
+        entry.running = false;
+      },
+      () => {
+        entry.running = false;
+        // A request that failed outright (it threw) is not an answer: the next try runs.
+        // Only this entry goes; a newer one under the same key stays.
+        if (kept.get(key) === entry) kept.delete(key);
+      },
+    );
+    return entry.answer;
+  };
   return {
-    once: (key, run) => {
+    once: (key, run, holds) => {
       if (key === undefined) return run();
       const found = kept.get(key);
-      if (found !== undefined && (found.running || found.at >= now() - options.keepMs)) {
-        return found.answer;
+      if (found === undefined || (!found.running && found.at < now() - options.keepMs)) {
+        return start(key, run);
       }
-      kept.delete(key);
-      prune();
-      const entry: Entry = { at: now(), answer: run(), running: true };
-      kept.set(key, entry);
-      entry.answer.then(
-        () => {
-          entry.running = false;
-        },
-        () => {
-          entry.running = false;
-          // A request that failed outright (it threw) is not an answer: the next try runs.
-          // Only this entry goes; a newer one under the same key stays.
-          if (kept.get(key) === entry) kept.delete(key);
-        },
-      );
-      return entry.answer;
+      if (found.running || holds === undefined) return found.answer;
+      return found.answer.then(async (answer) => {
+        if (await holds(answer)) return answer;
+        // No longer true: run again, unless another post of it already did meanwhile.
+        const current = kept.get(key);
+        return current !== undefined && current !== found ? current.answer : start(key, run);
+      });
     },
   };
 }
@@ -99,5 +116,12 @@ export function sameRequestsHere<T>(): SameRequests<T> {
   const holder = globalThis as Holder;
   holder[holderKey] ??= sameRequests<unknown>({ keepMs: 10 * 60_000, most: 5000 });
   const store = holder[holderKey];
-  return { once: (k, run) => store.once(k, run) as Promise<T> };
+  return {
+    once: (k, run, holds) =>
+      store.once(
+        k,
+        run,
+        holds === undefined ? undefined : (answer) => holds(answer as T),
+      ) as Promise<T>,
+  };
 }

@@ -306,12 +306,12 @@ if (browser !== null) {
     ]);
     const removed = page.locator('[data-removed]');
     note(
-      'the removed notice names her and offers "Put them back"',
+      'the removed notice names her and offers "Put Ada Lovell back"',
       (await removed.innerText()).includes('Removed from the league list: Ada Lovell.'),
     );
     await Promise.all([
       page.waitForURL((url) => url.href.startsWith(record)),
-      removed.getByRole('button', { name: 'Put them back' }).click(),
+      removed.getByRole('button', { name: 'Put Ada Lovell back' }).click(),
     ]);
     await page.getByText('Put back on the league list: Ada Lovell', { exact: false }).waitFor();
     note(

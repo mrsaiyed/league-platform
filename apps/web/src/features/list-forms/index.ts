@@ -9,5 +9,6 @@ export {
   type TypedFields,
 } from './form-state.ts';
 export { ListForm, type ListField, type ListFormProps } from './list-form.tsx';
+export { nameBeforeStop } from './name-before-stop.ts';
 export { MarkedFocus } from './marked-focus.tsx';
 export { SaidLine } from './said-line.tsx';

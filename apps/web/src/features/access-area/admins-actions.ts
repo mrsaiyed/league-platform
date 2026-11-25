@@ -30,7 +30,7 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
-import { typedOf, type FormState, type TypedFields } from '../games-area/form-state.ts';
+import { typedOf, type FormState, type TypedFields } from '../list-forms/form-state.ts';
 import { adminsAnchors } from './admins-anchors.ts';
 import { problemKeyOf, wrongInviteFields } from './access-words.ts';
 

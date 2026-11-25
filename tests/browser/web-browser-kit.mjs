@@ -371,3 +371,24 @@ export async function settingAnswer(page, section, button, timeout = 10_000) {
     text: (await fresh.innerText({ timeout })).trim(),
   };
 }
+
+/**
+ * Presses a bin row's "Bring it back" and waits, `timeout` ms at most, for an answer of the
+ * bin's (step 2.155 part 5) that was not there before the press: "Brought back: …" at the
+ * top or a refusal beside the row, each `[data-bin-answer]`. Every answer standing before
+ * the press is marked first, so only a new one counts; a wait past the limit throws.
+ */
+export async function binAnswer(page, button, timeout = 10_000) {
+  const before = 'data-answered-before';
+  await page.evaluate((mark) => {
+    for (const old of document.querySelectorAll('[data-bin-answer]')) old.setAttribute(mark, '');
+  }, before);
+  await button.click({ timeout });
+  const fresh = page.locator(`[data-bin-answer]:not([${before}])`).first();
+  await fresh.waitFor({ timeout });
+  return {
+    said: await fresh.getAttribute('data-said', { timeout }),
+    id: await fresh.getAttribute('data-bin-answer', { timeout }),
+    text: (await fresh.innerText({ timeout })).trim(),
+  };
+}

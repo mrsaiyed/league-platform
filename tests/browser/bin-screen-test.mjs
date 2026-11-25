@@ -18,6 +18,7 @@
 // scrolls sideways at 390.
 import {
   accessibilityProblems,
+  binAnswer,
   buildNext,
   freePort,
   launch,
@@ -185,20 +186,96 @@ if (built) {
 
     at = 'the person and the team are brought back';
     const personRow = page.locator('li[data-bin=person]', { hasText: kites.last });
-    await tap(page, personRow.getByRole('button', { name: 'Bring it back' }), /back=person/);
-    note(
-      'the bin says the person is back',
-      (await page.locator('main').innerText()).includes('They are on the league list again.'),
-    );
-    await tap(
+    const personBack = await binAnswer(
       page,
-      binRow(page, kites.team).getByRole('button', { name: 'Bring it back' }),
-      /back=team/,
+      personRow.getByRole('button', { name: 'Bring it back' }),
+    );
+    note(
+      'the bin says the person is back, naming them, at the top',
+      personBack.said === 'back' &&
+        personBack.text.startsWith('Brought back: ') &&
+        personBack.text.includes(kites.last) &&
+        personBack.text.includes('They are on the league list again.'),
+      personBack.text,
+    );
+    note('the address holds no answer', new URL(page.url()).search === '', page.url());
+    await page.reload();
+    note('a reload says nothing old', (await page.locator('[data-bin-answer]').count()) === 0);
+    // A double tap that got through: the row's one post, with its one-time token, sent twice.
+    const fields = await binRow(page, kites.team)
+      .locator('form')
+      .evaluate((element) =>
+        Object.fromEntries([...new FormData(element).entries()].map(([k, v]) => [k, String(v)])),
+      );
+    note('"Bring it back" carries a one-time token', (fields['requestToken'] ?? '') !== '');
+    const statuses = [];
+    for (let i = 0; i < 2; i += 1) {
+      const response = await page.request.post(page.url(), {
+        multipart: fields,
+        headers: { origin },
+        maxRedirects: 0,
+        timeout: 10_000,
+      });
+      statuses.push(response.status());
+    }
+    note(
+      'both posts are answered as the first',
+      statuses.join(',') === '303,303',
+      statuses.join(','),
+    );
+    await page.goto(binAddress);
+    const teamBack = page.locator('[data-bin-answer][data-said]').first();
+    const teamBackText = (await teamBack.count()) === 1 ? await teamBack.innerText() : '';
+    note(
+      'the second post is answered as the first: "Brought back", naming the team, not a refusal',
+      (await teamBack.count()) === 1 &&
+        (await teamBack.getAttribute('data-said', { timeout: 10_000 })) === 'back' &&
+        teamBackText.startsWith(`Brought back: ${kites.team}.`) &&
+        (await binRow(page, kites.team).count()) === 0,
+      teamBackText,
     );
     await tap(page, page.getByRole('link', { name: 'Open the team' }), /\/admin\/teams\//);
     note(
       'the team is back with its player on the roster',
       (await page.locator('main ol > li', { hasText: kites.last }).count()) === 1,
+    );
+    const restoredRows = async () => {
+      await page.goto(`${origin}/north-valley/admin/settings/activity`);
+      return page
+        .locator('li[data-entry]', { hasText: `Restored the team ${kites.team} from the bin` })
+        .count();
+    };
+    const restoredOnce = await restoredRows();
+    note(
+      'the doubled post wrote one row in the activity log, not two',
+      restoredOnce === 1,
+      String(restoredOnce),
+    );
+
+    at = 'an old bin page, after the team was binned again, brings it back again';
+    await page.goto(teamAddress);
+    await removeTeamHere(page);
+    const stale = await page.request.post(binAddress, {
+      multipart: fields,
+      headers: { origin },
+      maxRedirects: 0,
+      timeout: 10_000,
+    });
+    await page.goto(binAddress);
+    const staleBack = page.locator('[data-bin-answer][data-said]').first();
+    const staleText = (await staleBack.count()) === 1 ? await staleBack.innerText() : '';
+    note(
+      'the old page\'s "Bring it back" is the truth: the team is out of the bin, and said back',
+      stale.status() === 303 &&
+        staleText.startsWith(`Brought back: ${kites.team}.`) &&
+        (await binRow(page, kites.team).count()) === 0,
+      `${stale.status()} ${staleText}`,
+    );
+    const restoredTwice = await restoredRows();
+    note(
+      'and the activity log has a second restore, as it ran again',
+      restoredTwice === 2,
+      String(restoredTwice),
     );
 
     at = 'a published game is removed and published';
@@ -222,7 +299,15 @@ if (built) {
     const gameRow = page.locator(`li[id="bin-${gameId}"]`);
     note('the bin lists the removed game', (await gameRow.count()) === 1);
     await checks(page, 'the bin with a game');
-    await tap(page, gameRow.getByRole('button', { name: 'Bring it back' }), /back=game/);
+    const gameBackAnswer = await binAnswer(
+      page,
+      gameRow.getByRole('button', { name: 'Bring it back' }),
+    );
+    note(
+      'the game back is said at the top, naming the game',
+      gameBackAnswer.said === 'back' && gameBackAnswer.id === gameId,
+      gameBackAnswer.text,
+    );
     note(
       'the bin says the game is back',
       (await page.locator('main').innerText()).includes('The game is on the schedule again.'),
@@ -252,7 +337,21 @@ if (built) {
     await toTeams(page);
     await addTeam(page, larks);
     await page.goto(binAddress);
-    await tap(page, binRow(page, larks).getByRole('button', { name: 'Bring it back' }), /not=/);
+    const larksRefused = await binAnswer(
+      page,
+      binRow(page, larks).getByRole('button', { name: 'Bring it back' }),
+    );
+    note(
+      'the refusal stands in the row of what was not brought back',
+      larksRefused.said === 'refused' &&
+        (await binRow(page, larks).locator('[data-bin-answer][data-said=refused]').count()) === 1,
+      larksRefused.text,
+    );
+    note(
+      'the browser lands on that row',
+      new URL(page.url()).hash.startsWith('#bin-') && new URL(page.url()).search === '',
+      page.url(),
+    );
     const refusedText = await binRow(page, larks).innerText();
     note(
       'bringing the first back is refused with one sentence naming the other (A-19)',
@@ -272,12 +371,48 @@ if (built) {
       live.locator('main [role=status]').getByRole('link', { name: 'Bring it back' }),
       /\/admin\/settings\/bin/,
     );
-    await tap(
+    const liveBack = await binAnswer(
       live,
       binRow(live, wrens).getByRole('button', { name: 'Bring it back' }),
-      /back=team/,
     );
-    note('scripts on: the team is back', (await binRow(live, wrens).count()) === 0);
+    note(
+      'scripts on: the team is back, said naming it',
+      (await binRow(live, wrens).count()) === 0 &&
+        liveBack.text.startsWith(`Brought back: ${wrens}.`),
+      liveBack.text,
+    );
+
+    // A second kind of thing with scripts on (step 2.155 part 5): a person removed from
+    // People, brought back from the bin.
+    at = 'with scripts on, a person removed and brought back';
+    await live.goto(`${origin}/north-valley/admin/people`);
+    const addIvo = live.locator('#add-person');
+    await addIvo.getByLabel('First name').fill('Ivo');
+    await addIvo.getByLabel('Last name').fill('Scriptwell');
+    await Promise.all([
+      live.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/, { timeout: 10_000 }),
+      addIvo.getByRole('button', { name: 'Add to the league' }).click(),
+    ]);
+    await live.locator('#remove').getByLabel('Yes, I am sure').check();
+    await Promise.all([
+      live.waitForURL((url) => url.pathname.endsWith('/admin/people'), { timeout: 10_000 }),
+      live.locator('#remove').getByRole('button', { name: 'Remove from the league list' }).click(),
+    ]);
+    await live.goto(`${origin}/north-valley/admin/settings/bin`);
+    const ivoRow = () => live.locator('li[data-bin=person]', { hasText: 'Scriptwell' });
+    note('scripts on: the bin lists the person removed', (await ivoRow().count()) === 1);
+    const ivoBack = await binAnswer(live, ivoRow().getByRole('button', { name: 'Bring it back' }));
+    note(
+      'scripts on: the person is back, said at the top naming them',
+      (await ivoRow().count()) === 0 &&
+        ivoBack.said === 'back' &&
+        ivoBack.text.startsWith('Brought back: ') &&
+        ivoBack.text.includes('Ivo') &&
+        ivoBack.text.includes('Scriptwell') &&
+        ivoBack.text.includes('They are on the league list again.'),
+      ivoBack.text,
+    );
+    note('scripts on: the address holds no answer', new URL(live.url()).search === '', live.url());
 
     at = "a scheduler sees the bin's games only";
     const scheduler = await open(false, 'local-scheduler-token');

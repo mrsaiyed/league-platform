@@ -13,6 +13,7 @@
 // at once, League settings asks to confirm the privacy choices, and once the owner
 // confirms, the public page shows "Bea Lark".
 import {
+  binAnswer,
   buildNext,
   freePort,
   launch,
@@ -65,7 +66,7 @@ try {
   visitor.setDefaultTimeout(60_000);
   const settings = `${origin}/${league}/admin/settings`;
   const said = () => page.locator('main [role=status], main [role=alert]').first().innerText();
-  const submit = async (button, url = /done=|problem=|back=|not=/) => {
+  const submit = async (button, url = /done=|problem=/) => {
     try {
       await Promise.all([page.waitForURL(url), button.click()]);
     } catch (error) {
@@ -184,7 +185,12 @@ try {
   await yesIs('with Ada in the bin the yes stays', 'yes');
   await page.goto(`${origin}/${league}/admin/settings/bin`);
   const row = page.locator('li[data-bin]', { hasText: 'Ada Moss' });
-  await submit(row.getByRole('button', { name: 'Bring it back' }), /back=person/);
+  const back = await binAnswer(page, row.getByRole('button', { name: 'Bring it back' }));
+  note(
+    'the bin says Ada is back',
+    back.said === 'back' && back.text.includes('Ada Moss'),
+    back.text,
+  );
   note(
     "the bin's page says Ada back is the first child and the yes went back",
     (await firstChildLine().innerText()).startsWith(firstChildSaid),
