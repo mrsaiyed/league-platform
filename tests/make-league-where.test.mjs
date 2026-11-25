@@ -24,6 +24,8 @@ const plan = {
   staffEmail: 'staff@example.test',
   season: { name: 'Fall 2026', slug: 'fall-2026', startsOn: null, endsOn: null },
   design: { startingDesign: 'crest', chosen: false, colors: {} },
+  // As planNewLeague always returns it (step 2.245): the game rules asked.
+  gameRules: { clockMode: 'running', mercyLead: null },
 };
 const preview = { ready: true, shortNameHeld: false, owner: 'none', staff: 'none' };
 
