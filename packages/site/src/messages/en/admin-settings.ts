@@ -22,9 +22,7 @@ export const enAdminSettings = {
   'adminSettings.defaultMark': '{choice} (the default)',
   'adminSettings.done.archived':
     'The league is archived. Everything in it is kept as it was, and nothing can be changed until it is brought back.',
-  'adminSettings.done.cleared': 'The setting is back to its default.',
   'adminSettings.done.published': 'The league is published. Visitors can see it now.',
-  'adminSettings.done.saved': 'The setting was saved.',
   'adminSettings.done.unarchived': 'The league is published again. It can be changed as before.',
   'adminSettings.field.value': 'Value',
   // A refused Profile box (step 2.155 part 3): the box's label, then why.
@@ -138,6 +136,9 @@ export const enAdminSettings = {
     'Saved: the contact email, city, time zone and listing. In the new time zone someone in this league is now a child, the first one recorded, so the confirmation that parents agreed to children’s full names is back to no and a saved choice of full names is cleared. Until you confirm again under Privacy, children are shown by first name and last initial.',
   'adminSettings.saved.name': "Saved: the league's name.",
   'adminSettings.saved.profile': 'Saved: the contact email, city, time zone and listing.',
+  // Beside one setting after its save (step 2.155 part 4): the setting's own name.
+  'adminSettings.saved.setting': 'Saved: {setting}.',
+  'adminSettings.saved.settingCleared': 'Saved: {setting} is back to its default.',
   'adminSettings.saved.shortName':
     'Saved: the short name. The old address forwards to the new one for 12 months.',
   'adminSettings.saved.whoPlays': 'Saved: who plays.',

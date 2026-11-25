@@ -2250,10 +2250,11 @@ function pageForms(html) {
 }
 
 /**
- * The action of the one League settings form that sets `key`, found by the hidden field
- * naming its setting, wherever the page draws it (step 2.125, T-352): Profile and the
- * Publish panel may come before the settings' forms. Undefined unless exactly one form
- * sets it.
+ * The framework's fields of the one League settings form that sets `key`, found by the
+ * hidden field naming its setting, wherever the page draws it (step 2.125, T-352): Profile
+ * and the Publish panel may come before the settings' forms. Since step 2.155 part 4 each
+ * is a form with its own state: all its hidden `$ACTION…` boxes, as a browser sends them.
+ * Undefined unless exactly one form sets it.
  */
 function settingFormAction(html, key) {
   const forms = pageForms(html)
@@ -2261,7 +2262,16 @@ function settingFormAction(html, key) {
     .slice(1)
     .map((form) => form.slice(0, form.indexOf('</form>')))
     .filter((form) => form.includes('name="key"') && form.includes(`value="${key}"`));
-  return forms.length === 1 ? /name="(\$ACTION_ID_[^"]+)"/.exec(forms[0])?.[1] : undefined;
+  if (forms.length !== 1) return undefined;
+  const found = [...forms[0].matchAll(/<input[^>]*>/g)]
+    .map(([input]) => [
+      /name="([^"]*)"/.exec(input)?.[1] ?? '',
+      (/value="([^"]*)"/.exec(input)?.[1] ?? '').replaceAll('&quot;', '"').replaceAll('&amp;', '&'),
+    ])
+    .filter(([name]) => name.startsWith('$ACTION'));
+  return found.some(([name]) => name === '$ACTION_KEY' || name.startsWith('$ACTION_ID_'))
+    ? found
+    : undefined;
 }
 
 async function checkTeams(origin) {
@@ -2464,13 +2474,13 @@ async function checkSettings(origin) {
   const page = '/north-valley/admin/settings';
   const pageOf = async (who) => (await fetch(origin + page, { headers: as(who) })).text();
   async function post(who, fields) {
-    const id = settingFormAction(await pageOf('owner'), fields.key);
-    if (id === undefined) {
+    const action = settingFormAction(await pageOf('owner'), fields.key);
+    if (action === undefined) {
       problems.push(`settings: no one form sets ${fields.key}`);
       return undefined;
     }
     const body = new FormData();
-    body.set(id, '');
+    for (const [name, value] of action) body.set(name, value);
     for (const [name, value] of Object.entries(fields)) body.set(name, value);
     const response = await fetch(origin + page, {
       method: 'POST',
@@ -2479,22 +2489,35 @@ async function checkSettings(origin) {
       redirect: 'manual',
     });
     const location = new URL(response.headers.get('location') ?? '/nowhere', origin);
-    return { status: response.status, to: location.pathname + location.search };
+    // Since step 2.155 part 4 a refusal is said in the answer to the post itself.
+    const body200 = response.status === 200 ? await response.text() : '';
+    return {
+      status: response.status,
+      to: location.pathname + location.search + location.hash,
+      body: body200,
+    };
   }
   const key = 'games.whoMayScore';
-  const saved = await post('owner', {
-    league: 'north-valley',
-    key,
-    version: '',
-    value: 'assignedOnly',
-  });
-  if (saved?.to !== `${page}?done=saved`) {
-    problems.push(`saving a setting answers ${saved?.status} to ${saved?.to}`);
+  // Saved: back to the setting's own place, nothing of it in the address; posted twice
+  // with one token (a double tap), it is saved once and both posts are answered so.
+  const once = { league: 'north-valley', key, version: '', value: 'assignedOnly' };
+  const token = { requestToken: '0b7c4a52-1f3e-4d2a-9c11-5e6f7a8b9c0d' };
+  const saved = await post('owner', { ...once, ...token });
+  const again = await post('owner', { ...once, ...token });
+  const place = `${page}#setting-games-whoMayScore`;
+  if (saved?.to !== place || again?.to !== place) {
+    problems.push(`saving a setting twice answers ${saved?.to} and ${again?.to}`);
     return problems;
   }
   const after = await pageOf('owner');
   if (!after.includes('Now: set for this league.') || !after.includes('Go back to the default')) {
     problems.push('the settings page does not show the saved value');
+  }
+  if (!after.includes('data-said="saved"') || !/Saved: Which games a scorekeeper/.test(after)) {
+    problems.push('the settings page does not say the setting was saved, by its name');
+  }
+  if ((await pageOf('owner')).includes('data-said="saved"')) {
+    problems.push('a reload of the settings page says the old "Saved" again');
   }
   const stale = await post('owner', {
     league: 'north-valley',
@@ -2502,8 +2525,13 @@ async function checkSettings(origin) {
     version: '',
     value: 'anyScorekeeper',
   });
-  if (!stale?.to.includes('problem=leagues.set_setting.changed-since-read')) {
-    problems.push(`a stale version was not refused (${stale?.to})`);
+  if (
+    stale?.status !== 200 ||
+    !stale.body.includes('data-problem="setting"') ||
+    !stale.body.includes('Someone else changed the league since you opened this page') ||
+    !stale.body.includes('data-saved-now="value"')
+  ) {
+    problems.push(`a stale version was not refused in the page (${stale?.status} ${stale?.to})`);
   }
   const outside = await post('owner', {
     league: 'north-valley',
@@ -2511,8 +2539,12 @@ async function checkSettings(origin) {
     version: '1',
     value: 'nobody',
   });
-  if (!outside?.to.includes('problem=leagues.set_setting.invalid-value')) {
-    problems.push(`a value outside the limits was not refused (${outside?.to})`);
+  if (
+    outside?.status !== 200 ||
+    !/<fieldset aria-invalid="true"[^>]*><legend>Which games a scorekeeper/.test(outside.body) ||
+    !/Which games a scorekeeper[^<]*: That value is not allowed for this setting/.test(outside.body)
+  ) {
+    problems.push(`a value outside the limits was not refused in the page (${outside?.to})`);
   }
   const cleared = await post('owner', {
     league: 'north-valley',
@@ -2520,7 +2552,7 @@ async function checkSettings(origin) {
     version: '1',
     intent: 'clear',
   });
-  if (cleared?.to !== `${page}?done=cleared`) {
+  if (cleared?.to !== place) {
     problems.push(`going back to the default answers ${cleared?.to}`);
   }
   if ((await pageOf('owner')).includes('Go back to the default')) {
@@ -2584,10 +2616,10 @@ async function checkSiteMarks(origin) {
   async function save(key, fields, league = 'north-valley') {
     const page = `/${league}/admin/settings`;
     const html = await (await fetch(origin + page, { headers: as })).text();
-    const id = settingFormAction(html, key);
-    if (id === undefined) problems.push(`site marks: no one form sets ${key} in ${league}`);
+    const action = settingFormAction(html, key);
+    if (action === undefined) problems.push(`site marks: no one form sets ${key} in ${league}`);
     const body = new FormData();
-    body.set(id ?? '', '');
+    for (const [name, value] of action ?? []) body.set(name, value);
     for (const [name, value] of Object.entries({ league, key, ...fields })) {
       body.set(name, value);
     }
@@ -2598,8 +2630,8 @@ async function checkSiteMarks(origin) {
       redirect: 'manual',
     });
     const to = response.headers.get('location') ?? '';
-    if (!to.includes('done='))
-      problems.push(`site marks: saving ${key} in ${league} answers ${to}`);
+    if (response.status !== 303 || !to.endsWith(`#setting-${key.replaceAll('.', '-')}`))
+      problems.push(`site marks: saving ${key} in ${league} answers ${response.status} ${to}`);
   }
   const more = {
     'north-valley': ['/north-valley/teams/owls', `/north-valley/games/${game(2)}`],

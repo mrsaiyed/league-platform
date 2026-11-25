@@ -19,6 +19,7 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  settingAnswer,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -74,8 +75,16 @@ try {
   const confirmAgain = async (label) => {
     await page.goto(settings);
     await page.locator(`${confirmation} input[type=checkbox]`).check();
-    await submit(page.locator(`${confirmation} button[type=submit]`).first());
-    note(`${label}: the yes is saved`, (await said()) === 'The setting was saved.', await said());
+    const answer = await settingAnswer(
+      page,
+      confirmation,
+      page.locator(`${confirmation} button[type=submit]`).first(),
+    );
+    note(
+      `${label}: the yes is saved`,
+      answer.saved && answer.text.startsWith("Saved: Children's full names"),
+      answer.text,
+    );
   };
   // The saved yes as League settings shows it: 'yes' or 'no' only when the section and
   // its one tick are on the page, else what is missing (so a vanished section fails).
@@ -117,7 +126,11 @@ try {
     .locator(`${names} form`)
     .first()
     .evaluate((form, key) => {
-      for (const box of form.querySelectorAll('[name=value], [name=confirmed]')) box.remove();
+      // Set aside, not removed: the page's own scripts draw these boxes (step 2.155 part 4)
+      // and draw them again with the answer; a disabled box is not sent.
+      for (const box of form.querySelectorAll('[name=value], [name=confirmed]')) {
+        box.disabled = true;
+      }
       form.querySelector('input[name=key]').value = key;
       for (const [name, value] of [
         ['value', 'tick'],
@@ -128,13 +141,18 @@ try {
         form.append(input);
       }
     }, 'privacy.childrenInFullConfirmed');
-  await submit(page.locator(`${names} form button[type=submit]`).first());
+  const handPosted = await settingAnswer(
+    page,
+    names,
+    page.locator(`${names} form button[type=submit]`).first(),
+  );
   note(
     'the hand-posted yes is refused in plain words',
-    (await said()).startsWith(
-      'This league is for adults and no one in it is recorded as a child, so there is nothing to confirm yet.',
-    ),
-    await said(),
+    !handPosted.saved &&
+      handPosted.text.startsWith(
+        'This league is for adults and no one in it is recorded as a child, so there is nothing to confirm yet.',
+      ),
+    handPosted.text,
   );
   await page.goto(settings);
   note(
@@ -236,7 +254,10 @@ try {
   at = 'the owner confirms again: Bea is shown in full';
   await page.goto(settings);
   await page.locator(`${names} input[type=radio][value="fullName"]`).check();
-  await submit(page.locator(`${names} button[type=submit]`).first());
+  note(
+    'full names are saved',
+    (await settingAnswer(page, names, page.locator(`${names} button[type=submit]`).first())).saved,
+  );
   await confirmAgain('with Bea recorded');
   await visitor.goto(publicTeam);
   shown = await visitor.locator('main').innerText();

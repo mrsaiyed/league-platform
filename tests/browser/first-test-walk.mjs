@@ -471,7 +471,12 @@ export async function walkFirstTest(o) {
     const setting = page.locator('section[data-setting="statistics.minimumGamesToRank"]');
     say(15, await setting.innerText());
     await setting.locator('input[name=value]').fill('1');
-    await tap(page, setting.getByRole('button', { name: 'Save' }));
+    await tap(
+      page,
+      setting.getByRole('button', { name: 'Save' }),
+      /\/admin\/settings#setting-statistics-minimumGamesToRank$/,
+    );
+    await setting.locator('[data-said="saved"]').waitFor({ timeout: 10_000 });
     const saved = await page
       .locator('section[data-setting="statistics.minimumGamesToRank"]')
       .innerText();
@@ -516,7 +521,13 @@ export async function walkFirstTest(o) {
       if ((await panel.locator('li[data-check="privacyChosen"][data-met="no"]').count()) > 0) {
         at = 'publishing: saving "Names on public pages" as it starts, as the list asks';
         const names = page.locator('section[data-setting="privacy.publicNames"]');
-        await tap(page, names.locator('button[type=submit]').first(), /done=/);
+        await tap(
+          page,
+          names.locator('button[type=submit]').first(),
+          /\/admin\/settings#setting-privacy-publicNames$/,
+        );
+        // Said beside the setting (step 2.155 part 4), waited for with a limit.
+        await names.locator('[data-said="saved"]').waitFor({ timeout: 10_000 });
         await staffLink(page, 'League settings', /\/admin\/settings/);
       }
       note(

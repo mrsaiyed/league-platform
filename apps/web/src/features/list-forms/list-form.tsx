@@ -55,6 +55,11 @@ export type ListField =
       readonly label: string;
       readonly value: string;
       readonly help?: string;
+      /**
+       * A number with limits (a league setting, step 2.155 part 4): drawn as the browser's
+       * own number box, with them. Left out, a text box (a deduction needs a minus sign).
+       */
+      readonly limits?: { readonly min: number; readonly max: number; readonly whole: boolean };
     }
   | {
       /** One of a short list (step 2.56: the team an adjustment is for). */
@@ -97,6 +102,13 @@ export type ListFormProps = {
   readonly className?: string;
   /** Drawn greyed, nothing to change: someone who may look but not change (League settings). */
   readonly disabled?: boolean;
+  /**
+   * A second button, quieter, that sends `name=value` with the same boxes and asks the
+   * browser to check none of them (a setting's "Go back to the default", step 2.155 part 4).
+   */
+  readonly second?: { readonly label: string; readonly name: string; readonly value: string };
+  /** The id of words every box is also described by (a setting's default and limits). */
+  readonly about?: string;
 };
 
 /** "yes" is what a tick sends when ticked. */
@@ -152,6 +164,8 @@ export function ListForm({
   name,
   className = 'staff-form',
   disabled = false,
+  second,
+  about,
 }: ListFormProps) {
   const [state, dispatch, pending] = useActionState(action, untouched, permalink);
   const onSubmit = useOneSubmit(pending, state);
@@ -185,7 +199,14 @@ export function ListForm({
     );
   };
   const marked = (field: string) =>
-    wrongField === field ? { 'aria-invalid': true, 'aria-describedby': problemId } : {};
+    wrongField === field
+      ? {
+          'aria-invalid': true,
+          'aria-describedby': about === undefined ? problemId : `${problemId} ${about}`,
+        }
+      : about === undefined
+        ? {}
+        : { 'aria-describedby': about };
   return (
     <form
       ref={formRef}
@@ -319,10 +340,18 @@ export function ListForm({
                   name={field.name}
                   // Text, not a number box: a phone's number keypad has no minus sign, and
                   // a deduction needs one. The server checks the number either way.
-                  type="text"
+                  {...(field.limits === undefined
+                    ? { type: 'text', size: 6 }
+                    : {
+                        type: 'number',
+                        min: field.limits.min,
+                        max: field.limits.max,
+                        step: field.limits.whole ? 1 : 'any',
+                        required: true,
+                      })}
                   defaultValue={value}
                   autoComplete="off"
-                  size={6}
+                  disabled={disabled}
                   {...marked(field.name)}
                 />
                 {help}
@@ -386,6 +415,22 @@ export function ListForm({
         >
           {button}
         </button>
+        {second === undefined ? null : (
+          <>
+            {' '}
+            <button
+              type="submit"
+              className="ui-button"
+              data-kind="quiet"
+              name={second.name}
+              value={second.value}
+              formNoValidate
+              disabled={disabled}
+            >
+              {second.label}
+            </button>
+          </>
+        )}
       </p>
       {wrongField === undefined ? problem : null}
     </form>

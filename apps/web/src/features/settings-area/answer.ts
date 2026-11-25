@@ -6,8 +6,8 @@ import { catalogs } from '@srleagues/site';
 import type { TextKey } from '../../server/messages.ts';
 
 export const doneNames = [
-  'saved',
-  'cleared',
+  // A setting's own Save and "Go back to the default" answer in the response to the post
+  // since step 2.155 part 4 (setting-form-answer.ts), not here.
   'published',
   // The Archive buttons (step 2.125 part 2). Profile's forms answer in the response to the
   // post since step 2.155 part 3 (profile-form-answer.ts), not here.

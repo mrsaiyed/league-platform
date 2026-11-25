@@ -4,9 +4,13 @@
 // for a list of choices, `setting.<key>.option.<choice>` (T-187); the page may add
 // sentences around them (privacy-notes.ts, record 065). The words are given as
 // a function so a test can draw a setting that has no words of its own.
+import { randomUUID } from 'node:crypto';
 import type { LeagueSettingRow } from '@srleagues/core';
+import { requestTokenField } from '../../server/same-request.ts';
+import { ListForm, SaidLine, type ListField } from '../list-forms/index.ts';
 import { saveSettingAction } from './actions.ts';
 import { clearIntent, tickValue } from './form-input.ts';
+import { settingPlace } from './profile-place.ts';
 import type { Line, SettingNotes } from './privacy-notes.ts';
 
 export type Say = (key: string, params?: Readonly<Record<string, string | number>>) => string;
@@ -27,22 +31,6 @@ function byArea(rows: readonly LeagueSettingRow[]) {
     else groups.push({ area, rows: [row] });
   }
   return groups;
-}
-
-/** The box to tick before a value that asks to be confirmed is saved (R-14). */
-function Confirm({ row, say }: { readonly row: LeagueSettingRow; readonly say: Say }) {
-  if (row.confirm.length === 0 || drawnAsTick(row)) return null;
-  const choices = row.confirm.map((value) => valueText(row, value, say)).join(', ');
-  return (
-    <div className="settings-confirm">
-      <p className="ui-field-help">{say('adminSettings.confirmNote', { choice: choices })}</p>
-      <p>
-        <label className="staff-check">
-          <input type="checkbox" name="confirmed" value="yes" /> {say(`${wordsOf(row)}.confirm`)}
-        </label>
-      </p>
-    </div>
-  );
 }
 
 /** A value in words, as the screen shows a default. */
@@ -85,116 +73,125 @@ export function drawnAsTick(row: LeagueSettingRow): boolean {
   return row.field.kind === 'toggle' && row.confirm.includes(true);
 }
 
-function Control({ row, say }: { readonly row: LeagueSettingRow; readonly say: Say }) {
+/**
+ * A setting's boxes, as ListForm draws them (step 2.155 part 4): its value, then, for a
+ * value that asks to be confirmed (R-14), the words and the box to tick.
+ */
+function fieldsOf(row: LeagueSettingRow, say: Say): ListField[] {
+  const value = String(row.value);
   if (drawnAsTick(row)) {
-    return (
-      <fieldset className="settings-choice" aria-describedby={`${row.key}-about`}>
-        <legend>{say(row.label)}</legend>
-        <input type="hidden" name="value" value={tickValue} />
-        <p>
-          <label className="staff-check">
-            <input
-              type="checkbox"
-              name="confirmed"
-              value="yes"
-              defaultChecked={row.value === true}
-            />{' '}
-            {say(`${wordsOf(row)}.confirm`)}
-          </label>
-        </p>
-      </fieldset>
-    );
+    return [
+      {
+        kind: 'tick',
+        name: 'confirmed',
+        label: say(`${wordsOf(row)}.confirm`),
+        checked: row.value === true,
+      },
+    ];
   }
   const { field } = row;
-  const describedBy = `${row.key}-about`;
-  const radios = (options: readonly { value: string; text: string }[], current: string) => (
-    <fieldset className="settings-choice" aria-describedby={describedBy}>
-      <legend>{say(row.label)}</legend>
-      {options.map((option) => (
-        <p key={option.value}>
-          <label className="staff-check">
-            <input
-              type="radio"
-              name="value"
-              value={option.value}
-              defaultChecked={option.value === current}
-            />{' '}
-            {option.text}
-          </label>
-        </p>
-      ))}
-    </fieldset>
+  const control = ((): ListField | undefined => {
+    switch (field.kind) {
+      case 'choice':
+        return {
+          kind: 'choice',
+          name: 'value',
+          label: say(row.label),
+          value,
+          options: field.choices.map((choice) => ({
+            value: choice,
+            label:
+              choice === row.default
+                ? say('adminSettings.defaultMark', { choice: say(optionKey(row, choice)) })
+                : say(optionKey(row, choice)),
+          })),
+        };
+      case 'toggle':
+        return {
+          kind: 'choice',
+          name: 'value',
+          label: say(row.label),
+          value,
+          options: [
+            { value: 'true', label: say('adminSettings.yes') },
+            { value: 'false', label: say('adminSettings.no') },
+          ],
+        };
+      case 'number':
+        return {
+          kind: 'number',
+          name: 'value',
+          label: say(row.label),
+          value,
+          limits: { min: field.min, max: field.max, whole: field.whole },
+        };
+      case 'text':
+        return {
+          kind: 'text',
+          name: 'value',
+          label: say(row.label),
+          value,
+          maxLength: field.maxLength,
+        };
+      case 'other':
+        return undefined;
+    }
+  })();
+  const confirm: ListField[] =
+    row.confirm.length === 0
+      ? []
+      : [
+          {
+            kind: 'note',
+            name: 'confirmNote',
+            content: (
+              <p className="ui-field-help">
+                {say('adminSettings.confirmNote', {
+                  choice: row.confirm.map((choice) => valueText(row, choice, say)).join(', '),
+                })}
+              </p>
+            ),
+          },
+          {
+            kind: 'tick',
+            name: 'confirmed',
+            label: say(`${wordsOf(row)}.confirm`),
+            checked: false,
+          },
+        ];
+  return [...(control === undefined ? [] : [control]), ...confirm];
+}
+
+/** What it is set to, quietly, in one line: a small pill, then its default and limits. */
+function About({ row, say }: { readonly row: LeagueSettingRow; readonly say: Say }) {
+  return (
+    <p id={`${row.key}-about`} className="settings-about">
+      <span className="staff-pill" data-kind={row.source === 'league' ? 'good' : 'plain'}>
+        {say(row.source === 'league' ? 'adminSettings.usingOwn' : 'adminSettings.usingDefault')}
+      </span>{' '}
+      <span>{say('adminSettings.default', { value: valueText(row, row.default, say) })}</span>{' '}
+      <span>{limitsText(row, say)}</span>
+    </p>
   );
-  switch (field.kind) {
-    case 'choice':
-      return radios(
-        field.choices.map((choice) => ({
-          value: choice,
-          text:
-            choice === row.default
-              ? say('adminSettings.defaultMark', { choice: say(optionKey(row, choice)) })
-              : say(optionKey(row, choice)),
-        })),
-        String(row.value),
-      );
-    case 'toggle':
-      return radios(
-        [
-          { value: 'true', text: say('adminSettings.yes') },
-          { value: 'false', text: say('adminSettings.no') },
-        ],
-        String(row.value),
-      );
-    case 'number':
-      return (
-        <p>
-          <label className="staff-field" data-size="figure">
-            {say(row.label)}{' '}
-            <input
-              type="number"
-              name="value"
-              min={field.min}
-              max={field.max}
-              step={field.whole ? 1 : 'any'}
-              defaultValue={String(row.value)}
-              aria-describedby={describedBy}
-              required
-            />
-          </label>
-        </p>
-      );
-    case 'text':
-      return (
-        <p>
-          <label className="staff-field">
-            {say(row.label)}{' '}
-            <input
-              type="text"
-              name="value"
-              maxLength={field.maxLength}
-              defaultValue={String(row.value)}
-              aria-describedby={describedBy}
-              autoComplete="off"
-            />
-          </label>
-        </p>
-      );
-    case 'other':
-      return <p className="settings-name">{say(row.label)}</p>;
-  }
 }
 
 /** One form for each setting that can be set for the league. */
 export function SettingForms({
   rows,
   league,
+  address,
   say,
   notes = {},
+  saved,
 }: {
   readonly rows: readonly LeagueSettingRow[];
   /** The route's `[league]` value, so the server can find the page again. */
   readonly league: string;
+  /** League settings' own address, where the browser lands with scripts off. */
+  readonly address: string;
   readonly say: Say;
+  /** The setting just saved and its "Saved" words, from the one-time notice (step 2.155). */
+  readonly saved?: { readonly key: string; readonly text: string } | undefined;
   /** Sentences the page adds around the settings, and settings it does not offer here. */
   readonly notes?: SettingNotes;
 }) {
@@ -214,59 +211,58 @@ export function SettingForms({
           <h2>{say(`adminSettings.area.${group.area}`)}</h2>
           {lines(notes.area?.[group.area])}
           {group.rows.map((row) => (
-            <section key={row.key} className="settings-item" data-setting={row.key}>
+            <section
+              key={row.key}
+              className="settings-item"
+              data-setting={row.key}
+              id={settingPlace(row.key)}
+            >
               {lines(notes.rows?.[row.key]?.before)}
-              {notes.rows?.[row.key]?.offered === false ? null : (
-                <form action={saveSettingAction} className="staff-form">
-                  <input type="hidden" name="league" value={league} />
-                  <input type="hidden" name="key" value={row.key} />
-                  <input type="hidden" name="version" value={row.version ?? ''} />
-                  <Control row={row} say={say} />
-                  <Confirm row={row} say={say} />
-                  {/* What it is set to, quietly, in one line: how it stands now as a small
-                      pill, then its default and what it accepts. */}
-                  <p id={`${row.key}-about`} className="settings-about">
-                    <span
-                      className="staff-pill"
-                      data-kind={row.source === 'league' ? 'good' : 'plain'}
-                    >
-                      {say(
-                        row.source === 'league'
-                          ? 'adminSettings.usingOwn'
-                          : 'adminSettings.usingDefault',
-                      )}
-                    </span>{' '}
-                    <span>
-                      {say('adminSettings.default', { value: valueText(row, row.default, say) })}
-                    </span>{' '}
-                    <span>{limitsText(row, say)}</span>
-                  </p>
-                  {row.field.kind === 'other' ? null : (
-                    <p className="staff-buttons">
-                      {/* A page of settings has no one main action: each setting's Save
-                          is outlined, and giving a setting back its default is quieter
-                          still, so no screen is a column of filled buttons (step 2.103). */}
-                      <button type="submit" className="ui-button">
-                        {say('adminSettings.save')}
-                      </button>
-                      {row.version === null ? null : (
-                        <>
-                          {' '}
-                          <button
-                            type="submit"
-                            className="ui-button"
-                            data-kind="quiet"
-                            name="intent"
-                            value={clearIntent}
-                            formNoValidate
-                          >
-                            {say('adminSettings.clear')}
-                          </button>
-                        </>
-                      )}
-                    </p>
-                  )}
-                </form>
+              {saved?.key === row.key ? (
+                // A fresh line on every answer (its own key), so a second save of the same
+                // setting is said again and brought into view again.
+                <SaidLine key={randomUUID()} kind="saved">
+                  {saved.text}
+                </SaidLine>
+              ) : null}
+              {notes.rows?.[row.key]?.offered === false ? null : row.field.kind === 'other' ? (
+                // Nothing this screen can set: its name and how it stands, no button.
+                <div className="staff-form">
+                  <p className="settings-name">{say(row.label)}</p>
+                  <About row={row} say={say} />
+                </div>
+              ) : (
+                // A page of settings has no one main action: each setting's Save is
+                // outlined, and giving a setting back its default is quieter still, so
+                // no screen is a column of filled buttons (step 2.103).
+                <ListForm
+                  action={saveSettingAction}
+                  permalink={`${address}#${settingPlace(row.key)}`}
+                  hidden={{
+                    league,
+                    key: row.key,
+                    version: row.version === null ? '' : String(row.version),
+                    ...(drawnAsTick(row) ? { value: tickValue } : {}),
+                    [requestTokenField]: randomUUID(),
+                  }}
+                  fields={[
+                    ...fieldsOf(row, say),
+                    { kind: 'note', name: 'about', content: <About row={row} say={say} /> },
+                  ]}
+                  about={`${row.key}-about`}
+                  button={say('adminSettings.save')}
+                  label={say(row.label)}
+                  name="setting"
+                  {...(row.version === null
+                    ? {}
+                    : {
+                        second: {
+                          label: say('adminSettings.clear'),
+                          name: 'intent',
+                          value: clearIntent,
+                        },
+                      })}
+                />
               )}
             </section>
           ))}

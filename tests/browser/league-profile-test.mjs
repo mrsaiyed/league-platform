@@ -24,6 +24,7 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  settingAnswer,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -200,7 +201,12 @@ if (browser) {
     );
     const names = 'section[data-setting="privacy.publicNames"]';
     await owner.locator(`${names} input[type=radio][value="fullName"]`).check(limit);
-    await submit(owner.locator(`${names} button[type=submit]`).first());
+    const named = await settingAnswer(
+      owner,
+      names,
+      owner.locator(`${names} button[type=submit]`).first(),
+    );
+    note('names on public pages is saved, said beside it', named.saved, named.text);
     await owner.goto(settings(), limit);
     note(
       'every item is met once the choice is made',
@@ -387,7 +393,12 @@ if (browser) {
     );
     const full = owner.locator('section[data-setting="privacy.childrenInFullConfirmed"]');
     await full.locator('input[type=checkbox]').first().check(limit);
-    await submit(full.locator('button[type=submit]').first());
+    const confirmed = await settingAnswer(
+      owner,
+      'section[data-setting="privacy.childrenInFullConfirmed"]',
+      full.locator('button[type=submit]').first(),
+    );
+    note('the confirmation is saved, said beside it', confirmed.saved, confirmed.text);
     await owner.goto(settings(), limit);
     note(
       'children in full is confirmed',
