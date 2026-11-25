@@ -20,6 +20,10 @@ export const enTracker = {
   // the first word only, at the same size: the word that tells the two badges apart
   // comes first.
   'tracker.bonus.2': 'Double bonus',
+  // Beside the period while the last-minutes stop clock holds (step 2.69): one short word,
+  // so the scoreboard is no taller; a screen reader is told the label.
+  'tracker.clock.lastMinutes': 'Stop clock',
+  'tracker.clock.lastMinutesLabel': 'The last minutes: the clock stops on every foul.',
   'tracker.clock.over': 'Period over',
   'tracker.clock.overLabel': 'Period over: pick the next period',
   'tracker.clock.pause': 'Pause',
@@ -29,6 +33,15 @@ export const enTracker = {
   // Start and Pause differ in word and in shape; at 0:00 the button says why it is greyed.
   'tracker.clock.start': 'Start',
   'tracker.clock.startLabel': 'Start the clock',
+  // The running-clock switch in the clock's form (step 2.69; S-21): on or off at any
+  // moment, whatever the season's rule says. A timeout stops the clock either way.
+  'tracker.clockMode.helpLastMinutes':
+    'These are the last minutes, so the clock stops on every foul. Turn it on to keep the clock going.',
+  'tracker.clockMode.helpRunning': 'The clock keeps going after a foul.',
+  'tracker.clockMode.helpStop': 'The clock stops on every foul.',
+  'tracker.clockMode.label': 'Running clock',
+  'tracker.clockMode.off': 'Off',
+  'tracker.clockMode.on': 'On',
   // What a time that takes time off the clock adds to the minutes (S-71): it was played
   // with the clock stopped. The engine's own figure, "4:55" for 16:55 set to 12:00.
   'tracker.clockSheet.adds': 'This adds {time} to the minutes of the players on the court.',
@@ -404,6 +417,11 @@ export const enTracker = {
   // On a tile for a moment, for the two players of a substitution.
   'tracker.mark.on': 'On',
   'tracker.matchup': '{away} at {home}',
+  // The mercy rule switched the clock to running (step 2.69): said with the way back.
+  'tracker.mercy.back': 'Stop the clock on fouls again',
+  'tracker.mercy.keep': 'Keep it running',
+  'tracker.mercy.said':
+    'One team leads by {lead} or more, so the clock now keeps running after fouls (the mercy rule).',
   'tracker.noStorage':
     'This browser window cannot save the game on this device, so scoring is off. If this is a private window, open the tracker in a normal one.',
   // No longer allowed to score, with plays still on the device (finding M2).

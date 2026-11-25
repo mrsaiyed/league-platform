@@ -55,6 +55,7 @@ const on: ClockHandlers & { readonly closePad: () => void } = {
   clockKey: () => undefined,
   setClock: () => undefined,
   pickPeriod: () => undefined,
+  switchClock: () => undefined,
   timeouts: () => undefined,
   callTimeout: () => undefined,
   answerTimeout: () => undefined,
@@ -63,9 +64,15 @@ const on: ClockHandlers & { readonly closePad: () => void } = {
 };
 
 const viewOf = (game: basketball.GameState) => scoringView(game, testRosters, noLineupPicks);
-const stopped: CourtClock = { text: '7:30', running: false, over: false, start: null };
+const stopped: CourtClock = {
+  text: '7:30',
+  running: false,
+  over: false,
+  start: null,
+  mode: { now: 'stop', lastMinutes: false, lastMinutesAtMs: null },
+};
 const running: CourtClock = { ...stopped, running: true };
-const over: CourtClock = { text: '0:00', running: false, over: true, start: null };
+const over: CourtClock = { ...stopped, text: '0:00', over: true };
 const fouls = (side: 'home' | 'away', playerId: string, count: number): basketball.Command[] =>
   Array.from({ length: count }, () => ({ type: 'foul', side, playerId }) as const);
 const final = () =>

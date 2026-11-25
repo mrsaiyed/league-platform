@@ -33,6 +33,12 @@
 // Undo with a player's options open, Redo, a foul undone, plays waiting with no
 // connection, the play log), played on a game of its own with fifteen a side; the taps
 // are in tests/browser/tracker-driver.mjs.
+// Since step 2.241 a season keeping the standard set shows no turnover button, and these
+// games tap turnovers: each world's season is first made to keep the standard set with
+// turnovers, as its owner does. Step 2.69's are two chapters of their own: `mercy` (63:
+// the running-clock switch in the clock's form, 64: the mercy rule's notice) on a stop
+// clock with a mercy lead of 10, and `last-minutes` (65: the "Stop clock" sign) on a
+// running clock that stops in the last 2 minutes; both at the two phone sizes only.
 // From state 02 on the game is a stop-clock game, so a foul and a timeout are seen to
 // stop a running clock; the made-up league's own format is a running clock.
 import fs from 'node:fs';
@@ -43,9 +49,11 @@ import {
   bannerShortHtml,
   court,
   evenMorePlayers,
+  keepStatistics,
   owner,
   playStretch,
   scorekeeper,
+  seasonClock,
   sizes,
   starters,
   stopClockGame,
@@ -891,6 +899,60 @@ const endAdminStates = [
   },
 ];
 
+/** Step 2.69 on a stop clock with a mercy lead of 10: the switch, then the notice. */
+const phones = ['phone-upright', 'phone-lying'];
+const mercyStates = [
+  {
+    name: '63-clock-switch',
+    about: 'the clock’s form with the running-clock switch beside its title',
+    sizes: phones,
+    run: async (page) => {
+      const c = court(page);
+      await c.open();
+      await c.pick('home', starters);
+      await c.pick('away', starters);
+      await page.locator('[data-scoring] [data-clock]').click();
+      await page.locator('[data-clock-sheet] [data-clock-switch]').waitFor();
+    },
+  },
+  {
+    name: '64-mercy-notice',
+    about: 'the mercy rule switched the clock: the notice and its two ways',
+    sizes: phones,
+    run: async (page) => {
+      const c = court(page);
+      await page.keyboard.press('Escape');
+      await page.locator('[data-clock-sheet] [role="dialog"]').waitFor({ state: 'detached' });
+      for (const jersey of [3, 5, 7]) await c.play('home', jersey, 'p3');
+      await c.play('home', 9, 'p2');
+      await page.locator('[data-scoring] [data-mercy-notice]').waitFor();
+      await c.saved();
+    },
+  },
+];
+
+/** The season's number of periods, as the last-minutes chapter sets the season. */
+let seasonPeriods = 4;
+/** Step 2.69 on a running clock that stops in the last 2 minutes: the sign. */
+const lastMinutesStates = [
+  {
+    name: '65-last-minutes',
+    about: 'the last 2 minutes of the game: "Stop clock" beside the period',
+    sizes: phones,
+    run: async (page) => {
+      const c = court(page);
+      await c.open();
+      await c.pick('home', starters);
+      await c.pick('away', starters);
+      await c.pickPeriod(seasonPeriods);
+      await page.keyboard.press('Escape');
+      await c.setClock('159');
+      await page.locator('[data-scoring] [data-clock] [data-last-minutes]').waitFor();
+      await c.saved();
+    },
+  },
+];
+
 /** The chapters photographed: each is a game of its own on a made-up world of its own. */
 const chapters = [
   {
@@ -931,6 +993,24 @@ const chapters = [
       await addPlayers(origin, evenMorePlayers);
     },
   },
+  {
+    name: 'mercy',
+    about: 'step 2.69: the running-clock switch and the mercy rule’s notice',
+    states: mercyStates,
+    prepare: async (origin, browser) => {
+      await seasonClock(browser, origin, 'stop', '', '10');
+      await addPlayers(origin);
+    },
+  },
+  {
+    name: 'last-minutes',
+    about: 'step 2.69: the last-minutes stop clock’s sign',
+    states: lastMinutesStates,
+    prepare: async (origin, browser) => {
+      seasonPeriods = await seasonClock(browser, origin, 'running', '2', '');
+      await addPlayers(origin);
+    },
+  },
 ];
 const chapterAsked = process.argv
   .find((arg) => arg.startsWith('--chapter='))
@@ -960,8 +1040,10 @@ async function shootChapter({ states, prepare, as = scorekeeper }) {
   let browser;
   try {
     await waitFor(`${origin}/`, server);
-    await prepare(origin);
     browser = await launch();
+    // The games tap turnovers: the season keeps them (step 2.241), as its owner sets it.
+    await keepStatistics(browser, origin);
+    await prepare(origin, browser);
     const [first] = sizes;
     const context = await browser.newContext({
       viewport: { width: first.width, height: first.height },
