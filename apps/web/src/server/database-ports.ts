@@ -82,6 +82,8 @@ export type DatabaseQueries = Pick<
   | 'createOwnProfile'
   | 'readOwnName'
   | 'renameOwnProfile'
+  | 'emailFreeForOwnAccount'
+  | 'changeOwnEmail'
   | 'accountForSignIn'
   | 'isSignInLinkConflict'
   | 'isSignInRefusal'
@@ -311,6 +313,17 @@ export function databasePorts(options: DatabasePortsOptions): WebPorts {
     newRequestId: () => randomUUID(),
     identify,
     ownName,
+    // T-458: the account set only; neither says whose an address is.
+    ownEmail: {
+      isFree: (accountId, email) =>
+        database.withTransaction(db, { accountId }, (scope) =>
+          database.emailFreeForOwnAccount(scope, email),
+        ),
+      change: (accountId, email) =>
+        database.withTransaction(db, { accountId }, (scope) =>
+          database.changeOwnEmail(scope, email),
+        ),
+    },
     signIn,
     signInMail: options.signInMail,
     botCheck: options.botCheck,

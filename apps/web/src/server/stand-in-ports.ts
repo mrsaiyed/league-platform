@@ -565,6 +565,9 @@ export function standInPorts(options: StandInOptions): StandInPorts {
     newRequestId: () => randomUUID(),
     identify,
     ownName,
+    // The stand-in keeps no addresses of its own: the sign-in stand-in holds every one, and
+    // itself answers a taken one as a free one (T-455, T-458).
+    ownEmail: { isFree: async () => true, change: async () => 'changed' },
     signIn,
     signInMail,
     botCheck,

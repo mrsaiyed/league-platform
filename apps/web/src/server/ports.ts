@@ -48,6 +48,14 @@ export type WebPorts = Omit<ContextDeps, 'siteOrigin'> & {
     readonly read: (accountId: string) => Promise<OwnName | undefined>;
     readonly store: OwnNameStore;
   };
+  /**
+   * Our own account's address (T-73, T-458): whether no other account in our records holds
+   * one, a yes or a no only; and moving it once the sign-in service confirmed a change.
+   */
+  readonly ownEmail: {
+    readonly isFree: (accountId: string, email: string) => Promise<boolean>;
+    readonly change: (accountId: string, email: string) => Promise<'changed' | 'taken'>;
+  };
   /** The sign-in service (T-6): the local stand-in, or Supabase (record 018). */
   readonly signIn: SignInService;
   /** The sign-in emails, through our own email service (T4 §3). */

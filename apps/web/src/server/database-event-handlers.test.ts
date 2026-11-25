@@ -96,6 +96,8 @@ function portsWithCommands(): {
  */
 const runNoCommand: Record<string, string> = {
   botCheck: 'asks the bot-check service about one form; it reads and writes nothing of ours',
+  ownEmail:
+    'the own address (step 2.128) is the account’s, not a league’s: its two queries raise no event',
   ownName:
     'the own name (step 2.128) is the account’s, not a league’s: its two commands raise no event',
   publicSchedule: 'the public schedule pages only read published games',
