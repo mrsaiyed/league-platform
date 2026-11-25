@@ -81,6 +81,24 @@ if (browser) {
   /** Presses `button` and waits, with a limit, for the answer's page. */
   const submit = (button) =>
     Promise.all([owner.waitForURL(/done=|problem=/, limit), button.click(limit)]);
+  /**
+   * Presses Profile form `mark`'s button and waits, with a limit, for League settings to be
+   * drawn again and for "Saved: …" beside that form (step 2.155 part 3); returns its words.
+   */
+  const saveProfile = async (mark) => {
+    await Promise.all([
+      owner.waitForResponse(
+        (r) => r.request().method() === 'GET' && r.url().startsWith(settings()),
+        limit,
+      ),
+      form(mark).getByRole('button').click(limit),
+    ]);
+    const line = savedBeside(mark);
+    await line.waitFor(limit);
+    return (await line.innerText(limit)).trim();
+  };
+  /** The "Saved" line that stands right after Profile form `mark`. */
+  const savedBeside = (mark) => profile.locator(`form[data-form="${mark}"] + [data-said="saved"]`);
   /** The hidden fields of the owner's form `mark` (its action among them), as drawn now. */
   const hiddenOf = async (mark) => {
     // The Archive form is drawn only while it asks (?archive=ask).
@@ -95,7 +113,7 @@ if (browser) {
     const hidden = await hiddenOf(mark);
     note(
       `the owner's ${mark} form is there to copy`,
-      hidden.some(([name]) => name.startsWith('$ACTION_ID')),
+      hidden.some(([name]) => name.startsWith('$ACTION')),
     );
     for (const [name, value] of hidden) if (name !== '') body.append(name, value);
     for (const [name, value] of Object.entries(extra)) body.set(name, value);
@@ -106,7 +124,12 @@ if (browser) {
       redirect: 'manual',
       signal: AbortSignal.timeout(60_000),
     });
-    return { status: answer.status, to: answer.headers.get('location') ?? '' };
+    return {
+      status: answer.status,
+      to: answer.headers.get('location') ?? '',
+      // A Profile form answers a refusal in the page itself (step 2.155 part 3).
+      body: answer.status === 200 ? await answer.text() : '',
+    };
   };
   const visitorAnswer = async (path) =>
     (await fetch(`${origin}${path}`, { redirect: 'manual', signal: AbortSignal.timeout(60_000) }))
@@ -195,7 +218,8 @@ if (browser) {
   await step('the name and the short name', async () => {
     await owner.goto(settings(), limit);
     await form('league-name').locator('input[name="name"]').fill('Quiet Pines Spring League');
-    await submit(form('league-name').getByRole('button'));
+    const savedName = await saveProfile('league-name');
+    note('"Saved" beside the name names it', savedName === "Saved: the league's name.", savedName);
     note(
       'the new name is saved',
       (await form('league-name').locator('input[name="name"]').inputValue(limit)) ===
@@ -208,14 +232,28 @@ if (browser) {
       words,
     );
     await form('short-name').locator('input[name="slug"]').fill(renamed);
-    await Promise.all([
+    const [posted] = await Promise.all([
+      owner.waitForResponse((r) => r.request().method() === 'POST', limit),
       owner.waitForURL((url) => url.pathname.startsWith(`/${renamed}/`), limit),
       form('short-name').getByRole('button').click(limit),
     ]);
+    // The answer itself names the new address, not the old one that would forward.
+    const sentTo = posted.headers()['location'] ?? '';
     note(
-      'after renaming, the screen says the old address forwards',
-      (await said()).includes('The old address forwards to the new one for 12 months.'),
+      'the rename answers with the new address directly',
+      posted.status() === 303 && new URL(sentTo, origin).pathname.startsWith(`/${renamed}/`),
+      `${posted.status()} ${sentTo}`,
     );
+    const renamedLine = savedBeside('short-name');
+    await renamedLine.waitFor(limit);
+    note(
+      'after renaming, beside the short name the screen says the old address forwards',
+      (await renamedLine.innerText(limit)).includes(
+        'Saved: the short name. The old address forwards to the new one for 12 months.',
+      ),
+    );
+    await owner.reload(limit);
+    note('a reload says nothing old', (await profile.locator('[data-said]').count()) === 0);
     const old = await fetch(`${origin}/${league}`, {
       redirect: 'manual',
       signal: AbortSignal.timeout(60_000),
@@ -240,9 +278,18 @@ if (browser) {
       timeZone: 'UTC',
     });
     note(
-      'a hand-post emptying the contact email is refused',
-      emptied.to.includes('problem='),
+      'a hand-post emptying the contact email is refused beside that box, naming it',
+      emptied.status === 200 &&
+        emptied.body.includes('data-problem="league-profile"') &&
+        emptied.body.includes('Contact email: ') &&
+        /<input[^>]*aria-invalid="true"[^>]*name="contactEmail"|<input[^>]*name="contactEmail"[^>]*aria-invalid="true"/.test(
+          emptied.body,
+        ),
       `${emptied.status} ${emptied.to}`,
+    );
+    note(
+      'the refused form keeps the time zone as typed',
+      /<input[^>]*name="timeZone"[^>]*value="UTC"/.test(emptied.body),
     );
     const fields = form('league-profile');
     const before = await fields.locator('input[name="listed"]').isChecked(limit);
@@ -254,8 +301,12 @@ if (browser) {
     await fields.locator('input[name="city"]').fill('Pine Hollow East');
     await fields.locator('input[name="timeZone"]').fill('America/Chicago');
     await fields.locator('input[name="listed"]').setChecked(!before, limit);
-    await submit(fields.getByRole('button'));
-    note('the profile is saved', (await said()).includes('saved'));
+    const savedProfile = await saveProfile('league-profile');
+    note(
+      '"Saved" beside the profile names what was saved',
+      savedProfile.startsWith('Saved: the contact email, city, time zone and listing.'),
+      savedProfile,
+    );
     await owner.goto(settings(), limit);
     note(
       'the contact email is the new one',
@@ -275,7 +326,7 @@ if (browser) {
       (await fields.locator('input[name="listed"]').isChecked(limit)) === !before,
     );
     await fields.locator('input[name="listed"]').setChecked(before, limit);
-    await submit(fields.getByRole('button'));
+    await saveProfile('league-profile');
     await owner.goto(settings(), limit);
     note(
       'the listing changed back',
@@ -287,10 +338,29 @@ if (browser) {
     const refused = await handPost('who-plays', 'local-owner-token', { audience: 'adult' });
     note(
       'toward adults without the tick is refused by the server',
-      refused.to.includes('problem=leagues.set_audience.confirmation-needed'),
-      refused.to,
+      refused.status === 200 &&
+        refused.body.includes('data-problem="who-plays"') &&
+        refused.body.includes('Tick the confirmation to show more people as adults'),
+      `${refused.status} ${refused.to}`,
     );
     const plays = form('who-plays');
+    // The same refusal in the page (step 2.155 part 3): the choice is kept, the tick marked.
+    await owner.goto(settings(), limit);
+    await plays.locator('input[type=radio][value="adult"]').check(limit);
+    await plays.getByRole('button').click(limit);
+    const problem = plays.locator('[data-problem="who-plays"]');
+    await problem.waitFor(limit);
+    note(
+      'refused in the page: the sentence is beside the tick and names it',
+      (await problem.innerText(limit)).includes('Tick the confirmation'),
+    );
+    note(
+      'refused in the page: "for adults" is still chosen and the tick is marked',
+      (await plays.locator('input[type=radio]:checked').inputValue(limit)) === 'adult' &&
+        (await plays.locator('input[name="confirmed"]').getAttribute('aria-invalid', limit)) ===
+          'true',
+    );
+    await owner.goto(settings(), limit);
     note(
       'still under-18s after the refusal',
       (await plays.locator('input[type=radio]:checked').inputValue(limit)) === 'youth',
@@ -301,7 +371,7 @@ if (browser) {
     );
     await plays.locator('input[type=radio][value="adult"]').check(limit);
     await plays.locator('input[name="confirmed"]').check(limit);
-    await submit(plays.getByRole('button'));
+    note('"Saved" beside who plays', (await saveProfile('who-plays')) === 'Saved: who plays.');
     await owner.goto(settings(), limit);
     note(
       'the league is now for adults',
@@ -329,10 +399,11 @@ if (browser) {
       (await warning.count()) === 1 && (await warning.innerText(limit)).includes('back to no'),
     );
     await plays.locator('input[type=radio][value="youth"]').check(limit);
-    await submit(plays.getByRole('button'));
+    const back = await saveProfile('who-plays');
     note(
       'the move back is saved without a tick, and says full names were cleared',
-      (await said()).includes('back where a youth league starts'),
+      back.includes('back where a youth league starts'),
+      back,
     );
     note(
       'the published league stays published, and asks for its privacy choices (S-96)',
@@ -353,7 +424,7 @@ if (browser) {
     );
     await plays.locator('input[type=radio][value="adult"]').check(limit);
     await plays.locator('input[name="confirmed"]').check(limit);
-    await submit(plays.getByRole('button'));
+    await saveProfile('who-plays');
     await owner.goto(settings(), limit);
     note(
       'children in full was cleared',
@@ -377,9 +448,12 @@ if (browser) {
       ];
       for (const [mark, extra] of posts) {
         const answer = await handPost(mark, token, extra);
+        // A Profile form's save is a 303 with nothing in the address (step 2.155 part 3).
         note(
           `the ${who}'s ${mark} hand-post is not taken`,
-          answer.status < 500 && !answer.to.includes('done='),
+          answer.status < 500 &&
+            !answer.to.includes('done=') &&
+            (mark === 'archive' || answer.status !== 303),
           `${answer.status} ${answer.to}`,
         );
       }
@@ -447,6 +521,46 @@ if (browser) {
     note('the league is live again', (await panel.getAttribute('data-status', limit)) === 'live');
   });
 
+  await step('a Profile form posted twice with one token is saved once', async () => {
+    const profileChanges = async () => {
+      await owner.goto(`${origin}/${league}/admin/settings/activity`, limit);
+      const texts = await owner.locator('[data-activity-log] > li').allInnerTexts();
+      return texts.filter((text) => text.includes("Changed the league's profile")).length;
+    };
+    const before = await profileChanges();
+    await owner.goto(settings(), limit);
+    // Every box of the form as drawn, its one-time token among them; then a new city.
+    const fields = await form('league-profile').evaluate((element) =>
+      Object.fromEntries([...new FormData(element).entries()].map(([k, v]) => [k, String(v)])),
+    );
+    note('the profile form carries a one-time token', (fields['requestToken'] ?? '') !== '');
+    const statuses = [];
+    for (let i = 0; i < 2; i += 1) {
+      const body = new FormData();
+      for (const [name, value] of Object.entries(fields)) body.append(name, value);
+      body.set('city', 'Twice Pine Ridge');
+      const answer = await fetch(settings(), {
+        method: 'POST',
+        body,
+        headers: { origin, cookie: 'srl_session=local-owner-token' },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(60_000),
+      });
+      statuses.push(answer.status);
+    }
+    note(
+      'both posts of the profile form are answered as saved',
+      statuses.every((status) => status === 303),
+      String(statuses),
+    );
+    const after = await profileChanges();
+    note(
+      'posted twice, one change in the activity log',
+      after === before + 1,
+      `${before} then ${after}`,
+    );
+  });
+
   await step('each change is one entry in the activity log', async () => {
     const kinds = {
       profile: "Changed the league's profile",
@@ -466,9 +580,9 @@ if (browser) {
     const before = await counts();
     await owner.goto(settings(), limit);
     await form('league-profile').locator('input[name="city"]').fill('Lower Pine Ridge', limit);
-    await submit(form('league-profile').getByRole('button'));
+    await saveProfile('league-profile');
     await form('who-plays').locator('input[type=radio][value="mixed"]').check(limit);
-    await submit(form('who-plays').getByRole('button'));
+    await saveProfile('who-plays');
     await owner.goto(`${settings()}?archive=ask`, limit);
     await submit(panel.getByRole('button', { name: 'Archive' }));
     const after = await counts();

@@ -24,6 +24,10 @@ export const enAdminTeams = {
   'adminTeams.add.title': 'Add a player',
   'adminTeams.allTeams': 'All teams',
   'adminTeams.byNumber': '#{number}',
+  // A team form refused because the team or the line changed meanwhile (step 2.155 part 3):
+  // the screen keeps what was typed and shows "Saved now" beside it, and this says so.
+  'adminTeams.changedMeanwhile':
+    'Someone else changed this team since you opened this page, so it was not saved. What you typed is kept, and beside each box that differs is what is saved now. Save again to replace it with yours.',
   'adminTeams.confirm': 'Yes, I am sure',
   // A refused "Add team", beside the box it is about (step 2.155): each names its box.
   'adminTeams.create.problem.color':
@@ -36,7 +40,6 @@ export const enAdminTeams = {
   'adminTeams.create.submit': 'Add team',
   'adminTeams.create.title': 'Add a team',
   'adminTeams.done.added': 'The player was added to the roster.',
-  'adminTeams.done.entrySaved': 'The number and role were saved.',
   'adminTeams.done.left': 'The player was marked as having left.',
   'adminTeams.done.moved': 'The roster order was saved.',
   'adminTeams.done.personRemoved':
@@ -46,7 +49,6 @@ export const enAdminTeams = {
   'adminTeams.done.putBackNoNumber':
     'The player is back on the roster with no number, because someone else now wears theirs. Give them a number.',
   'adminTeams.done.removed': 'Moved to the bin: the team is kept there for 30 days.',
-  'adminTeams.done.statsSaved': 'Who sees the numbers was saved.',
   'adminTeams.done.teamBack': 'The mark is off: the team is playing in the league again.',
   'adminTeams.done.teamLeft': 'The team is marked as having left the league.',
   'adminTeams.done.updated': 'The team was saved.',
@@ -144,6 +146,7 @@ export const enAdminTeams = {
   'adminTeams.remove.toSchedule': 'Go to Schedule',
   'adminTeams.roster.backAlready':
     'They are on this roster again, so there is nothing to put back.',
+  'adminTeams.roster.entryLabel': 'The roster line of {name}',
   'adminTeams.roster.leftLine': '{name}, left on {date}',
   'adminTeams.roster.leftOn': 'Left on',
   'adminTeams.roster.leftOnHelp': 'The day they left: today or a day before.',
@@ -172,6 +175,7 @@ export const enAdminTeams = {
   'adminTeams.roster.toReview': '(added at the scorer’s table, to review)',
   // Said on the player's own line, naming them (step 2.161; R-32 for the number).
   'adminTeams.said.added': 'Saved: {name} was added to {team}.',
+  'adminTeams.said.entrySaved': 'Saved: the number and role of {name}.',
   'adminTeams.said.left': '{name} was marked as having left {team}.',
   'adminTeams.said.putBack':
     '{name} is back on the roster. Their games and numbers are as they were.',
@@ -181,6 +185,7 @@ export const enAdminTeams = {
     '{name} is back on the roster with no number: someone else on the team now wears {number}. Give them a number.',
   // Beside the team's details, once, after they were saved (step 2.155).
   'adminTeams.saved.details': 'Saved: the details of {name}.',
+  'adminTeams.saved.stats': 'Saved: who sees the numbers of {name}.',
   'adminTeams.savedNow': 'Saved now:',
   'adminTeams.savedNowNothing': '(nothing)',
   'adminTeams.seasonLine': 'Teams of {season}',

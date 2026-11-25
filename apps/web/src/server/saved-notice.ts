@@ -24,6 +24,8 @@ export const noticeScreens = [
   'standings',
   'scorekeepers',
   'bin',
+  // League settings → Profile (step 2.155 part 3).
+  'settings',
   'teams',
 ] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];

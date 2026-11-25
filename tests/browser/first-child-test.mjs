@@ -185,7 +185,11 @@ try {
   at = 'Bea, a child by a birth date, is the first child: the yes goes back in the same save';
   await page.goto(`${origin}/${league}/admin/teams`);
   await page.locator('input[name=name]').fill('Herons');
-  await submit(page.getByRole('button', { name: 'Add team' }), /done=created/);
+  // A team just added opens on its own page (step 2.155), which says it was added.
+  await submit(page.getByRole('button', { name: 'Add team' }), /\/admin\/teams\/[0-9a-f-]{36}/);
+  await page
+    .locator('[role=status]', { hasText: 'Saved: Herons was added to the season.' })
+    .waitFor({ timeout: 10_000 });
   const herons = page.url().split(/[?#]/)[0];
   await addPerson('Bea', 'Lark', childBorn);
   note(
@@ -195,7 +199,13 @@ try {
   await page.goto(herons);
   const roster = page.locator('form', { has: page.locator('select[name=personId]') });
   await roster.locator('select[name=personId]').selectOption({ label: 'Bea Lark' });
-  await submit(roster.getByRole('button', { name: 'Add to the roster' }));
+  // Said on the new roster line (step 2.155), with scripts on or off.
+  await Promise.all([
+    page
+      .locator('[data-said-on] [role=status]', { hasText: 'was added to' })
+      .waitFor({ timeout: 10_000 }),
+    roster.getByRole('button', { name: 'Add to the roster' }).click(),
+  ]);
   await visitor.goto(`${origin}/${league}/teams`);
   await Promise.all([
     visitor.waitForURL(/\/teams\/[^/]+$/),
