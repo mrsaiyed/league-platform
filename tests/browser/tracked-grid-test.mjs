@@ -219,7 +219,9 @@ async function teamsOf(page) {
 /**
  * The two teams' own rows of the public standings, read signed out: by team name, its
  * wins, losses, points for and against as numbers (the columns W, L, PF and PA). A team
- * missing, or a column the page does not show, throws, so the step fails.
+ * missing, or wins or losses not shown, throws, so the step fails. Points for and against
+ * are null when the season's standings do not show them (the made-up season shows W and L
+ * only), and are then compared as such.
  */
 async function standingsRows(names) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -235,7 +237,8 @@ async function standingsRows(names) {
           const name = row.querySelector('.ui-team-name')?.textContent.trim() ?? '';
           if (!teams.includes(name)) continue;
           const cells = [...row.children].map((cell) => cell.textContent.trim());
-          const at = (label) => (heads.includes(label) ? Number(cells[heads.indexOf(label)]) : NaN);
+          const at = (label) =>
+            heads.includes(label) ? Number(cells[heads.indexOf(label)]) : null;
           found[name] = { wins: at('W'), losses: at('L'), for: at('PF'), against: at('PA') };
         }
       }
@@ -243,7 +246,9 @@ async function standingsRows(names) {
     }, names);
     for (const name of names) {
       const row = rows[name];
-      if (row === undefined || Object.values(row).some((n) => !Number.isFinite(n))) {
+      const shown = (n) => n === null || Number.isFinite(n);
+      const full = row !== undefined && Number.isFinite(row.wins) && Number.isFinite(row.losses);
+      if (!full || !shown(row.for) || !shown(row.against)) {
         throw new Error(`the standings have no full row for ${name}: ${JSON.stringify(rows)}`);
       }
     }
@@ -257,7 +262,8 @@ async function standingsRows(names) {
 const moved = (names, from, to) =>
   names.map((name) => {
     const [a, b] = [from[name], to[name]];
-    return [b.wins - a.wins, b.losses - a.losses, b.for - a.for, b.against - a.against];
+    const by = (key) => (a[key] === null || b[key] === null ? null : b[key] - a[key]);
+    return [by('wins'), by('losses'), by('for'), by('against')];
   });
 
 /** The public game page's main text, read signed out. */
@@ -616,8 +622,10 @@ try {
       );
       const shown = await publicText();
       note(
-        'the public page says Final and Corrected',
-        shown.includes('Final') && shown.includes('Corrected on'),
+        // The device's basket was taken back by its own Undo (T-408), so the result is the one
+        // the game first ended with: no "Corrected" (S-81, a correction that changed it).
+        'the public page says Final, and not Corrected while the result is unchanged',
+        shown.includes('Final') && !shown.includes('Corrected on'),
         shown.slice(0, 300),
       );
       counted = await standingsRows(teams);
@@ -629,8 +637,7 @@ try {
           away[1] === 1 &&
           home[0] === 1 &&
           home[1] === 0 &&
-          home[2] > 0 &&
-          away[3] === home[2],
+          (home[2] === null || (home[2] > 0 && away[3] === home[2])),
         JSON.stringify({ teams, whileLive, counted }),
       );
     } finally {
@@ -671,11 +678,13 @@ try {
     await endAgainIn('[data-end-again]');
     const after = await standingsRows(teams);
     // Away won instead: a win and nine points more for away, a loss more for home.
-    const [away, home] = moved(teams, counted, after);
+    const [awayMoved, homeMoved] = moved(teams, counted, after);
     note(
       'the two teams’ rows follow the new winner',
-      JSON.stringify(away) === JSON.stringify([1, -1, 9, 0]) &&
-        JSON.stringify(home) === JSON.stringify([-1, 1, 0, 9]),
+      JSON.stringify(awayMoved) ===
+        JSON.stringify([1, -1, ...(after[teams[0]].for === null ? [null, null] : [9, 0])]) &&
+        JSON.stringify(homeMoved) ===
+          JSON.stringify([-1, 1, ...(after[teams[1]].for === null ? [null, null] : [0, 9])]),
       JSON.stringify({ teams, counted, after }),
     );
   });
