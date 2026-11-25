@@ -22,6 +22,7 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  settingAnswer,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -99,10 +100,12 @@ if (browser) {
     if ((await privacy.count()) > 0) {
       const names = 'section[data-setting="privacy.publicNames"]';
       await owner.locator(`${names} input[type=radio][value="fullName"]`).check();
-      await Promise.all([
-        owner.waitForURL(/done=|problem=/),
-        owner.locator(`${names} button[type=submit]`).first().click(),
-      ]);
+      const answer = await settingAnswer(
+        owner,
+        names,
+        owner.locator(`${names} button[type=submit]`).first(),
+      );
+      note('names on public pages is saved', answer.saved, answer.text);
     }
     await owner.goto(settings);
     note(

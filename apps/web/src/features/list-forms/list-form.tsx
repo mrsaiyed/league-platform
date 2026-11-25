@@ -7,8 +7,14 @@
 // button when no box is wrong). With scripts off React's form state does the same in the
 // page that answers the post, at the form's own place (`permalink`). Every word comes from
 // the server, from the message files (T-187).
-import { useActionState, useEffect, useId, useRef, type ReactNode } from 'react';
-import { untouched, type FormState, type SavedNowWords, type TypedFields } from './form-state.ts';
+import { useActionState, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import {
+  chosenOf,
+  untouched,
+  type FormState,
+  type SavedNowWords,
+  type TypedFields,
+} from './form-state.ts';
 import { useOneSubmit } from './use-one-submit.ts';
 
 export type ListField =
@@ -55,6 +61,11 @@ export type ListField =
       readonly label: string;
       readonly value: string;
       readonly help?: string;
+      /**
+       * A number with limits (a league setting, step 2.155 part 4): drawn as the browser's
+       * own number box, with them. Left out, a text box (a deduction needs a minus sign).
+       */
+      readonly limits?: { readonly min: number; readonly max: number; readonly whole: boolean };
     }
   | {
       /** One of a short list (step 2.56: the team an adjustment is for). */
@@ -97,6 +108,13 @@ export type ListFormProps = {
   readonly className?: string;
   /** Drawn greyed, nothing to change: someone who may look but not change (League settings). */
   readonly disabled?: boolean;
+  /**
+   * A second button, quieter, that sends `name=value` with the same boxes and asks the
+   * browser to check none of them (a setting's "Go back to the default", step 2.155 part 4).
+   */
+  readonly second?: { readonly label: string; readonly name: string; readonly value: string };
+  /** The id of words every box is also described by (a setting's default and limits). */
+  readonly about?: string;
 };
 
 /** "yes" is what a tick sends when ticked. */
@@ -152,6 +170,8 @@ export function ListForm({
   name,
   className = 'staff-form',
   disabled = false,
+  second,
+  about,
 }: ListFormProps) {
   const [state, dispatch, pending] = useActionState(action, untouched, permalink);
   const onSubmit = useOneSubmit(pending, state);
@@ -162,6 +182,11 @@ export function ListForm({
     if (state.kind !== 'refused') return;
     formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
   }, [state]);
+  // A mark that changes with every answer (step 2.155 part 4): two refusals in a row that
+  // read the same are still two answers, drawn as a new line each, so a person's screen
+  // reader says the second one and a test can tell it from the first.
+  const [answers, setAnswers] = useState({ state, count: 0 });
+  if (answers.state !== state) setAnswers({ state, count: answers.count + 1 });
   const base = useId();
   const problemId = `${base}-problem`;
   const refused = state.kind === 'refused' ? state : undefined;
@@ -169,7 +194,14 @@ export function ListForm({
   const typed = (field: string) => refused?.typed[field];
   const problem =
     refused === undefined ? null : (
-      <p id={problemId} className="ui-field-error" role="alert" data-problem={name}>
+      <p
+        key={answers.count}
+        id={problemId}
+        className="ui-field-error"
+        role="alert"
+        data-problem={name}
+        data-answer={answers.count}
+      >
         {refused.said}
       </p>
     );
@@ -185,7 +217,14 @@ export function ListForm({
     );
   };
   const marked = (field: string) =>
-    wrongField === field ? { 'aria-invalid': true, 'aria-describedby': problemId } : {};
+    wrongField === field
+      ? {
+          'aria-invalid': true,
+          'aria-describedby': about === undefined ? problemId : `${problemId} ${about}`,
+        }
+      : about === undefined
+        ? {}
+        : { 'aria-describedby': about };
   return (
     <form
       ref={formRef}
@@ -257,23 +296,26 @@ export function ListForm({
           );
         }
         if (field.kind === 'choice') {
-          const chosen = typed(field.name) ?? field.value;
+          const chosen = chosenOf(field.options, typed(field.name), field.value);
           return (
             <div key={field.name} className="admin-field-group">
-              <fieldset {...marked(field.name)}>
+              {/* Each choice a line of its own, a whole line to tap (the settings' own look). */}
+              <fieldset className="settings-choice" {...marked(field.name)}>
                 <legend>{field.label}</legend>
                 {field.options.map((option) => (
-                  <label key={option.value}>
-                    <input
-                      key={`${option.value}:${String(option.value === chosen)}`}
-                      type="radio"
-                      name={field.name}
-                      value={option.value}
-                      defaultChecked={option.value === chosen}
-                      disabled={disabled}
-                    />{' '}
-                    {option.label}
-                  </label>
+                  <p key={option.value}>
+                    <label className="staff-check">
+                      <input
+                        key={`${option.value}:${String(option.value === chosen)}`}
+                        type="radio"
+                        name={field.name}
+                        value={option.value}
+                        defaultChecked={option.value === chosen}
+                        disabled={disabled}
+                      />{' '}
+                      {option.label}
+                    </label>
+                  </p>
                 ))}
               </fieldset>
               {savedNow(field)}
@@ -319,10 +361,18 @@ export function ListForm({
                   name={field.name}
                   // Text, not a number box: a phone's number keypad has no minus sign, and
                   // a deduction needs one. The server checks the number either way.
-                  type="text"
+                  {...(field.limits === undefined
+                    ? { type: 'text', size: 6 }
+                    : {
+                        type: 'number',
+                        min: field.limits.min,
+                        max: field.limits.max,
+                        step: field.limits.whole ? 1 : 'any',
+                        required: true,
+                      })}
                   defaultValue={value}
                   autoComplete="off"
-                  size={6}
+                  disabled={disabled}
                   {...marked(field.name)}
                 />
                 {help}
@@ -386,6 +436,22 @@ export function ListForm({
         >
           {button}
         </button>
+        {second === undefined ? null : (
+          <>
+            {' '}
+            <button
+              type="submit"
+              className="ui-button"
+              data-kind="quiet"
+              name={second.name}
+              value={second.value}
+              formNoValidate
+              disabled={disabled}
+            >
+              {second.label}
+            </button>
+          </>
+        )}
       </p>
       {wrongField === undefined ? problem : null}
     </form>

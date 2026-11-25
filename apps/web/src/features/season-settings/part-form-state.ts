@@ -3,6 +3,8 @@
 // the browser, which only draws it. An answer travels in the response to the post itself,
 // drawn from what was posted (T-271, record 067): never in the address.
 
+import type { SavedNowWords } from '../list-forms/index.ts';
+
 /** What a form held: text only, by field name. A tick that is not ticked is not there. */
 export type TypedFields = Readonly<Record<string, string>>;
 
@@ -84,6 +86,12 @@ export type PartState =
       readonly typed: TypedFields;
       readonly wrong: readonly WrongBox[];
       readonly said: string;
+      /**
+       * The season changed since the page was drawn (T-418, as T-399): the words that say,
+       * beside each box whose saved value now differs from what was typed, what is saved
+       * now. Left out for every other refusal.
+       */
+      readonly savedNow?: SavedNowWords;
     }
   /** The boxes again with these values: a preset chosen, or "No, change the rules". */
   | {
