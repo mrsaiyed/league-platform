@@ -7,6 +7,13 @@ import { escapeHtml, headerText, type EmailWords, type RenderedEmail } from './r
 export type SignInEmailKey =
   | 'email.signInCode.subjectSignUp'
   | 'email.signInCode.subjectReset'
+  | 'email.signInCode.subjectEmailChange'
+  | 'email.emailChangeAsked.subject'
+  | 'email.emailChangeAsked.body'
+  | 'email.emailChangeAsked.notYou'
+  | 'email.emailChanged.subject'
+  | 'email.emailChanged.body'
+  | 'email.emailChanged.notYou'
   | 'email.signInCode.code'
   | 'email.signInCode.existing'
   | 'email.signInCode.notExpected'
@@ -19,7 +26,7 @@ export type SignInEmailKey =
   | 'site.poweredBy';
 
 export type SignInCodeEmailData = {
-  readonly purpose: 'sign-up' | 'reset';
+  readonly purpose: 'sign-up' | 'reset' | 'email-change';
   readonly code: string;
   readonly validMinutes: number;
   /** Told only to the mailbox: "you already have an account" (T-68). */
@@ -48,7 +55,11 @@ type Words = EmailWords<SignInEmailKey>;
 
 export function signInCodeEmail(data: SignInCodeEmailData, t: Words): RenderedEmail {
   const subject = t(
-    data.purpose === 'sign-up' ? 'email.signInCode.subjectSignUp' : 'email.signInCode.subjectReset',
+    data.purpose === 'sign-up'
+      ? 'email.signInCode.subjectSignUp'
+      : data.purpose === 'reset'
+        ? 'email.signInCode.subjectReset'
+        : 'email.signInCode.subjectEmailChange',
   );
   const lines = [t('email.signInCode.code', { code: data.code, minutes: data.validMinutes })];
   if (data.accountExists && data.purpose === 'sign-up') lines.push(t('email.signInCode.existing'));
@@ -74,6 +85,42 @@ export function passwordChangedEmail(data: PasswordChangedEmailData, t: Words): 
     t('email.passwordChanged.subject'),
     [t('email.passwordChanged.body', { when: data.when }), t('email.passwordChanged.notYou')],
     data.resetUrl,
+    data.siteUrl,
+    t,
+  );
+}
+
+/** To the old address, when a change of email is asked and when it is made (T-73, S-129). */
+export type EmailChangeEmailData = {
+  /** The address the account is moving to. */
+  readonly newEmail: string;
+  readonly when: string;
+  /** The account page ("asked"), or our site ("changed"). */
+  readonly link: string;
+  readonly siteUrl: string;
+};
+
+export function emailChangeAskedEmail(data: EmailChangeEmailData, t: Words): RenderedEmail {
+  return render(
+    t('email.emailChangeAsked.subject'),
+    [
+      t('email.emailChangeAsked.body', { email: data.newEmail, when: data.when }),
+      t('email.emailChangeAsked.notYou'),
+    ],
+    data.link,
+    data.siteUrl,
+    t,
+  );
+}
+
+export function emailChangedEmail(data: EmailChangeEmailData, t: Words): RenderedEmail {
+  return render(
+    t('email.emailChanged.subject'),
+    [
+      t('email.emailChanged.body', { email: data.newEmail, when: data.when }),
+      t('email.emailChanged.notYou'),
+    ],
+    data.link,
     data.siteUrl,
     t,
   );

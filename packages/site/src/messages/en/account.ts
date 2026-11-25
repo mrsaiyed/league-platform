@@ -38,6 +38,27 @@ export const enAccount = {
   'account.devices': 'Signed-in devices',
   'account.devicesUnreadable':
     'We could not read the list of devices just now. Reload the page to try again.',
+  'account.email.changed': 'Your email is now {email}. Every other device was signed out.',
+  'account.email.code': 'The 6-digit code',
+  'account.email.codeExpired':
+    'That code no longer works. Type your new email and password again for a new one.',
+  'account.email.codeWrong': 'That code is not right. Check the newest email and try again.',
+  'account.email.confirm': 'Change my email',
+  // "Your email" on the account page (T-73, S-129): {email} is the new address typed.
+  'account.email.heading': 'Your email',
+  'account.email.help':
+    'Type the new address and your password. We send a 6-digit code to the new address and tell the old one. Nothing changes until you type the code here.',
+  'account.email.invalid': 'Type a whole email address, like name@example.com.',
+  'account.email.newEmail': 'New email',
+  'account.email.noPassword':
+    'Your account has no password yet. Sign out, choose one with "Forgot your password?", then change your email here.',
+  'account.email.notSent': 'We could not send the code. Try again in a minute.',
+  'account.email.password': 'Your password',
+  'account.email.same': 'That is already your email.',
+  'account.email.send': 'Send the code',
+  'account.email.sent':
+    'We sent a 6-digit code to {email}. Your email does not change until you type it here.',
+  'account.email.wrongPassword': 'That is not your current password.',
   'account.lastActive': 'Last active {when}',
   // Beside a league the person helps run, on their own lists: the way to its admin.
   'account.leagueAdmin': 'Admin',
@@ -124,6 +145,16 @@ export const enAccount = {
   'confirm.title': 'Enter your password again',
   'device.label': '{browser} on {system}',
   'device.unknown': 'A web browser',
+  // To the old address when a change of email is asked and when it is made (T-73, S-129).
+  'email.emailChangeAsked.body':
+    'Someone signed in to your account asked at {when} to move it to {email}. Nothing changes unless the code we sent to that address is typed.',
+  'email.emailChangeAsked.notYou':
+    'If this was not you, choose a new password and use "Sign out everywhere" on your account page:',
+  'email.emailChangeAsked.subject': 'Someone asked to change your email',
+  'email.emailChanged.body':
+    'The email of your account was changed to {email} at {when}, and every other device was signed out. This address no longer signs in.',
+  'email.emailChanged.notYou': 'If this was not you, tell us at once:',
+  'email.emailChanged.subject': 'Your email was changed',
   'email.invitation.action': 'Accept the invitation',
   'email.invitation.expiry':
     'It stops working {days} days after the invitation was sent, or as soon as it is re-sent or cancelled.',
@@ -151,6 +182,7 @@ export const enAccount = {
     'You already have an account with this address. Entering this code lets you choose a new password.',
   'email.signInCode.notExpected':
     'If you did not ask for this, you can ignore this email. Nobody can use the code without your mailbox.',
+  'email.signInCode.subjectEmailChange': 'Your code to change your email',
   'email.signInCode.subjectReset': 'Your code to choose a new password',
   // Sign-in emails (T-67, T-70, T-85), built by packages/emails. {code} is the 6-digit
   // code, {minutes} how long it works, {device} a device's name, {when} a time, {url}

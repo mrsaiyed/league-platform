@@ -8,6 +8,9 @@ export {
 export {
   newDeviceEmail,
   passwordChangedEmail,
+  emailChangeAskedEmail,
+  emailChangedEmail,
+  type EmailChangeEmailData,
   signInCodeEmail,
   type NewDeviceEmailData,
   type PasswordChangedEmailData,

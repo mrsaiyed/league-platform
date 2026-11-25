@@ -34,7 +34,7 @@ describe('the Supabase Auth client', () => {
         refreshToken: 'r-1',
         accessExpiresAt: new Date(1_700_000_000_000),
         sessionId: 's-1',
-        user: { id: 'u-1', email: 'ana@example.test', emailConfirmedAt: null },
+        user: { id: 'u-1', email: 'ana@example.test', emailConfirmedAt: null, newEmail: null },
       },
     });
     expect(seen[0]?.url).toBe(

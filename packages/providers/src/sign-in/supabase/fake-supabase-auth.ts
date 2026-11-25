@@ -232,7 +232,11 @@ export function createFakeSupabaseAuth(options: FakeSupabaseAuthOptions) {
         const newEmail = field(body, 'new_email').toLowerCase();
         if (!user) return refuse(404, 'user_not_found', 'User with this email not found');
         if (usersByEmail.has(newEmail)) {
-          return refuse(422, 'email_exists', 'A user with this email address has already been registered');
+          return refuse(
+            422,
+            'email_exists',
+            'A user with this email address has already been registered',
+          );
         }
         const token = String(randomInt(0, 1_000_000)).padStart(6, '0');
         user.emailChange = { newEmail, token, expiresAt: nowMs() + codeMs };

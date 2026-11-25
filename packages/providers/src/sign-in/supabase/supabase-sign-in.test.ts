@@ -20,6 +20,7 @@ import {
   signUp,
   strongPassword,
   value,
+  type Setup,
 } from './supabase-sign-in.test-helper.ts';
 
 const elsewhere = '203.0.113.7';
@@ -1037,5 +1038,77 @@ describe('changing the password while signed in (T-85, step 2.128)', () => {
         networkAddress: here,
       }),
     ).toEqual(fail({ code: 'no-password' }));
+  });
+});
+
+describe('changing the email while signed in (T-73, step 2.128, T-455)', () => {
+  const ana = 'ana@example.test';
+  const fresh = 'ana.new@example.test';
+  const start = (env: Setup, accessToken: string, newEmail = fresh, takenElsewhere = false) =>
+    env.sign.startEmailChange({
+      accessToken,
+      password: strongPassword,
+      newEmail,
+      takenElsewhere,
+      networkAddress: here,
+    });
+  const confirm = (env: Setup, accessToken: string, code: string) =>
+    env.sign.confirmEmailChange({ accessToken, code, networkAddress: here });
+  const signsIn = async (env: Setup, email: string) =>
+    (await env.sign.signIn({ email, password: strongPassword, device: laptop })).ok;
+  const wrongOf = (code: string) => (code === '000000' ? '111111' : '000000');
+
+  it('a wrong code changes nothing; the right one moves the address at Supabase and ends the others', async () => {
+    const env = setup();
+    const { session } = await signUp(env, ana);
+    const other = value(
+      await env.sign.signIn({ email: ana, password: strongPassword, device: phone }),
+    );
+    expect(
+      await env.sign.startEmailChange({
+        accessToken: session.accessToken,
+        password: 'not my password',
+        newEmail: fresh,
+        takenElsewhere: false,
+        networkAddress: here,
+      }),
+    ).toEqual(fail({ code: 'wrong-password' }));
+    value(await start(env, session.accessToken));
+    const code = codeFor(env, fresh);
+    expect(await confirm(env, session.accessToken, wrongOf(code))).toEqual(
+      fail({ code: 'code-wrong' }),
+    );
+    // A sign-up screen cannot spend it.
+    expect(await env.sign.verifyCode({ email: fresh, code, networkAddress: here })).toEqual(
+      fail({ code: 'code-expired' }),
+    );
+    expect(await signsIn(env, fresh)).toBe(false);
+    expect(value(await confirm(env, session.accessToken, code))).toMatchObject({
+      oldEmail: ana,
+      newEmail: fresh,
+    });
+    expect(value(await env.sign.identify({ accessToken: session.accessToken })).email).toBe(fresh);
+    expect(errorCode(await env.sign.identify({ accessToken: other.session.accessToken }))).toBe(
+      'session-ended',
+    );
+    expect(await signsIn(env, fresh)).toBe(true);
+    expect(await signsIn(env, ana)).toBe(false);
+    expect(await confirm(env, session.accessToken, code)).toEqual(fail({ code: 'code-expired' }));
+  });
+
+  it('a taken address, at Supabase or in our records, answers as a free one and sends no code', async () => {
+    const env = setup();
+    const { session } = await signUp(env, ana);
+    await signUp(env, 'bo@example.test');
+    env.capture.clear();
+    const taken = await start(env, session.accessToken, 'bo@example.test');
+    expect(taken).toEqual(await start(env, session.accessToken, 'cy@example.test', true));
+    expect(taken.ok).toBe(true);
+    expect(env.capture.messages().map((m) => [m.to, m.purpose, m.code])).toEqual([
+      ['bo@example.test', 'email-change', null],
+      ['cy@example.test', 'email-change', null],
+    ]);
+    expect(errorCode(await confirm(env, session.accessToken, '123456'))).toBe('code-wrong');
+    expect(await signsIn(env, ana)).toBe(true);
   });
 });

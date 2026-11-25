@@ -366,6 +366,11 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       const code = emailCode.safeParse(rawCode);
       if (!email.success || !code.success) return wrong();
       const { verifyType } = attempt;
+      // A change of email's code is spent only by confirmEmailChange, signed in (T-455).
+      if (verifyType === 'email_change') {
+        await store.limits.cancelGuess(reserved.ticket);
+        return fail({ code: 'code-expired' });
+      }
       let verified;
       try {
         // No code was sent (T-68): the same call, which cannot succeed.
@@ -469,7 +474,7 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       const session: GoTrueSession = {
         ...held.supabase,
         // Only the id is recorded; identify asks Supabase whether the address is confirmed.
-        user: { id: held.accountId, email: held.email, emailConfirmedAt: null },
+        user: { id: held.accountId, email: held.email, emailConfirmedAt: null, newEmail: null },
       };
       await recordSession(session, where.label, now());
       return ok({
@@ -686,6 +691,132 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       );
       await store.sessions.passwordEntered(session.sessionId, now());
       return ok({ endedSessions });
+    },
+
+    async startEmailChange({ accessToken, password, newEmail, takenElsewhere, networkAddress }) {
+      const network = parseNetwork(networkAddress);
+      const live = await liveSession(accessToken);
+      if ('code' in live) return fail(live);
+      const { session, user } = live;
+      if (!(await store.accounts.hasPassword(session.accountId))) {
+        return fail({ code: 'no-password' });
+      }
+      const parsed = signInEmail.safeParse(newEmail);
+      if (!parsed.success) return fail({ code: 'invalid-email' });
+      const email = parsed.data;
+      if (email === user.email) return fail({ code: 'same-email' });
+      // The password exactly as confirmPassword checks it (T-85, T-225).
+      const reserved = await reserveGuess(user.email, network);
+      if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
+      const answer = await checkPassword(user.email, password, reserved.ticket);
+      if ('limited' in answer) return fail(answer.limited);
+      if ('wrong' in answer) return fail({ code: 'wrong-password' });
+      await auth.signOut(answer.session.accessToken, 'local');
+      if (answer.session.user.id !== session.accountId) return fail({ code: 'wrong-password' });
+      await store.limits.forgiveGuess(reserved.ticket);
+      await store.sessions.passwordEntered(session.sessionId, now());
+      const limited = await store.limits.countCodeRequest({
+        email,
+        network,
+        perEmail: settings.codesPerHour,
+        perNetwork: settings.codesPerHourPerNetwork,
+      });
+      if (limited) return fail(tooMany(limited.retryAfterSeconds));
+      // Supabase is asked either way, so a taken address costs the same work (T-68); it
+      // keeps the pending address on its user. A code for an address taken here or there
+      // is never sent nor kept: the store's row has no kind, so nothing can match it.
+      const generated = await auth.generateEmailChangeCode(user.email, email);
+      let code: string | null = null;
+      if (!generated.ok) {
+        const limit = supabaseLimited(generated.refusal);
+        if (limit) return fail(limit);
+        expectedRefusal('generate_link', generated.refusal, ['email_exists']);
+      } else if (!emailCode.safeParse(generated.value.code).success) {
+        throw new SupabaseAuthUnexpected('generate_link: the code is not 6 digits');
+      } else if (!takenElsewhere) {
+        code = generated.value.code;
+      }
+      const expiresAt = new Date(now().getTime() + settings.codeValidMinutes * minute);
+      const sent = await codeSender.send({
+        to: email,
+        purpose: 'email-change',
+        code,
+        accountExists: code === null,
+        expiresAt,
+      });
+      if (!sent.ok) return fail({ code: 'code-not-sent' });
+      await store.codes.putCode(email, {
+        verifyType: code === null ? null : 'email_change',
+        expiresAt,
+        attemptsLeft: settings.attemptsPerCode,
+      });
+      return ok({ codeValidMinutes: settings.codeValidMinutes });
+    },
+
+    async confirmEmailChange({ accessToken, code: rawCode, networkAddress }) {
+      const network = parseNetwork(networkAddress);
+      const live = await liveSession(accessToken);
+      if ('code' in live) return fail(live);
+      const { session, user } = live;
+      const reserved = await reserveGuess(null, network);
+      if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
+      // Only this account's own pending address, as Supabase holds it on its user.
+      const attempt =
+        user.newEmail === null
+          ? ({ status: 'none' } as const)
+          : await store.codes.takeCodeAttempt(user.newEmail, now());
+      if (attempt.status !== 'taken' || user.newEmail === null) {
+        await store.limits.cancelGuess(reserved.ticket);
+        return fail(
+          attempt.status === 'used-up' ? { code: 'too-many-attempts' } : { code: 'code-expired' },
+        );
+      }
+      const pendingAddress = user.newEmail;
+      const wrong = () =>
+        fail({ code: attempt.attemptsLeft <= 0 ? 'too-many-attempts' : 'code-wrong' } as const);
+      const code = emailCode.safeParse(rawCode);
+      if (!code.success) return wrong();
+      if (attempt.verifyType !== null && attempt.verifyType !== 'email_change') {
+        // The address's code is now a sign-up's or a reset's: this change has none.
+        await store.limits.cancelGuess(reserved.ticket);
+        return fail({ code: 'code-expired' });
+      }
+      let verified;
+      try {
+        verified =
+          attempt.verifyType === null
+            ? await auth.verifyNothing(token())
+            : await auth.verifyCode('email_change', pendingAddress, code.data);
+        if (!verified.ok && !supabaseLimited(verified.refusal)) {
+          expectedRefusal('verify', verified.refusal, ['otp_expired']);
+        }
+      } catch (error) {
+        await store.limits.cancelGuess(reserved.ticket);
+        throw error;
+      }
+      if (!verified.ok) {
+        const limit = supabaseLimited(verified.refusal);
+        if (limit) {
+          await store.limits.cancelGuess(reserved.ticket);
+          return fail(limit);
+        }
+        return wrong();
+      }
+      const made = verified.value;
+      if (made === null) return wrong();
+      // The session the check made is not one of ours.
+      await auth.signOut(made.accessToken, 'local');
+      if (made.user.id !== session.accountId) return wrong();
+      await store.limits.cancelGuess(reserved.ticket);
+      await store.codes.dropCode(pendingAddress);
+      await store.codes.dropProofsFor(user.email);
+      // T-73: every other device is signed out; this one stays.
+      await auth.signOut(accessToken, 'others');
+      const endedSessions = await store.sessions.endSessionsOf(
+        session.accountId,
+        session.sessionId,
+      );
+      return ok({ oldEmail: user.email, newEmail: made.user.email, endedSessions });
     },
 
     async signOut(input) {
