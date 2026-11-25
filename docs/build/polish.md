@@ -149,3 +149,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.246 leftovers: browser tests that type no date and the database store tests (the database's own clock) were not searched for a dependence on the hour.
 
 - 2.243 leftovers: no browser test reaches the Profile time-zone sentence; the first-child sentence shows only when a yes was put back, not when only a saved "full names" was cleared; an adult league that had a child and an old yes before this step keeps both (made-up data only today; the lead checks the test copy in a session the founder started); the two-connection race wants a run on a real PostgreSQL.
+
+- 2.155 part 2 leftovers: a refused grid form still carries what was typed in the address (a round name ends in history and logs; a reload drops it); the grid's one-time notice does not record which answer it belongs to, so a fresh notice lets an older address show its old words; a refusal is remembered for ten minutes, so retrying an unchanged form gets the old refusal even after its cause was fixed elsewhere; a jersey number a teammate already wears was not walked in a browser.
