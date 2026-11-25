@@ -175,7 +175,9 @@ describe('saving a part of Season settings', () => {
     );
     expect(stateOf(result)).toMatchObject({
       kind: 'refused',
-      said: expect.stringContaining('Someone else saved this season'),
+      said: expect.stringContaining('What you typed is kept, and beside each box that differs'),
+      typed: { uniqueJerseys: 'yes' },
+      savedNow: { label: 'Saved now:', ticked: 'ticked', unticked: 'not ticked' },
     });
   });
 });

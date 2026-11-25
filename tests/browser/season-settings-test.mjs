@@ -275,7 +275,7 @@ if (built) {
     await live.getByLabel('First day').fill(firstDay);
     await live.getByRole('button', { name: 'Save the name and dates' }).click();
     const nameBox = live.getByLabel('Season name');
-    await live.locator('#season-name .ui-field-error[role=alert]').waitFor();
+    await live.locator('#season-name [data-problem=part]').waitFor({ timeout: 10_000 });
     note(
       'with scripts on, an empty name is refused beside its box, the day kept',
       (await nameBox.getAttribute('aria-invalid')) === 'true' &&
@@ -284,9 +284,10 @@ if (built) {
     await nameBox.fill('Fall 2026 Season');
     await live.getByLabel('Last day').fill(leagueDay(worldNow, 17));
     await live.getByRole('button', { name: 'Save the name and dates' }).click();
-    await live.waitForURL(/#season-name$/);
+    // The answer itself, ten seconds at most; then where the browser landed.
     const saved = live.locator('#season-name [data-notice=saved]');
-    await saved.waitFor();
+    await saved.waitFor({ timeout: 10_000 });
+    note('with scripts on, the save lands at the name and dates', /#season-name$/.test(live.url()));
     const named = await panel(live, 'name').innerText();
     note(
       '"Saved" is said beside the name and dates, in view',

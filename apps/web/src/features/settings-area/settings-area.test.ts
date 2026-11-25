@@ -26,6 +26,13 @@ import { valueOf, versionOf } from './form-input.ts';
 import { privacyNotes } from './privacy-notes.ts';
 import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
 
+// The confirmation's tick, whatever the order of its other marks (it is a ListForm's tick
+// since step 2.155 part 4, described by the setting's default and limits).
+const unticked =
+  /<input type="checkbox"(?: aria-describedby="[^"]+")? name="confirmed" value="yes"\/>/;
+const ticked =
+  /<input type="checkbox"(?: aria-describedby="[^"]+")? name="confirmed" checked="" value="yes"\/>/;
+
 const t = createTranslator('en');
 const words: Readonly<Record<string, string>> = {
   'setting.test.reminderHours.label': 'Hours before a game to remind people',
@@ -110,7 +117,12 @@ describe('the settings form', () => {
     const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx, testRegistry));
     const html = renderToStaticMarkup(
-      createElement(SettingForms, { rows, league: 'north-valley', say }),
+      createElement(SettingForms, {
+        rows,
+        league: 'north-valley',
+        address: '/north-valley/admin/settings',
+        say,
+      }),
     );
     expect(html).toContain('Hours before a game to remind people');
     expect(html).toContain('Default: 24');
@@ -132,7 +144,9 @@ describe('the settings form', () => {
     const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
     expect(rows.map((r) => r.key)).toEqual(declaredSettings.all().map((s) => s.key));
-    const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
+    const html = renderToStaticMarkup(
+      createElement(SettingForms, { rows, league: 'x', address: '/x/admin/settings', say }),
+    );
     expect(html).toContain('The league home');
     expect(html).toContain('Any game');
     for (const setting of declaredSettings.all()) {
@@ -148,7 +162,9 @@ describe('the settings form', () => {
   it('shows under Scoring how long a scorekeeper may reopen a game they ended (S-36)', async () => {
     const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
-    const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
+    const html = renderToStaticMarkup(
+      createElement(SettingForms, { rows, league: 'x', address: '/x/admin/settings', say }),
+    );
     const scoring = html.slice(html.indexOf('data-area="games"'));
     expect(scoring).toMatch(/^data-area="games"><h2>Scoring<\/h2>/);
     const field = scoring.slice(scoring.indexOf('data-setting="games.scorekeeperReopenMinutes"'));
@@ -176,7 +192,9 @@ describe('the settings form', () => {
   it("puts the names settings under Privacy, with the parents' confirmation as its own (R-14, R-29)", async () => {
     const { deps } = settingsStandIn();
     const rows = await deps.transaction(as(ownerId), (tx) => listLeagueSettings(tx));
-    const html = renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say }));
+    const html = renderToStaticMarkup(
+      createElement(SettingForms, { rows, league: 'x', address: '/x/admin/settings', say }),
+    );
     const privacy = html.slice(html.indexOf('data-area="privacy"'));
     expect(privacy).toMatch(/^data-area="privacy"><h2>Privacy<\/h2>/);
     // Three choices, from the most shown to the least (R-24), each saying what it does to
@@ -205,7 +223,7 @@ describe('the settings form', () => {
       privacy.indexOf('data-setting="privacy.playersMayAskForInitials"'),
     );
     // Drawn as one box to tick: ticking it says yes and confirms (record 065).
-    expect(confirmation).toContain('type="checkbox" name="confirmed" value="yes"');
+    expect(confirmation).toMatch(unticked);
     expect(confirmation).toContain('name="value" value="tick"');
     expect(confirmation).not.toContain('type="radio"');
     expect(privacy).not.toContain('Tick this only if');
@@ -236,7 +254,13 @@ describe('the settings form', () => {
       }));
       const notes = privacyNotes({ facts, policy, rows, timeZone: 'UTC', locale: 'en' });
       const html = renderToStaticMarkup(
-        createElement(SettingForms, { rows, league: 'x', say, notes }),
+        createElement(SettingForms, {
+          rows,
+          league: 'x',
+          address: '/x/admin/settings',
+          say,
+          notes,
+        }),
       );
       return html.slice(html.indexOf('data-area="privacy"'));
     };
@@ -254,7 +278,7 @@ describe('the settings form', () => {
     expect(adult).not.toContain('name="confirmed"');
     const adultWithChild = confirmationOf(await privacyOf('adult', true));
     expect(adultWithChild).toContain('This league has players recorded as children.');
-    expect(adultWithChild).toContain('type="checkbox" name="confirmed" value="yes"');
+    expect(adultWithChild).toMatch(unticked);
     for (const audience of ['youth', 'mixed'] as const) {
       const html = await privacyOf(audience);
       expect(html, audience).toContain('young players by first name and last initial');
@@ -286,13 +310,21 @@ describe('the settings form', () => {
         policy: await readNamePolicy(tx.leagues),
       }));
       const notes = privacyNotes({ facts, policy, rows, timeZone: 'UTC', locale: 'en' });
-      return renderToStaticMarkup(createElement(SettingForms, { rows, league: 'x', say, notes }));
+      return renderToStaticMarkup(
+        createElement(SettingForms, {
+          rows,
+          league: 'x',
+          address: '/x/admin/settings',
+          say,
+          notes,
+        }),
+      );
     };
     const html = await render();
     expect(html).toContain('Now: everyone is shown by full name, children too.');
     expect(html).toContain('Confirmed on November 15, 2026.');
     // The tick is drawn ticked.
-    expect(html).toContain('type="checkbox" name="confirmed" checked="" value="yes"');
+    expect(html).toMatch(ticked);
     // Names moved off full names: the confirmation is kept and has no effect.
     await setSetting(
       as(ownerId),
@@ -328,7 +360,9 @@ describe('form input', () => {
 
 describe('answers', () => {
   it('chooses the words for what happened, and never shows what was typed', () => {
-    expect(doneKey({ done: 'saved' })).toBe('adminSettings.done.saved');
+    expect(doneKey({ done: 'published' })).toBe('adminSettings.done.published');
+    // A setting's save is said beside it since step 2.155 part 4: the address cannot ask.
+    expect(doneKey({ done: 'saved' })).toBeUndefined();
     expect(doneKey({ done: '<b>' })).toBeUndefined();
     expect(answerQuery(refused('leagues.set_setting', 'changed-since-read'))).toBe(
       '?problem=leagues.set_setting.changed-since-read',

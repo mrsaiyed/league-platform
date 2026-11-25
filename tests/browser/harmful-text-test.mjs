@@ -37,6 +37,7 @@ import {
   trackedPlayer,
   waitFor,
   whatWentWrong,
+  settingAnswer,
 } from './web-browser-kit.mjs';
 
 const failures = [];
@@ -849,14 +850,11 @@ if (browser) {
     const ownerContext = await contextFor(owner);
     const settingsPage = await ownerContext.newPage();
     await settingsPage.goto(`${origin}/north-valley/admin/settings`);
-    const form = settingsPage.locator('form', {
-      has: settingsPage.locator('input[type=text][name=value]'),
-    });
+    const section = 'section[data-setting="site.notice"]';
+    const form = settingsPage.locator(`${section} form`);
     await form.locator('input[name=value]').fill(typed.notice);
-    await Promise.all([
-      settingsPage.waitForURL(/done=saved/),
-      form.locator('button').first().click(),
-    ]);
+    const answer = await settingAnswer(settingsPage, section, form.locator('button').first());
+    if (!answer.saved) throw new Error(`the site notice was not saved: ${answer.text}`);
     await ownerContext.close();
   });
 
@@ -1630,8 +1628,13 @@ async function walkThePublishPart() {
     const page = await context.newPage();
     await page.goto(origin + settings);
     if ((await page.locator('li[data-check="privacyChosen"][data-met="no"]').count()) > 0) {
-      const save = page.locator('section[data-setting="privacy.publicNames"] button[type=submit]');
-      await Promise.all([page.waitForURL(/done=|problem=/), save.first().click()]);
+      const names = 'section[data-setting="privacy.publicNames"]';
+      const answer = await settingAnswer(
+        page,
+        names,
+        page.locator(`${names} button[type=submit]`).first(),
+      );
+      if (!answer.saved) throw new Error(`names on public pages was not saved: ${answer.text}`);
     }
     await context.close();
     const asked = `${settings}?publish=ask`;
