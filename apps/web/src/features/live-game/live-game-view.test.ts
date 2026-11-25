@@ -1,5 +1,6 @@
 // The public game page says who shoots the bonus as the tracker's badge does (step 2.123),
 // from the count and the season's bonus the snapshot carries, and what the count counts.
+import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import { liveGameLabels } from './build-game.ts';
 import { bonusWords } from './live-game-view.tsx';
@@ -31,5 +32,42 @@ describe('the bonus on the public game page', () => {
     expect(liveGameLabels('live').teamFouls).toMatch(/^Team fouls this period:/);
     expect(liveGameLabels('live', undefined, 'half').teamFouls).toMatch(/^Team fouls this half:/);
     expect(liveGameLabels('live', undefined, 'game').teamFouls).toMatch(/^Team fouls this game:/);
+  });
+});
+
+describe('the public bonus is the engine’s, so the two cannot drift (S-115)', () => {
+  it('names a team exactly when the engine’s derived game puts it in the bonus', () => {
+    const home = ['h1', 'h2', 'h3', 'h4', 'h5'];
+    const lineups: basketball.Command[] = [
+      { type: 'lineup', side: 'home', playerIds: home },
+      { type: 'lineup', side: 'away', playerIds: ['a1', 'a2', 'a3', 'a4', 'a5'] },
+    ];
+    for (const format of [basketball.QUARTERS, basketball.HALVES]) {
+      let state = lineups.reduce(
+        (s, c, i) => basketball.apply(s, c, { id: `l${i}`, now: 1_000 * (i + 1) }),
+        basketball.newGame(format, 0),
+      );
+      for (let n = 1; n <= 12; n += 1) {
+        state = basketball.apply(
+          state,
+          { type: 'foul', side: 'home', playerId: home[n % 5] ?? 'h1' },
+          { id: `f${n}`, now: 10_000 + n * 1_000 },
+        );
+        const derived = basketball.derive(state);
+        const rules = {
+          counted: 'period',
+          bonusFouls: state.rules.bonusFouls,
+          doubleBonusFouls: state.rules.doubleBonusFouls,
+        } as const;
+        const fouls = {
+          home: derived.teams.home.periodFouls,
+          away: derived.teams.away.periodFouls,
+        };
+        const expected = [, labels[1], labels[2]][derived.teams.away.bonus];
+        expect(bonusWords(rules, fouls, teams, labels)).toBe(
+          expected === undefined ? '' : ` ${expected.replace('{team}', 'Lions')}`,
+        );
+      }
+    }
   });
 });

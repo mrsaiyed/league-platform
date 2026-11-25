@@ -8,6 +8,7 @@
 // before tip-off gets its play-by-play and one kept open to the end its box scores
 // (record 051). Subscribing only; this page can never publish (T-120).
 import { GameSnapshotReading, type GameSnapshot } from '@srleagues/contracts';
+import { basketball } from '@srleagues/sports';
 import {
   BoxScoreTable,
   lettersWide,
@@ -145,7 +146,7 @@ export function redrawsWhileHeld(
 
 /**
  * " Hawks shoot the bonus.", for each team the other team's fouls have put there, as the
- * tracker's badge says it (step 2.123); nothing when the snapshot does not say how fouls
+ * tracker's badge says it (step 2.123, S-115); nothing when the snapshot does not say how fouls
  * count, or nobody is there.
  */
 export function bonusWords(
@@ -155,12 +156,8 @@ export function bonusWords(
   labels: LiveGameLabels['bonus'],
 ): string {
   if (rules === undefined) return '';
-  const level = (count: number): 0 | 1 | 2 =>
-    rules.doubleBonusFouls !== null && count >= rules.doubleBonusFouls
-      ? 2
-      : count >= rules.bonusFouls
-        ? 1
-        : 0;
+  // The engine's own rule, as the tracker's badge reads it, so the two cannot drift (S-115).
+  const level = (count: number) => basketball.bonusLevel(count, rules);
   let said = '';
   for (const [side, other] of [
     ['away', 'home'],

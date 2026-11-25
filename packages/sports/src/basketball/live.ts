@@ -694,7 +694,11 @@ export function takenBackMs(beforeMs: number, after: GameState): number {
   return Math.sign(back) === Math.sign(change) ? Math.min(Math.abs(back), Math.abs(change)) : 0;
 }
 
-const bonusLevel = (fouls: number, rules: Rules): 0 | 1 | 2 =>
+/** The bonus a team's fouls give the other team: 2 the double bonus, 1 the bonus, 0 none. */
+export const bonusLevel = (
+  fouls: number,
+  rules: Pick<Rules, 'bonusFouls' | 'doubleBonusFouls'>,
+): 0 | 1 | 2 =>
   rules.doubleBonusFouls != null && fouls >= rules.doubleBonusFouls
     ? 2
     : fouls >= rules.bonusFouls
