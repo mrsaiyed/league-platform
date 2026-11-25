@@ -453,15 +453,17 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       ? undefined
       : { id: found.id, slug: standInNamesOf(found).slug, status: standInStatusOf(found) };
   };
-  // The made-up world's own names (R-21, step 2.128): the made-up people have answered
-  // before (T-446), but for one (standInPeople.unnamed), so the gate below asks only them and
-  // someone who signs up through the form.
+  // The made-up world's own names (R-21, step 2.128): the made-up people, and the made-up
+  // member (standInMember.name), have answered before (T-446), but for one
+  // (standInPeople.unnamed), so the gate below asks only them and someone who signs up
+  // through the form.
   const ownNames = standInOwnNames();
-  const madeUpIds = new Set(
-    Object.values(standInPeople)
+  const madeUpIds = new Set([
+    ...Object.values(standInPeople)
       .filter((p) => p !== standInPeople.unnamed)
       .map((p) => p.accountId),
-  );
+    standInMemberAccountId,
+  ]);
   const identifyAccount: WebPorts['identify'] = async (accessToken) => {
     const person = people.find((p) => p.token === accessToken);
     if (person !== undefined) return ok(identityOf(person));

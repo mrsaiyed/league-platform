@@ -106,6 +106,14 @@ describe('on the made-up stand-in', () => {
     expect((await ports.signIn.identify({ accessToken: token ?? '' })).ok).toBe(true);
   });
 
+  it('lets the made-up member in with no name screen: they have their name (step 2.128)', async () => {
+    const { ports, tools, deps } = await onTheStandIn();
+    const { visit, cookies } = browser();
+    expect(await beMadeUpPerson({ person: 'member' }, visit, deps, tools)).not.toBeNull();
+    const who = await ports.identify(cookies.get(cookieNames.session) ?? '');
+    expect(who.ok).toBe(true);
+  });
+
   it('signs nobody in for a key that is no made-up person, and goes nowhere but our paths', async () => {
     const { tools, deps } = await onTheStandIn();
     for (const person of ['', 'nobody', 'stranger', 'owner@example.test', '__proto__']) {
