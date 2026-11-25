@@ -6,10 +6,10 @@
 export const enGame = {
   'game.awaitingScore': 'Awaiting score',
   'game.back': 'Schedule',
+  'game.beingCorrected': 'Being corrected',
   // After the team fouls, the team that shoots the bonus, as the tracker's badge says (2.123).
   'game.bonus.1': '{team} shoot the bonus.',
   'game.bonus.2': '{team} shoot the double bonus.',
-  'game.beingCorrected': 'Being corrected',
   'game.boxScores': 'Box scores',
   'game.cancelled': 'This game has been cancelled.',
   'game.col.play': 'Play',
