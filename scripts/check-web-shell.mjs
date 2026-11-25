@@ -2302,6 +2302,32 @@ async function everyWaySameAsNoLeague(origin) {
       }
     }
   }
+  // The invitation page with a token-shaped invitation cookie held (review M2): a hidden
+  // league's held invitation is read, and so is a missing one's (T-449), so the answers
+  // match, headers too. Three times each, as a header that comes with a slower answer
+  // showed up only some of the time.
+  const heldShaped = `srl_invitation=${'A'.repeat(43)}`;
+  for (const who of people) {
+    const cookie = [cookieOf(who).cookie, heldShaped].filter(Boolean).join('; ');
+    const asked = async (name) =>
+      said(
+        await fetch(`${origin}/${name}/invitation`, { headers: { cookie }, redirect: 'manual' }),
+        name,
+        `${who} holding an invitation at /${name}/invitation`,
+      );
+    for (const { what, slug } of hidden) {
+      for (let round = 1; round <= 3; round += 1) {
+        const there = await asked(slug);
+        const none = await asked(noSlugOf(slug));
+        compare(
+          `${who} holding an invitation at the ${what} league, try ${round}`,
+          there,
+          none,
+          true,
+        );
+      }
+    }
+  }
   // All twelve league API routes, by each method, with nothing, `{}` and a valid body.
   const made = (n) => `01900000-0000-7000-8000-0000000d${n.toString(16).padStart(4, '0')}`;
   const valid = {
