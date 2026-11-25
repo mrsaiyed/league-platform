@@ -32,7 +32,7 @@ import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffNotice, StaffPill, StaffTrail } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { changeVisibilityAction, savePartAction } from './actions.ts';
-import { earnedDone, earnedStateDone, problemKey } from './answer.ts';
+import { earnedDone, earnedStateDone, problemKey, seasonAnswerOf } from './answer.ts';
 import { mayShowSeason, mayStartSeason } from './may-show-season.ts';
 import { PartForm } from './part-form.tsx';
 import { partFacts, partGroups, partTexts, teamFoulsLine } from './part-words.ts';
@@ -83,7 +83,13 @@ export async function SeasonSettingsPage({
   const top = <PageHead title={t('admin.area.season')} sub={t('seasonSettings.intro')} />;
   // Which panel a refusal in the address belongs to (step 2.130): the start form's, the
   // current-and-archived panel's, else the visibility panel's.
-  const problemWord = firstValue(search['problem']) ?? '';
+  // The answer of a visibility, current-or-archived or start form, or a part's "Saved": the
+  // one-time notice, taken once as the page is drawn, never the address (T-437).
+  const noticeHolder = noticeHolderOf(context);
+  const notice =
+    noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'season');
+  const answer = seasonAnswerOf(notice, season?.slug);
+  const problemWord = firstValue(answer['problem']) ?? '';
   const problemAt = problemWord.startsWith('leagues.start_season.')
     ? 'start'
     : /^leagues\.(set_current_season|archive_season)\./.test(problemWord) ||
@@ -91,7 +97,7 @@ export async function SeasonSettingsPage({
       ? 'state'
       : 'visibility';
   const problemFor = (panel: typeof problemAt) =>
-    problemAt === panel ? problemKey(search) : undefined;
+    problemAt === panel ? problemKey(answer) : undefined;
   // "Start a new season" (step 2.130): in the shown season's program, copying that
   // program's current season, if it has one.
   const programId = season?.programId;
@@ -124,10 +130,7 @@ export async function SeasonSettingsPage({
   if (read.ok && mayChange && isSeasonPart(edit)) {
     return <PartPage league={addressee} route={league} season={read.value} part={edit} />;
   }
-  // "Saved", beside the part saved, once (record 067): taken as the page is drawn.
-  const noticeHolder = noticeHolderOf(context);
-  const notice =
-    noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'season');
+  // "Saved", beside the part saved, once (record 067): taken as the page is drawn (above).
   const savedPart =
     notice !== undefined && notice.thing === season.id && isSeasonPart(notice.said)
       ? notice.said
@@ -172,6 +175,7 @@ export async function SeasonSettingsPage({
             mayChange={mayChange}
             gameUnderWay={gameUnderWay}
             search={search}
+            answer={answer}
             problem={problemFor('visibility')}
           />
           <SeasonStatePanel
@@ -181,7 +185,7 @@ export async function SeasonSettingsPage({
             back={seasonSettingsAddress(addressee, season.slug)}
             mayChange={mayChange}
             asked={firstValue(search['ask'])}
-            said={earnedStateDone(search, {
+            said={earnedStateDone(answer, {
               isCurrent: read.value.isCurrent,
               archived: read.value.status === archivedSeasonStatus,
             })}
@@ -359,6 +363,7 @@ function VisibilityPanel({
   mayChange,
   gameUnderWay,
   search,
+  answer,
   problem,
 }: {
   readonly season: SeasonView;
@@ -373,6 +378,8 @@ function VisibilityPanel({
   /** Whether a game of the season is being scored now (read only while hiding is asked). */
   readonly gameUnderWay: boolean;
   readonly search: SearchParams;
+  /** The answer taken from the one-time notice (never the address). */
+  readonly answer: SearchParams;
   /** A refusal that belongs to this panel, as words. */
   readonly problem: TextKey | undefined;
 }) {
@@ -387,17 +394,17 @@ function VisibilityPanel({
   });
   const wish = mayChange ? wishOf(season.status) : undefined;
   const asked = firstValue(search['ask']);
-  const said = earnedDone(search, visibility);
+  const said = earnedDone(answer, visibility);
   return (
     <section className="staff-panel" id={visibilityAnchor} aria-labelledby="who-can-see-title">
       <h2 id="who-can-see-title">{t('seasonSettings.visibility.title')}</h2>
       {problem === undefined ? null : (
-        <StaffNotice kind="refused">
+        <StaffNotice kind="refused" intoView={t(problem)}>
           <p>{t(problem)}</p>
         </StaffNotice>
       )}
       {problem === undefined && said !== undefined ? (
-        <StaffNotice kind="saved" data={{ 'data-notice': 'done' }}>
+        <StaffNotice kind="saved" data={{ 'data-notice': 'done' }} intoView={said}>
           <p>
             {said === 'shown'
               ? words.shown

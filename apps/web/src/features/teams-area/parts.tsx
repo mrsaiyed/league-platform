@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import type { AdminDivision } from '../../server/admin-teams.ts';
 import { t, type TextKey } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
+import { IntoView } from '../list-forms/index.ts';
 import { doneKey, problemKey } from './answer.ts';
 
 /** The notices that say something went to the bin, and so lead to it (step 2.77). */
@@ -42,9 +43,12 @@ export function Notice({
   // One notice, in kinds told apart at a glance (step 2.103): refused; saved; or removed.
   if (problem !== undefined) {
     return (
-      <p className="ui-notice" data-kind="error" role="alert">
+      <IntoView
+        words={t(problem)}
+        marks={{ className: 'ui-notice', 'data-kind': 'error', role: 'alert' }}
+      >
         {t(problem)}
-      </p>
+      </IntoView>
     );
   }
   if (good !== undefined) {

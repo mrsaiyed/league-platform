@@ -4,6 +4,7 @@
 // Their look is in the admin's own stylesheet (app/[league]/admin/staff.css).
 import type { ReactNode } from 'react';
 import { t } from '../../server/messages.ts';
+import { IntoView } from '../list-forms/index.ts';
 
 /**
  * The way back at the top of an inner page: "Teams / Falcons". Each step before the last
@@ -45,14 +46,37 @@ export function StaffNotice({
   kind,
   id,
   data,
+  intoView,
   children,
 }: {
   readonly kind: NoticeKind;
   readonly id?: string;
   /** What the notice is found by: the `data-…` attributes of the thing it is about. */
   readonly data?: Readonly<Record<`data-${string}`, string>> | undefined;
+  /**
+   * The words of an answer just given (step 2.155 part 6, T-437): with scripts on the notice
+   * brings itself into view when drawn, and again when the words change.
+   */
+  readonly intoView?: string;
   readonly children: ReactNode;
 }) {
+  if (intoView !== undefined) {
+    return (
+      <IntoView
+        tag="div"
+        words={intoView}
+        marks={{
+          id,
+          className: 'ui-notice',
+          'data-kind': kind === 'refused' ? 'error' : kind,
+          role: kind === 'refused' ? 'alert' : 'status',
+          ...data,
+        }}
+      >
+        {children}
+      </IntoView>
+    );
+  }
   return (
     <div
       id={id}

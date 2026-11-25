@@ -24,7 +24,7 @@ import {
   seasonSettingsAddress,
   visibilityAnchor,
 } from '../season-settings/index.ts';
-import { MarkedFocus } from '../list-forms/index.ts';
+import { IntoView, MarkedFocus } from '../list-forms/index.ts';
 import { ArchivedSeasonNotice, StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { venuesAddress } from '../venues-area/index.ts';
@@ -246,14 +246,17 @@ export async function ScheduleBuilderPage({
         )}
       </div>
     ) : notice === undefined ? null : (
-      <p
-        className="ui-notice"
-        role="status"
-        data-notice={notice.kind}
-        data-kind={notice.kind === 'problem' ? 'error' : 'saved'}
+      <IntoView
+        words={notice.text}
+        marks={{
+          className: 'ui-notice',
+          role: 'status',
+          'data-notice': notice.kind,
+          'data-kind': notice.kind === 'problem' ? 'error' : 'saved',
+        }}
       >
         {notice.text}
-      </p>
+      </IntoView>
     );
   if (!drafted.ok) {
     const key = noticeOf({ problem: drafted.error.code });
@@ -602,9 +605,12 @@ function Field({
       </label>
       {now}
       {wrong === undefined ? null : (
-        <p className="ui-field-error" role="alert" data-notice="problem">
+        <IntoView
+          words={wrong}
+          marks={{ className: 'ui-field-error', role: 'alert', 'data-notice': 'problem' }}
+        >
           {wrong}
-        </p>
+        </IntoView>
       )}
     </>
   );
@@ -637,9 +643,17 @@ function gameBoxes(refused: GameRefusal | undefined): GameBoxes {
     wrong: (name) => (refused?.field === name ? refused.text : undefined),
     top:
       refused?.field !== 'form' ? null : (
-        <p className="ui-notice" data-kind="error" role="alert" data-notice="problem">
+        <IntoView
+          words={refused.text}
+          marks={{
+            className: 'ui-notice',
+            'data-kind': 'error',
+            role: 'alert',
+            'data-notice': 'problem',
+          }}
+        >
           {refused.text}
-        </p>
+        </IntoView>
       ),
     now: (name, saved, shown) =>
       refused?.changed !== true || refused.at.typed[name] === saved ? null : (
@@ -767,9 +781,17 @@ function RoundSection({
       </div>
       {saved}
       {problem === undefined || boxWrong !== undefined ? null : (
-        <p className="ui-notice" data-kind="error" role="alert" data-notice="problem">
+        <IntoView
+          words={problem}
+          marks={{
+            className: 'ui-notice',
+            'data-kind': 'error',
+            role: 'alert',
+            'data-notice': 'problem',
+          }}
+        >
           {problem}
-        </p>
+        </IntoView>
       )}
       {basis.canEdit ? (
         <details open={problem !== undefined} className="admin-round-edit">
@@ -1441,9 +1463,12 @@ function AddRoundForm({
   const suggested = lastDate === null ? '' : (daysAfter(lastDate, 7) ?? '');
   const error = (field: 'label' | 'date' | 'form') =>
     problem?.field !== field ? null : (
-      <p className="ui-field-error" role="alert" data-notice="problem">
+      <IntoView
+        words={problem.text}
+        marks={{ className: 'ui-field-error', role: 'alert', 'data-notice': 'problem' }}
+      >
         {problem.text}
-      </p>
+      </IntoView>
     );
   return (
     <form action={addRoundAction} id={addRoundAnchor} data-add-round-form="" className="staff-form">

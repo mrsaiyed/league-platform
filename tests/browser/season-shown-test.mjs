@@ -157,7 +157,9 @@ if (built) {
     );
     note('it has not changed yet', asked.includes('Only the people who run the league can see'));
     await accessible(page, 'the question before showing');
-    await tap(page, panel.getByRole('button', { name: 'Yes, show it' }), /done=shown/);
+    await tap(page, panel.getByRole('button', { name: 'Yes, show it' }), {
+      said: 'Visitors can see Winter 2027 now.',
+    });
     const shown = await page.locator('#who-can-see').innerText();
     note(
       'Season settings says everyone can see it now',
@@ -206,11 +208,9 @@ if (built) {
       'the visitor still sees it while the question is open',
       (await visitor.goto(seasonAddress))?.status() === 200,
     );
-    await tap(
-      page,
-      page.locator('#who-can-see').getByRole('button', { name: 'Yes, hide it' }),
-      /done=hidden/,
-    );
+    await tap(page, page.locator('#who-can-see').getByRole('button', { name: 'Yes, hide it' }), {
+      said: 'Winter 2027 is hidden from visitors again.',
+    });
     note(
       'Season settings says it is hidden again',
       (await page.locator('#who-can-see').innerText()).includes(

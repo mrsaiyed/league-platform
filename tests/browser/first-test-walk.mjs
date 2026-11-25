@@ -550,7 +550,9 @@ export async function walkFirstTest(o) {
         ),
         await panel.innerText(),
       );
-      await tap(page, panel.getByRole('button', { name: 'Publish' }), /done=/);
+      await tap(page, panel.getByRole('button', { name: 'Publish' }), {
+        said: 'The league is published.',
+      });
       const publishedSaid = await page.locator('[role=status], [role=alert]').first().innerText();
       note(
         '15. the owner publishes: "The league is published."',

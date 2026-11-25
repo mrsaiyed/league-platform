@@ -1,8 +1,11 @@
-// What a Season settings form answers with, and how that answer travels in the address
-// (step 2.182): `?done=shown`, `?done=hidden`, or `?problem=` with the command's name and
-// code, or one of the screen's own words when the season's state no longer fits the wish.
-// The page turns the word into text from the message files; it never shows anything the
-// person typed (T-187).
+// What a Season settings form answers with (step 2.182): `?done=shown`, `?done=hidden`, or
+// `?problem=` with the command's name and code, or one of the screen's own words when the
+// season's state no longer fits the wish. Since step 2.155 part 6 (T-437) it never rides in
+// the address: the form's action leaves it as the server's one-time notice
+// (server/saved-notice.ts, screen `season`) for the person who sent it, the page takes it
+// once as it is drawn and reads it here, so a reload, Back or an address with `done=` or
+// `problem=` in it says nothing. The page turns the word into text from the message files;
+// it never shows anything the person typed (T-187).
 import { catalogs } from '@srleagues/site';
 import type { TextKey } from '../../server/messages.ts';
 import type { Visibility } from './season-visibility.ts';
@@ -25,12 +28,36 @@ export const refusedBy = (command: string, code: string): Answer => ({
 });
 export const refusedHere = (why: ScreenRefusal): Answer => ({ kind: 'refused', word: why });
 
-/** The part of the address that carries an answer, after the season's own `season=`. */
+/** The words of an answer, as doneOf and problemKey read them. */
 export function answerParams(answer: Answer): Readonly<Record<string, string>> {
   return answer.kind === 'done' ? { done: answer.done } : { problem: answer.word };
 }
 
 type Query = Readonly<Record<string, string | readonly string[] | undefined>>;
+
+/** What an answer leaves as the notice's `said`: `?done=shown`, `?problem=…`. */
+export function answerSaid(answer: Answer): string {
+  return `?${new URLSearchParams(answerParams(answer)).toString()}`;
+}
+
+/**
+ * The notice's `thing` for an answer about the season with this address name (a part's
+ * "Saved" uses the season's id): empty when the season was not found, and the page then
+ * shows the season it falls back to, as the address without `season=` did.
+ */
+export const seasonAnswerThing = (seasonSlug: string | undefined): string =>
+  `answer:${seasonSlug ?? ''}`;
+
+/** The answer the page took from the notice, for the season it shows; empty for none or another's. */
+export function seasonAnswerOf(
+  notice: { readonly thing: string; readonly said: string } | undefined,
+  seasonSlug: string | undefined,
+): Readonly<Record<string, string>> {
+  if (notice === undefined || !notice.said.startsWith('?')) return {};
+  const forHere = notice.thing === seasonAnswerThing(seasonSlug);
+  if (!forHere && notice.thing !== seasonAnswerThing(undefined)) return {};
+  return Object.fromEntries(new URLSearchParams(notice.said.slice(1)));
+}
 
 const only = (value: string | readonly string[] | undefined): string | undefined =>
   typeof value === 'string' ? value : undefined;

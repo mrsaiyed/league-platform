@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   answerParams,
+  answerSaid,
   done,
   doneOf,
   earnedDone,
   problemKey,
   refusedBy,
   refusedHere,
+  seasonAnswerOf,
+  seasonAnswerThing,
 } from './answer.ts';
 
-describe("Season settings' answers in the address", () => {
+describe("Season settings' answers", () => {
   it('carries a done word and reads back only the known ones', () => {
     expect(answerParams(done('shown'))).toEqual({ done: 'shown' });
     expect(doneOf({ done: 'hidden' })).toBe('hidden');
@@ -43,5 +46,30 @@ describe("Season settings' answers in the address", () => {
       'seasonSettings.refused.not-hidden',
     );
     expect(problemKey({ problem: 'not-shown' })).toBe('seasonSettings.refused.not-shown');
+  });
+});
+
+describe('the answer from the one-time notice (step 2.155 part 6)', () => {
+  const left = (said: string, slug: string | undefined) => ({
+    thing: seasonAnswerThing(slug),
+    said,
+  });
+
+  it('reads the answer left for the season shown, or for no season named', () => {
+    const shown = seasonAnswerOf(left(answerSaid(done('shown')), 'fall'), 'fall');
+    expect(earnedDone(shown, 'shown')).toBe('shown');
+    const refused = left(
+      answerSaid(refusedBy('leagues.update_season', 'season-not-found')),
+      undefined,
+    );
+    expect(problemKey(seasonAnswerOf(refused, 'fall'))).toBe(
+      'error.leagues.update_season.season-not-found',
+    );
+  });
+
+  it("says nothing for no notice, another season's answer or a part's Saved", () => {
+    expect(seasonAnswerOf(undefined, 'fall')).toEqual({});
+    expect(seasonAnswerOf(left(answerSaid(done('shown')), 'spring'), 'fall')).toEqual({});
+    expect(seasonAnswerOf({ thing: 'a-season-id', said: 'game' }, 'fall')).toEqual({});
   });
 });

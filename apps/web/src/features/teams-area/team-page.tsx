@@ -55,7 +55,7 @@ import {
 import { LeagueField, Notice, Section, Swatch } from './parts.tsx';
 import { answerQueryOf } from './answer-notice.ts';
 
-import { ListForm, SaidLine, takeNotice } from '../list-forms/index.ts';
+import { IntoView, ListForm, SaidLine, takeNotice } from '../list-forms/index.ts';
 import { requestTokenField } from '../../server/same-request.ts';
 
 /** Where "Add a player", the page's main action, leads: the form's own place on the page. */
@@ -610,7 +610,11 @@ export async function TeamPage({
               : t.plural('adminTeams.remove.roster', open.length)}
         </p>
         {tapRefused === undefined ? null : (
-          <StaffNotice kind="refused" data={{ 'data-remove-refused': removeCode ?? '' }}>
+          <StaffNotice
+            kind="refused"
+            data={{ 'data-remove-refused': removeCode ?? '' }}
+            intoView={tapRefused}
+          >
             <p>{tapRefused}</p>
           </StaffNotice>
         )}
@@ -733,9 +737,17 @@ function LeavingDate({
         </StaffField>
       </p>
       {problem === undefined ? null : (
-        <p id={errorId} className="ui-field-error" role="alert" data-left-on-problem={entryId}>
+        <IntoView
+          words={problem}
+          marks={{
+            id: errorId,
+            className: 'ui-field-error',
+            role: 'alert',
+            'data-left-on-problem': entryId,
+          }}
+        >
           {problem}
-        </p>
+        </IntoView>
       )}
       <p id={helpId} className="ui-field-help">
         {t('adminTeams.roster.leftOnHelp')}

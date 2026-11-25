@@ -74,6 +74,11 @@ if (built) {
     const page = await open(false);
     /** Taps a link or button and waits until the address matches. */
     const tap = async (p, locator, url) => {
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) {
+        await locator.click();
+        return answered(p, url.said);
+      }
       await Promise.all([p.waitForURL(url), locator.click()]);
     };
     const checks = async (p, label) => {
@@ -135,9 +140,13 @@ if (built) {
     await toArea(page, 'Season settings', /\/admin\/season/);
     const who = page.locator('#who-can-see');
     await tap(page, who.getByRole('button', { name: 'Hide it again' }), /ask=hide/);
-    await tap(page, who.getByRole('button', { name: 'Yes, hide it' }), /done=hidden/);
+    await tap(page, who.getByRole('button', { name: 'Yes, hide it' }), {
+      said: /is hidden from visitors again\./,
+    });
     await tap(page, who.getByRole('button', { name: 'Show this season to visitors' }), /ask=show/);
-    await tap(page, who.getByRole('button', { name: 'Yes, show it' }), /done=shown/);
+    await tap(page, who.getByRole('button', { name: 'Yes, show it' }), {
+      said: /Visitors can see .+ now\.|is shown\. Visitors will see it once/,
+    });
 
     at = 'the log, from the admin menu';
     await toLog(page);

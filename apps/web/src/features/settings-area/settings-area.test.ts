@@ -21,7 +21,15 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { standInAdminSettings } from '../../server/stand-in-admin-settings.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
-import { answerQuery, doneKey, problemKey, refused } from './answer.ts';
+import {
+  answerQuery,
+  done,
+  doneKey,
+  leagueStatusThing,
+  problemKey,
+  refused,
+  statusAnswerOf,
+} from './answer.ts';
 import { valueOf, versionOf } from './form-input.ts';
 import { privacyNotes } from './privacy-notes.ts';
 import { areaOf, SettingForms, type Say } from './setting-fields.tsx';
@@ -375,6 +383,20 @@ describe('answers', () => {
     );
     expect(problemKey({ problem: 'whatever.nonsense' })).toBe('error.unknown');
     expect(problemKey({})).toBeUndefined();
+  });
+
+  it('reads Publish, Archive and Un-archive only from their own notice (step 2.155 part 6)', () => {
+    const left = (said: string, thing = leagueStatusThing) => ({ thing, said });
+    expect(doneKey(statusAnswerOf(left(answerQuery(done('published')))))).toBe(
+      'adminSettings.done.published',
+    );
+    expect(problemKey(statusAnswerOf(left(answerQuery(refused('leagues.x', 'not-allowed')))))).toBe(
+      'error.not-allowed',
+    );
+    // No notice, a Profile form's or a setting's notice: nothing is said.
+    expect(statusAnswerOf(undefined)).toEqual({});
+    expect(statusAnswerOf(left('?done=published', 'members.startPage'))).toEqual({});
+    expect(statusAnswerOf(left('name', leagueStatusThing))).toEqual({});
   });
 });
 

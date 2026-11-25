@@ -13,6 +13,7 @@
 // Pages are found by their own marks; no check passes on a timeout.
 import {
   accessibilityProblems,
+  answered,
   buildNext,
   freePort,
   launch,
@@ -80,6 +81,14 @@ if (built) {
     /** Taps a link or button, waits for the page it leads to, and checks its address. */
     const tap = async (on, locator, url) => {
       await Promise.all([on.waitForEvent('load'), locator.click()]);
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says,
+      // on the season's own address.
+      if (!(url instanceof RegExp)) {
+        if (!new URL(on.url()).search.startsWith(`?season=${url.season}`)) {
+          throw new Error(`landed on ${on.url()}, not season ${url.season}`);
+        }
+        return answered(on, url.said);
+      }
       if (!url.test(on.url())) throw new Error(`landed on ${on.url()}, not ${url}`);
     };
     /** The public season picker's choices, as a visitor sees them. */
@@ -99,11 +108,10 @@ if (built) {
       await form.locator('input[name=name]').fill(name);
       await form.locator('input[name=slug]').fill(slug);
       await form.locator(`input[name=carry][value=${carry}]`).check();
-      await tap(
-        page,
-        form.getByRole('button', { name: 'Start the season', exact: true }),
-        new RegExp(`season=${slug}&done=started`),
-      );
+      await tap(page, form.getByRole('button', { name: 'Start the season', exact: true }), {
+        season: slug,
+        said: `${name} is ready. Visitors cannot see it until you show it.`,
+      });
       const said = await page.locator('[data-notice=done]').innerText();
       note(
         `${name}: the screen says it is ready and hidden`,
@@ -123,11 +131,10 @@ if (built) {
         panel.getByRole('button', { name: 'Show this season to visitors' }),
         /ask=show/,
       );
-      await tap(
-        page,
-        page.getByRole('button', { name: 'Yes, show it' }),
-        new RegExp(`season=${slug}&done=shown`),
-      );
+      await tap(page, page.getByRole('button', { name: 'Yes, show it' }), {
+        season: slug,
+        said: /Visitors can see .+ now\.|is shown\. Visitors will see it once/,
+      });
     };
 
     /** Makes the season current by its own question; gives the question's words. */
@@ -135,7 +142,10 @@ if (built) {
       await page.goto(`${origin}/north-valley/admin/season?season=${slug}`);
       await tap(page, page.locator('[data-season-change=current]'), /ask=current/);
       const asked = await page.locator('[data-season-ask=current]').innerText();
-      await tap(page, page.getByRole('button', { name: 'Yes, make it current' }), /done=current/);
+      await tap(page, page.getByRole('button', { name: 'Yes, make it current' }), {
+        season: slug,
+        said: /is the current season now\./,
+      });
       note(
         `${slug}: it says the season is current now`,
         // An archived season is marked archived first; its words still say it is current.
@@ -261,7 +271,10 @@ if (built) {
       ask,
     );
     await accessible(page, 'the archive question');
-    await tap(page, page.getByRole('button', { name: 'Yes, archive it' }), /done=archived/);
+    await tap(page, page.getByRole('button', { name: 'Yes, archive it' }), {
+      season: 'spring-2027',
+      said: 'Spring 2027 is archived.',
+    });
     note('it says it is archived', (await page.locator('[data-season-archived]').count()) === 1);
     note(
       'an archived season offers no archive button',
@@ -322,7 +335,10 @@ if (built) {
     at = 'the owner archives Fall 2026, whose games Admin → Games lists';
     await page.goto(`${origin}/north-valley/admin/season?season=fall-2026`);
     await tap(page, page.locator('[data-season-change=archive]'), /ask=archive/);
-    await tap(page, page.getByRole('button', { name: 'Yes, archive it' }), /done=archived/);
+    await tap(page, page.getByRole('button', { name: 'Yes, archive it' }), {
+      season: 'fall-2026',
+      said: 'Fall 2026 is archived.',
+    });
     note(
       'Fall 2026 says it is archived',
       (await page.locator('[data-season-archived]').count()) === 1,

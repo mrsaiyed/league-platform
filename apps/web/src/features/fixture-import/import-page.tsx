@@ -5,7 +5,7 @@ import { commandContextOf } from '../../server/context.ts';
 import type { ImportNames } from '../../server/fixture-import-ports.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
-import { takeNotice } from '../list-forms/index.ts';
+import { IntoView, takeNotice } from '../list-forms/index.ts';
 import { StaffTrail } from '../staff/index.ts';
 import {
   applyImportAction,
@@ -287,16 +287,20 @@ export async function ImportPage({
       />
       <PageHead title={t('admin.import.title')} sub={t('admin.import.intro')} />
       {notice === undefined ? null : (
-        <div
-          className="ui-notice"
-          data-kind={notice.problem ? 'error' : 'saved'}
-          role={notice.problem ? 'alert' : 'status'}
+        <IntoView
+          tag="div"
+          words={`${notice.key} ${notice.clashes ?? ''}`}
+          marks={{
+            className: 'ui-notice',
+            'data-kind': notice.problem ? 'error' : 'saved',
+            role: notice.problem ? 'alert' : 'status',
+          }}
         >
           <p>{t(notice.key, { size: sizeLimitText })}</p>
           {notice.clashes === undefined ? null : (
             <p>{t.plural('admin.import.clashes', notice.clashes)}</p>
           )}
-        </div>
+        </IntoView>
       )}
       {season === undefined ? (
         <EmptyPanel text={t('admin.import.noSeason')} />

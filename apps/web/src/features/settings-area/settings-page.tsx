@@ -15,8 +15,8 @@ import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
-import { takeNotice } from '../list-forms/index.ts';
-import { doneKey, problemKey } from './answer.ts';
+import { IntoView, takeNotice } from '../list-forms/index.ts';
+import { doneKey, problemKey, statusAnswerOf } from './answer.ts';
 import { profileSaved } from './profile-form-answer.ts';
 import { settingSaved } from './setting-form-answer.ts';
 import { privacyNotes } from './privacy-notes.ts';
@@ -71,8 +71,10 @@ export async function SettingsPage({
     (key) => rows.find((row) => row.key === key)?.label as TextKey | undefined,
   );
   const address = leagueUrl(view.context.league, 'admin-area', { area: 'settings' });
-  const problem = problemKey(query);
-  const good = doneKey(query);
+  // Publish, Archive and Un-archive (step 2.155 part 6): from the same notice, never the address.
+  const answered = statusAnswerOf(notice);
+  const problem = problemKey(answered);
+  const good = doneKey(answered);
   return (
     <main className="admin-settings">
       <PageHead title={t('admin.area.settings')} sub={t('adminSettings.intro')} />
@@ -93,15 +95,23 @@ export async function SettingsPage({
           </span>
         </li>
       </ul>
+      {/* Said at the top as before; with scripts on the page is drawn again where it was,
+          so the answer brings itself into view (T-437). */}
       {problem === undefined ? null : (
-        <p className="ui-notice" data-kind="error" role="alert">
+        <IntoView
+          words={t(problem)}
+          marks={{ className: 'ui-notice', 'data-kind': 'error', role: 'alert' }}
+        >
           {t(problem)}
-        </p>
+        </IntoView>
       )}
       {problem === undefined && good !== undefined ? (
-        <p className="ui-notice" data-kind="saved" role="status">
+        <IntoView
+          words={t(good)}
+          marks={{ className: 'ui-notice', 'data-kind': 'saved', role: 'status' }}
+        >
           {t(good)}
-        </p>
+        </IntoView>
       ) : null}
       {/* Profile (step 2.125) is the first thing in League settings (T-352); the page-step
           checks find each settings form by the setting it names, not by its place. */}
