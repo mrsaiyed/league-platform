@@ -48,7 +48,7 @@ There are two programs of ours:
 - The **web app** answers every request from a browser: public pages, the admin, the tracker.
 - The **worker** does things on a timer or after an event: sending reminders a day before a game, sending recaps after a final, generating a schedule, running an import, cleaning up.
 
-Both are the same codebase and talk to the same database. Neither keeps anything important in its own memory, so either can be restarted or copied to several machines without losing anything.
+Both are the same codebase and talk to the same database. Neither keeps anything important in its own memory, so either can be restarted or copied to several machines without losing anything. One named exception (T-444): the web app holds a form's one-time answer (the sentence a page says once after a save, step 2.155) and the kept answer to a doubled post in its own memory, for a minute or so; a restart loses at most that sentence, never saved data. So the web app runs as one copy, as the test copy and the first leagues do, until step 2.251 moves that store to a place every copy shares.
 
 **T-1 (agreed, delegated): one application organized into modules, not many small services.** All the business rules live in one program with clear internal boundaries ([T2](T2-repo-and-code-structure.md)). Saving a game result and queuing its recap happen in one database transaction, which cannot half-succeed. Splitting into separate services would make that kind of guarantee much harder and would need operations work a small team cannot afford. We split something out only when a measured problem requires it.
 

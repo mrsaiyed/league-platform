@@ -1,14 +1,16 @@
-// How a schedule button's answer travels back to the grid in its address (step 2.160),
-// beyond the fixed words notice.ts turns into text: what was saved (a round, a game, the
-// place of a removed one), so the grid says "Saved" beside it and the address's anchor
-// takes the phone there; and, for a refused round form, which form it was and what was
-// typed in it, so the form opens again with it kept and the reason beside it. Ids must be
+// How a schedule button's answer travels back to the grid (step 2.160; never the address
+// since step 2.155 part 6, T-434): beyond the fixed words notice.ts turns into text, what
+// was saved (a round, a game, the place of a removed one), so the grid says "Saved" beside
+// it and the anchor takes the phone there; and, for a refused round or game form, which
+// form it was and what was typed in it, so the form opens again with it kept and the reason
+// beside it. All of it is the server's one-time notice (server/saved-notice.ts) for the
+// person who sent it: the grid takes it once as it is drawn, so a reload, or Back to the
+// page, says nothing old, and an address with the old words in it says nothing. Ids must be
 // ids, and typed text is only ever put back into its own field, never shown as text (T-187).
 //
-// A game removed, put back or already back is answered by a one-time notice instead (record
-// 067, step 2.185): the address holds only the place, so a reload, or the phone's Back to
-// it, never shows an old "Removed … Put it back".
-import { gameAnchor } from '@srleagues/core';
+// A game removed, put back or already back has a notice of its own shape (record 067, step
+// 2.185): the game's id, what was done and the round it was in.
+import { gameAnchor, type ScheduleDraftView } from '@srleagues/core';
 import type { SavedNotice } from '../../server/saved-notice.ts';
 import type {
   GameTyped,
@@ -40,13 +42,8 @@ export const swapAnchor = (gameId: string): string => `swap-${gameId}`;
 export const addGameAnchor = (roundId: string): string =>
   `add-game-${roundId === '' ? 'none' : roundId}`;
 
-/**
- * The one-time notice every other answer that works leaves (step 2.155): the grid reads the
- * address's "Saved" words only while it is there, so a reload, or Back to the page, says
- * nothing old. The address still says where on the grid.
- */
-export const freshAnswer = 'answer';
-// A refusal's words too: what it was, which form, and what was typed in it.
+// The words an answer is written in: what it was, which form, and what was typed in it.
+// None is ever read from the address; only these are read back from a notice.
 const answerWords = [
   'done',
   'saved',
@@ -56,6 +53,7 @@ const answerWords = [
   'problem',
   'reason',
   'partial',
+  'blocker',
   'at',
   'game',
   'other',
@@ -70,19 +68,67 @@ const answerWords = [
   'recording',
 ];
 
+/** What an answer that is not a game's own notice leaves as `said`: its words, `?`-led. */
+export function answerSaid(outcome: ScheduleActionOutcome): string {
+  return `?${new URLSearchParams(answerParams(outcome).query).toString()}`;
+}
+
 /**
- * The address as the grid reads it: without its answer words once their notice is gone, a
- * refusal's as much as a save's.
+ * The address as the grid reads it: its own words (the season, the team it came from), never
+ * an answer's, with the answer words of the notice the grid took for this page (`thing`, the
+ * schedule's own address), if it took one.
  */
-export function answerShown(search: Search, fresh: boolean): Search {
-  if (fresh) return search;
-  return Object.fromEntries(Object.entries(search).filter(([name]) => !answerWords.includes(name)));
+export function answerShown(search: Search, notice: GridNotice | undefined, thing: string): Search {
+  const own = Object.fromEntries(
+    Object.entries(search).filter(([name]) => !answerWords.includes(name)),
+  );
+  if (notice === undefined || notice.thing !== thing || !notice.said.startsWith('?')) return own;
+  const said = [...new URLSearchParams(notice.said.slice(1))].filter(([name]) =>
+    answerWords.includes(name),
+  );
+  return { ...own, ...Object.fromEntries(said) };
+}
+
+/**
+ * Whether a kept answer to a button pressed again is still the truth (server/same-request.ts),
+ * read against the draft as it is now: a round said added or saved is still in it, a game
+ * still on it, a game said put back still there and one removed (or a round) still gone, a publish or a
+ * discard has no draft since. Otherwise the button runs again and its command answers as
+ * things are now. A kept refusal holds: it is run again only when something typed changed.
+ */
+export function gridAnswerHolds(
+  outcome: ScheduleActionOutcome,
+  now: Pick<ScheduleDraftView, 'draft' | 'result'>,
+): boolean {
+  if (outcome.kind === 'refused') return true;
+  if (outcome.kind === 'published' || outcome.kind === 'discarded') return now.draft === null;
+  if (now.draft === null) return false;
+  const detail = outcome.detail;
+  if (detail === undefined) return false;
+  const hasGame = (id: string | undefined) => now.result.games.some((g) => g.id === id);
+  switch (detail.what) {
+    case 'round-added':
+    case 'round-saved':
+      return now.result.rounds.some((r) => r.id === detail.roundId);
+    case 'game-saved':
+    case 'game-round':
+    case 'game-put-back':
+    case 'game-already-back':
+      return hasGame(detail.gameId);
+    case 'game-removed':
+      return detail.gameId !== undefined && !hasGame(detail.gameId);
+    // While the round stays gone, as a removed game (a double tap of "Remove this round").
+    case 'round-removed':
+      return (
+        detail.roundId !== undefined && !now.result.rounds.some((r) => r.id === detail.roundId)
+      );
+  }
 }
 
 const timeShape = /^\d{2}:\d{2}$/;
 const recordingShape = /^[a-z-]{1,40}$/;
 
-/** A game form's boxes as they ride in the address: ids, a date, a time, a place, a word. */
+/** A game form's boxes as they ride in the notice: ids, a date, a time, a place, a word. */
 function typedQuery(typed: GameTyped): Record<string, string> {
   return {
     home: typed.homeTeamId,
@@ -110,7 +156,7 @@ function gameTypedOf(search: Search): GameTyped {
   };
 }
 
-/** The address's query and anchor for an answer (the caller adds the season). */
+/** An answer's words and the grid's anchor for it (the words go in the notice, answerSaid). */
 export function answerParams(outcome: ScheduleActionOutcome): {
   readonly query: Readonly<Record<string, string>>;
   readonly hash: string;
@@ -194,7 +240,7 @@ export function answerParams(outcome: ScheduleActionOutcome): {
         hash: `#${gameAnchor(detail.gameId)}`,
       };
     case 'game-removed':
-      // Said by the one-time notice (noticeOfAnswer); the address keeps only the place:
+      // Said by the game's own notice (noticeOfAnswer); the anchor is only the place:
       // the struck row, or the round of a game only ever in the draft.
       return {
         query: {},
@@ -215,7 +261,7 @@ export type GridNotice = Omit<SavedNotice, 'screen'>;
 /**
  * The answers that travel as a one-time notice (step 2.185): which game, what was done and,
  * for a removal, the round it was in, or for a put back, the round the draft had removed
- * since. Undefined for every other answer, which still rides in the address.
+ * since. Undefined for every other answer, whose words the notice holds (answerSaid).
  */
 export function noticeOfAnswer(outcome: ScheduleActionOutcome): GridNotice | undefined {
   if (outcome.kind !== 'saved' || outcome.detail === undefined) return undefined;
@@ -261,7 +307,7 @@ export function savedDetailOfNotice(notice: GridNotice | undefined): SavedDetail
   }
 }
 
-/** What a save the address names did, if it names one we know. */
+/** What a save the answer's words name did, if they name one we know (answerShown). */
 export function savedDetailOf(search: Search): SavedDetail | undefined {
   if (first(search['done']) !== 'saved') return undefined;
   const what = first(search['saved']);
@@ -279,14 +325,13 @@ export function savedDetailOf(search: Search): SavedDetail | undefined {
       const gameId = idOf(first(search['game']));
       return gameId === undefined ? undefined : { what, gameId };
     }
-    // A removal or a put back is never read from the address (step 2.185): an old address
-    // that still names one says no more than "Saved".
+    // A removal or a put back is read only from its own notice (step 2.185).
     default:
       return undefined;
   }
 }
 
-/** The form a refusal belongs beside, with what was typed in it, if the address names one. */
+/** The form a refusal belongs beside, with what was typed in it, if the answer names one. */
 export function refusedAtOf(search: Search): RefusedAt | undefined {
   if (first(search['problem']) === undefined) return undefined;
   const at = first(search['at']);
@@ -318,4 +363,22 @@ export function refusedAtOf(search: Search): RefusedAt | undefined {
     return { form: 'add-round', label, date: dateShape.test(typedDate) ? typedDate : '' };
   }
   return undefined;
+}
+
+/**
+ * A refusal of a round's form whose round is no longer drawn (removed in another tab, or by
+ * a repeat of the post): its place is gone, so it is said at the top of the season's
+ * schedule, carrying that round's anchor so the post's landing brings it into view. The
+ * round as the draft last knew it (its bin), or just its id when the draft no longer holds it.
+ */
+export function refusedRoundGone(
+  at: RefusedAt | undefined,
+  drawn: readonly { readonly id: string }[],
+  removed: readonly { readonly id: string; readonly number: number; readonly label: string }[],
+): { readonly roundId: string; readonly round?: { number: number; label: string } } | undefined {
+  if (at?.form !== 'round' || drawn.some((r) => r.id === at.roundId)) return undefined;
+  const was = removed.find((r) => r.id === at.roundId);
+  return was === undefined
+    ? { roundId: at.roundId }
+    : { roundId: at.roundId, round: { number: was.number, label: was.label } };
 }

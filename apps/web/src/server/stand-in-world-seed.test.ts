@@ -3,6 +3,7 @@
 // game already played is in the past, the game under way has started and is on the
 // scorekeeper's list, exactly one round of each current season is dated the league's today,
 // and every game and round the browser tests name is there as they expect it.
+import { SEASON_RULES_PRESETS, SeasonRules, seasonRulesPreset } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import { standInPeople, standInSeedCast } from './stand-in-cast.ts';
 import { dayIn } from './stand-in-world-clock.ts';
@@ -220,5 +221,33 @@ describe('the empty league to start from (step 2.192)', () => {
         'reed-marsh',
       ].sort(),
     );
+  });
+});
+
+describe('what the seeds saved before step 2.248 means the same after it (S-113)', () => {
+  /** The clock of a stored rules document, or undefined when it holds none. */
+  const clockOf = (
+    rules: unknown,
+  ): { mode?: unknown; stopClockLastSeconds?: unknown } | undefined => {
+    if (typeof rules !== 'object' || rules === null || !('clock' in rules)) return undefined;
+    const clock = (rules as { clock: unknown }).clock;
+    return typeof clock === 'object' && clock !== null ? clock : undefined;
+  };
+
+  it('no seeded season, and no preset the demo league starts from, holds a stop clock with last minutes', () => {
+    const stored = [
+      ...madeUpLeagues(standInSeedCast, new Date('2026-11-16T18:00:00Z')).flatMap((l) =>
+        l.seasons.map((s) => s.rules),
+      ),
+      ...SEASON_RULES_PRESETS.map((p) => seasonRulesPreset(p)),
+    ];
+    const clocks = stored.map(clockOf).filter((c) => c !== undefined);
+    expect(clocks.length).toBeGreaterThan(SEASON_RULES_PRESETS.length);
+    // The pair was refused until this step, so nothing saved can hold it: the loosened
+    // check changes the reading of no saved season.
+    expect(clocks.filter((c) => c.mode === 'stop' && c.stopClockLastSeconds != null)).toEqual([]);
+    for (const rules of stored.filter((r) => clockOf(r) !== undefined)) {
+      expect(SeasonRules.parse(rules)).toEqual(rules);
+    }
   });
 });

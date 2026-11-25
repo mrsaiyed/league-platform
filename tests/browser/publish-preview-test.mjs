@@ -127,7 +127,12 @@ if (built) {
     const submit = box.getByRole('button', { name: 'Publish this schedule' });
     note('the publish button is in view from the summary', await onScreen(submit));
     await tap(submit);
-    note('published', page.url().includes('done=published'), page.url());
+    note(
+      'published: said once, the address holding no answer',
+      (await page.locator('[role=status]', { hasText: 'The schedule is published' }).count()) ===
+        1 && !/[?&](done|saved|problem)=/.test(page.url()),
+      page.url(),
+    );
     note('no draft is left', (await page.locator('[data-draft-bar]').count()) === 0);
 
     at = 'the new games are on the public schedule, each with its game number';

@@ -14,11 +14,10 @@
 //   player tile, pad button or Undo, and a second quick tap where its "+2" was chooses
 //   neither answer (they rest, as Undo does; where that spot is not an answer, the test
 //   taps "Stop the clock on fouls again" at once instead), then the basket is undone.
-// - A season cannot hold both a mercy lead and a last-minutes stop clock (the first is a
-//   stop clock's, the second a running clock's), so the "Stop clock" sign is played in a
-//   second game of the same world, once the owner gives the season a running clock that
-//   stops in the last 2 minutes: the sign is not there at 2:10 and is drawn as the running
-//   clock reaches 2:00.
+// - The "Stop clock" sign is played in a second game of the same world, once the owner
+//   gives the season a running clock that stops in the last 2 minutes: the sign is not
+//   there at 2:10 and is drawn as the running clock reaches 2:00. (A season with both a
+//   mercy lead and the last minutes, since step 2.248, is `mercy-and-stop-clock-test`.)
 // Builds the app first unless given --no-build, so it never runs on an old build.
 import {
   addPlayers,

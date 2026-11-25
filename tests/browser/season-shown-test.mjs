@@ -24,6 +24,8 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  answered,
+  saysNothingOf,
 } from './web-browser-kit.mjs';
 
 // The rounds' days: over a year after the made-up world's today (it reads this computer's
@@ -86,6 +88,8 @@ if (built) {
     /** Taps a link or button, waits for the page it leads to, and checks its address. */
     const tap = async (on, locator, url) => {
       await Promise.all([on.waitForEvent('load'), locator.click()]);
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) return answered(on, url.said);
       if (!url.test(on.url())) throw new Error(`landed on ${on.url()}, not ${url}`);
     };
     const mainText = (on) => on.locator('main').innerText();
@@ -110,8 +114,12 @@ if (built) {
       }
       await form.locator('input[name=label]').fill(label);
       await form.locator('input[name=date]').fill(date);
-      await tap(on, form.getByRole('button', { name: 'Add round' }), /saved=round-added/);
-      await tap(on, on.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+      await tap(on, form.getByRole('button', { name: 'Add round' }), {
+        said: /Saved to the draft: .+ was added/,
+      });
+      await tap(on, on.getByRole('button', { name: 'Publish this schedule' }), {
+        said: 'The schedule is published',
+      });
       return on.locator('[data-published]');
     };
 
@@ -150,7 +158,9 @@ if (built) {
     );
     note('it has not changed yet', asked.includes('Only the people who run the league can see'));
     await accessible(page, 'the question before showing');
-    await tap(page, panel.getByRole('button', { name: 'Yes, show it' }), /done=shown/);
+    await tap(page, panel.getByRole('button', { name: 'Yes, show it' }), {
+      said: 'Visitors can see Winter 2027 now.',
+    });
     const shown = await page.locator('#who-can-see').innerText();
     note(
       'Season settings says everyone can see it now',
@@ -158,6 +168,27 @@ if (built) {
         shown.includes('Everyone can see Winter 2027.'),
       shown,
     );
+
+    // The answer is a one-time notice (step 2.155 part 6, T-437): said once, then a reload,
+    // Back or a typed address says nothing.
+    const shownSaid = 'Visitors can see Winter 2027 now.';
+    const seasonSettingsAddress = page.url().replace(/#.*$/, '');
+    note(
+      'the address holds only the season',
+      /\/admin\/season\?season=winter-2027$/.test(seasonSettingsAddress),
+      seasonSettingsAddress,
+    );
+    await page.reload();
+    await page.locator('#who-can-see').waitFor();
+    note('a reload says nothing of the season shown', await saysNothingOf(page, shownSaid));
+    await page.goto(`${origin}/north-valley/admin`);
+    await page.goBack();
+    await page.locator('#who-can-see').waitFor();
+    note('Back says nothing of the season shown', await saysNothingOf(page, shownSaid));
+    await page.goto(`${seasonSettingsAddress}&done=shown#who-can-see`);
+    await page.locator('#who-can-see').waitFor();
+    note('a typed ?done=shown says nothing', await saysNothingOf(page, shownSaid));
+    await page.goto(seasonSettingsAddress);
 
     at = 'a visitor finds the season and its games from the league home';
     const visitor = await signedIn(undefined);
@@ -199,11 +230,9 @@ if (built) {
       'the visitor still sees it while the question is open',
       (await visitor.goto(seasonAddress))?.status() === 200,
     );
-    await tap(
-      page,
-      page.locator('#who-can-see').getByRole('button', { name: 'Yes, hide it' }),
-      /done=hidden/,
-    );
+    await tap(page, page.locator('#who-can-see').getByRole('button', { name: 'Yes, hide it' }), {
+      said: 'Winter 2027 is hidden from visitors again.',
+    });
     note(
       'Season settings says it is hidden again',
       (await page.locator('#who-can-see').innerText()).includes(

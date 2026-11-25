@@ -13,7 +13,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withLoopback } from '../../scripts/web-listen.mjs';
-import { sayOnFailure, whatWentWrong } from './web-browser-kit.mjs';
+import { answered, sayOnFailure, whatWentWrong } from './web-browser-kit.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const app = path.join(root, 'apps/web');
@@ -114,12 +114,14 @@ if (built) {
 
     const round = (n) => page.locator('section[data-round]').nth(n - 1);
     /**
-     * Clicks a form's button and waits for the page it leads to. Not `waitForURL`: it
-     * answers at once when the address showing already says `done=saved` (the save
-     * before), so the next count would read the page the click is leaving.
+     * Clicks a form's button, waits for the page it leads to, and for that page to say
+     * `said` with no answer in its address (step 2.155 part 6: the answer is a one-time
+     * notice). Not `waitForURL`: it answers at once when the address showing is the one the
+     * click leads to, so the next count would read the page the click is leaving.
      */
-    async function submitTo(done, button) {
-      await Promise.all([page.waitForNavigation({ url: done }), button.click()]);
+    async function submitTo(said, button) {
+      await Promise.all([page.waitForNavigation(), button.click()]);
+      await answered(page, said);
     }
     /** Adds a game in a round with the form the grid offers. */
     async function addGame(n, home, away, time, court) {
@@ -129,7 +131,7 @@ if (built) {
       await add.locator('select[name=awayTeamId]').selectOption({ label: away });
       await add.locator('input[name=time]').fill(time);
       await add.locator('select[name=place]').selectOption({ label: `Central Gym: ${court}` });
-      await submitTo(/done=saved/, add.locator('button[type=submit]'));
+      await submitTo(/Saved to the draft/, add.locator('button[type=submit]'));
     }
     const teams = await page.$$eval(
       'section[data-round] details[data-add-game] select[name=homeTeamId] option',
@@ -172,7 +174,7 @@ if (built) {
     await flagged.locator('summary').first().click();
     await flagged.locator('select[name=place]').selectOption({ label: 'Central Gym: Court 2' });
     await submitTo(
-      /done=saved/,
+      /Saved to the draft/,
       flagged.locator('form').first().locator('button[type=submit]').first(),
     );
     note((await page.locator('[data-clashes] li').count()) === 0, 'the clash is gone once fixed');
@@ -181,7 +183,10 @@ if (built) {
     // Rename a round and see it.
     await round(1).locator('summary').first().click();
     await round(1).locator('input[name=label]').fill('Week 5, Rivalry Week');
-    await submitTo(/done=saved/, round(1).locator('form').first().locator('button[type=submit]'));
+    await submitTo(
+      /Saved to the draft/,
+      round(1).locator('form').first().locator('button[type=submit]'),
+    );
     note(
       (await page.locator('h2', { hasText: 'Rivalry Week' }).count()) === 1,
       'the round was not renamed',
@@ -207,7 +212,10 @@ if (built) {
 
     // Publish it: the page then says so.
     await page.goto(address);
-    await submitTo(/done=published/, page.locator('button', { hasText: 'Publish this schedule' }));
+    await submitTo(
+      'The schedule is published',
+      page.locator('button', { hasText: 'Publish this schedule' }),
+    );
     note((await page.locator('[data-notice=done]').count()) === 1, 'no word that it was published');
   } catch (error) {
     failures.push(whatWentWrong(error));

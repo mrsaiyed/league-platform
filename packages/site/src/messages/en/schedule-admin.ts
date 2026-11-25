@@ -160,6 +160,7 @@ export const enScheduleAdmin = {
   'schedule.admin.problem': 'That was not saved: {reason}',
   'schedule.admin.problemPartial':
     'The new time and place were saved to the draft, but the recording change was not: {reason}',
+  'schedule.admin.problemRoundGone': '{round}: that was not saved. {reason}',
   'schedule.admin.publish': 'Publish',
   'schedule.admin.publishBlocked': 'It cannot be published yet:',
   'schedule.admin.publishClashes_one': '{count} clash is still in the schedule.',

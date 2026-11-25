@@ -23,12 +23,18 @@ describe('a game format', () => {
     expect(parseGameFormat(quarters)).toEqual(quarters);
     expect(parseGameFormat(null)).toBeNull();
     expect(parseGameFormat({ ...quarters, version: 2 })).toBeNull();
+    // A stop clock may have the last minutes too (S-113), as a season may.
     const lastMinutesOnStop = {
       ...quarters,
-      clock: { ...quarters.clock, stopClockLastSeconds: 60 },
+      clock: { ...quarters.clock, mode: 'stop', stopClockLastSeconds: 60, mercyLead: 10 },
     };
-    expect(GameFormatRules.safeParse(lastMinutesOnStop).error?.issues[0]?.message).toBe(
-      'A stop clock for the last minutes only applies to a running clock.',
+    expect(GameFormatRules.parse(lastMinutesOnStop)).toEqual(lastMinutesOnStop);
+    const mercyOnRunning = {
+      ...lastMinutesOnStop,
+      clock: { ...lastMinutesOnStop.clock, mode: 'running' },
+    };
+    expect(GameFormatRules.safeParse(mercyOnRunning).error?.issues[0]?.message).toBe(
+      'A mercy rule only applies to a stop clock.',
     );
     const doubleFirst = { ...quarters, fouls: { ...quarters.fouls, doubleBonusFouls: 4 } };
     expect(GameFormatRules.safeParse(doubleFirst).success).toBe(false);

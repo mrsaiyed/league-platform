@@ -54,7 +54,11 @@ const GameFormat = z.strictObject({
 
 const Clock = z.strictObject({
   mode: z.enum(['stop', 'running']),
-  /** Extra for a running clock: it stops by itself in the final seconds (null for none). */
+  /**
+   * The final seconds in which the clock stops on fouls whatever else runs it: a running
+   * clock, or a stop clock the mercy rule or the scorer switched to running (S-113, S-123;
+   * null for none).
+   */
   stopClockLastSeconds: count(1, 600).nullable(),
   /** Where those final seconds are: each period, each half or the game. Read as 'half' when absent. */
   stopClockScope: z.enum(['period', 'half', 'game']).optional(),
@@ -131,12 +135,9 @@ function formatIssues(
   if (r.fouls.doubleBonusFouls !== null && r.fouls.doubleBonusFouls <= r.fouls.bonusFouls) {
     issue(['fouls', 'doubleBonusFouls'], 'The double bonus must start after the bonus.');
   }
-  if (r.clock.mode === 'stop' && r.clock.stopClockLastSeconds !== null) {
-    issue(
-      ['clock', 'stopClockLastSeconds'],
-      'A stop clock for the last minutes only applies to a running clock.',
-    );
-  }
+  // A last-minutes stop clock stands beside either clock (S-113, S-123): under a stop
+  // clock it holds once the clock runs, by the mercy rule or the scorer's switch, and
+  // inside those last minutes the stop clock wins, as the engine has done since step 2.67.
   if (
     r.clock.stopClockLastSeconds !== null &&
     r.clock.stopClockLastSeconds > r.gameFormat.periodSeconds

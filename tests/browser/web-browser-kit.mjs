@@ -378,6 +378,48 @@ export async function settingAnswer(page, section, button, timeout = 10_000) {
  * top or a refusal beside the row, each `[data-bin-answer]`. Every answer standing before
  * the press is marked first, so only a new one counts; a wait past the limit throws.
  */
+/** The words an admin answer once rode in, in the address (gone since step 2.155 part 6). */
+const answerWords = [
+  'done',
+  'problem',
+  'saved',
+  'clashes',
+  'entry',
+  'leftOn',
+  'number',
+  // The schedule's (step 2.155 part 6): a refused form, a publish's games moved to the bin.
+  'at',
+  'reason',
+  'partial',
+  'already',
+  'removed',
+  'blocker',
+];
+
+/**
+ * After a press: the page says `said` (a sentence or a pattern) in a status or an alert,
+ * and the address holds no answer (step 2.155 part 6: an answer is a one-time notice kept
+ * on the server). Throws, naming the address, when either is not so within the time.
+ */
+export async function answered(page, said, timeout = 10_000) {
+  const words = [...new URL(page.url()).searchParams.keys()].filter((word) =>
+    answerWords.includes(word),
+  );
+  if (words.length > 0) throw new Error(`the address holds an answer: ${page.url()}`);
+  await page
+    .locator('[role=status], [role=alert]')
+    .filter({ hasText: said })
+    .first()
+    .waitFor({ timeout });
+}
+
+/** Whether the page says `said` nowhere in a status or an alert (after a reload, say). */
+export async function saysNothingOf(page, said) {
+  return (
+    (await page.locator('[role=status], [role=alert]').filter({ hasText: said }).count()) === 0
+  );
+}
+
 export async function binAnswer(page, button, timeout = 10_000) {
   const before = 'data-answered-before';
   await page.evaluate((mark) => {

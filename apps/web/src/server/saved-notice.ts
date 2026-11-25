@@ -1,14 +1,16 @@
 // The one-time "Saved" notice (T-271, record 067). A form that saved something sends the
 // browser to the screen again (post, redirect, get) and leaves this notice for the person
-// who sent it, in this league: only which screen, which thing was saved and what was done
-// to it, never anything typed. The screen takes it as it is drawn and says "Saved" beside
-// that thing; taking it clears it, so a reload shows nothing old.
+// who sent it, in this league: which screen, which thing was saved and what was done to it;
+// for a refused schedule form (step 2.155 part 6), what was typed in it too, cut short, only
+// ever put back into its own field. The screen takes it as it is drawn and says "Saved"
+// beside that thing; taking it clears it, so a reload shows nothing old.
 //
 // It is kept in this server's memory, not in a cookie or the address: with scripts on,
 // Next.js draws the screen the browser is sent to inside the answer to the post, and that
 // drawing does not see a cookie the post has just set. A notice nobody takes is gone after
-// a minute. The web app runs as one server (T-270); a second one would need this, and
-// same-request.ts, behind a port both servers share.
+// a minute. This is the named exception to T-9 (T-444): the web app runs as one copy, and
+// before a second is run this store, and same-request.ts's, moves to one both share (step
+// 2.251); only savedNoticesHere's store changes.
 
 /** The screens that say "Saved" from a notice. */
 export const noticeScreens = [
@@ -29,6 +31,8 @@ export const noticeScreens = [
   // League settings → Profile (step 2.155 part 3).
   'settings',
   'teams',
+  // The fixture import, each step's answer (step 2.155 part 6).
+  'import',
 ] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 
@@ -41,7 +45,7 @@ export type SavedNotice = {
   /**
    * Other things the notice names, by id: the games that took a game's place since it was
    * called off, when it is put back (step 2.158); on the schedule, the round a game was
-   * removed from (step 2.185). Ids only, never anything typed.
+   * removed from (step 2.185). Ids only.
    */
   readonly about?: readonly string[];
   /**
@@ -50,13 +54,22 @@ export type SavedNotice = {
    * "Removed …" (steps 2.49 and 2.50). Held here for one look, as the rest.
    */
   readonly name?: string;
+  /**
+   * Where it is said, when a screen shows more than one: the schedule's season (step 2.155
+   * part 6 fix round). Without it a notice is said where its `thing` is: a Teams page's team.
+   */
+  readonly place?: string;
 };
 
 export type SavedNotices = {
   /** Leaves the notice for this person in this league, in place of any before it. */
   readonly leave: (holder: string, notice: SavedNotice) => void;
-  /** The notice left for this person and screen, taken: it is not there a second time. */
-  readonly take: (holder: string, screen: NoticeScreen) => SavedNotice | undefined;
+  /**
+   * The notice left for this person and screen, taken: it is not there a second time. Given
+   * `place`, a notice for another place (its `place`, else its `thing`) is neither given nor
+   * taken: it waits for its own page.
+   */
+  readonly take: (holder: string, screen: NoticeScreen, place?: string) => SavedNotice | undefined;
 };
 
 /** Whose notices: one person in one league. Undefined for a visitor, who saves nothing. */
@@ -85,9 +98,10 @@ export function savedNotices(options: {
       }
       left.set(holder, { ...notice, at: now() });
     },
-    take: (holder, screen) => {
+    take: (holder, screen, place) => {
       const found = left.get(holder);
       if (found === undefined || found.screen !== screen) return undefined;
+      if (place !== undefined && (found.place ?? found.thing) !== place) return undefined;
       left.delete(holder);
       if (found.at < now() - options.keepMs) return undefined;
       return {
@@ -96,6 +110,7 @@ export function savedNotices(options: {
         said: found.said,
         ...(found.about === undefined ? {} : { about: found.about }),
         ...(found.name === undefined ? {} : { name: found.name }),
+        ...(found.place === undefined ? {} : { place: found.place }),
       };
     },
   };

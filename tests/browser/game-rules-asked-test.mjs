@@ -3,7 +3,8 @@
 // - The owner starts Rules 2027 from Fall 2026 with a stop clock and a mercy lead of 12
 //   (the plan's "mercy rule and a running clock": a stop clock that runs once the lead is
 //   reached), with its teams and rosters, and makes it current.
-// - Its settings ("Game rules") show the stop clock and 12, and change the lead to 10.
+// - Its settings ("Game rules") show the stop clock and 12 beside the last 2 minutes copied
+//   from Fall 2026 (step 2.248: the pair is kept), and change the lead to 10.
 // - A game added to its schedule, tracked on the scoring screen, starts on a stop clock;
 //   a 9-point lead says nothing, the basket that makes it 11 brings step 2.69's mercy
 //   notice and the clock runs.
@@ -21,6 +22,7 @@
 import { leagueDay } from '../../scripts/league-clock.mjs';
 import { addPlayers, court, league, owner, scorekeeper, trackerPath } from './tracker-driver.mjs';
 import {
+  answered,
   buildNext,
   freePort,
   launch,
@@ -86,6 +88,7 @@ async function gameRulesOf(page, slug) {
   return {
     mode: await page.locator('input[name=clockMode]:checked').getAttribute('value'),
     mercyLead: await page.locator('input[name=mercyLead]').inputValue(),
+    lastMinutes: await page.locator('input[name=lastMinutes]').inputValue(),
     teamFoulsReset: await page.locator('input[name=teamFoulsReset]:checked').getAttribute('value'),
   };
 }
@@ -102,11 +105,14 @@ async function startSeason(page, { name, slug, clock, mercyLead, teamFoulsReset,
     await form.locator(`input[name=teamFoulsReset][value=${teamFoulsReset}]`).check();
   }
   if (carry !== undefined) await form.locator(`input[name=carry][value=${carry}]`).check();
+  // "Started" is the server's one-time notice (step 2.155 part 6): said on the new season's
+  // own address, never in it.
   await tap(
     page,
     form.getByRole('button', { name: 'Start the season', exact: true }),
-    new RegExp(`season=${slug}&done=started`),
+    new RegExp(`\\?season=${slug}(#|$)`),
   );
+  await answered(page, `${name} is ready. Visitors cannot see it until you show it.`);
 }
 
 try {
@@ -118,7 +124,7 @@ try {
   let game;
 
   await step(
-    'a copied last-minutes stop clock is named under the clock question (review M1)',
+    'a copied last-minutes stop clock is named under the clock question, kept (review M1, step 2.248)',
     async () => {
       await page.goto(`${seasonPage}?season=fall-2026&edit=game`);
       await page.locator('input[name=clockMode][value=running]').check();
@@ -131,13 +137,13 @@ try {
         /season=fall-2026/,
       );
       await page.goto(seasonPage);
-      const dropped = startForm(page).locator('[data-stop-clock-dropped]');
+      const kept = startForm(page).locator('[data-last-minutes-kept]');
       note(
-        'the start form says a stop clock for the whole game replaces it',
-        (await dropped.count()) === 1 &&
-          (await dropped.innerText()).trim() ===
-            'Fall 2026 also stops the clock in the last 2 minutes. A stop clock for the whole game replaces that.',
-        (await dropped.count()) === 1 ? await dropped.innerText() : 'no sentence',
+        'the start form says the new season keeps it with either clock',
+        (await kept.count()) === 1 &&
+          (await kept.innerText()).trim() ===
+            'Fall 2026 also stops the clock in the last 2 minutes. The new season keeps that whichever clock you choose; you can change it in its settings.',
+        (await kept.count()) === 1 ? await kept.innerText() : 'no sentence',
       );
       const fouls = startForm(page).locator('input[name=teamFoulsReset]:checked');
       const said = startForm(page).locator('[data-team-fouls-said]');
@@ -163,7 +169,12 @@ try {
       });
       await page.goto(`${seasonPage}?season=rules-2027`);
       await tap(page, page.locator('[data-season-change=current]'), /ask=current/);
-      await tap(page, page.getByRole('button', { name: 'Yes, make it current' }), /done=current/);
+      await tap(
+        page,
+        page.getByRole('button', { name: 'Yes, make it current' }),
+        /\?season=rules-2027(#|$)/,
+      );
+      await answered(page, 'Rules 2027 is the current season now.');
       note(
         'Rules 2027 is the current season',
         (await page.locator('[data-season-state=current]').count()) === 1,
@@ -174,8 +185,11 @@ try {
   await step("the season's settings show both and change the lead", async () => {
     const shown = await gameRulesOf(page, 'rules-2027');
     note(
-      "the season's settings show a stop clock, a mercy lead of 12 and fouls by the half",
-      shown.mode === 'stop' && shown.mercyLead === '12' && shown.teamFoulsReset === 'half',
+      "the season's settings show a stop clock, a mercy lead of 12 beside Fall 2026's last 2 minutes, and fouls by the half",
+      shown.mode === 'stop' &&
+        shown.mercyLead === '12' &&
+        shown.lastMinutes === '2' &&
+        shown.teamFoulsReset === 'half',
       JSON.stringify(shown),
     );
     await page.locator('input[name=mercyLead]').fill('10');
@@ -183,7 +197,10 @@ try {
     const changed = await gameRulesOf(page, 'rules-2027');
     note(
       "the season's settings changed the lead to 10, the clock and the fouls kept",
-      changed.mode === 'stop' && changed.mercyLead === '10' && changed.teamFoulsReset === 'half',
+      changed.mode === 'stop' &&
+        changed.mercyLead === '10' &&
+        changed.lastMinutes === '2' &&
+        changed.teamFoulsReset === 'half',
       JSON.stringify(changed),
     );
   });
@@ -193,21 +210,28 @@ try {
     const round = page.locator('[data-no-rounds] form');
     await round.locator('input[name=label]').fill('Week 1');
     await round.locator('input[name=date]').fill(leagueDay(worldNow, 0));
-    await tap(page, round.getByRole('button', { name: 'Add round' }), /saved=round-added/);
+    // With scripts the schedule is drawn again in place (step 2.155 part 6): no new page, the
+    // answer said on the screen and never in the address.
+    await round.getByRole('button', { name: 'Add round' }).click();
+    await page.locator('section[data-round]').first().waitFor({ timeout: limit });
+    await answered(page, /Saved to the draft/);
     const add = page.locator('section[data-round] details[data-add-game]').first();
     await add.locator('summary').click();
     await add.locator('select[name=homeTeamId]').selectOption({ index: 1 });
     await add.locator('select[name=awayTeamId]').selectOption({ index: 2 });
     await add.locator('input[name=time]').fill('13:00');
     await add.locator('select[name=place]').selectOption({ index: 1 });
-    await tap(page, add.locator('button[type=submit]'), /done=saved/);
+    await add.locator('button[type=submit]').click();
+    await page.locator('li[data-game]').first().waitFor({ timeout: limit });
+    await answered(page, /Saved to the draft/);
     const games = await page
       .locator('li[data-game]')
       .evaluateAll((items) => items.map((item) => item.getAttribute('data-game')));
     note('the schedule of Rules 2027 holds one game', games.length === 1, String(games.length));
     game = games[0];
     // A game added is a draft until the schedule is published: the tracker finds no other.
-    await tap(page, page.getByRole('button', { name: 'Publish this schedule' }), /done=published/);
+    await page.getByRole('button', { name: 'Publish this schedule' }).click();
+    await answered(page, 'The schedule is published');
   });
 
   await step('the tracked game follows the stop clock and the mercy lead of 10', async () => {
@@ -279,24 +303,27 @@ try {
     const offered = {
       mode: await form.locator('input[name=clockMode]:checked').getAttribute('value'),
       mercyLead: await form.locator('input[name=mercyLead]').inputValue(),
-      dropped: await form.locator('[data-stop-clock-dropped]').count(),
+      kept: await form.locator('[data-last-minutes-kept]').count(),
       teamFoulsReset: await form
         .locator('input[name=teamFoulsReset]:checked')
         .getAttribute('value'),
     };
     note(
-      'the start form offers a stop clock, 10, fouls by the half, and no last-minutes sentence',
+      'the start form offers a stop clock, 10, fouls by the half, and says the last minutes are kept',
       offered.mode === 'stop' &&
         offered.mercyLead === '10' &&
-        offered.dropped === 0 &&
+        offered.kept === 1 &&
         offered.teamFoulsReset === 'half',
       JSON.stringify(offered),
     );
     await startSeason(page, { name: 'Next 2028', slug: 'next-2028', carry: 'nothing' });
     const kept = await gameRulesOf(page, 'next-2028');
     note(
-      'a season started leaving them keeps a stop clock, 10 and fouls by the half',
-      kept.mode === 'stop' && kept.mercyLead === '10' && kept.teamFoulsReset === 'half',
+      'a season started leaving them keeps a stop clock, 10 beside the last 2 minutes, and fouls by the half',
+      kept.mode === 'stop' &&
+        kept.mercyLead === '10' &&
+        kept.lastMinutes === '2' &&
+        kept.teamFoulsReset === 'half',
       JSON.stringify(kept),
     );
     // Fall 2026's question was never answered: its settings count each quarter.
@@ -332,7 +359,8 @@ try {
         else await tap(on, button, /\/admin\/season/);
         const problem = form.locator('[data-problem=start-season]');
         await problem.waitFor({ timeout: limit });
-        note(`${named}: no season was started`, !on.url().includes('done=started'), on.url());
+        const ready = await on.getByText(`${typed.name} is ready.`).count();
+        note(`${named}: no season was started`, ready === 0, `${ready} "is ready" said`);
         const kept = {};
         for (const box of Object.keys(typed)) {
           kept[box] = await form.locator(`input[name=${box}]`).inputValue();

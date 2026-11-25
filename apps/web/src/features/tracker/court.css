@@ -2524,6 +2524,33 @@
   min-inline-size: 0;
   white-space: normal;
 }
+/* At rest a notice with one answer (the last-minutes stop clock of S-124, the mercy rule
+   inside the last minutes) is itself the confirmation of the tap or play that brought it,
+   and the gold line said above it would push its "Got it" off a phone's screen (step
+   2.248's second fix round). So the line is drawn with no box there: still in the page and
+   still a live status, so a screen reader hears it the moment it is said, and nothing else
+   moves. A notice waiting behind Undo's question is not a direct child, so the line shows. */
+.court[data-pad-mode='rest']:has(
+    [data-pad-notices] > [data-last-minutes-stop],
+    [data-pad-notices] > [data-mercy-notice] [data-mercy-last-minutes]
+  )
+  .court-say {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Every answer of the mercy notice and of the last-minutes stop notice is a full-size tap
+   target, 60 or more, not the button's own 48 (step 2.248's review, L3): one answer
+   ("Got it") or two. The two used to reach 60 only because their words wrapped, so under
+   other fonts the two and "Got it" differed (step 2.248's GitHub check). */
+.court-mercy-acts > .court-button {
+  min-block-size: 60px;
+}
 /* A period's button acts at once and with no question, at the top of the form, far from
    the thumb: 56 or more on its short side, as the point buttons are (the area 4 review
    of step 2.36, L2: they were 53 x 48). */

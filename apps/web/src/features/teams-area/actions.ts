@@ -204,7 +204,7 @@ export async function saveTeamStatsAction(_state: FormState, form: FormData): Pr
   );
 }
 
-export async function removeTeamAction(form: FormData): Promise<never> {
+export async function removeTeamAction(form: FormData): Promise<void> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     const teamId = fields['team'] ?? '';
     if (fields['confirm'] === undefined) {
@@ -220,7 +220,7 @@ export async function removeTeamAction(form: FormData): Promise<never> {
  * A person put on a team from their People page: answered on the team's page, in the
  * address (People is converted later, handover of step 2.155).
  */
-export async function addToRosterAction(form: FormData): Promise<never> {
+export async function addToRosterAction(form: FormData): Promise<void> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     const input = addToRosterInput(fields, fields['personId'] ?? '');
     return settle(
@@ -298,7 +298,7 @@ export async function changeEntryAction(_state: FormState, form: FormData): Prom
   );
 }
 
-export async function markLeftAction(form: FormData): Promise<never> {
+export async function markLeftAction(form: FormData): Promise<void> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     const input = markLeftInput(fields);
     const result = await markLeft(context, input, ports.deps);
@@ -313,7 +313,7 @@ export async function markLeftAction(form: FormData): Promise<never> {
 }
 
 /** Puts a player marked as left by mistake back on the roster (step 2.161). */
-export async function putBackAction(form: FormData): Promise<never> {
+export async function putBackAction(form: FormData): Promise<void> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     const input = putBackInput(fields);
     const result = await putBackOnRoster(context, input, ports.deps);
@@ -328,25 +328,28 @@ export async function putBackAction(form: FormData): Promise<never> {
   });
 }
 
-export async function moveEntryAction(form: FormData): Promise<never> {
+export async function moveEntryAction(form: FormData): Promise<void> {
   return runTeamsAction(form, ({ context, ports, fields }) =>
     moveEntry(context, ports.deps, fields),
   );
 }
 
 /** Takes a person off the league list: refused while they are on a roster (R-17). */
-export async function removePersonAction(form: FormData): Promise<never> {
+export async function removePersonAction(form: FormData): Promise<void> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     if (fields['confirm'] === undefined) {
       return { answer: refused(removePerson.commandName, 'not-confirmed'), teamId: fields['team'] };
     }
-    const result = await removePerson(context, { personId: fields['personId'] ?? '' }, ports.deps);
-    return settle(removePerson, result, 'personRemoved', fields['team']);
+    const personId = fields['personId'] ?? '';
+    const result = await removePerson(context, { personId }, ports.deps);
+    const settled = settle(removePerson, result, 'personRemoved', fields['team']);
+    // Kept with the person, so a second post is answered as this one while they stay off.
+    return result.ok ? { ...settled, truth: { personOff: personId } } : settled;
   });
 }
 
 /** S-87: marks the team as having left the league; its results and games stay. */
-export async function markTeamLeftAction(form: FormData): Promise<never> {
+export async function markTeamLeftAction(form: FormData): Promise<void> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     const input = teamLeftInput(fields);
     return settle(
@@ -359,7 +362,7 @@ export async function markTeamLeftAction(form: FormData): Promise<never> {
 }
 
 /** S-87: takes the mark off, so the team is offered for new games again. */
-export async function undoTeamLeftAction(form: FormData): Promise<never> {
+export async function undoTeamLeftAction(form: FormData): Promise<void> {
   return runTeamsAction(form, async ({ context, ports, fields }) => {
     const input = teamLeftInput(fields);
     return settle(

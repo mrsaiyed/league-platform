@@ -1,7 +1,10 @@
-// What a League settings form answers with, and how that answer travels in the address
-// (step 2.48): the same two fixed words as the Teams screens use, `done` and `problem`.
-// The page turns the word into text from the message files; it never shows anything the
-// person typed (T-187).
+// What a League settings form answers with (step 2.48): the same two fixed words as the
+// Teams screens use, `done` and `problem`. Since step 2.155 part 6 (T-437) the answer of
+// Publish, Archive and Un-archive never rides in the address: the form's action leaves it
+// as the server's one-time notice (server/saved-notice.ts) for the person who sent it, the
+// page takes it once as it is drawn and reads it here, so a reload, Back or an address with
+// `done=published` in it says nothing. The page turns the word into text from the message
+// files; it never shows anything the person typed (T-187).
 import { catalogs } from '@srleagues/site';
 import type { TextKey } from '../../server/messages.ts';
 
@@ -28,7 +31,10 @@ export const refused = (command: string, code: string): Answer => ({
   code,
 });
 
-/** The part of the address that carries an answer: `?done=published` or `?problem=...`. */
+/** The notice's `thing` for the league's Publish, Archive and Un-archive answers. */
+export const leagueStatusThing = 'league-status';
+
+/** The words an answer leaves in the notice (`said`): `?done=published` or `?problem=...`. */
 export function answerQuery(answer: Answer): string {
   return answer.kind === 'done'
     ? `?done=${answer.done}`
@@ -39,6 +45,15 @@ type Query = Readonly<Record<string, string | string[] | undefined>>;
 
 const only = (value: string | string[] | undefined): string | undefined =>
   typeof value === 'string' ? value : undefined;
+
+/** The answer the page took from the notice, as doneKey and problemKey read it; empty for none or another form's. */
+export function statusAnswerOf(
+  notice: { readonly thing: string; readonly said: string } | undefined,
+): Query {
+  if (notice === undefined || notice.thing !== leagueStatusThing) return {};
+  if (!notice.said.startsWith('?')) return {};
+  return Object.fromEntries(new URLSearchParams(notice.said.slice(1)));
+}
 
 export function doneKey(query: Query): TextKey | undefined {
   const found = doneNames.find((name) => name === only(query['done']));

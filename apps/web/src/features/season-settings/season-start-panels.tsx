@@ -73,7 +73,7 @@ export function SeasonStatePanel({
     >
       <h2 id="season-state-title">{t('seasonSettings.state.title')}</h2>
       {problem === undefined ? null : (
-        <StaffNotice kind="refused">
+        <StaffNotice kind="refused" intoView={problem}>
           <p>{t(problem)}</p>
         </StaffNotice>
       )}
@@ -165,7 +165,7 @@ export function StartSeasonPanel({
   programId,
   copiedFrom,
   gameRules,
-  stopClockDropped,
+  lastMinutesKept,
   teamFoulsSaid,
   permalink,
 }: {
@@ -179,9 +179,9 @@ export function StartSeasonPanel({
   readonly gameRules: Required<GameRuleAnswers>;
   /**
    * Said under the clock question when the copied season has a last-minutes stop clock,
-   * which a stop clock for the whole game clears (T-428, review M1); else undefined.
+   * which the new season keeps with either clock (review M1, step 2.248); else undefined.
    */
-  readonly stopClockDropped?: string | undefined;
+  readonly lastMinutesKept?: string | undefined;
   /** What the copied (or starting) rules count team fouls by, in the settings' words. */
   readonly teamFoulsSaid: string;
   /** Where the browser lands with scripts off: this form's place on the page. */
@@ -235,15 +235,15 @@ export function StartSeasonPanel({
         ),
       })),
     },
-    ...(stopClockDropped === undefined
+    ...(lastMinutesKept === undefined
       ? []
       : [
           {
             kind: 'note',
-            name: 'stopClockDropped',
+            name: 'lastMinutesKept',
             content: (
-              <p className="ui-field-help" data-stop-clock-dropped="">
-                {stopClockDropped}
+              <p className="ui-field-help" data-last-minutes-kept="">
+                {lastMinutesKept}
               </p>
             ),
           } satisfies ListField,

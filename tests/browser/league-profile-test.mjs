@@ -18,6 +18,7 @@
 // links to League settings, where Un-archive brings the league back.
 import {
   accessibilityProblems,
+  answered,
   buildNext,
   freePort,
   launch,
@@ -79,9 +80,18 @@ if (browser) {
   const form = (mark) => owner.locator(`form[data-form="${mark}"]`);
   const said = async () =>
     (await owner.locator('[role=status], [role=alert]').first().innerText(limit)).trim();
-  /** Presses `button` and waits, with a limit, for the answer's page. */
-  const submit = (button) =>
-    Promise.all([owner.waitForURL(/done=|problem=/, limit), button.click(limit)]);
+  /**
+   * Presses Publish, Archive or Un-archive and waits, with a limit, for League settings with
+   * nothing in its address and `words` said there (step 2.155 part 6: a one-time notice).
+   */
+  const submit = async (button, words) => {
+    await Promise.all([owner.waitForEvent('load', limit), button.click(limit)]);
+    const landed = new URL(owner.url());
+    if (landed.search !== '' || !landed.pathname.endsWith('/admin/settings')) {
+      throw new Error(`landed on ${owner.url()}, not League settings with nothing in its address`);
+    }
+    await answered(owner, words);
+  };
   /**
    * Presses Profile form `mark`'s button and waits, with a limit, for League settings to be
    * drawn again and for "Saved: …" beside that form (step 2.155 part 3); returns its words.
@@ -216,7 +226,7 @@ if (browser) {
       owner.waitForURL(/publish=ask/, limit),
       panel.getByRole('link', { name: 'Publish' }).click(limit),
     ]);
-    await submit(panel.getByRole('button', { name: 'Publish' }));
+    await submit(panel.getByRole('button', { name: 'Publish' }), 'The league is published.');
     note('the owner published', (await said()).includes('The league is published.'));
     note('after: a visitor reads the league', (await visitorAnswer(`/${league}`)) === 200);
   });
@@ -508,7 +518,7 @@ if (browser) {
       panel.getByRole('link', { name: 'Archive' }).click(limit),
     ]);
     note('Archive asks once', (await panel.innerText(limit)).includes('Archive this league?'));
-    await submit(panel.getByRole('button', { name: 'Archive' }));
+    await submit(panel.getByRole('button', { name: 'Archive' }), 'The league is archived.');
     note('the screen says it is archived', (await said()).includes('The league is archived.'));
     note(
       'the profile cannot be changed while archived',
@@ -524,7 +534,10 @@ if (browser) {
         .locator('.staff-status-band a', { hasText: 'Un-archive it in League settings' })
         .click(limit),
     ]);
-    await submit(panel.getByRole('button', { name: 'Un-archive' }));
+    await submit(
+      panel.getByRole('button', { name: 'Un-archive' }),
+      'The league is published again.',
+    );
     note(
       'the screen says it is published again',
       (await said()).includes('The league is published again.'),
@@ -595,7 +608,7 @@ if (browser) {
     await form('who-plays').locator('input[type=radio][value="mixed"]').check(limit);
     await saveProfile('who-plays');
     await owner.goto(`${settings()}?archive=ask`, limit);
-    await submit(panel.getByRole('button', { name: 'Archive' }));
+    await submit(panel.getByRole('button', { name: 'Archive' }), 'The league is archived.');
     const after = await counts();
     for (const kind of Object.keys(kinds)) {
       note(

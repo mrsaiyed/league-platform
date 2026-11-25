@@ -40,12 +40,21 @@ import {
 import {
   clockModeShown,
   deviceStore,
+  lastMinutesStop,
+  lastMinutesStopDismissal,
+  mercyDismissal,
   mercySwitch,
   readMercyDismissed,
   switchedClock,
   writeMercyDismissed,
 } from './clock-mode.ts';
-import { clockSetSaid, MercyNotice, type ClockSheet, type CourtClock } from './clock-parts.tsx';
+import {
+  clockSetSaid,
+  LastMinutesStopNotice,
+  MercyNotice,
+  type ClockSheet,
+  type CourtClock,
+} from './clock-parts.tsx';
 import { createClockTicker } from './clock-ticker.ts';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
 import {
@@ -268,7 +277,7 @@ const restingPlaces = {
    * with the basket that crossed the lead, where that basket's "+2" was, and the second of
    * two fast taps is not an answer.
    */
-  mercy: '[data-mercy-notice] .court-mercy-acts',
+  mercy: '[data-mercy-notice] .court-mercy-acts, [data-last-minutes-stop] .court-mercy-acts',
   /**
    * The answers to Undo's question about a correction's play (step 2.65), after it is
    * asked: the double of the Undo tap that asked is not an answer.
@@ -679,11 +688,25 @@ export function ScoringScreen(props: ScoringScreenProps) {
   const [mercyDismissed, setMercyDismissed] = useState<string | null>(() =>
     readMercyDismissed(deviceStore(), mercyOwner),
   );
-  const mercy = mercySwitch(state);
-  const mercyShown = mercy !== null && mercy.playId !== mercyDismissed ? mercy : null;
+  const mercy = mercySwitch(state, reading.remainingMs);
+  const mercyShown = mercy !== null && mercyDismissal(mercy) !== mercyDismissed ? mercy : null;
+  // In the same place (S-124): the running clock turned On then Off inside the last
+  // minutes, so a stop clock for the rest of the game. Never with the mercy notice: that
+  // one holds only on a running clock. Its dismissal is kept the same way.
+  const stopForGame = lastMinutesStop(state);
+  const stopForGameShown =
+    stopForGame !== null && lastMinutesStopDismissal(stopForGame) !== mercyDismissed
+      ? stopForGame
+      : null;
   // Its answers rest from the moment it comes up (above, `restingPlaces.mercy`).
   // (The effect that begins it is below Undo's question, which makes the notice wait.)
-  const mercyShownId = mercyShown?.playId ?? null;
+  // Its words change as the last minutes begin: the answers rest again then too.
+  const mercyShownId =
+    mercyShown !== null
+      ? mercyDismissal(mercyShown)
+      : stopForGameShown !== null
+        ? lastMinutesStopDismissal(stopForGameShown)
+        : null;
   // Start or Pause under the scoreboard rests when its word changes, whatever changed it
   // (a tap kept by the device, a foul that stopped the clock, the clock running out): a
   // tap already on its way was meant for the word that was there.
@@ -1596,7 +1619,23 @@ export function ScoringScreen(props: ScoringScreenProps) {
       banner={props.banner}
       notices={props.notices}
       padNotice={
-        mercyShown === null ? null : mercyWaits ? (
+        mercyShown === null ? (
+          stopForGameShown === null ? null : mercyWaits ? (
+            <div className="court-waits" data-mercy-waits="">
+              <LastMinutesStopNotice t={t} seen={() => undefined} />
+            </div>
+          ) : (
+            <LastMinutesStopNotice
+              t={t}
+              seen={(event) => {
+                if (!tapTaken(resting.mercy, tapOf(event))) return;
+                const kept = lastMinutesStopDismissal(stopForGameShown);
+                writeMercyDismissed(deviceStore(), mercyOwner, kept);
+                setMercyDismissed(kept);
+              }}
+            />
+          )
+        ) : mercyWaits ? (
           // Waiting behind Undo's question: in its place, out of sight and out of reach.
           <div className="court-waits" data-mercy-waits="">
             <MercyNotice t={t} mercy={mercyShown} back={() => undefined} keep={() => undefined} />
@@ -1611,8 +1650,8 @@ export function ScoringScreen(props: ScoringScreenProps) {
             }}
             keep={(event) => {
               if (!tapTaken(resting.mercy, tapOf(event))) return;
-              writeMercyDismissed(deviceStore(), mercyOwner, mercyShown.playId);
-              setMercyDismissed(mercyShown.playId);
+              writeMercyDismissed(deviceStore(), mercyOwner, mercyDismissal(mercyShown));
+              setMercyDismissed(mercyDismissal(mercyShown));
             }}
           />
         )

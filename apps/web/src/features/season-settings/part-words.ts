@@ -68,19 +68,31 @@ export function partFacts(part: SeasonPart, season: SeasonView): readonly PartFa
     case 'game': {
       const preset = presetOf(r);
       const { mode, stopClockLastSeconds: last, mercyLead } = r.clock;
+      const lastWords =
+        last === null
+          ? undefined
+          : {
+              minutes: minutesOf(last),
+              scope: say(
+                `seasonSettings.option.stopClockScope.${r.clock.stopClockScope ?? 'half'}`,
+              ).toLocaleLowerCase(locale),
+            };
+      // Under a stop clock the last minutes matter once it runs (S-123), by the mercy rule.
       const clock =
         mode === 'running'
-          ? last === null
+          ? lastWords === undefined
             ? say('seasonSettings.value.clock.running')
-            : say('seasonSettings.value.clock.runningLast', {
-                minutes: minutesOf(last),
-                scope: say(
-                  `seasonSettings.option.stopClockScope.${r.clock.stopClockScope ?? 'half'}`,
-                ).toLocaleLowerCase(locale),
-              })
+            : say('seasonSettings.value.clock.runningLast', lastWords)
           : mercyLead === null
-            ? say('seasonSettings.value.clock.stop')
-            : say('seasonSettings.value.clock.stopMercy', { lead: mercyLead });
+            ? lastWords === undefined
+              ? say('seasonSettings.value.clock.stop')
+              : t.plural('seasonSettings.value.clock.stopLast', last! / 60, lastWords)
+            : lastWords === undefined
+              ? say('seasonSettings.value.clock.stopMercy', { lead: mercyLead })
+              : t.plural('seasonSettings.value.clock.stopMercyLast', last! / 60, {
+                  lead: mercyLead,
+                  ...lastWords,
+                });
       const { bonusFouls, doubleBonusFouls, playerFoulLimit } = r.fouls;
       const timeouts = r.timeouts;
       return [
@@ -286,9 +298,11 @@ export function partGroups(part: SeasonPart, rules: SeasonRules): readonly FormG
         {
           fields: [
             radios('clockMode', ['running', 'stop']),
+            // The mercy rule and the last minutes side by side (S-113): what runs the clock,
+            // then where it stops again.
+            number('mercyLead', help('seasonSettings.field.mercyLead.help')),
             number('lastMinutes', help('seasonSettings.field.lastMinutes.help')),
             radios('stopClockScope', ['period', 'half', 'game']),
-            number('mercyLead', help('seasonSettings.field.mercyLead.help')),
           ],
         },
         {

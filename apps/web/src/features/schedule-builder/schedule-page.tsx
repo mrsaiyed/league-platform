@@ -24,7 +24,7 @@ import {
   seasonSettingsAddress,
   visibilityAnchor,
 } from '../season-settings/index.ts';
-import { MarkedFocus } from '../list-forms/index.ts';
+import { IntoView, MarkedFocus } from '../list-forms/index.ts';
 import { ArchivedSeasonNotice, StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { venuesAddress } from '../venues-area/index.ts';
@@ -60,9 +60,9 @@ import {
   addGameAnchor,
   addRoundAnchor,
   answerShown,
-  freshAnswer,
   swapAnchor,
   refusedAtOf,
+  refusedRoundGone,
   roundAnchor,
   savedAnchor,
   savedDetailOf,
@@ -78,6 +78,7 @@ import {
   type GameField,
 } from './notice.ts';
 import { publishedNotice } from './published-notice.ts';
+import { SaidInView } from './said-in-view.tsx';
 import { publishLines, publishWarnings, type PublishLine } from './publish-summary.ts';
 import { RoundFacts, RoundRemoval, roundIsEmpty } from './round-parts.tsx';
 import { ScheduleHeading } from './schedule-heading.tsx';
@@ -135,23 +136,18 @@ export async function ScheduleBuilderPage({
   const addressee = view.context.league;
   const ports = await webPorts();
   const context = commandContextOf(view.context);
-  // Every answer that worked is said once, from the notice its form left (steps 2.185 and
-  // 2.155): taking it clears it, so a reload, or Back to the page, says nothing old. A
-  // removal or a put back is read from the notice itself; any other save's words are in
-  // the address, read only while their notice is fresh.
-  const noticeHolder = noticeHolderOf(context);
-  const taken =
-    noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'schedule');
-  const search = answerShown(inAddress, taken?.said === freshAnswer);
+  // Every answer is said once, from the notice its form left (steps 2.185 and 2.155 part 6):
+  // taking it clears it, so a reload, or Back to the page, says nothing old, and no answer
+  // is ever read from the address. A removal or a put back is read from its own notice; any
+  // other answer's words, a refusal's typed boxes too, are in the notice (answerShown).
   const holder = await ports.accessOf(context);
   // Every season the holder may be told of, the ones not public yet among them (a season is
   // scheduled before it is shown): the port lists only those (P4 §4).
   const seasons = await ports.scheduleAdmin.seasonsOf(addressee.id, holder);
-  const asked = firstValue(search['season']);
+  // The season is the address's own word, never an answer's.
+  const asked = firstValue(inAddress['season']);
   const chosen = chooseSeason(seasons, asked);
   const season = seasons.find((s) => s.id === chosen?.id);
-  const notice = noticeOf(search);
-  const action = leagueUrl(addressee, 'admin-area', { area: 'schedule' });
   if (season === undefined) {
     return (
       <main className="admin-schedule">
@@ -160,6 +156,15 @@ export async function ScheduleBuilderPage({
       </main>
     );
   }
+  // Only this season's notice: another season's waits for its own schedule.
+  const noticeHolder = noticeHolderOf(context);
+  const taken =
+    noticeHolder === undefined
+      ? undefined
+      : savedNoticesHere().take(noticeHolder, 'schedule', season.id);
+  const action = leagueUrl(addressee, 'admin-area', { area: 'schedule' });
+  const search = answerShown(inAddress, taken, action);
+  const notice = noticeOf(search);
   const deps = ports.scheduleAdmin.deps;
   const [drafted, listed, seasonTeams] = await Promise.all([
     getScheduleDraft(context, { seasonId: season.id }, deps),
@@ -246,14 +251,17 @@ export async function ScheduleBuilderPage({
         )}
       </div>
     ) : notice === undefined ? null : (
-      <p
-        className="ui-notice"
-        role="status"
-        data-notice={notice.kind}
-        data-kind={notice.kind === 'problem' ? 'error' : 'saved'}
+      <IntoView
+        words={notice.text}
+        marks={{
+          className: 'ui-notice',
+          role: 'status',
+          'data-notice': notice.kind,
+          'data-kind': notice.kind === 'problem' ? 'error' : 'saved',
+        }}
       >
         {notice.text}
-      </p>
+      </IntoView>
     );
   if (!drafted.ok) {
     const key = noticeOf({ problem: drafted.error.code });
@@ -362,7 +370,33 @@ export async function ScheduleBuilderPage({
     removed: draft.removed,
     removedRounds: draft.result.removedRounds ?? [],
   });
-  const top = saidBeside || here !== undefined ? null : plainNotice;
+  // A refusal of a round no longer drawn is said at the top, by the round's name, once, and
+  // carries its anchor: the post lands on it and it is brought into view.
+  const gone = refusedRoundGone(refusedAt, grid.rounds, draft.result.removedRounds ?? []);
+  const goneWhy = gone === undefined ? undefined : whyNotSaved(search);
+  const goneNotice =
+    gone === undefined || goneWhy === undefined ? undefined : (
+      <IntoView
+        words={goneWhy}
+        marks={{
+          className: 'ui-notice',
+          role: 'alert',
+          id: roundAnchor(gone.roundId),
+          'data-notice': 'problem',
+          'data-kind': 'error',
+          'data-round-gone': gone.roundId,
+        }}
+      >
+        {gone.round === undefined
+          ? t('schedule.admin.problem', { reason: goneWhy })
+          : t('schedule.admin.problemRoundGone', {
+              round: t('schedule.admin.round', gone.round),
+              reason: goneWhy,
+            })}
+      </IntoView>
+    );
+  const top =
+    goneNotice !== undefined ? goneNotice : saidBeside || here !== undefined ? null : plainNotice;
   const noRounds = grid.rounds.length === 0;
   // A season with no rounds: a calm panel under the intro, the first round's form open in it.
   const firstRound = noRounds ? (
@@ -602,9 +636,12 @@ function Field({
       </label>
       {now}
       {wrong === undefined ? null : (
-        <p className="ui-field-error" role="alert" data-notice="problem">
+        <IntoView
+          words={wrong}
+          marks={{ className: 'ui-field-error', role: 'alert', 'data-notice': 'problem' }}
+        >
           {wrong}
-        </p>
+        </IntoView>
       )}
     </>
   );
@@ -637,9 +674,17 @@ function gameBoxes(refused: GameRefusal | undefined): GameBoxes {
     wrong: (name) => (refused?.field === name ? refused.text : undefined),
     top:
       refused?.field !== 'form' ? null : (
-        <p className="ui-notice" data-kind="error" role="alert" data-notice="problem">
+        <IntoView
+          words={refused.text}
+          marks={{
+            className: 'ui-notice',
+            'data-kind': 'error',
+            role: 'alert',
+            'data-notice': 'problem',
+          }}
+        >
           {refused.text}
-        </p>
+        </IntoView>
       ),
     now: (name, saved, shown) =>
       refused?.changed !== true || refused.at.typed[name] === saved ? null : (
@@ -767,9 +812,17 @@ function RoundSection({
       </div>
       {saved}
       {problem === undefined || boxWrong !== undefined ? null : (
-        <p className="ui-notice" data-kind="error" role="alert" data-notice="problem">
+        <IntoView
+          words={problem}
+          marks={{
+            className: 'ui-notice',
+            'data-kind': 'error',
+            role: 'alert',
+            'data-notice': 'problem',
+          }}
+        >
           {problem}
-        </p>
+        </IntoView>
       )}
       {basis.canEdit ? (
         <details open={problem !== undefined} className="admin-round-edit">
@@ -1441,9 +1494,12 @@ function AddRoundForm({
   const suggested = lastDate === null ? '' : (daysAfter(lastDate, 7) ?? '');
   const error = (field: 'label' | 'date' | 'form') =>
     problem?.field !== field ? null : (
-      <p className="ui-field-error" role="alert" data-notice="problem">
+      <IntoView
+        words={problem.text}
+        marks={{ className: 'ui-field-error', role: 'alert', 'data-notice': 'problem' }}
+      >
         {problem.text}
-      </p>
+      </IntoView>
     );
   return (
     <form action={addRoundAction} id={addRoundAnchor} data-add-round-form="" className="staff-form">
@@ -1558,10 +1614,10 @@ function savedHere(
   // One notice in kinds told apart at a glance (step 2.103): saved, or removed with its
   // way back.
   const said = (text: string, more?: ReactNode, kind: 'saved' | 'removed' = 'saved') => (
-    <div id={savedAnchor} className="ui-notice" data-kind={kind} role="status" data-notice="done">
+    <SaidInView id={savedAnchor} kind={kind} words={text}>
       <p>{text}</p>
       {more}
-    </div>
+    </SaidInView>
   );
   const gameName = (g: GridGame) =>
     t('schedule.admin.gameVs', { away: g.awayName, home: g.homeName });
@@ -1686,7 +1742,10 @@ function savedHere(
       if (game.offRoundDate === null || !basis.canEdit || !game.editable) {
         return { place: { game: game.id }, node: said(text) };
       }
-      const query = new URLSearchParams({ season: basis.seasonSlug }).toString();
+      // `kept` says nothing: it only makes the address differ from the grid's own, which no
+      // longer holds the answer (step 2.155 part 6), so the browser draws the grid again
+      // without the question rather than only moving to the game.
+      const query = new URLSearchParams({ season: basis.seasonSlug, kept: game.id }).toString();
       const keep = `${gridAddress}?${query}#${gameAnchor(game.id)}`;
       return {
         place: { game: game.id },

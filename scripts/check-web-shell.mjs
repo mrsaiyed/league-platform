@@ -1097,16 +1097,19 @@ const cases = [
       oneHeading,
     ],
   ],
-  // In a league not published, a shown season is never said to be seen by visitors.
+  // In a league not published, a shown season is never said to be seen by visitors; and
+  // since step 2.155 part 6 a typed `done=shown` says nothing (the answer is a one-time notice).
   [
     'owner',
     '/quiet-pines/admin/season?done=shown',
     200,
+    ['is shown, but visitors cannot see this league until it is published.'],
     [
+      'Everyone can see',
+      'Visitors can see',
+      'Visitors will see its',
       'is shown. Visitors will see it once the league is published.',
-      'is shown, but visitors cannot see this league until it is published.',
     ],
-    ['Everyone can see', 'Visitors can see', 'Visitors will see its'],
   ],
   [
     'owner',
@@ -2414,14 +2417,9 @@ async function checkTeams(origin) {
     // Twelve days before the world's today: a day that has passed, whatever day this runs.
     leftOn: leagueDay(worldNow, -12),
   });
-  // The answer lands on the marked player's own line (step 2.161): the address names
-  // exactly the roster entry this check marked.
-  if (
-    gone === undefined ||
-    entry === undefined ||
-    gone.status !== 303 ||
-    to(gone) !== `${page}?done=left&entry=${entry}`
-  ) {
+  // The answer lands on the marked player's own line (step 2.161); since step 2.155 part 6
+  // it is the server's one-time notice, so the address is the team's page and nothing more.
+  if (gone === undefined || entry === undefined || gone.status !== 303 || to(gone) !== page) {
     problems.push(
       `marking a player as left answers ${gone?.status} to ${gone && to(gone)} of ${forms} forms`,
     );

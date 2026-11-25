@@ -42,6 +42,10 @@ export const enTracker = {
   'tracker.clockMode.label': 'Running clock',
   'tracker.clockMode.off': 'Off',
   'tracker.clockMode.on': 'On',
+  // Turned On then Off inside the last minutes (S-124): a stop clock for the rest of the
+  // game until step 2.252, said on the scoring screen while it holds.
+  'tracker.clockMode.stopForGame':
+    'The clock now stops on fouls for the rest of the game. Tap Running clock to change it back.',
   // What a time that takes time off the clock adds to the minutes (S-71): it was played
   // with the clock stopped. The engine's own figure, "4:55" for 16:55 set to 12:00.
   'tracker.clockSheet.adds': 'This adds {time} to the minutes of the players on the court.',
@@ -427,6 +431,10 @@ export const enTracker = {
   'tracker.mercy.keep': 'Keep it running',
   'tracker.mercy.said':
     'One team leads by {lead} or more, so the clock now keeps running after fouls (the mercy rule).',
+  // Inside the last minutes (step 2.248): the stop clock holds there, so no way back.
+  'tracker.mercy.saidLastMinutes':
+    'One team leads by {lead} or more (the mercy rule), but in these last minutes the clock stops on every foul.',
+  'tracker.mercy.seen': 'Got it',
   'tracker.noStorage':
     'This browser window cannot save the game on this device, so scoring is off. If this is a private window, open the tracker in a normal one.',
   // No longer allowed to score, with plays still on the device (finding M2).

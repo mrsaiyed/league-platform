@@ -16,12 +16,14 @@
 // the draft notice is gone; the visitor reads the league's home with a 200 answer.
 import {
   accessibilityProblems,
+  answered,
   buildNext,
   freePort,
   launch,
   startNext,
   waitFor,
   whatWentWrong,
+  saysNothingOf,
   settingAnswer,
 } from './web-browser-kit.mjs';
 
@@ -171,6 +173,22 @@ if (browser) {
   });
 
   await step('publishing', async () => {
+    // An answer is the server's one-time notice (step 2.155 part 6): a typed address says
+    // nothing, so it cannot make the page say a draft is published.
+    for (const typed of ['?done=published', '?problem=leagues.set_league_status.not-allowed']) {
+      await owner.goto(`${settings}${typed}`);
+      note(
+        `a typed ${typed} says nothing`,
+        (await saysNothingOf(owner, 'The league is published.')) &&
+          (await owner.locator('main .ui-notice[data-kind=error]').count()) === 0,
+        await owner.locator('main').innerText(),
+      );
+    }
+    await owner.goto(settings);
+    note(
+      'the typed addresses published nothing',
+      (await panel.getAttribute('data-status')) === 'draft',
+    );
     await Promise.all([
       owner.waitForURL(/publish=ask/),
       panel.getByRole('link', { name: 'Publish' }).click(),
@@ -182,9 +200,11 @@ if (browser) {
       ),
     );
     await Promise.all([
-      owner.waitForURL(/done=|problem=/),
+      owner.waitForEvent('load'),
       panel.getByRole('button', { name: 'Publish' }).click(),
     ]);
+    note('the answer is not in the address', new URL(owner.url()).search === '', owner.url());
+    await answered(owner, 'The league is published.');
     const said = await owner.locator('[role=status], [role=alert]').first().innerText();
     note('the screen says it is published', said.includes('The league is published.'), said);
     const after = await panel.innerText();
@@ -195,11 +215,43 @@ if (browser) {
         (await panel.getByRole('button', { name: 'Publish' }).count()) === 0,
     );
     note('the draft notice is gone', (await owner.locator('.staff-status').count()) === 0);
+    await owner.reload();
+    note('a reload says nothing old', await saysNothingOf(owner, 'The league is published.'));
+    await owner.goBack();
+    note(
+      'Back says nothing old',
+      /publish=ask/.test(owner.url()) && (await saysNothingOf(owner, 'The league is published.')),
+      owner.url(),
+    );
   });
 
   await step('a visitor after publishing', async () => {
     const answer = await visitor.goto(`${origin}/${league}`);
     note('after: the visitor reads the league home with 200', answer?.status() === 200);
+  });
+
+  // With scripts on, a stale Archive is refused at the top and nothing is archived. (Whether a
+  // refusal brings itself into view is proved where the page is drawn again in place, the
+  // schedule: rounds-test. Here Next.js goes to the top after the redirect anyway.)
+  await step('with scripts on, a stale Archive is refused', async () => {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await context.addCookies([{ name: 'srl_session', value: 'local-owner-token', url: origin }]);
+    const page = await context.newPage();
+    page.setDefaultTimeout(60_000);
+    await page.goto(`${settings}?archive=ask`);
+    const form = page.locator('section#publish form[data-form=archive]');
+    // As if someone else had changed the league since this page was drawn.
+    await form.locator('input[name=version]').evaluate((input) => {
+      input.value = String(Number(input.value) - 1);
+    });
+    await form.getByRole('button', { name: 'Archive' }).click();
+    const refusal = page.locator('main > .ui-notice[data-kind=error][role=alert]');
+    await refusal.waitFor({ timeout: 10_000 });
+    note(
+      'nothing was archived',
+      (await page.locator('section#publish').getAttribute('data-status')) === 'live',
+    );
+    await context.close();
   });
 }
 
