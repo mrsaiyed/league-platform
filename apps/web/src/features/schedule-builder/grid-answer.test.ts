@@ -130,6 +130,26 @@ describe('gridAnswerHolds', () => {
     expect(gridAnswerHolds(unnamed, nowWith([], []))).toBe(false);
   });
 
+  it('gives a kept "round removed" again only while that same round is gone, whatever happened between', () => {
+    // Last helper of part 6: a second tap after something else changed the draft.
+    const other = '55555555-5555-4555-8555-555555555555';
+    const removed = {
+      kind: 'saved',
+      detail: { what: 'round-removed', afterRoundId: other, roundId: round },
+    } as const;
+    // Put back from the bin in between (the same id is back): run again, its command answers.
+    expect(gridAnswerHolds(removed, nowWith([round, other], []))).toBe(false);
+    // Another round removed in between: this one is still gone, the first answer is the truth
+    // and nothing runs, so the other round is never touched.
+    expect(gridAnswerHolds(removed, nowWith([], []))).toBe(true);
+    // Its neighbour kept, the answer still holds: it is read by its own round, not the one after.
+    expect(gridAnswerHolds(removed, nowWith([other], []))).toBe(true);
+    // Published in between: no draft, run again (refused by its command, never "removed").
+    expect(gridAnswerHolds(removed, nowWith([other], [], false))).toBe(false);
+    // Published, put back and a new draft started: the round is in it, run again.
+    expect(gridAnswerHolds(removed, nowWith([round], []))).toBe(false);
+  });
+
   it('gives a kept publish while no draft was started since; a refusal always', () => {
     expect(gridAnswerHolds({ kind: 'published' }, nowWith([], [], false))).toBe(true);
     expect(gridAnswerHolds({ kind: 'published' }, nowWith([], []))).toBe(false);
