@@ -17,7 +17,7 @@ import { testWorld } from '../../server/stand-in-world.test-helper.ts';
 import type { FormState } from './form-state.ts';
 import { trackedGridProblemKey } from './problem-keys.ts';
 import { runBoxScoreAction } from './run-box-score-action.ts';
-import { runTrackedGridAction } from './run-tracked-grid-action.ts';
+import { runEndAgainAction, runTrackedGridAction } from './run-tracked-grid-action.ts';
 import { playMark, playSentences, trackedGridColumns, trackedGridField } from './tracked-grid.ts';
 import { TrackedGridForm } from './tracked-grid-form.tsx';
 
@@ -202,6 +202,27 @@ describe('the grid of a tracked game (step 2.65)', () => {
     expect(
       await runTrackedGridAction(posted(now, statKeys, { [fouls]: 'two' }), ctx, ports.deps),
     ).toEqual({ ok: false, code: 'cell', wrong: [fouls] });
+  });
+
+  it('refuses a save of too many plays at the top, and ends the game again (T-407)', async () => {
+    const { ports, read, statKeys } = await trackedGame();
+    const before = await read();
+    const [first] = before.lines;
+    if (first === undefined) throw new Error('no players');
+    const free = trackedGridField(first.personId, 'fg1');
+    const typo = posted(before, statKeys, { [free]: String(first.fg1 + 201) });
+    expect(await runTrackedGridAction(typo, ctx, ports.deps)).toEqual({
+      ok: false,
+      code: 'too-many-plays',
+    });
+    const end = { gameId: trackedId, sequence: String(before.sequence) };
+    expect(await runEndAgainAction({ ...end, sequence: '0' }, ctx, ports.deps)).toEqual({
+      ok: false,
+      code: 'changed-since-read',
+    });
+    expect(await runEndAgainAction(end, ctx, ports.deps)).toEqual({ ok: true });
+    expect((await read()).notCorrectable).toBe('game-final');
+    expect(await runEndAgainAction(end, ctx, ports.deps)).toEqual({ ok: false, code: 'gone' });
   });
 
   it('is closed to a game not reopened with a reason', async () => {
