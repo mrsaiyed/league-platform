@@ -240,7 +240,7 @@ const reviewedFiles = new Map(
     ['remove-table-player.ts', 4, '#4:6f98646a'],
     ['set-current-season.ts', 3, '#2:0bed84f4 #3:665c9135'],
     ['update-published-game.ts', 3, '#2:93321121'],
-    ['update-season.ts', 3, '#1:bcca7281 #2:0bed84f4 #3:c5c04ff0'],
+    ['update-season.ts', 3, '#1:bcca7281 #2:0bed84f4 #3:a6718501'],
   ].map(([file, filters, prints]) => [file, { filters, prints }]),
 );
 

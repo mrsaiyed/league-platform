@@ -336,7 +336,7 @@ export function rulesFromPart(
       const statistics = readChoice(
         fields,
         'statistics',
-        ['points-only', 'points-fouls', 'standard', 'full'] as const,
+        ['points-only', 'points-fouls', 'standard', 'standard-turnovers', 'full'] as const,
         wrong,
       );
       if (recording === undefined || statistics === undefined) return { ok: false, wrong };

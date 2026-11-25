@@ -259,9 +259,11 @@ async function fillBackup(db: PGlite) {
 async function makeLeague(pglite: PGlite, slug: string) {
   const l = await newLeague(pglite, slug);
   const seasonId = await newSeason(pglite, l.leagueId, l.defaultProgramId, { slug: '2025-26' });
+  // The tracker kept turnovers, and a season takes a turnover only if it keeps them
+  // (S-93, step 2.241), so the season the games move into keeps them.
   await pglite.query(`update seasons set status = 'active', rules = $2 where id = $1`, [
     seasonId,
-    JSON.stringify(seasonRulesPreset('high-school')),
+    JSON.stringify({ ...seasonRulesPreset('high-school'), statistics: 'full' }),
   ]);
   const stageId = await newStage(pglite, l.leagueId, seasonId);
   const teams = {} as Record<TeamKey, string>;
@@ -534,6 +536,24 @@ describe('the tracker transfer (step 2.58)', () => {
       'The tracker played it as 4 periods of 8 minutes (overtime 4); here it is 4 of 7 (overtime 4).',
     );
     expect(outcome.report?.stopped?.stop.kind).toBe('not-ready');
+    expect(await fingerprint(pglite, league.leagueId)).toEqual(start);
+  });
+
+  it('moves nothing, people included, while the season does not keep a statistic the games hold (T-392)', async () => {
+    const league = await makeLeague(pglite, 'made-up-not-kept');
+    await pglite.query(
+      `update seasons set rules = jsonb_set(rules, '{statistics}', '"standard"') where id = $1`,
+      [league.seasonId],
+    );
+    const start = await fingerprint(pglite, league.leagueId);
+    const outcome = await run(optionsFor(league, 'made-up-not-kept'));
+    expect(outcome.plan.ready, outcome.planText).toBe(true);
+    expect(outcome.report?.stopped?.stop).toEqual({
+      kind: 'statistic-not-kept',
+      statistic: 'turnovers',
+    });
+    expect(outcome.reportText).toContain('under “Statistics kept”');
+    expect(outcome.report?.added).toEqual([]);
     expect(await fingerprint(pglite, league.leagueId)).toEqual(start);
   });
 

@@ -105,15 +105,10 @@ but it is slower. More detail is in [run it locally](run-it-locally.md).
    one of the buttons that appear: Ravens 1 (Ann), the +2 button; Wolves 11 (Ann), the +3
    button; Ravens 2 (Ben), "Foul"; Wolves 12 (Ben), the +1 button. The score reads Ravens
    2, Wolves 4, and Ben Ravens shows "1F" (one foul).
-10. **One team turnover.** Tap the Wolves' "0 turnovers" button. It shows "Wolves
-    turnovers", "No turnovers yet. Tap a player, then Turnover." and "+ Team turnover".
-    Tap "+ Team turnover" (a turnover charged to the team, not a player, such as a
-    shot-clock violation). It says "Team turnover: Wolves." and the button now reads "1
-    turnover". Tap that button again to close the list. Where this number shows: here on
-    the tracker, and on the game's page in the play by play as "Turnover by Wolves". It is
-    not in the box score (the table of each player's points and fouls for one game) or the
-    statistics, because this league keeps the standard statistics (points, 3-pointers, free
-    throws and fouls), which have no turnovers column.
+10. **No turnovers.** The season keeps the standard set (Season settings, "Statistics
+    kept"), which has no turnovers, so the scoring screen shows no "0 turnovers" button
+    and no "+ Team turnover" for either team (S-93). An admin who wants turnovers picks
+    "the standard set with turnovers" there; nothing else in this walk counts one.
 11. **A wrong basket, taken back.** Tap Ravens 1 (Ann) and the +3 button: the Ravens show 5. That basket was a mistake. The "Undo" button names it ("+3 #1 Ann"). Tap "Undo". The
     Ravens are back to 2 and the screen says "Undone: #1 Ann Ravens +3."
 12. **More baskets, then the clock set wrongly and right again.** Ravens 4 (Dee), the +2

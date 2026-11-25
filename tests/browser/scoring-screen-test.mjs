@@ -48,6 +48,7 @@ import {
   addPlayers,
   court,
   evenMorePlayers,
+  keepStatistics,
   league,
   lettersHere,
   liveGame,
@@ -156,6 +157,8 @@ if (built) {
     // Twelve players a side, as on a real game night.
     await addPlayers(origin);
     browser = await launch();
+    // The screen's turnover buttons are tried: the season keeps turnovers (S-93, S-107).
+    await keepStatistics(browser, origin);
   });
 }
 

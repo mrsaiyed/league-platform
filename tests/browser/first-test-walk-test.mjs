@@ -11,7 +11,7 @@
 // five players each for the Ravens and the Wolves, a round today with two games and no
 // place, published; the season is already shown. Game 1, Wolves at Ravens, is opened from
 // "Score this game" on the league home and scored on the tracker: the fives, baskets, a
-// foul, one team turnover, a wrong basket taken back with Undo, the clock set wrongly and
+// foul, no turnover (the season keeps none), a wrong basket taken back with Undo, the clock set wrongly and
 // right again, the second half, End game from More after its question. Game 2's final
 // score is typed in Admin → Games, 50 to 45 for the Wolves, so the two teams end level.
 // League settings' minimum games for the leaders is set to 1 (so the statistics page shows

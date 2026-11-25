@@ -9,7 +9,13 @@ import { basketball } from '@srleagues/sports';
 import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { bears, games, hawks, liveLeagueId } from '../../server/tracker-endpoints.test-helper.ts';
+import {
+  bears,
+  games,
+  hawks,
+  keepingTurnovers,
+  liveLeagueId,
+} from '../../server/tracker-endpoints.test-helper.ts';
 import { standInPlayerId } from '../../server/stand-in-games.ts';
 import { trackerStateRequest } from '../../server/tracker-state-endpoint.ts';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
@@ -185,6 +191,7 @@ function drawn(
     readonly when?: string | null;
     readonly account?: ReactNode;
     readonly banner?: CourtBanner;
+    readonly turnovers?: boolean;
   } = {},
 ): string {
   return renderToStaticMarkup(
@@ -202,6 +209,7 @@ function drawn(
       on: noHandlers,
       ...(options.slots === undefined ? {} : { slots: options.slots }),
       ...(options.account === undefined ? {} : { account: options.account }),
+      ...(options.turnovers === undefined ? {} : { turnovers: options.turnovers }),
     }),
   );
 }
@@ -524,9 +532,76 @@ describe('substitutions (checklist E1 to E5)', () => {
   });
 });
 
+// The stand-in seasons keep the standard set: these play in one that keeps turnovers (S-93).
+const turnoversKept = () => scoringDevice(endpointNetwork({ deps: keepingTurnovers }));
+
 describe('turnovers (checklist D9, G1, G2)', () => {
-  it('counts a player’s turnovers in the team’s chip, lists them, and takes one back', async () => {
+  it('draws no turnover button, chip or hint where the season keeps none, and all three where it does (S-93)', async () => {
     const device = await scoringDevice();
+    await device.tipOff();
+    const tapped = tapTile(device.view(), noLineupPicks, padAtRest, h1);
+    if (tapped?.kind !== 'pad') throw new Error('the options did not open');
+    for (const turnovers of [false, true]) {
+      const atRest = drawn(device.view(), { turnovers });
+      const open = drawn(device.view(), { pad: tapped.pad, turnovers });
+      const list = drawn(device.view(), { pad: { kind: 'turnovers', side: 'home' }, turnovers });
+      const shown = [
+        atRest.includes('data-turnovers="home"'),
+        atRest.includes('data-turnovers="away"'),
+        padDrawn(atRest).includes(t('tracker.hint.turnovers')),
+        padDrawn(open).includes('data-act="turnover"'),
+        padDrawn(list).includes('data-act="team-turnover"'),
+      ];
+      expect(shown).toEqual(shown.map(() => turnovers));
+      // The other options stay.
+      expect(padDrawn(open)).toContain('data-act="foul"');
+    }
+  });
+
+  it('sets a turnover aside and lists it where the season keeps none, and sends the plays after it (S-93)', async () => {
+    const device = await scoringDevice();
+    await device.tipOff();
+    await device.option(h2, 'turnover');
+    await device.option(h1, 'p2');
+    const server = await device.onServer();
+    expect(server.teams.home.turnovers).toBe(0);
+    expect(server.teams.home.score).toBe(2);
+    const status = device.controller.status();
+    expect(status.waiting).toEqual([]);
+    // Listed as not applied, with its own code (T-391): never lost silently.
+    expect(status.notApplied.map((r) => [r.command.commandId, r.refusal.code])).toEqual([
+      [expect.any(String), 'statistic-not-kept'],
+    ]);
+    const refused = status.notApplied[0]?.command;
+    expect(refused !== undefined && 'input' in refused && refused.input.type).toBe('turnover');
+  });
+
+  it('still offers taking back turnovers recorded while they were kept, with no button adding one (T-394)', async () => {
+    const device = await turnoversKept();
+    await device.tipOff();
+    await device.option(h2, 'turnover');
+    await device.taken({ type: 'team-turnover', side: 'home' });
+    // The admin turns turnovers off: the device reads rosters keeping none.
+    const turnovers = false;
+    const atRest = drawn(device.view(), { turnovers });
+    expect(tagWith(atRest, 'data-turnovers="home"')).toContain('aria-expanded="false"');
+    expect(atRest).toContain('>2 turnovers<');
+    expect(atRest).not.toContain('data-turnovers="away"');
+    const list = padDrawn(
+      drawn(device.view(), { pad: { kind: 'turnovers', side: 'home' }, turnovers }),
+    );
+    expect(list).toContain(`data-turnovers-of="${h2}"`);
+    expect(list).toContain('data-act="unturnover"');
+    expect(list).toContain('data-act="team-unturnover"');
+    expect(list).not.toContain('data-act="team-turnover"');
+    const tapped = drawn(device.view(), { pad: { kind: 'player', playerId: h2 }, turnovers });
+    expect(padDrawn(tapped)).not.toContain('data-act="turnover"');
+    await device.taken({ type: 'unturnover', side: 'home', playerId: h2 });
+    expect((await device.onServer()).teams.home.turnovers).toBe(1);
+  });
+
+  it('counts a player’s turnovers in the team’s chip, lists them, and takes one back', async () => {
+    const device = await turnoversKept();
     await device.tipOff();
     const none = drawn(device.view(), { pad: { kind: 'turnovers', side: 'home' } });
     expect(tagWith(none, 'data-turnovers="home"')).toContain('aria-expanded="true"');
@@ -558,7 +633,7 @@ describe('turnovers (checklist D9, G1, G2)', () => {
   });
 
   it('adds a team turnover, charged to no player, and takes it back (G2)', async () => {
-    const device = await scoringDevice();
+    const device = await turnoversKept();
     await device.tipOff();
     await device.taken({ type: 'team-turnover', side: 'away' });
     const server = await device.onServer();

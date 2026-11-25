@@ -161,6 +161,7 @@ function UploadAnswer({
           data-added={view.added}
           data-already-there={view.alreadyThere}
           data-not-taken={view.notTaken}
+          data-not-kept={(view.notKept ?? []).reduce((sum, n) => sum + n.count, 0)}
         >
           {uploadedLines(view, t).map((line) => (
             <p key={line}>{line}</p>

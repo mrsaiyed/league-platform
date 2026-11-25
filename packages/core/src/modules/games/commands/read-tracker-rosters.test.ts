@@ -59,9 +59,31 @@ describe('reading the rosters for the tracker (T-115, T-258)', () => {
         status: 'scheduled',
         uniqueJerseys: false,
         allowTies: false,
+        statistics: ['points', 'fg3', 'fg1', 'fouls'],
         players: roster.slice(0, 3),
       },
     });
+  });
+
+  it('says which statistics the season keeps as it stands, so the tracker offers only those (S-93)', async () => {
+    const { deps, as } = memoryGames({
+      status: 'live',
+      seasons: [
+        {
+          id: seasonId,
+          programId: 'p1',
+          rules: rules((r) => {
+            r.statistics = 'full';
+          }),
+        },
+      ],
+      games: [game(1, { captureMode: 'live' })],
+      grants: [scorekeeperGrant],
+      roster: [player(homeTeamId, 1)],
+    });
+    const result = await readTrackerRosters(as(scorekeeperId), { gameId: gameUuid(1) }, deps);
+    if (!result.ok) throw new Error(result.error.code);
+    expect(result.value.statistics).toContain('turnovers');
   });
 
   it('says whether a level score may end the game, from the rules the game is played under (S-73)', async () => {

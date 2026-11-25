@@ -28,6 +28,7 @@ import { applyTrackerCommands } from '@srleagues/core';
 import { commandContextOf, type LeagueRequestContext } from './context.ts';
 import { isGameIdFormat, type ApiAnswer } from './league-api.ts';
 import type { TrackerPorts } from './tracker-ports.ts';
+import { wordedTrackerReply } from './worded-tracker-reply.ts';
 
 /** What the route does once it has answered: publish the game's new state, or nothing. */
 export type CommandsOutcome = {
@@ -83,7 +84,8 @@ export async function sendTrackerCommands(
         return answer(409, { error: 'season-archived' });
     }
   }
-  const reply = result.value;
+  // The refusals the games module gives as plain data, worded (T-187, step 2.241).
+  const reply = wordedTrackerReply(result.value);
   // No such game in this league: the whole batch is turned away, as for any address
   // that names nothing.
   const noGame = reply.results.every(

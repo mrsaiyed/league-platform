@@ -16,6 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { adminPlaceholder } from './admin-placeholder.mjs';
+import { leagueDay, leagueDayWords, worldAtNoon } from './league-clock.mjs';
 import { checkStructure, formatViolation } from './structure/index.mjs';
 import { withLoopback } from './web-listen.mjs';
 
@@ -1579,9 +1580,15 @@ if (!process.argv.includes('--no-build')) await run(['build'], { APP_ENV: 'test'
 
 const port = await freePort();
 const origin = `http://localhost:${port}`;
+// The made-up world's clock starts at noon in the league's zone on its today (LOCAL_NOW,
+// T-404), so every game this check names is as the world dates it from that clock (game 1
+// tonight not started yet, game 2 under way, game 5 played this morning) whatever the hour
+// or day it is run; `--now=<UTC time>` starts it there instead.
+const worldNow = worldAtNoon();
 const server = start(['start', '--port', String(port)], {
   APP_ENV: 'test',
   PUBLIC_BASE_URL: origin,
+  LOCAL_NOW: worldNow,
 });
 try {
   await waitFor(`${origin}/`, server);
@@ -2359,7 +2366,8 @@ async function checkTeams(origin) {
     team,
     entry,
     version: version ?? '1',
-    leftOn: '2026-11-13',
+    // Twelve days before the world's today: a day that has passed, whatever day this runs.
+    leftOn: leagueDay(worldNow, -12),
   });
   // The answer lands on the marked player's own line (step 2.161): the address names
   // exactly the roster entry this check marked.
@@ -2375,7 +2383,11 @@ async function checkTeams(origin) {
     return problems;
   }
   // The day is written in words, as the public pages write a day (step 2.103).
-  if (!(await pageOf('owner', page)).includes('Casey Walker, left on Fri, Nov 13')) {
+  if (
+    !(await pageOf('owner', page)).includes(
+      `Casey Walker, left on ${leagueDayWords(worldNow, -12)}`,
+    )
+  ) {
     problems.push('the roster does not show the player who left');
   }
   // Forged posts change nothing: a league field that is not the page's league is "not

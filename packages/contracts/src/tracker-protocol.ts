@@ -172,6 +172,9 @@ export const CommandBatchV1 = z.strictObject({
   commands: commandList(TrackerCommandV1),
 });
 
+/** The refusal codes a tracker of this release names in `knownRefusals` (T-391). */
+export const knownRefusals = ['statistic-not-kept'] as const;
+
 /** What the tracker posts to `POST /api/v1/leagues/{leagueId}/games/{game}/commands` (T-229). */
 export const CommandBatch = z.strictObject({
   protocolVersion: z.number().int().min(1),
@@ -190,6 +193,13 @@ export const CommandBatch = z.strictObject({
    * End or a reopen by the same account; otherwise each is refused `game-moved`.
    */
   notSavedSince: z.number().int().nonnegative().optional(),
+  /**
+   * The refusal codes about one tap that this tracker reads (T-391, step 2.241). A
+   * tracker of an earlier release reads a code it does not know as no answer and sends
+   * the batch again for ever, so the server says `statistic-not-kept` only to a tracker
+   * that names it here, and `rule` to any other: a refusal about the tap either way.
+   */
+  knownRefusals: z.array(z.enum(knownRefusals)).max(4).optional(),
   commands: commandList(BatchCommand),
 });
 export type CommandBatch = z.infer<typeof CommandBatch>;
@@ -275,7 +285,16 @@ export const refusalCodes = [
   'unknown-game',
   'not-allowed', // the person may not score this game
   'game-moved', // "send these plays": something was recorded since they were made (S-43)
+  // A play of a statistic the season does not keep, such as a turnover in a season keeping
+  // the standard set (S-93, step 2.241, T-391). About this one tap, as `rule` is.
+  'statistic-not-kept',
 ] as const;
+
+/** The refusal codes about one tap: the queue sets that tap aside and sends the rest (T-113). */
+export const tapRefusalCodes = ['rule', 'statistic-not-kept'] as const;
+export type TapRefusalCode = (typeof tapRefusalCodes)[number];
+export const isTapRefusal = (code: RefusalCode): code is TapRefusalCode =>
+  (tapRefusalCodes as readonly string[]).includes(code);
 export const RefusalCode = z.enum(refusalCodes);
 export type RefusalCode = z.infer<typeof RefusalCode>;
 
@@ -538,6 +557,12 @@ export const TrackerRosters = z.strictObject({
    * without a signal; the server stays the judge of the End tap.
    */
   allowTies: z.boolean(),
+  /**
+   * The statistics the season keeps ("Statistics kept", P7 §1), as the public pages count
+   * them (S-93, step 2.241): the tracker draws a button only for a statistic in it. The
+   * server stays the judge of each tap.
+   */
+  statistics: z.array(z.string().max(40)).max(40),
   players: z.array(TrackerRosterPlayer).max(1000),
 });
 export type TrackerRosters = z.infer<typeof TrackerRosters>;

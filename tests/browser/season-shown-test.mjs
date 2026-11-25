@@ -18,6 +18,7 @@ import {
   accessibilityProblems,
   buildNext,
   freePort,
+  leagueDay,
   launch,
   openStaffMenu,
   startNext,
@@ -25,6 +26,9 @@ import {
   whatWentWrong,
 } from './web-browser-kit.mjs';
 
+// The rounds' days: over a year after the made-up world's today (it reads this computer's
+// clock), so always ahead, whatever day it is run (T-404).
+const worldNow = new Date().toISOString();
 const failures = [];
 const checked = [];
 const note = (label, ok, detail = '') => {
@@ -113,7 +117,7 @@ if (built) {
 
     at = 'the owner opens the admin and publishes the hidden season';
     await page.goto(`${origin}/north-valley/admin`);
-    const said = await publishHidden(page, 'Week 1', '2027-01-10');
+    const said = await publishHidden(page, 'Week 1', leagueDay(worldNow, 400));
     const words = (await said.innerText()) ?? '';
     note(
       'publishing a hidden season says visitors cannot see it yet',
@@ -232,7 +236,7 @@ if (built) {
     at = 'a scheduler publishes the hidden season';
     const scheduler = await signedIn('local-scheduler-token');
     await scheduler.goto(`${origin}/north-valley/admin`);
-    const theirs = await publishHidden(scheduler, 'Week 2', '2027-01-17');
+    const theirs = await publishHidden(scheduler, 'Week 2', leagueDay(worldNow, 407));
     const theirWords = await theirs.innerText();
     note(
       'the scheduler is told whom to ask',

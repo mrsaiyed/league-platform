@@ -15,6 +15,7 @@ export type SeasonChangeRow = {
   status?: string;
   isCurrent?: boolean;
   rules?: JsonObject;
+  statKeys?: readonly string[];
 };
 
 /** The new version, 'unique-jerseys-clash', or undefined if it is not there, is in the bin or moved on. */
@@ -53,6 +54,7 @@ export async function updateSeason(
         ...(change.status === undefined ? {} : { status: change.status }),
         ...(change.isCurrent === undefined ? {} : { is_current: change.isCurrent }),
         ...(change.rules === undefined ? {} : { rules: change.rules }),
+        ...(change.statKeys === undefined ? {} : { stat_keys: [...change.statKeys] }),
       })
       .where('league_id', '=', scope.leagueId)
       .where('id', '=', seasonId)
