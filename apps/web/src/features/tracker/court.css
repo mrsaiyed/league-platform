@@ -2544,9 +2544,11 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-/* A notice's one answer ("Got it") as tall as the two answers beside the mercy rule's way
-   back (60), not the button's own 48 (step 2.248's review, L3). */
-.court-mercy-acts > .court-button:only-child {
+/* Every answer of the mercy notice and of the last-minutes stop notice is a full-size tap
+   target, 60 or more, not the button's own 48 (step 2.248's review, L3): one answer
+   ("Got it") or two. The two used to reach 60 only because their words wrapped, so under
+   other fonts the two and "Got it" differed (step 2.248's GitHub check). */
+.court-mercy-acts > .court-button {
   min-block-size: 60px;
 }
 /* A period's button acts at once and with no question, at the top of the form, far from

@@ -194,7 +194,12 @@ try {
       await modeIs('running');
       await notice.waitFor({ timeout: tapLimit });
       note('at 2:10 the notice still says the clock keeps running', (await words()) === said);
-      const answerHeight = (await notice.locator('[data-mercy-back]').boundingBox())?.height ?? 0;
+      // A button's least height is read from the style it is given, not measured: its words
+      // wrap to more lines under other fonts (GitHub's machine), and a wrapped answer is
+      // taller, never shorter, than its least height.
+      const leastHeight = (button) =>
+        button.evaluate((element) => parseFloat(getComputedStyle(element).minBlockSize));
+      const answerLeast = await leastHeight(notice.locator('[data-mercy-back]'));
       const outside = await theSwitch();
       note('at 2:10 the switch reads On and can be used', outside.on && outside.usable);
       await c.startClock();
@@ -206,11 +211,13 @@ try {
         (await notice.locator('[data-mercy-back]').count()) === 0 &&
           ((await notice.locator('[data-mercy-keep]').textContent()) ?? '').trim() === 'Got it',
       );
-      const gotIt = (await notice.locator('[data-mercy-keep]').boundingBox())?.height ?? 0;
+      const gotIt = notice.locator('[data-mercy-keep]');
+      const gotItLeast = await leastHeight(gotIt);
+      const gotItHeight = (await gotIt.boundingBox())?.height ?? 0;
       note(
-        '"Got it" is as tall as the notice’s other answers (60)',
-        Math.round(gotIt) === 60 && Math.round(answerHeight) === 60,
-        `${gotIt} and ${answerHeight}`,
+        '"Got it" is a full-size answer: its least height is 60, the same as the notice’s other answers’, and it is at least that tall',
+        gotItLeast >= 60 && gotItLeast === answerLeast && gotItHeight >= gotItLeast - 0.5,
+        `${gotItLeast}, ${answerLeast} and ${gotItHeight}`,
       );
       note('in the last minutes the "Stop clock" sign is drawn', (await sign.count()) === 1);
       await c.play('away', 7, 'foul');
@@ -291,8 +298,13 @@ try {
       }
       await page.setViewportSize({ width: 1180, height: 820 });
       await c.pauseClock();
+      const seenLeast = await leastHeight(stopSeen);
       const seenHeight = (await stopSeen.boundingBox())?.height ?? 0;
-      note('its "Got it" is 60 tall', Math.round(seenHeight) === 60, String(seenHeight));
+      note(
+        'its "Got it" is a full-size answer: least height 60, the mercy answers’, and at least that tall',
+        seenLeast >= 60 && seenLeast === answerLeast && seenHeight >= seenLeast - 0.5,
+        `${seenLeast} and ${seenHeight}`,
+      );
       await stopSeen.click();
       await stopNotice.waitFor({ state: 'detached', timeout: tapLimit });
       await flip();
