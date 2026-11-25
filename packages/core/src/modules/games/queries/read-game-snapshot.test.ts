@@ -10,7 +10,7 @@ import {
 } from '../../people/index.ts';
 import type { GameSnapshotStore } from '../read-ports.ts';
 import type { GameViewing } from './read-game-page.ts';
-import { liveMessageOf, readGameSnapshot } from './read-game-snapshot.ts';
+import { foulRulesOf, liveMessageOf, readGameSnapshot } from './read-game-snapshot.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
 const gameId = '01900000-0000-7000-8000-0000000b0001';
@@ -269,5 +269,35 @@ describe('readGameSnapshot', () => {
     const message = liveMessageOf(await snapshot(store()));
     expect(LiveMessage.parse(message)).toEqual(message);
     expect(Object.keys(message)).not.toContain('players');
+  });
+});
+
+describe('the snapshot says how team fouls count, checked first (step 2.123, T-421)', () => {
+  const withRules = (rules: Record<string, unknown>): basketball.GameState => {
+    const state = playedState();
+    // A stored state is data: it may hold a value no engine of today writes.
+    return { ...state, rules: { ...state.rules, ...rules } as basketball.GameState['rules'] };
+  };
+
+  it('carries the way of counting and the bonus fouls the game started with', async () => {
+    const shot = await snapshot(store({ state: withRules({ teamFoulsReset: 'half' }) }));
+    expect(GameSnapshot.parse(shot)).toEqual(shot);
+    expect(shot.foulRules).toEqual({ counted: 'half', bonusFouls: 5, doubleBonusFouls: null });
+    expect(foulRulesOf(playedState())).toEqual({
+      foulRules: { counted: 'period', bonusFouls: 5, doubleBonusFouls: null },
+    });
+  });
+
+  it('leaves the field out for a stored value the contract does not take, and the snapshot still reads', async () => {
+    for (const bad of [
+      { teamFoulsReset: 'quarter' },
+      { bonusFouls: 0 },
+      { doubleBonusFouls: 2.5 },
+    ]) {
+      const shot = await snapshot(store({ state: withRules(bad) }));
+      expect(GameSnapshot.safeParse(shot).success).toBe(true);
+      expect(Object.hasOwn(shot, 'foulRules')).toBe(false);
+      expect(shot.teamFouls).toEqual({ home: 0, away: 1 });
+    }
   });
 });

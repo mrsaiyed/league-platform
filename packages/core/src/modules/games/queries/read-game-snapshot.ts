@@ -11,6 +11,7 @@
 // signed-in game page (readGamePage).
 import {
   defaultSeasonRules,
+  SnapshotFoulRules,
   upgradeSeasonRules,
   type ClockReference,
   type GameSnapshot,
@@ -271,16 +272,25 @@ export async function readGameSnapshot(
     },
     players,
     ...(correctedOn !== undefined && datePattern.test(correctedOn) ? { correctedOn } : {}),
-    ...(state === undefined
-      ? {}
-      : {
-          foulRules: {
-            counted: state.rules.teamFoulsReset ?? 'period',
-            bonusFouls: state.rules.bonusFouls,
-            doubleBonusFouls: state.rules.doubleBonusFouls,
-          },
-        }),
+    ...foulRulesOf(state),
   });
+}
+
+/**
+ * How the game's team fouls count, checked as every other field is: a stored state with a
+ * value the contract does not take leaves the field out, so the snapshot still reads and
+ * the page keeps refreshing (it then says the count without the bonus line).
+ */
+export function foulRulesOf(state: basketball.GameState | undefined): {
+  foulRules?: SnapshotFoulRules;
+} {
+  if (state === undefined) return {};
+  const checked = SnapshotFoulRules.safeParse({
+    counted: state.rules.teamFoulsReset ?? 'period',
+    bonusFouls: state.rules.bonusFouls,
+    doubleBonusFouls: state.rules.doubleBonusFouls,
+  });
+  return checked.success ? { foulRules: checked.data } : {};
 }
 
 /** The live message a snapshot gives (T-117): the same facts, without the players. */
