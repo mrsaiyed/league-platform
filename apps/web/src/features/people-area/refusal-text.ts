@@ -2,6 +2,7 @@
 // part 5): the command's own words when the message file has them, else the general ones.
 import { catalogs } from '@srleagues/site';
 import { t, type TextKey } from '../../server/messages.ts';
+import { nameBeforeStop } from '../list-forms/index.ts';
 
 /** The sentence for a refusal: the command's own when the message file has one. */
 export function peopleRefusalText(command: string, code: string, name?: string): string {
@@ -16,7 +17,10 @@ export function peopleRefusalText(command: string, code: string, name?: string):
   const problem = [`error.people.${command}.${code}`, `error.${code}`].find((key) =>
     Object.hasOwn(english, key),
   );
-  return t(lead, { name: name ?? '', problem: t((problem ?? 'error.unknown') as TextKey) });
+  return t(lead, {
+    name: nameBeforeStop(name ?? ''),
+    problem: t((problem ?? 'error.unknown') as TextKey),
+  });
 }
 
 /**
@@ -32,5 +36,5 @@ export function notPutBackText(said: string, name: string | undefined): string |
       : t('error.leagues.restore_person.person-not-found');
   return name === undefined || name === ''
     ? t('adminPeople.putBack.notPutBack', { problem })
-    : t('adminPeople.putBack.notPutBackNamed', { name, problem });
+    : t('adminPeople.putBack.notPutBackNamed', { name: nameBeforeStop(name), problem });
 }

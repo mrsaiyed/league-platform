@@ -16,6 +16,7 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffNotice } from '../staff/index.ts';
+import { nameBeforeStop } from '../list-forms/index.ts';
 import { problemKey } from '../teams-area/answer.ts';
 import { requestTokenField } from '../../server/same-request.ts';
 import { bringBackAction } from './actions.ts';
@@ -134,7 +135,7 @@ export async function BinPage({
                     name: takenBy.name,
                     slug: takenBy.slug,
                   })
-                : t('admin.bin.notBack', { name: row.title, problem: t(refusal) })}
+                : t('admin.bin.notBack', { name: nameBeforeStop(row.title), problem: t(refusal) })}
             {!heldByTeam(row)
               ? null
               : row.teamsInBin
@@ -234,7 +235,7 @@ export async function BinPage({
           <p>
             {backName === ''
               ? t('admin.bin.backUnnamed')
-              : t('admin.bin.backNamed', { name: backName })}{' '}
+              : t('admin.bin.backNamed', { name: nameBeforeStop(backName) })}{' '}
             {t(`admin.bin.backDone.${backKind}`)}{' '}
             {backHref === undefined ? null : (
               <a href={backHref}>{t(`admin.bin.backLink.${backKind}`)}</a>
