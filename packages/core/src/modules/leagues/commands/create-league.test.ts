@@ -1,5 +1,10 @@
 // createLeague on a stand-in store; the database's own rules are tested in packages/database.
-import { startingDesignWith } from '@srleagues/contracts';
+import {
+  defaultSeasonRules,
+  foulsWithReset,
+  startingDesignWith,
+  type SeasonRules,
+} from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import { leagueId, memoryLeagues, ownerId, staffId } from '../memory-leagues.test-helper.ts';
 import { createLeague } from './create-league.ts';
@@ -229,5 +234,67 @@ describe('createLeague with its first season', () => {
       createLeague(as(staffId), { ...input, design: { startingDesign: 'crest' } }, deps),
     ).rejects.toThrow(/already had a site release/);
     expect(db.state.league).toBeUndefined();
+  });
+});
+
+describe('createLeague with the game rules asked (S-106, step 2.245)', () => {
+  const season = { slug: 'fall-2026', name: 'Fall 2026' };
+  const savedRules = (db: ReturnType<typeof memoryLeagues>['db']) =>
+    db.state.seasons.find((s) => s.slug === 'fall-2026')?.rules as SeasonRules | undefined;
+
+  it('saves the first season with a stop clock and a mercy lead', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    const firstSeason = { ...season, gameRules: { clockMode: 'stop', mercyLead: 20 } } as const;
+    expect(await createLeague(as(staffId), { ...input, firstSeason }, deps)).toMatchObject({
+      ok: true,
+    });
+    expect(savedRules(db)).toEqual({
+      ...defaultSeasonRules(),
+      clock: { mode: 'stop', stopClockLastSeconds: null, mercyLead: 20 },
+    });
+  });
+
+  it('saves team fouls that start again each half as the settings do, marked (T-422)', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    const firstSeason = { ...season, gameRules: { teamFoulsReset: 'half' } } as const;
+    await createLeague(as(staffId), { ...input, firstSeason }, deps);
+    const rules = savedRules(db);
+    expect(rules?.fouls).toEqual(foulsWithReset(defaultSeasonRules().fouls, 'half'));
+    expect(rules?.fouls.teamFoulsResetChosen).toBe(true);
+  });
+
+  it('saves the defaults for answers left untouched', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    const firstSeason = { ...season, gameRules: {} };
+    expect(await createLeague(as(staffId), { ...input, firstSeason }, deps)).toMatchObject({
+      ok: true,
+    });
+    expect(savedRules(db)).toEqual(defaultSeasonRules());
+    expect(savedRules(db)?.fouls.teamFoulsResetChosen).toBeUndefined();
+  });
+
+  it('saves no rules when the questions are not given, as before', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    await createLeague(as(staffId), { ...input, firstSeason: season }, deps);
+    expect(savedRules(db)).toBeUndefined();
+  });
+
+  it('refuses a pair the settings refuse, naming the question, and makes nothing', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    for (const gameRules of [{ clockMode: 'running', mercyLead: 20 }, { mercyLead: 0 }] as const) {
+      expect(
+        await createLeague(as(staffId), { ...input, firstSeason: { ...season, gameRules } }, deps),
+      ).toEqual({ ok: false, error: { code: 'game-rule-refused', question: 'mercyLead' } });
+    }
+    expect(db.state.league).toBeUndefined();
+  });
+
+  it('refuses an answer of the wrong kind as input', async () => {
+    const { deps, as } = memoryLeagues(none);
+    for (const gameRules of [{ clockMode: 'sometimes' }, { mercyLead: 2.5 }]) {
+      expect(
+        await createLeague(as(staffId), { ...input, firstSeason: { ...season, gameRules } }, deps),
+      ).toMatchObject({ ok: false, error: { code: 'invalid-input' } });
+    }
   });
 });

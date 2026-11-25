@@ -45,8 +45,52 @@ describe('planNewLeague', () => {
         staffEmail: 'Staff@Example.test',
         season: { name: 'Fall 2026', slug: 'fall-2026', startsOn: null, endsOn: null },
         design: { startingDesign: 'crest', chosen: false, colors: {} },
+        gameRules: { clockMode: 'running', mercyLead: null },
       },
     });
+  });
+
+  it('takes the clock and the mercy rule asked, the defaults when left (S-106, step 2.245)', () => {
+    const rules = (change: NewLeagueAnswers) => {
+      const result = planNewLeague({ ...answers, ...change });
+      return result.ok ? result.plan.gameRules : result.problems;
+    };
+    expect(rules({ clock: ' Stop ', mercyLead: '20' })).toEqual({
+      clockMode: 'stop',
+      mercyLead: 20,
+    });
+    expect(rules({ clock: 'stop', mercyLead: 'none' })).toEqual({
+      clockMode: 'stop',
+      mercyLead: null,
+    });
+    expect(rules({ clock: 'running' })).toEqual({ clockMode: 'running', mercyLead: null });
+    expect(rules({ clock: 'sometimes' })).toEqual([{ field: 'clock', problem: 'invalid' }]);
+    for (const mercyLead of ['0', '101', '2.5', 'lots']) {
+      expect(rules({ clock: 'stop', mercyLead })).toEqual([
+        { field: 'mercyLead', problem: 'invalid' },
+      ]);
+    }
+    // A pair the season's settings refuse is refused here too (S-113).
+    expect(rules({ mercyLead: '20' })).toEqual([{ field: 'mercyLead', problem: 'invalid' }]);
+  });
+
+  it('takes when team fouls start again only when answered (after step 2.123, T-422)', () => {
+    const rules = (change: NewLeagueAnswers) => {
+      const result = planNewLeague({ ...answers, ...change });
+      return result.ok ? result.plan.gameRules : result.problems;
+    };
+    expect(rules({ teamFoulsReset: ' Half ' })).toEqual({
+      clockMode: 'running',
+      mercyLead: null,
+      teamFoulsReset: 'half',
+    });
+    expect(rules({ teamFoulsReset: 'game' })).toMatchObject({ teamFoulsReset: 'game' });
+    expect(rules({ teamFoulsReset: 'period' })).toMatchObject({ teamFoulsReset: 'period' });
+    // Left alone, no answer is carried, so the first season writes no choice.
+    expect(rules({})).toEqual({ clockMode: 'running', mercyLead: null });
+    for (const teamFoulsReset of ['quarter', 'never', '2']) {
+      expect(rules({ teamFoulsReset })).toEqual([{ field: 'teamFoulsReset', problem: 'invalid' }]);
+    }
   });
 
   it('takes a starting design by its key and the colors chosen, or the first one, never the neutral one (step 2.187, C-16)', () => {

@@ -70,7 +70,11 @@ export function leaguesStore(
       const id = await findProgramId(scope, programId);
       return id === undefined ? undefined : { id };
     },
-    createSeason: (season) => insertSeason(scope, season),
+    createSeason: ({ rules, ...season }) =>
+      insertSeason(
+        scope,
+        rules === undefined ? season : { ...season, rules: toJson(rules) as JsonObject },
+      ),
     findSeason: async (seasonId) => {
       const season = await findSeason(scope, seasonId);
       return season === undefined
