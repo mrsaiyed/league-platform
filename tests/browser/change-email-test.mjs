@@ -182,6 +182,29 @@ await step('a wrong code changed nothing', async () => {
   note('the new address does not sign in', !(await signsInElsewhere(moved)));
 });
 
+await step('asking again makes the first code useless (T-455)', async () => {
+  const first = code;
+  const ask = root.locator('form[data-change-email-ask]');
+  await ask.locator('input[name=newEmail]').fill(moved);
+  await ask.locator('input[name=password]').fill(password);
+  await ask.locator('button[type=submit]').click();
+  // The newest kept email is the second code; a few looks, then give up.
+  for (let looks = 0; looks < 20 && code === first; looks += 1) {
+    code = await keptCode(one, moved);
+    if (code === first) await pageOne.waitForTimeout(250);
+  }
+  note('a second code went to the new address', /^\d{6}$/.test(code) && code !== first);
+  await codeBox.fill(first);
+  await root.locator('form[data-change-email-code] button[type=submit]').click();
+  await root.locator('[data-box="code"][data-change-email-problem="codeWrong"]').waitFor();
+  await pageOne.waitForFunction(
+    () => document.querySelector('form[data-change-email-code] input[name=code]')?.value === '',
+  );
+  note('the first code is refused as a wrong one', (await codeBox.inputValue()) === '');
+  note('the first code moved nothing', !(await signsInElsewhere(moved)));
+  note('the old address still signs in', await signsInElsewhere(person));
+});
+
 await step('the right code changes the email', async () => {
   await codeBox.fill(code);
   await root.locator('form[data-change-email-code] button[type=submit]').click();
