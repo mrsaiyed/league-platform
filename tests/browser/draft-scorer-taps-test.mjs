@@ -14,6 +14,12 @@
 //   still lists them as waiting; it never says the game is gone.
 // - Signed in again from the notice's link, the plays are saved once, and the game's box
 //   score (the server's snapshot) is right.
+// - T-456: two more plays wait, and the account on this browser can no longer open the
+//   league (signed in, but as an account with no place in the draft league: the server
+//   answers it exactly as a scorer removed from the league, "not found" at every league
+//   endpoint, and "signed in" at the address about no league). The screen says so in
+//   plain words, never asks for sign-in, keeps the two plays, and "Save a copy" gives them.
+import { readFileSync } from 'node:fs';
 import {
   buildNext,
   freePort,
@@ -32,6 +38,8 @@ const draftLeagueId = '01900000-0000-7000-8000-000000000003';
 const game = '01900000-0000-7000-8000-006a00000002';
 const scorer = { name: 'srl_session', value: 'local-admin-token' };
 const scorePath = `/${draftLeague}/score/${game}`;
+// Signed in, with no place in the draft league (stand-in-cast.ts).
+const noPlaceHere = { name: 'srl_session', value: 'local-stranger-token' };
 
 const failures = [];
 const checked = [];
@@ -231,6 +239,51 @@ if (built) {
           'signed in again: nothing waits on the device any more',
           !kept.includes('waiting'),
           JSON.stringify(kept),
+        );
+      },
+    );
+    await step(
+      'T-456: this account can no longer open the league, with two plays waiting',
+      async () => {
+        await context.setOffline(true);
+        await play('home', 5, 'p2');
+        await play('away', 3, 'p2');
+        await context.clearCookies();
+        await context.addCookies([{ ...noPlaceHere, url: origin }]);
+        notFound.length = 0;
+        await context.setOffline(false);
+        await page
+          .getByText(
+            'This account can no longer open this game. 2 plays not yet saved are kept on this device.',
+            { exact: false },
+          )
+          .waitFor({ timeout: 90_000 });
+        note(
+          'refused while signed in: the league answered "not found", never "no such game"',
+          notFound.length > 0 && notFound.every((said) => said.endsWith('{"error":"not-found"}')),
+          JSON.stringify(notFound),
+        );
+        note(
+          'refused while signed in: never told to sign in, never "signed out", never "gone"',
+          (await page.getByRole('link', { name: 'Sign in', exact: true }).count()) === 0 &&
+            (await page.getByText('You are signed out', { exact: false }).count()) === 0 &&
+            (await page.getByText('This game could not be found.').count()) === 0,
+        );
+        const kept = await keptTaps(page);
+        note(
+          'refused while signed in: the device still keeps the two plays as waiting',
+          kept.filter((state) => state === 'waiting').length === 2,
+          JSON.stringify(kept),
+        );
+        const [download] = await Promise.all([
+          page.waitForEvent('download'),
+          page.locator('[data-save-copy] [data-save-copy-button]').tap(),
+        ]);
+        const copy = JSON.parse(readFileSync((await download.path()) ?? '', 'utf8'));
+        note(
+          'refused while signed in: "Save a copy" gives the two plays, for this game',
+          copy.commands?.length === 2 && copy.gameId === game && copy.leagueId === draftLeagueId,
+          `${copy.commands?.length} ${copy.gameId}`,
         );
       },
     );

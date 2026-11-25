@@ -1206,6 +1206,8 @@ const ROUTES = {
 const ANSWERS = {
   '/api/v1/health': [null],
   '/api/v1/live': [null, keeper],
+  // "Am I signed in?" (T-456): about no league, signed out and as the scorekeeper.
+  '/api/v1/signed-in': [null, keeper],
   // The tracker kept on the device (step 2.38): its manifest names the league, its
   // worker the pages it keeps; asked signed out and as the scorekeeper.
   '/[league]/score/manifest.webmanifest': [null, keeper],

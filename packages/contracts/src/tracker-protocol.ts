@@ -744,3 +744,13 @@ export const GameSnapshotReading = LiveMessageReading.extend({
   teams: z.object({ home: z.object(teamShape), away: z.object(teamShape) }),
   players: z.array(z.object(snapshotPlayerShape)).max(200),
 });
+
+/**
+ * Whether this request is signed in, asked of an address about no league (T-456): a
+ * tracker refused "not found" at a league asks it once, to tell "signed out" (sign in,
+ * the taps held) from "this account can no longer open this game" (the taps kept, a
+ * copy offered). It says nothing about any league, so it gives nothing away.
+ */
+export const signedInApiPath = '/api/v1/signed-in';
+export const SignedInAnswer = z.strictObject({ signedIn: z.boolean() });
+export type SignedInAnswer = z.infer<typeof SignedInAnswer>;
