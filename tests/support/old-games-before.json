@@ -1043,7 +1043,8 @@
           "Team turnover — Home",
           "Foul — #a7"
         ],
-        "hasRecordedStats": true
+        "hasRecordedStats": true,
+        "mercyClocks": 0
       }
     },
     {
@@ -2129,7 +2130,8 @@
           "Foul — #h5",
           "Foul — #h5"
         ],
-        "hasRecordedStats": true
+        "hasRecordedStats": true,
+        "mercyClocks": 0
       }
     },
     {
@@ -3170,7 +3172,8 @@
           "Foul — #a6",
           "#h3 +1"
         ],
-        "hasRecordedStats": true
+        "hasRecordedStats": true,
+        "mercyClocks": 0
       }
     },
     {
@@ -4256,7 +4259,8 @@
           "Foul — #h3",
           "#a6 +1"
         ],
-        "hasRecordedStats": true
+        "hasRecordedStats": true,
+        "mercyClocks": 0
       }
     },
     {
@@ -5170,7 +5174,8 @@
           "#h8 +2",
           "#h8 +3"
         ],
-        "hasRecordedStats": true
+        "hasRecordedStats": true,
+        "mercyClocks": 0
       }
     },
     {
@@ -6201,7 +6206,8 @@
           "#a8 +2",
           "#h7 +2"
         ],
-        "hasRecordedStats": true
+        "hasRecordedStats": true,
+        "mercyClocks": 0
       }
     },
     {
@@ -6238,635 +6244,675 @@
           "id": "g17-1",
           "now": 1000
         },
+        { "command": { "type": "start" }, "id": "g17-2", "now": 4000 },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h1" },
+          "id": "g17-3",
+          "now": 7000
+        },
+        { "command": { "type": "start" }, "id": "g17-4", "now": 10000 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 3 },
+          "id": "g17-5",
+          "now": 13000
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
+          "id": "g17-6",
+          "now": 16000
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 3 },
+          "id": "g17-7",
+          "now": 19000
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h4", "points": 3 },
+          "id": "g17-8",
+          "now": 22000
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a1" },
+          "id": "g17-9",
+          "now": 25000
+        },
         {
           "command": { "type": "timeout", "side": "home", "seconds": 60 },
-          "id": "g17-2",
-          "now": 17928
+          "id": "g17-10",
+          "now": 41928
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a3", "points": 1 },
-          "id": "g17-3",
-          "now": 20122
+          "id": "g17-11",
+          "now": 44122
         },
         {
           "command": { "type": "foul", "side": "away", "playerId": "a2" },
-          "id": "g17-4",
-          "now": 37206
+          "id": "g17-12",
+          "now": 61206
         },
-        { "command": { "type": "start" }, "id": "g17-5", "now": 42169 },
-        { "command": { "type": "pause" }, "id": "g17-6", "now": 49508 },
+        { "command": { "type": "pause" }, "id": "g17-13", "now": 66169 },
+        { "command": { "type": "start" }, "id": "g17-14", "now": 73508 },
         {
           "command": { "type": "sub", "side": "away", "inId": "a7", "outId": "a3" },
-          "id": "g17-7",
-          "now": 66256
+          "id": "g17-15",
+          "now": 90256
         },
-        { "command": { "type": "undo" }, "id": "g17-8", "now": 67851 },
+        { "command": { "type": "undo" }, "id": "g17-16", "now": 91851 },
         {
           "command": { "type": "sub", "side": "home", "inId": "h7", "outId": "h1" },
-          "id": "g17-9",
-          "now": 75868
+          "id": "g17-17",
+          "now": 99868
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
-          "id": "g17-10",
-          "now": 81613
+          "id": "g17-18",
+          "now": 105613
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a2", "points": 3 },
-          "id": "g17-11",
-          "now": 84346
+          "id": "g17-19",
+          "now": 108346
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
-          "id": "g17-12",
-          "now": 86527
+          "id": "g17-20",
+          "now": 110527
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h5", "points": 2 },
-          "id": "g17-13",
-          "now": 95450
+          "id": "g17-21",
+          "now": 119450
         },
         {
           "command": { "type": "turnover", "side": "home", "playerId": "h5" },
-          "id": "g17-14",
-          "now": 112995
+          "id": "g17-22",
+          "now": 136995
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a4", "points": 3 },
-          "id": "g17-15",
-          "now": 127677
+          "id": "g17-23",
+          "now": 151677
         },
-        { "command": { "type": "start" }, "id": "g17-16", "now": 134427 },
-        { "command": { "type": "period", "period": 2 }, "id": "g17-17", "now": 138006 },
-        { "command": { "type": "set-clock", "ms": 44000 }, "id": "g17-18", "now": 151856 },
-        { "command": { "type": "start" }, "id": "g17-19", "now": 162746 },
+        { "command": { "type": "pause" }, "id": "g17-24", "now": 158427 },
+        { "command": { "type": "period", "period": 2 }, "id": "g17-25", "now": 162006 },
+        { "command": { "type": "set-clock", "ms": 44000 }, "id": "g17-26", "now": 175856 },
+        { "command": { "type": "start" }, "id": "g17-27", "now": 186746 },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
-          "id": "g17-20",
-          "now": 175582
+          "id": "g17-28",
+          "now": 199582
         },
         {
           "command": { "type": "foul", "side": "home", "playerId": "h3" },
-          "id": "g17-21",
-          "now": 189379
+          "id": "g17-29",
+          "now": 213379
         },
         {
           "command": { "type": "turnover", "side": "home", "playerId": "h4" },
-          "id": "g17-22",
-          "now": 203289
+          "id": "g17-30",
+          "now": 227289
         },
-        { "command": { "type": "redo" }, "id": "g17-23", "now": 203885 },
+        { "command": { "type": "redo" }, "id": "g17-31", "now": 227885 },
         {
           "command": { "type": "foul", "side": "away", "playerId": "a2" },
-          "id": "g17-24",
-          "now": 214125
+          "id": "g17-32",
+          "now": 238125
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h4", "points": 3 },
-          "id": "g17-25",
-          "now": 228016
+          "id": "g17-33",
+          "now": 252016
         },
-        { "command": { "type": "untimeout", "side": "away" }, "id": "g17-26", "now": 237345 },
-        { "command": { "type": "redo" }, "id": "g17-27", "now": 252896 },
+        { "command": { "type": "untimeout", "side": "away" }, "id": "g17-34", "now": 261345 },
+        { "command": { "type": "redo" }, "id": "g17-35", "now": 276896 },
         {
           "command": { "type": "sub", "side": "away", "inId": "a7", "outId": "a4" },
-          "id": "g17-28",
-          "now": 263564
+          "id": "g17-36",
+          "now": 287564
         },
         {
           "command": { "type": "foul", "side": "away", "playerId": "a2" },
-          "id": "g17-29",
-          "now": 270781
+          "id": "g17-37",
+          "now": 294781
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
-          "id": "g17-30",
-          "now": 280728
+          "id": "g17-38",
+          "now": 304728
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a2", "points": 1 },
-          "id": "g17-31",
-          "now": 282005
+          "id": "g17-39",
+          "now": 306005
         },
-        { "command": { "type": "start" }, "id": "g17-32", "now": 295238 },
-        { "command": { "type": "pause" }, "id": "g17-33", "now": 299225 },
-        { "command": { "type": "undo" }, "id": "g17-34", "now": 322360 },
+        { "command": { "type": "start" }, "id": "g17-40", "now": 319238 },
+        { "command": { "type": "start" }, "id": "g17-41", "now": 323225 },
+        { "command": { "type": "undo" }, "id": "g17-42", "now": 346360 },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
-          "id": "g17-35",
-          "now": 335015
+          "id": "g17-43",
+          "now": 359015
         },
         {
           "command": { "type": "unfoul", "side": "away", "playerId": "a3" },
-          "id": "g17-36",
-          "now": 344091
+          "id": "g17-44",
+          "now": 368091
         },
-        { "command": { "type": "redo" }, "id": "g17-37", "now": 346830 },
+        { "command": { "type": "redo" }, "id": "g17-45", "now": 370830 },
         {
           "command": { "type": "score", "side": "home", "playerId": "h2", "points": 2 },
-          "id": "g17-38",
-          "now": 362181
+          "id": "g17-46",
+          "now": 386181
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h7", "points": 1 },
-          "id": "g17-39",
-          "now": 362975
+          "id": "g17-47",
+          "now": 386975
         },
         {
           "command": { "type": "unturnover", "side": "home", "playerId": "h5" },
-          "id": "g17-40",
-          "now": 377018
+          "id": "g17-48",
+          "now": 401018
         },
-        { "command": { "type": "undo" }, "id": "g17-41", "now": 399063 },
+        { "command": { "type": "undo" }, "id": "g17-49", "now": 423063 },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
-          "id": "g17-42",
-          "now": 400751
+          "id": "g17-50",
+          "now": 424751
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a2", "points": 2 },
-          "id": "g17-43",
-          "now": 417575
+          "id": "g17-51",
+          "now": 441575
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h2", "points": 2 },
-          "id": "g17-44",
-          "now": 420360
+          "id": "g17-52",
+          "now": 444360
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
-          "id": "g17-45",
-          "now": 442532
+          "id": "g17-53",
+          "now": 466532
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h7", "points": 3 },
-          "id": "g17-46",
-          "now": 453375
+          "id": "g17-54",
+          "now": 477375
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h4", "points": 2 },
-          "id": "g17-47",
-          "now": 477401
+          "id": "g17-55",
+          "now": 501401
         },
-        { "command": { "type": "start" }, "id": "g17-48", "now": 489094 },
-        { "command": { "type": "undo" }, "id": "g17-49", "now": 492449 },
+        { "command": { "type": "start" }, "id": "g17-56", "now": 513094 },
+        { "command": { "type": "undo" }, "id": "g17-57", "now": 516449 },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 2 },
-          "id": "g17-50",
-          "now": 498843
+          "id": "g17-58",
+          "now": 522843
         },
-        { "command": { "type": "period", "period": 3 }, "id": "g17-51", "now": 519776 },
+        { "command": { "type": "period", "period": 3 }, "id": "g17-59", "now": 543776 },
         {
           "command": { "type": "unfoul", "side": "home", "playerId": "h7" },
-          "id": "g17-52",
-          "now": 520176
+          "id": "g17-60",
+          "now": 544176
         },
         {
           "command": { "type": "timeout", "side": "home", "seconds": 30 },
-          "id": "g17-53",
-          "now": 537353
+          "id": "g17-61",
+          "now": 561353
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
-          "id": "g17-54",
-          "now": 549694
+          "id": "g17-62",
+          "now": 573694
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a3", "points": 1 },
-          "id": "g17-55",
-          "now": 554521
+          "id": "g17-63",
+          "now": 578521
         },
-        { "command": { "type": "clock-mode", "mode": "stop" }, "id": "g17-56", "now": 566184 },
+        { "command": { "type": "clock-mode", "mode": "stop" }, "id": "g17-64", "now": 590184 },
         {
           "command": { "type": "turnover", "side": "away", "playerId": "a7" },
-          "id": "g17-57",
-          "now": 581980
+          "id": "g17-65",
+          "now": 605980
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
-          "id": "g17-58",
-          "now": 593980
+          "id": "g17-66",
+          "now": 617980
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a7", "points": 3 },
-          "id": "g17-59",
-          "now": 609057
+          "id": "g17-67",
+          "now": 633057
         },
         {
           "command": { "type": "sub", "side": "home", "inId": "h6", "outId": "h2" },
-          "id": "g17-60",
-          "now": 624576
+          "id": "g17-68",
+          "now": 648576
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h6", "points": 2 },
-          "id": "g17-61",
-          "now": 647826
+          "id": "g17-69",
+          "now": 671826
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a3", "points": 1 },
-          "id": "g17-62",
-          "now": 655761
+          "id": "g17-70",
+          "now": 679761
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a1", "points": 1 },
-          "id": "g17-63",
-          "now": 674476
+          "id": "g17-71",
+          "now": 698476
         },
         {
           "command": { "type": "sub", "side": "away", "inId": "a8", "outId": "a5" },
-          "id": "g17-64",
-          "now": 682461
+          "id": "g17-72",
+          "now": 706461
         },
-        { "command": { "type": "undo" }, "id": "g17-65", "now": 702490 },
+        { "command": { "type": "undo" }, "id": "g17-73", "now": 726490 },
         {
           "command": { "type": "score", "side": "away", "playerId": "a7", "points": 1 },
-          "id": "g17-66",
-          "now": 706392
+          "id": "g17-74",
+          "now": 730392
         },
-        { "command": { "type": "start" }, "id": "g17-67", "now": 723679 },
-        { "command": { "type": "redo" }, "id": "g17-68", "now": 736537 },
+        { "command": { "type": "start" }, "id": "g17-75", "now": 747679 },
+        { "command": { "type": "redo" }, "id": "g17-76", "now": 760537 },
         {
           "command": { "type": "score", "side": "away", "playerId": "a2", "points": 2 },
-          "id": "g17-69",
-          "now": 745861
+          "id": "g17-77",
+          "now": 769861
         },
-        { "command": { "type": "team-turnover", "side": "away" }, "id": "g17-70", "now": 764124 },
+        { "command": { "type": "team-turnover", "side": "away" }, "id": "g17-78", "now": 788124 },
         {
           "command": { "type": "score", "side": "home", "playerId": "h4", "points": 2 },
-          "id": "g17-71",
-          "now": 782325
+          "id": "g17-79",
+          "now": 806325
         },
-        { "command": { "type": "pause" }, "id": "g17-72", "now": 796730 },
+        { "command": { "type": "pause" }, "id": "g17-80", "now": 820730 },
         {
           "command": { "type": "score", "side": "home", "playerId": "h6", "points": 2 },
-          "id": "g17-73",
-          "now": 811124
+          "id": "g17-81",
+          "now": 835124
         },
-        { "command": { "type": "set-clock", "ms": 59000 }, "id": "g17-74", "now": 829149 },
-        { "command": { "type": "redo" }, "id": "g17-75", "now": 834832 },
-        { "command": { "type": "untimeout", "side": "away" }, "id": "g17-76", "now": 857805 },
-        { "command": { "type": "set-clock", "ms": 59000 }, "id": "g17-77", "now": 865873 },
+        { "command": { "type": "set-clock", "ms": 59000 }, "id": "g17-82", "now": 853149 },
+        { "command": { "type": "redo" }, "id": "g17-83", "now": 858832 },
+        { "command": { "type": "untimeout", "side": "away" }, "id": "g17-84", "now": 881805 },
+        { "command": { "type": "set-clock", "ms": 59000 }, "id": "g17-85", "now": 889873 },
         {
           "command": { "type": "sub", "side": "home", "inId": "h1", "outId": "h5" },
-          "id": "g17-78",
-          "now": 888158
+          "id": "g17-86",
+          "now": 912158
         },
-        { "command": { "type": "period", "period": 5 }, "id": "g17-79", "now": 911956 },
-        { "command": { "type": "team-turnover", "side": "away" }, "id": "g17-80", "now": 918245 },
+        { "command": { "type": "period", "period": 5 }, "id": "g17-87", "now": 935956 },
+        { "command": { "type": "team-turnover", "side": "away" }, "id": "g17-88", "now": 942245 },
         {
           "command": { "type": "foul", "side": "away", "playerId": "a2" },
-          "id": "g17-81",
-          "now": 940897
+          "id": "g17-89",
+          "now": 964897
         },
         {
           "command": { "type": "unturnover", "side": "away", "playerId": "a5" },
-          "id": "g17-82",
-          "now": 962604
+          "id": "g17-90",
+          "now": 986604
         },
-        { "command": { "type": "start" }, "id": "g17-83", "now": 973876 },
+        { "command": { "type": "start" }, "id": "g17-91", "now": 997876 },
         {
           "command": { "type": "foul", "side": "home", "playerId": "h7" },
-          "id": "g17-84",
-          "now": 990394
+          "id": "g17-92",
+          "now": 1014394
         },
-        { "command": { "type": "set-clock", "ms": 37000 }, "id": "g17-85", "now": 996664 },
-        { "command": { "type": "redo" }, "id": "g17-86", "now": 996750 },
-        { "command": { "type": "period", "period": 6 }, "id": "g17-87", "now": 1016412 },
-        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g17-88", "now": 1020148 },
+        { "command": { "type": "set-clock", "ms": 37000 }, "id": "g17-93", "now": 1020664 },
+        { "command": { "type": "redo" }, "id": "g17-94", "now": 1020750 },
+        { "command": { "type": "period", "period": 6 }, "id": "g17-95", "now": 1040412 },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g17-96", "now": 1044148 },
         {
           "command": { "type": "score", "side": "home", "playerId": "h3", "points": 3 },
-          "id": "g17-89",
-          "now": 1022528
+          "id": "g17-97",
+          "now": 1046528
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h4", "points": 3 },
-          "id": "g17-90",
-          "now": 1026664
+          "id": "g17-98",
+          "now": 1050664
         },
-        { "command": { "type": "undo" }, "id": "g17-91", "now": 1031119 },
-        { "command": { "type": "start" }, "id": "g17-92", "now": 1038223 },
+        { "command": { "type": "undo" }, "id": "g17-99", "now": 1055119 },
+        { "command": { "type": "start" }, "id": "g17-100", "now": 1062223 },
         {
           "command": { "type": "turnover", "side": "away", "playerId": "a1" },
-          "id": "g17-93",
-          "now": 1055241
+          "id": "g17-101",
+          "now": 1079241
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a2", "points": 2 },
-          "id": "g17-94",
-          "now": 1092662
+          "id": "g17-102",
+          "now": 1116662
         },
-        { "command": { "type": "pause" }, "id": "g17-95", "now": 1110049 },
-        { "command": { "type": "start" }, "id": "g17-96", "now": 1113435 },
-        { "command": { "type": "undo" }, "id": "g17-97", "now": 1121027 },
+        { "command": { "type": "pause" }, "id": "g17-103", "now": 1134049 },
+        { "command": { "type": "start" }, "id": "g17-104", "now": 1137435 },
+        { "command": { "type": "undo" }, "id": "g17-105", "now": 1145027 },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
-          "id": "g17-98",
-          "now": 1128481
+          "id": "g17-106",
+          "now": 1152481
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a2", "points": 1 },
-          "id": "g17-99",
-          "now": 1149827
+          "id": "g17-107",
+          "now": 1173827
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
-          "id": "g17-100",
-          "now": 1165512
+          "id": "g17-108",
+          "now": 1189512
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a7", "points": 2 },
-          "id": "g17-101",
-          "now": 1189774
+          "id": "g17-109",
+          "now": 1213774
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h3", "points": 3 },
-          "id": "g17-102",
-          "now": 1202835
+          "id": "g17-110",
+          "now": 1226835
         },
-        { "command": { "type": "period", "period": 8 }, "id": "g17-103", "now": 1217373 },
+        { "command": { "type": "period", "period": 8 }, "id": "g17-111", "now": 1241373 },
         {
           "command": { "type": "score", "side": "home", "playerId": "h1", "points": 3 },
-          "id": "g17-104",
-          "now": 1235876
+          "id": "g17-112",
+          "now": 1259876
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 2 },
-          "id": "g17-105",
-          "now": 1238686
+          "id": "g17-113",
+          "now": 1262686
         },
-        { "command": { "type": "undo" }, "id": "g17-106", "now": 1258210 },
+        { "command": { "type": "undo" }, "id": "g17-114", "now": 1282210 },
         {
           "command": { "type": "sub", "side": "away", "inId": "a6", "outId": "a2" },
-          "id": "g17-107",
-          "now": 1282405
+          "id": "g17-115",
+          "now": 1306405
         },
         {
           "command": { "type": "turnover", "side": "away", "playerId": "a6" },
-          "id": "g17-108",
-          "now": 1292076
+          "id": "g17-116",
+          "now": 1316076
         },
         {
           "command": { "type": "sub", "side": "away", "inId": "a8", "outId": "a3" },
-          "id": "g17-109",
-          "now": 1304308
+          "id": "g17-117",
+          "now": 1328308
         },
-        { "command": { "type": "start" }, "id": "g17-110", "now": 1318039 },
+        { "command": { "type": "start" }, "id": "g17-118", "now": 1342039 },
         {
           "command": { "type": "score", "side": "home", "playerId": "h3", "points": 1 },
-          "id": "g17-111",
-          "now": 1334844
+          "id": "g17-119",
+          "now": 1358844
         },
         {
           "command": { "type": "turnover", "side": "home", "playerId": "h4" },
-          "id": "g17-112",
-          "now": 1352592
+          "id": "g17-120",
+          "now": 1376592
         },
         {
           "command": { "type": "foul", "side": "home", "playerId": "h1" },
-          "id": "g17-113",
-          "now": 1358447
+          "id": "g17-121",
+          "now": 1382447
         },
-        { "command": { "type": "redo" }, "id": "g17-114", "now": 1367196 },
+        { "command": { "type": "redo" }, "id": "g17-122", "now": 1391196 },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
-          "id": "g17-115",
-          "now": 1389718
+          "id": "g17-123",
+          "now": 1413718
         },
         {
           "command": { "type": "team-unturnover", "side": "home" },
-          "id": "g17-116",
-          "now": 1396795
+          "id": "g17-124",
+          "now": 1420795
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a8", "points": 1 },
-          "id": "g17-117",
-          "now": 1416371
+          "id": "g17-125",
+          "now": 1440371
         },
         {
           "command": { "type": "turnover", "side": "away", "playerId": "a5" },
-          "id": "g17-118",
-          "now": 1440740
+          "id": "g17-126",
+          "now": 1464740
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
-          "id": "g17-119",
-          "now": 1453237
+          "id": "g17-127",
+          "now": 1477237
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a7", "points": 2 },
-          "id": "g17-120",
-          "now": 1477700
+          "id": "g17-128",
+          "now": 1501700
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a7", "points": 1 },
-          "id": "g17-121",
-          "now": 1487960
+          "id": "g17-129",
+          "now": 1511960
         },
-        { "command": { "type": "undo" }, "id": "g17-122", "now": 1505973 },
-        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g17-123", "now": 1528255 },
-        { "command": { "type": "redo" }, "id": "g17-124", "now": 1534677 },
+        { "command": { "type": "undo" }, "id": "g17-130", "now": 1529973 },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g17-131", "now": 1552255 },
+        { "command": { "type": "redo" }, "id": "g17-132", "now": 1558677 },
         {
           "command": { "type": "sub", "side": "home", "inId": "h2", "outId": "h3" },
-          "id": "g17-125",
-          "now": 1537999
+          "id": "g17-133",
+          "now": 1561999
         },
         {
           "command": { "type": "team-unturnover", "side": "away" },
-          "id": "g17-126",
-          "now": 1557563
+          "id": "g17-134",
+          "now": 1581563
         },
         {
           "command": { "type": "turnover", "side": "home", "playerId": "h6" },
-          "id": "g17-127",
-          "now": 1580368
+          "id": "g17-135",
+          "now": 1604368
         },
         {
           "command": { "type": "turnover", "side": "home", "playerId": "h1" },
-          "id": "g17-128",
-          "now": 1605361
+          "id": "g17-136",
+          "now": 1629361
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
-          "id": "g17-129",
-          "now": 1624492
+          "id": "g17-137",
+          "now": 1648492
         },
         {
           "command": { "type": "timeout", "side": "away", "seconds": 30 },
-          "id": "g17-130",
-          "now": 1649471
+          "id": "g17-138",
+          "now": 1673471
         },
         {
           "command": { "type": "timeout", "side": "home", "seconds": 60 },
-          "id": "g17-131",
-          "now": 1665946
+          "id": "g17-139",
+          "now": 1689946
         },
         {
           "command": { "type": "score", "side": "away", "playerId": "a6", "points": 3 },
-          "id": "g17-132",
-          "now": 1690937
+          "id": "g17-140",
+          "now": 1714937
         },
-        { "command": { "type": "start" }, "id": "g17-133", "now": 1703485 },
+        { "command": { "type": "start" }, "id": "g17-141", "now": 1727485 },
         {
           "command": { "type": "timeout", "side": "home", "seconds": 60 },
-          "id": "g17-134",
-          "now": 1715538
+          "id": "g17-142",
+          "now": 1739538
         },
         {
           "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
-          "id": "g17-135",
-          "now": 1729499
+          "id": "g17-143",
+          "now": 1753499
         },
-        { "command": { "type": "end" }, "id": "g17-136", "now": 1729499 }
+        { "command": { "type": "end" }, "id": "g17-144", "now": 1753499 }
       ],
       "expected": {
         "steps": [
           "6532d00cd8f4d1b4",
           "3492526e6d6a6e3d",
-          "21734d64b63b798b",
-          "3a7bc9dd9d0966b3",
-          "ec6892337af22057",
-          "9db7aa5bb849ac2a",
-          "c3f37fa799bf1ace",
-          "c7ed8170c94e08b8",
-          "00605fde971d2b58",
-          "6426cf4a711db23b",
-          "0564e3df13dfc16c",
-          "8b06b12b3a15f454",
-          "5ee48ed80ef4ff78",
-          "b3bd998d6ceb5608",
-          "963af9a95a309117",
-          "382c431a2d32eddb",
-          "8440c31d81f61d54",
-          "0e183e484a871692",
-          "fe801eb036b32f89",
-          "ed20ed3128fc6b55",
-          "9758005b457d2a1e",
-          "63bc14a7bd43a77c",
-          "1e7a90e5d18119e5",
+          "d473c40d4a6f73de",
+          "02eedffd8abe5476",
+          "6002d1bb5d961df9",
+          "923d4cffb8e55983",
+          "7203c6cc091801c6",
+          "b8b02a5f5a730161",
+          "3672b92804be0f9c",
+          "a138c8ebe1232494",
+          "37823bebdb2bc980",
+          "cd690ac9069b686e",
+          "61c2fe61e2926cca",
+          "359c87cde164e2e7",
+          "95bea894136fa08d",
+          "e09031cd43d196e4",
+          "08aa8de3d147a9d7",
+          "572a76e914adc267",
+          "fee4484397b2ca22",
+          "426facafb0e14c9d",
+          "3dedf8801f17f9d7",
+          "fa3dc485464fdd90",
+          "7dfc94d852710347",
+          "bf5a216e03dce10e",
+          "87a4c7110965e965",
+          "bb1065e5659f18bc",
+          "a6e68e462eee1d12",
+          "159ab78102d19685",
+          "c7278acbf959d7f6",
+          "f8e834f8890bb7b8",
+          "a180b0d8c119bc76",
           "refused: Nothing to redo.",
-          "0d48bf18c8a22bac",
-          "9fe4f26eb614a91f",
+          "035a7f60101f456e",
+          "b709ca2d0fa1fd90",
           "refused: There is no timeout to take back.",
           "refused: Nothing to redo.",
-          "b6b510f8f053a20a",
-          "b9c5e0c6d7a05992",
-          "6fe942c1adcf9a13",
-          "2d90e7cade20224a",
-          "19c50659876a2b68",
-          "0f18dd0510778af3",
-          "a91a795f535c2b9b",
-          "bd40893beae3f74e",
-          "refused: That player has no foul to take back.",
-          "refused: Nothing to redo.",
-          "7dc9ee956bee3b33",
-          "2d8943e48d76919e",
-          "b0841c3bd403ecca",
-          "fa047e45d83bf697",
-          "7e8810702a1d9d79",
-          "ccd12ccfa870a4c1",
-          "1bc781e4221734b3",
-          "1e799fbbe7487b06",
-          "a65861809827acc5",
-          "88c4e9761eae97cd",
-          "bda296ce6394b17d",
-          "112314fde3eb4413",
-          "330e8363e0e91571",
-          "5a7b789d862994df",
-          "refused: That player has no foul to take back.",
-          "298e8cf6c15140f4",
-          "b7b4ce3fd59b85bd",
-          "75a22fef4218b98a",
-          "refused: The clock already stops on fouls.",
-          "d96e5eae4ebb0c73",
-          "c658f2e70daba92b",
-          "a0186340241cffb1",
-          "2ae3e3c10b5b5baf",
-          "9ea83b2876b68b3c",
-          "c2de1a9573c61d9d",
-          "9e1c3d695bb3b6ba",
-          "a871f9bd172e64ea",
-          "f8f1523b62c888a3",
-          "7b68443042372f91",
-          "912f3c65669dac84",
-          "refused: Nothing to redo.",
-          "27449a148984f87e",
-          "b064d4d46a915e32",
-          "7418e729d4ebf21b",
-          "a146375e62c4cc2d",
-          "ed213e839383777d",
-          "19895bb5e29bb8c2",
-          "refused: Nothing to redo.",
-          "refused: There is no timeout to take back.",
-          "ffd9e95728a97d2c",
-          "e494a5b9ef2f3417",
-          "c5293fd8014fa762",
-          "49b2b6ae0d091917",
-          "ff2e277732182d17",
-          "refused: That player has no turnover to take back.",
-          "94e0df44ca33c68f",
-          "fcb9fbc9eb275921",
-          "465a4b026cd73210",
-          "refused: Nothing to redo.",
-          "48efd98172258166",
-          "c8d55aad01246826",
-          "abeaa1db11eeb09b",
-          "4822691302c7cf64",
-          "75e36793b5a219dd",
-          "4ba17da80f525ac1",
-          "b902e8ec936e83a3",
-          "8231cf57f19cb48f",
-          "6d3e1543a0336158",
-          "fe2a77b93131ba3f",
-          "6c8d9c3fd8e20ec4",
-          "cdc59b61ecfcee00",
-          "913e37d45c3573e6",
-          "a13ac11335ec8ef9",
-          "7a8a395355a0ea14",
-          "3456b45b1074260f",
-          "230a473c74a31a6d",
-          "14b78d437b275577",
-          "8788bbf248a54ec5",
-          "b22eac2293b3d1f4",
-          "ba0e91443a5e84d4",
-          "28d3e4e0aca803c9",
-          "8e704d2515f79a22",
-          "280ddd845f50cb41",
-          "ddd57e510fb0e9a1",
-          "4d1bb4fac5b2b230",
-          "e903b77aeb61ed63",
-          "refused: Nothing to redo.",
-          "9a07483e7c41d78d",
-          "refused: There is no team turnover to take back.",
-          "1032390f34d483e9",
-          "5493ab8f6cff3fc2",
-          "17c62a5f76e5872c",
-          "a84d8fc098dbfb07",
-          "c21ae1a251be1bb9",
-          "55e9ff726458fca0",
-          "refused: The clock is already running through fouls.",
-          "04d8d67a348299da",
-          "c966eae5a64c55e2",
-          "47039e66968a3594",
-          "f089e735bc0aee3f",
-          "39759620ceebacec",
-          "9bcf1e2fc988f3f7",
-          "dae70353714ddd81",
-          "029d116e65e20722",
-          "437cb6f18ed3fe09",
+          "c8e52c40f4bbd09b",
+          "a9b56022c4c681ad",
+          "31772a29326cc1bf",
+          "3677afa39012dd32",
           "refused: This period is over. Pick the next period first.",
-          "99ed234756458303",
-          "325db1a72af94a04",
-          "52c82caf5f433e60"
+          "refused: This period is over. Pick the next period first.",
+          "6056ff85b64340b6",
+          "a2adfb929867f070",
+          "refused: That player has no foul to take back.",
+          "refused: Nothing to redo.",
+          "ae0cdf6902d6d287",
+          "9a3cd788fdebf905",
+          "7b2f2a6d39348254",
+          "14efc63bcb9f49da",
+          "45f5a7e74a923983",
+          "62fec1ab84bed8aa",
+          "26202a1214965e34",
+          "1db11f39996ce8d5",
+          "c5d19ae4fafc543f",
+          "66325abb7fa4230c",
+          "refused: This period is over. Pick the next period first.",
+          "0605a4d5612d5d43",
+          "3423bb181de81f2f",
+          "1ca98e029ef39513",
+          "refused: That player has no foul to take back.",
+          "e397f356bf7e337b",
+          "8249efedae60fdc3",
+          "350ae66a93616b30",
+          "8ba44cc0d047d55f",
+          "1ea67edb85cba1d6",
+          "7840bd680b00222c",
+          "21f6891cd48d4062",
+          "9000f905e6ecc80b",
+          "9b443044cedb166a",
+          "92760ba838b1c6e1",
+          "5dddff3a69b4ac99",
+          "dc7c892d2907dd71",
+          "c98763a8daa40af3",
+          "36280e23875cd9ec",
+          "8665b55a7f8ce25f",
+          "refused: Nothing to redo.",
+          "59f90a4a85b3623b",
+          "5a8c530d386d6575",
+          "afd2059d3714eba8",
+          "705a15b445f99afb",
+          "9bc123013d22078b",
+          "8c7867bca7bd9eb6",
+          "refused: Nothing to redo.",
+          "refused: There is no timeout to take back.",
+          "a77a9d911501649b",
+          "b6c2e086ac6e9a67",
+          "14283b8b7f19979c",
+          "120ab3e31d2c4d33",
+          "ff36d95a3465b836",
+          "refused: That player has no turnover to take back.",
+          "4d82bff491299354",
+          "6d9eea2df7bde4c4",
+          "1ad651213566767f",
+          "refused: Nothing to redo.",
+          "66a7a25fbbe9d60d",
+          "ff8d1ad78628c8a8",
+          "5344bffd49d615d9",
+          "969bbc89985791f3",
+          "0d5804ad6ae3f901",
+          "c4e67d47406186b6",
+          "07b10366ac54e432",
+          "00eda6bc7613a934",
+          "8df1939cc49191aa",
+          "061eee397f76f79a",
+          "1b2e6fe9983d6d97",
+          "0a6091550be2d238",
+          "dc469cbd52a375e9",
+          "30d273140d66bf1e",
+          "a3fb914827b647fb",
+          "7d45660f41658240",
+          "f8d88763a8174465",
+          "cc04c6732dc1241d",
+          "16bf0ea80f0b0043",
+          "98b7a9e7c9f464eb",
+          "d8d67c5b2f9b6ca5",
+          "3460566e66ea9cf4",
+          "35d3ea2b1a6dd08b",
+          "fed0fe8f0bd55fbe",
+          "7335b9d796dd436d",
+          "24fb10f4cc928d07",
+          "ed40ab9128faf2ba",
+          "refused: Nothing to redo.",
+          "5cf40e23aa3a0857",
+          "refused: There is no team turnover to take back.",
+          "232ac0e976e8b2dd",
+          "a141758474386bfd",
+          "30c8b48d144635ca",
+          "b64c5db7134d5a94",
+          "298b1b019ae86ab0",
+          "fe8dd89c52610c55",
+          "refused: The clock is already running through fouls.",
+          "3845452798d061a8",
+          "c1956594e7ba0788",
+          "601aa6fe0d905ddf",
+          "bed5bef3b57fd71e",
+          "2aeb9ca94583734d",
+          "515f9e15da0dad63",
+          "645b2603784abdb2",
+          "66a71a0f2df1d4a9",
+          "6123dd6ebd4c02b5",
+          "refused: This period is over. Pick the next period first.",
+          "5d1f3b4605e299a0",
+          "87aa944c480658c4",
+          "c11ff2f41bce08ac"
         ],
-        "state": "3d9cc5c9b35eb884",
+        "state": "132223257ab136d7",
         "derived": {
           "period": 8,
-          "periodStartElapsedMs": 320251,
+          "periodStartElapsedMs": 453421,
           "clockMode": "running",
           "teams": {
             "home": {
-              "score": 41,
-              "fouls": 3,
+              "score": 53,
+              "fouls": 4,
               "turnovers": 5,
               "teamTurnovers": 0,
               "periodFouls": 3,
@@ -6883,7 +6929,7 @@
             },
             "away": {
               "score": 51,
-              "fouls": 4,
+              "fouls": 5,
               "turnovers": 5,
               "teamTurnovers": 1,
               "periodFouls": 3,
@@ -6897,46 +6943,46 @@
           "players": {
             "h1": {
               "side": "home",
-              "points": 3,
+              "points": 6,
               "fg1": 0,
               "fg2": 0,
-              "fg3": 1,
-              "fouls": 1,
+              "fg3": 2,
+              "fouls": 2,
               "turnovers": 1,
-              "ms": 499621,
+              "ms": 577811,
               "appeared": true
             },
             "h2": {
               "side": "home",
-              "points": 16,
+              "points": 19,
               "fg1": 0,
               "fg2": 2,
-              "fg3": 4,
+              "fg3": 5,
               "fouls": 0,
               "turnovers": 0,
-              "ms": 134958,
+              "ms": 268128,
               "appeared": true
             },
             "h3": {
               "side": "home",
-              "points": 7,
+              "points": 10,
               "fg1": 1,
               "fg2": 0,
-              "fg3": 2,
+              "fg3": 3,
               "fouls": 1,
               "turnovers": 0,
-              "ms": 540211,
+              "ms": 673381,
               "appeared": true
             },
             "h4": {
               "side": "home",
-              "points": 5,
+              "points": 8,
               "fg1": 0,
               "fg2": 1,
-              "fg3": 1,
+              "fg3": 2,
               "fouls": 0,
               "turnovers": 2,
-              "ms": 620251,
+              "ms": 753421,
               "appeared": true
             },
             "h5": {
@@ -6947,7 +6993,7 @@
               "fg3": 0,
               "fouls": 0,
               "turnovers": 1,
-              "ms": 127969,
+              "ms": 261139,
               "appeared": true
             },
             "a1": {
@@ -6956,9 +7002,9 @@
               "fg1": 1,
               "fg2": 0,
               "fg3": 0,
-              "fouls": 0,
+              "fouls": 1,
               "turnovers": 1,
-              "ms": 620251,
+              "ms": 753421,
               "appeared": true
             },
             "a2": {
@@ -6969,7 +7015,7 @@
               "fg3": 1,
               "fouls": 4,
               "turnovers": 0,
-              "ms": 320251,
+              "ms": 453421,
               "appeared": true
             },
             "a3": {
@@ -6980,7 +7026,7 @@
               "fg3": 0,
               "fouls": 0,
               "turnovers": 0,
-              "ms": 320251,
+              "ms": 453421,
               "appeared": true
             },
             "a4": {
@@ -6991,7 +7037,7 @@
               "fg3": 1,
               "fouls": 0,
               "turnovers": 0,
-              "ms": 37551,
+              "ms": 188088,
               "appeared": true
             },
             "a5": {
@@ -7002,7 +7048,7 @@
               "fg3": 5,
               "fouls": 0,
               "turnovers": 1,
-              "ms": 620251,
+              "ms": 753421,
               "appeared": true
             },
             "h7": {
@@ -7013,7 +7059,7 @@
               "fg3": 1,
               "fouls": 1,
               "turnovers": 0,
-              "ms": 612912,
+              "ms": 667892,
               "appeared": true
             },
             "a7": {
@@ -7024,7 +7070,7 @@
               "fg3": 1,
               "fouls": 0,
               "turnovers": 1,
-              "ms": 582700,
+              "ms": 565333,
               "appeared": true
             },
             "h6": {
@@ -7061,103 +7107,116 @@
               "appeared": true
             }
           },
-          "standing": { "a2": [1, 2, 2, 5], "h3": [2], "h7": [5], "h1": [8] }
+          "standing": { "h1": [1, 8], "a1": [1], "a2": [1, 2, 2, 5], "h3": [2], "h7": [5] }
         },
         "clockLater": {
           "remainingMs": 0,
           "running": false,
-          "anchorAt": 1624492,
-          "elapsedMs": 620251
+          "anchorAt": 1648492,
+          "elapsedMs": 753421
         },
         "running": [
           "0-0",
           "0-0",
           "0-0",
-          "0-1",
-          "0-1",
-          "0-1",
-          "0-2",
-          "0-5",
-          "0-8",
-          "2-8",
-          "2-8",
-          "2-11",
-          "2-11",
-          "2-12",
-          "2-12",
-          "2-12",
-          "2-12",
-          "5-12",
-          "5-12",
-          "5-12",
-          "8-12",
-          "8-13",
-          "10-13",
-          "11-13",
-          "11-14",
-          "11-16",
-          "13-16",
-          "16-16",
-          "19-16",
-          "19-18",
-          "19-18",
-          "19-18",
-          "22-18",
-          "22-19",
-          "22-19",
-          "22-22",
-          "22-25",
-          "22-25",
-          "24-25",
-          "24-26",
-          "24-27",
-          "24-28",
-          "24-30",
-          "24-30",
-          "26-30",
-          "28-30",
-          "28-30",
-          "28-30",
-          "28-30",
-          "28-30",
-          "28-30",
-          "28-30",
-          "28-30",
-          "31-30",
-          "31-30",
-          "31-33",
-          "31-34",
-          "31-35",
-          "31-37",
-          "34-37",
-          "34-37",
-          "37-37",
-          "37-37",
-          "37-37",
-          "37-37",
-          "38-37",
-          "38-37",
-          "38-37",
-          "38-40",
-          "38-41",
-          "38-41",
-          "38-44",
-          "38-46",
-          "38-47",
-          "38-47",
-          "38-47",
-          "38-47",
-          "38-47",
-          "38-48",
-          "38-48",
-          "38-48",
-          "38-51",
-          "38-51",
-          "41-51"
+          "3-0",
+          "6-0",
+          "9-0",
+          "12-0",
+          "12-0",
+          "12-0",
+          "12-1",
+          "12-1",
+          "12-1",
+          "12-2",
+          "12-5",
+          "12-8",
+          "14-8",
+          "14-8",
+          "14-11",
+          "14-11",
+          "14-12",
+          "14-12",
+          "14-12",
+          "14-12",
+          "17-12",
+          "17-12",
+          "17-12",
+          "20-12",
+          "20-13",
+          "22-13",
+          "23-13",
+          "23-14",
+          "23-16",
+          "25-16",
+          "28-16",
+          "31-16",
+          "31-18",
+          "31-18",
+          "31-18",
+          "34-18",
+          "34-19",
+          "34-19",
+          "34-19",
+          "34-22",
+          "34-25",
+          "34-25",
+          "36-25",
+          "36-26",
+          "36-27",
+          "36-28",
+          "36-30",
+          "36-30",
+          "38-30",
+          "40-30",
+          "40-30",
+          "40-30",
+          "40-30",
+          "40-30",
+          "40-30",
+          "40-30",
+          "40-30",
+          "43-30",
+          "43-30",
+          "43-33",
+          "43-34",
+          "43-35",
+          "43-37",
+          "46-37",
+          "46-37",
+          "49-37",
+          "49-37",
+          "49-37",
+          "49-37",
+          "50-37",
+          "50-37",
+          "50-37",
+          "50-40",
+          "50-41",
+          "50-41",
+          "50-44",
+          "50-46",
+          "50-47",
+          "50-47",
+          "50-47",
+          "50-47",
+          "50-47",
+          "50-48",
+          "50-48",
+          "50-48",
+          "50-51",
+          "50-51",
+          "53-51"
         ],
         "words": [
           "Home starting lineup: #h1, #h2, #h3, #h4, #h5",
           "Away starting lineup: #a1, #a2, #a3, #a4, #a5",
+          "Foul — #h1",
+          "#h1 +3",
+          "#h2 +3",
+          "#h3 +3",
+          "#h4 +3",
+          "Foul — #a1",
           "Full timeout — Home",
           "#a3 +1",
           "Foul — #a2",
@@ -7190,6 +7249,7 @@
           "30-second timeout — Home",
           "#h2 +3",
           "#a3 +1",
+          "Stop clock on",
           "Turnover — #a7",
           "#a5 +3",
           "#a7 +3",
@@ -7241,7 +7301,8 @@
           "Full timeout — Home",
           "#h2 +3"
         ],
-        "hasRecordedStats": true
+        "hasRecordedStats": true,
+        "mercyClocks": 1
       }
     },
     {
@@ -8189,7 +8250,8 @@
           "#a3 +2",
           "#h4 +1"
         ],
-        "hasRecordedStats": true
+        "hasRecordedStats": true,
+        "mercyClocks": 0
       }
     },
     {
@@ -9225,7 +9287,4325 @@
           "#h3 +1",
           "#h6 +2"
         ],
-        "hasRecordedStats": true
+        "hasRecordedStats": true,
+        "mercyClocks": 0
+      }
+    },
+    {
+      "name": "colors, rules and reset",
+      "rules": {
+        "periods": 4,
+        "periodSeconds": 480,
+        "overtimeSeconds": 240,
+        "bonusFouls": 5,
+        "doubleBonusFouls": null,
+        "fullTimeouts": 3,
+        "shortTimeouts": 2,
+        "timeoutsPer": "game",
+        "overtimeTimeouts": 1,
+        "timeoutsCarry": false
+      },
+      "commands": [
+        {
+          "command": {
+            "type": "rules",
+            "rules": {
+              "periods": 2,
+              "periodSeconds": 1200,
+              "overtimeSeconds": 300,
+              "bonusFouls": 7,
+              "doubleBonusFouls": 10,
+              "fullTimeouts": 2,
+              "shortTimeouts": 0,
+              "timeoutsPer": "half",
+              "overtimeTimeouts": 1,
+              "timeoutsCarry": false
+            }
+          },
+          "id": "g20-0",
+          "now": 4000
+        },
+        { "command": { "type": "colors", "swapped": true }, "id": "g20-1", "now": 7000 },
+        {
+          "command": {
+            "type": "lineup",
+            "side": "home",
+            "playerIds": ["h1", "h2", "h3", "h4", "h5"]
+          },
+          "id": "g20-2",
+          "now": 7000
+        },
+        {
+          "command": {
+            "type": "lineup",
+            "side": "away",
+            "playerIds": ["a1", "a2", "a3", "a4", "a5"]
+          },
+          "id": "g20-3",
+          "now": 7000
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h6", "outId": "h3" },
+          "id": "g20-4",
+          "now": 25815
+        },
+        { "command": { "type": "undo" }, "id": "g20-5", "now": 30609 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a1", "points": 1 },
+          "id": "g20-6",
+          "now": 41008
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 1 },
+          "id": "g20-7",
+          "now": 54970
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 2 },
+          "id": "g20-8",
+          "now": 58630
+        },
+        { "command": { "type": "undo" }, "id": "g20-9", "now": 81565 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 1 },
+          "id": "g20-10",
+          "now": 105470
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a1", "points": 1 },
+          "id": "g20-11",
+          "now": 111238
+        },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g20-12", "now": 132008 },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a8", "outId": "a2" },
+          "id": "g20-13",
+          "now": 153816
+        },
+        {
+          "command": { "type": "unturnover", "side": "home", "playerId": "h3" },
+          "id": "g20-14",
+          "now": 153925
+        },
+        { "command": { "type": "team-turnover", "side": "home" }, "id": "g20-15", "now": 159982 },
+        { "command": { "type": "undo" }, "id": "g20-16", "now": 170551 },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h8", "outId": "h2" },
+          "id": "g20-17",
+          "now": 194887
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h4", "points": 3 },
+          "id": "g20-18",
+          "now": 212402
+        },
+        { "command": { "type": "end" }, "id": "g20-19", "now": 230344 },
+        { "command": { "type": "period", "period": 3 }, "id": "g20-20", "now": 248461 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 1 },
+          "id": "g20-21",
+          "now": 271051
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h5" },
+          "id": "g20-22",
+          "now": 277122
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a8", "points": 3 },
+          "id": "g20-23",
+          "now": 301712
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a1", "points": 2 },
+          "id": "g20-24",
+          "now": 306015
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 2 },
+          "id": "g20-25",
+          "now": 336657
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 1 },
+          "id": "g20-26",
+          "now": 356263
+        },
+        { "command": { "type": "reopen" }, "id": "g20-27", "now": 370087 },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h1" },
+          "id": "g20-28",
+          "now": 375799
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g20-29",
+          "now": 383568
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h4", "points": 1 },
+          "id": "g20-30",
+          "now": 394325
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a8" },
+          "id": "g20-31",
+          "now": 416625
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 3 },
+          "id": "g20-32",
+          "now": 425849
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 2 },
+          "id": "g20-33",
+          "now": 435310
+        },
+        { "command": { "type": "undo" }, "id": "g20-34", "now": 459349 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
+          "id": "g20-35",
+          "now": 472633
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a3" },
+          "id": "g20-36",
+          "now": 473718
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h4", "points": 2 },
+          "id": "g20-37",
+          "now": 496179
+        },
+        { "command": { "type": "set-clock", "ms": 56000 }, "id": "g20-38", "now": 498498 },
+        {
+          "command": { "type": "timeout", "side": "away", "seconds": 60 },
+          "id": "g20-39",
+          "now": 516043
+        },
+        { "command": { "type": "team-unturnover", "side": "away" }, "id": "g20-40", "now": 535977 },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g20-41", "now": 548006 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
+          "id": "g20-42",
+          "now": 572521
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h2", "outId": "h3" },
+          "id": "g20-43",
+          "now": 588455
+        },
+        { "command": { "type": "undo" }, "id": "g20-44", "now": 605352 },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a4" },
+          "id": "g20-45",
+          "now": 624052
+        },
+        { "command": { "type": "undo" }, "id": "g20-46", "now": 637504 },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g20-47", "now": 646341 },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a5" },
+          "id": "g20-48",
+          "now": 667710
+        },
+        { "command": { "type": "redo" }, "id": "g20-49", "now": 676976 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 1 },
+          "id": "g20-50",
+          "now": 701583
+        },
+        { "command": { "type": "undo" }, "id": "g20-51", "now": 721256 },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a7", "outId": "a4" },
+          "id": "g20-52",
+          "now": 740465
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a4", "outId": "a1" },
+          "id": "g20-53",
+          "now": 754565
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+          "id": "g20-54",
+          "now": 760732
+        },
+        { "command": { "type": "start" }, "id": "g20-55", "now": 799223 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a8", "points": 2 },
+          "id": "g20-56",
+          "now": 805114
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a8" },
+          "id": "g20-57",
+          "now": 811439
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h4", "points": 1 },
+          "id": "g20-58",
+          "now": 827889
+        },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a8" },
+          "id": "g20-59",
+          "now": 847251
+        },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a5" },
+          "id": "g20-60",
+          "now": 853784
+        },
+        { "command": { "type": "period", "period": 3 }, "id": "g20-61", "now": 876956 },
+        { "command": { "type": "undo" }, "id": "g20-62", "now": 888359 },
+        { "command": { "type": "untimeout", "side": "home" }, "id": "g20-63", "now": 901131 },
+        { "command": { "type": "undo" }, "id": "g20-64", "now": 907761 },
+        { "command": { "type": "clock-mode", "mode": "stop" }, "id": "g20-65", "now": 929959 },
+        {
+          "command": { "type": "unfoul", "side": "home", "playerId": "h1" },
+          "id": "g20-66",
+          "now": 936279
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 2 },
+          "id": "g20-67",
+          "now": 956446
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 2 },
+          "id": "g20-68",
+          "now": 980273
+        },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h8" },
+          "id": "g20-69",
+          "now": 1001331
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h8", "points": 1 },
+          "id": "g20-70",
+          "now": 1023399
+        },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h1" },
+          "id": "g20-71",
+          "now": 1035956
+        },
+        { "command": { "type": "set-clock", "ms": 53000 }, "id": "g20-72", "now": 1042227 },
+        { "command": { "type": "period", "period": 2 }, "id": "g20-73", "now": 1066056 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 3 },
+          "id": "g20-74",
+          "now": 1078527
+        },
+        {
+          "command": { "type": "unturnover", "side": "away", "playerId": "a7" },
+          "id": "g20-75",
+          "now": 1097938
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 3 },
+          "id": "g20-76",
+          "now": 1110071
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h8", "points": 2 },
+          "id": "g20-77",
+          "now": 1119008
+        },
+        { "command": { "type": "start" }, "id": "g20-78", "now": 1121933 },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a7" },
+          "id": "g20-79",
+          "now": 1142731
+        },
+        { "command": { "type": "redo" }, "id": "g20-80", "now": 1149227 },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h2", "outId": "h4" },
+          "id": "g20-81",
+          "now": 1161440
+        },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g20-82", "now": 1162053 },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a1", "outId": "a7" },
+          "id": "g20-83",
+          "now": 1182418
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 2 },
+          "id": "g20-84",
+          "now": 1205585
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 3 },
+          "id": "g20-85",
+          "now": 1225095
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a8", "points": 2 },
+          "id": "g20-86",
+          "now": 1225646
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 2 },
+          "id": "g20-87",
+          "now": 1263498
+        },
+        { "command": { "type": "team-turnover", "side": "away" }, "id": "g20-88", "now": 1269234 },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a8" },
+          "id": "g20-89",
+          "now": 1272699
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h6", "outId": "h3" },
+          "id": "g20-90",
+          "now": 1297261
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h8" },
+          "id": "g20-91",
+          "now": 1304863
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a1" },
+          "id": "g20-92",
+          "now": 1305578
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a8", "points": 1 },
+          "id": "g20-93",
+          "now": 1321018
+        },
+        { "command": { "type": "team-turnover", "side": "away" }, "id": "g20-94", "now": 1332419 },
+        {
+          "command": { "type": "team-unturnover", "side": "away" },
+          "id": "g20-95",
+          "now": 1356879
+        },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a5" },
+          "id": "g20-96",
+          "now": 1363610
+        },
+        { "command": { "type": "redo" }, "id": "g20-97", "now": 1366916 },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a5" },
+          "id": "g20-98",
+          "now": 1374281
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h3", "outId": "h6" },
+          "id": "g20-99",
+          "now": 1379348
+        },
+        { "command": { "type": "pause" }, "id": "g20-100", "now": 1394476 },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a8" },
+          "id": "g20-101",
+          "now": 1400560
+        },
+        {
+          "command": { "type": "unturnover", "side": "home", "playerId": "h3" },
+          "id": "g20-102",
+          "now": 1411084
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g20-103",
+          "now": 1419776
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 1 },
+          "id": "g20-104",
+          "now": 1420392
+        },
+        { "command": { "type": "start" }, "id": "g20-105", "now": 1424472 },
+        { "command": { "type": "undo" }, "id": "g20-106", "now": 1424479 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 3 },
+          "id": "g20-107",
+          "now": 1447462
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a6", "outId": "a3" },
+          "id": "g20-108",
+          "now": 1463831
+        },
+        { "command": { "type": "pause" }, "id": "g20-109", "now": 1488135 },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a6" },
+          "id": "g20-110",
+          "now": 1504856
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a3", "outId": "a1" },
+          "id": "g20-111",
+          "now": 1516329
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 3 },
+          "id": "g20-112",
+          "now": 1517732
+        },
+        {
+          "command": { "type": "timeout", "side": "away", "seconds": 60 },
+          "id": "g20-113",
+          "now": 1525526
+        },
+        { "command": { "type": "undo" }, "id": "g20-114", "now": 1538332 },
+        { "command": { "type": "undo" }, "id": "g20-115", "now": 1558822 },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 60 },
+          "id": "g20-116",
+          "now": 1572280
+        },
+        { "command": { "type": "team-turnover", "side": "away" }, "id": "g20-117", "now": 1596530 },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h3" },
+          "id": "g20-118",
+          "now": 1609242
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g20-119",
+          "now": 1611557
+        },
+        { "command": { "type": "start" }, "id": "g20-120", "now": 1613749 },
+        { "command": { "type": "redo" }, "id": "g20-121", "now": 1634543 },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h5" },
+          "id": "g20-122",
+          "now": 1655628
+        },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h5" },
+          "id": "g20-123",
+          "now": 1669191
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 1 },
+          "id": "g20-124",
+          "now": 1679768
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
+          "id": "g20-125",
+          "now": 1681361
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g20-126",
+          "now": 1685942
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h5" },
+          "id": "g20-127",
+          "now": 1692892
+        },
+        { "command": { "type": "redo" }, "id": "g20-128", "now": 1710647 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 2 },
+          "id": "g20-129",
+          "now": 1723361
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a6", "points": 1 },
+          "id": "g20-130",
+          "now": 1727605
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 3 },
+          "id": "g20-131",
+          "now": 1752221
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h3" },
+          "id": "g20-132",
+          "now": 1771506
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a6", "points": 2 },
+          "id": "g20-133",
+          "now": 1772650
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h5" },
+          "id": "g20-134",
+          "now": 1774876
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 2 },
+          "id": "g20-135",
+          "now": 1777706
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a6" },
+          "id": "g20-136",
+          "now": 1783192
+        },
+        { "command": { "type": "team-turnover", "side": "home" }, "id": "g20-137", "now": 1789128 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a6", "points": 1 },
+          "id": "g20-138",
+          "now": 1802390
+        },
+        { "command": { "type": "reset" }, "id": "g20-139", "now": 1805390 },
+        {
+          "command": {
+            "type": "rules",
+            "rules": {
+              "periods": 4,
+              "periodSeconds": 480,
+              "overtimeSeconds": 240,
+              "bonusFouls": 5,
+              "doubleBonusFouls": null,
+              "fullTimeouts": 3,
+              "shortTimeouts": 2,
+              "timeoutsPer": "game",
+              "overtimeTimeouts": 1,
+              "timeoutsCarry": false
+            }
+          },
+          "id": "g20-140",
+          "now": 1808390
+        },
+        { "command": { "type": "colors", "swapped": false }, "id": "g20-141", "now": 1811390 },
+        {
+          "command": {
+            "type": "lineup",
+            "side": "home",
+            "playerIds": ["h1", "h2", "h3", "h4", "h5"]
+          },
+          "id": "g20-142",
+          "now": 1814390
+        },
+        {
+          "command": {
+            "type": "lineup",
+            "side": "away",
+            "playerIds": ["a1", "a2", "a3", "a4", "a5"]
+          },
+          "id": "g20-143",
+          "now": 1817390
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+          "id": "g20-144",
+          "now": 1820390
+        },
+        { "command": { "type": "end" }, "id": "g20-145", "now": 1820390 }
+      ],
+      "expected": {
+        "steps": [
+          "88082099eb629670",
+          "ca4fe808550e65fb",
+          "d11b2e9366670a7f",
+          "55e1bb418acf7193",
+          "a674c1c93ad9531c",
+          "2e06357faab4e38f",
+          "a4b3d68afa4f14b9",
+          "980b34e0d9c252ae",
+          "c92cc6de19ad8c47",
+          "f37c0114ee24831f",
+          "68a5b62be5fd9568",
+          "140ff7969aa93c70",
+          "033a2bfcc2de0456",
+          "ee5af8c1b666ac3f",
+          "refused: That player has no turnover to take back.",
+          "f8a02a0d985a9039",
+          "3543f83e24654bc1",
+          "70d8260456710023",
+          "3a07b10d3db8231f",
+          "981267f241857b73",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "21bc0a0738e106f7",
+          "90c28e06ba7c74e3",
+          "10952cda75d0c7b4",
+          "63442b5f388c338c",
+          "1b0713a9f7fd6c68",
+          "f6438d723ae4cb9f",
+          "d0f1d67a2eb0b0ac",
+          "8754898d426666c2",
+          "75c0dec188ad2447",
+          "d8ae5479672dd38d",
+          "61db1b8f16c2b28c",
+          "8d88a1b891108107",
+          "826262cd7a7bf837",
+          "refused: There is no team turnover to take back.",
+          "refused: The clock is already running through fouls.",
+          "11e5716c5fd14ab8",
+          "780df6fba4b4d090",
+          "493313e903ba6ec8",
+          "b018c170bdd1835c",
+          "47c376f6bf394664",
+          "refused: The clock is already running through fouls.",
+          "a4f3e5d3e92023ce",
+          "refused: Nothing to redo.",
+          "a467ab921eabe1d7",
+          "f029fba129e973bf",
+          "b14b59de25ebe488",
+          "c66e42ba04568f60",
+          "5b63a55465a3a036",
+          "760b890050661bf5",
+          "cd13fe9400618313",
+          "ad52825a06e71347",
+          "2b363f1fc6202515",
+          "b80c0220d7c78b08",
+          "99dc8518676032d6",
+          "2436bbd24f9984a5",
+          "d530b7f07757be3c",
+          "refused: There is no timeout to take back.",
+          "6080e603bb1869d7",
+          "70fc3b565dbdd201",
+          "57ea57589218738b",
+          "7d599c42fd3532dd",
+          "6b2f02832eebb98f",
+          "cad9414b3b9a063a",
+          "984af2789af7a062",
+          "5bca7f0c09ead3c6",
+          "60ed320b3e30c785",
+          "8205c36f6faba181",
+          "9b2e70e971900504",
+          "refused: That player has no turnover to take back.",
+          "21f8be7cf066744e",
+          "f6163539fc7c9bd1",
+          "98f4f5115ecaf730",
+          "refused: That player has no foul to take back.",
+          "refused: Nothing to redo.",
+          "28d31b07d9e46443",
+          "9a46645ad0b827e1",
+          "0d3e1809e422d9fa",
+          "7159bf86a1d8886a",
+          "20f5d7a91fa77be5",
+          "fde2c4d5c01a3b0e",
+          "c215208911b2e6b2",
+          "d118d3c32ce37aee",
+          "30e91fb39de85d96",
+          "20bea0aaa45c50c0",
+          "b8ccc0040b727ed2",
+          "d9151205a7a62514",
+          "7d9b2d0bdf8e473b",
+          "15e003d8ca4d7fa1",
+          "8d92d113a0ddad40",
+          "76c00bacc8e46a50",
+          "refused: Nothing to redo.",
+          "09537ef98055290a",
+          "b654685e449523e1",
+          "bfcaa26fa6c55f9c",
+          "f3b6069bd5a1d6ee",
+          "refused: That player has no turnover to take back.",
+          "29c55bc3c1f2a02a",
+          "093958ee74ce5591",
+          "4a7dcc80796e3433",
+          "ec71cbcc0f9c85bf",
+          "feb9f434abc3af92",
+          "195ee3e9fc6e0ba1",
+          "a6b6a79e01288891",
+          "refused: That player has no foul to take back.",
+          "7f998671e35616ba",
+          "a4f1dd4872d63d52",
+          "014e6c5ab729d234",
+          "f314c544b58f7663",
+          "bfa93011d3e673ec",
+          "c8f55b0e512f0b94",
+          "71316b1e8b5f0118",
+          "96f77045c23faab9",
+          "1eff77959a847273",
+          "c4e7502c783cbef1",
+          "refused: Nothing to redo.",
+          "d9874f450d013ea3",
+          "18a1599da480608d",
+          "62af8f1f612404e8",
+          "b1bc098abf01ee17",
+          "5c2ab90b64aa17a1",
+          "d8903f895a4519cd",
+          "refused: Nothing to redo.",
+          "2b58cc0bc01c2392",
+          "24a1a9ecada48ff2",
+          "ffca0ffb41c6e178",
+          "ab590283a462a8ff",
+          "99934210153d0252",
+          "87833341c736fc5b",
+          "8bab54cff4d4c8e6",
+          "8aacfca1293d5cd9",
+          "6b3883a19623927a",
+          "05c5a85537563854",
+          "2c5d388f51fe7dc6",
+          "4a23580a6461b39f",
+          "61c377cc0c85d349",
+          "92cabbdf02d4e576",
+          "ac4fb94736253944",
+          "72e3da2ed8e33950",
+          "62e528f759a7e794"
+        ],
+        "state": "2a66ecc2cc541db9",
+        "derived": {
+          "period": 1,
+          "periodStartElapsedMs": 0,
+          "clockMode": "stop",
+          "teams": {
+            "home": {
+              "score": 2,
+              "fouls": 0,
+              "turnovers": 0,
+              "teamTurnovers": 0,
+              "periodFouls": 0,
+              "onCourt": ["h1", "h2", "h3", "h4", "h5"],
+              "penalty": 0,
+              "bonus": 0,
+              "timeouts": [],
+              "timeoutsLeft": { "full": 3, "short": 2 }
+            },
+            "away": {
+              "score": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "teamTurnovers": 0,
+              "periodFouls": 0,
+              "onCourt": ["a1", "a2", "a3", "a4", "a5"],
+              "penalty": 0,
+              "bonus": 0,
+              "timeouts": [],
+              "timeoutsLeft": { "full": 3, "short": 2 }
+            }
+          },
+          "players": {
+            "h1": {
+              "side": "home",
+              "points": 2,
+              "fg1": 0,
+              "fg2": 1,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "h2": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "h3": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "h4": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "h5": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "a1": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "a2": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "a3": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "a4": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "a5": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            }
+          },
+          "standing": {}
+        },
+        "clockLater": {
+          "remainingMs": 480000,
+          "running": false,
+          "anchorAt": 1805390,
+          "elapsedMs": 0
+        },
+        "running": ["0-0", "0-0", "2-0"],
+        "words": [
+          "Home starting lineup: #h1, #h2, #h3, #h4, #h5",
+          "Away starting lineup: #a1, #a2, #a3, #a4, #a5",
+          "#h1 +2"
+        ],
+        "hasRecordedStats": true,
+        "mercyClocks": 0
+      }
+    },
+    {
+      "name": "team fouls by game",
+      "rules": {
+        "periods": 4,
+        "periodSeconds": 480,
+        "overtimeSeconds": 240,
+        "bonusFouls": 5,
+        "doubleBonusFouls": null,
+        "fullTimeouts": 3,
+        "shortTimeouts": 2,
+        "timeoutsPer": "game",
+        "overtimeTimeouts": 1,
+        "timeoutsCarry": false,
+        "teamFoulsReset": "game"
+      },
+      "commands": [
+        {
+          "command": {
+            "type": "lineup",
+            "side": "home",
+            "playerIds": ["h1", "h2", "h3", "h4", "h5"]
+          },
+          "id": "g21-0",
+          "now": 1000
+        },
+        {
+          "command": {
+            "type": "lineup",
+            "side": "away",
+            "playerIds": ["a1", "a2", "a3", "a4", "a5"]
+          },
+          "id": "g21-1",
+          "now": 1000
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 2 },
+          "id": "g21-2",
+          "now": 11807
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a3" },
+          "id": "g21-3",
+          "now": 34106
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h4" },
+          "id": "g21-4",
+          "now": 53514
+        },
+        { "command": { "type": "redo" }, "id": "g21-5", "now": 62015 },
+        { "command": { "type": "set-clock", "ms": 3000 }, "id": "g21-6", "now": 67175 },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 60 },
+          "id": "g21-7",
+          "now": 79391
+        },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g21-8", "now": 81836 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a2", "points": 2 },
+          "id": "g21-9",
+          "now": 98057
+        },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a2" },
+          "id": "g21-10",
+          "now": 105844
+        },
+        { "command": { "type": "period", "period": 2 }, "id": "g21-11", "now": 129025 },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g21-12", "now": 150643 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 3 },
+          "id": "g21-13",
+          "now": 153837
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a2", "points": 2 },
+          "id": "g21-14",
+          "now": 163638
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 1 },
+          "id": "g21-15",
+          "now": 184684
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
+          "id": "g21-16",
+          "now": 199733
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a2", "points": 1 },
+          "id": "g21-17",
+          "now": 222262
+        },
+        { "command": { "type": "set-clock", "ms": 43000 }, "id": "g21-18", "now": 224422 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 3 },
+          "id": "g21-19",
+          "now": 234692
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 2 },
+          "id": "g21-20",
+          "now": 240933
+        },
+        { "command": { "type": "redo" }, "id": "g21-21", "now": 242256 },
+        { "command": { "type": "start" }, "id": "g21-22", "now": 251250 },
+        { "command": { "type": "pause" }, "id": "g21-23", "now": 259661 },
+        { "command": { "type": "reopen" }, "id": "g21-24", "now": 280537 },
+        { "command": { "type": "start" }, "id": "g21-25", "now": 292078 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 2 },
+          "id": "g21-26",
+          "now": 292157
+        },
+        { "command": { "type": "undo" }, "id": "g21-27", "now": 298819 },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a3" },
+          "id": "g21-28",
+          "now": 304435
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 2 },
+          "id": "g21-29",
+          "now": 320132
+        },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g21-30", "now": 338662 },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a5" },
+          "id": "g21-31",
+          "now": 355053
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 2 },
+          "id": "g21-32",
+          "now": 365309
+        },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a5" },
+          "id": "g21-33",
+          "now": 367094
+        },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a1" },
+          "id": "g21-34",
+          "now": 374497
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 1 },
+          "id": "g21-35",
+          "now": 382796
+        },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a3" },
+          "id": "g21-36",
+          "now": 402847
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
+          "id": "g21-37",
+          "now": 410447
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
+          "id": "g21-38",
+          "now": 422452
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a8", "outId": "a5" },
+          "id": "g21-39",
+          "now": 433157
+        },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 30 },
+          "id": "g21-40",
+          "now": 439830
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h8", "outId": "h4" },
+          "id": "g21-41",
+          "now": 461877
+        },
+        { "command": { "type": "start" }, "id": "g21-42", "now": 479411 },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h7", "outId": "h8" },
+          "id": "g21-43",
+          "now": 498645
+        },
+        { "command": { "type": "period", "period": 4 }, "id": "g21-44", "now": 531867 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 2 },
+          "id": "g21-45",
+          "now": 536288
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a5", "outId": "a8" },
+          "id": "g21-46",
+          "now": 557322
+        },
+        { "command": { "type": "redo" }, "id": "g21-47", "now": 565841 },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a3" },
+          "id": "g21-48",
+          "now": 585989
+        },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 30 },
+          "id": "g21-49",
+          "now": 602158
+        },
+        { "command": { "type": "period", "period": 5 }, "id": "g21-50", "now": 622169 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 2 },
+          "id": "g21-51",
+          "now": 626312
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a7", "outId": "a2" },
+          "id": "g21-52",
+          "now": 632040
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a6", "outId": "a5" },
+          "id": "g21-53",
+          "now": 634779
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h1" },
+          "id": "g21-54",
+          "now": 646668
+        },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a1" },
+          "id": "g21-55",
+          "now": 668388
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+          "id": "g21-56",
+          "now": 668880
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a7" },
+          "id": "g21-57",
+          "now": 673751
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 3 },
+          "id": "g21-58",
+          "now": 675745
+        },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a4" },
+          "id": "g21-59",
+          "now": 689763
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 3 },
+          "id": "g21-60",
+          "now": 704973
+        },
+        { "command": { "type": "team-turnover", "side": "home" }, "id": "g21-61", "now": 724424 },
+        { "command": { "type": "start" }, "id": "g21-62", "now": 734001 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g21-63",
+          "now": 751269
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a6" },
+          "id": "g21-64",
+          "now": 766180
+        },
+        { "command": { "type": "pause" }, "id": "g21-65", "now": 790944 },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a4" },
+          "id": "g21-66",
+          "now": 791897
+        },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a4" },
+          "id": "g21-67",
+          "now": 807217
+        },
+        {
+          "command": { "type": "unfoul", "side": "home", "playerId": "h1" },
+          "id": "g21-68",
+          "now": 817798
+        },
+        { "command": { "type": "team-turnover", "side": "home" }, "id": "g21-69", "now": 820873 },
+        {
+          "command": { "type": "timeout", "side": "away", "seconds": 30 },
+          "id": "g21-70",
+          "now": 823647
+        },
+        { "command": { "type": "start" }, "id": "g21-71", "now": 842907 },
+        { "command": { "type": "team-turnover", "side": "home" }, "id": "g21-72", "now": 848257 },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a5", "outId": "a3" },
+          "id": "g21-73",
+          "now": 852386
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+          "id": "g21-74",
+          "now": 857608
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a7", "points": 2 },
+          "id": "g21-75",
+          "now": 871424
+        },
+        {
+          "command": { "type": "unturnover", "side": "away", "playerId": "a5" },
+          "id": "g21-76",
+          "now": 875737
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h6", "outId": "h7" },
+          "id": "g21-77",
+          "now": 886438
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 1 },
+          "id": "g21-78",
+          "now": 899873
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
+          "id": "g21-79",
+          "now": 919454
+        },
+        { "command": { "type": "set-clock", "ms": 15000 }, "id": "g21-80", "now": 934929 },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h3" },
+          "id": "g21-81",
+          "now": 944298
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 3 },
+          "id": "g21-82",
+          "now": 957796
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 1 },
+          "id": "g21-83",
+          "now": 962750
+        },
+        { "command": { "type": "redo" }, "id": "g21-84", "now": 985369 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
+          "id": "g21-85",
+          "now": 1005889
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g21-86",
+          "now": 1027863
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a2", "outId": "a6" },
+          "id": "g21-87",
+          "now": 1031559
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a7", "points": 3 },
+          "id": "g21-88",
+          "now": 1053011
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 3 },
+          "id": "g21-89",
+          "now": 1072070
+        },
+        {
+          "command": { "type": "timeout", "side": "away", "seconds": 60 },
+          "id": "g21-90",
+          "now": 1083930
+        },
+        { "command": { "type": "start" }, "id": "g21-91", "now": 1089777 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a2", "points": 2 },
+          "id": "g21-92",
+          "now": 1103418
+        },
+        { "command": { "type": "redo" }, "id": "g21-93", "now": 1124876 },
+        { "command": { "type": "pause" }, "id": "g21-94", "now": 1138245 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a7", "points": 2 },
+          "id": "g21-95",
+          "now": 1141079
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a4" },
+          "id": "g21-96",
+          "now": 1154840
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 2 },
+          "id": "g21-97",
+          "now": 1164185
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
+          "id": "g21-98",
+          "now": 1184033
+        },
+        { "command": { "type": "start" }, "id": "g21-99", "now": 1205141 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h6", "points": 2 },
+          "id": "g21-100",
+          "now": 1215418
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 2 },
+          "id": "g21-101",
+          "now": 1219251
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h7", "outId": "h1" },
+          "id": "g21-102",
+          "now": 1220013
+        },
+        { "command": { "type": "start" }, "id": "g21-103", "now": 1226576 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a7", "points": 3 },
+          "id": "g21-104",
+          "now": 1249502
+        },
+        { "command": { "type": "undo" }, "id": "g21-105", "now": 1270856 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
+          "id": "g21-106",
+          "now": 1275290
+        },
+        {
+          "command": { "type": "unfoul", "side": "home", "playerId": "h6" },
+          "id": "g21-107",
+          "now": 1287649
+        },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g21-108", "now": 1290699 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g21-109",
+          "now": 1308032
+        },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a4" },
+          "id": "g21-110",
+          "now": 1327452
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a7", "points": 1 },
+          "id": "g21-111",
+          "now": 1348243
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h6", "points": 1 },
+          "id": "g21-112",
+          "now": 1368997
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h5" },
+          "id": "g21-113",
+          "now": 1379087
+        },
+        {
+          "command": { "type": "unturnover", "side": "home", "playerId": "h6" },
+          "id": "g21-114",
+          "now": 1385512
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a8", "outId": "a4" },
+          "id": "g21-115",
+          "now": 1403710
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h2" },
+          "id": "g21-116",
+          "now": 1415956
+        },
+        {
+          "command": { "type": "team-unturnover", "side": "home" },
+          "id": "g21-117",
+          "now": 1421374
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
+          "id": "g21-118",
+          "now": 1439630
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h5" },
+          "id": "g21-119",
+          "now": 1449679
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a7" },
+          "id": "g21-120",
+          "now": 1465161
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 1 },
+          "id": "g21-121",
+          "now": 1476056
+        },
+        { "command": { "type": "start" }, "id": "g21-122", "now": 1489426 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h6", "points": 2 },
+          "id": "g21-123",
+          "now": 1513764
+        },
+        {
+          "command": { "type": "timeout", "side": "away", "seconds": 60 },
+          "id": "g21-124",
+          "now": 1517373
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h7", "points": 2 },
+          "id": "g21-125",
+          "now": 1525799
+        },
+        { "command": { "type": "period", "period": 6 }, "id": "g21-126", "now": 1545101 },
+        { "command": { "type": "untimeout", "side": "home" }, "id": "g21-127", "now": 1563863 },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a5" },
+          "id": "g21-128",
+          "now": 1572447
+        },
+        {
+          "command": { "type": "timeout", "side": "away", "seconds": 60 },
+          "id": "g21-129",
+          "now": 1591911
+        },
+        { "command": { "type": "start" }, "id": "g21-130", "now": 1596470 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h6", "points": 1 },
+          "id": "g21-131",
+          "now": 1615012
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h1", "outId": "h7" },
+          "id": "g21-132",
+          "now": 1639125
+        },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a8" },
+          "id": "g21-133",
+          "now": 1653697
+        },
+        { "command": { "type": "undo" }, "id": "g21-134", "now": 1660622 },
+        { "command": { "type": "pause" }, "id": "g21-135", "now": 1662210 },
+        { "command": { "type": "clock-mode", "mode": "stop" }, "id": "g21-136", "now": 1671624 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a8", "points": 3 },
+          "id": "g21-137",
+          "now": 1693809
+        },
+        { "command": { "type": "end" }, "id": "g21-138", "now": 1693809 }
+      ],
+      "expected": {
+        "steps": [
+          "0cfc85ada617d5ee",
+          "8547b7b6f6a5bf65",
+          "e3c483ad27b56739",
+          "1e3a9154d6b6c043",
+          "1c316631ee5a6266",
+          "refused: Nothing to redo.",
+          "9d3adcdd1583c3fc",
+          "06bf339897967d2f",
+          "4507a79ed4e26961",
+          "c6cbd8de94adc339",
+          "refused: That player has no foul to take back.",
+          "a89729857044e1b1",
+          "refused: The clock is already running through fouls.",
+          "ddb80235b373b361",
+          "8402b4536207ed84",
+          "f6dd32f219f280eb",
+          "c092d284fa4822d8",
+          "79a48bc159c101b2",
+          "1033815682a322d2",
+          "ef2d7dbc1bce255c",
+          "9533e8093eb217f9",
+          "refused: Nothing to redo.",
+          "c662ed39e18604c7",
+          "5a3e8c3b5da4d3b6",
+          "refused: Only a final game can be reopened.",
+          "9024c8ce555d315a",
+          "46bbb36868ca9ce5",
+          "b2e7dc5eed922a24",
+          "fc49ad78f4ca64c8",
+          "627f1d5aaea4584e",
+          "refused: The clock is already running through fouls.",
+          "f3e0d2a2f794e767",
+          "846cc6a714cbe3ed",
+          "refused: That player has no foul to take back.",
+          "refused: That player has no foul to take back.",
+          "700fa23ce7761e2f",
+          "d3347ac2b0b5dcf7",
+          "99b38c18cb9d4f80",
+          "fb29fcc2bf8b602e",
+          "5870597077b7c6b0",
+          "1c43990454a63ba6",
+          "7f46d9a72d3ad909",
+          "refused: This period is over. Pick the next period first.",
+          "691bbf3fff7e32e4",
+          "4a967e5d264e13ff",
+          "d13a8709dc064b54",
+          "a10d883108e3dc9d",
+          "refused: Nothing to redo.",
+          "45447a1ee54cc368",
+          "85b26efaeea69af0",
+          "9aff0d966bee86ff",
+          "0696ff2ee8af5f32",
+          "c191f89b2938d77a",
+          "611d5bfd5efd5ee1",
+          "7c3a393e0cf10ec7",
+          "1aba332be8f44939",
+          "d4f29e21e5cb549f",
+          "6877dcc0bd695f0a",
+          "748057c9d0c27b9f",
+          "a364e63a56893431",
+          "46f65a71154e7b32",
+          "14bd34c0c64fcf78",
+          "1850998ce72916df",
+          "b830ba499bd63bb8",
+          "62adf37cea5f27d6",
+          "1a21028b973225fa",
+          "49dd60d6a0751db4",
+          "468fe12b86d2a944",
+          "0b0db0271ec6d93b",
+          "f3b9fd68c8c7247e",
+          "6b4b34339c0ae23f",
+          "a723e2b0655588e1",
+          "e2ae1e05ba165ca7",
+          "d6f23381e8b8b51f",
+          "89eea0f553087054",
+          "111de471d5b05f24",
+          "427b934feae4255e",
+          "01602c4ba7697e54",
+          "160d86d65726c792",
+          "a79fae2464076f4d",
+          "c00ae376ed2ddf4a",
+          "db672f8ce61dd308",
+          "733df5d0ad73d320",
+          "e5f2477e1bb65c41",
+          "refused: Nothing to redo.",
+          "e9b7431713ab329b",
+          "71b398a974cde965",
+          "ada8f9fb9e545911",
+          "7d0381241790d7dd",
+          "33077a8835ad0e46",
+          "2f5ed7e47af07baa",
+          "13ed55ef395ccdef",
+          "a9c3a8e026dd3742",
+          "refused: Nothing to redo.",
+          "refused: The clock is not running.",
+          "1f8dc79063732c5c",
+          "a02d728ccd48d984",
+          "43f1600dcb2a8a76",
+          "6f008e8e953e09a4",
+          "refused: This period is over. Pick the next period first.",
+          "95d765c715e90be7",
+          "270566c2f6eaae6b",
+          "a13444d4ebe9733f",
+          "refused: This period is over. Pick the next period first.",
+          "576b4a240cf0f016",
+          "97577c58f45a379c",
+          "e430ecf6aac63f8b",
+          "refused: That player has no foul to take back.",
+          "refused: The clock is already running through fouls.",
+          "4e98f9bedd0f446f",
+          "4c8b7ebdaf8fd696",
+          "9427a3e7c568e1c1",
+          "51e5e1dd73087e51",
+          "2a4f18c926f4ca70",
+          "refused: That player has no turnover to take back.",
+          "c1f34543b72f07b8",
+          "1f2c53991133c600",
+          "4c2be48ab0d59853",
+          "5ab0bd7d135b7f90",
+          "888db5487ea897b1",
+          "7fd9ff493cf97e48",
+          "f1200983d7b40549",
+          "refused: This period is over. Pick the next period first.",
+          "142d31867ae9a3b6",
+          "1060d761aa00b300",
+          "6fdf4e9de46b938e",
+          "91daf89c6167c20b",
+          "3769ae00b24616ac",
+          "7f05a98de8a16e88",
+          "b6709ff6d1af305f",
+          "fdeee837de21ee16",
+          "d6fd6c75540fdd92",
+          "cf183885c87ad0fd",
+          "b8b1e1510e2053d9",
+          "eccef42e64f56a1f",
+          "695df8c4a43179b8",
+          "e789b2db35c9495c",
+          "828f954a21ed4a61",
+          "5f63ebafedcc2706"
+        ],
+        "state": "dffc82a2d61a8b83",
+        "derived": {
+          "period": 6,
+          "periodStartElapsedMs": 206965,
+          "clockMode": "stop",
+          "teams": {
+            "home": {
+              "score": 59,
+              "fouls": 5,
+              "turnovers": 2,
+              "teamTurnovers": 2,
+              "periodFouls": 5,
+              "onCourt": ["h1", "h2", "h3", "h6", "h5"],
+              "penalty": 1,
+              "bonus": 1,
+              "timeouts": [
+                { "period": 1, "seconds": 60 },
+                { "period": 2, "seconds": 30 }
+              ],
+              "timeoutsLeft": { "full": 1, "short": 0 }
+            },
+            "away": {
+              "score": 35,
+              "fouls": 7,
+              "turnovers": 7,
+              "teamTurnovers": 0,
+              "periodFouls": 7,
+              "onCourt": ["a1", "a7", "a5", "a8", "a2"],
+              "penalty": 1,
+              "bonus": 1,
+              "timeouts": [
+                { "period": 5, "seconds": 30 },
+                { "period": 5, "seconds": 60 },
+                { "period": 5, "seconds": 60 },
+                { "period": 6, "seconds": 60 }
+              ],
+              "timeoutsLeft": { "full": 0, "short": 0 }
+            }
+          },
+          "players": {
+            "h1": {
+              "side": "home",
+              "points": 15,
+              "fg1": 2,
+              "fg2": 2,
+              "fg3": 3,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 230050,
+              "appeared": true
+            },
+            "h2": {
+              "side": "home",
+              "points": 22,
+              "fg1": 1,
+              "fg2": 3,
+              "fg3": 5,
+              "fouls": 1,
+              "turnovers": 0,
+              "ms": 272705,
+              "appeared": true
+            },
+            "h3": {
+              "side": "home",
+              "points": 10,
+              "fg1": 0,
+              "fg2": 2,
+              "fg3": 2,
+              "fouls": 1,
+              "turnovers": 0,
+              "ms": 272705,
+              "appeared": true
+            },
+            "h4": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 1,
+              "turnovers": 0,
+              "ms": 43000,
+              "appeared": true
+            },
+            "h5": {
+              "side": "home",
+              "points": 4,
+              "fg1": 1,
+              "fg2": 0,
+              "fg3": 1,
+              "fouls": 2,
+              "turnovers": 0,
+              "ms": 272705,
+              "appeared": true
+            },
+            "a1": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 1,
+              "ms": 272705,
+              "appeared": true
+            },
+            "a2": {
+              "side": "away",
+              "points": 7,
+              "fg1": 1,
+              "fg2": 3,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 123740,
+              "appeared": true
+            },
+            "a3": {
+              "side": "away",
+              "points": 1,
+              "fg1": 1,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 1,
+              "turnovers": 3,
+              "ms": 109422,
+              "appeared": true
+            },
+            "a4": {
+              "side": "away",
+              "points": 7,
+              "fg1": 3,
+              "fg2": 2,
+              "fg3": 0,
+              "fouls": 2,
+              "turnovers": 3,
+              "ms": 206965,
+              "appeared": true
+            },
+            "a5": {
+              "side": "away",
+              "points": 9,
+              "fg1": 1,
+              "fg2": 1,
+              "fg3": 2,
+              "fouls": 1,
+              "turnovers": 0,
+              "ms": 206283,
+              "appeared": true
+            },
+            "a8": {
+              "side": "away",
+              "points": 3,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 1,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 65740,
+              "appeared": true
+            },
+            "h8": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "h7": {
+              "side": "home",
+              "points": 2,
+              "fg1": 0,
+              "fg2": 1,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 143129,
+              "appeared": true
+            },
+            "a7": {
+              "side": "away",
+              "points": 8,
+              "fg1": 1,
+              "fg2": 2,
+              "fg3": 1,
+              "fouls": 2,
+              "turnovers": 0,
+              "ms": 229705,
+              "appeared": true
+            },
+            "a6": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 1,
+              "turnovers": 0,
+              "ms": 148965,
+              "appeared": true
+            },
+            "h6": {
+              "side": "home",
+              "points": 6,
+              "fg1": 2,
+              "fg2": 2,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 129231,
+              "appeared": true
+            }
+          },
+          "standing": {
+            "a3": [1],
+            "h4": [1],
+            "h1": [],
+            "a7": [5, 5],
+            "a6": [5],
+            "a4": [5, 5],
+            "h3": [5],
+            "h5": [5, 5],
+            "h2": [5],
+            "a5": [6]
+          }
+        },
+        "clockLater": {
+          "remainingMs": 174260,
+          "running": false,
+          "anchorAt": 1662210,
+          "elapsedMs": 272705
+        },
+        "running": [
+          "0-0",
+          "0-0",
+          "2-0",
+          "2-0",
+          "2-0",
+          "2-0",
+          "2-0",
+          "2-2",
+          "2-2",
+          "5-2",
+          "5-4",
+          "6-4",
+          "6-5",
+          "6-6",
+          "9-6",
+          "11-6",
+          "11-6",
+          "11-8",
+          "11-8",
+          "13-8",
+          "13-9",
+          "13-9",
+          "16-9",
+          "16-12",
+          "16-12",
+          "16-12",
+          "16-12",
+          "16-12",
+          "16-12",
+          "16-14",
+          "16-14",
+          "16-14",
+          "16-14",
+          "16-14",
+          "18-14",
+          "18-14",
+          "18-14",
+          "18-14",
+          "18-14",
+          "20-14",
+          "20-14",
+          "23-14",
+          "23-14",
+          "26-14",
+          "26-14",
+          "26-15",
+          "26-15",
+          "26-15",
+          "26-15",
+          "26-15",
+          "26-15",
+          "26-15",
+          "26-15",
+          "26-15",
+          "28-15",
+          "28-17",
+          "28-17",
+          "28-17",
+          "29-17",
+          "32-17",
+          "32-17",
+          "35-17",
+          "36-17",
+          "39-17",
+          "39-18",
+          "39-18",
+          "39-21",
+          "42-21",
+          "42-21",
+          "42-23",
+          "42-25",
+          "42-25",
+          "42-27",
+          "42-30",
+          "44-30",
+          "46-30",
+          "46-30",
+          "49-30",
+          "49-31",
+          "49-31",
+          "49-32",
+          "50-32",
+          "50-32",
+          "50-32",
+          "50-32",
+          "50-32",
+          "53-32",
+          "53-32",
+          "53-32",
+          "54-32",
+          "56-32",
+          "56-32",
+          "58-32",
+          "58-32",
+          "58-32",
+          "58-32",
+          "58-32",
+          "59-32",
+          "59-32",
+          "59-32",
+          "59-35"
+        ],
+        "words": [
+          "Home starting lineup: #h1, #h2, #h3, #h4, #h5",
+          "Away starting lineup: #a1, #a2, #a3, #a4, #a5",
+          "#h2 +2",
+          "Foul — #a3",
+          "Foul — #h4",
+          "Full timeout — Home",
+          "Running clock on",
+          "#a2 +2",
+          "Start of Q2",
+          "#h1 +3",
+          "#a2 +2",
+          "#h1 +1",
+          "#a5 +1",
+          "#a2 +1",
+          "#h3 +3",
+          "#h3 +2",
+          "Turnover — #a3",
+          "#a4 +2",
+          "Turnover — #a5",
+          "#h2 +2",
+          "#a3 +1",
+          "Turnover — #a3",
+          "#h2 +3",
+          "#a5 +3",
+          "Sub: #a8 in for #a5",
+          "30-second timeout — Home",
+          "Sub: #h8 in for #h4",
+          "Sub: #h7 in for #h8",
+          "Start of Q4",
+          "#a4 +2",
+          "Sub: #a5 in for #a8",
+          "Turnover — #a3",
+          "30-second timeout — Home",
+          "Start of OT1",
+          "#h3 +2",
+          "Sub: #a7 in for #a2",
+          "Sub: #a6 in for #a5",
+          "Foul — #h1",
+          "Turnover — #a1",
+          "#h1 +2",
+          "Foul — #a7",
+          "#h1 +3",
+          "Turnover — #a4",
+          "#h1 +3",
+          "Team turnover — Home",
+          "#a4 +1",
+          "Foul — #a6",
+          "Foul — #a4",
+          "Turnover — #a4",
+          "Foul taken back — #h1",
+          "Team turnover — Home",
+          "30-second timeout — Away",
+          "Team turnover — Home",
+          "Sub: #a5 in for #a3",
+          "#h1 +2",
+          "#a7 +2",
+          "Turnover taken back — #a5",
+          "Sub: #h6 in for #h7",
+          "#h5 +1",
+          "#h2 +3",
+          "Foul — #h3",
+          "#h5 +3",
+          "#h1 +1",
+          "#h2 +3",
+          "#a4 +1",
+          "Sub: #a2 in for #a6",
+          "#a7 +3",
+          "#h3 +3",
+          "Full timeout — Away",
+          "#a2 +2",
+          "#a7 +2",
+          "Foul — #a4",
+          "#a5 +2",
+          "#a5 +3",
+          "#h6 +2",
+          "#h2 +2",
+          "Sub: #h7 in for #h1",
+          "#h2 +3",
+          "#a4 +1",
+          "Turnover — #a4",
+          "#a7 +1",
+          "#h6 +1",
+          "Foul — #h5",
+          "Sub: #a8 in for #a4",
+          "Foul — #h2",
+          "Team turnover taken back — Home",
+          "#h2 +3",
+          "Foul — #h5",
+          "Foul — #a7",
+          "#h2 +1",
+          "#h6 +2",
+          "Full timeout — Away",
+          "#h7 +2",
+          "Start of OT2",
+          "Timeout taken back — Home",
+          "Foul — #a5",
+          "Full timeout — Away",
+          "#h6 +1",
+          "Sub: #h1 in for #h7",
+          "Stop clock on",
+          "#a8 +3"
+        ],
+        "hasRecordedStats": true,
+        "mercyClocks": 0
+      }
+    },
+    {
+      "name": "running clock, stop in the last minute of each period",
+      "rules": {
+        "periods": 4,
+        "periodSeconds": 480,
+        "overtimeSeconds": 240,
+        "bonusFouls": 5,
+        "doubleBonusFouls": null,
+        "fullTimeouts": 3,
+        "shortTimeouts": 2,
+        "timeoutsPer": "game",
+        "overtimeTimeouts": 1,
+        "timeoutsCarry": false,
+        "clockMode": "running",
+        "stopClockLastSeconds": 60,
+        "stopClockScope": "period"
+      },
+      "commands": [
+        {
+          "command": {
+            "type": "lineup",
+            "side": "home",
+            "playerIds": ["h1", "h2", "h3", "h4", "h5"]
+          },
+          "id": "g22-0",
+          "now": 1000
+        },
+        {
+          "command": {
+            "type": "lineup",
+            "side": "away",
+            "playerIds": ["a1", "a2", "a3", "a4", "a5"]
+          },
+          "id": "g22-1",
+          "now": 1000
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 2 },
+          "id": "g22-2",
+          "now": 16546
+        },
+        { "command": { "type": "start" }, "id": "g22-3", "now": 38974 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 1 },
+          "id": "g22-4",
+          "now": 57592
+        },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 60 },
+          "id": "g22-5",
+          "now": 70037
+        },
+        { "command": { "type": "pause" }, "id": "g22-6", "now": 84090 },
+        { "command": { "type": "start" }, "id": "g22-7", "now": 103452 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h4", "points": 2 },
+          "id": "g22-8",
+          "now": 114011
+        },
+        { "command": { "type": "set-clock", "ms": 6000 }, "id": "g22-9", "now": 118298 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 1 },
+          "id": "g22-10",
+          "now": 125675
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+          "id": "g22-11",
+          "now": 133764
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a6", "outId": "a1" },
+          "id": "g22-12",
+          "now": 135108
+        },
+        { "command": { "type": "set-clock", "ms": 11000 }, "id": "g22-13", "now": 148293 },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a5" },
+          "id": "g22-14",
+          "now": 158714
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 3 },
+          "id": "g22-15",
+          "now": 169199
+        },
+        { "command": { "type": "undo" }, "id": "g22-16", "now": 182300 },
+        { "command": { "type": "period", "period": 2 }, "id": "g22-17", "now": 185341 },
+        { "command": { "type": "period", "period": 3 }, "id": "g22-18", "now": 186586 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+          "id": "g22-19",
+          "now": 208549
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h2" },
+          "id": "g22-20",
+          "now": 222542
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 1 },
+          "id": "g22-21",
+          "now": 226060
+        },
+        { "command": { "type": "untimeout", "side": "home" }, "id": "g22-22", "now": 249940 },
+        { "command": { "type": "start" }, "id": "g22-23", "now": 272294 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 2 },
+          "id": "g22-24",
+          "now": 282430
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a4" },
+          "id": "g22-25",
+          "now": 307284
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 1 },
+          "id": "g22-26",
+          "now": 309448
+        },
+        { "command": { "type": "period", "period": 4 }, "id": "g22-27", "now": 321616 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 1 },
+          "id": "g22-28",
+          "now": 333230
+        },
+        { "command": { "type": "undo" }, "id": "g22-29", "now": 348308 },
+        { "command": { "type": "start" }, "id": "g22-30", "now": 363699 },
+        { "command": { "type": "clock-mode", "mode": "stop" }, "id": "g22-31", "now": 388637 },
+        { "command": { "type": "team-unturnover", "side": "home" }, "id": "g22-32", "now": 396877 },
+        { "command": { "type": "pause" }, "id": "g22-33", "now": 414651 },
+        {
+          "command": { "type": "unturnover", "side": "home", "playerId": "h2" },
+          "id": "g22-34",
+          "now": 432341
+        },
+        { "command": { "type": "period", "period": 6 }, "id": "g22-35", "now": 442863 },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a5" },
+          "id": "g22-36",
+          "now": 451040
+        },
+        { "command": { "type": "redo" }, "id": "g22-37", "now": 468945 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g22-38",
+          "now": 476726
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 1 },
+          "id": "g22-39",
+          "now": 499698
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a6", "points": 1 },
+          "id": "g22-40",
+          "now": 524330
+        },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 30 },
+          "id": "g22-41",
+          "now": 527401
+        },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a2" },
+          "id": "g22-42",
+          "now": 528085
+        },
+        {
+          "command": { "type": "unfoul", "side": "home", "playerId": "h3" },
+          "id": "g22-43",
+          "now": 542659
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a2", "points": 3 },
+          "id": "g22-44",
+          "now": 556335
+        },
+        { "command": { "type": "team-turnover", "side": "home" }, "id": "g22-45", "now": 556820 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 1 },
+          "id": "g22-46",
+          "now": 562007
+        },
+        { "command": { "type": "start" }, "id": "g22-47", "now": 566300 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
+          "id": "g22-48",
+          "now": 577236
+        },
+        { "command": { "type": "undo" }, "id": "g22-49", "now": 580353 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+          "id": "g22-50",
+          "now": 605072
+        },
+        { "command": { "type": "period", "period": 8 }, "id": "g22-51", "now": 627892 },
+        { "command": { "type": "start" }, "id": "g22-52", "now": 649877 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
+          "id": "g22-53",
+          "now": 656478
+        },
+        { "command": { "type": "pause" }, "id": "g22-54", "now": 674376 },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a2" },
+          "id": "g22-55",
+          "now": 689972
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 2 },
+          "id": "g22-56",
+          "now": 705280
+        },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 30 },
+          "id": "g22-57",
+          "now": 727756
+        },
+        { "command": { "type": "start" }, "id": "g22-58", "now": 740764 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 1 },
+          "id": "g22-59",
+          "now": 760607
+        },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h4" },
+          "id": "g22-60",
+          "now": 780958
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h6", "outId": "h5" },
+          "id": "g22-61",
+          "now": 788851
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a7", "outId": "a6" },
+          "id": "g22-62",
+          "now": 804980
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a5" },
+          "id": "g22-63",
+          "now": 813538
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 3 },
+          "id": "g22-64",
+          "now": 829973
+        },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 30 },
+          "id": "g22-65",
+          "now": 831836
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h4", "points": 3 },
+          "id": "g22-66",
+          "now": 853255
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h6", "points": 3 },
+          "id": "g22-67",
+          "now": 876800
+        },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 30 },
+          "id": "g22-68",
+          "now": 890361
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h2" },
+          "id": "g22-69",
+          "now": 895648
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+          "id": "g22-70",
+          "now": 910627
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a2", "points": 1 },
+          "id": "g22-71",
+          "now": 927821
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a5" },
+          "id": "g22-72",
+          "now": 951153
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 3 },
+          "id": "g22-73",
+          "now": 975306
+        },
+        { "command": { "type": "start" }, "id": "g22-74", "now": 977570 },
+        { "command": { "type": "redo" }, "id": "g22-75", "now": 997563 },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a6", "outId": "a5" },
+          "id": "g22-76",
+          "now": 1018302
+        },
+        { "command": { "type": "untimeout", "side": "home" }, "id": "g22-77", "now": 1035381 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 1 },
+          "id": "g22-78",
+          "now": 1049251
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a1", "outId": "a7" },
+          "id": "g22-79",
+          "now": 1054279
+        },
+        { "command": { "type": "period", "period": 9 }, "id": "g22-80", "now": 1077255 },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a1" },
+          "id": "g22-81",
+          "now": 1097468
+        },
+        { "command": { "type": "start" }, "id": "g22-82", "now": 1105176 },
+        {
+          "command": { "type": "team-unturnover", "side": "away" },
+          "id": "g22-83",
+          "now": 1135488
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a5", "outId": "a1" },
+          "id": "g22-84",
+          "now": 1153646
+        },
+        { "command": { "type": "undo" }, "id": "g22-85", "now": 1166108 },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h4" },
+          "id": "g22-86",
+          "now": 1166511
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a6" },
+          "id": "g22-87",
+          "now": 1183685
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h6", "points": 1 },
+          "id": "g22-88",
+          "now": 1188500
+        },
+        { "command": { "type": "start" }, "id": "g22-89", "now": 1202265 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h6", "points": 1 },
+          "id": "g22-90",
+          "now": 1208442
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h4", "points": 3 },
+          "id": "g22-91",
+          "now": 1227887
+        },
+        { "command": { "type": "undo" }, "id": "g22-92", "now": 1241587 },
+        { "command": { "type": "redo" }, "id": "g22-93", "now": 1245265 },
+        { "command": { "type": "undo" }, "id": "g22-94", "now": 1271735 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h4", "points": 2 },
+          "id": "g22-95",
+          "now": 1296417
+        },
+        { "command": { "type": "set-clock", "ms": 6000 }, "id": "g22-96", "now": 1307662 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h6", "points": 1 },
+          "id": "g22-97",
+          "now": 1320384
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 1 },
+          "id": "g22-98",
+          "now": 1328931
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a6", "points": 1 },
+          "id": "g22-99",
+          "now": 1350836
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h3" },
+          "id": "g22-100",
+          "now": 1364497
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a6", "points": 1 },
+          "id": "g22-101",
+          "now": 1385394
+        },
+        { "command": { "type": "undo" }, "id": "g22-102", "now": 1404690 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a6", "points": 3 },
+          "id": "g22-103",
+          "now": 1414467
+        },
+        { "command": { "type": "undo" }, "id": "g22-104", "now": 1426641 },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a3" },
+          "id": "g22-105",
+          "now": 1444918
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 2 },
+          "id": "g22-106",
+          "now": 1462531
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 1 },
+          "id": "g22-107",
+          "now": 1464550
+        },
+        {
+          "command": { "type": "team-unturnover", "side": "away" },
+          "id": "g22-108",
+          "now": 1467633
+        },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h2" },
+          "id": "g22-109",
+          "now": 1469083
+        },
+        { "command": { "type": "start" }, "id": "g22-110", "now": 1490265 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 3 },
+          "id": "g22-111",
+          "now": 1504082
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h3" },
+          "id": "g22-112",
+          "now": 1519903
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
+          "id": "g22-113",
+          "now": 1540382
+        },
+        { "command": { "type": "redo" }, "id": "g22-114", "now": 1556064 },
+        {
+          "command": { "type": "team-unturnover", "side": "away" },
+          "id": "g22-115",
+          "now": 1565365
+        },
+        { "command": { "type": "set-clock", "ms": 9000 }, "id": "g22-116", "now": 1589259 },
+        { "command": { "type": "start" }, "id": "g22-117", "now": 1610158 },
+        { "command": { "type": "pause" }, "id": "g22-118", "now": 1610629 },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h6" },
+          "id": "g22-119",
+          "now": 1614429
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 3 },
+          "id": "g22-120",
+          "now": 1626122
+        },
+        { "command": { "type": "untimeout", "side": "away" }, "id": "g22-121", "now": 1628602 },
+        { "command": { "type": "start" }, "id": "g22-122", "now": 1649029 },
+        { "command": { "type": "undo" }, "id": "g22-123", "now": 1669511 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 2 },
+          "id": "g22-124",
+          "now": 1693698
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+          "id": "g22-125",
+          "now": 1714538
+        },
+        { "command": { "type": "team-turnover", "side": "home" }, "id": "g22-126", "now": 1747096 },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h7", "outId": "h3" },
+          "id": "g22-127",
+          "now": 1748503
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 3 },
+          "id": "g22-128",
+          "now": 1755179
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a6", "points": 3 },
+          "id": "g22-129",
+          "now": 1759934
+        },
+        {
+          "command": { "type": "unfoul", "side": "home", "playerId": "h4" },
+          "id": "g22-130",
+          "now": 1764893
+        },
+        { "command": { "type": "start" }, "id": "g22-131", "now": 1777065 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g22-132",
+          "now": 1798102
+        },
+        { "command": { "type": "start" }, "id": "g22-133", "now": 1806562 },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a3" },
+          "id": "g22-134",
+          "now": 1812290
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a2", "points": 2 },
+          "id": "g22-135",
+          "now": 1823366
+        },
+        { "command": { "type": "start" }, "id": "g22-136", "now": 1840746 },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a1" },
+          "id": "g22-137",
+          "now": 1850749
+        },
+        { "command": { "type": "end" }, "id": "g22-138", "now": 1850749 }
+      ],
+      "expected": {
+        "steps": [
+          "87b9ad4becde8483",
+          "ad46dd4da6974d5c",
+          "e2da94aa24fc0b0a",
+          "b4017c4c9753132c",
+          "ae3d350390b04607",
+          "8fe353097da9618d",
+          "c8cf40535cb1d0b0",
+          "5343bfa8859c25fd",
+          "b41738ebdee8e8f8",
+          "139bd1b01e7bc150",
+          "4ec2d73ee001f027",
+          "63b960548dc1ebea",
+          "0d1881000128e59e",
+          "e9b8e73ca0cea508",
+          "849fc7aa5fe029e1",
+          "fd1f548be5deb3d7",
+          "d7280dabb4aa94e5",
+          "d3f0139e19bb41d2",
+          "aad2447a4c67985c",
+          "862caa73fc3fc1ad",
+          "e1da26218413b42e",
+          "6689dfda0be83ef9",
+          "ab8ec04bb20cc9f4",
+          "90a52efde43d4a5d",
+          "b86cbb01c8f63f9f",
+          "25baac0b7b13544b",
+          "86c399218fa1f48c",
+          "a68787b72b4ca4db",
+          "078e9803990c64b3",
+          "8a46601186918792",
+          "c41a13f1a56d7089",
+          "8816b6048156e9a4",
+          "refused: There is no team turnover to take back.",
+          "2a9b1736641098bb",
+          "refused: That player has no turnover to take back.",
+          "b2378ce4e6f84658",
+          "50a5bc8aabcc50f5",
+          "refused: Nothing to redo.",
+          "e954496c1597fd6e",
+          "a2076e7c65b12a8d",
+          "1f2b0b61046abeb5",
+          "b7cf0a24a7120fce",
+          "68b3c9de16b37b06",
+          "refused: That player has no foul to take back.",
+          "77e92b71f4f3bdb8",
+          "aa7103259e45e1b3",
+          "5f59e84f661abbc9",
+          "17d533000ff2cc45",
+          "160b165fdf4dee2f",
+          "2a34fd998582ed4d",
+          "f5bb865f2865ed73",
+          "72bc8f02941cedae",
+          "24a1b47c8041e7f6",
+          "f6ba498a5cfd498d",
+          "d45b31ed11e63cad",
+          "a2f1431d06af16d3",
+          "a63d94acde96210d",
+          "802a96843f4bb79b",
+          "22b4d7c4ba3abf85",
+          "bfe9cb51dc55a164",
+          "1b485214c9cea81a",
+          "06e01d6023614c3a",
+          "28228a17fbbc4afe",
+          "d1381513ab750d66",
+          "ddd50adab76060be",
+          "5f10b4167073aa29",
+          "85974ad6ac17aaf7",
+          "70d7e84c0acfa0ca",
+          "fdc15306d8f0ff28",
+          "e2a1b8a8439b3569",
+          "d133991b6f7f6d24",
+          "2e075270611642c8",
+          "9ec93cc2881478e3",
+          "6bdf0650881a962b",
+          "ce936a9fa949fa3c",
+          "refused: Nothing to redo.",
+          "3f8bd131aa9cc24d",
+          "b9c65dde959ddcf8",
+          "d10084375192a762",
+          "1a008dfb5b6c2368",
+          "c895d5a04f830344",
+          "ee05e853847d0f62",
+          "dfc5774ef9b385c0",
+          "refused: There is no team turnover to take back.",
+          "a229f8fa8cfb92b5",
+          "caa1830ef51e4d96",
+          "fd1493746835e567",
+          "146c2a4b84e5252a",
+          "4cdefffb267d5c42",
+          "0de4b5d175ed120d",
+          "1c6f87d14b5b8e76",
+          "6917d4f5d711f551",
+          "2d2b5fc66fc36ad6",
+          "db31ecc484fdd389",
+          "0c7426795b0adbd0",
+          "1e9733d9b77f95aa",
+          "d03940a741c62c60",
+          "ff674da6f336ee68",
+          "65401272950086f6",
+          "cac9297a0f9383f1",
+          "4fff9c9d78efdec5",
+          "ee890e7073e57959",
+          "8f52f3ea3ed26893",
+          "5ebf975d3a8035cb",
+          "3849f3e8c23cccca",
+          "ddd364cf387951c8",
+          "eb18679cf7fb837c",
+          "57b86a4076cfc7ce",
+          "refused: There is no team turnover to take back.",
+          "dbd77a17f7018e82",
+          "f189eab70b927d99",
+          "5ed5d666fb9b9c02",
+          "9d7382236cf3c769",
+          "8b5c494d5cb3cef4",
+          "refused: Nothing to redo.",
+          "refused: There is no team turnover to take back.",
+          "bf15c628e42b3251",
+          "23ea486ad75fdca2",
+          "a079f1a42ec99033",
+          "b5a77958af02fdaf",
+          "de6e439da70b0af8",
+          "refused: There is no timeout to take back.",
+          "7c14043b81b77fc3",
+          "d9866576b74e9a13",
+          "66a2fa865a94b135",
+          "b8bac54e5229da72",
+          "be194990a3a1052f",
+          "cb05a2e29f192184",
+          "31b7d37c9b64f5f9",
+          "83c6738292a36ff7",
+          "267825517d9f1286",
+          "refused: This period is over. Pick the next period first.",
+          "512833f0d3dd611b",
+          "refused: This period is over. Pick the next period first.",
+          "2123841fe2a35d66",
+          "7c17f5cb7b0de0df",
+          "refused: This period is over. Pick the next period first.",
+          "40f6c7eacb5e446c",
+          "d32432ea11355811"
+        ],
+        "state": "446a7a51c2fb1e72",
+        "derived": {
+          "period": 9,
+          "periodStartElapsedMs": 413786,
+          "clockMode": "stop",
+          "teams": {
+            "home": {
+              "score": 41,
+              "fouls": 4,
+              "turnovers": 5,
+              "teamTurnovers": 2,
+              "periodFouls": 3,
+              "onCourt": ["h1", "h2", "h7", "h4", "h6"],
+              "penalty": 0,
+              "bonus": 1,
+              "timeouts": [
+                { "period": 6, "seconds": 30 },
+                { "period": 8, "seconds": 30 },
+                { "period": 8, "seconds": 30 }
+              ],
+              "timeoutsLeft": { "full": 1, "short": 0 }
+            },
+            "away": {
+              "score": 33,
+              "fouls": 9,
+              "turnovers": 3,
+              "teamTurnovers": 0,
+              "periodFouls": 8,
+              "onCourt": ["a1", "a2", "a3", "a4", "a6"],
+              "penalty": 1,
+              "bonus": 0,
+              "timeouts": [],
+              "timeoutsLeft": { "full": 1, "short": 0 }
+            }
+          },
+          "players": {
+            "h1": {
+              "side": "home",
+              "points": 15,
+              "fg1": 2,
+              "fg2": 5,
+              "fg3": 1,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 586518,
+              "appeared": true
+            },
+            "h2": {
+              "side": "home",
+              "points": 8,
+              "fg1": 3,
+              "fg2": 1,
+              "fg3": 1,
+              "fouls": 2,
+              "turnovers": 1,
+              "ms": 586518,
+              "appeared": true
+            },
+            "h3": {
+              "side": "home",
+              "points": 3,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 1,
+              "fouls": 2,
+              "turnovers": 0,
+              "ms": 586518,
+              "appeared": true
+            },
+            "h4": {
+              "side": "home",
+              "points": 7,
+              "fg1": 0,
+              "fg2": 2,
+              "fg3": 1,
+              "fouls": 0,
+              "turnovers": 1,
+              "ms": 586518,
+              "appeared": true
+            },
+            "h5": {
+              "side": "home",
+              "points": 2,
+              "fg1": 2,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 289414,
+              "appeared": true
+            },
+            "a1": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 2,
+              "turnovers": 0,
+              "ms": 250670,
+              "appeared": true
+            },
+            "a2": {
+              "side": "away",
+              "points": 6,
+              "fg1": 1,
+              "fg2": 1,
+              "fg3": 1,
+              "fouls": 1,
+              "turnovers": 1,
+              "ms": 586518,
+              "appeared": true
+            },
+            "a3": {
+              "side": "away",
+              "points": 8,
+              "fg1": 3,
+              "fg2": 1,
+              "fg3": 1,
+              "fouls": 2,
+              "turnovers": 0,
+              "ms": 586518,
+              "appeared": true
+            },
+            "a4": {
+              "side": "away",
+              "points": 9,
+              "fg1": 2,
+              "fg2": 2,
+              "fg3": 1,
+              "fouls": 1,
+              "turnovers": 0,
+              "ms": 586518,
+              "appeared": true
+            },
+            "a5": {
+              "side": "away",
+              "points": 5,
+              "fg1": 0,
+              "fg2": 1,
+              "fg3": 1,
+              "fouls": 2,
+              "turnovers": 2,
+              "ms": 354833,
+              "appeared": true
+            },
+            "a6": {
+              "side": "away",
+              "points": 5,
+              "fg1": 2,
+              "fg2": 0,
+              "fg3": 1,
+              "fouls": 1,
+              "turnovers": 0,
+              "ms": 482266,
+              "appeared": true
+            },
+            "h6": {
+              "side": "home",
+              "points": 6,
+              "fg1": 3,
+              "fg2": 0,
+              "fg3": 1,
+              "fouls": 0,
+              "turnovers": 1,
+              "ms": 297104,
+              "appeared": true
+            },
+            "a7": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 85267,
+              "appeared": true
+            },
+            "h7": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            }
+          },
+          "standing": {
+            "h2": [3, 8],
+            "a4": [3],
+            "a2": [8],
+            "a5": [8, 8],
+            "a1": [9, 9],
+            "h4": [],
+            "a6": [9],
+            "h3": [9, 9],
+            "a3": [9, 9]
+          }
+        },
+        "clockLater": {
+          "remainingMs": 0,
+          "running": false,
+          "anchorAt": 1669511,
+          "elapsedMs": 586518
+        },
+        "running": [
+          "0-0",
+          "0-0",
+          "2-0",
+          "3-0",
+          "3-0",
+          "5-0",
+          "6-0",
+          "8-0",
+          "8-0",
+          "8-0",
+          "8-0",
+          "8-0",
+          "10-0",
+          "10-0",
+          "10-1",
+          "10-1",
+          "10-3",
+          "10-3",
+          "10-4",
+          "10-4",
+          "10-4",
+          "10-4",
+          "10-4",
+          "10-5",
+          "11-5",
+          "11-6",
+          "11-6",
+          "11-6",
+          "11-9",
+          "11-9",
+          "12-9",
+          "14-9",
+          "14-9",
+          "14-12",
+          "14-12",
+          "14-14",
+          "14-14",
+          "15-14",
+          "15-14",
+          "15-14",
+          "15-14",
+          "15-14",
+          "15-17",
+          "15-17",
+          "18-17",
+          "21-17",
+          "21-17",
+          "21-17",
+          "23-17",
+          "23-18",
+          "23-18",
+          "26-18",
+          "26-18",
+          "26-18",
+          "26-19",
+          "26-19",
+          "26-19",
+          "26-19",
+          "26-19",
+          "26-19",
+          "27-19",
+          "28-19",
+          "30-19",
+          "31-19",
+          "32-19",
+          "32-20",
+          "32-20",
+          "32-20",
+          "32-22",
+          "33-22",
+          "33-22",
+          "36-22",
+          "36-22",
+          "39-22",
+          "39-22",
+          "39-24",
+          "41-24",
+          "41-24",
+          "41-24",
+          "41-27",
+          "41-30",
+          "41-30",
+          "41-31",
+          "41-31",
+          "41-33",
+          "41-33"
+        ],
+        "words": [
+          "Home starting lineup: #h1, #h2, #h3, #h4, #h5",
+          "Away starting lineup: #a1, #a2, #a3, #a4, #a5",
+          "#h2 +2",
+          "#h1 +1",
+          "Full timeout — Home",
+          "#h4 +2",
+          "#h2 +1",
+          "#h1 +2",
+          "Sub: #a6 in for #a1",
+          "Turnover — #a5",
+          "Start of Q2",
+          "Start of Q3",
+          "#h1 +2",
+          "Foul — #h2",
+          "#a3 +1",
+          "Timeout taken back — Home",
+          "#a5 +2",
+          "Foul — #a4",
+          "#a3 +1",
+          "Start of Q4",
+          "Stop clock on",
+          "Start of OT2",
+          "Turnover — #a5",
+          "#a4 +1",
+          "#h5 +1",
+          "#a6 +1",
+          "30-second timeout — Home",
+          "Turnover — #a2",
+          "#a2 +3",
+          "Team turnover — Home",
+          "#h5 +1",
+          "#h1 +2",
+          "Start of OT4",
+          "#a5 +3",
+          "Foul — #a2",
+          "#a4 +2",
+          "30-second timeout — Home",
+          "#h2 +1",
+          "Turnover — #h4",
+          "Sub: #h6 in for #h5",
+          "Sub: #a7 in for #a6",
+          "Foul — #a5",
+          "#a3 +3",
+          "30-second timeout — Home",
+          "#h4 +3",
+          "#h6 +3",
+          "30-second timeout — Home",
+          "Foul — #h2",
+          "#h1 +2",
+          "#a2 +1",
+          "Foul — #a5",
+          "#h1 +3",
+          "Sub: #a6 in for #a5",
+          "Timeout taken back — Home",
+          "#a3 +1",
+          "Sub: #a1 in for #a7",
+          "Start of OT5",
+          "Foul — #a1",
+          "Foul — #h4",
+          "Foul — #a6",
+          "#h6 +1",
+          "#h6 +1",
+          "#h4 +2",
+          "#h6 +1",
+          "#h2 +1",
+          "#a6 +1",
+          "Foul — #h3",
+          "Foul — #a3",
+          "#a3 +2",
+          "#h1 +1",
+          "Turnover — #h2",
+          "#h3 +3",
+          "Foul — #h3",
+          "#h2 +3",
+          "Turnover — #h6",
+          "#a4 +2",
+          "#h1 +2",
+          "Team turnover — Home",
+          "Sub: #h7 in for #h3",
+          "#a4 +3",
+          "#a6 +3",
+          "Foul taken back — #h4",
+          "#a4 +1",
+          "Foul — #a3",
+          "#a2 +2",
+          "Foul — #a1"
+        ],
+        "hasRecordedStats": true,
+        "mercyClocks": 0
+      }
+    },
+    {
+      "name": "running clock, stop in the last minutes of each half",
+      "rules": {
+        "periods": 4,
+        "periodSeconds": 480,
+        "overtimeSeconds": 240,
+        "bonusFouls": 5,
+        "doubleBonusFouls": null,
+        "fullTimeouts": 3,
+        "shortTimeouts": 2,
+        "timeoutsPer": "game",
+        "overtimeTimeouts": 1,
+        "timeoutsCarry": false,
+        "clockMode": "running",
+        "stopClockLastSeconds": 120,
+        "stopClockScope": "half"
+      },
+      "commands": [
+        {
+          "command": {
+            "type": "lineup",
+            "side": "home",
+            "playerIds": ["h1", "h2", "h3", "h4", "h5"]
+          },
+          "id": "g23-0",
+          "now": 1000
+        },
+        {
+          "command": {
+            "type": "lineup",
+            "side": "away",
+            "playerIds": ["a1", "a2", "a3", "a4", "a5"]
+          },
+          "id": "g23-1",
+          "now": 1000
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h6", "outId": "h2" },
+          "id": "g23-2",
+          "now": 3318
+        },
+        { "command": { "type": "start" }, "id": "g23-3", "now": 29325 },
+        { "command": { "type": "pause" }, "id": "g23-4", "now": 55529 },
+        { "command": { "type": "start" }, "id": "g23-5", "now": 56912 },
+        { "command": { "type": "undo" }, "id": "g23-6", "now": 81551 },
+        { "command": { "type": "period", "period": 2 }, "id": "g23-7", "now": 87305 },
+        { "command": { "type": "team-turnover", "side": "home" }, "id": "g23-8", "now": 105187 },
+        { "command": { "type": "undo" }, "id": "g23-9", "now": 128837 },
+        { "command": { "type": "set-clock", "ms": 42000 }, "id": "g23-10", "now": 151662 },
+        { "command": { "type": "team-turnover", "side": "home" }, "id": "g23-11", "now": 157092 },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g23-12", "now": 179481 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a2", "points": 3 },
+          "id": "g23-13",
+          "now": 187436
+        },
+        { "command": { "type": "undo" }, "id": "g23-14", "now": 191465 },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h7", "outId": "h4" },
+          "id": "g23-15",
+          "now": 210854
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 1 },
+          "id": "g23-16",
+          "now": 219904
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h8", "outId": "h7" },
+          "id": "g23-17",
+          "now": 236098
+        },
+        { "command": { "type": "start" }, "id": "g23-18", "now": 240679 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 3 },
+          "id": "g23-19",
+          "now": 254464
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a1", "points": 2 },
+          "id": "g23-20",
+          "now": 275444
+        },
+        {
+          "command": { "type": "unfoul", "side": "home", "playerId": "h2" },
+          "id": "g23-21",
+          "now": 291210
+        },
+        {
+          "command": { "type": "unturnover", "side": "away", "playerId": "a1" },
+          "id": "g23-22",
+          "now": 297689
+        },
+        { "command": { "type": "pause" }, "id": "g23-23", "now": 321819 },
+        { "command": { "type": "undo" }, "id": "g23-24", "now": 346265 },
+        { "command": { "type": "period", "period": 3 }, "id": "g23-25", "now": 350982 },
+        { "command": { "type": "start" }, "id": "g23-26", "now": 365675 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g23-27",
+          "now": 380620
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a1", "points": 3 },
+          "id": "g23-28",
+          "now": 404921
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 1 },
+          "id": "g23-29",
+          "now": 408862
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 3 },
+          "id": "g23-30",
+          "now": 429649
+        },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 60 },
+          "id": "g23-31",
+          "now": 433318
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h6", "outId": "h1" },
+          "id": "g23-32",
+          "now": 445628
+        },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a3" },
+          "id": "g23-33",
+          "now": 448467
+        },
+        { "command": { "type": "set-clock", "ms": 54000 }, "id": "g23-34", "now": 460649 },
+        {
+          "command": { "type": "timeout", "side": "away", "seconds": 60 },
+          "id": "g23-35",
+          "now": 466797
+        },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h3" },
+          "id": "g23-36",
+          "now": 473135
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 1 },
+          "id": "g23-37",
+          "now": 477781
+        },
+        { "command": { "type": "period", "period": 4 }, "id": "g23-38", "now": 495847 },
+        { "command": { "type": "start" }, "id": "g23-39", "now": 511630 },
+        { "command": { "type": "pause" }, "id": "g23-40", "now": 536332 },
+        { "command": { "type": "clock-mode", "mode": "stop" }, "id": "g23-41", "now": 540489 },
+        { "command": { "type": "start" }, "id": "g23-42", "now": 553755 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h6", "points": 3 },
+          "id": "g23-43",
+          "now": 576088
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a1", "points": 3 },
+          "id": "g23-44",
+          "now": 593360
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 1 },
+          "id": "g23-45",
+          "now": 600034
+        },
+        { "command": { "type": "reopen" }, "id": "g23-46", "now": 622630 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 2 },
+          "id": "g23-47",
+          "now": 632395
+        },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h2" },
+          "id": "g23-48",
+          "now": 636011
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a3" },
+          "id": "g23-49",
+          "now": 645996
+        },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a2" },
+          "id": "g23-50",
+          "now": 655629
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h1", "outId": "h5" },
+          "id": "g23-51",
+          "now": 677112
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a2", "points": 1 },
+          "id": "g23-52",
+          "now": 684572
+        },
+        { "command": { "type": "start" }, "id": "g23-53", "now": 708479 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 2 },
+          "id": "g23-54",
+          "now": 723990
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h6" },
+          "id": "g23-55",
+          "now": 725422
+        },
+        { "command": { "type": "team-unturnover", "side": "home" }, "id": "g23-56", "now": 725901 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
+          "id": "g23-57",
+          "now": 745397
+        },
+        { "command": { "type": "undo" }, "id": "g23-58", "now": 755803 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a1", "points": 3 },
+          "id": "g23-59",
+          "now": 775471
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 2 },
+          "id": "g23-60",
+          "now": 790697
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h3" },
+          "id": "g23-61",
+          "now": 804194
+        },
+        { "command": { "type": "undo" }, "id": "g23-62", "now": 818756 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a4", "points": 1 },
+          "id": "g23-63",
+          "now": 837957
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 3 },
+          "id": "g23-64",
+          "now": 845721
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h5", "outId": "h6" },
+          "id": "g23-65",
+          "now": 858169
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 1 },
+          "id": "g23-66",
+          "now": 865867
+        },
+        { "command": { "type": "period", "period": 5 }, "id": "g23-67", "now": 869364 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 2 },
+          "id": "g23-68",
+          "now": 882254
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a2" },
+          "id": "g23-69",
+          "now": 889018
+        },
+        { "command": { "type": "undo" }, "id": "g23-70", "now": 890680 },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a5" },
+          "id": "g23-71",
+          "now": 904800
+        },
+        {
+          "command": { "type": "timeout", "side": "away", "seconds": 60 },
+          "id": "g23-72",
+          "now": 921371
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 3 },
+          "id": "g23-73",
+          "now": 922257
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h4", "outId": "h8" },
+          "id": "g23-74",
+          "now": 925602
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a1" },
+          "id": "g23-75",
+          "now": 932565
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 1 },
+          "id": "g23-76",
+          "now": 949380
+        },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a2" },
+          "id": "g23-77",
+          "now": 973314
+        },
+        {
+          "command": { "type": "foul", "side": "home", "playerId": "h4" },
+          "id": "g23-78",
+          "now": 1015912
+        },
+        {
+          "command": { "type": "unfoul", "side": "home", "playerId": "h4" },
+          "id": "g23-79",
+          "now": 1035828
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h4", "points": 2 },
+          "id": "g23-80",
+          "now": 1044759
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 1 },
+          "id": "g23-81",
+          "now": 1066092
+        },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 30 },
+          "id": "g23-82",
+          "now": 1081056
+        },
+        { "command": { "type": "start" }, "id": "g23-83", "now": 1099217 },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a7", "outId": "a2" },
+          "id": "g23-84",
+          "now": 1108545
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h8", "outId": "h4" },
+          "id": "g23-85",
+          "now": 1123921
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 1 },
+          "id": "g23-86",
+          "now": 1146469
+        },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 60 },
+          "id": "g23-87",
+          "now": 1151041
+        },
+        {
+          "command": { "type": "turnover", "side": "away", "playerId": "a7" },
+          "id": "g23-88",
+          "now": 1174317
+        },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a5" },
+          "id": "g23-89",
+          "now": 1184114
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a7", "points": 1 },
+          "id": "g23-90",
+          "now": 1184573
+        },
+        {
+          "command": { "type": "unfoul", "side": "away", "playerId": "a1" },
+          "id": "g23-91",
+          "now": 1206617
+        },
+        {
+          "command": { "type": "team-unturnover", "side": "away" },
+          "id": "g23-92",
+          "now": 1223986
+        },
+        { "command": { "type": "end" }, "id": "g23-93", "now": 1247204 },
+        {
+          "command": { "type": "timeout", "side": "home", "seconds": 30 },
+          "id": "g23-94",
+          "now": 1274041
+        },
+        { "command": { "type": "start" }, "id": "g23-95", "now": 1279629 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 2 },
+          "id": "g23-96",
+          "now": 1301652
+        },
+        { "command": { "type": "redo" }, "id": "g23-97", "now": 1315631 },
+        { "command": { "type": "undo" }, "id": "g23-98", "now": 1321103 },
+        { "command": { "type": "undo" }, "id": "g23-99", "now": 1354879 },
+        {
+          "command": { "type": "turnover", "side": "home", "playerId": "h5" },
+          "id": "g23-100",
+          "now": 1355307
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 2 },
+          "id": "g23-101",
+          "now": 1377351
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
+          "id": "g23-102",
+          "now": 1387550
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 1 },
+          "id": "g23-103",
+          "now": 1388188
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 3 },
+          "id": "g23-104",
+          "now": 1404766
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 2 },
+          "id": "g23-105",
+          "now": 1410351
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a5", "points": 3 },
+          "id": "g23-106",
+          "now": 1428922
+        },
+        { "command": { "type": "clock-mode", "mode": "running" }, "id": "g23-107", "now": 1449440 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a3", "points": 3 },
+          "id": "g23-108",
+          "now": 1473001
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a7", "points": 2 },
+          "id": "g23-109",
+          "now": 1483752
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a1", "points": 3 },
+          "id": "g23-110",
+          "now": 1494303
+        },
+        { "command": { "type": "set-clock", "ms": 21000 }, "id": "g23-111", "now": 1510182 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 3 },
+          "id": "g23-112",
+          "now": 1524676
+        },
+        { "command": { "type": "team-turnover", "side": "away" }, "id": "g23-113", "now": 1527282 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a1", "points": 3 },
+          "id": "g23-114",
+          "now": 1536526
+        },
+        {
+          "command": { "type": "foul", "side": "away", "playerId": "a1" },
+          "id": "g23-115",
+          "now": 1551592
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 1 },
+          "id": "g23-116",
+          "now": 1568686
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 2 },
+          "id": "g23-117",
+          "now": 1577254
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h1", "points": 3 },
+          "id": "g23-118",
+          "now": 1599589
+        },
+        {
+          "command": { "type": "sub", "side": "home", "inId": "h7", "outId": "h1" },
+          "id": "g23-119",
+          "now": 1601133
+        },
+        { "command": { "type": "start" }, "id": "g23-120", "now": 1613545 },
+        { "command": { "type": "undo" }, "id": "g23-121", "now": 1633567 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a7", "points": 2 },
+          "id": "g23-122",
+          "now": 1648712
+        },
+        {
+          "command": { "type": "sub", "side": "away", "inId": "a6", "outId": "a1" },
+          "id": "g23-123",
+          "now": 1658944
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h5", "points": 1 },
+          "id": "g23-124",
+          "now": 1682312
+        },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a7", "points": 3 },
+          "id": "g23-125",
+          "now": 1683477
+        },
+        { "command": { "type": "start" }, "id": "g23-126", "now": 1690771 },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h3", "points": 3 },
+          "id": "g23-127",
+          "now": 1707128
+        },
+        {
+          "command": { "type": "timeout", "side": "away", "seconds": 60 },
+          "id": "g23-128",
+          "now": 1715908
+        },
+        {
+          "command": { "type": "score", "side": "home", "playerId": "h2", "points": 3 },
+          "id": "g23-129",
+          "now": 1728641
+        },
+        { "command": { "type": "end" }, "id": "g23-130", "now": 1728641 }
+      ],
+      "expected": {
+        "steps": [
+          "ec8e61e7bcf791c4",
+          "724e117054b9af64",
+          "581fa67b7a1e7b8a",
+          "e20331d029f5b43e",
+          "d3d7841450f58bc2",
+          "09314591fcf2ed04",
+          "60709e4c7d1dbafb",
+          "475c69e4e566fb33",
+          "da42e782879c2a52",
+          "60bca39eca6d6120",
+          "a95f59c3f7ad6b2f",
+          "3220564572abd805",
+          "6f3f1a6f57c7e572",
+          "4538f9d7c0720be4",
+          "48da5c7564db084c",
+          "2b5125aec141cbe5",
+          "21dcbc8a16594bfb",
+          "166860e74f12beac",
+          "191555cc6fb87dde",
+          "715b33f9515c0b00",
+          "0aaec088faa9bd78",
+          "refused: That player has no foul to take back.",
+          "refused: That player has no turnover to take back.",
+          "refused: The clock is not running.",
+          "ba3139b17a75713c",
+          "bdcb9784222a8b62",
+          "9d656b5d9d17b8aa",
+          "10b0db4137e3af16",
+          "a69f0719813d35d9",
+          "bff5b4bd92a66bcb",
+          "450610e91260757e",
+          "78b1f924d6783567",
+          "abd00a77e27639a0",
+          "refused: That player has no foul to take back.",
+          "5c54e195745a5eb9",
+          "350830ba9c4418d3",
+          "5d2d957c5f002b2f",
+          "6ad8021fe79ad921",
+          "474ebbf67bbacb1f",
+          "b54fe13b40137d27",
+          "af4d4d77a6a8098d",
+          "f0c3b6cf2446856a",
+          "9f28733d4e3978be",
+          "59773ace13e0065a",
+          "7f7d777d3ce2764f",
+          "533ffc23a587d831",
+          "refused: Only a final game can be reopened.",
+          "9a7371d4a45cd8c9",
+          "159d8f4980494540",
+          "c202e7e20b5686ae",
+          "2e5f4b845ae52130",
+          "d3216a0b9eb1a162",
+          "65b7a62195aa49d9",
+          "8549371335dfdab6",
+          "0b0ce9be5e4f52d1",
+          "fa8f8b50c647b6bf",
+          "eeed9fdfa3c2d29a",
+          "363cae2f9e0ff6cd",
+          "a4a9ed72e04f35e9",
+          "0d5d135f06e70daf",
+          "b64d1dfa6d89873c",
+          "125a48e77690fcc0",
+          "1a50c093b88c7943",
+          "fb09fd76b33588a4",
+          "abf8a14eea84eb35",
+          "9d96f25a44c81aaf",
+          "9c86b17cad8bb9b9",
+          "a64c1f911d19948a",
+          "ea872edd9d982ba4",
+          "fcada8994a7de8b4",
+          "35eab52ac5ef4a21",
+          "35627470cff6342a",
+          "3a11e7f72978d443",
+          "23a7d5f0d3ed52b8",
+          "630001662f2b4af9",
+          "17ab263f0c036605",
+          "5103923756706df6",
+          "refused: That player has no foul to take back.",
+          "f73d70a124a446c4",
+          "eba4d367955e3aa7",
+          "bf8c16d33772017f",
+          "5f791e0595105773",
+          "564ca6748fa8675c",
+          "0dd32c31d4ce3564",
+          "2cba7c9b8e01dc1d",
+          "80906889460c1202",
+          "ce03a6c38630a4e4",
+          "ba36e928f1b10521",
+          "96aeed3135220401",
+          "230811e0a18f5f0e",
+          "36bd1be60d38dd86",
+          "64e6163a82f07e3b",
+          "refused: There is no team turnover to take back.",
+          "a20721f2bf921108",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes.",
+          "refused: This game is final. Reopen it to make changes."
+        ],
+        "state": "699dfedddb50c4d6",
+        "derived": {
+          "period": 5,
+          "periodStartElapsedMs": 327457,
+          "clockMode": "stop",
+          "teams": {
+            "home": {
+              "score": 18,
+              "fouls": 1,
+              "turnovers": 2,
+              "teamTurnovers": 0,
+              "periodFouls": 1,
+              "onCourt": ["h5", "h2", "h3", "h8", "h1"],
+              "penalty": 0,
+              "bonus": 0,
+              "timeouts": [
+                { "period": 3, "seconds": 60 },
+                { "period": 5, "seconds": 30 },
+                { "period": 5, "seconds": 60 }
+              ],
+              "timeoutsLeft": { "full": 0, "short": -1 }
+            },
+            "away": {
+              "score": 28,
+              "fouls": 1,
+              "turnovers": 2,
+              "teamTurnovers": 0,
+              "periodFouls": 1,
+              "onCourt": ["a1", "a7", "a3", "a4", "a5"],
+              "penalty": 0,
+              "bonus": 0,
+              "timeouts": [
+                { "period": 3, "seconds": 60 },
+                { "period": 5, "seconds": 60 }
+              ],
+              "timeoutsLeft": { "full": 0, "short": 0 }
+            }
+          },
+          "players": {
+            "h1": {
+              "side": "home",
+              "points": 2,
+              "fg1": 2,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 247317,
+              "appeared": true
+            },
+            "h2": {
+              "side": "home",
+              "points": 2,
+              "fg1": 2,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 1,
+              "ms": 379281,
+              "appeared": true
+            },
+            "h3": {
+              "side": "home",
+              "points": 3,
+              "fg1": 3,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 1,
+              "ms": 379281,
+              "appeared": true
+            },
+            "h4": {
+              "side": "home",
+              "points": 2,
+              "fg1": 0,
+              "fg2": 1,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 81301,
+              "appeared": true
+            },
+            "h5": {
+              "side": "home",
+              "points": 6,
+              "fg1": 1,
+              "fg2": 1,
+              "fg3": 1,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 362338,
+              "appeared": true
+            },
+            "a1": {
+              "side": "away",
+              "points": 9,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 3,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 379281,
+              "appeared": true
+            },
+            "a2": {
+              "side": "away",
+              "points": 1,
+              "fg1": 1,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 1,
+              "ms": 336785,
+              "appeared": true
+            },
+            "a3": {
+              "side": "away",
+              "points": 13,
+              "fg1": 0,
+              "fg2": 2,
+              "fg3": 3,
+              "fouls": 1,
+              "turnovers": 0,
+              "ms": 379281,
+              "appeared": true
+            },
+            "a4": {
+              "side": "away",
+              "points": 2,
+              "fg1": 2,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 379281,
+              "appeared": true
+            },
+            "a5": {
+              "side": "away",
+              "points": 2,
+              "fg1": 0,
+              "fg2": 1,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 379281,
+              "appeared": true
+            },
+            "h7": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 0,
+              "appeared": true
+            },
+            "h8": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 297980,
+              "appeared": true
+            },
+            "h6": {
+              "side": "home",
+              "points": 3,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 1,
+              "fouls": 1,
+              "turnovers": 0,
+              "ms": 148907,
+              "appeared": true
+            },
+            "a7": {
+              "side": "away",
+              "points": 1,
+              "fg1": 1,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 1,
+              "ms": 42496,
+              "appeared": true
+            }
+          },
+          "standing": { "a3": [4], "h6": [4], "a5": [], "a1": [], "h4": [] }
+        },
+        "clockLater": {
+          "remainingMs": 188176,
+          "running": false,
+          "anchorAt": 1151041,
+          "elapsedMs": 379281
+        },
+        "running": [
+          "0-0",
+          "0-0",
+          "0-0",
+          "0-0",
+          "0-0",
+          "0-0",
+          "1-0",
+          "1-0",
+          "4-0",
+          "4-0",
+          "4-1",
+          "4-4",
+          "5-4",
+          "5-7",
+          "5-7",
+          "5-7",
+          "5-7",
+          "5-7",
+          "6-7",
+          "6-7",
+          "6-7",
+          "9-7",
+          "9-10",
+          "10-10",
+          "12-10",
+          "12-10",
+          "12-10",
+          "12-10",
+          "12-10",
+          "12-11",
+          "12-13",
+          "12-13",
+          "12-13",
+          "12-16",
+          "12-18",
+          "12-19",
+          "12-22",
+          "12-22",
+          "13-22",
+          "13-22",
+          "13-24",
+          "13-24",
+          "13-24",
+          "13-27",
+          "13-27",
+          "13-27",
+          "14-27",
+          "14-27",
+          "14-27",
+          "16-27",
+          "17-27",
+          "17-27",
+          "17-27",
+          "17-27",
+          "18-27",
+          "18-27",
+          "18-27",
+          "18-27",
+          "18-28",
+          "18-28"
+        ],
+        "words": [
+          "Home starting lineup: #h1, #h2, #h3, #h4, #h5",
+          "Away starting lineup: #a1, #a2, #a3, #a4, #a5",
+          "Start of Q2",
+          "Team turnover — Home",
+          "Running clock on",
+          "Sub: #h7 in for #h4",
+          "#h1 +1",
+          "Sub: #h8 in for #h7",
+          "#h5 +3",
+          "Start of Q3",
+          "#a4 +1",
+          "#a1 +3",
+          "#h2 +1",
+          "#a3 +3",
+          "Full timeout — Home",
+          "Sub: #h6 in for #h1",
+          "Full timeout — Away",
+          "Turnover — #h3",
+          "#h5 +1",
+          "Start of Q4",
+          "Stop clock on",
+          "#h6 +3",
+          "#a1 +3",
+          "#h3 +1",
+          "#h5 +2",
+          "Turnover — #h2",
+          "Foul — #a3",
+          "Turnover — #a2",
+          "Sub: #h1 in for #h5",
+          "#a2 +1",
+          "#a5 +2",
+          "Foul — #h6",
+          "Team turnover taken back — Home",
+          "#a1 +3",
+          "#a3 +2",
+          "#a4 +1",
+          "#a3 +3",
+          "Sub: #h5 in for #h6",
+          "#h3 +1",
+          "Start of OT1",
+          "#a3 +2",
+          "Foul — #a5",
+          "Full timeout — Away",
+          "#a3 +3",
+          "Sub: #h4 in for #h8",
+          "Foul — #a1",
+          "#h1 +1",
+          "Foul — #h4",
+          "Foul taken back — #h4",
+          "#h4 +2",
+          "#h3 +1",
+          "30-second timeout — Home",
+          "Sub: #a7 in for #a2",
+          "Sub: #h8 in for #h4",
+          "#h2 +1",
+          "Full timeout — Home",
+          "Turnover — #a7",
+          "Foul taken back — #a5",
+          "#a7 +1",
+          "Foul taken back — #a1"
+        ],
+        "hasRecordedStats": true,
+        "mercyClocks": 0
+      }
+    },
+    {
+      "name": "ended with nothing recorded",
+      "rules": {
+        "periods": 4,
+        "periodSeconds": 480,
+        "overtimeSeconds": 240,
+        "bonusFouls": 5,
+        "doubleBonusFouls": null,
+        "fullTimeouts": 3,
+        "shortTimeouts": 2,
+        "timeoutsPer": "game",
+        "overtimeTimeouts": 1,
+        "timeoutsCarry": false
+      },
+      "commands": [
+        {
+          "command": {
+            "type": "lineup",
+            "side": "home",
+            "playerIds": ["h1", "h2", "h3", "h4", "h5"]
+          },
+          "id": "g24-0",
+          "now": 1000
+        },
+        {
+          "command": {
+            "type": "lineup",
+            "side": "away",
+            "playerIds": ["a1", "a2", "a3", "a4", "a5"]
+          },
+          "id": "g24-1",
+          "now": 1000
+        },
+        { "command": { "type": "end" }, "id": "g24-2", "now": 4000 },
+        { "command": { "type": "start" }, "id": "g24-3", "now": 7000 },
+        { "command": { "type": "pause" }, "id": "g24-4", "now": 10000 },
+        { "command": { "type": "end" }, "id": "g24-5", "now": 13000 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a1", "points": 1 },
+          "id": "g24-6",
+          "now": 16000
+        },
+        { "command": { "type": "undo" }, "id": "g24-7", "now": 19000 },
+        { "command": { "type": "end" }, "id": "g24-8", "now": 22000 },
+        {
+          "command": { "type": "score", "side": "away", "playerId": "a2", "points": 2 },
+          "id": "g24-9",
+          "now": 25000
+        },
+        { "command": { "type": "end" }, "id": "g24-10", "now": 25000 }
+      ],
+      "expected": {
+        "steps": [
+          "56f0f36e07da04e4",
+          "9cecfbf153b29e73",
+          "refused: Nothing is recorded for this game yet.",
+          "71784656e25e004d",
+          "79ae53265ba2760f",
+          "refused: Nothing is recorded for this game yet.",
+          "7afe0df5b18f3c6b",
+          "1c60db8532f20d06",
+          "refused: Nothing is recorded for this game yet.",
+          "b7b12e1c08607726",
+          "7d00f070906eb4be"
+        ],
+        "state": "f27539c715487b41",
+        "derived": {
+          "period": 1,
+          "periodStartElapsedMs": 0,
+          "clockMode": "stop",
+          "teams": {
+            "home": {
+              "score": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "teamTurnovers": 0,
+              "periodFouls": 0,
+              "onCourt": ["h1", "h2", "h3", "h4", "h5"],
+              "penalty": 0,
+              "bonus": 0,
+              "timeouts": [],
+              "timeoutsLeft": { "full": 3, "short": 2 }
+            },
+            "away": {
+              "score": 2,
+              "fouls": 0,
+              "turnovers": 0,
+              "teamTurnovers": 0,
+              "periodFouls": 0,
+              "onCourt": ["a1", "a2", "a3", "a4", "a5"],
+              "penalty": 0,
+              "bonus": 0,
+              "timeouts": [],
+              "timeoutsLeft": { "full": 3, "short": 2 }
+            }
+          },
+          "players": {
+            "h1": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 3000,
+              "appeared": true
+            },
+            "h2": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 3000,
+              "appeared": true
+            },
+            "h3": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 3000,
+              "appeared": true
+            },
+            "h4": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 3000,
+              "appeared": true
+            },
+            "h5": {
+              "side": "home",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 3000,
+              "appeared": true
+            },
+            "a1": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 3000,
+              "appeared": true
+            },
+            "a2": {
+              "side": "away",
+              "points": 2,
+              "fg1": 0,
+              "fg2": 1,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 3000,
+              "appeared": true
+            },
+            "a3": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 3000,
+              "appeared": true
+            },
+            "a4": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 3000,
+              "appeared": true
+            },
+            "a5": {
+              "side": "away",
+              "points": 0,
+              "fg1": 0,
+              "fg2": 0,
+              "fg3": 0,
+              "fouls": 0,
+              "turnovers": 0,
+              "ms": 3000,
+              "appeared": true
+            }
+          },
+          "standing": {}
+        },
+        "clockLater": {
+          "remainingMs": 477000,
+          "running": false,
+          "anchorAt": 10000,
+          "elapsedMs": 3000
+        },
+        "running": ["0-0", "0-0", "0-2"],
+        "words": [
+          "Home starting lineup: #h1, #h2, #h3, #h4, #h5",
+          "Away starting lineup: #a1, #a2, #a3, #a4, #a5",
+          "#a2 +2"
+        ],
+        "hasRecordedStats": true,
+        "mercyClocks": 0
       }
     }
   ]

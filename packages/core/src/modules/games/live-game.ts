@@ -282,8 +282,9 @@ const notPlayed: ReadonlySet<string> = new Set(['period', 'clock-mode', 'unscore
  * End is tapped: a game reopened and put right in an earlier period keeps the overtime it
  * was won in, and an overtime picked by mistake with nothing in it counts for nothing.
  * Undone plays are not standing and count for nothing; nor do a take-back and the basket
- * it takes back, which reads as never made (T-432), so the count agrees with the engine's
- * score by period, which has no column for an overtime whose only basket was taken back.
+ * it takes back, which reads as never made (T-432): an overtime whose only play is a basket
+ * taken back counts for nothing, as the engine's score by period has no column for it. The
+ * two do not always agree: an overtime holding a basket taken back and a foul counts 1.
  * Read when the tracker ends a game.
  */
 export function overtimePeriodsOf(state: basketball.GameState): number {

@@ -1,10 +1,14 @@
 // The law of step 2.247 (T-432): a game with no `unscore`, which is every game recorded
 // before it, reads through today's engine exactly as through the engine before it.
 // `support/old-games-before.json` was made once by running the engine of `build/stage-1`
-// before the step (20c39416) on nine fixed seeded games, refusals included: each step's
+// before the step (20c39416) on fourteen fixed games, refusals included: each step's
 // state and derived numbers (as a hash of their JSON, so key order counts too), each
 // refusal's words, and at the end the derived numbers, the clock, the running score,
-// every play's words and whether the game has statistics.
+// every play's words, whether the game has statistics and how many plays switched the
+// clock to running by the mercy rule. Nine are seeded at random; the mercy game opens with
+// a foul that stops the clock and the basket that reaches the mercy lead; one game uses
+// `rules`, `colors` and `reset`, others team fouls by the game and a last-minutes stop
+// clock by the period and by the half, and one is ended with nothing recorded (refused).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -40,11 +44,12 @@ function readGame(rules, list) {
     running: engine.runningScores(state.plays).map((s) => `${s.home}-${s.away}`),
     words: state.plays.map((p) => engine.describePlay(p, names, teams, rules.periods)),
     hasRecordedStats: engine.hasRecordedStats(state),
+    mercyClocks: state.plays.filter((p) => p.mercyClock === true).length,
   };
 }
 
-test('the file holds nine games, none with a take-back, with refusals and baskets', () => {
-  assert.equal(before.games.length, 9);
+test('the file holds fourteen games, none with a take-back, with refusals and baskets', () => {
+  assert.equal(before.games.length, 14);
   for (const game of before.games) {
     assert.ok(
       game.commands.every(({ command }) => command.type !== 'unscore'),
@@ -61,6 +66,21 @@ test('the file holds nine games, none with a take-back, with refusals and basket
   }
 });
 
+test('the games use the mercy switch, rules, colors, reset, every foul window and stop scope', () => {
+  const named = (name) => before.games.find((game) => game.name === name);
+  assert.ok(named('mercy').expected.mercyClocks >= 1, 'a basket switches the clock by mercy');
+  const types = new Set(before.games.flatMap((g) => g.commands.map((c) => c.command.type)));
+  for (const type of ['rules', 'colors', 'reset']) assert.ok(types.has(type), type);
+  const resets = new Set(before.games.map((g) => g.rules.teamFoulsReset ?? 'period'));
+  assert.deepEqual([...resets].sort(), ['game', 'half', 'period']);
+  const scopes = new Set(
+    before.games.filter((g) => g.rules.stopClockLastSeconds).map((g) => g.rules.stopClockScope),
+  );
+  assert.deepEqual([...scopes].sort(), ['game', 'half', 'period']);
+  const nothing = named('ended with nothing recorded').expected.steps;
+  assert.ok(nothing.includes('refused: Nothing is recorded for this game yet.'));
+});
+
 for (const game of before.games)
   test(`${game.name}: a game with no take-back reads as before step 2.247`, () => {
     const now = readGame(game.rules, game.commands);
@@ -70,6 +90,7 @@ for (const game of before.games)
     assert.deepEqual(now.running, game.expected.running);
     assert.deepEqual(now.clockLater, game.expected.clockLater);
     assert.equal(now.hasRecordedStats, game.expected.hasRecordedStats);
+    assert.equal(now.mercyClocks, game.expected.mercyClocks);
     assert.deepEqual(now.steps, game.expected.steps);
     assert.equal(now.state, game.expected.state);
   });
