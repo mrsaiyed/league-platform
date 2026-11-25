@@ -21,8 +21,9 @@
 //   game, on their games and on the games list.
 // - A game its tracker ended (played to its end through the tracker's own endpoints, as a
 //   tablet would): the scorekeeper who ended it reads until when they may reopen it and
-//   does, inside the league's minutes; ended again, an admin reopens it. Each time it is
-//   live again, scored in the tracker, with no score boxes.
+//   does, inside the league's minutes, and is back on the games list; ended again, an admin
+//   reopens it and stays on the game's page, offered "Edit the box score" (step 2.65). Each
+//   time it is live again, corrected through the tracker's plays, with no score boxes.
 // - With scripts off, a game set to live tracking with no plays yet is finished by score
 //   through the same two steps; by keyboard, the boxes open and the score is saved.
 // - Every control on the games list is at least 44 high; accessibility checks (T-186) and
@@ -431,14 +432,21 @@ if (browser) {
         await page
           .getByLabel('Why it needs correcting (kept in the log, never shown publicly)')
           .fill('A basket went to the wrong player');
+        // An admin who may correct it stays on the game's page, where its grid is (2.65).
         await Promise.all([
-          page.waitForURL((url) => url.pathname === '/north-valley/admin/games'),
+          page.waitForURL((url) => url.pathname === `/north-valley/admin/games/${liveGame}`),
           page.getByRole('button', { name: 'Reopen to correct' }).click(),
         ]);
+        const said = page.getByText(
+          'The game is live again. Correct it with “Edit the box score” below, or on the scoring screen, then end it again there.',
+          { exact: true },
+        );
+        await said.waitFor({ timeout: 20_000 });
         note(
-          'an admin reopens a game its tracker ended, and it goes back to the tracker',
-          (await gameOn(page, liveGame).getByRole('status').textContent()) ===
-            'The game is live again. Correct it in the tracker, then end it again.',
+          'an admin reopens a game its tracker ended: live again, with both ways to correct it',
+          (await said.count()) === 1 &&
+            (await page.getByRole('link', { name: 'Edit the box score' }).count()) === 1 &&
+            (await page.locator('input[type=number]').count()) === 0,
         );
       } finally {
         await admin.context.close();

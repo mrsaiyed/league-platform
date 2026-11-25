@@ -159,7 +159,11 @@ export async function BoxScorePage({
   const mine = notice?.thing === game.id ? notice : undefined;
   const reopened =
     mine?.said === 'reopen'
-      ? t('admin.boxScore.done.reopen')
+      ? t(
+          sheet.locked === 'tracked'
+            ? 'admin.boxScore.done.reopenTracked'
+            : 'admin.boxScore.done.reopen',
+        )
       : mine?.said === 'put-back'
         ? t('admin.boxScore.done.putBack')
         : undefined;
@@ -314,8 +318,9 @@ export async function BoxScorePage({
               requestToken: crypto.randomUUID(),
               // Made once as the form is drawn: a second send of it is the same reopen.
               ...(reopen.door === 'tracked' ? { requestId: crypto.randomUUID() } : {}),
-              // A game not entered as a box score is put right on the games list, beside it.
-              ...(game.captureMode === 'box' ? {} : { then: 'games' }),
+              // A game not entered as a box score is put right on the games list, beside it;
+              // a tracked game someone here may correct comes back here, to its grid (2.65).
+              ...(game.captureMode === 'box' || trackedGrid !== undefined ? {} : { then: 'games' }),
             }}
             texts={{
               ...(reopen.until === null

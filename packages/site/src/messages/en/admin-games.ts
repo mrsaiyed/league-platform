@@ -11,6 +11,8 @@ export const enAdminGames = {
   'admin.boxScore.done.putBack':
     'The box score is back as it was before the game was reopened, and the game is final again.',
   'admin.boxScore.done.reopen': 'The game is reopened. Fix the grid and save it again.',
+  'admin.boxScore.done.reopenTracked':
+    'The game is live again. Correct it with “Edit the box score” below, or on the scoring screen, then end it again there.',
   'admin.boxScore.done.save': 'The box score is saved and the game is final.',
   // An empty box of a final game's grid, which is read and not filled in.
   'admin.boxScore.empty': '–',
@@ -49,7 +51,7 @@ export const enAdminGames = {
   'admin.boxScore.locked.postponed':
     'This game is postponed, so it has no score yet. It is scored once it is played on its new date.',
   'admin.boxScore.locked.tracked':
-    'This game was scored with the live tracker. Correct it in the tracker, so its list of plays still explains the numbers.',
+    'This game was scored with the live tracker. Correct it with “Edit the box score”, or on the scoring screen to take points away; either way its list of plays still explains the numbers.',
   'admin.boxScore.minutes': 'Minutes',
   'admin.boxScore.minutes.short': 'MIN',
   'admin.boxScore.noPlayers': 'This team has no players on its roster yet. Add them in Teams.',

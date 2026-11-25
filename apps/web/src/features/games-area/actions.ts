@@ -361,10 +361,10 @@ export async function saveBoxScoreAction(
 }
 
 /**
- * The game reopened to correct it: back to its grid; or, for a game that was not entered
- * as a box score (a final score typed by hand, a forfeit, a game its tracker ended), to
- * the games list beside it, where its result is entered again or it is scored in the
- * tracker.
+ * The game reopened to correct it: back to its page; or, for a game that was not entered
+ * as a box score (a final score typed by hand, a forfeit, a game its tracker ended that
+ * this person may not edit in its grid), to the games list beside it, where its result is
+ * entered again or it is scored in the tracker. The page's form says which (`then`).
  */
 export async function reopenBoxScoreAction(_state: FormState, form: FormData): Promise<FormState> {
   const fields = typedOf(form);
