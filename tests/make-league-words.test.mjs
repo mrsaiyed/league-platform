@@ -12,7 +12,12 @@ import {
   confirmHosted,
   made,
   makeProblemLines,
+  mercyLeadProblem,
+  planLines,
+  problemWords,
+  questions,
 } from '../scripts/make-league.messages.mjs';
+import { en } from '@srleagues/site';
 
 const plan = {
   name: 'Made-up Hoops',
@@ -149,4 +154,47 @@ test('a short name with a word from the offensive starter list is refused in pla
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
+});
+
+test('a refused mercy lead is told its own cause: the number, or the clock (review L2)', () => {
+  const said = (clock, mercyLead) => problemWords.invalid[mercyLeadProblem({ clock, mercyLead })];
+  const number = 'Mercy rule: a whole number of points from 1 to 100, or none.';
+  const clock = 'Mercy rule: it only works with a stop clock. Choose a stop clock or answer none.';
+  assert.equal(said('stop', '12.5'), number);
+  assert.equal(said('STOP', ' 101 '), number);
+  assert.equal(said('running', '12.5'), number);
+  assert.equal(said('running', '20'), clock);
+  assert.equal(said(undefined, '15'), clock);
+});
+
+test('team fouls are asked in the season settings’ own words, and the plan says the answer (step 2.245)', () => {
+  const means = (reset) => en[`seasonSettings.option.teamFoulsReset.${reset}`];
+  for (const reset of ['period', 'half', 'game']) {
+    assert.ok(questions.teamFoulsReset.includes(`${reset} (${means(reset)})`), reset);
+    assert.ok(problemWords.invalid.teamFoulsReset.includes(`${reset} (${means(reset)})`), reset);
+  }
+  assert.ok(questions.teamFoulsReset.startsWith(en['seasonSettings.field.teamFoulsReset']));
+  const full = {
+    ...plan,
+    sportKey: 'basketball',
+    audience: 'adult',
+    listed: true,
+    listedChosen: false,
+    city: 'Springfield',
+    timeZone: 'America/Chicago',
+    contactEmail: 'hello@example.test',
+    season: { name: 'Fall 2026', startsOn: null, endsOn: null },
+    design: { startingDesign: 'crest', chosen: false, colors: {} },
+  };
+  const place = { kind: 'memory' };
+  const preview = { owner: 'none', staff: 'none' };
+  const line = (gameRules) =>
+    planLines({ ...full, gameRules }, preview, place, '/made-up-hoops').find((l) =>
+      l.trimStart().startsWith('Team fouls'),
+    );
+  const half = line({ clockMode: 'running', mercyLead: null, teamFoulsReset: 'half' });
+  assert.ok(half?.includes(means('half')), half);
+  // Left alone, the first season counts each period, as every season before.
+  const left = line({ clockMode: 'running', mercyLead: null });
+  assert.ok(left?.includes(means('period')), left);
 });

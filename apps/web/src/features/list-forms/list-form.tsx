@@ -19,7 +19,7 @@ import { useOneSubmit } from './use-one-submit.ts';
 
 export type ListField =
   | {
-      readonly kind: 'text' | 'url' | 'email';
+      readonly kind: 'text' | 'url' | 'email' | 'date';
       readonly name: string;
       readonly label: string;
       readonly value: string;
@@ -390,7 +390,7 @@ export function ListForm({
                 key={`${field.name}:${value}`}
                 name={field.name}
                 type={field.kind}
-                inputMode={field.kind === 'text' ? undefined : field.kind}
+                inputMode={field.kind === 'url' || field.kind === 'email' ? field.kind : undefined}
                 defaultValue={value}
                 required={field.required}
                 maxLength={field.maxLength}

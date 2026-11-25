@@ -75,6 +75,12 @@ export type NewSeason = {
   readonly name: string;
   readonly startsOn: string | null;
   readonly endsOn: string | null;
+  /**
+   * Its rules, saved in the statement that makes it (T-430): left out, the season holds
+   * the database's starting document. Given, the season's version is what a just-made
+   * season's always is, so a league made with its game rules stays removable.
+   */
+  readonly rules?: SeasonRules;
 };
 
 /** A season as it is kept. `rules` is the stored document, which may be of an older version. */

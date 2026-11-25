@@ -165,3 +165,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.123: the scoring screen's team-foul count has no small word saying what it covers (half, game, quarter): it did not fit on a phone beside a bonus badge within the scoreboard's fifth of the screen; and the game-format panel has no rule for team fouls when the periods change on the night.
 
 - 2.155 part 5: the bin keeps one notice per person and league, so two tabs used at the same moment can show one tab the other's answer; a name ending in ! or ? reads with a full stop after it; no test makes restore_binned_person refuse with profile-taken in a browser.
+
+- 2.245: the season settings' own sentence reads 'the last 1 minutes' for a 60-second stop clock; the browser test tracks no game in a season started with the team-fouls question left alone; any later change to the league-removal guard must start from migration 0030, not 0020.
