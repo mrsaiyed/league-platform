@@ -19,6 +19,12 @@ export async function createOwnProfile(
   if (scope.accountId === null) {
     throw new Error('createOwnProfile needs a transaction opened for an account.');
   }
+  // Two answers at once (L5): the second waits here for the first to finish, then the
+  // function's own check sees its profile and answers 'already-has-one', never the unique
+  // index's error.
+  await sql`select pg_advisory_xact_lock(hashtextextended(${`own_profile:${scope.accountId}`}, 0))`.execute(
+    transactionOf(scope),
+  );
   const { rows } = await sql<{ profile_id: string | null }>`
     select public.create_own_profile(${profile.firstName}, ${profile.lastName},
                                      ${profile.birthDate}::date) as profile_id

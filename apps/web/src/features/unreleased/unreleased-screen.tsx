@@ -25,7 +25,9 @@ export async function unreleasedScreen(address: readonly string[]): Promise<Reac
       // sign in and brought back here (step 2.163, L10), as the page will when it is built.
       if (page.page === 'inbox') {
         const person = await signedInPerson();
-        if (person.kind === 'account-problem') redirect(platformUrl('account'));
+        // A name to give first (S-125): brought back here after.
+        if (person.kind === 'account-problem')
+          redirect(screenUrl('account', { next: platformUrl('inbox') }));
         if (person.kind === 'visitor')
           redirect(screenUrl('signin', { next: platformUrl('inbox') }));
       }

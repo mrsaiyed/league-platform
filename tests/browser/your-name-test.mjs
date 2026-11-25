@@ -125,6 +125,22 @@ await step('a new sign-up is asked its name once', async () => {
     const problems = await accessibilityProblems(page);
     note('accessibility: the name screen', problems.length === 0, problems.join('; '));
 
+    // The two pages that once dropped where the person was going keep it too (L4).
+    await page.goto(`${origin}/inbox`);
+    await nameScreen(page).waitFor();
+    note(
+      'the inbox, before the name, is the name screen holding /inbox',
+      new URL(page.url()).searchParams.get('next') === '/inbox',
+      page.url(),
+    );
+    await page.goto(`${origin}/account/confirm?next=%2Faccount`);
+    await nameScreen(page).waitFor();
+    note(
+      'the password again, before the name, is the name screen holding that page',
+      new URL(page.url()).searchParams.get('next') === '/account/confirm?next=%2Faccount',
+      page.url(),
+    );
+
     // Before answering, a league page sends them to the screen, holding where they were going.
     await page.goto(`${origin}/north-valley/schedule`);
     await nameScreen(page).waitFor();
