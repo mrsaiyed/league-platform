@@ -185,6 +185,17 @@ export {
   type SeasonSuggestion,
   type WhoPlays,
 } from './rules/new-league-plan.ts';
+export {
+  clockModes,
+  gameRuleAnswers,
+  gameRuleAnswersOf,
+  gameRuleQuestions,
+  withGameRuleAnswers,
+  type ClockMode,
+  type GameRuleAnswers,
+  type GameRuleQuestion,
+  type GameRuleRefusal,
+} from './rules/game-rule-answers.ts';
 export type {
   DivisionChange,
   DivisionRecord,

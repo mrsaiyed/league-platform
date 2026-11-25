@@ -18,9 +18,11 @@
 // the `leagues.create` entry names the starting design. A league made without one has
 // no release, and is drawn in the neutral design until one is published.
 import {
+  defaultSeasonRules,
   startingColors,
   startingDesignKeys,
   startingDesignWith,
+  type SeasonRules,
   type StartingColors,
   type StartingDesignKey,
 } from '@srleagues/contracts';
@@ -37,12 +39,23 @@ import { leagueCreated } from '../events.ts';
 import { audiences, defaultProgramSlug, listedByDefault } from '../league-values.ts';
 import { mayActAsPlatform } from '../policy.ts';
 import type { LeagueRecord, LeaguesTx } from '../ports.ts';
+import {
+  gameRuleAnswers,
+  withGameRuleAnswers,
+  type GameRuleRefusal,
+} from '../rules/game-rule-answers.ts';
 import { isBlockedShortName, shortNameSchema } from '../short-names.ts';
 import { namedTimeZone } from '../time-zone.ts';
 
-export type CreateLeagueError = {
-  readonly code: 'short-name-blocked' | 'short-name-taken' | 'league-exists' | 'owner-not-found';
-};
+export type CreateLeagueError =
+  | {
+      readonly code:
+        | 'short-name-blocked'
+        | 'short-name-taken'
+        | 'league-exists'
+        | 'owner-not-found';
+    }
+  | GameRuleRefusal;
 
 /** The league, and its first season's id when one was made with it. */
 export type CreatedLeague = LeagueRecord & { readonly firstSeasonId: string | null };
@@ -60,6 +73,12 @@ const firstSeason = z
     name: z.string().trim().min(1).max(120),
     startsOn: day.optional(),
     endsOn: day.optional(),
+    /**
+     * The game rules asked when the league is made (S-106, step 2.245), put into the
+     * starting rules; given, the season's rules are saved with them, an answer left out
+     * keeping the starting one.
+     */
+    gameRules: gameRuleAnswers.optional(),
   })
   .refine((s) => s.startsOn === undefined || s.endsOn === undefined || s.endsOn >= s.startsOn, {
     path: ['endsOn'],
@@ -104,6 +123,11 @@ export const createLeague = defineCommand({
   allowed: (context, _input, tx: LeaguesTx) => mayActAsPlatform(context, tx),
   run: async ({ context, input, tx, emit }): Promise<Result<CreatedLeague, CreateLeagueError>> => {
     if (isBlockedShortName(input.slug)) return fail({ code: 'short-name-blocked' });
+    const answered =
+      input.firstSeason?.gameRules === undefined
+        ? undefined
+        : withGameRuleAnswers(defaultSeasonRules(), input.firstSeason.gameRules);
+    if (answered?.ok === false) return fail({ code: answered.code, question: answered.question });
     const created = await tx.leagues.createLeague({
       slug: input.slug,
       name: input.name,
@@ -127,7 +151,9 @@ export const createLeague = defineCommand({
           : { ...setUp, startingDesign: input.design.startingDesign },
     });
     const firstSeasonId =
-      input.firstSeason === undefined ? null : await makeFirstSeason(tx, input.firstSeason);
+      input.firstSeason === undefined
+        ? null
+        : await makeFirstSeason(tx, input.firstSeason, answered?.rules);
     if (firstSeasonId !== null) {
       await recordActivity(tx, context, {
         action: 'leagues.create_season',
@@ -170,6 +196,7 @@ async function publishFirstDesign(
 async function makeFirstSeason(
   tx: LeaguesTx,
   season: z.output<typeof firstSeason>,
+  rules: SeasonRules | undefined,
 ): Promise<string> {
   const program = await tx.leagues.findProgram(undefined);
   if (program === undefined) throw new Error('leagues.create: the default program is missing.');
@@ -185,6 +212,16 @@ async function makeFirstSeason(
   }
   if (!(await tx.leagues.setCurrentSeason(seasonId))) {
     throw new Error('leagues.create: the first season could not be made the current one.');
+  }
+  if (rules !== undefined) {
+    const made = await tx.leagues.findSeason(seasonId);
+    const saved =
+      made === undefined
+        ? undefined
+        : await tx.leagues.updateSeason(seasonId, { rules }, made.version);
+    if (typeof saved !== 'number') {
+      throw new Error("leagues.create: the first season's rules could not be saved.");
+    }
   }
   return seasonId;
 }
