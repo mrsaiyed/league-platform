@@ -73,10 +73,10 @@ const holder = globalThis as Holder;
 
 /**
  * Sets the server's key, once, as the server starts (container.ts), before any snapshot is
- * read, under the secret T-465 chooses. It never fails for want of SESSION_SECRET.
+ * read, under the secret T-465 chooses. It never fails for want of SESSION_SECRET. A second
+ * start in one process (the tests start the app many times) sets it again from its settings.
  */
 export function startPublicPlayerKey(settings: PlayerKeySettings): void {
-  if (holder[slot] !== undefined) throw new Error('The public player key was made before start.');
   holder[slot] = playerKeyUnder(playerKeySecretFrom(settings));
 }
 
