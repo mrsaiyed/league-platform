@@ -19,7 +19,7 @@ import {
   court,
   league,
   liveGame,
-  owner,
+  seasonClock,
   scorekeeper,
   starters,
   trackerPath,
@@ -58,40 +58,6 @@ const server = startNext(['start', '--port', new URL(origin).port], {
   PUBLIC_BASE_URL: origin,
 });
 let browser;
-
-/**
- * The owner sets the season's clock in "Game rules", as on the season's settings page:
- * `mode` stop or running, `lastMinutes` and `mercyLead` a number or '' for none. Throws
- * unless the page then shows the season so. Returns the season's number of periods.
- */
-async function seasonClock(mode, lastMinutes, mercyLead) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-  try {
-    await context.addCookies([{ ...owner, url: origin }]);
-    const page = await context.newPage();
-    const address = `${origin}/${league}/admin/season?season=fall-2026&edit=game`;
-    await page.goto(address);
-    await page.locator(`input[name=clockMode][value=${mode}]`).check();
-    await page.locator('input[name=lastMinutes]').fill(lastMinutes);
-    await page.locator('input[name=mercyLead]').fill(mercyLead);
-    await Promise.all([
-      page.waitForEvent('load'),
-      page.getByRole('button', { name: 'Save the game rules' }).click(),
-    ]);
-    await page.goto(address);
-    const kept = {
-      mode: await page.locator('input[name=clockMode]:checked').getAttribute('value'),
-      lastMinutes: await page.locator('input[name=lastMinutes]').inputValue(),
-      mercyLead: await page.locator('input[name=mercyLead]').inputValue(),
-    };
-    if (kept.mode !== mode || kept.lastMinutes !== lastMinutes || kept.mercyLead !== mercyLead) {
-      throw new Error(`the season keeps ${JSON.stringify(kept)}`);
-    }
-    return Number(await page.locator('input[name=periods]:checked').getAttribute('value'));
-  } finally {
-    await context.close();
-  }
-}
 
 /** The scoring screen of `game` on a tablet lying down; `work` gets the court, page and context. */
 async function onTheScreen(game, work) {
@@ -135,7 +101,7 @@ try {
   browser = await launch();
 
   await step('the owner gives the season a stop clock with a mercy lead of 10', () =>
-    seasonClock('stop', '', '10'),
+    seasonClock(browser, origin, 'stop', '', '10'),
   );
   await addPlayers(origin);
 
@@ -243,7 +209,7 @@ try {
   await step(
     'the owner gives the season a running clock that stops in the last 2 minutes',
     async () => {
-      periods = await seasonClock('running', '2', '');
+      periods = await seasonClock(browser, origin, 'running', '2', '');
     },
   );
   // The Hawks are the mercy game's home team too, so only the Lions are given players.

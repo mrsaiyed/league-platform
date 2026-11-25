@@ -2507,6 +2507,17 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+/* In the pad of an upright phone the two answers share one row, each as wide as the
+   other and its words on two lines if need be: stacked, "Keep it running" fell below the
+   pad's foot at 390 x 844 (step 2.69's pictures). */
+.court-notices-pad .court-mercy-acts {
+  flex-wrap: nowrap;
+}
+.court-notices-pad .court-mercy-acts > .court-button {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: normal;
+}
 /* A period's button acts at once and with no question, at the top of the form, far from
    the thumb: 56 or more on its short side, as the point buttons are (the area 4 review
    of step 2.36, L2: they were 53 x 48). */
