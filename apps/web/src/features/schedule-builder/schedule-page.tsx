@@ -62,6 +62,7 @@ import {
   answerShown,
   swapAnchor,
   refusedAtOf,
+  refusedRoundGone,
   roundAnchor,
   savedAnchor,
   savedDetailOf,
@@ -369,7 +370,33 @@ export async function ScheduleBuilderPage({
     removed: draft.removed,
     removedRounds: draft.result.removedRounds ?? [],
   });
-  const top = saidBeside || here !== undefined ? null : plainNotice;
+  // A refusal of a round no longer drawn is said at the top, by the round's name, once, and
+  // carries its anchor: the post lands on it and it is brought into view.
+  const gone = refusedRoundGone(refusedAt, grid.rounds, draft.result.removedRounds ?? []);
+  const goneWhy = gone === undefined ? undefined : whyNotSaved(search);
+  const goneNotice =
+    gone === undefined || goneWhy === undefined ? undefined : (
+      <IntoView
+        words={goneWhy}
+        marks={{
+          className: 'ui-notice',
+          role: 'alert',
+          id: roundAnchor(gone.roundId),
+          'data-notice': 'problem',
+          'data-kind': 'error',
+          'data-round-gone': gone.roundId,
+        }}
+      >
+        {gone.round === undefined
+          ? t('schedule.admin.problem', { reason: goneWhy })
+          : t('schedule.admin.problemRoundGone', {
+              round: t('schedule.admin.round', gone.round),
+              reason: goneWhy,
+            })}
+      </IntoView>
+    );
+  const top =
+    goneNotice !== undefined ? goneNotice : saidBeside || here !== undefined ? null : plainNotice;
   const noRounds = grid.rounds.length === 0;
   // A season with no rounds: a calm panel under the intro, the first round's form open in it.
   const firstRound = noRounds ? (

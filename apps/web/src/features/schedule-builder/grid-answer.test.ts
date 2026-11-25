@@ -8,6 +8,7 @@ import {
   answerShown,
   gridAnswerHolds,
   refusedAtOf,
+  refusedRoundGone,
   savedDetailOf,
 } from './grid-answer.ts';
 import { noticeOf } from './notice.ts';
@@ -154,5 +155,23 @@ describe('gridAnswerHolds', () => {
     expect(gridAnswerHolds({ kind: 'published' }, nowWith([], [], false))).toBe(true);
     expect(gridAnswerHolds({ kind: 'published' }, nowWith([], []))).toBe(false);
     expect(gridAnswerHolds({ kind: 'refused', code: 'stale-version' }, nowWith([], []))).toBe(true);
+  });
+});
+
+describe('refusedRoundGone', () => {
+  const at = { form: 'round', roundId: round } as const;
+  it('names a refused round that is no longer drawn, from the bin', () => {
+    const binned = [{ id: round, number: 2, label: 'Week 2' }];
+    expect(refusedRoundGone(at, [], binned)).toEqual({
+      roundId: round,
+      round: { number: 2, label: 'Week 2' },
+    });
+    // Not in the bin either: its id only, so its anchor still lands on the notice.
+    expect(refusedRoundGone(at, [], [])).toEqual({ roundId: round });
+  });
+  it('says nothing at the top while the round is drawn, or for another form', () => {
+    expect(refusedRoundGone(at, [{ id: round }], [])).toBeUndefined();
+    expect(refusedRoundGone({ form: 'add-round', label: '', date: '' }, [], [])).toBeUndefined();
+    expect(refusedRoundGone(undefined, [], [])).toBeUndefined();
   });
 });

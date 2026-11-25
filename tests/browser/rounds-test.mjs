@@ -398,6 +398,37 @@ if (built) {
       await saysNothingOf(page, 'That was not saved'),
     );
     note('still two rounds', (await page.locator('section[data-round]').count()) === 2);
+    // The same form from another tab drawn before the removal (a new token): refused, and its
+    // round is no longer drawn, so it is said at the top, by the round's name, once, in view.
+    const late = await page.request.post(gridAddress, {
+      multipart: { ...removeFields, requestToken: crypto.randomUUID() },
+      headers: { origin },
+      maxRedirects: 0,
+      timeout: 30_000,
+    });
+    const lateTo = late.headers()['location'] ?? '';
+    note('a late "Remove this round" is refused at its round', /#round-/.test(lateTo), lateTo);
+    // Off the grid first: the same address with only a new anchor would not load it again.
+    await page.goto('about:blank');
+    await page.goto(new URL(lateTo, gridAddress).href);
+    const goneSaid = page.locator('[data-round-gone][data-notice="problem"]');
+    await goneSaid.waitFor({ timeout: 15_000 });
+    note(
+      'the refusal of a round no longer drawn is said at the top, by its name',
+      /Week 2: that was not saved\./.test(await goneSaid.innerText()),
+      await goneSaid.innerText(),
+    );
+    note(
+      'and said once',
+      (await page.getByText('that was not saved', { exact: false }).count()) === 1,
+    );
+    note(
+      'and brought into view',
+      await goneSaid.evaluate((el) => {
+        const box = el.getBoundingClientRect();
+        return box.top >= 0 && box.bottom <= window.innerHeight;
+      }),
+    );
     const removedAfter = await roundsRemoved();
     note(
       'removed twice, one row in the activity log',

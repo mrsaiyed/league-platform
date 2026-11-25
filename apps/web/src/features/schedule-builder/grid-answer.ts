@@ -364,3 +364,21 @@ export function refusedAtOf(search: Search): RefusedAt | undefined {
   }
   return undefined;
 }
+
+/**
+ * A refusal of a round's form whose round is no longer drawn (removed in another tab, or by
+ * a repeat of the post): its place is gone, so it is said at the top of the season's
+ * schedule, carrying that round's anchor so the post's landing brings it into view. The
+ * round as the draft last knew it (its bin), or just its id when the draft no longer holds it.
+ */
+export function refusedRoundGone(
+  at: RefusedAt | undefined,
+  drawn: readonly { readonly id: string }[],
+  removed: readonly { readonly id: string; readonly number: number; readonly label: string }[],
+): { readonly roundId: string; readonly round?: { number: number; label: string } } | undefined {
+  if (at?.form !== 'round' || drawn.some((r) => r.id === at.roundId)) return undefined;
+  const was = removed.find((r) => r.id === at.roundId);
+  return was === undefined
+    ? { roundId: at.roundId }
+    : { roundId: at.roundId, round: { number: was.number, label: was.label } };
+}

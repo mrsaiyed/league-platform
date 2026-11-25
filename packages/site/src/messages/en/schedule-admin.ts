@@ -158,6 +158,7 @@ export const enScheduleAdmin = {
   'schedule.admin.otherGames': 'Games with no round',
   'schedule.admin.place': 'Venue and court',
   'schedule.admin.problem': 'That was not saved: {reason}',
+  'schedule.admin.problemRoundGone': '{round}: that was not saved. {reason}',
   'schedule.admin.problemPartial':
     'The new time and place were saved to the draft, but the recording change was not: {reason}',
   'schedule.admin.publish': 'Publish',
