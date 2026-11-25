@@ -282,6 +282,8 @@ export const enAdminSettings = {
   'seasonSettings.option.statistics.points-fouls': 'Points and fouls',
   'seasonSettings.option.statistics.points-only': 'Points only',
   'seasonSettings.option.statistics.standard': 'Points, 3-pointers, free throws, fouls and minutes',
+  'seasonSettings.option.statistics.standard-turnovers':
+    'Points, 3-pointers, free throws, fouls, minutes and turnovers',
   'seasonSettings.option.stopClockScope.game': 'The game',
   'seasonSettings.option.stopClockScope.half': 'Each half',
   'seasonSettings.option.stopClockScope.period': 'Each half or quarter',

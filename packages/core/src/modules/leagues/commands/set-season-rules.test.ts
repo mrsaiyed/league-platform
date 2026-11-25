@@ -21,6 +21,21 @@ describe('setSeasonRules', () => {
     expect(db.state.activity).toHaveLength(1);
   });
 
+  it('lets the admin\'s "Statistics kept" rule over a list the season named (T-393)', async () => {
+    const named = { ...season, statKeys: ['points', 'rebounds', 'fouls'] };
+    const { db, deps, as } = memoryLeagues({ seasons: [named] });
+    const fouls = defaultSeasonRules();
+    fouls.fouls.bonusFouls = 5;
+    await setSeasonRules(as(ownerId), { seasonId: id(1), version: 1, rules: fouls }, deps);
+    expect(db.state.seasons[0]?.statKeys).toEqual(['points', 'rebounds', 'fouls']);
+    const turnovers: SeasonRules = { ...fouls, statistics: 'standard-turnovers' };
+    expect(
+      await setSeasonRules(as(ownerId), { seasonId: id(1), version: 2, rules: turnovers }, deps),
+    ).toEqual({ ok: true, value: { version: 3 } });
+    expect(db.state.seasons[0]?.statKeys).toEqual([]);
+    expect(db.state.seasons[0]?.rules).toEqual(turnovers);
+  });
+
   it('refuses invalid rules and saves nothing', async () => {
     const { db, deps, as } = memoryLeagues({ seasons: [season] });
     const bad = defaultSeasonRules();

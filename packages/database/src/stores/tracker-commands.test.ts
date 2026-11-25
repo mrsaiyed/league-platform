@@ -372,6 +372,11 @@ describe('the tracker’s commands on the database (T6 §1, §3)', () => {
   it('undo takes a player’s only line out again', async () => {
     const l = await leagueWithGames();
     const [gameId = '', sessionId = ''] = [l.gameIds[0], l.sessionIds[0]];
+    // A turnover is taken only in a season that keeps turnovers (S-93, step 2.241).
+    await pglite.query(
+      `update seasons set rules = jsonb_set(rules, '{statistics}', '"full"') where id = $1`,
+      [l.seasonId],
+    );
     await applyTrackerCommands(
       l.as(l.first),
       batch(

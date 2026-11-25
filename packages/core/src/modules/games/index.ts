@@ -102,6 +102,8 @@ export {
 export { boxScoreColumns } from './box-score-columns.ts';
 // One answer for the columns of the statistics page and a game's box score (step 2.196).
 export { statisticsKept } from './statistics-kept.ts';
+// What the scoring screen offers and the server takes (S-93, step 2.241).
+export { keptForScoring, statisticOfTap, tapNotKept } from './statistic-of-tap.ts';
 // A team's own count, from the saved plays: in its Total and its season's (step 2.196).
 export { teamOwnCounts, type TeamOwnCount, type TeamOwnCounts } from './team-own-counts.ts';
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
@@ -181,6 +183,7 @@ export {
   applyTrackerCommands,
   batchReaders,
   type ApplyTrackerCommandsError,
+  type TrackerCommandsApplied,
 } from './commands/apply-tracker-commands.ts';
 export {
   readTrackerState,

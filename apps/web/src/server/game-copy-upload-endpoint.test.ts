@@ -116,6 +116,29 @@ describe('POST …/games/{game}/copy: a copy uploaded from another device (step 
     expect(await sequenceOf(world)).toBe(4);
   });
 
+  it('a copy holding plays the season does not keep is uploaded, those counted apart by statistic (S-93, T-395)', async () => {
+    // The stand-in season keeps the standard set, which has no turnovers.
+    const world = trackerWorld();
+    await tabletOpens(world);
+    const plays = [
+      ...theGame(),
+      tap({ type: 'turnover', side: 'away', playerId: bears[0] }),
+      tap({ type: 'score', side: 'away', playerId: bears[0], points: 3 }),
+      tap({ type: 'team-turnover', side: 'home' }),
+      // Refused by the game's rules, not by "Statistics kept": counted in notTaken.
+      tap({ type: 'unturnover', side: 'home', playerId: bears[0] }),
+    ];
+    const sent = await uploadTakingOver(world, copyOf(plays));
+    expect(sent.reply).toEqual({
+      status: 'uploaded',
+      added: 5,
+      alreadyThere: 0,
+      notTaken: 1,
+      notKept: [{ statistic: 'turnovers', count: 2 }],
+    });
+    expect(await sequenceOf(world)).toBe(5);
+  });
+
   it('a release that fails after the plays were saved still answers the counts and tells the watchers (T-371)', async () => {
     const world = trackerWorld();
     const tablet = await tabletOpens(world);

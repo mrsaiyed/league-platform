@@ -158,6 +158,32 @@ export async function addPlayers(origin, players = morePlayers, game = liveGame)
 }
 
 /**
+ * Makes the made-up league's season keep `statistics` ("Statistics kept"; S-107, step
+ * 2.241), as its owner does on the season's settings page: the stand-in seasons keep the
+ * standard set, whose scoring screen offers no turnover. Throws unless the page then
+ * shows the season keeping them.
+ */
+export async function keepStatistics(browser, origin, statistics = 'standard-turnovers') {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  try {
+    await context.addCookies([{ ...owner, url: origin }]);
+    const page = await context.newPage();
+    const address = `${origin}/${league}/admin/season?season=fall-2026&edit=recording`;
+    await page.goto(address);
+    await page.locator(`input[name=statistics][value=${statistics}]`).check();
+    await Promise.all([
+      page.waitForEvent('load'),
+      page.getByRole('button', { name: 'Save how games are recorded' }).click(),
+    ]);
+    await page.goto(address);
+    const kept = await page.locator('input[name=statistics]:checked').getAttribute('value');
+    if (kept !== statistics) throw new Error(`the season keeps ${kept}, not ${statistics}`);
+  } finally {
+    await context.close();
+  }
+}
+
+/**
  * Makes the game a stop-clock game, where a foul or a timeout stops a running clock
  * (step 2.36): the made-up league's own format is a running clock, under which neither
  * does. It is the engine's own switch (`clock-mode`, T-128), sent before tip-off from

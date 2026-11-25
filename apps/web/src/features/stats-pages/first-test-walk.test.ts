@@ -4,7 +4,8 @@
 // tests/browser/first-test-walk-test.mjs, tap for tap: the empty league Still Waters
 // (step 2.192), three teams (the Owls play no game), five made-up players each for the
 // Ravens and the Wolves, one round today with two games and no place, published. Game 1,
-// Wolves at Ravens, scored on the tablet: baskets, a foul, one team turnover, a wrong
+// Wolves at Ravens, scored on the tablet: baskets, a foul, one team turnover (refused: the
+// default rules keep the standard set, which has no turnovers, S-93), a wrong
 // basket taken back with Undo, the clock set wrongly and right again, ended from More in
 // the middle of the second half. Game 2, Ravens at Wolves, its final score typed: 50 to 45
 // for the Wolves. League settings' minimum games for the leaders is set to 1. The numbers
@@ -202,7 +203,7 @@ async function walk() {
     // In the middle of the second half, after the question: End game.
     [900, { type: 'end' }],
   ];
-  ok(
+  const applied = ok(
     'taps',
     await applyTrackerCommands(
       as,
@@ -265,11 +266,18 @@ async function walk() {
     { leagueId, seasonId, by: 'total' },
   );
   if ('code' in statsPage) throw new Error(statsPage.code);
-  return { live, typed, standings: buildStandingsViews(standings), statsPage };
+  const tapStatuses = applied.results.map((r) => r.status);
+  return { live, typed, standings: buildStandingsViews(standings), statsPage, tapStatuses };
 }
 
 describe("the first test's walk, through core's commands (step 2.194)", async () => {
-  const { live, typed, standings, statsPage } = await walk();
+  const { live, typed, standings, statsPage, tapStatuses } = await walk();
+
+  it('takes every tap but the team turnover, which a season keeping the standard set refuses (S-93)', () => {
+    const turnover = 7;
+    expect(tapStatuses[turnover]).toBe('refused');
+    expect(tapStatuses.filter((s, i) => i !== turnover && s !== 'accepted')).toEqual([]);
+  });
 
   it('game 1 is final, Ravens 7, Wolves 6; the undone basket is not in the play-by-play', () => {
     expect(live.game.status).toBe('final');
@@ -327,11 +335,11 @@ describe("the first test's walk, through core's commands (step 2.194)", async ()
         ['Eli Wolves', 0, 0, 0, 0],
       ],
       totals: [6, 1, 1, 1],
-      // The team turnover is counted (the Total keeps it) but the standard set the default
-      // rules keep has no TO column, so no page shows it and no sentence explains it.
+      // The standard set the default rules keep has no turnovers: the team turnover was
+      // refused (S-93), so no Total counts one, no column shows it and no sentence is wanted.
       notes: [],
     });
-    expect(built.tables.find((x) => x.teamName === 'Wolves')?.totals['turnovers']).toBe(1);
+    expect(built.tables.find((x) => x.teamName === 'Wolves')?.totals['turnovers'] ?? 0).toBe(0);
   });
 
   it('game 2 is final, Wolves 50, Ravens 45, with no statistics', () => {

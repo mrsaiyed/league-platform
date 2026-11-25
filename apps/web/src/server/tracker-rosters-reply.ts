@@ -7,9 +7,10 @@ import type { TrackerRosters } from '@srleagues/contracts';
 import type { TrackerRosters as RostersRead } from '@srleagues/core';
 
 export function trackerRostersReply(read: RostersRead): TrackerRosters {
-  const { recording, players, ...rest } = read;
+  const { recording, players, statistics, ...rest } = read;
   return {
     ...rest,
+    statistics: [...statistics],
     ...(recording === undefined ? {} : { recording }),
     players: players.map((p) => ({
       teamId: p.teamId,

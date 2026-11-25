@@ -31,7 +31,10 @@ import {
   trackerProtocolVersion,
   type BatchCommand,
   type CommandBatch,
+  isTapRefusal,
+  knownRefusals,
   type RefusalCode,
+  type TapRefusalCode,
   type TableNotice,
 } from '@srleagues/contracts';
 import type { CommandTransport, TransportOutcome } from './command-transport.ts';
@@ -71,7 +74,7 @@ export const browserClock: QueueClock = {
 /** Why the queue has stopped sending until `resume`. */
 export type QueueHalt =
   /** A command was refused for a reason every later one shares (T-113, T-116). */
-  | { readonly kind: 'refused'; readonly code: Exclude<RefusalCode, 'rule'> }
+  | { readonly kind: 'refused'; readonly code: Exclude<RefusalCode, TapRefusalCode> }
   /** The server no longer speaks the version these taps were made under (T-127). */
   | { readonly kind: 'version-refused'; readonly accepted: readonly number[] }
   /** The server turned the request away whole: signed out (401), not allowed (403), no such game (404). */
@@ -409,7 +412,15 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
       first.accountId === undefined || first.protocolVersion < 2
         ? {}
         : { accountId: first.accountId };
-    return { protocolVersion: first.protocolVersion, sessionId: session, commands, ...maker };
+    // So are the refusal codes about one tap this tracker reads (T-391, step 2.241).
+    const reads = first.protocolVersion < 2 ? {} : { knownRefusals: [...knownRefusals] };
+    return {
+      protocolVersion: first.protocolVersion,
+      sessionId: session,
+      commands,
+      ...maker,
+      ...reads,
+    };
   };
 
   const send = async (batch: CommandBatch): Promise<TransportOutcome> => {
@@ -480,7 +491,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
         continue;
       }
       const { code, message, problem, wornBy, playerId, follows } = result.reason;
-      // Only a game rule is about the tap. Any other reason is about the request (the
+      // Only a game rule, or a statistic the season does not keep (S-93), is about the tap. Any other reason is about the request (the
       // session, the game, the person): the tap stays waiting for `resume`. A play or a
       // change of players keeps why (record 058); a wearer's name is never stored.
       const why = {
@@ -491,7 +502,7 @@ export function createTrackerQueue(options: TrackerQueueOptions): TrackerQueue {
         ...(playerId === undefined ? {} : { playerId }),
         ...(follows === undefined ? {} : { follows }),
       };
-      if (code === 'rule') {
+      if (isTapRefusal(code)) {
         refuse.push({ commandId: result.commandId, refusal: { code, message, ...why } });
       } else halt ??= { kind: 'refused', code };
     }

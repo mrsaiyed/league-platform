@@ -1,6 +1,6 @@
 import type { TrackerRosters } from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
-import { deviceRosters, refreshedRosters } from './device-rosters.ts';
+import { deviceRosters, keepsTurnovers, refreshedRosters } from './device-rosters.ts';
 
 const home = '00000000-0000-4000-8000-0000000000d1';
 const away = '00000000-0000-4000-8000-0000000000d2';
@@ -34,6 +34,7 @@ const rostersOf = (players: TrackerRosters['players'], uniqueJerseys = false): T
   status: 'scheduled',
   uniqueJerseys,
   allowTies: false,
+  statistics: ['points', 'fouls'],
   players,
 });
 const kept = ({ teamId, ...p }: TrackerRosters['players'][number]) => p;
@@ -53,7 +54,18 @@ describe('the rosters as the device keeps them', () => {
       away: { teamId: away, name: 'Made-up Away', players: [kept(player(away, 1))] },
       uniqueJerseys: false,
       allowTies: false,
+      statistics: ['points', 'fouls'],
     });
+  });
+
+  it('offers turnovers only when the season keeps them; rosters stored before name none (S-93)', () => {
+    const names = { [home]: 'Made-up Home', [away]: 'Made-up Away' };
+    const standard = deviceRosters(rostersOf([player(home, 2)]), names);
+    expect(keepsTurnovers(standard)).toBe(false);
+    const told = { ...rostersOf([player(home, 2)]), statistics: ['points', 'turnovers'] };
+    expect(keepsTurnovers(deviceRosters(told, names))).toBe(true);
+    const older = { home: standard.home, away: standard.away, uniqueJerseys: false };
+    expect(keepsTurnovers(older)).toBe(true);
   });
 
   it('keeps whether a level score may end the game, so End game is refused on the device at once (S-73)', () => {

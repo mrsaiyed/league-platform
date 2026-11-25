@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { seasonRulesPreset } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
+import { keptForScoring } from '../games/index.ts';
 import { planTrackerTransfer, type PlanOptions } from './plan-tracker-transfer.ts';
 import type {
   ListedPersonFact,
@@ -137,6 +138,7 @@ function readsOf(season: Season = {}): TrackerTransferReads {
     }),
     lines: async () => [],
     uniqueJerseys: season.uniqueJerseys ?? false,
+    statisticsKept: keptForScoring(undefined),
     peopleOffRosters: async (name) =>
       (season.offRoster ?? []).filter((p) =>
         `${p.firstName} ${p.lastName}`.toLowerCase().includes(name.toLowerCase()),

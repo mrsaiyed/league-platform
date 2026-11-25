@@ -103,7 +103,8 @@ export function trackedGamePlays(home: string, away: string): Play[] {
     { type: 'pause' },
     { type: 'period', period: 2 },
     { type: 'start' },
-    { type: 'turnover', side: 'home', playerId: home },
+    // No turnover: the seed seasons keep the standard set, which a turnover is not in,
+    // so the server would refuse it (S-93, step 2.241).
     { type: 'score', side: 'away', playerId: away, points: 2 },
     { type: 'score', side: 'home', playerId: home, points: 2 },
     { type: 'score', side: 'away', playerId: away, points: 2 },

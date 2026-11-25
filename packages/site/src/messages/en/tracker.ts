@@ -621,6 +621,10 @@ export const enTracker = {
   'tracker.redo.done': 'Brought back: {play}.',
   'tracker.redo.label': 'Redo {play}',
   'tracker.redo.nothing': 'Redo: nothing to bring back',
+  // The server's refusal of a play of a statistic the season does not keep (S-93, step
+  // 2.241): the tracker lists it with this sentence, an older one included.
+  'tracker.refused.notKept.other': 'This season does not keep this statistic.',
+  'tracker.refused.notKept.turnovers': 'This season does not keep turnovers.',
   // Left the game (an upload of a copy let go of it, step 2.70) with plays this device
   // can still send by "Send these plays" (T-370).
   'tracker.releasedKept_one':
@@ -813,6 +817,14 @@ export const enTracker = {
     'Pick the file saved by “Save a copy” on the scoring device. Its plays are sent to the server; any the server already has are skipped, so nothing is counted twice.',
   'tracker.upload.link': 'Upload a copy of this game',
   'tracker.upload.noFile': 'Pick the copy’s file first.',
+  'tracker.upload.notKept.other_one':
+    '{count} play was not taken: this season does not keep its statistic. An admin can change that in “Statistics kept”.',
+  'tracker.upload.notKept.other_other':
+    '{count} plays were not taken: this season does not keep their statistic. An admin can change that in “Statistics kept”.',
+  'tracker.upload.notKept.turnovers_one':
+    '{count} turnover was not taken: this season does not keep turnovers. An admin can change that in “Statistics kept”.',
+  'tracker.upload.notKept.turnovers_other':
+    '{count} turnovers were not taken: this season does not keep turnovers. An admin can change that in “Statistics kept”.',
   'tracker.upload.notNow': 'Nothing was uploaded. The game stays with that device.',
   'tracker.upload.notTaken_one':
     '{count} play was not taken: the game’s rules refused it, or another device took the game while the copy was being sent.',

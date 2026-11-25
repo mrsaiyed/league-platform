@@ -31,8 +31,17 @@ export function deviceRosters(
     away: team(rosters.awayTeamId),
     uniqueJerseys: rosters.uniqueJerseys,
     allowTies: rosters.allowTies,
+    statistics: rosters.statistics,
   };
 }
+
+/**
+ * Whether the scoring screen offers turnovers (S-93, step 2.241): only when the season
+ * keeps them. Rosters an older page stored name no statistics: offered, as before; the
+ * server still refuses a turnover the season does not keep, and the tap is set aside.
+ */
+export const keepsTurnovers = (rosters: DeviceRosters): boolean =>
+  rosters.statistics === undefined || rosters.statistics.includes('turnovers');
 
 /**
  * The rosters the address gave, kept as the device keeps them, with the teams' names it

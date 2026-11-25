@@ -28,6 +28,7 @@ import { mayScoreGame } from '../policy.ts';
 import type { GameRosterPlayer, GamesTx } from '../ports.ts';
 import { lowerId } from '../scoring-session.ts';
 import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
+import { keptForScoring } from '../statistic-of-tap.ts';
 
 /** The game's two teams and their players, by team, roster order and name. */
 export type TrackerRosters = {
@@ -42,6 +43,8 @@ export type TrackerRosters = {
   readonly uniqueJerseys: boolean;
   /** A level score may end the game: the rules it is played under allow ties (S-73). */
   readonly allowTies: boolean;
+  /** The statistics the season keeps, as the server takes taps (S-93, step 2.241). */
+  readonly statistics: readonly string[];
   readonly players: readonly GameRosterPlayer[];
 };
 
@@ -58,6 +61,7 @@ export const readTrackerRosters = defineCommand({
     const players = await tx.games.listRoster(game.id);
     const { uniqueJerseys } = (await seasonRulesOf(tx, game.seasonId)).rosters;
     const { allowTies } = await effectiveRulesOf(tx, game);
+    const statistics = keptForScoring((await tx.games.findSeason(game.seasonId))?.rules);
     return ok({
       gameId: game.id,
       homeTeamId: game.homeTeamId,
@@ -66,6 +70,7 @@ export const readTrackerRosters = defineCommand({
       status: game.status,
       uniqueJerseys,
       allowTies,
+      statistics,
       players,
     });
   },

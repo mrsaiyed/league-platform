@@ -273,7 +273,10 @@ export async function seedDemoLeagueInto(
         {
           seasonId,
           version: await seasonVersion(),
-          rules: seasonRulesPreset('high-school'),
+          // The made-up tracker backup kept turnovers, and a season takes a turnover only
+          // if it keeps them (S-93, step 2.241): the season keeps the standard set and
+          // turnovers, so every play the transfer brings over is shown on the public pages.
+          rules: { ...seasonRulesPreset('high-school'), statistics: 'standard-turnovers' },
           confirmed: true,
         },
         deps,

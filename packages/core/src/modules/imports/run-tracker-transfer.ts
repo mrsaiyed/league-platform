@@ -15,6 +15,11 @@
 // the door refuses, or at any command that says no, with what it was. The scoring
 // session it held is let go however a game's sending ends. A game transferred before is
 // only compared again.
+//
+// Before it moves anything, the run looks for a play of a statistic the season does not
+// keep (a turnover in a season keeping the standard set, S-93): the door would refuse it,
+// so the run refuses whole, naming the statistic and the setting, and nothing is
+// half-moved (T-392).
 import { maxCommandsPerBatch, trackerProtocolVersion } from '@srleagues/contracts';
 import type { CommandContext, CommandDeps } from '../../command/index.ts';
 import {
@@ -22,6 +27,7 @@ import {
   openScoringSession,
   releaseScoringSession,
   reopenGame,
+  tapNotKept,
   type TrackerTx,
 } from '../games/index.ts';
 import { createPerson, type PeopleTx } from '../people/index.ts';
@@ -44,6 +50,8 @@ export const transferDeviceId = 'tracker-transfer';
 
 export type TransferStop =
   | { readonly kind: 'not-ready' }
+  /** A game to move holds a play of a statistic the season does not keep (T-392). */
+  | { readonly kind: 'statistic-not-kept'; readonly statistic: string }
   | { readonly kind: 'person-not-added'; readonly playerId: string; readonly code: string }
   | { readonly kind: 'not-opened'; readonly code: string }
   | { readonly kind: 'reopen-refused'; readonly code: string }
@@ -121,6 +129,18 @@ export function resultProblem(
     here: { home: here.homeScore, away: here.awayScore },
     tracker: { home: tracker.homeScore, away: tracker.awayScore },
   };
+}
+
+/** The first statistic a game's actions record that the season does not keep, if any. */
+export function statisticNotKept(
+  segments: readonly (readonly { readonly input: { readonly type: string } }[])[],
+  kept: readonly string[],
+): string | undefined {
+  for (const step of segments.flat()) {
+    const statistic = tapNotKept(step.input.type, kept);
+    if (statistic !== undefined) return statistic;
+  }
+  return undefined;
 }
 
 /** Sends one game's actions; how many were sent, or why it stopped. */
@@ -265,6 +285,14 @@ export async function runTrackerTransfer<Tx extends TrackerTransferTx>(
     stopped,
   });
   if (!plan.ready) return report({ trackerGameId: null, stop: { kind: 'not-ready' } });
+  // T-392: nothing is moved while a game to move holds a statistic the door would refuse.
+  for (const { outcome, game } of plan.games) {
+    if (outcome.kind !== 'transfer') continue;
+    const statistic = statisticNotKept(outcome.replay.segments, reads.statisticsKept);
+    if (statistic !== undefined) {
+      return report({ trackerGameId: game.id, stop: { kind: 'statistic-not-kept', statistic } });
+    }
+  }
 
   const personOfPlayer = new Map<string, string>();
   for (const [playerId, person] of plan.people) {

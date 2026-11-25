@@ -187,17 +187,30 @@ export const gameCopyRefusalStatus: Readonly<Record<GameCopyUploadRefusal, numbe
   'season-archived': 409,
 };
 
+/**
+ * Plays of one statistic the season does not keep ("Statistics kept", S-93), not taken
+ * (T-395): counted apart from `notTaken`, so the page can name the statistic and the setting.
+ */
+export const GameCopyNotKept = z.strictObject({
+  statistic: z.string().min(1).max(40),
+  count: z.number().int().positive(),
+});
+export type GameCopyNotKept = z.infer<typeof GameCopyNotKept>;
+
 export const GameCopyUploadReply = z.discriminatedUnion('status', [
   /**
    * Sent through the commands door: `added` were new, `alreadyThere` the server had
    * (skipped), `notTaken` refused by the game's rules or because another device took the
-   * game while the copy was being sent. A second upload of the same file adds nothing.
+   * game while the copy was being sent; `notKept`, present only when there are some, the
+   * plays of a statistic the season does not keep, by statistic (T-395). A second upload
+   * of the same file adds nothing.
    */
   z.strictObject({
     status: z.literal('uploaded'),
     added: z.number().int().nonnegative(),
     alreadyThere: z.number().int().nonnegative(),
     notTaken: z.number().int().nonnegative(),
+    notKept: z.array(GameCopyNotKept).min(1).max(20).optional(),
   }),
   /** Another device holds the game: the page asks the takeover question, then posts again. */
   z.strictObject({
