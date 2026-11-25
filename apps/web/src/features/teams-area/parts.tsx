@@ -1,11 +1,13 @@
 // The pieces both Teams screens are made of (step 2.51). Words come from the message
 // files (T-187). Every form carries the route's league only so the server can find the
 // page again; who is acting comes from the session (run-teams-action.ts).
+import { randomUUID } from 'node:crypto';
 import type { TeamRecord } from '@srleagues/core';
 import { Emblem } from '@srleagues/ui';
 import type { ReactNode } from 'react';
 import type { AdminDivision } from '../../server/admin-teams.ts';
 import { t, type TextKey } from '../../server/messages.ts';
+import { requestTokenField } from '../../server/same-request.ts';
 import { doneKey, problemKey } from './answer.ts';
 
 /** The notices that say something went to the bin, and so lead to it (step 2.77). */
@@ -65,8 +67,14 @@ export function Notice({
   return null;
 }
 
+/** The league's route value, and the form's one-time token: a second post is the same request (T-435). */
 export function LeagueField({ league }: { readonly league: string }) {
-  return <input type="hidden" name="league" value={league} />;
+  return (
+    <>
+      <input type="hidden" name="league" value={league} />
+      <input type="hidden" name={requestTokenField} value={randomUUID()} />
+    </>
+  );
 }
 
 export function TextField({

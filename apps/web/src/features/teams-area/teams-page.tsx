@@ -13,7 +13,8 @@ import { startSeasonAddress } from '../season-settings/index.ts';
 import { ArchivedSeasonNotice } from '../staff/index.ts';
 import { t } from '../../server/messages.ts';
 import { requestTokenField } from '../../server/same-request.ts';
-import { ListForm } from '../list-forms/index.ts';
+import { ListForm, takeNotice } from '../list-forms/index.ts';
+import { answerQueryOf, teamsListThing } from './answer-notice.ts';
 import { createTeamAction } from './actions.ts';
 import { Notice, Section, Swatch } from './parts.tsx';
 
@@ -22,7 +23,6 @@ const addTeamAnchor = 'add-team';
 
 export async function TeamsPage({
   league,
-  query,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
@@ -34,6 +34,8 @@ export async function TeamsPage({
   const context = commandContextOf(view.context);
   const season = await ports.currentSeason(context);
   const binLink = await binLinkFor(here, context, 'teams');
+  // A removed team's answer, taken once, never from the address (T-435).
+  const query = answerQueryOf(takeNotice(context, 'teams'), teamsListThing);
   return (
     <main className="admin-teams">
       <PageHead

@@ -53,6 +53,7 @@ import {
   undoTeamLeftAction,
 } from './actions.ts';
 import { LeagueField, Notice, Section, Swatch } from './parts.tsx';
+import { answerQueryOf } from './answer-notice.ts';
 
 import { ListForm, SaidLine, takeNotice } from '../list-forms/index.ts';
 import { requestTokenField } from '../../server/same-request.ts';
@@ -74,7 +75,6 @@ const nameOf = rosterName;
 export async function TeamPage({
   league,
   teamId,
-  query,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
@@ -106,6 +106,8 @@ export async function TeamPage({
   const saved = notice?.thing === team.id ? notice.said : undefined;
   // A line added or its number and role saved: said on that line (step 2.155).
   const savedEntry = saved === 'added' || saved === 'entrySaved' ? notice?.about?.[0] : undefined;
+  // Every other answer of this team's forms, from the same notice, never the address (T-435).
+  const query = answerQueryOf(notice, team.id);
   const teamUrl = leagueUrl(here, 'admin-area', { area: 'teams', subpath: [team.id] });
   const roster = await listRoster(context, { teamId: team.id }, ports.deps);
   const lines: readonly RosterLine[] = roster.ok ? roster.value : [];

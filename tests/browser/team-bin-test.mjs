@@ -22,6 +22,7 @@
 // Pictures of the panel at each state go to .local/shots/390/team-bin-*.jpg (not committed).
 import fs from 'node:fs';
 import {
+  answered,
   accessibilityProblems,
   buildNext,
   freePort,
@@ -105,6 +106,8 @@ if (built) {
     /** Taps a link or button, waits for the page it leads to, and checks its address. */
     const tap = async (locator, url) => {
       await Promise.all([page.waitForEvent('load'), locator.click()]);
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) return answered(page, url.said);
       if (!url.test(page.url())) throw new Error(`landed on ${page.url()}, not ${url}`);
     };
     /** On the screen as the page shows it now, without scrolling. */
@@ -278,7 +281,12 @@ if (built) {
 
     at = 'the team goes to the bin';
     await bin().locator('input[name=confirm]').check();
-    await tap(binButtons(), /\/admin\/teams\?done=removed/);
+    await tap(binButtons(), { said: 'Moved to the bin: the team is kept there for 30 days.' });
+    note(
+      'back on the list of teams',
+      /\/admin\/teams$/.test(new URL(page.url()).pathname),
+      page.url(),
+    );
     note(
       'the team is gone from the list',
       (await page.locator('main').getByRole('link', { name: kestrels, exact: true }).count()) === 0,

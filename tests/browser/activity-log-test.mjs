@@ -15,6 +15,7 @@
 // are refused the page. Each page passes the accessibility checks and nothing scrolls
 // sideways at 390.
 import {
+  answered,
   accessibilityProblems,
   binAnswer,
   buildNext,
@@ -125,8 +126,10 @@ if (built) {
     await tap(
       page,
       panel.getByRole('button', { name: 'Move the team to the bin' }),
-      /done=removed/,
+      // Scripts on, the list keeps the "#add-team" the team's page was opened at.
+      /\/admin\/teams(#add-team)?$/,
     );
+    await answered(page, 'Moved to the bin: the team is kept there for 30 days.');
 
     at = 'the current season is hidden from visitors, then shown again';
     await toArea(page, 'Season settings', /\/admin\/season/);

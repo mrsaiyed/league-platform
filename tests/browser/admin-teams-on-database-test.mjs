@@ -16,6 +16,7 @@
 // under another league's address are "Page not found" (404). Every change is a plain
 // form, read back from the database. Each page passes the accessibility checks; the server's output holds no code and none of the seed's private values.
 import {
+  answered,
   accessibilityProblems,
   buildNext,
   freePort,
@@ -122,6 +123,8 @@ async function signUpByTheKeptCode(page, origin, address) {
  */
 async function submit(page, button, answer) {
   await Promise.all([page.waitForEvent('load'), button.click()]);
+  // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+  if (!(answer instanceof RegExp)) return answered(page, answer.said);
   if (!answer.test(page.url())) throw new Error(`landed on ${page.url()}, not ${answer}`);
 }
 
@@ -289,11 +292,9 @@ if (browser !== null) {
     const names = async () =>
       page.locator('ol.admin-roster > li .admin-roster-name strong').allInnerTexts();
     const before = await names();
-    await submit(
-      page,
-      lineOf(page, 'Morgan Example').getByRole('button', { name: 'Move up' }),
-      /done=moved/,
-    );
+    await submit(page, lineOf(page, 'Morgan Example').getByRole('button', { name: 'Move up' }), {
+      said: 'The roster order was saved.',
+    });
     const after = await names();
     note(
       'Morgan Example is now first',
@@ -306,14 +307,16 @@ if (browser !== null) {
     const name = `${newcomer.first} ${newcomer.last}`;
     const line = lineOf(page, name);
     await line.getByLabel('Left on').fill(leagueToday);
-    await submit(page, line.getByRole('button', { name: 'Mark as left' }), /done=left/);
+    await submit(page, line.getByRole('button', { name: 'Mark as left' }), {
+      said: `${name} was marked as having left`,
+    });
     const left = page.locator('li[data-left-entry]').filter({ hasText: name });
     note('the player is under "Left the team"', (await left.count()) === 1);
     note('and no longer on the roster', (await lineOf(page, name).count()) === 0);
     await submit(
       page,
       left.getByRole('button', { name: 'Put back on the roster (marked by mistake)' }),
-      /done=putBack/,
+      { said: `${name} is back on the roster.` },
     );
     note('the player is back on the roster', (await lineOf(page, name).count()) === 1);
   });
@@ -326,11 +329,9 @@ if (browser !== null) {
       has: page.getByRole('button', { name: 'Move the team to the bin' }),
     });
     await form.getByLabel('Yes, I am sure').check();
-    await submit(
-      page,
-      form.getByRole('button', { name: 'Move the team to the bin' }),
-      /done=removed/,
-    );
+    await submit(page, form.getByRole('button', { name: 'Move the team to the bin' }), {
+      said: 'Moved to the bin: the team is kept there for 30 days.',
+    });
     note(
       'back on the list of teams',
       new URL(page.url()).pathname === '/lakeside/admin/teams',

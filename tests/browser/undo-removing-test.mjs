@@ -15,6 +15,8 @@
 // exactly as it was, and the public schedule never changed. No page visited promises a way
 // back that no screen offers.
 import {
+  answered,
+  saysNothingOf,
   accessibilityProblems,
   buildNext,
   freePort,
@@ -97,6 +99,8 @@ if (built) {
     /** Taps a link or button, waits for the page it leads to, and checks its address. */
     const tap = async (locator, url) => {
       await Promise.all([page.waitForEvent('load'), locator.click()]);
+      // An answer is the server's one-time notice (step 2.155 part 6): what the page says.
+      if (!(url instanceof RegExp)) return answered(page, url.said);
       if (!url.test(page.url())) throw new Error(`landed on ${page.url()}, not ${url}`);
     };
     /** On the screen as the page shows it now, without scrolling. */
@@ -125,7 +129,7 @@ if (built) {
 
     at = 'a leaving date of next year is refused';
     await line.locator('input[name=leftOn]').fill(nextYear);
-    await tap(line.getByRole('button', { name: 'Mark as left' }), /problem=teams\.mark_left/);
+    await tap(line.getByRole('button', { name: 'Mark as left' }), { said: 'after today' });
     const refusal = line.locator('[data-left-on-problem]');
     const said = (await refusal.count()) === 1 ? ((await refusal.textContent()) ?? '') : '';
     note('the refusal is a sentence beside the field', said.includes('after today'), said);
@@ -146,7 +150,9 @@ if (built) {
 
     at = 'the wrong player is marked as left';
     await line.locator('input[name=leftOn]').fill(lately);
-    await tap(line.getByRole('button', { name: 'Mark as left' }), /done=left/);
+    await tap(line.getByRole('button', { name: 'Mark as left' }), {
+      said: `${player} was marked as having left Falcons.`,
+    });
     const leftLine = page.locator('[data-left-entry]', { hasText: player });
     note('a "left" line is shown for the player', (await leftLine.count()) === 1);
     const back = leftLine.getByRole('button', {
@@ -162,9 +168,11 @@ if (built) {
     const whileLeft = count(await publicText('/teams/falcons'), player);
     note('their game lines stay while they are marked as left (R-17)', whileLeft >= 1);
     await accessible('a player marked as left');
+    await page.reload();
+    note('a reload does not say it again', await saysNothingOf(page, 'was marked as having left'));
 
     at = 'the player is put back';
-    await tap(back, /done=putBack/);
+    await tap(back, { said: `${player} is back on the roster.` });
     note(
       'no "left" line remains',
       (await page.locator('[data-left-entry]', { hasText: player }).count()) === 0,
@@ -183,6 +191,26 @@ if (built) {
       count(await publicText('/teams/falcons'), player) === linesBefore,
     );
     await accessible('a player put back');
+
+    await page.reload();
+    note(
+      'a reload does not say they are back again',
+      await saysNothingOf(page, 'is back on the roster'),
+    );
+    await page.goBack();
+    note('nor does Back', await saysNothingOf(page, 'is back on the roster'));
+    await page.goForward();
+    // An address with the old answer's words in it says nothing (step 2.155 part 6).
+    const entryId = ((await line.getAttribute('id')) ?? '').replace('entry-', '');
+    const teamPath = new URL(page.url()).pathname;
+    await page.goto(
+      `${origin}${teamPath}?done=left&entry=${entryId}&problem=teams.mark_left.already-left`,
+    );
+    note(
+      'an address with the old answer words in it says nothing',
+      (await saysNothingOf(page, 'was marked as having left')) &&
+        (await page.locator('main [role=alert]').count()) === 0,
+    );
 
     at = 'a team with two players is made';
     await openStaffMenu(page);
@@ -218,7 +246,7 @@ if (built) {
       await item.locator('input[name=confirm]').check();
       await tap(item.getByRole('button', { name: 'Remove from the league list' }), url);
     };
-    await removeFromList(wrens.people[0], /problem=people\.remove_person\.person-on-a-roster/);
+    await removeFromList(wrens.people[0], { said: 'That person is still on a roster.' });
     note(
       'a player of a team still there is not taken off the list',
       (await listed(wrens.people[0]).count()) === 1,
@@ -246,7 +274,9 @@ if (built) {
     );
     await accessible('a team before it is moved to the bin');
     await bin.locator('input[name=confirm]').check();
-    await tap(bin.getByRole('button', { name: 'Move the team to the bin' }), /done=removed/);
+    await tap(bin.getByRole('button', { name: 'Move the team to the bin' }), {
+      said: 'Moved to the bin: the team is kept there for 30 days.',
+    });
     const removed = await page.locator('main [role=status]').first().innerText();
     note(
       'removing the team says it is in the bin, with the way to bring it back (step 2.77)',
@@ -270,7 +300,9 @@ if (built) {
       page.locator('main').getByRole('link', { name: 'Falcons', exact: true }),
       /\/admin\/teams\//,
     );
-    await removeFromList(wrens.people[0], /done=personRemoved/);
+    await removeFromList(wrens.people[0], {
+      said: 'Moved to the bin: taken off the league list',
+    });
     note(
       'the player of the binned team is off the league list',
       (await listed(wrens.people[0]).count()) === 0,
@@ -391,7 +423,7 @@ if (built) {
     const formerly = page.locator('[data-left-entry]', { hasText: 'Tess Moreno' });
     await tap(
       formerly.getByRole('button', { name: 'Put back on the roster (marked by mistake)' }),
-      /done=putBackNoNumber/,
+      { said: 'Tess Moreno is back on the roster with no number' },
     );
     const tess = page.locator('main ol > li', { hasText: 'Tess Moreno' });
     const noNumber = tess.locator('[data-said-on]');
