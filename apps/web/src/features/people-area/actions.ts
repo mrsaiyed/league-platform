@@ -58,7 +58,7 @@ import { currentTeamsByPerson } from './teams-of-people.ts';
 import { emailNotTakenHere } from './test-copy-email.ts';
 
 type Outcome =
-  | { readonly ok: true; readonly personId: string }
+  | { readonly ok: true; readonly personId: string; readonly firstChild?: boolean }
   | { readonly ok: false; readonly code: string };
 
 /** The answers to the saves of the last ten minutes, by request (server/same-request.ts). */
@@ -258,11 +258,16 @@ export async function addPersonAction(_state: FormState, form: FormData): Promis
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const made = await createPerson(context, newPersonInput(fields), deps);
     return made.ok
-      ? { ok: true, personId: made.value.personId }
+      ? {
+          ok: true,
+          personId: made.value.personId,
+          firstChild: made.value.clearedChildrenInFull === true,
+        }
       : { ok: false, code: made.error.code };
   });
   if (!result.ok) return refused('create_person', result.code, fields, []);
-  leaveNotice(context, 'person', result.personId, 'added');
+  // S-109: the adult league's first child put its "children in full" back to no.
+  leaveNotice(context, 'person', result.personId, result.firstChild ? 'added.firstChild' : 'added');
   return redirect(`${record(result.personId)}#${detailsAnchor}`);
 }
 
@@ -288,11 +293,13 @@ export async function savePersonAction(_state: FormState, form: FormData): Promi
   }
   const result = await requests().once(requestKeyOf(context, fields), async () => {
     const saved = await updatePerson(context, personChangeInput(fields), deps);
-    return saved.ok ? { ok: true, personId } : { ok: false, code: saved.error.code };
+    return saved.ok
+      ? { ok: true, personId, firstChild: saved.value.clearedChildrenInFull === true }
+      : { ok: false, code: saved.error.code };
   });
   if (!result.ok) return refused('update_person', result.code, fields, []);
   if (!uuidShape.test(personId)) return redirect(list);
-  leaveNotice(context, 'person', personId, 'saved');
+  leaveNotice(context, 'person', personId, result.firstChild ? 'saved.firstChild' : 'saved');
   await showSaved(`${record(personId)}#${detailsAnchor}`);
   return untouched;
 }

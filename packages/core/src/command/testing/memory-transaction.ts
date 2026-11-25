@@ -48,3 +48,33 @@ export function testDeps<Tx extends CommandTx>(
     lines,
   };
 }
+
+/**
+ * A transaction whose stores write down each call, as "store.method" (and
+ * "store.part.method" one level in), in `calls`, in the order made: for a test that
+ * one call comes before another (T-403, the league's row before any read).
+ */
+export function recordingTransaction<Tx extends CommandTx>(
+  transaction: TransactionRunner<Tx>,
+  calls: string[],
+): TransactionRunner<Tx> {
+  return (context, work) => transaction(context, (tx) => work(recorded(tx, '', calls)));
+}
+
+function recorded<T extends object>(target: T, path: string, calls: string[]): T {
+  return new Proxy(target, {
+    get(inner, key, receiver) {
+      const value: unknown = Reflect.get(inner, key, receiver);
+      const name = path === '' ? String(key) : `${path}.${String(key)}`;
+      if (typeof value === 'function') {
+        return (...args: unknown[]) => {
+          calls.push(name);
+          return (value as (...given: unknown[]) => unknown).apply(inner, args);
+        };
+      }
+      return typeof value === 'object' && value !== null && !Array.isArray(value)
+        ? recorded(value, name, calls)
+        : value;
+    },
+  });
+}

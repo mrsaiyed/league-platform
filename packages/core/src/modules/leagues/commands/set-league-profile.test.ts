@@ -86,3 +86,45 @@ describe('setLeagueProfile', () => {
     expect(db.state.listed).toBe(false);
   });
 });
+
+describe('setLeagueProfile and the first child (S-109)', () => {
+  const yesRow = {
+    place: { level: 'league' as const },
+    key: 'privacy.childrenInFullConfirmed',
+    document: { version: 1, value: true },
+    version: 1,
+  };
+  const adultWithYes = (childOnlyIn: string) => {
+    const { db, deps } = setUp();
+    db.state.audience = 'adult';
+    db.state.settings = [yesRow];
+    db.state.childOnlyIn = childOnlyIn;
+    return { db, deps };
+  };
+
+  it('a time zone that makes someone the first child puts the yes back to no', async () => {
+    const { db, deps } = adultWithYes('Europe/London');
+    expect(await setLeagueProfile(owner, input, deps)).toEqual({
+      ok: true,
+      value: { version: 4, clearedChildrenInFull: true },
+    });
+    expect(db.state.settings).toEqual([]);
+    expect(db.state.activity.map((a) => a.action)).toEqual([
+      'leagues.set_profile',
+      'leagues.clear_setting',
+    ]);
+  });
+
+  it('a time zone that makes no one a child keeps it, and so does a child already there', async () => {
+    const none = adultWithYes('Asia/Tokyo');
+    expect(await setLeagueProfile(owner, input, none.deps)).toEqual({
+      ok: true,
+      value: { version: 4 },
+    });
+    expect(none.db.state.settings).toEqual([yesRow]);
+    const already = adultWithYes('Europe/London');
+    already.db.state.recordedChild = true;
+    await setLeagueProfile(owner, input, already.deps);
+    expect(already.db.state.settings).toEqual([yesRow]);
+  });
+});

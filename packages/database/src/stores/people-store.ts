@@ -6,9 +6,12 @@ import {
   findLeagueToday,
   findPerson,
   findPersonIsMinor,
+  hasRecordedChild,
   insertPerson,
   isPersonOnRoster,
   listPeople,
+  lockLeagueRow,
+  deleteSettingValue,
   listSettingValues,
   setPersonBinned,
   updatePerson,
@@ -37,5 +40,15 @@ export function peopleStore(scope: LeagueScope): PeopleStore {
     },
     leagueSettingRows: async (key) =>
       (await listSettingValues(scope, key, {})).filter((row) => row.level === 'league'),
+    // S-109: the same reading and clearing as the leagues store's (one writer, record 065).
+    hasRecordedChild: () => hasRecordedChild(scope),
+    // T-403: a save that could not hold its league's row must not go on unguarded.
+    lockLeague: async () => {
+      if ((await lockLeagueRow(scope)) === undefined) {
+        throw new Error('lockLeague: the league row could not be held.');
+      }
+    },
+    clearLeagueSetting: (key, version) =>
+      deleteSettingValue(scope, { level: 'league' }, key, version),
   };
 }

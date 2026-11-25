@@ -3,14 +3,17 @@
 // value must pass its schema; the save names the version it started from (A-8). A value
 // the declaration asks to confirm (R-14: full names) is saved only when the admin has
 // confirmed it, and the activity entry says so. In an archived or suspended league only
-// a change that shows less of people works (R-26, `protectiveOrder`).
+// a change that shows less of people works (R-26, `protectiveOrder`). A yes to "children
+// in full" is refused in an adult league that has no recorded child (S-109, T-402): it
+// counts only if given while the league had children or a recorded child, so there is
+// nothing to confirm yet. Read in the transaction that writes it (see T-402 on the race).
 import { z } from 'zod';
 import { settingAtArchivedSeason } from '../archived-season.ts';
 import { recordActivity } from '../../access/index.ts';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
 import { leagueSettingChanged } from '../events.ts';
 import type { LeaguesTx, SettingPlace } from '../ports.ts';
-import { declaredSettings } from '../settings/declarations.ts';
+import { childrenInFullConfirmed, declaredSettings } from '../settings/declarations.ts';
 import { needsConfirming, type SettingRegistry } from '../settings/define-setting.ts';
 import { settingDocument } from '../settings/lookup-setting.ts';
 import {
@@ -28,7 +31,8 @@ export type SetSettingError = {
     | 'invalid-value'
     | 'place-not-found'
     | 'changed-since-read'
-    | 'confirmation-needed';
+    | 'confirmation-needed'
+    | 'no-child-recorded';
 };
 
 export type SettingSaved = { readonly key: string; readonly version: number };
@@ -91,6 +95,17 @@ export function setSettingFor(registry: SettingRegistry) {
       if (!parsed.success || parsed.data === undefined) return fail({ code: 'invalid-value' });
       const confirming = needsConfirming(setting, parsed.data);
       if (confirming && input.confirmed !== true) return fail({ code: 'confirmation-needed' });
+      const givingYes = setting.key === childrenInFullConfirmed.key && parsed.data === true;
+      // T-403: a yes takes the league's row before it reads who is recorded, so it and a
+      // save that records a first child or puts one in the bin take turns.
+      if (givingYes) await tx.leagues.lockLeague();
+      if (
+        givingYes &&
+        (await tx.leagues.leagueAudience()) === 'adult' &&
+        !(await tx.leagues.hasRecordedChild())
+      ) {
+        return fail({ code: 'no-child-recorded' });
+      }
       const place = await findPlace(tx, input);
       if (place === undefined) return fail({ code: 'place-not-found' });
       // The same value saved again, from the version read, changes nothing: nothing is

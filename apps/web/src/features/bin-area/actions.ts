@@ -17,7 +17,7 @@ import {
 } from '@srleagues/core';
 import { redirect } from 'next/navigation';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
-import { gameBackSaid } from './bin-view.ts';
+import { firstChildSaid, gameBackSaid } from './bin-view.ts';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -96,6 +96,16 @@ export async function bringBackAction(form: FormData): Promise<never> {
         name: game.seasonId,
         ...(game.clashes.length === 0 ? {} : { about: game.clashes.map((c) => c.id) }),
       });
+    }
+    // A person back from the bin who is the league's first recorded child put the yes to
+    // "children in full" back to no (S-109): said on the bin's page, kept on the server.
+    if (
+      kind === 'person' &&
+      holder !== undefined &&
+      'clearedChildrenInFull' in result.done.value &&
+      result.done.value.clearedChildrenInFull === true
+    ) {
+      savedNoticesHere().leave(holder, { screen: 'bin', thing: id, said: firstChildSaid });
     }
     const said = '';
     return redirect(`${bin}?back=${kind}&id=${id}${said}`);

@@ -93,7 +93,8 @@ export async function saveLeagueProfileAction(form: FormData): Promise<never> {
       version: versionOf(fields) ?? Number.NaN,
     };
     const result = await setLeagueProfile(context, input, ports.deps);
-    return result.ok ? done('saved') : refused(setLeagueProfile.commandName, result.error.code);
+    if (!result.ok) return refused(setLeagueProfile.commandName, result.error.code);
+    return done(result.value.clearedChildrenInFull === true ? 'firstChild' : 'saved');
   });
 }
 

@@ -18,6 +18,7 @@ import {
   findPerson,
   findPersonIsMinor,
   hasRecordedChild,
+  lockLeagueRow,
   insertPerson,
   isPersonOnRoster,
   listPeople,
@@ -73,6 +74,16 @@ registerIsolationCase({
   subject: setPersonBinned,
   name: "move the target's former player to the bin",
   run: (scope, target) => setPersonBinned(scope, target.formerPlayerId, true),
+});
+
+registerIsolationCase({
+  subject: lockLeagueRow,
+  name: "hold the scope's league row for the save (T-403), never the target's",
+  arrange: setTargetLeagueApart,
+  run: async (scope) => {
+    await moveOwnLeagueRowLast(scope);
+    return lockLeagueRow(scope);
+  },
 });
 
 registerIsolationCase({
@@ -150,6 +161,28 @@ registerIsolationCase({
 registerCommandCase(createPerson, harnessTx, {
   name: 'add a person',
   input: () => ({ firstName: 'Harness', lastName: 'Person', contactEmail: 'h@example.test' }),
+});
+
+// S-109 (step 2.243): recording a child may put the league's "children in full" back;
+// only ever the scope's own league's, whatever the target holds.
+registerCommandCase(createPerson, harnessTx, {
+  name: 'add a child, which may put back the confirmation of its own league only',
+  input: () => ({
+    firstName: 'Harness',
+    lastName: 'Child',
+    birthDate: '2015-01-02',
+    isMinor: true,
+  }),
+});
+
+registerCommandCase(updatePersonCommand, harnessTx, {
+  name: "record the target's person as a child",
+  input: (target) => ({
+    personId: target.personId,
+    version: 1,
+    birthDate: '2015-01-02',
+    isMinor: true,
+  }),
 });
 
 registerCommandCase(getPerson, harnessTx, {

@@ -60,6 +60,12 @@ describe('one writer of the names settings (record 065)', () => {
         'packages/core/src/modules/leagues/commands/clear-setting.ts',
       ]),
     ).toEqual([]);
+    // S-109: a store's own clearing for the first-child put-back, called in one place.
+    expect(
+      writersOf(/\.clearLeagueSetting\(/, [
+        'packages/core/src/modules/leagues/commands/clear-setting.ts',
+      ]),
+    ).toEqual([]);
   });
 
   it('writes the setting_values table in the two database queries the store uses, and nowhere else', () => {

@@ -2,7 +2,7 @@
 // one transaction for one league, so none of these take a league id (T-28).
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, ActivityLog } from '../access/index.ts';
-import type { Audience, StoredSettingRow } from '../leagues/index.ts';
+import type { Audience, FirstChildGuard, StoredSettingRow } from '../leagues/index.ts';
 import type { NameRequest } from './rules/name-policy.ts';
 
 /** What only people allowed to see sensitive fields are given (R-16, T-76). */
@@ -104,7 +104,7 @@ export type PeopleStore = {
   readonly leagueToday: () => Promise<string>;
   /** The league's own stored values of one setting (the name policy's, R-25). */
   readonly leagueSettingRows: (key: string) => Promise<readonly StoredSettingRow[]>;
-};
+} & FirstChildGuard;
 
 /** A people command's transaction: its store, the permission reader and the activity log. */
 export type PeopleTx = CommandTx & {

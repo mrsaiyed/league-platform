@@ -21,6 +21,8 @@ export const enAdminSettings = {
   'adminSettings.done.audienceClearedFullNames':
     'Who plays was saved, and the privacy choices listed are back where a youth league starts. Confirm them again under Privacy; you can widen each one in its own setting.',
   'adminSettings.done.cleared': 'The setting is back to its default.',
+  'adminSettings.done.firstChild':
+    'The setting was saved. In the new time zone someone in this league is now a child, the first one recorded, so the confirmation that parents agreed to children’s full names is back to no and a saved choice of full names is cleared. Until you confirm again under Privacy, children are shown by first name and last initial.',
   'adminSettings.done.published': 'The league is published. Visitors can see it now.',
   'adminSettings.done.renamed':
     'The short name was changed. The old address forwards to the new one for 12 months.',

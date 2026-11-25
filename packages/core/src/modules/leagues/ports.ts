@@ -141,6 +141,11 @@ export type LeaguesStore = {
    */
   readonly hasRecordedChild: () => Promise<boolean>;
   /**
+   * T-403: holds the league's own row until the transaction ends, so the saves S-109 and
+   * T-402 guard run one after another for one league. The first thing such a save does.
+   */
+  readonly lockLeague: () => Promise<void>;
+  /**
    * How people reach the league (given when it is made), or null when it never was:
    * publishing waits for one (P3 §3, step 2.240).
    */

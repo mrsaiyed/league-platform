@@ -30,6 +30,8 @@ export const enAdminPeople = {
   'adminPeople.field.emailHelp': 'Nothing is sent to it yet.',
   'adminPeople.field.firstName': 'First name',
   'adminPeople.field.lastName': 'Last name',
+  'adminPeople.firstChild':
+    'This is the first child recorded in this league, so the confirmation that parents agreed to children’s full names is back to no and a saved choice of full names is cleared. Until you confirm again in League settings, this child is shown by first name and last initial.',
   'adminPeople.list.count_one': '{count} person',
   'adminPeople.list.count_other': '{count} people',
   'adminPeople.list.first': 'Back to the first page',

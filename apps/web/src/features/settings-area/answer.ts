@@ -14,6 +14,8 @@ export const doneNames = [
   'audienceClearedFullNames',
   'archived',
   'unarchived',
+  // Profile's time zone made someone the league's first recorded child (S-109).
+  'firstChild',
 ] as const;
 export type DoneName = (typeof doneNames)[number];
 

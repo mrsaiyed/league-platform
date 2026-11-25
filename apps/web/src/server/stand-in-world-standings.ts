@@ -462,6 +462,8 @@ export function worldLeaguesStores(
     // Every made-up league was made with a contact email of its own (step 2.240).
     leagueContactEmail: async () => s.contactEmail,
     // R-28: a child by birth date or by the tick counts.
+    // T-403: the stand-in runs one save at a time, so the lock holds nothing.
+    lockLeague: async () => undefined,
     hasRecordedChild: async () =>
       s.people.some((p) => !p.binned && minorAt(p, s.timeZone, now()) === true),
     // The permission check asks who the league is and whether it may be changed.

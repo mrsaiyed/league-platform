@@ -65,6 +65,8 @@ export type MemoryLeagues = {
   audience: Audience;
   /** Whether anyone in the league is recorded as a child (record 065). */
   recordedChild: boolean;
+  /** A time zone in which someone a day short of 18 is a child (S-109); none to start. */
+  childOnlyIn?: string;
   /** How people reach the league; given unless a test says otherwise. */
   contactEmail: string | null;
   /** Where the league plays, its clock and its listing (step 2.125's Profile). */
@@ -224,7 +226,9 @@ export function memoryLeagues(state: Partial<MemoryLeagues> = {}) {
           return next;
         },
         leagueAudience: async () => s.audience,
-        hasRecordedChild: async () => s.recordedChild,
+        hasRecordedChild: async () => s.recordedChild || s.timeZone === s.childOnlyIn,
+        // T-403: one stand-in transaction at a time here, so the lock holds nothing.
+        lockLeague: async () => undefined,
         leagueContactEmail: async () => s.contactEmail,
         leagueProfile: async () =>
           s.league === undefined

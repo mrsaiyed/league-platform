@@ -13,6 +13,7 @@ import {
   findPublishedDesign,
   findProgramId,
   hasRecordedChild,
+  lockLeagueRow,
   findSeasonProgramId,
   insertLeague,
   insertSeason,
@@ -48,6 +49,12 @@ export function leaguesStore(
     setName: (name, version) => updateLeagueName(scope, name, version),
     leagueAudience: () => findLeagueAudience(scope),
     hasRecordedChild: () => hasRecordedChild(scope),
+    // T-403: a save that could not hold its league's row must not go on unguarded.
+    lockLeague: async () => {
+      if ((await lockLeagueRow(scope)) === undefined) {
+        throw new Error('lockLeague: the league row could not be held.');
+      }
+    },
     leagueContactEmail: () => findLeagueContactEmail(scope),
     isPlatformStaff: async () =>
       scope.accountId !== null && platformStaff.includes(scope.accountId),

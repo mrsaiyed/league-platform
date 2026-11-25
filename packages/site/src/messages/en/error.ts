@@ -155,6 +155,8 @@ export const enError = {
     'This choice needs you to tick the box to confirm before it is saved. Nothing was changed.',
   'error.leagues.set_setting.invalid-value':
     'That value is not allowed for this setting. Check what it accepts and try again.',
+  'error.leagues.set_setting.no-child-recorded':
+    'This league is for adults and no one in it is recorded as a child, so there is nothing to confirm yet. Nothing was changed. You can confirm once the league is for children or has a child recorded.',
   'error.leagues.set_setting.unknown-setting': 'That setting does not exist.',
   'error.leagues.set_status.illegal-transition':
     'The league cannot be changed that way from where it is now.',
