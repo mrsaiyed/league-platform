@@ -8,7 +8,6 @@ import type { TextKey } from '../../server/messages.ts';
 
 /** What went well, each with a message `adminTeams.done.<name>`. */
 export const doneNames = [
-  'created',
   'updated',
   'statsSaved',
   'removed',
@@ -62,6 +61,12 @@ const dateShape = /^\d{4}-\d{2}-\d{2}$/;
 /** A jersey number as the roster takes it (core's roster-fields.ts): 0 to 99, or 00. */
 const numberShape = /^(0|00|[1-9][0-9]?)$/;
 
+/** Where "Add a player" leads: the first form that adds one. */
+export const addPlayerAnchor = 'add-player';
+
+/** The place on a team's page of its details form, where its "Saved" is said. */
+export const teamDetailsAnchor = 'team-details';
+
 /** The anchor of a roster line, where a refusal of its leaving date is said. */
 export const entryAnchor = (entryId: string): string => `entry-${entryId}`;
 
@@ -79,7 +84,7 @@ export function removeRefusalOf(query: Query): string | undefined {
 }
 
 /**
- * The part of the address that carries an answer: `?done=created` or `?problem=...`; a
+ * The part of the address that carries an answer: `?done=updated` or `?problem=...`; a
  * refused leaving date adds its line and what was typed, and the line's anchor.
  */
 export function answerQuery(answer: Answer): string {

@@ -17,12 +17,14 @@ import { commandContextOf } from '../../server/context.ts';
 import { binLinkFor } from '../bin-area/index.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { t } from '../../server/messages.ts';
+import { requestTokenField } from '../../server/same-request.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import {
   mayShowSeason,
   seasonSettingsAddress,
   visibilityAnchor,
 } from '../season-settings/index.ts';
+import { MarkedFocus } from '../list-forms/index.ts';
 import { ArchivedSeasonNotice, StaffPill } from '../staff/index.ts';
 import { chooseSeason, firstValue, type SearchParams } from '../stats-pages/index.ts';
 import { venuesAddress } from '../venues-area/index.ts';
@@ -55,16 +57,26 @@ import {
   type RemovedGridGame,
 } from './build-grid.ts';
 import {
+  addGameAnchor,
   addRoundAnchor,
+  answerShown,
+  freshAnswer,
+  swapAnchor,
   refusedAtOf,
   roundAnchor,
   savedAnchor,
   savedDetailOf,
   savedDetailOfNotice,
 } from './grid-answer.ts';
-import type { SavedDetail } from './run-schedule-action.ts';
+import type { GameTyped, RefusedAt, SavedDetail } from './run-schedule-action.ts';
 import { importLinkOf } from './import-link.ts';
-import { addRoundProblemOf, noticeOf, whyNotSaved } from './notice.ts';
+import {
+  addRoundProblemOf,
+  gameProblemOf,
+  noticeOf,
+  whyNotSaved,
+  type GameField,
+} from './notice.ts';
 import { publishedNotice } from './published-notice.ts';
 import { publishLines, publishWarnings, type PublishLine } from './publish-summary.ts';
 import { RoundFacts, RoundRemoval, roundIsEmpty } from './round-parts.tsx';
@@ -90,14 +102,30 @@ type Basis = {
    */
   readonly waitingHref: string;
   readonly gameHref: (gameId: string) => string;
+  /** A game form's refusal, said beside it with every box as typed (step 2.155). */
+  readonly refused: GameRefusal | undefined;
+  /** A refused "Swap with", said beside its game. */
+  readonly swapRefused: SwapRefusal | undefined;
 };
+
+/** A refused game form: which, what was typed, the box it is about and the sentence. */
+type GameRefusal = {
+  readonly at: Extract<RefusedAt, { readonly form: 'game' | 'add-game' }>;
+  readonly field: GameField | 'form';
+  readonly text: string;
+  /** Someone else changed the draft meanwhile: what is saved now is said beside the boxes. */
+  readonly changed?: true;
+};
+
+/** A refused "Swap with": the game it was asked on, the one chosen, and why. */
+type SwapRefusal = { readonly gameId: string; readonly otherGameId: string; readonly text: string };
 
 const recordings = ['final-score', 'box-score', 'live'] as const;
 
 /** `/{league}/admin/schedule`: the hand-editing grid of rounds and games (P7 §4.3). */
 export async function ScheduleBuilderPage({
   league,
-  search,
+  search: inAddress,
 }: {
   /** The route's `[league]` value. */
   readonly league: string;
@@ -107,6 +135,14 @@ export async function ScheduleBuilderPage({
   const addressee = view.context.league;
   const ports = await webPorts();
   const context = commandContextOf(view.context);
+  // Every answer that worked is said once, from the notice its form left (steps 2.185 and
+  // 2.155): taking it clears it, so a reload, or Back to the page, says nothing old. A
+  // removal or a put back is read from the notice itself; any other save's words are in
+  // the address, read only while their notice is fresh.
+  const noticeHolder = noticeHolderOf(context);
+  const taken =
+    noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'schedule');
+  const search = answerShown(inAddress, taken?.said === freshAnswer);
   const holder = await ports.accessOf(context);
   // Every season the holder may be told of, the ones not public yet among them (a season is
   // scheduled before it is shown): the port lists only those (P4 §4).
@@ -236,12 +272,6 @@ export async function ScheduleBuilderPage({
   const { grid, teams } = pageGrid(draft, seasonTeams, venues);
   // The team "Remove this team" sent the person here from, to go back to (step 2.180).
   const fromTeam = backToTeamOf(firstValue(search[backToTeamParam]), seasonTeams);
-  // A game removed, put back or already back is said once, from the notice its form left
-  // (step 2.185): taking it clears it, so a reload says nothing old. Other saves are still
-  // said from the address.
-  const noticeHolder = noticeHolderOf(context);
-  const taken =
-    noticeHolder === undefined ? undefined : savedNoticesHere().take(noticeHolder, 'schedule');
   const saved = savedDetailOfNotice(taken) ?? savedDetailOf(search);
   const refusedAt = refusedAtOf(search);
   // A refusal of a round's form is said beside that form, if it is on the page.
@@ -252,6 +282,33 @@ export async function ScheduleBuilderPage({
   const besideAdd = refusedAt?.form === 'add-round' ? refusedAt : undefined;
   const roundProblem = besideRound === undefined ? undefined : whyNotSaved(search);
   const addProblem = besideAdd === undefined ? undefined : addRoundProblemOf(search, besideAdd);
+  // A refusal of a game's form is said beside that form, if it is on the page (step 2.155).
+  const gameAt =
+    refusedAt?.form === 'game'
+      ? grid.allGames.some((g) => g.id === refusedAt.gameId && g.editable)
+        ? refusedAt
+        : undefined
+      : refusedAt?.form === 'add-game' &&
+          (refusedAt.typed.roundId === '' ||
+            grid.rounds.some((r) => r.id === refusedAt.typed.roundId))
+        ? refusedAt
+        : undefined;
+  const gameProblem =
+    gameAt === undefined
+      ? undefined
+      : gameProblemOf(search, gameAt.typed, gameAt.form === 'add-game');
+  const gameRefusal: GameRefusal | undefined =
+    gameAt === undefined || gameProblem === undefined ? undefined : { at: gameAt, ...gameProblem };
+  // A refused "Swap with" is said beside the game it was asked on, if it is on the page.
+  const swapAt =
+    refusedAt?.form === 'swap' && grid.allGames.some((g) => g.id === refusedAt.gameId && g.editable)
+      ? refusedAt
+      : undefined;
+  const swapWhy = swapAt === undefined ? undefined : whyNotSaved(search);
+  const swapRefusal: SwapRefusal | undefined =
+    swapAt === undefined || swapWhy === undefined
+      ? undefined
+      : { gameId: swapAt.gameId, otherGameId: swapAt.otherGameId, text: swapWhy };
   const basis: Basis = {
     ...seasonControls(holder, season),
     league,
@@ -262,6 +319,8 @@ export async function ScheduleBuilderPage({
     draftId: draft.draft?.id ?? null,
     fromTeam: fromTeam?.id ?? null,
     waitingHref,
+    refused: gameRefusal,
+    swapRefused: swapRefusal,
     gameHref: (gameId) => leagueUrl(addressee, 'admin-area', { area: 'games', subpath: [gameId] }),
   };
   const preview =
@@ -289,7 +348,12 @@ export async function ScheduleBuilderPage({
       ? undefined
       : t('schedule.admin.gameVs', { away: g.awayName, home: g.homeName });
   };
-  const saidBeside = basis.canEdit && (besideRound !== undefined || besideAdd !== undefined);
+  const saidBeside =
+    basis.canEdit &&
+    (besideRound !== undefined ||
+      besideAdd !== undefined ||
+      gameRefusal !== undefined ||
+      swapRefusal !== undefined);
   const roundName = (r: GridRound) =>
     t('schedule.admin.round', { number: r.number, label: r.label });
   // "Saved", said beside what was saved (A-4); at the top only when that is not on the page.
@@ -473,6 +537,7 @@ export async function ScheduleBuilderPage({
             basis={basis}
             rounds={grid.rounds}
             problem={besideRound === round.id ? roundProblem : undefined}
+            typed={besideRound === round.id && refusedAt?.form === 'round' ? refusedAt : undefined}
             saved={savedAt({ round: round.id })}
             savedGame={savedGame}
             previousRoundId={grid.rounds[grid.rounds.indexOf(round) - 1]?.id ?? null}
@@ -504,6 +569,8 @@ function BasisFields({ basis }: { readonly basis: Basis }) {
       <input type="hidden" name="basedOnRevision" value={basis.basedOnRevision ?? ''} />
       <input type="hidden" name="version" value={basis.version ?? ''} />
       <input type="hidden" name="draftId" value={basis.draftId ?? ''} />
+      {/* A one-time token: a second post of this form (a double tap) saves once (step 2.155). */}
+      <input type="hidden" name={requestTokenField} value={randomUUID()} />
       {basis.fromTeam === null ? null : (
         <input type="hidden" name={backToTeamParam} value={basis.fromTeam} />
       )}
@@ -511,19 +578,99 @@ function BasisFields({ basis }: { readonly basis: Basis }) {
   );
 }
 
-/** A field of the grid's forms: its label above it (the staff area's field piece). */
-function Field({ label, children }: { readonly label: string; readonly children: ReactNode }) {
+/**
+ * A field of the grid's forms: its label above it (the staff area's field piece) and, after
+ * a refusal about it, the sentence beside it that names it (step 2.155).
+ */
+function Field({
+  label,
+  children,
+  wrong,
+  now,
+}: {
+  readonly label: string;
+  readonly children: ReactNode;
+  readonly wrong?: string | undefined;
+  /** What is saved now, after someone else changed it meanwhile (T-399). */
+  readonly now?: ReactNode;
+}) {
   return (
-    <label className="staff-field">
-      <span>{label}</span>
-      {children}
-    </label>
+    <>
+      <label className="staff-field">
+        <span>{label}</span>
+        {children}
+      </label>
+      {now}
+      {wrong === undefined ? null : (
+        <p className="ui-field-error" role="alert" data-notice="problem">
+          {wrong}
+        </p>
+      )}
+    </>
   );
 }
 
-function RecordingSelect({ value }: { readonly value: GridGame['recording'] }) {
+/** How a game form's boxes are drawn: as typed after a refusal, the wrong one marked. */
+type GameBoxes = {
+  /** The box's value: as typed, after a refusal of this form; else `fallback`. */
+  readonly value: (name: keyof GameTyped, fallback: string) => string;
+  /** The props that mark the box a refusal is about (and put the focus there). */
+  readonly mark: (name: GameField) => {
+    readonly 'aria-invalid'?: true;
+    readonly autoFocus?: true;
+  };
+  /** The sentence beside the box a refusal is about. */
+  readonly wrong: (name: GameField) => string | undefined;
+  /** The sentence at the top of the form when the refusal is about no one box. */
+  readonly top: ReactNode;
+  /**
+   * After a refusal because someone else changed the draft (T-399): "Saved now: …" beside
+   * the box, when what is saved differs from what was typed; else nothing.
+   */
+  readonly now: (name: keyof GameTyped, saved: string, shown: () => string) => ReactNode;
+};
+
+function gameBoxes(refused: GameRefusal | undefined): GameBoxes {
+  return {
+    value: (name, fallback) => (refused === undefined ? fallback : refused.at.typed[name]),
+    mark: (name) => (refused?.field === name ? { 'aria-invalid': true, autoFocus: true } : {}),
+    wrong: (name) => (refused?.field === name ? refused.text : undefined),
+    top:
+      refused?.field !== 'form' ? null : (
+        <p className="ui-notice" data-kind="error" role="alert" data-notice="problem">
+          {refused.text}
+        </p>
+      ),
+    now: (name, saved, shown) =>
+      refused?.changed !== true || refused.at.typed[name] === saved ? null : (
+        <small className="ui-field-help" data-saved-now={name}>
+          {t('schedule.admin.savedNow')} {shown()}
+        </small>
+      ),
+  };
+}
+
+/** A place as its box shows it: the venue, and the court if there is one. */
+function placeShown(venues: readonly VenueWithCourts[], value: string): string {
+  const [venueId, court = ''] = value.split('|');
+  const venue = venues.find((v) => v.id === venueId);
+  if (venue === undefined) return t('schedule.admin.noPlaceOption');
+  return court === ''
+    ? t('schedule.admin.venueOnly', { venue: venue.name })
+    : t('schedule.admin.venueCourt', { venue: venue.name, court });
+}
+
+function RecordingSelect({
+  value,
+  typed,
+  marked,
+}: {
+  readonly value: GridGame['recording'];
+  readonly typed?: string;
+  readonly marked?: { readonly 'aria-invalid'?: true; readonly autoFocus?: true };
+}) {
   return (
-    <select name="recording" defaultValue={value ?? ''}>
+    <select name="recording" defaultValue={typed ?? value ?? ''} {...marked}>
       {value === null || value === undefined ? (
         <option value="">{t('schedule.admin.recording.rules')}</option>
       ) : null}
@@ -541,15 +688,17 @@ function TeamSelect({
   label,
   teams,
   value,
+  boxes,
 }: {
-  readonly name: string;
+  readonly name: 'homeTeamId' | 'awayTeamId';
   readonly label: string;
   readonly teams: readonly GridTeam[];
   readonly value: string;
+  readonly boxes: GameBoxes;
 }) {
   return (
-    <Field label={label}>
-      <select name={name} defaultValue={value} required>
+    <Field label={label} wrong={boxes.wrong(name)}>
+      <select name={name} defaultValue={boxes.value(name, value)} required {...boxes.mark(name)}>
         <option value="">{t('schedule.admin.chooseTeam')}</option>
         {teams.map((team) => (
           <option key={team.id} value={team.id}>
@@ -569,6 +718,7 @@ function RoundSection({
   basis,
   rounds,
   problem,
+  typed,
   saved,
   savedGame,
   previousRoundId,
@@ -581,6 +731,8 @@ function RoundSection({
   readonly rounds: readonly GridRound[];
   /** Why the last change to this round was refused, said beside its forms. */
   readonly problem: string | undefined;
+  /** A refused new name or day, as typed: kept in its box, the sentence beside it (2.155). */
+  readonly typed: { readonly label?: string; readonly date?: string } | undefined;
   /** "Saved", when the last save was this round's. */
   readonly saved: ReactNode;
   readonly savedGame: (gameId: string) => SavedGame;
@@ -588,6 +740,21 @@ function RoundSection({
   readonly previousRoundId: string | null;
 }) {
   const headingId = roundAnchor(round.id);
+  // The box a refusal of a new name or day is about, and the sentence beside it naming it.
+  const boxWrong =
+    problem === undefined
+      ? undefined
+      : typed?.label !== undefined
+        ? ('label' as const)
+        : typed?.date !== undefined
+          ? ('date' as const)
+          : undefined;
+  const besideBox = (box: 'label' | 'date', field: string) =>
+    boxWrong === box && problem !== undefined
+      ? t('schedule.admin.fieldRefused', { field, why: problem })
+      : undefined;
+  const marked = (box: 'label' | 'date') =>
+    boxWrong === box ? { 'aria-invalid': true as const, autoFocus: true as const } : {};
   return (
     <section aria-labelledby={headingId} data-round={round.id} className="staff-panel admin-round">
       {/* The round's head: its name, then its day (as the public pages write a day) and
@@ -599,7 +766,7 @@ function RoundSection({
         <RoundFacts round={round} />
       </div>
       {saved}
-      {problem === undefined ? null : (
+      {problem === undefined || boxWrong !== undefined ? null : (
         <p className="ui-notice" data-kind="error" role="alert" data-notice="problem">
           {problem}
         </p>
@@ -611,8 +778,17 @@ function RoundSection({
             <form action={renameRoundAction} className="staff-form">
               <BasisFields basis={basis} />
               <input type="hidden" name="roundId" value={round.id} />
-              <Field label={t('schedule.admin.renameRound')}>
-                <input name="label" defaultValue={round.label} required maxLength={120} />
+              <Field
+                label={t('schedule.admin.renameRound')}
+                wrong={besideBox('label', t('schedule.admin.renameRound'))}
+              >
+                <input
+                  name="label"
+                  defaultValue={typed?.label ?? round.label}
+                  required
+                  maxLength={120}
+                  {...marked('label')}
+                />
               </Field>
               <p className="staff-buttons">
                 <button type="submit" className="ui-button">
@@ -623,8 +799,17 @@ function RoundSection({
             <form action={changeRoundDateAction} className="staff-form">
               <BasisFields basis={basis} />
               <input type="hidden" name="roundId" value={round.id} />
-              <Field label={t('schedule.admin.changeRoundDate')}>
-                <input type="date" name="date" defaultValue={round.date ?? ''} required />
+              <Field
+                label={t('schedule.admin.changeRoundDate')}
+                wrong={besideBox('date', t('schedule.admin.changeRoundDate'))}
+              >
+                <input
+                  type="date"
+                  name="date"
+                  defaultValue={typed?.date ?? round.date ?? ''}
+                  required
+                  {...marked('date')}
+                />
               </Field>
               <p className="ui-field-help">{t('schedule.admin.changeRoundDateNote')}</p>
               <p className="staff-buttons">
@@ -845,6 +1030,12 @@ function GameItem({
   // While "Move it to … too?" is asked beside the game, its flag waits for the answer.
   const flagged = game.outsideRound && saved?.asks !== true;
   const round = rounds.find((r) => r.id === game.roundId);
+  const refused =
+    basis.refused?.at.form === 'game' && basis.refused.at.gameId === game.id
+      ? basis.refused
+      : undefined;
+  const boxes = gameBoxes(refused);
+  const swapRefused = basis.swapRefused?.gameId === game.id ? basis.swapRefused : undefined;
   return (
     <li id={gameAnchor(game.id)} data-game={game.id} data-clash={game.clashed ? 'yes' : 'no'}>
       {/* One row a game: its two teams' marks and names, then its day, time and place. */}
@@ -903,9 +1094,10 @@ function GameItem({
           <p className="staff-quiet">{t('schedule.admin.gameLocked')}</p>
         )
       ) : (
-        <details>
+        <details open={refused === undefined && swapRefused === undefined ? undefined : true}>
           <summary>{t('schedule.admin.edit')}</summary>
           <form action={saveGameAction} className="staff-form admin-slot-form">
+            {boxes.top}
             <BasisFields basis={basis} />
             <input type="hidden" name="gameId" value={game.id} />
             <input
@@ -914,8 +1106,20 @@ function GameItem({
               value={[game.roundId ?? '', game.date, game.time ?? '', game.place].join('~')}
             />
             <input type="hidden" name="wasRecording" value={game.recording ?? ''} />
-            <Field label={t('schedule.admin.roundField')}>
-              <select name="roundId" defaultValue={game.roundId ?? ''}>
+            <Field
+              label={t('schedule.admin.roundField')}
+              wrong={boxes.wrong('roundId')}
+              now={boxes.now('roundId', game.roundId ?? '', () =>
+                round === undefined
+                  ? t('schedule.admin.noRound')
+                  : t('schedule.admin.round', { number: round.number, label: round.label }),
+              )}
+            >
+              <select
+                name="roundId"
+                defaultValue={boxes.value('roundId', game.roundId ?? '')}
+                {...boxes.mark('roundId')}
+              >
                 <option value="">{t('schedule.admin.noRound')}</option>
                 {rounds.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -924,17 +1128,58 @@ function GameItem({
                 ))}
               </select>
             </Field>
-            <Field label={t('schedule.admin.date')}>
-              <input type="date" name="date" defaultValue={game.date} required />
+            <Field
+              label={t('schedule.admin.date')}
+              wrong={boxes.wrong('date')}
+              now={boxes.now('date', game.date, () => game.date)}
+            >
+              <input
+                type="date"
+                name="date"
+                defaultValue={boxes.value('date', game.date)}
+                required
+                {...boxes.mark('date')}
+              />
             </Field>
-            <Field label={t('schedule.admin.time')}>
-              <input type="time" name="time" defaultValue={game.time ?? ''} />
+            <Field
+              label={t('schedule.admin.time')}
+              wrong={boxes.wrong('time')}
+              now={boxes.now('time', game.time ?? '', () =>
+                game.time === null ? t('schedule.admin.savedNowNothing') : game.time,
+              )}
+            >
+              <input
+                type="time"
+                name="time"
+                defaultValue={boxes.value('time', game.time ?? '')}
+                {...boxes.mark('time')}
+              />
             </Field>
-            <Field label={t('schedule.admin.place')}>
-              <PlaceSelect venues={venues} value={game.place} />
+            <Field
+              label={t('schedule.admin.place')}
+              wrong={boxes.wrong('place')}
+              now={boxes.now('place', game.place, () => placeShown(venues, game.place))}
+            >
+              <PlaceSelect
+                venues={venues}
+                value={boxes.value('place', game.place)}
+                marked={boxes.mark('place')}
+              />
             </Field>
-            <Field label={t('schedule.admin.recording')}>
-              <RecordingSelect value={game.recording} />
+            <Field
+              label={t('schedule.admin.recording')}
+              wrong={boxes.wrong('recording')}
+              now={boxes.now('recording', game.recording ?? '', () =>
+                game.recording === null || game.recording === undefined
+                  ? t('schedule.admin.recording.rules')
+                  : t(`schedule.admin.recording.${game.recording}`),
+              )}
+            >
+              <RecordingSelect
+                value={game.recording}
+                {...(refused === undefined ? {} : { typed: refused.at.typed.recording })}
+                marked={boxes.mark('recording')}
+              />
             </Field>
             {/* Save is the main button; "Remove game" is the outlined destructive one, apart. */}
             <p>
@@ -955,11 +1200,29 @@ function GameItem({
             </p>
           </form>
           {others.length === 0 ? null : (
-            <form action={swapGamesAction} className="staff-form">
+            <form action={swapGamesAction} className="staff-form" id={swapAnchor(game.id)}>
+              {swapRefused === undefined ? null : <MarkedFocus within={swapAnchor(game.id)} />}
               <BasisFields basis={basis} />
               <input type="hidden" name="gameId" value={game.id} />
-              <Field label={t('schedule.admin.swapWith')}>
-                <select name="otherGameId" defaultValue="" required>
+              <Field
+                label={t('schedule.admin.swapWith')}
+                wrong={
+                  swapRefused === undefined
+                    ? undefined
+                    : t('schedule.admin.fieldRefused', {
+                        field: t('schedule.admin.swapWith'),
+                        why: swapRefused.text,
+                      })
+                }
+              >
+                <select
+                  name="otherGameId"
+                  defaultValue={swapRefused?.otherGameId ?? ''}
+                  required
+                  {...(swapRefused === undefined
+                    ? {}
+                    : { 'aria-invalid': true as const, autoFocus: true as const })}
+                >
                   <option value="">{t('schedule.admin.swapChoose')}</option>
                   {others.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -996,26 +1259,68 @@ function AddGame({
   readonly venues: readonly VenueWithCourts[];
   readonly basis: Basis;
 }) {
+  const roundId = round?.id ?? '';
+  const refused =
+    basis.refused?.at.form === 'add-game' && basis.refused.at.typed.roundId === roundId
+      ? basis.refused
+      : undefined;
+  const boxes = gameBoxes(refused);
   return (
-    <details data-add-game={round?.id ?? 'none'}>
+    <details
+      data-add-game={round?.id ?? 'none'}
+      id={addGameAnchor(roundId)}
+      open={refused === undefined ? undefined : true}
+    >
       <summary>{t('schedule.admin.addGame')}</summary>
       <form action={addGameAction} className="staff-form admin-slot-form">
+        {boxes.top}
         <BasisFields basis={basis} />
         <input type="hidden" name="gameId" value={randomUUID()} />
-        <input type="hidden" name="roundId" value={round?.id ?? ''} />
-        <TeamSelect name="homeTeamId" label={t('schedule.admin.home')} teams={teams} value="" />
-        <TeamSelect name="awayTeamId" label={t('schedule.admin.away')} teams={teams} value="" />
-        <Field label={t('schedule.admin.date')}>
-          <input type="date" name="date" defaultValue={round?.date ?? ''} required />
+        <input type="hidden" name="roundId" value={roundId} />
+        <TeamSelect
+          name="homeTeamId"
+          label={t('schedule.admin.home')}
+          teams={teams}
+          value=""
+          boxes={boxes}
+        />
+        <TeamSelect
+          name="awayTeamId"
+          label={t('schedule.admin.away')}
+          teams={teams}
+          value=""
+          boxes={boxes}
+        />
+        <Field label={t('schedule.admin.date')} wrong={boxes.wrong('date')}>
+          <input
+            type="date"
+            name="date"
+            defaultValue={boxes.value('date', round?.date ?? '')}
+            required
+            {...boxes.mark('date')}
+          />
         </Field>
-        <Field label={t('schedule.admin.time')}>
-          <input type="time" name="time" />
+        <Field label={t('schedule.admin.time')} wrong={boxes.wrong('time')}>
+          <input
+            type="time"
+            name="time"
+            defaultValue={boxes.value('time', '')}
+            {...boxes.mark('time')}
+          />
         </Field>
-        <Field label={t('schedule.admin.place')}>
-          <PlaceSelect venues={venues} value="" />
+        <Field label={t('schedule.admin.place')} wrong={boxes.wrong('place')}>
+          <PlaceSelect
+            venues={venues}
+            value={boxes.value('place', '')}
+            marked={boxes.mark('place')}
+          />
         </Field>
-        <Field label={t('schedule.admin.recording')}>
-          <RecordingSelect value={null} />
+        <Field label={t('schedule.admin.recording')} wrong={boxes.wrong('recording')}>
+          <RecordingSelect
+            value={null}
+            {...(refused === undefined ? {} : { typed: refused.at.typed.recording })}
+            marked={boxes.mark('recording')}
+          />
         </Field>
         <p className="staff-buttons">
           <button type="submit" className="ui-button" data-kind="main">

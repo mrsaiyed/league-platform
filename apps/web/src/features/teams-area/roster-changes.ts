@@ -50,7 +50,7 @@ export async function addNewPerson(
   if (!made.ok) return { answer: refused(createPerson.commandName, made.error.code), teamId };
   const personId = made.value.personId;
   const added = await addToRoster(context, { ...input, personId }, deps);
-  if (added.ok) return { answer: done('added'), teamId };
+  if (added.ok) return { answer: done('added', { entry: added.value.rosterEntryId }), teamId };
   const undone = await undoNewPerson(context, deps, personId);
   return { answer: refused(command, undone ? added.error.code : 'not-undone'), teamId };
 }

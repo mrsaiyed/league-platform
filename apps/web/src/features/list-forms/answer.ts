@@ -17,17 +17,29 @@ import {
   type NoticeScreen,
   type SavedNotice,
 } from '../../server/saved-notice.ts';
-import type { FormState, TypedFields } from './form-state.ts';
+import type { FormState, SavedNowWords, TypedFields } from './form-state.ts';
 
-/** A refusal drawn from the post; a typing mistake leaves the rest of the screen as it is. */
+/**
+ * A refusal drawn from the post; a typing mistake leaves the rest of the screen as it is.
+ * With `savedNow` (the thing changed meanwhile, T-399) the screen drawn again shows, beside
+ * each box, what is saved now where it differs from what was typed.
+ */
 export function refusedWith(
   code: string,
   typed: TypedFields,
   wrong: readonly string[],
   said: string,
+  savedNow?: SavedNowWords,
 ): FormState {
   if (code !== 'invalid-input' && code !== 'not-confirmed') refresh();
-  return { kind: 'refused', code, typed, wrong, said };
+  return {
+    kind: 'refused',
+    code,
+    typed,
+    wrong,
+    said,
+    ...(savedNow === undefined ? {} : { savedNow }),
+  };
 }
 
 /** Leaves the notice and draws the screen again, at `to` (its address and the thing's #…). */
@@ -43,6 +55,17 @@ export async function answerSaved(
     refresh();
     return { kind: 'untouched' };
   }
+  return redirect(to);
+}
+
+/**
+ * Leaves the notice and sends the browser to `to`, with scripts on or off (step 2.155): a
+ * thing just made has a page of its own, and its "Saved" is said there, at the top, beside
+ * its name. As answerSaved, nothing of it rides in the address; a reload says nothing old.
+ */
+export function answerSavedAt(context: CommandContext, notice: SavedNotice, to: string): never {
+  const holder = noticeHolderOf(context);
+  if (holder !== undefined) savedNoticesHere().leave(holder, notice);
   return redirect(to);
 }
 

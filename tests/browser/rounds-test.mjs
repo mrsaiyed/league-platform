@@ -264,8 +264,9 @@ if (built) {
     await tap(dateForm.getByRole('button', { name: 'Change round date' }), /at=round/);
     const roundError = round('Week 3').locator('[data-notice=problem]');
     note(
-      'the round says why, in one sentence',
-      ((await roundError.textContent()) ?? '') === 'Choose a date between the years 1900 and 2999.',
+      'the round says why, in one sentence naming the date box',
+      ((await roundError.textContent()) ?? '') ===
+        'Round date: Choose a date between the years 1900 and 2999.',
       (await roundError.textContent()) ?? 'nothing said',
     );
     note('beside the round, on the screen', await onScreen(roundError));

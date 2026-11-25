@@ -188,16 +188,26 @@ if (built) {
     await openStaffMenu(page);
     await tap(adminLink('Teams'), /\/admin\/teams$/);
     await page.locator('input[name=name]').fill(wrens.team);
-    await tap(page.getByRole('button', { name: 'Add team' }), /done=created/);
+    await tap(
+      page.getByRole('button', { name: 'Add team' }),
+      /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+    );
+    // The save is proved by the page itself: the new team's page says so (2.155).
+    await page
+      .getByRole('status')
+      .filter({ hasText: `Saved: ${wrens.team} was added to the season.` })
+      .waitFor({ timeout: 10_000 });
     for (const name of wrens.people) {
       const [first, last] = name.split(' ');
       const form = page.locator('form', { has: page.locator('input[name=firstName]') });
       await form.locator('input[name=firstName]').fill(first);
       await form.locator('input[name=lastName]').fill(last);
-      await tap(
-        form.getByRole('button', { name: 'Add the person and put them on the roster' }),
-        /done=added/,
-      );
+      await form.getByRole('button', { name: 'Add the person and put them on the roster' }).click();
+      await page
+        .locator('[data-said-on] [role=status]', {
+          hasText: `Saved: ${first} ${last} was added to`,
+        })
+        .waitFor({ timeout: 10_000 });
     }
     const listed = (name) =>
       page

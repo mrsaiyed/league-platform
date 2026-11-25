@@ -127,7 +127,16 @@ export async function walkFirstTest(o) {
     ]) {
       await staffLink(page, 'Teams', /\/admin\/teams$/);
       await page.locator('input[name=name]').fill(name);
-      await tap(page, page.getByRole('button', { name: 'Add team' }), /done=created/);
+      await tap(
+        page,
+        page.getByRole('button', { name: 'Add team' }),
+        /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+      );
+      // The save is proved by the page itself: the new team's page says so (2.155).
+      await page
+        .getByRole('status')
+        .filter({ hasText: `Saved: ${name} was added to the season.` })
+        .waitFor({ timeout: 10_000 });
       if (name === 'Ravens') say(3, await mainText(page));
       if (from === null) continue;
       const headings = await page.locator('main h2').allInnerTexts();
@@ -145,11 +154,14 @@ export async function walkFirstTest(o) {
         await form.getByLabel('First name').fill(first);
         await form.getByLabel('Last name').fill(name);
         await form.getByLabel('Jersey number (0 to 99, or 00)').fill(String(from + n));
-        await tap(
-          page,
-          form.getByRole('button', { name: 'Add the person and put them on the roster' }),
-          /done=/,
-        );
+        await form
+          .getByRole('button', { name: 'Add the person and put them on the roster' })
+          .click();
+        await page
+          .locator('[data-said-on] [role=status]', {
+            hasText: `Saved: ${first} ${name} was added to`,
+          })
+          .waitFor({ timeout: 10_000 });
       }
       const roster = await mainText(page);
       note(

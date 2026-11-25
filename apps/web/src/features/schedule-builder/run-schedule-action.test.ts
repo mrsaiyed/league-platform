@@ -421,7 +421,12 @@ describe('schedule grid', () => {
       recording: 'not-a-mode',
       wasRecording: '',
     });
-    expect(saved).toEqual({ kind: 'refused', code: 'invalid-input', partial: true });
+    expect(saved).toMatchObject({
+      kind: 'refused',
+      code: 'invalid-input',
+      partial: true,
+      at: { form: 'game', gameId: gameId(1) },
+    });
     const view = await read();
     expect(view.result.games.find((g) => g.id === gameId(1))?.time).toBe('11:00');
   });
@@ -446,7 +451,8 @@ describe('schedule grid', () => {
     expect(stale).toEqual({
       kind: 'refused',
       code: 'changed-since-read',
-      at: { form: 'round', roundId: '01900000-0000-7000-8000-0000b2000001' },
+      // With the name as typed, kept in its box (step 2.155).
+      at: { form: 'round', roundId: '01900000-0000-7000-8000-0000b2000001', label: 'Second' },
     });
   });
 

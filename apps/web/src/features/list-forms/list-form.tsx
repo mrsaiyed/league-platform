@@ -7,8 +7,8 @@
 // button when no box is wrong). With scripts off React's form state does the same in the
 // page that answers the post, at the form's own place (`permalink`). Every word comes from
 // the server, from the message files (T-187).
-import { useActionState, useId } from 'react';
-import { untouched, type FormState } from './form-state.ts';
+import { useActionState, useEffect, useId, useRef, type ReactNode } from 'react';
+import { untouched, type FormState, type TypedFields } from './form-state.ts';
 import { useOneSubmit } from './use-one-submit.ts';
 
 export type ListField =
@@ -37,6 +37,8 @@ export type ListField =
       readonly value: string;
       readonly options: readonly { readonly value: string; readonly label: string }[];
       readonly help?: string;
+      /** False where one of the options is "none" (a team with no division); true when left out. */
+      readonly required?: boolean;
     }
   | {
       /** A color, and the choice to use the league's own (checked when there is none). */
@@ -59,7 +61,7 @@ export type ListFormProps = {
   readonly confirm?: string;
   readonly button: string;
   /** A button that takes something away is drawn as one; a small step (move up) is quiet. */
-  readonly kind?: 'danger' | 'quiet';
+  readonly kind?: 'danger' | 'quiet' | 'main';
   /** What the form is about, for a screen reader: "Change East". */
   readonly label: string;
   /** How the test and the page find the form: `data-form="rename"`. */
@@ -69,6 +71,25 @@ export type ListFormProps = {
 /** A colour the color box can show: the league's own colors show a calm grey to start from. */
 const colorOrStart = (value: string | null | undefined) =>
   value !== null && value !== undefined && /^#[0-9a-f]{6}$/i.test(value) ? value : '#5a6270';
+
+/**
+ * What is saved now in a box, as the page shows it, when it differs from what was typed
+ * (T-399); undefined when they are the same.
+ */
+function savedNowOf(field: ListField, typed: TypedFields, nothing: string): string | undefined {
+  if (field.kind === 'color') {
+    const savedOwn = field.value === null;
+    const typedOwn = typed[field.ownName] !== undefined;
+    const sameColor = (typed[field.name] ?? '').toLowerCase() === (field.value ?? '').toLowerCase();
+    if (savedOwn === typedOwn && (savedOwn || sameColor)) return undefined;
+    return field.value ?? field.ownLabel;
+  }
+  if ((typed[field.name] ?? '') === field.value) return undefined;
+  if (field.kind === 'select') {
+    return field.options.find((option) => option.value === field.value)?.label ?? nothing;
+  }
+  return field.value === '' ? nothing : field.value;
+}
 
 export function ListForm({
   action,
@@ -83,6 +104,13 @@ export function ListForm({
 }: ListFormProps) {
   const [state, dispatch, pending] = useActionState(action, untouched, permalink);
   const onSubmit = useOneSubmit(pending, state);
+  const formRef = useRef<HTMLFormElement>(null);
+  // After a refusal the first wrong box has the focus, so the keyboard and the screen
+  // reader are where the sentence is (step 2.155, as the games area's boxes).
+  useEffect(() => {
+    if (state.kind !== 'refused') return;
+    formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [state]);
   const base = useId();
   const problemId = `${base}-problem`;
   const refused = state.kind === 'refused' ? state : undefined;
@@ -94,10 +122,22 @@ export function ListForm({
         {refused.said}
       </p>
     );
+  // Someone else changed it meanwhile (T-399): what is saved now, beside each box that differs.
+  const savedNow = (field: ListField): ReactNode => {
+    const words = refused?.savedNow;
+    if (refused === undefined || words === undefined) return null;
+    const shown = savedNowOf(field, refused.typed, words.nothing);
+    return shown === undefined ? null : (
+      <small className="ui-field-help" data-saved-now={field.name}>
+        {words.label} {shown}
+      </small>
+    );
+  };
   const marked = (field: string) =>
     wrongField === field ? { 'aria-invalid': true, 'aria-describedby': problemId } : {};
   return (
     <form
+      ref={formRef}
       action={dispatch}
       onSubmit={onSubmit}
       className="staff-form"
@@ -133,6 +173,7 @@ export function ListForm({
                 />{' '}
                 {field.ownLabel}
               </label>
+              {savedNow(field)}
               {wrongField === field.name ? problem : null}
             </div>
           );
@@ -149,7 +190,7 @@ export function ListForm({
                   key={`${field.name}:${value}`}
                   name={field.name}
                   defaultValue={value}
-                  required
+                  required={field.required ?? true}
                   {...marked(field.name)}
                 >
                   {field.options.map((option) => (
@@ -160,6 +201,7 @@ export function ListForm({
                 </select>
                 {help}
               </label>
+              {savedNow(field)}
               {wrongField === field.name ? problem : null}
             </div>
           );
@@ -182,6 +224,7 @@ export function ListForm({
                 />
                 {help}
               </label>
+              {savedNow(field)}
               {wrongField === field.name ? problem : null}
             </div>
           );
@@ -205,6 +248,7 @@ export function ListForm({
                 <small className="ui-field-help">{field.help}</small>
               )}
             </label>
+            {savedNow(field)}
             {wrongField === field.name ? problem : null}
           </div>
         );

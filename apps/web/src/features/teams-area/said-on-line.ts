@@ -21,6 +21,11 @@ export function saidOnLine(
   const name = rosterName(line);
   const said = (text: string): SaidOnLine => ({ entry: line.id, text });
   switch (found.done) {
+    // A player just added, said on their new line (step 2.155).
+    case 'added':
+      return line.leftOn !== null
+        ? undefined
+        : said(t('adminTeams.said.added', { name, team: teamName }));
     case 'left':
       return line.leftOn === null
         ? undefined

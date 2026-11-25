@@ -25,10 +25,17 @@ export const enAdminTeams = {
   'adminTeams.allTeams': 'All teams',
   'adminTeams.byNumber': '#{number}',
   'adminTeams.confirm': 'Yes, I am sure',
+  // A refused "Add team", beside the box it is about (step 2.155): each names its box.
+  'adminTeams.create.problem.color':
+    "The color could not be read. Choose it again, or tick “Use the league's own colors”.",
+  'adminTeams.create.problem.name': "The team's name is needed, at most 120 characters.",
+  'adminTeams.create.problem.shortName':
+    'The short name can have only lower-case letters, numbers and single hyphens, like blue-jays.',
+  // At the top of the new team's own page, beside its name, once (step 2.155).
+  'adminTeams.create.saved': 'Saved: {name} was added to the season.',
   'adminTeams.create.submit': 'Add team',
   'adminTeams.create.title': 'Add a team',
   'adminTeams.done.added': 'The player was added to the roster.',
-  'adminTeams.done.created': 'The team was added.',
   'adminTeams.done.entrySaved': 'The number and role were saved.',
   'adminTeams.done.left': 'The player was marked as having left.',
   'adminTeams.done.moved': 'The roster order was saved.',
@@ -52,6 +59,8 @@ export const enAdminTeams = {
   'adminTeams.field.shortNameHint': 'Lower-case letters and numbers, with single hyphens.',
   'adminTeams.field.statsVisibility': "Who sees this team's players' numbers",
   'adminTeams.field.useOwnColors': "Use the league's own colors",
+  // A refusal said beside the box it is about, naming it (step 2.155).
+  'adminTeams.fieldRefused': '{field}: {why}',
   // After a team's name in the list, with the space before it: " (North)".
   'adminTeams.inDivision': ' ({division})',
   // S-87: a team that leaves the league mid-season. Its results stay, it is marked in
@@ -162,6 +171,7 @@ export const enAdminTeams = {
   'adminTeams.roster.title': 'Roster',
   'adminTeams.roster.toReview': '(added at the scorer’s table, to review)',
   // Said on the player's own line, naming them (step 2.161; R-32 for the number).
+  'adminTeams.said.added': 'Saved: {name} was added to {team}.',
   'adminTeams.said.left': '{name} was marked as having left {team}.',
   'adminTeams.said.putBack':
     '{name} is back on the roster. Their games and numbers are as they were.',
@@ -169,6 +179,10 @@ export const enAdminTeams = {
     '{name} is back on the roster with no number: {number} is now worn by {wearer}. Give them a number.',
   'adminTeams.said.putBackNoNumberNoWearer':
     '{name} is back on the roster with no number: someone else on the team now wears {number}. Give them a number.',
+  // Beside the team's details, once, after they were saved (step 2.155).
+  'adminTeams.saved.details': 'Saved: the details of {name}.',
+  'adminTeams.savedNow': 'Saved now:',
+  'adminTeams.savedNowNothing': '(nothing)',
   'adminTeams.seasonLine': 'Teams of {season}',
   'adminTeams.stats.everyone': 'Everyone',
   'adminTeams.stats.staff': "Only the team's staff and the league's admins",

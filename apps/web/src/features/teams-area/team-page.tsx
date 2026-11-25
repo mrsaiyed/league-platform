@@ -12,6 +12,7 @@ import {
   type RosterLine,
 } from '@srleagues/core';
 import { PageHead } from '@srleagues/ui';
+import { randomUUID } from 'node:crypto';
 import { notFound } from 'next/navigation';
 import { webPorts } from '../../server/container.ts';
 import { commandContextOf } from '../../server/context.ts';
@@ -27,6 +28,8 @@ import {
   problemKey,
   removeRefusalOf,
   removeTeamAnchor,
+  addPlayerAnchor,
+  teamDetailsAnchor,
 } from './answer.ts';
 import { removePanel, tapRefusal, type RemoveWayOn } from './remove-team-words.ts';
 import { backToTeamParam, publishAnchor } from '../schedule-builder/index.ts';
@@ -47,19 +50,12 @@ import {
   saveTeamStatsAction,
   undoTeamLeftAction,
 } from './actions.ts';
-import {
-  ColorFields,
-  DivisionField,
-  LeagueField,
-  Notice,
-  Section,
-  StatsVisibilityField,
-  Swatch,
-  TextField,
-} from './parts.tsx';
+import { LeagueField, Notice, Section, StatsVisibilityField, Swatch } from './parts.tsx';
+
+import { ListForm, SaidLine, takeNotice } from '../list-forms/index.ts';
+import { requestTokenField } from '../../server/same-request.ts';
 
 /** Where "Add a player", the page's main action, leads: the form's own place on the page. */
-const addPlayerAnchor = 'add-player';
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** How many of the league list one page reads. */
@@ -101,6 +97,13 @@ export async function TeamPage({
     return (await binnedTeamPage(here, context, teamId.toLowerCase())) ?? notFound();
   }
 
+  // A team just added: "Saved" at the top, beside its name, once (step 2.155).
+  const notice = takeNotice(context, 'teams');
+  const justAdded = notice?.thing === team.id && notice.said === 'created';
+  // The details saved, said beside them; a player added, said on their new line (step 2.155).
+  const saved = notice?.thing === team.id ? notice.said : undefined;
+  const addedEntry = saved === 'added' ? notice?.about?.[0] : undefined;
+  const teamUrl = leagueUrl(here, 'admin-area', { area: 'teams', subpath: [team.id] });
   const roster = await listRoster(context, { teamId: team.id }, ports.deps);
   const lines: readonly RosterLine[] = roster.ok ? roster.value : [];
   const open = lines.filter((line) => line.leftOn === null);
@@ -165,7 +168,11 @@ export async function TeamPage({
   const besideEntry = open.some((line) => line.id === leaving?.entry) ? leaving : undefined;
   const leavingProblem = besideEntry === undefined ? undefined : problemKey(query);
   // What went well on one line is said on that line, naming the player (step 2.161).
-  const onLine = saidOnLine(doneAtOf(query), lines, team.name);
+  const onLine = saidOnLine(
+    addedEntry === undefined ? doneAtOf(query) : { done: 'added', at: { entry: addedEntry } },
+    lines,
+    team.name,
+  );
   // What the team has of games, and why "Remove this team" was refused, said in its panel (A-17).
   const counted = await countTeamGames(context, { teamId: team.id }, ports.deps);
   const games = counted.ok ? counted.value : undefined;
@@ -176,9 +183,9 @@ export async function TeamPage({
   const tapRefused = removeCode === undefined ? undefined : tapRefusal(removeCode);
   const saidHere = (entryId: string) =>
     onLine?.entry !== entryId ? null : (
-      <StaffNotice kind="saved" data={{ 'data-said-on': entryId }}>
-        {onLine.text}
-      </StaffNotice>
+      <div data-said-on={entryId}>
+        <SaidLine kind="saved">{onLine.text}</SaidLine>
+      </div>
     );
 
   return (
@@ -193,6 +200,9 @@ export async function TeamPage({
           </a>
         ) : null}
       </PageHead>
+      {justAdded ? (
+        <SaidLine kind="saved">{t('adminTeams.create.saved', { name: team.name })}</SaidLine>
+      ) : null}
       <Notice
         query={query}
         binHref={leagueUrl(here, 'admin-area', { area: 'settings', subpath: ['bin'] })}
@@ -201,35 +211,60 @@ export async function TeamPage({
         }
       />
 
-      <Section title={t('adminTeams.edit.title')}>
-        <form action={saveTeamAction} className="staff-form">
-          <LeagueField league={here.slug} />
-          <input type="hidden" name="team" value={team.id} />
-          <input type="hidden" name="version" value={team.version} />
-          <TextField
-            name="name"
-            label={t('adminTeams.field.name')}
-            defaultValue={team.name}
-            required
-            maxLength={120}
-          />
-          <TextField
-            name="shortName"
-            label={t('adminTeams.field.shortName')}
-            defaultValue={team.slug}
-            hint={t('adminTeams.field.shortNameHint')}
-            maxLength={60}
-          />
-          <ColorFields color={team.color} />
-          <DivisionField divisions={divisions} value={team.divisionId} />
-          {/* The page's one filled button is "Add a player", at its head and on the form
-              it leads to; every other save here is outlined (step 2.103). */}
-          <p className="staff-buttons">
-            <button type="submit" className="ui-button">
-              {t('adminTeams.edit.submit')}
-            </button>
-          </p>
-        </form>
+      <Section title={t('adminTeams.edit.title')} id={teamDetailsAnchor}>
+        {saved === 'details' ? (
+          <SaidLine kind="saved">{t('adminTeams.saved.details', { name: team.name })}</SaidLine>
+        ) : null}
+        <ListForm
+          action={saveTeamAction}
+          permalink={`${teamUrl}#${teamDetailsAnchor}`}
+          hidden={{
+            league: here.slug,
+            team: team.id,
+            version: String(team.version),
+            [requestTokenField]: randomUUID(),
+          }}
+          fields={[
+            {
+              kind: 'text',
+              name: 'name',
+              label: t('adminTeams.field.name'),
+              value: team.name,
+              required: true,
+              maxLength: 120,
+            },
+            {
+              kind: 'text',
+              name: 'shortName',
+              label: t('adminTeams.field.shortName'),
+              value: team.slug,
+              maxLength: 60,
+              help: t('adminTeams.field.shortNameHint'),
+            },
+            {
+              kind: 'color',
+              name: 'color',
+              label: t('adminTeams.field.color'),
+              value: team.color,
+              ownName: 'useOwnColors',
+              ownLabel: t('adminTeams.field.useOwnColors'),
+            },
+            {
+              kind: 'select',
+              name: 'divisionId',
+              label: t('adminTeams.field.division'),
+              value: team.divisionId ?? '',
+              required: false,
+              options: [
+                { value: '', label: t('adminTeams.noDivision') },
+                ...divisions.map((division) => ({ value: division.id, label: division.name })),
+              ],
+            },
+          ]}
+          button={t('adminTeams.edit.submit')}
+          label={t('adminTeams.edit.title')}
+          name="team-details"
+        />
       </Section>
 
       <Section title={t('adminTeams.stats.title')}>
@@ -382,28 +417,47 @@ export async function TeamPage({
           meant for the other. The "Add a player" button at the top leads to the first. */}
       {mayAddPeople ? (
         <Section title={t('adminTeams.newPerson.title')} id={addPlayerAnchor}>
-          <form action={addNewPersonAction} className="staff-form">
-            <LeagueField league={here.slug} />
-            <input type="hidden" name="team" value={team.id} />
-            <TextField
-              name="firstName"
-              label={t('adminTeams.newPerson.firstName')}
-              required
-              maxLength={100}
-            />
-            <TextField
-              name="lastName"
-              label={t('adminTeams.newPerson.lastName')}
-              required
-              maxLength={100}
-            />
-            <NumberAndRole />
-            <p className="staff-buttons">
-              <button type="submit" className="ui-button" data-kind="main">
-                {t('adminTeams.newPerson.submit')}
-              </button>
-            </p>
-          </form>
+          <ListForm
+            action={addNewPersonAction}
+            permalink={`${teamUrl}#${addPlayerAnchor}`}
+            hidden={{ league: here.slug, team: team.id, [requestTokenField]: randomUUID() }}
+            fields={[
+              {
+                kind: 'text',
+                name: 'firstName',
+                label: t('adminTeams.newPerson.firstName'),
+                value: '',
+                required: true,
+                maxLength: 100,
+              },
+              {
+                kind: 'text',
+                name: 'lastName',
+                label: t('adminTeams.newPerson.lastName'),
+                value: '',
+                required: true,
+                maxLength: 100,
+              },
+              {
+                kind: 'text',
+                name: 'jerseyNumber',
+                label: t('adminTeams.add.number'),
+                value: '',
+                maxLength: 2,
+              },
+              {
+                kind: 'select',
+                name: 'role',
+                label: t('adminTeams.roster.role'),
+                value: 'player',
+                options: rosterRoles.map((role) => ({ value: role, label: roleText(role) })),
+              },
+            ]}
+            button={t('adminTeams.newPerson.submit')}
+            kind="main"
+            label={t('adminTeams.newPerson.title')}
+            name="new-player"
+          />
         </Section>
       ) : null}
 

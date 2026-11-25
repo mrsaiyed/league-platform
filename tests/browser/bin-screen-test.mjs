@@ -93,7 +93,16 @@ if (built) {
     };
     const addTeam = async (p, name) => {
       await p.locator('input[name=name]').fill(name);
-      await tap(p, p.getByRole('button', { name: 'Add team' }), /done=created/);
+      await tap(
+        p,
+        p.getByRole('button', { name: 'Add team' }),
+        /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+      );
+      // The save is proved by the page itself: the new team's page says so (2.155).
+      await p
+        .getByRole('status')
+        .filter({ hasText: `Saved: ${name} was added to the season.` })
+        .waitFor({ timeout: 10_000 });
     };
     const removeTeamHere = async (p) => {
       const panel = p.locator('section', {
@@ -112,11 +121,12 @@ if (built) {
     const form = page.locator('form', { has: page.locator('input[name=firstName]') });
     await form.locator('input[name=firstName]').fill(kites.first);
     await form.locator('input[name=lastName]').fill(kites.last);
-    await tap(
-      page,
-      form.getByRole('button', { name: 'Add the person and put them on the roster' }),
-      /done=added/,
-    );
+    await form.getByRole('button', { name: 'Add the person and put them on the roster' }).click();
+    await page
+      .locator('[data-said-on] [role=status]', {
+        hasText: `Saved: ${kites.first} ${kites.last} was added to`,
+      })
+      .waitFor({ timeout: 10_000 });
     await removeTeamHere(page);
     const said = page.locator('main [role=status]').first();
     note(

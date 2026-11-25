@@ -98,7 +98,15 @@ if (built) {
     await tap(adminLink('Teams'), /\/admin\/teams$/);
     await page.locator('input[name=name]').fill(team);
     await page.locator('select[name=divisionId]').selectOption({ label: 'East' });
-    await tap(page.getByRole('button', { name: 'Add team' }), /done=created/);
+    await tap(
+      page.getByRole('button', { name: 'Add team' }),
+      /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+    );
+    // The save is proved by the page itself: the new team's page says so (2.155).
+    await page
+      .getByRole('status')
+      .filter({ hasText: `Saved: ${team} was added to the season.` })
+      .waitFor({ timeout: 10_000 });
     await accessible('the new team in the admin');
 
     at = 'the owner adds two players';
@@ -107,10 +115,12 @@ if (built) {
       await form.locator('input[name=firstName]').fill(p.first);
       await form.locator('input[name=lastName]').fill(p.last);
       await form.locator('input[name=jerseyNumber]').fill(p.number);
-      await tap(
-        form.getByRole('button', { name: 'Add the person and put them on the roster' }),
-        /done=/,
-      );
+      await form.getByRole('button', { name: 'Add the person and put them on the roster' }).click();
+      await page
+        .locator('[data-said-on] [role=status]', {
+          hasText: `Saved: ${p.first} ${p.last} was added to`,
+        })
+        .waitFor({ timeout: 10_000 });
     }
     const roster = await page.locator('main').innerText();
     note(

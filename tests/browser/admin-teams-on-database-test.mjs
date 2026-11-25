@@ -190,7 +190,11 @@ if (browser !== null) {
 
   await step('a team is added and its page opens', async () => {
     await page.getByLabel('Name', { exact: true }).fill(teamName);
-    await submit(page, page.getByRole('button', { name: 'Add team' }), /done=created/);
+    await submit(
+      page,
+      page.getByRole('button', { name: 'Add team' }),
+      /\/admin\/teams\/[0-9a-f-]{36}(#add-team)?$/,
+    );
     teamPath = new URL(page.url()).pathname;
     note(
       "the team's own page opens",
@@ -198,7 +202,14 @@ if (browser !== null) {
         (await page.getByRole('heading', { level: 1, name: teamName }).count()) === 1,
       page.url(),
     );
-    note('it says the team was added', (await page.getByText('The team was added.').count()) === 1);
+    // Said at the top of its own page, naming it, once (step 2.155).
+    note(
+      'it says the team was added, naming it',
+      (await page
+        .getByRole('status')
+        .filter({ hasText: `Saved: ${teamName} was added to the season.` })
+        .count()) === 1,
+    );
     await accessible(page, "a team's page on the database");
   });
 
@@ -209,11 +220,13 @@ if (browser !== null) {
     await form.getByLabel('First name').fill(newcomer.first);
     await form.getByLabel('Last name').fill(newcomer.last);
     await form.getByLabel('Jersey number (0 to 99, or 00)').fill('21');
-    await submit(
-      page,
-      form.getByRole('button', { name: 'Add the person and put them on the roster' }),
-      /done=added/,
-    );
+    // Step 2.155: said on the new line, once, in the answer to the post.
+    await form.getByRole('button', { name: 'Add the person and put them on the roster' }).click();
+    await page
+      .locator('[data-said-on] [role=status]', {
+        hasText: `Saved: ${newcomer.first} ${newcomer.last} was added to`,
+      })
+      .waitFor({ timeout: 10_000 });
     const line = lineOf(page, `${newcomer.first} ${newcomer.last}`);
     note('the newcomer is on the roster', (await line.count()) === 1);
     note(
