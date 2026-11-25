@@ -47,6 +47,13 @@ const otherExports = /^export\s*(?:\{|\*|default\b|let\b|var\b|class\b|enum\b|ab
 export const ungatedActions = {
   'apps/web/src/server/sign-in/actions.ts': 'signing in reaches no league',
   'apps/web/src/server/sign-in/local-actions.ts': 'the made-up sign-ins reach no league',
+  // Step 2.128: the signed-in person's own account, by the session's account only.
+  'apps/web/src/server/sign-in/email-actions.ts':
+    'changing your own email reaches your account only, no league',
+  'apps/web/src/server/sign-in/own-name-actions.ts':
+    "giving or changing your own name writes your account's own profile only, no league",
+  'apps/web/src/server/sign-in/password-actions.ts':
+    'changing your own password reaches your account only, no league',
   'apps/web/src/features/access-area/invitation-actions.ts':
     'an invitee must reach a draft league; a visitor at a hidden league is sent where a ' +
     'missing league sends them (turnedBackTo, T-453)',
