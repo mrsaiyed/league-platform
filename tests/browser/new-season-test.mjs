@@ -20,6 +20,7 @@ import {
   startNext,
   waitFor,
   whatWentWrong,
+  worldAtNoon,
 } from './web-browser-kit.mjs';
 import { leagueId } from './tracker-driver.mjs';
 
@@ -47,6 +48,11 @@ if (built) {
     PUBLIC_BASE_URL: origin,
     // The test's own league with no current season (step 2.130, the stand-in's world only).
     LOCAL_NO_CURRENT_SEASON: 'harbor-city',
+    // The made-up world's clock at noon on the league's today (step 2.249, T-425): the
+    // decided game the owner corrects is this morning's, under Today on Admin → Games.
+    // Started from the machine's clock, between the league's midnight and 03:00 that game
+    // was last night's, under Earlier games only, and the check found none.
+    LOCAL_NOW: worldAtNoon(),
   });
   let browser;
   let at = 'starting';
