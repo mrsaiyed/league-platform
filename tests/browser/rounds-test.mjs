@@ -305,6 +305,49 @@ if (built) {
     );
     note('beside the round, on the screen', await onScreen(roundError));
 
+    at = 'with scripts on, a round refused far down the page comes into view (T-437)';
+    // With scripts the grid is drawn again in place after a button: no new page, so the
+    // browser does not move. A refusal of the round as a whole is said in its head, above its
+    // forms; with "Remove this round" at the top of the screen that head is off it, and the
+    // refusal must bring itself into view (IntoView). (A refused box is said beside the box,
+    // on the screen already.)
+    const live = await browser.newContext({ viewport: screen });
+    await live.addCookies([{ name: 'srl_session', value: 'local-owner-token', url: origin }]);
+    const livePage = await live.newPage();
+    livePage.setDefaultTimeout(dev ? 120_000 : 60_000);
+    try {
+      await livePage.goto(plainGrid);
+      const far = livePage.locator('section[data-round]', {
+        has: livePage.locator('h2', { hasText: 'Week 2' }),
+      });
+      await far.locator('summary', { hasText: 'Change or remove this round' }).click();
+      const removeForm = far.locator('form', {
+        has: livePage.locator('button', { hasText: 'Remove this round' }),
+      });
+      // As if someone else had changed the draft since this page was drawn.
+      await removeForm.locator('input[name=version]').evaluate((input) => {
+        input.value = String(Number(input.value) - 1);
+      });
+      const press = removeForm.getByRole('button', { name: 'Remove this round' });
+      await press.evaluate((button) => {
+        window.scrollBy(0, button.getBoundingClientRect().top - 150);
+      });
+      const head = await far.locator('h2').evaluate((h2) => h2.getBoundingClientRect().bottom);
+      note("before the press the round's head is above the screen", head < 0, String(head));
+      await press.click();
+      const liveError = far.locator('.ui-notice[data-into-view][data-notice=problem]');
+      await liveError.waitFor({ timeout: 10_000 });
+      note(
+        'scripts on: the refused round is said on the screen without scrolling',
+        await onScreen(liveError),
+        JSON.stringify(await liveError.boundingBox()),
+      );
+      note('scripts on: the round is still there', (await far.count()) === 1);
+      note('scripts on: the address holds no answer', !/[?&](problem|at)=/.test(livePage.url()));
+    } finally {
+      await live.close();
+    }
+
     at = 'the owner removes the empty second round';
     const second = round('Week 2');
     await second.locator('summary', { hasText: 'Change or remove this round' }).click();

@@ -230,9 +230,10 @@ if (browser) {
     note('after: the visitor reads the league home with 200', answer?.status() === 200);
   });
 
-  // With scripts on the page is drawn again where it was after a button (step 2.155 part 6):
-  // a refusal said at the top, after a button far down the page, brings itself into view.
-  await step('with scripts on, a refusal comes into view', async () => {
+  // With scripts on, a stale Archive is refused at the top and nothing is archived. (Whether a
+  // refusal brings itself into view is proved where the page is drawn again in place, the
+  // schedule: rounds-test. Here Next.js goes to the top after the redirect anyway.)
+  await step('with scripts on, a stale Archive is refused', async () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     await context.addCookies([{ name: 'srl_session', value: 'local-owner-token', url: origin }]);
     const page = await context.newPage();
@@ -246,15 +247,6 @@ if (browser) {
     await form.getByRole('button', { name: 'Archive' }).click();
     const refusal = page.locator('main > .ui-notice[data-kind=error][role=alert]');
     await refusal.waitFor({ timeout: 10_000 });
-    const box = await refusal.evaluate((line) => {
-      const { top, bottom } = line.getBoundingClientRect();
-      return { top, bottom, height: window.innerHeight };
-    });
-    note(
-      'the refusal is on the screen without scrolling',
-      box.top >= 0 && box.bottom <= box.height,
-      JSON.stringify(box),
-    );
     note(
       'nothing was archived',
       (await page.locator('section#publish').getAttribute('data-status')) === 'live',

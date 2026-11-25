@@ -25,6 +25,7 @@ import {
   waitFor,
   whatWentWrong,
   answered,
+  saysNothingOf,
 } from './web-browser-kit.mjs';
 
 // The rounds' days: over a year after the made-up world's today (it reads this computer's
@@ -167,6 +168,27 @@ if (built) {
         shown.includes('Everyone can see Winter 2027.'),
       shown,
     );
+
+    // The answer is a one-time notice (step 2.155 part 6, T-437): said once, then a reload,
+    // Back or a typed address says nothing.
+    const shownSaid = 'Visitors can see Winter 2027 now.';
+    const seasonSettingsAddress = page.url().replace(/#.*$/, '');
+    note(
+      'the address holds only the season',
+      /\/admin\/season\?season=winter-2027$/.test(seasonSettingsAddress),
+      seasonSettingsAddress,
+    );
+    await page.reload();
+    await page.locator('#who-can-see').waitFor();
+    note('a reload says nothing of the season shown', await saysNothingOf(page, shownSaid));
+    await page.goto(`${origin}/north-valley/admin`);
+    await page.goBack();
+    await page.locator('#who-can-see').waitFor();
+    note('Back says nothing of the season shown', await saysNothingOf(page, shownSaid));
+    await page.goto(`${seasonSettingsAddress}&done=shown#who-can-see`);
+    await page.locator('#who-can-see').waitFor();
+    note('a typed ?done=shown says nothing', await saysNothingOf(page, shownSaid));
+    await page.goto(seasonSettingsAddress);
 
     at = 'a visitor finds the season and its games from the league home';
     const visitor = await signedIn(undefined);
