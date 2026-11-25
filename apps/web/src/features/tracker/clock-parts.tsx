@@ -867,13 +867,16 @@ function ClockModeSwitch(props: {
 
 /**
  * The mercy rule switched the clock to running (step 2.69): a plain sentence, and the way
- * back in one tap. Kept until it is dismissed or the clock is switched by hand.
+ * back in one tap. Kept until it is dismissed or the clock is switched by hand. It comes
+ * up as a basket is taken, under the finger that took it, so its answers rest for a moment
+ * (the screen marks them `data-resting`) and it is drawn in the pad at rest at every size,
+ * where it moves nothing (the step's fix round).
  */
 export function MercyNotice(props: {
   readonly t: Translate;
   readonly mercy: MercySwitch;
-  readonly back: () => void;
-  readonly keep: () => void;
+  readonly back: (event: MouseEvent<HTMLButtonElement>) => void;
+  readonly keep: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   const { t } = props;
   return (

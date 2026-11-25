@@ -12,6 +12,8 @@ import { bears, games, hawks, liveLeagueId } from '../../server/tracker-endpoint
 import {
   clockModeShown,
   mercySwitch,
+  mercyDismissedIndexKey,
+  mercyDismissedKept,
   readMercyDismissed,
   switchedClock,
   writeMercyDismissed,
@@ -260,6 +262,7 @@ describe('the mercy rule’s notice (step 2.69, item 2)', () => {
     const store = {
       getItem: (key: string) => kept.get(key) ?? null,
       setItem: (key: string, value: string) => void kept.set(key, value),
+      removeItem: (key: string) => void kept.delete(key),
     };
     const owner = { gameId: 'game-1', accountId: 'person-1' };
     const firstId = mercySwitch(homeRuns(mercyRules))?.playId ?? '';
@@ -277,10 +280,33 @@ describe('the mercy rule’s notice (step 2.69, item 2)', () => {
       setItem: () => {
         throw new Error('full');
       },
+      removeItem: () => undefined,
     };
     expect(() => writeMercyDismissed(broken, owner, firstId)).not.toThrow();
     expect(readMercyDismissed(broken, owner)).toBeNull();
     expect(readMercyDismissed(null, owner)).toBeNull();
+  });
+
+  it('only the newest 20 games keep their dismissal, so the keys never pile up', () => {
+    const kept = new Map<string, string>();
+    const store = {
+      getItem: (key: string) => kept.get(key) ?? null,
+      setItem: (key: string, value: string) => void kept.set(key, value),
+      removeItem: (key: string) => void kept.delete(key),
+    };
+    const game = (n: number) => ({ gameId: `game-${n}`, accountId: 'person-1' });
+    for (let n = 1; n <= 25; n++) writeMercyDismissed(store, game(n), `basket-${n}`);
+    // Game 3 is dismissed again: it comes back as the newest, game 6 goes, and game 7 is the oldest kept.
+    writeMercyDismissed(store, game(3), 'basket-3b');
+    const dismissals = [...kept.keys()].filter((key) => key !== mercyDismissedIndexKey);
+    expect(dismissals).toHaveLength(mercyDismissedKept);
+    expect(readMercyDismissed(store, game(3))).toBe('basket-3b');
+    for (const n of [1, 2, 4, 5, 6]) expect(readMercyDismissed(store, game(n))).toBeNull();
+    for (const n of [7, 25]) expect(readMercyDismissed(store, game(n))).toBe(`basket-${n}`);
+    // A list that cannot be read is begun again, never a fault.
+    kept.set(mercyDismissedIndexKey, '{not a list');
+    expect(() => writeMercyDismissed(store, game(26), 'basket-26')).not.toThrow();
+    expect(readMercyDismissed(store, game(26))).toBe('basket-26');
   });
 });
 

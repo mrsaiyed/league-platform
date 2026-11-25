@@ -7,7 +7,13 @@
 //   for the same basket (the lead's decision of step 2.69: a scorekeeper's phone reloads).
 // - The running-clock switch is turned off by hand with no signal (shown as unsaved, kept
 //   by the device) and sent once when the signal returns, then turned on again.
-// - The game is ended, and its public page shows the final score.
+// - The game is ended, and its public page shows the final score; a new device sees the
+//   switch by hand kept once (one clock-mode play with the id the device sent).
+// - The notice moves nothing and takes no tap meant for something else (the step's fix
+//   round): at 390 x 664, 844 x 390 and an upright tablet the crossing basket moves no
+//   player tile, pad button or Undo, and a second quick tap where its "+2" was chooses
+//   neither answer (they rest, as Undo does; where that spot is not an answer, the test
+//   taps "Stop the clock on fouls again" at once instead), then the basket is undone.
 // - A season cannot hold both a mercy lead and a last-minutes stop clock (the first is a
 //   stop clock's, the second a running clock's), so the "Stop clock" sign is played in a
 //   second game of the same world, once the owner gives the season a running clock that
@@ -59,12 +65,16 @@ const server = startNext(['start', '--port', new URL(origin).port], {
 });
 let browser;
 
-/** The scoring screen of `game` on a tablet lying down; `work` gets the court, page and context. */
-async function onTheScreen(game, work) {
+/**
+ * The scoring screen of `game` on a tablet lying down; `work` gets the court, page and
+ * context, and `listen`, if given, the page before it is opened.
+ */
+async function onTheScreen(game, work, listen = () => undefined) {
   const context = await browser.newContext({ viewport: { width: 1180, height: 820 } });
   try {
     await context.addCookies([{ ...scorekeeper, url: origin }]);
     const page = await context.newPage();
+    listen(page);
     await page.goto(`${origin}${trackerPath(game)}`);
     const c = court(page);
     await c.open();
@@ -96,6 +106,40 @@ async function flipSwitch(page, on) {
   await modeIs(page, on ? 'running' : 'stop');
 }
 
+/** The sizes the notice is checked at: the phone in its browser, lying down, a tablet. */
+const sizes = [
+  { width: 390, height: 664 },
+  { width: 844, height: 390 },
+  { width: 820, height: 1180 },
+];
+
+/**
+ * Where a player tile, the first pad button outside the notices and Undo are drawn, each
+ * by its own mark: the crossing basket must move none of them.
+ */
+const places = (page) =>
+  page.evaluate(() => {
+    const at = (element) => {
+      if (element === null || element === undefined) return null;
+      const box = element.getBoundingClientRect();
+      return [box.x, box.y, box.width, box.height].map(Math.round).join(',');
+    };
+    const shown = (element) => element.getClientRects().length > 0;
+    const screen = document.querySelector('[data-scoring]');
+    const tile = [...screen.querySelectorAll('[data-teams] [data-player]')].find(shown);
+    const pad = [...screen.querySelectorAll('[data-pad] button')].find(
+      (button) => shown(button) && button.closest('[data-pad-notices]') === null,
+    );
+    return {
+      tile: `${tile?.getAttribute('data-player')}@${at(tile)}`,
+      pad: `${pad?.textContent?.trim()}@${at(pad)}`,
+      undo: at(screen.querySelector('[data-undo]')),
+    };
+  });
+
+/** The clock-mode commands the device sent, by id (the switch by hand with no signal). */
+const sent = [];
+
 try {
   await waitFor(`${origin}/`, server);
   browser = await launch();
@@ -113,6 +157,67 @@ try {
       // 9–0 is a lead under the mercy line: no notice.
       for (const jersey of [3, 5, 7]) await c.play('home', jersey, 'p3');
       note('no notice under the mercy lead', (await notice(page).count()) === 0);
+      for (const size of sizes) {
+        const named = `${size.width} x ${size.height}`;
+        await page.setViewportSize(size);
+        const before = await places(page);
+        // #9's "+2", tapped by the finger; the notice comes up as the lead crosses 10.
+        const options = c.pad.locator(
+          `[data-options="${await c.tile('home', 9).getAttribute('data-player')}"]`,
+        );
+        await c.tile('home', 9).click();
+        const box = await options.locator('[data-act="p2"]').boundingBox();
+        if (box === null) throw new Error(`no "+2" at ${named}`);
+        const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+        const plays = Number(await page.locator('[data-scoring]').getAttribute('data-plays'));
+        await page.mouse.click(x, y);
+        await notice(page).waitFor({ timeout: tapLimit });
+        // At once, a second tap where "+2" was, or, where that is not one of the notice's
+        // answers, on "Stop the clock on fouls again" itself: neither answer may take it.
+        const under = await page.evaluate(
+          ([px, py]) => {
+            const answer = document.elementFromPoint(px, py)?.closest('[data-mercy-notice] button');
+            if (answer === null || answer === undefined) return null;
+            return answer.hasAttribute('data-mercy-back') ? 'back' : 'keep';
+          },
+          [x, y],
+        );
+        let tap = [x, y];
+        if (under === null) {
+          const back = await notice(page).locator('[data-mercy-back]').boundingBox();
+          if (back === null) throw new Error(`no "Stop the clock" at ${named}`);
+          tap = [back.x + back.width / 2, back.y + back.height / 2];
+        }
+        const hit = under ?? 'back, where "+2" was is not an answer';
+        await page.mouse.click(tap[0], tap[1]);
+        await page.waitForTimeout(500);
+        note(
+          `${named}: the tap where "+2" was chooses neither answer`,
+          (await notice(page).count()) === 1 &&
+            (await page
+              .locator('[data-scoring] [data-clock][data-clock-mode="running"]')
+              .count()) === 1 &&
+            Number(await page.locator('[data-scoring]').getAttribute('data-plays')) === plays + 1,
+          hit,
+        );
+        const after = await places(page);
+        note(
+          `${named}: the notice moves no tile, pad button or Undo`,
+          JSON.stringify(after) === JSON.stringify(before),
+          `${JSON.stringify(before)} then ${JSON.stringify(after)}`,
+        );
+        const answers = await notice(page).locator('.court-mercy-acts').boundingBox();
+        note(
+          `${named}: the notice's answers are whole on the screen`,
+          answers !== null && answers.y >= 0 && answers.y + answers.height <= size.height,
+          JSON.stringify(answers),
+        );
+        // The basket is undone: the stop clock is back and the notice goes.
+        await c.recorded(() => page.locator('[data-scoring] [data-undo]').click());
+        await notice(page).waitFor({ state: 'detached', timeout: tapLimit });
+        await modeIs(page, 'stop');
+      }
+      await page.setViewportSize({ width: 1180, height: 820 });
       // 11–0 crosses it: the clock now runs, and the notice says so with the way back.
       await c.play('home', 9, 'p2');
       await notice(page).waitFor({ timeout: tapLimit });
@@ -145,7 +250,6 @@ try {
       note('after a reload the dismissed notice stays away', (await notice(page).count()) === 0);
 
       // The switch by hand with no signal: kept as unsaved, sent once when it returns.
-      const sent = [];
       page.on('request', (request) => {
         if (!request.url().endsWith('/commands') || request.method() !== 'POST') return;
         const body = JSON.parse(request.postData() ?? '{}');
@@ -179,15 +283,35 @@ try {
     }),
   );
 
-  await step('a new device sees the switch kept once: a stop clock, then running', () =>
-    onTheScreen(liveGame, async (_c, page) => {
-      const plays = await page.locator('[data-scoring]').getAttribute('data-plays');
-      note('the game is opened again with its plays', Number(plays) > 0, String(plays));
-      await page.locator('[data-scoring] [data-clock][data-clock-mode="running"]').waitFor({
-        timeout: tapLimit,
-      });
-    }),
-  );
+  await step('a new device sees the switch kept once: a stop clock, then running', () => {
+    const states = [];
+    return onTheScreen(
+      liveGame,
+      async (_c, page) => {
+        const plays = await page.locator('[data-scoring]').getAttribute('data-plays');
+        note('the game is opened again with its plays', Number(plays) > 0, String(plays));
+        await page.locator('[data-scoring] [data-clock][data-clock-mode="running"]').waitFor({
+          timeout: tapLimit,
+        });
+        // The game's stored plays, as the new device read them: the switch turned off with
+        // no signal is one clock-mode play with the id the first device sent, never two.
+        const kept = (await Promise.all(states)).at(-1)?.state?.plays ?? [];
+        const switched = kept.filter((play) => play.type === 'clock-mode' && play.id === sent[0]);
+        note(
+          'the stored plays hold the switch by hand once, with its id',
+          sent.length >= 1 && switched.length === 1,
+          `${switched.length} of ${JSON.stringify(sent)}`,
+        );
+      },
+      (page) =>
+        page.on('response', (response) => {
+          const request = response.request();
+          if (request.method() === 'GET' && new URL(response.url()).pathname.endsWith('/state')) {
+            states.push(response.json());
+          }
+        }),
+    );
+  });
 
   await step('the public game page shows the final score', async () => {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });

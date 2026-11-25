@@ -262,6 +262,12 @@ const restingPlaces = {
    * to the games" lies where "End game" was, and a slow double tap must not leave.
    */
   final: '[data-pad] [data-final-actions]',
+  /**
+   * The mercy rule's answers, after the notice comes up (step 2.69's fix round): it comes
+   * with the basket that crossed the lead, where that basket's "+2" was, and the second of
+   * two fast taps is not an answer.
+   */
+  mercy: '[data-mercy-notice] .court-mercy-acts',
 } as const;
 type RestingPlace = keyof typeof restingPlaces;
 const restingNames = Object.keys(restingPlaces) as RestingPlace[];
@@ -536,6 +542,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     redo: createTapRest(restTimers, drawRests, takeBackRestMs),
     asked: createTapRest(restTimers, drawRests),
     final: createTapRest(restTimers, drawRests, takeBackRestMs),
+    mercy: createTapRest(restTimers, drawRests),
   };
   const resting = rests.current;
   // After every drawing: a control drawn anew while it rests is marked as well.
@@ -667,6 +674,11 @@ export function ScoringScreen(props: ScoringScreenProps) {
   );
   const mercy = mercySwitch(state);
   const mercyShown = mercy !== null && mercy.playId !== mercyDismissed ? mercy : null;
+  // Its answers rest from the moment it comes up (above, `restingPlaces.mercy`).
+  const mercyShownId = mercyShown?.playId ?? null;
+  useLayoutEffect(() => {
+    if (mercyShownId !== null) resting.mercy.begin();
+  }, [mercyShownId, resting]);
   // Start or Pause under the scoreboard rests when its word changes, whatever changed it
   // (a tap kept by the device, a foul that stopped the clock, the clock running out): a
   // tap already on its way was meant for the word that was there.
@@ -1566,24 +1578,22 @@ export function ScoringScreen(props: ScoringScreenProps) {
       clock={clock}
       clockSheet={clockSheet}
       banner={props.banner}
-      notices={
-        mercyShown === null ? (
-          props.notices
-        ) : (
-          <>
-            <MercyNotice
-              t={t}
-              mercy={mercyShown}
-              back={() => {
-                void send({ type: 'clock-mode', mode: 'stop' }, t('tracker.play.clock-mode.stop'));
-              }}
-              keep={() => {
-                writeMercyDismissed(deviceStore(), mercyOwner, mercyShown.playId);
-                setMercyDismissed(mercyShown.playId);
-              }}
-            />
-            {props.notices}
-          </>
+      notices={props.notices}
+      padNotice={
+        mercyShown === null ? null : (
+          <MercyNotice
+            t={t}
+            mercy={mercyShown}
+            back={(event) => {
+              if (!tapTaken(resting.mercy, tapOf(event))) return;
+              void send({ type: 'clock-mode', mode: 'stop' }, t('tracker.play.clock-mode.stop'));
+            }}
+            keep={(event) => {
+              if (!tapTaken(resting.mercy, tapOf(event))) return;
+              writeMercyDismissed(deviceStore(), mercyOwner, mercyShown.playId);
+              setMercyDismissed(mercyShown.playId);
+            }}
+          />
         )
       }
       noticesIn={noticesInPad ? 'pad' : 'top'}

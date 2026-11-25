@@ -85,7 +85,22 @@ export type MercyOwner = { readonly gameId: string; readonly accountId: string }
 export const mercyDismissedKey = (owner: MercyOwner) =>
   `srleagues.tracker.mercy-dismissed.${owner.accountId}.${owner.gameId}`;
 
-type DismissalStore = Pick<Storage, 'getItem' | 'setItem'>;
+type DismissalStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+/** How many games' dismissals a device keeps: the newest, so the keys never pile up. */
+export const mercyDismissedKept = 20;
+
+/** The list of the dismissal keys kept on this device, the oldest first. */
+export const mercyDismissedIndexKey = 'srleagues.tracker.mercy-dismissed';
+
+function keptKeys(store: DismissalStore): string[] {
+  try {
+    const read: unknown = JSON.parse(store.getItem(mercyDismissedIndexKey) ?? '[]');
+    return Array.isArray(read) ? read.filter((key): key is string => typeof key === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 /** The basket whose mercy notice was dismissed on this device; null for none or unreadable. */
 export function readMercyDismissed(store: DismissalStore | null, owner: MercyOwner): string | null {
@@ -103,8 +118,16 @@ export function writeMercyDismissed(
   owner: MercyOwner,
   playId: string,
 ): void {
+  if (store === null) return;
   try {
-    store?.setItem(mercyDismissedKey(owner), playId);
+    const key = mercyDismissedKey(owner);
+    store.setItem(key, playId);
+    // The newest game last; the games beyond the newest `mercyDismissedKept` are forgotten.
+    const kept = [...keptKeys(store).filter((other) => other !== key), key];
+    for (const old of kept.splice(0, Math.max(0, kept.length - mercyDismissedKept))) {
+      store.removeItem(old);
+    }
+    store.setItem(mercyDismissedIndexKey, JSON.stringify(kept));
   } catch {
     // Private windows and full storage: the dismissal holds until the page goes.
   }
