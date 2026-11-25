@@ -222,6 +222,36 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
     // two-league harness's (packages/database/src/isolation/grid-correction-cases).
   });
 
+  it('in an archived season: refused until reopened with a reason, then the corrector’s, as the tracker’s work (O-12)', async () => {
+    const t = setUp();
+    await endedWithFoul(t);
+    t.db.state.seasons = t.db.state.seasons.map((x) => ({ ...x, status: 'completed' }));
+    const events = t.db.state.events.length;
+    const line = [{ teamId: homeTeamId, personId: h0, fouls: 0 }];
+    // The grid offers nothing (the pages follow `correctable`), and the command refuses.
+    expect((await grid(t)).correctable).toBe(false);
+    const archived = { ok: false, error: { code: 'season-archived' } };
+    expect(await correct(t, events, line)).toEqual(archived);
+    expect(await endAgain(t, events)).toEqual(archived);
+    expect([t.db.state.events.length, t.db.state.games[0]?.status]).toEqual([events, 'final']);
+    // A correction with a reason is still the admin's there (S-7): then the grid is theirs.
+    const reopen = await reopenGame(
+      t.as(ownerId),
+      { gameId, version: versionOf(t), reason: 'The foul was the other player’s' },
+      t.deps,
+    );
+    expect(reopen.ok).toBe(true);
+    const { sequence, correctable } = await grid(t);
+    expect(correctable).toBe(true);
+    const saved = await correct(t, sequence, line);
+    if (!saved.ok) throw new Error(`save refused: ${saved.error.code}`);
+    const ended = await endAgain(t, saved.value.sequence);
+    if (!ended.ok) throw new Error(`end refused: ${ended.error.code}`);
+    expect([ended.value.ended, t.db.state.games[0]?.status]).toEqual([true, 'final']);
+    // Final again, so read-only again: nothing more is corrected without a new reason.
+    expect(await correct(t, ended.value.sequence, line)).toEqual(archived);
+  });
+
   it('ends the game again with the scoring screen’s own end, while the tablet still holds it (T-407)', async () => {
     const t = setUp();
     await reopened(t);

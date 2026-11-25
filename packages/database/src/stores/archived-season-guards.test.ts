@@ -62,6 +62,7 @@ const guarded: Readonly<Record<string, Reads>> = {
   'games.assign_scorekeeper': 'game',
   'games.cancel_game': 'game',
   'games.clear_game_format': 'game',
+  'games.correct_tracked_box_score': 'game',
   'games.end_tracked_game': 'game',
   'games.give_game_format': 'game',
   'games.mark_not_started': 'game',
