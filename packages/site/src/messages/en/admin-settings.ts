@@ -11,6 +11,10 @@ export const enAdminSettings = {
   'adminSettings.area.site': 'Public site',
   'adminSettings.area.statistics': 'Statistics',
   'adminSettings.area.teams': 'Team statistics',
+  // A Profile form refused because the league changed meanwhile (step 2.155 part 3): the
+  // screen keeps what was typed and shows "Saved now" beside it, and this says so.
+  'adminSettings.changedMeanwhile':
+    'Someone else changed the league since you opened this page, so it was not saved. What you typed is kept, and beside each box that differs is what is saved now. Save again to replace it with yours.',
   'adminSettings.clear': 'Go back to the default',
   // Beside a setting whose value asks to be confirmed (its `setting.<key>.confirm`).
   'adminSettings.confirmNote': 'Tick this only if you are choosing {choice}:',
@@ -18,17 +22,13 @@ export const enAdminSettings = {
   'adminSettings.defaultMark': '{choice} (the default)',
   'adminSettings.done.archived':
     'The league is archived. Everything in it is kept as it was, and nothing can be changed until it is brought back.',
-  'adminSettings.done.audienceClearedFullNames':
-    'Who plays was saved, and the privacy choices listed are back where a youth league starts. Confirm them again under Privacy; you can widen each one in its own setting.',
   'adminSettings.done.cleared': 'The setting is back to its default.',
-  'adminSettings.done.firstChild':
-    'The setting was saved. In the new time zone someone in this league is now a child, the first one recorded, so the confirmation that parents agreed to children’s full names is back to no and a saved choice of full names is cleared. Until you confirm again under Privacy, children are shown by first name and last initial.',
   'adminSettings.done.published': 'The league is published. Visitors can see it now.',
-  'adminSettings.done.renamed':
-    'The short name was changed. The old address forwards to the new one for 12 months.',
   'adminSettings.done.saved': 'The setting was saved.',
   'adminSettings.done.unarchived': 'The league is published again. It can be changed as before.',
   'adminSettings.field.value': 'Value',
+  // A refused Profile box (step 2.155 part 3): the box's label, then why.
+  'adminSettings.fieldRefused': '{field}: {why}',
   'adminSettings.groups': 'Groups of settings',
   // The admin's League settings screen (step 2.48). The words for each setting itself are
   // `setting.<key>.label` and `setting.<key>.option.<choice>`, declared with the setting.
@@ -131,6 +131,21 @@ export const enAdminSettings = {
   'adminSettings.publish.title': 'Publishing',
   'adminSettings.publish.unarchive': 'Un-archive',
   'adminSettings.save': 'Save',
+  // Beside a saved Profile form (step 2.155 part 3), once: what was saved, named.
+  'adminSettings.saved.audienceClearedFullNames':
+    'Saved: who plays. The privacy choices listed are back where a youth league starts. Confirm them again under Privacy; you can widen each one in its own setting.',
+  'adminSettings.saved.firstChild':
+    'Saved: the contact email, city, time zone and listing. In the new time zone someone in this league is now a child, the first one recorded, so the confirmation that parents agreed to children’s full names is back to no and a saved choice of full names is cleared. Until you confirm again under Privacy, children are shown by first name and last initial.',
+  'adminSettings.saved.name': "Saved: the league's name.",
+  'adminSettings.saved.profile': 'Saved: the contact email, city, time zone and listing.',
+  'adminSettings.saved.shortName':
+    'Saved: the short name. The old address forwards to the new one for 12 months.',
+  'adminSettings.saved.whoPlays': 'Saved: who plays.',
+  // Beside a box when someone else changed the league meanwhile (T-399).
+  'adminSettings.savedNow': 'Saved now:',
+  'adminSettings.savedNowNothing': '(nothing)',
+  'adminSettings.savedNowTicked': 'ticked',
+  'adminSettings.savedNowUnticked': 'not ticked',
   'adminSettings.usingDefault': 'Now: the default.',
   'adminSettings.usingOwn': 'Now: set for this league.',
   'adminSettings.yes': 'Yes',

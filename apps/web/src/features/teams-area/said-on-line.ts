@@ -26,6 +26,9 @@ export function saidOnLine(
       return line.leftOn !== null
         ? undefined
         : said(t('adminTeams.said.added', { name, team: teamName }));
+    // A line's number and role saved, said on that line (step 2.155).
+    case 'entrySaved':
+      return line.leftOn !== null ? undefined : said(t('adminTeams.said.entrySaved', { name }));
     case 'left':
       return line.leftOn === null
         ? undefined

@@ -1,7 +1,7 @@
 // The pieces both Teams screens are made of (step 2.51). Words come from the message
 // files (T-187). Every form carries the route's league only so the server can find the
 // page again; who is acting comes from the session (run-teams-action.ts).
-import { statsVisibilityChoices, type TeamRecord } from '@srleagues/core';
+import type { TeamRecord } from '@srleagues/core';
 import { Emblem } from '@srleagues/ui';
 import type { ReactNode } from 'react';
 import type { AdminDivision } from '../../server/admin-teams.ts';
@@ -144,29 +144,6 @@ export function DivisionField({
 }
 
 /** Who sees a team's numbers (S-22): the choices a league can make today. */
-export function StatsVisibilityField({
-  label,
-  value,
-}: {
-  readonly label: string;
-  readonly value: string;
-}) {
-  return (
-    <p>
-      <label className="staff-field">
-        {label}
-        <select name="statsVisibility" defaultValue={value}>
-          {statsVisibilityChoices.map((choice) => (
-            <option key={choice} value={choice}>
-              {t(`adminTeams.stats.${choice}` as TextKey)}
-            </option>
-          ))}
-        </select>
-      </label>
-    </p>
-  );
-}
-
 /**
  * The team's mark: its shield with its initial, in the team's own color (the league's
  * accent for a team with none). The name beside it says everything, so the shield is

@@ -186,8 +186,11 @@ if (browser !== null) {
     await page
       .getByLabel("Who sees this team's players' numbers")
       .selectOption({ label: "Only the team's staff and the league's admins" });
+    // Said beside the form (step 2.155), with scripts on or off.
     await Promise.all([
-      page.waitForURL((url) => url.search.includes('done=')),
+      page
+        .locator('[role=status]', { hasText: 'Saved: who sees the numbers of' })
+        .waitFor({ timeout: 10_000 }),
       page.getByRole('button', { name: 'Save who sees the numbers' }).click(),
     ]);
     await context.close();

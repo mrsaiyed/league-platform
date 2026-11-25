@@ -8,6 +8,7 @@ import {
   listPeople,
   listRoster,
   rosterRoles,
+  statsVisibilityChoices,
   type PersonRecord,
   type RosterLine,
 } from '@srleagues/core';
@@ -30,6 +31,7 @@ import {
   removeTeamAnchor,
   addPlayerAnchor,
   teamDetailsAnchor,
+  teamStatsAnchor,
 } from './answer.ts';
 import { removePanel, tapRefusal, type RemoveWayOn } from './remove-team-words.ts';
 import { backToTeamParam, publishAnchor } from '../schedule-builder/index.ts';
@@ -38,7 +40,7 @@ import { saidOnLine } from './said-on-line.ts';
 import { numbersWornTwice, rosterName } from './roster-name.ts';
 import {
   addNewPersonAction,
-  addToRosterAction,
+  addFromListAction,
   changeEntryAction,
   markLeftAction,
   moveEntryAction,
@@ -50,7 +52,7 @@ import {
   saveTeamStatsAction,
   undoTeamLeftAction,
 } from './actions.ts';
-import { LeagueField, Notice, Section, StatsVisibilityField, Swatch } from './parts.tsx';
+import { LeagueField, Notice, Section, Swatch } from './parts.tsx';
 
 import { ListForm, SaidLine, takeNotice } from '../list-forms/index.ts';
 import { requestTokenField } from '../../server/same-request.ts';
@@ -102,7 +104,8 @@ export async function TeamPage({
   const justAdded = notice?.thing === team.id && notice.said === 'created';
   // The details saved, said beside them; a player added, said on their new line (step 2.155).
   const saved = notice?.thing === team.id ? notice.said : undefined;
-  const addedEntry = saved === 'added' ? notice?.about?.[0] : undefined;
+  // A line added or its number and role saved: said on that line (step 2.155).
+  const savedEntry = saved === 'added' || saved === 'entrySaved' ? notice?.about?.[0] : undefined;
   const teamUrl = leagueUrl(here, 'admin-area', { area: 'teams', subpath: [team.id] });
   const roster = await listRoster(context, { teamId: team.id }, ports.deps);
   const lines: readonly RosterLine[] = roster.ok ? roster.value : [];
@@ -169,7 +172,9 @@ export async function TeamPage({
   const leavingProblem = besideEntry === undefined ? undefined : problemKey(query);
   // What went well on one line is said on that line, naming the player (step 2.161).
   const onLine = saidOnLine(
-    addedEntry === undefined ? doneAtOf(query) : { done: 'added', at: { entry: addedEntry } },
+    savedEntry === undefined || (saved !== 'added' && saved !== 'entrySaved')
+      ? doneAtOf(query)
+      : { done: saved, at: { entry: savedEntry } },
     lines,
     team.name,
   );
@@ -267,21 +272,35 @@ export async function TeamPage({
         />
       </Section>
 
-      <Section title={t('adminTeams.stats.title')}>
-        <form action={saveTeamStatsAction} className="staff-form">
-          <LeagueField league={here.slug} />
-          <input type="hidden" name="team" value={team.id} />
-          <input type="hidden" name="version" value={team.version} />
-          <StatsVisibilityField
-            label={t('adminTeams.field.statsVisibility')}
-            value={team.statsVisibility}
-          />
-          <p className="staff-buttons">
-            <button type="submit" className="ui-button">
-              {t('adminTeams.stats.submit')}
-            </button>
-          </p>
-        </form>
+      <Section title={t('adminTeams.stats.title')} id={teamStatsAnchor}>
+        {saved === 'stats' ? (
+          <SaidLine kind="saved">{t('adminTeams.saved.stats', { name: team.name })}</SaidLine>
+        ) : null}
+        <ListForm
+          action={saveTeamStatsAction}
+          permalink={`${teamUrl}#${teamStatsAnchor}`}
+          hidden={{
+            league: here.slug,
+            team: team.id,
+            version: String(team.version),
+            [requestTokenField]: randomUUID(),
+          }}
+          fields={[
+            {
+              kind: 'select',
+              name: 'statsVisibility',
+              label: t('adminTeams.field.statsVisibility'),
+              value: team.statsVisibility,
+              options: statsVisibilityChoices.map((choice) => ({
+                value: choice,
+                label: t(`adminTeams.stats.${choice}` as TextKey),
+              })),
+            },
+          ]}
+          button={t('adminTeams.stats.submit')}
+          label={t('adminTeams.stats.title')}
+          name="team-stats"
+        />
       </Section>
 
       <Section title={t('adminTeams.roster.title')}>
@@ -318,30 +337,31 @@ export async function TeamPage({
                   ) : null}
                 </p>
                 {saidHere(line.id)}
-                <form action={changeEntryAction} className="admin-roster-form">
-                  <LeagueField league={here.slug} />
-                  <input type="hidden" name="team" value={team.id} />
-                  <input type="hidden" name="entry" value={line.id} />
-                  <input type="hidden" name="version" value={line.version} />
-                  <p className="admin-roster-fields">
-                    <StaffField label={t('adminTeams.roster.number')} size="figure">
-                      <input
-                        name="jerseyNumber"
-                        type="text"
-                        inputMode="numeric"
-                        size={3}
-                        maxLength={2}
-                        defaultValue={line.jerseyNumber ?? ''}
-                        placeholder={t('adminTeams.roster.noNumber')}
-                        autoComplete="off"
-                      />
-                    </StaffField>{' '}
-                    <RoleSelect value={line.role} />{' '}
-                    <button type="submit" className="ui-button">
-                      {t('adminTeams.roster.saveEntry')}
-                    </button>
-                  </p>
-                </form>
+                <ListForm
+                  action={changeEntryAction}
+                  permalink={`${teamUrl}#${entryAnchor(line.id)}`}
+                  hidden={{
+                    league: here.slug,
+                    team: team.id,
+                    entry: line.id,
+                    version: String(line.version),
+                    [requestTokenField]: randomUUID(),
+                  }}
+                  fields={[
+                    {
+                      kind: 'text',
+                      name: 'jerseyNumber',
+                      label: t('adminTeams.roster.number'),
+                      value: line.jerseyNumber ?? '',
+                      maxLength: 2,
+                    },
+                    roleField(line.role),
+                  ]}
+                  button={t('adminTeams.roster.saveEntry')}
+                  label={t('adminTeams.roster.entryLabel', { name: nameOf(line) })}
+                  name="roster-entry"
+                  className="admin-roster-form"
+                />
                 <form action={markLeftAction} className="admin-roster-form">
                   <LeagueField league={here.slug} />
                   <input type="hidden" name="team" value={team.id} />
@@ -474,30 +494,34 @@ export async function TeamPage({
         ) : available.length === 0 ? (
           <p className="staff-quiet">{t('adminTeams.add.noOne')}</p>
         ) : (
-          <form action={addToRosterAction} className="staff-form">
-            <LeagueField league={here.slug} />
-            <input type="hidden" name="team" value={team.id} />
-            <p>
-              <StaffField label={t('adminTeams.add.person')}>
-                <select name="personId" required defaultValue="">
-                  <option value="" disabled>
-                    {t('adminTeams.add.choose')}
-                  </option>
-                  {available.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {nameOf(person)}
-                    </option>
-                  ))}
-                </select>
-              </StaffField>
-            </p>
-            <NumberAndRole />
-            <p className="staff-buttons">
-              <button type="submit" className="ui-button">
-                {t('adminTeams.add.submit')}
-              </button>
-            </p>
-          </form>
+          <ListForm
+            action={addFromListAction}
+            permalink={`${teamUrl}#${addPlayerAnchor}`}
+            hidden={{ league: here.slug, team: team.id, [requestTokenField]: randomUUID() }}
+            fields={[
+              {
+                kind: 'select',
+                name: 'personId',
+                label: t('adminTeams.add.person'),
+                value: '',
+                options: [
+                  { value: '', label: t('adminTeams.add.choose') },
+                  ...available.map((person) => ({ value: person.id, label: nameOf(person) })),
+                ],
+              },
+              {
+                kind: 'text',
+                name: 'jerseyNumber',
+                label: t('adminTeams.add.number'),
+                value: '',
+                maxLength: 2,
+              },
+              roleField('player'),
+            ]}
+            button={t('adminTeams.add.submit')}
+            label={t('adminTeams.add.fromLeague')}
+            name="from-list"
+          />
         )}
       </Section>
 
@@ -734,36 +758,15 @@ function ConfirmBox() {
   );
 }
 
-function RoleSelect({ value }: { readonly value: string }) {
-  return (
-    <StaffField label={t('adminTeams.roster.role')}>
-      <select name="role" defaultValue={value}>
-        {rosterRoles.map((role) => (
-          <option key={role} value={role}>
-            {roleText(role)}
-          </option>
-        ))}
-      </select>
-    </StaffField>
-  );
-}
-
-function NumberAndRole() {
-  return (
-    <p className="admin-roster-fields">
-      <StaffField label={t('adminTeams.add.number')} size="figure">
-        <input
-          name="jerseyNumber"
-          type="text"
-          inputMode="numeric"
-          size={3}
-          maxLength={2}
-          autoComplete="off"
-        />
-      </StaffField>{' '}
-      <RoleSelect value="player" />
-    </p>
-  );
+/** A roster line's role, as a box of a form that keeps what was typed (step 2.155). */
+function roleField(value: string) {
+  return {
+    kind: 'select' as const,
+    name: 'role',
+    label: t('adminTeams.roster.role'),
+    value,
+    options: rosterRoles.map((role) => ({ value: role, label: roleText(role) })),
+  };
 }
 
 /** Up and down, each its own small form; the first has no up and the last no down. */

@@ -1463,7 +1463,13 @@ async function undoSteps(page, what) {
     const row = (name) => page.locator('main ol > li', { hasText: name });
     const number = async (name, value) => {
       await row(name).locator('input[name=jerseyNumber]').fill(value);
-      await tapTo(row(name).getByRole('button', { name: 'Save number and role' }), /done=/);
+      // Said on that line (step 2.155), with scripts on or off.
+      await Promise.all([
+        row(name)
+          .locator('[role=status]', { hasText: 'Saved: the number and role of' })
+          .waitFor({ timeout: 10_000 }),
+        row(name).getByRole('button', { name: 'Save number and role' }).click(),
+      ]);
     };
     // The picture at the other width finds Tess already back: set the scene again.
     if ((await row('Tess Moreno').count()) === 1) {

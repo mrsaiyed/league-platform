@@ -33,6 +33,7 @@ const draw = (over: Partial<Parameters<typeof ProfilePanel>[0]> = {}) =>
   renderToStaticMarkup(
     createElement(ProfilePanel, {
       league: 'north-valley',
+      address: '/north-valley/admin/settings',
       name: 'North Valley League',
       slug: 'north-valley',
       version: 4,

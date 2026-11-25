@@ -384,7 +384,10 @@ if (built) {
     await openTeam('Rockets');
     const wearer = page.locator('main ol > li', { hasText: 'Jay Whitaker' });
     await wearer.locator('input[name=jerseyNumber]').fill('1');
-    await tap(wearer.getByRole('button', { name: 'Save number and role' }), /done=entrySaved/);
+    await tap(wearer.getByRole('button', { name: 'Save number and role' }), /#entry-/);
+    await wearer
+      .locator('[role=status]', { hasText: 'Saved: the number and role of Jay Whitaker.' })
+      .waitFor({ timeout: 10_000 });
     const formerly = page.locator('[data-left-entry]', { hasText: 'Tess Moreno' });
     await tap(
       formerly.getByRole('button', { name: 'Put back on the roster (marked by mistake)' }),

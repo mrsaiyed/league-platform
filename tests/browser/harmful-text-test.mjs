@@ -505,7 +505,13 @@ if (browser) {
       has: page.getByRole('button', { name: 'Add to the roster', exact: true }),
     });
     await form.getByLabel('Person').selectOption({ label: 'Amal Nasser' });
-    await tap(form.getByRole('button', { name: 'Add to the roster', exact: true }), /done=added/);
+    // Said on the new line (step 2.155), with scripts on or off.
+    await Promise.all([
+      page
+        .locator('[data-said-on] [role=status]', { hasText: 'Saved: Amal Nasser was added to' })
+        .waitFor({ timeout: 10_000 }),
+      form.getByRole('button', { name: 'Add to the roster', exact: true }).click(),
+    ]);
   });
 
   await step('a round is renamed with the attack', async () => {
@@ -871,10 +877,9 @@ if (browser) {
     ]) {
       await page.goto(at, limit);
       await box(form, name).fill(text);
-      await Promise.all([
-        page.waitForURL(/done=/, limit),
-        page.locator(`form[data-form="${form}"] button`).click(limit),
-      ]);
+      await page.locator(`form[data-form="${form}"] button`).click(limit);
+      // Saved: said beside the form, once (step 2.155 part 3), nothing in the address.
+      await page.locator(`form[data-form="${form}"] + [data-said="saved"]`).waitFor(limit);
       typedInto.add(`/[league]/admin/settings ${name}`);
     }
     for (const address of [at, `${origin}/still-waters`]) {
@@ -916,8 +921,12 @@ if (browser) {
         redirect: 'manual',
         signal: AbortSignal.timeout(60_000),
       });
+      // Refused in the answer to the post itself, beside the form (step 2.155 part 3).
       const to = answer.headers.get('location') ?? '';
-      if (!to.includes('problem=')) throw new Error(`the attack in ${name} was not refused: ${to}`);
+      const words = answer.status === 200 ? await answer.text() : '';
+      if (!words.includes(`data-problem="${form}"`)) {
+        throw new Error(`the attack in ${name} was not refused: ${answer.status} ${to}`);
+      }
       typedInto.add(`/[league]/admin/settings ${name}`);
     }
     await ownerContext.close();

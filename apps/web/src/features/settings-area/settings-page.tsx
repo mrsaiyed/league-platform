@@ -15,7 +15,9 @@ import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t, type TextKey } from '../../server/messages.ts';
+import { takeNotice } from '../list-forms/index.ts';
 import { doneKey, problemKey } from './answer.ts';
+import { profileSaved } from './profile-form-answer.ts';
 import { privacyNotes } from './privacy-notes.ts';
 import { ProfilePanel } from './profile-panel.tsx';
 import { archiveAsk, publishAsk, PublishPanel } from './publish-panel.tsx';
@@ -59,6 +61,9 @@ export async function SettingsPage({
     }));
   const { timeZone } = await publicSchedule.clockOf(view.context.league.id);
   const notes = privacyNotes({ facts, policy, rows, timeZone, locale });
+  // A Profile form's "Saved" (step 2.155 part 3): taken once, so a reload says nothing old.
+  const saved = profileSaved(takeNotice(context, 'settings')?.said);
+  const address = leagueUrl(view.context.league, 'admin-area', { area: 'settings' });
   const problem = problemKey(query);
   const good = doneKey(query);
   return (
@@ -96,6 +101,8 @@ export async function SettingsPage({
       {current === undefined || profile === undefined ? null : (
         <ProfilePanel
           league={view.context.league.slug}
+          address={address}
+          saved={saved}
           name={current.name}
           slug={current.slug}
           version={current.version}
@@ -107,7 +114,7 @@ export async function SettingsPage({
       {current === undefined ? null : (
         <PublishPanel
           league={view.context.league.slug}
-          address={leagueUrl(view.context.league, 'admin-area', { area: 'settings' })}
+          address={address}
           status={current.status}
           version={current.version}
           checks={checks}

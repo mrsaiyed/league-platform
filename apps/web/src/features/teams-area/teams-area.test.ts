@@ -6,7 +6,7 @@ import {
   answerQuery,
   doneAtOf,
   doneKey,
-  doneNames,
+  addressDoneNames,
   leavingAtOf,
   problemKey,
   refused,
@@ -139,7 +139,10 @@ describe('answers in the address', () => {
   });
 
   it('has words for every thing that can go well', () => {
-    for (const name of doneNames) expect(doneKey({ done: name })).toBeDefined();
+    for (const name of addressDoneNames) expect(doneKey({ done: name })).toBeDefined();
+    // Said on the page from the one-time notice since step 2.155, never in the address.
+    expect(doneKey({ done: 'entrySaved' })).toBeUndefined();
+    expect(doneKey({ done: 'statsSaved' })).toBeUndefined();
   });
 
   it('carries a refused leaving date to its line, with the date typed and nothing else (step 2.161)', () => {

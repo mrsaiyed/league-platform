@@ -143,6 +143,12 @@ export type CourtViewProps = {
    */
   readonly noticesIn?: 'top' | 'pad';
   /**
+   * A notice a basket brings up mid-play (the mercy rule's, step 2.69): drawn in the pad
+   * at rest in place of the hint at every size, first of the pad's notices. Above the
+   * teams it would push every tile, the pad and Undo down as it came and went.
+   */
+  readonly padNotice?: ReactNode;
+  /**
    * The season keeps turnovers (S-93, step 2.241): only then are the turnover button, the
    * team-turnover button, the turnovers chip and its hint drawn. Absent: they are. Where
    * it keeps none, a team with turnovers recorded while they were kept still gets its chip
@@ -697,9 +703,11 @@ function Pad(props: CourtViewProps) {
               {slots.pregame}
             </div>
           ) : null}
-          {props.noticesIn === 'pad' && props.notices !== undefined && props.notices !== null ? (
+          {(props.noticesIn === 'pad' && props.notices !== undefined && props.notices !== null) ||
+          (props.padNotice !== undefined && props.padNotice !== null) ? (
             <div className="court-notices court-notices-pad" data-pad-notices="">
-              {props.notices}
+              {props.padNotice}
+              {props.noticesIn === 'pad' ? props.notices : null}
             </div>
           ) : (
             <div className="court-hint" data-hint="">
