@@ -620,6 +620,74 @@ export function createSupabaseSignIn(options: SupabaseSignInOptions): SignInServ
       return ok({ passwordEnteredAt: at });
     },
 
+    async changePassword({ accessToken, oldPassword, newPassword: typedNew, networkAddress }) {
+      const network = parseNetwork(networkAddress);
+      const live = await liveSession(accessToken);
+      if ('code' in live) return fail(live);
+      const { session, user } = live;
+      if (!(await store.accounts.hasPassword(session.accountId))) {
+        return fail({ code: 'no-password' });
+      }
+      // The new one's length first, by setPassword's rule: it spends no guess. Whether it
+      // is leaked only Supabase can say, below.
+      const checked = newPassword.safeParse(typedNew);
+      if (!checked.success) {
+        const tooLong = checked.error.issues.some((issue) => issue.message === 'too-long');
+        return fail({ code: tooLong ? 'password-too-long' : 'password-too-short' });
+      }
+      // The old one exactly as confirmPassword checks it (T-85, T-225): a sign-in, whose
+      // session is ended with every other below. The change itself is made with this
+      // session's own token, since Supabase keeps alive only the session that changed it.
+      const reserved = await reserveGuess(user.email, network);
+      if ('retryAfterSeconds' in reserved) return fail(tooMany(reserved.retryAfterSeconds));
+      const answer = await checkPassword(user.email, oldPassword, reserved.ticket);
+      if ('limited' in answer) return fail(answer.limited);
+      if ('wrong' in answer) return fail({ code: 'wrong-password' });
+      const check = answer.session;
+      if (check.user.id !== session.accountId) {
+        await auth.signOut(check.accessToken, 'local');
+        return fail({ code: 'wrong-password' });
+      }
+      await store.limits.forgiveGuess(reserved.ticket);
+      let set;
+      try {
+        set = await auth.setPassword(accessToken, checked.data);
+      } catch (error) {
+        await auth.signOut(check.accessToken, 'local');
+        throw error;
+      }
+      if (!set.ok) {
+        const { refusal } = set;
+        await auth.signOut(check.accessToken, 'local');
+        if (refusal.status === 429) return unexpected('user update', refusal);
+        const refused = expectedRefusal('user update', refusal, [
+          'weak_password',
+          'same_password',
+          'session_not_found',
+          'bad_jwt',
+        ]);
+        if (refused === 'session_not_found') return fail({ code: 'session-ended' });
+        if (refused === 'bad_jwt') return fail({ code: 'access-expired' });
+        if (refused === 'weak_password') {
+          if (refusal.reasons.includes('pwned')) return fail({ code: 'password-leaked' });
+          if (refusal.reasons.includes('length')) return fail({ code: 'password-too-short' });
+          return unexpected('user update', refusal);
+        }
+        // The same password again: nothing to change, but the other devices are still
+        // signed out below, as a reset with the same password does.
+      }
+      // T-85: every other device is signed out, the check's session among them; this one
+      // stays. Supabase is told, and our list decides.
+      await auth.signOut(accessToken, 'others');
+      await store.codes.dropProofsFor(user.email);
+      const endedSessions = await store.sessions.endSessionsOf(
+        session.accountId,
+        session.sessionId,
+      );
+      await store.sessions.passwordEntered(session.sessionId, now());
+      return ok({ endedSessions });
+    },
+
     async signOut(input) {
       if ('accessToken' in input) {
         const session = await store.sessions.sessionByAccessToken(digest(input.accessToken));

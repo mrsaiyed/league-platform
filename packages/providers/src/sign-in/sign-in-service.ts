@@ -188,6 +188,20 @@ export type ConfirmPasswordError =
   | TooManyAttempts
   | SessionError;
 
+/**
+ * Why a password change changed nothing (T-85, step 2.128). `wrong-password`: the old one
+ * is wrong, counted as `confirmPassword`'s guesses are. The `password-*` refusals are the
+ * new one's, by `setPassword`'s rule. `no-password`: as for `confirmPassword`.
+ */
+export type ChangePasswordError =
+  | ConfirmPasswordError
+  | { readonly code: 'password-too-short' }
+  | { readonly code: 'password-too-long' }
+  | { readonly code: 'password-leaked' };
+
+/** A changed password: every other session ended, this one kept (T-70, T-85). */
+export type PasswordChanged = { readonly endedSessions: number };
+
 /** Signing out by either token: the access token may have run out; the refresh token is in the cookie. */
 export type SignOutInput = { readonly accessToken: string } | { readonly refreshToken: string };
 
@@ -282,6 +296,20 @@ export type SignInService = {
     readonly password: string;
     readonly networkAddress: string;
   }) => Promise<Result<{ readonly passwordEnteredAt: Date }, ConfirmPasswordError>>;
+  /**
+   * The signed-in person's own change of password (T-85, step 2.128, T-451): the old one,
+   * whose wrong guesses count as for `confirmPassword`, and the new one, by `setPassword`'s
+   * rule (judged first as far as the service can without the old one, so a new one too
+   * short or, on the stand-in, leaked spends no guess). On success
+   * every other session of the account is ended at once and this one stays signed in. A
+   * refusal changes nothing. The caller emails the account.
+   */
+  readonly changePassword: (input: {
+    readonly accessToken: string;
+    readonly oldPassword: string;
+    readonly newPassword: string;
+    readonly networkAddress: string;
+  }) => Promise<Result<PasswordChanged, ChangePasswordError>>;
   /** Ends this session. A second call is harmless. */
   readonly signOut: (input: SignOutInput) => Promise<Result<{ readonly ended: boolean }, never>>;
   /**

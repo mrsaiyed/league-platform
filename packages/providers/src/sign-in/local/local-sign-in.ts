@@ -494,6 +494,44 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       return ok({ passwordEnteredAt: at });
     },
 
+    async changePassword({ accessToken, oldPassword, newPassword: typedNew, networkAddress }) {
+      const network = parseNetwork(networkAddress);
+      const session = liveSession(accessToken);
+      if ('code' in session) return fail(session);
+      const { account } = session;
+      if (account.hash === undefined) return fail({ code: 'no-password' });
+      // The new one first, by setPassword's rule: a refused new one spends no guess.
+      const checked = newPassword.safeParse(typedNew);
+      if (!checked.success) {
+        const tooLong = checked.error.issues.some((issue) => issue.message === 'too-long');
+        return fail({ code: tooLong ? 'password-too-long' : 'password-too-short' });
+      }
+      if (leaked.has(checked.data.toLowerCase())) return fail({ code: 'password-leaked' });
+      // The old one exactly as confirmPassword checks it (T-85, T-225).
+      const reserved = reserveGuess(account.email, network);
+      if ('limited' in reserved) return fail(reserved.limited);
+      const attempt = passwordAttempt.safeParse(oldPassword);
+      const hashUsed = account.hash;
+      const matches = await hasher.matches(attempt.success ? attempt.data : '', hashUsed);
+      if (session.ended) return fail({ code: 'session-ended' });
+      if (!matches || !attempt.success || account.hash !== hashUsed) {
+        return fail({ code: 'wrong-password' });
+      }
+      reserved.forgive();
+      const hash = await hasher.hash(checked.data);
+      // From here to the return nothing is awaited: no other change can slip between.
+      if (session.ended) return fail({ code: 'session-ended' });
+      if (account.hash !== hashUsed) return fail({ code: 'wrong-password' });
+      account.hash = hash;
+      forgetProofsFor(account.email);
+      // T-85: every other device is signed out; this one stays.
+      const endedSessions = endSessions(account, session);
+      const at = now();
+      session.passwordEnteredAt = at;
+      session.lastSignInAt = at;
+      return ok({ endedSessions });
+    },
+
     async signOut(input) {
       const session =
         'accessToken' in input

@@ -975,3 +975,67 @@ describe('reset by code', () => {
     expect(who.hasPassword).toBe(true);
   });
 });
+
+describe('changing the password while signed in (T-85, step 2.128)', () => {
+  const newOne = 'a brand new passphrase';
+
+  it('ends every other session at Supabase and ours, keeps this one, and swaps which password signs in', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    const other = value(
+      await env.sign.signIn({ email: 'ana@example.test', password: strongPassword, device: phone }),
+    );
+    const change = (oldPassword: string, newPassword: string) =>
+      env.sign.changePassword({
+        accessToken: session.accessToken,
+        oldPassword,
+        newPassword,
+        networkAddress: here,
+      });
+    expect(await change('not my password', newOne)).toEqual(fail({ code: 'wrong-password' }));
+    expect(await change(strongPassword, 'short')).toEqual(fail({ code: 'password-too-short' }));
+    expect(env.fake.liveSessionsFor('ana@example.test')).toBe(2);
+    expect(await change(strongPassword, newOne)).toEqual({ ok: true, value: { endedSessions: 1 } });
+    expect((await env.sign.identify({ accessToken: session.accessToken })).ok).toBe(true);
+    expect(errorCode(await env.sign.identify({ accessToken: other.session.accessToken }))).toBe(
+      'session-ended',
+    );
+    expect(env.fake.liveSessionsFor('ana@example.test')).toBe(1);
+    const signIn = (password: string) =>
+      env.sign.signIn({ email: 'ana@example.test', password, device: laptop });
+    expect(errorCode(await signIn(strongPassword))).toBe('wrong-email-or-password');
+    expect((await signIn(newOne)).ok).toBe(true);
+  });
+
+  it('counts a wrong old password like a wrong sign-in', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    const results = [];
+    for (let i = 0; i < 6; i++) {
+      results.push(
+        errorCode(
+          await env.sign.changePassword({
+            accessToken: session.accessToken,
+            oldPassword: 'wrong password',
+            newPassword: newOne,
+            networkAddress: here,
+          }),
+        ),
+      );
+    }
+    expect(results).toEqual([...Array(5).fill('wrong-password'), 'too-many-attempts']);
+  });
+
+  it('answers no-password for an account made with Google', async () => {
+    const env = setup();
+    const { session } = await signInWithGoogle(env, 'gia@example.test');
+    expect(
+      await env.sign.changePassword({
+        accessToken: session.accessToken,
+        oldPassword: 'anything at all',
+        newPassword: newOne,
+        networkAddress: here,
+      }),
+    ).toEqual(fail({ code: 'no-password' }));
+  });
+});

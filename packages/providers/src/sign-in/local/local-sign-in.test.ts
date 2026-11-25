@@ -976,3 +976,71 @@ describe('email confirmation (step 2.115)', () => {
     expect(await env.sign.emailConfirmation()).toBe('on');
   });
 });
+
+describe('changing the password while signed in (T-85, step 2.128)', () => {
+  const newOne = 'a brand new passphrase';
+
+  it('needs the old one, judges the new one by the sign-up rule, and changes nothing when refused', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    const change = (oldPassword: string, newPassword: string) =>
+      env.sign.changePassword({
+        accessToken: session.accessToken,
+        oldPassword,
+        newPassword,
+        networkAddress: here,
+      });
+    expect(await change('not my password', newOne)).toEqual(fail({ code: 'wrong-password' }));
+    expect(await change(strongPassword, 'short')).toEqual(fail({ code: 'password-too-short' }));
+    expect(await change(strongPassword, 'x'.repeat(73))).toEqual(
+      fail({ code: 'password-too-long' }),
+    );
+    expect(await change(strongPassword, 'password123')).toEqual(fail({ code: 'password-leaked' }));
+    const old = await env.sign.signIn({
+      email: 'ana@example.test',
+      password: strongPassword,
+      device: phone,
+    });
+    expect(old.ok).toBe(true);
+  });
+
+  it('ends every other session, keeps this one, and swaps which password signs in', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    const other = value(
+      await env.sign.signIn({ email: 'ana@example.test', password: strongPassword, device: phone }),
+    );
+    expect(
+      await env.sign.changePassword({
+        accessToken: session.accessToken,
+        oldPassword: strongPassword,
+        newPassword: newOne,
+        networkAddress: here,
+      }),
+    ).toEqual({ ok: true, value: { endedSessions: 1 } });
+    expect((await env.sign.identify({ accessToken: session.accessToken })).ok).toBe(true);
+    expect(errorCode(await env.sign.identify({ accessToken: other.session.accessToken }))).toBe(
+      'session-ended',
+    );
+    const signIn = (password: string) =>
+      env.sign.signIn({ email: 'ana@example.test', password, device: phone });
+    expect(errorCode(await signIn(strongPassword))).toBe('wrong-email-or-password');
+    expect((await signIn(newOne)).ok).toBe(true);
+  });
+
+  it('counts a wrong old password as a wrong sign-in, and a refused new one not at all', async () => {
+    const env = setup();
+    const { session } = await signUp(env, 'ana@example.test');
+    const change = (oldPassword: string, newPassword: string) =>
+      env.sign.changePassword({
+        accessToken: session.accessToken,
+        oldPassword,
+        newPassword,
+        networkAddress: here,
+      });
+    for (let i = 0; i < 12; i++) await change('wrong', 'short');
+    expect((await change(strongPassword, newOne)).ok).toBe(true);
+    for (let i = 0; i < 5; i++) await change('wrong', newOne);
+    expect(errorCode(await change(newOne, strongPassword))).toBe('too-many-attempts');
+  });
+});
