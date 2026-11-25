@@ -795,6 +795,78 @@ test('T-454 catches a league route or server action that skips the league gate',
   );
 });
 
+test('T-454 catches a re-export, any handler, an inline action, a body read and a late gate', (t) => {
+  const route = 'apps/web/src/app/api/v1/leagues/league/games/game';
+  const ungated = (name) =>
+    `export async function ${name}(req) {\n  return respond(await req.json());\n}\n`;
+  const readFirst = (read) =>
+    `export async function POST(r) {\n  const sent = ${read};\n` +
+    "  const endpoint = await leagueEndpoint(['x']);\n  return respond(await sent, endpoint);\n}\n";
+  assertExactly(
+    found(t, {
+      // Handlers written elsewhere, a list and a default: none can be read for the gate.
+      [`${route}/re/route.ts`]: "export { GET, POST } from '../c/route.ts';\n",
+      [`${route}/list/route.ts`]: 'async function GET() {}\nexport { GET };\n',
+      [`${route}/all/route.ts`]: "export * from '../c/route.ts';\n",
+      [`${route}/def/route.ts`]: 'export default async function handler() {}\n',
+      // Every handler name is read, and any other exported name is refused.
+      [`${route}/options/route.ts`]: ungated('OPTIONS'),
+      [`${route}/head/route.ts`]: ungated('HEAD'),
+      [`${route}/patch/route.ts`]: ungated('PATCH'),
+      [`${route}/delete/route.ts`]: ungated('DELETE'),
+      [`${route}/put/route.ts`]: ungated('PUT'),
+      [`${route}/other/route.ts`]: ungated('handler'),
+      // The body read before the gate, by any name, even unawaited.
+      [`${route}/json/route.ts`]: readFirst('r.json()'),
+      [`${route}/form/route.ts`]: readFirst('r.formData()'),
+      [`${route}/text/route.ts`]: readFirst('r.text()'),
+      [`${route}/bytes/route.ts`]: readFirst('r.arrayBuffer()'),
+      // The gate only under an if, inside another call, after another await.
+      [`${route}/if/route.ts`]:
+        'export async function GET(request) {\n  if (request.url) {\n' +
+        "    const endpoint = await leagueEndpoint(['f']);\n  }\n  return x();\n}\n",
+      [`${route}/inside/route.ts`]:
+        "export async function GET() {\n  return respond(await leagueEndpoint(['h']));\n}\n",
+      [`${route}/late/route.ts`]:
+        'export async function GET() {\n  const jar = await cookies();\n' +
+        "  const endpoint = await leagueEndpoint(['g']);\n  return respond(jar, endpoint);\n}\n",
+      // Passes: the route's params awaited first, the gate, then the body; a setting.
+      [`${route}/fine/route.ts`]:
+        "export const dynamic = 'force-dynamic';\n" +
+        'export async function POST(request, { params }) {\n  const { game } = await params;\n' +
+        "  const endpoint = await leagueEndpoint(['games', game]);\n" +
+        '  return respond(await jsonBody(request), endpoint);\n}\n',
+      // A server action written inline in a component.
+      'apps/web/src/features/a/panel.tsx':
+        'export default function Page() {\n  async function go() {\n    "use server";\n' +
+        '    await save();\n  }\n  return go;\n}\n',
+      // Not inline: a comment and a string that name it.
+      'apps/web/src/features/a/note.tsx':
+        "// 'use server' is not here\nexport const said = 'use server, said no one';\n",
+    }),
+    [
+      [`${route}/re/route.ts:1 [T-454]`, 'exports only the handlers it writes itself'],
+      [`${route}/list/route.ts:2 [T-454]`, 'exports only the handlers it writes itself'],
+      [`${route}/all/route.ts:1 [T-454]`, 'exports only the handlers it writes itself'],
+      [`${route}/def/route.ts:1 [T-454]`, 'exports only the handlers it writes itself'],
+      [`${route}/options/route.ts:1 [T-454]`, 'OPTIONS reaches a league without the league gate'],
+      [`${route}/head/route.ts:1 [T-454]`, 'HEAD reaches a league without the league gate'],
+      [`${route}/patch/route.ts:1 [T-454]`, 'PATCH reaches a league without the league gate'],
+      [`${route}/delete/route.ts:1 [T-454]`, 'DELETE reaches a league without the league gate'],
+      [`${route}/put/route.ts:1 [T-454]`, 'PUT reaches a league without the league gate'],
+      [`${route}/other/route.ts:1 [T-454]`, 'handler is exported by a league route'],
+      [`${route}/json/route.ts:1 [T-454]`, 'reads the body before the gate'],
+      [`${route}/form/route.ts:1 [T-454]`, 'reads the body before the gate'],
+      [`${route}/text/route.ts:1 [T-454]`, 'reads the body before the gate'],
+      [`${route}/bytes/route.ts:1 [T-454]`, 'reads the body before the gate'],
+      [`${route}/if/route.ts:1 [T-454]`, 'not a statement of the handler itself'],
+      [`${route}/inside/route.ts:1 [T-454]`, 'not a statement of the handler itself'],
+      [`${route}/late/route.ts:1 [T-454]`, 'other than the route params is awaited'],
+      ['apps/web/src/features/a/panel.tsx:3 [T-454]', 'a server action written inside'],
+    ],
+  );
+});
+
 test('a planted violation of any rule fails the gate', (t) => {
   const plants = {
     'T-21': { 'packages/core/src/a.ts': "import '@srleagues/database';\n" },
