@@ -37,7 +37,8 @@ import {
   type BonusHorn,
   type BonusShown,
 } from './bonus-horn.ts';
-import { clockSetSaid, type ClockSheet, type CourtClock } from './clock-parts.tsx';
+import { clockModeShown, mercySwitch, switchedClock } from './clock-mode.ts';
+import { clockSetSaid, MercyNotice, type ClockSheet, type CourtClock } from './clock-parts.tsx';
 import { createClockTicker } from './clock-ticker.ts';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
 import {
@@ -634,7 +635,24 @@ export function ScoringScreen(props: ScoringScreenProps) {
     start: startShown
       ? { tipOff: state.status === 'scheduled', why: whyStopped(stopReason(state)) }
       : null,
+    mode: clockModeShown(state, reading.remainingMs),
   };
+  // The last-minutes stop clock begins while the clock runs: the screen is drawn again
+  // then, so its sign shows and the switch reads Off from that moment (step 2.69).
+  const [, setLastMinutesDrawn] = useState(0);
+  const lastMinutesAtMs = clock.mode.lastMinutesAtMs;
+  useEffect(() => {
+    if (lastMinutesAtMs === null || !reading.running) return;
+    const wait = reading.remainingMs - lastMinutesAtMs;
+    if (wait <= 0) return;
+    const timer = window.setTimeout(() => setLastMinutesDrawn((n) => n + 1), wait + 20);
+    return () => window.clearTimeout(timer);
+  }, [lastMinutesAtMs, reading.running, reading.remainingMs]);
+  // The mercy rule switched the clock to running: said until dismissed or switched back,
+  // and not again for the same basket once dismissed (step 2.69).
+  const [mercyDismissed, setMercyDismissed] = useState<string | null>(null);
+  const mercy = mercySwitch(state);
+  const mercyShown = mercy !== null && mercy.playId !== mercyDismissed ? mercy : null;
   // Start or Pause under the scoreboard rests when its word changes, whatever changed it
   // (a tap kept by the device, a foul that stopped the clock, the clock running out): a
   // tap already on its way was meant for the word that was there.
@@ -957,6 +975,12 @@ export function ScoringScreen(props: ScoringScreenProps) {
         // What the engine truly did to the minutes: what came off, or what was added.
         say(clockSetSaid(t, typed.text, minutesMoved(state, before, result.game)));
       });
+    },
+    switchClock() {
+      const input = switchedClock(clock.mode);
+      setDigits('');
+      setClockOpen(false);
+      void send(input, t(`tracker.play.clock-mode.${input.mode}`));
     },
     pickPeriod(period) {
       setDigits('');
@@ -1528,7 +1552,23 @@ export function ScoringScreen(props: ScoringScreenProps) {
       clock={clock}
       clockSheet={clockSheet}
       banner={props.banner}
-      notices={props.notices}
+      notices={
+        mercyShown === null ? (
+          props.notices
+        ) : (
+          <>
+            <MercyNotice
+              t={t}
+              mercy={mercyShown}
+              back={() => {
+                void send({ type: 'clock-mode', mode: 'stop' }, t('tracker.play.clock-mode.stop'));
+              }}
+              keep={() => setMercyDismissed(mercyShown.playId)}
+            />
+            {props.notices}
+          </>
+        )
+      }
       noticesIn={noticesInPad ? 'pad' : 'top'}
       turnovers={keepsTurnovers(props.rosters)}
       pad={pad}

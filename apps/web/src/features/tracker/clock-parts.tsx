@@ -18,6 +18,7 @@
 import type { Translate } from '@srleagues/site';
 import { basketball } from '@srleagues/sports';
 import { Fragment, type MouseEvent } from 'react';
+import type { ClockModeShown, MercySwitch } from './clock-mode.ts';
 import { periodText } from './engine-words.ts';
 import type { ClockEntry, MinutesMoved, PeriodChoice, SetEffect } from './game-clock.ts';
 import type { TimeoutCall } from './scoring-moves.ts';
@@ -35,6 +36,8 @@ export type CourtClock = {
    * stopped; null while it is not offered.
    */
   readonly start: { readonly tipOff: boolean; readonly why: string } | null;
+  /** The clock mode in force, and whether the last-minutes stop clock holds (step 2.69). */
+  readonly mode: ClockModeShown;
 };
 
 /** The form that sets the clock and picks the period, while it is open. */
@@ -65,6 +68,8 @@ export type ClockHandlers = {
   readonly clockKey: (key: string) => void;
   readonly setClock: () => void;
   readonly pickPeriod: (period: number) => void;
+  /** The running-clock switch: the other mode from the one in force (S-21). */
+  readonly switchClock: () => void;
   /** Opens both teams' timeouts in the pad, or closes them. */
   readonly timeouts: () => void;
   readonly callTimeout: (call: TimeoutCall, event: MouseEvent<HTMLButtonElement>) => void;
@@ -145,6 +150,7 @@ export function ClockButton(props: {
       data-clock=""
       data-zero={clock.over ? '' : undefined}
       data-running={clock.running ? '' : undefined}
+      data-clock-mode={clock.mode.now}
       aria-haspopup="dialog"
       aria-expanded={props.open}
       aria-controls={clockSheetId}
@@ -156,8 +162,18 @@ export function ClockButton(props: {
       </span>
       <span className="court-clock-period" data-period={view.period}>
         {period(view, t)}
+        {/* The last-minutes stop clock holds: said beside the period, in a word, so the
+            scoreboard is no taller (step 2.69). A screen reader is told in full. */}
+        {clock.mode.lastMinutes ? (
+          <span className="court-clock-last" data-last-minutes="" aria-hidden="true">
+            {t('tracker.clock.lastMinutes')}
+          </span>
+        ) : null}
         <span className="court-caret" aria-hidden="true" />
       </span>
+      {clock.mode.lastMinutes ? (
+        <span className="court-sr">{t('tracker.clock.lastMinutesLabel')}</span>
+      ) : null}
       <span className="court-sr">{t('tracker.clock.set')}</span>
     </button>
   );
@@ -654,7 +670,10 @@ export function ClockSheetView(props: {
   readonly view: ScoringView;
   readonly clock: CourtClock;
   readonly sheet: ClockSheet;
-  readonly on: Pick<ClockHandlers, 'clockSheet' | 'clockKey' | 'setClock' | 'pickPeriod'>;
+  readonly on: Pick<
+    ClockHandlers,
+    'clockSheet' | 'clockKey' | 'setClock' | 'pickPeriod' | 'switchClock'
+  >;
 }) {
   const { t, view, clock, sheet, on } = props;
   const { entry } = sheet;
@@ -736,6 +755,7 @@ export function ClockSheetView(props: {
             </div>
             <p className="court-quiet court-clock-help">{t('tracker.clockSheet.periodHelp')}</p>
           </section>
+          <ClockModePart t={t} mode={clock.mode} on={on} />
           <section className="court-clock-part" data-part="time" aria-labelledby="court-time-title">
             <h3 className="court-label" id="court-time-title">
               {t('tracker.clockSheet.time')}
@@ -797,6 +817,78 @@ export function ClockSheetView(props: {
               : t('tracker.clockSheet.setTo', { clock: entry.text })}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The running-clock switch (step 2.69; P7 section 5.2, S-21): on or off at any moment of
+ * the game, whatever the season's rule says. It shows the mode in force, so inside the
+ * last-minutes stop clock it reads Off and a tap keeps the clock running there.
+ */
+function ClockModePart(props: {
+  readonly t: Translate;
+  readonly mode: ClockModeShown;
+  readonly on: Pick<ClockHandlers, 'switchClock'>;
+}) {
+  const { t, mode } = props;
+  const running = mode.now === 'running';
+  return (
+    <section className="court-clock-part" data-part="mode">
+      <button
+        type="button"
+        role="switch"
+        className="court-opt court-clock-mode"
+        data-clock-switch=""
+        aria-checked={running}
+        onClick={props.on.switchClock}
+      >
+        <span className="court-opt-word">{t('tracker.clockMode.label')}</span>
+        <span className="court-clock-mode-state" data-on={running ? '' : undefined}>
+          {t(running ? 'tracker.clockMode.on' : 'tracker.clockMode.off')}
+        </span>
+      </button>
+      <p className="court-quiet court-clock-help" data-clock-mode-help="">
+        {t(
+          running
+            ? 'tracker.clockMode.helpRunning'
+            : mode.lastMinutes
+              ? 'tracker.clockMode.helpLastMinutes'
+              : 'tracker.clockMode.helpStop',
+        )}
+      </p>
+    </section>
+  );
+}
+
+/**
+ * The mercy rule switched the clock to running (step 2.69): a plain sentence, and the way
+ * back in one tap. Kept until it is dismissed or the clock is switched by hand.
+ */
+export function MercyNotice(props: {
+  readonly t: Translate;
+  readonly mercy: MercySwitch;
+  readonly back: () => void;
+  readonly keep: () => void;
+}) {
+  const { t } = props;
+  return (
+    <div className="court-notice court-mercy" role="status" data-mercy-notice="">
+      <p>{t('tracker.mercy.said', { lead: props.mercy.lead })}</p>
+      <div className="court-mercy-acts">
+        <button
+          type="button"
+          className="court-button"
+          data-kind="main"
+          data-mercy-back=""
+          onClick={props.back}
+        >
+          {t('tracker.mercy.back')}
+        </button>
+        <button type="button" className="court-button" data-mercy-keep="" onClick={props.keep}>
+          {t('tracker.mercy.keep')}
+        </button>
       </div>
     </div>
   );
