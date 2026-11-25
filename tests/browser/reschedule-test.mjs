@@ -9,12 +9,19 @@
 import {
   buildNext,
   freePort,
+  leagueDay,
+  leagueDayWords,
   launch,
   startNext,
   waitFor,
   whatWentWrong,
 } from './web-browser-kit.mjs';
 
+// The new date: over a year after the made-up world's today (it reads this computer's clock),
+// so always ahead, whatever day it is run (T-404); `newDay` is how the page writes it, "Mar 6".
+const worldNow = new Date().toISOString();
+const newDate = leagueDay(worldNow, 400);
+const newDay = leagueDayWords(worldNow, 400).split(', ')[1] ?? newDate;
 const failures = [];
 const checked = [];
 const note = (label, ok, detail = '') => {
@@ -80,7 +87,7 @@ if (built) {
     note('it offers "Give it a new date"', (await give.count()) === 1);
 
     at = 'giving it a new date puts it in the draft';
-    await give.locator('[data-new-date-date]').fill('2027-03-06');
+    await give.locator('[data-new-date-date]').fill(newDate);
     await give.locator('[data-new-date-time]').fill('19:00');
     await tap(give.locator('[data-new-date-save]'));
     note(
@@ -89,7 +96,7 @@ if (built) {
       page.url(),
     );
     const inGrid = page.locator(`[data-game="${gameId}"]`);
-    note('the game is in the grid on its new date', (await inGrid.innerText()).includes('Mar 6'));
+    note('the game is in the grid on its new date', (await inGrid.innerText()).includes(newDay));
 
     at = 'publishing puts it on the public schedule';
     await tap(page.locator('[data-publish-submit]'));
@@ -105,7 +112,7 @@ if (built) {
     if ((await link.count()) > 0) {
       await tap(link.first());
       const text = await page.locator('main').innerText();
-      note('on its new date', text.includes('Mar 6'), text.slice(0, 300));
+      note('on its new date', text.includes(newDay), text.slice(0, 300));
       note('and no longer postponed', !/postponed/i.test(text), text.slice(0, 300));
     }
   } catch (error) {
