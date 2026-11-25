@@ -90,6 +90,53 @@ const viewing = (viewer: Viewer): GameViewing => ({
 });
 
 describe('readGamePage', () => {
+  it("orders a box score's equal or missing numbers by the name shown, then by the player's key, never by the person's id (step 2.225)", async () => {
+    const id = (n: number) => `01900000-0000-7000-8000-00000000f1${String(n).padStart(2, '0')}`;
+    // Two share number 7; three have none: one named, two removed (no name shown).
+    const roster: [string, string | null, string, string][] = [
+      [id(1), '7', 'Zed', 'none'],
+      [id(2), '7', 'Abe', 'none'],
+      [id(3), null, 'Rem', 'removed'],
+      [id(4), null, 'Rem', 'removed'],
+      [id(5), null, 'Cy', 'none'],
+    ];
+    const lines = store({
+      lines: async () =>
+        roster.map(([personId, jerseyNumber]) => ({
+          teamId: home,
+          personId,
+          jerseyNumber,
+          played: true,
+          secondsPlayed: 60,
+          stats: { points: 1 },
+        })),
+      people: async (ids) =>
+        ids.map((pid) => {
+          const [, , firstName, visibility] = roster.find(([r]) => r === pid) ?? [];
+          return {
+            id: pid,
+            firstName: firstName ?? 'X',
+            lastName: 'Player',
+            isMinor: false,
+            visibility: visibility ?? 'none',
+          };
+        }),
+    });
+    // The keys order 4 before 3, against their ids' order.
+    const keyOf = (_game: string, personId: string) => (personId === id(3) ? 'k-b' : 'k-a');
+    const result = await readGamePage(lines, { gameId }, viewing(publicViewer(leagueId)), keyOf);
+    if (!result.ok) throw new Error('expected a page');
+    const box = result.value.boxScores.find((b) => b.side === 'home');
+    expect(box?.players.map((p) => [p.jersey, p.name])).toEqual([
+      ['7', 'Abe Player'],
+      ['7', 'Zed Player'],
+      [null, 'Cy Player'],
+      [null, null],
+      [null, null],
+    ]);
+    expect(box?.players.map((p) => p.personId)).toEqual([id(2), id(1), id(5), id(4), id(3)]);
+  });
+
   it('says a basket taken back where it was taken back, and the score after it no longer counts it (T-432)', async () => {
     const plays = [
       { type: 'period', period: 1 },

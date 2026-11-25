@@ -235,8 +235,13 @@ async function gameMore(
       publicPlayerKey,
     );
     if (!snapshot.ok) return null;
-    const everyone = await readGamePage(store, { gameId }, viewing(publicViewer(league.id)));
-    const staff = await readGamePage(store, { gameId }, viewing(viewer));
+    const everyone = await readGamePage(
+      store,
+      { gameId },
+      viewing(publicViewer(league.id)),
+      publicPlayerKey,
+    );
+    const staff = await readGamePage(store, { gameId }, viewing(viewer), publicPlayerKey);
     if (!everyone.ok || !staff.ok) return null;
     const beyond = staff.value.boxScores.filter(
       (box) =>

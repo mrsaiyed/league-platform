@@ -559,21 +559,47 @@ async function scanServed(world, at, leaguesOf) {
       redirect: 'manual',
       headers: cookie === undefined ? {} : { cookie: `srl_session=${cookie}` },
     });
-    return { status: answer.status, text: (await answer.text()).toLowerCase() };
+    return {
+      status: answer.status,
+      location: answer.headers.get('location'),
+      text: (await answer.text()).toLowerCase(),
+    };
+  };
+  const local = (href) => (href.startsWith(at) ? href.slice(at.length) || '/' : href);
+  /**
+   * A visitor's answer to one address, its redirects followed (five at most): where it
+   * ended and with what status, and every address it passed through.
+   */
+  const visit = async (address) => {
+    const passed = [address];
+    let answer = await fetchText(address);
+    while (answer.status >= 300 && answer.status < 400 && passed.length <= 5) {
+      const next = local(new URL(answer.location ?? '', at + passed.at(-1)).href);
+      passed.push(next);
+      answer = await fetchText(next);
+    }
+    return { ...answer, end: passed.at(-1), passed };
   };
   const linksIn = (html) =>
-    [...html.matchAll(/href="([^"#]*)/g)].map(([, href]) => {
-      const local = href.replaceAll('&amp;', '&');
-      return local.startsWith(at) ? local.slice(at.length) || '/' : local;
-    });
+    [...html.matchAll(/href="([^"#]*)/g)].map(([, href]) => local(href.replaceAll('&amp;', '&')));
   let playersInWorld = 0;
-  for (const { slug, cookie } of leaguesOf) {
+  let namelessInWorld = 0;
+  for (const { slug, cookie, unplayed = false } of leaguesOf) {
     // The ids, from the stores as the owner is shown them.
     const personIds = new Set();
     const placeIds = new Set();
     const people = await fetchText(`/${slug}/admin/people`, cookie);
     for (const [, id] of people.text.matchAll(/\/admin\/people\/([0-9a-f-]{36})/g)) {
       personIds.add(id);
+    }
+    // The accounts the owner can put on a game's table: each one's id, as the scorekeepers
+    // page names it in its forms. No screen an owner sees shows a profile's id (T-467).
+    const accountIds = new Set();
+    const keepers = await fetchText(`/${slug}/admin/games/scorekeepers`, cookie);
+    for (const [, id] of keepers.text.matchAll(
+      /(?:<option value|name="account" value)="([0-9a-f-]{36})"/g,
+    )) {
+      accountIds.add(id);
     }
     const teams = await fetchText(`/${slug}/admin/teams`, cookie);
     const teamPages = new Set(
@@ -586,20 +612,43 @@ async function scanServed(world, at, leaguesOf) {
       }
     }
     // Every public page, followed from the home page as a visitor follows its links.
+    // Each page must answer 200, after its redirects; only the page the scan asks for
+    // knowing it is not there may end in the public "not found" (404).
     const served = new Map();
-    const waiting = [`/${slug}`, `/${slug}/my`, `/${slug}/no-such-page`];
+    const notThere = `/${slug}/no-such-page`;
+    const waiting = [`/${slug}`, `/${slug}/my`, notThere];
     const isPublic = (href) =>
       (href === `/${slug}` || href.startsWith(`/${slug}/`) || href.startsWith(`/${slug}?`)) &&
       !/^\/[^/]+\/(admin|score|account|invitation)(\/|$|\?)/.test(href);
-    while (waiting.length > 0 && served.size < 400) {
+    const limit = 400;
+    const badAnswers = [];
+    const pageOk = new Set();
+    let pagesRead = 0;
+    while (waiting.length > 0 && pagesRead < limit) {
       const address = waiting.shift();
       if (served.has(address)) continue;
-      const answer = await fetchText(address);
-      served.set(address, answer.text);
+      const answer = await visit(address);
+      pagesRead += 1;
+      for (const passed of answer.passed) served.set(passed, '');
+      served.set(answer.end, answer.text);
+      const expected = answer.status === 200 || (address === notThere && answer.status === 404);
+      if (expected) pageOk.add(address);
+      else badAnswers.push(`${address} ended at ${answer.end} with ${answer.status}`);
       for (const href of linksIn(answer.text)) {
         if (isPublic(href) && !served.has(href)) waiting.push(href);
       }
     }
+    const unread = waiting.filter((href) => !served.has(href));
+    note(
+      `${world} ${slug}: every public page it follows answers 200 (${pagesRead} pages read)`,
+      badAnswers.length === 0,
+      badAnswers.slice(0, 6).join('; '),
+    );
+    note(
+      `${world} ${slug}: the scan reads every public page within its limit of ${limit}`,
+      unread.length === 0,
+      `${unread.length} not read, as ${unread.slice(0, 3).join(', ')}`,
+    );
     const home = served.get(`/${slug}`) ?? '';
     const leagueId = home.match(/leagueid\\?":\\?"([0-9a-f-]{36})/)?.[1];
     const games = new Set(
@@ -610,9 +659,26 @@ async function scanServed(world, at, leaguesOf) {
     let playersInSnapshots = 0;
     for (const game of games) {
       const api = `/api/v1/leagues/${leagueId}/games/${game}`;
+      const shownAt = [...served.keys()].filter((a) =>
+        new RegExp(`^/${slug}/games/${game}(\\?|$)`).test(a),
+      );
+      note(
+        `${world} ${slug}: game ${game}'s page answers 200`,
+        shownAt.some((a) => pageOk.has(a)),
+        shownAt.join(', '),
+      );
       const snapshot = await fetchText(`${api}/snapshot`);
       served.set(`${api}/snapshot`, snapshot.text);
-      if (snapshot.status === 200) playersInSnapshots += JSON.parse(snapshot.text).players.length;
+      note(
+        `${world} ${slug}: game ${game}'s snapshot answers 200`,
+        snapshot.status === 200,
+        String(snapshot.status),
+      );
+      if (snapshot.status === 200) {
+        const { players } = JSON.parse(snapshot.text);
+        playersInSnapshots += players.length;
+        namelessInWorld += players.filter((p) => p.unnamed === true).length;
+      }
       // The scorer's rosters (staff only): every player's person id, from the store.
       const rosters = await fetchText(`${api}/rosters`, cookie);
       if (rosters.status === 200) {
@@ -638,6 +704,20 @@ async function scanServed(world, at, leaguesOf) {
       games.size >= 2 && leagueId !== undefined,
       String(games.size),
     );
+    note(
+      `${world} ${slug}: the owner is shown accounts' ids`,
+      accountIds.size >= 1,
+      String(accountIds.size),
+    );
+    // Counted per league: a league whose snapshots list nobody would be scanned for nothing.
+    // One whose games nobody has played is said so, and must still list nobody.
+    note(
+      unplayed
+        ? `${world} ${slug}: its games' snapshots list no player (none is played)`
+        : `${world} ${slug}: its games' snapshots list players`,
+      unplayed ? playersInSnapshots === 0 : playersInSnapshots > 0,
+      String(playersInSnapshots),
+    );
     playersInWorld += playersInSnapshots;
     note(`${world} ${slug}: its public pages are found`, served.size >= 10, String(served.size));
     const found = [];
@@ -645,6 +725,7 @@ async function scanServed(world, at, leaguesOf) {
       for (const id of text.match(uuidIn) ?? []) {
         if (personIds.has(id)) found.push(`a person's id ${id} in ${address}`);
         if (placeIds.has(id)) found.push(`a roster place's id ${id} in ${address}`);
+        if (accountIds.has(id)) found.push(`an account's id ${id} in ${address}`);
       }
     }
     note(
@@ -653,7 +734,7 @@ async function scanServed(world, at, leaguesOf) {
       found.slice(0, 6).join('; '),
     );
   }
-  note(`${world}: its games' snapshots list players`, playersInWorld > 0, String(playersInWorld));
+  return { playersInWorld, namelessInWorld };
 }
 
 if (browser) {
@@ -694,26 +775,45 @@ if (browser) {
         body: JSON.stringify(body),
       });
       if (!answer.ok) throw new Error(`${path} answered ${answer.status}`);
-      return answer.json();
+      const reply = await answer.json();
+      const refused = (reply.results ?? []).filter((r) => r.status !== 'accepted');
+      if (refused.length > 0) throw new Error(`taps refused: ${JSON.stringify(refused)}`);
+      return reply;
     };
     const { sessionId } = await post('/session', { type: 'open', deviceId: 'scan-tablet' });
     const player = (team, n) =>
       `01900000-0000-7000-8000-${(0x70 + team).toString(16).padStart(4, '0')}${n.toString(16).padStart(8, '0')}`;
     const tap = (input) => ({ commandId: randomUUID(), at: Date.now(), input });
+    // A player added at the table by number only (S-34): a line with no name, its id one
+    // the device made, scored so the snapshot lists it.
+    const numberOnly = randomUUID();
     await post('/commands', {
-      protocolVersion: 1,
+      protocolVersion: 2,
       sessionId,
       commands: [
-        tap({ type: 'lineup', side: 'home', playerIds: [1, 2, 3, 4, 5].map((n) => player(3, n)) }),
+        tap({ type: 'add-player', side: 'home', playerId: numberOnly, jersey: '77', name: '' }),
+        tap({
+          type: 'lineup',
+          side: 'home',
+          playerIds: [...[1, 2, 3, 4].map((n) => player(3, n)), numberOnly],
+        }),
         tap({ type: 'lineup', side: 'away', playerIds: [1, 2, 3, 4, 5].map((n) => player(4, n)) }),
         tap({ type: 'start' }),
         tap({ type: 'score', side: 'home', playerId: player(3, 1), points: 2 }),
+        tap({ type: 'score', side: 'home', playerId: numberOnly, points: 2 }),
       ],
     });
-    await scanServed('stand-in', standIn, [
+    const { namelessInWorld } = await scanServed('stand-in', standIn, [
       { slug: 'north-valley', cookie: 'local-owner-token' },
-      { slug: 'harbor-city', cookie: 'local-owner-token' },
+      // Its games are all to come (stand-in-world-seed.ts, an empty league's world).
+      { slug: 'harbor-city', cookie: 'local-owner-token', unplayed: true },
     ]);
+    // The seed leagues have no nameless person; this world's scan meets one.
+    note(
+      'stand-in: a snapshot lists a line with no name',
+      namelessInWorld >= 1,
+      String(namelessInWorld),
+    );
   });
 }
 

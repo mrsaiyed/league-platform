@@ -65,7 +65,10 @@ export async function GamePage({
       tracker.clock.now(),
       publicPlayerKey,
     );
-    return { snapshot: shown, page: await readGamePage(store, { gameId: game }, viewing) };
+    return {
+      snapshot: shown,
+      page: await readGamePage(store, { gameId: game }, viewing, publicPlayerKey),
+    };
   });
   const [{ snapshot, page }, clock] = await Promise.all([
     read,
