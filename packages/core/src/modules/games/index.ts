@@ -107,6 +107,25 @@ export { keptForScoring, statisticOfTap, tapNotKept } from './statistic-of-tap.t
 // A team's own count, from the saved plays: in its Total and its season's (step 2.196).
 export { teamOwnCounts, type TeamOwnCount, type TeamOwnCounts } from './team-own-counts.ts';
 export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
+// Correcting a tracked game in its box score grid: the grid's edits become plays (step 2.65, T-122).
+export {
+  correctTrackedBoxScore,
+  trackedGridLine,
+  type CorrectTrackedBoxScoreError,
+} from './commands/correct-tracked-box-score.ts';
+export {
+  readTrackedBoxScore,
+  type ReadTrackedBoxScoreError,
+  type TrackedBoxScore,
+  type TrackedGridRow,
+} from './commands/read-tracked-box-score.ts';
+export {
+  gridCorrectionPlays,
+  type GridCorrection,
+  type GridPlay,
+  type GridProblem,
+  type WantedLine,
+} from './grid-correction-plays.ts';
 export { endTrackedGame, type EndTrackedGameError } from './commands/end-tracked-game.ts';
 export { markNotStarted, type MarkNotStartedError } from './commands/mark-not-started.ts';
 export { giveGameFormat, type GiveGameFormatError } from './commands/give-game-format.ts';

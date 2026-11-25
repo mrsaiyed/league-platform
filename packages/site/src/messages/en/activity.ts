@@ -15,6 +15,7 @@ export const enActivity = {
   'activity.games.assign_scorekeeper': 'Assigned a scorekeeper to a game',
   'activity.games.cancel_game': 'Cancelled a game',
   'activity.games.clear_game_format': "Put a game back on its season's format",
+  'activity.games.correct_tracked_box_score': 'Corrected a tracked game in its box score grid',
   'activity.games.end_tracked_game': 'Ended a tracked game',
   'activity.games.give_game_format': 'Gave a game its own format',
   'activity.games.mark_not_started': 'Marked a started game not started',
@@ -116,6 +117,8 @@ export const enActivity = {
   // entry's plain sentence above.
   'activityNamed.games.assign_scorekeeper': 'Assigned a scorekeeper to the game {name}',
   'activityNamed.games.cancel_game': 'Cancelled the game {name}',
+  'activityNamed.games.correct_tracked_box_score':
+    'Corrected the tracked game {name} in its box score grid',
   'activityNamed.games.mark_not_started': 'Marked the started game {name} not started',
   'activityNamed.games.postpone_game': 'Postponed the game {name}',
   'activityNamed.games.put_game_back': 'Put the cancelled game {name} back on the schedule',
