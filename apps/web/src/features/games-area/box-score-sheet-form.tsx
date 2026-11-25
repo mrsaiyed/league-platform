@@ -21,9 +21,9 @@
 import { useActionState, useEffect, useId, useRef } from 'react';
 import { fillScores, sheetScoresId, untouched, type BoxScoreState } from './form-state.ts';
 import { ScoreCheck, type ScoreCheckProps } from './score-check.tsx';
-import { SavedLine } from './saved-line.tsx';
+import { SaidLine } from '../list-forms/said-line.tsx';
 import type { ScoreField } from './score-fields.ts';
-import { useOneSubmit } from './use-one-submit.ts';
+import { useOneSubmit } from '../list-forms/use-one-submit.ts';
 
 /** One box of the grid: its field, the label it is read by, and what is saved in it. */
 export type SheetBox = {
@@ -313,7 +313,7 @@ export function BoxScoreSheetForm(props: BoxScoreSheetFormProps) {
             {problem}
           </p>
         )}
-        {props.saved === undefined ? null : <SavedLine text={props.saved} />}
+        {props.saved === undefined ? null : <SaidLine kind="saved">{props.saved}</SaidLine>}
       </fieldset>
       {editable ? (
         <p className="staff-buttons">

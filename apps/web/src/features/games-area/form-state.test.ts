@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fillScores, typedOf } from './form-state.ts';
+import * as shared from '../list-forms/form-state.ts';
+import { fillScores, typedOf, untouched } from './form-state.ts';
 
 describe("what the games area's forms are answered with", () => {
   it('keeps what a form held exactly as typed, without the framework’s own fields', () => {
@@ -10,6 +11,11 @@ describe("what the games area's forms are answered with", () => {
     form.set('$ACTION_REF_1', '');
     form.set('photo', new Blob(['x']));
     expect(typedOf(form)).toEqual({ homeScore: ' 051 ', awayScore: '' });
+  });
+
+  it('reads a form and starts untouched with the pieces every admin form shares, not a copy', () => {
+    expect(typedOf).toBe(shared.typedOf);
+    expect(untouched).toBe(shared.untouched);
   });
 
   it('puts both scores into a sentence written for them', () => {

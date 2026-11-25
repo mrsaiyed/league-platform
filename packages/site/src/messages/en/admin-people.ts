@@ -49,6 +49,7 @@ export const enAdminPeople = {
     'No one in the league matches that search. Check the spelling, or add them.',
   'adminPeople.noMatch.add': 'Add {name}',
   'adminPeople.notRemoved': 'Not removed. {problem}',
+  'adminPeople.notRemovedNamed': 'Not removed: {name}. {problem}',
   'adminPeople.person.sub':
     'Their details as the league keeps them. A change shows on every page of the league at once.',
   'adminPeople.private.body':
@@ -62,7 +63,9 @@ export const enAdminPeople = {
   'adminPeople.putBack':
     'Put back on the league list: {name}, as they were. They are on no team; a team’s page in Teams puts them on its roster.',
   'adminPeople.putBack.notPutBack': 'Not put back. {problem}',
+  'adminPeople.putBack.notPutBackNamed': 'Not put back: {name}. {problem}',
   'adminPeople.putBack.submit': 'Put them back',
+  'adminPeople.putBack.submitNamed': 'Put {name} back',
   'adminPeople.readFailed':
     'The league list could not be read just now. Reload the page to try again.',
   'adminPeople.refused': 'Not saved. {problem}',

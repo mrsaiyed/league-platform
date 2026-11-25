@@ -8,7 +8,7 @@
 // Like the box score's own grid, the boxes are text boxes the server checks (step 2.103).
 import { useActionState, useEffect, useId, useRef } from 'react';
 import { untouched, type FormState } from './form-state.ts';
-import { useOneSubmit } from './use-one-submit.ts';
+import { useOneSubmit } from '../list-forms/use-one-submit.ts';
 
 export type TrackedGridBox = {
   readonly field: string;

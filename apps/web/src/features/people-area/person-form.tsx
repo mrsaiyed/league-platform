@@ -14,9 +14,9 @@
 // The browser's own checking is off (`noValidate`), as on the box score grid: the server
 // tells what is wrong, in words beside the box, with scripts on or off.
 import { useActionState, useId } from 'react';
-import { untouched, type FormState } from '../games-area/form-state.ts';
-import { SavedLine } from '../games-area/saved-line.tsx';
-import { useOneSubmit } from '../games-area/use-one-submit.ts';
+import { untouched, type FormState } from '../list-forms/form-state.ts';
+import { SaidLine } from '../list-forms/said-line.tsx';
+import { useOneSubmit } from '../list-forms/use-one-submit.ts';
 import type { PrivateDetails } from './people-view.ts';
 import {
   changedBox,
@@ -195,7 +195,9 @@ export function PersonForm({
   const generalId = `${id}-refused`;
   return (
     <form action={dispatch} onSubmit={onSubmit} className="staff-form" noValidate key={drawn}>
-      {saved === undefined || pending || refused !== undefined ? null : <SavedLine text={saved} />}
+      {saved === undefined || pending || refused !== undefined ? null : (
+        <SaidLine kind="saved">{saved}</SaidLine>
+      )}
       {Object.entries(hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}

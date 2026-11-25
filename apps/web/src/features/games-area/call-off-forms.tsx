@@ -26,7 +26,7 @@
 import { useActionState, useId, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { untouched, type CallOffAct, type CallOffState } from './form-state.ts';
 import { newDateNow } from './call-off-step.ts';
-import { useOneSubmit } from './use-one-submit.ts';
+import { useOneSubmit } from '../list-forms/use-one-submit.ts';
 
 /** A change's own choice: the team that forfeits, or why a game is put back. */
 export type CallOffChoice = {
