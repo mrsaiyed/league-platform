@@ -42,7 +42,12 @@ export type ScheduleActionKind =
  */
 export type SavedDetail =
   | { readonly what: 'round-added' | 'round-saved'; readonly roundId: string }
-  | { readonly what: 'round-removed'; readonly afterRoundId: string | null }
+  | {
+      readonly what: 'round-removed';
+      readonly afterRoundId: string | null;
+      /** The round removed, so a second "Remove this round" is answered as the first. */
+      readonly roundId?: string;
+    }
   | { readonly what: 'game-saved'; readonly gameId: string }
   /** A game went to another round and its date was left as it was: the grid offers the round's. */
   | { readonly what: 'game-round'; readonly gameId: string }
@@ -280,7 +285,11 @@ export async function runScheduleAction(
       return done.ok
         ? {
             kind: 'saved',
-            detail: { what: 'round-removed', afterRoundId: orNull(text(form, 'afterRoundId')) },
+            detail: {
+              what: 'round-removed',
+              afterRoundId: orNull(text(form, 'afterRoundId')),
+              roundId,
+            },
           }
         : { ...refusal(done), at: { form: 'round', roundId } };
     }

@@ -92,7 +92,7 @@ export function answerShown(search: Search, notice: GridNotice | undefined, thin
 /**
  * Whether a kept answer to a button pressed again is still the truth (server/same-request.ts),
  * read against the draft as it is now: a round said added or saved is still in it, a game
- * still on it, a game said put back still there and one removed still gone, a publish or a
+ * still on it, a game said put back still there and one removed (or a round) still gone, a publish or a
  * discard has no draft since. Otherwise the button runs again and its command answers as
  * things are now. A kept refusal holds: it is run again only when something typed changed.
  */
@@ -117,8 +117,11 @@ export function gridAnswerHolds(
       return hasGame(detail.gameId);
     case 'game-removed':
       return detail.gameId !== undefined && !hasGame(detail.gameId);
+    // While the round stays gone, as a removed game (a double tap of "Remove this round").
     case 'round-removed':
-      return false;
+      return (
+        detail.roundId !== undefined && !now.result.rounds.some((r) => r.id === detail.roundId)
+      );
   }
 }
 

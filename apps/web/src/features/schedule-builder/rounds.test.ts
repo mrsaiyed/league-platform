@@ -218,7 +218,7 @@ describe('rounds an owner can make (step 2.160)', () => {
 
     expect(await press('remove-round', { roundId: roundId(2), afterRoundId: roundId(1) })).toEqual({
       kind: 'saved',
-      detail: { what: 'round-removed', afterRoundId: roundId(1) },
+      detail: { what: 'round-removed', afterRoundId: roundId(1), roundId: roundId(2) },
     });
     expect((await read()).result.rounds.map((r) => r.id)).toEqual([roundId(1)]);
   });
@@ -387,7 +387,7 @@ describe('a game in the bin does not hold its round (step 2.181, S-60)', () => {
     expect(shown).toMatchObject({ games: [], undated: 0 });
     expect(await press('remove-round', { roundId: roundOf })).toEqual({
       kind: 'saved',
-      detail: { what: 'round-removed', afterRoundId: null },
+      detail: { what: 'round-removed', afterRoundId: null, roundId: roundOf },
     });
     expect(await press('publish', {})).toEqual({ kind: 'published' });
     expect((await read()).published.rounds.map((r) => r.id)).not.toContain(roundOf);

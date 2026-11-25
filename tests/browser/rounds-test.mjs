@@ -349,13 +349,61 @@ if (built) {
     }
 
     at = 'the owner removes the empty second round';
+    const removedWords = 'Saved to the draft: the round was removed.';
+    const gridAddress = page.url();
+    /** How many "Removed a round" rows the activity log holds; back to the grid after. */
+    const roundsRemoved = async () => {
+      await page.goto(`${origin}/north-valley/admin/settings/activity`);
+      const rows = await page.locator('[data-activity-log] > li').allInnerTexts();
+      await page.goto(gridAddress);
+      return rows.filter((text) => text.includes('Removed a round in the schedule draft')).length;
+    };
+    const removedBefore = await roundsRemoved();
     const second = round('Week 2');
     await second.locator('summary', { hasText: 'Change or remove this round' }).click();
     const remove = second.getByRole('button', { name: 'Remove this round' });
     note('"Remove this round" is drawn as a danger button', (await kindOf(remove)) === 'danger');
-    await tap(remove, { said: 'Saved to the draft: the round was removed.' });
+    // Its form as drawn, its one-time token among them, to send again after the first is done.
+    const removeFields = await remove
+      .locator('xpath=ancestor::form[1]')
+      .evaluate((element) =>
+        Object.fromEntries([...new FormData(element).entries()].map(([k, v]) => [k, String(v)])),
+      );
+    note(
+      '"Remove this round" carries a one-time token',
+      (removeFields['requestToken'] ?? '') !== '',
+    );
+    await tap(remove, { said: removedWords });
     await saidBeside('the removal', 'the round was removed');
     note('two rounds are left', (await page.locator('section[data-round]').count()) === 2);
+    // A double tap that got through after the first finished: the same form sent again.
+    const again = await page.request.post(gridAddress, {
+      multipart: removeFields,
+      headers: { origin },
+      maxRedirects: 0,
+      timeout: 30_000,
+    });
+    const againTo = again.headers()['location'] ?? '';
+    note('the second "Remove this round" is sent back to the grid', again.status() === 303);
+    // As the first: to its "Saved", not to the round's form as a refusal is (#round-…).
+    note(
+      'the second "Remove this round" lands where the first did',
+      againTo.endsWith('#saved'),
+      againTo,
+    );
+    await page.goto(new URL(againTo, gridAddress).href);
+    await answered(page, removedWords);
+    note(
+      'the second "Remove this round" is answered as the first, not as someone else\'s change',
+      await saysNothingOf(page, 'That was not saved'),
+    );
+    note('still two rounds', (await page.locator('section[data-round]').count()) === 2);
+    const removedAfter = await roundsRemoved();
+    note(
+      'removed twice, one row in the activity log',
+      removedAfter === removedBefore + 1,
+      `${removedBefore} then ${removedAfter}`,
+    );
 
     at = 'the owner moves the game again and keeps its date';
     await editGame('Round 1: Week 1');

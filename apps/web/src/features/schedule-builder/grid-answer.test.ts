@@ -114,6 +114,22 @@ describe('gridAnswerHolds', () => {
     expect(gridAnswerHolds(removed, nowWith([], [game]))).toBe(false);
   });
 
+  it('gives a kept "round removed" while the round stays gone (a second "Remove this round")', () => {
+    const removed = {
+      kind: 'saved',
+      detail: { what: 'round-removed', afterRoundId: null, roundId: round },
+    } as const;
+    expect(gridAnswerHolds(removed, nowWith([], []))).toBe(true);
+    expect(gridAnswerHolds(removed, nowWith([round], []))).toBe(false);
+    expect(gridAnswerHolds(removed, nowWith([], [], false))).toBe(false);
+    // An answer that names no round is never given again.
+    const unnamed = {
+      kind: 'saved',
+      detail: { what: 'round-removed', afterRoundId: null },
+    } as const;
+    expect(gridAnswerHolds(unnamed, nowWith([], []))).toBe(false);
+  });
+
   it('gives a kept publish while no draft was started since; a refusal always', () => {
     expect(gridAnswerHolds({ kind: 'published' }, nowWith([], [], false))).toBe(true);
     expect(gridAnswerHolds({ kind: 'published' }, nowWith([], []))).toBe(false);
