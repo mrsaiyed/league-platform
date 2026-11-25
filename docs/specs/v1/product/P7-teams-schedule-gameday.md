@@ -143,6 +143,7 @@ How the grid works (built in step 2.64):
 
 - Each rule is a season setting, with presets to start from: a high-school-style stop clock, a rec-league-style running clock, or custom.
 - **S-106 (agreed, the founder, November 24):** the mercy rule, the running clock and whether team fouls reset each half are asked of the admin when the league is made, each with a plain default they can leave, and the admin can change them for a season in its settings. The platform chooses none of them for any league.
+- **S-118 (decided for you, step 2.245):** asked so far: the clock (a running clock unless the admin chooses a stop clock) and the mercy rule (none unless a lead is given, asked only with a stop clock until step 2.248). A new season's answers start as the season it copies. Team fouls that reset each half join them after step 2.123.
 - A single game can be given different rules before it starts: by an admin, or at the table by the scorekeeper where the league allows it (S-35).
 - During a game the clock mode can be switched at any moment, and the clock, period, fouls and score can always be corrected by hand.
 - Built first: the clock mode and its switch, stopping on fouls, the mercy rule, a stop clock in the last minutes, and the personal foul limit. Timeouts and technical fouls follow when a league asks for them.
