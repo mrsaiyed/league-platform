@@ -77,6 +77,7 @@ import {
 import type { OpenedTrackerGame } from './open-tracker-game.ts';
 import type { DeviceRosters, LineupPicks } from './opened-game-storage.ts';
 import { endOffered, playLog, redoTarget, redoneText, undoTarget, undoneText } from './play-log.ts';
+import { useUndoAsk } from './undo-correction-ask.tsx';
 import {
   LatestPlays,
   MoreLog,
@@ -1045,6 +1046,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
   // game does not wait for every line of it (finding M6).
   const undoPlay = useMemo(() => undoTarget(state, rosters, t), [state, rosters, t]);
   const redoPlay = useMemo(() => redoTarget(state, rosters, t), [state, rosters, t]);
+  const undoAsk = useUndoAsk(t, () => controller.status().game ?? state, status.corrections);
   const { waiting } = status;
   const logHasPanel = useScreenIs(logPanelWhere);
   const noticesInPad = useScreenIs(uprightPhone);
@@ -1085,7 +1087,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
       .finally(taken(event.currentTarget));
   };
   const plays: PlaysHandlers = {
-    undo: (event) => turn('undo', event),
+    undo: (event) => undoAsk.undo(event, (tap) => turn('undo', tap)),
     redo: (event) => turn('redo', event),
     playLog(open) {
       if (open) logOpener.current = document.activeElement;
@@ -1543,6 +1545,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
         controls: (
           <>
             <UndoRedo t={t} undo={undoPlay} redo={redoPlay} on={plays} />
+            {undoAsk.ask}
             {props.slots?.controls}
           </>
         ),

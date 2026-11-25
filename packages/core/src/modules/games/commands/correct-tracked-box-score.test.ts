@@ -1,3 +1,4 @@
+import { correctionPlaySource, playSourceKey } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import { linesOf, readState, rosterOf } from '../live-game.ts';
@@ -13,6 +14,7 @@ import {
 } from '../reopen-game.test-helper.ts';
 import { correctTrackedBoxScore, maxCorrectionPlays } from './correct-tracked-box-score.ts';
 import { readTrackedBoxScore } from './read-tracked-box-score.ts';
+import { readTrackerState } from './read-tracker-state.ts';
 import { reopenGame } from './reopen-game.ts';
 
 const [h0 = '', h1 = ''] = homeIds;
@@ -55,8 +57,11 @@ const correct = (t: Tracker, sequence: number, lines: object[], accountId: strin
 const endAgain = (t: Tracker, sequence: number, lines: object[] = []) =>
   correctTrackedBoxScore(t.as(ownerId), { gameId, sequence, lines, end: true }, t.deps);
 
-/** The game's event log replayed with the engine from nothing: the lines it gives. */
-function replayedLines(t: Tracker) {
+/**
+ * The game's event log replayed with the engine from nothing: the lines it gives. With
+ * `withoutMark`, each payload is read with its source (T-408) taken out first.
+ */
+function replayedLines(t: Tracker, withoutMark = false) {
   const saved = t.db.state.states.find((s) => s.gameId === gameId);
   const game = t.db.state.games[0];
   if (saved === undefined || game === undefined) throw new Error('no game');
@@ -65,7 +70,9 @@ function replayedLines(t: Tracker) {
     .filter((e) => e.gameId === gameId)
     .toSorted((a, b) => a.seq - b.seq);
   for (const event of events) {
-    const command = { type: event.type, ...event.payload } as basketball.Command;
+    const { [playSourceKey]: _source, ...engineFields } = event.payload;
+    const payload = withoutMark ? engineFields : event.payload;
+    const command = { type: event.type, ...payload } as basketball.Command;
     state = basketball.apply(state, command, { id: event.commandId, now: event.tappedAt });
   }
   return linesOf(game, rosterOf(t.db.state.players), state);
@@ -93,9 +100,10 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
       value: { sequence: before.sequence + 2, plays: 2, ended: false },
     });
     const added = t.db.state.events.filter((e) => e.seq > before.sequence);
+    const mark = { [playSourceKey]: correctionPlaySource };
     expect(added.map((e) => [e.type, e.payload, e.accountId])).toEqual([
-      ['unfoul', { side: 'home', playerId: h0 }, ownerId],
-      ['foul', { side: 'home', playerId: h1 }, ownerId],
+      ['unfoul', { side: 'home', playerId: h0, ...mark }, ownerId],
+      ['foul', { side: 'home', playerId: h1, ...mark }, ownerId],
     ]);
     const replayed = replayedLines(t);
     expect([foulsOf(replayed, h0), foulsOf(replayed, h1)]).toEqual([0, 1]);
@@ -110,6 +118,38 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
     expect(t.db.state.activity.at(-1)?.action).toBe('games.correct_tracked_box_score');
     // Still live, to be ended again.
     expect(t.db.state.games[0]?.status).toBe('live');
+  });
+
+  it('T-408: a grid save’s plays carry the mark, the tablet’s do not, and a replay ignores it', async () => {
+    const t = setUp();
+    await reopened(t);
+    const { sequence } = await grid(t);
+    await correct(t, sequence, [
+      { teamId: homeTeamId, personId: h0, fouls: 0 },
+      { teamId: awayTeamId, personId: a0, fg1: 1 },
+    ]);
+    // The tablet's tap after the correction carries no mark either.
+    expect(await tap(t, [{ type: 'score', side: 'home', playerId: h1, points: 2 }])).toEqual([
+      'accepted',
+    ]);
+    const events = t.db.state.events.filter((e) => e.gameId === gameId);
+    const marked = events.filter((e) => playSourceKey in e.payload);
+    expect(marked.map((e) => [e.type, e.payload[playSourceKey]])).toEqual([
+      ['unfoul', correctionPlaySource],
+      ['score', correctionPlaySource],
+    ]);
+    expect(marked.every((e) => e.seq > sequence && e.accountId === ownerId)).toBe(true);
+    // Every play scored on the tablet, before and after, is read as the scoring screen's.
+    expect(events.filter((e) => !(playSourceKey in e.payload)).length).toBe(events.length - 2);
+    // The same lines with or without the mark.
+    const withMark = replayedLines(t);
+    expect(replayedLines(t, true)).toEqual(withMark);
+    expect(withMark.get(a0)?.stats.points).toBe(3);
+    // The scorekeeper's device is told which plays a correction wrote; its own are not named.
+    const read = await readTrackerState(t.as(scorekeeperId), { gameId }, t.deps);
+    if (!read.ok) throw new Error(`read refused: ${read.error.code}`);
+    expect(read.value.corrections).toEqual(marked.map((e) => e.commandId.toLowerCase()));
+    expect(read.value.state.plays.at(-1)?.id).toBe(events.at(-1)?.commandId);
   });
 
   it('a basket added moves the score; nothing changed adds nothing', async () => {

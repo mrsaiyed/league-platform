@@ -1,6 +1,6 @@
 // What the games module needs from storage. packages/database supplies it, bound to
 // one transaction for one league, so none of these take a league id (T-28).
-import type { GameFormatRules, SeasonRules } from '@srleagues/contracts';
+import type { GameFormatRules, PlaySource, SeasonRules } from '@srleagues/contracts';
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, AccessStore, ActivityLog } from '../access/index.ts';
 import type { StoredSetting } from '../leagues/index.ts';
@@ -483,6 +483,8 @@ export type GameEventMark = {
   readonly commandId: string;
   readonly type: string;
   readonly accountId: string | null;
+  /** Where the play came from (T-408): left out for the scoring screen's own. */
+  readonly source?: PlaySource;
 };
 
 /** A game's saved engine state (T3 §8 `game_states`): the last event it applied, and the document. */

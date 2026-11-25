@@ -8,10 +8,12 @@
 // from apply-tracker-commands.ts unchanged; what it does is said there.
 import {
   isTablePlayerCommand,
+  playSourceKey,
   refusedAddEventType,
   tablePlayerProblems,
   type CommandBatch,
   type CommandResult,
+  type PlaySource,
   type TablePlayerInput,
   type TablePlayerProblem,
 } from '@srleagues/contracts';
@@ -77,6 +79,11 @@ export type PlaysToApply = Pick<FinishArgs, 'context' | 'tx' | 'emit'> & {
   readonly version: number;
   readonly accountId: string;
   readonly playedWithout: boolean;
+  /**
+   * Where the plays come from (T-408): kept in each play's payload, so the scoring
+   * screen can tell a correction's play from its own. Left out for the tracker's taps.
+   */
+  readonly source?: PlaySource;
 };
 
 /** Each command's answer, the game's last event number after them, and the plays refused for a statistic not kept. */
@@ -273,7 +280,9 @@ export async function applyPlays(p: PlaysToApply): Promise<PlaysApplied> {
     }
     state = next;
     played = true;
-    const { type, ...payload } = input;
+    const { type, ...engineFields } = input;
+    const payload =
+      p.source === undefined ? engineFields : { ...engineFields, [playSourceKey]: p.source };
     seq += 1;
     events.push({ gameId, seq, commandId, type, payload, tappedAt: at, accountId });
     taken.add(commandId);

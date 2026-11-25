@@ -787,6 +787,9 @@ export const enTracker = {
   // Undo (step 2.37; checklist I1 to I3): the button names the play it takes back, and
   // the screen then says what happened in a sentence.
   'tracker.undo.button': 'Undo',
+  'tracker.undo.correctionAsk': 'This was added by a correction after the game. Take it back?',
+  'tracker.undo.correctionLeave': 'Leave it',
+  'tracker.undo.correctionTakeBack': 'Take it back',
   'tracker.undo.done': 'Undone: {play}.',
   'tracker.undo.doneClock': 'Undone: {play}. The clock is back at {clock}, stopped.',
   'tracker.undo.doneStopped':

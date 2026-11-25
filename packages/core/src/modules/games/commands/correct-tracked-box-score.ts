@@ -25,7 +25,11 @@
 // game is told at its next tap that the game can no longer be scored (T-113), and keeps
 // what it typed. A level score the rules do not allow is refused first (`tie-not-allowed`).
 // One save writes at most `maxCorrectionPlays` plays (`too-many-plays`): more is a typo.
-import { trackerProtocolVersion, type TrackerCommand } from '@srleagues/contracts';
+import {
+  correctionPlaySource,
+  trackerProtocolVersion,
+  type TrackerCommand,
+} from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
 import { recordActivity, scopeDetails } from '../../access/index.ts';
@@ -220,6 +224,8 @@ export const correctTrackedBoxScore = defineCommand({
       version: trackerProtocolVersion,
       accountId,
       playedWithout: false,
+      // T-408: each play says it came from a correction, for the scoring screen's Undo.
+      source: correctionPlaySource,
     });
     if (applied.results.some((r) => r.status !== 'accepted')) {
       throw new Error('A play of a box score correction, judged beforehand, was refused.');

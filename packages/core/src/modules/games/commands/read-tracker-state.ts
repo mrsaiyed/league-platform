@@ -21,7 +21,11 @@
 // every player by id, a team that shows its numbers to staff only included. Only whoever
 // may score the game may read it (`games.score`, mayScoreGame, read fresh, T-75). It
 // changes nothing, but runs in the same shape as a command (record 014).
-import { tablePlayerEventTypes, trackerChangesWindow } from '@srleagues/contracts';
+import {
+  correctionPlaySource,
+  tablePlayerEventTypes,
+  trackerChangesWindow,
+} from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
 import { defineCommand, fail, ok, type Result } from '../../../command/index.ts';
@@ -42,6 +46,11 @@ export type TrackerGameState = {
    * included, among the game's last `trackerChangesWindow` events up to `sequence`.
    */
   readonly changes: readonly string[];
+  /**
+   * The command IDs (lower case, oldest first) of the plays among the same events that a
+   * correction wrote (T-408): left out when there are none.
+   */
+  readonly corrections?: readonly string[];
 };
 
 export type ReadTrackerStateError = { readonly code: 'game-not-found' };
@@ -60,19 +69,25 @@ async function changesUpTo(
   gameId: string,
   upTo: number,
   saved: boolean,
-): Promise<{ readonly sequence: number; readonly changes: string[] }> {
-  if (upTo === 0) return { sequence: 0, changes: [] };
+): Promise<{
+  readonly sequence: number;
+  readonly changes: string[];
+  readonly corrections: string[];
+}> {
+  if (upTo === 0) return { sequence: 0, changes: [], corrections: [] };
   const from = Math.max(0, upTo - trackerChangesWindow);
   const marks = await tx.liveGames.eventsAfter(gameId, from, trackerChangesWindow);
   const changes: string[] = [];
+  const corrections: string[] = [];
   let sequence = saved ? upTo : from;
   for (const mark of marks) {
     if (mark.seq > upTo) break;
     if (isChange(mark)) changes.push(mark.commandId.toLowerCase());
     else if (!saved) break;
+    if (mark.source === correctionPlaySource) corrections.push(mark.commandId.toLowerCase());
     if (!saved) sequence = mark.seq;
   }
-  return { sequence, changes };
+  return { sequence, changes, corrections };
 }
 
 export const readTrackerState = defineCommand({
@@ -90,7 +105,12 @@ export const readTrackerState = defineCommand({
         ? basketball.newGame(rules, 0)
         : withCurrentRules(readState(saved.state), rules);
     const upTo = saved?.seq ?? (await tx.liveGames.lastEventSeq(input.gameId));
-    const { sequence, changes } = await changesUpTo(tx, input.gameId, upTo, saved !== undefined);
-    return ok({ sequence, state, changes });
+    const { sequence, changes, corrections } = await changesUpTo(
+      tx,
+      input.gameId,
+      upTo,
+      saved !== undefined,
+    );
+    return ok({ sequence, state, changes, ...(corrections.length === 0 ? {} : { corrections }) });
   },
 });

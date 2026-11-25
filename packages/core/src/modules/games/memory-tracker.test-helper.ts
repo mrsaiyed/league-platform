@@ -7,7 +7,7 @@
 // `lockingTracker` runs transactions over one shared state with a real lock per game,
 // to show batches for different games never wait for each other (T-112): PGlite has
 // one connection and runs transactions one after another, so it cannot show that.
-import { refusedAddEventType } from '@srleagues/contracts';
+import { correctionPlaySource, playSourceKey, refusedAddEventType } from '@srleagues/contracts';
 import type {
   DomainEvent,
   EventHandler,
@@ -212,7 +212,15 @@ function tablePlayersOf(
         .filter((e) => e.gameId === gameId && e.seq > afterSeq)
         .sort((a, b) => a.seq - b.seq)
         .slice(0, limit)
-        .map((e) => ({ seq: e.seq, commandId: e.commandId, type: e.type, accountId: e.accountId })),
+        .map((e) => ({
+          seq: e.seq,
+          commandId: e.commandId,
+          type: e.type,
+          accountId: e.accountId,
+          ...(e.payload[playSourceKey] === correctionPlaySource
+            ? { source: correctionPlaySource }
+            : {}),
+        })),
   };
 }
 

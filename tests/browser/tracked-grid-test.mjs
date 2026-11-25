@@ -10,7 +10,9 @@
 //   moves the foul to the right player and saves: the page says the two plays in plain
 //   sentences, and the game's list of plays (the server's `/state`) ends `unfoul`, `foul`.
 // - The device's next tap is saved on top of the correction, which it never overwrites,
-//   and the device then shows the server's numbers (or says in words why it cannot).
+//   and the device then shows the server's numbers (or says in words why it cannot). Its
+//   Undo takes that tap back; the next Undo, on the correction's foul, asks first (T-408),
+//   and "Leave it" keeps the foul on the server.
 // - A lowered basket is refused beside its box, with everything typed kept and nothing
 //   saved; a grid left open while the game changed in a second tab is refused at the top
 //   with "Load it again", everything typed kept, and the second tab's change alone saved.
@@ -19,7 +21,8 @@
 //   its next tap, and the public page shows Final, Corrected and the grid's lines.
 // - The standings count it again; reopened and ended again with no change they are as they
 //   were; reopened, given an away basket that changes the winner and ended again from the
-//   game's own page, they change.
+//   game's own page, they change. Each time the two teams' own rows are compared (wins,
+//   losses, points for and against), never the whole page's text.
 // Every wait has a time limit, and a wait that runs out is a failure, never a pass.
 // Builds the app first unless given --no-build, so it never runs on an old build.
 import {
@@ -41,6 +44,8 @@ const pageLimit = 20_000;
 const endLimit = 20_000;
 
 const words = {
+  undoCorrection: 'This was added by a correction after the game. Take it back?',
+  leaveIt: 'Leave it',
   reason: 'Why it needs correcting (kept in the log, never shown publicly)',
   reopen: 'Reopen to correct',
   edit: 'Edit the box score',
@@ -203,18 +208,57 @@ async function publicLines() {
   }
 }
 
-/** The public standings page's text, read signed out. */
-async function standingsText() {
+/** The two teams' names, `[away, home]`, from the grid page's title "Edit box score: {away} at {home}". */
+async function teamsOf(page) {
+  const title = (await page.locator('h1').first().textContent()) ?? '';
+  const found = /^Edit box score: (.+) at (.+)$/.exec(title.trim());
+  if (found === null) throw new Error(`the grid's title is “${title}”`);
+  return [found[1], found[2]];
+}
+
+/**
+ * The two teams' own rows of the public standings, read signed out: by team name, its
+ * wins, losses, points for and against as numbers (the columns W, L, PF and PA). A team
+ * missing, or a column the page does not show, throws, so the step fails.
+ */
+async function standingsRows(names) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   try {
     const page = await context.newPage();
     page.setDefaultTimeout(pageLimit);
     await open(page, `/${league}/standings`);
-    return (await page.locator('main').textContent()) ?? '';
+    const rows = await page.evaluate((teams) => {
+      const found = {};
+      for (const table of document.querySelectorAll('main table')) {
+        const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+        for (const row of table.querySelectorAll('tbody tr')) {
+          const name = row.querySelector('.ui-team-name')?.textContent.trim() ?? '';
+          if (!teams.includes(name)) continue;
+          const cells = [...row.children].map((cell) => cell.textContent.trim());
+          const at = (label) => (heads.includes(label) ? Number(cells[heads.indexOf(label)]) : NaN);
+          found[name] = { wins: at('W'), losses: at('L'), for: at('PF'), against: at('PA') };
+        }
+      }
+      return found;
+    }, names);
+    for (const name of names) {
+      const row = rows[name];
+      if (row === undefined || Object.values(row).some((n) => !Number.isFinite(n))) {
+        throw new Error(`the standings have no full row for ${name}: ${JSON.stringify(rows)}`);
+      }
+    }
+    return rows;
   } finally {
     await context.close();
   }
 }
+
+/** How each of the two rows moved from `from` to `to`: wins, losses, points for and against. */
+const moved = (names, from, to) =>
+  names.map((name) => {
+    const [a, b] = [from[name], to[name]];
+    return [b.wins - a.wins, b.losses - a.losses, b.for - a.for, b.against - a.against];
+  });
 
 /** The public game page's main text, read signed out. */
 async function publicText() {
@@ -322,7 +366,9 @@ try {
 
   let seven = '';
   let nine = '';
+  let teams = [];
   await step('the foul is moved to the right player in the grid and saved', async () => {
+    teams = await teamsOf(page);
     const from = await boxOf(page, 7, 'Fouls');
     const to = await boxOf(page, 9, 'Fouls');
     seven = from.heading;
@@ -404,6 +450,40 @@ try {
     );
     note('the device shows its own basket', (await c.points('home', 11)) === 2);
   });
+
+  // T-408: the scorekeeper's Undo takes its own tap back, then asks before the admin's foul.
+  await step(
+    'Undo takes the device’s tap back, then asks before the correction’s foul',
+    async () => {
+      const before = await serverPlays();
+      await c.undo();
+      await c.saved();
+      const undone = await serverPlays();
+      const isTheFoul = (play) => play?.type === 'foul' && play?.playerId === ids[9];
+      note(
+        'the first Undo took the device’s basket back, leaving the correction’s foul last',
+        undone.length === before.length - 1 && isTheFoul(undone.at(-1)),
+        JSON.stringify(undone.slice(-2)),
+      );
+      await device.page.locator('[data-undo]:not([data-resting])').click();
+      const ask = device.page.locator('[data-undo-correction]');
+      await ask.waitFor({ timeout: tapLimit });
+      note(
+        'the next Undo asks first, in plain words',
+        (await ask.textContent())?.includes(words.undoCorrection),
+      );
+      await ask.getByRole('button', { name: words.leaveIt, exact: true }).click();
+      await ask.waitFor({ state: 'detached', timeout: tapLimit });
+      await c.saved();
+      const kept = await serverPlays();
+      note(
+        '“Leave it” keeps the admin’s foul on the server',
+        JSON.stringify(kept) === JSON.stringify(undone) && isTheFoul(kept.at(-1)),
+        JSON.stringify(kept.slice(-2)),
+      );
+      note('the device still shows the foul on number 9', (await c.fouls('home', 9)) === 1);
+    },
+  );
   await device.context.close();
 
   await step('a lowered basket is refused beside its box, everything typed kept', async () => {
@@ -493,9 +573,9 @@ try {
     await page.getByText(words.reopened, { exact: true }).waitFor({ timeout: pageLimit });
   };
 
-  let counted = '';
+  let counted = {};
   await step('the owner ends it again from the grid while a device holds it', async () => {
-    const whileLive = await standingsText();
+    const whileLive = await standingsRows(teams);
     const holder = await signedIn(scorekeeper);
     try {
       await open(holder.page, trackerPath());
@@ -540,8 +620,19 @@ try {
         shown.includes('Final') && shown.includes('Corrected on'),
         shown.slice(0, 300),
       );
-      counted = await standingsText();
-      note('the standings count the game again', counted !== whileLive);
+      counted = await standingsRows(teams);
+      // [away, home]: the game counts again, home the winner.
+      const [away, home] = moved(teams, whileLive, counted);
+      note(
+        'the standings count the game again in the two teams’ own rows',
+        away[0] === 0 &&
+          away[1] === 1 &&
+          home[0] === 1 &&
+          home[1] === 0 &&
+          home[2] > 0 &&
+          away[3] === home[2],
+        JSON.stringify({ teams, whileLive, counted }),
+      );
     } finally {
       await holder.context.close();
     }
@@ -550,7 +641,12 @@ try {
   await step('ended again with no change, the standings are as they were', async () => {
     await reopenAgain('Checked the score again');
     await endAgainIn('[data-end-again]');
-    note('the standings are unchanged', (await standingsText()) === counted);
+    const again = await standingsRows(teams);
+    note(
+      'the two teams’ rows are unchanged',
+      JSON.stringify(again) === JSON.stringify(counted),
+      JSON.stringify({ counted, again }),
+    );
   });
 
   await step('a basket that changes the winner changes the standings', async () => {
@@ -573,7 +669,15 @@ try {
     await page.getByRole('button', { name: words.save }).click();
     await page.locator('[data-grid-saved]').waitFor({ timeout: pageLimit });
     await endAgainIn('[data-end-again]');
-    note('the standings follow the new winner', (await standingsText()) !== counted);
+    const after = await standingsRows(teams);
+    // Away won instead: a win and nine points more for away, a loss more for home.
+    const [away, home] = moved(teams, counted, after);
+    note(
+      'the two teams’ rows follow the new winner',
+      JSON.stringify(away) === JSON.stringify([1, -1, 9, 0]) &&
+        JSON.stringify(home) === JSON.stringify([-1, 1, 0, 9]),
+      JSON.stringify({ teams, counted, after }),
+    );
   });
 
   await admin.context.close();

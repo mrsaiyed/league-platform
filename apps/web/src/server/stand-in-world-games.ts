@@ -8,7 +8,7 @@
 // numbers with no gaps, a number worn once where the season asks) are stood in for by the
 // checks made here. Only the storage is made up: every rule is the games commands' own.
 // A table is never changed in place: each write gives it a new array (stand-in-world-rows.ts).
-import { refusedAddEventType } from '@srleagues/contracts';
+import { correctionPlaySource, playSourceKey, refusedAddEventType } from '@srleagues/contracts';
 import {
   earlierRoundsOf,
   hasPlaysPastMarker,
@@ -691,6 +691,14 @@ export function worldLiveGames(s: LeagueWorld, now: () => Date): LiveGamesStore 
         .filter((e) => e.gameId === gameId && e.seq > afterSeq)
         .sort((a, b) => a.seq - b.seq)
         .slice(0, limit)
-        .map((e) => ({ seq: e.seq, commandId: e.commandId, type: e.type, accountId: e.accountId })),
+        .map((e) => ({
+          seq: e.seq,
+          commandId: e.commandId,
+          type: e.type,
+          accountId: e.accountId,
+          ...(e.payload[playSourceKey] === correctionPlaySource
+            ? { source: correctionPlaySource }
+            : {}),
+        })),
   };
 }
