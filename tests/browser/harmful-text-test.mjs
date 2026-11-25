@@ -1463,6 +1463,32 @@ async function walkEveryRoute() {
     );
   });
 
+  // One of those fields is the team page's tick "Move the team to the bin" (since step 2.90
+  // the team page holds no other tick): posted by hand it is ticked, so the attack team went
+  // to the bin. It is brought back, so the reads below (the coach's own teams) still find it.
+  await step(
+    'the attack team, moved to the bin by its tick posted by hand, is brought back',
+    async () => {
+      const context = await contextFor(owner);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(30_000);
+        await page.goto(`${origin}/north-valley/admin/settings/bin`);
+        const row = page.locator('li[data-bin=team]', { hasText: typed.team });
+        const binned = (await row.count()) === 1;
+        note('the tick posted by hand moved the attack team to the bin', binned);
+        if (binned) {
+          await Promise.all([
+            page.locator('[data-bin-answer][data-said=back]').waitFor({ timeout: 10_000 }),
+            row.getByRole('button', { name: 'Bring it back' }).click(),
+          ]);
+        }
+      } finally {
+        await context.close();
+      }
+    },
+  );
+
   // C. Every route again, in a browser as each role, with the script policy off: whatever was
   // kept from the posts above is shown as text, and the questions too.
   at = await addressesFound();
