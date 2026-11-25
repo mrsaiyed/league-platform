@@ -19,7 +19,7 @@ export type AttemptLimits = {
 /** A wait, in whole seconds. */
 export type Limited = { readonly retryAfterSeconds: number };
 
-export type VerifyType = 'signup' | 'magiclink' | 'recovery';
+export type VerifyType = 'signup' | 'magiclink' | 'recovery' | 'email_change';
 
 export type PendingCode = {
   readonly verifyType: VerifyType | null;

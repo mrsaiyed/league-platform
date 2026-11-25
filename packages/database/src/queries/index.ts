@@ -72,6 +72,8 @@ export { createOwnProfile, type OwnProfile } from './create-own-profile.ts';
 export { readOwnName } from './read-own-name.ts';
 export { renameOwnProfile } from './rename-own-profile.ts';
 export { eraseAccount, type EraseAccountAnswer } from './erase-account.ts';
+export { changeOwnEmail, type ChangeOwnEmailAnswer } from './change-own-email.ts';
+export { emailFreeForOwnAccount } from './email-free-for-own-account.ts';
 export { findAccountOfSignIn } from './find-account-of-sign-in.ts';
 export { listAccessNames, type AccessListName } from './list-access-names.ts';
 export { listMyLeagues } from './list-my-leagues.ts';

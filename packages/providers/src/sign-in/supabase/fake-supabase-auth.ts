@@ -41,7 +41,9 @@ export type FakeCall = {
 
 type User = {
   readonly id: string;
-  readonly email: string;
+  email: string;
+  /** A change of email asked (generate_link email_change_new) and not yet verified. */
+  emailChange: { newEmail: string; token: string; expiresAt: number } | null;
   readonly createdAt: Date;
   passwordDigest: string | null;
   confirmedAt: Date | null;
@@ -95,6 +97,7 @@ export function createFakeSupabaseAuth(options: FakeSupabaseAuthOptions) {
     role: 'authenticated',
     email: user.email,
     email_confirmed_at: user.confirmedAt?.toISOString() ?? null,
+    new_email: user.emailChange?.newEmail ?? '',
     app_metadata: { provider: [...user.providers][0] ?? 'email', providers: [...user.providers] },
     user_metadata: {},
     identities: [...user.providers].map((provider) => ({
@@ -162,6 +165,7 @@ export function createFakeSupabaseAuth(options: FakeSupabaseAuthOptions) {
         confirmedAt: null,
         providers: new Set(['email']),
         otp: null,
+        emailChange: null,
       };
       users.set(user.id, user);
       usersByEmail.set(email, user);
@@ -223,6 +227,16 @@ export function createFakeSupabaseAuth(options: FakeSupabaseAuthOptions) {
       } else if (type === 'magiclink') {
         user = findOrCreate(email).user;
         if (!user.confirmedAt) verificationType = 'signup';
+      } else if (type === 'email_change_new') {
+        // Supabase's own pending change, kept on the user (with "secure email change" off).
+        const newEmail = field(body, 'new_email').toLowerCase();
+        if (!user) return refuse(404, 'user_not_found', 'User with this email not found');
+        if (usersByEmail.has(newEmail)) {
+          return refuse(422, 'email_exists', 'A user with this email address has already been registered');
+        }
+        const token = String(randomInt(0, 1_000_000)).padStart(6, '0');
+        user.emailChange = { newEmail, token, expiresAt: nowMs() + codeMs };
+        return json(200, { ...userJson(user), email_otp: token, verification_type: type });
       } else {
         return refuse(400, 'validation_failed', 'Invalid link type');
       }
@@ -236,6 +250,24 @@ export function createFakeSupabaseAuth(options: FakeSupabaseAuthOptions) {
         redirect_to: 'https://fake.supabase.test',
         verification_type: verificationType,
       });
+    }
+
+    if (call.method === 'POST' && path === '/verify' && field(body, 'type') === 'email_change') {
+      const address = field(body, 'email').toLowerCase();
+      const user = [...users.values()].find(
+        (u) =>
+          u.emailChange?.newEmail === address &&
+          u.emailChange.token === field(body, 'token') &&
+          nowMs() < u.emailChange.expiresAt,
+      );
+      if (!user || usersByEmail.has(address)) {
+        return refuse(403, 'otp_expired', 'Token has expired or is invalid');
+      }
+      usersByEmail.delete(user.email);
+      user.email = address;
+      user.emailChange = null;
+      usersByEmail.set(address, user);
+      return startSession(user);
     }
 
     if (call.method === 'POST' && path === '/verify') {

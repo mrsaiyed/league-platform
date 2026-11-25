@@ -3,9 +3,9 @@ import type { Selectable } from 'kysely';
 import type { SignInProofsTable } from '../db/schema-types.ts';
 import type { HeldProof, VerifyType } from './sign-in-store-types.ts';
 
-const verifyTypes: readonly VerifyType[] = ['signup', 'magiclink', 'recovery'];
+const verifyTypes: readonly VerifyType[] = ['signup', 'magiclink', 'recovery', 'email_change'];
 
-/** The kind of check a code answers, as stored (0012 allows only these). */
+/** The kind of check a code answers, as stored (0012 allows these, 0031 email_change too). */
 export function verifyTypeOf(value: string | null): VerifyType | null {
   if (value === null) return null;
   const found = verifyTypes.find((type) => type === value);

@@ -18,8 +18,11 @@ import type { Result } from '@srleagues/core';
 
 export type { SignInDevice };
 
-/** What a code was asked for. Sign-up proves a new address; reset is the forgotten-password route (T-67). */
-export type CodePurpose = 'sign-up' | 'reset';
+/**
+ * What a code was asked for. Sign-up proves a new address; reset is the forgotten-password
+ * route (T-67); email-change proves the new address of a signed-in account (T-73, T-455).
+ */
+export type CodePurpose = 'sign-up' | 'reset' | 'email-change';
 
 /**
  * One sign-in email to send, through our own email service (T4 §3: not the vendor's
@@ -202,6 +205,31 @@ export type ChangePasswordError =
 /** A changed password: every other session ended, this one kept (T-70, T-85). */
 export type PasswordChanged = { readonly endedSessions: number };
 
+/**
+ * Why asking to change the email sent nothing (T-73, T-455). The password's refusals are
+ * `confirmPassword`'s, counted the same. `same-email`: the account's own address, nothing
+ * to change. An address another account holds is never a refusal: it answers as a free one
+ * does, with no code sent (T-68).
+ */
+export type StartEmailChangeError =
+  | ConfirmPasswordError
+  | { readonly code: 'invalid-email' }
+  | { readonly code: 'same-email' }
+  | CodeNotSent;
+
+/**
+ * Why a code changed nothing. As `verifyCode`'s: `code-expired` also covers no pending
+ * change, one asked by another account, and an address taken since it was asked.
+ */
+export type ConfirmEmailChangeError = VerifyCodeError | SessionError;
+
+/** A changed email: every other session ended, this one kept (T-73, T-70). */
+export type EmailChanged = {
+  readonly oldEmail: string;
+  readonly newEmail: string;
+  readonly endedSessions: number;
+};
+
 /** Signing out by either token: the access token may have run out; the refresh token is in the cookie. */
 export type SignOutInput = { readonly accessToken: string } | { readonly refreshToken: string };
 
@@ -310,6 +338,31 @@ export type SignInService = {
     readonly newPassword: string;
     readonly networkAddress: string;
   }) => Promise<Result<PasswordChanged, ChangePasswordError>>;
+  /**
+   * The signed-in person asks to move their account to `newEmail` (T-73, step 2.128, T-455):
+   * the password first, counted as `confirmPassword`'s guesses, then a code for the new
+   * address under every code's limits (T-225). An address the service gives another
+   * account, or `takenElsewhere` (the caller's own records do), gets no code and the same
+   * answer (T-68). Asking again replaces the pending change. Nothing changes yet; the caller
+   * tells the old address.
+   */
+  readonly startEmailChange: (input: {
+    readonly accessToken: string;
+    readonly password: string;
+    readonly newEmail: string;
+    readonly takenElsewhere: boolean;
+    readonly networkAddress: string;
+  }) => Promise<Result<CodeRequested, StartEmailChangeError>>;
+  /**
+   * The code from the new address. A right one moves the account's address, ends every
+   * other session and keeps this one; a wrong one spends an attempt and counts against the
+   * network, as for `verifyCode`. Any refusal changes nothing.
+   */
+  readonly confirmEmailChange: (input: {
+    readonly accessToken: string;
+    readonly code: string;
+    readonly networkAddress: string;
+  }) => Promise<Result<EmailChanged, ConfirmEmailChangeError>>;
   /** Ends this session. A second call is harmless. */
   readonly signOut: (input: SignOutInput) => Promise<Result<{ readonly ended: boolean }, never>>;
   /**

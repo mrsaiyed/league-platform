@@ -87,7 +87,8 @@ export type LocalSignInStandIn = {
 
 type Account = {
   readonly id: string;
-  readonly email: string;
+  /** Changes only by a confirmed change of email (T-73). */
+  email: string;
   hash: PasswordHash | undefined;
   readonly devices: Set<string>;
 };
@@ -98,6 +99,9 @@ type PendingCode = {
   readonly expiresAt: number;
   attemptsLeft: number;
 };
+
+/** A change of email asked and not yet confirmed (T-455): the account's own, one at a time. */
+type PendingEmailChange = PendingCode & { readonly newEmail: string };
 
 type Session = {
   readonly id: string;
@@ -156,6 +160,7 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
   const accessTokens = new Map<string, { session: Session; expiresAt: number }>();
   const refreshTokens = new Map<string, Session>();
   const external = new Map<string, PendingExternal>();
+  const emailChanges = new Map<Account, PendingEmailChange>();
   const guessesPerEmail = createAttemptLimiter(settings.guessesPerEmail, now);
   const guessesPerNetwork = createAttemptLimiter(settings.guessesPerNetwork, now);
 
@@ -174,20 +179,30 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
     return Math.max(1, Math.ceil((oldest + hour - at) / 1000));
   };
 
-  const requestCode = async (rawEmail: string, rawNetwork: string, purpose: CodePurpose) => {
-    const network = parseNetwork(rawNetwork);
-    const parsed = signInEmail.safeParse(rawEmail);
-    if (!parsed.success) return fail({ code: 'invalid-email' as const });
-    const email = parsed.data;
+  const newCode = () => String(randomInt(0, 1_000_000)).padStart(6, '0');
+
+  /** Counts a request for a code against the address and the network (T-225); the wait if over. */
+  const countCodeRequest = (email: string, network: string): number | null => {
     // Counted whether or not an account exists, so the limit looks the same (T-68).
     const waits = [
       hourlyWait(codeRequestsByEmail, email, settings.codesPerHour),
       hourlyWait(codeRequestsByNetwork, network, settings.codesPerHourPerNetwork),
     ].filter((w) => w !== null);
-    if (waits.length) return fail(tooMany(Math.max(...waits)));
+    if (waits.length) return Math.max(...waits);
     const at = now().getTime();
     codeRequestsByEmail.get(email)?.push(at);
     codeRequestsByNetwork.get(network)?.push(at);
+    return null;
+  };
+
+  const requestCode = async (rawEmail: string, rawNetwork: string, purpose: CodePurpose) => {
+    const network = parseNetwork(rawNetwork);
+    const parsed = signInEmail.safeParse(rawEmail);
+    if (!parsed.success) return fail({ code: 'invalid-email' as const });
+    const email = parsed.data;
+    const wait = countCodeRequest(email, network);
+    if (wait !== null) return fail(tooMany(wait));
+    const at = now().getTime();
 
     const account = accounts.get(email);
     const expiresAt = at + settings.codeValidMinutes * minute;
@@ -196,10 +211,7 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
     // way the sender gets a message (one with no code sends nothing), so asking costs
     // the same work, and the address gets a pending entry, so guessing behaves the
     // same (T-68).
-    const code =
-      purpose === 'sign-up' || account !== undefined
-        ? String(randomInt(0, 1_000_000)).padStart(6, '0')
-        : null;
+    const code = purpose === 'sign-up' || account !== undefined ? newCode() : null;
     const sent = await options.codeSender.send({
       to: email,
       purpose,
@@ -530,6 +542,85 @@ export function createLocalSignInStandIn(options: LocalSignInOptions): LocalSign
       session.passwordEnteredAt = at;
       session.lastSignInAt = at;
       return ok({ endedSessions });
+    },
+
+    async startEmailChange({ accessToken, password, newEmail, takenElsewhere, networkAddress }) {
+      const network = parseNetwork(networkAddress);
+      const session = liveSession(accessToken);
+      if ('code' in session) return fail(session);
+      const { account } = session;
+      if (account.hash === undefined) return fail({ code: 'no-password' });
+      const parsed = signInEmail.safeParse(newEmail);
+      if (!parsed.success) return fail({ code: 'invalid-email' });
+      const email = parsed.data;
+      if (email === account.email) return fail({ code: 'same-email' });
+      // The password exactly as confirmPassword checks it (T-85, T-225).
+      const reserved = reserveGuess(account.email, network);
+      if ('limited' in reserved) return fail(reserved.limited);
+      const attempt = passwordAttempt.safeParse(password);
+      const hashUsed = account.hash;
+      const matches = await hasher.matches(attempt.success ? attempt.data : '', hashUsed);
+      if (session.ended) return fail({ code: 'session-ended' });
+      if (!matches || !attempt.success || account.hash !== hashUsed) {
+        return fail({ code: 'wrong-password' });
+      }
+      reserved.forgive();
+      session.passwordEnteredAt = now();
+      const wait = countCodeRequest(email, network);
+      if (wait !== null) return fail(tooMany(wait));
+      // Another account's address gets no code and the same answer (T-68): the sender is
+      // handed a message either way, and one with no code sends nothing.
+      const taken = takenElsewhere || accounts.has(email);
+      const code = taken ? null : newCode();
+      const expiresAt = now().getTime() + settings.codeValidMinutes * minute;
+      const sent = await options.codeSender.send({
+        to: email,
+        purpose: 'email-change',
+        code,
+        accountExists: taken,
+        expiresAt: new Date(expiresAt),
+      });
+      if (!sent.ok) return fail({ code: 'code-not-sent' });
+      emailChanges.set(account, {
+        newEmail: email,
+        code,
+        expiresAt,
+        attemptsLeft: settings.attemptsPerCode,
+      });
+      return ok({ codeValidMinutes: settings.codeValidMinutes });
+    },
+
+    async confirmEmailChange({ accessToken, code: rawCode, networkAddress }) {
+      const network = parseNetwork(networkAddress);
+      const session = liveSession(accessToken);
+      if ('code' in session) return fail(session);
+      const allowed = guessesPerNetwork.check(network);
+      if (!allowed.allowed) {
+        return fail({ code: 'too-many-attempts', retryAfterSeconds: allowed.retryAfterSeconds });
+      }
+      const { account } = session;
+      // Only this account's own pending change: a code asked by another matches nothing.
+      const pending = emailChanges.get(account);
+      if (!pending || now().getTime() >= pending.expiresAt) return fail({ code: 'code-expired' });
+      if (pending.attemptsLeft <= 0) return fail({ code: 'too-many-attempts' });
+      const code = emailCode.safeParse(rawCode);
+      if (pending.code === null || !code.success || code.data !== pending.code) {
+        pending.attemptsLeft--;
+        guessesPerNetwork.recordFailure(network);
+        return fail({ code: pending.attemptsLeft <= 0 ? 'too-many-attempts' : 'code-wrong' });
+      }
+      emailChanges.delete(account);
+      // Taken since it was asked: nothing changes.
+      if (accounts.has(pending.newEmail)) return fail({ code: 'code-expired' });
+      const oldEmail = account.email;
+      forgetProofsFor(oldEmail);
+      forgetProofsFor(pending.newEmail);
+      accounts.delete(oldEmail);
+      account.email = pending.newEmail;
+      accounts.set(account.email, account);
+      // T-73: like a changed password, every other device is signed out; this one stays.
+      const endedSessions = endSessions(account, session);
+      return ok({ oldEmail, newEmail: account.email, endedSessions });
     },
 
     async signOut(input) {

@@ -56,7 +56,7 @@ export type SignInLimitStore = {
 /** A code asked for. The code itself is Supabase's; this keeps what Supabase does not. */
 export type PendingCode = {
   /** Which Supabase check the code answers; null when no code was sent (T-68). */
-  readonly verifyType: 'signup' | 'magiclink' | 'recovery' | null;
+  readonly verifyType: 'signup' | 'magiclink' | 'recovery' | 'email_change' | null;
   readonly expiresAt: Date;
   readonly attemptsLeft: number;
 };

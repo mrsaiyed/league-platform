@@ -339,6 +339,16 @@ const narrowLookups = new Map<unknown, string>([
     databasePackage.listMyLeagues,
     "the leagues of the account set (my_leagues): no argument, that account's own owner, role and roster rows only, the fewest columns, no league in the bin; tested in list-my-leagues.test.ts",
   ],
+  // Step 2.128 (T-458): a change of email, for the account set only; neither reads nor
+  // writes a league's data, nor says whose an address is; tested in change-own-email.test.ts.
+  [
+    databasePackage.emailFreeForOwnAccount,
+    'whether no other account holds an address (email_free_for_own_account): a yes or a no only',
+  ],
+  [
+    databasePackage.changeOwnEmail,
+    "moves the address of the account set (change_own_email): that account's own row only, or taken",
+  ],
   [
     databasePackage.eraseAccount,
     "erases the account set (erase_account): its personal rows and sign-in rows, and writes across leagues by design (T-52): that account's grants ended, its game assignments and scoring sessions removed, its accepted invitations' email emptied; tested in erase-account.test.ts",
