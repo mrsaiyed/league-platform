@@ -63,6 +63,16 @@ export const enAdminTeams = {
   'adminTeams.field.useOwnColors': "Use the league's own colors",
   // A refusal said beside the box it is about, naming it (step 2.155).
   'adminTeams.fieldRefused': '{field}: {why}',
+  'adminTeams.find.allOnRoster': 'Everyone found here is already on this roster.',
+  'adminTeams.find.clear': 'Show everyone',
+  'adminTeams.find.foundFor': 'People whose name holds “{search}”.',
+  'adminTeams.find.label': 'Find a person by name',
+  'adminTeams.find.next': 'Next page',
+  'adminTeams.find.nobody':
+    'Nobody in the league list here. Try another name, or add them as someone new above.',
+  'adminTeams.find.page': 'Page {page} of the league list, 200 to a page.',
+  'adminTeams.find.previous': 'Previous page',
+  'adminTeams.find.submit': 'Find',
   // After a team's name in the list, with the space before it: " (North)".
   'adminTeams.inDivision': ' ({division})',
   // S-87: a team that leaves the league mid-season. Its results stay, it is marked in

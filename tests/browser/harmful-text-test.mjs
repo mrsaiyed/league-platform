@@ -135,6 +135,8 @@ const FIELDS = {
     firstName: 'a person is added',
     lastName: 'a person is added',
     jerseyNumber: 'a person is added',
+    // Step 2.90: "Find a person by name" for the roster, a plain question shown back.
+    q: POSTED,
   },
   // People: the search box (a plain question, shown back) and the add-a-person form, each
   // posted the attack by hand; what is kept is read back by the walk below.

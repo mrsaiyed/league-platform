@@ -18,6 +18,7 @@ import {
   leagueUrl,
   type Result,
 } from '@srleagues/core';
+import { redirect } from 'next/navigation';
 import { commandContextOf } from '../../server/context.ts';
 import { webPorts } from '../../server/container.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
@@ -33,6 +34,7 @@ import {
 import { createTeamRefusal } from './create-team-answer.ts';
 import {
   addPlayerAnchor,
+  fromListAnchor,
   done,
   entryAnchor,
   refused,
@@ -214,6 +216,29 @@ export async function removeTeamAction(form: FormData): Promise<void> {
     // Gone, so back to the list; a refusal stays on the team's own page.
     return result.ok ? { answer: done('removed') } : settle(removeTeam, result, 'removed', teamId);
   });
+}
+
+/**
+ * "Find" on a team's page (step 2.90, T-448): the browser goes to the team's own address
+ * with the name searched for, where the league list is read on the server for it. A name
+ * only: what holds an email address is never put in an address (T-76); the page then
+ * shows the list unsearched.
+ */
+export async function findPersonAction(form: FormData): Promise<void> {
+  const fields = typedOf(form);
+  const view = await loadLeaguePage(fields['league'] ?? '', 'admin', 'teams');
+  const teamId = (fields['team'] ?? '').toLowerCase();
+  const typed = (fields['q'] ?? '')
+    .trim()
+    .slice(0, 100)
+    .replace(/[\u2018\u2019]/g, "'");
+  const search = typed === '' || typed.includes('@') ? {} : { q: typed };
+  const page = leagueUrl(view.context.league, 'admin-area', {
+    area: 'teams',
+    ...(teamIdShape.test(teamId) ? { subpath: [teamId] } : {}),
+    query: search,
+  });
+  redirect(`${page}#${fromListAnchor}`);
 }
 
 /**

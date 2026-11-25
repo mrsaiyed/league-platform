@@ -72,6 +72,8 @@ const numberShape = /^(0|00|[1-9][0-9]?)$/;
 
 /** Where "Add a player" leads: the first form that adds one. */
 export const addPlayerAnchor = 'add-player';
+/** "Someone already in the league": where a search for a person leads back to (step 2.90). */
+export const fromListAnchor = 'from-league-list';
 
 /** The place on a team's page of its details form, where its "Saved" is said. */
 export const teamDetailsAnchor = 'team-details';
