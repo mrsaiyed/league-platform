@@ -6,7 +6,7 @@
 import { catalogs } from '@srleagues/site';
 import type { TextKey } from '../../server/messages.ts';
 
-/** What went well, each with a message `adminTeams.done.<name>`. */
+/** What went well; each one said in the address has a message `adminTeams.done.<name>`. */
 export const doneNames = [
   'updated',
   'statsSaved',
@@ -22,6 +22,15 @@ export const doneNames = [
   'teamBack',
 ] as const;
 export type DoneName = (typeof doneNames)[number];
+
+/**
+ * What a form that answers in the response to the post saved (step 2.155): said on the
+ * page from the one-time notice, never in the address, so it has no `adminTeams.done.…`.
+ */
+const saidOnThePageOnly: readonly DoneName[] = ['statsSaved', 'entrySaved'];
+
+/** The words an address's `done=` may carry. */
+export const addressDoneNames = doneNames.filter((name) => !saidOnThePageOnly.includes(name));
 
 /**
  * The roster line a change was about, so the page says what went well on that line,
@@ -143,7 +152,7 @@ export function doneAtOf(
 /** The text of what went well, from the address; undefined when nothing did or the word is not ours. */
 export function doneKey(query: Query): TextKey | undefined {
   const word = only(query['done']);
-  const found = doneNames.find((name) => name === word);
+  const found = addressDoneNames.find((name) => name === word);
   return found === undefined ? undefined : (`adminTeams.done.${found}` as TextKey);
 }
 

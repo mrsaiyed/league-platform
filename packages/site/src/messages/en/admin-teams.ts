@@ -36,7 +36,6 @@ export const enAdminTeams = {
   'adminTeams.create.submit': 'Add team',
   'adminTeams.create.title': 'Add a team',
   'adminTeams.done.added': 'The player was added to the roster.',
-  'adminTeams.done.entrySaved': 'The number and role were saved.',
   'adminTeams.done.left': 'The player was marked as having left.',
   'adminTeams.done.moved': 'The roster order was saved.',
   'adminTeams.done.personRemoved':
@@ -46,7 +45,6 @@ export const enAdminTeams = {
   'adminTeams.done.putBackNoNumber':
     'The player is back on the roster with no number, because someone else now wears theirs. Give them a number.',
   'adminTeams.done.removed': 'Moved to the bin: the team is kept there for 30 days.',
-  'adminTeams.done.statsSaved': 'Who sees the numbers was saved.',
   'adminTeams.done.teamBack': 'The mark is off: the team is playing in the league again.',
   'adminTeams.done.teamLeft': 'The team is marked as having left the league.',
   'adminTeams.done.updated': 'The team was saved.',
