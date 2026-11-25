@@ -33,8 +33,9 @@ type Outcome =
       readonly ok: true;
       readonly said: string;
       readonly about?: readonly string[];
+      readonly name?: string;
     }
-  | { readonly ok: false; readonly said: string };
+  | { readonly ok: false; readonly said: string; readonly name?: string };
 
 /** The answers to the restores of the last ten minutes, by request (server/same-request.ts). */
 const requests = () => sameRequestsHere<Outcome>();
@@ -95,17 +96,19 @@ export async function bringBackAction(form: FormData): Promise<never> {
                   }
                 : undefined;
   if (!binKinds.has(kind ?? '')) return redirect(bin);
-  // Its name as the bin lists it, read before it leaves the bin, so the answer can name it.
-  const listed = await listBinPart(context, {}, deps);
-  const item = listed.ok ? listed.value.items.find((i) => i.id === id) : undefined;
-  const name = item === undefined ? undefined : binTitle(item);
   const outcome = await requests().once(
     requestKeyOf(context, fields),
     async (): Promise<Outcome> => {
+      // Its name as the bin lists it, read before it leaves the bin, so the answer (and the
+      // same answer to a second post, when it is no longer there) can name it.
+      const listed = await listBinPart(context, {}, deps);
+      const item = listed.ok ? listed.value.items.find((i) => i.id === id) : undefined;
+      const named = item === undefined ? {} : { name: binTitle(item) };
       const result = await restore();
       if (result === undefined) return { ok: false, said: '' };
-      if (!result.done.ok)
-        return { ok: false, said: binNotSaid(result.name, result.done.error.code) };
+      if (!result.done.ok) {
+        return { ok: false, said: binNotSaid(result.name, result.done.error.code), ...named };
+      }
       // A game brought back is a schedule change (A-19): its revision, the teams and people
       // it reaches (A-7) and the games now at its time, kept on the server for the next page.
       const game = 'revision' in result.done.value ? result.done.value : undefined;
@@ -117,6 +120,7 @@ export async function bringBackAction(form: FormData): Promise<never> {
             seasonId: game.seasonId,
           }),
           about: game.clashes.map((c) => c.id),
+          ...named,
         };
       }
       // A person back who is the league's first recorded child put "children in full" back to no (S-109).
@@ -126,6 +130,7 @@ export async function bringBackAction(form: FormData): Promise<never> {
       return {
         ok: true,
         said: binBackSaid(kind === 'person' ? 'person' : (kind as BinKindShown), { firstChild }),
+        ...named,
       };
     },
   );
@@ -136,7 +141,7 @@ export async function bringBackAction(form: FormData): Promise<never> {
       screen: 'bin',
       thing: id,
       said: outcome.said,
-      ...(name === undefined ? {} : { name }),
+      ...(outcome.name === undefined ? {} : { name: outcome.name }),
       ...(outcome.ok && outcome.about !== undefined && outcome.about.length > 0
         ? { about: outcome.about }
         : {}),
