@@ -13,8 +13,8 @@
 //   and the device then shows the server's numbers (or says in words why it cannot). Its
 //   Undo takes that tap back; the next Undo, on the correction's foul, asks first (T-408),
 //   (once, for a fast double tap) and "Leave it" keeps the foul on the server.
-// - A lowered basket is refused beside its box, with everything typed kept and nothing
-//   saved; a grid left open while the game changed in a second tab is refused at the top
+// - A basket moved from one player to another is a take-back and a basket (step 2.247);
+//   a grid left open while the game changed in a second tab is refused at the top
 //   with "Load it again", everything typed kept, and the second tab's change alone saved.
 // - The owner ends it again from the grid ("End the game again", T-407) while a device
 //   still holds it: the game's page says it is final, the device is told in plain words at
@@ -59,8 +59,6 @@ const words = {
   endAgain: 'End the game again',
   deviceTold: 'This game cannot be scored now: it is over, cancelled or postponed.',
   saved: 'Saved. These plays were added to the game’s list of plays:',
-  lowered: (cell) =>
-    `${cell} cannot go lower here. To take points away, reopen the game on the scoring screen and use Undo. Nothing was saved.`,
   stale:
     'Someone else changed this game since you opened this page, so nothing was saved. Load it again to see the new numbers; what you typed is still shown below.',
 };
@@ -496,31 +494,44 @@ try {
   );
   await device.context.close();
 
-  await step('a lowered basket is refused beside its box, everything typed kept', async () => {
-    await open(page, gridPage);
-    const before = (await serverPlays()).length;
-    const three = await boxOf(page, 9, '3-pointers made');
-    const foul = await boxOf(page, 11, 'Fouls');
-    note('number 9 has one 3-point basket', three.value === '1', three.value);
-    await three.input.fill('0');
-    await foul.input.fill('2');
-    await page.getByRole('button', { name: words.save }).click();
-    const beside = page.locator(
-      `td:has(input[name="${three.name}"]) [data-grid-problem="basket-taken-back"]`,
-    );
-    await beside.waitFor({ timeout: pageLimit });
-    note(
-      'the sentence is beside the lowered box',
-      (await beside.textContent()) === words.lowered(three.label),
-      (await beside.textContent()) ?? '',
-    );
-    note('the lowered box is marked', (await three.input.getAttribute('aria-invalid')) === 'true');
-    note(
-      'every box still holds what was typed',
-      (await three.input.inputValue()) === '0' && (await foul.input.inputValue()) === '2',
-    );
-    note('nothing was saved', (await serverPlays()).length === before);
-  });
+  // Step 2.247 (T-436): points moved from one player to another are a take-back of the
+  // first player's newest basket of that value and a new basket for the other.
+  await step(
+    'a 3-point basket moved from number 9 to number 11 is a take-back and a basket',
+    async () => {
+      await open(page, gridPage);
+      const before = await serverPlays();
+      const three = await boxOf(page, 9, '3-pointers made');
+      const theirs = await boxOf(page, 11, '3-pointers made');
+      note('number 9 has one 3-point basket', three.value === '1', three.value);
+      const basket = before.findLast((p) => p.type === 'score' && p.points === 3);
+      await three.input.fill('0');
+      await theirs.input.fill(String(Number(theirs.value) + 1));
+      await page.getByRole('button', { name: words.save }).click();
+      await page.locator('[data-grid-saved]').waitFor({ timeout: pageLimit });
+      const after = await serverPlays();
+      const [takeBack, added] = after.slice(before.length);
+      note(
+        'the event log holds the take-back of that basket, then the new basket',
+        after.length === before.length + 2 &&
+          takeBack?.type === 'unscore' &&
+          takeBack.playId === basket?.id &&
+          takeBack.points === 3 &&
+          added?.type === 'score' &&
+          added.points === 3 &&
+          added.playerId !== basket?.playerId,
+        JSON.stringify([takeBack, added]),
+      );
+      await open(page, gridPage);
+      const nine = await boxOf(page, 9, '3-pointers made');
+      const eleven = await boxOf(page, 11, '3-pointers made');
+      note(
+        'the grid read again gives the moved basket',
+        nine.value === '0' && eleven.value === String(Number(theirs.value) + 1),
+        `${nine.value} ${eleven.value}`,
+      );
+    },
+  );
 
   await step('a grid left open while the game changed is refused, everything kept', async () => {
     await open(page, gridPage);
