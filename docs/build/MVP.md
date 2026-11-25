@@ -32,6 +32,7 @@ Two things to know before reading:
 9. **2.155 A refused save keeps what was typed.** Why: today one mistake empties every box, for example twelve players' points copied from a paper score sheet.
 10. **2.159 A game's page tells the truth in every state.** Why: today a game with no score yet says "has not started" and sits under "Upcoming"; parents read this on game night.
     - **2.69 Running-clock switch and the mercy rule in the tracker**, **2.123 Team fouls that reset each half** and **2.245 The three game rules are asked when a league is made** (moved from list B and added on 2026-11-24, S-106, the founder: "those rules should be decided by admin at league creation time and changed at season through admin acc if needed"). Why: Faraj's admin must be able to answer the question when the league is made, and the tracker must then follow the answer.
+    - **2.247 The grid can take a basket away** and **2.248 A season may have both a mercy rule and a last-minutes stop clock** (added 2026-11-25 by the lead, found building 2.65 and reviewing 2.69; built after 2.123). Why: points given to the wrong player are the commonest correction, and today the grid can only raise them; and an admin who answers both game rules at league creation is refused today. (unsure: 2.247 could wait, since the scoring screen’s Undo still takes points away.)
 
 ### Faraj's league, seasons and old data
 
