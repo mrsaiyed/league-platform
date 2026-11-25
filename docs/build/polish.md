@@ -173,3 +173,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.248: the `runningLast` sentence says "last 1 minutes" for 60 seconds; in a mercy season "for the rest of the game" stops being true if the lead drops under the mercy line and climbs back; a stop-clock tap queued on a device that arrives inside the last minutes is refused and one tap after them puts it right.
 
 - 2.155 part 6: the kit helper `answered` can be satisfied by an old answer still on screen; `game-rules-asked-test` about line 352 passes if a season started but its notice was lost; `scripts/shots.mjs` line 1759 still waits for `at=add-round` in the address; one notice per person and league (two tabs); a stale "left" answer keeps its old date; harmful-text never tries a refused game's place.
+
+- 2.90: harmful-text's blind hand-posts can take destructive actions on data later steps need (give the team page a team of its own); `mercy-and-stop-clock-test` failed once in three on the machine at "phone-lying: Stop clock on" (the scoring screen's layout, from step 2.248); the paging test reads `?page=` only to two pages.
