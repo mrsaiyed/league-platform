@@ -346,8 +346,9 @@ export function buildBoxScores(page: GamePage): BoxScoresView {
       teamName: box.name,
       columns,
       players: box.playerLinesShown
-        ? box.players.map((p) => ({
-            id: p.personId,
+        ? box.players.map((p, place) => ({
+            // Keyed by its place in the table, never the person's id (T-463, step 2.225).
+            id: `${box.side}-player-${place}`,
             jersey: p.jersey,
             name: boxScoreName(t('game.jerseyOnly'), t('game.nameNotShown'), p),
             cells: p.stats,

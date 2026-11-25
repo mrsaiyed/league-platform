@@ -18,6 +18,7 @@ import { scoringSessionRequest } from '../../server/scoring-session-endpoint.ts'
 import { sendTrackerCommands } from '../../server/tracker-commands-endpoint.ts';
 import {
   bears,
+  bearsBench,
   bearsNames,
   games,
   hawks,
@@ -471,6 +472,25 @@ describe('a game page', () => {
     expect(built.tables[0]?.players).toBeNull();
     expect(built.tables[1]?.players?.map((p) => p.name)).toEqual(['Name not shown', '#12']);
     expect(built.tables[0]?.columns.map((c) => c.label)).toEqual(['PTS']);
+    // Rows are keyed by their place in the table, never by the person's id (step 2.225).
+    expect(built.tables[1]?.players?.map((p) => p.id)).toEqual(['home-player-0', 'home-player-1']);
+  });
+
+  it("holds no person's id, in its drawn page or in what it hands the browser (step 2.225)", async () => {
+    const world = trackerWorld();
+    await scoreHawksBears(world);
+    const { view, page } = await viewOf(world, games.hawksBears);
+    // The box scores drawn as a final game draws them, beside the live snapshot.
+    const shown = { ...view, boxScores: buildBoxScores(page) };
+    const built = shown.boxScores;
+    if (built.kind !== 'tables') throw new Error(built.kind);
+    expect(built.tables.some((table) => (table.players?.length ?? 0) > 0)).toBe(true);
+    expect(view.snapshot.players.length).toBeGreaterThan(0);
+    const served = `${draw(shown)}${JSON.stringify(shown)}`;
+    for (const id of [...hawks, ...bears, bearsBench]) {
+      expect(served).not.toContain(id);
+      expect(served).not.toContain(id.toUpperCase());
+    }
   });
 
   it('draws the play-by-play as a table a period: clock, team mark, and the score after a basket', async () => {
