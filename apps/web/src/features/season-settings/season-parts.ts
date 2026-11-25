@@ -3,9 +3,9 @@
 // takes them from the message files by the keys named here, T-187) and nothing read or
 // saved. Every rule a part changes is followed by the product today (step 2.138 follows
 // this one): the roster limits, the lock date and the coin flip are not fields of any
-// part (they are shown "not in use yet"), the team-foul reset is not a choice (it follows
-// the game's periods, as the tracker counts it, step 2.123), and "last five" is not a
-// column (nothing works it out).
+// part (they are shown "not in use yet"), the team-foul reset is the admin's choice (each
+// period, each half or once a game, which the tracker counts since step 2.123; S-106), and
+// "last five" is not a column (nothing works it out).
 //
 // A part's form changes only its own part of the rules: the rest is the season's rules
 // as read fresh when it is saved, so two admins saving two parts do not undo each other.
@@ -106,6 +106,7 @@ export function fieldsOfPart(part: SeasonPart): readonly string[] {
         'bonusFouls',
         'doubleBonusFouls',
         'playerFoulLimit',
+        'teamFoulsReset',
         'fullTimeouts',
         'shortTimeouts',
         'timeoutsPer',
@@ -163,6 +164,7 @@ export function rulesFields(part: Exclude<SeasonPart, 'name'>, rules: SeasonRule
         bonusFouls: shown(rules.fouls.bonusFouls),
         doubleBonusFouls: shown(rules.fouls.doubleBonusFouls),
         playerFoulLimit: shown(rules.fouls.playerFoulLimit),
+        teamFoulsReset: rules.fouls.teamFoulsReset,
         fullTimeouts: shown(rules.timeouts.full),
         shortTimeouts: shown(rules.timeouts.short),
         timeoutsPer: rules.timeouts.per,
@@ -276,6 +278,12 @@ export function rulesFromPart(
       const bonusFouls = readNumber(fields, 'bonusFouls', wrong);
       const doubleBonusFouls = readNumber(fields, 'doubleBonusFouls', wrong);
       const playerFoulLimit = readNumber(fields, 'playerFoulLimit', wrong);
+      const reset = readChoice(
+        fields,
+        'teamFoulsReset',
+        ['period', 'half', 'game'] as const,
+        wrong,
+      );
       const full = readNumber(fields, 'fullTimeouts', wrong);
       const short = readNumber(fields, 'shortTimeouts', wrong);
       const per = readChoice(fields, 'timeoutsPer', ['game', 'half'] as const, wrong);
@@ -292,6 +300,7 @@ export function rulesFromPart(
         bonusFouls == null ||
         doubleBonusFouls === undefined ||
         playerFoulLimit === undefined ||
+        reset === undefined ||
         full == null ||
         short == null ||
         per === undefined ||
@@ -317,7 +326,7 @@ export function rulesFromPart(
           mercyLead: mode === 'stop' ? mercyLead : null,
         },
         fouls: {
-          teamFoulsReset: teamFoulsResetFor(periodCount, base.fouls.teamFoulsReset),
+          teamFoulsReset: reset,
           bonusFouls,
           doubleBonusFouls,
           playerFoulLimit,
@@ -401,20 +410,6 @@ export function rulesFromPart(
   const checked = SeasonRules.safeParse(rules);
   if (!checked.success) return { ok: false, wrong: contractWrong(checked.error.issues) };
   return { ok: true, value: checked.data };
-}
-
-/**
- * How team fouls reset, as the tracker counts them (until step 2.123 it counts by period):
- * each quarter with quarters; with halves a period is a half, so "each half" (or "each
- * period", the same thing) is kept, and "once a game", which the tracker does not follow,
- * becomes each half.
- */
-export function teamFoulsResetFor(
-  periods: 2 | 4,
-  now: SeasonRules['fouls']['teamFoulsReset'],
-): SeasonRules['fouls']['teamFoulsReset'] {
-  if (periods === 4) return 'period';
-  return now === 'game' ? 'half' : now;
 }
 
 /** Where on the form each finding of the rules contract is said, by its path. */

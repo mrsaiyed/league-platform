@@ -9,7 +9,6 @@ import {
   presetOf,
   rulesFields,
   rulesFromPart,
-  teamFoulsResetFor,
   ticked,
   withPreset,
 } from './season-parts.ts';
@@ -138,12 +137,23 @@ describe('a part changes only its own rules', () => {
     ]);
   });
 
-  it('sets the team-foul reset the tracker follows: each quarter, or each half', () => {
-    expect(teamFoulsResetFor(4, 'half')).toBe('period');
-    expect(teamFoulsResetFor(2, 'game')).toBe('half');
-    expect(teamFoulsResetFor(2, 'period')).toBe('period');
+  it('keeps the team-foul reset the admin chose, each half and once a game with quarters too (S-106, step 2.123)', () => {
     const quarters = { ...rulesFields('game', base), periods: '4' };
-    expect(saved(rulesFromPart('game', base, quarters)).fouls.teamFoulsReset).toBe('period');
+    for (const reset of ['period', 'half', 'game'] as const) {
+      for (const fields of [quarters, { ...quarters, periods: '2' }]) {
+        const rules = saved(rulesFromPart('game', base, { ...fields, teamFoulsReset: reset }));
+        expect(rules.fouls.teamFoulsReset).toBe(reset);
+      }
+    }
+    const halfOnQuarters = {
+      ...base,
+      gameFormat: { ...base.gameFormat, periods: 4 as const },
+      fouls: { ...base.fouls, teamFoulsReset: 'half' as const },
+    };
+    expect(rulesFields('game', halfOnQuarters).teamFoulsReset).toBe('half');
+    expect(wrongOf(rulesFromPart('game', base, { ...quarters, teamFoulsReset: 'week' }))).toEqual([
+      'teamFoulsReset:choice',
+    ]);
   });
 
   it('switches the unique-jersey rule, and keeps the roster limits as they are', () => {

@@ -220,12 +220,15 @@ export function partFacts(part: SeasonPart, season: SeasonView): readonly PartFa
   }
 }
 
-/** How team fouls reset, as the tracker counts them: not a choice (step 2.123). */
+/** When team fouls start again, as the admin chose (step 2.123): with halves a period is a half. */
 function teamFoulsLine(rules: SeasonRules): string {
+  const reset = rules.fouls.teamFoulsReset;
   return say(
-    rules.gameFormat.periods === 4
-      ? 'seasonSettings.teamFouls.quarter'
-      : 'seasonSettings.teamFouls.half',
+    reset === 'game'
+      ? 'seasonSettings.teamFouls.game'
+      : reset === 'period' && rules.gameFormat.periods === 4
+        ? 'seasonSettings.teamFouls.quarter'
+        : 'seasonSettings.teamFouls.half',
   );
 }
 
@@ -291,7 +294,11 @@ export function partGroups(part: SeasonPart, rules: SeasonRules): readonly FormG
             number('bonusFouls'),
             number('doubleBonusFouls', help('seasonSettings.field.doubleBonusFouls.help')),
             number('playerFoulLimit', help('seasonSettings.field.playerFoulLimit.help')),
-            { kind: 'note', text: say('seasonSettings.teamFouls.form') },
+            radios(
+              'teamFoulsReset',
+              ['period', 'half', 'game'],
+              help('seasonSettings.field.teamFoulsReset.help'),
+            ),
           ],
         },
         {
