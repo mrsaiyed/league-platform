@@ -401,7 +401,9 @@ export const enAdminSettings = {
   'seasonSettings.start.clock': 'When a foul is called, does the game clock stop?',
   'seasonSettings.start.clock.running': 'No, the clock keeps running (a running clock)',
   'seasonSettings.start.clock.stop': 'Yes, the clock stops on every foul (a stop clock)',
-  'seasonSettings.start.clockDropsLastMinutes':
+  'seasonSettings.start.clockDropsLastMinutes_one':
+    '{season} also stops the clock in the last minute. A stop clock for the whole game replaces that.',
+  'seasonSettings.start.clockDropsLastMinutes_other':
     '{season} also stops the clock in the last {minutes} minutes. A stop clock for the whole game replaces that.',
   'seasonSettings.start.endsOn': 'Last day (you can leave it empty)',
   'seasonSettings.start.gameRules': 'Game rules',

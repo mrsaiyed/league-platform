@@ -16,6 +16,17 @@ describe('stopClockDroppedNote (step 2.245, review M1)', () => {
     );
   });
 
+  it('says one minute in the singular, from the message file’s plural form', () => {
+    const said = stopClockDroppedNote(
+      'Fall 2026',
+      withClock({ mode: 'running', stopClockLastSeconds: 60 }),
+    );
+    expect(said).toBe(
+      'Fall 2026 also stops the clock in the last minute. A stop clock for the whole game replaces that.',
+    );
+    expect(said).not.toContain('1 minutes');
+  });
+
   it('names a part of a minute as the settings do', () => {
     expect(
       stopClockDroppedNote('Fall 2026', withClock({ mode: 'running', stopClockLastSeconds: 90 })),

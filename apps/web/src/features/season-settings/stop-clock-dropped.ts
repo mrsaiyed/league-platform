@@ -16,7 +16,8 @@ export function stopClockDroppedNote(
   if (copiedFrom === undefined || rules.clock.mode !== 'running' || last === null) {
     return undefined;
   }
-  return t('seasonSettings.start.clockDropsLastMinutes', {
+  // The message file's plural form: 60 seconds is "the last minute", never "1 minutes".
+  return t.plural('seasonSettings.start.clockDropsLastMinutes', last / 60, {
     season: copiedFrom,
     minutes: minutes.format(last / 60),
   });
