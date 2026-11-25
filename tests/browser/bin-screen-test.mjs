@@ -344,6 +344,38 @@ if (built) {
       liveBack.text,
     );
 
+    // A second kind of thing with scripts on (step 2.155 part 5): a person removed from
+    // People, brought back from the bin.
+    at = 'with scripts on, a person removed and brought back';
+    await live.goto(`${origin}/north-valley/admin/people`);
+    const addIvo = live.locator('#add-person');
+    await addIvo.getByLabel('First name').fill('Ivo');
+    await addIvo.getByLabel('Last name').fill('Scriptwell');
+    await Promise.all([
+      live.waitForURL(/\/admin\/people\/[0-9a-f-]{36}/, { timeout: 10_000 }),
+      addIvo.getByRole('button', { name: 'Add to the league' }).click(),
+    ]);
+    await live.locator('#remove').getByLabel('Yes, I am sure').check();
+    await Promise.all([
+      live.waitForURL((url) => url.pathname.endsWith('/admin/people'), { timeout: 10_000 }),
+      live.locator('#remove').getByRole('button', { name: 'Remove from the league list' }).click(),
+    ]);
+    await live.goto(`${origin}/north-valley/admin/settings/bin`);
+    const ivoRow = () => live.locator('li[data-bin=person]', { hasText: 'Scriptwell' });
+    note('scripts on: the bin lists the person removed', (await ivoRow().count()) === 1);
+    const ivoBack = await binAnswer(live, ivoRow().getByRole('button', { name: 'Bring it back' }));
+    note(
+      'scripts on: the person is back, said at the top naming them',
+      (await ivoRow().count()) === 0 &&
+        ivoBack.said === 'back' &&
+        ivoBack.text.startsWith('Brought back: ') &&
+        ivoBack.text.includes('Ivo') &&
+        ivoBack.text.includes('Scriptwell') &&
+        ivoBack.text.includes('They are on the league list again.'),
+      ivoBack.text,
+    );
+    note('scripts on: the address holds no answer', new URL(live.url()).search === '', live.url());
+
     at = "a scheduler sees the bin's games only";
     const scheduler = await open(false, 'local-scheduler-token');
     const part = await scheduler.goto(`${origin}/north-valley/admin/settings/bin`);

@@ -18,3 +18,19 @@ export function peopleRefusalText(command: string, code: string, name?: string):
   );
   return t(lead, { name: name ?? '', problem: t((problem ?? 'error.unknown') as TextKey) });
 }
+
+/**
+ * "Put them back" refused (a one-time notice, `notPutBack.<code>`): "Not put back: <name>.
+ * <why>", the name read from the bin listing, never the form; "Not put back. <why>" when
+ * the bin no longer lists them. Undefined for any other notice.
+ */
+export function notPutBackText(said: string, name: string | undefined): string | undefined {
+  if (!said.startsWith('notPutBack.')) return undefined;
+  const problem =
+    said === 'notPutBack.person-profile-taken'
+      ? t('error.leagues.restore_person.person-profile-taken')
+      : t('error.leagues.restore_person.person-not-found');
+  return name === undefined || name === ''
+    ? t('adminPeople.putBack.notPutBack', { problem })
+    : t('adminPeople.putBack.notPutBackNamed', { name, problem });
+}

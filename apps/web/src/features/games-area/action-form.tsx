@@ -9,7 +9,7 @@
 // beside the game. Words come from the server, from the message files (T-187).
 import { useActionState, useId } from 'react';
 import { untouched, type FormState } from './form-state.ts';
-import { useOneSubmit } from './use-one-submit.ts';
+import { useOneSubmit } from '../list-forms/use-one-submit.ts';
 
 export type ActionChoice = {
   readonly name: string;

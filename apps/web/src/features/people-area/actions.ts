@@ -42,7 +42,7 @@ import {
   type FormState,
   type Refused,
   type TypedFields,
-} from '../games-area/form-state.ts';
+} from '../list-forms/form-state.ts';
 import { rosterName } from '../teams-area/index.ts';
 import { unlikelyYears } from './age-on-record.ts';
 import { peopleRefusalText } from './refusal-text.ts';

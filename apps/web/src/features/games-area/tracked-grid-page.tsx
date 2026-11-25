@@ -25,7 +25,7 @@ import { statLabel } from '../stats-pages/index.ts';
 import { hasName, rosterName } from '../teams-area/index.ts';
 import { correctTrackedGridAction, endTrackedGameAgainAction } from './actions.ts';
 import { EndAgainForm } from './end-again-form.tsx';
-import { SavedLine } from './saved-line.tsx';
+import { SaidLine } from '../list-forms/said-line.tsx';
 import { playSentences, trackedGridColumns, trackedGridField } from './tracked-grid.ts';
 import { TrackedGridForm, type TrackedGridTeam } from './tracked-grid-form.tsx';
 
@@ -145,13 +145,11 @@ export async function TrackedGridPage({
       <PageHead title={title} sub={t('admin.boxScore.tracked.help')} />
       {said === undefined ? null : (
         <div className="staff-panel" data-grid-saved="">
-          <SavedLine
-            text={
-              said.length === 0
-                ? t('admin.boxScore.tracked.noChange')
-                : t('admin.boxScore.tracked.saved')
-            }
-          />
+          <SaidLine kind="saved">
+            {said.length === 0
+              ? t('admin.boxScore.tracked.noChange')
+              : t('admin.boxScore.tracked.saved')}
+          </SaidLine>
           {said.length === 0 ? null : (
             <ul>
               {said.map((sentence, index) => (

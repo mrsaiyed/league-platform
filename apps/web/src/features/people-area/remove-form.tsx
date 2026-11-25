@@ -4,8 +4,8 @@
 // given, the person still on a roster) is the answer to the post itself and is said beside
 // the button (T-271, record 067). It goes quiet once sent. Words come from the server.
 import { useActionState, useId } from 'react';
-import { untouched, type FormState } from '../games-area/form-state.ts';
-import { useOneSubmit } from '../games-area/use-one-submit.ts';
+import { untouched, type FormState } from '../list-forms/form-state.ts';
+import { useOneSubmit } from '../list-forms/use-one-submit.ts';
 
 export function RemoveForm({
   action,
