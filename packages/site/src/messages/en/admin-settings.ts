@@ -11,6 +11,10 @@ export const enAdminSettings = {
   'adminSettings.area.site': 'Public site',
   'adminSettings.area.statistics': 'Statistics',
   'adminSettings.area.teams': 'Team statistics',
+  // A Profile form refused because the league changed meanwhile (step 2.155 part 3): the
+  // screen keeps what was typed and shows "Saved now" beside it, and this says so.
+  'adminSettings.changedMeanwhile':
+    'Someone else changed the league since you opened this page, so it was not saved. What you typed is kept, and beside each box that differs is what is saved now. Save again to replace it with yours.',
   'adminSettings.clear': 'Go back to the default',
   // Beside a setting whose value asks to be confirmed (its `setting.<key>.confirm`).
   'adminSettings.confirmNote': 'Tick this only if you are choosing {choice}:',

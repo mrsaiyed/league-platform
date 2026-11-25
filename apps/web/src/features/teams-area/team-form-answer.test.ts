@@ -57,5 +57,18 @@ describe("a refused form of a team's page names the box it is about (step 2.155)
       {},
     );
     expect(refusal.wrong).toEqual([]);
+    // The screen keeps what was typed, "Saved now" beside it: the sentence says so.
+    expect(refusal.said).toContain('What you typed is kept');
+    expect(refusal.said).not.toContain('The page now shows the latest');
+  });
+
+  it('says a roster line changed meanwhile as the screen shows it', () => {
+    const refusal = teamFormRefusal('entry', 'teams.change_roster_entry', 'changed-since-read', {});
+    expect(refusal.said).toContain('What you typed is kept');
+  });
+
+  it('keeps "Team details" own sentence for a team changed meanwhile', () => {
+    const refusal = teamFormRefusal('details', 'teams.update_team', 'changed-since-read', {});
+    expect(refusal.said).toContain('What you typed is kept');
   });
 });

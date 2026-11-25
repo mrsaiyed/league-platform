@@ -36,6 +36,9 @@ describe('profileRefusal', () => {
     const refusal = profileRefusal('profile', 'leagues.set_profile', 'changed-since-read');
     expect(refusal.wrong).toEqual([]);
     expect(refusal.said).not.toContain(':');
+    // The screen keeps what was typed, "Saved now" beside it: the sentence says so.
+    expect(refusal.said).toContain('What you typed is kept');
+    expect(refusal.said).not.toContain('The page now shows the latest');
   });
 });
 

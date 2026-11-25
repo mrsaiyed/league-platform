@@ -232,10 +232,18 @@ if (browser) {
       words,
     );
     await form('short-name').locator('input[name="slug"]').fill(renamed);
-    await Promise.all([
+    const [posted] = await Promise.all([
+      owner.waitForResponse((r) => r.request().method() === 'POST', limit),
       owner.waitForURL((url) => url.pathname.startsWith(`/${renamed}/`), limit),
       form('short-name').getByRole('button').click(limit),
     ]);
+    // The answer itself names the new address, not the old one that would forward.
+    const sentTo = posted.headers()['location'] ?? '';
+    note(
+      'the rename answers with the new address directly',
+      posted.status() === 303 && new URL(sentTo, origin).pathname.startsWith(`/${renamed}/`),
+      `${posted.status()} ${sentTo}`,
+    );
     const renamedLine = savedBeside('short-name');
     await renamedLine.waitFor(limit);
     note(
@@ -511,6 +519,46 @@ if (browser) {
       (await said()).includes('The league is published again.'),
     );
     note('the league is live again', (await panel.getAttribute('data-status', limit)) === 'live');
+  });
+
+  await step('a Profile form posted twice with one token is saved once', async () => {
+    const profileChanges = async () => {
+      await owner.goto(`${origin}/${league}/admin/settings/activity`, limit);
+      const texts = await owner.locator('[data-activity-log] > li').allInnerTexts();
+      return texts.filter((text) => text.includes("Changed the league's profile")).length;
+    };
+    const before = await profileChanges();
+    await owner.goto(settings(), limit);
+    // Every box of the form as drawn, its one-time token among them; then a new city.
+    const fields = await form('league-profile').evaluate((element) =>
+      Object.fromEntries([...new FormData(element).entries()].map(([k, v]) => [k, String(v)])),
+    );
+    note('the profile form carries a one-time token', (fields['requestToken'] ?? '') !== '');
+    const statuses = [];
+    for (let i = 0; i < 2; i += 1) {
+      const body = new FormData();
+      for (const [name, value] of Object.entries(fields)) body.append(name, value);
+      body.set('city', 'Twice Pine Ridge');
+      const answer = await fetch(settings(), {
+        method: 'POST',
+        body,
+        headers: { origin, cookie: 'srl_session=local-owner-token' },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(60_000),
+      });
+      statuses.push(answer.status);
+    }
+    note(
+      'both posts of the profile form are answered as saved',
+      statuses.every((status) => status === 303),
+      String(statuses),
+    );
+    const after = await profileChanges();
+    note(
+      'posted twice, one change in the activity log',
+      after === before + 1,
+      `${before} then ${after}`,
+    );
   });
 
   await step('each change is one entry in the activity log', async () => {

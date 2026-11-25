@@ -47,7 +47,10 @@ export function profileRefusal(
 ): ProfileRefusal {
   const boxes = boxesOf[form];
   const names = Object.keys(boxes);
-  const why = t(problemKey({ problem: `${command}.${code}` }) ?? 'error.unknown');
+  const key = problemKey({ problem: `${command}.${code}` }) ?? 'error.unknown';
+  // Changed meanwhile: the screen keeps what was typed with "Saved now" beside it, so the
+  // sentence says that, not the general "the page now shows the latest".
+  const why = t(key === 'error.changed-since-read' ? 'adminSettings.changedMeanwhile' : key);
   let wrong = names.filter((box) =>
     issues.some((issue) => issue.path === box || issue.path.startsWith(`${box}.`)),
   );

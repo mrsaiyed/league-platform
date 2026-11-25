@@ -24,6 +24,10 @@ export const enAdminTeams = {
   'adminTeams.add.title': 'Add a player',
   'adminTeams.allTeams': 'All teams',
   'adminTeams.byNumber': '#{number}',
+  // A team form refused because the team or the line changed meanwhile (step 2.155 part 3):
+  // the screen keeps what was typed and shows "Saved now" beside it, and this says so.
+  'adminTeams.changedMeanwhile':
+    'Someone else changed this team since you opened this page, so it was not saved. What you typed is kept, and beside each box that differs is what is saved now. Save again to replace it with yours.',
   'adminTeams.confirm': 'Yes, I am sure',
   // A refused "Add team", beside the box it is about (step 2.155): each names its box.
   'adminTeams.create.problem.color':
