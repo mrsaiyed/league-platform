@@ -75,6 +75,7 @@ export type BoxScore = {
 export const playTypes = [
   'lineup',
   'score',
+  'unscore',
   'foul',
   'unfoul',
   'turnover',
@@ -335,7 +336,10 @@ export async function readGamePage(
     if (type === undefined) continue;
     const side = sideOf(raw['side']);
     const points = pointsOf(raw);
+    // A basket taken back (T-432) is said where the correction was made, and the score from
+    // there on is the corrected one, as the engine's runningScores gives it.
     if (type === 'score' && side !== null && points !== null) runningScore[side] += points;
+    if (type === 'unscore' && side !== null && points !== null) runningScore[side] -= points;
     if (type === 'period' && count(raw['period']) !== null) period = raw['period'] as number;
     const open = side === null || shown[side];
     // A hidden team's substitutions and line-ups say only who played: left out.
@@ -347,7 +351,7 @@ export async function readGamePage(
       side,
       period: count(raw['period']) ?? period,
       clockMs: count(raw['clockMs']),
-      points: type === 'score' ? points : null,
+      points: type === 'score' || type === 'unscore' ? points : null,
       timeoutSeconds: raw['seconds'] === 30 || raw['seconds'] === 60 ? raw['seconds'] : null,
       player: side !== null && open && playerId !== null ? refOf(side, playerId) : null,
       playersIn:

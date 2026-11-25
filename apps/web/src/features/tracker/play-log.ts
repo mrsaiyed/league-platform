@@ -71,6 +71,8 @@ export function playLog(
   let unsent = 0;
   game.plays.forEach((play, place) => {
     if (play.type === 'score') score[play.side] += play.points;
+    // A basket taken back (T-432): from here on the score is the corrected one.
+    else if (play.type === 'unscore') score[play.side] -= play.points;
     const notSent = waitingIds.has(play.id.toLowerCase());
     if (notSent) unsent += 1;
     if (place < from) return;
@@ -82,7 +84,7 @@ export function playLog(
         clock: basketball.formatClock(play.clockMs),
       }),
       score:
-        play.type === 'score'
+        play.type === 'score' || play.type === 'unscore'
           ? t('tracker.log.score', { home: score.home, away: score.away })
           : null,
       unsent: notSent,

@@ -67,6 +67,17 @@ describe('the words of a game', () => {
     expect(play({ type: 'period', period: 'Q2' })).toBe('Start of Q2');
   });
 
+  it('words a basket taken back as no longer counting (T-432)', () => {
+    const play = (p: Partial<Parameters<typeof playSentence>[1]>) =>
+      playSentence(words, { type: 'unscore', team: 'Lions', player: 'Ada', points: 2, ...p });
+    expect(play({})).toBe('Basket taken back: Ada’s 2 points for Lions no longer count');
+    expect(play({ points: 1 })).toBe(
+      'Free throw taken back: Ada’s 1 point for Lions no longer counts',
+    );
+    expect(play({ player: null })).toBe('Basket taken back: 2 points for Lions no longer count');
+    expect(play({ team: null, player: null })).toBe('Basket taken back: 2 points no longer count');
+  });
+
   it('leaves a name with no value as it is', () => {
     expect(fill('{a} and {b}', { a: 1 })).toBe('1 and {b}');
   });

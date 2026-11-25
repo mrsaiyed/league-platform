@@ -57,6 +57,17 @@ describe('the play log (checklist I4)', () => {
     expect(log.count).toBe(5);
   });
 
+  it('after a basket taken back, the corrected score (T-432)', () => {
+    const scored = played([basket('h5')], tippedOff());
+    const playId = lastId(scored);
+    const game = played(
+      [basket('a7', 3), { type: 'unscore', side: 'home', playerId: 'h5', points: 2, playId }],
+      scored,
+    );
+    const log = playLog(game, testRosters, [], t, 3);
+    expect(log.rows.map((row) => row.score)).toEqual(['0–3', '2–3', '2–0']);
+  });
+
   it('gives only the newest rows when asked, with the count, the unsent and the score of the whole game', () => {
     const game = played(
       [basket('h5'), { type: 'foul', side: 'away', playerId: 'a3' }, basket('a7', 3), basket('h9')],
