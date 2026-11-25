@@ -251,6 +251,23 @@ describe('makeLeague', () => {
     });
   });
 
+  it('saves when team fouls start again only when it was answered, marked as the settings mark it (T-422)', async () => {
+    const rulesOf = async (answers: Parameters<typeof planFor>[0]) => {
+      const outcome = await makeLeague(target, planFor(answers));
+      if (!outcome.ok) throw new Error(JSON.stringify(outcome));
+      const saved = await one(pglite, 'select rules from seasons where id = $1', [
+        outcome.made.seasonId,
+      ]);
+      return (saved as { rules: { fouls: Record<string, unknown> } }).rules.fouls;
+    };
+    expect(await rulesOf({ teamFoulsReset: 'half' })).toMatchObject({
+      teamFoulsReset: 'half',
+      teamFoulsResetChosen: true,
+    });
+    expect(await rulesOf({ teamFoulsReset: 'period' })).not.toHaveProperty('teamFoulsResetChosen');
+    expect(await rulesOf({})).not.toHaveProperty('teamFoulsResetChosen');
+  });
+
   it('gives the league the starting design and colors it was given, as its first release (step 2.187)', async () => {
     const plan = planFor({
       design: 'Midnight-Gold',

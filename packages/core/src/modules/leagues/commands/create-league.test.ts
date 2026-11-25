@@ -1,5 +1,10 @@
 // createLeague on a stand-in store; the database's own rules are tested in packages/database.
-import { defaultSeasonRules, startingDesignWith } from '@srleagues/contracts';
+import {
+  defaultSeasonRules,
+  foulsWithReset,
+  startingDesignWith,
+  type SeasonRules,
+} from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import { leagueId, memoryLeagues, ownerId, staffId } from '../memory-leagues.test-helper.ts';
 import { createLeague } from './create-league.ts';
@@ -235,7 +240,7 @@ describe('createLeague with its first season', () => {
 describe('createLeague with the game rules asked (S-106, step 2.245)', () => {
   const season = { slug: 'fall-2026', name: 'Fall 2026' };
   const savedRules = (db: ReturnType<typeof memoryLeagues>['db']) =>
-    db.state.seasons.find((s) => s.slug === 'fall-2026')?.rules;
+    db.state.seasons.find((s) => s.slug === 'fall-2026')?.rules as SeasonRules | undefined;
 
   it('saves the first season with a stop clock and a mercy lead', async () => {
     const { db, deps, as } = memoryLeagues(none);
@@ -249,6 +254,15 @@ describe('createLeague with the game rules asked (S-106, step 2.245)', () => {
     });
   });
 
+  it('saves team fouls that start again each half as the settings do, marked (T-422)', async () => {
+    const { db, deps, as } = memoryLeagues(none);
+    const firstSeason = { ...season, gameRules: { teamFoulsReset: 'half' } } as const;
+    await createLeague(as(staffId), { ...input, firstSeason }, deps);
+    const rules = savedRules(db);
+    expect(rules?.fouls).toEqual(foulsWithReset(defaultSeasonRules().fouls, 'half'));
+    expect(rules?.fouls.teamFoulsResetChosen).toBe(true);
+  });
+
   it('saves the defaults for answers left untouched', async () => {
     const { db, deps, as } = memoryLeagues(none);
     const firstSeason = { ...season, gameRules: {} };
@@ -256,6 +270,7 @@ describe('createLeague with the game rules asked (S-106, step 2.245)', () => {
       ok: true,
     });
     expect(savedRules(db)).toEqual(defaultSeasonRules());
+    expect(savedRules(db)?.fouls.teamFoulsResetChosen).toBeUndefined();
   });
 
   it('saves no rules when the questions are not given, as before', async () => {

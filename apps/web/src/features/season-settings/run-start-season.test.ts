@@ -74,6 +74,23 @@ describe('runStartSeason', () => {
         field: 'clockMode',
       });
     });
+
+    it('takes when team fouls start again as one of the settings’ choices; another word is refused at its box', async () => {
+      for (const teamFoulsReset of ['half', 'game', 'period']) {
+        const world = testWorld();
+        expect(
+          await runStartSeason(owner, { ...asked('running', ''), teamFoulsReset }, world.deps),
+        ).toMatchObject({ kind: 'started' });
+      }
+      const world = testWorld();
+      expect(
+        await runStartSeason(
+          owner,
+          { ...asked('running', ''), teamFoulsReset: 'quarter' },
+          world.deps,
+        ),
+      ).toEqual({ kind: 'refused', code: 'invalid-input', field: 'teamFoulsReset' });
+    });
   });
 
   // Step 2.245: a refusal names the box it is about, so the form marks it and keeps the rest.

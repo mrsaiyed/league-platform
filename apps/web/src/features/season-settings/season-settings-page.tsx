@@ -117,6 +117,7 @@ export async function SeasonSettingsPage({
       copiedFrom={current?.name}
       gameRules={gameRuleAnswersOf(startRules)}
       stopClockDropped={stopClockDroppedNote(current?.name, startRules)}
+      teamFoulsSaid={teamFoulsLine(startRules)}
       permalink={`${seasonSettingsAddress(addressee, season?.slug)}#${startSeasonAnchor}`}
     />
   ) : null;

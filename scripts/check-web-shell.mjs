@@ -1030,6 +1030,12 @@ const cases = [
       'name="clockMode" value="stop"',
       'name="clockMode" checked="" value="running"',
       'name="mercyLead"',
+      // After step 2.123: when team fouls start again, the settings' three choices, Fall
+      // 2026's (no choice saved: each period) chosen, and what it counts said under them.
+      'name="teamFoulsReset" checked="" value="period"',
+      'name="teamFoulsReset" value="half"',
+      'name="teamFoulsReset" value="game"',
+      'data-team-fouls-said',
       '$ACTION_KEY',
       // Drawn inside the staff frame, its menu at Season settings (step 2.103).
       staffFrameAt('/north-valley/admin/season'),

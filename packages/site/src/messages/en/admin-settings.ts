@@ -434,6 +434,8 @@ export const enAdminSettings = {
     'Short name: another season already uses it. Choose another; nothing was changed.',
   'seasonSettings.start.refused.startsOn':
     'First day: it must be a date, or empty. Nothing was changed.',
+  'seasonSettings.start.refused.teamFoulsReset':
+    'Team fouls start again: choose each half or quarter, each half, or never. Nothing was changed.',
   'seasonSettings.start.slug': 'Short name',
   'seasonSettings.start.slugHelp':
     "Used in the season's web address: lowercase letters, numbers and dashes, for example winter-2027.",

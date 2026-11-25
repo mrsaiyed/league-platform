@@ -16,6 +16,7 @@ import {
   hiddenSeasonStatus,
   clockModes,
   seasonCarryChoices,
+  teamFoulsResets,
   type GameRuleAnswers,
   type SeasonView,
 } from '@srleagues/core';
@@ -165,6 +166,7 @@ export function StartSeasonPanel({
   copiedFrom,
   gameRules,
   stopClockDropped,
+  teamFoulsSaid,
   permalink,
 }: {
   /** The route's `[league]` value, which the form's post finds the page by. */
@@ -180,6 +182,8 @@ export function StartSeasonPanel({
    * which a stop clock for the whole game clears (T-428, review M1); else undefined.
    */
   readonly stopClockDropped?: string | undefined;
+  /** What the copied (or starting) rules count team fouls by, in the settings' words. */
+  readonly teamFoulsSaid: string;
   /** Where the browser lands with scripts off: this form's place on the page. */
   readonly permalink: string;
 }) {
@@ -250,6 +254,26 @@ export function StartSeasonPanel({
       label: t('seasonSettings.start.mercyLead'),
       value: gameRules.mercyLead === null ? '' : String(gameRules.mercyLead),
       help: t('seasonSettings.start.mercyLeadHelp'),
+    },
+    {
+      // After step 2.123, in the season settings' own words and choices.
+      kind: 'choice',
+      name: 'teamFoulsReset',
+      label: t('seasonSettings.field.teamFoulsReset'),
+      value: gameRules.teamFoulsReset ?? 'period',
+      options: teamFoulsResets.map((reset) => ({
+        value: reset,
+        label: t(`seasonSettings.option.teamFoulsReset.${reset}` as TextKey),
+      })),
+    },
+    {
+      kind: 'note',
+      name: 'teamFoulsSaid',
+      content: (
+        <p className="ui-field-help" data-team-fouls-said="">
+          {teamFoulsSaid}
+        </p>
+      ),
     },
     ...carryFields(copiedFrom),
   ];

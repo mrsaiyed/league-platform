@@ -74,6 +74,25 @@ describe('planNewLeague', () => {
     expect(rules({ mercyLead: '20' })).toEqual([{ field: 'mercyLead', problem: 'invalid' }]);
   });
 
+  it('takes when team fouls start again only when answered (after step 2.123, T-422)', () => {
+    const rules = (change: NewLeagueAnswers) => {
+      const result = planNewLeague({ ...answers, ...change });
+      return result.ok ? result.plan.gameRules : result.problems;
+    };
+    expect(rules({ teamFoulsReset: ' Half ' })).toEqual({
+      clockMode: 'running',
+      mercyLead: null,
+      teamFoulsReset: 'half',
+    });
+    expect(rules({ teamFoulsReset: 'game' })).toMatchObject({ teamFoulsReset: 'game' });
+    expect(rules({ teamFoulsReset: 'period' })).toMatchObject({ teamFoulsReset: 'period' });
+    // Left alone, no answer is carried, so the first season writes no choice.
+    expect(rules({})).toEqual({ clockMode: 'running', mercyLead: null });
+    for (const teamFoulsReset of ['quarter', 'never', '2']) {
+      expect(rules({ teamFoulsReset })).toEqual([{ field: 'teamFoulsReset', problem: 'invalid' }]);
+    }
+  });
+
   it('takes a starting design by its key and the colors chosen, or the first one, never the neutral one (step 2.187, C-16)', () => {
     const of = (change: NewLeagueAnswers) => {
       const result = planNewLeague({ ...answers, ...change });

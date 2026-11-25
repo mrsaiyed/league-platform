@@ -11,6 +11,7 @@ const label: Record<(typeof startFields)[number], string> = {
   endsOn: 'Last day',
   clockMode: 'Clock',
   mercyLead: 'Mercy rule',
+  teamFoulsReset: 'Team fouls start again',
   carry: 'Teams',
 };
 

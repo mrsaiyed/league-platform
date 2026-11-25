@@ -1,5 +1,20 @@
 // The words of scripts/make-league.mjs (step 2.125 part 1): how to use it, its
 // questions, the plan it shows before making anything, and what came of it (T-187).
+import { en } from '@srleagues/site';
+
+/**
+ * When team fouls start again, in the season settings' own words (step 2.123): the
+ * answer typed, then what it means, from the same message keys.
+ */
+const teamFoulsResetWords = Object.fromEntries(
+  ['period', 'half', 'game'].map((reset) => [
+    reset,
+    en[`seasonSettings.option.teamFoulsReset.${reset}`],
+  ]),
+);
+const teamFoulsResetChoices = Object.entries(teamFoulsResetWords)
+  .map(([reset, means]) => `${reset} (${means})`)
+  .join(', ');
 
 export const usage = [
   'Makes a league in draft, with its first season as the current one, in one step,',
@@ -34,6 +49,10 @@ export const usage = [
   '                           running keeps it going (default: running)',
   '  --mercy-lead <points>    with a stop clock, the lead that turns it into a running',
   '                           clock, or none (default: none)',
+  '  --team-fouls-reset <period|half|game>',
+  '                           when team fouls start again: period, each half or',
+  '                           quarter; half, each half, also with quarters; game, never',
+  '                           (default: period)',
   '  --as <email>             your own email, as SR Leagues staff',
   '  --db <folder>            a local test database folder (default: .local/seed-db)',
   '  --hosted                 a hosted database instead: see below',
@@ -67,6 +86,7 @@ export const questions = {
     'Clock: stop (it stops on every foul) or running (it keeps going through fouls); the admin can change it for each season',
   mercyLead:
     'Mercy rule: the lead in points that turns the stop clock into a running clock, or none for no mercy rule',
+  teamFoulsReset: `${en['seasonSettings.field.teamFoulsReset']}: ${teamFoulsResetChoices}; the admin can change it for each season`,
   staffEmail: 'Your own email (SR Leagues staff)',
 };
 
@@ -129,6 +149,7 @@ export const problemWords = {
     mercyLead: 'Mercy rule: a whole number of points from 1 to 100, or none.',
     mercyLeadClock:
       'Mercy rule: it only works with a stop clock. Choose a stop clock or answer none.',
+    teamFoulsReset: `${en['seasonSettings.field.teamFoulsReset']}: one of ${teamFoulsResetChoices}.`,
   },
   blocked: {
     shortName:
@@ -242,7 +263,8 @@ export const planLines = (plan, preview, place, address) => [
   `  First season    ${plan.season.name}, the current one, ${seasonDates(plan.season)}`,
   `  Design          ${designWords(plan.design)}; the admin can change its colors later`,
   `  Clock           ${clockWords[plan.gameRules.clockMode]}`,
-  `  Mercy rule      ${mercyWords(plan.gameRules.mercyLead)}; both can be changed in Season settings`,
+  `  Mercy rule      ${mercyWords(plan.gameRules.mercyLead)}`,
+  `  Team fouls      start again: ${teamFoulsResetWords[plan.gameRules.teamFoulsReset ?? 'period']}; all three can be changed in Season settings`,
   '  State           draft: only the league’s own staff can see it until it is published',
   `  Made by         ${plan.staffEmail} ${accountWords.staff[preview.staff]}`,
   `  Where           ${placeWords(place)}`,

@@ -7,6 +7,7 @@
 // session, never from the form (T-23).
 import {
   clockModes,
+  teamFoulsResets,
   seasonCarryChoices,
   startSeason,
   type CommandContext,
@@ -36,6 +37,7 @@ export const startFields = [
   'endsOn',
   'clockMode',
   'mercyLead',
+  'teamFoulsReset',
   'carry',
 ] as const;
 export type StartField = (typeof startFields)[number];
@@ -79,12 +81,19 @@ export async function runStartSeason(
   const mercyTyped = typed(fields['mercyLead']);
   const mercyLead =
     mercyTyped === undefined ? null : /^\d{1,3}$/.test(mercyTyped) ? Number(mercyTyped) : undefined;
+  // When team fouls start again (after step 2.123): one of the settings' three choices;
+  // not sent, the question is left alone and the copied season's choice is kept.
+  const resetTyped = typed(fields['teamFoulsReset']);
+  const teamFoulsReset = teamFoulsResets.find((reset) => reset === resetTyped);
   if (typed(fields['name']) === undefined) return refused('invalid-input', 'name');
   if (slug === undefined) return refused('invalid-input', 'slug');
   if (clockTyped !== undefined && clockMode === undefined) {
     return refused('invalid-input', 'clockMode');
   }
   if (mercyLead === undefined) return refused(mercyLeadNumber, 'mercyLead');
+  if (resetTyped !== undefined && teamFoulsReset === undefined) {
+    return refused('invalid-input', 'teamFoulsReset');
+  }
   if (carry === undefined) return refused('invalid-input', 'carry');
   const result = await startSeason(
     context,
@@ -93,7 +102,11 @@ export async function runStartSeason(
       slug,
       name: fields['name'] ?? '',
       carry,
-      gameRules: { ...(clockMode === undefined ? {} : { clockMode }), mercyLead },
+      gameRules: {
+        ...(clockMode === undefined ? {} : { clockMode }),
+        mercyLead,
+        ...(teamFoulsReset === undefined ? {} : { teamFoulsReset }),
+      },
       ...(startsOn === undefined ? {} : { startsOn }),
       ...(endsOn === undefined ? {} : { endsOn }),
     },

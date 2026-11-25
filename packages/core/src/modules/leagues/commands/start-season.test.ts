@@ -1,6 +1,11 @@
 // startSeason's game-rule answers (S-106, step 2.245) on a stand-in store; copying a
 // season's setup is tested in packages/database (leagues-commands.test.ts).
-import { defaultSeasonRules, seasonRulesPreset, type SeasonRules } from '@srleagues/contracts';
+import {
+  defaultSeasonRules,
+  foulsWithReset,
+  seasonRulesPreset,
+  type SeasonRules,
+} from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import { memoryLeagues, ownerId } from '../memory-leagues.test-helper.ts';
 import { startSeason } from './start-season.ts';
@@ -23,7 +28,7 @@ const withOld = () =>
     ],
   });
 const rulesOf = (db: ReturnType<typeof memoryLeagues>['db']) =>
-  db.state.seasons.find((s) => s.slug === 'spring-2027')?.rules;
+  db.state.seasons.find((s) => s.slug === 'spring-2027')?.rules as SeasonRules | undefined;
 
 describe('startSeason with the game rules asked', () => {
   it('saves the answers onto the old season’s rules', async () => {
@@ -41,6 +46,37 @@ describe('startSeason with the game rules asked', () => {
     const { db, deps, as } = withOld();
     await startSeason(as(ownerId), { ...input, gameRules: {} }, deps);
     expect(rulesOf(db)).toEqual(oldRules);
+  });
+
+  it('keeps the old season’s team-fouls choice, marked or not, and saves a new one marked', async () => {
+    const marked: SeasonRules = { ...oldRules, fouls: foulsWithReset(oldRules.fouls, 'half') };
+    const { db, deps, as } = memoryLeagues({
+      seasons: [
+        {
+          id: 'season-old',
+          programId: 'program-default',
+          slug: 'fall-2026',
+          isCurrent: true,
+          rules: marked,
+        },
+      ],
+    });
+    await startSeason(as(ownerId), { ...input, gameRules: { teamFoulsReset: 'half' } }, deps);
+    expect(rulesOf(db)).toEqual(marked);
+    const unmarked = withOld();
+    await startSeason(
+      unmarked.as(ownerId),
+      { ...input, gameRules: { teamFoulsReset: 'period' } },
+      unmarked.deps,
+    );
+    expect(rulesOf(unmarked.db)).toEqual(oldRules);
+    const chosen = withOld();
+    await startSeason(
+      chosen.as(ownerId),
+      { ...input, gameRules: { teamFoulsReset: 'game' } },
+      chosen.deps,
+    );
+    expect(rulesOf(chosen.db)?.fouls).toEqual(foulsWithReset(oldRules.fouls, 'game'));
   });
 
   it('starts from the starting rules when there is no current season', async () => {

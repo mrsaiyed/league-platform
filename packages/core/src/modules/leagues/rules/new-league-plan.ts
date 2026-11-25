@@ -16,7 +16,13 @@ import {
   type StartingDesignKey,
 } from '@srleagues/contracts';
 import { z } from 'zod';
-import { clockModes, withGameRuleAnswers, type ClockMode } from './game-rule-answers.ts';
+import {
+  clockModes,
+  teamFoulsResets,
+  withGameRuleAnswers,
+  type ClockMode,
+  type TeamFoulsResetAnswer,
+} from './game-rule-answers.ts';
 import { isBlockedShortName, isSystemShortName, shortNameSchema } from '../short-names.ts';
 import { namedTimeZone } from '../time-zone.ts';
 import {
@@ -67,6 +73,8 @@ export type NewLeagueAnswers = {
   readonly clock?: string | undefined;
   /** Points of lead for the mercy rule, or "none"; left out, none. */
   readonly mercyLead?: string | undefined;
+  /** When team fouls start again: "period", "half" or "game"; left out, each period. */
+  readonly teamFoulsReset?: string | undefined;
 };
 
 export const newLeagueFields = [
@@ -89,6 +97,7 @@ export const newLeagueFields = [
   'highlightColor',
   'clock',
   'mercyLead',
+  'teamFoulsReset',
 ] as const;
 export type NewLeagueField = (typeof newLeagueFields)[number];
 
@@ -131,7 +140,12 @@ export type NewLeaguePlan = {
     readonly colors: StartingColors;
   };
   /** The first season's game rules, checked by the settings' contract; defaults when left. */
-  readonly gameRules: { readonly clockMode: ClockMode; readonly mercyLead: number | null };
+  readonly gameRules: {
+    readonly clockMode: ClockMode;
+    readonly mercyLead: number | null;
+    /** Only when answered: left out, the first season writes no choice (T-422). */
+    readonly teamFoulsReset?: TeamFoulsResetAnswer;
+  };
 };
 
 export type NewLeaguePlanResult =
@@ -307,13 +321,20 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
   const mercyLead = check('mercyLead', text(answers.mercyLead)?.toLowerCase(), (value) =>
     value === 'none' ? null : /^\d{1,3}$/.test(value) ? Number(value) : invalid,
   );
+  const teamFoulsReset = check(
+    'teamFoulsReset',
+    text(answers.teamFoulsReset)?.toLowerCase(),
+    (value) => teamFoulsResets.find((reset) => reset === value) ?? invalid,
+  );
   const gameRules = withGameRuleAnswers(defaultSeasonRules(), {
     ...(clockMode === undefined ? {} : { clockMode }),
     ...(mercyLead === undefined ? {} : { mercyLead }),
+    ...(teamFoulsReset === undefined ? {} : { teamFoulsReset }),
   });
-  if (!gameRules.ok && !problems.some((p) => p.field === 'clock' || p.field === 'mercyLead')) {
+  const gameRuleFields = ['clock', 'mercyLead', 'teamFoulsReset'] as const;
+  if (!gameRules.ok && !problems.some((p) => gameRuleFields.some((f) => f === p.field))) {
     problems.push({
-      field: gameRules.question === 'clockMode' ? 'clock' : 'mercyLead',
+      field: gameRules.question === 'clockMode' ? 'clock' : gameRules.question,
       problem: 'invalid',
     });
   }
@@ -361,6 +382,7 @@ export function planNewLeague(answers: NewLeagueAnswers): NewLeaguePlanResult {
       gameRules: {
         clockMode: gameRules.rules.clock.mode,
         mercyLead: gameRules.rules.clock.mercyLead,
+        ...(teamFoulsReset === undefined ? {} : { teamFoulsReset }),
       },
     },
   };

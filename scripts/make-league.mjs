@@ -56,6 +56,7 @@ try {
       'highlight-color': { type: 'string' },
       clock: { type: 'string' },
       'mercy-lead': { type: 'string' },
+      'team-fouls-reset': { type: 'string' },
       as: { type: 'string' },
       db: { type: 'string' },
       hosted: { type: 'boolean', default: false },
@@ -94,6 +95,7 @@ const answers = {
   highlightColor: values['highlight-color'],
   clock: values.clock,
   mercyLead: values['mercy-lead'],
+  teamFoulsReset: values['team-fouls-reset'],
 };
 
 const computerZone = () => namedTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -104,6 +106,8 @@ const defaults = {
   // The game rules asked (S-106, step 2.245): P7 section 1's defaults, no mercy rule.
   clock: () => 'running',
   mercyLead: () => 'none',
+  // Each period: what every season before step 2.123 counted by, and no choice written.
+  teamFoulsReset: () => 'period',
   timeZone: () => computerZone(),
   seasonName: () => {
     const zone = namedTimeZone(answers.timeZone ?? '') ?? computerZone() ?? 'UTC';
