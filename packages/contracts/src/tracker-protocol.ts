@@ -508,8 +508,26 @@ export const trackerChangesWindow = 300;
  */
 export const TrackerGameStateWithChanges = TrackerGameState.extend({
   changes: z.array(z.string().max(64)).max(trackerChangesWindow).optional(),
+  /**
+   * The command IDs (lower case, oldest first) of the plays among the same events that a
+   * correction wrote (`correctionPlaySource`, T-408), so the scoring screen asks before its
+   * Undo takes one back. Left out when there are none, and never sent to a tracker that
+   * does not ask (T-127).
+   */
+  corrections: z.array(z.string().max(64)).max(trackerChangesWindow).optional(),
 });
 export type TrackerGameStateWithChanges = z.infer<typeof TrackerGameStateWithChanges>;
+
+/**
+ * Where a stored play came from (step 2.65, T-408): kept in the event's own payload under
+ * this key, so no column is added and every game recorded before reads the same. Absent
+ * means the scoring screen; `correctionPlaySource` marks a play an admin's box score grid
+ * wrote when correcting a tracked game. The engine never reads it: a replay of the log
+ * gives the same lines with or without it.
+ */
+export const playSourceKey = 'source';
+export const correctionPlaySource = 'correction';
+export type PlaySource = typeof correctionPlaySource;
 
 // ---------------------------------------------------------------- the rosters (record 058)
 

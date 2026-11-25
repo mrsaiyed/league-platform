@@ -51,6 +51,18 @@ const putBackKeys: readonly TextKey[] = [
   'admin.boxScore.putBackError.scored-live',
 ];
 
+const trackedGridKeys: readonly TextKey[] = [
+  'admin.boxScore.tracked.refused.basket-taken-back',
+  'admin.boxScore.tracked.refused.cell',
+  'admin.boxScore.tracked.refused.changed-since-read',
+  'admin.boxScore.tracked.refused.engine',
+  'admin.boxScore.tracked.refused.gone',
+  'admin.boxScore.tracked.refused.player-not-on-team',
+  'admin.boxScore.tracked.refused.statistic-not-kept',
+  'admin.boxScore.tracked.refused.tie-not-allowed',
+  'admin.boxScore.tracked.refused.too-many-plays',
+];
+
 /** A refusal on the games list, as words. */
 export function gamesProblemKey(code: string): TextKey {
   return gamesKeys.find((k) => k === `admin.games.error.${code}`) ?? 'admin.games.error.unknown';
@@ -69,5 +81,13 @@ export function boxScoreProblemKey(code: string): TextKey {
 export function putBackProblemKey(code: string): TextKey {
   return (
     putBackKeys.find((k) => k === `admin.boxScore.putBackError.${code}`) ?? boxScoreProblemKey(code)
+  );
+}
+
+/** A tracked game's grid refused (step 2.65): its own words, else "load the page again". */
+export function trackedGridProblemKey(code: string): TextKey {
+  return (
+    trackedGridKeys.find((k) => k === `admin.boxScore.tracked.refused.${code}`) ??
+    'admin.boxScore.tracked.refused.gone'
   );
 }

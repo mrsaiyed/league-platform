@@ -16,6 +16,7 @@ import {
   readOwnResultOffer,
   readReopenOffer,
   readSheetPutBackOffer,
+  readTrackedBoxScore,
   type BoxScoreSheet,
   type GameLine,
   type GameRosterPlayer,
@@ -36,9 +37,11 @@ import { StaffTrail } from '../staff/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
 import { hasName, rosterName } from '../teams-area/index.ts';
 import { ActionForm } from './action-form.tsx';
+import { EndAgainForm } from './end-again-form.tsx';
 import {
   callOffAction,
   putBackAction,
+  endTrackedGameAgainAction,
   putSheetBackAction,
   reopenBoxScoreAction,
   saveBoxScoreAction,
@@ -158,7 +161,11 @@ export async function BoxScorePage({
   const mine = notice?.thing === game.id ? notice : undefined;
   const reopened =
     mine?.said === 'reopen'
-      ? t('admin.boxScore.done.reopen')
+      ? t(
+          sheet.locked === 'tracked'
+            ? 'admin.boxScore.done.reopenTracked'
+            : 'admin.boxScore.done.reopen',
+        )
       : mine?.said === 'put-back'
         ? t('admin.boxScore.done.putBack')
         : undefined;
@@ -203,6 +210,13 @@ export async function BoxScorePage({
     (offer.value.code === 'player-in-bin' || offer.value.code === 'player-gone')
       ? offer.value.code
       : undefined;
+  // A game scored with the tracker is edited in its own grid, as plays (step 2.65): the
+  // way there once it is reopened with a reason, else what to do first.
+  const tracked =
+    sheet.locked === 'tracked' && sheet.mayCorrect
+      ? await readTrackedBoxScore(context, { gameId: game.id }, ports.games.deps)
+      : undefined;
+  const trackedGrid = tracked !== undefined && tracked.ok ? tracked.value : undefined;
   const { timeZone } = await ports.publicSchedule.clockOf(here.id);
   // Postponed or cancelled: no box score, no grid; the way it is put back (step 2.158).
   const calledOff = sheet.locked === 'cancelled' || sheet.locked === 'postponed';
@@ -306,8 +320,9 @@ export async function BoxScorePage({
               requestToken: crypto.randomUUID(),
               // Made once as the form is drawn: a second send of it is the same reopen.
               ...(reopen.door === 'tracked' ? { requestId: crypto.randomUUID() } : {}),
-              // A game not entered as a box score is put right on the games list, beside it.
-              ...(game.captureMode === 'box' ? {} : { then: 'games' }),
+              // A game not entered as a box score is put right on the games list, beside it;
+              // a tracked game someone here may correct comes back here, to its grid (2.65).
+              ...(game.captureMode === 'box' || trackedGrid !== undefined ? {} : { then: 'games' }),
             }}
             texts={{
               ...(reopen.until === null
@@ -332,6 +347,47 @@ export async function BoxScorePage({
           {t(`admin.games.reopenWho.${reopen.because}`)}
         </p>
       ) : null}
+      {trackedGrid === undefined ? null : (
+        <div className="staff-panel">
+          {trackedGrid.correctable ? (
+            <p>
+              <a
+                className="ui-button"
+                data-kind="main"
+                href={leagueUrl(here, 'admin-area', {
+                  area: 'games',
+                  subpath: [game.id, 'edit'],
+                })}
+              >
+                {t('admin.boxScore.tracked.edit')}
+              </a>
+            </p>
+          ) : null}
+          {trackedGrid.correctable ? (
+            <EndAgainForm
+              action={endTrackedGameAgainAction}
+              permalink={sheetHref}
+              hidden={{
+                league,
+                gameId: game.id,
+                sequence: String(trackedGrid.sequence),
+                requestToken: crypto.randomUUID(),
+              }}
+              texts={{
+                help: t('admin.boxScore.tracked.endAgainHelp'),
+                button: t('admin.boxScore.tracked.endAgain'),
+                reload: t('admin.boxScore.tracked.reload'),
+              }}
+            />
+          ) : (
+            <p data-grid-closed={trackedGrid.notCorrectable}>
+              {t(
+                `admin.boxScore.tracked.notCorrectable.${trackedGrid.notCorrectable ?? 'game-not-live'}`,
+              )}
+            </p>
+          )}
+        </div>
+      )}
       {calledOff ? (
         // Its own page puts it back too (step 2.158, S-51, S-75), so a game called off
         // outside this week's list is never stuck: a cancelled one to what it was, a

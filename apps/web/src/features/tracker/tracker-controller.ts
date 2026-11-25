@@ -177,6 +177,8 @@ export type TrackerControllerStatus = {
   readonly game: basketball.GameState | null;
   /** The sequence number of the server's state the game was last rebuilt on. */
   readonly serverSequence: number | null;
+  /** The plays a correction wrote, as the server's state named them (T-408): Undo asks first. */
+  readonly corrections: readonly string[];
   /** Taps the server refused, oldest first, until `dismissNotApplied` (T-113). */
   readonly notApplied: readonly RefusedCommand[];
   /**
@@ -726,6 +728,7 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     mode: { kind: 'opening' },
     game: null,
     serverSequence: null,
+    corrections: [],
     notApplied: [],
     notSaved: [],
     cannotTell: false,
@@ -868,7 +871,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   const showGame = (): void => {
     if (base === null) return;
-    update({ game: replay(base, made), serverSequence: base.sequence });
+    update({
+      game: replay(base, made),
+      serverSequence: base.sequence,
+      corrections: base.corrections ?? [],
+    });
     keepScoringNow();
   };
 
