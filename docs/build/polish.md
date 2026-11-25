@@ -145,3 +145,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.130 leftovers: there is no way to abandon a correction once opened (one left open before archiving stays open until an admin enters a result); a refused start loses what was typed (step 2.155); the import screen's "no current season" sentences do not link to the form; run-start-season.ts and run-season-change.ts want fuller unit tests; a genuinely damaged copy in an archived season still answers damaged (the file is read before any server check); the tracker says "cannot be scored now", not "archived".
 
 - 2.241 leftovers: the server and keptForScoring do not read a season's own named list of statistics (record 070), which no command writes today; the transfer's check also reads plays already sent, so it is stricter than it needs to be; saving "Statistics kept" unchanged raises the season's version, so a second click from the same old page is told "changed since read".
+
+- 2.246 leftovers: browser tests that type no date and the database store tests (the database's own clock) were not searched for a dependence on the hour.
