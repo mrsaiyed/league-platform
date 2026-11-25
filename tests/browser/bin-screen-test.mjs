@@ -299,15 +299,15 @@ if (built) {
     await toTeams(page);
     await addTeam(page, larks);
     await page.goto(binAddress);
-    const refused = await binAnswer(
+    const larksRefused = await binAnswer(
       page,
       binRow(page, larks).getByRole('button', { name: 'Bring it back' }),
     );
     note(
       'the refusal stands in the row of what was not brought back',
-      refused.said === 'refused' &&
+      larksRefused.said === 'refused' &&
         (await binRow(page, larks).locator('[data-bin-answer][data-said=refused]').count()) === 1,
-      refused.text,
+      larksRefused.text,
     );
     note(
       'the browser lands on that row',
