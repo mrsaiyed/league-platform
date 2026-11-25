@@ -15,3 +15,5 @@ export {
 } from './sign-in-parts.tsx';
 export { OwnNameForm, type OwnNameWords } from './own-name-form.tsx';
 export type { OwnNameFormState } from './own-name-state.ts';
+export { ChangePasswordForm, type ChangePasswordWords } from './change-password-form.tsx';
+export { changePasswordStart, type ChangePasswordFormState } from './change-password-state.ts';

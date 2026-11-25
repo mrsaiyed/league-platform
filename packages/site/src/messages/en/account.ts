@@ -63,6 +63,17 @@ export const enAccount = {
   'account.name.save': 'Save my name',
   'account.name.saved': 'Your name is saved.',
   'account.name.title': 'Your name',
+  'account.password.heading': 'Your password',
+  'account.password.help':
+    'Changing it signs out every other device that uses your account. This one stays signed in, and we email you to say it changed.',
+  'account.password.new': 'New password',
+  'account.password.newHelp': 'At least 8 characters.',
+  'account.password.noPassword':
+    'Your account has no password, because you sign in with Google. To set one, sign out and use “Forgot your password?” on the sign-in screen.',
+  'account.password.old': 'Current password',
+  'account.password.save': 'Change my password',
+  'account.password.saved': 'Your password is changed. Every other device is signed out.',
+  'account.password.wrongOld': 'Your current password is wrong. Nothing was changed.',
   'account.problem.addressRefused':
     'You are signed in, but we cannot open an account for this email address. Nothing has been lost, and we have noted it. Please contact us, or sign out and sign in with another email address.',
   'account.problem.linkConflict':

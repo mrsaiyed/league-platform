@@ -9,8 +9,11 @@ import {
   waitingQuestionWords,
 } from '../../../features/shell/index.ts';
 import {
+  ChangePasswordForm,
+  changePasswordStart,
   LocalTime,
   OwnNameForm,
+  type ChangePasswordWords,
   type LocalTimeWords,
   type OwnNameWords,
   type SearchProps,
@@ -25,6 +28,7 @@ import {
   giveOwnNameAction,
 } from '../../../server/sign-in/own-name-actions.ts';
 import { cookieNames } from '../../../server/sign-in/cookies.ts';
+import { changePasswordAction } from '../../../server/sign-in/password-actions.ts';
 import { safeReturnPath } from '../../../server/sign-in/device.ts';
 import { screenUrl } from '../../../server/sign-in/problems.ts';
 import { leaguesOfThisRequest, signedInPerson } from '../../../server/signed-in-leagues.ts';
@@ -38,6 +42,8 @@ import { timeInWords } from '../../../server/sign-in/sign-in-mail.ts';
 // Since step 2.127 it says first who is signed in (the address the sign-in service holds
 // for the session), then lists the leagues they belong to with their role in each, each a
 // link (P2 line 71; record 066), before the devices.
+// Since step 2.128: "Your name", and "Your password" (the old one and a new one; a change
+// signs out every other device and emails the account, T-85).
 // Since step 2.163 (M26, M30, L10): this device first and said to be this one; each time in
 // the reader's own time ("today at 8:41 PM"), by their browser (local-time.tsx); a list that
 // could not be read says so; and "Sign out everywhere" asks first, on this page
@@ -86,6 +92,13 @@ export default async function Page({ searchParams }: SearchProps) {
           }}
           words={ownNameWords()}
           mark="change"
+        />
+        <h2>{t('account.password.heading')}</h2>
+        <p>{t('account.password.help')}</p>
+        <ChangePasswordForm
+          action={changePasswordAction}
+          initial={changePasswordStart}
+          words={changePasswordWords()}
         />
         <h2>{t('account.leagues')}</h2>
         <MyLeaguesList leagues={leagues} />
@@ -184,6 +197,26 @@ function ownNameWords(): OwnNameWords {
       alreadyNamed: t('account.name.alreadyNamed'),
       noNameYet: t('account.name.noNameYet'),
     },
+  };
+}
+
+function changePasswordWords(): ChangePasswordWords {
+  const hole = '{count}';
+  return {
+    oldPassword: t('account.password.old'),
+    newPassword: t('account.password.new'),
+    newHelp: t('account.password.newHelp'),
+    save: t('account.password.save'),
+    saved: t('account.password.saved'),
+    problems: {
+      wrongOld: t('account.password.wrongOld'),
+      noPassword: t('account.password.noPassword'),
+      tooShort: t('problem.passwordTooShort'),
+      tooLong: t('problem.passwordTooLong'),
+      leaked: t('problem.passwordLeaked'),
+      tooManyAttempts: t.plural('problem.tooManyAttempts', 2, { count: hole }),
+    },
+    tooManyAttemptsOne: t.plural('problem.tooManyAttempts', 1, { count: hole }),
   };
 }
 
