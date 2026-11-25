@@ -37,7 +37,15 @@ import {
   type BonusHorn,
   type BonusShown,
 } from './bonus-horn.ts';
-import { clockSetSaid, type ClockSheet, type CourtClock } from './clock-parts.tsx';
+import {
+  clockModeShown,
+  deviceStore,
+  mercySwitch,
+  readMercyDismissed,
+  switchedClock,
+  writeMercyDismissed,
+} from './clock-mode.ts';
+import { clockSetSaid, MercyNotice, type ClockSheet, type CourtClock } from './clock-parts.tsx';
 import { createClockTicker } from './clock-ticker.ts';
 import { CourtView, type CourtBanner, type CourtHandlers, type CourtSlots } from './court-view.tsx';
 import {
@@ -254,6 +262,12 @@ const restingPlaces = {
    * to the games" lies where "End game" was, and a slow double tap must not leave.
    */
   final: '[data-pad] [data-final-actions]',
+  /**
+   * The mercy rule's answers, after the notice comes up (step 2.69's fix round): it comes
+   * with the basket that crossed the lead, where that basket's "+2" was, and the second of
+   * two fast taps is not an answer.
+   */
+  mercy: '[data-mercy-notice] .court-mercy-acts',
 } as const;
 type RestingPlace = keyof typeof restingPlaces;
 const restingNames = Object.keys(restingPlaces) as RestingPlace[];
@@ -528,6 +542,7 @@ export function ScoringScreen(props: ScoringScreenProps) {
     redo: createTapRest(restTimers, drawRests, takeBackRestMs),
     asked: createTapRest(restTimers, drawRests),
     final: createTapRest(restTimers, drawRests, takeBackRestMs),
+    mercy: createTapRest(restTimers, drawRests),
   };
   const resting = rests.current;
   // After every drawing: a control drawn anew while it rests is marked as well.
@@ -634,7 +649,36 @@ export function ScoringScreen(props: ScoringScreenProps) {
     start: startShown
       ? { tipOff: state.status === 'scheduled', why: whyStopped(stopReason(state)) }
       : null,
+    mode: clockModeShown(state, reading.remainingMs),
   };
+  // The last-minutes stop clock begins while the clock runs: the screen is drawn again
+  // then, so its sign shows and the switch reads Off from that moment (step 2.69).
+  const [, setLastMinutesDrawn] = useState(0);
+  const lastMinutesAtMs = clock.mode.lastMinutesAtMs;
+  useEffect(() => {
+    if (lastMinutesAtMs === null || !reading.running) return;
+    const wait = reading.remainingMs - lastMinutesAtMs;
+    if (wait <= 0) return;
+    const timer = window.setTimeout(() => setLastMinutesDrawn((n) => n + 1), wait + 20);
+    return () => window.clearTimeout(timer);
+  }, [lastMinutesAtMs, reading.running, reading.remainingMs]);
+  // The mercy rule switched the clock to running: said until dismissed or switched back,
+  // and not again for the same basket once dismissed (step 2.69), even after a reload: the
+  // dismissal is kept on the device by game and person, as the Players panel's drafts are.
+  const mercyOwner = {
+    gameId: props.gameId ?? `${rosters.home.teamId}.${rosters.away.teamId}`,
+    accountId: props.accountId,
+  };
+  const [mercyDismissed, setMercyDismissed] = useState<string | null>(() =>
+    readMercyDismissed(deviceStore(), mercyOwner),
+  );
+  const mercy = mercySwitch(state);
+  const mercyShown = mercy !== null && mercy.playId !== mercyDismissed ? mercy : null;
+  // Its answers rest from the moment it comes up (above, `restingPlaces.mercy`).
+  const mercyShownId = mercyShown?.playId ?? null;
+  useLayoutEffect(() => {
+    if (mercyShownId !== null) resting.mercy.begin();
+  }, [mercyShownId, resting]);
   // Start or Pause under the scoreboard rests when its word changes, whatever changed it
   // (a tap kept by the device, a foul that stopped the clock, the clock running out): a
   // tap already on its way was meant for the word that was there.
@@ -957,6 +1001,12 @@ export function ScoringScreen(props: ScoringScreenProps) {
         // What the engine truly did to the minutes: what came off, or what was added.
         say(clockSetSaid(t, typed.text, minutesMoved(state, before, result.game)));
       });
+    },
+    switchClock() {
+      const input = switchedClock(clock.mode);
+      setDigits('');
+      setClockOpen(false);
+      void send(input, t(`tracker.play.clock-mode.${input.mode}`));
     },
     pickPeriod(period) {
       setDigits('');
@@ -1529,6 +1579,23 @@ export function ScoringScreen(props: ScoringScreenProps) {
       clockSheet={clockSheet}
       banner={props.banner}
       notices={props.notices}
+      padNotice={
+        mercyShown === null ? null : (
+          <MercyNotice
+            t={t}
+            mercy={mercyShown}
+            back={(event) => {
+              if (!tapTaken(resting.mercy, tapOf(event))) return;
+              void send({ type: 'clock-mode', mode: 'stop' }, t('tracker.play.clock-mode.stop'));
+            }}
+            keep={(event) => {
+              if (!tapTaken(resting.mercy, tapOf(event))) return;
+              writeMercyDismissed(deviceStore(), mercyOwner, mercyShown.playId);
+              setMercyDismissed(mercyShown.playId);
+            }}
+          />
+        )
+      }
       noticesIn={noticesInPad ? 'pad' : 'top'}
       turnovers={keepsTurnovers(props.rosters)}
       pad={pad}

@@ -184,6 +184,40 @@ export async function keepStatistics(browser, origin, statistics = 'standard-tur
 }
 
 /**
+ * Sets the made-up season's clock in "Game rules" (step 2.69), as on the season's settings page:
+ * `mode` stop or running, `lastMinutes` and `mercyLead` a number or '' for none. Throws
+ * unless the page then shows the season so. Returns the season's number of periods.
+ */
+export async function seasonClock(browser, origin, mode, lastMinutes, mercyLead) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  try {
+    await context.addCookies([{ ...owner, url: origin }]);
+    const page = await context.newPage();
+    const address = `${origin}/${league}/admin/season?season=fall-2026&edit=game`;
+    await page.goto(address);
+    await page.locator(`input[name=clockMode][value=${mode}]`).check();
+    await page.locator('input[name=lastMinutes]').fill(lastMinutes);
+    await page.locator('input[name=mercyLead]').fill(mercyLead);
+    await Promise.all([
+      page.waitForEvent('load'),
+      page.getByRole('button', { name: 'Save the game rules' }).click(),
+    ]);
+    await page.goto(address);
+    const kept = {
+      mode: await page.locator('input[name=clockMode]:checked').getAttribute('value'),
+      lastMinutes: await page.locator('input[name=lastMinutes]').inputValue(),
+      mercyLead: await page.locator('input[name=mercyLead]').inputValue(),
+    };
+    if (kept.mode !== mode || kept.lastMinutes !== lastMinutes || kept.mercyLead !== mercyLead) {
+      throw new Error(`the season keeps ${JSON.stringify(kept)}`);
+    }
+    return Number(await page.locator('input[name=periods]:checked').getAttribute('value'));
+  } finally {
+    await context.close();
+  }
+}
+
+/**
  * Makes the game a stop-clock game, where a foul or a timeout stops a running clock
  * (step 2.36): the made-up league's own format is a running clock, under which neither
  * does. It is the engine's own switch (`clock-mode`, T-128), sent before tip-off from
