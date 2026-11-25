@@ -29,6 +29,8 @@ export const noticeScreens = [
   // League settings → Profile (step 2.155 part 3).
   'settings',
   'teams',
+  // The fixture import, each step's answer (step 2.155 part 6).
+  'import',
 ] as const;
 export type NoticeScreen = (typeof noticeScreens)[number];
 

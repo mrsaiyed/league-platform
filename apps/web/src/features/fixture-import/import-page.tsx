@@ -5,6 +5,7 @@ import { commandContextOf } from '../../server/context.ts';
 import type { ImportNames } from '../../server/fixture-import-ports.ts';
 import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { locale, t } from '../../server/messages.ts';
+import { takeNotice } from '../list-forms/index.ts';
 import { StaffTrail } from '../staff/index.ts';
 import {
   applyImportAction,
@@ -260,9 +261,9 @@ export async function ImportPage({
   const context = commandContextOf(view.context);
   const season = await fixtureImport.currentSeasonOf(addressee.id);
   const here = leagueUrl(addressee, 'admin-area', { area: 'schedule', subpath: ['import'] });
-  const notice = importNotice(search);
-
   const importId = first(search['import']);
+  // The step's answer, taken once (T-434): a reload or a typed address says nothing.
+  const notice = importNotice(takeNotice(context, 'import'), importId);
   const found =
     importId === undefined
       ? undefined

@@ -2,7 +2,6 @@ import { getFixtureImport, type AccessReader, type Grant } from '@srleagues/core
 import { describe, expect, it } from 'vitest';
 import { standInFixtureImport } from '../../server/stand-in-fixture-import.ts';
 import { testWorld } from '../../server/stand-in-world.test-helper.ts';
-import { importNotice } from './import-notice.ts';
 import { runImportAction } from './run-import-action.ts';
 
 const leagueId = '01900000-0000-7000-8000-000000000001';
@@ -171,31 +170,5 @@ describe('the fixture import screen actions', () => {
         await seasonOf(),
       ),
     ).toEqual({ ok: false, code: 'not-reading', importId });
-  });
-});
-
-describe('the notice after a step', () => {
-  it('names what was done, with the clashes an apply caused', () => {
-    expect(importNotice({ done: 'apply', clashes: '2' })).toEqual({
-      key: 'admin.import.done.apply',
-      problem: false,
-      clashes: 2,
-    });
-    expect(importNotice({ done: 'undo' })).toEqual({
-      key: 'admin.import.done.undo',
-      problem: false,
-    });
-  });
-
-  it('turns a refusal into words, and anything unknown into the general one', () => {
-    expect(importNotice({ problem: 'draft-changed' })).toEqual({
-      key: 'admin.import.error.draft-changed',
-      problem: true,
-    });
-    expect(importNotice({ problem: '<script>' })).toEqual({
-      key: 'admin.import.error.unknown',
-      problem: true,
-    });
-    expect(importNotice({ done: 'everything' })).toBeUndefined();
   });
 });

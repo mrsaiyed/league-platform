@@ -686,7 +686,7 @@ if (browser) {
       buffer: Buffer.from(file),
     });
     await Promise.all([
-      page.waitForURL((url) => url.searchParams.get('done') === 'upload'),
+      page.waitForURL((url) => url.searchParams.has('import')),
       page.getByRole('button', { name: 'Upload and check' }).click(),
     ]);
     // The venue is not one of the season's: the row is left out, its venue quoted, cut short.
