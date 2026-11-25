@@ -121,6 +121,7 @@ describe('what Undo and Redo name (checklist I1, I3)', () => {
   it('has short words for every kind of play the engine has', () => {
     const plays: basketball.Play[] = [
       { type: 'score', side: 'home', playerId: 'h5', points: 2 },
+      { type: 'unscore', side: 'home', playerId: 'h5', points: 2, playId: 'p1' },
       { type: 'foul', side: 'home', playerId: 'h5' },
       { type: 'unfoul', side: 'home', playerId: 'h5' },
       { type: 'turnover', side: 'home', playerId: 'h5' },
@@ -138,6 +139,7 @@ describe('what Undo and Redo name (checklist I1, I3)', () => {
     expect(new Set(plays.map((play) => play.type))).toEqual(new Set(Object.keys(playKeys)));
     expect(plays.map((play) => playShortText(play, testRosters, 4, t))).toEqual([
       '+2 #5 Ned',
+      '−2 #5 Ned',
       'Foul #5 Ned',
       '−Foul #5 Ned',
       // The one long word comes after the player: a cut line keeps the number.

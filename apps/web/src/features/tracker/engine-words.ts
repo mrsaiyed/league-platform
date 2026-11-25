@@ -36,6 +36,11 @@ const refusals: Readonly<Record<string, RefusalKey>> = {
   'This team already has players on the floor. Use substitutions.':
     'tracker.refusal.lineupAlreadySet',
   'A basket is 1, 2 or 3 points.': 'tracker.refusal.badPoints',
+  'Pick the basket to take back.': 'tracker.refusal.pickBasket',
+  'That basket is not in this game.': 'tracker.refusal.basketNotInGame',
+  'That play is not a basket.': 'tracker.refusal.notABasket',
+  'That basket is already taken back.': 'tracker.refusal.basketAlreadyTakenBack',
+  'That basket was not made by that player for those points.': 'tracker.refusal.basketNotTheirs',
   'Pick a player.': 'tracker.refusal.pickPlayer',
   'That player has no foul to take back.': 'tracker.refusal.noFoulToTakeBack',
   'That player has no turnover to take back.': 'tracker.refusal.noTurnoverToTakeBack',
