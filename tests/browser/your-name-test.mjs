@@ -8,6 +8,8 @@
 // - Signed out and in again, they are not asked again; the account page holds their name.
 // - The one made-up person with no name (local-unnamed-token, T-446) meets the same screen
 //   at the empty league's admin page, answers, and League settings → Admins shows the name.
+//   Before that, the league's owner sees them there as "No name yet" (A-14), and once they
+//   answer, the same line carries their name.
 // - "Your name" on the account page, with scripts on: a refused change keeps what was typed,
 //   and a saved one appears without the page being loaded again; Admins then shows it.
 import {
@@ -177,11 +179,30 @@ await step('a new sign-up is asked its name once', async () => {
 });
 
 await step('the made-up person with no name, and the Admins page', async () => {
+  // The league's owner looks at the empty league's Admins page first (A-14).
+  const ownerContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ownerContext.addCookies([{ name: 'srl_session', value: 'local-owner-token', url: origin }]);
+  const ownerPage = await ownerContext.newPage();
+  ownerPage.setDefaultTimeout(30_000);
+  const unnamedLines = (page) =>
+    page.locator('li[data-person=""]').filter({ hasText: 'No name yet' });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await context.addCookies([{ name: 'srl_session', value: 'local-unnamed-token', url: origin }]);
   const page = await context.newPage();
   page.setDefaultTimeout(30_000);
   try {
+    await ownerPage.goto(`${origin}/still-waters/admin/settings/admins`);
+    const unnamedBefore = await unnamedLines(ownerPage).count();
+    note(
+      'the owner sees the person who has not answered as "No name yet", with their role',
+      unnamedBefore >= 1 &&
+        (await unnamedLines(ownerPage).filter({ hasText: 'Admin' }).count()) >= 1,
+      (await ownerPage.locator('li[data-person]').allInnerTexts()).join(' | '),
+    );
+    note(
+      'and not by an email address',
+      !(await ownerPage.locator('li[data-person]').allInnerTexts()).join(' ').includes('@'),
+    );
     await page.goto(`${origin}/still-waters/admin`);
     note(
       'the made-up person with no name meets the name screen at an admin page',
@@ -194,6 +215,15 @@ await step('the made-up person with no name, and the Admins page', async () => {
     note(
       'League settings → Admins shows the name given',
       (await page.locator('main').getByText('Una Named').count()) > 0,
+    );
+    await ownerPage.goto(`${origin}/still-waters/admin/settings/admins`);
+    note(
+      'the owner now sees that line by the name given, one "No name yet" fewer',
+      (await ownerPage
+        .locator('li[data-person="Una Named"]')
+        .filter({ hasText: 'Admin' })
+        .count()) === 1 && (await unnamedLines(ownerPage).count()) === unnamedBefore - 1,
+      (await ownerPage.locator('li[data-person]').allInnerTexts()).join(' | '),
     );
 
     // "Your name" with scripts on: nothing loads the page again (the mark stays).
@@ -224,6 +254,7 @@ await step('the made-up person with no name, and the Admins page', async () => {
     );
   } finally {
     await context.close();
+    await ownerContext.close();
   }
 });
 

@@ -10,7 +10,9 @@
 // Admins and invites an address as Scorekeeper; the email is read on the kept emails' page
 // (step 2.96); the person opens the link on a phone, creates an account, accepts and lands
 // on the league's home with the league's header; the Admins page then lists them by role and
-// as "No name yet" (A-14); re-send, cancel and remove access each work and are in the list of
+// by the name they gave on the one name screen, never by their email (A-14; "No name yet"
+// itself is proved on the stand-in by your-name-test, the one place a person on the page
+// can still have no name, see below); re-send, cancel and remove access each work and are in the list of
 // latest changes; a scheduler cannot open the page nor post its form; the link answers
 // no-store and no-referrer, the accept page it forwards to (whose address holds no secret)
 // no-store and same-origin, and no token is in the server's output.
@@ -52,6 +54,10 @@ const seedOwner = 'owner@lakeside.example.test';
 const seedScheduler = 'scheduler@lakeside.example.test';
 const chosenPassword = 'a made-up chosen password';
 const volunteer = `volunteer-${run}@example.test`;
+// The name the volunteer gives on the one name screen (step 2.128).
+const volunteerName = ['Vic', 'Volunteer'];
+const volunteerLine = (page) =>
+  page.locator(`li[data-person="${volunteerName.join(' ')}"]`).filter({ hasText: 'Scorekeeper' });
 const withdrawn = `withdrawn-${run}@example.test`;
 const replaced = `replaced-${run}@example.test`;
 const forwarded = `forwarded-${run}@example.test`;
@@ -134,7 +140,7 @@ async function codeFor(page, origin, address) {
  * Finishes signing up `address` from the sign-up screen the browser is on (its own address
  * may carry where to come back to), reading the code in another tab, as a person would.
  */
-async function finishSignUp(page, origin, address) {
+async function finishSignUp(page, origin, address, [first, last]) {
   await page.getByLabel('Email').fill(address);
   await Promise.all([
     page.waitForURL((url) => url.pathname === '/signup/code'),
@@ -153,18 +159,18 @@ async function finishSignUp(page, origin, address) {
     page.waitForURL((url) => url.pathname !== '/signup/password'),
     page.getByRole('button', { name: 'Save and sign in' }).click(),
   ]);
-  // The one name screen a new account meets (step 2.128).
-  await answerNameScreen(page, 'Made-up', 'Signer');
+  // The one name screen a new account meets (step 2.128), answered with the person's own name.
+  await answerNameScreen(page, first, last);
   return code;
 }
 
 /** A browser signed in as `address` (made up by signing up through the screens). */
-async function signedIn(browser, origin, address, options) {
+async function signedIn(browser, origin, address, name, options) {
   const context = await browser.newContext(options);
   const page = await context.newPage();
   page.setDefaultTimeout(60_000);
   await page.goto(`${origin}/signup`);
-  await finishSignUp(page, origin, address);
+  await finishSignUp(page, origin, address, name);
   return { context, page };
 }
 
@@ -210,7 +216,10 @@ if (server !== null) {
 const phone = { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true };
 
 if (browser !== null) {
-  const owner = await signedIn(browser, origin, seedOwner, { ...phone, javaScriptEnabled: true });
+  const owner = await signedIn(browser, origin, seedOwner, ['Ola', 'Lakeside'], {
+    ...phone,
+    javaScriptEnabled: true,
+  });
   const session = await owner.context.storageState();
   await owner.context.close();
   // The owner works with no script in the page; a second tab of theirs has scripts on.
@@ -311,7 +320,13 @@ if (browser !== null) {
       '"Invitation cancelled" is said',
       (await page.getByText('Invitation cancelled').count()) === 1,
     );
-    const stranger = await signedIn(browser, origin, `cancelled-reader-${run}@example.test`, phone);
+    const stranger = await signedIn(
+      browser,
+      origin,
+      `cancelled-reader-${run}@example.test`,
+      ['Cass', 'Reader'],
+      phone,
+    );
     await stranger.page.goto(link);
     note(
       'the cancelled link says it does not work',
@@ -423,7 +438,7 @@ if (browser !== null) {
       !phonePage.url().includes(link.slice(-43)),
       phonePage.url(),
     );
-    await finishSignUp(phonePage, origin, volunteer);
+    await finishSignUp(phonePage, origin, volunteer, volunteerName);
     note(
       'it comes straight back to the accept page',
       new URL(phonePage.url()).pathname === '/lakeside/invitation',
@@ -478,7 +493,13 @@ if (browser !== null) {
       (await phonePage.locator('[data-invitation-state="accepted"]').count()) === 1,
     );
     await shot(phonePage, 'admins-accept-accepted');
-    const other = await signedIn(browser, origin, `link-reader-${run}@example.test`, phone);
+    const other = await signedIn(
+      browser,
+      origin,
+      `link-reader-${run}@example.test`,
+      ['Lin', 'Reader'],
+      phone,
+    );
     await other.page.goto(link);
     note(
       'anyone else is told only that it does not work',
@@ -505,7 +526,7 @@ if (browser !== null) {
       await page.goto(`${origin}${adminsPath}`);
       await inviteFromThePage(page, forwarded, 'Registrar', false);
       const forwardedLink = await linkFor(await ownerContext.newPage(), origin, forwarded);
-      const other = await signedIn(browser, origin, otherAccount, {
+      const other = await signedIn(browser, origin, otherAccount, ['Otto', 'Other'], {
         ...phone,
         javaScriptEnabled: false,
       });
@@ -534,42 +555,54 @@ if (browser !== null) {
     },
   );
 
-  await step('the Admins page lists the volunteer as Scorekeeper, "No name yet"', async () => {
-    await page.goto(`${origin}${adminsPath}`);
-    const line = page.locator('li[data-person=""]').filter({ hasText: 'Scorekeeper' });
-    note(
-      'one line with no name and the role',
-      (await line.count()) >= 1,
-      await page
-        .locator('li[data-person]')
-        .allInnerTexts()
-        .then((t) => t.join(' | ')),
-    );
-    note('as "No name yet"', (await line.first().innerText()).includes('No name yet'));
-    note(
-      'their invitation is no longer waiting',
-      (await invitationLine(page, volunteer).count()) === 0,
-    );
-    const changes = await page.locator('[data-access-activity] li').allInnerTexts();
-    for (const said of [
-      'Invited someone as Scorekeeper',
-      'Re-sent an invitation as Scheduler',
-      'Cancelled an invitation as Editor',
-      'Joined as Scorekeeper',
-    ]) {
+  // A-14's "No name yet" no longer has a case on the made-up database: every seeded person
+  // has a name in the seed, and an invited person meets the name screen before the accept
+  // page lets them accept (identify's name gate, T-445), so nobody is on this page unnamed.
+  // The true case, a made-up person on the page who has never answered the screen, and the
+  // line taking their name once they answer, is proved on the stand-in by your-name-test.
+  await step(
+    'the Admins page lists the volunteer as Scorekeeper, by the name they gave',
+    async () => {
+      await page.goto(`${origin}${adminsPath}`);
+      const line = volunteerLine(page);
       note(
-        `the latest changes say "${said}"`,
-        changes.some((c) => c.includes(said)),
-        changes.join(' | '),
+        'one line with their name and the role',
+        (await line.count()) === 1,
+        await page
+          .locator('li[data-person]')
+          .allInnerTexts()
+          .then((t) => t.join(' | ')),
       );
-    }
-  });
+      note(
+        'not by their email address (A-14)',
+        !(await line.first().innerText()).includes(volunteer) &&
+          !(await page.locator('li[data-person]').allInnerTexts()).join(' ').includes('@'),
+      );
+      note(
+        'their invitation is no longer waiting',
+        (await invitationLine(page, volunteer).count()) === 0,
+      );
+      const changes = await page.locator('[data-access-activity] li').allInnerTexts();
+      for (const said of [
+        'Invited someone as Scorekeeper',
+        'Re-sent an invitation as Scheduler',
+        'Cancelled an invitation as Editor',
+        'Joined as Scorekeeper',
+      ]) {
+        note(
+          `the latest changes say "${said}"`,
+          changes.some((c) => c.includes(said)),
+          changes.join(' | '),
+        );
+      }
+    },
+  );
 
   await step('a scheduler cannot open the page, nor post its form', async () => {
     // The owner's own page, as it was drawn for them: its form, sent by a scheduler's browser.
     await page.goto(`${origin}${adminsPath}`);
     const ownersPage = await page.content();
-    const scheduler = await signedIn(browser, origin, seedScheduler, {
+    const scheduler = await signedIn(browser, origin, seedScheduler, ['Sam', 'Scheduler'], {
       ...phone,
       javaScriptEnabled: false,
     });
@@ -606,7 +639,7 @@ if (browser !== null) {
     'removing access asks first, then ends the volunteer’s open session at once',
     async () => {
       await page.goto(`${origin}${adminsPath}`);
-      const line = page.locator('li[data-person=""]').filter({ hasText: 'Scorekeeper' }).first();
+      const line = volunteerLine(page).first();
       const remove = line.locator('details.admin-access-remove');
       await remove.locator('summary').tap();
       await shot(page, 'admins-remove-ask');
