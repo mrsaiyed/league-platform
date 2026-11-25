@@ -93,6 +93,7 @@ export const playKeys = {
   score: 'tracker.play.score',
   foul: 'tracker.play.foul',
   unfoul: 'tracker.play.unfoul',
+  unscore: 'tracker.play.unscore',
   turnover: 'tracker.play.turnover',
   unturnover: 'tracker.play.unturnover',
   'team-turnover': 'tracker.play.team-turnover',
@@ -171,6 +172,8 @@ export function playShortText(
   switch (play.type) {
     case 'score':
       return t('tracker.play.short.score', { who: who(play.playerId), points: play.points });
+    case 'unscore':
+      return t('tracker.play.short.unscore', { who: who(play.playerId), points: play.points });
     case 'foul':
     case 'unfoul':
     case 'turnover':
@@ -204,6 +207,8 @@ export function playText(
   switch (play.type) {
     case 'score':
       return t(playKeys.score, { player: player(play.playerId), points: play.points });
+    case 'unscore':
+      return t(playKeys.unscore, { player: player(play.playerId), points: play.points });
     case 'foul':
     case 'unfoul':
     case 'turnover':
