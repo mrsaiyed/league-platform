@@ -38,13 +38,20 @@ export const readInvitation = defineCommand({
   name: 'access.read_invitation',
   permission: 'signed-in',
   input: z.object({ token: invitationTokenSchema }),
-  allowed: (context, _input, tx: AccessTx) => isSignedInHere(context, tx),
+  // Anyone signed in may ask; whether the league is there is asked only after the link has
+  // been looked up (review M2, T-459), so an address with no league behind it (the
+  // invitation page asks with an id no league has, T-449) costs the same work, the same
+  // reads in the same order, as a hidden league holding no such link: the hash, the link,
+  // nothing more. Asking for the league first answered a missing one sooner, and the page's
+  // answer then came without the stylesheet preload a hidden league's carried.
+  allowed: async (context, _input, _tx: AccessTx) => context.accountId !== null,
   run: async ({ context, input, tx }): Promise<Result<InvitationOffer, ReadInvitationError>> => {
     const notUsable = fail({ code: 'invitation-not-usable' as const });
     const invitation = await tx.access.findInvitationByTokenHash(
       await hashInvitationToken(input.token),
     );
     if (invitation === undefined) return notUsable;
+    if (!(await isSignedInHere(context, tx))) return notUsable;
     const { role, scope } = invitation;
     if (invitation.status === 'accepted') {
       return invitation.acceptedByAccountId !== null &&

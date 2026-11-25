@@ -102,10 +102,15 @@ describe('fetch tracker server: the state', () => {
       [401, 'signed-out'],
       [403, 'not-allowed'],
       [404, 'not-found'],
+      [404, 'unknown-game'],
     ] as const;
     for (const [status, error] of own) {
       const { server } = serverAnswering(() => json(status, { error }));
-      expect(await server.loadState(signal)).toEqual({ kind: 'rejected', httpStatus: status });
+      expect(await server.loadState(signal)).toEqual({
+        kind: 'rejected',
+        httpStatus: status,
+        error,
+      });
     }
     // Not the server's (finding G): a page in between, another body, or the wrong status.
     for (const answer of foreignRefusals) {

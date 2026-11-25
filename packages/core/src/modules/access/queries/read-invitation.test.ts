@@ -52,6 +52,19 @@ describe('readInvitation (step 2.97)', () => {
     });
   });
 
+  it('asks for the league only after the link: no league answers as a wrong link (M2)', async () => {
+    // The invitation page asks with an id no league has for an address with no league
+    // behind it (T-449): that must take the same steps as a hidden league holding no such
+    // link (the hash, the link), so it is not refused before the link is looked up.
+    const { deps, as, db, token } = await invited();
+    db.state.ownerId = undefined;
+    expect(await readInvitation(as(strangerId), { token: 'c'.repeat(43) }, deps)).toEqual(
+      notUsable,
+    );
+    // A link that is there, at a league that is not: still not usable.
+    expect(await readInvitation(as(strangerId), { token }, deps)).toEqual(notUsable);
+  });
+
   it('answers one way for a wrong, cancelled, run-out, replaced or used link', async () => {
     const wrong = await invited();
     expect(

@@ -2,7 +2,12 @@
 // scoring session (T6 §5, T-116) and the engine's state (T-113, T-253). The taps go
 // through the queue's own transport (command-transport.ts). The browser's version is
 // fetch-tracker-server.ts; nothing here throws, every failure is an outcome.
-import type { SessionReply, SessionRequest, TrackerRosters } from '@srleagues/contracts';
+import type {
+  SessionReply,
+  SessionRequest,
+  TrackerRefusal,
+  TrackerRosters,
+} from '@srleagues/contracts';
 import type { basketball } from '@srleagues/sports';
 
 /** The engine's state as the server holds it, and the sequence number of its last tap. */
@@ -27,7 +32,16 @@ export type ServerOutcome<T> =
    * changes: signed out (401), may not score (403), no such game (404), or a request
    * it could not read (400). Only the server's own refusal (`TrackerRefusal`) is this.
    */
-  | { readonly kind: 'rejected'; readonly httpStatus: number }
+  | {
+      readonly kind: 'rejected';
+      readonly httpStatus: number;
+      /**
+       * The refusal's own code (`TrackerRefusal`). A 404 is "the game is gone" only with
+       * `unknown-game`, given past the league gate; any other 404 (a hidden league, say)
+       * asks for sign-in and holds the taps, as a 401 does (T-453).
+       */
+      readonly error?: TrackerRefusal['error'];
+    }
   /**
    * No usable answer: no network, a timeout, a server error, or a page that is not the
    * server's, whatever its status. Ask again later.

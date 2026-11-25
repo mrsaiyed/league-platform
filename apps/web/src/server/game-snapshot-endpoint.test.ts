@@ -31,7 +31,9 @@ async function read(
     carriesSignIn?: boolean;
   },
 ) {
-  const context = await world.contextAs(as, league, ['games', game, 'snapshot']);
+  // A hidden league never gets past the gate (step 2.223): the snapshot's own answer
+  // there is tested past it, and the gate's own in league-gate-hidden.test.ts.
+  const context = await world.contextPastTheGate(as, league, ['games', game, 'snapshot']);
   return gameSnapshot(
     { context, holder: await world.holderOf(context), carriesSignIn },
     game,
@@ -154,6 +156,9 @@ describe('GET …/games/{game}/snapshot', () => {
     const world = trackerWorld();
     const hidden = await read(world, { league: 'draft' });
     expect(hidden.status).toBe(404);
+    await expect(
+      world.contextAs('visitor', 'draft', ['games', games.hawksBears, 'snapshot']),
+    ).rejects.toThrow('no context: not-found');
     // Its staff may open the draft league, which has the same made-up games
     // (stand-in-ports.ts): they get the game, never cached, even with no sign-in cookie.
     for (const carriesSignIn of [true, false]) {

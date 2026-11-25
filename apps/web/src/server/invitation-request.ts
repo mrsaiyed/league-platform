@@ -23,6 +23,7 @@ import { cookies } from 'next/headers';
 import { webPorts } from './container.ts';
 import { requestContext, type LeagueRequestContext } from './context.ts';
 import { getConfig } from './config.ts';
+import { noLeagueId } from './league-gate.ts';
 import { secureCookies } from './sign-in/next-visit.ts';
 import { thisRequestFacts } from './this-request.ts';
 
@@ -87,6 +88,12 @@ export type InvitationRequest =
       readonly slug: string;
       /** Nobody is signed in: answered exactly as a visitor to a league that is there. */
       readonly visitor: boolean;
+      /**
+       * What the page reads the held invitation with, as it does for a league that is
+       * there: an id no league has (T-449, review M2), so a hidden league and a missing
+       * one cost the same read and answer alike, cookie or no cookie.
+       */
+      readonly asNoLeague: CommandContext;
     }
   /** The session is none of our accounts' (record 055): the account page explains. */
   | { readonly kind: 'account-problem' }
@@ -114,13 +121,22 @@ export async function invitationRequest(): Promise<InvitationRequest> {
     visitor = true;
   }
   const slug = (facts.path.split(/[?#]/)[0] ?? '').split('/')[1] ?? '';
+  const noLeague = (): InvitationRequest => ({
+    kind: 'no-league',
+    slug,
+    visitor,
+    asNoLeague: {
+      leagueId: noLeagueId,
+      accountId:
+        !visitor && facts.session?.ok === true ? facts.session.value.accountId.toLowerCase() : null,
+      requestId: deps.newRequestId(),
+    },
+  });
   if (!built.ok) {
-    return built.error.code === 'account-problem'
-      ? { kind: 'account-problem' }
-      : { kind: 'no-league', slug, visitor };
+    return built.error.code === 'account-problem' ? { kind: 'account-problem' } : noLeague();
   }
   const context = built.value;
-  if (context.kind !== 'league') return { kind: 'no-league', slug, visitor };
+  if (context.kind !== 'league') return noLeague();
   const email =
     context.account !== null && facts.session?.ok === true ? facts.session.value.email : null;
   return { kind: 'league', context, email };

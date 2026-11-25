@@ -47,9 +47,10 @@ export function createFetchGameDoors(options: FetchGameDoorsOptions): GameDoors 
     }
     const value = own(response.status, body);
     if (value !== null) return { kind: 'answer', value };
-    return ownTrackerRefusal(response.status, body) === null
+    const refusal = ownTrackerRefusal(response.status, body);
+    return refusal === null
       ? unanswered
-      : { kind: 'rejected', httpStatus: response.status };
+      : { kind: 'rejected', httpStatus: response.status, error: refusal.error };
   };
 
   const post = (body: unknown, signal: AbortSignal): RequestInit => ({

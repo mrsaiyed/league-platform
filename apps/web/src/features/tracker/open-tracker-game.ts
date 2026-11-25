@@ -17,6 +17,7 @@
 // 5. Once the server says the account is signed out (401), the names the device keeps
 //    are deleted (`forgetAll`), as signing out on the device deletes them: whoever
 //    picks the device up next does not find the players' names on it (T-115).
+import type { SignedInCheck } from './fetch-signed-in.ts';
 import type { QueueErrorCode } from './queue-storage.ts';
 import { inLeague, QueueError, type QueueStorage } from './queue-storage.ts';
 import type { CommandTransport } from './command-transport.ts';
@@ -91,6 +92,8 @@ export type OpenTrackerGameOptions = {
   }>;
   readonly transport: CommandTransport;
   readonly server: TrackerServer;
+  /** "Am I signed in?", asked when a league answers "not found" (T-456). */
+  readonly signedIn?: SignedInCheck;
   /**
    * Reopening the game and marking it not started (game-doors.ts; step 2.37): in the
    * browser, fetch-game-doors.ts. Left out, the controller offers neither.
@@ -247,6 +250,7 @@ export async function openTrackerGame(
     },
     transport: options.transport,
     ...(options.doors === undefined ? {} : { doors: options.doors }),
+    ...(options.signedIn === undefined ? {} : { signedIn: options.signedIn }),
     server: createStoringTrackerServer({
       gameId,
       server: markingOnAnswer(options.server, () => options.markSignedIn?.(accountId)),

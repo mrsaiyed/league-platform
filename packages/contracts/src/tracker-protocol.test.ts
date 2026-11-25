@@ -227,6 +227,7 @@ describe("the server's own refusals (T-251)", () => {
       [403, { error: 'not-allowed' }],
       [403, { error: 'account-problem' }],
       [404, { error: 'not-found' }],
+      [404, { error: 'unknown-game' }],
       [400, { error: 'invalid-input', issues: [{ path: 'commands', problem: 'too_small' }] }],
     ];
     for (const [status, body] of own) {
@@ -248,7 +249,7 @@ describe("the server's own refusals (T-251)", () => {
       [401, { error: 'account-problem' }],
     ];
     for (const [status, body] of foreign) expect(ownTrackerRefusal(status, body)).toBeNull();
-    expect(Object.values(trackerRefusalStatus).sort()).toEqual([400, 401, 403, 403, 404]);
+    expect(Object.values(trackerRefusalStatus).sort()).toEqual([400, 401, 403, 403, 404, 404]);
   });
 });
 

@@ -63,10 +63,12 @@ export function createFetchTrackerServer(options: FetchTrackerServerOptions): Tr
   const turnedAway = <T>(answer: {
     readonly status: number;
     readonly body: unknown;
-  }): ServerOutcome<T> =>
-    ownTrackerRefusal(answer.status, answer.body) === null
+  }): ServerOutcome<T> => {
+    const refusal = ownTrackerRefusal(answer.status, answer.body);
+    return refusal === null
       ? unanswered
-      : { kind: 'rejected', httpStatus: answer.status };
+      : { kind: 'rejected', httpStatus: answer.status, error: refusal.error };
+  };
 
   return {
     async session(request, signal) {
