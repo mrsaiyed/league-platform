@@ -37,9 +37,11 @@ import { StaffTrail } from '../staff/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
 import { hasName, rosterName } from '../teams-area/index.ts';
 import { ActionForm } from './action-form.tsx';
+import { EndAgainForm } from './end-again-form.tsx';
 import {
   callOffAction,
   putBackAction,
+  endTrackedGameAgainAction,
   putSheetBackAction,
   reopenBoxScoreAction,
   saveBoxScoreAction,
@@ -360,6 +362,23 @@ export async function BoxScorePage({
                 {t('admin.boxScore.tracked.edit')}
               </a>
             </p>
+          ) : null}
+          {trackedGrid.correctable ? (
+            <EndAgainForm
+              action={endTrackedGameAgainAction}
+              permalink={sheetHref}
+              hidden={{
+                league,
+                gameId: game.id,
+                sequence: String(trackedGrid.sequence),
+                requestToken: crypto.randomUUID(),
+              }}
+              texts={{
+                help: t('admin.boxScore.tracked.endAgainHelp'),
+                button: t('admin.boxScore.tracked.endAgain'),
+                reload: t('admin.boxScore.tracked.reload'),
+              }}
+            />
           ) : (
             <p data-grid-closed={trackedGrid.notCorrectable}>
               {t(

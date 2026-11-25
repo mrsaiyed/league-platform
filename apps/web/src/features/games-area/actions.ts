@@ -23,7 +23,13 @@
 // confirmed, saves it. So a double tap, or going back and sending the boxes again, only
 // asks again. A forfeit, a postponement and a cancellation take the same two steps (step
 // 2.158, callOffAction); a cancelled game is put back in one, with a reason chosen.
-import { gameAnchor, leagueUrl, listPostponedGames, type CommandContext } from '@srleagues/core';
+import {
+  gameAnchor,
+  leagueUrl,
+  listPostponedGames,
+  maxCorrectionPlays,
+  type CommandContext,
+} from '@srleagues/core';
 import { mayGiveNewDates, takeBackNewDate } from '../schedule-builder/index.ts';
 import { newDateAnchor } from './waiting-anchor.ts';
 import { refresh } from 'next/cache';
@@ -55,13 +61,18 @@ import {
   type BoxScoreActionResult,
 } from './run-box-score-action.ts';
 import { runGameAction, type GameAction, type GameActionResult } from './run-game-action.ts';
-import { runTrackedGridAction, type TrackedGridResult } from './run-tracked-grid-action.ts';
+import {
+  runEndAgainAction,
+  runTrackedGridAction,
+  type TrackedGridResult,
+} from './run-tracked-grid-action.ts';
 import { playMark } from './tracked-grid.ts';
 import { trackedGridProblemKey } from './problem-keys.ts';
 import { gameIdOf, scoreFields, typedScoresOf, wrongScoreFields } from './score-fields.ts';
 
 /** A tracked game's grid saved (step 2.65): the same, for its own answer. */
 const gridRequests = () => sameRequestsHere<TrackedGridResult>();
+const endRequests = () => sameRequestsHere<Awaited<ReturnType<typeof runEndAgainAction>>>();
 /** The answers to the saves of the last ten minutes, by request (server/same-request.ts). */
 const requests = () => sameRequestsHere<BoxScoreActionResult>();
 /** The same, for the games list's changes, whose answer may say what a game is now. */
@@ -443,6 +454,31 @@ export async function correctTrackedGridAction(
     code,
     typed: fields,
     wrong: result.ok ? [] : (result.wrong ?? []),
-    said: t(trackedGridProblemKey(code), { cell: '{cell}' }),
+    said: t(trackedGridProblemKey(code), { cell: '{cell}', limit: String(maxCorrectionPlays) }),
   };
+}
+
+/**
+ * "End the game again" on a reopened tracked game (step 2.65 fix round, T-407): the
+ * scoring screen's own end, then to the game's page (from the grid too), now final,
+ * which says "Saved" with its score. Refused, the sentence is said beside the button.
+ */
+export async function endTrackedGameAgainAction(
+  _state: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const fields = typedOf(form);
+  const { context, league } = await gamesOf(fields);
+  const gameId = gameIdOf(fields['gameId']);
+  const { games } = await webPorts();
+  const result = await endRequests().once(requestKeyOf(context, fields), () =>
+    runEndAgainAction(fields, context, games.deps),
+  );
+  if (result.ok && gameId !== undefined) {
+    leaveNotice(context, 'box-score', gameId, 'save');
+    // From the grid too: the game's page, where its result now is.
+    return redirect(leagueUrl(league, 'admin-area', { area: 'games', subpath: [gameId] }));
+  }
+  const code = result.ok ? 'gone' : result.code;
+  return refused(code, fields, [], t(trackedGridProblemKey(code), { cell: '', limit: '' }), true);
 }

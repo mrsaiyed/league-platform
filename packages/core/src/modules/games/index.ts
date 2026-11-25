@@ -110,6 +110,7 @@ export { reopenGame, type ReopenGameError } from './commands/reopen-game.ts';
 // Correcting a tracked game in its box score grid: the grid's edits become plays (step 2.65, T-122).
 export {
   correctTrackedBoxScore,
+  maxCorrectionPlays,
   trackedGridLine,
   type CorrectTrackedBoxScoreError,
 } from './commands/correct-tracked-box-score.ts';

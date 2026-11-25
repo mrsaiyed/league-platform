@@ -438,7 +438,7 @@ if (browser) {
           page.getByRole('button', { name: 'Reopen to correct' }).click(),
         ]);
         const said = page.getByText(
-          'The game is live again. Correct it with “Edit the box score” below, or on the scoring screen, then end it again there.',
+          'The game is live again. Correct it with “Edit the box score” below, or on the scoring screen, then tap “End the game again”.',
           { exact: true },
         );
         await said.waitFor({ timeout: 20_000 });

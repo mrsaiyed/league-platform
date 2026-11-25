@@ -59,6 +59,8 @@ const trackedGridKeys: readonly TextKey[] = [
   'admin.boxScore.tracked.refused.gone',
   'admin.boxScore.tracked.refused.player-not-on-team',
   'admin.boxScore.tracked.refused.statistic-not-kept',
+  'admin.boxScore.tracked.refused.tie-not-allowed',
+  'admin.boxScore.tracked.refused.too-many-plays',
 ];
 
 /** A refusal on the games list, as words. */

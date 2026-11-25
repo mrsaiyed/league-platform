@@ -23,7 +23,8 @@ import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { StaffTrail } from '../staff/index.ts';
 import { statLabel } from '../stats-pages/index.ts';
 import { hasName, rosterName } from '../teams-area/index.ts';
-import { correctTrackedGridAction } from './actions.ts';
+import { correctTrackedGridAction, endTrackedGameAgainAction } from './actions.ts';
+import { EndAgainForm } from './end-again-form.tsx';
 import { SavedLine } from './saved-line.tsx';
 import { playSentences, trackedGridColumns, trackedGridField } from './tracked-grid.ts';
 import { TrackedGridForm, type TrackedGridTeam } from './tracked-grid-form.tsx';
@@ -186,6 +187,23 @@ export async function TrackedGridPage({
           reload: t('admin.boxScore.tracked.reload'),
         }}
       />
+      <div className="staff-panel">
+        <EndAgainForm
+          action={endTrackedGameAgainAction}
+          permalink={editHref}
+          hidden={{
+            league,
+            gameId: game.id,
+            sequence: String(grid.sequence),
+            requestToken: crypto.randomUUID(),
+          }}
+          texts={{
+            help: t('admin.boxScore.tracked.endAgainHelp'),
+            button: t('admin.boxScore.tracked.endAgain'),
+            reload: t('admin.boxScore.tracked.reload'),
+          }}
+        />
+      </div>
     </main>
   );
 }

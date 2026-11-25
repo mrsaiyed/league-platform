@@ -16,6 +16,15 @@
 // refusal does not roll a transaction back. A play the door then refuses after all is a
 // fault, thrown, so the transaction is rolled back. The plays are the admin's, kept with
 // their account; the game stays live, to be ended again (finish-tracked-game.ts).
+//
+// "End the game again" (step 2.65 fix round, T-407): with `end`, the scoring screen's own
+// End game tap (`{ type: 'end' }`) follows the grid's plays, if any, through the same
+// door, so it is the scoring screen's end and no second way: the lines are settled, the
+// game is final with its scores and its correction closed, and standings follow. No
+// scoring session is asked for, as none is for the grid's plays: a device that holds the
+// game is told at its next tap that the game can no longer be scored (T-113), and keeps
+// what it typed. A level score the rules do not allow is refused first (`tie-not-allowed`).
+// One save writes at most `maxCorrectionPlays` plays (`too-many-plays`): more is a typo.
 import { trackerProtocolVersion, type TrackerCommand } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { z } from 'zod';
@@ -25,10 +34,14 @@ import { applyPlays } from '../apply-plays.ts';
 import { gameInArchivedSeasonNotReopened } from '../archived-season.ts';
 import { isDecided } from '../game-fields.ts';
 import { gridCorrectionPlays, gridCounts, type GridCount } from '../grid-correction-plays.ts';
-import { linesOf, playerNotOnTeam, readState, rosterOf } from '../live-game.ts';
+import { linesOf, playerNotOnTeam, readState, rosterOf, scoreOf } from '../live-game.ts';
 import { gameScope, mayChangeGames } from '../policy.ts';
 import type { TrackerTx } from '../ports.ts';
+import { effectiveRulesOf } from '../season-rules-of.ts';
 import { keptForScoring, tapNotKept } from '../statistic-of-tap.ts';
+
+/** The most plays one grid save writes (T-407): 200 is far past any real correction. */
+export const maxCorrectionPlays = 200;
 
 export type CorrectTrackedBoxScoreError =
   | {
@@ -41,8 +54,11 @@ export type CorrectTrackedBoxScoreError =
         | 'game-not-live'
         | 'reason-needed'
         | 'team-not-in-game'
-        | 'player-listed-twice';
+        | 'player-listed-twice'
+        | 'tie-not-allowed'
+        | 'nothing-recorded';
     }
+  | { readonly code: 'too-many-plays'; readonly limit: number }
   | { readonly code: 'player-not-on-team'; readonly personId: string }
   | { readonly code: 'statistic-not-kept'; readonly personId: string; readonly statistic: string }
   | {
@@ -80,6 +96,8 @@ export const correctTrackedBoxScore = defineCommand({
     /** The game's last event when the grid was read (games.read_tracked_box_score). */
     sequence: z.number().int().min(0),
     lines: z.array(trackedGridLine).max(200),
+    /** End the game again after the plays, with the scoring screen's own End game tap. */
+    end: z.literal(true).optional(),
   }),
   allowed: async (context, input, tx: TrackerTx) =>
     mayChangeGames(context, tx, 'games.correct', await gameScope(tx, input.gameId)),
@@ -88,7 +106,9 @@ export const correctTrackedBoxScore = defineCommand({
     input,
     tx,
     emit,
-  }): Promise<Result<{ sequence: number; plays: number }, CorrectTrackedBoxScoreError>> => {
+  }): Promise<
+    Result<{ sequence: number; plays: number; ended: boolean }, CorrectTrackedBoxScoreError>
+  > => {
     const gameId = input.gameId.toLowerCase();
     // T-111: the game's lock first, as every command that writes a live game takes it.
     if (!(await tx.scoringSessions.lockGame(gameId))) return fail({ code: 'game-not-found' });
@@ -127,7 +147,11 @@ export const correctTrackedBoxScore = defineCommand({
       }
       return fail({ code: first.problem });
     }
-    if (made.plays.length === 0) return ok({ sequence: seq, plays: 0 });
+    if (made.plays.length > maxCorrectionPlays) {
+      return fail({ code: 'too-many-plays', limit: maxCorrectionPlays });
+    }
+    const end = input.end === true;
+    if (made.plays.length === 0 && !end) return ok({ sequence: seq, plays: 0, ended: false });
 
     // Judged first, as the door will judge them, so nothing is written for a grid refused.
     const kept = keptForScoring((await tx.games.findSeason(game.seasonId))?.rules);
@@ -154,10 +178,29 @@ export const correctTrackedBoxScore = defineCommand({
       }
     }
 
-    const commands: TrackerCommand[] = made.plays.map((play) => ({
+    if (end) {
+      // Judged as the door judges the scoring screen's end: the engine's own "no" first,
+      // then a level score the game's rules do not allow.
+      try {
+        trial = basketball.apply(trial, { type: 'end' }, { id: crypto.randomUUID(), now });
+      } catch (thrown) {
+        if (!(thrown instanceof basketball.TrackerError)) throw thrown;
+        return fail({ code: 'nothing-recorded' });
+      }
+      const score = scoreOf(trial);
+      if (score.home === score.away && !(await effectiveRulesOf(tx, game)).allowTies) {
+        return fail({ code: 'tie-not-allowed' });
+      }
+    }
+
+    const plays: TrackerCommand['input'][] = [
+      ...made.plays.map((play) => ({ ...play })),
+      ...(end ? [{ type: 'end' as const }] : []),
+    ];
+    const commands: TrackerCommand[] = plays.map((input) => ({
       commandId: crypto.randomUUID(),
       at: now,
-      input: { ...play },
+      input,
     }));
     const ids = commands.map((c) => c.commandId.toLowerCase());
     const refusedBefore = await tx.liveGames.refusedAdds(gameId);
@@ -184,8 +227,13 @@ export const correctTrackedBoxScore = defineCommand({
     await recordActivity(tx, context, {
       action: 'games.correct_tracked_box_score',
       target: { type: 'game', id: gameId },
-      details: { gameId, plays: made.plays.length, ...scopeDetails(await gameScope(tx, gameId)) },
+      details: {
+        gameId,
+        plays: made.plays.length,
+        ...(end ? { ended: true } : {}),
+        ...scopeDetails(await gameScope(tx, gameId)),
+      },
     });
-    return ok({ sequence: applied.seq, plays: made.plays.length });
+    return ok({ sequence: applied.seq, plays: made.plays.length, ended: end });
   },
 });

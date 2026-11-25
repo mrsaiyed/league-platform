@@ -11,7 +11,7 @@ import {
   versionOf,
   type Tracker,
 } from '../reopen-game.test-helper.ts';
-import { correctTrackedBoxScore } from './correct-tracked-box-score.ts';
+import { correctTrackedBoxScore, maxCorrectionPlays } from './correct-tracked-box-score.ts';
 import { readTrackedBoxScore } from './read-tracked-box-score.ts';
 import { reopenGame } from './reopen-game.ts';
 
@@ -52,6 +52,9 @@ async function grid(t: Tracker, accountId = ownerId) {
 const correct = (t: Tracker, sequence: number, lines: object[], accountId: string = ownerId) =>
   correctTrackedBoxScore(t.as(accountId), { gameId, sequence, lines }, t.deps);
 
+const endAgain = (t: Tracker, sequence: number, lines: object[] = []) =>
+  correctTrackedBoxScore(t.as(ownerId), { gameId, sequence, lines, end: true }, t.deps);
+
 /** The game's event log replayed with the engine from nothing: the lines it gives. */
 function replayedLines(t: Tracker) {
   const saved = t.db.state.states.find((s) => s.gameId === gameId);
@@ -85,7 +88,10 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
       { teamId: homeTeamId, personId: h0, fouls: 0 },
       { teamId: homeTeamId, personId: h1, fouls: 1 },
     ]);
-    expect(result).toEqual({ ok: true, value: { sequence: before.sequence + 2, plays: 2 } });
+    expect(result).toEqual({
+      ok: true,
+      value: { sequence: before.sequence + 2, plays: 2, ended: false },
+    });
     const added = t.db.state.events.filter((e) => e.seq > before.sequence);
     expect(added.map((e) => [e.type, e.payload, e.accountId])).toEqual([
       ['unfoul', { side: 'home', playerId: h0 }, ownerId],
@@ -112,7 +118,7 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
     const { sequence } = await grid(t);
     expect(await correct(t, sequence, [{ teamId: homeTeamId, personId: h0, fouls: 1 }])).toEqual({
       ok: true,
-      value: { sequence, plays: 0 },
+      value: { sequence, plays: 0, ended: false },
     });
     expect(t.db.state.events.filter((e) => e.seq > sequence)).toEqual([]);
     const result = await correct(t, sequence, [{ teamId: awayTeamId, personId: a0, fg1: 1 }]);
@@ -167,5 +173,58 @@ describe('games.correct_tracked_box_score (step 2.65, T-122)', () => {
     });
     // Another league's admin: the memory stores keep one league, so that case is the
     // two-league harness's (packages/database/src/isolation/grid-correction-cases).
+  });
+
+  it('ends the game again with the scoring screen’s own end, while the tablet still holds it (T-407)', async () => {
+    const t = setUp();
+    await reopened(t);
+    const { sequence } = await grid(t);
+    // The tablet's session is the scorekeeper's: the grid asks for none.
+    expect(t.db.state.sessions.map((s) => s.accountId)).toEqual([scorekeeperId]);
+    const result = await endAgain(t, sequence, [{ teamId: awayTeamId, personId: a0, fg2: 2 }]);
+    expect(result).toEqual({ ok: true, value: { sequence: sequence + 2, plays: 1, ended: true } });
+    const added = t.db.state.events.filter((e) => e.seq > sequence);
+    expect(added.map((e) => [e.type, e.accountId])).toEqual([
+      ['score', ownerId],
+      ['end', ownerId],
+    ]);
+    expect(t.db.state.games[0]).toMatchObject({ status: 'final', homeScore: 5, awayScore: 4 });
+    expect((await grid(t)).notCorrectable).toBe('game-final');
+    // The tablet's next tap is told the game can no longer be scored.
+    expect(await tap(t, [{ type: 'foul', side: 'away', playerId: a0 }])).toEqual(['refused']);
+  });
+
+  it('refuses to end again on a level score the rules do not allow, and writes nothing', async () => {
+    const t = setUp();
+    await reopened(t);
+    const { sequence } = await grid(t);
+    const events = t.db.state.events.length;
+    const level = [{ teamId: awayTeamId, personId: a0, fg3: 1 }];
+    expect(await endAgain(t, sequence, level)).toEqual({
+      ok: false,
+      error: { code: 'tie-not-allowed' },
+    });
+    expect(t.db.state.events.length).toBe(events);
+    expect(t.db.state.games[0]?.status).toBe('live');
+  });
+
+  it('refuses by name a statistic the season does not keep, and a save of too many plays', async () => {
+    const t = setUp();
+    await reopened(t);
+    const { sequence } = await grid(t);
+    const events = t.db.state.events.length;
+    // The high-school preset keeps no turnovers.
+    expect(
+      await correct(t, sequence, [{ teamId: homeTeamId, personId: h0, turnovers: 1 }]),
+    ).toEqual({
+      ok: false,
+      error: { code: 'statistic-not-kept', personId: h0, statistic: 'turnovers' },
+    });
+    const many = [{ teamId: awayTeamId, personId: a0, fg1: maxCorrectionPlays + 1 }];
+    expect(await correct(t, sequence, many)).toEqual({
+      ok: false,
+      error: { code: 'too-many-plays', limit: maxCorrectionPlays },
+    });
+    expect(t.db.state.events.length).toBe(events);
   });
 });

@@ -14,7 +14,12 @@
 // - A lowered basket is refused beside its box, with everything typed kept and nothing
 //   saved; a grid left open while the game changed in a second tab is refused at the top
 //   with "Load it again", everything typed kept, and the second tab's change alone saved.
-// - Ended again on a device, the public game page shows the same lines as the grid.
+// - The owner ends it again from the grid ("End the game again", T-407) while a device
+//   still holds it: the game's page says it is final, the device is told in plain words at
+//   its next tap, and the public page shows Final, Corrected and the grid's lines.
+// - The standings count it again; reopened and ended again with no change they are as they
+//   were; reopened, given an away basket that changes the winner and ended again from the
+//   game's own page, they change.
 // Every wait has a time limit, and a wait that runs out is a failure, never a pass.
 // Builds the app first unless given --no-build, so it never runs on an old build.
 import {
@@ -45,7 +50,9 @@ const words = {
   bothWays:
     'This game was scored with the live tracker. Correct it with “Edit the box score”, or on the scoring screen to take points away; either way its list of plays still explains the numbers.',
   reopened:
-    'The game is live again. Correct it with “Edit the box score” below, or on the scoring screen, then end it again there.',
+    'The game is live again. Correct it with “Edit the box score” below, or on the scoring screen, then tap “End the game again”.',
+  endAgain: 'End the game again',
+  deviceTold: 'This game cannot be scored now: it is over, cancelled or postponed.',
   saved: 'Saved. These plays were added to the game’s list of plays:',
   lowered: (cell) =>
     `${cell} cannot go lower here. To take points away, reopen the game on the scoring screen and use Undo. Nothing was saved.`,
@@ -191,6 +198,32 @@ async function publicLines() {
         );
       }),
     );
+  } finally {
+    await context.close();
+  }
+}
+
+/** The public standings page's text, read signed out. */
+async function standingsText() {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(pageLimit);
+    await open(page, `/${league}/standings`);
+    return (await page.locator('main').textContent()) ?? '';
+  } finally {
+    await context.close();
+  }
+}
+
+/** The public game page's main text, read signed out. */
+async function publicText() {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(pageLimit);
+    await open(page, `/${league}/games/${liveGame}`);
+    return (await page.locator('main').textContent()) ?? '';
   } finally {
     await context.close();
   }
@@ -441,32 +474,106 @@ try {
       JSON.stringify(fresh),
     );
   });
-  await step('the public game page shows the same lines as the grid', async () => {
-    // The public box score is a final game's: the game is ended again on a device.
-    await open(page, gridPage);
-    const grid = (await homeRows(page))
-      .map((row) => ({
-        jersey: row.jersey,
-        points: row.points,
-        fouls: row.boxes['Fouls']?.value ?? '?',
-      }))
-      .filter((line) => line.points !== '0' || line.fouls !== '0');
-    const ender = await signedIn(scorekeeper);
+  /** Taps "End the game again" in `where` and waits for the game's page to say it is final. */
+  const endAgainIn = async (where) => {
+    await Promise.all([
+      page.waitForURL((url) => url.pathname === gamePage, { timeout: endLimit }),
+      page.locator(where).getByRole('button', { name: words.endAgain }).click(),
+    ]);
+    await page.locator('[data-grid-closed="game-final"]').waitFor({ timeout: pageLimit });
+  };
+  /** Reopened with a reason from the game's page, which then offers the grid again. */
+  const reopenAgain = async (why) => {
+    await open(page, gamePage);
+    await page.getByLabel(words.reason).fill(why);
+    await Promise.all([
+      page.waitForURL((url) => url.pathname === gamePage, { timeout: pageLimit }),
+      page.getByRole('button', { name: words.reopen }).click(),
+    ]);
+    await page.getByText(words.reopened, { exact: true }).waitFor({ timeout: pageLimit });
+  };
+
+  let counted = '';
+  await step('the owner ends it again from the grid while a device holds it', async () => {
+    const whileLive = await standingsText();
+    const holder = await signedIn(scorekeeper);
     try {
-      await open(ender.page, trackerPath());
-      const e = court(ender.page);
-      await e.open();
-      await e.endGame();
-      await e.pad.locator('[data-final="saved"]').waitFor({ timeout: endLimit });
+      await open(holder.page, trackerPath());
+      const h = court(holder.page);
+      await h.open();
+      await open(page, gridPage);
+      const grid = (await homeRows(page))
+        .map((row) => ({
+          jersey: row.jersey,
+          points: row.points,
+          fouls: row.boxes['Fouls']?.value ?? '?',
+        }))
+        .filter((line) => line.points !== '0' || line.fouls !== '0');
+      const before = await serverPlays();
+      await endAgainIn('[data-end-again]');
+      note(
+        'the game’s page no longer offers to end it',
+        (await page.getByRole('button', { name: words.endAgain }).count()) === 0,
+      );
+      const after = await serverPlays();
+      // The end is no play of the list (`/state` lists plays); every play is still there.
+      note(
+        'the server kept every play, and added none',
+        JSON.stringify(after) === JSON.stringify(before),
+        JSON.stringify(after.slice(before.length)),
+      );
+      // The device that held the game is told in plain words at its next tap.
+      await h.play('home', 3, 'foul');
+      const told = holder.page.getByText(words.deviceTold, { exact: true });
+      await told.first().waitFor({ timeout: tapLimit });
+      note('the device is told the game cannot be scored now', (await told.count()) >= 1);
+      note('the device’s tap changed nothing', (await serverPlays()).length === after.length);
+      const tables = await publicLines();
+      note(
+        'one public box score has exactly the grid’s home lines',
+        tables.filter((lines) => linesText(lines) === linesText(grid)).length === 1,
+        JSON.stringify({ grid, tables }),
+      );
+      const shown = await publicText();
+      note(
+        'the public page says Final and Corrected',
+        shown.includes('Final') && shown.includes('Corrected on'),
+        shown.slice(0, 300),
+      );
+      counted = await standingsText();
+      note('the standings count the game again', counted !== whileLive);
     } finally {
-      await ender.context.close();
+      await holder.context.close();
     }
-    const tables = await publicLines();
-    note(
-      'one public box score has exactly the grid’s home lines',
-      tables.filter((lines) => linesText(lines) === linesText(grid)).length === 1,
-      JSON.stringify({ grid, tables }),
-    );
+  });
+
+  await step('ended again with no change, the standings are as they were', async () => {
+    await reopenAgain('Checked the score again');
+    await endAgainIn('[data-end-again]');
+    note('the standings are unchanged', (await standingsText()) === counted);
+  });
+
+  await step('a basket that changes the winner changes the standings', async () => {
+    await reopenAgain('An away 3-pointer was missed');
+    await open(page, gridPage);
+    const home = await homeName(page);
+    // The away team's first row, its 3-pointers box: three of them make away the winner.
+    const name = await gridOf(page)
+      .locator('section', { hasNot: page.getByRole('heading', { name: home, exact: true }) })
+      .locator('tbody tr')
+      .first()
+      .evaluate((row, column) => {
+        const columns = [...row.closest('table').querySelectorAll('thead abbr')].map(
+          (a) => a.title,
+        );
+        const cell = [...row.querySelectorAll('td')].find((_, index) => columns[index] === column);
+        return cell?.querySelector('input')?.name ?? '';
+      }, '3-pointers made');
+    await page.locator(`input[name="${name}"]`).fill('3');
+    await page.getByRole('button', { name: words.save }).click();
+    await page.locator('[data-grid-saved]').waitFor({ timeout: pageLimit });
+    await endAgainIn('[data-end-again]');
+    note('the standings follow the new winner', (await standingsText()) !== counted);
   });
 
   await admin.context.close();
