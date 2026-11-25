@@ -144,6 +144,8 @@ const grants = [
     type: 'team',
     id: standInOwlsTeamId,
   }),
+  // The made-up person with no name yet (step 2.128), an admin of the empty league only.
+  grantOf(16, standInPeople.unnamed.accountId, 'admin', standInLeagues.empty.id),
 ];
 
 const leagues: readonly (typeof standInLeagues)[keyof typeof standInLeagues][] =
@@ -452,9 +454,14 @@ export function standInPorts(options: StandInOptions): StandInPorts {
       : { id: found.id, slug: standInNamesOf(found).slug, status: standInStatusOf(found) };
   };
   // The made-up world's own names (R-21, step 2.128): the made-up people have answered
-  // before (T-446), so the gate below asks only someone who signs up through the form.
+  // before (T-446), but for one (standInPeople.unnamed), so the gate below asks only them and
+  // someone who signs up through the form.
   const ownNames = standInOwnNames();
-  const madeUpIds = new Set(Object.values(standInPeople).map((p) => p.accountId));
+  const madeUpIds = new Set(
+    Object.values(standInPeople)
+      .filter((p) => p !== standInPeople.unnamed)
+      .map((p) => p.accountId),
+  );
   const identifyAccount: WebPorts['identify'] = async (accessToken) => {
     const person = people.find((p) => p.token === accessToken);
     if (person !== undefined) return ok(identityOf(person));

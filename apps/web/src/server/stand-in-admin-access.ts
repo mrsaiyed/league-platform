@@ -59,6 +59,10 @@ export function standInAdminAccess(
         const own = ownNames.names.get(person.accountId);
         names.set(person.accountId, own === undefined ? null : `${own.firstName} ${own.lastName}`);
       }
+      // Someone who signed up through the form and has given a name (step 2.128).
+      for (const [accountId, own] of ownNames.names) {
+        names.set(accountId, `${own.firstName} ${own.lastName}`);
+      }
       return names;
     },
     // The made-up world's rows of the league, things in the bin too (step 2.77).

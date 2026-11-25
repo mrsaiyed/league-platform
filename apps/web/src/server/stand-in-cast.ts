@@ -48,6 +48,12 @@ export const standInPeople = {
    * a coach role on that team alone (step 2.46): sees those numbers, and no other team's.
    */
   teamCoach: { accountId: id(0xae), token: 'local-team-coach-token' },
+  /**
+   * The one made-up person with no name yet (step 2.128, T-446): an admin of the empty
+   * league who meets the one name screen at their first sign-in, as an account made before
+   * names were asked does. Every other made-up person has answered it already.
+   */
+  unnamed: { accountId: id(0xaf), token: 'local-unnamed-token' },
 } as const satisfies Record<string, MadeUpPerson>;
 
 function league(
