@@ -194,19 +194,32 @@ describe('a part changes only its own rules', () => {
       fouls: { ...base.fouls, teamFoulsReset: reset, teamFoulsResetChosen: true as const },
     });
 
-    it('becomes each half or quarter, halves to quarters and back', () => {
+    it('each half becomes each half or quarter, halves to quarters and back', () => {
       for (const [from, to] of [
         [2, '4'],
         [4, '2'],
       ] as const) {
-        for (const reset of ['half', 'game'] as const) {
-          const was = chosen(from, reset);
-          const rules = saved(
-            rulesFromPart('game', was, { ...rulesFields('game', was), periods: to }),
-          );
-          expect(teamFoulsCounted(rules)).toBe('period');
-          expect(rules.fouls.teamFoulsResetChosen).toBeUndefined();
-        }
+        const was = chosen(from, 'half');
+        const rules = saved(
+          rulesFromPart('game', was, { ...rulesFields('game', was), periods: to }),
+        );
+        expect(teamFoulsCounted(rules)).toBe('period');
+        expect(rules.fouls.teamFoulsResetChosen).toBeUndefined();
+      }
+    });
+
+    it('keeps never, once a game, halves to quarters and back (the confirming look)', () => {
+      for (const [from, to] of [
+        [2, '4'],
+        [4, '2'],
+      ] as const) {
+        const was = chosen(from, 'game');
+        const rules = saved(
+          rulesFromPart('game', was, { ...rulesFields('game', was), periods: to }),
+        );
+        expect(teamFoulsCounted(rules)).toBe('game');
+        expect(rules.fouls.teamFoulsResetChosen).toBe(true);
+        expect(rules.gameFormat.periods).toBe(Number(to));
       }
     });
 

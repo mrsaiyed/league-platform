@@ -71,6 +71,8 @@ describe('when team fouls start again', () => {
     expect(helpOf(withReset(4, 'half'))).toMatch(/^Team fouls start again each half\. /);
     expect(helpOf(withReset(4, 'period'))).toMatch(/^Team fouls start again each quarter\. /);
     expect(helpOf(withReset(2, 'game'))).toMatch(/^Team fouls count for the whole game\. /);
-    expect(helpOf(base)).toMatch(/leave this as it is, and it becomes each half or quarter\.$/);
+    expect(helpOf(base)).toMatch(
+      /Never stays as it is .*; leave any other choice as it is, and it becomes each half or quarter\.$/,
+    );
   });
 });

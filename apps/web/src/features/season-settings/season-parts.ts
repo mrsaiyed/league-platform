@@ -422,8 +422,9 @@ export function rulesFromPart(
  * radio shows how the season counts) and the periods as they were: the stored value is
  * kept as it is, so a season saved before step 2.123 keeps counting each period until its
  * admin chooses otherwise. Periods changed and the choice left as it was: it becomes the
- * natural one for the new periods, each half or quarter, as the help line says. Any
- * other choice is saved, marked as chosen when it is not each period.
+ * natural one for the new periods, each half or quarter, as the help line says, except
+ * once a game, which does not depend on the periods and is kept. Any other choice is
+ * saved, marked as chosen when it is not each period.
  */
 export function teamFoulsSaved(
   base: SeasonRules,
@@ -434,7 +435,7 @@ export function teamFoulsSaved(
   const fouls = { ...base.fouls, ...numbers };
   const left = reset === teamFoulsCounted(base);
   if (left && periods === base.gameFormat.periods) return fouls;
-  return foulsWithReset(fouls, left ? 'period' : reset);
+  return foulsWithReset(fouls, left && reset !== 'game' ? 'period' : reset);
 }
 
 /** Where on the form each finding of the rules contract is said, by its path. */

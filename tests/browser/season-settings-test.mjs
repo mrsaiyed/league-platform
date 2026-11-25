@@ -185,16 +185,25 @@ if (built) {
     note(
       'the help line says it too, and what a change of periods does',
       (await help.innerText()).includes('Team fouls count for the whole game. Overtime goes on') &&
+        (await help.innerText()).includes('Never stays as it is when you change between') &&
         (await help.innerText()).includes('it becomes each half or quarter.'),
     );
     await page.locator('input[name=periods][value="2"]').check();
     await tap(page, page.getByRole('button', { name: 'Save the game rules' }), /#season-game$/);
     const halves = await panel(page, 'game').innerText();
     note(
-      'two halves with the choice left: they start again each half, and "Saved" says so',
-      halves.includes('Games not started yet follow them. Team fouls start again each half.') &&
+      'two halves with never left as it was: never is kept, and "Saved" says so',
+      halves.includes('Games not started yet follow them. Team fouls count for the whole game.') &&
         halves.includes('Two halves'),
       halves,
+    );
+    const eachHalf = await saveGame(() =>
+      page.locator('input[name=teamFoulsReset][value="half"]').check(),
+    );
+    note(
+      'two halves counted each half: "Saved" says so',
+      eachHalf.includes('Games not started yet follow them. Team fouls start again each half.'),
+      eachHalf,
     );
     const quartersAgain = await saveGame(() =>
       page.locator('input[name=periods][value="4"]').check(),
