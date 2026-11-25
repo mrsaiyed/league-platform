@@ -159,3 +159,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.249: other browser tests that use the real clock and a game dated from now were not run between 00:00 and 03:00 league time; bad-wifi-visitors-test line 291 uses yesterday in UTC.
 
 - 2.155 part 4: with scripts on a save leaves no #setting-… at the end of the address; done=saved remains in the schedule's and rounds' own tests (not converted forms).
+
+- 2.65: a corrected play lands in the period and clock time the game ended in (a foul moved from Q1 counts toward the last period's team fouls and shows there in the play by play); a typo like 30 for 3 adds baskets only Undo takes back; game-states-test "take back, end, reopen, end, reopen" timed out once on GitHub where the twin passed (make its error print the whole message, which names the locator); a scorekeeper who cannot use the grid also sees the subtitle naming "Edit the box score"; the mercy notice waiting behind the Undo question is untested (no made-up game shows both).
