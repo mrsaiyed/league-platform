@@ -45,7 +45,7 @@ Progress saves at every step. Someone who stops midway finds it waiting when the
 - **What makes it safe** (T-85): we never store or see a password, only a one-way scramble of it held by the sign-in service. A password must be at least 8 characters and is refused if it appears in the public lists of leaked passwords. Wrong guesses are slowed and then locked out. Changing a password signs out every other device.
 - In practice people will rarely type it, because they stay signed in (R-9).
 
-**R-21 (decided for you, November 14): a person is asked their name once, on the screen right after choosing a password** (or right after Google, if Google did not give one): first and last name, made into their own profile. Anyone who signs up, a player or someone invited to help run a league, then has a name the league's staff can see on the Admins page and in the activity log, and every later form fills it in (step 3). The account is made at step 1 without a name, so asking at the first registration instead is a small change.
+**R-21 (decided for you, November 14): a person is asked their name once, on the screen right after choosing a password** (or right after Google, if Google did not give one): first and last name, made into their own profile; answered, the screen goes on to the page that sent them there, else their account page (S-125). Anyone who signs up, a player or someone invited to help run a league, then has a name the league's staff can see on the Admins page and in the activity log, and every later form fills it in (step 3). The account is made at step 1 without a name, so asking at the first registration instead is a small change.
 
 ## 3. A captain signs up a team
 
