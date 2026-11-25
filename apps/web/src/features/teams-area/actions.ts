@@ -340,8 +340,11 @@ export async function removePersonAction(form: FormData): Promise<never> {
     if (fields['confirm'] === undefined) {
       return { answer: refused(removePerson.commandName, 'not-confirmed'), teamId: fields['team'] };
     }
-    const result = await removePerson(context, { personId: fields['personId'] ?? '' }, ports.deps);
-    return settle(removePerson, result, 'personRemoved', fields['team']);
+    const personId = fields['personId'] ?? '';
+    const result = await removePerson(context, { personId }, ports.deps);
+    const settled = settle(removePerson, result, 'personRemoved', fields['team']);
+    // Kept with the person, so a second post is answered as this one while they stay off.
+    return result.ok ? { ...settled, truth: { personOff: personId } } : settled;
   });
 }
 

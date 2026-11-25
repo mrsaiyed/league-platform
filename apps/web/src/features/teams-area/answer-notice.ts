@@ -35,17 +35,27 @@ export function answerQueryOf(notice: SavedNotice | undefined, thing: string): Q
 }
 
 /**
+ * What a kept answer needs beside it to be checked again: the roster's open order a move left
+ * (step 2.155 part 6 fix round), or the person taken off the league list.
+ */
+export type KeptTruth = { readonly openOrder: readonly string[] } | { readonly personOff: string };
+
+/**
  * Whether a kept answer to a form sent again is still the truth (server/same-request.ts): a
  * player said marked as left is still marked, one put back still on the roster, a team said
- * left or back still so, a team removed still gone. Any other kept "done" is not checked, so
- * the form runs again and its command answers as things are now; a kept refusal holds.
+ * left or back still so, a team removed still gone, a move's order still the roster's, a
+ * person taken off the list still off it. Any other kept "done" is not checked, so the form
+ * runs again and its command answers as things are now; a kept refusal holds.
  */
 export function answerHolds(
   answer: Answer,
   now: {
     readonly lines: readonly RosterLine[] | undefined;
     readonly team: { readonly left: boolean } | undefined;
+    /** Whether the person `truth` names is on the league list; undefined when not read. */
+    readonly personOnList?: boolean | undefined;
   },
+  truth?: KeptTruth,
 ): boolean {
   if (answer.kind === 'refused') return true;
   const line = now.lines?.find((candidate) => candidate.id === answer.at?.entry);
@@ -61,6 +71,14 @@ export function answerHolds(
       return now.team?.left === false;
     case 'removed':
       return now.team === undefined;
+    case 'moved': {
+      if (truth === undefined || !('openOrder' in truth) || now.lines === undefined) return false;
+      const open = now.lines.filter((l) => l.leftOn === null).map((l) => l.id);
+      const order = truth.openOrder;
+      return open.length === order.length && open.every((id, at) => order[at] === id);
+    }
+    case 'personRemoved':
+      return truth !== undefined && 'personOff' in truth && now.personOnList === false;
     default:
       return false;
   }

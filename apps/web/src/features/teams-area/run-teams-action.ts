@@ -6,7 +6,7 @@
 // (answer-notice.ts, T-435). A form sent twice (its one-time token, LeagueField) is the same
 // request, answered as the first while that answer still holds (server/same-request.ts).
 // Plain forms, so it all works with no script in the page.
-import { leagueUrl, listRoster, type CommandContext } from '@srleagues/core';
+import { getPerson, leagueUrl, listRoster, type CommandContext } from '@srleagues/core';
 import { redirect } from 'next/navigation';
 import type { AdminTeamsPorts } from '../../server/admin-teams.ts';
 import { commandContextOf } from '../../server/context.ts';
@@ -15,7 +15,7 @@ import { loadLeaguePage } from '../../server/load-league-page.ts';
 import { noticeHolderOf, savedNoticesHere } from '../../server/saved-notice.ts';
 import { requestKeyOf, sameRequestsHere } from '../../server/same-request.ts';
 import type { Answer } from './answer.ts';
-import { answerHolds, teamsAnswerSaid, teamsListThing } from './answer-notice.ts';
+import { answerHolds, teamsAnswerSaid, teamsListThing, type KeptTruth } from './answer-notice.ts';
 import type { Fields } from './form-input.ts';
 
 export type TeamsAction = {
@@ -27,7 +27,12 @@ export type TeamsAction = {
 };
 
 /** What to tell the person, and which team's page to go back to (the list when none). */
-export type TeamsActionResult = { readonly answer: Answer; readonly teamId?: string | undefined };
+export type TeamsActionResult = {
+  readonly answer: Answer;
+  readonly teamId?: string | undefined;
+  /** What the answer needs to be given again to a second post (answerHolds). */
+  readonly truth?: KeptTruth;
+};
 
 const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -54,14 +59,28 @@ export async function runTeamsAction(
     () => work({ context, ports, seasonId: season?.id, fields }),
     async (kept) => {
       const team = (kept.teamId ?? fields['team'] ?? '').toLowerCase();
-      const [teams, roster] = await Promise.all([
+      const personOff =
+        kept.truth !== undefined && 'personOff' in kept.truth ? kept.truth.personOff : undefined;
+      const [teams, roster, person] = await Promise.all([
         season === undefined ? Promise.resolve([]) : ports.teams(context, season.id),
         uuidShape.test(team) ? listRoster(context, { teamId: team }, ports.deps) : undefined,
+        personOff === undefined
+          ? undefined
+          : getPerson(context, { personId: personOff }, ports.deps),
       ]);
-      return answerHolds(kept.answer, {
-        lines: roster?.ok === true ? roster.value : undefined,
-        team: teams.find((candidate) => candidate.id === team),
-      });
+      const personOnList =
+        person === undefined
+          ? undefined
+          : person.ok || (person.error.code === 'person-not-found' ? false : undefined);
+      return answerHolds(
+        kept.answer,
+        {
+          lines: roster?.ok === true ? roster.value : undefined,
+          team: teams.find((candidate) => candidate.id === team),
+          personOnList,
+        },
+        kept.truth,
+      );
     },
   );
   const teamId =

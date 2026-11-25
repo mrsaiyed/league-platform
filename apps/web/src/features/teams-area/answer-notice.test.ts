@@ -86,6 +86,34 @@ describe("a Teams answer travels in the server's notice, not the address (T-435)
     expect(answerHolds(done('removed'), now(null))).toBe(true);
     expect(answerHolds(done('removed'), now(null, false))).toBe(false);
     expect(answerHolds(done('moved'), now(null, false))).toBe(false);
-    expect(answerHolds(refused('teams.mark_left', 'already-left'), now(null, false))).toBe(true);
+    expect(answerHolds(done('personRemoved'), now(null, false))).toBe(false);
+  });
+
+  it('gives a kept move again while the roster is in the order it left (fix round of part 6)', () => {
+    const other = { ...line(null), id: '01900000-0000-7000-8000-0000000e0003', sort: 1 };
+    const moved = { openOrder: [other.id, entry] };
+    const roster = (lines: readonly RosterLine[]) => ({ lines, team: { left: false } });
+    expect(answerHolds(done('moved'), roster([other, line(null)]), moved)).toBe(true);
+    // Moved back since, or the player since marked as left: run again, answered as now.
+    expect(answerHolds(done('moved'), roster([line(null), other]), moved)).toBe(false);
+    expect(answerHolds(done('moved'), roster([other, line('2026-11-13')]), moved)).toBe(false);
+    expect(answerHolds(done('moved'), { lines: undefined, team: undefined }, moved)).toBe(false);
+    expect(answerHolds(done('moved'), roster([other, line(null)]), { personOff: entry })).toBe(
+      false,
+    );
+  });
+
+  it('gives a kept "taken off the league list" again while the person stays off it', () => {
+    const off = { personOff: '01900000-0000-7000-8000-0000000a0001' };
+    const now = (personOnList: boolean | undefined) => ({
+      lines: [],
+      team: undefined,
+      personOnList,
+    });
+    expect(answerHolds(done('personRemoved'), now(false), off)).toBe(true);
+    expect(answerHolds(done('personRemoved'), now(true), off)).toBe(false);
+    expect(answerHolds(done('personRemoved'), now(undefined), off)).toBe(false);
+    expect(answerHolds(done('personRemoved'), now(false), { openOrder: [] })).toBe(false);
+    expect(answerHolds(refused('teams.mark_left', 'already-left'), now(false))).toBe(true);
   });
 });

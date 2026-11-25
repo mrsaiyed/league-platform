@@ -96,6 +96,6 @@ export async function moveEntry(
   const order = movedOrder(seen, entry, direction);
   const result = await reorderRoster(context, { teamId, rosterEntryIds: order }, deps);
   return result.ok
-    ? { answer: done('moved'), teamId }
+    ? { answer: done('moved'), teamId, truth: { openOrder: order } }
     : { answer: refused(command, result.error.code), teamId };
 }

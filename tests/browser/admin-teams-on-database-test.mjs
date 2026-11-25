@@ -292,14 +292,42 @@ if (browser !== null) {
     const names = async () =>
       page.locator('ol.admin-roster > li .admin-roster-name strong').allInnerTexts();
     const before = await names();
-    await submit(page, lineOf(page, 'Morgan Example').getByRole('button', { name: 'Move up' }), {
-      said: 'The roster order was saved.',
-    });
+    const moveUp = lineOf(page, 'Morgan Example').getByRole('button', { name: 'Move up' });
+    // The move's form as drawn (its one-time token and the order seen), to send again after.
+    const moveFields = await moveUp
+      .locator('xpath=ancestor::form[1]')
+      .evaluate((element) =>
+        Object.fromEntries([...new FormData(element).entries()].map(([k, v]) => [k, String(v)])),
+      );
+    const teamAddress = page.url().replace(/#.*$/, '');
+    await submit(page, moveUp, { said: 'The roster order was saved.' });
     const after = await names();
     note(
       'Morgan Example is now first',
       after[0] === 'Morgan Example' && before[0] !== 'Morgan Example',
       `${before.join(', ')} → ${after.join(', ')}`,
+    );
+    // A double tap that got through after the first finished: the same "Move up" sent again.
+    const again = await page.request.post(teamAddress, {
+      multipart: { ...moveFields, moveUp: '' },
+      headers: { origin },
+      maxRedirects: 0,
+      timeout: 30_000,
+    });
+    note('the second "Move up" is sent back to the team', again.status() === 303);
+    await page.goto(new URL(again.headers()['location'] ?? '', teamAddress).href);
+    const said = await page.locator('[role=status], [role=alert]').allInnerTexts();
+    note(
+      'the second "Move up" is answered as the first, not as a changed roster',
+      said.some((text) => text.includes('The roster order was saved.')) &&
+        !said.some((text) => text.includes('not saved')),
+      said.join(' | '),
+    );
+    const afterAgain = await names();
+    note(
+      'the order is as the first move left it',
+      afterAgain.join() === after.join(),
+      afterAgain.join(', '),
     );
   });
 
