@@ -225,6 +225,39 @@ describe('team fouls and the bonus, in each team’s box (F1 to F3)', () => {
     );
   });
 
+  it('counts by the half or the game when the season does, and says so (step 2.123)', () => {
+    const byHalf = tippedOff({
+      ...basketball.QUARTERS,
+      bonusFouls: 7,
+      doubleBonusFouls: 10,
+      teamFoulsReset: 'half',
+    });
+    const q2 = played(
+      [...fouls('home', 'h3', 4), { type: 'period', period: 2 }, ...fouls('home', 'h5', 3)],
+      byHalf,
+    );
+    expect(words(box(q2, 'home').html)).toBe('7 fouls');
+    expect(words(box(q2, 'away').html)).toBe('0 fouls Bonus');
+    expect(box(q2, 'home').label).toBe('Hawks: 0, 7 team fouls this half');
+    const q3 = played([{ type: 'period', period: 3 }], q2);
+    expect(box(q3, 'home').label).toBe('Hawks: 0, 0 team fouls this half');
+    expect(box(q3, 'away').html).not.toContain('data-bonus');
+    const byGame = tippedOff({
+      ...basketball.QUARTERS,
+      bonusFouls: 7,
+      doubleBonusFouls: 10,
+      teamFoulsReset: 'game',
+    });
+    const late = played(
+      [...fouls('home', 'h3', 5), { type: 'period', period: 4 }, ...fouls('home', 'h5', 5)],
+      byGame,
+    );
+    expect(box(late, 'home').label).toBe('Hawks: 0, 10 team fouls this game');
+    expect(box(late, 'away').label).toBe(
+      'Bears: 0, 0 team fouls this game, shooting the Double bonus',
+    );
+  });
+
   it('shows both at once when both teams are over the limit', () => {
     const both = played([...fouls('home', 'h3', 10), ...fouls('away', 'a3', 7)], halves());
     expect(words(box(both, 'home').html)).toBe('10 fouls Bonus');

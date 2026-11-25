@@ -129,6 +129,8 @@ export const enTrackerStates = {
   'tracker.refusal.rules.overtimeTimeouts': 'Allow 0 to 5 timeouts each overtime.',
   'tracker.refusal.rules.periodLength': 'A period runs 1 to 60 minutes.',
   'tracker.refusal.rules.periods': 'Play halves or quarters.',
+  'tracker.refusal.rules.teamFoulsReset':
+    'Team fouls start again each period, each half or once a game.',
   'tracker.refusal.rules.timeoutCount': 'Allow 0 to 10 timeouts of each length.',
   'tracker.refusal.rules.timeoutsCarry': 'Say whether unused timeouts carry over.',
   'tracker.refusal.rules.timeoutsPer': 'Timeouts are per game or per half.',

@@ -199,6 +199,26 @@ describe('when the horn sounds (F4)', () => {
     expect(bonusRises(shown(back), shown(double))).toEqual([{ side: 'away', level: 2 }]);
   });
 
+  it('by the half with quarters: the seventh foul of the half sounds, in Q2 (step 2.123)', () => {
+    const byHalf = {
+      ...basketball.QUARTERS,
+      bonusFouls: 7,
+      doubleBonusFouls: 10,
+      teamFoulsReset: 'half' as const,
+    };
+    const q1 = played(fouls('home', 4), tippedOff(byHalf));
+    const q2 = played([{ type: 'period', period: 2 }, ...fouls('home', 2)], q1);
+    expect(shown(q2)).toEqual({ home: 0, away: 0, period: 2 });
+    const seventh = played(fouls('home', 1), q2);
+    expect(bonusRises(shown(q2), shown(seventh))).toEqual([{ side: 'away', level: 1 }]);
+    // Counted each period, the same plays put nobody in the bonus.
+    const each = played(
+      [...fouls('home', 4), { type: 'period', period: 2 }, ...fouls('home', 3)],
+      tippedOff({ ...byHalf, teamFoulsReset: 'period' }),
+    );
+    expect(shown(each)).toEqual({ home: 0, away: 0, period: 2 });
+  });
+
   it('and not when a game already in the bonus is opened', () => {
     expect(bonusRises(null, { home: 2, away: 1, period: 1 })).toEqual([]);
   });

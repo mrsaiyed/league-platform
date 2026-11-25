@@ -63,7 +63,15 @@ const Clock = z.strictObject({
 });
 
 const Fouls = z.strictObject({
+  /** Counted only when `teamFoulsResetChosen` is there: read it with `teamFoulsCounted`. */
   teamFoulsReset: z.enum(['period', 'half', 'game']),
+  /**
+   * Written (always `true`) only when an admin saves a way of counting other than each
+   * period, which every form before step 2.123 forced (T-422). Absent, team fouls count
+   * each period whatever `teamFoulsReset` holds, as every season and game saved before
+   * did, until its admin chooses otherwise. No migration.
+   */
+  teamFoulsResetChosen: z.literal(true).optional(),
   bonusFouls: count(1, 30),
   doubleBonusFouls: count(2, 40).nullable(),
   /** Personal fouls that put a player out; null means no limit. */
@@ -204,6 +212,33 @@ export const SeasonRules = z
   });
 
 export type SeasonRules = z.infer<typeof SeasonRules>;
+
+export type TeamFoulsReset = SeasonRules['fouls']['teamFoulsReset'];
+
+/**
+ * When team fouls start again, as they are counted (T-422): the admin's choice when one
+ * was saved, otherwise each period, the rule every season and game saved before step
+ * 2.123 counted by, whatever its stored `teamFoulsReset` says.
+ */
+export function teamFoulsCounted(rules: {
+  readonly fouls: Pick<SeasonRules['fouls'], 'teamFoulsReset' | 'teamFoulsResetChosen'>;
+}): TeamFoulsReset {
+  return rules.fouls.teamFoulsResetChosen === true ? rules.fouls.teamFoulsReset : 'period';
+}
+
+/**
+ * The fouls with an admin's saved choice of when team fouls start again: marked as
+ * chosen unless it is each period, which is what an unmarked document counts (T-422).
+ */
+export function foulsWithReset(
+  fouls: SeasonRules['fouls'],
+  reset: TeamFoulsReset,
+): SeasonRules['fouls'] {
+  const { teamFoulsResetChosen: _chosen, ...rest } = fouls;
+  return reset === 'period'
+    ? { ...rest, teamFoulsReset: reset }
+    : { ...rest, teamFoulsReset: reset, teamFoulsResetChosen: true };
+}
 
 /** Basketball defaults of P7 section 1 (halves, running clock); also the "custom" start. */
 export function defaultSeasonRules(): SeasonRules {
@@ -355,7 +390,7 @@ export function formatFacts(format: GameFormatRules): readonly FormatFact[] {
     // Where the last seconds are counts only when there are some ('half' when not said).
     stopClockScope: c.stopClockLastSeconds === null ? null : (c.stopClockScope ?? 'half'),
     mercyLead: c.mercyLead,
-    teamFoulsReset: f.teamFoulsReset,
+    teamFoulsReset: teamFoulsCounted(format),
     bonusFouls: f.bonusFouls,
     doubleBonusFouls: f.doubleBonusFouls,
     playerFoulLimit: f.playerFoulLimit,

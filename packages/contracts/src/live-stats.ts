@@ -41,6 +41,8 @@ export const PlatformRules = Rules.extend({
   stopClockScope: z.enum(['period', 'half', 'game']).optional(),
   mercyLead: z.number().int().min(1).max(100).nullable().optional(),
   playerFoulLimit: z.number().int().min(1).max(20).nullable().optional(),
+  /** When team fouls reset (step 2.123); absent means each period. */
+  teamFoulsReset: z.enum(['period', 'half', 'game']).optional(),
 }).superRefine((r, ctx) => {
   if (r.stopClockLastSeconds != null && r.stopClockLastSeconds > r.periodSeconds)
     ctx.addIssue({

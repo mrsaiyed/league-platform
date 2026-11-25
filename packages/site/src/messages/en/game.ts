@@ -7,6 +7,9 @@ export const enGame = {
   'game.awaitingScore': 'Awaiting score',
   'game.back': 'Schedule',
   'game.beingCorrected': 'Being corrected',
+  // After the team fouls, the team that shoots the bonus, as the tracker's badge says (2.123).
+  'game.bonus.1': '{team} shoot the bonus.',
+  'game.bonus.2': '{team} shoot the double bonus.',
   'game.boxScores': 'Box scores',
   'game.cancelled': 'This game has been cancelled.',
   'game.col.play': 'Play',
@@ -85,6 +88,8 @@ export const enGame = {
   'game.spokenScore': '{away} {awayScore}, {home} {homeScore}.',
   'game.startsAt': 'Starts {when}',
   'game.teamFouls': 'Team fouls this period: {away} {awayFouls}, {home} {homeFouls}',
+  'game.teamFouls.game': 'Team fouls this game: {away} {awayFouls}, {home} {homeFouls}',
+  'game.teamFouls.half': 'Team fouls this half: {away} {awayFouls}, {home} {homeFouls}',
   // Under a box score whose Total counts turnovers charged to the team itself, which are
   // in no player's line (step 2.196).
   'game.teamTurnovers_one': 'The Total includes 1 turnover charged to the team, not to a player.',

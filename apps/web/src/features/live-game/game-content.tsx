@@ -134,7 +134,7 @@ export function GameContent({ view }: { readonly view: GameView }) {
         held={stood !== null}
         showPlayers={!arrivedFinal}
         words={gameWords()}
-        labels={liveGameLabels(view.status, view.truth.state)}
+        labels={liveGameLabels(view.status, view.truth.state, view.snapshot.foulRules?.counted)}
         board={{
           ...view.board,
           stateText: truthPill(view.truth.state) ?? boardStateText(view.status),

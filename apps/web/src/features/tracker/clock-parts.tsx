@@ -85,12 +85,19 @@ export const clockSheetId = 'court-clock-sheet';
 const period = (view: ScoringView, t: Translate, number = view.period): string =>
   periodText(number, view.periods, t);
 
+/** The words for what the team-foul count counts: this period, this half or the game. */
+const foulsCountedKey = {
+  period: 'tracker.fouls.thisPeriod',
+  half: 'tracker.fouls.thisHalf',
+  game: 'tracker.fouls.thisGame',
+} as const;
+
 /** What a team's scoreboard box says to a screen reader: the score, its fouls, its bonus. */
 export function teamBoardLabel(team: TeamPanel, t: Translate): string {
   const values = {
     team: team.name,
     score: team.score,
-    fouls: t.plural('tracker.fouls.thisPeriod', team.teamFouls),
+    fouls: t.plural(foulsCountedKey[team.foulsCounted], team.teamFouls),
   };
   return team.bonus === 0
     ? t('tracker.court.teamBoard', values)

@@ -687,8 +687,23 @@ const snapshotPlayerShape = {
 
 const teamShape = { name: z.string().max(120), statsVisible: z.boolean() };
 
+/** How a game's team fouls count, as a snapshot says it (step 2.123, T-421). */
+export const SnapshotFoulRules = z.strictObject({
+  counted: z.enum(['period', 'half', 'game']),
+  bonusFouls: z.number().int().min(1).max(30),
+  doubleBonusFouls: z.number().int().min(1).max(60).nullable(),
+});
+export type SnapshotFoulRules = z.infer<typeof SnapshotFoulRules>;
+
 const snapshotShape = {
   periods: z.union([z.literal(2), z.literal(4)]),
+  /**
+   * How the game's team fouls count (step 2.123, T-421): what `teamFouls` counts, and the
+   * fouls that put the other team in the bonus and the double bonus, so the page says the
+   * bonus as the tracker shows it. Absent before the tracker has the game, and on a page
+   * that does not know it.
+   */
+  foulRules: SnapshotFoulRules.optional(),
   /** Set when the game was reopened and finalised again; the date only (S-7). */
   correctedOn: z.iso.date().optional(),
 };

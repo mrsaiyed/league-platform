@@ -50,10 +50,9 @@ Learned, not yet rules elsewhere: (a) a lane that adds a page, a route, a field,
 
 Every lane's work is on GitHub. Three at a time, by short helpers on the lead's own machine.
 
-| Lane (branch `lane/…`) | Where it stands                   | What is left                                   |
-| ---------------------- | --------------------------------- | ---------------------------------------------- |
-| 2.191-ci-parallel      | parked                            | after the first test is in the founder's hands |
-| 2.123-team-fouls-reset | built, reviewed, fixed, looked at | one closing helper, then land (Handover, 1)    |
+| Lane (branch `lane/…`) | Where it stands | What is left                                   |
+| ---------------------- | --------------- | ---------------------------------------------- |
+| 2.191-ci-parallel      | parked          | after the first test is in the founder's hands |
 
 Next free: STEP 2.250, migration 0030, T-426, S-116, A-25, U-23 (the Handover part says which numbers were given out and are unused). Numbers already given out stand with their lanes (in each lane’s note).
 

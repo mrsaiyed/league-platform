@@ -161,3 +161,5 @@ One line each (USAGE.md, rule 9). Done in batches; a line is removed when it is 
 - 2.155 part 4: with scripts on a save leaves no #setting-… at the end of the address; done=saved remains in the schedule's and rounds' own tests (not converted forms).
 
 - 2.65: a corrected play lands in the period and clock time the game ended in (a foul moved from Q1 counts toward the last period's team fouls and shows there in the play by play); a typo like 30 for 3 adds baskets only Undo takes back; game-states-test "take back, end, reopen, end, reopen" timed out once on GitHub where the twin passed (make its error print the whole message, which names the locator); a scorekeeper who cannot use the grid also sees the subtitle naming "Edit the box score"; the mercy notice waiting behind the Undo question is untested (no made-up game shows both).
+
+- 2.123: the scoring screen's team-foul count has no small word saying what it covers (half, game, quarter): it did not fit on a phone beside a bonus badge within the scoreboard's fifth of the screen; and the game-format panel has no rule for team fouls when the periods change on the night.

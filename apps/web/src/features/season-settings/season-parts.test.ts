@@ -1,7 +1,12 @@
 // Season settings' parts (step 2.47): each part's form shows the season's rules and gives
 // back the rules with only that part changed; a box the rules refuse is named, never
 // saved; nothing the product does not follow is offered or lost.
-import { defaultSeasonRules, seasonRulesPreset, type SeasonRules } from '@srleagues/contracts';
+import {
+  defaultSeasonRules,
+  seasonRulesPreset,
+  teamFoulsCounted,
+  type SeasonRules,
+} from '@srleagues/contracts';
 import { describe, expect, it } from 'vitest';
 import {
   columnField,
@@ -9,7 +14,6 @@ import {
   presetOf,
   rulesFields,
   rulesFromPart,
-  teamFoulsResetFor,
   ticked,
   withPreset,
 } from './season-parts.ts';
@@ -138,12 +142,107 @@ describe('a part changes only its own rules', () => {
     ]);
   });
 
-  it('sets the team-foul reset the tracker follows: each quarter, or each half', () => {
-    expect(teamFoulsResetFor(4, 'half')).toBe('period');
-    expect(teamFoulsResetFor(2, 'game')).toBe('half');
-    expect(teamFoulsResetFor(2, 'period')).toBe('period');
+  it('keeps the team-foul reset the admin chose, each half and once a game with quarters too (S-106, step 2.123)', () => {
     const quarters = { ...rulesFields('game', base), periods: '4' };
-    expect(saved(rulesFromPart('game', base, quarters)).fouls.teamFoulsReset).toBe('period');
+    for (const reset of ['period', 'half', 'game'] as const) {
+      for (const fields of [quarters, { ...quarters, periods: '2' }]) {
+        const rules = saved(rulesFromPart('game', base, { ...fields, teamFoulsReset: reset }));
+        expect(teamFoulsCounted(rules)).toBe(reset);
+        expect(rules.fouls.teamFoulsResetChosen).toBe(reset === 'period' ? undefined : true);
+      }
+    }
+    expect(wrongOf(rulesFromPart('game', base, { ...quarters, teamFoulsReset: 'week' }))).toEqual([
+      'teamFoulsReset:choice',
+    ]);
+  });
+
+  describe('a season saved before step 2.123 (T-422)', () => {
+    // The old form forced each period with quarters only when saving the game rules, and
+    // the game-format panel offered all three, so quarters with 'half' can be stored.
+    const old = {
+      ...base,
+      gameFormat: { ...base.gameFormat, periods: 4 as const },
+      fouls: { ...base.fouls, teamFoulsReset: 'half' as const },
+    };
+
+    it('shows and counts each period, whatever it stores, until the admin chooses', () => {
+      expect(teamFoulsCounted(old)).toBe('period');
+      expect(rulesFields('game', old).teamFoulsReset).toBe('period');
+    });
+
+    it('is saved unchanged when the choice is left as it was', () => {
+      const rules = saved(
+        rulesFromPart('game', old, { ...rulesFields('game', old), bonusFouls: '6' }),
+      );
+      expect(rules.fouls).toEqual({ ...old.fouls, bonusFouls: 6 });
+      expect(teamFoulsCounted(rules)).toBe('period');
+    });
+
+    it('counts by the half once the admin chooses it, and the choice is marked', () => {
+      const rules = saved(
+        rulesFromPart('game', old, { ...rulesFields('game', old), teamFoulsReset: 'half' }),
+      );
+      expect(rules.fouls).toEqual({ ...old.fouls, teamFoulsResetChosen: true });
+      expect(teamFoulsCounted(rules)).toBe('half');
+    });
+  });
+
+  describe('the periods changed and the team-foul choice left as it was (T-422)', () => {
+    const chosen = (periods: 2 | 4, reset: 'half' | 'game') => ({
+      ...base,
+      gameFormat: { ...base.gameFormat, periods },
+      fouls: { ...base.fouls, teamFoulsReset: reset, teamFoulsResetChosen: true as const },
+    });
+
+    it('each half becomes each half or quarter, halves to quarters and back', () => {
+      for (const [from, to] of [
+        [2, '4'],
+        [4, '2'],
+      ] as const) {
+        const was = chosen(from, 'half');
+        const rules = saved(
+          rulesFromPart('game', was, { ...rulesFields('game', was), periods: to }),
+        );
+        expect(teamFoulsCounted(rules)).toBe('period');
+        expect(rules.fouls.teamFoulsResetChosen).toBeUndefined();
+      }
+    });
+
+    it('keeps never, once a game, halves to quarters and back (the confirming look)', () => {
+      for (const [from, to] of [
+        [2, '4'],
+        [4, '2'],
+      ] as const) {
+        const was = chosen(from, 'game');
+        const rules = saved(
+          rulesFromPart('game', was, { ...rulesFields('game', was), periods: to }),
+        );
+        expect(teamFoulsCounted(rules)).toBe('game');
+        expect(rules.fouls.teamFoulsResetChosen).toBe(true);
+        expect(rules.gameFormat.periods).toBe(Number(to));
+      }
+    });
+
+    it('the default halves season switched to quarters counts each quarter (the review)', () => {
+      const rules = saved(
+        rulesFromPart('game', base, { ...rulesFields('game', base), periods: '4' }),
+      );
+      expect(teamFoulsCounted(rules)).toBe('period');
+    });
+
+    it('keeps a choice changed in the same save', () => {
+      const was = chosen(2, 'game');
+      const fields = { ...rulesFields('game', was), periods: '4', teamFoulsReset: 'half' };
+      expect(teamFoulsCounted(saved(rulesFromPart('game', was, fields)))).toBe('half');
+    });
+
+    it('keeps the choice when the periods stay', () => {
+      const was = chosen(4, 'half');
+      const rules = saved(
+        rulesFromPart('game', was, { ...rulesFields('game', was), bonusFouls: '6' }),
+      );
+      expect(teamFoulsCounted(rules)).toBe('half');
+    });
   });
 
   it('switches the unique-jersey rule, and keeps the roster limits as they are', () => {
