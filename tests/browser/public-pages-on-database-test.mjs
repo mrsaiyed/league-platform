@@ -21,6 +21,14 @@
 // its starting design's main color in the page's styles, not the neutral one (#1f5fbf),
 // and the two leagues differ. A league with no design published is drawn in the neutral
 // one: that fallback is proved in apps/web/src/server/database-league-sites.test.ts.
+// Part 4 (step 2.225, T-81): every public page and public API answer of both seed leagues,
+// and then of the stand-in's two live leagues on a second server, holds no person's or
+// roster place's database id. The ids are collected from the stores as their owners are
+// shown them (the people list, each team's admin page, each game's scorer rosters), and
+// every served byte is searched for each; the pages are found by following every public
+// link from each league's home page, the API answers are each game's snapshot, health and
+// robots.txt. It fails when the snapshot's player key is put back to the person's id.
+import { randomUUID } from 'node:crypto';
 import {
   accessibilityProblems,
   buildNext,
@@ -494,6 +502,219 @@ if (browser) {
     drawnIn.size === people.length && new Set(drawnIn.values()).size === people.length,
     JSON.stringify([...drawnIn]),
   );
+}
+
+const uuidIn = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+const chosenPassword = 'a made-up chosen password';
+
+/** The code in the newest kept email to `address`, read on the kept emails' page. */
+async function codeOnThePage(page, address) {
+  await page.goto(`${origin}/signin/kept-emails`);
+  const email = page.locator(`li[data-kept-email="${address}"]`).first();
+  await email.waitFor();
+  return (await email.locator('code[data-code]').innerText()).trim();
+}
+
+/** A seed owner signed up through the screens; their session cookie's value. */
+async function ownerCookie(address) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  page.setDefaultTimeout(60_000);
+  await page.goto(`${origin}/signup`);
+  await page.getByLabel('Email').fill(address);
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === '/signup/code'),
+    page.getByRole('button', { name: 'Email me a code' }).click(),
+  ]);
+  let code = '';
+  for (let tries = 0; tries < 10 && !/^\d{6}$/.test(code); tries += 1) {
+    code = await codeOnThePage(page, address).catch(() => '');
+  }
+  await page.goto(`${origin}/signup/code`);
+  await page.getByLabel('Code').fill(code);
+  await Promise.all([
+    page.waitForURL((url) => url.pathname === '/signup/password'),
+    page.getByRole('button', { name: 'Continue' }).click(),
+  ]);
+  await page.getByLabel('Password').fill(chosenPassword);
+  await Promise.all([
+    page.waitForURL((url) => url.pathname !== '/signup/password'),
+    page.getByRole('button', { name: 'Save and sign in' }).click(),
+  ]);
+  const cookie = (await context.cookies()).find((c) => c.name === 'srl_session')?.value ?? '';
+  await context.close();
+  note(`${address} is signed in`, cookie !== '');
+  return cookie;
+}
+
+/**
+ * Part 4: the scan of one world. `leaguesOf` is each league's short name and its owner's
+ * session cookie. Every public page (followed from the league's home page) and every public
+ * API answer is fetched as a visitor, and searched for every person's and roster place's id
+ * the league's owner is shown.
+ */
+async function scanServed(world, at, leaguesOf) {
+  const fetchText = async (path, cookie) => {
+    const answer = await fetch(at + path, {
+      redirect: 'manual',
+      headers: cookie === undefined ? {} : { cookie: `srl_session=${cookie}` },
+    });
+    return { status: answer.status, text: (await answer.text()).toLowerCase() };
+  };
+  const linksIn = (html) =>
+    [...html.matchAll(/href="([^"#]*)/g)].map(([, href]) => {
+      const local = href.replaceAll('&amp;', '&');
+      return local.startsWith(at) ? local.slice(at.length) || '/' : local;
+    });
+  let playersInWorld = 0;
+  for (const { slug, cookie } of leaguesOf) {
+    // The ids, from the stores as the owner is shown them.
+    const personIds = new Set();
+    const placeIds = new Set();
+    const people = await fetchText(`/${slug}/admin/people`, cookie);
+    for (const [, id] of people.text.matchAll(/\/admin\/people\/([0-9a-f-]{36})/g)) {
+      personIds.add(id);
+    }
+    const teams = await fetchText(`/${slug}/admin/teams`, cookie);
+    const teamPages = new Set(
+      linksIn(teams.text).filter((href) => new RegExp(`^/${slug}/admin/teams/[^/?]+$`).test(href)),
+    );
+    for (const address of teamPages) {
+      const team = await fetchText(address, cookie);
+      for (const [, id] of team.text.matchAll(/name="entry" value="([0-9a-f-]{36})"/g)) {
+        placeIds.add(id);
+      }
+    }
+    // Every public page, followed from the home page as a visitor follows its links.
+    const served = new Map();
+    const waiting = [`/${slug}`, `/${slug}/my`, `/${slug}/no-such-page`];
+    const isPublic = (href) =>
+      (href === `/${slug}` || href.startsWith(`/${slug}/`) || href.startsWith(`/${slug}?`)) &&
+      !/^\/[^/]+\/(admin|score|account|invitation)(\/|$|\?)/.test(href);
+    while (waiting.length > 0 && served.size < 400) {
+      const address = waiting.shift();
+      if (served.has(address)) continue;
+      const answer = await fetchText(address);
+      served.set(address, answer.text);
+      for (const href of linksIn(answer.text)) {
+        if (isPublic(href) && !served.has(href)) waiting.push(href);
+      }
+    }
+    const home = served.get(`/${slug}`) ?? '';
+    const leagueId = home.match(/leagueid\\?":\\?"([0-9a-f-]{36})/)?.[1];
+    const games = new Set(
+      [...served.keys()].flatMap(
+        (a) => a.match(/\/games\/([0-9a-f-]{36})(?:\?|$)/)?.slice(1, 2) ?? [],
+      ),
+    );
+    let playersInSnapshots = 0;
+    for (const game of games) {
+      const api = `/api/v1/leagues/${leagueId}/games/${game}`;
+      const snapshot = await fetchText(`${api}/snapshot`);
+      served.set(`${api}/snapshot`, snapshot.text);
+      if (snapshot.status === 200) playersInSnapshots += JSON.parse(snapshot.text).players.length;
+      // The scorer's rosters (staff only): every player's person id, from the store.
+      const rosters = await fetchText(`${api}/rosters`, cookie);
+      if (rosters.status === 200) {
+        for (const player of JSON.parse(rosters.text).players) personIds.add(player.personid);
+      }
+    }
+    for (const address of ['/api/v1/health', '/robots.txt']) {
+      served.set(address, (await fetchText(address)).text);
+    }
+    // The scan is not empty: it has the ids to look for and players' lines to look in.
+    note(
+      `${world} ${slug}: the owner is shown its people's ids`,
+      personIds.size >= 2,
+      String(personIds.size),
+    );
+    note(
+      `${world} ${slug}: the owner is shown its roster places' ids`,
+      placeIds.size >= 2,
+      String(placeIds.size),
+    );
+    note(
+      `${world} ${slug}: its games' pages are found`,
+      games.size >= 2 && leagueId !== undefined,
+      String(games.size),
+    );
+    playersInWorld += playersInSnapshots;
+    note(`${world} ${slug}: its public pages are found`, served.size >= 10, String(served.size));
+    const found = [];
+    for (const [address, text] of served) {
+      for (const id of text.match(uuidIn) ?? []) {
+        if (personIds.has(id)) found.push(`a person's id ${id} in ${address}`);
+        if (placeIds.has(id)) found.push(`a roster place's id ${id} in ${address}`);
+      }
+    }
+    note(
+      `${world} ${slug}: no public page or API answer holds a person's or roster place's id (${served.size} answers)`,
+      found.length === 0,
+      found.slice(0, 6).join('; '),
+    );
+  }
+  note(`${world}: its games' snapshots list players`, playersInWorld > 0, String(playersInWorld));
+}
+
+if (browser) {
+  await step('part 4: every public answer on the made-up database holds no person id', async () => {
+    const owners = {
+      lakeside: 'owner@lakeside.example.test',
+      'maple-street': 'owner@maple.example.test',
+    };
+    const leaguesOf = [];
+    for (const [slug, address] of Object.entries(owners)) {
+      leaguesOf.push({ slug, cookie: await ownerCookie(address) });
+    }
+    await scanServed('database', origin, leaguesOf);
+  });
+}
+server?.child.kill();
+server = undefined;
+
+if (browser) {
+  const standIn = `http://localhost:${await freePort()}`;
+  server = startNext(['start', '--port', new URL(standIn).port], {
+    APP_ENV: 'test',
+    PUBLIC_BASE_URL: standIn,
+  });
+  await step('part 4: every public answer on the stand-in holds no person id', async () => {
+    await waitFor(`${standIn}/`, server);
+    // The made-up scorekeeper tips off North Valley's live game (stand-in-games.ts), so
+    // its snapshot lists every player of both teams.
+    const game = `${standIn}/api/v1/leagues/01900000-0000-7000-8000-000000000001/games/01900000-0000-7000-8000-006a00000002`;
+    const post = async (path, body) => {
+      const answer = await fetch(game + path, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: 'srl_session=local-scorekeeper-token',
+          origin: standIn,
+        },
+        body: JSON.stringify(body),
+      });
+      if (!answer.ok) throw new Error(`${path} answered ${answer.status}`);
+      return answer.json();
+    };
+    const { sessionId } = await post('/session', { type: 'open', deviceId: 'scan-tablet' });
+    const player = (team, n) =>
+      `01900000-0000-7000-8000-${(0x70 + team).toString(16).padStart(4, '0')}${n.toString(16).padStart(8, '0')}`;
+    const tap = (input) => ({ commandId: randomUUID(), at: Date.now(), input });
+    await post('/commands', {
+      protocolVersion: 1,
+      sessionId,
+      commands: [
+        tap({ type: 'lineup', side: 'home', playerIds: [1, 2, 3, 4, 5].map((n) => player(3, n)) }),
+        tap({ type: 'lineup', side: 'away', playerIds: [1, 2, 3, 4, 5].map((n) => player(4, n)) }),
+        tap({ type: 'start' }),
+        tap({ type: 'score', side: 'home', playerId: player(3, 1), points: 2 }),
+      ],
+    });
+    await scanServed('stand-in', standIn, [
+      { slug: 'north-valley', cookie: 'local-owner-token' },
+      { slug: 'harbor-city', cookie: 'local-owner-token' },
+    ]);
+  });
 }
 
 await browser?.close();
