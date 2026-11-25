@@ -263,8 +263,7 @@ try {
       await c.play('away', 11, 'foul');
       await fouled();
       note('in the last minutes, switched On, a foul leaves the clock running', await running());
-      // Switched Off with the clock running, as at a game: with it stopped, the pad's
-      // "Start clock" pushes the notice's answer below a phone's screen (said in the note).
+      // Switched Off with the clock running, as at a game; with it stopped, below.
       const boxes = async () =>
         JSON.stringify([
           await root.locator('[data-clock]').boundingBox(),
@@ -302,6 +301,45 @@ try {
       await modeIs('stop');
       await stopNotice.waitFor({ timeout: tapLimit });
       note('On then Off again: the sentence comes back', (await stopWords()) === saidStop);
+
+      // Switched Off with the clock STOPPED (the second fix round): the gold line said with
+      // the tap is drawn with no box under a notice with one answer, so that answer is in
+      // sight from the first moment, at every size, and nothing else moves; the line's
+      // words are still in the page, for a screen reader.
+      for (const size of sizes) {
+        await page.setViewportSize({ width: size.width, height: size.height });
+        await flip();
+        await modeIs('running');
+        const unmoved = await boxes();
+        await flip();
+        await modeIs('stop');
+        await stopNotice.waitFor({ timeout: tapLimit });
+        const answers = [];
+        for (const answer of await stopNotice.locator('button').all()) {
+          const box = await answer.boundingBox();
+          answers.push(
+            box !== null &&
+              box.x >= 0 &&
+              box.y >= 0 &&
+              box.x + box.width <= size.width &&
+              box.y + box.height <= size.height
+              ? 'in'
+              : JSON.stringify(box),
+          );
+        }
+        const line = ((await root.locator('[data-say]').textContent()) ?? '').trim();
+        note(
+          `switched Off with the clock stopped, its answer is in sight at once at ${size.name}`,
+          answers.length === 1 && answers.every((seen) => seen === 'in'),
+          answers.join(' '),
+        );
+        note(
+          `and the line said is in the page, nothing moved, at ${size.name}`,
+          line !== '' && (await boxes()) === unmoved,
+          line,
+        );
+      }
+      await page.setViewportSize({ width: 1180, height: 820 });
 
       // After the last minutes the screen still says the truth; one tap puts it right.
       await c.pickPeriod(periods + 2);
