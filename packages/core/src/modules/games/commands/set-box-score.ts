@@ -22,6 +22,7 @@ import { mayScoreGame } from '../policy.ts';
 import type { GameRosterPlayer, GamesTx, NewGameLine } from '../ports.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
 import { gameInArchivedSeasonNotReopened } from '../archived-season.ts';
+import { scoringNameSettingsOf } from '../queries/read-scoring-name-view.ts';
 
 export type SetBoxScoreError =
   | DecideGameError
@@ -77,7 +78,7 @@ export const setBoxScore = defineCommand({
       const rules = await effectiveRulesOf(tx, game);
       if (!rules.allowTies) return fail({ code: 'tie-not-allowed' });
     }
-    const roster = await tx.games.listRoster(game.id);
+    const roster = await tx.games.listRoster(game.id, await scoringNameSettingsOf(tx));
     const rosterOf = new Map<string, GameRosterPlayer>(
       roster.map((player) => [`${player.teamId}/${player.personId}`, player]),
     );

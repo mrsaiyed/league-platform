@@ -41,13 +41,16 @@ export function createMemoryOpenedGameStorage(): OpenedGameStorage {
         }),
       );
     },
-    async forgetOthers(owner, olderThan) {
+    async forgetOthers(owner, olderThan, withTaps) {
       for (const [gameId, game] of games) {
-        if (!stillKept(game, owner, olderThan)) games.delete(gameId);
+        if (!stillKept(game, owner, olderThan, withTaps)) games.delete(gameId);
       }
     },
     async forgetAll() {
       games.clear();
+    },
+    async forgetGame(gameId) {
+      games.delete(gameId);
     },
     async saveState(gameId, state) {
       change(gameId, (game) => ({ ...game, state }));

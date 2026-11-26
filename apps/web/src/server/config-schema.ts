@@ -49,6 +49,7 @@ export const fields = {
   LOCAL_DESIGN: { secret: false },
   LOCAL_NOW: { secret: false },
   LOCAL_NO_CURRENT_SEASON: { secret: false },
+  LOCAL_SCORING_NAMES: { secret: false },
   LOCAL_UNRELEASED: { secret: false },
   SESSION_SECRET: { secret: true },
   SUPABASE_URL: { secret: false },
@@ -109,6 +110,13 @@ const schema = z.object({
   // A-17 held such a team (step 2.180): so a browser test and the pictures can see how
   // every screen shows it. Only the stand-in's world reads it; only local and test.
   LOCAL_BINNED_TEAM: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a short name')
+    .optional(),
+  // The short name of a made-up league made a youth league as the world is made, its game
+  // under way given a removed child (#12) and an adult shown as initials (step 2.226): so
+  // a browser test scores that game as R-33 names it. Only the stand-in's world reads it.
+  LOCAL_SCORING_NAMES: z
     .string()
     .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a short name')
     .optional(),
@@ -211,6 +219,7 @@ const optional: readonly ConfigName[] = [
   'LOCAL_DESIGN',
   'LOCAL_NOW',
   'LOCAL_NO_CURRENT_SEASON',
+  'LOCAL_SCORING_NAMES',
   'LOCAL_UNRELEASED',
   'SESSION_SECRET',
   'STRIPE_SECRET_KEY',
@@ -251,6 +260,7 @@ const onlyIn: Readonly<Partial<Record<ConfigName, readonly string[]>>> = {
   LOCAL_DESIGN: ['local', 'test'],
   LOCAL_NOW: ['local', 'test'],
   LOCAL_NO_CURRENT_SEASON: ['local', 'test'],
+  LOCAL_SCORING_NAMES: ['local', 'test'],
   LOCAL_UNRELEASED: ['local', 'test'],
 };
 

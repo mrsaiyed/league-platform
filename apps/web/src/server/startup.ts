@@ -192,6 +192,9 @@ export async function startWebApp(config: Config, deps: StartupDeps): Promise<We
       ...(config.LOCAL_NO_CURRENT_SEASON === undefined
         ? {}
         : { noCurrentSeason: config.LOCAL_NO_CURRENT_SEASON }),
+      ...(config.LOCAL_SCORING_NAMES === undefined
+        ? {}
+        : { scoringNames: config.LOCAL_SCORING_NAMES }),
       keptEmailsFolder: deps.keptEmailsFolder ?? null,
     };
     if (config.LOCAL_DATA === 'made-up-database') {

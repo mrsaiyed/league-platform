@@ -100,6 +100,7 @@ export {
   publicNamesChoices,
   childrenInFullConfirmed,
   playersMayAskForInitials,
+  scorekeepersSeeFullNames,
   siteNotice,
   siteDoNotIndex,
 } from './settings/declarations.ts';

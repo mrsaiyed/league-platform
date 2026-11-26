@@ -247,6 +247,19 @@ export type {
   TablePlayerRefusal,
   TrackerTx,
 } from './ports.ts';
+export {
+  namedRoster,
+  scoringNames,
+  type PlayerForScoring,
+  type ScoringName,
+  type ScoringNameSettings,
+  type ScoringNameView,
+} from './scoring-names.ts';
+export {
+  readScoringNameView,
+  scoringNameSettingsOf,
+  type LeagueSettingRows,
+} from './queries/read-scoring-name-view.ts';
 export type {
   EarlierRoundCount,
   EarlierRoundRef,
@@ -258,6 +271,7 @@ export type {
   GameRecord,
   GameRosterEntry,
   GameRosterPlayer,
+  RecordedRosterPlayer,
   NewGameLine,
   GameResultDocument,
   KeptLine,

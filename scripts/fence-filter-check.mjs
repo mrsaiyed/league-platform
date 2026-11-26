@@ -229,7 +229,7 @@ const reviewedFiles = new Map(
     ['is-person-on-roster.ts', 2, '#1:bd91ec9f #2:075519b6'],
     ['list-decided-game-lines.ts', 2, '#1:089ba6a0 #2:7a0a9c01'],
     ['list-earlier-rounds.ts', 3, '#1:c16e2061 #2:101d4ef4 #3:0140c76a'],
-    ['list-game-roster.ts', 4, '#1:6751b205 #2:23489906 #3:fae8f946 #4:177fd99d'],
+    ['list-game-roster.ts', 4, '#1:6751b205 #2:a9a687c9 #3:f6bbf1b1 #4:eb1ec702'],
     ['list-public-schedule.ts', 1, '#1:4ccdd30a'],
     ['list-season-names.ts', 3, '#3:01b68703'],
     ['list-season-teams.ts', 3, '#1:fd8ed90c #2:2983ac7d #3:5ce51dbb'],

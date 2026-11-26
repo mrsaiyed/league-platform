@@ -15,7 +15,7 @@ import type { ActivityEntry, Grant } from '../access/index.ts';
 import type {
   GameLine,
   GameRecord,
-  GameRosterPlayer,
+  RecordedRosterPlayer,
   GamesTx,
   LiveGamesStore,
   NewGameCorrection,
@@ -42,7 +42,7 @@ export type MemoryStandings = {
   games: GameRecord[];
   lines: GameLine[];
   /** Players on teams' rosters, by team. */
-  roster: GameRosterPlayer[];
+  roster: RecordedRosterPlayer[];
   /** Games the tracker has recorded plays for. */
   tracked: string[];
   adjustments: (SeasonAdjustment & { seasonId: string; binned?: boolean })[];

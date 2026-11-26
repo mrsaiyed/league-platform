@@ -545,8 +545,11 @@ export const enTracker = {
   'tracker.play.unturnover': 'Turnover taken back: {player}',
   'tracker.player.fullName': '{first} {last}',
   'tracker.player.name': '{name}',
+  // R-33: one the number and name do not tell apart, by their place on the team's roster.
+  'tracker.player.namePlace': 'Player {place} · {name}',
   'tracker.player.number': '#{jersey}',
   'tracker.player.numberName': '#{jersey} {name}',
+  'tracker.player.place': 'Player {place}',
   // A player the game has and this device's rosters do not (added at another table).
   'tracker.player.unknown': 'Player not on this device’s list',
   'tracker.player.unlistedShort': 'Not listed',

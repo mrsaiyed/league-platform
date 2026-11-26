@@ -269,3 +269,60 @@ export const trackerWorkerForgetMessage = 'srleagues-tracker-forget';
 export function trackerScopeOf(workerHref: string): string {
   return workerHref.slice(0, workerHref.lastIndexOf('/') + 1);
 }
+
+/**
+ * Asks the worker to drop its kept page of one game (T-488), with `page`, the game's
+ * tracker address: the game was ended and saved and the device forgot its rosters.
+ */
+export const trackerWorkerForgetGameMessage = 'srleagues-tracker-forget-game';
+
+/**
+ * Whether the worker may drop a game's kept page (T-488): never while a tap of the game
+ * waits or is set aside on this device, nor when the queue cannot be read (`null`).
+ */
+export function mayForgetGamePage(
+  gameId: string,
+  queued: readonly QueuedPlayRecord[] | null,
+): boolean {
+  if (queued === null) return false;
+  const id = gameId.toLowerCase();
+  return !queued.some((play) => play.gameId.toLowerCase() === id);
+}
+
+/**
+ * Asks the worker to replace its kept page of one game with one fetched fresh (T-489),
+ * with `page`, the game's tracker address: a fresh rosters answer changed the names the
+ * device stores, or the network is back.
+ */
+export const trackerWorkerRenewGameMessage = 'srleagues-tracker-renew-game';
+
+/**
+ * Whether a page fetched fresh replaces the kept one when the page asks (T-489): only
+ * when both are of the same account, known. Another account's page, or one that names
+ * nobody, is never kept: the next opening deletes the kept pages instead (T-321).
+ */
+export function mayRenewKeptPage(keptMark: string | null, freshMark: string | null): boolean {
+  return keptMark !== null && keptMark === freshMark;
+}
+
+/**
+ * The code a tracker page names in its own text (T-487): its scripts' and stylesheets'
+ * addresses, made whole against the page's address. A page fetched fresh replaces the
+ * kept one only once each of these the worker keeps is kept too, so a reload with no
+ * signal still has every file the page starts with, whatever release it is of.
+ */
+export function pageCodeOf(html: string, pageAddress: string): string[] {
+  const found: string[] = [];
+  for (const tag of html.match(/<(?:script|link)\b[^>]*>/gi) ?? []) {
+    const isLink = /^<link/i.test(tag);
+    if (isLink && !/\brel="(?:stylesheet|preload|modulepreload)"/i.test(tag)) continue;
+    const value = (isLink ? /\bhref="([^"]*)"/i : /\bsrc="([^"]*)"/i).exec(tag)?.[1];
+    if (value === undefined || value === '') continue;
+    try {
+      found.push(new URL(value.replace(/&amp;/g, '&'), pageAddress).href);
+    } catch {
+      // Not an address: nothing to keep.
+    }
+  }
+  return [...new Set(found)];
+}

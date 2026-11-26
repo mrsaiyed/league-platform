@@ -2,9 +2,11 @@
 // record 058): the contract's `TrackerRosters`, from the staff read
 // (games.read_tracker_rosters). The tracker's page and the rosters address
 // (GET …/games/{game}/rosters) both hand it over through this, so the device never
-// sees two shapes of the same rosters.
+// sees two shapes of the same rosters. The names are already those the scoring screens'
+// rule gives (R-33, the games store's roster read): nothing else of a name is added here.
 import type { TrackerRosters } from '@srleagues/contracts';
 import type { TrackerRosters as RostersRead } from '@srleagues/core';
+import { scoringNameText } from './scoring-name-text.ts';
 
 export function trackerRostersReply(read: RostersRead): TrackerRosters {
   const { recording, players, statistics, ...rest } = read;
@@ -15,8 +17,8 @@ export function trackerRostersReply(read: RostersRead): TrackerRosters {
     players: players.map((p) => ({
       teamId: p.teamId,
       personId: p.personId,
-      firstName: p.firstName,
-      lastName: p.lastName,
+      // T-483: a place is worded into the name ("Player 1"); no field is added.
+      ...scoringNameText(p),
       jerseyNumber: p.jerseyNumber,
       left: p.left,
       addedAtGameId: p.addedAtGameId ?? null,

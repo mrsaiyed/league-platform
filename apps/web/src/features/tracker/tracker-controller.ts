@@ -67,7 +67,7 @@ import { basketball } from '@srleagues/sports';
 import { againCommandId } from './again-command-id.ts';
 import type { CommandTransport } from './command-transport.ts';
 import { commandsSince } from './commands-since.ts';
-import { refreshedRosters } from './device-rosters.ts';
+import { freshOverKept, refreshedRosters } from './device-rosters.ts';
 import type { GameDoors } from './game-doors.ts';
 import { mayEnterAgain } from './kept-plays.ts';
 import { sameData } from '../game-format/index.ts';
@@ -430,6 +430,14 @@ export type TrackerControllerOptions = {
     readonly kept?: DeviceRosters | null;
     readonly keep?: (rosters: DeviceRosters) => Promise<void>;
   };
+  /** How often the rosters are asked again while this device holds the game (T-489). */
+  readonly rostersEveryMs?: number;
+  /**
+   * Asks the service worker to replace its kept page of the game (T-489): called when a
+   * fresh rosters answer changed what is stored, and when the network is back, so the
+   * kept page never holds a name the stored rosters no longer hold.
+   */
+  readonly renewKeptPage?: () => void;
   /** A new player's id: a random (version 4) UUID, as the contract wants. */
   readonly newPlayerId?: () => string;
 };
@@ -591,6 +599,14 @@ export const offlineLongMs = 5 * 60_000;
  */
 export const finalCheckMs = 15_000;
 
+/**
+ * How often an open game asks for its rosters again while this device holds it (T-489):
+ * a name that should have gone (a setting switched off, a request now "removed") stays
+ * on an open device with signal no longer than this. Carried on the session's renewal,
+ * never a timer of its own; a page shown again and the network back ask at once.
+ */
+export const rostersAgainMs = 5 * 60_000;
+
 /** The reasons that mean another device may be scoring the game now. */
 const lostTheGame: ReadonlySet<ReadOnlyReason> = new Set([
   'taken-over',
@@ -674,6 +690,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     retry = defaultRetryTiming,
     requestTimeoutMs = 15_000,
     renewEveryMs = sessionRenewSeconds * 1000,
+    rostersEveryMs = rostersAgainMs,
+    renewKeptPage = () => {},
     wallClock = () => Date.now(),
   } = options;
 
@@ -978,8 +996,20 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
     keptSession = scoring.sessionId;
     // The rosters this device last kept for this account, not the page's copy, which a
     // worker may have kept from before a fetch (step 2.118).
+    // A fresh answer since opening wins for names (T-487): the kept copy only adds a
+    // player the server does not know yet, one added at the table whose change waits.
     const keptRosters = options.rosters?.kept;
-    if (keptRosters !== undefined && keptRosters !== null) keepRosters(keptRosters);
+    if (keptRosters !== undefined && keptRosters !== null) {
+      if (rostersFetched && storedRosters !== null) {
+        const adds = new Set(
+          waiting
+            .filter(isTablePlayerCommand)
+            .filter((c) => c.input.type === 'add-player')
+            .map((c) => c.input.playerId.toLowerCase()),
+        );
+        keepRosters(freshOverKept(storedRosters, keptRosters, adds));
+      } else keepRosters(keptRosters);
+    }
     showGame();
     update({ mode: { kind: 'scoring' } });
   };
@@ -1207,6 +1237,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   /** The rosters the device keeps: the page's, a fetched one, with changes taken since. */
   let storedRosters: DeviceRosters | null = options.rosters?.page ?? null;
+  /** The server has answered a fetch of the rosters since opening (T-487). */
+  let rostersFetched = false;
   /** Fetches of the rosters begun so far: a change taken is laid on those begun before. */
   let rosterAsks = 0;
   /** Changes the server took, each with the fetches begun when it was taken. */
@@ -1241,6 +1273,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
 
   let fetchingRosters: Promise<DeviceRosters | null> | null = null;
   let fetchRostersAgain = false;
+  /** When the rosters were last asked for (steady clock), null before the first (T-489). */
+  let rostersAskedAt: number | null = null;
   /**
    * Fetches the rosters (on opening, taking over, after a loss, after a refused change,
    * back online): kept, with the changes taken since the fetch began laid on them. One
@@ -1258,10 +1292,14 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       do {
         fetchRostersAgain = false;
         rosterAsks += 1;
+        rostersAskedAt = clock.now();
         const asks = rosterAsks;
         const outcome = await ask((signal) => load(signal));
+        // No answer: nothing changes, the next moment asks again (T-489).
         if (outcome.kind !== 'answer' || storedRosters === null || stopped) continue;
+        const before = JSON.stringify(storedRosters);
         fetched = refreshedRosters(storedRosters, outcome.value);
+        rostersFetched = true;
         takenSince = takenSince.filter((t) => t.asks >= asks);
         keepRosters(
           withChanges(
@@ -1270,6 +1308,8 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
             gameId,
           ),
         );
+        // What is stored changed: the worker's kept page carries the old (T-489).
+        if (JSON.stringify(storedRosters) !== before) renewKeptPage();
         const saved = changesTakenIn(fetched, current.notSaved);
         if (saved.length > 0) {
           showNotSaved(withoutTaps(current.notSaved, new Set(saved)));
@@ -1692,6 +1732,9 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       return later(open);
     }
     failures = 0;
+    // Scored from the device's copy with no fetch of the rosters answered: fetched now
+    // that the server answers, so the names are the server's (T-487).
+    if (!rostersFetched && fetchingRosters === null) void refreshRosters();
     if (opened.kind === 'rejected') return readOnly(await refusedReason(opened));
     const reply = opened.value;
     if (reply.status !== 'held-by-you') return notHeld(reply);
@@ -1713,6 +1756,10 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
         return held === keptSession ? settleByOpening() : notHeld(renewed.value);
       }
       signedInAgain();
+      // An open game asks for its rosters again every few minutes, on this renewal (T-489).
+      if (rostersAskedAt === null || clock.now() - rostersAskedAt >= rostersEveryMs) {
+        void refreshRosters();
+      }
     }
     scheduleRenew();
   };
@@ -2329,7 +2376,11 @@ export function createTrackerController(options: TrackerControllerOptions): Trac
       await track(begun ? open() : begin());
     },
 
-    online: backOnline,
+    online() {
+      backOnline();
+      // The page the worker kept may be older than the names now given (T-489).
+      if (!stopped) renewKeptPage();
+    },
 
     awake() {
       pageHidden = false;

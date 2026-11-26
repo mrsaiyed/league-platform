@@ -3,7 +3,8 @@
 import type { GameFormatRules, PlaySource, SeasonRules } from '@srleagues/contracts';
 import type { CommandTx } from '../../command/index.ts';
 import type { AccessReader, AccessStore, ActivityLog } from '../access/index.ts';
-import type { StoredSetting } from '../leagues/index.ts';
+import type { Audience, StoredSetting } from '../leagues/index.ts';
+import type { ScoringNameView } from './scoring-names.ts';
 
 /** A game of a season, in or out of the bin (T3 §8). */
 export type GameRecord = {
@@ -126,12 +127,20 @@ export type NewGameLine = GameLine & { readonly jerseyNumber: string | null };
 /** A roster entry of one of a game's two teams, by ids only (T-220). */
 export type GameRosterEntry = { readonly teamId: string; readonly personId: string };
 
-/** A player on the roster of one of a game's two teams, as the box score grid lists them (P7 §5.2). */
+/**
+ * A player on the roster of one of a game's two teams, as the box score grid, the score
+ * page and the scorer's rosters list them (P7 §5.2), named by the scoring screens' rule
+ * (R-33, scoringNames): `firstName` and `lastName` are the recorded ones only where the
+ * rule shows the name in full; a shorter form stands whole in `firstName`; no name to
+ * show leaves both empty. The recorded name is in no other field.
+ */
 export type GameRosterPlayer = {
   readonly teamId: string;
   readonly personId: string;
   readonly firstName: string;
   readonly lastName: string;
+  /** "Player 1", "Player 2": the place of one the number and name do not tell apart, or null. */
+  readonly ordinal: number | null;
   readonly jerseyNumber: string | null;
   /** The player has left the team since (R-17); still listed, as they may have played this game. */
   readonly left: boolean;
@@ -139,6 +148,16 @@ export type GameRosterPlayer = {
   readonly addedAtGameId?: string | null;
   /** Added at a table and not yet reviewed by an admin (S-6, S-45); absent where not read. */
   readonly needsReview?: boolean;
+};
+
+/**
+ * A game's roster player as recorded, for a store to name by the rule: whether they count
+ * as a child and their own request, read beside the name. A stand-in store that does not
+ * keep them gives none: not known, and nothing asked.
+ */
+export type RecordedRosterPlayer = Omit<GameRosterPlayer, 'ordinal'> & {
+  readonly isMinor?: boolean | null;
+  readonly nameRequest?: string;
 };
 
 /** One reopening, with numbers only, never names (T-220). */
@@ -284,9 +303,15 @@ export type GamesStore = {
   readonly replaceLines: (gameId: string, lines: readonly NewGameLine[]) => Promise<void>;
   /**
    * The players (not coaches) on either team's roster, those who have left included,
-   * by team, roster order and name.
+   * by team, roster order and name. Names as the scoring screens' rule gives them under
+   * this view of the league, its audience included, as the caller read it
+   * (scoringNameSettingsOf; R-33, scoringNames): the store applies it, so no recorded
+   * name the rule keeps back leaves the store.
    */
-  readonly listRoster: (gameId: string) => Promise<readonly GameRosterPlayer[]>;
+  readonly listRoster: (
+    gameId: string,
+    names: ScoringNameView,
+  ) => Promise<readonly GameRosterPlayer[]>;
   /**
    * Whether the person and team are both still in the league and one of them is in the bin
    * (A-5): left out of `listRoster`, but a restore brings them back (step 2.229, the put
@@ -303,6 +328,12 @@ export type GamesStore = {
   ) => Promise<{ readonly programId: string; readonly rules: unknown } | undefined>;
   /** The league's own stored values of one setting (the league level), as a lookup reads them. */
   readonly leagueSettingRows: (key: string) => Promise<readonly StoredSetting[]>;
+  /**
+   * Who plays in the league (adult, youth or mixed), for the scoring screens' names
+   * (R-33). A league whose audience cannot be read counts as youth: the careful reading,
+   * as the people module's own (PeopleStore.leagueAudience).
+   */
+  readonly leagueAudience: () => Promise<Audience>;
   /**
    * A season's games still to be decided (not final, forfeit or cancelled), not in the bin,
    * soonest first (those with no time last), with who is assigned to score each, in the

@@ -29,6 +29,7 @@ import type { GameRosterPlayer, GamesTx } from '../ports.ts';
 import { lowerId } from '../scoring-session.ts';
 import { effectiveRulesOf, seasonRulesOf } from '../season-rules-of.ts';
 import { keptForScoring } from '../statistic-of-tap.ts';
+import { scoringNameSettingsOf } from '../queries/read-scoring-name-view.ts';
 
 /** The game's two teams and their players, by team, roster order and name. */
 export type TrackerRosters = {
@@ -58,7 +59,7 @@ export const readTrackerRosters = defineCommand({
   run: async ({ input, tx }): Promise<Result<TrackerRosters, ReadTrackerRostersError>> => {
     const game = await tx.games.find(input.gameId);
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
-    const players = await tx.games.listRoster(game.id);
+    const players = await tx.games.listRoster(game.id, await scoringNameSettingsOf(tx));
     const { uniqueJerseys } = (await seasonRulesOf(tx, game.seasonId)).rosters;
     const { allowTies } = await effectiveRulesOf(tx, game);
     const statistics = keptForScoring((await tx.games.findSeason(game.seasonId))?.rules);

@@ -13,6 +13,7 @@ import { isDecided } from '../game-fields.ts';
 import { gameScope, mayChangeGames, mayScoreGame } from '../policy.ts';
 import type { GameLine, GameRecord, GameRosterPlayer, GamesTx } from '../ports.ts';
 import { effectiveRulesOf } from '../season-rules-of.ts';
+import { scoringNameSettingsOf } from '../queries/read-scoring-name-view.ts';
 
 export type BoxScoreSheet = {
   readonly game: GameRecord;
@@ -55,7 +56,7 @@ export const getBoxScoreSheet = defineCommand({
     if (game === undefined || game.binned) return fail({ code: 'game-not-found' });
     // One after another: they share the transaction's one connection.
     const rules = await effectiveRulesOf(tx, game);
-    const players = await tx.games.listRoster(game.id);
+    const players = await tx.games.listRoster(game.id, await scoringNameSettingsOf(tx));
     const lines = await tx.games.listLines(game.id);
     const tracked = game.status === 'live' || (await tx.games.hasPlays(game.id));
     const columns = boxScoreColumns(rules.statistics);

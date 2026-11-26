@@ -1,6 +1,7 @@
 // Opening a game on the device against the real endpoints over the made-up stand-in
 // (endpoint-network.test-helper.ts): the session is taken, the rosters and the state are
 // stored on the device (T-115), and the format is confirmed once per device (P7 §5.1).
+import { TrackerRosters } from '@srleagues/contracts';
 import { basketball } from '@srleagues/sports';
 import { describe, expect, it } from 'vitest';
 import {
@@ -10,6 +11,8 @@ import {
   liveLeagueId,
   type Person,
 } from '../../server/tracker-endpoints.test-helper.ts';
+import { trackerRostersRequest } from '../../server/tracker-rosters-endpoint.ts';
+import { refreshedRosters } from './device-rosters.ts';
 import { endpointNetwork, type EndpointNetwork } from './endpoint-network.test-helper.ts';
 import { createFetchCommandTransport } from './fetch-command-transport.ts';
 import { createFetchGameDoors } from './fetch-game-doors.ts';
@@ -24,15 +27,16 @@ import {
   type OpenTrackerGameOptions,
 } from './open-tracker-game.ts';
 import { madeUpRosters } from './opened-game-storage-contract.test-helper.ts';
+import { tap } from './queue-storage-contract.test-helper.ts';
 import { formatOf, openedGameKeepMs, type OpenedGameStorage } from './opened-game-storage.ts';
-import { QueueError, type QueueStorage } from './queue-storage.ts';
+import { QueueError, type DeviceQueueStorage, type QueueStorage } from './queue-storage.ts';
 import type { TapInput } from './tracker-controller.ts';
 import type { QueueClock } from './tracker-queue.ts';
 import { createManualClock } from './tracker-queue.test-helper.ts';
 
 const gameId = games.hawksBears;
 
-type Device = { readonly queue: QueueStorage; readonly games: OpenedGameStorage };
+type Device = { readonly queue: DeviceQueueStorage; readonly games: OpenedGameStorage };
 const newDevice = (): Device => ({
   queue: createMemoryQueueStorage(),
   games: createMemoryOpenedGameStorage(),
@@ -45,13 +49,26 @@ const newDevice = (): Device => ({
 const accountOf = (as: Person) =>
   as === 'visitor' ? '00000000-0000-4000-8000-0000000000ff' : standInPeople[as].accountId;
 
+/** The rosters as the device keeps them once fetched fresh on opening (T-487). */
+async function keptFromServer(network: EndpointNetwork) {
+  const context = await network.world.contextAs('scorekeeper', 'live', [
+    'games',
+    gameId,
+    'rosters',
+  ]);
+  const answer = await trackerRostersRequest(context, gameId, network.world.tracker);
+  return refreshedRosters(madeUpRosters, TrackerRosters.parse(answer.body));
+}
+
 let deviceNumber = 0;
 async function open(
   network: EndpointNetwork,
   as: Person,
   device: Device = newDevice(),
   clock?: QueueClock,
-  more: Partial<Pick<OpenTrackerGameOptions, 'deviceAccount' | 'markSignedIn'>> = {},
+  more: Partial<
+    Pick<OpenTrackerGameOptions, 'deviceAccount' | 'markSignedIn' | 'rosters' | 'forgetPage'>
+  > = {},
 ) {
   const fetch = network.fetchAs(as);
   const opened = await openTrackerGame({
@@ -82,7 +99,7 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     const game = await open(network, 'scorekeeper');
     expect(game.controller.status().mode).toEqual({ kind: 'scoring' });
     const kept = await game.device.games.find(gameId);
-    expect(kept?.rosters).toEqual(madeUpRosters);
+    expect(kept?.rosters).toEqual(await keptFromServer(network));
     expect(kept?.leagueId).toBe(liveLeagueId);
     expect(kept?.rostersSavedAt).toBe(1_000);
     expect(kept?.state?.sequence).toBe(0);
@@ -90,7 +107,7 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     const format = formatOf(kept?.state?.state.rules ?? basketball.DEFAULT_RULES);
     expect(screen(game)).toEqual({ kind: 'confirm-format', format });
     // The state came through the one state read, after the session was taken.
-    expect(network.reached).toEqual(['POST session:open', 'GET state']);
+    expect(network.reached).toEqual(['GET rosters', 'POST session:open', 'GET state']);
 
     await game.confirmFormat(format);
     expect(screen(game)).toEqual({ kind: 'scoring', format });
@@ -118,8 +135,10 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     const scorekeeper = { leagueId: liveLeagueId, accountId: accountOf('scorekeeper') };
     const earlier = '00000000-0000-4000-8000-0000000001a1';
     const recent = '00000000-0000-4000-8000-0000000001a2';
-    await device.games.saveRosters({ ...scorekeeper, gameId: earlier }, madeUpRosters, 0);
-    await device.games.saveRosters({ ...scorekeeper, gameId: recent }, madeUpRosters, 900);
+    // Stored since step 2.226 (T-484): their age decides.
+    const marked = { ...madeUpRosters, scoringNames: true as const };
+    await device.games.saveRosters({ ...scorekeeper, gameId: earlier }, marked, 0);
+    await device.games.saveRosters({ ...scorekeeper, gameId: recent }, marked, 900);
     // Another account's game (someone who used the device before, still signed in).
     await device.games.saveRosters(
       { gameId, leagueId: liveLeagueId, accountId: accountOf('owner') },
@@ -148,6 +167,40 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     expect(await device.games.find(earlier)).toBeUndefined();
     expect(await device.games.find(gameId)).toBeUndefined();
     expect(await device.games.find(recent)).toBeDefined();
+  });
+
+  it('drops other games’ rosters stored before step 2.226 at opening, unless taps of them wait (T-484)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const scorekeeper = { leagueId: liveLeagueId, accountId: accountOf('scorekeeper') };
+    const old = '00000000-0000-4000-8000-0000000001d1';
+    const waiting = '00000000-0000-4000-8000-0000000001d2';
+    const marked = '00000000-0000-4000-8000-0000000001d3';
+    // madeUpRosters has no mark: copies a page stored before the step, names as recorded.
+    await device.games.saveRosters({ ...scorekeeper, gameId: old }, madeUpRosters, 900);
+    await device.games.saveRosters({ ...scorekeeper, gameId: waiting }, madeUpRosters, 900);
+    await device.games.saveRosters(
+      { ...scorekeeper, gameId: marked },
+      { ...madeUpRosters, scoringNames: true },
+      900,
+    );
+    // A tap of that game waits on the device, as one made with no signal does.
+    await device.queue.add(waiting, { protocolVersion: 1, command: tap(1), ...scorekeeper });
+    const first = await open(network, 'scorekeeper', device);
+    expect(await device.games.find(old)).toBeUndefined();
+    expect((await device.games.find(waiting))?.rosters).toEqual(madeUpRosters);
+    expect(await device.games.find(marked)).toBeDefined();
+    await first.controller.leave();
+    // Its tap saved (the server has it: dropped from the queue), the next opening drops
+    // the old copy too.
+    const [held] = await device.queue.list(waiting);
+    if (held === undefined) throw new Error('no tap');
+    await device.queue.settle(waiting, { remove: [held.command.commandId] });
+    expect(await device.queue.list(waiting)).toEqual([]);
+    const second = await open(network, 'scorekeeper', device);
+    expect(await device.games.find(waiting)).toBeUndefined();
+    expect(await device.games.find(marked)).toBeDefined();
+    await second.controller.leave();
   });
 
   it('asks again when the format has changed since it was confirmed', () => {
@@ -303,7 +356,7 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     expect(controller.status().signedOut).toBe(true);
     expect(controller.status().mode).toEqual({ kind: 'scoring' });
     const kept = await device.games.find(gameId);
-    expect(kept?.rosters).toEqual(madeUpRosters);
+    expect(kept?.rosters).toEqual(await keptFromServer(network));
     expect(kept?.state).not.toBeNull();
     // The tap still waiting keeps its league, so "Your games" lists it there (T-317).
     expect((await device.queue.list(gameId)).map((entry) => entry.leagueId)).toEqual([
@@ -492,6 +545,123 @@ describe('opening a game on the device (T-115, T-116, P7 §5.1)', () => {
     ).toEqual([[accountOf('scorekeeper'), 'waiting']]);
     await other.controller.leave();
     await first.controller.leave();
+  });
+
+  it('keeps the rosters while the End waits, and lets them go once it is saved (step 2.226, M4)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const clock = createManualClock();
+    const game = await open(network, 'scorekeeper', device, clock);
+    const taps: TapInput[] = [
+      { type: 'lineup', side: 'home', playerIds: hawks },
+      { type: 'lineup', side: 'away', playerIds: bears },
+      { type: 'score', side: 'home', playerId: hawks[0] ?? '', points: 2 },
+    ];
+    for (const input of taps) expect((await game.controller.tap(input)).ok).toBe(true);
+    await game.controller.idle();
+    // Live, every tap saved: the rosters stay.
+    expect((await device.games.find(gameId))?.rosters).toEqual(await keptFromServer(network));
+    network.mode = 'down';
+    expect((await game.controller.tap({ type: 'end' })).ok).toBe(true);
+    await game.controller.idle();
+    await clock.advance(60_000);
+    // Ended on the device, the End still waiting: the rosters stay.
+    expect(game.controller.status().game?.status).toBe('final');
+    expect(game.controller.status().waiting).toHaveLength(1);
+    expect((await device.games.find(gameId))?.rosters).toEqual(await keptFromServer(network));
+    network.mode = 'up';
+    game.controller.online();
+    await game.controller.idle();
+    await clock.advance(60_000);
+    await game.controller.idle();
+    await new Promise((settle) => setTimeout(settle, 0));
+    // Ended and saved: the game's rosters, names and state are gone from the device.
+    expect(game.controller.status().waiting).toEqual([]);
+    expect(await device.games.find(gameId)).toBeUndefined();
+    await game.controller.leave();
+  });
+
+  it('does not use again rosters stored before step 2.226 unless taps wait (T-484)', async () => {
+    // madeUpRosters has no mark: a copy a page stored before the step, names as recorded.
+    const marked = { ...madeUpRosters, scoringNames: true as const };
+    const reloaded = async (tapWaits: boolean) => {
+      const network = endpointNetwork();
+      const device = newDevice();
+      const first = await open(network, 'scorekeeper', device, createManualClock());
+      const lineup: TapInput = { type: 'lineup', side: 'home', playerIds: hawks };
+      expect((await first.controller.tap(lineup)).ok).toBe(true);
+      await first.controller.idle();
+      network.mode = 'down';
+      if (tapWaits) {
+        const away: TapInput = { type: 'lineup', side: 'away', playerIds: bears };
+        expect((await first.controller.tap(away)).ok).toBe(true);
+        await first.controller.idle();
+      }
+      first.controller.hidden();
+      // The copy a page stored before the step (the first opening fetched a fresh one).
+      const owner = { gameId, leagueId: liveLeagueId, accountId: accountOf('scorekeeper') };
+      await device.games.saveRosters(owner, madeUpRosters, 1_000);
+      // The release's page, with no signal: it scores on from what the device kept.
+      const again = await open(network, 'scorekeeper', device, createManualClock(), {
+        rosters: marked,
+      });
+      expect(again.controller.status().mode).toEqual({ kind: 'scoring' });
+      await again.controller.idle();
+      await new Promise((settle) => setTimeout(settle, 0));
+      return (await device.games.find(gameId))?.rosters;
+    };
+    expect(await reloaded(false)).toEqual(marked);
+    expect(await reloaded(true)).toEqual(madeUpRosters);
+  });
+
+  it('fetches the rosters fresh on opening: their names replace the page copy stored (T-487)', async () => {
+    const network = endpointNetwork();
+    const device = newDevice();
+    const stale = {
+      ...madeUpRosters,
+      home: {
+        ...madeUpRosters.home,
+        players: madeUpRosters.home.players.map((p) => ({ ...p, lastName: 'Hawkinsrecorded' })),
+      },
+    };
+    const game = await open(network, 'scorekeeper', device, createManualClock(), {
+      rosters: stale,
+    });
+    await game.controller.idle();
+    await new Promise((settle) => setTimeout(settle, 0));
+    const stored = JSON.stringify((await device.games.find(gameId))?.rosters);
+    expect(stored).toContain(hawks[0] ?? 'a player');
+    expect(stored).not.toContain('Hawkinsrecorded');
+  });
+
+  it("drops the worker's kept page once the game is ended and saved, never while a tap waits (T-488)", async () => {
+    const ended = async (tapWaits: boolean) => {
+      const network = endpointNetwork();
+      let asked = 0;
+      const game = await open(network, 'scorekeeper', newDevice(), createManualClock(), {
+        forgetPage: () => (asked += 1),
+      });
+      for (const input of [
+        { type: 'lineup', side: 'home', playerIds: hawks },
+        { type: 'lineup', side: 'away', playerIds: bears },
+        // A tie cannot end the game here: a basket ahead.
+        { type: 'score', side: 'home', playerId: hawks[0] ?? '', points: 2 },
+      ] satisfies TapInput[]) {
+        expect(await game.controller.tap(input)).toMatchObject({ ok: true });
+      }
+      await game.controller.idle();
+      if (tapWaits) network.mode = 'down';
+      expect(await game.controller.tap({ type: 'end' })).toMatchObject({ ok: true });
+      await game.controller.idle();
+      expect(game.controller.status().game?.status).toBe('final');
+      return { asked, kept: await game.device.games.find(gameId) };
+    };
+    const saved = await ended(false);
+    expect(saved.asked).toBe(1);
+    expect(saved.kept).toBeUndefined();
+    const waiting = await ended(true);
+    expect(waiting.asked).toBe(0);
+    expect(waiting.kept).toBeDefined();
   });
 
   it('keeps the names on the device when refused for another reason', async () => {

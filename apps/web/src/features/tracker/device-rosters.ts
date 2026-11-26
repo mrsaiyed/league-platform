@@ -32,6 +32,9 @@ export function deviceRosters(
     uniqueJerseys: rosters.uniqueJerseys,
     allowTies: rosters.allowTies,
     statistics: rosters.statistics,
+    // The server names players by the scoring screens' rule (R-33): marked, so a copy
+    // stored before step 2.226 is told apart (T-484).
+    scoringNames: true,
   };
 }
 
@@ -52,3 +55,26 @@ export const refreshedRosters = (kept: DeviceRosters, rosters: TrackerRosters): 
     [kept.home.teamId]: kept.home.name,
     [kept.away.teamId]: kept.away.name,
   });
+
+/**
+ * A fresh answer wins for names (T-487): the rosters just fetched, with players of the
+ * copy kept before laid over only where the server does not know them yet, a player
+ * added at the table whose change still waits (`waitingAdds`, their ids, step 2.118).
+ * A player the server knows keeps the server's name and number, whatever the kept copy
+ * says: an admin's switch or a person's own request reaches the device at its next fetch.
+ */
+export function freshOverKept(
+  fresh: DeviceRosters,
+  kept: DeviceRosters,
+  waitingAdds: ReadonlySet<string>,
+): DeviceRosters {
+  const side = (team: DeviceTeam, keptTeam: DeviceTeam): DeviceTeam => {
+    const known = new Set(team.players.map((p) => p.personId.toLowerCase()));
+    const unknown = keptTeam.players.filter((p) => {
+      const id = p.personId.toLowerCase();
+      return !known.has(id) && waitingAdds.has(id);
+    });
+    return unknown.length === 0 ? team : { ...team, players: [...team.players, ...unknown] };
+  };
+  return { ...fresh, home: side(fresh.home, kept.home), away: side(fresh.away, kept.away) };
+}

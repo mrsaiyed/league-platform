@@ -547,6 +547,11 @@ export type PlaySource = typeof correctionPlaySource;
  * One player of a game's two rosters as the scorekeeper's device holds them (record 054):
  * names and numbers only (R-16), those who left marked (R-17). A player added by number
  * only has an empty first and last name (S-34): the tracker shows them as "#12".
+ *
+ * The names are those the scoring screens' rule gives (R-33, T4 §7): the recorded first
+ * and last name only where it shows the name in full; a shorter form (initials, first
+ * name and last initial) whole in `firstName` with `lastName` empty; no name to show,
+ * both empty. The device stores what it is sent, so nothing more is sent.
  */
 export const TrackerRosterPlayer = z.strictObject({
   teamId: Id,
