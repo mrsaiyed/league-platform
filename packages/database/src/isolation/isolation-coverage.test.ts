@@ -506,7 +506,7 @@ describe('every security-definer function app_user may run is reviewed (T-469)',
           and has_function_privilege('app_user', p.oid, 'EXECUTE')
         order by 1`);
       expect([...reviewedDefiners.keys()].sort()).toEqual(rows.map((row) => row.signature));
-      expect(rows.length).toBe(9);
+      expect(rows.length).toBe(11);
       for (const [signature, reason] of reviewedDefiners) {
         expect(reason.length, signature).toBeGreaterThan(40);
       }
