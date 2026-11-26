@@ -98,7 +98,7 @@ describe('checkQueueSchema (the worker, T-257)', () => {
     await pglite.exec('alter schema pgboss owner to made_up_middle');
     const said = await checkQueueSchema(db, 'made_up_worker_login');
     expect(said).toEqual([
-      'the pgboss schema is owned by made_up_middle, not queue_owner: alter schema pgboss owner to queue_owner',
+      'the pgboss schema is owned by made_up_middle, not queue_owner: grant queue_owner to current_user with set true; alter schema pgboss owner to queue_owner; revoke queue_owner from current_user',
       ...notUsable,
     ]);
     await pglite.exec(statementOf(said[0] ?? ''));
@@ -187,7 +187,7 @@ describe('the website’s login reaches nothing of the job queue (checkLoginRole
       grant create on schema pgboss to app_user;`);
     const said = await checkLoginRole(db, 'made_up_web_login');
     expect(said).toEqual([
-      'app_user, made_up_web_login, public may use the job queue (the pgboss schema), so made_up_web_login could read or change a queued job: revoke all on schema pgboss from app_user, made_up_web_login, public',
+      'app_user, made_up_web_login, public may use the job queue (the pgboss schema), so made_up_web_login could read or change a queued job: grant queue_owner to current_user with set true; set role queue_owner; revoke all on schema pgboss from app_user, made_up_web_login, public cascade; reset role; revoke queue_owner from current_user',
     ]);
     await pglite.exec(statementOf(said[0] ?? ''));
     expect(await checkLoginRole(db, 'made_up_web_login')).toEqual([]);
@@ -197,9 +197,9 @@ describe('the website’s login reaches nothing of the job queue (checkLoginRole
     await pglite.exec('alter schema pgboss owner to made_up_web_login');
     const said = await checkLoginRole(db, 'made_up_web_login');
     expect(said[0]).toBe(
-      'made_up_web_login owns the job queue (the pgboss schema), and the website must never read or change a queued job: alter schema pgboss owner to queue_owner',
+      'made_up_web_login owns the job queue (the pgboss schema), and the website must never read or change a queued job: grant queue_owner to current_user with set true; alter schema pgboss owner to queue_owner; revoke queue_owner from current_user',
     );
-    await pglite.exec('alter schema pgboss owner to queue_owner');
+    await pglite.exec(statementOf(said[0] ?? ''));
     expect(await checkLoginRole(db, 'made_up_web_login')).toEqual([]);
   });
 });

@@ -18,6 +18,14 @@
 //       fence. In a library's own schema (library-schemas.ts, T-482; none today) and,
 //       for the worker's login only, in the job queue's (T-490) only ordinary tables
 //       without a league column are let be; any view or foreign table there is refused;
+//       Since step 2.112's review (T-492) a relation counts when the login or a role it
+//       reaches has ANY right on it (insert alone is enough), not only a reading one; and
+//       (T-493) a table with a league column in the job queue's schema is refused for the
+//       worker too, mended by moving it out to the migrations' owner, never by a revoke or
+//       a drop; and (T-494) a table named like pg-boss's own in public is never dropped;
+//   (c') every security-definer function a trigger runs on a relation the login or a role
+//       it reaches may change is on the reviewed list or is one the migrations made (T-492):
+//       a change the website may make there runs it as its owner;
 //   (e) every trigger and rewrite rule on a relation the migrations made is theirs, as
 //       they made it and enabled (T-486): a rule that copies a league's rows elsewhere on
 //       each change, or a trigger that does, opens the fence without touching a policy.
@@ -42,9 +50,14 @@ import {
 } from './fence-catalog.ts';
 import { queueSchema } from './check-queue-schema.ts';
 import { librarySchemas } from './library-schemas.ts';
+import { asRole, holdingRole } from './mending.ts';
 import { migrationCatalog } from './migration-catalog.ts';
 import { reviewedDefiners } from './reviewed-definers.ts';
 import type { Database } from './schema-types.ts';
+
+/** The login first, then every other role it reaches. */
+const reachedRoles = (roles: FenceRoles) =>
+  JSON.stringify([roles.login, ...roles.reached.filter((role) => role !== roles.login)]);
 
 /** Who the login is, the roles it may become (SET ROLE), and every role it reaches. */
 export type FenceRoles = {
@@ -247,7 +260,11 @@ async function unreviewedDefiners(
       const holders = definer.grantees.filter((grantee) => reached.has(grantee));
       const statement =
         holders.length > 0
-          ? `revoke execute on ${what} ${definer.signature} from ${holders.join(', ')}`
+          ? asRole(
+              definer.owner,
+              `revoke execute on ${what} ${definer.signature} from ${holders.join(', ')}`,
+              roles.databaseOwner,
+            )
           : `alter ${what} ${definer.signature} owner to ${roles.databaseOwner}`;
       const who =
         definer.runner === roles.login
@@ -256,6 +273,75 @@ async function unreviewedDefiners(
       return (
         `${who} may run ${definer.signature}, a security-definer ${what} that is not on ` +
         `the reviewed list, so it may read past the league fence: ${statement}`
+      );
+    });
+}
+
+type TriggerDefiner = {
+  signature: string;
+  trigger: string;
+  table: string;
+  table_owner: string;
+  changer: string;
+};
+
+/**
+ * (c') A security-definer function that a trigger runs on a relation the login or a role it
+ * reaches may change, not on the reviewed list and not the migrations' own (whose shape
+ * changedFunctions reads). Seen on the real server: a table the website could only insert
+ * into, outside every schema the guard read, with a definer trigger that wrote a queued job.
+ */
+async function unreviewedTriggerDefiners(
+  database: Kysely<Database>,
+  catalog: MigrationCatalog,
+  roles: FenceRoles,
+): Promise<string[]> {
+  const own = new Set(catalog.functions.map((made) => made.signature));
+  // Every trigger on a relation the migrations made is (e)'s to judge, word for word.
+  const theirs = new Set(catalog.relations.map((relation) => relation.name));
+  const { rows } = await sql<TriggerDefiner>`
+    select * from (
+      select pg_catalog.quote_ident(pn.nspname) || '.' || pg_catalog.quote_ident(p.proname) ||
+          '(' || pg_catalog.pg_get_function_identity_arguments(p.oid) || ')' as signature,
+        pg_catalog.quote_ident(t.tgname) as trigger,
+        pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname) as "table",
+        pg_catalog.pg_get_userbyid(c.relowner)::text as table_owner,
+        (select r.name from pg_catalog.jsonb_array_elements_text(${reachedRoles(roles)}::jsonb)
+            with ordinality as r(name, place)
+         where pg_catalog.has_schema_privilege(r.name, n.oid, 'USAGE')
+           and (pg_catalog.has_table_privilege(r.name, c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE')
+             or pg_catalog.has_any_column_privilege(r.name, c.oid, 'INSERT, UPDATE'))
+         order by r.place limit 1) as changer
+      from pg_catalog.pg_trigger t
+      join pg_catalog.pg_class c on c.oid = t.tgrelid
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      join pg_catalog.pg_proc p on p.oid = t.tgfoid
+      join pg_catalog.pg_namespace pn on pn.oid = p.pronamespace
+      where not t.tgisinternal and p.prosecdef
+    ) triggers
+    where changer is not null
+    order by "table", trigger`.execute(database);
+  return rows
+    .filter(
+      (found) =>
+        !reviewedDefiners.has(found.signature) &&
+        !own.has(found.signature) &&
+        !theirs.has(found.table),
+    )
+    .map((found) => {
+      const who =
+        found.changer === roles.login
+          ? roles.login
+          : `${roles.login} may become ${found.changer}, which`;
+      return (
+        `${who} may change ${found.table}, whose trigger ${found.trigger} runs ` +
+        `${found.signature}, a security-definer function that is not on the reviewed list, ` +
+        `so a change there may reach past the league fence or into the job queue: ` +
+        asRole(
+          found.table_owner,
+          `drop trigger ${found.trigger} on ${found.table}`,
+          roles.databaseOwner,
+        )
       );
     });
 }
@@ -406,8 +492,33 @@ async function changedTriggersAndRules(
   ];
 }
 
+/** pg-boss's own tables (T-494): one of these in public is from before 0031, with jobs. */
+const queueTableNames = new Set([
+  'archive',
+  'bam',
+  'instance',
+  'job',
+  'job_common',
+  'job_dependency',
+  'queue',
+  'queue_stats',
+  'schedule',
+  'subscription',
+  'version',
+  'warning',
+]);
+
 type Stranger = {
   name: string;
+  /** Its own name, and its schema's, quoted. */
+  bare: string;
+  schema_name: string;
+  owner: string;
+  /** The first role that may use it reads it too; else it may only change it. */
+  reads: boolean;
+  /** Holders of a right on it other than SELECT. */
+  writers: string[];
+  leagueish: boolean;
   kind: string;
   ours: boolean;
   reader: string | null;
@@ -427,7 +538,7 @@ async function strangers(
   catalog: MigrationCatalog,
   roles: FenceRoles,
 ): Promise<string[]> {
-  const readers = JSON.stringify([roles.login, ...roles.mayBecome]);
+  const readers = reachedRoles(roles);
   const libraries = JSON.stringify([
     ...librarySchemas.keys(),
     ...(roles.queueSchema === undefined ? [] : [roles.queueSchema]),
@@ -435,9 +546,13 @@ async function strangers(
   const listed = catalog.leagueTables.map((table) => table.table);
   const { rows } = await sql<Stranger>`
     with league_tables as (${leagueTables(listed)})
-    select name, kind, ours and not library as ours, reader, holders, library, queue from (
+    select name, bare, schema_name, owner, kind, ours and not library as ours, reader,
+      reader is not null and pg_catalog.has_any_column_privilege(reader, oid, 'SELECT') as reads,
+      holders, writers, library, queue, leagueish from (
       select pg_catalog.quote_ident(n.nspname) || '.' || pg_catalog.quote_ident(c.relname)
           as name,
+        c.oid, pg_catalog.quote_ident(c.relname) as bare, n.nspname::text as schema_name,
+        pg_catalog.pg_get_userbyid(c.relowner)::text as owner,
         c.relkind::text as kind,
         n.nspname::text in (
           select pg_catalog.jsonb_array_elements_text(${JSON.stringify(catalog.schemas)}::jsonb))
@@ -445,7 +560,10 @@ async function strangers(
         (select r.name from pg_catalog.jsonb_array_elements_text(${readers}::jsonb)
             with ordinality as r(name, place)
          where pg_catalog.has_schema_privilege(r.name, n.oid, 'USAGE')
-           and pg_catalog.has_any_column_privilege(r.name, c.oid, 'SELECT')
+           and (pg_catalog.has_table_privilege(r.name, c.oid,
+               'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+             or pg_catalog.has_any_column_privilege(r.name, c.oid,
+               'SELECT, INSERT, UPDATE, REFERENCES'))
          order by r.place limit 1) as reader,
         array(
           select distinct case when e.grantee = 0 then 'public'
@@ -456,7 +574,17 @@ async function strangers(
             select (pg_catalog.aclexplode(a.attacl)).* from pg_catalog.pg_attribute a
             where a.attrelid = c.oid and a.attacl is not null
           ) e
-          where e.privilege_type = 'SELECT' order by 1) as holders,
+          where e.grantee <> c.relowner order by 1) as holders,
+        array(
+          select distinct case when e.grantee = 0 then 'public'
+            else pg_catalog.pg_get_userbyid(e.grantee)::text end
+          from (
+            select (pg_catalog.aclexplode(c.relacl)).*
+            union all
+            select (pg_catalog.aclexplode(a.attacl)).* from pg_catalog.pg_attribute a
+            where a.attrelid = c.oid and a.attacl is not null
+          ) e
+          where e.grantee <> c.relowner and e.privilege_type <> 'SELECT' order by 1) as writers,
         n.nspname::text in (select pg_catalog.jsonb_array_elements_text(${libraries}::jsonb))
           as library,
         n.nspname::text = ${queueSchema} as queue,
@@ -483,29 +611,64 @@ async function strangers(
     -- In a library's schema only an ordinary table without a league column is let be
     -- (T-482, tightened): a view, materialized view or foreign table there never is.
     where (ours or reader is not null) and not (library and kind in ('r', 'p') and not leagueish)
+      -- The website's reach of the job queue is queueReachProblems' to name (T-491).
+      and not (queue and ${roles.queueSchema === undefined}::boolean)
     order by name`.execute(database);
   const reached = new Set(['public', ...roles.reached]);
-  return rows.map(({ name, kind, ours, reader, holders, library, queue }) => {
+  return rows.map((row) => {
+    const { name, kind, ours, reader, holders, library, queue } = row;
     const what = kindWords[kind] ?? 'table';
+    const isTable = kind === 'r' || kind === 'p';
+    const who =
+      reader === roles.login ? roles.login : `${roles.login} may become ${String(reader)}, which`;
+    if (queue && row.leagueish && isTable) {
+      // T-493: a league's rows in the queue's schema, held by the worker or queue_owner,
+      // whose owner may switch the fence off; a revoke the owner can undo is no mending.
+      const move = holdingRole(
+        row.owner,
+        [
+          `alter table ${name} set schema public`,
+          `alter table public.${row.bare} owner to ${roles.databaseOwner}`,
+        ],
+        roles.databaseOwner,
+      );
+      return (
+        `${name} has a league column, so it does not belong in the job queue's schema, which ` +
+        `is for pg-boss's own tables: ${who} may use it there, and its owner ${row.owner} could ` +
+        `switch its fence off; give it to the migrations' owner, out of the queue's schema ` +
+        `(its rows are kept): ${move}`
+      );
+    }
+    if (ours && isTable && row.schema_name === 'public' && queueTableNames.has(row.bare))
+      // T-494: pg-boss's tables from before the queue had its own schema may hold jobs.
+      return (
+        `${name} is a table that no migration made, named like one of pg-boss's own, so it ` +
+        `may hold queued jobs from before the job queue had its own schema, and nothing has ` +
+        `checked its fence: do not drop it; ask the lead, who moves its jobs or drops it (T-494)`
+      );
     if (ours)
       return (
         `${name} is a ${what} that no migration made, so nothing has checked its fence: ` +
         `drop ${what} ${name} (or make it in a migration)`
       );
     const from = holders.filter((holder) => reached.has(holder));
+    const rights = row.writers.some((holder) => reached.has(holder)) ? 'all' : 'select';
     // In a library's schema the library's own tables are never dropped (T-482), nor
     // pg-boss's in its schema, even where the website is judged (T-490): a login that reads
     // them is the worker's, and the queue sentence (revoke queue_owner) says so.
     const statement =
       from.length > 0
-        ? `revoke select on table ${name} from ${from.join(', ')}`
+        ? asRole(
+            row.owner,
+            `revoke ${rights} on table ${name} from ${from.join(', ')}`,
+            roles.databaseOwner,
+          )
         : (library || queue) && (kind === 'r' || kind === 'p')
           ? `revoke select on table ${name} from ${String(reader)}`
           : `drop ${what} ${name}`;
-    const who =
-      reader === roles.login ? roles.login : `${roles.login} may become ${String(reader)}, which`;
     return (
-      `${name} is a ${what} that no migration made, and ${who} may read it, so nothing has ` +
+      `${name} is a ${what} that no migration made, and ${who} may ` +
+      `${row.reads ? 'read' : 'change'} it, so nothing has ` +
       `checked its fence: ${statement}`
     );
   });
@@ -526,6 +689,7 @@ export async function checkFence(
     ...(await openTables(database, catalog)),
     ...(await widePolicies(database, catalog)),
     ...(await unreviewedDefiners(database, roles)),
+    ...(await unreviewedTriggerDefiners(database, catalog, roles)),
     ...(await changedFunctions(database, catalog)),
     ...(await changedRelations(database, catalog)),
     ...(await changedTriggersAndRules(database, catalog)),

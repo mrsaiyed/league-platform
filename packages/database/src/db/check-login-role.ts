@@ -29,10 +29,17 @@
 // worker's (checkWorkerLoginRole) holds queue_owner, and pg-boss's tables in pgboss
 // belong to it: a table there that the login itself or queue_owner owns is not counted,
 // and every other rule is the website's, word for word.
+//
+// Since step 2.112's review (T-491) neither login may be a member, at any depth, of one of
+// PostgreSQL's predefined roles (pg_read_all_data and the rest, predefined-roles.ts): they
+// give rights no grant list shows. While one is held, the queue's and the fence's checks
+// are not asked (every right they read would come through it, and their sentences would
+// name revokes that change nothing); they are asked at the next start, once it is revoked.
 import { sql } from 'kysely';
 import { checkFence } from './check-fence.ts';
 import { queueOwner, queueReachProblems, queueSchema } from './check-queue-schema.ts';
 import { kyselyOf, type DatabaseHandle } from './database-handle.ts';
+import { predefinedRoleProblems } from './predefined-roles.ts';
 
 /** One role the login is or reaches, by the best way there (the login itself first). */
 type ReachedRole = {
@@ -203,6 +210,12 @@ async function judgeLogin(
       );
     }
   }
+  // T-491: no predefined role, for either login; the rest is read once none is held.
+  const predefined = predefinedRoleProblems(
+    login,
+    rows.map((reached) => reached.path),
+  );
+  if (predefined.length > 0) return [...problems, ...predefined];
   // Step 2.112 (T-490): the website reaches nothing of the job queue.
   if (use === 'website') {
     problems.push(
@@ -210,6 +223,7 @@ async function judgeLogin(
         login,
         superuser: self.superuser,
         paths: rows.map((reached) => reached.path),
+        databaseOwner: self.database_owner,
       })),
     );
   }

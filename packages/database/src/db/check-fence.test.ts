@@ -420,8 +420,8 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
       grant select on pgboss.job to ${login};`);
     const said = await checkLoginRole(db, login);
     expect(said).toEqual([
-      `${login} may use the job queue (the pgboss schema), so ${login} could read or change a queued job: revoke all on schema pgboss from ${login}`,
-      `pgboss.job is a table that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.job from ${login}`,
+      `${login} may use the job queue (the pgboss schema), so ${login} could read or change a queued job: grant queue_owner to current_user with set true; set role queue_owner; revoke all on schema pgboss from ${login} cascade; reset role; revoke queue_owner from current_user`,
+      `pgboss.job is a table of the job queue (the pgboss schema) that ${login} has a right on, so the website could read or change a queued job: revoke all on table pgboss.job from ${login}`,
     ]);
     for (const problem of said) await pglite.exec(statementOf(problem));
     expect(await checkLoginRole(db, login)).toEqual([]);
@@ -430,6 +430,8 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
 
   // Found on the real PostgreSQL (step 2.112, builder 2): the worker's login used as the
   // website's reads pg-boss's tables through queue_owner, and no sentence may say to drop one.
+  // Since the review (T-491) the queue's own check names it alone: the membership is the
+  // fault, and a revoke of select from queue_owner, which owns the table, changed nothing.
   it('(d) never says to drop a table in the job queue’s schema, even judging the website (T-490)', async () => {
     await pglite.exec(`
       create table pgboss.job (id uuid, name text, data jsonb);
@@ -437,17 +439,15 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
       grant queue_owner to ${login};`);
     try {
       const said = await checkLoginRole(db, login);
-      expect(said).toContainEqual(
-        expect.stringMatching(
-          /^pgboss\.job is a table that no migration made, and .+ may read it, so nothing has checked its fence: revoke select on table pgboss\.job from \S+$/,
-        ),
-      );
-      expect(said.some((problem) => problem.endsWith(`revoke queue_owner from ${login}`))).toBe(
-        true,
-      );
+      expect(said).toEqual([
+        `${login} may become queue_owner, which owns a table (pgboss.job): revoke queue_owner from ${login}`,
+        `${login} is a member of queue_owner, which owns the job queue (the pgboss schema), and the website must never read or change a queued job: revoke queue_owner from ${login}`,
+      ]);
       expect(said.join(' ')).not.toMatch(/drop table/);
+      await pglite.exec(statementOf(said[1] ?? ''));
+      expect(await checkLoginRole(db, login)).toEqual([]);
     } finally {
-      await pglite.exec(`revoke queue_owner from ${login}; drop table pgboss.job`);
+      await pglite.exec(`revoke queue_owner from ${login}; drop table if exists pgboss.job`);
     }
   });
 
@@ -468,7 +468,8 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
     expect(said).toEqual([
       'pgboss.kept has a league column but its row-level security is off, so every role that may read it sees every league: alter table pgboss.kept enable row level security, force row level security',
       `pgboss.every_program is a view that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.every_program from ${login}`,
-      `pgboss.kept is a table that no migration made, and ${login} may read it, so nothing has checked its fence: revoke select on table pgboss.kept from ${login}`,
+      // T-493: a league's rows do not belong in the queue's schema; moved out, never dropped.
+      `pgboss.kept has a league column, so it does not belong in the job queue's schema, which is for pg-boss's own tables: ${login} may use it there, and its owner postgres could switch its fence off; give it to the migrations' owner, out of the queue's schema (its rows are kept): alter table pgboss.kept set schema public; alter table public.kept owner to postgres`,
     ]);
     expect(said.join(' ')).not.toMatch(/drop (table|view)/);
     await pglite.exec('drop table pgboss.kept; drop view pgboss.every_program');
