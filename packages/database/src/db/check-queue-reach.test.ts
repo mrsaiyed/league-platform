@@ -147,7 +147,7 @@ describe('what the website may do in the job queue’s schema, as PostgreSQL jud
     const said = await webCheck();
     expect(said).toEqual([
       `pgboss.made_up_definer() is a function of the job queue (the pgboss schema) that ${web} has a right on, so the website could read or change a queued job: grant ${worker} to current_user with set true; set role ${worker}; revoke all on function pgboss.made_up_definer() from public; reset role; revoke ${worker} from current_user`,
-      `${web} may run pgboss.made_up_definer(), a security-definer function that is not on the reviewed list, so it may read past the league fence: grant ${worker} to current_user with set true; set role ${worker}; revoke execute on function pgboss.made_up_definer() from public; reset role; revoke ${worker} from current_user`,
+      `${web} may run, or use the schema of, pgboss.made_up_definer(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): grant ${worker} to current_user with set true; set role ${worker}; alter function pgboss.made_up_definer() security invoker; reset role; revoke ${worker} from current_user`,
     ]);
     await mended(said, webCheck);
     await pglite.exec('drop function pgboss.made_up_definer()');
@@ -173,6 +173,7 @@ describe('what the website may change elsewhere (T-492)', () => {
     const asWorker = (statement: string) =>
       `grant ${worker} to current_user with set true; set role ${worker}; ${statement}; reset role; revoke ${worker} from current_user`;
     expect(said).toEqual([
+      `${web} may run, or use the schema of, made_up_side.tg(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): ${asWorker('alter function made_up_side.tg() security invoker')}`,
       `${web} may change made_up_side.inbox, whose trigger tg runs made_up_side.tg(), a security-definer function that is not on the reviewed list, so a change there may reach past the league fence or into the job queue: ${asWorker('drop trigger tg on made_up_side.inbox')}`,
       `made_up_side.inbox is a table that no migration made, and ${web} may change it, so nothing has checked its fence: ${asWorker('revoke all on table made_up_side.inbox from app_user')}`,
     ]);
@@ -200,6 +201,7 @@ describe('a right on one column is a right to change (T-492, T-497)', () => {
     const asWorker = (statement: string) =>
       `grant ${worker} to current_user with set true; set role ${worker}; ${statement}; reset role; revoke ${worker} from current_user`;
     expect(said).toEqual([
+      `${web} may run, or use the schema of, made_up_side.tg(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): ${asWorker('alter function made_up_side.tg() security invoker')}`,
       `${web} may change made_up_side.inbox, whose trigger tg runs made_up_side.tg(), a security-definer function that is not on the reviewed list, so a change there may reach past the league fence or into the job queue: ${asWorker('drop trigger tg on made_up_side.inbox')}`,
       `made_up_side.inbox is a table that no migration made, and ${web} may change it, so nothing has checked its fence: ${asWorker('revoke all on table made_up_side.inbox from app_user')}`,
     ]);

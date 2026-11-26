@@ -220,10 +220,15 @@ type Definer = {
   kind: string;
   owner: string;
   runner: string;
-  grantees: string[];
 };
 
-/** (c) A security-definer function the login may run that is not on the reviewed list. */
+/**
+ * (c) A security-definer function, of any return type, not on the reviewed list, in a schema
+ * the login or a role it may become has USAGE on, whether or not it may run it (T-499), or
+ * one it may run wherever it is (T-469): PostgreSQL checks the right to run some functions
+ * against another role (an aggregate's transition function against the aggregate's owner,
+ * an operator's or a cast's function), so who holds EXECUTE says nothing of who reaches it.
+ */
 async function unreviewedDefiners(
   database: Kysely<Database>,
   roles: FenceRoles,
@@ -236,44 +241,32 @@ async function unreviewedDefiners(
         p.prokind::text as kind, pg_catalog.pg_get_userbyid(p.proowner)::text as owner,
         (select r.name from pg_catalog.jsonb_array_elements_text(${runners}::jsonb)
             with ordinality as r(name, place)
-         where pg_catalog.has_function_privilege(r.name, p.oid, 'EXECUTE')
-         order by r.place limit 1) as runner,
-        case when p.proacl is null then array['public']
-          else array(
-            select distinct case when e.grantee = 0 then 'public'
-              else pg_catalog.pg_get_userbyid(e.grantee)::text end
-            from pg_catalog.aclexplode(p.proacl) e
-            where e.privilege_type = 'EXECUTE' order by 1)
-          end as grantees
+         where pg_catalog.has_schema_privilege(r.name, n.oid, 'USAGE')
+           or pg_catalog.has_function_privilege(r.name, p.oid, 'EXECUTE')
+         order by r.place limit 1) as runner
       from pg_catalog.pg_proc p
       join pg_catalog.pg_namespace n on n.oid = p.pronamespace
       where p.prosecdef and n.nspname !~ '^pg_' and n.nspname <> 'information_schema'
-        and p.prorettype not in (
-          'pg_catalog.trigger'::pg_catalog.regtype, 'pg_catalog.event_trigger'::pg_catalog.regtype)
     ) definers
     where runner is not null
     order by signature`.execute(database);
-  const reached = new Set(['public', ...roles.reached]);
   return rows
     .filter((definer) => !reviewedDefiners.has(definer.signature))
     .map((definer) => {
       const what = definer.kind === 'p' ? 'procedure' : 'function';
-      const holders = definer.grantees.filter((grantee) => reached.has(grantee));
-      const statement =
-        holders.length > 0
-          ? asRole(
-              definer.owner,
-              `revoke execute on ${what} ${definer.signature} from ${holders.join(', ')}`,
-              roles.databaseOwner,
-            )
-          : `alter ${what} ${definer.signature} owner to ${roles.databaseOwner}`;
       const who =
         definer.runner === roles.login
           ? roles.login
           : `${roles.login} may become ${definer.runner}, which`;
       return (
-        `${who} may run ${definer.signature}, a security-definer ${what} that is not on ` +
-        `the reviewed list, so it may read past the league fence: ${statement}`
+        `${who} may run, or use the schema of, ${definer.signature}, a security-definer ` +
+        `${what} that is not on the reviewed list, so it may read past the league fence, ` +
+        `whoever may run it (T-499): ` +
+        asRole(
+          definer.owner,
+          `alter ${what} ${definer.signature} security invoker`,
+          roles.databaseOwner,
+        )
       );
     });
 }

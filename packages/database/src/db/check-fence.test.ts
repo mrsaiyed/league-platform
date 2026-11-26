@@ -141,13 +141,13 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
 
   it('(c) refuses a security-definer function the login may run that is not reviewed', async () => {
     // The migrations take EXECUTE from public by default, so the plant grants it by hand.
-    // One statement takes it from every holder the login reaches.
+    // Taking it back would not do (T-499): the function stops being a definer.
     await plantedAndMended(
       `create function public.made_up_peek() returns bigint language sql security definer
          as 'select count(*) from public.games';
        grant execute on function public.made_up_peek() to app_user, public;`,
       [
-        'made_up_app_login may run public.made_up_peek(), a security-definer function that is not on the reviewed list, so it may read past the league fence: revoke execute on function public.made_up_peek() from app_user, public',
+        'made_up_app_login may run, or use the schema of, public.made_up_peek(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): alter function public.made_up_peek() security invoker',
       ],
     );
   });
@@ -162,17 +162,20 @@ describe('the start-up guard reads the league fence (step 2.238)', () => {
        grant execute on function made_up_tools.peek(uuid) to made_up_helper;
        grant made_up_helper to ${login} with inherit false, set true;`,
       [
-        'made_up_app_login may become made_up_helper, which may run made_up_tools.peek(wanted uuid), a security-definer function that is not on the reviewed list, so it may read past the league fence: revoke execute on function made_up_tools.peek(wanted uuid) from made_up_helper',
+        'made_up_app_login may become made_up_helper, which may run, or use the schema of, made_up_tools.peek(wanted uuid), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): alter function made_up_tools.peek(wanted uuid) security invoker',
       ],
     );
   });
 
-  it('(c) lets a trigger function be, which no one can call', async () => {
-    await pglite.exec(`
-      create function public.made_up_on_write() returns trigger language plpgsql
-        security definer as $$ begin return new; end $$;
-      grant execute on function public.made_up_on_write() to app_user;`);
-    expect(await checkLoginRole(db, login)).toEqual([]);
+  it('(c) refuses a trigger function too, in a schema the login may use, which it may not run (T-499)', async () => {
+    await plantedAndMended(
+      `create function public.made_up_on_write() returns trigger language plpgsql
+         security definer as $$ begin return new; end $$;
+       revoke execute on function public.made_up_on_write() from public;`,
+      [
+        'made_up_app_login may run, or use the schema of, public.made_up_on_write(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): alter function public.made_up_on_write() security invoker',
+      ],
+    );
     await pglite.exec('drop function public.made_up_on_write()');
   });
 

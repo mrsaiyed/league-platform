@@ -18,6 +18,8 @@ const word = fresh();
 const web = `rq_web_${word}`;
 const worker = `rq_worker_${word}`;
 const side = `rq_side_${word}`;
+const agg = `rq_agg_${word}`;
+const aggOwner = `rq_agg_owner_${word}`;
 let owner: PostgresDriver;
 let db: DatabaseHandle;
 let ownerName = '';
@@ -83,6 +85,7 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await owner.exec(`drop schema if exists ${side} cascade`);
+  await owner.exec(`drop schema if exists ${agg} cascade; drop role if exists ${aggOwner}`);
   await dropLogin(owner, worker, workerUrl);
   await dropLogin(owner, web, webUrl);
   await db.close();
@@ -113,6 +116,7 @@ describe('the review’s attacks, refused by name and mended as printed', () => 
     );
     const said = await webCheck();
     expect(said).toEqual([
+      `${web} may run, or use the schema of, ${side}.tg(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): ${asWorker(`alter function ${side}.tg() security invoker`)}`,
       `${web} may change ${side}.inbox, whose trigger tg runs ${side}.tg(), a security-definer function that is not on the reviewed list, so a change there may reach past the league fence or into the job queue: ${asWorker(`drop trigger tg on ${side}.inbox`)}`,
       `${side}.inbox is a table that no migration made, and ${web} may change it, so nothing has checked its fence: ${asWorker(`revoke all on table ${side}.inbox from app_user`)}`,
     ]);
@@ -269,6 +273,10 @@ describe('the confirming look’s attacks, refused by name and mended as printed
     ]);
     for (const problem of said) await owner.exec(statementOf(problem));
     expect(await webCheck()).toEqual([]);
+    // The worker may use pgboss, so its start names the definer function itself (T-499).
+    const definer = `${worker} may run, or use the schema of, pgboss.rq_on_gone(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): ${asWorker('alter function pgboss.rq_on_gone() security invoker')}`;
+    expect(await workerCheck()).toEqual([definer]);
+    await owner.exec(statementOf(definer));
     expect(await workerCheck()).toEqual([]);
     await as(
       workerUrl,
@@ -322,5 +330,49 @@ describe('the confirming look’s attacks, refused by name and mended as printed
     expect(await webCheck()).toEqual([]);
     expect(await workerCheck()).toEqual([]);
     await as(workerUrl, 'drop table pgboss.rq_own');
+  });
+});
+
+describe('the second confirming look’s attacks, refused by name and mended as printed (T-499, T-495)', () => {
+  it('(T-499) the website’s start refuses a definer transition function it may not run, reached through another role’s aggregate', async () => {
+    const step = `${agg}.peek_step(state bigint, v integer)`;
+    await owner.exec(
+      `create schema ${agg};
+       grant usage on schema ${agg} to app_user;
+       create function ${agg}.peek_step(state bigint, v integer) returns bigint
+         language sql security definer set search_path = pg_catalog
+         as 'select state + (select count(*) from public.programs)';
+       revoke execute on function ${agg}.peek_step(bigint, integer) from public;
+       create role ${aggOwner} nologin;
+       grant usage, create on schema ${agg} to ${aggOwner};
+       grant execute on function ${agg}.peek_step(bigint, integer) to ${aggOwner};
+       grant ${aggOwner} to current_user with set true;
+       set role ${aggOwner};
+       create aggregate ${agg}.peek_all(integer) (sfunc = ${agg}.peek_step, stype = bigint, initcond = '0');
+       reset role;
+       revoke ${aggOwner} from current_user`,
+    );
+    // The plant is real: the website may not run the function, but through the aggregate,
+    // whose owner PostgreSQL checks instead, it runs as the function's owner.
+    await expect(as(webUrl, `select ${agg}.peek_step(0, 1)`)).rejects.toThrow(/permission denied/);
+    await as(webUrl, `select ${agg}.peek_all(1)`);
+    const said = await webCheck();
+    expect(said).toEqual([
+      `${web} may run, or use the schema of, ${step}, a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): alter function ${step} security invoker`,
+    ]);
+    for (const problem of said) await owner.exec(statementOf(problem));
+    expect(await webCheck()).toEqual([]);
+    expect(await workerCheck()).toEqual([]);
+    await owner.exec(`drop schema ${agg} cascade; drop role ${aggOwner}`);
+  });
+
+  it('(T-495) both starts refuse a TRIGGER right alone on public.programs given to app_user', async () => {
+    await owner.exec('grant trigger on public.programs to app_user');
+    const sentence = referenceRight('app_user', 'public.programs');
+    expect(await webCheck()).toEqual([sentence]);
+    expect(await workerCheck()).toEqual([sentence]);
+    await owner.exec(statementOf(sentence));
+    expect(await webCheck()).toEqual([]);
+    expect(await workerCheck()).toEqual([]);
   });
 });

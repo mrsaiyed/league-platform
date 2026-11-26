@@ -385,8 +385,9 @@ describe('(c) a security-definer function the login may run, outside public', ()
         `grant ${helper} to app_login with inherit false, set true`,
       ],
       [
-        `app_login may run ${schema}.peek(), a security-definer function that is not on the reviewed list, so it may read past the league fence: revoke execute on function ${schema}.peek() from app_user`,
-        `app_login may become ${helper}, which may run ${schema}.peek_more(), a security-definer function that is not on the reviewed list, so it may read past the league fence: revoke execute on function ${schema}.peek_more() from ${helper}`,
+        // The login may use the schema, so it is named for both (T-499), not the helper.
+        `app_login may run, or use the schema of, ${schema}.peek(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): alter function ${schema}.peek() security invoker`,
+        `app_login may run, or use the schema of, ${schema}.peek_more(), a security-definer function that is not on the reviewed list, so it may read past the league fence, whoever may run it (T-499): alter function ${schema}.peek_more() security invoker`,
       ],
       [`drop schema if exists ${schema} cascade`, `drop role if exists ${helper}`],
       async () => {
