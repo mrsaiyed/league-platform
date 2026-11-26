@@ -32,6 +32,9 @@ export function deviceRosters(
     uniqueJerseys: rosters.uniqueJerseys,
     allowTies: rosters.allowTies,
     statistics: rosters.statistics,
+    // The server names players by the scoring screens' rule (R-33): marked, so a copy
+    // stored before step 2.226 is told apart (T-484).
+    scoringNames: true,
   };
 }
 

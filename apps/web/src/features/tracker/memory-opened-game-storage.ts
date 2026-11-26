@@ -49,6 +49,9 @@ export function createMemoryOpenedGameStorage(): OpenedGameStorage {
     async forgetAll() {
       games.clear();
     },
+    async forgetGame(gameId) {
+      games.delete(gameId);
+    },
     async saveState(gameId, state) {
       change(gameId, (game) => ({ ...game, state }));
     },

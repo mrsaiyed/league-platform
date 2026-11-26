@@ -55,6 +55,7 @@ describe('the rosters as the device keeps them', () => {
       uniqueJerseys: false,
       allowTies: false,
       statistics: ['points', 'fouls'],
+      scoringNames: true,
     });
   });
 

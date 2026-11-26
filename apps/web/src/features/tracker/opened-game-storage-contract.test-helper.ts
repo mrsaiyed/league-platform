@@ -163,6 +163,15 @@ export function openedGameStorageContract(
       expect(await storage.find(game)).toBeUndefined();
     });
 
+    it('forgets one game alone, its rosters with it (step 2.226)', async () => {
+      const storage = await make();
+      await storage.saveRosters(owner, madeUpRosters, 10);
+      await storage.saveRosters({ ...owner, gameId: other }, madeUpRosters, 10);
+      await storage.forgetGame(game);
+      expect(await storage.find(game)).toBeUndefined();
+      expect((await storage.find(other))?.rosters).toEqual(madeUpRosters);
+    });
+
     it('gives what it holds as a copy', async () => {
       const storage = await make();
       await storage.saveRosters(owner, madeUpRosters, 10);

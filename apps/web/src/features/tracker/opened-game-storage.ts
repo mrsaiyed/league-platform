@@ -54,6 +54,12 @@ export type DeviceRosters = {
   readonly allowTies?: boolean;
   /** The statistics the season keeps (S-93); missing in rosters an older page stored. */
   readonly statistics?: readonly string[];
+  /**
+   * The names are the scoring screens' rule's (R-33, step 2.226). Missing in rosters a
+   * page stored before, which hold every name as recorded: such a copy is not used again
+   * unless taps of the game wait on the device (T-484).
+   */
+  readonly scoringNames?: true;
 };
 
 /** The game format the scorekeeper is asked to confirm (P7 §1, §5.1). */
@@ -132,6 +138,11 @@ export interface OpenedGameStorage {
   forgetOthers(owner: OpenedGameOwner, olderThan: number): Promise<void>;
   /** Deletes every game kept on the device (signing out). The device id stays. */
   forgetAll(): Promise<void>;
+  /**
+   * Deletes the one game, its rosters with it (step 2.226, the 2.107 audit's M4): once it
+   * is ended and every tap of it saved, so players' names do not stay on the device.
+   */
+  forgetGame(gameId: string): Promise<void>;
   /** Stores the state the server gave; ignored for a game whose rosters are not stored. */
   saveState(gameId: string, state: ServerState): Promise<void>;
   /** Stores the format confirmed; ignored for a game whose rosters are not stored. */

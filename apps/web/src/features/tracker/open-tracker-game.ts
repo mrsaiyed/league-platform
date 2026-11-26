@@ -208,6 +208,12 @@ export async function openTrackerGame(
     // The rosters kept before this opening (a fetch may have had more than the page's
     // copy, which a worker kept earlier): started from when opening gets no answer.
     earlierRosters = (await storage.games.find(gameId))?.rosters ?? null;
+    // T-484: a copy stored before step 2.226 holds every name as recorded. The page's
+    // copy has just replaced it; it is not used again, unless taps of this game wait on
+    // the device (one may name a player only that copy lists).
+    if (earlierRosters !== null && earlierRosters.scoringNames !== true) {
+      if ((await storage.queue.list(gameId)).length === 0) earlierRosters = null;
+    }
     await storage.games.saveRosters(owner, rosters, openedAt);
     deviceId = await storage.games.deviceId(options.newDeviceId);
     const kept = await storage.games.find(gameId);
@@ -228,6 +234,7 @@ export async function openTrackerGame(
   }
   if (letGo()) return letGoOf;
   const { games } = storage;
+  let letGoOfGame = false;
   const controller = createTrackerController({
     renewEveryMs: holdCheckMs,
     ...options.controller,
@@ -246,7 +253,9 @@ export async function openTrackerGame(
     rosters: {
       page: rosters,
       kept: earlierRosters,
-      keep: (fetched) => games.saveRosters(owner, fetched, now()),
+      // Not stored again once the game was let go of, ended and saved (below).
+      keep: (fetched) =>
+        letGoOfGame ? Promise.resolve() : games.saveRosters(owner, fetched, now()),
     },
     transport: options.transport,
     ...(options.doors === undefined ? {} : { doors: options.doors }),
@@ -262,6 +271,15 @@ export async function openTrackerGame(
   // names kept on the device go. Signed out once scoring, the game stays open on the
   // device (`signedOut`, record 054): its rosters, names and state stay with it.
   let forgotten = false;
+  // Ended and saved (step 2.226, the 2.107 audit's M4): the game's rosters, names and
+  // state go from the device once it is final with no tap of it waiting or set aside.
+  // Never while it is live or a tap waits; the taps themselves are the queue's.
+  controller.subscribe(({ game, waiting, notSaved }) => {
+    if (letGoOfGame || game?.status !== 'final' || waiting.length > 0 || notSaved.length > 0)
+      return;
+    letGoOfGame = true;
+    games.forgetGame(gameId).catch((error: unknown) => options.onStoreFailed?.(codeOf(error)));
+  });
   controller.subscribe(({ mode }) => {
     if (forgotten || mode.kind !== 'read-only' || mode.reason !== 'signed-out') return;
     forgotten = true;

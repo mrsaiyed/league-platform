@@ -165,6 +165,11 @@ export async function openIndexedDbOpenedGameStorage(
         store.clear();
       });
     },
+    forgetGame(gameId) {
+      return run(gamesStore, 'readwrite', undefined, (store) => {
+        store.delete(gameId);
+      });
+    },
     saveState(gameId, state) {
       return change(gameId, (game) => ({ ...game, state }));
     },
